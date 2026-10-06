@@ -10,6 +10,7 @@ import {
 } from "@guildhall/core"
 import { type DeedLook, deedLook, interestOf, ROLES, roleOf } from "@guildhall/roster"
 import { Player, party, rush, solo, toEvents } from "@guildhall/sim"
+import { type Traces, tracesOf } from "../scene/life/traces.ts"
 import { ROLE_SITE, SITES, type SiteId, siteOf } from "../world/lands.ts"
 import {
   GATE,
@@ -120,6 +121,8 @@ export class GuildStore {
   markers: Marker[] = []
   /** Completed edits/writes this run: the yard's building grows with it. */
   progress = 0
+  /** What finished work has left at each job site (logs, stone, fish, books, arrows). */
+  traces: Traces = tracesOf([])
   /** The world's conditions: time of day, weather, temperature (ADR 0007). */
   environmentSettings: EnvironmentSettings = { ...DEFAULT_SETTINGS }
   environment: Environment = environmentOf({
@@ -367,6 +370,7 @@ export class GuildStore {
     if (this.focus && this.now - this.focus.at > FOCUS_TTL_MS) this.focus = null
     this.views = viewsOf(this.model, this.now)
     this.progress = progressOf(this.model)
+    this.traces = tracesOf(this.model.sessions.values())
     this.environment = environmentOf({
       wallClock: Date.now(),
       runTime: this.time,

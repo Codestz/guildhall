@@ -17,6 +17,7 @@ import { useGuild } from "../guild/useGuild.ts"
 import { LANDS_URL } from "../world/cast.ts"
 import { HEX_SCALE, island, type LandPiece, type LandPlacement, SITES, yardBuilding } from "../world/lands.ts"
 import { plain } from "./Kit.tsx"
+import { isMovingPart } from "./life/moving.ts"
 
 useGLTF.preload(LANDS_URL)
 
@@ -103,7 +104,8 @@ function parts(source: Object3D): Map<Material, BufferGeometry> {
   const byMaterial = new Map<Material, BufferGeometry[]>()
   source.traverse((child) => {
     const mesh = child as Mesh
-    if (!mesh.isMesh) return
+    // Sails, water wheel and saw are drawn (and turned) by the Life layer.
+    if (!mesh.isMesh || isMovingPart(mesh.name)) return
     const geometry = plain(mesh.geometry).applyMatrix4(inverse.clone().multiply(mesh.matrixWorld))
     const material = mesh.material as Material
     byMaterial.set(material, [...(byMaterial.get(material) ?? []), geometry])

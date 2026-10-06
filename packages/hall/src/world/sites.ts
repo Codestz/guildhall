@@ -1,5 +1,6 @@
 import type { Session } from "@guildhall/core"
 import { roleOf } from "@guildhall/roster"
+import { type Behaviour, SITE_WORK } from "./behaviours.ts"
 import type { Piece } from "./furniture.ts"
 import { SITES, type Site, type SiteId } from "./lands.ts"
 import { INFIRMARY, INFIRMARY_MATS, type Post, type Seat } from "./layout.ts"
@@ -8,7 +9,7 @@ import type { Mix } from "./wilds.ts"
 /**
  * The site registry (ADR 0008): every fact about a job site that code used to switch on, as data.
  * Where a site is (its spot, posts and landmark) is map data in `lands.ts` `SITES`; this adds what
- * happens there. Everything that varies by site reads it: the clip and gear (scene/Adventurer), the
+ * happens there. Everything that varies by site reads it: the work loop and gear (scene/Adventurer), the
  * traces (scene/life/traces), the machines (scene/life/state), the yard's growth (guild/store) and
  * the wilds (world/wilds).
  *
@@ -23,10 +24,10 @@ export type Machine = "forging" | "sawing" | "fishing"
 
 export interface SiteDef extends Site {
   /**
-   * The work clip for the deed in hand — the site sets the trade, the deed picks the motion.
-   * KayKit Rig_Medium names (scripts/assets.ts CLIPS).
+   * The work loop its adventurers run while their session is busy, thinking or calling tools
+   * (world/behaviours.ts `SITE_WORK`, ADR 0009): the site sets the trade, a deed steers it.
    */
-  clip(tool: string | undefined, thinking: boolean): string
+  work: Behaviour
   /** Tools of the trade, held instead of the role's own gear while working here. */
   gear?: { right?: Piece; left?: Piece }
   /**
@@ -45,21 +46,14 @@ export interface SiteDef extends Site {
 export const SITE_DEFS: Record<SiteId, SiteDef> = {
   yard: {
     ...SITES.yard,
-    clip: (tool, thinking) => {
-      if (tool === "write") return "Sawing"
-      if (tool === "edit" || tool === "patch" || tool === "bash" || tool === "shell") return "Hammering"
-      return tool ? "Working_B" : thinking ? "Idle_B" : "Working_A"
-    },
+    work: SITE_WORK.yard,
     machine: "forging",
     builds: new Set(["edit", "write"]),
     wilds: { mix: { bush: 0.4, grass: 0.35, rock: 0.25 } },
   },
   forest: {
     ...SITES.forest,
-    clip: (tool) => {
-      if (tool === "grep" || tool === "glob" || tool === "list") return "Chopping"
-      return tool ? "Working_A" : "Idle_B"
-    },
+    work: SITE_WORK.forest,
     gear: { right: "axe" },
     trace: { pile: "logs", tools: new Set(["grep", "glob", "list"]) },
     machine: "sawing",
@@ -67,34 +61,31 @@ export const SITE_DEFS: Record<SiteId, SiteDef> = {
   },
   river: {
     ...SITES.river,
-    clip: (tool) => {
-      if (tool === "webfetch" || tool === "websearch") return "Fishing_Reeling"
-      return tool ? "Fishing_Cast" : "Fishing_Idle"
-    },
+    work: SITE_WORK.river,
+    // Both hands for the rod (the routine's own tool).
+    gear: {},
     trace: { pile: "fish", tools: new Set(["webfetch", "websearch"]) },
     machine: "fishing",
     wilds: { mix: { bush: 0.35, grass: 0.45, rock: 0.2 } },
   },
   proving: {
     ...SITES.proving,
-    clip: (tool) => {
-      if (tool === "bash" || tool === "shell") return "Melee_1H_Attack_Chop"
-      return tool ? "Working_B" : "Idle_B"
-    },
-    gear: { right: "sword_1handed" },
+    work: SITE_WORK.proving,
+    // The bow is the routine's own tool, in the left hand; the right draws the string.
+    gear: {},
     trace: { pile: "hits", tools: new Set(["bash", "shell"]), missed: "misses" },
     wilds: { mix: { bush: 0.45, grass: 0.4, tree: 0.15 } },
   },
   quarry: {
     ...SITES.quarry,
-    clip: (tool) => (tool ? "Pickaxing" : "Idle_A"),
+    work: SITE_WORK.quarry,
     gear: { right: "pickaxe" },
     trace: { pile: "stones", tools: true },
     wilds: { mix: { rock: 0.6, grass: 0.25, tree: 0.15 }, barren: true },
   },
   tower: {
     ...SITES.tower,
-    clip: (tool) => (tool ? "Ranged_Magic_Spellcasting" : "Idle_B"),
+    work: SITE_WORK.tower,
     trace: { pile: "books", tools: true },
     wilds: { mix: { tree: 0.35, rock: 0.3, grass: 0.35 }, barren: true },
   },

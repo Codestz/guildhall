@@ -19,15 +19,27 @@ import type { AdventurerView } from "../guild/store.ts"
 import { positions, useGuildStore } from "../guild/useGuild.ts"
 import { verbOf } from "../hud/format.ts"
 import { Icon } from "../hud/icons.tsx"
+import { legOf, placeOf, Routine, seedOf, shifted } from "../world/behaviours.ts"
 import { ANIMS_URL, GEAR, isModel, MODELS, modelUrl } from "../world/cast.ts"
 import type { Piece } from "../world/furniture.ts"
 import { GATE, type Spot } from "../world/layout.ts"
 import { route } from "../world/paths.ts"
 import { DESTINATIONS, SITE_DEFS } from "../world/sites.ts"
+import {
+  attachHands,
+  CARRY_WALK,
+  carryClip,
+  HAND_SLOT,
+  type Hands,
+  probed,
+  release,
+  reserve,
+} from "./activity.ts"
 import { useBlob } from "./Blobs.tsx"
 import { addChip, CHIP_HEIGHT, chipSlot, declutter, removeChip } from "./chips.ts"
 import { DeedEffect } from "./DeedEffect.tsx"
 import { clonePiece, useKit } from "./Kit.tsx"
+import { BEAT_HEIGHT, emitBeat } from "./life/work.ts"
 
 const WALK_SPEED = 3.4
 /** The infirmary bed's blanket, measured on kit.glb's bed_frame (0.84 up, scale 1). */
@@ -36,6 +48,11 @@ const BED_TOP = 0.84
 const MAX_WALK_S = 5
 const RUN_ABOVE = 5.2
 const FADE_S = 0.25
+/** Carrying slows the walk a little. */
+const CARRY_SPEED = WALK_SPEED * 0.85
+/** Where the hands are, for a beat that happens there (a page turned, an arrow loosed). */
+const HANDS_AHEAD = 0.45
+const HANDS_UP = 1.4
 
 useGLTF.preload(ANIMS_URL)
 // Every model up front: a model loading mid-run would suspend and hide the whole cast.
@@ -43,10 +60,13 @@ for (const model of MODELS) useGLTF.preload(modelUrl(model))
 
 /**
  * A KayKit adventurer: the role's model with its gear, animated from the shared Rig_Medium clips.
- * Walks to `view.target`, then plays what the phase and current deed call for.
+ * Walks to `view.target`, then plays what the phase and current deed call for. While working at a
+ * site or station they run its behaviour's loop (world/behaviours.ts, ADR 0009): chop, carry, put
+ * down, walk back — thinking or calling tools, never just standing there.
  */
 export function Adventurer({ view }: { view: AdventurerView }) {
   const store = useGuildStore()
+  const id = view.id
   const root = useRef<Group>(null)
   const model = isModel(view.character) ? view.character : "rogue-hooded"
   const { scene } = useGLTF(modelUrl(model))
@@ -59,7 +79,11 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   const current = useRef<AnimationAction | null>(null)
   /** Spots still to walk through; recomputed whenever the target moves. */
   const path = useRef<Spot[]>([])
-  const routedTo = useRef<string>("")
+  const routed = useRef({ x: Number.NaN, z: Number.NaN })
+  /** The work loop at this adventurer's place, and what their hands show (scene/activity.ts). */
+  const routine = useRef<Routine | null>(null)
+  const hands = useRef<Hands | null>(null)
+  const beatsSeen = useRef(0)
   const start = view.master ? view.target : ([GATE[0], GATE[1], Math.PI] as const)
 
   // Role colour on cape and hat; shadows on. The tinted clones are this adventurer's own: on
@@ -98,6 +122,10 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     const mixer = new AnimationMixer(body)
     const actions = new Map<string, AnimationAction>()
     for (const clip of animations) actions.set(clip.name, mixer.clipAction(clip))
+    const carry = carryClip(animations)
+    if (carry) actions.set(CARRY_WALK, mixer.clipAction(carry))
+    // A touch of each one's own tempo: two smiths side by side never strike in step.
+    mixer.timeScale = 0.94 + (seedOf(id) % 1000) * 0.00012
     animator.current = { mixer, actions }
     current.current = null
     return () => {
@@ -110,17 +138,43 @@ export function Adventurer({ view }: { view: AdventurerView }) {
         if (skinned.isSkinnedMesh) skinned.skeleton.dispose()
       })
     }
-  }, [body, animations])
+  }, [body, animations, id])
+
+  // Where they work, and the loop they run there (a new place: a new routine, berth reserved).
+  const [tx, tz, tf] = view.target
+  const place = useMemo(
+    () => placeOf(view.site, view.station, [tx, tz, tf]),
+    [view.site, view.station, tx, tz, tf],
+  )
+  useEffect(() => {
+    if (!place) return
+    const lap = reserve(place, id)
+    const work = new Routine(shifted(place, lap), seedOf(id))
+    const held = attachHands(body, place.behaviour)
+    routine.current = work
+    hands.current = held
+    beatsSeen.current = 0
+    if (import.meta.env.DEV) probed.set(id, { title: id, routine: work, body })
+    return () => {
+      if (import.meta.env.DEV) probed.delete(id)
+      release(place, id)
+      held.dispose()
+      if (routine.current === work) routine.current = null
+      if (hands.current === held) hands.current = null
+    }
+  }, [place, id, body])
 
   // Gear in the hand slots; a mug instead while resting in the tavern.
   const atWork = view.site && (view.phase === "working" || view.phase === "waiting")
   const gear = (atWork && view.site ? SITE_DEFS[view.site].gear : undefined) ?? GEAR[view.agent] ?? {}
   const right: Piece | undefined = view.phase === "resting" ? "mug_full" : gear.right
-  useHeld(body, kit, "handslot.r", right)
-  // After dark, a free left hand carries a lantern: you can always find your agents at night.
+  const rightHeld = useHeld(body, kit, HAND_SLOT.right, right)
+  // After dark, a free left hand carries a lantern: you can always find your agents at night (an
+  // archer's left hand holds the bow).
   const dark = store.environment.daylight < 0.3
-  const left = view.phase === "resting" ? undefined : (gear.left ?? (dark ? "lantern" : undefined))
-  useHeld(body, kit, "handslot.l", left)
+  const bow = atWork && place?.behaviour.tool === "bow"
+  const left = view.phase === "resting" ? undefined : (gear.left ?? (dark && !bow ? "lantern" : undefined))
+  useHeld(body, kit, HAND_SLOT.left, left)
 
   useBlob(root, 0.85)
 
@@ -160,11 +214,20 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     declutter(state.camera, state.size.width, state.size.height)
     const node = root.current
     if (!node) return
-    const [tx, tz, facing] = view.target
-    const key = `${tx},${tz}`
-    if (routedTo.current !== key) {
-      routedTo.current = key
-      path.current = route([node.position.x, node.position.z], [tx, tz])
+    const work = routine.current
+    const active = work !== null && view.phase === "working"
+    // Off work (a plea, loot, a failure): the loop starts over, hands emptied, when they're back.
+    if (work && !active && work.started) work.reset()
+    const looping = active && work.started
+    const aim = looping ? work.aim : view.target
+    const tx = aim[0]
+    const tz = aim[1]
+    if (routed.current.x !== tx || routed.current.z !== tz) {
+      routed.current.x = tx
+      routed.current.z = tz
+      const from: Spot = [node.position.x, node.position.z]
+      // The loop's own walks are short and tested clear; going to a post takes the roads.
+      path.current = looping ? legOf(from, [tx, tz]) : route(from, [tx, tz])
     }
     let next = path.current[0]
     while (
@@ -181,15 +244,21 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     const step = Math.hypot(dx, dz)
     const remaining = step + pathLength(path.current)
     const walking = remaining > 0.12
+    const carrying = looping && work.held !== null
     let speed = 0
     if (walking) {
-      speed = Math.max(WALK_SPEED, remaining / MAX_WALK_S)
+      speed = carrying ? CARRY_SPEED : Math.max(WALK_SPEED, remaining / MAX_WALK_S)
       const move = Math.min(1, (speed * delta) / Math.max(step, 1e-6))
       node.position.x += dx * move
       node.position.z += dz * move
       turn(node, Math.atan2(dx, dz), delta * 10)
+    } else if (looping) {
+      // Face the work, or the post's own way at the post; elsewhere, stay as they stand.
+      const face = work.faceAt
+      if (face) turn(node, Math.atan2(face[0] - node.position.x, face[1] - node.position.z), delta * 6)
+      else if (work.atPost) turn(node, view.target[2], delta * 5)
     } else {
-      turn(node, facing, delta * 5)
+      turn(node, view.target[2], delta * 5)
     }
     const distance = remaining
     // In bed: up onto the mattress. The post is at floor level beside it, so lying down there
@@ -200,9 +269,39 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     const leaving = view.phase === "leaving" ? distance : 99
     node.scale.setScalar(leaving < 1.2 ? Math.max(0.01, leaving / 1.2) : 1)
 
-    play(clipFor(view, walking, speed))
+    if (active) {
+      work.update(delta, { thinking: view.thinking, tool: view.tool, arrived: !walking })
+      if (work.beats !== beatsSeen.current) {
+        beatsSeen.current = work.beats
+        beat(work, node)
+      }
+    }
+    hands.current?.show(looping ? work.held : null, active)
+    // Carrying takes both hands: the trade's own gear is put away meanwhile.
+    if (rightHeld.current) rightHeld.current.visible = !carrying
+
+    play(clipFor(view, walking, speed, looping ? work : null))
     animator.current?.mixer.update(delta)
   })
+
+  /** A beat of work (world/behaviours.ts): where it lands, for scene/life/WorkFx to draw. */
+  function beat(work: Routine, node: Object3D): void {
+    const kind = work.beat
+    if (!kind) return
+    const at = work.beatAt
+    const hx = node.position.x + Math.sin(node.rotation.y) * HANDS_AHEAD
+    const hz = node.position.z + Math.cos(node.rotation.y) * HANDS_AHEAD
+    if (kind === "arrow") {
+      emitBeat("arrow", at?.[0] ?? hx, BEAT_HEIGHT.arrow, at?.[1] ?? hz, hx, HANDS_UP, hz)
+      return
+    }
+    if (!at) {
+      emitBeat(kind, hx, HANDS_UP, hz)
+      return
+    }
+    // From where they stand: a chop knows which way to lean the tree.
+    emitBeat(kind, at[0], BEAT_HEIGHT[kind], at[1], node.position.x, 0, node.position.z)
+  }
 
   function play(name: string): void {
     const actions = animator.current?.actions
@@ -296,9 +395,13 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   )
 }
 
-/** Which clip the moment calls for. Clip names are KayKit Rig_Medium (scripts/assets.ts CLIPS). */
-function clipFor(view: AdventurerView, walking: boolean, speed: number): string {
-  if (walking) return speed > RUN_ABOVE ? "Running_A" : "Walking_A"
+/**
+ * Which clip the moment calls for. Clip names are KayKit Rig_Medium (scripts/assets.ts CLIPS);
+ * `work` is the routine when its loop is running.
+ */
+function clipFor(view: AdventurerView, walking: boolean, speed: number, work: Routine | null): string {
+  const moving = work?.held ? CARRY_WALK : speed > RUN_ABOVE ? "Running_A" : "Walking_A"
+  if (walking) return moving
   if (view.stung) return "Hit_A"
   switch (view.phase) {
     case "resting":
@@ -316,8 +419,8 @@ function clipFor(view: AdventurerView, walking: boolean, speed: number): string 
     default:
       break
   }
-  // Work at an island site (ADR 0006): the site sets the trade, the deed picks the motion.
-  if (view.site) return SITE_DEFS[view.site].clip(view.tool, view.thinking)
+  // At work: the loop's step. Between two walks (a waypoint), keep walking rather than flicker.
+  if (work) return work.clip ?? moving
   if (view.look) {
     if (view.master && (view.tool === "task" || view.tool === "subagent")) return "Ranged_Magic_Summon"
     switch (view.look.clip) {
@@ -343,18 +446,22 @@ function useHeld(
   kit: Record<string, Object3D>,
   slot: string,
   piece: Piece | undefined,
-): void {
+): { readonly current: Object3D | null } {
+  const held = useRef<Object3D | null>(null)
   useEffect(() => {
     if (!piece) return
     const bone = body.getObjectByName(slot)
     if (!bone || !kit[piece]) return
-    const held = clonePiece(kit, piece)
-    bone.add(held)
+    const copy = clonePiece(kit, piece)
+    bone.add(copy)
+    held.current = copy
     // Materials are shared with the kit: detach only, never dispose.
     return () => {
-      bone.remove(held)
+      bone.remove(copy)
+      if (held.current === copy) held.current = null
     }
   }, [body, kit, slot, piece])
+  return held
 }
 
 /** Length of the rest of the walk, after the spot being walked to now. */

@@ -41,30 +41,27 @@ describe("site registry", () => {
     for (const role of [...ROLES, STRANGER]) if (role.site) expect(SITE_DEFS[role.site]).toBeDefined()
   })
 
-  test("each site's trade: the deed in hand picks the clip", () => {
-    const clips = (id: keyof typeof SITE_DEFS, tools: (string | undefined)[], thinking = false) =>
-      tools.map((tool) => SITE_DEFS[id].clip(tool, thinking))
-    expect(clips("yard", ["write", "edit", "bash", "read", undefined])).toEqual([
-      "Sawing",
-      "Hammering",
-      "Hammering",
-      "Working_B",
-      "Working_A",
+  test("each site's trade: its loop works the trade, and the trade's deeds steer it", () => {
+    const loop = (id: keyof typeof SITE_DEFS) =>
+      SITE_DEFS[id].work.loop.flatMap((step) => ("clip" in step ? [step.clip] : []))
+    expect(loop("yard")).toEqual(expect.arrayContaining(["Hammering", "Sawing"]))
+    expect(loop("forest")).toContain("Chopping")
+    expect(loop("river")).toEqual(expect.arrayContaining(["Fishing_Cast", "Fishing_Reeling"]))
+    expect(loop("proving")).toEqual(expect.arrayContaining(["Ranged_Bow_Draw", "Ranged_Bow_Release"]))
+    expect(loop("quarry")).toContain("Pickaxing")
+    expect(loop("tower")).toContain("Ranged_Magic_Spellcasting")
+    const steers = (id: keyof typeof SITE_DEFS, tool: string) =>
+      SITE_DEFS[id].work.steer?.some((rule) => rule.tools === true || rule.tools.has(tool)) ?? false
+    expect([steers("yard", "write"), steers("forest", "grep"), steers("river", "webfetch")]).toEqual([
+      true,
+      true,
+      true,
     ])
-    expect(SITE_DEFS.yard.clip(undefined, true)).toBe("Idle_B")
-    expect(clips("forest", ["grep", "read", undefined])).toEqual(["Chopping", "Working_A", "Idle_B"])
-    expect(clips("river", ["webfetch", "read", undefined])).toEqual([
-      "Fishing_Reeling",
-      "Fishing_Cast",
-      "Fishing_Idle",
+    expect([steers("proving", "bash"), steers("quarry", "anything"), steers("forest", "edit")]).toEqual([
+      true,
+      true,
+      false,
     ])
-    expect(clips("proving", ["shell", "read", undefined])).toEqual([
-      "Melee_1H_Attack_Chop",
-      "Working_B",
-      "Idle_B",
-    ])
-    expect(clips("quarry", ["bash", undefined])).toEqual(["Pickaxing", "Idle_A"])
-    expect(clips("tower", ["read", undefined])).toEqual(["Ranged_Magic_Spellcasting", "Idle_B"])
   })
 
   test("a site's landmark, where the Life layer has one, is marked as that site's", () => {

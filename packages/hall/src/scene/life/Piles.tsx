@@ -1,25 +1,19 @@
 import { useFrame } from "@react-three/fiber"
 import {
   BatchedMesh,
-  BoxGeometry,
   type BufferGeometry,
   Color,
-  ConeGeometry,
-  CylinderGeometry,
   Euler,
-  Float32BufferAttribute,
-  IcosahedronGeometry,
   MathUtils,
   Matrix4,
   MeshStandardMaterial,
-  OctahedronGeometry,
   Quaternion,
   Vector3,
 } from "three"
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import { HEX_SCALE } from "../../world/lands.ts"
 import { useOwnedMeshes } from "../owned.ts"
 import { PILES, type Pile, TARGET_FACE, targets } from "./places.ts"
+import { arrowGeometry, bookGeometry, COVERS, fishGeometry, logGeometry, stoneGeometry } from "./shapes.ts"
 import { life } from "./state.ts"
 import {
   CAPACITY,
@@ -78,23 +72,13 @@ export function TracePiles() {
 const scaled = new Matrix4()
 const out = new Matrix4()
 
-const BARK = new Color("#7b5536")
-const CUT = new Color("#d8b07a")
-const STONE = new Color("#9a9b98")
-const FISH_BACK = new Color("#5f7f96")
-const FISH_BELLY = new Color("#c9d6dc")
-const SHAFT = new Color("#a98256")
-const FLETCH = new Color("#f1ece0")
-const TIP = new Color("#4a4d52")
-const PAGES = new Color("#d9cfb4")
-const COVERS = ["#8e3b33", "#2f5a8a", "#3f6e45", "#6d4a8a", "#8a6a2f"].map((c) => new Color(c))
 const MISSED = new Color("#e0473a")
 const WHITE = new Color("#ffffff")
 
 function build() {
   const shapes = {
     log: logGeometry(),
-    stone: paint(new IcosahedronGeometry(0.42, 0), () => STONE),
+    stone: stoneGeometry(),
     fish: fishGeometry(),
     arrow: arrowGeometry(),
     books: COVERS.map(bookGeometry),
@@ -208,79 +192,4 @@ function inGround(board: Board, [x, , z, lean]: Slot): Matrix4 {
   const position = new Vector3(x, 0.15, z + 1.2).applyQuaternion(turn).add(new Vector3(board.x, 0, board.z))
   const down = new Quaternion().setFromEuler(new Euler(-(Math.PI / 2 - lean), (hash(x * 100) - 0.5) * 0.8, 0))
   return new Matrix4().compose(position, turn.multiply(down), new Vector3(1, 1, 1))
-}
-
-// ---- Shapes: low-poly, flat-shaded, coloured per vertex (KayKit's look, no texture) ----------------
-
-/** Non-indexed, position + normal + color: every shape in the batch carries the same attributes. */
-function paint(
-  source: BufferGeometry,
-  colour: (normal: Vector3, position: Vector3) => Color,
-): BufferGeometry {
-  const geometry = (source.index ? source.toNonIndexed() : source).clone()
-  geometry.deleteAttribute("uv")
-  geometry.computeVertexNormals()
-  const positions = geometry.getAttribute("position")
-  const normals = geometry.getAttribute("normal")
-  const colors = new Float32Array(positions.count * 3)
-  const n = new Vector3()
-  const p = new Vector3()
-  for (let i = 0; i < positions.count; i++) {
-    n.fromBufferAttribute(normals, i)
-    p.fromBufferAttribute(positions, i)
-    const c = colour(n, p)
-    colors[i * 3] = c.r
-    colors[i * 3 + 1] = c.g
-    colors[i * 3 + 2] = c.b
-  }
-  geometry.setAttribute("color", new Float32BufferAttribute(colors, 3))
-  return geometry
-}
-
-function merge(parts: BufferGeometry[]): BufferGeometry {
-  return mergeGeometries(parts) ?? parts[0] ?? new BoxGeometry()
-}
-
-/** A log lying along x: bark round the sides, pale cut ends. */
-function logGeometry(): BufferGeometry {
-  const log = new CylinderGeometry(0.3, 0.3, 2.3, 7, 1)
-  // Colour by the cylinder's own normals (ends face ±y) before laying it down.
-  const painted = paint(log, (normal) => (Math.abs(normal.y) > 0.9 ? CUT : BARK))
-  painted.rotateZ(Math.PI / 2)
-  painted.rotateY(Math.PI / 2)
-  return painted
-}
-
-/** A fish lying on its side along x: dark back, pale belly, a tail fin. */
-function fishGeometry(): BufferGeometry {
-  const body = paint(new OctahedronGeometry(0.5, 0).scale(0.75, 0.12, 0.26), (_, p) =>
-    p.z > 0.01 ? FISH_BACK : FISH_BELLY,
-  )
-  const tail = paint(
-    new ConeGeometry(0.16, 0.28, 3)
-      .rotateZ(Math.PI / 2)
-      .scale(1, 0.4, 1)
-      .translate(0.48, 0, 0),
-    () => FISH_BACK,
-  )
-  return merge([body, tail])
-}
-
-/** An arrow along +z, its tip at the origin: dark tip, wooden shaft, pale fletching. */
-function arrowGeometry(): BufferGeometry {
-  const shaft = paint(
-    new CylinderGeometry(0.035, 0.035, 1.25, 5).rotateX(Math.PI / 2).translate(0, 0, 0.7),
-    () => SHAFT,
-  )
-  const tip = paint(new ConeGeometry(0.07, 0.2, 5).rotateX(-Math.PI / 2).translate(0, 0, 0.05), () => TIP)
-  const vane = (turn: number) =>
-    paint(new BoxGeometry(0.22, 0.012, 0.3).rotateZ(turn).translate(0, 0, 1.18), () => FLETCH)
-  return merge([shaft, tip, vane(0), vane(Math.PI / 2)])
-}
-
-/** A closed book lying flat: coloured cover, cream page edges on three sides. */
-function bookGeometry(cover: Color): BufferGeometry {
-  return paint(new BoxGeometry(0.72, 0.15, 0.52), (normal) =>
-    normal.x > 0.9 || Math.abs(normal.z) > 0.9 ? PAGES : cover,
-  )
 }

@@ -13,6 +13,7 @@ import { Sparks } from "./Sparks.tsx"
 import { life, readGuild } from "./state.ts"
 import { Villagers } from "./Villagers.tsx"
 import { Windows } from "./Windows.tsx"
+import { WorkFx } from "./WorkFx.tsx"
 
 /**
  * Life (ADR 0007): the island lives and keeps a record of the work done on it.
@@ -24,8 +25,10 @@ import { Windows } from "./Windows.tsx"
  *   windows    the village's windows glow from dusk, going dark through the night
  *   villagers  a farmer and two townsfolk on their rounds by day, indoors by night
  *   ravens     carry quests out, news of loot home, and circle over a plea (Ravens.tsx)
- * Draw calls (High): machines 1, traces 1, smoke 1, sparks 1, birds 1, windows 2, villagers 3, ravens 2 = 12.
- * Medium: 2 villagers = 11. Low: none = 9. Nothing here casts into the (static) sun shadow map;
+ *   work       what working looks like between results: chips, sparks, steam, splashes, arrows in
+ *              flight, the forest's shaking work trees, the forge's quench buckets (WorkFx.tsx)
+ * Draw calls (High): machines 1, traces 1, smoke 1, sparks 1, birds 1, windows 2, villagers 3, ravens 2,
+ * work 5 = 17. Medium: 2 villagers = 16. Low: none = 14. Nothing here casts into the (static) sun shadow map;
  * villagers get a blob shadow (scene/Blobs.tsx).
  */
 export function Life() {
@@ -40,6 +43,7 @@ export function Life() {
       <TracePiles />
       <Smoke tier={tier} />
       <Sparks />
+      <WorkFx />
       <Birds tier={tier} />
       <Ravens />
       <Windows />

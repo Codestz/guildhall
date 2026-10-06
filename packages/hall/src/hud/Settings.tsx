@@ -195,6 +195,12 @@ export function Settings({ store, onClose }: { store: GuildStore; onClose: () =>
             </div>
           </Lever>
           <Switch
+            label="Sigils over agents"
+            hint="An icon for each deed in progress, readable with the HUD hidden"
+            checked={prefs.sigils}
+            onChange={(sigils) => hudPrefs.set({ sigils })}
+          />
+          <Switch
             label="Stats for nerds"
             hint="Frame rate, draw calls, triangles"
             checked={prefs.stats}

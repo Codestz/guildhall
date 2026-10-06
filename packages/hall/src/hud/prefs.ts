@@ -10,6 +10,8 @@ export interface HudPrefs {
   mode: HudMode
   /** "Stats for nerds" panel. */
   stats: boolean
+  /** Deed sigils over working adventurers (scene/Sigils.tsx). Decorative; on by default. */
+  sigils: boolean
 }
 
 export const HUD_MODES: Record<HudMode, { label: string; next: HudMode; hint: string }> = {
@@ -19,7 +21,7 @@ export const HUD_MODES: Record<HudMode, { label: string; next: HudMode; hint: st
 }
 
 const KEY = "guildhall.hud"
-const DEFAULTS: HudPrefs = { mode: "minimal", stats: false }
+const DEFAULTS: HudPrefs = { mode: "minimal", stats: false, sigils: true }
 
 function read(): HudPrefs {
   try {
@@ -29,6 +31,7 @@ function read(): HudPrefs {
     return {
       mode: value.mode && value.mode in HUD_MODES ? value.mode : DEFAULTS.mode,
       stats: typeof value.stats === "boolean" ? value.stats : DEFAULTS.stats,
+      sigils: typeof value.sigils === "boolean" ? value.sigils : DEFAULTS.sigils,
     }
   } catch {
     return DEFAULTS

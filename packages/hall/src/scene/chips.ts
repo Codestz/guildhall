@@ -1,4 +1,5 @@
 import { type Camera, type Object3D, Vector3 } from "three"
+import { pxPerUnit, sigilRoom, sizeFor } from "./sigilSize.ts"
 
 /**
  * Screen-space declutter for the name chips over adventurers' heads (drei `<Html>`).
@@ -7,6 +8,10 @@ import { type Camera, type Object3D, Vector3 } from "three"
  *  - folds a pile of three or more overlapping chips into one that reads "+N";
  *  - nudges any other overlapping chip upward until it clears the ones placed before it.
  * The chip you follow and a pleading chip always stay visible (they are placed first).
+ *
+ * A chip whose adventurer shows a deed sigil (scene/Sigils.tsx) keeps a band under itself for it
+ * (`--room`, sigilSize.ts), and that band counts as part of the chip: no other chip is placed over a
+ * sigil, and in the Hidden HUD (no name plate) the sigils alone still declutter.
  *
  * Nothing here goes through React: it writes a CSS variable (`--lift`), two attributes and a text,
  * and only when they change. CSS eases the lift and fades a folded chip, so nothing jumps.
@@ -27,6 +32,8 @@ const FOLD_AFTER = 3
 const UNFOLD_AFTER = 2
 
 export interface ChipSlot {
+  /** The adventurer's session id ("" for chips that are not an adventurer's): sigils find their chip by it. */
+  id: string
   /** The adventurer's root: the anchor is CHIP_HEIGHT above it, in its own space. */
   anchor: Object3D | null
   /** The `.chip` element. */
@@ -35,6 +42,8 @@ export interface ChipSlot {
   more: HTMLElement | null
   /** The selected or pleading chip: never folded, placed before anyone else. */
   pinned: boolean
+  /** A deed sigil shows under this chip: keep room for it (set by scene/Sigils.tsx). */
+  sigil: boolean
   // ── per run ──
   on: boolean
   x: number
@@ -47,8 +56,11 @@ export interface ChipSlot {
   /** Chips in the pile this one roots (meaningful on roots only). */
   count: number
   lift: number
+  /** Px kept under the chip for its sigil, this run. */
+  room: number
   // ── written state ──
   shownLift: number
+  shownRoom: number
   folded: boolean
   votes: number
   shownMore: number
@@ -57,10 +69,12 @@ export interface ChipSlot {
 
 export function chipSlot(): ChipSlot {
   return {
+    id: "",
     anchor: null,
     el: null,
     more: null,
     pinned: false,
+    sigil: false,
     on: false,
     x: 0,
     y: 0,
@@ -71,7 +85,9 @@ export function chipSlot(): ChipSlot {
     index: 0,
     count: 0,
     lift: 0,
+    room: 0,
     shownLift: 0,
+    shownRoom: 0,
     folded: false,
     votes: 0,
     shownMore: 0,
@@ -87,6 +103,12 @@ let last = -Infinity
 
 export function addChip(slot: ChipSlot): void {
   if (!slots.includes(slot)) slots.push(slot)
+}
+
+/** The chip of the adventurer with session `id`, if it is on stage. */
+export function chipOf(id: string): ChipSlot | undefined {
+  for (const slot of slots) if (slot.id === id) return slot
+  return undefined
 }
 
 export function removeChip(slot: ChipSlot): void {
@@ -112,11 +134,15 @@ export function layout(camera: Camera, width: number, height: number): void {
     slot.on = false
     const { el, anchor } = slot
     if (!el || !anchor) continue
-    const w = el.offsetWidth
-    const h = el.offsetHeight
-    if (w === 0 || h === 0) continue
     scratch.set(0, CHIP_HEIGHT, 0)
     anchor.localToWorld(scratch)
+    const perUnit = slot.sigil ? pxPerUnit(camera, scratch, height) : 0
+    const size = slot.sigil ? sizeFor(perUnit) : 0
+    slot.room = size ? sigilRoom(size, perUnit, CHIP_HEIGHT) : 0
+    // The band counts as part of the chip, so a sigil alone (Hidden HUD: no plate) declutters too.
+    const w = Math.max(el.offsetWidth, size)
+    const h = el.offsetHeight + slot.room || size
+    if (w === 0 || h === 0) continue
     scratch.project(camera)
     if (scratch.z > 1 || scratch.z < -1) continue
     slot.x = (scratch.x * 0.5 + 0.5) * width
@@ -195,6 +221,11 @@ export function layout(camera: Camera, width: number, height: number): void {
       slot.moreN = 0
       slot.folded = false
       slot.votes = 0
+      slot.room = slot.sigil ? slot.shownRoom : 0
+    }
+    if (slot.room !== slot.shownRoom) {
+      slot.shownRoom = slot.room
+      el.style.setProperty("--room", `${slot.room}px`)
     }
     const lift = slot.folded ? slot.shownLift : Math.round(slot.lift)
     if (lift !== slot.shownLift) {

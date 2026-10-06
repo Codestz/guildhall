@@ -21,6 +21,7 @@ import { Nature } from "./nature/Nature.tsx"
 import { OpeningCue } from "./OpeningCue.tsx"
 import { Quality } from "./Quality.tsx"
 import { Room } from "./Room.tsx"
+import { Sigils } from "./Sigils.tsx"
 import { Stations } from "./Stations.tsx"
 import { UndeadGate } from "./Undead.tsx"
 import { WeatherLayer } from "./weather/WeatherLayer.tsx"
@@ -49,6 +50,8 @@ export function Scene() {
         <Stations />
         <Cast />
         <Blobs />
+        {/* What everyone is doing, as an icon over their head: readable with the HUD hidden. */}
+        <Sigils />
         <WorldReady />
         {/* Showcase: mounts with the world, then lifts the title card (guild/opening.ts). */}
         {MODE === "showcase" && <OpeningCue />}

@@ -231,6 +231,8 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   const pleading = view.phase === "waiting"
   // Read by the declutter on its next run (refs, not state: no re-render for it).
   chip.pinned = selected || pleading
+  // Its deed sigil (scene/Sigils.tsx) finds this chip by id, to sit under it and follow its lift.
+  chip.id = view.id
   const { verb, glyph } = verbOf(view)
   const Glyph = Icon[glyph]
   /** The full deed, for Detailed mode and whoever you follow; Minimal shows the verb instead. */

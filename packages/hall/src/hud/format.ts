@@ -106,6 +106,8 @@ export type VerbGlyph =
   | "fail"
   | "join"
   | "work"
+  | "summon"
+  | "globe"
 
 /**
  * What an adventurer is doing, in one word a newcomer can read off a name chip: `reading`,
@@ -136,8 +138,8 @@ export function verbOf(view: Pick<AdventurerView, "phase" | "tool" | "thinking" 
     if (verb) return verb
     if (tool === "bash" || tool === "shell")
       return TESTING.test(view.doing) ? { verb: "testing", glyph: "test" } : { verb: "running", glyph: "run" }
-    // MCP tools (`context7_query-docs`) are almost always lookups.
-    if (tool.includes("_")) return { verb: "consulting", glyph: "read" }
+    // MCP tools (`context7_query-docs`) are almost always lookups outside the repo.
+    if (tool.includes("_")) return { verb: "consulting", glyph: "globe" }
     return { verb: "working", glyph: "work" }
   }
   if (view.doing === "writing its answer") return { verb: "answering", glyph: "edit" }
@@ -149,7 +151,7 @@ const TESTING = /\b(test|tests|spec|vitest|jest|pytest|check|lint|typecheck|tsc)
 
 const TOOL_VERBS: Record<string, { verb: string; glyph: VerbGlyph }> = {
   read: { verb: "reading", glyph: "read" },
-  webfetch: { verb: "reading", glyph: "read" },
+  webfetch: { verb: "consulting", glyph: "globe" },
   edit: { verb: "editing", glyph: "edit" },
   write: { verb: "editing", glyph: "edit" },
   patch: { verb: "editing", glyph: "edit" },
@@ -157,9 +159,9 @@ const TOOL_VERBS: Record<string, { verb: string; glyph: VerbGlyph }> = {
   grep: { verb: "searching", glyph: "search" },
   glob: { verb: "searching", glyph: "search" },
   list: { verb: "searching", glyph: "search" },
-  websearch: { verb: "searching", glyph: "search" },
+  websearch: { verb: "consulting", glyph: "globe" },
   codesearch: { verb: "searching", glyph: "search" },
-  task: { verb: "dispatching", glyph: "quest" },
-  subagent: { verb: "dispatching", glyph: "quest" },
-  todowrite: { verb: "planning", glyph: "quest" },
+  task: { verb: "dispatching", glyph: "summon" },
+  subagent: { verb: "dispatching", glyph: "summon" },
+  todowrite: { verb: "planning", glyph: "thought" },
 }

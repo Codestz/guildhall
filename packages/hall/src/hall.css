@@ -1915,12 +1915,14 @@ button {
 
 .chip {
   --lift: 0px;
+  /* The band kept under the plate for a deed sigil (scene/sigilSize.ts), set by the declutter. */
+  --room: 0px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 5px;
   /* Bottom edge on the anchor; --lift is the declutter's nudge (scene/chips.ts), eased here. */
-  transform: translateY(calc(-50% - var(--lift)));
+  transform: translateY(calc(-50% - var(--lift) - var(--room)));
   transition:
     transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
     opacity 0.25s ease-out,

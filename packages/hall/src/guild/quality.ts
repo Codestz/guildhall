@@ -31,7 +31,7 @@ export const TIERS: Record<
   },
   1: {
     name: "Medium",
-    dpr: 1.25,
+    dpr: 1.1,
     post: true,
     tiltShift: false,
     shadowMap: 2048,
@@ -40,7 +40,9 @@ export const TIERS: Record<
   },
   2: {
     name: "High",
-    dpr: 1.5,
+    // 1.25, not 1.5: the frame is fill-rate bound at Retina, and with SMAA on the final image 1.25
+    // looked identical side by side (.probe/c-dpr-*.png) while saving 2.7 ms (10.9 → 8.2 ms).
+    dpr: 1.25,
     post: true,
     tiltShift: false,
     shadowMap: 2048,

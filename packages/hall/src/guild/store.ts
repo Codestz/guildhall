@@ -5,6 +5,7 @@ import {
   emptyModel,
   type GuildEvent,
   type Model,
+  rootOf,
   type Session,
 } from "@guildhall/core"
 import { type DeedLook, deedLook, interestOf, ROLES, roleOf } from "@guildhall/roster"
@@ -128,20 +129,79 @@ export class GuildStore {
     this.load("party")
   }
 
+  /** "sim": playing a scenario. "live": following the hub (real OpenCode sessions). */
+  mode: "sim" | "live" = "sim"
+  /** Live: whether the hub is connected, and the guild being followed. */
+  connected = false
+  guild = ""
+  private liveStart = 0
+  private socket: WebSocket | undefined
+
   get now(): number {
-    return (this.events[0]?.change.at ?? 0) + this.player.time
+    return this.mode === "live" ? Date.now() : (this.events[0]?.change.at ?? 0) + this.player.time
   }
   get time(): number {
-    return this.player.time
+    return this.mode === "live" ? Date.now() - this.liveStart : this.player.time
   }
   get duration(): number {
-    return this.player.duration
+    return this.mode === "live" ? this.time : this.player.duration
+  }
+  /** Run time 0 in ms since the epoch: the first event's `at`. */
+  private get start(): number {
+    return this.mode === "live" ? this.liveStart : (this.events[0]?.change.at ?? 0)
+  }
+
+  /**
+   * Follow the hub (ADR 0003): a hello with everything so far, then events as they happen.
+   * Reconnects with backoff, so the hall can be opened before OpenCode or the hub.
+   */
+  live(url = "ws://127.0.0.1:4747/ws"): void {
+    this.mode = "live"
+    this.reset()
+    this.markers = []
+    this.liveStart = Date.now()
+    let delay = 500
+    const open = () => {
+      const socket = new WebSocket(url)
+      this.socket = socket
+      socket.onopen = () => {
+        delay = 500
+        this.connected = true
+        this.emit()
+      }
+      socket.onmessage = (message) => {
+        const data = JSON.parse(String(message.data)) as { type: string; events: GuildEvent[] }
+        if (data.type === "hello") {
+          this.reset()
+          this.liveStart = data.events[0]?.change.at ?? Date.now()
+          for (const event of data.events) this.take(event.change, false)
+        } else {
+          for (const event of data.events) this.take(event.change, true)
+        }
+        const last = data.events.at(-1)
+        if (last) this.guild = last.guild
+        this.refresh()
+      }
+      socket.onclose = () => {
+        this.connected = false
+        this.emit()
+        if (this.socket === socket) setTimeout(open, (delay = Math.min(delay * 2, 10_000)))
+      }
+    }
+    open()
   }
   get speed(): number {
     return this.player.speed
   }
 
   load(scenario: ScenarioId): void {
+    if (this.mode === "live") {
+      const socket = this.socket
+      this.socket = undefined
+      socket?.close()
+      this.mode = "sim"
+      this.connected = false
+    }
     const speed = this.player?.speed ?? 1
     this.scenario = scenario
     this.events = toEvents(SCENARIOS[scenario](), "demo")
@@ -190,6 +250,11 @@ export class GuildStore {
 
   /** Called every frame with real elapsed ms. */
   tick(realMs: number): void {
+    if (this.mode === "live") {
+      this.sinceViews += realMs
+      if (this.sinceViews > 100) this.refresh()
+      return
+    }
     const { events, restarted } = this.player.tick(realMs)
     if (restarted) this.reset()
     for (const event of events) this.take(event.change, true)
@@ -209,27 +274,39 @@ export class GuildStore {
     this.focus = null
     this.lastEventAt = 0
     this.log = []
+    this.logged.clear()
     this.progress = 0
   }
 
   private take(change: Change, live: boolean): void {
     apply(this.model, change)
     this.record(change)
+    if (this.mode === "live") {
+      const kind = markerOf(change)
+      if (kind) this.markers.push({ at: change.at - this.start, kind })
+    }
     if (!live) return
-    this.lastEventAt = this.player.time
+    this.lastEventAt = this.time
     const score = interestOf(change)
     if (score === 0) return
     const held = this.focus && change.at - this.focus.at < HOLD_MS
     if (!this.focus || !held || score > this.focus.score) this.focus = { id: change.id, score, at: change.at }
   }
 
+  /** Tool calls already written to the log: OpenCode 1 re-sends a running call as its output streams. */
+  private logged = new Set<string>()
+
   private record(change: Change): void {
     const s = this.model.sessions.get(change.id)
     if (!s) return
+    if (change.type === "tool" && change.state === "running") {
+      if (this.logged.has(change.call)) return
+      this.logged.add(change.call)
+    }
     const line = lineOf(change, s)
     if (!line) return
-    const role = roleOf(s.agent)
-    const start = this.events[0]?.change.at ?? 0
+    const role = s.parentID ? roleOf(s.agent) : GUILDMASTER
+    const start = this.start
     this.log.push({
       key: this.log.length ? (this.log.at(-1)?.key ?? 0) + 1 : 1,
       at: change.at - start,
@@ -257,7 +334,15 @@ export class GuildStore {
 
 /** Everyone on stage right now, and where they belong. */
 export function viewsOf(model: Model, now: number): AdventurerView[] {
-  const sessions = [...model.sessions.values()].sort((a, b) => a.started - b.started)
+  // Several OpenCode sessions (or windows) at once: follow the most recently active party.
+  const roots = [...model.sessions.values()].filter((s) => !s.parentID)
+  const followed = roots.reduce<Session | undefined>(
+    (best, s) => (!best || s.seen > best.seen ? s : best),
+    undefined,
+  )
+  const sessions = [...model.sessions.values()]
+    .filter((s) => !followed || rootOf(model, s.id) === followed.id)
+    .sort((a, b) => a.started - b.started)
   const master = sessions.find((s) => !s.parentID)
   const taken = new Map<StationId, number>()
   let stools = 0
@@ -268,7 +353,8 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
 
   for (const s of sessions) {
     const isMaster = s === master
-    const role = roleOf(s.agent)
+    // The root session is the guildmaster whatever agent runs it (OpenCode's `build`, a user's own).
+    const role = isMaster ? GUILDMASTER : roleOf(s.agent)
     const activity = activityOf(s)
     const since = s.ended !== undefined ? now - s.ended : 0
     if (!isMaster && s.status === "done" && since > GONE_MS) continue
@@ -367,6 +453,8 @@ function progressOf(model: Model): number {
   }
   return done
 }
+
+const GUILDMASTER = roleOf("guild-master")
 
 const MASTER_POST: Post = STATIONS["quest-board"].posts[0] ?? [0, -7.4, 0]
 

@@ -1462,3 +1462,9 @@ button {
 .stats-row[data-over="true"] dd:first-of-type {
   color: var(--plea);
 }
+
+/* Live mode: the badge turns green once the hub is connected. */
+.sim-badge[data-live="true"] i {
+  background: var(--loot);
+  box-shadow: 0 0 8px var(--loot);
+}

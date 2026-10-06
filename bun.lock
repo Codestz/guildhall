@@ -46,6 +46,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@guildhall/core": "workspace:*",
+        "@guildhall/hub": "workspace:*",
         "@guildhall/roster": "workspace:*",
       },
     },

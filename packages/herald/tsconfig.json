@@ -1,6 +1,19 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "rootDir": "src", "outDir": "types" },
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "types"
+  },
   "include": ["src"],
-  "references": [{ "path": "../core" }, { "path": "../roster" }]
+  "references": [
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../roster"
+    },
+    {
+      "path": "../hub"
+    }
+  ]
 }

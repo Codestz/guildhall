@@ -87,12 +87,15 @@ export function Console({ store, stageOpen }: { store: GuildStore; stageOpen: bo
               <button
                 key={id}
                 type="button"
-                aria-pressed={store.scenario === id}
+                aria-pressed={store.mode === "sim" && store.scenario === id}
                 onClick={() => store.load(id)}
               >
                 {STORIES[id]}
               </button>
             ))}
+            <button type="button" aria-pressed={store.mode === "live"} onClick={() => store.live()}>
+              Live
+            </button>
           </div>
         </fieldset>
 

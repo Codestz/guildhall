@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./server": "./server.js"
   },
   "dependencies": {
     "@guildhall/core": "workspace:*",
+    "@guildhall/hub": "workspace:*",
     "@guildhall/roster": "workspace:*"
   }
 }

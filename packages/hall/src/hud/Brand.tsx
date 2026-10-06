@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react"
+import { useGuild } from "../guild/useGuild.ts"
 import { Icon } from "./icons.tsx"
 
 const SNIPPET = `"plugin": ["opencode-guildhall"]`
 
 /** Who we are, the honest "this is a simulation" line, and the one-line install. */
 export function Brand() {
+  const store = useGuild()
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
@@ -34,13 +36,29 @@ export function Brand() {
         </div>
       </div>
 
-      <div className="sim">
-        <span className="sim-badge">
-          <i aria-hidden="true" />
-          Simulated guild · not live
-        </span>
-        <p className="sim-note">A scripted run. Installed, the hall shows your own agents as they work.</p>
-      </div>
+      {store.mode === "live" ? (
+        <div className="sim">
+          <span className="sim-badge" data-live={store.connected}>
+            <i aria-hidden="true" />
+            {store.connected
+              ? `Live · ${store.guild || "waiting for OpenCode"}`
+              : "Live · connecting to the hub…"}
+          </span>
+          <p className="sim-note">
+            {store.connected
+              ? "Your OpenCode agents, as they work."
+              : "Start OpenCode with the guildhall plugin; the hub starts with it."}
+          </p>
+        </div>
+      ) : (
+        <div className="sim">
+          <span className="sim-badge">
+            <i aria-hidden="true" />
+            Simulated guild · not live
+          </span>
+          <p className="sim-note">A scripted run. Installed, the hall shows your own agents as they work.</p>
+        </div>
+      )}
 
       <div className="install">
         <span className="install-label">

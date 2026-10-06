@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { activityOf, applyAll, emptyModel, subagentsOf } from "@guildhall/core"
-import { Player, party, rush, Script, solo, toEvents } from "../src/index.ts"
+import { Player, parties, party, rush, Script, solo, toEvents } from "../src/index.ts"
 
 describe("simulated runs read like real ones", () => {
   test("same seed, same story", () => {
@@ -110,5 +110,35 @@ describe("rush", () => {
     const model = applyAll(emptyModel(), changes)
     const statuses = failed.map((id) => model.sessions.get(id)?.status)
     expect(statuses).toEqual(["failed", "done"])
+  })
+})
+
+describe("parties: several conversations at once", () => {
+  const changes = parties()
+  const model = applyAll(emptyModel(), changes)
+  const roots = [...model.sessions.values()].filter((s) => !s.parentID)
+
+  test("three root sessions, started 0, 3 and 9 s in, each with its own adventurers", () => {
+    expect(roots.map((s) => s.started)).toEqual([0, 3000, 9000])
+    expect(roots.map((s) => subagentsOf(model, s.id).length)).toEqual([7, 0, 8])
+  })
+
+  test("their work overlaps: two guildmasters are busy at the same time", () => {
+    const busy = (t: number) =>
+      roots.filter((r) => {
+        const live = applyAll(
+          emptyModel(),
+          changes.filter((c) => c.at <= t),
+        ).sessions.get(r.id)
+        return live?.status === "running"
+      }).length
+    expect(busy(12_000)).toBeGreaterThanOrEqual(2)
+  })
+
+  test("the quick fix is done early and the long one runs past two minutes", () => {
+    const ends = roots.map((r) => r.ended ?? 0)
+    expect(ends[1]).toBeLessThan(25_000)
+    expect(changes.at(-1)?.at ?? 0).toBeGreaterThan(121_000)
+    expect(roots.every((r) => r.status === "done")).toBe(true)
   })
 })

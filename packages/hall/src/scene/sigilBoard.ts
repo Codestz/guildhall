@@ -114,6 +114,10 @@ interface Entry {
   /** Rim colour: brass tinted by the role's colour (linear). */
   rim: Color
   colour: string
+  /** Their party's banner (linear), drawn as the medallion's outer ring when several parties share the island. */
+  banner: Color
+  bannerColour: string
+  bannerOn: number
   /** Bob phase, so neighbours don't bob in step. */
   phase: number
   /** The chip's lift, eased like its CSS transition. */
@@ -133,6 +137,8 @@ export interface SigilData {
   rim: Float32Array
   /** flash r, g, b, amount. */
   flash: Float32Array
+  /** banner r, g, b; 1 when several parties are on the island, else 0. */
+  banner: Float32Array
 }
 
 export interface BurstData {
@@ -154,6 +160,7 @@ export class SigilBoard {
     state: new Float32Array(MAX_SIGILS * 4),
     rim: new Float32Array(MAX_SIGILS * 4),
     flash: new Float32Array(MAX_SIGILS * 4),
+    banner: new Float32Array(MAX_SIGILS * 4),
   }
   readonly bursts: BurstData = {
     origin: new Float32Array(MAX_PARTICLES * 3),
@@ -189,6 +196,9 @@ export class SigilBoard {
   /** At the store's refresh (~10×/s): who is on stage and what each is doing. */
   sync(views: readonly AdventurerView[]): void {
     for (const entry of this.list) entry.present = false
+    let multi = false
+    for (let i = 1; i < views.length; i++)
+      if ((views[i] as AdventurerView).party !== views[0]?.party) multi = true
     for (const view of views) {
       let entry = this.byId.get(view.id)
       if (!entry) {
@@ -203,6 +213,9 @@ export class SigilBoard {
           ok: true,
           rim: new Color(),
           colour: "",
+          banner: new Color(),
+          bannerColour: "",
+          bannerOn: 0,
           phase: hash(view.id) * Math.PI * 2,
           lift: 0,
           present: true,
@@ -220,6 +233,11 @@ export class SigilBoard {
         entry.colour = view.color
         entry.rim.set(view.color).lerp(BRASS, 0.35)
       }
+      if (entry.bannerColour !== view.banner) {
+        entry.bannerColour = view.banner
+        entry.banner.set(view.banner)
+      }
+      entry.bannerOn = multi ? 1 : 0
     }
     for (let i = this.list.length - 1; i >= 0; i--) {
       const entry = this.list[i] as Entry
@@ -330,7 +348,7 @@ export class SigilBoard {
       // Over the cap, the farthest one goes.
       if (order.length > MAX_SIGILS) order.shift()
     }
-    const { anchor, state, rim, flash } = this.sigils
+    const { anchor, state, rim, flash, banner } = this.sigils
     for (let k = 0; k < order.length; k++) {
       const entry = order[k] as Entry
       const at = this.positions.get(entry.id) as Vector3
@@ -364,6 +382,10 @@ export class SigilBoard {
       flash[o + 1] = tone.g
       flash[o + 2] = tone.b
       flash[o + 3] = popping ? (1 - t / POP_S) ** 1.5 : 0
+      banner[o] = entry.banner.r
+      banner[o + 1] = entry.banner.g
+      banner[o + 2] = entry.banner.b
+      banner[o + 3] = entry.bannerOn
     }
     this.count = order.length
     return order.length

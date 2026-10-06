@@ -9,12 +9,12 @@ import {
   type Session,
 } from "@guildhall/core"
 import { type DeedLook, deedLook, interestOf, roleOf } from "@guildhall/roster"
-import { Player, party, rush, solo, toEvents } from "@guildhall/sim"
+import { Player, parties, party, rush, solo, toEvents } from "@guildhall/sim"
 import { type Traces, tracesOf } from "../scene/life/traces.ts"
 import type { SiteId } from "../world/lands.ts"
 import {
   GATE,
-  HAND_IN,
+  HAND_INS,
   hearthSeat,
   type Post,
   type Seat,
@@ -35,6 +35,7 @@ import {
 } from "./director.ts"
 import { DEFAULT_SETTINGS, type Environment, type EnvironmentSettings, environmentOf } from "./environment.ts"
 import { type Actor, before, happenings, MomentStream } from "./moments.ts"
+import { byJoin, PARTY_IDLE_MS, type Party, stageOf } from "./parties.ts"
 import { RISE_MS, Undead } from "./undead.ts"
 
 export type { Seat }
@@ -49,6 +50,8 @@ export const SCENARIOS = {
   party: () => party(),
   solo: () => solo(),
   rush: () => rush(12),
+  /** Three conversations at once: several parties on one island (guild/parties.ts). */
+  parties: () => parties(),
 } as const
 export type ScenarioId = keyof typeof SCENARIOS
 
@@ -113,6 +116,12 @@ export interface AdventurerView {
   bubble?: string
   /** A deed just failed: stumble + red puff. */
   stung: boolean
+  /** Their party: its guildmaster's (root) session id ("" with no root heard of). */
+  party: string
+  /** Their party's banner colour (guild/parties.ts BANNERS). */
+  banner: string
+  /** A guildmaster arriving beside another party: walks in from the gate rather than appearing. */
+  arrives?: boolean
 }
 
 /** One line of the guild chronicle, for the HUD's feed. */
@@ -125,6 +134,8 @@ export interface LogEntry {
   color: string
   kind: "join" | "quest" | "deed" | "fail" | "plea" | "loot" | "thought"
   text: string
+  /** Their party (root session id). */
+  party: string
 }
 
 /** An interesting moment on the timeline (run time, ms), for scrubber ticks. */
@@ -154,6 +165,16 @@ export class GuildStore {
   /** Diorama: the orthographic tabletop. Explore: a perspective camera that can go low and close. */
   view: "diorama" | "explore" = "diorama"
   views: AdventurerView[] = []
+  /**
+   * The parties on the island (guild/parties.ts), the dais's first: one per conversation, at most
+   * MAX_PARTIES. One party is the hall as it always was.
+   */
+  parties: Party[] = []
+  /**
+   * The party the viewer follows (its root session id), or null for all of them. Following one, the
+   * others still live on the island, but the camera, captions, roster and weather are about this one.
+   */
+  following: string | null = null
   focus: Focus | null = null
   /** Run time of the newest event: lets the Bard tell a quiet guild from a busy one. */
   lastEventAt = 0
@@ -271,9 +292,9 @@ export class GuildStore {
           this.markers = []
           this.seen.clear()
           this.liveStart = data.events[0]?.change.at ?? Date.now()
-          for (const event of data.events) if (this.fresh(event)) this.take(event.change, false)
+          for (const event of data.events) if (this.fresh(event)) this.take(event.change, false, event.guild)
         } else {
-          for (const event of data.events) if (this.fresh(event)) this.take(event.change, true)
+          for (const event of data.events) if (this.fresh(event)) this.take(event.change, true, event.guild)
         }
         const last = data.events.at(-1)
         if (last) this.guild = last.guild
@@ -346,9 +367,41 @@ export class GuildStore {
     return this.model.sessions.get(id)
   }
 
-  /** The followed party's sessions (guildmaster first by join), for the Legends book (guild/story.ts). */
-  party(): Session[] {
-    return partyOf(this.model)
+  /**
+   * A party's sessions (guildmaster first by join), for the Legends book (guild/legends.ts) and the
+   * world events: the one asked for, else the followed one, else the newest (the hall's focus).
+   */
+  party(id?: string): Session[] {
+    const wanted = id ?? this.following
+    const found =
+      wanted !== null && wanted !== undefined ? this.parties.find((p) => p.id === wanted) : undefined
+    if (found) return found.sessions
+    return this.parties.find((p) => p.newest)?.sessions ?? partyOf(this.model)
+  }
+
+  /** The party the hall is about: the followed one, else the newest. */
+  get focalParty(): Party | undefined {
+    return this.parties.find((p) => p.id === this.following) ?? this.parties.find((p) => p.newest)
+  }
+
+  /** Follow one party (its root session id), or null for all (the HUD's party switcher). */
+  follow(id: string | null): void {
+    this.following = id !== null && this.parties.some((p) => p.id === id) ? id : null
+    // Someone picked in another party is let go: the camera is about the followed party now.
+    if (
+      this.following &&
+      this.selected &&
+      this.views.find((v) => v.id === this.selected)?.party !== this.following
+    )
+      this.selected = null
+    this.director.restart()
+    this.refresh()
+  }
+
+  /** Is this session in the party being followed (always, when following all)? */
+  inFocus(id: string): boolean {
+    if (this.following === null) return true
+    return this.views.find((v) => v.id === id)?.party === this.following
   }
 
   setSpeed(speed: number): void {
@@ -465,11 +518,14 @@ export class GuildStore {
     this.logged.clear()
     this.progress = 0
     this.left.clear()
+    this.arrived.clear()
+    this.guilds.clear()
     this.rebuilding = true
     this.moments.rebuild()
   }
 
-  private take(change: Change, live: boolean): void {
+  private take(change: Change, live: boolean, guild?: string): void {
+    if (guild !== undefined && !this.guilds.has(change.id)) this.guilds.set(change.id, guild)
     const was = before(this.model, change)
     apply(this.model, change)
     this.record(change)
@@ -481,7 +537,13 @@ export class GuildStore {
       // The fallen keep vigil in the graveyard (guild/undead.ts): the chronicle says so.
       if (happening.kind === "fail" && s.parentID)
         this.write(
-          { at: change.at - this.start, id: s.id, title: actor.title, color: actor.color },
+          {
+            at: change.at - this.start,
+            id: s.id,
+            title: actor.title,
+            color: actor.color,
+            party: actor.master,
+          },
           {
             kind: "fail",
             text: "☠ rises in the graveyard",
@@ -496,6 +558,8 @@ export class GuildStore {
     this.lastEventAt = this.time
     const score = interestOf(change)
     if (score === 0) return
+    // Following one party: the calm Bard looks only at it.
+    if (this.following !== null && rootOf(this.model, change.id) !== this.following) return
     const held = this.focus && change.at - this.focus.at < HOLD_MS
     if (!this.focus || !held || score > this.focus.score) this.focus = { id: change.id, score, at: change.at }
   }
@@ -514,12 +578,15 @@ export class GuildStore {
     if (!line) return
     const role = s.parentID ? roleOf(s.agent) : GUILDMASTER
     const title = s.parentID ? numbered(role.title, ordinalOf(this.model, s)) : role.title
-    this.write({ at: change.at - this.start, id: s.id, title, color: role.color }, line)
+    this.write(
+      { at: change.at - this.start, id: s.id, title, color: role.color, party: rootOf(this.model, s.id) },
+      line,
+    )
   }
 
   /** One line onto the chronicle (newest last, at most LOG_SIZE). */
   private write(
-    who: Pick<LogEntry, "at" | "id" | "title" | "color">,
+    who: Pick<LogEntry, "at" | "id" | "title" | "color" | "party">,
     line: Pick<LogEntry, "kind" | "text">,
   ): void {
     this.log.push({ key: this.log.length ? (this.log.at(-1)?.key ?? 0) + 1 : 1, ...who, ...line })
@@ -541,13 +608,45 @@ export class GuildStore {
 
   /** Subagents already gone out of the gate (a `leave` moment made), until they work again. */
   private left = new Set<string>()
+  /** Live: the guild (project) each session was heard from: one island shows one project. */
+  private guilds = new Map<string, string>()
+  /** Parties already on the island (root ids), to notice a new one arriving. */
+  private arrived = new Set<string>()
+
+  /** A new party walks in beside the others: the director looks at its guildmaster (live only). */
+  private arrivals(parties: readonly Party[]): void {
+    for (const party of parties) {
+      if (this.arrived.has(party.id)) continue
+      this.arrived.add(party.id)
+      if (!this.rebuilding && parties.length > 1 && party.root && party.arriving)
+        this.director.hint(party.root.id, 6, 6000, { shot: "follow" })
+    }
+    if (this.arrived.size > parties.length * 4) {
+      const here = new Set(parties.map((p) => p.id))
+      for (const id of this.arrived) if (!here.has(id)) this.arrived.delete(id)
+    }
+  }
   /** Set by a reset, cleared by the next refresh: departures found meanwhile are history, not news. */
   private rebuilding = false
 
-  /** `leave` moments: a finished subagent leaves the stage `GONE_MS` after it ended (see `viewsOf`). */
-  private departures(party: readonly Session[]): void {
+  /**
+   * `leave` moments: a finished subagent leaves the stage `GONE_MS` after it ended (see `viewsOf`),
+   * and a party's guildmaster when the party goes home (guild/parties.ts PARTY_IDLE_MS).
+   */
+  private departures(parties: readonly Party[]): void {
     const now = this.now
-    for (const s of party) {
+    for (const party of parties) {
+      const root = party.root
+      if (!root) continue
+      if (!party.leaving) this.left.delete(root.id)
+      else if (!this.left.has(root.id) && party.idleSince !== undefined) {
+        this.left.add(root.id)
+        const at = party.idleSince + PARTY_IDLE_MS - this.start
+        this.moments.add({ ...this.actorOf(root), kind: "leave", at, live: !this.rebuilding })
+      }
+    }
+    for (const s of parties.flatMap((p) => p.sessions)) {
+      if (!s.parentID) continue
       const gone =
         s.parentID !== undefined && s.status === "done" && s.ended !== undefined && now - s.ended > GONE_MS
       if (!gone) {
@@ -564,7 +663,9 @@ export class GuildStore {
   private refresh(): void {
     this.sinceViews = 0
     if (this.focus && this.now - this.focus.at > FOCUS_TTL_MS) this.focus = null
-    this.views = viewsOf(this.model, this.now)
+    this.parties = stageOf(this.model, this.now, (id) => this.guilds.get(id))
+    if (this.following !== null && !this.parties.some((p) => p.id === this.following)) this.following = null
+    this.views = viewsOf(this.model, this.now, FATES, this.parties)
     this.undead.sync(
       this.views.filter((view) => view.phase === "failed"),
       this.realTime,
@@ -585,19 +686,28 @@ export class GuildStore {
         },
       )
     }
-    // The world shows the party on stage, not every guild the hub has heard from.
-    const party = partyOf(this.model)
-    this.departures(party)
+    // The world shows the parties on stage, not every guild the hub has heard from.
+    const parties = this.parties
+    this.arrivals(parties)
+    this.departures(parties)
     this.rebuilding = false
-    this.progress = progressOf(party)
-    this.traces = tracesOf(party)
+    const all = parties.flatMap((p) => p.sessions)
+    // Traces are things on the shared sites (logs on the pile, the yard's building): every party's
+    // work leaves them, whoever is followed, so switching parties never empties a pile.
+    this.progress = progressOf(all)
+    this.traces = tracesOf(all)
+    // The weather is the mood of the story being told: all parties together, or the followed one.
+    const followed = parties.find((p) => p.id === this.following)
+    const told = followed ? followed.sessions : all
     this.environment = environmentOf({
       wallClock: Date.now(),
       runTime: this.time,
       runStart: this.start,
-      model: { sessions: new Map(party.map((s) => [s.id, s])) },
+      model: { sessions: new Map(told.map((s) => [s.id, s])) },
       settings: this.environmentSettings,
     })
+    // The director films the followed party only; with all, everyone on stage.
+    this.director.scope = followed ? new Set(followed.sessions.map((s) => s.id)) : null
     this.emit()
   }
 
@@ -625,23 +735,29 @@ export class GuildStore {
 }
 
 /**
- * The party the hall follows: several OpenCode sessions (or windows, or guilds) at once, it shows the
- * most recently active root and everyone under it. With no root at all, every session.
+ * The newest party (guild/parties.ts): the most recently active root and everyone under it — what
+ * the hall showed before several parties shared the island. With no root at all, every session.
  */
 export function partyOf(model: Model): Session[] {
-  const roots = [...model.sessions.values()].filter((s) => !s.parentID)
-  const followed = roots.reduce<Session | undefined>(
-    (best, s) => (!best || s.seen > best.seen ? s : best),
-    undefined,
-  )
-  return [...model.sessions.values()].filter((s) => !followed || rootOf(model, s.id) === followed.id)
+  return stageOf(model, Number.POSITIVE_INFINITY).find((p) => p.newest)?.sessions ?? []
 }
 
-/** Everyone on stage right now, and where they belong. `fates` says where failures go. */
-export function viewsOf(model: Model, now: number, fates: Fates = FATES): AdventurerView[] {
-  const sessions = partyOf(model).sort(byJoin)
-  const master = sessions.find((s) => !s.parentID)
-  /** How many of each role have joined so far: counted before anyone leaves, so numbers never shift. */
+/**
+ * Everyone on stage right now, and where they belong. `fates` says where failures go; `stage` is
+ * the parties on the island (guild/parties.ts), each with its guildmaster at its own seat. Posts at
+ * the shared sites and stations are handed out across all parties in join order, so a party that
+ * arrives later never moves anyone already working.
+ */
+export function viewsOf(
+  model: Model,
+  now: number,
+  fates: Fates = FATES,
+  stage: readonly Party[] = stageOf(model, now),
+): AdventurerView[] {
+  const partyOfId = new Map<string, Party>()
+  for (const party of stage) for (const s of party.sessions) partyOfId.set(s.id, party)
+  const sessions = stage.flatMap((party) => party.sessions).sort(byJoin)
+  /** How many of each role have joined each party so far: counted before anyone leaves, so numbers never shift. */
   const joined = new Map<string, number>()
   const taken = new Map<StationId, number>()
   let stools = 0
@@ -652,11 +768,13 @@ export function viewsOf(model: Model, now: number, fates: Fates = FATES): Advent
   const views: AdventurerView[] = []
 
   for (const s of sessions) {
-    const isMaster = s === master
+    const party = partyOfId.get(s.id) as Party
+    const isMaster = s === party.root
     // The root session is the guildmaster whatever agent runs it (OpenCode's `build`, a user's own).
     const role = isMaster ? GUILDMASTER : roleOf(s.agent)
-    const ordinal = (joined.get(role.title) ?? 0) + 1
-    joined.set(role.title, ordinal)
+    const counted = `${party.id}\u0000${role.title}`
+    const ordinal = (joined.get(counted) ?? 0) + 1
+    joined.set(counted, ordinal)
     const activity = activityOf(s)
     const since = s.ended !== undefined ? now - s.ended : 0
     if (!isMaster && s.status === "done" && since > GONE_MS) continue
@@ -674,14 +792,19 @@ export function viewsOf(model: Model, now: number, fates: Fates = FATES): Advent
     let seat: Seat | undefined
     let destination: string | undefined
     const home = isMaster ? undefined : siteOf(s.agent)
-    if (isMaster) {
+    const dais = SEAT_POSTS[party.seat] ?? MASTER_POST
+    if (isMaster && party.leaving) {
+      // The party goes home: its guildmaster walks out through the gate.
+      phase = "leaving"
+      target = [GATE[0], GATE[1], 0]
+    } else if (isMaster) {
       station = "quest-board"
-      target = MASTER_POST
+      target = dais
       phase = s.status === "done" ? "idle" : s.status === "waiting" ? "waiting" : "working"
     } else if (s.status === "done") {
       if (since < LOOT_MS) {
         phase = "loot"
-        target = HAND_IN
+        target = HAND_INS[party.seat] ?? HAND_INS[0] ?? dais
       } else if (since < REST_MS) {
         phase = "resting"
         const stool = TAVERN[stools++]
@@ -711,6 +834,10 @@ export function viewsOf(model: Model, now: number, fates: Fates = FATES): Advent
       atSite.set(home, n + 1)
       const posts = SITE_DEFS[home].posts
       target = posts[n % posts.length] ?? MASTER_POST
+    } else if (look?.goTo === "quest-board") {
+      // A quest of their own: sent from their party's place at the board.
+      station = look.goTo
+      target = dais
     } else if (look?.goTo) {
       station = look.goTo
       const posts = STATIONS[look.goTo].posts
@@ -742,14 +869,12 @@ export function viewsOf(model: Model, now: number, fates: Fates = FATES): Advent
       doing: doingOf(s, activity.kind, activity.tool, activity.text),
       ...bubbleOf(s, activity.kind, now),
       stung,
+      party: party.id,
+      banner: party.color,
+      ...(isMaster && party.arriving ? { arrives: true } : {}),
     })
   }
   return views
-}
-
-/** Join order: start time, then id, so two sessions started in the same millisecond keep one order. */
-function byJoin(a: Session, b: Session): number {
-  return a.started - b.started || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
 }
 
 /**
@@ -817,6 +942,8 @@ function progressOf(sessions: Iterable<Session>): number {
 const GUILDMASTER = roleOf("guild-master")
 
 const MASTER_POST: Post = STATIONS["quest-board"].posts[0] ?? [0, -7.4, 0]
+/** Each party's guildmaster's place: the dais, then the seats beside it (guild/parties.ts). */
+const SEAT_POSTS: readonly Post[] = STATIONS["quest-board"].posts
 
 function postAt(id: StationId, taken: Map<StationId, number>): Post {
   const n = taken.get(id) ?? 0

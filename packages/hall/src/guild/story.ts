@@ -41,6 +41,14 @@ export function spell(n: number): string {
 }
 
 /** `Three`. */
+/** `The Explorer` → `the Explorer`, for a line that now follows a lead-in; `API` stays `API`. */
+export function uncapital(text: string): string {
+  const [first = "", second = ""] = text
+  return second && second === second.toUpperCase() && /\p{L}/u.test(second)
+    ? text
+    : first.toLowerCase() + text.slice(1)
+}
+
 export function capital(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
@@ -235,6 +243,12 @@ export interface Lookup {
   session(id: string): Session | undefined
   /** How the hall named an adventurer last, when it has heard of them. */
   actor?(id: string): Pick<Moment, "title" | "color"> | undefined
+  /** A party on the island by its guildmaster's id: its short name and banner (guild/parties.ts). */
+  party?(master: string): { name: string; color: string } | undefined
+  /** How many parties are on the island: captions name the party only when there are several. */
+  parties?(): number
+  /** The party being followed (its guildmaster's id), or null for all: captions tell only its story. */
+  following?(): string | null
 }
 
 type ToolEntry = Extract<Entry, { kind: "tool" }>
@@ -989,6 +1003,9 @@ export class Narrator {
     this.lookup = {
       session: (id) => lookup.session(id),
       actor: (id) => this.names.get(id) ?? lookup.actor?.(id),
+      party: (master) => lookup.party?.(master),
+      parties: () => lookup.parties?.() ?? 1,
+      following: () => lookup.following?.() ?? null,
     }
   }
 
@@ -999,6 +1016,9 @@ export class Narrator {
 
   hear(moment: Moment, now: number): void {
     if (!moment.live) return
+    // Following one party: the others' stories go untold (they still live on the island).
+    const following = this.lookup.following?.() ?? null
+    if (following !== null && moment.master !== following) return
     this.names.set(moment.id, { title: moment.title, color: moment.color })
     const beat = beatOf(moment)
     if (!beat) return
@@ -1078,35 +1098,37 @@ export class Narrator {
       }
     }
 
-    // The burst: everything waiting in the same beat (a quest takes the joins it caused with it).
+    // The burst: everything waiting in the same beat (a quest takes the joins it caused with it),
+    // in the same party — two conversations' deeds are never told as one.
+    const party = best.moment.master
+    const pool = this.heard.filter((h) => h.moment.master === party)
     let beat = best.beat
-    let taken = this.heard.filter((h) => h.beat === beat)
+    let taken = pool.filter((h) => h.beat === beat)
     // A rise that a call-back caused is told with the call-back, in that order.
-    const callbacks = this.heard.filter((h) => h.beat === "quest" && this.resumes(h.moment))
+    const callbacks = pool.filter((h) => h.beat === "quest" && this.resumes(h.moment))
     if (beat === "rise" && callbacks.some((h) => taken.some((r) => r.moment.id === this.resumes(h.moment)))) {
       beat = "quest"
-      taken = this.heard.filter((h) => h.beat === "quest")
+      taken = pool.filter((h) => h.beat === "quest")
     }
     if (beat === "quest") {
       const back = new Set(taken.map((h) => this.resumes(h.moment)))
       taken = taken.concat(
-        this.heard.filter((h) => h.beat === "join" || (h.beat === "rise" && back.has(h.moment.id))),
+        pool.filter((h) => h.beat === "join" || (h.beat === "rise" && back.has(h.moment.id))),
       )
     }
     // A failed deed tells the deeds that went with it, as a lead-in: "Three files forged; …".
-    const extra = beat === "flaw" ? this.heard.filter((h) => h.beat === "deed").map((h) => h.moment) : []
-    const used = new Set([...taken, ...(extra.length ? this.heard.filter((h) => h.beat === "deed") : [])])
+    const extra = beat === "flaw" ? pool.filter((h) => h.beat === "deed").map((h) => h.moment) : []
+    const used = new Set([...taken, ...(extra.length ? pool.filter((h) => h.beat === "deed") : [])])
     // An ending says the rest: a fall makes its own failed deed old news, loot its last deeds.
     const ids = new Set(taken.map((h) => h.moment.id))
     const ends = beat === "fall" || beat === "loot" || beat === "complete"
     if (ends)
-      for (const h of this.heard)
-        if (ids.has(h.moment.id) && (h.beat === "deed" || h.beat === "flaw")) used.add(h)
+      for (const h of pool) if (ids.has(h.moment.id) && (h.beat === "deed" || h.beat === "flaw")) used.add(h)
     this.heard = this.heard.filter((h) => !used.has(h))
     const moments = taken.map((h) => h.moment).sort((a, b) => a.at - b.at || a.seq - b.seq)
 
     const told = beat === "complete" ? taken.find((h) => h.parts)?.parts : undefined
-    const parts = told ?? lineOf(beat, moments, this.lookup, extra)
+    const parts = this.named(party, told ?? lineOf(beat, moments, this.lookup, extra))
     const text = parts.map((p) => p.text).join("")
     this.last = now
     const priority = PRIORITY[beat]
@@ -1122,6 +1144,23 @@ export class Narrator {
     }
   }
 
+  /**
+   * With several parties on the island (and none followed), a line opens with whose story it is:
+   * `In the Pagination quest, the Explorer reads routes.ts`. The party's name is in its banner colour.
+   */
+  private named(master: string, parts: CaptionPart[]): CaptionPart[] {
+    if ((this.lookup.parties?.() ?? 1) < 2 || (this.lookup.following?.() ?? null) !== null) return parts
+    const party = this.lookup.party?.(master)
+    if (!party?.name) return parts
+    const [head, ...rest] = parts
+    const lead: CaptionPart[] = [
+      { text: "In the " },
+      { text: party.name, color: party.color },
+      { text: " quest, " },
+    ]
+    return head ? [...lead, { ...head, text: uncapital(head.text) }, ...rest] : lead
+  }
+
   /** The session a quest calls back (its `task_id`), if it is a call-back. */
   private resumes(m: Moment): string | undefined {
     if (m.kind !== "quest") return undefined
@@ -1131,8 +1170,12 @@ export class Narrator {
 
   private prune(now: number): void {
     const { routineStale, stale } = this.options
+    // Following one party: anything heard before the follow from the others goes untold too.
+    const following = this.lookup.following?.() ?? null
     this.heard = this.heard.filter(
-      (h) => h.beat === "complete" || now - h.heard < (PRIORITY[h.beat] <= 1 ? routineStale : stale),
+      (h) =>
+        (following === null || h.beat === "renown" || h.moment.master === following) &&
+        (h.beat === "complete" || now - h.heard < (PRIORITY[h.beat] <= 1 ? routineStale : stale)),
     )
   }
 }

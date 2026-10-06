@@ -2,7 +2,21 @@ import { type CSSProperties, useRef } from "react"
 import type { GuildStore, LogEntry } from "../guild/store.ts"
 import { clock, LOG_TONE } from "./format.ts"
 import { Icon } from "./icons.tsx"
+import { Pennant } from "./Parties.tsx"
 import { Panel } from "./parts.tsx"
+
+/**
+ * Following one party, the chronicle tells its story (a plea from any party still shows: it needs
+ * you). With several parties shown, each line carries its party's banner.
+ */
+function told(store: GuildStore, entry: LogEntry): boolean {
+  return store.following === null || entry.party === store.following || entry.kind === "plea"
+}
+function BannerOf({ store, entry }: { store: GuildStore; entry: LogEntry }) {
+  if (store.parties.length < 2) return null
+  const party = store.parties.find((p) => p.id === entry.party)
+  return party ? <Pennant color={party.color} size={13} /> : null
+}
 
 const SHOWN = 10
 
@@ -21,7 +35,10 @@ export function Chronicle({
   compact?: boolean
   className?: string
 }) {
-  const entries = store.log.slice(-SHOWN).reverse()
+  const entries = store.log
+    .filter((e) => told(store, e))
+    .slice(-SHOWN)
+    .reverse()
 
   return (
     <Panel
@@ -51,6 +68,7 @@ export function Chronicle({
                     <Glyph />
                   </span>
                   <span className="chron-text">
+                    <BannerOf store={store} entry={e} />
                     <b style={{ "--role": e.color } as CSSProperties}>{e.title}</b> {e.text}
                   </span>
                   <time className="chron-at mono">{clock(e.at)}</time>
@@ -97,7 +115,7 @@ export function Toasts({
     const entry = store.log[i]
     if (!entry) continue
     const life = LIFE[entry.kind]
-    if (!life) continue
+    if (!life || !told(store, entry)) continue
     // Keys restart with each story or seek; the moment itself (when, who, what) does not.
     const id = `${entry.at}:${entry.id}:${entry.kind}:${entry.text}`
     let first = seen.current.get(id)
@@ -129,6 +147,7 @@ export function Toasts({
                   <Glyph />
                 </span>
                 <span className="toast-text">
+                  <BannerOf store={store} entry={entry} />
                   <b style={{ "--role": entry.color } as CSSProperties}>{entry.title}</b> {entry.text}
                 </span>
               </button>

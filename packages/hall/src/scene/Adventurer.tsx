@@ -4,15 +4,21 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import {
   type AnimationAction,
   AnimationMixer,
+  type BufferGeometry,
   Color,
-  type Group,
+  CylinderGeometry,
+  DoubleSide,
+  Group,
   LoopOnce,
   type Material,
   MathUtils,
-  type Mesh,
-  type MeshStandardMaterial,
+  Mesh,
+  MeshStandardMaterial,
   type Object3D,
+  Shape,
+  ShapeGeometry,
   type SkinnedMesh,
+  SphereGeometry,
 } from "three"
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js"
 import type { AdventurerView } from "../guild/store.ts"
@@ -84,7 +90,8 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   const routine = useRef<Routine | null>(null)
   const hands = useRef<Hands | null>(null)
   const beatsSeen = useRef(0)
-  const start = view.master ? view.target : ([GATE[0], GATE[1], Math.PI] as const)
+  // A guildmaster is at their post from the start, unless their party has just arrived beside another.
+  const start = view.master && !view.arrives ? view.target : ([GATE[0], GATE[1], Math.PI] as const)
 
   // Role colour on cape and hat; shadows on. The tinted clones are this adventurer's own: on
   // unmount (or a new colour) they are disposed and the model's shared materials put back.
@@ -163,6 +170,10 @@ export function Adventurer({ view }: { view: AdventurerView }) {
       if (hands.current === held) hands.current = null
     }
   }, [place, id, body])
+
+  // Several parties on the island: each guildmaster wears their party's banner on their back.
+  const parties = store.parties.length
+  useBackBanner(body, view.banner, view.master && parties > 1)
 
   // Gear in the hand slots; a mug instead while resting in the tavern.
   const atWork = view.site && (view.phase === "working" || view.phase === "waiting")
@@ -336,6 +347,8 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   const Glyph = Icon[glyph]
   /** The full deed, for Detailed mode and whoever you follow; Minimal shows the verb instead. */
   const deed = view.doing && !quiet ? view.doing : ""
+  /** Following another party: this one's chip steps back so the followed party reads first. */
+  const aside = store.following !== null && view.party !== store.following && !selected && !pleading
 
   return (
     <group
@@ -357,7 +370,7 @@ export function Adventurer({ view }: { view: AdventurerView }) {
       <mesh position-y={0.06} rotation-x={-Math.PI / 2}>
         <ringGeometry args={[0.75, selected ? 1.05 : 0.9, 40]} />
         <meshBasicMaterial
-          color={view.color}
+          color={view.master && parties > 1 ? view.banner : view.color}
           transparent
           opacity={selected ? 0.95 : 0.55}
           depthWrite={false}
@@ -373,12 +386,13 @@ export function Adventurer({ view }: { view: AdventurerView }) {
         <div
           ref={chipRef}
           aria-hidden="true"
-          className={`chip${selected ? " selected" : ""}${quiet && !selected ? " quiet" : ""}${deed ? " has-deed" : ""}`}
+          className={`chip${selected ? " selected" : ""}${quiet && !selected ? " quiet" : ""}${deed ? " has-deed" : ""}${aside ? " aside" : ""}`}
           data-tone={glyph}
         >
           {pleading && <div className="plea">!</div>}
           {view.bubble && <div className="bubble">{view.bubble}</div>}
           <div className="name" style={{ borderColor: view.color }}>
+            {parties > 1 && <Pennant color={view.banner} />}
             <b>
               {view.title}
               <i className="more" ref={moreRef} />
@@ -478,4 +492,75 @@ function pathLength(path: Spot[]): number {
 function turn(node: Object3D, heading: number, rate: number): void {
   const delta = Math.atan2(Math.sin(heading - node.rotation.y), Math.cos(heading - node.rotation.y))
   node.rotation.y += delta * Math.min(1, rate)
+}
+
+/** The chip's party mark: a small swallowtail banner hanging from the plate's top-left corner. */
+function Pennant({ color }: { color: string }) {
+  return (
+    <svg className="pennant" width="9" height="14" viewBox="0 0 9 14" aria-hidden="true">
+      <path d="M0.5 0.5h8v12.6l-4-3.2-4 3.2z" fill={color} stroke="rgba(12,9,7,0.85)" strokeWidth="1" />
+    </svg>
+  )
+}
+
+/** Shared by every back-banner, for the app's lifetime (never freed). */
+let bannerParts: {
+  staff: BufferGeometry
+  flag: BufferGeometry
+  knob: BufferGeometry
+  wood: Material
+  gold: Material
+} | null = null
+
+function partsOfBanner() {
+  if (bannerParts) return bannerParts
+  const flag = new Shape()
+  // A swallowtail pennant flying sideways from the staff: 0.95 long, 0.56 deep.
+  flag.moveTo(0, 0)
+  flag.lineTo(0.95, -0.05)
+  flag.lineTo(0.68, -0.28)
+  flag.lineTo(0.95, -0.51)
+  flag.lineTo(0, -0.56)
+  flag.closePath()
+  bannerParts = {
+    staff: new CylinderGeometry(0.026, 0.026, 2.2, 6),
+    flag: new ShapeGeometry(flag),
+    knob: new SphereGeometry(0.05, 8, 6),
+    wood: new MeshStandardMaterial({ color: "#5a3a22", roughness: 0.9 }),
+    gold: new MeshStandardMaterial({ color: "#e0b84a", roughness: 0.4, metalness: 0.6 }),
+  }
+  return bannerParts
+}
+
+/**
+ * A guildmaster's back-banner (a sashimono): a staff on the chest bone, rising behind the head, with
+ * the party's pennant flying sideways so it reads from the isometric camera. Only while several
+ * parties share the island; the pennant's material is this guildmaster's own.
+ */
+function useBackBanner(body: Object3D, color: string, on: boolean): void {
+  useEffect(() => {
+    if (!on) return
+    const chest = body.getObjectByName("chest")
+    if (!chest) return
+    const parts = partsOfBanner()
+    const cloth = new MeshStandardMaterial({ color, roughness: 0.75, side: DoubleSide })
+    const group = new Group()
+    group.name = "back-banner"
+    const staff = new Mesh(parts.staff, parts.wood)
+    // Tall enough to fly over the widest hat (the guildmaster's brim reaches ~2.6 up).
+    staff.position.set(0, 1.15, -0.36)
+    const knob = new Mesh(parts.knob, parts.gold)
+    knob.position.set(0, 2.27, -0.36)
+    const flag = new Mesh(parts.flag, cloth)
+    flag.position.set(0.02, 2.2, -0.36)
+    for (const mesh of [staff, knob, flag]) {
+      mesh.castShadow = false
+      group.add(mesh)
+    }
+    chest.add(group)
+    return () => {
+      group.removeFromParent()
+      cloth.dispose()
+    }
+  }, [body, color, on])
 }

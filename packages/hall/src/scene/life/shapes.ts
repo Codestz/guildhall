@@ -149,3 +149,58 @@ export function bowGeometry(): BufferGeometry {
   const string = paint(new CylinderGeometry(0.006, 0.006, height, 3).translate(tip, 0, 0), () => STRING)
   return merge([limbs, string])
 }
+
+// ---- The townsfolk's things (scene/life/rounds.ts): what farmers, merchants and guards carry ------
+
+const WICKER = new Color("#a67c45")
+const LEAVES = new Color("#5f9a3c")
+const CARROT = new Color("#d9772b")
+const IRON = new Color("#6f7378")
+const BRISTLE = new Color("#c9a85a")
+
+/** A basket of greens and carrots, carried in both arms. */
+export function produceGeometry(): BufferGeometry {
+  const basket = paint(new CylinderGeometry(0.42, 0.32, 0.36, 7, 1), () => WICKER)
+  const greens = paint(new IcosahedronGeometry(0.2, 0).translate(-0.12, 0.22, 0.04), () => LEAVES)
+  const more = paint(new IcosahedronGeometry(0.17, 0).translate(0.16, 0.2, -0.08), () => LEAVES)
+  const carrot = paint(
+    new ConeGeometry(0.06, 0.4, 5).rotateZ(Math.PI / 2.4).translate(0.08, 0.26, 0.16),
+    () => CARROT,
+  )
+  return merge([basket, greens, more, carrot])
+}
+
+/** A small wooden crate, carried in both arms. */
+export function crateGeometry(): BufferGeometry {
+  return paint(new BoxGeometry(0.62, 0.48, 0.5), (normal) => (Math.abs(normal.y) > 0.9 ? PLANK_END : PLANK))
+}
+
+/** A hoe along +y from the grip at the origin, its iron blade at the top. */
+export function hoeGeometry(): BufferGeometry {
+  const shaft = paint(new CylinderGeometry(0.03, 0.035, 1.7, 5).translate(0, 0.55, 0), () => SHAFT)
+  const blade = paint(new BoxGeometry(0.32, 0.05, 0.2).translate(0, 1.38, 0.1), () => IRON)
+  return merge([shaft, blade])
+}
+
+/** A wooden bucket hanging from the hand, its handle at the origin. */
+export function bucketGeometry(): BufferGeometry {
+  const pail = paint(new CylinderGeometry(0.22, 0.17, 0.32, 8, 1).translate(0, -0.3, 0), (normal) =>
+    normal.y > 0.9 ? FISH_BACK : PLANK,
+  )
+  const handle = paint(new TorusGeometry(0.2, 0.012, 3, 8, Math.PI).translate(0, -0.16, 0), () => IRON)
+  return merge([pail, handle])
+}
+
+/** A guard's spear along +y from the grip at the origin. */
+export function spearGeometry(): BufferGeometry {
+  const shaft = paint(new CylinderGeometry(0.025, 0.03, 2.3, 5).translate(0, 0.65, 0), () => SHAFT)
+  const tip = paint(new ConeGeometry(0.06, 0.3, 4).translate(0, 1.95, 0), () => IRON)
+  return merge([shaft, tip])
+}
+
+/** A broom along +y from the grip at the origin, its bristles at the bottom. */
+export function broomGeometry(): BufferGeometry {
+  const shaft = paint(new CylinderGeometry(0.025, 0.03, 1.5, 5).translate(0, 0.1, 0), () => SHAFT)
+  const bristles = paint(new ConeGeometry(0.18, 0.42, 6).translate(0, -0.78, 0), () => BRISTLE)
+  return merge([shaft, bristles])
+}

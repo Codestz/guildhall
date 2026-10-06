@@ -41,6 +41,9 @@ export const Captions = memo(function Captions({
     const narrator = new Narrator({
       session: (id) => store.sessionOf(id),
       actor: (id) => store.views.find((view) => view.id === id),
+      party: (master) => store.parties.find((party) => party.id === master),
+      parties: () => store.parties.length,
+      following: () => store.following,
     })
     narrator.quietUntil = clock() + quietMs
     let timer: ReturnType<typeof setTimeout> | undefined

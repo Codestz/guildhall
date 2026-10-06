@@ -238,13 +238,18 @@ export class Director {
   }
   /** Fewer cuts (prefers-reduced-motion). */
   calm = false
+  /**
+   * Who may be filmed: the followed party's session ids, or null for everyone on stage (all
+   * parties, scored together). Places (the graveyard, world events) are always in scope.
+   */
+  scope: ReadonlySet<string> | null = null
 
   private recs: Rec[] = []
   private byKey = new Map<string, Rec>()
   /** The next shot a chain asks for once the current one has run its length. */
   private chain: { key: string; beat: Beat } | undefined
-  /** Quests seen since the last rebuild: the first opens on an establishing shot. */
-  private quests = 0
+  /** Parties (root ids) whose first quest has been seen since the last rebuild: each opens wide. */
+  private opened = new Set<string>()
   private establishPending = false
 
   /** Ask for attention: `weight` (WEIGHTS scale) for `ttlMs`, then it fades. */
@@ -279,8 +284,11 @@ export class Director {
     this.add(rec, weight)
     this.setBeat(rec, moment.kind, weight)
     if (moment.kind === "quest") {
-      // The run's first quest opens wide (unless the camera is already wide).
-      if (this.quests++ === 0 && this.shot.kind !== "establishing") this.establishPending = true
+      // A party's first quest opens wide (unless the camera is already wide, or it isn't filmed).
+      if (!this.opened.has(moment.master)) {
+        this.opened.add(moment.master)
+        if (this.shot.kind !== "establishing" && this.inScope(moment.id)) this.establishPending = true
+      }
     } else if (moment.kind === "join" && moment.parent) {
       rec.parent = moment.parent
       const parent = this.byKey.get(moment.parent)
@@ -303,7 +311,7 @@ export class Director {
     this.recs = []
     this.byKey.clear()
     this.chain = undefined
-    this.quests = 0
+    this.opened.clear()
     this.establishPending = false
     this.restart()
   }
@@ -338,7 +346,8 @@ export class Director {
 
     // 1. Score everyone.
     for (let i = 0; i < this.recs.length; i++) (this.recs[i] as Rec).steady = 0
-    for (const view of stage.views) this.rec(view.id).steady = STEADY[view.phase] ?? 0
+    for (const view of stage.views)
+      if (this.inScope(view.id)) this.rec(view.id).steady = STEADY[view.phase] ?? 0
     let best: Rec | undefined
     let current: Rec | undefined
     let sumX = 0
@@ -353,7 +362,8 @@ export class Director {
         rec.x = rec.place.x
         rec.z = rec.place.z
       } else {
-        rec.located = stage.locate(rec.key, point)
+        // Out of scope (another party, while one is followed) counts as off stage.
+        rec.located = this.inScope(rec.key) && stage.locate(rec.key, point)
         rec.x = point.x
         rec.z = point.z
       }
@@ -441,6 +451,10 @@ export class Director {
   }
 
   // ── internals ──
+
+  private inScope(id: string): boolean {
+    return this.scope === null || this.scope.has(id)
+  }
 
   private cutTo(subject: Rec | undefined, why: Beat, cx: number, cz: number, stage: Stage): void {
     const shot = this.shot

@@ -15,6 +15,7 @@ import {
 import type { GuildStore } from "../guild/store.ts"
 import { spell } from "../guild/story.ts"
 import { Icon } from "./icons.tsx"
+import { Pennant } from "./Parties.tsx"
 
 const NOTE_GLYPH: Record<NotableKind, keyof typeof Icon> = {
   plea: "plea",
@@ -40,14 +41,42 @@ export function Legends({ store, onClose }: { store: GuildStore; onClose: () => 
   const history = store.moments.history
   const second = Math.floor(store.time / 1000)
   const status = store.views.map((v) => v.phase).join()
+  // One book per party: the followed one first, else the newest. A chooser when there are several.
+  const parties = store.parties
+  const [chosen, setChosen] = useState<string | undefined>(() => store.focalParty?.id)
+  const book = parties.find((p) => p.id === chosen) ?? store.focalParty
+  const tabs = useRef<(HTMLButtonElement | null)[]>([])
 
   // Shows the probe hook forced (dev / probe builds only; empty otherwise).
   const forced = worldEventsOf(store).forced
   // biome-ignore lint/correctness/useExhaustiveDependencies: rebuilt when the story moves, not per render
   const legend = useMemo(
-    () => legendOf(store.moments.history, store.party(), forced),
-    [store, store.moments.epoch, history.length, second, status, forced.length],
+    () => legendOf(store.moments.history, store.party(book?.id), forced),
+    [store, store.moments.epoch, history.length, second, status, forced.length, book?.id],
   )
+
+  /** Tabs: arrows move between the books (and open the one reached), Home and End jump. */
+  function onTabKey(event: KeyboardEvent, index: number) {
+    const last = parties.length - 1
+    const next =
+      event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? index === last
+          ? 0
+          : index + 1
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? index === 0
+            ? last
+            : index - 1
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? last
+              : -1
+    if (next < 0) return
+    event.preventDefault()
+    setChosen(parties[next]?.id)
+    tabs.current[next]?.focus()
+  }
 
   useEffect(() => {
     head.current?.focus()
@@ -140,11 +169,47 @@ export function Legends({ store, onClose }: { store: GuildStore; onClose: () => 
             </button>
           </div>
         </header>
+        {parties.length > 1 && (
+          <div className="legends-books" role="tablist" aria-label="One book per party">
+            {parties.map((party, i) => {
+              const selected = party.id === book?.id
+              return (
+                <button
+                  key={party.id}
+                  ref={(el) => {
+                    tabs.current[i] = el
+                  }}
+                  type="button"
+                  role="tab"
+                  id={`legends-tab-${i}`}
+                  aria-selected={selected}
+                  aria-controls="legends-body"
+                  tabIndex={selected ? 0 : -1}
+                  className="legends-book"
+                  onClick={() => setChosen(party.id)}
+                  onKeyDown={(event) => onTabKey(event, i)}
+                >
+                  <Pennant color={party.color} size={15} />
+                  <span>{party.name}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
         <span className="visually-hidden" aria-live="polite">
           {copied === "done" ? "Legend copied as Markdown" : copied === "failed" ? "Could not copy" : ""}
         </span>
 
-        <div className="legends-body">
+        <div
+          className="legends-body"
+          id="legends-body"
+          {...(parties.length > 1
+            ? {
+                role: "tabpanel",
+                "aria-labelledby": `legends-tab-${Math.max(0, parties.indexOf(book as (typeof parties)[number]))}`,
+              }
+            : {})}
+        >
           {!legend ? (
             <p className="legends-empty">
               When the guildmaster takes up a quest, its story is written here, chapter by chapter.

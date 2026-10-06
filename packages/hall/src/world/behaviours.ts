@@ -19,10 +19,16 @@ import { route } from "./paths.ts"
  * scene/Adventurer.tsx) walks the body, plays the clip, shows what is held and fires the beats.
  */
 
-/** Things carried in the hands for a moment (drawn by scene/life/shapes.ts). */
-export type Held = "log" | "stone" | "fish" | "book" | "plank" | "note"
-/** A tool the trade holds the whole time it works (not in kit.glb: drawn like the held things). */
-export type Tool = "rod" | "bow"
+/**
+ * Things carried in the hands for a moment (drawn by scene/life/shapes.ts). `produce` and `crate`
+ * are the townsfolk's (scene/life/rounds.ts): a farmer's basket, a merchant's stock.
+ */
+export type Held = "log" | "stone" | "fish" | "book" | "plank" | "note" | "produce" | "crate"
+/**
+ * A tool the trade holds the whole time it works (not in kit.glb: drawn like the held things).
+ * The hoe, bucket, spear and broom are the townsfolk's.
+ */
+export type Tool = "rod" | "bow" | "hoe" | "bucket" | "spear" | "broom"
 /** A visible beat of work: an axe bite, a stone chip, a spark, a puff of steam… (scene/life/WorkFx). */
 export type Beat =
   | "chop"
@@ -442,13 +448,18 @@ const SHELVES: readonly { stand: Spot; at: Spot }[] = [
 
 export const STATION_WORK: Record<StationId, Behaviour> = {
   "quest-board": {
-    spots: () => ({
-      work: [0, -10.4],
-      board: [0, -8.65],
-      paceL: [-1.9, -7.9],
-      paceR: [1.9, -7.9],
-      hall: HALL,
-    }),
+    // Berth 0 is the dais; 1 and 2 are the seats of other parties' guildmasters (guild/parties.ts),
+    // who face the back wall at their own post and pace on the spot, clear of the dais.
+    spots: (post, n) =>
+      n === 0
+        ? { work: [0, -10.4], board: [0, -8.65], paceL: [-1.9, -7.9], paceR: [1.9, -7.9], hall: HALL }
+        : {
+            work: [post[0], -10.8],
+            board: [post[0], r2(post[1] - 0.9)],
+            paceL: [r2(post[0] - 0.7), r2(post[1] + 0.4)],
+            paceR: [r2(post[0] + 0.7), r2(post[1] + 0.4)],
+            hall: HALL,
+          },
     marks: marks("work", "hall"),
     loop: [
       { walk: "board" },

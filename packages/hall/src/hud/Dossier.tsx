@@ -22,6 +22,8 @@ export function Dossier({
   const scroller = useRef<HTMLOListElement>(null)
   const pinned = useRef(true)
   const count = session?.entries.length ?? 0
+  // Several parties on the island: whose quest they are on, in the eyebrow.
+  const party = store.parties.length > 1 ? store.parties.find((p) => p.id === view?.party) : undefined
 
   // Follow the newest entry unless the reader scrolled up to read something older.
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when the transcript grows
@@ -44,7 +46,9 @@ export function Dossier({
       <header className="dossier-head">
         <Sigil title={view?.role ?? title} color={color} ordinal={view?.ordinal} size="lg" />
         <div className="dossier-id">
-          <span className="eyebrow">{view?.master ? "Guildmaster" : "Adventurer"} · Dossier</span>
+          <span className="eyebrow">
+            {view?.master ? "Guildmaster" : "Adventurer"} · {party ? `${party.name} quest` : "Dossier"}
+          </span>
           <h2 id="dossier-h">{title}</h2>
           <Status tone={state.tone} label={state.label} />
         </div>

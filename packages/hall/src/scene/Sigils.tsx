@@ -127,7 +127,7 @@ export function Sigils() {
   )
 }
 
-const SIGIL_ATTRIBUTES = ["aAnchor", "aState", "aRim", "aFlash"] as const
+const SIGIL_ATTRIBUTES = ["aAnchor", "aState", "aRim", "aFlash", "aBanner"] as const
 const BURST_ATTRIBUTES = ["aOrigin", "aMotion", "aLook", "aShape"] as const
 
 type Uniforms = Record<string, { value: unknown }>
@@ -158,11 +158,12 @@ const DISC = 0.8
 
 function sigilMesh(board: SigilBoard, uniforms: Uniforms, atlas: CanvasTexture): InstancedMesh {
   const geometry = new PlaneGeometry(2, 2)
-  const { anchor, state, rim, flash } = board.sigils
+  const { anchor, state, rim, flash, banner } = board.sigils
   geometry.setAttribute("aAnchor", dynamic(anchor, 4))
   geometry.setAttribute("aState", dynamic(state, 4))
   geometry.setAttribute("aRim", dynamic(rim, 4))
   geometry.setAttribute("aFlash", dynamic(flash, 4))
+  geometry.setAttribute("aBanner", dynamic(banner, 4))
   const material = new ShaderMaterial({
     uniforms: { ...uniforms, uAtlas: { value: atlas } },
     vertexShader: /* glsl */ `
@@ -172,6 +173,8 @@ function sigilMesh(board: SigilBoard, uniforms: Uniforms, atlas: CanvasTexture):
       attribute vec4 aState;  // cell, alpha, scale, lift px
       attribute vec4 aRim;    // rgb, bob phase
       attribute vec4 aFlash;  // rgb, amount
+      attribute vec4 aBanner; // party banner rgb, on (several parties on the island)
+      varying vec4 vBanner;
       varying vec2 vLocal;
       varying float vCell;
       varying float vAlpha;
@@ -189,6 +192,7 @@ function sigilMesh(board: SigilBoard, uniforms: Uniforms, atlas: CanvasTexture):
         vAlpha = aState.y;
         vRim = aRim.rgb;
         vFlash = aFlash;
+        vBanner = aBanner;
       }
     `,
     fragmentShader: /* glsl */ `
@@ -202,6 +206,7 @@ function sigilMesh(board: SigilBoard, uniforms: Uniforms, atlas: CanvasTexture):
       varying float vAlpha;
       varying vec3 vRim;
       varying vec4 vFlash;
+      varying vec4 vBanner;
       const float DISC = ${DISC.toFixed(2)};
       const float FACE = 0.69;    // the inner ink face; the rim is FACE..DISC
       const float ICON = 0.62;    // half the glyph box
@@ -230,8 +235,12 @@ function sigilMesh(board: SigilBoard, uniforms: Uniforms, atlas: CanvasTexture):
         colour = mix(colour, mix(uPaper, vFlash.rgb, vFlash.a * 0.45), glyph);
         // A soft shadow just outside the rim lifts it off busy ground.
         float shade = (1.0 - smoothstep(DISC, 1.0, r)) * 0.4;
-        float alpha = disc + (1.0 - disc) * shade;
-        gl_FragColor = vec4(colour * uBright * disc / max(alpha, 1e-4), alpha * vAlpha);
+        // Several parties on the island: a thin ring of the party's banner just outside the dark
+        // outer line (the role keeps the rim; the party gets the ring).
+        float ring = vBanner.a * (1.0 - disc) * (1.0 - smoothstep(DISC + 0.13 - aa, DISC + 0.13 + aa, r));
+        float alpha = disc + ring + (1.0 - disc - ring) * shade;
+        vec3 lit = (colour * disc + vBanner.rgb * ring) * uBright;
+        gl_FragColor = vec4(lit / max(alpha, 1e-4), alpha * vAlpha);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }

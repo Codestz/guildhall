@@ -28,7 +28,18 @@ const TO_BACK = Math.PI
 const TO_GATE = 0
 
 export const STATIONS: Record<StationId, Station> = {
-  "quest-board": { id: "quest-board", label: "Quest board", at: [0, -10], posts: [[0, -7.4, TO_BACK]] },
+  // The dais first (the guildmaster's place), then two seats beside it for the guildmasters of other
+  // parties on the island at once (guild/parties.ts): one per conversation, never shared.
+  "quest-board": {
+    id: "quest-board",
+    label: "Quest board",
+    at: [0, -10],
+    posts: [
+      [0, -7.4, TO_BACK],
+      [4.4, -7.6, TO_BACK],
+      [9.2, -6.8, TO_BACK],
+    ],
+  },
   library: {
     id: "library",
     label: "Library",
@@ -128,3 +139,10 @@ export function hearthSeat(n: number): Post {
 
 /** Where the guildmaster takes loot: just in front of the dais. */
 export const HAND_IN: Post = [1.8, -5.6, -Math.PI * 0.75]
+
+/** Where loot is handed to each seat's guildmaster (STATIONS["quest-board"].posts), facing them. */
+export const HAND_INS: readonly Post[] = [
+  HAND_IN,
+  [6, -5.6, Math.atan2(-1.6, -2)],
+  [10.6, -5, Math.atan2(-1.4, -1.8)],
+]

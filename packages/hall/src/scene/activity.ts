@@ -18,11 +18,17 @@ import {
 import {
   bookGeometry,
   bowGeometry,
+  broomGeometry,
+  bucketGeometry,
+  crateGeometry,
   fishGeometry,
+  hoeGeometry,
   logGeometry,
   noteGeometry,
   plankGeometry,
+  produceGeometry,
   rodGeometry,
+  spearGeometry,
   stoneGeometry,
 } from "./life/shapes.ts"
 
@@ -144,6 +150,31 @@ const GRIPS: Record<Held | Tool, Grip> = {
   },
   rod: { make: rodGeometry, bone: HAND_SLOT.right, scale: 1, position: [0, -0.1, 0], rotation: [0, 0, 0] },
   bow: { make: bowGeometry, bone: HAND_SLOT.left, scale: 1, position: [0, 0, 0], rotation: [0, 0, 0] },
+  // The townsfolk's (scene/life/rounds.ts): loads on the chest like a log, tools in the right hand.
+  produce: {
+    make: produceGeometry,
+    bone: "chest",
+    scale: 0.8,
+    position: [0, -0.12, 0.6],
+    rotation: [0, 0, 0],
+  },
+  crate: { make: crateGeometry, bone: "chest", scale: 0.85, position: [0, -0.1, 0.6], rotation: [0, 0, 0] },
+  hoe: { make: hoeGeometry, bone: HAND_SLOT.right, scale: 1, position: [0, -0.2, 0], rotation: [0, 0, 0] },
+  bucket: {
+    make: bucketGeometry,
+    bone: HAND_SLOT.right,
+    scale: 1,
+    position: [0, 0.05, 0],
+    rotation: [0, 0, 0],
+  },
+  spear: {
+    make: spearGeometry,
+    bone: HAND_SLOT.right,
+    scale: 1,
+    position: [0, -0.3, 0],
+    rotation: [0, 0, 0],
+  },
+  broom: { make: broomGeometry, bone: HAND_SLOT.right, scale: 1, position: [0, 0, 0], rotation: [0, 0, 0] },
 }
 
 /** One geometry per kind and one material for all of it, for the app's lifetime (never freed). */

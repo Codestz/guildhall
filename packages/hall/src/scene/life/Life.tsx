@@ -23,13 +23,16 @@ import { WorkFx } from "./WorkFx.tsx"
  *   sparks     the smithy's anvil (implementers at work)
  *   birds      a quiet flock over the forest by day, in fair weather
  *   windows    the village's windows glow from dusk, going dark through the night
- *   villagers  a farmer and two townsfolk on their rounds by day, indoors by night
+ *   townsfolk  farmers, a fisher, merchants, gate guards, children, a graveyard keeper and villagers
+ *              about their day (rounds.ts, Villagers.tsx): home at dusk and in the rain, guards and a
+ *              night watchman out after dark with lanterns, on the square at a festival
  *   ravens     carry quests out, news of loot home, and circle over a plea (Ravens.tsx)
  *   work       what working looks like between results: chips, sparks, steam, splashes, arrows in
  *              flight, the forest's shaking work trees, the forge's quench buckets (WorkFx.tsx)
- * Draw calls (High): machines 1, traces 1, smoke 1, sparks 1, birds 1, windows 2, villagers 3, ravens 2,
- * work 5 = 17. Medium: 2 villagers = 16. Low: none = 14. Nothing here casts into the (static) sun shadow map;
- * villagers get a blob shadow (scene/Blobs.tsx).
+ * Draw calls (High): machines 1, traces 1, smoke 1, sparks 1, birds 1, windows 2, ravens 2, work 5,
+ * plus one per townsperson out (14 at High, 8 Medium, 4 Low) and one per held thing or lantern
+ * showing. Nothing here casts into the (static) sun shadow map; townsfolk get a blob shadow
+ * (scene/Blobs.tsx).
  */
 export function Life() {
   const store = useGuildStore()

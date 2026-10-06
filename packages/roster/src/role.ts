@@ -154,7 +154,7 @@ export const READ_ONLY: Permissions = { edit: "deny", bash: "deny", web: "deny",
  * Agent and command folders are denied for Markdown only (OpenCode loads `*.md` there; code in a
  * `commands/` folder is ordinary code); skill folders entirely, scripts included.
  */
-const PROTECTED: readonly string[] = [
+export const PROTECTED: readonly string[] = [
   ".opencode/*",
   "opencode.json*",
   "AGENTS.md",

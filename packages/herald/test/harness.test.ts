@@ -1,14 +1,21 @@
 import { describe, expect, test } from "bun:test"
 import { ROLES } from "@guildhall/roster"
 import { injectV1, type V1Rules, type V2Agent, v1Permission, v2Agent } from "../src/agents.ts"
+import { inspect } from "../src/guard.ts"
 import { type Effect, evaluate, fromV1, type Rule, shell, V1_BASE, V2_BASE } from "./support/opencode.ts"
-import { ATTACKS, CHECK_LINES } from "./support/shell-cases.ts"
+import { ATTACKS, CHECK_LINES, GAP_ATTACKS } from "./support/shell-cases.ts"
 
 /**
  * The guild's permissions as OpenCode itself resolves them (docs/reviews/review-2.md, findings 1–4
  * and 7): the herald's real output, merged over each version's own defaults, run through a port of
- * OpenCode's matcher (./support/opencode.ts, 1.18.32 and 2.0.18).
+ * OpenCode's matcher (./support/opencode.ts, 1.18.32 and 2.0.18). A shell line is first put to the
+ * herald's shell guard (src/guard.ts), which runs before the tool on both versions: what it denies
+ * never reaches OpenCode's rules.
  */
+
+type Guard = (agent: string, line: string) => string | undefined
+/** The guard switched off, for the mutation test. */
+const NO_GUARD: Guard = () => undefined
 
 const role = (id: string) => ROLES.find((r) => r.id === id)!
 
@@ -84,17 +91,27 @@ function table(inputs: readonly string[], decide: (input: string) => Effect): [s
 const all = (inputs: readonly string[], effect: Effect) =>
   inputs.map((input): [string, Effect] => [input, effect])
 
+/** Lines in ATTACKS that write a protected path: the guard denies them to the builders outright. */
+const PROTECTED_ATTACKS = new Set(["git status >> .git/hooks/pre-commit"])
+
 for (const version of VERSIONS) {
   const rules = version.rules
-  const run = (id: string) => (line: string) => shell(rules(id), line, version.shell)
+  /** What happens to a shell line: the guard first, then OpenCode's rules. */
+  const decide = (guard: Guard, id: string, line: string): Effect =>
+    guard(id, line) ? "deny" : shell(rules(id), line, version.shell)
+  const run = (id: string) => (line: string) => decide(inspect, id, line)
 
   describe(`${version.name}: the shell`, () => {
     test("the verifier is denied every attack line", () => {
       expect(table(ATTACKS, run("guild-verifier"))).toEqual(all(ATTACKS, "deny"))
     })
 
-    test("the implementer and the designer are asked before every attack line, never let through", () => {
-      for (const id of BUILDERS) expect(table(ATTACKS, run(id))).toEqual(all(ATTACKS, "ask"))
+    test("the implementer and the designer are asked before every attack line, or denied, never let through", () => {
+      const expected = ATTACKS.map((line): [string, Effect] => [
+        line,
+        PROTECTED_ATTACKS.has(line) ? "deny" : "ask",
+      ])
+      for (const id of BUILDERS) expect(table(ATTACKS, run(id))).toEqual(expected)
     })
 
     test("the verifier and the builders run the project's checks without a prompt", () => {
@@ -112,9 +129,25 @@ for (const version of VERSIONS) {
       )
     })
 
-    test("known gap: a redirect after &&, || or | is invisible to OpenCode (docs/harness.md)", () => {
-      // tree-sitter hangs it on the list or pipeline, and OpenCode checks only the commands in it.
-      expect(run("guild-verifier")("git status && git diff HEAD > src/index.ts")).toBe("allow")
+    test("closed: a redirect after &&, || or |, on a group, or with no command is denied to the verifier", () => {
+      expect(table(GAP_ATTACKS, run("guild-verifier"))).toEqual(all(GAP_ATTACKS, "deny"))
+    })
+
+    test("closed: the builders can't reach a protected path through a redirect OpenCode can't see", () => {
+      const lines = [
+        "git status && git diff HEAD > AGENTS.md",
+        "(git show) > .opencode/agents/x.md",
+        "> CLAUDE.md",
+      ]
+      for (const id of BUILDERS) expect(table(lines, run(id))).toEqual(all(lines, "deny"))
+    })
+
+    test("mutation: without the guard, OpenCode's rules alone let every gap line through", () => {
+      // tree-sitter hangs the redirect on the list, pipeline or group (or there is no command), and
+      // OpenCode checks only the commands. If this fails, the guard is no longer what closes the gap.
+      const unguarded = (id: string) => (line: string) => decide(NO_GUARD, id, line)
+      expect(table(GAP_ATTACKS, unguarded("guild-verifier"))).toEqual(all(GAP_ATTACKS, "allow"))
+      expect(unguarded("guild-implementer")("git status && git diff HEAD > AGENTS.md")).toBe("allow")
     })
   })
 

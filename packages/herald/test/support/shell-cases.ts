@@ -83,3 +83,82 @@ export const CHECK_LINES: readonly string[] = [
   "git show --stat",
   "cd packages/hall && bun test",
 ]
+
+/**
+ * Lines OpenCode's rules alone let the verifier run (its matcher never sees the redirect: tree-sitter
+ * hangs it on the list, pipeline or group, or there is no command at all). Only the shell guard
+ * (src/guard.ts) stops them.
+ */
+export const GAP_ATTACKS: readonly string[] = [
+  "git status && git diff HEAD > src/index.ts",
+  "git status || git diff HEAD > src/index.ts",
+  "git status | git diff > src/index.ts",
+  "git status && git diff >> .git/hooks/pre-commit",
+  "git status && bun test 2>&1 > ~/.zshrc",
+  "git status && git diff &> src/index.ts",
+  "(git show) > src/index.ts",
+  "> src/index.ts",
+]
+
+/**
+ * More lines the verifier must be denied, checked by the guard alone: some use syntax the port of
+ * OpenCode's splitter doesn't model (`{ }`, here-documents).
+ */
+export const GUARD_ATTACKS: readonly string[] = [
+  ...GAP_ATTACKS,
+  // groups
+  "{ git show; } > src/index.ts",
+  "(git status; git diff) > src/index.ts",
+  "(git status)",
+  // here-documents and here-strings
+  "git status && cat <<EOF > AGENTS.md\nx\nEOF",
+  "bun test <<EOF\nx\nEOF",
+  "bun test <<< x",
+  // substitutions, here and nested
+  "git diff $(echo HEAD)",
+  "git diff `echo HEAD`",
+  'git diff "$(git diff > src/index.ts)"',
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: shell syntax
+  "git diff ${X:-$(id)}",
+  "bun test <(id)",
+  "bun test >(sh)",
+  "bun test =(id)",
+  // every redirect form, alone and after a check
+  "git diff < src/index.ts",
+  "bun test 2> src/index.ts",
+  "bun test >| src/index.ts",
+  "bun test <> src/index.ts",
+  "bun test 1>&2",
+  "bun test >&2",
+  "git status 2>&1 > src/index.ts",
+  "git status 2>&1 && git diff 2> src/index.ts",
+  "cd .git && git diff > hooks/pre-commit",
+  // quoting tricks: a check spelled with quotes or escapes is not that check
+  "'bun' test",
+  '"bun test"',
+  "bun\\ test",
+  "bun te\\st",
+  "bun test '>' src/index.ts",
+  // newlines and continuations
+  "bun test\ngit diff > src/index.ts",
+  "bun test \\\n> src/index.ts",
+  // other operators
+  "bun test &",
+  "bun test 2>&1 | tee out.txt",
+  "bun test # > src/index.ts",
+  // nothing to run, or unreadable
+  "",
+  "cd src",
+  "git diff 'HEAD",
+  "git diff $(echo",
+]
+
+/** Guild checks the verifier may chain; none may be denied by the guard. */
+export const GUARD_CHECK_LINES: readonly string[] = [
+  ...CHECK_LINES,
+  "bun test 2>&1 && git status",
+  "git status\ngit diff",
+  "git diff --stat; git status --short",
+  "cd packages/hall && bun test 2>&1",
+  "bun test || git status",
+]

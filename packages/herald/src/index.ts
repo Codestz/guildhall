@@ -4,12 +4,14 @@ import { basename, join } from "node:path"
 import { createV1Translator, createV2Translator } from "@guildhall/core"
 import { injectV1, injectV2, readOptions, type V2AgentDomain } from "./agents.ts"
 import { createCourier } from "./courier.ts"
+import { type V2ToolCall, v1Guard, v2Guard } from "./guard.ts"
 import { createLocationFilter, type Located } from "./locate.ts"
 
 /**
  * The herald (CONTEXT.md): the OpenCode half of Guildhall. It brings the guild's agents into
- * OpenCode (src/agents.ts, ADR 0002), listens to OpenCode's events, translates them with
- * cockpit's translators into `Change`s, and sends them to the hub.
+ * OpenCode (src/agents.ts, ADR 0002), checks their shell calls before they run (src/guard.ts),
+ * listens to OpenCode's events, translates them with cockpit's translators into `Change`s, and
+ * sends them to the hub.
  *
  * One default export both OpenCodes load (cockpit's dual shape, docs/opencode/plugin-api.md):
  * OpenCode 1 calls `server(input)` and gets hooks back; OpenCode 2 calls `setup(ctx)`.
@@ -47,14 +49,17 @@ interface V2Context {
   options?: unknown
   agent?: V2AgentDomain
   location?: { directory: string }
-  tool?: unknown
+  tool?: { hook?(name: "execute.before", callback: (call: V2ToolCall) => void): Promise<unknown> }
   event?: { subscribe(options: { signal: AbortSignal }): AsyncIterable<unknown> }
 }
 
 export default {
   id: ID,
 
-  /** OpenCode 1: the `config` hook adds the agents, the `event` hook sees every bus event. */
+  /**
+   * OpenCode 1: the `config` hook adds the agents, `chat.params` and `tool.execute.before` guard
+   * their shell, the `event` hook sees every bus event.
+   */
   server: async (input: V1Input, raw?: unknown) => {
     const guild = basename(input.directory)
     log(`v1 server start in ${input.directory}`)
@@ -62,6 +67,7 @@ export default {
     const translator = createV1Translator(unknown(1))
     const courier = createCourier({ guild, opencode: 1, log })
     return {
+      ...(options.agents === false ? {} : v1Guard(log)),
       config: async (cfg: { agent?: Record<string, unknown> }) => {
         try {
           injectV1(cfg, options)
@@ -84,11 +90,19 @@ export default {
   setup: async (ctx: V2Context) => {
     // v1 1.18.29+ also calls setup with a preview context: no tools, no location. Skip it.
     if (!ctx.tool || !ctx.location) return
+    const options = readOptions(ctx.options, log)
     if (ctx.agent) {
       try {
-        injectV2(ctx.agent, readOptions(ctx.options, log))
+        injectV2(ctx.agent, options)
       } catch (error) {
         log(`v2 agents failed: ${String(error)}`)
+      }
+    }
+    if (options.agents !== false && ctx.tool.hook) {
+      try {
+        await ctx.tool.hook("execute.before", v2Guard(log))
+      } catch (error) {
+        log(`v2 shell guard failed: ${String(error)}`)
       }
     }
     if (!ctx.event) return

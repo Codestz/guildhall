@@ -18,17 +18,10 @@
  * Every line in the harness tests was checked against tree-sitter-bash carved from the 2.0.18 binary.
  */
 
-/** v2 `H0` / v1 `ql`, verbatim but for names. */
-export function match(value: string, pattern: string): boolean {
-  const text = value.replaceAll("\\", "/")
-  let source = pattern
-    .replaceAll("\\", "/")
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*/g, ".*")
-    .replace(/\?/g, ".")
-  if (source.endsWith(" .*")) source = `${source.slice(0, -3)}( .*)?`
-  return new RegExp(`^${source}$`, "s").test(text)
-}
+import { match } from "../../src/match.ts"
+
+/** v2 `H0` / v1 `ql`: shared with the shell guard (src/match.ts). */
+export { match }
 
 export type Effect = "allow" | "ask" | "deny"
 

@@ -3,6 +3,7 @@ import { type GuildStore, SCENARIOS, type ScenarioId } from "../guild/store.ts"
 import { MOODS, type Mood } from "../world/moods.ts"
 import { clock, MARKER_LABEL } from "./format.ts"
 import { Icon } from "./icons.tsx"
+import { WeatherLevers } from "./Weather.tsx"
 
 const SPEEDS = [0.5, 1, 2, 4] as const
 const STORIES: Record<ScenarioId, string> = { party: "Party", solo: "Solo", rush: "Rush" }
@@ -138,6 +139,8 @@ export function Console({ store, stageOpen }: { store: GuildStore; stageOpen: bo
             ))}
           </div>
         </fieldset>
+
+        <WeatherLevers store={store} />
 
         <fieldset className="lever lever-view">
           <legend>View</legend>

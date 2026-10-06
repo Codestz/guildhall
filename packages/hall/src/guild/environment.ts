@@ -96,24 +96,259 @@ export function skyOf(hour: number): Pick<Environment, "hour" | "daylight" | "su
   return { hour, daylight, sun, moon }
 }
 
+// ---------------------------------------------------------------------------------------------------
+// Weather and temperature: logic over the session model. Pure — no hidden state — so smoothness comes
+// from time windows: every input is weighted by its age, and the weather holds its worst state of the
+// last few seconds, so one event never flips it back and forth.
+
+/** Deeds weigh in on health for this long (run time), less the older they are. */
+const HEALTH_WINDOW_MS = 120_000
+/** Imagined successes behind every verdict: a single failure clouds the sky, it doesn't flood it. */
+const HEALTH_PRIOR = 3
+/** A failure is news, a success routine: a failed deed weighs this many completed ones. */
+const FAILURE_WEIGHT = 2
+/** Health this low is full gloom (1); a perfect record is none. */
+const GLOOM_AT_HEALTH = 0.4
+/** Gloom from which the sky is cloudy, and from which it rains: health ≈ 0.93 and 0.7. */
+const CLOUDY_GLOOM = 0.12
+const RAIN_GLOOM = 0.5
+/** A failed session is a full storm for this long, then fades out by `STORM_FADE_MS`. */
+const STORM_FULL_MS = 45_000
+const STORM_FADE_MS = 100_000
+/** A burst: failed deeds in this window, `BURST_FAILURES` of them (recency-weighted) make a full storm. */
+const BURST_WINDOW_MS = 20_000
+const BURST_FAILURES = 4
+const STORM_PRESSURE = 0.5
+/** The weather holds its worst state over these samples (now, 2.5 s ago, … 10 s ago). */
+const HOLD_SAMPLES = 5
+const HOLD_STEP_MS = 2500
+/** For the continuous values, each event eases in over this long instead of landing at once. */
+const RISE_MS = 6000
+/** Activity counts deeds started in the last minute (recency-weighted); this many is "busy". */
+const ACTIVITY_WINDOW_MS = 60_000
+const ACTIVITY_SCALE = 10
+/** Warmth: each deed adds heat that decays with this time constant; the run's start adds a mild baseline. */
+const HEAT_DECAY_MS = 600_000
+const HEAT_BASELINE = 22
+const HEAT_SCALE = 20
+/** Temperature from no heat (a long idle stretch) to a busy guild's summer. */
+const COLDEST = -6
+const WARMEST = 24
+/** Below this, precipitation falls as snow. */
+const FREEZING = 1
+/** Lightning: one chance per bucket of run time, at a hashed moment inside it. */
+const LIGHTNING_BUCKET_MS = 1200
+const LIGHTNING_CHANCE = 0.4
+const LIGHTNING_LOOKBACK = 6
+
+/** Weather a pinned setting shows: fixed conditions, so the demo's lever looks the same every time. */
+const PINNED: Record<Weather, Pick<Environment, "cloudCover" | "precipitation" | "wind">> = {
+  clear: { cloudCover: 0.15, precipitation: 0, wind: 0.2 },
+  cloudy: { cloudCover: 0.65, precipitation: 0, wind: 0.35 },
+  rain: { cloudCover: 0.85, precipitation: 0.65, wind: 0.45 },
+  storm: { cloudCover: 1, precipitation: 1, wind: 0.9 },
+  snow: { cloudCover: 0.8, precipitation: 0.6, wind: 0.25 },
+}
+
 /**
- * The world for this moment. The weather and temperature parts are deliberately simple here
- * (clear, mild); scene/weather's author replaces them with the full model (task: Weather).
+ * The world for this moment.
+ *
+ *   health        deeds (tool calls) that ended in the last 2 min, completed vs failed (a failure
+ *                 counts twice), newer ones weighing more, plus 3 imagined successes; 1 with no data
+ *   weather       storm while a session failed in the last ~75 s or failures come in a burst (≈3 in
+ *                 10 s); otherwise rain when health < ~0.7, cloudy < ~0.93, else clear. It holds the
+ *                 worst of the last 10 s, so it worsens at once and clears only when it stays better.
+ *                 Rain or storm below 1 °C is snow. A pinned setting wins.
+ *   cloudCover…   continuous, from the same pressures with every event easing in over 6 s, kept
+ *                 inside the band of the weather they show
+ *   lightningAt   during a storm: hashed strikes per 1.2 s bucket of run time (replays strike alike)
+ *   activity      deeds started in the last minute (recency-weighted), saturating at ~10
+ *   temperature   heat: every deed adds 1, decaying over ~10 min; the run's start adds a mild
+ *                 baseline (14 °C). Busy → ~24 °C; ~10 min idle → autumn (~8 °C); ~30 min → below 0
  */
 export function environmentOf(input: EnvironmentInput): Environment {
   const sky = skyOf(hourOf(input))
-  const weather = input.settings.weather === "auto" ? "clear" : input.settings.weather
+  const now = input.runStart + input.runTime
+  const reading = readModel(input.model, now, input.runStart)
+  const temperature = temperatureOf(reading.heat)
+  const pinned = input.settings.weather
+  if (pinned !== "auto") {
+    return {
+      ...sky,
+      weather: pinned,
+      ...PINNED[pinned],
+      lightningAt: pinned === "storm" ? lightningAt(input.runTime, 1) : -1,
+      // Keep the numbers agreeing with the sky: pinned snow is below freezing, pinned rain above.
+      temperature:
+        pinned === "snow"
+          ? Math.min(temperature, FREEZING - 2)
+          : pinned === "rain" || pinned === "storm"
+            ? Math.max(temperature, FREEZING + 1)
+            : temperature,
+      health: reading.health,
+      activity: reading.activity,
+    }
+  }
+
+  const gloomHeld = Math.max(...reading.gloom)
+  const stormHeld = Math.max(...reading.storm)
+  const { gloom, storm } = reading.soft
+  let weather: Weather =
+    stormHeld >= STORM_PRESSURE
+      ? "storm"
+      : gloomHeld >= RAIN_GLOOM
+        ? "rain"
+        : gloomHeld >= CLOUDY_GLOOM
+          ? "cloudy"
+          : "clear"
+  const intensity = Math.max(gloom, storm)
+  const band = BANDS[weather]
+  const cloudCover = clamp(0.1 + 0.9 * smoothstep(0, 0.75, intensity), band.cloud)
+  const precipitation = clamp(smoothstep(RAIN_GLOOM - 0.15, 1, intensity), band.rain)
+  const wind = clamp(0.15 + 0.3 * gloom + 0.55 * storm, band.wind)
+  if ((weather === "rain" || weather === "storm") && temperature < FREEZING) weather = "snow"
   return {
     ...sky,
     weather,
-    cloudCover: weather === "clear" ? 0.15 : weather === "cloudy" ? 0.6 : 0.9,
-    precipitation: weather === "rain" || weather === "snow" ? 0.6 : weather === "storm" ? 1 : 0,
-    wind: weather === "storm" ? 0.9 : 0.25,
-    lightningAt: -1,
-    temperature: weather === "snow" ? -3 : 18,
-    health: 1,
-    activity: 0,
+    cloudCover,
+    precipitation,
+    wind,
+    lightningAt: weather === "storm" ? lightningAt(input.runTime, storm) : -1,
+    temperature,
+    health: reading.health,
+    activity: reading.activity,
   }
+}
+
+type Range = readonly [min: number, max: number]
+/** What each weather allows of the continuous values, so they never contradict the name. */
+const BANDS: Record<Exclude<Weather, "snow">, { cloud: Range; rain: Range; wind: Range }> = {
+  clear: { cloud: [0, 0.35], rain: [0, 0], wind: [0, 0.4] },
+  cloudy: { cloud: [0.4, 0.75], rain: [0, 0], wind: [0.15, 0.6] },
+  rain: { cloud: [0.7, 0.95], rain: [0.25, 0.8], wind: [0.25, 0.75] },
+  storm: { cloud: [0.9, 1], rain: [0.7, 1], wind: [0.7, 1] },
+}
+
+interface Reading {
+  /** Health now. */
+  health: number
+  activity: number
+  heat: number
+  /** Gloom (from health) and storm pressure at each hold sample, now first. */
+  gloom: number[]
+  storm: number[]
+  /** The same now, with every event easing in over `RISE_MS`: for the continuous values. */
+  soft: { gloom: number; storm: number }
+}
+
+/** Slots 0…HOLD_SAMPLES-1 are the hold samples; the last is `soft`. */
+const SLOTS = HOLD_SAMPLES + 1
+const SOFT = HOLD_SAMPLES
+const offsetOf = (slot: number) => (slot === SOFT ? 0 : slot * HOLD_STEP_MS)
+const easeOf = (slot: number, age: number) => (slot === SOFT ? Math.min(1, age / RISE_MS) : 1)
+
+/** What one slot (a hold sample, or the soft "now") has gathered. */
+interface Tally {
+  ok: number
+  failed: number
+  burst: number
+  storm: number
+}
+
+/** One pass over every session and deed: everything the weather and temperature need. */
+function readModel(model: Model, now: number, runStart: number): Reading {
+  const tallies: Tally[] = Array.from({ length: SLOTS }, () => ({ ok: 0, failed: 0, burst: 0, storm: 0 }))
+  let busy = 0
+  let heat = HEAT_BASELINE * decay(now - runStart)
+
+  for (const session of model.sessions.values()) {
+    const failedAt = session.status === "failed" ? session.ended : undefined
+    if (failedAt !== undefined) {
+      tallies.forEach((tally, k) => {
+        const age = now - offsetOf(k) - failedAt
+        tally.storm = Math.max(tally.storm, stormAfter(age) * easeOf(k, age))
+      })
+    }
+    for (const entry of session.entries) {
+      if (entry.kind !== "tool" || entry.at > now) continue
+      heat += decay(now - entry.at)
+      if (entry.state === "running" || entry.state === "pending") busy += 1
+      else busy += fade(now - entry.at, ACTIVITY_WINDOW_MS)
+      if (entry.state !== "completed" && entry.state !== "failed") continue
+      const ended = entry.ended ?? entry.at
+      const succeeded = entry.state === "completed"
+      tallies.forEach((tally, k) => {
+        const age = now - offsetOf(k) - ended
+        const weight = fade(age, HEALTH_WINDOW_MS) ** 2 * easeOf(k, age)
+        if (weight === 0) return
+        if (succeeded) tally.ok += weight
+        else {
+          tally.failed += weight * FAILURE_WEIGHT
+          tally.burst += fade(age, BURST_WINDOW_MS) * easeOf(k, age)
+        }
+      })
+    }
+  }
+
+  const healthOf = (tally: Tally) => (tally.ok + HEALTH_PRIOR) / (tally.ok + tally.failed + HEALTH_PRIOR)
+  const gloomOf = (tally: Tally) => Math.min(1, (1 - healthOf(tally)) / (1 - GLOOM_AT_HEALTH))
+  const stormOf = (tally: Tally) => Math.max(tally.storm, Math.min(1, tally.burst / BURST_FAILURES))
+  const held = tallies.slice(0, HOLD_SAMPLES)
+  const soft = tallies[SOFT] ?? tallies[0]
+  return {
+    health: held[0] ? healthOf(held[0]) : 1,
+    activity: 1 - Math.exp(-busy / ACTIVITY_SCALE),
+    heat,
+    gloom: held.map(gloomOf),
+    storm: held.map(stormOf),
+    soft: soft ? { gloom: gloomOf(soft), storm: stormOf(soft) } : { gloom: 0, storm: 0 },
+  }
+}
+
+/** 1 for an event just now, falling linearly to 0 at `window`; 0 for the future. */
+function fade(age: number, window: number): number {
+  return age < 0 || age >= window ? 0 : 1 - age / window
+}
+
+/** What's left of a deed's heat after `age` ms. */
+function decay(age: number): number {
+  return age < 0 ? 0 : Math.exp(-age / HEAT_DECAY_MS)
+}
+
+/** Storm pressure `age` ms after a session failed. */
+function stormAfter(age: number): number {
+  if (age < 0 || age >= STORM_FADE_MS) return 0
+  if (age < STORM_FULL_MS) return 1
+  return 1 - (age - STORM_FULL_MS) / (STORM_FADE_MS - STORM_FULL_MS)
+}
+
+function temperatureOf(heat: number): number {
+  return COLDEST + (WARMEST - COLDEST) * (1 - Math.exp(-heat / HEAT_SCALE))
+}
+
+/** The run time of the latest strike at or before `runTime`, or -1. Hash of the bucket: replays agree. */
+function lightningAt(runTime: number, intensity: number): number {
+  const bucket = Math.floor(runTime / LIGHTNING_BUCKET_MS)
+  const chance = LIGHTNING_CHANCE * (0.5 + 0.5 * intensity)
+  for (let b = bucket; b > bucket - LIGHTNING_LOOKBACK; b--) {
+    if (hash(b * 2) >= chance) continue
+    const at = Math.floor((b + hash(b * 2 + 1)) * LIGHTNING_BUCKET_MS)
+    if (at <= runTime) return at
+  }
+  return -1
+}
+
+/** Integer → [0, 1), well mixed (a lowbias32 finaliser). */
+function hash(n: number): number {
+  let x = (n | 0) ^ 0x9e3779b9
+  x = Math.imul(x ^ (x >>> 16), 0x7feb352d)
+  x = Math.imul(x ^ (x >>> 15), 0x846ca68b)
+  x ^= x >>> 16
+  return (x >>> 0) / 4294967296
+}
+
+function clamp(value: number, [min, max]: Range): number {
+  return Math.min(max, Math.max(min, value))
 }
 
 function normalize([x, y, z]: Vec3): Vec3 {

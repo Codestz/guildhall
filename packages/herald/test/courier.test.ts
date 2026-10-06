@@ -2,7 +2,7 @@ import { afterAll, afterEach, describe, expect, setSystemTime, test } from "bun:
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { type Dispatch, startHub } from "@guildhall/hub"
+import { type Dispatch, hubBuild, startHub } from "@guildhall/hub"
 import { createCourier } from "../src/courier.ts"
 
 const change = { type: "status", id: "ses_1", status: "busy", at: 1 } as const
@@ -20,9 +20,13 @@ async function withoutBun<T>(run: () => Promise<T>): Promise<T> {
 
 /**
  * A stand-in hub that answers the n-th POST (from 0) with `answer(n, body)` and keeps what it
- * accepted; `sizes` has every POST's body length, accepted or not.
+ * accepted; `sizes` has every POST's body length, accepted or not. `/health` answers `health`: by
+ * default a hub of the current build.
  */
-function fakeHub(answer: (n: number, body: Dispatch, text: string) => Response | Promise<Response>) {
+function fakeHub(
+  answer: (n: number, body: Dispatch, text: string) => Response | Promise<Response>,
+  health: unknown = { ok: true, build: hubBuild() },
+) {
   const accepted: Dispatch[] = []
   const sizes: number[] = []
   let n = 0
@@ -31,6 +35,7 @@ function fakeHub(answer: (n: number, body: Dispatch, text: string) => Response |
     port: 0,
     maxRequestBodySize: 64 * 1024 * 1024,
     async fetch(request) {
+      if (new URL(request.url).pathname === "/health") return Response.json(health)
       const text = await request.text()
       sizes.push(Buffer.byteLength(text))
       const body = JSON.parse(text) as Dispatch
@@ -68,7 +73,46 @@ describe("courier", () => {
     const health = (await (await fetch(`http://127.0.0.1:${port}/health`)).json()) as { guilds: string[] }
     expect(health.guilds).toEqual(["t"])
     expect(logs.some((m) => m.includes("reachable again"))).toBe(true)
+    expect(logs.some((m) => m.includes("WARNING"))).toBe(false)
     await courier.flush()
+  })
+
+  test("a hub running older code is logged as stale, with its pid and start, and still used", async () => {
+    const fake = fakeHub(() => Response.json({ ok: true }), {
+      ok: true,
+      build: "0123456789ab",
+      started: "2026-10-06T00:13:00.000Z",
+      pid: 92027,
+    })
+    const logs: string[] = []
+    const courier = createCourier({ guild: "t", opencode: 2, log: (m) => logs.push(m), port: fake.port })
+    await withoutBun(async () => {
+      courier.send([change], { raw: 1 })
+      await until(() => logs.some((m) => m.includes("stale hub")), 3000)
+      await courier.flush()
+    })
+    fake.server.stop(true)
+    const warning = logs.find((m) => m.includes("stale hub")) ?? ""
+    expect(warning).toContain("0123456789ab")
+    expect(warning).toContain("92027")
+    expect(warning).toContain("2026-10-06T00:13:00.000Z")
+    expect(warning).toContain(hubBuild())
+    expect(fake.accepted[0]?.changes).toEqual([change])
+  })
+
+  test("a hub from before builds were reported, or a stranger on the port, is called out", async () => {
+    for (const health of [{ ok: true, guilds: [], halls: 0 }, { hello: "not a hub" }]) {
+      const fake = fakeHub(() => Response.json({ ok: true }), health)
+      const logs: string[] = []
+      const courier = createCourier({ guild: "t", opencode: 2, log: (m) => logs.push(m), port: fake.port })
+      await withoutBun(async () => {
+        courier.send([change], { raw: 1 })
+        await until(() => logs.some((m) => m.includes("WARNING")), 3000)
+        await courier.flush()
+      })
+      fake.server.stop(true)
+      expect(logs.filter((m) => m.includes("WARNING"))).toHaveLength(1)
+    }
   })
 
   test("a 5xx or 429 reply keeps the batch and retries it, logging the outage once", async () => {

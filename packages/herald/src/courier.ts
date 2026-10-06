@@ -1,5 +1,5 @@
 import type { Change } from "@guildhall/core"
-import { type Dispatch, HERALD_HEADER, HUB_PORT } from "@guildhall/hub"
+import { type Dispatch, HERALD_HEADER, type Health, HUB_PORT, hubBuild } from "@guildhall/hub"
 
 /**
  * Carries a herald's changes to the hub in small batches (every FLUSH_MS). Never throws into
@@ -54,6 +54,8 @@ export function createCourier(options: {
   let cap = Number.POSITIVE_INFINITY
   /** One POST at a time, so batches reach the hub in the order they were sent. */
   let sending: Promise<boolean> = Promise.resolve(true)
+  /** The hub's build was compared since it was last reached: once per hub, again after an outage. */
+  let checked = false
 
   function schedule(ms: number): void {
     if (!disposed) timer ??= setTimeout(() => void flush(), ms)
@@ -70,6 +72,10 @@ export function createCourier(options: {
     if (down) options.log("hub reachable again")
     down = false
     retry = RETRY_MS
+    if (!checked) {
+      checked = true
+      void checkHub(base, options.log)
+    }
   }
 
   /** Sends one batch; true when the queue moved on (sent, split or dropped) or was empty. */
@@ -109,6 +115,8 @@ export function createCourier(options: {
     }
     if (!down) options.log(`${failure}; keeping events and retrying`)
     down = true
+    // Whatever answers next may be another hub (a restart, or a stale one the outage revealed).
+    checked = false
     // Only when nothing listens: a hub that answers (or hangs) holds the port already.
     if (unreachable) startHub(options.log)
     // Keep the batch and try again: a hub just started needs a moment. Capped, so a hub that never
@@ -195,6 +203,35 @@ function json(value: unknown): string | undefined {
   } catch {
     return undefined
   }
+}
+
+/**
+ * Logs, loudly, when what answers on the hub's port is not the hub these sources would start: a hub
+ * still running older code, or another program. Events still go to it; stopping it is the user's
+ * call (the log says how). Never throws.
+ */
+async function checkHub(base: string, log: (message: string) => void): Promise<void> {
+  let ours: string
+  try {
+    ours = hubBuild()
+  } catch {
+    return // the hub's sources aren't readable from here: nothing to compare with
+  }
+  let health: Partial<Health>
+  try {
+    const response = await fetch(`${base}/health`, { signal: AbortSignal.timeout(TIMEOUT_MS) })
+    health = (await response.json()) as Partial<Health>
+    if (typeof health !== "object" || health === null || health.ok !== true) throw new Error("not a hub")
+  } catch {
+    log(`WARNING: what answers at ${base} is not a guildhall hub (no valid /health); events are going to it`)
+    return
+  }
+  if (health.build === ours) return
+  const which = health.build ? `build ${health.build}` : "a build from before builds were reported"
+  log(
+    `WARNING: stale hub at ${base}: it runs ${which} (pid ${health.pid ?? "unknown"}, started ${health.started ?? "unknown"}), ` +
+      `these sources are build ${ours}. It lacks any hub fix made since. Stop that process and a herald will start a fresh hub.`,
+  )
 }
 
 /** A failed or finished start may be tried again after this (a hub that crashed, a later outage). */

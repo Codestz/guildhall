@@ -1,11 +1,12 @@
 import { afterAll, describe, expect, test } from "bun:test"
-import { applyAll, type Change, emptyModel, type Model } from "@guildhall/core"
+import { applyAll, type Change, emptyModel, type Model, type Session } from "@guildhall/core"
 import { parties as partiesScenario, party as partyScenario, Script } from "@guildhall/sim"
 import { Director, type Stage } from "../src/guild/director.ts"
 import { legendOf } from "../src/guild/legends.ts"
 import type { Moment } from "../src/guild/moments.ts"
 import {
   BANNERS,
+  GUILD_HOLD_MS,
   MAX_PARTIES,
   PARTY_IDLE_MS,
   PARTY_LEAVE_MS,
@@ -86,6 +87,34 @@ function collisions(views: readonly AdventurerView[]): string[] {
   }
   return out
 }
+
+const S = 1000
+
+/** A bare session, as the model holds it: working (`running`) unless it `ended`. */
+function sessionOf(id: string, started: number, seen: number, more: Partial<Session> = {}): Session {
+  return {
+    id,
+    agent: more.parentID ? "guild-implementer" : "guild-master",
+    title: id,
+    status: more.ended !== undefined ? "done" : "running",
+    since: started,
+    started,
+    entries: [],
+    tokens: 0,
+    cost: 0,
+    denied: [],
+    steps: 0,
+    seen,
+    ...more,
+  } as Session
+}
+const modelOf = (sessions: Session[]): Model =>
+  ({ sessions: new Map(sessions.map((s) => [s.id, s])) }) as Model
+const brief = (stage: readonly { id: string; seat: number }[]) =>
+  stage
+    .map((p) => `${p.id}@${p.seat}`)
+    .sort()
+    .join(",")
 
 describe("parties: names", () => {
   test("a short name from what the conversation is about", () => {
@@ -200,6 +229,96 @@ describe("parties: the stage", () => {
     expect(first.size).toBe(3)
     // The first party of the run takes the first banner and the dais.
     expect([...first.values()][0]).toEqual({ color: BANNERS[0]?.color as string, seat: 0 })
+  })
+
+  test("four busy conversations heard from in turn: the island keeps who it has (review-2 #8)", () => {
+    // Each conversation is heard from every 4 s, staggered by 1 s: recency alone reshuffled the
+    // island about once a second. The three already here stay while they work; the fourth waits.
+    const ids = ["A", "B", "C", "D"]
+    const stages = new Set<string>()
+    for (let t = 4 * S; t <= 60 * S; t += 500) {
+      const sessions = ids.map((id, i) =>
+        sessionOf(id, i * S, Math.floor((t - i * S) / (4 * S)) * 4 * S + i * S),
+      )
+      stages.add(brief(stageOf(modelOf(sessions), t)))
+    }
+    expect([...stages]).toEqual(["A@0,B@1,C@2"])
+  })
+
+  test("a waiting conversation takes the place of one that went idle, not of a working one", () => {
+    const at = (t: number) =>
+      stageOf(
+        modelOf([
+          sessionOf("A", 0, Math.min(t, 20 * S), t >= 20 * S ? { ended: 20 * S } : {}),
+          sessionOf("B", 1 * S, t),
+          sessionOf("C", 2 * S, t - 500),
+          sessionOf("D", 3 * S, t - 250),
+        ]),
+        t,
+      )
+    expect(brief(at(10 * S))).toBe("A@0,B@1,C@2")
+    const later = at(25 * S)
+    expect(later.map((p) => p.id).sort()).toEqual(["B", "C", "D"])
+    // B and C keep their seats; D takes the one A left.
+    expect(brief(later)).toBe("B@1,C@2,D@0")
+  })
+
+  test("two busy projects: the island stays on one, and switches only once it has gone quiet", () => {
+    const guild = new Map([
+      ["X", "proj-x"],
+      ["Y", "proj-y"],
+    ])
+    const guildOf = (id: string) => guild.get(id)
+    const islands = new Set<string>()
+    // Both working, heard from in turn every second (the island used to swap project on each).
+    for (let t = 2 * S; t <= 30 * S; t += S) {
+      const seen = (i: number) => Math.floor((t - i * S) / (2 * S)) * 2 * S + i * S
+      const m = modelOf([sessionOf("X", 0, seen(0)), sessionOf("Y", S, seen(1))])
+      islands.add(
+        stageOf(m, t, guildOf)
+          .map((p) => p.id)
+          .join(),
+      )
+    }
+    expect([...islands]).toEqual(["Y"])
+    // Y finishes at 40 s; X works on. The island goes to X only after GUILD_HOLD_MS of quiet.
+    const after = (t: number) =>
+      stageOf(modelOf([sessionOf("X", 0, t), sessionOf("Y", S, 40 * S, { ended: 40 * S })]), t, guildOf)
+        .map((p) => p.id)
+        .join()
+    expect(after(41 * S)).toBe("Y")
+    expect(after(40 * S + GUILD_HOLD_MS - S)).toBe("Y")
+    expect(after(40 * S + GUILD_HOLD_MS + S)).toBe("X")
+  })
+
+  test("a party alone on the island keeps its seat; the next to come takes the free one (review-2 #14)", () => {
+    // A and B together; A finishes and goes home; later C arrives while B works on.
+    const at = (t: number) =>
+      stageOf(
+        modelOf([
+          ...(t < 20 * S ? [sessionOf("A", 0, t)] : [sessionOf("A", 0, 20 * S, { ended: 20 * S })]),
+          sessionOf("B", 10 * S, t),
+          ...(t >= 200 * S ? [sessionOf("C", 200 * S, t)] : []),
+        ]),
+        t,
+      )
+    expect(brief(at(15 * S))).toBe("A@0,B@1")
+    expect(brief(at(130 * S))).toBe("B@1")
+    expect(brief(at(210 * S))).toBe("B@1,C@0")
+  })
+
+  test("a subagent whose root was never heard of joins the rootless crowd, not nowhere (review-2 #21)", () => {
+    const m = modelOf([sessionOf("R", 0, 5 * S), sessionOf("x", S, 5 * S, { parentID: "MISSING" })])
+    const stage = stageOf(m, 5 * S)
+    expect(stage.map((p) => [p.id, p.sessions.map((s) => s.id)])).toEqual([
+      ["R", ["R"]],
+      ["", ["x"]],
+    ])
+    expect(new Set(stage.map((p) => p.seat)).size).toBe(2)
+    expect(stage.find((p) => p.id === "")?.name).toMatch(/^Party /)
+    // Everyone on stage has a place, the orphan with the crowd's banner.
+    const views = viewsOf(m, 5 * S, undefined, stage)
+    expect(views.find((v) => v.id === "x")?.party).toBe("")
   })
 
   test("the parties scenario: three parties on the island, the quick one goes home before the end", () => {

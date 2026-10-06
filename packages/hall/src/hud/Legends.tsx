@@ -14,6 +14,7 @@ import {
 } from "../guild/legends.ts"
 import type { GuildStore } from "../guild/store.ts"
 import { spell } from "../guild/story.ts"
+import { FOCUSABLE, tabStops, wrapOf } from "./focus.ts"
 import { Icon } from "./icons.tsx"
 import { Pennant } from "./Parties.tsx"
 
@@ -99,23 +100,14 @@ export function Legends({ store, onClose }: { store: GuildStore; onClose: () => 
     }
   }
 
-  /** Keep Tab inside the book while it is open. */
+  /** Keep Tab inside the book while it is open (hud/focus.ts). */
   function trap(event: KeyboardEvent) {
     if (event.key !== "Tab" || !panel.current) return
-    const stops = [...panel.current.querySelectorAll<HTMLElement>("button, [href], [tabindex='0']")].filter(
-      (el) => !el.hasAttribute("disabled"),
-    )
-    const first = stops[0]
-    const last = stops.at(-1)
-    if (!first || !last) return
-    const active = document.activeElement
-    if (event.shiftKey && (active === first || active === head.current)) {
-      event.preventDefault()
-      last.focus()
-    } else if (!event.shiftKey && active === last) {
-      event.preventDefault()
-      first.focus()
-    }
+    const stops = tabStops(panel.current.querySelectorAll<HTMLElement>(FOCUSABLE))
+    const to = wrapOf(stops, document.activeElement, event.shiftKey, head.current ?? undefined)
+    if (!to) return
+    event.preventDefault()
+    to.focus()
   }
 
   return (
@@ -203,12 +195,15 @@ export function Legends({ store, onClose }: { store: GuildStore; onClose: () => 
         <div
           className="legends-body"
           id="legends-body"
+          // A stop of its own (it scrolls: a tab panel, or a labelled region), so the trap knows it
+          // is the last one inside (hud/focus.ts).
           {...(parties.length > 1
             ? {
                 role: "tabpanel",
                 "aria-labelledby": `legends-tab-${Math.max(0, parties.indexOf(book as (typeof parties)[number]))}`,
+                tabIndex: 0,
               }
-            : {})}
+            : { role: "region", "aria-labelledby": "legends-h", tabIndex: 0 })}
         >
           {!legend ? (
             <p className="legends-empty">

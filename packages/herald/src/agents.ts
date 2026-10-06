@@ -65,9 +65,30 @@ function copy(rules: Rules): V1Rules {
   return typeof rules === "string" ? rules : { ...rules }
 }
 
-/** v1's `permission` object. The pattern order is kept: v1's last matching rule wins. */
+/**
+ * What every guild agent may use on v1, after a leading `"*": "deny"` that shuts every other tool:
+ * MCP tools, and any tool a later OpenCode adds. Reading (with v1's own `.env` asks, which the
+ * catch-all would otherwise drop), searching, LSP, its todo list, skills (instructions it reads; what
+ * they suggest is still gated) and v1's own asks for outside paths and loops. Tool names from the
+ * 1.18.32 binary.
+ */
+const V1_TOOLS: Record<string, V1Rules> = {
+  "*": "deny",
+  read: { "*": "allow", "*.env": "ask", "*.env.*": "ask", "*.env.example": "allow" },
+  glob: "allow",
+  grep: "allow",
+  list: "allow",
+  lsp: "allow",
+  todowrite: "allow",
+  skill: "allow",
+  external_directory: "ask",
+  doom_loop: "ask",
+}
+
+/** v1's `permission` object. Key and pattern order is kept: v1's last matching rule wins. */
 export function v1Permission(permissions: Permissions): Record<string, V1Rules> {
   return {
+    ...structuredClone(V1_TOOLS),
     edit: copy(permissions.edit),
     bash: copy(permissions.bash),
     webfetch: permissions.web,
@@ -93,14 +114,20 @@ export function v1Agent(role: Role, models?: HeraldOptions["models"]): V1Agent {
 
 /**
  * The v1 `config` hook's edit. Merged beneath the user's own entry for the same id, so their
- * fields win and their `disable: true` is honoured (measured: an assignment re-enabled it).
+ * fields win and their `disable: true` is honoured (measured: an assignment re-enabled it). Their
+ * `permission` is merged one level deeper, key by key: a user who sets `webfetch` replaces our
+ * `webfetch` and keeps every other rule, rather than dropping the role back to v1's `"*": "allow"`.
  */
 export function injectV1(cfg: { agent?: Record<string, unknown> }, options: HeraldOptions): void {
   if (options.agents === false) return
   cfg.agent ??= {}
   for (const role of ROLES) {
-    const theirs = cfg.agent[role.id]
-    cfg.agent[role.id] = { ...v1Agent(role, options.models), ...(isObject(theirs) ? theirs : {}) }
+    const ours = v1Agent(role, options.models)
+    const theirs = isObject(cfg.agent[role.id]) ? (cfg.agent[role.id] as Record<string, unknown>) : {}
+    const permission = isObject(theirs.permission)
+      ? { ...ours.permission, ...theirs.permission }
+      : (theirs.permission ?? ours.permission)
+    cfg.agent[role.id] = { ...ours, ...theirs, permission }
   }
 }
 
@@ -122,9 +149,29 @@ function rules(action: string, rules: Rules): V2Rule[] {
   return Object.entries(rules).map(([resource, effect]) => ({ action, resource, effect }))
 }
 
+/**
+ * What every guild agent may use on v2, after a leading deny-all that shuts every other action:
+ * MCP tools (`<server>_<tool>`), and any action a later OpenCode adds. Reading (with v2's own
+ * `.env` asks restated, since the catch-all hides its defaults), searching, skills, and v2's ask
+ * for outside paths. Action names from the 2.0.18 binary; v2 checks no permission for its other
+ * tools (todo, LSP).
+ */
+const V2_TOOLS: readonly V2Rule[] = [
+  { action: "*", resource: "*", effect: "deny" },
+  { action: "read", resource: "*", effect: "allow" },
+  { action: "read", resource: "*.env", effect: "ask" },
+  { action: "read", resource: "*.env.*", effect: "ask" },
+  { action: "read", resource: "*.env.example", effect: "allow" },
+  { action: "glob", resource: "*", effect: "allow" },
+  { action: "grep", resource: "*", effect: "allow" },
+  { action: "skill", resource: "*", effect: "allow" },
+  { action: "external_directory", resource: "*", effect: "ask" },
+]
+
 /** v2's ordered rules: `bash` is `shell`, `task` is `subagent`. */
 export function v2Permissions(permissions: Permissions): V2Rule[] {
   return [
+    ...V2_TOOLS.map((rule) => ({ ...rule })),
     ...rules("edit", permissions.edit),
     ...rules("shell", permissions.bash),
     ...rules("webfetch", permissions.web),
@@ -166,8 +213,9 @@ export function v2Agent(agent: V2Agent, role: Role, models?: HeraldOptions["mode
   agent.color = role.color
   const model = modelOf(role, models)
   if (model) agent.model = v2Model(model)
-  // Ours go last so they win over v2's defaults (allow `*`, ask for .env and outside paths),
-  // which stay. Ours are dropped first, so a transform that runs again doesn't stack them.
+  // Ours go last and start with a deny-all, so v2's defaults (allow `*`, ask for .env and outside
+  // paths) stay in the list but no longer decide anything; ours restate the asks. Ours are dropped
+  // first, so a transform that runs again doesn't stack them.
   const ours = v2Permissions(role.permissions)
   const key = (rule: V2Rule) => `${rule.action}\0${rule.resource}\0${rule.effect}`
   const mine = new Set(ours.map(key))

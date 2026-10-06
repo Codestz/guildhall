@@ -462,6 +462,23 @@ describe("audio: engine", () => {
     expect(probe.filter((c) => c.sound === "plea" && c.verdict === "play")).toHaveLength(2)
   })
 
+  test("a plea asked while the tab was hidden still calls once it is visible, until answered", () => {
+    const { engine, probe, on, advance } = rig()
+    on()
+    engine.setHidden(true)
+    engine.moment(moment({ kind: "plea" }))
+    advance(PLEA_EVERY + 0.1)
+    engine.tick(() => undefined)
+    expect(probe).toHaveLength(0)
+    engine.setHidden(false)
+    engine.tick(() => undefined)
+    expect(probe.filter((c) => c.sound === "plea" && c.verdict === "play")).toHaveLength(1)
+    engine.moment(moment({ kind: "plea-answered" }))
+    advance(PLEA_EVERY + 0.1)
+    engine.tick(() => undefined)
+    expect(probe.filter((c) => c.sound === "plea")).toHaveLength(1)
+  })
+
   test("a spot sound with no file falls back to its synth on the sfx bus", () => {
     const { engine, probe, on } = rig()
     on()

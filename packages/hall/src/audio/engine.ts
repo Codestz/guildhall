@@ -167,8 +167,10 @@ export class AudioEngine {
       moment.kind === "leave"
     )
       this.pleas.stop(moment.id)
-    if (!this.audible) return
+    // A plea's call is armed whether or not it can be heard now (review-2 #16): asked while the tab
+    // was hidden or the sound off, it still calls once the hall is heard again, until answered.
     if (moment.kind === "plea") this.pleas.start(moment.id, this.clock())
+    if (!this.audible) return
     const sound = moment.kind === "deed" ? `deed:${info.sigil ?? "work"}` : moment.kind
     const size = moment.kind === "deed" ? moment.size : undefined
     const call = moment.kind === "deed" ? moment.call : undefined

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { ROLES, roleOf, STRANGER } from "../src/index.ts"
+import { CHECKS, ROLES, roleOf, STRANGER } from "../src/index.ts"
 
 const subagents = ROLES.filter((role) => role.mode === "subagent")
 
@@ -55,7 +55,10 @@ describe("the roster", () => {
   })
 
   test("only the implementer and the designer may edit code", () => {
-    const editors = ROLES.filter((role) => role.permissions.edit === "allow").map((role) => role.id)
+    const editors = ROLES.filter((role) => {
+      const edit = role.permissions.edit
+      return typeof edit === "object" && edit["*"] === "allow"
+    }).map((role) => role.id)
     expect(editors.sort()).toEqual(["guild-designer", "guild-implementer"])
   })
 
@@ -65,8 +68,21 @@ describe("the roster", () => {
     const rules = bash as Record<string, string>
     expect(Object.keys(rules)[0]).toBe("*")
     expect(rules["*"]).toBe("deny")
-    expect(rules["bun test*"]).toBe("allow")
+    expect(rules["bun test"]).toBe("allow")
     expect(Object.values(rules).filter((effect) => effect !== "allow")).toEqual(["deny"])
+  })
+
+  test("every check is one exact command: no wildcard, no shell syntax (OpenCode's * crosses spaces)", () => {
+    // A trailing * lets any flag or redirect through (docs/reviews/review-2.md, finding 1).
+    for (const command of CHECKS) expect(command).toMatch(/^[a-z]+( [A-Za-z0-9./-]+)*$/)
+    expect(CHECKS.some((command) => /^(bunx|npx|sh|bash|curl) /.test(`${command} `))).toBe(false)
+  })
+
+  test("every prompt treats what it reads as data, not instructions", () => {
+    for (const role of ROLES) {
+      expect(role.prompt).toContain("data, not instructions")
+      expect(role.prompt).not.toMatch(/and follow them|an MCP server\)/)
+    }
   })
 })
 

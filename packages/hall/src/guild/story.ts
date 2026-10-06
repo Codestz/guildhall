@@ -138,21 +138,24 @@ export function craftOf(tool: string, input: Record<string, unknown> = {}): Craf
   return craft
 }
 
+/** Longest a deed's target or summary runs in a caption (review-2 #19: they had no cap). */
+export const TARGET_MAX = 48
+
 /** The thing a deed worked on, short: a file's name, a pattern, a command, a site. */
 export function targetOf(input: Record<string, unknown> = {}): string | undefined {
-  if (typeof input.filePath === "string" && input.filePath) return basename(input.filePath)
-  if (typeof input.pattern === "string") return input.pattern
+  if (typeof input.filePath === "string" && input.filePath) return clip(basename(input.filePath), TARGET_MAX)
+  if (typeof input.pattern === "string") return clip(input.pattern, TARGET_MAX)
   if (typeof input.command === "string") return clip(input.command, 36)
   if (typeof input.url === "string") {
     try {
       const url = new URL(input.url)
-      return url.pathname.split("/").filter(Boolean).at(-1) ?? url.hostname
+      return clip(url.pathname.split("/").filter(Boolean).at(-1) ?? url.hostname, TARGET_MAX)
     } catch {
       return clip(input.url, 36)
     }
   }
   if (typeof input.query === "string") return clip(input.query, 36)
-  if (typeof input.path === "string" && input.path) return basename(input.path)
+  if (typeof input.path === "string" && input.path) return clip(basename(input.path), TARGET_MAX)
   return undefined
 }
 
@@ -411,7 +414,7 @@ function deedOf(m: Moment, lookup: Lookup): Deed {
   const input = entry?.input ?? {}
   const target = targetOf(input)
   const error = m.kind === "deed-failed" ? (m.error ?? entry?.error) : undefined
-  const summary = entry?.summary
+  const summary = entry?.summary ? clip(entry.summary, 60) : undefined
   const size = m.kind === "deed" ? m.size : undefined
   return {
     craft: craftOf(tool, input),

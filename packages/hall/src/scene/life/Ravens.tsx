@@ -12,6 +12,7 @@ import {
   Vector3,
 } from "three"
 import type { Moment } from "../../guild/moments.ts"
+import { hear, masterOf } from "../../guild/ravens.ts"
 import { positions, useGuildStore } from "../../guild/useGuild.ts"
 import { useOwnedMeshes } from "../owned.ts"
 import { wing } from "./Birds.tsx"
@@ -63,7 +64,7 @@ export function Ravens() {
   const news = useMemo<Moment[]>(() => [], [])
   useEffect(() => {
     const off = store.moments.on((moment) => {
-      if (moment.kind === "join" || moment.kind === "loot" || moment.kind === "plea") news.push(moment)
+      hear(news, moment, document.hidden)
     })
     const offRebuild = store.moments.onRebuild(() => {
       news.length = 0
@@ -152,7 +153,7 @@ function launch(news: Moment[], views: readonly { id: string; master: boolean }[
   for (let i = news.length - 1; i >= 0; i--) {
     const entry = news[i]
     if (!entry || flights.length >= MAX) continue
-    const master = views.find((v) => v.master)
+    const master = masterOf(entry, views)
     const here = positions.get(entry.id)
     const there = master ? positions.get(master.id) : undefined
     const color = new Color(entry.color)

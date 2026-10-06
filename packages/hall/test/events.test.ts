@@ -412,6 +412,110 @@ describe("events: rebuilt moments never fire", () => {
     expect(started).toEqual([])
   })
 
+  /** Deeds by `id` under guildmaster `master`, one per `every` ms of run time from `from`. */
+  const deedsOf = (master: string, id: string, from: number, n: number, every: number, live: boolean) =>
+    Array.from({ length: n }, (_, i) => ({
+      kind: "deed" as const,
+      id,
+      agent: "guild-implementer",
+      title: id,
+      color: "#fff",
+      parent: master,
+      master,
+      tool: "read",
+      call: `${id}-${from + i * every}`,
+      at: from + i * every,
+      live,
+    }))
+
+  test("a live hello with more than 1000 moments: the raid already shown does not sail in again (review-2 #9)", async () => {
+    let clock = 0
+    const stream = new MomentStream()
+    const party = [session("R", { agent: "guild-master" }), session("S", { parentID: "R" })]
+    const events = new WorldEvents({ session: () => undefined, party: () => party }, () => clock, { gap: 0 })
+    events.attach(stream)
+    const started: string[] = []
+    events.onStart((show) => {
+      started.push(`${show.kind}@${Math.round(show.renown.at / MIN)}`)
+      queueMicrotask(() => events.done(show.id))
+    })
+    const step = async () => {
+      clock += 1000
+      events.tick(stream)
+      await Promise.resolve()
+    }
+    // 2000 deeds over 50 min, live: the raid (a 45-min run) is earned and shown once.
+    const run = deedsOf("R", "S", 0, 3000, 1500, true)
+    for (const [i, m] of run.slice(0, 2000).entries()) {
+      stream.add(m)
+      if (i % 40 === 0) await step()
+    }
+    await step()
+    // The socket reconnects: the hello is everything so far, rebuilt (the stream keeps the last 1000).
+    stream.rebuild(true)
+    for (const m of run.slice(0, 2000)) stream.add({ ...m, live: false })
+    await step()
+    // The run goes on live for 25 more minutes.
+    for (const [i, m] of run.slice(2000).entries()) {
+      stream.add(m)
+      if (i % 40 === 0) await step()
+    }
+    expect(started.filter((s) => s.startsWith("raid"))).toEqual(["raid@45"])
+    expect(new Set(started).size).toBe(started.length)
+  })
+
+  test("a live hello: another party's comet milestone does not fire twice (review-2 #9)", async () => {
+    let clock = 0
+    const stream = new MomentStream()
+    const focal = [session("A", { agent: "guild-master" }), session("a", { parentID: "A" })]
+    const events = new WorldEvents({ session: () => undefined, party: () => focal }, () => clock, { gap: 0 })
+    events.attach(stream)
+    const started: string[] = []
+    events.onStart((show) => {
+      started.push(show.renown.key)
+      queueMicrotask(() => events.done(show.id))
+    })
+    const feed = async (moments: ReturnType<typeof deedsOf>) => {
+      for (const m of moments) {
+        stream.add(m)
+        clock += 200
+        events.tick(stream)
+        await Promise.resolve()
+      }
+    }
+    const before = [...deedsOf("B", "b", 0, 600, 100, true), ...deedsOf("A", "a", 60_000, 600, 100, true)]
+    await feed(before)
+    stream.rebuild(true)
+    for (const m of before) stream.add({ ...m, live: false })
+    clock += 1000
+    events.tick(stream)
+    await feed(deedsOf("B", "b", 260_000, 200, 100, true))
+    expect(started.filter((key) => key === "comet:B:deeds-500")).toHaveLength(1)
+    expect(new Set(started).size).toBe(started.length)
+  })
+
+  test("a seek (not a live hello) still starts over: played again, an earning shows again", async () => {
+    let clock = 0
+    const stream = new MomentStream()
+    const events = new WorldEvents(noParty, () => clock, { gap: 0 })
+    events.attach(stream)
+    const started: string[] = []
+    events.onStart((show) => {
+      started.push(show.renown.key)
+      queueMicrotask(() => events.done(show.id))
+    })
+    for (let round = 0; round < 2; round++) {
+      stream.rebuild()
+      for (const m of deedsOf("m", "x", 0, 120, 100, true)) {
+        stream.add(m)
+        clock += 200
+        events.tick(stream)
+        await Promise.resolve()
+      }
+    }
+    expect(started).toEqual(["comet:m:deeds-100", "comet:m:deeds-100"])
+  })
+
   test("the store: a seek past the rush's falls shows nothing; playing through shows the ghost ship", () => {
     const seeker = fresh("rush")
     const sought = worldEventsOf(seeker)

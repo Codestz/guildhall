@@ -237,7 +237,26 @@ interface PartyTally {
   dragon: { session: string | undefined; lastFailAt: number } | undefined
 }
 
-function partyTally(at: number): PartyTally {
+/** What a party keeps across a live hello's rebuild (see `RenownLedger.reset`). */
+interface Carried {
+  firstAt: number
+  milestones: Set<string>
+  raided: boolean
+  last: Partial<Record<EventKind, number>>
+  count: Partial<Record<EventKind, number>>
+}
+
+function partyTally(at: number, carried?: Carried): PartyTally {
+  if (carried)
+    return {
+      ...partyTally(Math.min(at, carried.firstAt)),
+      milestones: new Set(carried.milestones),
+      raided: carried.raided,
+      // Its raid was earned before the hello: no ship is on stage to send away.
+      raidOver: carried.raided,
+      last: { ...carried.last },
+      count: { ...carried.count },
+    }
   return {
     firstAt: at,
     ended: false,
@@ -271,7 +290,33 @@ export class RenownLedger {
   private sessions = new Map<string, SessionTally>()
   private lastAt = 0
 
-  reset(): void {
+  /**
+   * What each party already earned once, kept across a `carry` reset (a live hello rebuilds from at
+   * most 1000 moments: replayed from the clipped history alone, the raid's clock and the comet's
+   * counts would start late and earn the same deeds again — review-2 #9).
+   */
+  private carried = new Map<string, Carried>()
+  private carriedSessions = new Map<string, number>()
+
+  /** Start over. `carry`: the same run goes on (a live hello), so what was earned stays earned. */
+  reset(carry = false): void {
+    if (carry) {
+      for (const [master, p] of this.parties) {
+        const was = this.carried.get(master)
+        this.carried.set(master, {
+          firstAt: Math.min(p.firstAt, was?.firstAt ?? p.firstAt),
+          milestones: new Set([...(was?.milestones ?? []), ...p.milestones]),
+          raided: p.raided || (was?.raided ?? false),
+          last: { ...was?.last, ...p.last },
+          count: { ...was?.count, ...p.count },
+        })
+      }
+      for (const [id, t] of this.sessions)
+        this.carriedSessions.set(id, Math.min(t.firstAt, this.carriedSessions.get(id) ?? t.firstAt))
+    } else {
+      this.carried.clear()
+      this.carriedSessions.clear()
+    }
     this.earned.length = 0
     this.parties.clear()
     this.sessions.clear()
@@ -283,12 +328,17 @@ export class RenownLedger {
     this.lastAt = Math.max(this.lastAt, m.at)
     let party = this.parties.get(m.master)
     if (!party) {
-      party = partyTally(m.at)
+      party = partyTally(m.at, this.carried.get(m.master))
       this.parties.set(m.master, party)
     }
     let tally = this.sessions.get(m.id)
     if (!tally) {
-      tally = { firstAt: m.at, ok: 0, failed: 0, runStreak: 0 }
+      tally = {
+        firstAt: Math.min(m.at, this.carriedSessions.get(m.id) ?? m.at),
+        ok: 0,
+        failed: 0,
+        runStreak: 0,
+      }
       this.sessions.set(m.id, tally)
     }
     const hero: Hero = { id: m.id, title: m.title, color: m.color }
@@ -611,7 +661,7 @@ const DEFAULT_CAP: Record<EventKind, number> = {
 export interface MomentSource {
   readonly history: readonly Moment[]
   on(fn: (moment: Moment) => void): () => void
-  onRebuild(fn: (epoch: number) => void): () => void
+  onRebuild(fn: (epoch: number, continued: boolean) => void): () => void
 }
 
 /**
@@ -652,7 +702,7 @@ export class WorldEvents {
   /** Hang it on a moment stream. Returns the unsubscribe. */
   attach(source: MomentSource): () => void {
     const off = source.on((moment) => this.hear(moment, source))
-    const offRebuild = source.onRebuild(() => this.rebuild())
+    const offRebuild = source.onRebuild((_, continued) => this.rebuild(continued))
     this.stale = true
     this.catchUp(source, Number.POSITIVE_INFINITY)
     return () => {
@@ -680,9 +730,12 @@ export class WorldEvents {
     this.apply(this.ledger.take(moment, this.ctx), moment.live)
   }
 
-  /** History is thrown away: the ledger starts over, nothing queued survives, lasting shows go. */
-  rebuild(): void {
-    this.ledger.reset()
+  /**
+   * History is thrown away: the ledger starts over, nothing queued survives, lasting shows go.
+   * `continued` (a live hello): the ledger keeps what was already earned, so nothing shows twice.
+   */
+  rebuild(continued = false): void {
+    this.ledger.reset(continued)
     this.queue = []
     this.cursor = 0
     this.stale = true

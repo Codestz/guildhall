@@ -6,8 +6,9 @@ import { type Model, rootOf, type Session } from "@guildhall/core"
  * each with its own guildmaster, banner and seat by the quest board. Pure: the same model and clock
  * give the same stage, so a seek lands where playing through would (test/parties.test.ts).
  *
- *   stage      which parties are on the island now: the newest always, then the most recently
- *              active ones, at most MAX_PARTIES. A party other than the newest that has been idle
+ *   stage      which parties are on the island now, at most MAX_PARTIES: the newest always, then
+ *              the working ones in start order (sticky: a newcomer waits for a slot), then idle
+ *              ones by recency. A party other than the newest that has been idle
  *              (everyone done) PARTY_IDLE_MS walks home through the gate and is gone PARTY_LEAVE_MS
  *              later.
  *   banner     a colour per party, kept for its whole stay; the first party gets the first banner.
@@ -28,6 +29,8 @@ export const PARTY_IDLE_MS = 90_000
 export const PARTY_LEAVE_MS = 14_000
 /** A party not heard from this long counts as idle even if it never said it ended (a crashed run). */
 export const PARTY_STALE_MS = 10 * 60_000
+/** A party idle less than this still holds the island for its guild (OpenCode project). */
+export const GUILD_HOLD_MS = 30_000
 /** A guildmaster who arrives beside another party this recently walks in from the gate. */
 export const ARRIVE_MS = 12_000
 
@@ -87,14 +90,18 @@ interface Tree {
   idleSince: number | undefined
 }
 
-/** Every party the model knows, newest root last, with when it was last heard of and since when idle. */
-function treesOf(model: Model, now: number): Tree[] {
+/**
+ * Every party the model knows, newest root last, with when it was last heard of and since when idle.
+ * `orphans` gets the sessions whose root was never heard of (a hub restarted after it began).
+ */
+function treesOf(model: Model, now: number, orphans: Session[] = []): Tree[] {
   const trees = new Map<string, Tree>()
   for (const s of model.sessions.values())
     if (!s.parentID) trees.set(s.id, { root: s, sessions: [], last: 0, idleSince: undefined })
   for (const s of model.sessions.values()) {
     const tree = trees.get(s.parentID ? rootOf(model, s.id) : s.id)
     if (tree) tree.sessions.push(s)
+    else orphans.push(s)
   }
   for (const tree of trees.values()) {
     tree.sessions.sort(byJoin)
@@ -121,7 +128,8 @@ function treesOf(model: Model, now: number): Tree[] {
  * project is the archipelago, later).
  */
 export function stageOf(model: Model, now: number, guildOf?: (id: string) => string | undefined): Party[] {
-  let trees = treesOf(model, now)
+  const orphans: Session[] = []
+  let trees = treesOf(model, now, orphans)
   if (trees.length === 0) {
     if (model.sessions.size === 0) return []
     const sessions = [...model.sessions.values()].sort(byJoin)
@@ -142,15 +150,27 @@ export function stageOf(model: Model, now: number, guildOf?: (id: string) => str
       },
     ]
   }
-  // The newest: the most recently active (as the single-party hall followed), ties to the later start.
-  const newest = trees.reduce((best, t) => (t.last > best.last || t.last === best.last ? t : best))
-  const guild = guildOf?.(newest.root.id)
+  // Sticky, not by recency (review-2 #8: four busy conversations, or two busy projects, reshuffled
+  // the island about once a second). The island's guild is the guild of the latest-started party
+  // still holding (working, or idle less than GUILD_HOLD_MS): a conversation opened in another
+  // project takes the island once, and the island goes back only after that one has been quiet for
+  // GUILD_HOLD_MS while the other works on. With nobody holding, the most recently active party's.
+  const recent = (list: readonly Tree[]) =>
+    list.reduce((best, t) => (t.last > best.last || t.last === best.last ? t : best))
+  const holding = (t: Tree) => t.idleSince === undefined || now - t.idleSince < GUILD_HOLD_MS
+  const anchor = trees.findLast(holding) ?? recent(trees)
+  const guild = guildOf?.(anchor.root.id)
   if (guild !== undefined) trees = trees.filter((t) => guildOf?.(t.root.id) === guild)
+  // On stage, working parties first by start (those already here keep their place: a newcomer waits
+  // for one of them to go idle), then idle ones by recency (a newcomer replaces only those).
+  const busy = trees.filter((t) => t.idleSince === undefined).slice(0, MAX_PARTIES)
+  // The newest: the latest-started working party on stage; with nobody working, the most recently
+  // active (the one the single-party hall followed). It never goes home.
+  const newest = busy.at(-1) ?? recent(trees)
   const endOf = (t: Tree) =>
     t === newest || t.idleSince === undefined
       ? Number.POSITIVE_INFINITY
       : t.idleSince + PARTY_IDLE_MS + PARTY_LEAVE_MS
-
   // Arrivals in start order: each takes the lowest free banner and seat.
   const banners = new Map<Tree, number>()
   const seats = new Map<Tree, number>()
@@ -175,10 +195,15 @@ export function stageOf(model: Model, now: number, guildOf?: (id: string) => str
     present.push(t)
   }
 
-  // On stage: the newest, then whoever is still here by recency, at most MAX_PARTIES.
+  // On stage: the newest, then the working by start, then whoever else is still here by recency.
+  const rank = (t: Tree) => (t === newest ? 0 : t.idleSince === undefined ? 1 : 2)
   const here = trees
     .filter((t) => t === newest || now < endOf(t))
-    .sort((a, b) => (a === newest ? -1 : b === newest ? 1 : b.last - a.last || byJoin(b.root, a.root)))
+    .sort(
+      (a, b) =>
+        rank(a) - rank(b) ||
+        (rank(a) === 1 ? byJoin(a.root, b.root) : b.last - a.last || byJoin(b.root, a.root)),
+    )
     .slice(0, MAX_PARTIES)
 
   // Seats and banners unique on the stage (a rare crowding can collide): older parties keep theirs.
@@ -208,9 +233,38 @@ export function stageOf(model: Model, now: number, guildOf?: (id: string) => str
       newest: t === newest,
     }
   })
-  // Alone on the island, the party holds the dais (the hall as it was before parties).
-  const only = parties.length === 1 ? parties[0] : undefined
-  if (only) only.seat = 0
+  // Subagents whose root was never heard of (review-2 #21: they were dropped whenever any root was
+  // known) gather as the rootless crowd, when the island has room and they are of its guild.
+  const crowd = orphans
+    .filter((s) => guild === undefined || guildOf?.(s.id) === guild)
+    .filter((s) => working(s) || now - s.seen < PARTY_IDLE_MS)
+    .sort(byJoin)
+  if (crowd.length > 0 && parties.length < MAX_PARTIES) {
+    const seat = lowestFree(
+      parties.map((p) => p.seat),
+      SEATS,
+    )
+    const banner = lowestFree(
+      parties.map((p) => p.banner),
+      BANNERS.length,
+    )
+    parties.push({
+      id: "",
+      root: undefined,
+      sessions: crowd,
+      name: "",
+      banner,
+      color: BANNERS[banner]?.color ?? "#e0525a",
+      seat,
+      last: Math.max(...crowd.map((s) => s.seen)),
+      idleSince: undefined,
+      leaving: false,
+      arriving: false,
+      newest: false,
+    })
+  }
+  // Alone on the island, a party keeps its seat (review-2 #14: forcing it onto the dais moved it
+  // there and back as others came and went); one that arrived alone has the dais anyway.
   if (parties.length > 1) for (const p of parties) p.arriving = now - (p.root?.started ?? 0) < ARRIVE_MS
   nameAll(parties)
   return parties.sort((a, b) => a.seat - b.seat)
@@ -292,7 +346,9 @@ function aboutOf(root: Session | undefined): string | undefined {
 /** Names every party, unique on the stage: a repeat gets its banner's numeral (`Pagination II`). */
 function nameAll(parties: Party[]): void {
   const seen = new Map<string, number>()
-  for (const p of [...parties].sort((a, b) => byJoin(a.root as Session, b.root as Session))) {
+  const joined = (a: Party, b: Party) =>
+    a.root && b.root ? byJoin(a.root, b.root) : a.root ? -1 : b.root ? 1 : 0
+  for (const p of [...parties].sort(joined)) {
     const base = partyNameOf(aboutOf(p.root)) || `Party ${ROMAN[p.banner] ?? p.banner + 1}`
     const n = (seen.get(base) ?? 0) + 1
     seen.set(base, n)

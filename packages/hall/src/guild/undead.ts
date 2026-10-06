@@ -162,6 +162,15 @@ export class Undead {
     let homeless = 0
     for (const f of shown) {
       if (this.risers.some((r) => r.id === f.id && r.state !== "sinking")) continue
+      // Back before it had sunk (its party left the stage and returned): it keeps its grave and
+      // its watch, rather than a second skeleton rising beside it (review-2 #15).
+      const sinking = this.risers.find((r) => r.id === f.id && r.state === "sinking")
+      if (sinking) {
+        sinking.state = "vigil"
+        sinking.since = now
+        this.version++
+        continue
+      }
       const grave = this.free()[0]
       if (grave === undefined) {
         homeless++

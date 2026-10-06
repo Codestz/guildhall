@@ -66,6 +66,17 @@ describe("the undead: who stands and how they came", () => {
     expect(undead.risers.map((r) => r.state)).toEqual(["sinking"])
   })
 
+  test("off the stage and back before it had sunk: one skeleton, at its own grave (review-2 #15)", () => {
+    const undead = settled()
+    undead.sync(fallen("s1"), 100)
+    const grave = undead.risers[0]?.grave
+    for (let t = 1000; t < 7000; t += 2000) {
+      undead.sync([], t)
+      undead.sync(fallen("s1"), t + 1000)
+    }
+    expect(undead.risers.map((r) => [r.id, r.grave, r.state])).toEqual([["s1", grave, "vigil"]])
+  })
+
   test("after a rebuild (a seek) the fallen simply stand: no rise, no glance, no death", () => {
     const undead = settled()
     undead.take(moment("fail", "gone"))

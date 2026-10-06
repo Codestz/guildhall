@@ -535,22 +535,39 @@ export const UNSUNG: Record<EventKind, string> = {
   dragon: "Fail the same trial three times running…",
 }
 
-/** The legend as Markdown, to paste anywhere: the shareable artifact. */
+/**
+ * Agent text made inert for Markdown (review-2 #18): an agent's words (a prompt-injected reply, a
+ * command) must not become an image, a link, HTML or a mention where the legend is pasted. With
+ * `[`, `]`, `<` and `>` escaped no image, link or tag can form; emphasis and code marks are escaped
+ * so the text reads as written; `@` is followed by a zero-width space so it mentions nobody.
+ */
+export function markdownText(text: string): string {
+  return text
+    .replace(/[\\`*_[\]~]/g, "\\$&")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/@(?=[\w-])/g, "@\u200b")
+}
+
+/** The legend as Markdown, to paste anywhere: the shareable artifact. Every told string is escaped. */
 export function legendMarkdown(legend: Legend): string {
+  const md = markdownText
   const out: string[] = []
-  out.push(`# The Legend of “${legend.title}”`, "")
+  out.push(`# The Legend of “${md(legend.title)}”`, "")
   const meta = [
     `A party of ${spell(legend.party)}`,
     duration(legend.span),
     ...(legend.tokens > 0 ? [tokensOf(legend.tokens)] : []),
     ...(legend.cost > 0 ? [costOf(legend.cost)] : []),
   ]
-  out.push(`*${meta.join(" · ")}*`, "", legend.opening, "")
+  out.push(`*${meta.join(" · ")}*`, "", md(legend.opening), "")
   for (const c of legend.chapters) {
-    const heading = c.sentBy ? `The ${c.who} — ${quote(c.quest, 90)}` : `The ${c.who} at the Quest Board`
+    const heading = c.sentBy
+      ? `The ${md(c.who)} — ${md(quote(c.quest, 90))}`
+      : `The ${md(c.who)} at the Quest Board`
     out.push(`## ${c.numeral}. ${heading}`, "")
     const facts = [
-      c.sentBy ? `${c.resumed ? "Called back by" : "Sent by"} the ${c.sentBy}` : "",
+      c.sentBy ? `${c.resumed ? "Called back by" : "Sent by"} the ${md(c.sentBy)}` : "",
       c.end !== undefined
         ? `${clockOf(c.begin)}–${clockOf(c.end)} (${duration(c.end - c.begin)})`
         : `from ${clockOf(c.begin)}`,
@@ -560,22 +577,22 @@ export function legendMarkdown(legend: Legend): string {
         : "",
     ].filter(Boolean)
     out.push(`*${facts.join(" · ")}*`, "")
-    if (c.deeds.length) out.push(`- **Deeds:** ${c.deeds.map((d) => d.label).join(", ")}`)
-    for (const n of c.notables) out.push(`- **${NOTABLE_LABEL[n.kind]}** (${clockOf(n.at)}): ${n.text}`)
-    if (c.loot) out.push(`- **Loot:** ${clip(c.loot, 240)}`)
+    if (c.deeds.length) out.push(`- **Deeds:** ${md(c.deeds.map((d) => d.label).join(", "))}`)
+    for (const n of c.notables) out.push(`- **${NOTABLE_LABEL[n.kind]}** (${clockOf(n.at)}): ${md(n.text)}`)
+    if (c.loot) out.push(`- **Loot:** ${md(clip(c.loot, 240))}`)
     out.push("")
   }
   if (legend.renown.length) {
     out.push("## Deeds of Renown", "")
     for (const r of legend.renown)
       out.push(
-        `- **${r.title}**${r.count > 1 ? ` ×${r.count}` : ""}${r.forced ? " *(forced)*" : ""}: ${r.text}`,
+        `- **${md(r.title)}**${r.count > 1 ? ` ×${r.count}` : ""}${r.forced ? " *(forced)*" : ""}: ${md(r.text)}`,
       )
     out.push("")
   }
   out.push("---", "")
-  if (legend.lastWord) out.push(`> ${clip(legend.lastWord, 240)}`, "")
-  out.push(`*${legend.closing}*`, "")
+  if (legend.lastWord) out.push(`> ${md(clip(legend.lastWord, 240))}`, "")
+  out.push(`*${md(legend.closing)}*`, "")
   return out.join("\n")
 }
 

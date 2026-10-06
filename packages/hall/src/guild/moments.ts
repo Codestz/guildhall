@@ -171,6 +171,8 @@ const KEEP = 1000
  *                  seek or a replayed backlog. Subscribing re-renders nothing.
  *   onRebuild(fn)  called when history is thrown away and rebuilt (seek, loop restart, scenario
  *                  load, live hello), *before* the rebuilt moments are added: drop anything in flight.
+ *                  `continued` is true for a live hello (a reconnect): the same run goes on, so what
+ *                  was already news (a world event shown) must not become news again.
  *   history        everything since the last rebuild, oldest first (at most KEEP), rebuilt moments
  *                  marked `live: false`: for consumers that tell a story rather than react.
  *
@@ -181,7 +183,7 @@ export class MomentStream {
   private kept: Moment[] = []
   private next = 1
   private listeners = new Set<(moment: Moment) => void>()
-  private rebuilds = new Set<(epoch: number) => void>()
+  private rebuilds = new Set<(epoch: number, continued: boolean) => void>()
 
   get history(): readonly Moment[] {
     return this.kept
@@ -192,7 +194,7 @@ export class MomentStream {
     return () => this.listeners.delete(listener)
   }
 
-  onRebuild(listener: (epoch: number) => void): () => void {
+  onRebuild(listener: (epoch: number, continued: boolean) => void): () => void {
     this.rebuilds.add(listener)
     return () => this.rebuilds.delete(listener)
   }
@@ -206,10 +208,10 @@ export class MomentStream {
     return made
   }
 
-  /** The store's: history is about to be rebuilt from scratch. */
-  rebuild(): void {
+  /** The store's: history is about to be rebuilt from scratch (`continued`: the same live run goes on). */
+  rebuild(continued = false): void {
     this.epoch++
     this.kept = []
-    for (const listener of this.rebuilds) listener(this.epoch)
+    for (const listener of this.rebuilds) listener(this.epoch, continued)
   }
 }

@@ -15,8 +15,9 @@ export type Rules = Access | Readonly<Record<string, Access>>
 
 /**
  * A role's permissions in OpenCode-neutral words. The herald writes them as v1's `permission`
- * object and as v2's ordered `permissions` rules. Reading (read, glob, grep, list) is always
- * allowed and so not listed.
+ * object and as v2's ordered `permissions` rules, after a deny-all: reading and searching (read,
+ * glob, grep, list) are always allowed and so not listed; every other tool, MCP tools included, is
+ * denied unless named here (docs/harness.md, "What every role gets").
  */
 export interface Permissions {
   /** Changing files (edit, write, patch). Patterns match the file's path. */
@@ -71,53 +72,120 @@ export interface Role {
 }
 
 /**
- * Commands that check work without changing it: test runners, linters, typecheckers, across the
- * usual stacks. The verifier may run these and nothing else; the builders run them without asking.
+ * Commands that check work without changing it: test runners, linters, typecheckers across the
+ * usual stacks, and read-only git. The verifier may run these and nothing else; the builders run
+ * them without asking.
+ *
+ * Each is an **exact** command line. OpenCode matches a whole command's text, redirects included,
+ * and its `*` is `.*`: it crosses spaces, so `git diff*` also allows `git difftool -x …`,
+ * `git diff --output=~/.zshrc` and `git diff > src/index.ts` (docs/harness.md, "The shell rules").
+ * No wildcard here can be made safe, so there is none: arguments, flags and other forms ask the
+ * builders and are denied to the verifier. `bunx` and `npx` are left out on purpose (they fetch and
+ * run any package); the project's own scripts (`bun run lint`) run what package.json says.
  */
 export const CHECKS: readonly string[] = [
-  "bun test*",
-  "bun run test*",
-  "bun run lint*",
-  "bun run check*",
-  "bun run typecheck*",
-  "bunx tsc*",
-  "bunx biome*",
-  "npm test*",
-  "npm run test*",
-  "npm run lint*",
-  "npm run typecheck*",
-  "npx tsc*",
-  "npx eslint*",
-  "npx vitest*",
-  "pnpm test*",
-  "pnpm run test*",
-  "pnpm lint*",
-  "pnpm run lint*",
-  "yarn test*",
-  "yarn lint*",
-  "pytest*",
-  "ruff check*",
-  "mypy*",
-  "cargo test*",
-  "cargo clippy*",
-  "go test*",
-  "go vet*",
-  "make test*",
-  "make lint*",
-  "make check*",
-  "git status*",
-  "git diff*",
-  "git log*",
-  "git show*",
+  "bun test",
+  "bun run test",
+  "bun run lint",
+  "bun run check",
+  "bun run typecheck",
+  "npm test",
+  "npm run test",
+  "npm run lint",
+  "npm run typecheck",
+  "pnpm test",
+  "pnpm run test",
+  "pnpm lint",
+  "pnpm run lint",
+  "yarn test",
+  "yarn lint",
+  "pytest",
+  "ruff check",
+  "ruff check .",
+  "mypy",
+  "mypy .",
+  "cargo test",
+  "cargo clippy",
+  "go test ./...",
+  "go vet ./...",
+  "make test",
+  "make lint",
+  "make check",
+  "git status",
+  "git status --short",
+  "git status --porcelain",
+  "git diff",
+  "git diff --stat",
+  "git diff --cached",
+  "git diff --cached --stat",
+  "git diff --staged",
+  "git diff HEAD",
+  "git log --oneline",
+  "git log --oneline -20",
+  "git show",
+  "git show --stat",
 ]
 
-/** `"*"` answered `fallback`, then every check allowed. */
+/**
+ * `"*"` answered `fallback`, then every check allowed, as written and with stderr folded into
+ * stdout (`2>&1` only duplicates a stream; it opens no file).
+ */
 export function checksAnd(fallback: Access): Readonly<Record<string, Access>> {
-  return Object.fromEntries([["*", fallback], ...CHECKS.map((command) => [command, "allow"])])
+  return Object.fromEntries([
+    ["*", fallback],
+    ...CHECKS.flatMap((command) => [
+      [command, "allow"],
+      [`${command} 2>&1`, "allow"],
+    ]),
+  ])
 }
 
 /** Reads and reports; changes nothing, runs nothing, launches no one. */
 export const READ_ONLY: Permissions = { edit: "deny", bash: "deny", web: "deny", dispatch: [] }
 
-/** May write Markdown documents (specs, plans, ADRs), and no other file. */
-export const DOCS_ONLY: Readonly<Record<string, Access>> = { "*": "deny", "*.md": "allow" }
+/**
+ * Paths no guild role may write, whatever else it may: what OpenCode (or another agent harness)
+ * loads as agents, commands, skills, plugins, instructions or config, and git's config and hooks,
+ * which run code on the next git command. Writing one would change what the guild itself may do.
+ *
+ * A file path reaches the matcher relative to the session's directory (`../../AGENTS.md` from a
+ * subfolder) or absolute outside it, and `*` crosses `/`: each is listed bare and with a leading
+ * `*` and `/`, which also catches nested copies.
+ * Agent and command folders are denied for Markdown only (OpenCode loads `*.md` there; code in a
+ * `commands/` folder is ordinary code); skill folders entirely, scripts included.
+ */
+const PROTECTED: readonly string[] = [
+  ".opencode/*",
+  "opencode.json*",
+  "AGENTS.md",
+  "CLAUDE.md",
+  ".claude/*",
+  ".agents/*",
+  ".config/opencode/*",
+  "agent/*.md",
+  "agents/*.md",
+  "command/*.md",
+  "commands/*.md",
+  "skill/*",
+  "skills/*",
+  ".git/*",
+].flatMap((path) => [path, `*/${path}`])
+
+/** `"*"` answered `fallback`, then each `allow` pattern, then every protected path denied. */
+function writes(fallback: Access, allow: readonly string[]): Readonly<Record<string, Access>> {
+  return Object.fromEntries([
+    ["*", fallback],
+    ...allow.map((path) => [path, "allow"]),
+    ...PROTECTED.map((path) => [path, "deny"]),
+  ])
+}
+
+/** May change any file but the protected ones: the builders. */
+export const CODE: Readonly<Record<string, Access>> = writes("allow", [])
+
+/**
+ * May write Markdown under a `docs/` folder (specs, plans, ADRs), and no other file. Not `*.md`
+ * anywhere: README, AGENTS.md and agent definitions are Markdown too, and any of them can steer
+ * every later session.
+ */
+export const DOCS_ONLY: Readonly<Record<string, Access>> = writes("deny", ["docs/*.md", "*/docs/*.md"])

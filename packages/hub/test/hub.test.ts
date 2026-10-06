@@ -1,9 +1,9 @@
 import { afterAll, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { HubMessage } from "../src/index.ts"
-import { HERALD_HEADER, startHub } from "../src/index.ts"
+import { HERALD_HEADER, type Health, hubBuild, startHub } from "../src/index.ts"
 import { MAX_RAW, MAX_RAW_TOTAL } from "../src/validate.ts"
 
 const home = mkdtempSync(join(tmpdir(), "guildhall-hub-"))
@@ -19,6 +19,22 @@ const dispatch = {
 }
 
 describe("hub", () => {
+  test("/health names the build it runs and when it started, so a stale hub can be told apart", async () => {
+    const health = (await (await fetch(`${base}/health`)).json()) as Health
+    expect(health.build).toBe(hubBuild())
+    expect(health.build).toMatch(/^[0-9a-f]{12}$/)
+    expect(Date.parse(health.started)).toBeLessThanOrEqual(Date.now())
+    expect(health.pid).toBe(process.pid)
+  })
+
+  test("the build changes when the hub's source does", () => {
+    const dir = mkdtempSync(join(tmpdir(), "guildhall-build-"))
+    writeFileSync(join(dir, "hub.ts"), "a")
+    const before = hubBuild(dir)
+    writeFileSync(join(dir, "hub.ts"), "b")
+    expect(hubBuild(dir)).not.toBe(before)
+  })
+
   test("refuses a POST without the herald header (a web page can't forge events)", async () => {
     const response = await fetch(`${base}/events`, { method: "POST", body: JSON.stringify(dispatch) })
     expect(response.status).toBe(403)

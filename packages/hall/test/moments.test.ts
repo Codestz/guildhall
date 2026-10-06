@@ -18,6 +18,27 @@ function playThrough(store: GuildStore): void {
   while (store.time < store.duration) store.tick(Math.min(50, store.duration - store.time))
 }
 
+/** The scenario's events moved in time so its first change happens `ago` ms before now. */
+function shifted(events: GuildEvent[], ago: number): GuildEvent[] {
+  const shift = Date.now() - ago - (events[0]?.change.at ?? 0)
+  return events.map((e) => ({ ...e, change: { ...e.change, at: e.change.at + shift } }))
+}
+
+/** A stand-in hub that sends `script` to the hall as it connects. */
+function hubOf(script: unknown[]) {
+  return Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: (request, srv) => (srv.upgrade(request, { data: undefined }) ? undefined : new Response("no")),
+    websocket: {
+      open(ws) {
+        for (const message of script) ws.send(JSON.stringify(message))
+      },
+      message() {},
+    },
+  })
+}
+
 /** What a moment says, minus when and its place in the stream: comparable across clocks. */
 const gist = (m: Moment) => {
   const { seq: _seq, at: _at, live: _live, ...rest } = m
@@ -200,19 +221,12 @@ describe("moments: the store's stream", () => {
   })
 
   test("live and sim agree: the same scenario through a hub makes the same moments", async () => {
-    const events: GuildEvent[] = toEvents(party(), "demo")
-    const server = Bun.serve({
-      hostname: "127.0.0.1",
-      port: 0,
-      fetch: (request, srv) => (srv.upgrade(request, { data: undefined }) ? undefined : new Response("no")),
-      websocket: {
-        open(ws) {
-          ws.send(JSON.stringify({ type: "hello", version: 1, events: [] }))
-          ws.send(JSON.stringify({ type: "events", events }))
-        },
-        message() {},
-      },
-    })
+    // Happening now (changes older than LIVE_MS on arrival are backlog: see the next test).
+    const events = shifted(toEvents(party(), "demo"), 0)
+    const server = hubOf([
+      { type: "hello", version: 1, events: [] },
+      { type: "events", events },
+    ])
     const live = new GuildStore()
     stores.push(live)
     const heard: Moment[] = []
@@ -229,6 +243,40 @@ describe("moments: the store's stream", () => {
     const story = (moments: readonly Moment[]) => moments.filter((m) => m.kind !== "leave").map(gist)
     expect(heard.every((m) => m.live)).toBe(true)
     expect(story(heard)).toEqual(story(sim.moments.history))
+  })
+
+  test("a courier's backlog after a hub restart is history, not news; a fresh change still is", async () => {
+    // The hub restarted: the hall's hello is empty, then the herald flushes ten-minute-old changes.
+    const backlog = shifted(toEvents(party(), "demo"), 10 * 60_000)
+    const root = backlog.find((e) => e.change.type === "session")?.change.id as string
+    const now: GuildEvent = {
+      v: 1,
+      guild: "demo",
+      seq: (backlog.at(-1)?.seq ?? 0) + 1,
+      change: {
+        type: "session",
+        id: "late",
+        parentID: root,
+        agent: "guild-explorer",
+        title: "x",
+        at: Date.now(),
+      },
+    }
+    const server = hubOf([
+      { type: "hello", version: 1, events: [] },
+      { type: "events", events: [...backlog, now] },
+    ])
+    const store = new GuildStore()
+    stores.push(store)
+    const heard: Moment[] = []
+    store.moments.on((m) => heard.push(m))
+    store.live(`ws://127.0.0.1:${server.port}/ws`)
+    const until = performance.now() + 3000
+    while (store.moments.history.length < 20 && performance.now() < until) await wait(20)
+    await wait(250)
+    server.stop(true)
+    expect(store.moments.history.length).toBeGreaterThan(20)
+    expect(heard.map((m) => [m.kind, m.id])).toEqual([["join", "late"]])
   })
 
   test("a live hello's backlog is history, not news", async () => {

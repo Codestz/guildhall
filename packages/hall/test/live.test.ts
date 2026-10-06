@@ -129,6 +129,55 @@ describe("live mode", () => {
     hub.server.stop(true)
   })
 
+  test("piles and the yard keep a party's work after it went home (review-2 #11)", async () => {
+    const now = Date.now()
+    let seq = 0
+    const event = (change: Change): GuildEvent => ({ v: 1, guild: "g", seq: ++seq, change })
+    // Party A: an explorer's ten greps (ten logs on the pile), an implementer's two edits (the yard),
+    // all done five minutes ago — long gone home. Party B works now.
+    const at = now - 5 * 60_000
+    const changes: Change[] = [
+      { type: "session", id: "a", agent: "guild-master", title: "a", at },
+      { type: "status", id: "a", status: "busy", at },
+      { type: "session", id: "a1", parentID: "a", agent: "guild-explorer", title: "x", at: at + 1 },
+      ...Array.from(
+        { length: 10 },
+        (_, n): Change => ({
+          type: "tool",
+          id: "a1",
+          call: `g${n}`,
+          name: "grep",
+          state: "completed",
+          at: at + 10 + n,
+        }),
+      ),
+      { type: "session", id: "a2", parentID: "a", agent: "guild-implementer", title: "y", at: at + 30 },
+      ...[1, 2].map(
+        (n): Change => ({
+          type: "tool",
+          id: "a2",
+          call: `e${n}`,
+          name: "edit",
+          state: "completed",
+          at: at + 40 + n,
+        }),
+      ),
+      ...["a1", "a2", "a"].map((id): Change => ({ type: "status", id, status: "idle", at: at + 100 })),
+      { type: "session", id: "b", agent: "guild-master", title: "b", at: now - 2000 },
+      { type: "status", id: "b", status: "busy", at: now - 1000 },
+    ]
+    const hub = fakeHub([{ type: "hello", version: 1, events: changes.map(event) }])
+    const store = new GuildStore()
+    stores.push(store)
+    store.live(hub.url)
+    await wait(300)
+    expect(store.parties.map((p) => p.id)).toEqual(["b"])
+    expect(store.traces.logs).toBe(10)
+    expect(store.progress).toBe(2)
+    store.load("party")
+    hub.server.stop(true)
+  })
+
   test("a reconnect's hello replaces the markers and the log instead of adding to them", async () => {
     const plea: GuildEvent = {
       v: 1,
@@ -167,6 +216,22 @@ describe("live mode", () => {
     store.load("party")
     server.stop(true)
   }, 10_000)
+
+  test("a hello rebuilds the moments as the same run going on; going live or loading starts afresh", async () => {
+    const hub = fakeHub([
+      { type: "hello", version: 1, events: [session(1, "first")] },
+      { type: "hello", version: 1, events: [session(1, "first")] },
+    ])
+    const store = new GuildStore()
+    stores.push(store)
+    const rebuilds: boolean[] = []
+    store.moments.onRebuild((_, continued) => rebuilds.push(continued))
+    store.live(hub.url)
+    await wait(300)
+    store.load("party")
+    expect(rebuilds).toEqual([false, true, true, false])
+    hub.server.stop(true)
+  })
 
   test("junk from the socket is ignored; good events around it still apply", async () => {
     const hub = fakeHub([

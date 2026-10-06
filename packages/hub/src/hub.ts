@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto"
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { appendFile, mkdir } from "node:fs/promises"
 import { homedir } from "node:os"
-import { join, resolve, sep } from "node:path"
+import { dirname, join, resolve, sep } from "node:path"
+import { fileURLToPath } from "node:url"
 import { type GuildEvent, WIRE_VERSION } from "@guildhall/core"
 import type { Server, ServerWebSocket } from "bun"
 import { type Dispatch, HERALD_HEADER, HUB_PORT, type HubMessage } from "./protocol.ts"
@@ -32,12 +34,43 @@ const MAX_BODY = 16 * 1024 * 1024
 /** Chronicles older than this aren't read back on start: those sessions are long over. */
 const HISTORY_MS = 24 * 60 * 60 * 1000
 
+/**
+ * Which hub this is: a hash of the hub's own source files. A herald computes it from the same files
+ * on disk and compares it with `/health`, so a hub still running older code (or something else
+ * holding the port) is noticed rather than trusted (docs/reviews/review-2.md, finding 5).
+ */
+export function hubBuild(dir = dirname(fileURLToPath(import.meta.url))): string {
+  const hash = createHash("sha256")
+  for (const file of list(dir)
+    .filter((name) => name.endsWith(".ts"))
+    .sort()) {
+    hash.update(`${file}\0`)
+    hash.update(readFileSync(join(dir, file)))
+  }
+  return hash.digest("hex").slice(0, 12)
+}
+
+/** What `/health` answers. */
+export interface Health {
+  ok: true
+  /** `hubBuild()` when this hub started. */
+  build: string
+  /** When this hub started, ISO 8601. */
+  started: string
+  pid: number
+  wire: number
+  guilds: string[]
+  halls: number
+}
+
 export function startHub(options: HubOptions = {}): Server<unknown> {
   const port = options.port ?? Number(process.env.GUILDHALL_PORT ?? HUB_PORT)
   const home = options.home ?? process.env.GUILDHALL_HOME ?? join(homedir(), ".cache", "guildhall")
   const keep = options.keep ?? 20_000
   const maxBuffered = options.maxBuffered ?? 16 * 1024 * 1024
-  const boot = new Date().toISOString().replace(/[:.]/g, "-")
+  const started = new Date().toISOString()
+  const build = hubBuild()
+  const boot = started.replace(/[:.]/g, "-")
   const events = loadHistory(join(home, "chronicles"), keep)
   const halls = new Set<ServerWebSocket<unknown>>()
   /** Per guild, the dispatch being recorded: the next waits for it, so seq and broadcasts agree. */
@@ -104,7 +137,15 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
     async fetch(request, server) {
       const url = new URL(request.url)
       if (url.pathname === "/health")
-        return Response.json({ ok: true, guilds: [...events.keys()], halls: halls.size })
+        return Response.json({
+          ok: true,
+          build,
+          started,
+          pid: process.pid,
+          wire: WIRE_VERSION,
+          guilds: [...events.keys()],
+          halls: halls.size,
+        } satisfies Health)
       if (url.pathname === "/events" && request.method === "POST") {
         if (request.headers.get(HERALD_HEADER) !== "1") return new Response("forbidden", { status: 403 })
         // Heralds never send an Origin; a browser always does. A page that rebinds its own DNS name

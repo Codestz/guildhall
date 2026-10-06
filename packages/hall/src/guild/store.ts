@@ -157,6 +157,8 @@ const GONE_MS = 27_000
 const HOLD_MS = 4000
 const FOCUS_TTL_MS = 9000
 const LOG_SIZE = 80
+/** Live: a change older than this when it arrives is backlog, applied quietly rather than as news. */
+export const LIVE_MS = 5000
 
 export class GuildStore {
   scenario: ScenarioId = "party"
@@ -288,13 +290,18 @@ export class GuildStore {
         if (!data) return
         if (data.type === "hello") {
           // A fresh hello (a reconnect, a hub restart) is everything so far: start over, markers too.
-          this.reset()
+          // The same run goes on: what was news already (a world event) is not news again.
+          this.reset(true)
           this.markers = []
           this.seen.clear()
           this.liveStart = data.events[0]?.change.at ?? Date.now()
           for (const event of data.events) if (this.fresh(event)) this.take(event.change, false, event.guild)
         } else {
-          for (const event of data.events) if (this.fresh(event)) this.take(event.change, true, event.guild)
+          // A change older than LIVE_MS is backlog (the herald's courier flushing its queue after a
+          // hub restart, review-2 #10): applied, but history, not news — no burst of ravens and cues.
+          const now = Date.now()
+          for (const event of data.events)
+            if (this.fresh(event)) this.take(event.change, now - event.change.at <= LIVE_MS, event.guild)
         }
         const last = data.events.at(-1)
         if (last) this.guild = last.guild
@@ -510,7 +517,7 @@ export class GuildStore {
 
   snapshot = (): number => this.version
 
-  private reset(): void {
+  private reset(continued = false): void {
     this.model = emptyModel()
     this.focus = null
     this.lastEventAt = 0
@@ -521,7 +528,7 @@ export class GuildStore {
     this.arrived.clear()
     this.guilds.clear()
     this.rebuilding = true
-    this.moments.rebuild()
+    this.moments.rebuild(continued)
   }
 
   private take(change: Change, live: boolean, guild?: string): void {
@@ -635,14 +642,16 @@ export class GuildStore {
    */
   private departures(parties: readonly Party[]): void {
     const now = this.now
+    // News only while it happens: live, a departure found long after its time is backlog (#10).
+    const news = (when: number) => !this.rebuilding && (this.mode !== "live" || now - when <= LIVE_MS)
     for (const party of parties) {
       const root = party.root
       if (!root) continue
       if (!party.leaving) this.left.delete(root.id)
       else if (!this.left.has(root.id) && party.idleSince !== undefined) {
         this.left.add(root.id)
-        const at = party.idleSince + PARTY_IDLE_MS - this.start
-        this.moments.add({ ...this.actorOf(root), kind: "leave", at, live: !this.rebuilding })
+        const when = party.idleSince + PARTY_IDLE_MS
+        this.moments.add({ ...this.actorOf(root), kind: "leave", at: when - this.start, live: news(when) })
       }
     }
     for (const s of parties.flatMap((p) => p.sessions)) {
@@ -655,8 +664,8 @@ export class GuildStore {
       }
       if (this.left.has(s.id) || s.ended === undefined) continue
       this.left.add(s.id)
-      const at = s.ended + GONE_MS - this.start
-      this.moments.add({ ...this.actorOf(s), kind: "leave", at, live: !this.rebuilding })
+      const when = s.ended + GONE_MS
+      this.moments.add({ ...this.actorOf(s), kind: "leave", at: when - this.start, live: news(when) })
     }
   }
 
@@ -693,9 +702,11 @@ export class GuildStore {
     this.rebuilding = false
     const all = parties.flatMap((p) => p.sessions)
     // Traces are things on the shared sites (logs on the pile, the yard's building): every party's
-    // work leaves them, whoever is followed, so switching parties never empties a pile.
-    this.progress = progressOf(all)
-    this.traces = tracesOf(all)
+    // work leaves them, whoever is followed, so switching parties never empties a pile — nor does a
+    // party going home (review-2 #11): they count every session of the island's guild, on stage or not.
+    const worked = this.islandSessions(parties)
+    this.progress = progressOf(worked)
+    this.traces = tracesOf(worked)
     // The weather is the mood of the story being told: all parties together, or the followed one.
     const followed = parties.find((p) => p.id === this.following)
     const told = followed ? followed.sessions : all
@@ -709,6 +720,15 @@ export class GuildStore {
     // The director films the followed party only; with all, everyone on stage.
     this.director.scope = followed ? new Set(followed.sessions.map((s) => s.id)) : null
     this.emit()
+  }
+
+  /** Every session of the island's guild (live: the stage's project; a replay: the whole run). */
+  private islandSessions(parties: readonly Party[]): Session[] {
+    if (parties.length === 0) return []
+    const root = parties.find((p) => p.root)?.root
+    const guild = root ? this.guilds.get(root.id) : undefined
+    const sessions = [...this.model.sessions.values()]
+    return guild === undefined ? sessions : sessions.filter((s) => this.guilds.get(s.id) === guild)
   }
 
   private emit(): void {

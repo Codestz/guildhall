@@ -1,4 +1,4 @@
-import { checksAnd, type Role } from "../role.ts"
+import { CODE, checksAnd, type Role } from "../role.ts"
 import { SUBAGENT_RULES } from "./common.ts"
 
 const prompt = `
@@ -52,7 +52,7 @@ export const implementer: Role = {
   description: "Builds one bounded task: code and tests inside the files it is given.",
   mode: "subagent",
   prompt,
-  permissions: { edit: "allow", bash: checksAnd("ask"), web: "deny", dispatch: [] },
+  permissions: { edit: CODE, bash: checksAnd("ask"), web: "deny", dispatch: [] },
   tier: "standard",
   color: "#e0702f",
   station: "forge",

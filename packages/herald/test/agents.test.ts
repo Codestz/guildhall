@@ -9,6 +9,7 @@ import {
   v1Permission,
   v2Permissions,
 } from "../src/agents.ts"
+import { evaluate } from "./support/opencode.ts"
 
 const role = (id: string) => ROLES.find((r) => r.id === id)!
 
@@ -36,17 +37,17 @@ function v2Host() {
   return { agents, domain: { transform: (fn: (e: V2AgentEditor) => void) => fn(editor) } }
 }
 
-/** v2's rule: the last matching rule decides; `*` matches anything. */
-function decide(rules: V2Agent["permissions"], action: string, resource: string): string | undefined {
-  const glob = (pattern: string, value: string) =>
-    new RegExp(`^${pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replaceAll("*", ".*")}$`).test(value)
-  return rules.findLast((rule) => glob(rule.action, action) && glob(rule.resource, resource))?.effect
-}
+/** OpenCode's own decision (./support/opencode.ts); no match there means ask. */
+const decide = (rules: V2Agent["permissions"], action: string, resource: string) =>
+  evaluate(rules, action, resource)
 
 describe("v1 permission", () => {
-  test("names v1's permissions and keeps pattern order", () => {
+  test("names v1's permissions after a leading deny-all, and keeps pattern order", () => {
     const permission = v1Permission(role("guild-verifier").permissions)
-    expect(Object.keys(permission).sort()).toEqual(["bash", "edit", "task", "webfetch", "websearch"])
+    expect(Object.keys(permission)[0]).toBe("*")
+    expect(permission["*"]).toBe("deny")
+    for (const key of ["read", "glob", "grep", "bash", "edit", "task", "webfetch", "websearch"])
+      expect(Object.keys(permission)).toContain(key)
     expect(permission.edit).toBe("deny")
     expect(Object.keys(permission.bash as object)[0]).toBe("*")
     expect(permission.task).toBe("deny")
@@ -61,20 +62,36 @@ describe("v1 permission", () => {
     expect(Object.keys(task)).toHaveLength(9)
   })
 
-  test("documents-only edit becomes a pattern map", () => {
-    expect(v1Permission(role("guild-architect").permissions).edit).toEqual({ "*": "deny", "*.md": "allow" })
+  test("documents-only edit becomes a pattern map: deny first, docs allowed, protected paths last", () => {
+    const edit = v1Permission(role("guild-architect").permissions).edit as Record<string, string>
+    expect(Object.entries(edit).slice(0, 3)).toEqual([
+      ["*", "deny"],
+      ["docs/*.md", "allow"],
+      ["*/docs/*.md", "allow"],
+    ])
+    expect(
+      Object.values(edit)
+        .slice(3)
+        .every((effect) => effect === "deny"),
+    ).toBe(true)
   })
 })
 
 describe("v2 permissions", () => {
-  test("renames bash to shell and task to subagent", () => {
-    const actions = new Set(v2Permissions(role("guild-implementer").permissions).map((rule) => rule.action))
-    expect(actions).toEqual(new Set(["edit", "shell", "webfetch", "websearch", "subagent"]))
+  test("renames bash to shell and task to subagent, after a leading deny-all", () => {
+    const rules = v2Permissions(role("guild-implementer").permissions)
+    expect(rules[0]).toEqual({ action: "*", resource: "*", effect: "deny" })
+    const actions = new Set(rules.map((rule) => rule.action))
+    for (const action of ["edit", "shell", "webfetch", "websearch", "subagent"])
+      expect(actions.has(action)).toBe(true)
+    expect(actions.has("bash")).toBe(false)
+    expect(actions.has("task")).toBe(false)
   })
 
   test("the verifier runs tests but no other command, and edits nothing", () => {
     const rules = v2Permissions(role("guild-verifier").permissions)
-    expect(decide(rules, "shell", "bun test packages/roster")).toBe("allow")
+    expect(decide(rules, "shell", "bun test")).toBe("allow")
+    expect(decide(rules, "shell", "bun test --preload ./x.ts")).toBe("deny")
     expect(decide(rules, "shell", "rm -rf src")).toBe("deny")
     expect(decide(rules, "edit", "src/index.ts")).toBe("deny")
   })
@@ -162,15 +179,17 @@ describe("injectV2", () => {
     expect(master.model).toBeUndefined()
   })
 
-  test("keeps v2's defaults beneath ours, and a second run does not stack rules", () => {
+  test("ours go after v2's defaults and shut them with a deny-all; a second run does not stack rules", () => {
     const host = v2Host()
     injectV2(host.domain, {})
     const once = host.agents.get("guild-explorer")!.permissions.length
     injectV2(host.domain, {})
     const rules = host.agents.get("guild-explorer")!.permissions
     expect(rules).toHaveLength(once)
-    expect(rules[1]).toEqual({ action: "external_directory", resource: "*", effect: "ask" })
+    expect(rules[0]).toEqual({ action: "*", resource: "*", effect: "allow" })
+    expect(rules.findIndex((rule) => rule.action === "*" && rule.effect === "deny")).toBe(1)
     expect(decide(rules, "edit", "a.ts")).toBe("deny")
+    expect(decide(rules, "external_directory", "/tmp/*")).toBe("ask")
   })
 
   test("models split into provider and model id at the first slash", () => {

@@ -5,14 +5,19 @@ import { frameStats } from "../../guild/stats.ts"
 import { useTier } from "../Quality.tsx"
 import { Grass } from "./Grass.tsx"
 import { Water } from "./Water.tsx"
+import { Wilds } from "./Wilds.tsx"
 
-/** Nature: water and grass shaders on island().water / island().meadow. (ADR 0007). */
+/**
+ * Nature: water and grass shaders on island().water / island().meadow, and the character-scale
+ * wilds along roads, sites, village and shore (world/wilds.ts). (ADR 0007).
+ */
 export function Nature() {
   const tier = useTier()
   return (
     <>
       <Water tier={tier} />
       <Grass tier={tier} />
+      <Wilds tier={tier} />
       {import.meta.env.DEV && <DevLook />}
     </>
   )

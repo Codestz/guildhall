@@ -1,7 +1,8 @@
 /**
  * Asset pipeline (ADR 0004): KayKit packs in assets/src → web-ready .glb in packages/hall/public/assets.
  *
- *   bun scripts/assets.ts
+ *   bun scripts/assets.ts               (everything)
+ *   bun scripts/assets.ts forest lands  (only those outputs)
  *
  * - characters/<name>.glb — one per character model, pruned.
  * - anims.glb             — only the clips the hall plays, from Rig_Medium, meshes stripped. Every
@@ -9,6 +10,9 @@
  * - kit.glb               — every environment piece and prop as a named top-level node, one shared
  *                           palette texture per pack, meshopt-compressed.
  * - packages/hall/src/world/kit.json — each kit piece's bounding box, for layout code.
+ * - lands.glb / lands.json — the island's hex tiles and dressing (ADR 0006), the same way.
+ * - forest.glb / forest.json — character-scale trees, bushes, rocks and grass from the Forest
+ *                           Nature Pack (one palette, one material), placed by world/wilds.ts.
  *
  * Unzip the packs first (assets/raw/*.zip → assets/src/<zip name>/). Both folders are git-ignored;
  * only the outputs are committed. All packs are CC0 (Kay Lousberg, kaylousberg.com).
@@ -301,6 +305,36 @@ const LANDS: Record<string, string[]> = {
   KayKit_RPGToolsBits: ["rope_bundle_A"],
 }
 
+/**
+ * The wilds (world/wilds.ts): a curated slice of the Forest Nature Pack, drawn at 1× so it stands
+ * at character scale beside the 5× hex canopy. Picked for variety at a low triangle count: every
+ * piece shares the pack's one palette texture (`forest_texture.png`, gradient swatches like the
+ * hex pack's), so the hall draws them all with one material. Node names drop the `_Color1` suffix.
+ */
+const FOREST: Record<string, string[]> = {
+  KayKit_Forest_Nature_Pack: [
+    "Tree_1_A_Color1",
+    "Tree_2_B_Color1",
+    "Tree_3_A_Color1",
+    "Tree_4_A_Color1",
+    "Tree_4_B_Color1",
+    "Tree_Bare_2_A_Color1",
+    "Bush_1_B_Color1",
+    "Bush_1_C_Color1",
+    "Bush_1_E_Color1",
+    "Bush_2_B_Color1",
+    "Bush_3_A_Color1",
+    "Bush_4_D_Color1",
+    "Rock_1_A_Color1",
+    "Rock_1_D_Color1",
+    "Rock_2_B_Color1",
+    "Rock_2_C_Color1",
+    "Rock_3_E_Color1",
+    "Grass_1_B_Color1",
+    "Grass_2_B_Color1",
+  ],
+}
+
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
   "meshopt.encoder": MeshoptEncoder,
 })
@@ -484,12 +518,13 @@ async function kit(name: string, sources: Record<string, string[]>): Promise<voi
       if (!sourceScene) continue
       const map = mergeDocuments(target, doc)
       const merged = map.get(sourceScene) as ReturnType<typeof target.createScene>
-      const group = target.createNode(piece)
+      const named = piece.replace(/_Color1$/, "")
+      const group = target.createNode(named)
       for (const child of merged.listChildren()) group.addChild(child as GNode)
       merged.dispose()
       scene.addChild(group)
       const box = getBounds(group)
-      bounds[piece] = {
+      bounds[named] = {
         min: box.min.map(round),
         max: box.max.map(round),
         size: box.max.map((v, i) => round(v - (box.min[i] ?? 0))),
@@ -521,8 +556,16 @@ function kb(path: string): string {
   return `${(statSync(path).size / 1024).toFixed(0)} KB`
 }
 
+const STEPS: Record<string, () => Promise<void>> = {
+  characters,
+  anims: animations,
+  kit: () => kit("kit", KIT),
+  lands: () => kit("lands", LANDS),
+  forest: () => kit("forest", FOREST),
+}
+const wanted = process.argv.slice(2)
+for (const name of wanted) if (!STEPS[name]) throw new Error(`unknown output ${name}: ${Object.keys(STEPS)}`)
+
 await MeshoptEncoder.ready
-await characters()
-await animations()
-await kit("kit", KIT)
-await kit("lands", LANDS)
+for (const [name, step] of Object.entries(STEPS))
+  if (wanted.length === 0 || wanted.includes(name)) await step()

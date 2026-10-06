@@ -5,7 +5,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./server": "./server.js"
+    "./server": "./server.js",
+    "./agents": "./src/agents.ts",
+    "./courier": "./src/courier.ts"
   },
   "dependencies": {
     "@guildhall/core": "workspace:*",

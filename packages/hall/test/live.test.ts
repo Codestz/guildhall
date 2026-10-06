@@ -275,4 +275,20 @@ describe("?live", () => {
     expect(liveUrlOf(`?live=${encodeURIComponent("ws://localhost.evil.example/ws")}`)).toBe(DEFAULT)
     expect(liveUrlOf("?live=ws://box.lan:4747/ws&anyhub=1")).toBe("ws://box.lan:4747/ws")
   })
+
+  describe("a hall served by a hub (the npm package)", () => {
+    const SERVING = "ws://127.0.0.1:4848/ws"
+    test("follows the hub that served it without being asked", () => {
+      expect(liveUrlOf("", SERVING)).toBe(SERVING)
+    })
+
+    test("bare ?live and refused hubs mean that hub, not the default port", () => {
+      expect(liveUrlOf("?live", SERVING)).toBe(SERVING)
+      expect(liveUrlOf(`?live=${encodeURIComponent("ws://evil.example/ws")}`, SERVING)).toBe(SERVING)
+    })
+
+    test("another hub on this machine can still be asked for", () => {
+      expect(liveUrlOf("?live=ws://localhost:5000/ws", SERVING)).toBe("ws://localhost:5000/ws")
+    })
+  })
 })

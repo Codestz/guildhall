@@ -1,9 +1,15 @@
 import { afterAll, afterEach, describe, expect, setSystemTime, test } from "bun:test"
-import { mkdtempSync } from "node:fs"
+import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { type Dispatch, hubBuild, startHub } from "@guildhall/hub"
-import { createCourier } from "../src/courier.ts"
+import { createCourier, setHubEntry } from "../src/courier.ts"
+
+// Without Bun on PATH the courier runs the hub with this process's own binary (Bun here): either
+// way, no test may start a real hub on the default port. Every start runs a script that exits.
+const noHub = join(mkdtempSync(join(tmpdir(), "guildhall-nohub-")), "no-hub.js")
+writeFileSync(noHub, "")
+setHubEntry(noHub)
 
 const change = { type: "status", id: "ses_1", status: "busy", at: 1 } as const
 
@@ -240,13 +246,14 @@ describe("courier", () => {
   })
 
   test("after a failed start, a later outage may start a hub again (at most every 30 s)", async () => {
-    // Nothing listens on this port; with no bun on PATH each start attempt logs that it can't.
+    // Nothing listens on this port; with no bun on PATH each start runs the hub entry with this
+    // process's own Bun (OpenCode's binary, in OpenCode), which here exits at once.
     const logs: string[] = []
     const dead = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() })
     const free = dead.port as number
     dead.stop(true)
     const courier = createCourier({ guild: "t", opencode: 2, log: (m) => logs.push(m), port: free })
-    const attempts = () => logs.filter((m) => m.includes("start the hub")).length
+    const attempts = () => logs.filter((m) => m.includes("started hub")).length
     // Clear of any start an earlier test made; the clock stays frozen at each time set.
     setSystemTime(new Date(Date.now() + 31_000))
     await withoutBun(async () => {
@@ -258,6 +265,7 @@ describe("courier", () => {
       await until(() => attempts() > 1, 4000)
     })
     expect(attempts()).toBe(2)
+    expect(logs.find((m) => m.includes("started hub"))).toContain(`with ${process.execPath} as Bun`)
     await withoutBun(() => courier.flush())
   }, 10_000)
 })

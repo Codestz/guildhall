@@ -34,6 +34,7 @@ import {
   MIN_SHOT_MS,
 } from "./director.ts"
 import { DEFAULT_SETTINGS, type Environment, type EnvironmentSettings, environmentOf } from "./environment.ts"
+import { SERVED } from "./mode.ts"
 import { type Actor, before, happenings, MomentStream } from "./moments.ts"
 import { byJoin, PARTY_IDLE_MS, type Party, stageOf } from "./parties.ts"
 import { RISE_MS, Undead } from "./undead.ts"
@@ -58,23 +59,30 @@ export type ScenarioId = keyof typeof SCENARIOS
 /** The hub a hall follows unless told otherwise (ADR 0003). */
 export const DEFAULT_HUB = "ws://127.0.0.1:4747/ws"
 
+/** The hub that served this page, when the hall was built to be served by one (mode.ts SERVED). */
+export const SERVING_HUB: string | null =
+  SERVED && typeof location !== "undefined" ? `ws://${location.host}/ws` : null
+
 /**
  * The hub a page's query asks for: null without `?live`; `?live=<url>` only for a hub on this
  * machine (ws://localhost or ws://127.0.0.1, any port) unless `&anyhub=1` says otherwise — a link
  * must not be able to point the hall at someone else's stream. Anything else is the default hub.
+ * A hall served by a hub (`serving`) follows it without being asked, and it is the default; the
+ * stories stay a click away in Settings.
  */
-export function liveUrlOf(search: string): string | null {
+export function liveUrlOf(search: string, serving: string | null = SERVING_HUB): string | null {
+  const fallback = serving ?? DEFAULT_HUB
   const params = new URLSearchParams(search)
   const asked = params.get("live")
-  if (asked === null) return null
-  if (!asked) return DEFAULT_HUB
+  if (asked === null) return serving
+  if (!asked) return fallback
   if (params.get("anyhub") === "1") return asked
   try {
     const url = new URL(asked)
     const local = url.hostname === "localhost" || url.hostname === "127.0.0.1"
-    return url.protocol === "ws:" && local ? asked : DEFAULT_HUB
+    return url.protocol === "ws:" && local ? asked : fallback
   } catch {
-    return DEFAULT_HUB
+    return fallback
   }
 }
 
@@ -266,7 +274,7 @@ export class GuildStore {
    * Follow the hub (ADR 0003): a hello with everything so far, then events as they happen.
    * Reconnects with backoff, so the hall can be opened before OpenCode or the hub.
    */
-  live(url = DEFAULT_HUB): void {
+  live(url = SERVING_HUB ?? DEFAULT_HUB): void {
     // One socket at a time: a second call replaces the first rather than doubling every event.
     const previous = this.socket
     this.socket = undefined

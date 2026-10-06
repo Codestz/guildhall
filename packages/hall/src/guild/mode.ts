@@ -16,3 +16,9 @@ export const MODE: Mode =
  * production build only when built with `VITE_GUILDHALL_PROBE=1` (to measure what ships).
  */
 export const PROBE: boolean = import.meta.env.DEV || import.meta.env.VITE_GUILDHALL_PROBE === "1"
+
+/**
+ * Built to be served by the hub, as the npm package ships it (`VITE_GUILDHALL_SERVED=1`, ADR 0002):
+ * the hall then follows the hub that served the page from the start, without `?live`.
+ */
+export const SERVED: boolean = import.meta.env.VITE_GUILDHALL_SERVED === "1"

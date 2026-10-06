@@ -58,6 +58,18 @@
         "@guildhall/core": "workspace:*",
       },
     },
+    "packages/opencode-guildhall": {
+      "name": "opencode-guildhall",
+      "version": "0.1.0",
+      "bin": {
+        "opencode-guildhall": "dist/cli.js",
+      },
+      "devDependencies": {
+        "@guildhall/herald": "workspace:*",
+        "@guildhall/hub": "workspace:*",
+        "@guildhall/roster": "workspace:*",
+      },
+    },
     "packages/roster": {
       "name": "@guildhall/roster",
       "version": "0.0.0",
@@ -377,6 +389,8 @@
     "ndarray-ops": ["ndarray-ops@1.2.2", "", { "dependencies": { "cwise-compiler": "^1.0.0" } }, "sha512-BppWAFRjMYF7N/r6Ie51q6D4fs0iiGmeXIACKY66fLpnwIui3Wc3CXiD/30mgLbDjPpSLrsqcp3Z62+IcHZsDw=="],
 
     "ndarray-pixels": ["ndarray-pixels@5.2.0", "", { "dependencies": { "@types/ndarray": "^1.0.14", "ndarray": "^1.0.19", "ndarray-ops": "^1.2.2", "sharp": "^0.35.0" } }, "sha512-lTh4tFKziAatVTa9crIsidUyn+lqujVOQpzfdBWvdFu2wo9Uo6z261lVX7SgMyP89xGmj3TMTPbbxl9YDnV4SA=="],
+
+    "opencode-guildhall": ["opencode-guildhall@workspace:packages/opencode-guildhall"],
 
     "path-key": ["path-key@3.1.1", "", {}, "sha512-ojmeN0qd+y0jszEtoY48r0Peq5dwMEkIlCOu6Q5f41lfkswXuKtYrhgoTpLnyIcHm24Uhqx+5Tqm2InSwLhE6Q=="],
 

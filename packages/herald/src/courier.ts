@@ -238,21 +238,34 @@ async function checkHub(base: string, log: (message: string) => void): Promise<v
 const START_EVERY_MS = 30_000
 let started = Number.NEGATIVE_INFINITY
 
+/** The script that runs the hub: its source in this repo; the npm package points it at its bundle. */
+let hubEntry = new URL("../../hub/src/main.ts", import.meta.url).pathname
+
+/** Where `startHub` finds the hub's entry script (the npm package's `dist/hub.js`). */
+export function setHubEntry(path: string): void {
+  hubEntry = path
+}
+
 /**
- * Start the hub as its own process if Bun is on PATH (OpenCode itself is a compiled binary). Shared
- * by every courier in this process, and at most once per START_EVERY_MS.
+ * Start the hub as its own process. Shared by every courier in this process, and at most once per
+ * START_EVERY_MS. With Bun, from PATH; without it, OpenCode's own binary, which is a compiled Bun
+ * and runs a script as Bun with BUN_BE_BUN=1 (measured: OpenCode 2.0.18 is Bun 1.4.2, 1.18.32 is
+ * Bun 1.3.14), so a user who never installed Bun still gets a hub.
  */
 function startHub(log: (message: string) => void): void {
   if (Date.now() - started < START_EVERY_MS) return
   started = Date.now()
   // PATH as it is now: Bun.which alone reads the PATH the process started with.
   const bun = Bun.which("bun", { PATH: process.env.PATH ?? "" })
-  if (!bun) {
-    log("bun not found on PATH; start the hub with `bun packages/hub/src/main.ts`")
-    return
+  const runtime = bun ?? process.execPath
+  try {
+    const child = Bun.spawn([runtime, hubEntry], {
+      stdio: ["ignore", "ignore", "ignore"],
+      env: bun ? process.env : { ...process.env, BUN_BE_BUN: "1" },
+    })
+    child.unref()
+    log(`started hub (pid ${child.pid}) with ${bun ? runtime : `${runtime} as Bun`}`)
+  } catch (error) {
+    log(`could not start the hub with ${runtime}: ${String(error)}; start it with \`bun ${hubEntry}\``)
   }
-  const main = new URL("../../hub/src/main.ts", import.meta.url).pathname
-  const child = Bun.spawn([bun, main], { stdio: ["ignore", "ignore", "ignore"] })
-  child.unref()
-  log(`started hub (pid ${child.pid})`)
 }

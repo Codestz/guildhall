@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url"
 import { type GuildEvent, WIRE_VERSION } from "@guildhall/core"
 import type { Server, ServerWebSocket } from "bun"
 import { type Dispatch, HERALD_HEADER, HUB_PORT, type HubMessage } from "./protocol.ts"
+import { serveStatic } from "./static.ts"
 import { MAX_CHANGES, MAX_RAW, MAX_RAW_TOTAL, validChange, validGuild } from "./validate.ts"
 
 /**
@@ -27,6 +28,11 @@ export interface HubOptions {
    * fresh hello), rather than have events silently go missing.
    */
   maxBuffered?: number
+  /**
+   * A built hall (Vite's `dist`) to serve at `/`, as the npm package does (ADR 0002). Without one,
+   * the hub serves only its API and the hall runs from its own dev server.
+   */
+  hall?: string
 }
 
 /** Largest herald POST. A batch is capped at MAX_CHANGES changes, each capped by the validator. */
@@ -37,12 +43,14 @@ const HISTORY_MS = 24 * 60 * 60 * 1000
 /**
  * Which hub this is: a hash of the hub's own source files. A herald computes it from the same files
  * on disk and compares it with `/health`, so a hub still running older code (or something else
- * holding the port) is noticed rather than trusted (docs/reviews/review-2.md, finding 5).
+ * holding the port) is noticed rather than trusted (docs/reviews/review-2.md, finding 5). In the
+ * npm package the hub and the herald are bundles side by side in one `dist/`, so there it is a hash
+ * of those bundles: a new package version is a new build.
  */
 export function hubBuild(dir = dirname(fileURLToPath(import.meta.url))): string {
   const hash = createHash("sha256")
   for (const file of list(dir)
-    .filter((name) => name.endsWith(".ts"))
+    .filter((name) => name.endsWith(".ts") || name.endsWith(".js"))
     .sort()) {
     hash.update(`${file}\0`)
     hash.update(readFileSync(join(dir, file)))
@@ -177,6 +185,10 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
         if (server.upgrade(request, { data: undefined })) return undefined
         return new Response("upgrade failed", { status: 400 })
       }
+      // The hall's files are no secret, but a page that rebinds its DNS name to 127.0.0.1 gets
+      // nothing from this port under its own name either.
+      if (options.hall && loopbackHost(request.headers.get("host"), server.port))
+        return serveStatic(options.hall, request, url.pathname)
       return new Response("not found", { status: 404 })
     },
     websocket: {

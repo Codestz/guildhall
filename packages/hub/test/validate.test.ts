@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { createV1Translator, createV2Translator } from "@guildhall/core"
 import { recorded } from "../../core/test/fixtures.ts"
-import { MAX_INPUT, MAX_NAME, MAX_TEXT, validChange } from "../src/validate.ts"
+import { MAX_INPUT, MAX_NAME, MAX_TEXT, validChange, validGuild } from "../src/validate.ts"
 
 const tool = { type: "tool", id: "ses_1", call: "c1", name: "read", state: "running", at: 1 }
 
@@ -36,10 +36,10 @@ describe("validChange", () => {
     expect(validChange({ type: "session", id: "s", background: "yes", at: 1 })).toBe(false)
   })
 
-  test("`at` must be a finite, non-negative time, not far in the future", () => {
+  test("`at` must be a finite time after the epoch, not far in the future", () => {
     const now = 1_000_000_000_000
     expect(validChange({ ...tool, at: now }, now)).toBe(true)
-    for (const at of [-1, Number.NaN, Number.POSITIVE_INFINITY, "1", now + 2 * 86_400_000])
+    for (const at of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, "1", now + 2 * 86_400_000])
       expect(validChange({ ...tool, at }, now)).toBe(false)
   })
 
@@ -49,5 +49,16 @@ describe("validChange", () => {
     expect(validChange({ ...tool, output: "o".repeat(MAX_TEXT + 1) })).toBe(false)
     expect(validChange({ ...tool, input: { content: "i".repeat(MAX_INPUT) } })).toBe(false)
     expect(validChange({ ...tool, input: { filePath: "/a.ts" } })).toBe(true)
+  })
+})
+
+describe("validGuild", () => {
+  test("project names pass, dots inside included", () => {
+    for (const guild of ["guildhall", "my.app", "a-b_c 2", "ünïcode"]) expect(validGuild(guild)).toBe(true)
+  })
+
+  test("refuses names that are or start with a dot, hold a path separator or a control character", () => {
+    for (const guild of ["", ".", "..", ".git", "a/b", "a\\b", "../x", "x\u0000", "a\nb", "\u007f", 7])
+      expect(validGuild(guild)).toBe(false)
   })
 })

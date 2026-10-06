@@ -1,11 +1,11 @@
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { appendFile, mkdir } from "node:fs/promises"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import { join, resolve, sep } from "node:path"
 import { type GuildEvent, WIRE_VERSION } from "@guildhall/core"
 import type { Server, ServerWebSocket } from "bun"
 import { type Dispatch, HERALD_HEADER, HUB_PORT, type HubMessage } from "./protocol.ts"
-import { validChange, validGuild } from "./validate.ts"
+import { MAX_CHANGES, MAX_RAW, MAX_RAW_TOTAL, validChange, validGuild } from "./validate.ts"
 
 /**
  * The hub (ADR 0003): heralds POST their guild's changes here; halls subscribe over WebSocket.
@@ -27,7 +27,7 @@ export interface HubOptions {
   maxBuffered?: number
 }
 
-/** Largest herald POST. A batch is capped at 500 changes, each capped by the validator. */
+/** Largest herald POST. A batch is capped at MAX_CHANGES changes, each capped by the validator. */
 const MAX_BODY = 16 * 1024 * 1024
 /** Chronicles older than this aren't read back on start: those sessions are long over. */
 const HISTORY_MS = 24 * 60 * 60 * 1000
@@ -64,7 +64,7 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
     if (list.length > keep) list.splice(0, list.length - keep)
     if (out.length > 0) broadcast({ type: "events", events: out })
     try {
-      const dir = join(home, "chronicles", safe(guild))
+      const dir = chronicleDir(home, guild)
       await mkdir(dir, { recursive: true })
       if (out.length > 0)
         await appendFile(join(dir, `${boot}.jsonl`), `${out.map((e) => JSON.stringify(e)).join("\n")}\n`)
@@ -107,15 +107,22 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
         return Response.json({ ok: true, guilds: [...events.keys()], halls: halls.size })
       if (url.pathname === "/events" && request.method === "POST") {
         if (request.headers.get(HERALD_HEADER) !== "1") return new Response("forbidden", { status: 403 })
+        // Heralds never send an Origin; a browser always does. A page that rebinds its own DNS name
+        // to 127.0.0.1 is a browser too, and its requests carry that name as Host.
+        if (request.headers.has("origin") || !loopbackHost(request.headers.get("host"), server.port))
+          return new Response("forbidden", { status: 403 })
         const body = (await request.json().catch(() => undefined)) as Partial<Dispatch> | undefined
         if (!body || !validGuild(body.guild) || !Array.isArray(body.changes))
           return new Response("bad dispatch", { status: 400 })
+        if (body.changes.length > MAX_CHANGES)
+          return new Response(`too many changes: at most ${MAX_CHANGES} per dispatch`, { status: 400 })
         const guild = body.guild
         const now = Date.now()
         const changes = body.changes.filter((change) => validChange(change, now))
         const rejected = body.changes.length - changes.length
         if (rejected > 0) console.warn(`hub: rejected ${rejected} bad change(s) from ${guild}`)
-        const raw = Array.isArray(body.raw) ? body.raw : undefined
+        const raw = Array.isArray(body.raw) ? rawWithin(body.raw, guild) : undefined
+        if (raw === null) return new Response(`raw events over ${MAX_RAW_TOTAL} chars`, { status: 413 })
         const opencode = body.opencode === 1 ? 1 : 2
         const recorded = await inOrder(guild, () => record(guild, { guild, opencode, changes, raw }))
         return Response.json(
@@ -230,6 +237,45 @@ function localOrigin(origin: string | null): boolean {
   }
 }
 
-function safe(name: string): string {
-  return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) || "guild"
+/**
+ * The raw host events worth keeping: each one over MAX_RAW (as JSON) is dropped, or can't be written
+ * at all; null when what is left is still over MAX_RAW_TOTAL.
+ */
+function rawWithin(raw: unknown[], guild: string): unknown[] | null {
+  let total = 0
+  const kept = raw.filter((event) => {
+    let length: number
+    try {
+      length = JSON.stringify(event)?.length ?? 0
+    } catch {
+      return false
+    }
+    if (length > MAX_RAW) return false
+    total += length
+    return true
+  })
+  if (kept.length < raw.length)
+    console.warn(`hub: dropped ${raw.length - kept.length} raw event(s) from ${guild}`)
+  return total > MAX_RAW_TOTAL ? null : kept
+}
+
+/** A herald talks to 127.0.0.1:<port> (or localhost), and says so in Host. */
+function loopbackHost(host: string | null, port: number | undefined): boolean {
+  return host === `127.0.0.1:${port}` || host === `localhost:${port}`
+}
+
+/**
+ * The guild's chronicle directory, always inside `<home>/chronicles` whatever the name holds (the
+ * validator refuses dangerous names already; this holds even if it didn't).
+ */
+function chronicleDir(home: string, guild: string): string {
+  const root = resolve(home, "chronicles")
+  const name =
+    guild
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .replace(/^\.+/, "_")
+      .slice(0, 80) || "guild"
+  const dir = resolve(root, name)
+  if (!dir.startsWith(root + sep)) throw new Error(`guild ${JSON.stringify(guild)} leaves the chronicles`)
+  return dir
 }

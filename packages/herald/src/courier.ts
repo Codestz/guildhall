@@ -3,8 +3,12 @@ import { type Dispatch, HERALD_HEADER, HUB_PORT } from "@guildhall/hub"
 
 /**
  * Carries a herald's changes to the hub in small batches (every FLUSH_MS). Never throws into
- * OpenCode: while the hub is down, refuses a batch or doesn't answer, the batch is kept (capped) and
- * retried with backoff; if nothing listens at all the herald tries to start a hub. Work goes on.
+ * OpenCode. What the hub says decides what happens to a batch:
+ *   2xx                     taken
+ *   413 (too large)         split in half and sent again; a single event still too large is dropped
+ *   other 4xx               dropped (logged): the hub will refuse it however often it is sent
+ *   5xx, 429, 408, timeout  kept (capped) and retried with backoff; so is a hub that isn't there, and
+ *   no answer at all        then the herald also tries to start a hub. Work goes on.
  */
 const FLUSH_MS = 120
 const RETRY_MS = 600
@@ -13,9 +17,15 @@ const MAX_RETRY_MS = 10_000
 const TIMEOUT_MS = 3000
 /** Flush on dispose gives up after this, however much is still queued. */
 const DISPOSE_MS = 5000
-const MAX_QUEUED = 5000
-/** Changes per POST, so a long outage's backlog goes out in requests the hub will take. */
+/** Events (changes and raw host events) kept through an outage. */
+const MAX_QUEUED = 10_000
+/** Changes (and raw events) per POST: the hub refuses a batch of more. */
 const MAX_BATCH = 500
+/** Bytes per POST: well inside the hub's body cap (16 MB). */
+const MAX_BYTES = 8 * 1024 * 1024
+
+/** One queued event: a translated change, or the raw host event behind some. */
+type Item = { change: Change } | { raw: unknown }
 
 export interface Courier {
   send(changes: Change[], raw: unknown): void
@@ -33,13 +43,15 @@ export function createCourier(options: {
   port?: number
 }): Courier {
   const base = `http://127.0.0.1:${options.port ?? Number(process.env.GUILDHALL_PORT ?? HUB_PORT)}`
-  let changes: Change[] = []
-  let raw: unknown[] = []
+  /** Oldest first. A batch is the first few; they leave the queue once the hub has answered. */
+  let queue: Item[] = []
   let timer: ReturnType<typeof setTimeout> | undefined
   /** In an outage: logged once when it starts, once when it ends. */
   let down = false
   let retry = RETRY_MS
   let disposed = false
+  /** Most items the next batch may hold: halved by each 413, back to the full size after a success. */
+  let cap = Number.POSITIVE_INFINITY
   /** One POST at a time, so batches reach the hub in the order they were sent. */
   let sending: Promise<boolean> = Promise.resolve(true)
 
@@ -53,28 +65,43 @@ export function createCourier(options: {
     return sending
   }
 
-  /** Sends one batch; true when the hub took it (or there was nothing to send). */
+  /** The hub answered: it is up, whatever it thought of the batch. */
+  function reached(): void {
+    if (down) options.log("hub reachable again")
+    down = false
+    retry = RETRY_MS
+  }
+
+  /** Sends one batch; true when the queue moved on (sent, split or dropped) or was empty. */
   async function post(): Promise<boolean> {
-    if (changes.length === 0 && raw.length === 0) return true
-    const batch = { changes: changes.splice(0, MAX_BATCH), raw: raw.splice(0, MAX_BATCH) }
-    const body = serialize(batch)
+    const batch = next()
+    if (!batch) return true
     let failure: string
     let unreachable = false
     try {
       const response = await fetch(`${base}/events`, {
         method: "POST",
         headers: { "content-type": "application/json", [HERALD_HEADER]: "1" },
-        body,
+        body: batch.body,
         signal: AbortSignal.timeout(TIMEOUT_MS),
       })
-      if (response.ok) {
-        if (down) options.log("hub reachable again")
-        down = false
-        retry = RETRY_MS
-        if (changes.length > 0 || raw.length > 0) schedule(0)
+      const status = response.status
+      if (response.ok || (status >= 400 && status < 500 && status !== 429 && status !== 408)) {
+        reached()
+        if (status === 413 && batch.size > 1) cap = Math.ceil(batch.size / 2)
+        else {
+          if (status === 413) options.log(`hub at ${base} answered 413: dropped 1 event too large to send`)
+          else if (!response.ok)
+            options.log(
+              `hub at ${base} answered ${status}: dropped ${batch.size} event(s) it will never take`,
+            )
+          queue.splice(0, batch.size)
+          cap = Number.POSITIVE_INFINITY
+        }
+        if (queue.length > 0) schedule(0)
         return true
       }
-      failure = `hub at ${base} answered ${response.status}`
+      failure = `hub at ${base} answered ${status}`
     } catch (error) {
       const timedOut = (error as Error)?.name === "TimeoutError"
       unreachable = !timedOut
@@ -86,29 +113,60 @@ export function createCourier(options: {
     if (unreachable) startHub(options.log)
     // Keep the batch and try again: a hub just started needs a moment. Capped, so a hub that never
     // comes back can't grow the queue without bound.
-    changes = [...batch.changes, ...changes].slice(-MAX_QUEUED)
-    raw = [...batch.raw, ...raw].slice(-MAX_QUEUED)
+    if (queue.length > MAX_QUEUED) queue = queue.slice(-MAX_QUEUED)
     schedule(retry)
     retry = Math.min(retry * 2, MAX_RETRY_MS)
     return false
   }
 
   /**
-   * The dispatch as JSON. Host events are whatever OpenCode hands us: one with a BigInt or a cycle
-   * is dropped (logged) rather than taken for a dead hub. Changes are ours, but checked the same way.
+   * The next batch from the head of the queue, as JSON: at most `cap` items and MAX_BATCH changes,
+   * halved until it fits MAX_BYTES. A single event bigger than that, or one that can't be sent as
+   * JSON at all (a host event with a BigInt or a cycle), is dropped (logged) on the way.
    */
-  function serialize(batch: { changes: Change[]; raw: unknown[] }): string {
-    const dispatch: Dispatch = { guild: options.guild, opencode: options.opencode, ...batch }
+  function next(): { body: string; size: number } | undefined {
+    while (queue.length > 0) {
+      let size = 0
+      let changes = 0
+      let raws = 0
+      for (const item of queue) {
+        if (size >= cap) break
+        if ("change" in item ? changes >= MAX_BATCH : raws >= MAX_BATCH) break
+        if ("change" in item) changes++
+        else raws++
+        size++
+      }
+      const body = serialize(queue.slice(0, size))
+      if (body === undefined) continue
+      if (Buffer.byteLength(body) <= MAX_BYTES) return { body, size }
+      if (size > 1) {
+        cap = Math.ceil(size / 2)
+        continue
+      }
+      queue.shift()
+      cap = Number.POSITIVE_INFINITY
+      options.log(`dropped 1 event of more than ${MAX_BYTES} bytes`)
+    }
+    return undefined
+  }
+
+  /** The items as a dispatch; undefined when some couldn't be sent as JSON (they leave the queue). */
+  function serialize(items: Item[]): string | undefined {
+    const dispatch: Dispatch = {
+      guild: options.guild,
+      opencode: options.opencode,
+      changes: items.flatMap((item) => ("change" in item ? [item.change] : [])),
+      raw: items.flatMap((item) => ("raw" in item ? [item.raw] : [])),
+    }
     try {
       return JSON.stringify(dispatch)
     } catch {
-      const keep = <T>(items: T[]) => items.filter((item) => json(item) !== undefined)
-      const clean = { ...dispatch, changes: keep(dispatch.changes), raw: keep(batch.raw) }
-      const dropped = batch.changes.length + batch.raw.length - clean.changes.length - clean.raw.length
-      options.log(`dropped ${dropped} event(s) that can't be sent as JSON`)
-      batch.changes = clean.changes
-      batch.raw = clean.raw
-      return JSON.stringify(clean)
+      const bad = new Set(
+        items.filter((item) => json("change" in item ? item.change : item.raw) === undefined),
+      )
+      queue = queue.filter((item) => !bad.has(item))
+      options.log(`dropped ${bad.size} event(s) that can't be sent as JSON`)
+      return undefined
     }
   }
 
@@ -117,15 +175,15 @@ export function createCourier(options: {
       if (timer) clearTimeout(timer)
       disposed = true
       const deadline = Date.now() + DISPOSE_MS
-      while ((changes.length > 0 || raw.length > 0) && Date.now() < deadline) {
+      while (queue.length > 0 && Date.now() < deadline) {
         if (!(await flush())) break
       }
       if (timer) clearTimeout(timer)
       timer = undefined
     },
     send(next, event) {
-      changes.push(...next)
-      raw.push(event)
+      for (const change of next) queue.push({ change })
+      queue.push({ raw: event })
       schedule(FLUSH_MS)
     },
   }

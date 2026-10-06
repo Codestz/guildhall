@@ -10,3 +10,9 @@ export const MODE: Mode =
   (typeof location !== "undefined" && new URLSearchParams(location.search).has("showcase"))
     ? "showcase"
     : "app"
+
+/**
+ * Automation hooks on `window` (guild, quality, r3f) for scripts/shot.ts: always in dev, and in a
+ * production build only when built with `VITE_GUILDHALL_PROBE=1` (to measure what ships).
+ */
+export const PROBE: boolean = import.meta.env.DEV || import.meta.env.VITE_GUILDHALL_PROBE === "1"

@@ -14,6 +14,12 @@ export const MAX_TEXT = 1_000_000
 /** A tool call's input, as JSON. */
 export const MAX_INPUT = 1_000_000
 export const MAX_GUILD = 200
+/** Changes per dispatch: the courier never sends more in one POST. */
+export const MAX_CHANGES = 500
+/** One raw host event, as JSON: bigger ones are dropped (they are kept for tuning, not shown). */
+export const MAX_RAW = 4_000_000
+/** All the raw events of one dispatch, as JSON: more is a 413, which the courier answers by splitting. */
+export const MAX_RAW_TOTAL = 12_000_000
 /** Changes dated more than this ahead of the hub's clock are refused. */
 const FUTURE_MS = 24 * 60 * 60 * 1000
 
@@ -73,13 +79,25 @@ export function validChange(value: unknown, now = Date.now()): value is Change {
   const change = value as Fields
   const shape = Object.hasOwn(SHAPES, String(change.type)) ? SHAPES[change.type as Change["type"]] : undefined
   if (!shape || !name(change.id)) return false
-  if (!count(change.at) || (change.at as number) > now + FUTURE_MS) return false
+  // A time, so after the epoch: 0 is what a missing clock looks like.
+  if (!count(change.at) || (change.at as number) <= 0 || (change.at as number) > now + FUTURE_MS) return false
   for (const [field, check] of Object.entries(shape.required ?? {})) if (!check(change[field])) return false
   for (const [field, check] of Object.entries(shape.optional ?? {}))
     if (change[field] !== undefined && !check(change[field])) return false
   return true
 }
 
+/**
+ * A guild is named after its project directory, and names the directory its chronicles go to: no
+ * path separators, no control characters, and no leading dot (".", "..", hidden files).
+ */
 export function validGuild(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= MAX_GUILD
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= MAX_GUILD &&
+    !value.startsWith(".") &&
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what it refuses.
+    !/[/\\\u0000-\u001f\u007f]/.test(value)
+  )
 }

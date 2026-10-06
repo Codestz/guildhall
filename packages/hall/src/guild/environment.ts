@@ -1,4 +1,4 @@
-import type { Model } from "@guildhall/core"
+import type { Entry, Model, Session } from "@guildhall/core"
 
 /**
  * The world's conditions (ADR 0007): time of day, weather, temperature. One pure function of the
@@ -97,9 +97,10 @@ export function skyOf(hour: number): Pick<Environment, "hour" | "daylight" | "su
 }
 
 // ---------------------------------------------------------------------------------------------------
-// Weather and temperature: logic over the session model. Pure — no hidden state — so smoothness comes
+// Weather and temperature: logic over the session model. Pure in what it returns — smoothness comes
 // from time windows: every input is weighted by its age, and the weather holds its worst state of the
-// last few seconds, so one event never flips it back and forth.
+// last few seconds, so one event never flips it back and forth. Its one memory is a cache that keeps
+// the cost bounded in a long session (`Cursor`); it changes how fast, not what.
 
 /** Deeds weigh in on health for this long (run time), less the older they are. */
 const HEALTH_WINDOW_MS = 120_000
@@ -255,7 +256,54 @@ interface Tally {
   storm: number
 }
 
-/** One pass over every session and deed: everything the weather and temperature need. */
+/**
+ * After this long a finished deed weighs nothing in any window (health over the oldest hold sample,
+ * activity); all that is left of it is decaying heat.
+ */
+const SETTLED_MS = Math.max(HEALTH_WINDOW_MS + (HOLD_SAMPLES - 1) * HOLD_STEP_MS, ACTIVITY_WINDOW_MS)
+
+type Deed = Extract<Entry, { kind: "tool" }>
+
+/**
+ * Per session, what has been read of its deeds: those settled (finished, older than SETTLED_MS) are
+ * folded into one heat number, decayed to `at`; the rest (`open`) are read each time. A session's
+ * entries only grow, and `now` only moves on for one model (a seek or a restart builds a new one);
+ * should it go back, the cursor starts over.
+ */
+interface Cursor {
+  scanned: number
+  open: Deed[]
+  heat: number
+  at: number
+}
+const cursors = new WeakMap<Session, Cursor>()
+
+/** The session's deeds still inside some window, with the heat of the rest folded up to `now`. */
+function deedsOf(session: Session, now: number): Cursor {
+  let cursor = cursors.get(session)
+  if (!cursor || now < cursor.at) {
+    cursor = { scanned: 0, open: [], heat: 0, at: now }
+    cursors.set(session, cursor)
+  }
+  cursor.heat *= decay(now - cursor.at)
+  cursor.at = now
+  const { entries } = session
+  for (; cursor.scanned < entries.length; cursor.scanned++) {
+    const entry = entries[cursor.scanned]
+    if (entry?.kind === "tool") cursor.open.push(entry)
+  }
+  let kept = 0
+  for (const entry of cursor.open) {
+    const finished = entry.state === "completed" || entry.state === "failed"
+    if (finished && now - entry.at >= SETTLED_MS && now - (entry.ended ?? entry.at) >= SETTLED_MS)
+      cursor.heat += decay(now - entry.at)
+    else cursor.open[kept++] = entry
+  }
+  cursor.open.length = kept
+  return cursor
+}
+
+/** One pass over every session and its recent deeds: everything the weather and temperature need. */
 function readModel(model: Model, now: number, runStart: number): Reading {
   const tallies: Tally[] = Array.from({ length: SLOTS }, () => ({ ok: 0, failed: 0, burst: 0, storm: 0 }))
   let busy = 0
@@ -269,8 +317,10 @@ function readModel(model: Model, now: number, runStart: number): Reading {
         tally.storm = Math.max(tally.storm, stormAfter(age) * easeOf(k, age))
       })
     }
-    for (const entry of session.entries) {
-      if (entry.kind !== "tool" || entry.at > now) continue
+    const deeds = deedsOf(session, now)
+    heat += deeds.heat
+    for (const entry of deeds.open) {
+      if (entry.at > now) continue
       heat += decay(now - entry.at)
       if (entry.state === "running" || entry.state === "pending") busy += 1
       else busy += fade(now - entry.at, ACTIVITY_WINDOW_MS)

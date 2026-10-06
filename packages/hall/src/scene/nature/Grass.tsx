@@ -154,7 +154,8 @@ function flowerMaterialOf(material: ShaderMaterial): ShaderMaterial {
   return twin
 }
 
-function meadow(
+/** Exported for tests. */
+export function meadow(
   geometries: { tuft: BufferGeometry; flower: BufferGeometry },
   material: ShaderMaterial,
   density: number,
@@ -192,6 +193,9 @@ function meadow(
     tints[i * 3 + 2] = colour.b
   })
   flowers.count = flowered.length
+  // The flower geometry is shared across tier rebuilds: replacing aTint would orphan the old one's GPU
+  // buffer, so free the geometry's buffers first (they upload again on the next draw).
+  if (geometries.flower.getAttribute("aTint")) geometries.flower.dispose()
   geometries.flower.setAttribute("aTint", new InstancedBufferAttribute(tints, 3))
   grass.name = "nature-grass"
   flowers.name = "nature-flowers"

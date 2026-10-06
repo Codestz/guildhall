@@ -38,6 +38,29 @@ export const SCENARIOS = {
 } as const
 export type ScenarioId = keyof typeof SCENARIOS
 
+/** The hub a hall follows unless told otherwise (ADR 0003). */
+export const DEFAULT_HUB = "ws://127.0.0.1:4747/ws"
+
+/**
+ * The hub a page's query asks for: null without `?live`; `?live=<url>` only for a hub on this
+ * machine (ws://localhost or ws://127.0.0.1, any port) unless `&anyhub=1` says otherwise — a link
+ * must not be able to point the hall at someone else's stream. Anything else is the default hub.
+ */
+export function liveUrlOf(search: string): string | null {
+  const params = new URLSearchParams(search)
+  const asked = params.get("live")
+  if (asked === null) return null
+  if (!asked) return DEFAULT_HUB
+  if (params.get("anyhub") === "1") return asked
+  try {
+    const url = new URL(asked)
+    const local = url.hostname === "localhost" || url.hostname === "127.0.0.1"
+    return url.protocol === "ws:" && local ? asked : DEFAULT_HUB
+  } catch {
+    return DEFAULT_HUB
+  }
+}
+
 export type Phase = "working" | "waiting" | "loot" | "resting" | "leaving" | "idle" | "failed"
 export type Seat = "stool" | "floor" | "bed"
 
@@ -170,7 +193,7 @@ export class GuildStore {
    * Follow the hub (ADR 0003): a hello with everything so far, then events as they happen.
    * Reconnects with backoff, so the hall can be opened before OpenCode or the hub.
    */
-  live(url = "ws://127.0.0.1:4747/ws"): void {
+  live(url = DEFAULT_HUB): void {
     // One socket at a time: a second call replaces the first rather than doubling every event.
     const previous = this.socket
     this.socket = undefined
@@ -190,9 +213,12 @@ export class GuildStore {
       }
       socket.onmessage = (message) => {
         if (this.socket !== socket) return
-        const data = JSON.parse(String(message.data)) as { type: string; events: GuildEvent[] }
+        const data = messageOf(message.data)
+        if (!data) return
         if (data.type === "hello") {
+          // A fresh hello (a reconnect, a hub restart) is everything so far: start over, markers too.
           this.reset()
+          this.markers = []
           this.seen.clear()
           this.liveStart = data.events[0]?.change.at ?? Date.now()
           for (const event of data.events) if (this.fresh(event)) this.take(event.change, false)
@@ -369,13 +395,15 @@ export class GuildStore {
     this.sinceViews = 0
     if (this.focus && this.now - this.focus.at > FOCUS_TTL_MS) this.focus = null
     this.views = viewsOf(this.model, this.now)
-    this.progress = progressOf(this.model)
-    this.traces = tracesOf(this.model.sessions.values())
+    // The world shows the party on stage, not every guild the hub has heard from.
+    const party = partyOf(this.model)
+    this.progress = progressOf(party)
+    this.traces = tracesOf(party)
     this.environment = environmentOf({
       wallClock: Date.now(),
       runTime: this.time,
       runStart: this.start,
-      model: this.model,
+      model: { sessions: new Map(party.map((s) => [s.id, s])) },
       settings: this.environmentSettings,
     })
     this.emit()
@@ -387,17 +415,22 @@ export class GuildStore {
   }
 }
 
-/** Everyone on stage right now, and where they belong. */
-export function viewsOf(model: Model, now: number): AdventurerView[] {
-  // Several OpenCode sessions (or windows) at once: follow the most recently active party.
+/**
+ * The party the hall follows: several OpenCode sessions (or windows, or guilds) at once, it shows the
+ * most recently active root and everyone under it. With no root at all, every session.
+ */
+export function partyOf(model: Model): Session[] {
   const roots = [...model.sessions.values()].filter((s) => !s.parentID)
   const followed = roots.reduce<Session | undefined>(
     (best, s) => (!best || s.seen > best.seen ? s : best),
     undefined,
   )
-  const sessions = [...model.sessions.values()]
-    .filter((s) => !followed || rootOf(model, s.id) === followed.id)
-    .sort((a, b) => a.started - b.started)
+  return [...model.sessions.values()].filter((s) => !followed || rootOf(model, s.id) === followed.id)
+}
+
+/** Everyone on stage right now, and where they belong. */
+export function viewsOf(model: Model, now: number): AdventurerView[] {
+  const sessions = partyOf(model).sort((a, b) => a.started - b.started)
   const master = sessions.find((s) => !s.parentID)
   const taken = new Map<StationId, number>()
   let stools = 0
@@ -493,9 +526,9 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
   return views
 }
 
-function progressOf(model: Model): number {
+function progressOf(sessions: Iterable<Session>): number {
   let done = 0
-  for (const s of model.sessions.values()) {
+  for (const s of sessions) {
     if (ROLE_SITE[s.agent] !== "yard") continue
     for (const entry of s.entries) {
       if (
@@ -549,6 +582,33 @@ function shorten(text: string, max: number): string {
   const base = line.split("/").at(-1) ?? line
   const picked = line.includes("/") && !line.includes(" ") ? base : line
   return picked.length > max ? `${picked.slice(0, max - 1)}…` : picked
+}
+
+/**
+ * A hub message, checked: the socket is a trust boundary too (a stray or broken peer must not throw
+ * in the hall). Undefined for anything that isn't a hello or events; events not shaped like a
+ * `GuildEvent` are left out.
+ */
+function messageOf(raw: unknown): { type: "hello" | "events"; events: GuildEvent[] } | undefined {
+  let data: unknown
+  try {
+    data = JSON.parse(String(raw))
+  } catch {
+    return undefined
+  }
+  if (typeof data !== "object" || data === null) return undefined
+  const { type, events } = data as { type?: unknown; events?: unknown }
+  if ((type !== "hello" && type !== "events") || !Array.isArray(events)) return undefined
+  return { type, events: events.filter(isEvent) }
+}
+
+function isEvent(value: unknown): value is GuildEvent {
+  if (typeof value !== "object" || value === null) return false
+  const { guild, seq, change } = value as Partial<Record<keyof GuildEvent, unknown>>
+  if (typeof guild !== "string" || !Number.isInteger(seq) || typeof change !== "object" || change === null)
+    return false
+  const { type, id, at } = change as { type?: unknown; id?: unknown; at?: unknown }
+  return typeof type === "string" && typeof id === "string" && typeof at === "number" && Number.isFinite(at)
 }
 
 function markerOf(change: Change): Marker["kind"] | undefined {

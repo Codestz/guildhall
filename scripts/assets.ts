@@ -505,7 +505,11 @@ async function kit(name: string, sources: Record<string, string[]>): Promise<voi
   )
   const out = join(OUT, `${name}.glb`)
   await io.write(out, target)
-  await writeFile(join(ROOT, `packages/hall/src/world/${name}.json`), `${JSON.stringify(bounds, null, 2)}\n`)
+  const json = join(ROOT, `packages/hall/src/world/${name}.json`)
+  await writeFile(json, `${JSON.stringify(bounds, null, 2)}\n`)
+  // In the repo's own format, so `biome check .` stays clean after a regeneration.
+  const format = Bun.spawnSync([process.execPath, "x", "biome", "format", "--write", json], { cwd: ROOT })
+  if (format.exitCode !== 0) throw new Error(`biome could not format ${json}: ${format.stderr.toString()}`)
   console.log(`${name}: ${Object.keys(bounds).length} pieces → ${kb(out)}`)
 }
 

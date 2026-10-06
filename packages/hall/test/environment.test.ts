@@ -205,3 +205,53 @@ describe("temperature from activity", () => {
     }
   })
 })
+
+describe("cost in a long live session", () => {
+  /** 60k deeds over 100 minutes in 100 sessions, a tenth of them failed, two still running. */
+  function long(): { model: ReturnType<typeof emptyModel>; end: number } {
+    const changes: Change[] = []
+    const SESSIONS = 100
+    const DEEDS = 60_000
+    for (let s = 0; s < SESSIONS; s++)
+      changes.push({ type: "session", id: `s${s}`, agent: "guild-implementer", title: "t", at: 1 })
+    for (let n = 0; n < DEEDS; n++) {
+      const at = 1 + n * 100
+      const state = n === 10 || n === DEEDS - 50 ? "running" : n % 10 === 0 ? "failed" : "completed"
+      changes.push({
+        type: "tool",
+        id: `s${n % SESSIONS}`,
+        call: `c${n}`,
+        name: "edit",
+        state,
+        at,
+        started: at,
+      })
+    }
+    return { model: applyAll(emptyModel(), changes), end: 1 + DEEDS * 100 }
+  }
+
+  test("60k deeds: each refresh is well under a millisecond, and agrees with a fresh read", () => {
+    const { model, end } = long()
+    const read = (t: number, m = model) =>
+      environmentOf({ wallClock: 0, runTime: t, runStart: 0, model: m, settings: DEFAULT_SETTINGS })
+    read(end) // the first read walks everything once
+    const times: number[] = []
+    let t = end
+    for (let i = 0; i < 30; i++) {
+      t += 100
+      const started = performance.now()
+      read(t)
+      times.push(performance.now() - started)
+    }
+    times.sort((a, b) => a - b)
+    expect(times[15]).toBeLessThan(0.5)
+    // Later, with the same model: exactly what a model read for the first time says.
+    for (const later of [t + 1000, t + 3 * MINUTE, t + 30 * MINUTE]) {
+      const { temperature, ...rest } = read(later)
+      const { temperature: freshTemperature, ...freshRest } = read(later, long().model)
+      expect(rest).toEqual(freshRest)
+      // Heat folded over time and heat summed at once differ in rounding only.
+      expect(temperature).toBeCloseTo(freshTemperature, 9)
+    }
+  })
+})

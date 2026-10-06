@@ -102,7 +102,8 @@ function show(object: Fall, amount: number, kind: "rain" | "snow", frame: typeof
 }
 
 /** A box of `count` seeded drops: rain as streaks (two vertices each), snow as points. */
-function fall(kind: "rain" | "snow", count: number): Fall {
+/** Exported for tests. */
+export function fall(kind: "rain" | "snow", count: number): Fall {
   const vertices = kind === "rain" ? 2 : 1
   const seeds = new Float32Array(count * vertices * 4)
   let a = kind === "rain" ? 11 : 23
@@ -128,7 +129,8 @@ function fall(kind: "rain" | "snow", count: number): Fall {
     fragmentShader: kind === "rain" ? RAIN_FRAGMENT : SNOW_FRAGMENT,
     transparent: true,
     depthWrite: false,
-    blending: kind === "rain" ? AdditiveBlending : undefined,
+    // Snow keeps the default blending: passing `blending: undefined` makes three warn.
+    ...(kind === "rain" ? { blending: AdditiveBlending } : {}),
   })
   const object = kind === "rain" ? new LineSegments(geometry, material) : new Points(geometry, material)
   object.frustumCulled = false

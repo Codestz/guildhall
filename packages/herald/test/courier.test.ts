@@ -18,21 +18,28 @@ async function withoutBun<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
-/** A stand-in hub that answers the n-th POST (from 0) with `answer(n)` and keeps what it accepted. */
-function fakeHub(answer: (n: number) => Response | Promise<Response>) {
+/**
+ * A stand-in hub that answers the n-th POST (from 0) with `answer(n, body)` and keeps what it
+ * accepted; `sizes` has every POST's body length, accepted or not.
+ */
+function fakeHub(answer: (n: number, body: Dispatch, text: string) => Response | Promise<Response>) {
   const accepted: Dispatch[] = []
+  const sizes: number[] = []
   let n = 0
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
+    maxRequestBodySize: 64 * 1024 * 1024,
     async fetch(request) {
-      const body = (await request.json()) as Dispatch
-      const response = await answer(n++)
+      const text = await request.text()
+      sizes.push(Buffer.byteLength(text))
+      const body = JSON.parse(text) as Dispatch
+      const response = await answer(n++, body, text)
       if (response.ok) accepted.push(body)
       return response
     },
   })
-  return { server, accepted, port: server.port as number }
+  return { server, accepted, sizes, port: server.port as number }
 }
 
 const wait = (ms: number) => new Promise((done) => setTimeout(done, ms))
@@ -64,8 +71,8 @@ describe("courier", () => {
     await courier.flush()
   })
 
-  test("a non-2xx reply keeps the batch and retries it, logging the outage once", async () => {
-    const fake = fakeHub((n) => new Response("no", { status: n < 2 ? 503 : 200 }))
+  test("a 5xx or 429 reply keeps the batch and retries it, logging the outage once", async () => {
+    const fake = fakeHub((n) => new Response("no", { status: n === 0 ? 503 : n === 1 ? 429 : 200 }))
     const logs: string[] = []
     const courier = createCourier({ guild: "t", opencode: 2, log: (m) => logs.push(m), port: fake.port })
     await withoutBun(async () => {
@@ -75,9 +82,75 @@ describe("courier", () => {
     fake.server.stop(true)
     expect(fake.accepted[0]?.changes).toEqual([change])
     expect(logs.filter((m) => m.includes("503"))).toHaveLength(1)
+    expect(logs.some((m) => m.includes("429"))).toBe(false)
     expect(logs.some((m) => m.includes("starting"))).toBe(false)
     await courier.flush()
   }, 10_000)
+
+  test("a 413 splits the batch: what fits goes, a single change too big is dropped, the rest flows", async () => {
+    // Takes bodies up to 100 KB, like a hub with a smaller cap.
+    const fake = fakeHub((_n, _body, text) =>
+      Buffer.byteLength(text) > 100_000
+        ? new Response("too big", { status: 413 })
+        : Response.json({ ok: true }),
+    )
+    const logs: string[] = []
+    const courier = createCourier({ guild: "t", opencode: 2, log: (m) => logs.push(m), port: fake.port })
+    const huge = { ...change, type: "prompt", key: "k", text: "x".repeat(200_000), at: 2 } as const
+    await withoutBun(async () => {
+      courier.send([change], { pad: "p".repeat(200_000) })
+      courier.send([huge], { small: true })
+      courier.send([{ ...change, at: 3 }], { small: true })
+      await until(() => fake.accepted.flatMap((d) => d.changes).some((c) => c.at === 3), 3000)
+    })
+    fake.server.stop(true)
+    expect(fake.accepted.flatMap((d) => d.changes.map((c) => c.at))).toEqual([1, 3])
+    expect(fake.accepted.flatMap((d) => d.raw)).toEqual([{ small: true }, { small: true }])
+    expect(logs.filter((m) => m.includes("too large")).length).toBe(2)
+    expect(logs.some((m) => m.includes("retrying"))).toBe(false)
+    await courier.flush()
+  }, 10_000)
+
+  test("a 400 drops the batch (it can never succeed) and later events still flow", async () => {
+    const fake = fakeHub((n) =>
+      n === 0 ? new Response("bad dispatch", { status: 400 }) : Response.json({ ok: true }),
+    )
+    const logs: string[] = []
+    const courier = createCourier({ guild: "t", opencode: 2, log: (m) => logs.push(m), port: fake.port })
+    await withoutBun(async () => {
+      courier.send([change], { raw: 1 })
+      await until(() => fake.sizes.length > 0, 2000)
+      await wait(50)
+      courier.send([{ ...change, at: 2 }], { raw: 2 })
+      await until(() => fake.accepted.length > 0, 3000)
+      await wait(300)
+    })
+    fake.server.stop(true)
+    expect(fake.accepted.flatMap((d) => d.changes.map((c) => c.at))).toEqual([2])
+    expect(fake.sizes).toHaveLength(2)
+    expect(logs.some((m) => m.includes("400") && m.includes("dropped"))).toBe(true)
+    await courier.flush()
+  }, 10_000)
+
+  test("a backlog goes out in POSTs of at most 500 changes and the byte budget", async () => {
+    const fake = fakeHub(() => Response.json({ ok: true }))
+    const courier = createCourier({ guild: "t", opencode: 2, log: () => {}, port: fake.port })
+    await withoutBun(async () => {
+      for (let i = 0; i < 1200; i++) courier.send([{ ...change, at: i + 1 }], { i })
+      // 4 × 3 MB of raw events: more than one POST may carry.
+      for (let i = 0; i < 4; i++) courier.send([], { pad: "p".repeat(3 * 1024 * 1024) })
+      await courier.flush()
+    })
+    fake.server.stop(true)
+    const counts = fake.accepted.map((d) => d.changes.length)
+    expect(Math.max(...counts)).toBeLessThanOrEqual(500)
+    expect(counts.reduce((a, b) => a + b, 0)).toBe(1200)
+    expect(fake.accepted.flatMap((d) => d.changes.map((c) => c.at))).toEqual(
+      Array.from({ length: 1200 }, (_, i) => i + 1),
+    )
+    expect(fake.accepted.flatMap((d) => d.raw ?? []).length).toBe(1204)
+    expect(Math.max(...fake.sizes)).toBeLessThanOrEqual(8 * 1024 * 1024)
+  }, 20_000)
 
   test("a hub that accepts but never answers can't hang flush; the batch is retried after", async () => {
     const fake = fakeHub((n) => (n === 0 ? new Promise<Response>(() => {}) : Response.json({ ok: true })))

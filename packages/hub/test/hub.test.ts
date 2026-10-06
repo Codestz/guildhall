@@ -1,9 +1,10 @@
 import { afterAll, describe, expect, test } from "bun:test"
-import { mkdtempSync, readdirSync, readFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { HubMessage } from "../src/index.ts"
 import { HERALD_HEADER, startHub } from "../src/index.ts"
+import { MAX_RAW, MAX_RAW_TOTAL } from "../src/validate.ts"
 
 const home = mkdtempSync(join(tmpdir(), "guildhall-hub-"))
 const hub = startHub({ port: 0, home })
@@ -191,5 +192,119 @@ describe("hub restart", () => {
     expect(hello?.type === "hello" && hello.events.map((e) => e.seq)).toEqual([1, 2])
     const live = watcher.messages[1]
     expect(live?.type === "events" && live.events.map((e) => e.seq)).toEqual([3])
+  })
+})
+
+describe("hub guild names", () => {
+  test("a guild name that could leave chronicles/ is refused, and nothing is written outside", async () => {
+    const root = mkdtempSync(join(tmpdir(), "guildhall-escape-"))
+    const home = join(root, "home")
+    const local = startHub({ port: 0, home })
+    const to = `http://127.0.0.1:${local.port}`
+    for (const guild of ["..", ".", ".hidden", "a/b", "../up", "a\\b", "x\u0000y", "tab\there"]) {
+      const response = await post(to, { guild, opencode: 2, changes: [status(1)], raw: [{ x: 1 }] })
+      expect(response.status).toBe(400)
+    }
+    local.stop(true)
+    const entries = (dir: string) => (existsSync(dir) ? readdirSync(dir) : [])
+    expect(entries(root).filter((f) => f !== "home")).toEqual([])
+    expect(entries(home).filter((f) => f !== "chronicles")).toEqual([])
+    expect(entries(join(home, "chronicles"))).toEqual([])
+  })
+
+  test("ordinary project names still work, dots inside included", async () => {
+    const response = await post(base, { guild: "my.app-2_x", opencode: 2, changes: [status(1)] })
+    expect(response.status).toBe(200)
+    expect(readdirSync(join(home, "chronicles"))).toContain("my.app-2_x")
+  })
+})
+
+describe("hub request checks", () => {
+  test("a POST carrying an Origin is refused (heralds never send one)", async () => {
+    const response = await fetch(`${base}/events`, {
+      method: "POST",
+      headers: { [HERALD_HEADER]: "1", origin: "http://127.0.0.1:5173" },
+      body: JSON.stringify(dispatch),
+    })
+    expect(response.status).toBe(403)
+  })
+
+  test("a POST whose Host isn't this hub's loopback address is refused (DNS rebinding)", async () => {
+    const { connect } = await import("node:net")
+    const raw = (host: string) =>
+      new Promise<string>((done) => {
+        const socket = connect(hub.port as number, "127.0.0.1")
+        const body = JSON.stringify(dispatch)
+        let reply = ""
+        socket.on("data", (chunk) => {
+          reply += String(chunk)
+          socket.end()
+        })
+        socket.on("close", () => done(reply))
+        socket.write(
+          `POST /events HTTP/1.1\r\nHost: ${host}\r\n${HERALD_HEADER}: 1\r\nContent-Type: application/json\r\n` +
+            `Content-Length: ${Buffer.byteLength(body)}\r\nConnection: close\r\n\r\n${body}`,
+        )
+      })
+    expect(await raw(`evil.example:${hub.port}`)).toStartWith("HTTP/1.1 403")
+    expect(await raw("127.0.0.1:1")).toStartWith("HTTP/1.1 403")
+    expect(await raw(`localhost:${hub.port}`)).toStartWith("HTTP/1.1 200")
+    expect(await raw(`127.0.0.1:${hub.port}`)).toStartWith("HTTP/1.1 200")
+  })
+
+  test("a batch of more than 500 changes is a 400 that says so", async () => {
+    const response = await post(base, {
+      guild: "many",
+      opencode: 2,
+      changes: Array.from({ length: 501 }, (_, n) => status(n + 1)),
+    })
+    expect(response.status).toBe(400)
+    expect(await response.text()).toContain("500")
+    const ok = await post(base, {
+      guild: "many",
+      opencode: 2,
+      changes: Array.from({ length: 500 }, (_, n) => status(n + 1)),
+    })
+    expect(ok.status).toBe(200)
+  })
+
+  test("a raw event over its cap is dropped; raw events over the total cap are a 413", async () => {
+    const one = await post(base, {
+      guild: "raws",
+      opencode: 2,
+      changes: [status(1)],
+      raw: [{ pad: "r".repeat(MAX_RAW + 1) }, { small: true }],
+    })
+    expect(one.status).toBe(200)
+    const lines = readFileSync(
+      join(
+        home,
+        "chronicles",
+        "raws",
+        readdirSync(join(home, "chronicles", "raws")).find((f) => f.endsWith(".raw.jsonl")) ?? "",
+      ),
+      "utf8",
+    )
+      .trim()
+      .split("\n")
+    expect(lines.map((line) => JSON.parse(line).raw)).toEqual([{ small: true }])
+    const piece = { pad: "r".repeat(MAX_RAW - 100) }
+    const total = Math.ceil(MAX_RAW_TOTAL / MAX_RAW) + 1
+    const all = await post(base, {
+      guild: "raws",
+      opencode: 2,
+      changes: [],
+      raw: Array.from({ length: total }, () => piece),
+    })
+    expect(all.status).toBe(413)
+  })
+
+  test("a change dated at or before 0 is dropped", async () => {
+    const response = await post(base, {
+      guild: "zero",
+      opencode: 2,
+      changes: [status(0), status(-1), status(1)],
+    })
+    expect(await response.json()).toEqual({ ok: true, count: 1, rejected: 2 })
   })
 })

@@ -175,7 +175,7 @@ export class GuildStore {
    */
   readonly director = new Director()
   /** Calm: the original gentle Bard. Cinematic: Director v2 (and replay fast-forward). */
-  directorStyle: DirectorStyle = "calm"
+  directorStyle: DirectorStyle = "cinematic"
   /**
    * Replay fast-forward: the multiple on top of the viewer's pace, 1 unless a quiet stretch of a
    * replay is being skipped (eased up to FF_MAX and back before the next beat).

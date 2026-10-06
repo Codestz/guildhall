@@ -12,7 +12,9 @@ import {
   type SkinnedMesh,
 } from "three"
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js"
+import { worldEventsOf } from "../../guild/events.ts"
 import type { Tier } from "../../guild/quality.ts"
+import type { GuildStore } from "../../guild/store.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { ANIMS_URL, type Model, modelUrl } from "../../world/cast.ts"
 import { useBlob } from "../Blobs.tsx"
@@ -132,6 +134,8 @@ function Villager({ round }: { round: Round }) {
     node.visible = walk.presence > 0.02
     node.scale.setScalar(VILLAGER.scale * Math.max(0.02, walk.presence))
     if (!node.visible) return
+    // A festival on: villagers standing about cheer (secret events, guild/events.ts).
+    if (clip !== "Walking_A" && festive(store)) clip = "Cheering"
     play(anim.actions, clip, rate)
     anim.mixer.update(dt)
   })
@@ -157,4 +161,10 @@ function Villager({ round }: { round: Round }) {
 function turn(node: Group, heading: number, rate: number): void {
   const delta = Math.atan2(Math.sin(heading - node.rotation.y), Math.cos(heading - node.rotation.y))
   node.rotation.y += delta * Math.min(1, rate)
+}
+
+/** Is a festival on stage? (Read per frame: a tiny scan of at most a few shows.) */
+function festive(store: GuildStore): boolean {
+  for (const show of worldEventsOf(store).shows) if (show.kind === "festival" && !show.leaving) return true
+  return false
 }

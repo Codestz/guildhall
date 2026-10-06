@@ -384,13 +384,14 @@ describe("replay fast-forward", () => {
     expect(atBeat).toBeLessThan(1.35)
   })
 
-  test("never live, never Calm, never once the viewer has the camera", () => {
+  test("Cinematic by default; never live, never Calm, never once the viewer has the camera", () => {
+    expect(new GuildStore().directorStyle).toBe("cinematic")
     const calm = new GuildStore()
+    calm.setDirector("calm")
     calm.load("party")
     expect(play(calm, 40_000).top).toBe(1)
 
     const yours = new GuildStore()
-    yours.setDirector("cinematic")
     yours.load("party")
     yours.setBard(false)
     expect(play(yours, 40_000).top).toBe(1)

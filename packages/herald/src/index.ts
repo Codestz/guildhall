@@ -3,6 +3,7 @@ import { homedir } from "node:os"
 import { basename, join } from "node:path"
 import { createV1Translator, createV2Translator } from "@guildhall/core"
 import { createCourier } from "./courier.ts"
+import { createLocationFilter, type Located } from "./locate.ts"
 
 /**
  * The herald (CONTEXT.md): the OpenCode half of Guildhall. It listens to OpenCode's events,
@@ -76,6 +77,7 @@ export default {
     const guild = basename(directory)
     log(`v2 setup in ${ctx.location.directory}`)
     const translator = createV2Translator(unknown(2))
+    const ours = createLocationFilter(directory)
     const courier = createCourier({ guild, opencode: 2, log })
     const stop = new AbortController()
     void (async () => {
@@ -84,10 +86,9 @@ export default {
         const opened = Date.now()
         try {
           for await (const event of events.subscribe({ signal: stop.signal })) {
-            // The service's stream carries every open location's events: keep this guild's own
-            // (measured: a herald set up for ~ also recorded a session in a project below it).
-            const where = (event as { location?: { directory?: string } }).location?.directory
-            if (where && where !== directory) continue
+            // The service's stream carries every open location's events: keep this guild's own,
+            // including its sessions' status and usage, which carry no location (src/locate.ts).
+            if (!ours(event as Located)) continue
             try {
               courier.send(translator.event(event, Date.now()), event)
             } catch (error) {

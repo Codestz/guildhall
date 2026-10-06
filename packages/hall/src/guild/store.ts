@@ -17,6 +17,7 @@ import {
   HAND_IN,
   hearthSeat,
   INFIRMARY,
+  INFIRMARY_MATS,
   type Post,
   STATIONS,
   type StationId,
@@ -68,7 +69,12 @@ export interface AdventurerView {
   id: string
   /** OpenCode agent name (`guild-implementer`). */
   agent: string
+  /** What the hall calls them: the role, numbered when it repeats (`Implementer II`). */
   title: string
+  /** The role's own name, never numbered (`Implementer`): sigils take their letters from it. */
+  role: string
+  /** 1 for the first of a role in the party, 2 for the second to join, …; stable while the session lasts. */
+  ordinal: number
   color: string
   /** Character model key (roster). */
   character: string
@@ -384,7 +390,7 @@ export class GuildStore {
       key: this.log.length ? (this.log.at(-1)?.key ?? 0) + 1 : 1,
       at: change.at - start,
       id: s.id,
-      title: role.title,
+      title: s.parentID ? numbered(role.title, ordinalOf(this.model, s)) : role.title,
       color: role.color,
       ...line,
     })
@@ -411,7 +417,24 @@ export class GuildStore {
 
   private emit(): void {
     this.version++
+    if (this.held) return
     for (const listener of this.listeners) listener()
+  }
+
+  /**
+   * Hold notifications while the world is first built (scene/Scene.tsx releases them once it has
+   * mounted). Mounting the world is one long, interruptible render, and every notification is an
+   * urgent update that restarts it: at ~10 a second, on a slow phone or a busy machine the island
+   * never finished mounting — an empty sky, forever (measured: 15 completed loads, 0 mounts).
+   */
+  private held = false
+  hold(): void {
+    this.held = true
+  }
+  release(): void {
+    if (!this.held) return
+    this.held = false
+    this.emit()
   }
 }
 
@@ -430,8 +453,10 @@ export function partyOf(model: Model): Session[] {
 
 /** Everyone on stage right now, and where they belong. */
 export function viewsOf(model: Model, now: number): AdventurerView[] {
-  const sessions = partyOf(model).sort((a, b) => a.started - b.started)
+  const sessions = partyOf(model).sort(byJoin)
   const master = sessions.find((s) => !s.parentID)
+  /** How many of each role have joined so far: counted before anyone leaves, so numbers never shift. */
+  const joined = new Map<string, number>()
   const taken = new Map<StationId, number>()
   let stools = 0
   let floor = 0
@@ -443,6 +468,8 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
     const isMaster = s === master
     // The root session is the guildmaster whatever agent runs it (OpenCode's `build`, a user's own).
     const role = isMaster ? GUILDMASTER : roleOf(s.agent)
+    const ordinal = (joined.get(role.title) ?? 0) + 1
+    joined.set(role.title, ordinal)
     const activity = activityOf(s)
     const since = s.ended !== undefined ? now - s.ended : 0
     if (!isMaster && s.status === "done" && since > GONE_MS) continue
@@ -483,8 +510,13 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
       }
     } else if (s.status === "failed") {
       phase = "failed"
-      seat = "bed"
-      target = INFIRMARY[beds++ % INFIRMARY.length] ?? INFIRMARY[0] ?? MASTER_POST
+      // Beds first, then bedrolls on the floor; past that they share (rare: 7+ failed at once).
+      const n = beds++
+      seat = n < INFIRMARY.length ? "bed" : "floor"
+      target =
+        n < INFIRMARY.length
+          ? (INFIRMARY[n] ?? MASTER_POST)
+          : (INFIRMARY_MATS[(n - INFIRMARY.length) % INFIRMARY_MATS.length] ?? MASTER_POST)
     } else if (home) {
       // Island workers stay at their site for the whole quest: no jogging back on every deed.
       site = home
@@ -506,7 +538,9 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
     views.push({
       id: s.id,
       agent: s.agent,
-      title: role.title,
+      title: numbered(role.title, ordinal),
+      role: role.title,
+      ordinal,
       color: role.color,
       character: role.character,
       master: isMaster,
@@ -524,6 +558,60 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
     })
   }
   return views
+}
+
+/** Join order: start time, then id, so two sessions started in the same millisecond keep one order. */
+function byJoin(a: Session, b: Session): number {
+  return a.started - b.started || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+}
+
+/**
+ * Which of its role `s` is in its party, by join order (1-based) — the same number `viewsOf` gives
+ * it, for lines written as events arrive.
+ */
+export function ordinalOf(model: Model, s: Session): number {
+  const root = rootOf(model, s.id)
+  const title = (s.parentID ? roleOf(s.agent) : GUILDMASTER).title
+  let n = 1
+  for (const other of model.sessions.values()) {
+    if (other === s || rootOf(model, other.id) !== root) continue
+    const otherTitle = (other.parentID ? roleOf(other.agent) : GUILDMASTER).title
+    if (otherTitle === title && byJoin(other, s) < 0) n++
+  }
+  return n
+}
+
+/** `Implementer`, `Implementer II`, `Implementer III`: the first of a role keeps its plain name. */
+export function numbered(title: string, ordinal: number): string {
+  return ordinal > 1 ? `${title} ${roman(ordinal)}` : title
+}
+
+const ROMAN: [number, string][] = [
+  [1000, "M"],
+  [900, "CM"],
+  [500, "D"],
+  [400, "CD"],
+  [100, "C"],
+  [90, "XC"],
+  [50, "L"],
+  [40, "XL"],
+  [10, "X"],
+  [9, "IX"],
+  [5, "V"],
+  [4, "IV"],
+  [1, "I"],
+]
+
+export function roman(n: number): string {
+  let rest = Math.max(1, Math.floor(n))
+  let out = ""
+  for (const [value, letters] of ROMAN) {
+    while (rest >= value) {
+      out += letters
+      rest -= value
+    }
+  }
+  return out
 }
 
 function progressOf(sessions: Iterable<Session>): number {

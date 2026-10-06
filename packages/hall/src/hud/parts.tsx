@@ -1,20 +1,28 @@
 import { type CSSProperties, type ReactNode, useId } from "react"
+import { roman } from "../guild/store.ts"
 import { initials, type Tone } from "./format.ts"
 import { Icon } from "./icons.tsx"
 
-/** A role's mark: a diamond in its colour with two letters. The colour is identity, never status. */
+/**
+ * A role's mark: a diamond in its colour with two letters. The colour is identity, never status.
+ * The second and later of a role carry a small numeral (II, III) so two Implementers read apart.
+ */
 export function Sigil({
   title,
   color,
+  ordinal = 1,
   size = "md",
 }: {
+  /** The role's own name (`Implementer`), not the numbered title. */
   title: string
   color: string
+  ordinal?: number
   size?: "sm" | "md" | "lg"
 }) {
   return (
     <span className={`sigil sigil-${size}`} style={{ "--role": color } as CSSProperties} aria-hidden="true">
       <span>{initials(title)}</span>
+      {ordinal > 1 && <i className="sigil-num">{roman(ordinal)}</i>}
     </span>
   )
 }

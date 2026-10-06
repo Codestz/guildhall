@@ -1,5 +1,5 @@
 import type { Entry, Session } from "@guildhall/core"
-import type { LogEntry, Marker, Phase } from "../guild/store.ts"
+import type { AdventurerView, LogEntry, Marker, Phase } from "../guild/store.ts"
 
 /** Run time as `m:ss`. */
 export function clock(ms: number): string {
@@ -89,4 +89,77 @@ export function initials(title: string): string {
   const words = title.split(/[\s-]+/).filter(Boolean)
   if (words.length > 1) return (words[0]?.[0] ?? "") + (words[1]?.[0] ?? "")
   return title.slice(0, 2)
+}
+
+/** A glyph from `Icon` that goes with a verb. */
+export type VerbGlyph =
+  | "read"
+  | "edit"
+  | "search"
+  | "test"
+  | "run"
+  | "quest"
+  | "thought"
+  | "plea"
+  | "idle"
+  | "loot"
+  | "fail"
+  | "join"
+  | "work"
+
+/**
+ * What an adventurer is doing, in one word a newcomer can read off a name chip: `reading`,
+ * `editing`, `searching`, `testing`, `thinking`, `waiting on you`, `resting`, … Always shown with its
+ * glyph. The full deed (`edit · routes.ts`) stays in Detailed mode and the dossier.
+ */
+export function verbOf(view: Pick<AdventurerView, "phase" | "tool" | "thinking" | "doing">): {
+  verb: string
+  glyph: VerbGlyph
+} {
+  switch (view.phase) {
+    case "waiting":
+      return { verb: "waiting on you", glyph: "plea" }
+    case "resting":
+    case "leaving":
+    case "idle":
+      return { verb: "resting", glyph: "idle" }
+    case "loot":
+      return { verb: "done", glyph: "loot" }
+    case "failed":
+      return { verb: "fallen", glyph: "fail" }
+    default:
+      break
+  }
+  const tool = view.tool?.toLowerCase()
+  if (tool) {
+    const verb = TOOL_VERBS[tool]
+    if (verb) return verb
+    if (tool === "bash" || tool === "shell")
+      return TESTING.test(view.doing) ? { verb: "testing", glyph: "test" } : { verb: "running", glyph: "run" }
+    // MCP tools (`context7_query-docs`) are almost always lookups.
+    if (tool.includes("_")) return { verb: "consulting", glyph: "read" }
+    return { verb: "working", glyph: "work" }
+  }
+  if (view.doing === "writing its answer") return { verb: "answering", glyph: "edit" }
+  if (view.doing === "starting") return { verb: "arriving", glyph: "join" }
+  return { verb: "thinking", glyph: "thought" }
+}
+
+const TESTING = /\b(test|tests|spec|vitest|jest|pytest|check|lint|typecheck|tsc)\b/i
+
+const TOOL_VERBS: Record<string, { verb: string; glyph: VerbGlyph }> = {
+  read: { verb: "reading", glyph: "read" },
+  webfetch: { verb: "reading", glyph: "read" },
+  edit: { verb: "editing", glyph: "edit" },
+  write: { verb: "editing", glyph: "edit" },
+  patch: { verb: "editing", glyph: "edit" },
+  multiedit: { verb: "editing", glyph: "edit" },
+  grep: { verb: "searching", glyph: "search" },
+  glob: { verb: "searching", glyph: "search" },
+  list: { verb: "searching", glyph: "search" },
+  websearch: { verb: "searching", glyph: "search" },
+  codesearch: { verb: "searching", glyph: "search" },
+  task: { verb: "dispatching", glyph: "quest" },
+  subagent: { verb: "dispatching", glyph: "quest" },
+  todowrite: { verb: "planning", glyph: "quest" },
 }

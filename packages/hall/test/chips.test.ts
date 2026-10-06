@@ -1,0 +1,98 @@
+import { afterEach, describe, expect, test } from "bun:test"
+import { Object3D, OrthographicCamera } from "three"
+import { addChip, type ChipSlot, chipSlot, layout, resetChips } from "../src/scene/chips.ts"
+
+/** Just enough of an HTMLElement for the declutter: a size, a style, attributes. */
+function fakeChip(w = 60, h = 20) {
+  const attrs = new Set<string>()
+  const style = new Map<string, string>()
+  const el = {
+    offsetWidth: w,
+    offsetHeight: h,
+    style: { setProperty: (k: string, v: string) => style.set(k, v) },
+    hasAttribute: (k: string) => attrs.has(k),
+    toggleAttribute: (k: string, on: boolean) => (on ? attrs.add(k) : attrs.delete(k)),
+  }
+  const more = { textContent: "" }
+  return { el, more, attrs, style }
+}
+
+// 20 world units across 200 px: 10 px a unit. Looking down -z, so a larger z is nearer.
+const camera = new OrthographicCamera(-10, 10, 10, -10, 0.1, 100)
+camera.position.set(0, 0, 50)
+camera.updateMatrixWorld()
+camera.updateProjectionMatrix()
+
+function chipAt(x: number, z: number, pinned = false) {
+  const anchor = new Object3D()
+  anchor.position.set(x, 0, z)
+  anchor.updateMatrixWorld()
+  const fake = fakeChip()
+  const slot: ChipSlot = chipSlot()
+  slot.anchor = anchor
+  slot.el = fake.el as unknown as HTMLElement
+  slot.more = fake.more as unknown as HTMLElement
+  slot.pinned = pinned
+  addChip(slot)
+  return { slot, ...fake }
+}
+
+/** Folding waits a few runs so chips walking past don't flicker. */
+const settle = () => {
+  for (let i = 0; i < 4; i++) layout(camera, 200, 200)
+}
+
+afterEach(resetChips)
+
+describe("chip declutter", () => {
+  test("two overlapping chips: the farther one is lifted clear, the nearer one stays", () => {
+    const near = chipAt(0, 5)
+    const far = chipAt(1, -5)
+    settle()
+    expect(near.style.get("--lift") ?? "0px").toBe("0px")
+    // 20 px tall + 3 px gap.
+    expect(far.style.get("--lift")).toBe("23px")
+    expect(far.attrs.has("data-folded")).toBe(false)
+  })
+
+  test("chips apart are left alone", () => {
+    const a = chipAt(-6, 0)
+    const b = chipAt(6, 1)
+    settle()
+    for (const c of [a, b]) {
+      expect(c.style.get("--lift") ?? "0px").toBe("0px")
+      expect(c.attrs.has("data-folded")).toBe(false)
+    }
+  })
+
+  test("three in a pile fold into the nearest, which reads +2", () => {
+    const near = chipAt(0, 5)
+    const mid = chipAt(0.5, 0)
+    const far = chipAt(1, -5)
+    settle()
+    expect(near.attrs.has("data-folded")).toBe(false)
+    expect(near.more.textContent).toBe("+2")
+    expect(mid.attrs.has("data-folded")).toBe(true)
+    expect(far.attrs.has("data-folded")).toBe(true)
+  })
+
+  test("a pinned chip (selected or pleading) is never folded, and hosts the +N", () => {
+    const near = chipAt(0, 5)
+    const pleading = chipAt(0.5, -5, true)
+    const far = chipAt(1, -6)
+    settle()
+    expect(pleading.attrs.has("data-folded")).toBe(false)
+    expect(pleading.style.get("--lift") ?? "0px").toBe("0px")
+    expect(pleading.more.textContent).toBe("+2")
+    expect(near.attrs.has("data-folded")).toBe(true)
+    expect(far.attrs.has("data-folded")).toBe(true)
+  })
+
+  test("a pile does not fold on a single run (no flicker as chips pass)", () => {
+    chipAt(0, 5)
+    const mid = chipAt(0.5, 0)
+    chipAt(1, -5)
+    layout(camera, 200, 200)
+    expect(mid.attrs.has("data-folded")).toBe(false)
+  })
+})

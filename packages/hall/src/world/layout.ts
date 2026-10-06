@@ -102,6 +102,17 @@ export const TAVERN: readonly Post[] = [
 export const INFIRMARY: readonly Post[] = [
   [-6.5, -9.2, 0],
   [-3.5, -9.2, 0],
+  [-9.5, -9.2, 0],
+]
+
+/**
+ * When every bed is taken: bedrolls on the floor in front of them (a run with six failed
+ * subagents stacked three to a bed). Lying down puts the body ~1.8 behind the post, on the mat.
+ */
+export const INFIRMARY_MATS: readonly Post[] = [
+  [-6.5, -5.4, 0],
+  [-3.5, -5.4, 0],
+  [-9.5, -5.4, 0],
 ]
 
 /** When the tavern is full: sit on the floor around the hearth. */

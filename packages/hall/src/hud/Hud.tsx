@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { MODE } from "../guild/mode.ts"
+import { useOpening } from "../guild/opening.ts"
 import { useGuild } from "../guild/useGuild.ts"
 import { Brand } from "./Brand.tsx"
 import { Chronicle, Toasts } from "./Chronicle.tsx"
 import { Dossier } from "./Dossier.tsx"
 import { Icon } from "./icons.tsx"
+import { Opening } from "./Opening.tsx"
 import { Pleas } from "./Pleas.tsx"
 import { HUD_MODES, type HudMode, hudPrefs, useHudPrefs } from "./prefs.ts"
 import { Roster, RosterBadges } from "./Roster.tsx"
@@ -17,6 +19,15 @@ const PHONE = "(max-width: 720px)"
 /** Regions that fold into a compact form: the brand's about card, the roster, the chronicle. */
 type Region = "about" | "roster" | "chronicle"
 type Regions = Record<Region, boolean>
+
+/** On a phone Detailed looks like Minimal (panels are sheets either way): H cycles Minimal and Hidden. */
+function modeOn(mode: HudMode, phone: boolean): HudMode {
+  return phone && mode === "detailed" ? "minimal" : mode
+}
+function nextMode(mode: HudMode, phone: boolean): HudMode {
+  const next = HUD_MODES[mode].next
+  return phone && next === "detailed" ? HUD_MODES[next].next : next
+}
 
 /** Detailed opens the lists; Minimal folds everything. Phones never open a sheet on their own. */
 function regionsFor(mode: HudMode, phone: boolean): Regions {
@@ -35,7 +46,10 @@ function regionsFor(mode: HudMode, phone: boolean): Regions {
 export function Hud() {
   const store = useGuild()
   const phone = useMedia(PHONE)
-  const { mode, stats } = useHudPrefs()
+  const prefs = useHudPrefs()
+  const mode = modeOn(prefs.mode, phone)
+  const { stats } = prefs
+  const intro = useOpening()
   const [settings, setSettings] = useState(false)
   const [open, setOpen] = useState<Regions>(() => regionsFor(mode, phone))
   const [said, setSaid] = useState("")
@@ -102,7 +116,7 @@ export function Hud() {
       if (target instanceof HTMLElement && /textarea|select/i.test(target.tagName)) return
       if (target instanceof HTMLInputElement && target.type !== "range") return
       if (event.key === "h" || event.key === "H") {
-        setMode(HUD_MODES[mode].next)
+        setMode(nextMode(mode, phone))
         return
       }
       if (event.key !== "Escape") return
@@ -117,6 +131,17 @@ export function Hud() {
 
   const hidden = mode === "hidden"
   const ModeGlyph = Icon[mode]
+  const next = nextMode(mode, phone)
+  const opening = showcase && <Opening state={intro} store={store} phone={phone} />
+
+  // The showcase opens on a title card and a camera reveal: the HUD waits until the camera lands.
+  if (showcase && (intro.stage === "card" || intro.stage === "reveal")) {
+    return (
+      <div className="hud" ref={root} data-opening={intro.stage}>
+        {opening}
+      </div>
+    )
+  }
 
   return (
     <div
@@ -128,7 +153,9 @@ export function Hud() {
       data-settings={settings}
       data-tape={tape}
       data-sheet={dossier || settings || open.roster || open.chronicle}
+      data-opening={showcase ? intro.stage : undefined}
     >
+      {opening}
       {!hidden && (
         <div className="region region-left">
           <Brand store={store} open={open.about} onToggle={() => toggle("about")} />
@@ -145,11 +172,11 @@ export function Hud() {
           ref={modeBtn}
           type="button"
           className={hidden ? "plaque show-hud" : "plaque tool"}
-          onClick={() => setMode(HUD_MODES[mode].next)}
+          onClick={() => setMode(next)}
           aria-label={
             hidden
               ? `Show the HUD (H)${pleas > 0 ? `, ${pleas} waiting for you` : ""}`
-              : `HUD: ${HUD_MODES[mode].label}. Switch to ${HUD_MODES[HUD_MODES[mode].next].label} (H)`
+              : `HUD: ${HUD_MODES[mode].label}. Switch to ${HUD_MODES[next].label} (H)`
           }
           title={hidden ? "Show the HUD (H)" : `HUD: ${HUD_MODES[mode].label} · H`}
         >

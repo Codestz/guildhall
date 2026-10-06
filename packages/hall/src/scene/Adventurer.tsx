@@ -1,6 +1,6 @@
 import { Html, useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import {
   type AnimationAction,
   AnimationMixer,
@@ -8,6 +8,7 @@ import {
   type Group,
   LoopOnce,
   type Material,
+  MathUtils,
   type Mesh,
   type MeshStandardMaterial,
   type Object3D,
@@ -16,15 +17,20 @@ import {
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js"
 import type { AdventurerView } from "../guild/store.ts"
 import { positions, useGuildStore } from "../guild/useGuild.ts"
+import { verbOf } from "../hud/format.ts"
+import { Icon } from "../hud/icons.tsx"
 import { ANIMS_URL, GEAR, isModel, MODELS, modelUrl } from "../world/cast.ts"
 import type { Piece } from "../world/furniture.ts"
 import { GATE, type Spot } from "../world/layout.ts"
 import { route } from "../world/paths.ts"
 import { useBlob } from "./Blobs.tsx"
+import { addChip, CHIP_HEIGHT, chipSlot, declutter, removeChip } from "./chips.ts"
 import { DeedEffect } from "./DeedEffect.tsx"
 import { clonePiece, useKit } from "./Kit.tsx"
 
 const WALK_SPEED = 3.4
+/** The infirmary bed's blanket, measured on kit.glb's bed_frame (0.84 up, scale 1). */
+const BED_TOP = 0.84
 /** No walk lasts longer than this: far trips run instead (Motion language board). */
 const MAX_WALK_S = 5
 const RUN_ABOVE = 5.2
@@ -126,7 +132,31 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     }
   }, [view.id])
 
-  useFrame((_, delta) => {
+  // The name chip joins the declutter (scene/chips.ts), which nudges and folds it directly in the DOM.
+  const chip = useMemo(chipSlot, [])
+  const chipRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      chip.el = el
+    },
+    [chip],
+  )
+  const moreRef = useCallback(
+    (el: HTMLElement | null) => {
+      chip.more = el
+    },
+    [chip],
+  )
+  useEffect(() => {
+    chip.anchor = root.current
+    addChip(chip)
+    return () => {
+      removeChip(chip)
+      chip.anchor = null
+    }
+  }, [chip])
+
+  useFrame((state, delta) => {
+    declutter(state.camera, state.size.width, state.size.height)
     const node = root.current
     if (!node) return
     const [tx, tz, facing] = view.target
@@ -161,6 +191,10 @@ export function Adventurer({ view }: { view: AdventurerView }) {
       turn(node, facing, delta * 5)
     }
     const distance = remaining
+    // In bed: up onto the mattress. The post is at floor level beside it, so lying down there
+    // put them on the floor under the bed (the user: "they sleep below the bed").
+    const inBed = view.seat === "bed" && !walking
+    node.position.y = MathUtils.damp(node.position.y, inBed ? BED_TOP : 0, 6, delta)
 
     const leaving = view.phase === "leaving" ? distance : 99
     node.scale.setScalar(leaving < 1.2 ? Math.max(0.01, leaving / 1.2) : 1)
@@ -191,8 +225,15 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   }
 
   const selected = store.selected === view.id
-  /** Resting and leaving adventurers keep a small, faded label so the busy ones stay readable. */
+  /** Resting and leaving adventurers keep a softer label so the busy ones stay readable. */
   const quiet = view.phase === "resting" || view.phase === "leaving"
+  const pleading = view.phase === "waiting"
+  // Read by the declutter on its next run (refs, not state: no re-render for it).
+  chip.pinned = selected || pleading
+  const { verb, glyph } = verbOf(view)
+  const Glyph = Icon[glyph]
+  /** The full deed, for Detailed mode and whoever you follow; Minimal shows the verb instead. */
+  const deed = view.doing && !quiet ? view.doing : ""
 
   return (
     <group
@@ -225,13 +266,26 @@ export function Adventurer({ view }: { view: AdventurerView }) {
           <DeedEffect effect={view.look.effect} />
         </group>
       )}
-      <Html position={[0, 3.2, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
-        <div className={`chip${selected ? " selected" : ""}${quiet && !selected ? " quiet" : ""}`}>
-          {view.phase === "waiting" && <div className="plea">!</div>}
+      {/* Decorative: the roster is the accessible list of who is here and what they are doing. */}
+      <Html position={[0, CHIP_HEIGHT, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
+        <div
+          ref={chipRef}
+          aria-hidden="true"
+          className={`chip${selected ? " selected" : ""}${quiet && !selected ? " quiet" : ""}${deed ? " has-deed" : ""}`}
+          data-tone={glyph}
+        >
+          {pleading && <div className="plea">!</div>}
           {view.bubble && <div className="bubble">{view.bubble}</div>}
           <div className="name" style={{ borderColor: view.color }}>
-            <b>{view.title}</b>
-            {view.doing && !quiet && <span>{view.doing}</span>}
+            <b>
+              {view.title}
+              <i className="more" ref={moreRef} />
+            </b>
+            <em className="verb">
+              <Glyph />
+              {verb}
+            </em>
+            {deed && <span className="deed">{deed}</span>}
           </div>
         </div>
       </Html>

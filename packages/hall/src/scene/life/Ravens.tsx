@@ -7,7 +7,7 @@ import {
   type InstancedMesh,
   MathUtils,
   Matrix4,
-  MeshBasicMaterial,
+  MeshStandardMaterial,
   Quaternion,
   Vector3,
 } from "three"
@@ -43,8 +43,19 @@ export function Ravens() {
   const store = useGuildStore()
   const geometry = useMemo(wing, [])
   const letterGeometry = useMemo(() => new BoxGeometry(0.34, 0.06, 0.24), [])
-  const material = useMemo(() => new MeshBasicMaterial({ color: "#16181c", side: DoubleSide }), [])
-  const letterMaterial = useMemo(() => new MeshBasicMaterial({ color: "#ffffff" }), [])
+  // Lit, blue-black with a sheen: flat unlit black read as glitch shards (design review #7).
+  const material = useMemo(
+    () =>
+      new MeshStandardMaterial({
+        color: "#2a3142",
+        roughness: 0.45,
+        metalness: 0.15,
+        side: DoubleSide,
+        flatShading: true,
+      }),
+    [],
+  )
+  const letterMaterial = useMemo(() => new MeshStandardMaterial({ color: "#ffffff", roughness: 0.8 }), [])
   const ravens = useRef<InstancedMesh>(null)
   const letters = useRef<InstancedMesh>(null)
   const sky = useMemo(() => ({ flights: [] as Flight[], seen: -1, time: 0 }), [])
@@ -105,7 +116,7 @@ export function Ravens() {
         heading = -angle
       }
       // Grow in, shrink out; flap hard, glide at the top of the arc.
-      const size = 1.5 * Math.min(1, t * 8, (1 - t) * 8)
+      const size = 1.95 * Math.min(1, t * 8, (1 - t) * 8)
       const beat =
         Math.sin(sky.time * 13 + i * 2) * (flight.kind === "carry" && t > 0.35 && t < 0.65 ? 0.3 : 1)
       rotation.setFromAxisAngle(UP, heading)

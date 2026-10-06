@@ -22,7 +22,16 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { basename, join } from "node:path"
 import { Document, type Node as GNode, getBounds, NodeIO } from "@gltf-transform/core"
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions"
-import { dedup, mergeDocuments, meshopt, prune, resample, simplify, unpartition, weld } from "@gltf-transform/functions"
+import {
+  dedup,
+  mergeDocuments,
+  meshopt,
+  prune,
+  resample,
+  simplify,
+  unpartition,
+  weld,
+} from "@gltf-transform/functions"
 import { MeshoptEncoder, MeshoptSimplifier } from "meshoptimizer"
 
 const ROOT = join(import.meta.dir, "..")

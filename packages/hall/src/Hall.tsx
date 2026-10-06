@@ -12,7 +12,12 @@ import { Scene } from "./scene/Scene.tsx"
 export function Hall({ store }: { store: GuildStore }) {
   return (
     <GuildContext.Provider value={store}>
-      <Canvas shadows dpr={1} gl={{ antialias: false }}>
+      {/*
+        The 3D world is a picture of what the HUD already says in words: the roster names everyone
+        and what they are doing, the dossier tells one adventurer's story. So the canvas, and the
+        name chips drei mounts beside it, stay out of the accessibility tree.
+      */}
+      <Canvas shadows dpr={1} gl={{ antialias: false }} aria-hidden="true">
         <Scene />
       </Canvas>
       <Hud />

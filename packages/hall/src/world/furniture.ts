@@ -54,6 +54,11 @@ export const FURNITURE: readonly Placement[] = [
   // Infirmary (back, between library and dais).
   { piece: "bed_frame", x: -6.5, z: -10.3 },
   { piece: "bed_frame", x: -3.5, z: -10.3 },
+  { piece: "bed_frame", x: -9.5, z: -10.3 },
+  // Bedrolls for when the beds are full (layout INFIRMARY_MATS).
+  { piece: "rug_oval_A", x: -6.5, z: -6.3, rot: Math.PI / 2, scale: 0.62 },
+  { piece: "rug_oval_A", x: -3.5, z: -6.3, rot: Math.PI / 2, scale: 0.62 },
+  { piece: "rug_oval_A", x: -9.5, z: -6.3, rot: Math.PI / 2, scale: 0.62 },
   { piece: "candle_lit", x: -5, z: -11.4 },
 
   // Forge (back right).

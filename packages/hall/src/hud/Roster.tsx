@@ -55,7 +55,7 @@ export function Roster({
                   data-tone={phase.tone}
                   onClick={() => store.select(active ? null : v.id)}
                 >
-                  <Sigil title={v.title} color={v.color} />
+                  <Sigil title={v.role} color={v.color} ordinal={v.ordinal} />
                   <span className="roster-text">
                     <span className="roster-name">
                       {v.title}
@@ -109,7 +109,7 @@ export function RosterBadges({ store, onExpand }: { store: GuildStore; onExpand:
                 onClick={() => store.select(active ? null : v.id)}
                 style={{ "--role": v.color } as CSSProperties}
               >
-                <Sigil title={v.title} color={v.color} />
+                <Sigil title={v.role} color={v.color} ordinal={v.ordinal} />
                 {mark && (
                   <span className="badge-mark" aria-hidden="true">
                     <Mark />

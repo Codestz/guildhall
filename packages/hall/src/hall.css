@@ -928,6 +928,29 @@ button {
 .sigil-lg span {
   font-size: 16px;
 }
+/* The second and later of a role: "II", "III" on a small ink tab under the diamond. */
+.sigil .sigil-num {
+  position: absolute;
+  right: -3px;
+  bottom: -2px;
+  min-width: 13px;
+  padding: 0 2px;
+  border-radius: 3px;
+  background: var(--ink-solid);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--role) 70%, transparent);
+  color: var(--paper);
+  font-family: var(--display);
+  font-style: normal;
+  font-size: 9.5px;
+  line-height: 12px;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+.sigil-lg .sigil-num {
+  font-size: 11.5px;
+  line-height: 14px;
+  min-width: 16px;
+}
 
 .status {
   display: inline-flex;
@@ -1891,15 +1914,30 @@ button {
 /* ───────────────────────────── scene chips (rendered by Adventurer) ───────────────────────────── */
 
 .chip {
+  --lift: 0px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 5px;
-  transform: translateY(-50%);
+  /* Bottom edge on the anchor; --lift is the declutter's nudge (scene/chips.ts), eased here. */
+  transform: translateY(calc(-50% - var(--lift)));
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.25s ease-out,
+    visibility 0s;
   font-family: var(--body);
   font-size: 12px;
   white-space: nowrap;
   user-select: none;
+}
+/* Folded into a neighbour's "+N": fades out, then leaves the hit-test and paint entirely. */
+.chip[data-folded] {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.25s ease-out,
+    visibility 0s 0.25s;
 }
 .chip .name {
   display: flex;
@@ -1916,15 +1954,68 @@ button {
   color: var(--paper);
 }
 .chip .name b {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-family: var(--display);
   font-weight: 400;
   font-size: 12.5px;
   letter-spacing: 0.06em;
 }
-.chip .name span {
+/* What they are doing, in one word with its glyph (format.ts verbOf). */
+.chip .verb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-style: normal;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+.chip .verb .glyph {
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+.chip[data-tone="plea"] .verb {
+  color: var(--plea);
+}
+.chip[data-tone="fail"] .verb {
+  color: var(--fail);
+}
+.chip[data-tone="loot"] .verb {
+  color: var(--loot);
+}
+/* The full deed: `edit · routes.ts`. */
+.chip .deed {
   font-family: var(--mono);
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
+  /* A long line (a provider error, a whole command) stays one short line; the dossier has it all. */
+  display: inline-block;
+  max-width: 26ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+/* A pile folded into this chip: "+2". */
+.chip .more {
+  display: none;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--brass-wash);
+  box-shadow: inset 0 0 0 1px var(--brass-line);
+  color: var(--brass-hi);
+  font-family: var(--body);
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 15px;
+}
+.chip[data-more] .more {
+  display: inline-block;
 }
 .chip .bubble {
   position: relative;
@@ -1985,8 +2076,11 @@ button {
 }
 
 @media (max-width: 720px) {
-  .chip .name span {
+  .chip .deed {
     display: none;
+  }
+  :root .chip.has-deed .verb {
+    display: flex;
   }
   .chip .bubble {
     max-width: 170px;
@@ -1999,10 +2093,9 @@ button {
   color: var(--muted);
 }
 
-/* Resting / leaving adventurers: a small faded label, so working ones stay readable. */
-.chip.quiet {
-  opacity: 0.55;
-  transform: translateY(-50%) scale(0.82);
+/* Resting / leaving adventurers: a softer label, so working ones stay readable — never smaller. */
+.chip.quiet:not([data-folded]) {
+  opacity: 0.8;
 }
 .chip.quiet .bubble {
   display: none;
@@ -2043,15 +2136,25 @@ button {
 
 /* ───────────────────────────── chips by HUD mode ───────────────────────────── */
 
-/* Minimal: names only, smaller; the deed line returns for whoever you follow. */
+/* Detailed: the full deed replaces the verb wherever there is one. */
+.chip.has-deed .verb {
+  display: none;
+}
+/* Minimal: name and one verb, smaller; the full deed returns for whoever you follow. */
 :root[data-hud="minimal"] .chip .name {
   padding: 2px 7px 1px;
 }
 :root[data-hud="minimal"] .chip .name b {
   font-size: 11px;
 }
-:root[data-hud="minimal"] .chip:not(.selected) .name span {
+:root[data-hud="minimal"] .chip:not(.selected) .deed {
   display: none;
+}
+:root[data-hud="minimal"] .chip.has-deed:not(.selected) .verb {
+  display: flex;
+}
+:root[data-hud="minimal"] .chip .verb {
+  font-size: 11px;
 }
 /* Hidden: a pure view. Speech and the plea mark stay; they are part of the world. */
 :root[data-hud="hidden"] .chip .name {
@@ -2075,5 +2178,309 @@ button {
   .hud *,
   .hud *::before {
     transition: none;
+  }
+}
+
+/* ═════════════════ showcase opening + touch toolbar (owned by the opening / phone pass) ═════════════════
+ * The showcase's directed opening (hud/Opening.tsx, guild/opening.ts): a title card while the world
+ * loads, dissolving into the camera's establishing shot between letterbox bars, then the HUD fades
+ * in with a one-line caption. Plus the touch toolbar: 44px targets, no keyboard hints.
+ */
+
+.opening {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --lb: clamp(28px, 8vh, 76px);
+  --lb-ink: #0c0907;
+}
+
+/* letterbox: framing the card and the reveal, retracting as the camera lands */
+.letterbox i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--lb);
+  background: var(--lb-ink);
+  z-index: 6;
+  transition: transform 0.9s cubic-bezier(0.6, 0, 0.2, 1);
+}
+.letterbox i:first-child {
+  top: 0;
+}
+.letterbox i:last-child {
+  bottom: 0;
+}
+.opening:is([data-stage="arrive"], [data-stage="landed"]) .letterbox i:first-child {
+  transform: translateY(-100%);
+}
+.opening:is([data-stage="arrive"], [data-stage="landed"]) .letterbox i:last-child {
+  transform: translateY(100%);
+}
+
+/* the title card */
+.title-card {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: calc(var(--lb) + 16px) 20px;
+  pointer-events: auto;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 46%, rgba(220, 182, 98, 0.1), transparent 70%),
+    radial-gradient(ellipse at 50% 50%, #241b13 0%, var(--ink-solid) 55%, var(--lb-ink) 100%);
+}
+.opening:not([data-stage="card"]) .title-card {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 1.1s ease-in-out,
+    visibility 0s linear 1.1s;
+}
+.title-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 620px;
+  text-align: center;
+  transition: transform 1.1s ease-in-out;
+}
+.opening:not([data-stage="card"]) .title-inner {
+  transform: translateY(-10px) scale(1.02);
+}
+.crest.title-crest {
+  width: 68px;
+  height: 68px;
+  margin-bottom: 4px;
+  box-shadow: 0 0 40px -8px rgba(220, 182, 98, 0.35);
+}
+.title-crest .glyph {
+  width: 40px;
+  height: 40px;
+}
+.title-name {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(40px, 8vw, 76px);
+  line-height: 1;
+  letter-spacing: 0.08em;
+  color: var(--brass-hi);
+  text-shadow: 0 2px 24px rgba(220, 182, 98, 0.18);
+}
+.title-rule {
+  width: 140px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--brass), transparent);
+  opacity: 0.6;
+}
+.title-pitch {
+  margin: 0;
+  max-width: 34ch;
+  font-size: clamp(16px, 1.9vw, 19px);
+  line-height: 1.5;
+  color: var(--paper);
+  text-wrap: balance;
+}
+.title-load {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.title-bar {
+  display: block;
+  width: 168px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--hair-2);
+  overflow: hidden;
+}
+.title-bar i {
+  display: block;
+  height: 100%;
+  background: var(--brass);
+  transform-origin: left center;
+  transition: transform 0.3s ease-out;
+}
+.title-load-text {
+  font-family: var(--display);
+  font-size: 12.5px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.title-load-text .mono {
+  margin-left: 4px;
+  font-size: 11.5px;
+  letter-spacing: 0;
+  color: var(--faint);
+}
+
+/* the HUD arrives as the camera lands */
+.hud[data-opening="arrive"] > :not(.opening, .visually-hidden) {
+  animation: hud-arrive 0.8s ease-out both;
+}
+@keyframes hud-arrive {
+  from {
+    opacity: 0;
+  }
+}
+
+/* the caption: what this is, how to start, where to read more */
+.opening-caption {
+  position: absolute;
+  left: 50%;
+  bottom: var(--gut);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: max-content;
+  max-width: min(600px, calc(100% - 2 * var(--gut)));
+  padding: 6px 6px 6px 16px;
+  pointer-events: auto;
+  transform: translateX(-50%);
+  animation: caption-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) 0.35s both;
+}
+@keyframes caption-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+.caption-text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+.caption-text b {
+  font-weight: 500;
+  color: var(--paper);
+}
+.caption-link {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 4px;
+  font-size: 13.5px;
+  color: var(--brass-hi);
+  text-decoration: underline;
+  text-decoration-color: var(--brass-line);
+  text-underline-offset: 3px;
+  white-space: nowrap;
+  border-radius: var(--r-sm);
+}
+.caption-link:hover {
+  color: var(--paper);
+  text-decoration-color: currentColor;
+}
+.caption-close {
+  margin-left: -6px;
+}
+
+/* the plea dot sits inside the hidden-HUD pill, never on its clipped corner */
+.show-hud .tab-dot {
+  position: static;
+  margin: 0 3px 0 1px;
+}
+
+/* mid widths: the toasts own the bottom-left, so the caption takes the bottom-right */
+@media (max-width: 1240px) and (min-width: 721px) {
+  .opening-caption {
+    left: auto;
+    right: var(--gut);
+    transform: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .opening {
+    --lb: clamp(24px, 6vh, 56px);
+  }
+  .title-crest.crest {
+    width: 56px;
+    height: 56px;
+  }
+  .title-crest .glyph {
+    width: 32px;
+    height: 32px;
+  }
+  .opening-caption {
+    left: var(--gut);
+    right: var(--gut);
+    bottom: calc(var(--gut) + env(safe-area-inset-bottom));
+    width: auto;
+    max-width: none;
+    transform: none;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    gap: 0 4px;
+    padding: 6px 6px 2px 14px;
+  }
+  .caption-text {
+    padding-top: 8px;
+  }
+  .caption-link {
+    grid-column: 1;
+    justify-self: start;
+    margin-left: -4px;
+  }
+  .caption-close {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    margin: 0;
+  }
+  /* one thing at the bottom at a time: the caption, then the toasts */
+  .hud:has(.opening-caption) .toasts {
+    display: none;
+  }
+}
+
+/* touch: 44px targets, and no keyboard hint where there is no keyboard */
+@media (hover: none) and (pointer: coarse) {
+  .hud {
+    --bar: 44px;
+  }
+  .show-hud {
+    height: 44px;
+    padding: 0 12px 0 14px;
+  }
+  .caption-close {
+    width: 44px;
+    height: 44px;
+  }
+  .caption-link {
+    min-height: 44px;
+  }
+}
+@media (hover: none) {
+  .show-hud kbd {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* no sweep, no bars: the card fades straight to the island */
+  .letterbox {
+    display: none;
+  }
+  .opening:not([data-stage="card"]) .title-card {
+    transition:
+      opacity 0.25s linear,
+      visibility 0s linear 0.25s;
+  }
+  .opening:not([data-stage="card"]) .title-inner {
+    transform: none;
+  }
+  .opening-caption,
+  .hud[data-opening="arrive"] > :not(.opening, .visually-hidden) {
+    animation: none;
   }
 }

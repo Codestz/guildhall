@@ -1,6 +1,6 @@
 import { useFrame, useThree } from "@react-three/fiber"
 import { Suspense, useEffect } from "react"
-import { PROBE } from "../guild/mode.ts"
+import { MODE, PROBE } from "../guild/mode.ts"
 import { useGuild, useGuildStore } from "../guild/useGuild.ts"
 import { Adventurer } from "./Adventurer.tsx"
 import { Atmosphere } from "./atmosphere/Atmosphere.tsx"
@@ -16,6 +16,7 @@ import { NearLights } from "./lights/NearLights.tsx"
 import { NightLife } from "./lights/NightLife.tsx"
 import { StreetLights } from "./lights/StreetLights.tsx"
 import { Nature } from "./nature/Nature.tsx"
+import { OpeningCue } from "./OpeningCue.tsx"
 import { Quality } from "./Quality.tsx"
 import { Room } from "./Room.tsx"
 import { Stations } from "./Stations.tsx"
@@ -26,6 +27,7 @@ export function Scene() {
   return (
     <Quality>
       <Clock />
+      <ReleaseLater />
       <Crisp />
       <FrameStats />
       {PROBE && <DevBridge />}
@@ -41,6 +43,9 @@ export function Scene() {
         <Stations />
         <Cast />
         <Blobs />
+        <WorldReady />
+        {/* Showcase: mounts with the world, then lifts the title card (guild/opening.ts). */}
+        {MODE === "showcase" && <OpeningCue />}
       </Suspense>
       <WeatherLayer />
       <CameraRig />
@@ -78,5 +83,26 @@ function DevBridge() {
   useEffect(() => {
     Object.assign(window, { r3f: { advance, gl, scene, setDpr, shadows } })
   }, [advance, gl, scene, setDpr])
+  return null
+}
+
+/**
+ * Mounts in the same commit as the island (inside its Suspense): the world is built, so the
+ * store may start notifying again (GuildStore.hold). A safety release after 20 s keeps the HUD
+ * alive even if the world can't load.
+ */
+function WorldReady() {
+  const store = useGuildStore()
+  useEffect(() => store.release(), [store])
+  return null
+}
+
+/** The safety release for GuildStore.hold, outside the world's Suspense. */
+function ReleaseLater() {
+  const store = useGuildStore()
+  useEffect(() => {
+    const timer = setTimeout(() => store.release(), 20_000)
+    return () => clearTimeout(timer)
+  }, [store])
   return null
 }

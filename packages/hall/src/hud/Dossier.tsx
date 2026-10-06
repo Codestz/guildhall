@@ -42,7 +42,7 @@ export function Dossier({
   return (
     <aside className={`plaque dossier ${className ?? ""}`} aria-labelledby="dossier-h">
       <header className="dossier-head">
-        <Sigil title={title} color={color} size="lg" />
+        <Sigil title={view?.role ?? title} color={color} ordinal={view?.ordinal} size="lg" />
         <div className="dossier-id">
           <span className="eyebrow">{view?.master ? "Guildmaster" : "Adventurer"} · Dossier</span>
           <h2 id="dossier-h">{title}</h2>

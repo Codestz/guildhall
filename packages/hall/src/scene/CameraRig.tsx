@@ -8,7 +8,10 @@ import {
   TOUCH,
   Vector3,
 } from "three"
+import { MODE } from "../guild/mode.ts"
+import { opening, reducedMotion } from "../guild/opening.ts"
 import { positions, useGuild, useGuildStore } from "../guild/useGuild.ts"
+import { OpeningProgress } from "./OpeningCue.tsx"
 
 /**
  * The camera: yours first, the Bard's when you hand it over (ADR 0005, season 2).
@@ -24,6 +27,11 @@ import { positions, useGuild, useGuildStore } from "../guild/useGuild.ts"
 type Controls = ComponentRef<typeof MapControls>
 
 const REVEAL_S = 3.2
+/** The showcase's directed opening (guild/opening.ts): hold, then reveal, then land. */
+const SHOWCASE = MODE === "showcase"
+/** Portrait screens close in on the keep by up to this much (a 390×844 phone gets all of it). */
+const PORTRAIT_BOOST = 0.7
+const PORTRAIT_ASPECT = 0.46
 /** Direction from the target to the camera: the isometric angle. */
 const ISO_DIR = new Vector3(1, 0.93, 1).normalize()
 const TOP_DIR = new Vector3(0.001, 1, 0.01).normalize()
@@ -62,9 +70,17 @@ export function CameraRig() {
   const size = useThree((state) => state.size)
   /** The default camera: switching views makes the other one default, and drei rebuilds the controls. */
   const defaultCamera = useThree((state) => state.camera)
-  /** Orthographic zoom that fits the keep; the island overview is a fraction of it. */
-  const fit = Math.min(size.width / 44, size.height / 31)
+  /**
+   * Orthographic zoom that fits the keep; the island overview is a fraction of it. A portrait
+   * screen fits by width, which leaves the island a band between two seas with 6px characters,
+   * so it closes in (×1.7 on a phone held upright). Zooming out still reaches the whole island.
+   */
+  const base = Math.min(size.width / 44, size.height / 31)
+  const upright = (1 - size.width / Math.max(size.height, 1)) / (1 - PORTRAIT_ASPECT)
+  const portrait = Math.min(1, Math.max(0, upright))
+  const fit = base * (1 + PORTRAIT_BOOST * portrait)
   const wide = fit * 0.42
+  const widest = base * 0.42 * 0.5
 
   // Your input turns the Bard off — and keeps it off. Listened to on the canvas itself: drei
   // recreates the controls whenever the default camera changes, so a listener on them gets lost.
@@ -140,9 +156,15 @@ export function CameraRig() {
     const camera = control.object as Ortho | Persp
     const isOrtho = (camera as Ortho).isOrthographicCamera === true
 
-    // 1. The dollhouse reveal, once.
+    // 1. The dollhouse reveal, once. The showcase holds it until the world has loaded (the title
+    //    card is up), cuts straight to the end for reduced motion, and lands the opening.
     if (revealed.current < 1) {
-      revealed.current = Math.min(1, revealed.current + delta / REVEAL_S)
+      const stage = SHOWCASE ? opening.get().stage : "landed"
+      // A long first frame (shader compiles) must not skip half the showcase's sweep.
+      const step = SHOWCASE ? Math.min(delta, 1 / 30) : delta
+      if (stage === "card") revealed.current = 0
+      else if (SHOWCASE && reducedMotion()) revealed.current = 1
+      else revealed.current = Math.min(1, revealed.current + step / REVEAL_S)
       const p = easeInOut(revealed.current)
       const dir = scratch.dir.copy(TOP_DIR).lerp(ISO_DIR, p).normalize()
       control.target.copy(HOME)
@@ -154,6 +176,7 @@ export function CameraRig() {
       }
       camera.updateProjectionMatrix()
       control.update()
+      if (SHOWCASE && revealed.current >= 1) opening.land()
       return
     }
 
@@ -260,6 +283,7 @@ export function CameraRig() {
 
   return (
     <>
+      {SHOWCASE && <OpeningProgress />}
       <OrthographicCamera
         ref={ortho}
         makeDefault={view === "diorama"}
@@ -285,7 +309,7 @@ export function CameraRig() {
         screenSpacePanning={false}
         minPolarAngle={0.12}
         maxPolarAngle={view === "explore" ? 1.45 : 1.25}
-        minZoom={wide * 0.5}
+        minZoom={widest}
         maxZoom={fit * 8}
         minDistance={4}
         maxDistance={300}

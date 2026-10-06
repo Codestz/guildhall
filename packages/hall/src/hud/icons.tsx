@@ -106,6 +106,34 @@ export const Icon = {
       <path d="M2.5 12h11M3 10.5 2 5l3.5 2.5L8 3l2.5 4.5L14 5l-1 5.5z" />
     </Glyph>
   ),
+  /* Verbs on the name chips: what someone is doing, by shape. */
+  read: () => (
+    <Glyph>
+      <path d="M8 4.5C6.5 3.3 4.3 3 2 3.2v9.3c2.3-.2 4.5.1 6 1.3 1.5-1.2 3.7-1.5 6-1.3V3.2c-2.3-.2-4.5.1-6 1.3zM8 4.5v9.3" />
+    </Glyph>
+  ),
+  edit: () => (
+    <Glyph>
+      <path d="M10.8 2.7a1.6 1.6 0 0 1 2.3 2.3L5.5 12.6l-3 .9.9-3z" />
+      <path d="M9.6 3.9 12 6.3" />
+    </Glyph>
+  ),
+  search: () => (
+    <Glyph>
+      <circle cx="7" cy="7" r="4.2" />
+      <path d="m10.2 10.2 3.6 3.6" />
+    </Glyph>
+  ),
+  test: () => (
+    <Glyph>
+      <path d="M6 2.5h4M6.8 2.5v4L3 12.6a.9.9 0 0 0 .8 1.4h8.4a.9.9 0 0 0 .8-1.4L9.2 6.5v-4M4.6 10h6.8" />
+    </Glyph>
+  ),
+  run: () => (
+    <Glyph>
+      <path d="m3 4.5 3.5 3.5L3 11.5M8.5 12h4.5" />
+    </Glyph>
+  ),
   /* Status / kind glyphs: shape carries the meaning, colour only reinforces it. */
   work: () => (
     <Glyph>

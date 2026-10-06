@@ -212,7 +212,7 @@ function Section({ title, value, children }: { title: string; value?: string; ch
     <section className="set-section" aria-labelledby={id}>
       <h3 id={id}>
         {title}
-        {value && <span className="lever-value">{value}</span>}
+        <LeverValue value={value} />
       </h3>
       {children}
     </section>
@@ -236,10 +236,24 @@ export function Lever({
     <fieldset className="lever">
       <legend className={quiet ? "visually-hidden" : undefined}>
         {label}
-        {value && <span className="lever-value">{value}</span>}
+        <LeverValue value={value} />
       </legend>
       {children}
     </fieldset>
+  )
+}
+
+/**
+ * What is in effect now, after a label. The comma is for screen readers only: without it a legend
+ * reads as one word ("MoodMorning Keep"); the gap you see is CSS.
+ */
+function LeverValue({ value }: { value: string | undefined }) {
+  if (!value) return null
+  return (
+    <>
+      <span className="visually-hidden">, </span>
+      <span className="lever-value">{value}</span>
+    </>
   )
 }
 

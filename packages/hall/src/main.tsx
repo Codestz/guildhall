@@ -10,6 +10,8 @@ const root = document.getElementById("root")
 if (!root) throw new Error("#root missing from index.html")
 
 const store = new GuildStore()
+// Until the world has mounted (scene/Scene.tsx WorldReady): see GuildStore.hold.
+store.hold()
 // `?live` follows the hub (real OpenCode sessions); `?live=ws://localhost:port/ws` picks another
 // hub on this machine (`&anyhub=1` for one elsewhere).
 const live = liveUrlOf(location.search)

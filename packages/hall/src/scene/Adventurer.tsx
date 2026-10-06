@@ -20,6 +20,7 @@ import { ANIMS_URL, GEAR, isModel, MODELS, modelUrl } from "../world/cast.ts"
 import type { Piece } from "../world/furniture.ts"
 import { GATE, type Spot } from "../world/layout.ts"
 import { route } from "../world/paths.ts"
+import { useBlob } from "./Blobs.tsx"
 import { DeedEffect } from "./DeedEffect.tsx"
 import { clonePiece, useKit } from "./Kit.tsx"
 
@@ -62,7 +63,9 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     body.traverse((child) => {
       const mesh = child as Mesh
       if (!mesh.isMesh) return
-      mesh.castShadow = true
+      // Characters move every frame; the shadow map is static (atmosphere/shadows.ts). A soft blob
+      // under their feet grounds them instead.
+      mesh.castShadow = false
       if (/Tinted/.test(mesh.name)) {
         const shared = mesh.material as MeshStandardMaterial
         const own = shared.clone()
@@ -111,6 +114,8 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   const dark = store.environment.daylight < 0.3
   const left = view.phase === "resting" ? undefined : (gear.left ?? (dark ? "lantern" : undefined))
   useHeld(body, kit, "handslot.l", left)
+
+  useBlob(root, 0.85)
 
   useEffect(() => {
     const id = view.id

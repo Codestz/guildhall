@@ -1,6 +1,6 @@
 import { useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
-import { useLayoutEffect, useMemo, useRef } from "react"
+import { useCallback, useLayoutEffect, useMemo, useRef } from "react"
 import {
   type AnimationAction,
   AnimationMixer,
@@ -15,6 +15,7 @@ import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { ANIMS_URL, type Model, modelUrl } from "../../world/cast.ts"
+import { useBlob } from "../Blobs.tsx"
 import { ROUNDS, type Round, type Stop, VILLAGER } from "./rounds.ts"
 
 /**
@@ -31,7 +32,7 @@ export function Villagers({ tier }: { tier: Tier }) {
   return (
     <>
       {rounds.map((round) => (
-        <Villager key={round.id} round={round} shadows={tier >= 2} />
+        <Villager key={round.id} round={round} />
       ))}
     </>
   )
@@ -39,7 +40,7 @@ export function Villagers({ tier }: { tier: Tier }) {
 
 const MUTED = new Color("#8d8577")
 
-function Villager({ round, shadows }: { round: Round; shadows: boolean }) {
+function Villager({ round }: { round: Round }) {
   const store = useGuildStore()
   const root = useRef<Group>(null)
   const { scene } = useGLTF(modelUrl(round.model as Model))
@@ -49,6 +50,8 @@ function Villager({ round, shadows }: { round: Round; shadows: boolean }) {
   const current = useRef<AnimationAction | null>(null)
   /** Where in the round: the stop walked to (or stood at), how long stood there, indoors or out. */
   const walk = useMemo(() => ({ stop: 0, waited: 0, home: false, presence: 1, indoors: false }), [])
+  const presence = useCallback(() => walk.presence, [walk])
+  useBlob(root, 0.8, presence)
 
   // Body only (no tinted cape or hat), its colours pulled towards a muted homespun: own materials,
   // freed on unmount. Mixer and bone textures likewise belong to this mount alone.
@@ -61,7 +64,8 @@ function Villager({ round, shadows }: { round: Round; shadows: boolean }) {
         mesh.visible = false
         return
       }
-      mesh.castShadow = shadows
+      // Walkers would need the shadow map redrawn every frame (atmosphere/shadows.ts).
+      mesh.castShadow = false
       const material = (mesh.material as MeshStandardMaterial).clone()
       material.color.lerp(MUTED, 0.5).multiplyScalar(0.92)
       mesh.material = material
@@ -83,7 +87,7 @@ function Villager({ round, shadows }: { round: Round; shadows: boolean }) {
         if (skinned.isSkinnedMesh) skinned.skeleton.dispose()
       })
     }
-  }, [body, animations, shadows])
+  }, [body, animations])
 
   useFrame((_, delta) => {
     const node = root.current

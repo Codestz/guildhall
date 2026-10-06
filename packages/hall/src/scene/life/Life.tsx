@@ -21,8 +21,9 @@ import { Windows } from "./Windows.tsx"
  *   birds      a quiet flock over the forest by day, in fair weather
  *   windows    the village's windows glow from dusk, going dark through the night
  *   villagers  a farmer and two townsfolk on their rounds by day, indoors by night
- * Draw calls (High): machines 1 (+1 shadow), traces 1, smoke 1, sparks 1, birds 1, windows 2,
- * villagers 3 (+3 shadow) = 14. Medium: 2 villagers, no villager shadows = 10. Low: none = 8.
+ * Draw calls (High): machines 1, traces 1, smoke 1, sparks 1, birds 1, windows 2, villagers 3 = 10.
+ * Medium: 2 villagers = 9. Low: none = 7. Nothing here casts into the (static) sun shadow map;
+ * villagers get a blob shadow (scene/Blobs.tsx).
  */
 export function Life() {
   const store = useGuildStore()

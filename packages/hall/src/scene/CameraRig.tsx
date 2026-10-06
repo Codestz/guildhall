@@ -2,7 +2,6 @@ import { MapControls, OrthographicCamera, PerspectiveCamera } from "@react-three
 import { useFrame, useThree } from "@react-three/fiber"
 import { type ComponentRef, useEffect, useRef } from "react"
 import {
-  type Camera,
   MOUSE,
   type OrthographicCamera as Ortho,
   type PerspectiveCamera as Persp,
@@ -38,6 +37,18 @@ const PAN_SPEED = 0.9
 const TURN_SPEED = 1.4
 const TILT_SPEED = 0.9
 const UP = new Vector3(0, 1, 0)
+/** Reused every frame: the camera loop allocates nothing (docs/perf-budget.md). */
+const scratch = {
+  dir: new Vector3(),
+  offset: new Vector3(),
+  forward: new Vector3(),
+  right: new Vector3(),
+  move: new Vector3(),
+  axis: new Vector3(),
+  tilted: new Vector3(),
+  goal: new Vector3(),
+  before: new Vector3(),
+}
 
 export function CameraRig() {
   const store = useGuildStore()
@@ -49,6 +60,8 @@ export function CameraRig() {
   const keys = useRef(new Set<string>())
   const following = useRef<string | null>(null)
   const size = useThree((state) => state.size)
+  /** The default camera: switching views makes the other one default, and drei rebuilds the controls. */
+  const defaultCamera = useThree((state) => state.camera)
   /** Orthographic zoom that fits the keep; the island overview is a fraction of it. */
   const fit = Math.min(size.width / 44, size.height / 31)
   const wide = fit * 0.42
@@ -103,7 +116,7 @@ export function CameraRig() {
   useEffect(() => {
     const control = controls.current
     if (!control || revealed.current < 1) return
-    const camera = control.object as Ortho | Persp
+    const camera = defaultCamera as Ortho | Persp
     const { target, position, zoom } = last.current
     const dir = position.clone().sub(target).normalize()
     control.target.copy(target)
@@ -119,9 +132,9 @@ export function CameraRig() {
       camera.position.copy(target).addScaledVector(dir, distance)
     }
     control.update()
-  }, [view, fit, wide])
+  }, [defaultCamera, fit, wide])
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
     const control = controls.current
     if (!control) return
     const camera = control.object as Ortho | Persp
@@ -131,7 +144,7 @@ export function CameraRig() {
     if (revealed.current < 1) {
       revealed.current = Math.min(1, revealed.current + delta / REVEAL_S)
       const p = easeInOut(revealed.current)
-      const dir = TOP_DIR.clone().lerp(ISO_DIR, p).normalize()
+      const dir = scratch.dir.copy(TOP_DIR).lerp(ISO_DIR, p).normalize()
       control.target.copy(HOME)
       if (isOrtho) {
         camera.position.copy(HOME).addScaledVector(dir, 220)
@@ -147,12 +160,12 @@ export function CameraRig() {
     // 2. Your keys.
     const held = keys.current
     if (held.size > 0) {
-      const offset = camera.position.clone().sub(control.target)
+      const offset = scratch.offset.copy(camera.position).sub(control.target)
       const azimuth = Math.atan2(offset.x, offset.z)
-      const forward = new Vector3(-Math.sin(azimuth), 0, -Math.cos(azimuth))
-      const right = new Vector3(-forward.z, 0, forward.x)
+      const forward = scratch.forward.set(-Math.sin(azimuth), 0, -Math.cos(azimuth))
+      const right = scratch.right.set(-forward.z, 0, forward.x)
       const scale = isOrtho ? 60 / (camera as Ortho).zoom : offset.length() * 0.9
-      const move = new Vector3()
+      const move = scratch.move.set(0, 0, 0)
       if (held.has("w") || held.has("arrowup")) move.add(forward)
       if (held.has("s") || held.has("arrowdown")) move.sub(forward)
       if (held.has("d") || held.has("arrowright")) move.add(right)
@@ -167,8 +180,10 @@ export function CameraRig() {
         camera.position.copy(control.target).add(offset)
       }
       if (held.has("r") || held.has("f")) {
-        const axis = new Vector3().crossVectors(UP, offset).normalize()
-        const tilted = offset.clone().applyAxisAngle(axis, (held.has("r") ? -1 : 1) * TILT_SPEED * delta)
+        const axis = scratch.axis.crossVectors(UP, offset).normalize()
+        const tilted = scratch.tilted
+          .copy(offset)
+          .applyAxisAngle(axis, (held.has("r") ? -1 : 1) * TILT_SPEED * delta)
         const polar = tilted.angleTo(UP)
         if (polar > control.minPolarAngle && polar < control.maxPolarAngle)
           camera.position.copy(control.target).add(tilted)
@@ -191,13 +206,13 @@ export function CameraRig() {
     // 3. Following the selected adventurer: keep them centred, let the viewer turn and zoom.
     const selected = store.selected ? positions.get(store.selected) : undefined
     if (selected) {
-      const goal = new Vector3(selected.x, 1.2, selected.z)
+      const goal = scratch.goal.set(selected.x, 1.2, selected.z)
       const fresh = following.current !== store.selected
       // A new pick: glide there quickly; then track tightly so walking never leaves the frame.
       const k = 1 - Math.exp(-delta * (fresh ? 8 : 6))
-      const before = control.target.clone()
+      const before = scratch.before.copy(control.target)
       control.target.lerp(goal, fresh ? 1 : k)
-      camera.position.add(control.target.clone().sub(before))
+      camera.position.add(before.subVectors(control.target, before))
       if (fresh) {
         following.current = store.selected
         closeIn(camera, control, isOrtho ? fit * 2.2 : CLOSE)
@@ -209,15 +224,15 @@ export function CameraRig() {
     // 4. The Bard directs, when it's on and nobody is being followed.
     if (store.bard && !selected) {
       const focus = store.focus ? positions.get(store.focus.id) : undefined
-      const goal = focus ? new Vector3(focus.x, 1.2, focus.z) : HOME
+      const goal = focus ? scratch.goal.set(focus.x, 1.2, focus.z) : HOME
       const slow = 1 - Math.exp(-delta * 1.1)
-      const before = control.target.clone()
+      const before = scratch.before.copy(control.target)
       control.target.lerp(goal, slow)
-      camera.position.add(control.target.clone().sub(before))
+      camera.position.add(before.subVectors(control.target, before))
       const quiet = store.time - store.lastEventAt > 5000 || !focus
       if (quiet) {
-        const offset = camera.position
-          .clone()
+        const offset = scratch.offset
+          .copy(camera.position)
           .sub(control.target)
           .applyAxisAngle(UP, delta * 0.05)
         camera.position.copy(control.target).add(offset)
@@ -228,7 +243,7 @@ export function CameraRig() {
         const zoomGoal = focus ? fit * (0.7 + score * 0.05) : wide
         o.zoom += (zoomGoal - o.zoom) * slow
       } else {
-        const offset = camera.position.clone().sub(control.target)
+        const offset = scratch.offset.copy(camera.position).sub(control.target)
         const distance = offset.length()
         const goalDistance = focus ? NEAR - score * 2 : FAR
         camera.position

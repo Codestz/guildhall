@@ -148,7 +148,8 @@ function build(nodes: Record<string, Object3D>, claimed: boolean) {
     }
   })
   mesh.sortObjects = false
-  mesh.castShadow = true
+  // Turning sails and wheels would need the shadow map redrawn every frame (atmosphere/shadows.ts).
+  mesh.castShadow = false
   mesh.receiveShadow = true
   // Turning parts move inside their bounds every frame: cull by the whole batch's sphere only.
   mesh.perObjectFrustumCulled = false

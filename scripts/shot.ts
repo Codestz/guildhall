@@ -4,7 +4,8 @@
  *   bun scripts/shot.ts [url] [steps.json]
  *
  * Steps: [{ "wait": ms } | { "shot": "name" } | { "eval": "js" } | { "key": "w", "hold": ms }
- *        | { "drag": [x1, y1, x2, y2], "button": "left" | "right" } | { "wheel": dy, "at": [x, y] }]
+ *        | { "drag": [x1, y1, x2, y2], "button": "left" | "right" } | { "wheel": dy, "at": [x, y] }
+ *        | { "profile": ms }]   (a CPU profile: prints the top functions by self time)
  * Screenshots land in .probe/ (git-ignored). Prints page errors and every `eval` result.
  */
 import { chromium } from "playwright-core"
@@ -16,6 +17,7 @@ type Step =
   | { key: string; hold?: number }
   | { drag: [number, number, number, number]; button?: "left" | "right" }
   | { wheel: number; at?: [number, number] }
+  | { profile: number }
 
 const url = process.argv[2] ?? "http://localhost:5199/"
 const steps: Step[] = process.argv[3]
@@ -44,6 +46,7 @@ await page.goto(url)
 
 for (const step of steps) {
   if ("wait" in step) await page.waitForTimeout(step.wait)
+  else if ("profile" in step) await profile(step.profile)
   else if ("shot" in step) await page.screenshot({ path: `.probe/${step.shot}.png` })
   else if ("eval" in step) console.log(JSON.stringify(await page.evaluate(step.eval)))
   else if ("key" in step) {
@@ -64,3 +67,28 @@ for (const step of steps) {
 }
 console.log(errors.length ? `errors: ${JSON.stringify(errors)}` : "no page errors")
 await browser.close()
+
+/** Samples the main thread for `ms` and prints where the time went, by function (self time). */
+async function profile(ms: number): Promise<void> {
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send("Profiler.enable")
+  await cdp.send("Profiler.setSamplingInterval", { interval: 200 })
+  await cdp.send("Profiler.start")
+  await page.waitForTimeout(ms)
+  const { profile } = await cdp.send("Profiler.stop")
+  const self = new Map<string, number>()
+  const byId = new Map(profile.nodes.map((node) => [node.id, node]))
+  const deltas = profile.timeDeltas ?? []
+  ;(profile.samples ?? []).forEach((id, i) => {
+    const frame = byId.get(id)?.callFrame
+    if (!frame) return
+    const file = frame.url.split("/").slice(-2).join("/").replace(/\?.*$/, "")
+    const key = `${frame.functionName || "(anon)"}  ${file}:${frame.lineNumber + 1}`
+    self.set(key, (self.get(key) ?? 0) + (deltas[i] ?? 0) / 1000)
+  })
+  const total = [...self.values()].reduce((a, b) => a + b, 0)
+  const top = [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 25)
+  console.log(`profile ${ms} ms (sampled ${total.toFixed(0)} ms):`)
+  for (const [key, time] of top) console.log(`  ${time.toFixed(1).padStart(8)} ms  ${key}`)
+  await cdp.detach()
+}

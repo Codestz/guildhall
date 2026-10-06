@@ -11,7 +11,8 @@ import { sky } from "../atmosphere/state.ts"
  * camera's target, so nearby walls, roofs and adventurers actually catch warm light at night.
  * The count is fixed (shaders compile once); everything farther away keeps the cheap halo + pool.
  */
-const COUNT = 4
+/** Two: each point light adds lighting cost to every lit pixel (measured ~1 ms per two at DPR 1.5). */
+const COUNT = 2
 const REPICK_S = 0.4
 
 const FLAMES: readonly (readonly [number, number, number])[] = [

@@ -1,9 +1,10 @@
 import { useFrame } from "@react-three/fiber"
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import { type Material, MeshStandardMaterial } from "three"
 import { useGuild } from "../guild/useGuild.ts"
 import { FURNITURE, NORMALS, type Placement, type Side, WALL_DECOR, WALLS } from "../world/furniture.ts"
 import { ROOM, TILE } from "../world/layout.ts"
+import { shadows } from "./atmosphere/shadows.ts"
 import { mergePlacements, useKit } from "./Kit.tsx"
 
 const SIDES: readonly Side[] = ["back", "front", "left", "right"]
@@ -27,6 +28,7 @@ export function Room() {
       }
       // A faded (cut-away) wall casts no shadow: with a moving sun it would shade the hall floor.
       const solid = (materials[0]?.opacity ?? 1) > 0.5
+      if (meshes[0] && meshes[0].castShadow !== solid) shadows.request()
       for (const mesh of meshes) mesh.castShadow = solid
     }
   })
@@ -58,6 +60,8 @@ export function Room() {
     [kit],
   )
   const plinth = useMemo(() => new MeshStandardMaterial({ color: mood.stone }), [mood.stone])
+  // A material passed by prop is ours to free: the old one on a mood change, the last on unmount.
+  useEffect(() => () => plinth.dispose(), [plinth])
 
   return (
     <group>

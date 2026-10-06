@@ -1,9 +1,12 @@
 import { useFrame, useThree } from "@react-three/fiber"
 import { Suspense, useEffect } from "react"
+import { PROBE } from "../guild/mode.ts"
 import { useGuild, useGuildStore } from "../guild/useGuild.ts"
 import { Adventurer } from "./Adventurer.tsx"
 import { Atmosphere } from "./atmosphere/Atmosphere.tsx"
 import { Post } from "./atmosphere/Post.tsx"
+import { shadows } from "./atmosphere/shadows.ts"
+import { Blobs } from "./Blobs.tsx"
 import { CameraRig } from "./CameraRig.tsx"
 import { FrameStats } from "./FrameStats.tsx"
 import { Island } from "./Island.tsx"
@@ -23,7 +26,7 @@ export function Scene() {
     <Quality>
       <Clock />
       <FrameStats />
-      {import.meta.env.DEV && <DevBridge />}
+      {PROBE && <DevBridge />}
       <Atmosphere />
       <Suspense fallback={null}>
         <Island />
@@ -35,6 +38,7 @@ export function Scene() {
         <Room />
         <Stations />
         <Cast />
+        <Blobs />
       </Suspense>
       <WeatherLayer />
       <CameraRig />
@@ -67,8 +71,10 @@ function Clock() {
 function DevBridge() {
   const advance = useThree((state) => state.advance)
   const gl = useThree((state) => state.gl)
+  const scene = useThree((state) => state.scene)
+  const setDpr = useThree((state) => state.setDpr)
   useEffect(() => {
-    Object.assign(window, { r3f: { advance, gl } })
-  }, [advance, gl])
+    Object.assign(window, { r3f: { advance, gl, scene, setDpr, shadows } })
+  }, [advance, gl, scene, setDpr])
   return null
 }

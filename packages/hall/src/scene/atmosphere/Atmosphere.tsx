@@ -16,6 +16,7 @@ import { flash, stepLightning } from "./flash.ts"
 import { installRadialFog } from "./fog.ts"
 import { Lamps } from "./Lamps.tsx"
 import { SkyDome } from "./SkyDome.tsx"
+import { shadows } from "./shadows.ts"
 import { updateSky } from "./sky.ts"
 import { sky } from "./state.ts"
 
@@ -101,6 +102,18 @@ function Key() {
   const map = TIERS[useTier()].shadowMap
   const light = useRef<DirectionalLight>(null)
   const scene = useThree((state) => state.scene)
+  const gl = useThree((state) => state.gl)
+  /** The shadow box's grid cell and the light direction it was last drawn for. */
+  const drawn = useRef({ cx: Number.NaN, cz: Number.NaN, dx: 0, dy: 0, dz: 0, geometries: -1, map: 0 })
+
+  // Render the shadow map on demand (scene/atmosphere/shadows.ts), not every frame.
+  useEffect(() => {
+    gl.shadowMap.autoUpdate = false
+    shadows.request()
+    return () => {
+      gl.shadowMap.autoUpdate = true
+    }
+  }, [gl])
 
   useEffect(() => {
     const target = light.current?.target
@@ -117,9 +130,33 @@ function Key() {
     const controls = state.controls as unknown as { target?: Vector3 } | null
     const at = controls?.target ?? ORIGIN
     const [dx, dy, dz] = sky.keyDirection
-    key.position.set(at.x + dx * DISTANCE, dy * DISTANCE, at.z + dz * DISTANCE)
-    key.target.position.set(at.x, 0, at.z)
-    key.target.updateMatrixWorld()
+    // The box moves in whole grid cells, so a drifting camera doesn't force a redraw every frame.
+    const cx = Math.round(at.x / CELL) * CELL
+    const cz = Math.round(at.z / CELL) * CELL
+    const last = drawn.current
+    // New geometry on the GPU (a model finished loading, a tier remount): its casters need drawing.
+    const geometries = gl.info.memory.geometries
+    // …and a new map size (a tier change) is a fresh, empty map.
+    if (geometries !== last.geometries || map !== last.map) {
+      last.geometries = geometries
+      last.map = map
+      shadows.request()
+    }
+    const turned = dx * last.dx + dy * last.dy + dz * last.dz < TURN_COS
+    if (shadows.dirty || turned || cx !== last.cx || cz !== last.cz) {
+      key.position.set(cx + dx * DISTANCE, dy * DISTANCE, cz + dz * DISTANCE)
+      key.target.position.set(cx, 0, cz)
+      key.target.updateMatrixWorld()
+      key.updateMatrixWorld()
+      gl.shadowMap.needsUpdate = true
+      shadows.dirty = false
+      shadows.draws++
+      last.cx = cx
+      last.cz = cz
+      last.dx = dx
+      last.dy = dy
+      last.dz = dz
+    }
     key.color.copy(sky.keyColor)
     key.intensity = sky.keyIntensity
     key.shadow.intensity = sky.keyShadow
@@ -144,4 +181,8 @@ function Key() {
 }
 
 const DISTANCE = 70
+/** Shadow box snapping (the box is ±40; a 6-unit step keeps the view well inside it). */
+const CELL = 6
+/** Redraw when the sun or moon has turned by more than ~0.4°. */
+const TURN_COS = Math.cos((0.4 * Math.PI) / 180)
 const ORIGIN = new Vector3()

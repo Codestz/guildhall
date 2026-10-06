@@ -40,6 +40,68 @@ const OUT = join(ROOT, "packages/hall/public/assets")
 
 const CHARACTERS = ["Knight", "Barbarian", "Mage", "Rogue", "Rogue_Hooded", "Ranger"]
 
+/**
+ * The graveyard's undead (KayKit Skeletons 1.1, same 23-joint rig as the adventurers: measured).
+ * Loaded only when the graveyard first appears, so they sit outside the always-loaded budget.
+ * Their eyes use a second, glowing material: kept as their own merged group, or mergeSkinned
+ * would skip the mixed group and leave ~8 draw calls per skeleton instead of 3.
+ */
+const SKELETONS = ["Skeleton_Warrior", "Skeleton_Rogue", "Skeleton_Mage", "Skeleton_Minion"]
+
+/** Rig_Medium_Special → the undead's own clips (anims-undead.glb, lazy like the skeletons). */
+const UNDEAD_CLIPS: Record<string, string[]> = {
+  Special: [
+    "Skeletons_Inactive_Floor_Pose",
+    "Skeletons_Awaken_Floor",
+    "Skeletons_Idle",
+    "Skeletons_Taunt",
+    "Skeletons_Walking",
+    "Skeletons_Death",
+    "Skeletons_Death_Resurrect",
+  ],
+}
+
+/**
+ * The graveyard (KayKit Halloween Bits 1.0, CC0): its own kit, lazy-loaded with the undead.
+ * Shares one palette texture, so the hall can batch it like the main kit.
+ */
+const GRAVEYARD: Record<string, string[]> = {
+  KayKit_HalloweenBits: [
+    "crypt",
+    "arch_gate",
+    "fence",
+    "fence_gate",
+    "fence_pillar",
+    "fence_broken",
+    "fence_pillar_broken",
+    "grave_A",
+    "grave_B",
+    "grave_A_destroyed",
+    "gravestone",
+    "gravemarker_A",
+    "gravemarker_B",
+    "floor_dirt_grave",
+    "coffin",
+    "coffin_decorated",
+    "bone_A",
+    "bone_B",
+    "skull",
+    "ribcage",
+    "tree_dead_large",
+    "tree_dead_medium",
+    "tree_dead_small",
+    "lantern_standing",
+    "post_lantern",
+    "candle_triple",
+    "shrine_candles",
+    "bench",
+    "path_A",
+    "path_B",
+    "pumpkin_orange_jackolantern",
+    "pumpkin_orange_small",
+  ],
+}
+
 /** Rig_Medium file → the clips we keep from it. */
 const CLIPS: Record<string, string[]> = {
   General: [
@@ -391,6 +453,20 @@ async function characters(): Promise<void> {
   }
 }
 
+async function skeletons(): Promise<void> {
+  await mkdir(join(OUT, "characters"), { recursive: true })
+  for (const name of SKELETONS) {
+    const path = find("KayKit_Skeletons", name)
+    if (!path) throw new Error(`skeleton ${name} not found`)
+    const doc = await io.read(path)
+    mergeSkinned(doc, (mesh) => (/Eyes/i.test(mesh) ? `${name}_Eyes` : `${name}_Body`))
+    await doc.transform(dedup(), prune())
+    const out = join(OUT, "characters", `${name.toLowerCase().replace("_", "-")}.glb`)
+    await io.write(out, doc)
+    console.log(`skeleton ${name} → ${kb(out)}`)
+  }
+}
+
 /**
  * KayKit characters are 8–9 skinned meshes (arms, legs, body, cape…) — 8–9 draw calls each, twice
  * with shadows. gltf-transform's join() skips skinned meshes, but skinned vertices live in bind
@@ -467,9 +543,9 @@ function mergeSkinned(doc: Document, group: (meshName: string) => string): void 
   }
 }
 
-async function animations(): Promise<void> {
+async function animations(name = "anims", clips: Record<string, string[]> = CLIPS): Promise<void> {
   const target = new Document()
-  for (const [file, keep] of Object.entries(CLIPS)) {
+  for (const [file, keep] of Object.entries(clips)) {
     const path = find("KayKit_Character_Animations", `Rig_Medium_${file}`)
     if (!path) throw new Error(`animation file ${file} not found`)
     const doc = await io.read(path)
@@ -513,9 +589,9 @@ async function animations(): Promise<void> {
     prune({ keepLeaves: true }),
     meshopt({ encoder: MeshoptEncoder, level: "medium" }),
   )
-  const out = join(OUT, "anims.glb")
+  const out = join(OUT, `${name}.glb`)
   await io.write(out, target)
-  console.log(`anims: ${target.getRoot().listAnimations().length} clips → ${kb(out)}`)
+  console.log(`${name}: ${target.getRoot().listAnimations().length} clips → ${kb(out)}`)
 }
 
 async function kit(name: string, sources: Record<string, string[]>): Promise<void> {
@@ -582,6 +658,11 @@ const STEPS: Record<string, () => Promise<void>> = {
   kit: () => kit("kit", KIT),
   lands: () => kit("lands", LANDS),
   forest: () => kit("forest", FOREST),
+  undead: async () => {
+    await skeletons()
+    await animations("anims-undead", UNDEAD_CLIPS)
+  },
+  graveyard: () => kit("graveyard", GRAVEYARD),
 }
 const wanted = process.argv.slice(2)
 for (const name of wanted) if (!STEPS[name]) throw new Error(`unknown output ${name}: ${Object.keys(STEPS)}`)

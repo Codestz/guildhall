@@ -6,6 +6,8 @@ import { type Dispatch, HERALD_HEADER, HUB_PORT } from "@guildhall/hub"
  * OpenCode: if the hub is down the batch is dropped, the herald tries to start one, and work goes on.
  */
 const FLUSH_MS = 120
+const RETRY_MS = 600
+const MAX_QUEUED = 5000
 
 export interface Courier {
   send(changes: Change[], raw: unknown): void
@@ -45,6 +47,11 @@ export function createCourier(options: {
         startHub(options.log)
       }
       down = true
+      // Keep the batch and try again shortly: the hub we just started needs a moment. Capped, so a
+      // hub that never comes back can't grow the queue without bound.
+      changes = [...dispatch.changes, ...changes].slice(-MAX_QUEUED)
+      raw = [...(dispatch.raw ?? []), ...raw].slice(-MAX_QUEUED)
+      timer ??= setTimeout(() => void flush(), RETRY_MS)
     }
   }
 

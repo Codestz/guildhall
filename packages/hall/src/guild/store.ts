@@ -26,6 +26,7 @@ import { MOODS, type Mood } from "../world/moods.ts"
 import { destinationOf, FATES, type Fates, SITE_DEFS, siteOf } from "../world/sites.ts"
 import { DEFAULT_SETTINGS, type Environment, type EnvironmentSettings, environmentOf } from "./environment.ts"
 import { type Actor, before, happenings, MomentStream } from "./moments.ts"
+import { Undead } from "./undead.ts"
 
 export type { Seat }
 
@@ -154,6 +155,11 @@ export class GuildStore {
   /** Typed joins, quests, deeds, failures, loot, pleas and departures (guild/moments.ts, ADR 0008). */
   readonly moments = new MomentStream()
   markers: Marker[] = []
+  /**
+   * The graveyard's undead (guild/undead.ts): fed live moments as they are made and the fallen on
+   * every refresh, so a seek re-stands them without a single rise.
+   */
+  readonly undead = new Undead()
   /** Completed edits/writes this run: the yard's building grows with it. */
   progress = 0
   /** What finished work has left at each job site (logs, stone, fish, books, arrows). */
@@ -176,8 +182,13 @@ export class GuildStore {
   private sinceViews = 0
 
   constructor() {
+    this.moments.on((moment) => this.undead.take(moment))
+    this.moments.onRebuild(() => this.undead.rebuild())
     this.load("party")
   }
+
+  /** Real time the hall has run (ms): the graveyard's animations keep it, paused story or not. */
+  private realTime = 0
 
   /** "sim": playing a scenario. "live": following the hub (real OpenCode sessions). */
   mode: "sim" | "live" = "sim"
@@ -335,6 +346,7 @@ export class GuildStore {
 
   /** Called every frame with real elapsed ms. */
   tick(realMs: number): void {
+    this.realTime += realMs
     if (this.mode === "live") {
       this.sinceViews += realMs
       if (this.sinceViews > 100) this.refresh()
@@ -372,7 +384,18 @@ export class GuildStore {
     this.record(change)
     for (const happening of happenings(this.model, change, was)) {
       const s = this.model.sessions.get(happening.id)
-      if (s) this.moments.add({ ...this.actorOf(s), ...happening, at: change.at - this.start, live })
+      if (!s) continue
+      const actor = this.actorOf(s)
+      this.moments.add({ ...actor, ...happening, at: change.at - this.start, live })
+      // The fallen keep vigil in the graveyard (guild/undead.ts): the chronicle says so.
+      if (happening.kind === "fail" && s.parentID)
+        this.write(
+          { at: change.at - this.start, id: s.id, title: actor.title, color: actor.color },
+          {
+            kind: "fail",
+            text: "☠ rises in the graveyard",
+          },
+        )
     }
     if (this.mode === "live") {
       const kind = markerOf(change)
@@ -399,15 +422,16 @@ export class GuildStore {
     const line = lineOf(change, s)
     if (!line) return
     const role = s.parentID ? roleOf(s.agent) : GUILDMASTER
-    const start = this.start
-    this.log.push({
-      key: this.log.length ? (this.log.at(-1)?.key ?? 0) + 1 : 1,
-      at: change.at - start,
-      id: s.id,
-      title: s.parentID ? numbered(role.title, ordinalOf(this.model, s)) : role.title,
-      color: role.color,
-      ...line,
-    })
+    const title = s.parentID ? numbered(role.title, ordinalOf(this.model, s)) : role.title
+    this.write({ at: change.at - this.start, id: s.id, title, color: role.color }, line)
+  }
+
+  /** One line onto the chronicle (newest last, at most LOG_SIZE). */
+  private write(
+    who: Pick<LogEntry, "at" | "id" | "title" | "color">,
+    line: Pick<LogEntry, "kind" | "text">,
+  ): void {
+    this.log.push({ key: this.log.length ? (this.log.at(-1)?.key ?? 0) + 1 : 1, ...who, ...line })
     if (this.log.length > LOG_SIZE) this.log.splice(0, this.log.length - LOG_SIZE)
   }
 
@@ -450,6 +474,10 @@ export class GuildStore {
     this.sinceViews = 0
     if (this.focus && this.now - this.focus.at > FOCUS_TTL_MS) this.focus = null
     this.views = viewsOf(this.model, this.now)
+    this.undead.sync(
+      this.views.filter((view) => view.phase === "failed"),
+      this.realTime,
+    )
     // The world shows the party on stage, not every guild the hub has heard from.
     const party = partyOf(this.model)
     this.departures(party)

@@ -1,4 +1,4 @@
-import type LANDS from "./lands.json"
+import LANDS from "./lands.json"
 import type { Post, Spot } from "./layout.ts"
 
 /**
@@ -358,6 +358,33 @@ export const SITES: Record<SiteId, Site> = {
     landmark: "building_tower_A_blue",
     posts: [toward(-40, -39.5, TOWER_AT[0], TOWER_AT[1]), toward(-46.6, -39.5, TOWER_AT[0], TOWER_AT[1])],
   },
+}
+
+// ---- The graveyard -------------------------------------------------------------------------
+
+/**
+ * The graveyard's plot (map data, like SITES; dressed by world/graveyard.ts, haunted by the undead
+ * of guild/undead.ts). The open meadow west of the avenue's south end, between the river road's end
+ * and the beach: level ground off every road, walk and villager round, out of the village, and in
+ * the overview's lower left, seen from the south-east like everything else. Its arch gate opens
+ * east onto the avenue opposite the road hex [0, 10]; the crypt stands at the back, to the west.
+ * The island keeps its own random trees, rocks and meadow grass off it (`island`).
+ */
+export const GRAVEYARD_PLOT = {
+  x0: -22,
+  x1: -6,
+  z0: 42,
+  z1: 60,
+  /** The gate's centre on the east fence (z). */
+  gate: 51,
+} as const
+
+/** Distance from (x, z) to the plot (0 inside it). */
+export function toPlot(x: number, z: number): number {
+  const { x0, x1, z0, z1 } = GRAVEYARD_PLOT
+  const dx = Math.max(x0 - x, 0, x - x1)
+  const dz = Math.max(z0 - z, 0, z - z1)
+  return Math.hypot(dx, dz)
 }
 
 // ---- Landmarks -------------------------------------------------------------------------------
@@ -819,7 +846,17 @@ export function island(seed = 7): Island {
     }
   }
 
-  decor.push(...DRESSING)
+  // The graveyard claims its plot: the map's own scatter (rolled above, so the rest of the island
+  // keeps its trees) stays off it, and so does the meadow grass.
+  const claimed = (d: LandPlacement): boolean => {
+    const { size } = LANDS[d.piece]
+    const reach = (Math.max(size[0] ?? 0, size[2] ?? 0) / 2) * HEX_SCALE * (d.scale ?? 1)
+    return toPlot(d.x, d.z) < reach + 0.5
+  }
+  const scattered = decor.splice(0).filter((d) => !claimed(d))
+  decor.push(...scattered, ...DRESSING)
+  const open = meadow.splice(0).filter(([x, z]) => toPlot(x, z) > 0)
+  meadow.push(...open)
   const landmarks: Landmark[] = []
   for (const placement of DRESSING) {
     const kind = LANDMARK_OF[placement.piece]

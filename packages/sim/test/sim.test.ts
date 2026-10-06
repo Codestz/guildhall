@@ -101,3 +101,14 @@ describe("Player", () => {
     expect(player.seek(0).length).toBeLessThan(events.length)
   })
 })
+
+describe("rush", () => {
+  test("two quests fail as sessions; the second is called back and recovers", () => {
+    const changes = rush(12)
+    const failed = changes.filter((c) => c.type === "status" && c.status === "failed").map((c) => c.id)
+    expect(new Set(failed).size).toBe(2)
+    const model = applyAll(emptyModel(), changes)
+    const statuses = failed.map((id) => model.sessions.get(id)?.status)
+    expect(statuses).toEqual(["failed", "done"])
+  })
+})

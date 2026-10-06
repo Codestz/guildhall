@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { island, ROAD_EDGES, ROAD_NODES, SITES } from "../src/world/lands.ts"
+import { GRAVEYARD, GRAVEYARD_REACH } from "../src/world/graveyard.ts"
+import { island, ROAD_EDGES, ROAD_NODES, SITES, toPlot } from "../src/world/lands.ts"
 import { ROOM } from "../src/world/layout.ts"
-import { LIGHTS, toSegment } from "../src/world/lights.ts"
+import { GLOWS, LIGHTS, toSegment } from "../src/world/lights.ts"
 
 const land = island()
 const at = (l: (typeof LIGHTS)[number]) => [l.placement.x, l.placement.z] as const
@@ -41,5 +42,21 @@ describe("night lights", () => {
         const [bx, bz] = at(LIGHTS[j]!)
         expect(Math.hypot(ax - bx, az - bz)).toBeGreaterThan(6)
       }
+  })
+
+  test("no torch or lantern stands in or before the graveyard's fence", () => {
+    for (const light of LIGHTS) expect(toPlot(...at(light))).toBeGreaterThanOrEqual(3)
+  })
+
+  test("the graveyard's lanterns and candles glow with the rest, inside its grounds", () => {
+    for (const glow of GRAVEYARD.glows) {
+      expect(GLOWS).toContain(glow)
+      const [x, , z] = glow.flame
+      expect(x).toBeGreaterThan(GRAVEYARD_REACH.x0)
+      expect(x).toBeLessThan(GRAVEYARD_REACH.x1)
+      expect(z).toBeGreaterThan(GRAVEYARD_REACH.z0)
+      expect(z).toBeLessThan(GRAVEYARD_REACH.z1)
+    }
+    expect(GLOWS.length).toBe(LIGHTS.length + GRAVEYARD.glows.length)
   })
 })

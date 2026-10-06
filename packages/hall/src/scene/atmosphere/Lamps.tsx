@@ -14,7 +14,7 @@ import {
 } from "three"
 import { useGuild } from "../../guild/useGuild.ts"
 import { FURNITURE, NORMALS, type Piece, type Side, WALL_DECOR } from "../../world/furniture.ts"
-import { LIGHTS } from "../../world/lights.ts"
+import { GLOWS } from "../../world/lights.ts"
 import { useOwnedMeshes } from "../owned.ts"
 import type { SkyState } from "./sky.ts"
 
@@ -57,8 +57,8 @@ function lamps(): Lamp[] {
       phase: out.length * 1.7,
     })
   }
-  // The island's street torches and lanterns (world/lights.ts).
-  for (const light of LIGHTS) {
+  // The island's street torches and lanterns, and the graveyard's (world/lights.ts GLOWS).
+  for (const light of GLOWS) {
     out.push({
       x: light.flame[0],
       y: light.flame[1],

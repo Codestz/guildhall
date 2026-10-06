@@ -56,6 +56,7 @@ const scratch = {
   tilted: new Vector3(),
   goal: new Vector3(),
   before: new Vector3(),
+  hint: new Vector3(),
 }
 
 export function CameraRig() {
@@ -246,9 +247,16 @@ export function CameraRig() {
 
     // 4. The Bard directs, when it's on and nobody is being followed.
     if (store.bard && !selected) {
-      const focus = store.focus ? positions.get(store.focus.id) : undefined
+      // A focus hint: a skeleton rising live gets a short glance (guild/undead.ts), then the
+      // director goes back to whoever it was watching.
+      const glance = store.undead.glancing()
+      const focus = glance
+        ? scratch.hint.set(glance.x, 1.2, glance.z)
+        : store.focus
+          ? positions.get(store.focus.id)
+          : undefined
       const goal = focus ? scratch.goal.set(focus.x, 1.2, focus.z) : HOME
-      const slow = 1 - Math.exp(-delta * 1.1)
+      const slow = 1 - Math.exp(-delta * (glance ? 3 : 1.1))
       const before = scratch.before.copy(control.target)
       control.target.lerp(goal, slow)
       camera.position.add(before.subVectors(control.target, before))
@@ -260,7 +268,7 @@ export function CameraRig() {
           .applyAxisAngle(UP, delta * 0.05)
         camera.position.copy(control.target).add(offset)
       }
-      const score = store.focus?.score ?? 0
+      const score = glance ? 3 : (store.focus?.score ?? 0)
       if (isOrtho) {
         const o = camera as Ortho
         const zoomGoal = focus ? fit * (0.7 + score * 0.05) : wide

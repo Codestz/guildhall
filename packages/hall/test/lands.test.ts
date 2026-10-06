@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import {
   cellToWorld,
+  GRAVEYARD_PLOT,
   island,
   MAP_FOR_TESTS as MAP,
   ROAD_EDGES,
   ROAD_NODES,
   SITES,
+  toPlot,
 } from "../src/world/lands.ts"
 import { GATE, type Spot, STATIONS } from "../src/world/layout.ts"
 import { route } from "../src/world/paths.ts"
@@ -157,5 +159,40 @@ describe("the island map", () => {
 
   test("same seed, same island", () => {
     expect(JSON.stringify(island(7))).toBe(JSON.stringify(island(7)))
+  })
+
+  test("the graveyard's plot is level open ground, off every road, building, post and walk", () => {
+    const { x0, x1, z0, z1 } = GRAVEYARD_PLOT
+    for (let x = x0; x <= x1; x += 1)
+      for (let z = z0; z <= z1; z += 1) {
+        const cell = MAP.cellOf([x, z])
+        // Meadow and light woods; its east fence may stand on a road hex's grass verge (the road
+        // itself is checked below, by distance).
+        expect({ at: [x, z], open: ".f=".includes(MAP.at(cell)), level: MAP.level(cell) }).toEqual({
+          at: [x, z],
+          open: true,
+          level: 0,
+        })
+      }
+    for (const [a, b] of ROAD_EDGES) {
+      const from = ROAD_NODES[a] ?? [0, 0]
+      const to = ROAD_NODES[b] ?? [0, 0]
+      for (const p of walk(from, [to])) expect(toPlot(p[0], p[1])).toBeGreaterThan(2.6 + 0.4)
+    }
+    const land = island()
+    for (const b of land.decor.filter((d) => d.piece.startsWith("building_")))
+      expect(toPlot(b.x, b.z)).toBeGreaterThan(5)
+    for (const post of posts) expect(toPlot(post[0], post[1])).toBeGreaterThan(5)
+    const forge = STATIONS.forge.posts[0] ?? [0, 0]
+    for (const post of posts)
+      for (const p of walk([forge[0], forge[1]], route([forge[0], forge[1]], post)))
+        expect(toPlot(p[0], p[1])).toBeGreaterThan(3)
+  })
+
+  test("the island's own scatter and meadow grass keep off the graveyard (and the rest is unchanged)", () => {
+    const land = island()
+    for (const d of land.decor)
+      expect({ piece: d.piece, d: toPlot(d.x, d.z) > 0.5 }).toEqual({ piece: d.piece, d: true })
+    for (const [x, z] of land.meadow) expect(toPlot(x, z)).toBeGreaterThan(0)
   })
 })

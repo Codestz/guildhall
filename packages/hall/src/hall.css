@@ -2100,6 +2100,16 @@ button {
 .chip.quiet .bubble {
   display: none;
 }
+/* The graveyard's undead (scene/Undead.tsx): a smaller, bone-pale plate with the fallen's name. */
+.chip.undead .name {
+  padding: 2px 7px 1px;
+  background: rgba(16, 17, 15, 0.82);
+  border-bottom: 2px solid #d8cfae;
+}
+.chip.undead .name b {
+  font-size: 11px;
+  color: #e4dcc0;
+}
 
 /* Stats for nerds */
 .stats-grid {

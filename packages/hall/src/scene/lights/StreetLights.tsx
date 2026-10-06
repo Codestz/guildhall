@@ -13,7 +13,7 @@ import {
   Vector3,
 } from "three"
 import { positions, useGuild } from "../../guild/useGuild.ts"
-import { LIGHTS } from "../../world/lights.ts"
+import { GLOWS, LIGHTS } from "../../world/lights.ts"
 import { sky } from "../atmosphere/state.ts"
 import { mergePlacements, useKit } from "../Kit.tsx"
 import { useOwnedMeshes } from "../owned.ts"
@@ -51,7 +51,7 @@ export function StreetLights() {
 
 function Pools() {
   const { mood } = useGuild()
-  const built = useOwnedMeshes(() => ({ meshes: [pools(LIGHTS.length)] }), [])
+  const built = useOwnedMeshes(() => ({ meshes: [pools(GLOWS.length)] }), [])
   const fire = useMemo(() => new Color(), [])
 
   useFrame(({ clock }) => {
@@ -60,8 +60,8 @@ function Pools() {
     // Firelight, pushed towards orange: additive yellow on the island's green grass reads lime.
     fire.set(mood.fire).lerp(EMBER, 0.6)
     const t = clock.elapsedTime
-    for (let i = 0; i < LIGHTS.length; i++) {
-      const light = LIGHTS[i]
+    for (let i = 0; i < GLOWS.length; i++) {
+      const light = GLOWS[i]
       if (!light) continue
       const flicker = 0.93 + Math.sin(t * 7.3 + i * 1.9) * 0.04 + Math.sin(t * 12.1 + i) * 0.03
       const size = light.pool * 2 * flicker

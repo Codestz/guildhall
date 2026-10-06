@@ -108,8 +108,15 @@ export function party(seed = 1): Change[] {
   return script.done()
 }
 
-/** Stress: one guildmaster sends `count` adventurers out at once. For crowding and frame rate. */
-export function rush(count = 12, seed = 1): Change[] {
+/** The rush's quitters by default: indices of the quests that fail; the second is retried and recovers. */
+const FALLEN = [2, 7]
+
+/**
+ * Stress: one guildmaster sends `count` adventurers out at once. For crowding and frame rate.
+ * Two of them give up halfway (a session failure: the graveyard's undead rise); the guildmaster
+ * calls the second back once the sweep is done, and it recovers.
+ */
+export function rush(count = 12, seed = 1, fallen: readonly number[] = FALLEN): Change[] {
   const script = new Script(seed)
   const master = script.guildmaster(`Sweep the repo: ${count} parallel quests`)
   master.think("Fan out. Everyone takes a module.", 1200)
@@ -129,12 +136,29 @@ export function rush(count = 12, seed = 1): Change[] {
       `Module ${i + 1}`,
       (child) => {
         child.wait(i * 150)
-        for (let step = 0; step < 8; step++) child.deed(script.pick(tools), { path: `src/mod${i + 1}` }, 2600)
-        child.finish(`Module ${i + 1} done.`)
+        const gives = fallen.includes(i)
+        for (let step = 0; step < (gives ? 4 : 8); step++)
+          child.deed(script.pick(tools), { path: `src/mod${i + 1}` }, 2600)
+        if (gives) {
+          child.deed("bash", { command: `bun test mod${i + 1}` }, 2200, {
+            fail: "3 failed",
+            summary: "exit 1",
+          })
+          child.fail("Gave up: the module's tests keep failing")
+        } else child.finish(`Module ${i + 1} done.`)
       },
       { wait: false },
     ),
   )
-  master.waitFor(...children).finish(`All ${count} modules swept.`)
+  master.waitFor(...children)
+  const retried = fallen[1]
+  const retry = retried === undefined ? undefined : children[retried]
+  if (retry && retried !== undefined)
+    master.resume(retry, `Retry module ${retried + 1}: fix the failing tests`, (child) => {
+      child.deed("edit", { filePath: `src/mod${retried + 1}/index.ts` }, 2400)
+      child.deed("bash", { command: `bun test mod${retried + 1}` }, 2400, { summary: "9 pass" })
+      child.finish("Fixed and passing.")
+    })
+  master.finish(`All ${count} modules swept.`)
   return script.done()
 }

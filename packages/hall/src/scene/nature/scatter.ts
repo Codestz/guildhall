@@ -1,4 +1,4 @@
-import { HEX_SCALE, type Island } from "../../world/lands.ts"
+import { HEX_SCALE, type Island, toPlot } from "../../world/lands.ts"
 import type { Spot } from "../../world/layout.ts"
 
 /**
@@ -58,6 +58,8 @@ export function scatter(land: Pick<Island, "meadow" | "tiles" | "decor">, densit
       const x = centre[0] + dx
       const z = centre[1] + dz
       if (blockers.some((b) => Math.hypot(b.x - x, b.z - z) < b.r)) continue
+      // The graveyard's plot is dirt and graves; a neighbouring meadow's grass stops at its fence.
+      if (toPlot(x, z) < 0.4) continue
       const flowered = random() < 0.13
       tufts.push({
         x,

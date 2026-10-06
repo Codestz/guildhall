@@ -11,6 +11,7 @@ import { CameraRig } from "./CameraRig.tsx"
 import { Crisp } from "./Crisp.tsx"
 import { FrameStats } from "./FrameStats.tsx"
 import { FRAME } from "./frame.ts"
+import { Graveyard } from "./Graveyard.tsx"
 import { Island } from "./Island.tsx"
 import { Life } from "./life/Life.tsx"
 import { NearLights } from "./lights/NearLights.tsx"
@@ -21,6 +22,7 @@ import { OpeningCue } from "./OpeningCue.tsx"
 import { Quality } from "./Quality.tsx"
 import { Room } from "./Room.tsx"
 import { Stations } from "./Stations.tsx"
+import { UndeadGate } from "./Undead.tsx"
 import { WeatherLayer } from "./weather/WeatherLayer.tsx"
 
 /** Everything inside the Canvas. */
@@ -35,6 +37,9 @@ export function Scene() {
       <Atmosphere />
       <Suspense fallback={null}>
         <Island />
+        <Graveyard />
+        {/* Lazy: the skeletons load on first need, under their own Suspense (scene/Undead.tsx). */}
+        <UndeadGate />
         <StreetLights />
         <NearLights />
         <NightLife />

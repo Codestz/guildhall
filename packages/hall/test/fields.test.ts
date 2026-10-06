@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { insideHex, plant } from "../src/world/fields.ts"
-import { type Field, island } from "../src/world/lands.ts"
+import { type Field, island, toPlot } from "../src/world/lands.ts"
 
 describe("farm fields", () => {
   const land = island()
@@ -44,5 +44,10 @@ describe("farm fields", () => {
     const again = plant()
     expect(again.crops.length).toBe(planted.crops.length)
     expect(again.crops[7]).toEqual(planted.crops[7])
+  })
+
+  test("no field, crop or ridge reaches the graveyard", () => {
+    for (const field of land.fields) expect(toPlot(field.x, field.z)).toBeGreaterThan(6)
+    for (const c of [...planted.crops, ...planted.ridges]) expect(toPlot(c.x, c.z)).toBeGreaterThan(1)
   })
 })

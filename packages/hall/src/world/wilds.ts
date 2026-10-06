@@ -1,6 +1,15 @@
 import FOREST from "./forest.json"
 import LANDS from "./lands.json"
-import { cellToWorld, HEX_SCALE, island, MAP_FOR_TESTS, ROAD_EDGES, ROAD_NODES, SITES } from "./lands.ts"
+import {
+  cellToWorld,
+  HEX_SCALE,
+  island,
+  MAP_FOR_TESTS,
+  ROAD_EDGES,
+  ROAD_NODES,
+  SITES,
+  toPlot,
+} from "./lands.ts"
 import { ROOM, type Spot } from "./layout.ts"
 import { LIGHTS, toSegment } from "./lights.ts"
 import { SITE_DEFS } from "./sites.ts"
@@ -63,6 +72,8 @@ export const WATER_CLEARANCE = 8
 /** From a river hex's centre: its banks are level grass, so just off the hex will do. */
 export const RIVER_CLEARANCE = 6
 const KEEP_MARGIN = 2.5
+/** Off the graveyard's fence (it dresses its own plot; its gate and lanterns stand in front). */
+export const GRAVEYARD_CLEARANCE = 1.2
 /** Neighbours may overlap a little (a bush at a trunk's foot), never stand inside each other. */
 const SPACING = 0.8
 
@@ -208,6 +219,7 @@ function clear(
     ].every(([dx = 0, dz = 0]) => ground(x + dx, z + dz))
   )
     return false
+  if (toPlot(x, z) < GRAVEYARD_CLEARANCE + r) return false
   if (sea.some((w) => Math.hypot(w[0] - x, w[1] - z) < WATER_CLEARANCE + r)) return false
   if (river.some((w) => Math.hypot(w[0] - x, w[1] - z) < RIVER_CLEARANCE + r)) return false
   if (roads.some(([a, b]) => toSegment([x, z], a, b) < ROAD_HALF + r)) return false

@@ -2,10 +2,16 @@ import { describe, expect, test } from "bun:test"
 import { PILES } from "../src/scene/life/places.ts"
 import { ROUNDS } from "../src/scene/life/rounds.ts"
 import FOREST from "../src/world/forest.json"
-import { island, MAP_FOR_TESTS as MAP, ROAD_EDGES, ROAD_NODES, SITES } from "../src/world/lands.ts"
+import { island, MAP_FOR_TESTS as MAP, ROAD_EDGES, ROAD_NODES, SITES, toPlot } from "../src/world/lands.ts"
 import { ROOM, type Spot } from "../src/world/layout.ts"
 import { LIGHTS, toSegment } from "../src/world/lights.ts"
-import { RIVER_CLEARANCE, ROAD_HALF, WATER_CLEARANCE, wilds } from "../src/world/wilds.ts"
+import {
+  GRAVEYARD_CLEARANCE,
+  RIVER_CLEARANCE,
+  ROAD_HALF,
+  WATER_CLEARANCE,
+  wilds,
+} from "../src/world/wilds.ts"
 
 const KEEP = {
   paths: ROUNDS.map((round) => [round.door, ...round.stops, round.door].map((s): Spot => [s.x, s.z])),
@@ -83,5 +89,10 @@ describe("the wilds", () => {
     expect(low.length).toBeLessThan(WILDS.length / 2)
     expect(low.some((w) => w.kind === "grass")).toBe(false)
     for (const w of low) if (w.kind !== "tree") expect(w.radius).toBeGreaterThan(0.9)
+  })
+
+  test("keep off the graveyard: its fence stands clear of every bush and tree", () => {
+    for (const { x, z, radius } of WILDS)
+      expect(toPlot(x, z)).toBeGreaterThanOrEqual(GRAVEYARD_CLEARANCE + radius)
   })
 })

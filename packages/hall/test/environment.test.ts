@@ -61,7 +61,8 @@ describe("weather from repo health", () => {
   })
 
   test("a healthy run stays clear", () => {
-    const run = rush()
+    // The rush with nobody giving up (by default two quests fail, for the graveyard).
+    const run = rush(12, 1, [])
     expect(new Set(weathers(run, 0, end(run) + MINUTE))).toEqual(new Set(["clear"]))
   })
 

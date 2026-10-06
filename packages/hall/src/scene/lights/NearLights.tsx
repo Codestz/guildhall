@@ -3,7 +3,7 @@ import { useMemo, useRef } from "react"
 import { Color, type PointLight, Vector3 } from "three"
 import { useGuild } from "../../guild/useGuild.ts"
 import { HEARTH } from "../../world/layout.ts"
-import { LIGHTS } from "../../world/lights.ts"
+import { GLOWS } from "../../world/lights.ts"
 import { sky } from "../atmosphere/state.ts"
 
 /**
@@ -17,7 +17,7 @@ const REPICK_S = 0.4
 
 const FLAMES: readonly (readonly [number, number, number])[] = [
   [HEARTH[0], 1.6, HEARTH[1]],
-  ...LIGHTS.map((light) => light.flame),
+  ...GLOWS.map((light) => light.flame),
 ]
 
 export function NearLights() {

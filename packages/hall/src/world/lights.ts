@@ -1,5 +1,6 @@
 import type { Placement } from "./furniture.ts"
-import { island, ROAD_EDGES, ROAD_NODES, SITES } from "./lands.ts"
+import { GRAVEYARD } from "./graveyard.ts"
+import { island, ROAD_EDGES, ROAD_NODES, SITES, toPlot } from "./lands.ts"
 import { ROOM, type Spot } from "./layout.ts"
 
 /**
@@ -11,14 +12,18 @@ import { ROOM, type Spot } from "./layout.ts"
  * pool of light on the ground (scene/lights/StreetLights).
  */
 
-export interface Light {
-  /** What stands there (a kit.glb piece). */
-  placement: Placement
+/** A flame that glows after dusk: a halo (scene/atmosphere/Lamps) and a pool on the ground (StreetLights). */
+export interface Glow {
   /** Where the flame burns, world units. */
   flame: readonly [x: number, y: number, z: number]
   /** Halo size and ground-pool radius. */
   halo: number
   pool: number
+}
+
+export interface Light extends Glow {
+  /** What stands there (a kit.glb piece). */
+  placement: Placement
 }
 
 /** A street torch: the RPG torch scaled up to a post. Flame at the top. */
@@ -33,6 +38,8 @@ const ROAD_CLEARANCE = 2.8
 const POST_CLEARANCE = 1.8
 const KEEP_MARGIN = 3
 const WATER_CLEARANCE = 5.6
+/** Off the graveyard's fence: its gate, path and own lanterns are in front of it. */
+const GRAVEYARD_CLEARANCE = 3
 const BUILDING_CLEARANCE = 4.2
 const MIN_SPACING = 7.5
 
@@ -67,6 +74,7 @@ function clear([x, z]: Spot, spacing: Spot[], rules: Rules = TORCH_RULES): boole
   if (buildings.some((b) => Math.hypot(b[0] - x, b[1] - z) < rules.building)) return false
   if (roads.some(([a, b]) => toSegment([x, z], a, b) < rules.road)) return false
   if (posts.some((p) => Math.hypot(p[0] - x, p[1] - z) < POST_CLEARANCE)) return false
+  if (toPlot(x, z) < GRAVEYARD_CLEARANCE) return false
   return !spacing.some((s) => Math.hypot(s[0] - x, s[1] - z) < MIN_SPACING)
 }
 
@@ -143,3 +151,9 @@ function build(): Light[] {
 }
 
 export const LIGHTS: readonly Light[] = build()
+
+/**
+ * Every flame that glows at night: the street lights, plus the graveyard's lanterns and candles
+ * (world/graveyard.ts; their models are the graveyard's own, drawn by scene/Graveyard).
+ */
+export const GLOWS: readonly Glow[] = [...LIGHTS, ...GRAVEYARD.glows]

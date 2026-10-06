@@ -1,0 +1,274 @@
+import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useSyncExternalStore } from "react"
+import { MODE } from "../guild/mode.ts"
+import { type QualityChoice, quality, TIERS, type Tier } from "../guild/quality.ts"
+import { type GuildStore, SCENARIOS, type ScenarioId } from "../guild/store.ts"
+import { MOODS, type Mood } from "../world/moods.ts"
+import { Icon } from "./icons.tsx"
+import { HUD_MODES, type HudMode, hudPrefs, useHudPrefs } from "./prefs.ts"
+import { WeatherLevers } from "./Weather.tsx"
+
+const QUALITY: QualityChoice[] = ["auto", 0, 1, 2, 3]
+const SPEEDS = [0.5, 1, 2, 4] as const
+const STORIES: Record<ScenarioId, string> = { party: "Party", solo: "Solo", rush: "Rush" }
+const KEYS: [string, string][] = [
+  ["Drag", "Pan"],
+  ["Right-drag", "Turn"],
+  ["Wheel", "Zoom"],
+  ["W A S D", "Move"],
+  ["Q E · R F", "Turn · tilt"],
+  ["+ −", "Zoom"],
+  ["Click", "Follow someone"],
+  ["V", "Diorama / Explore"],
+  ["B", "Bard on / off"],
+  ["H", "Minimal / Detailed / Hidden"],
+  ["Esc", "Back to the Bard"],
+]
+
+/**
+ * Everything the viewer can tune, in one place: quality, the world, the camera, the story and the
+ * HUD itself. A side drawer on desktop, a bottom sheet on phones. Non-modal: the hall stays live
+ * behind it, Esc closes it and focus returns to the gear.
+ */
+export function Settings({ store, onClose }: { store: GuildStore; onClose: () => void }) {
+  const tier = useSyncExternalStore(quality.subscribe, quality.snapshot)
+  const prefs = useHudPrefs()
+  const showcase = MODE === "showcase"
+  const head = useRef<HTMLHeadingElement>(null)
+  const paused = store.speed === 0
+
+  useEffect(() => {
+    head.current?.focus()
+  }, [])
+
+  const camera = store.selected
+    ? `Following ${store.views.find((v) => v.id === store.selected)?.title ?? "someone"}`
+    : store.bard
+      ? "Directs the shots for you"
+      : "Yours until you turn it back on"
+
+  return (
+    <aside className="plaque settings" role="dialog" aria-labelledby="settings-h">
+      <header className="settings-head">
+        <h2 id="settings-h" ref={head} tabIndex={-1}>
+          Settings
+        </h2>
+        <button type="button" className="icon-btn" onClick={onClose} aria-label="Close settings (Esc)">
+          <Icon.close />
+        </button>
+      </header>
+
+      <div className="settings-body">
+        <Section title="Quality" value={quality.auto ? `Auto · now ${TIERS[tier].name}` : TIERS[tier].name}>
+          <Lever label="Quality" quiet>
+            <div className="seg seg-fill">
+              {QUALITY.map((choice) => (
+                <button
+                  key={choice}
+                  type="button"
+                  aria-pressed={quality.choice === choice}
+                  onClick={() => quality.choose(choice)}
+                >
+                  {choice === "auto" ? "Auto" : TIERS[choice as Tier].name}
+                </button>
+              ))}
+            </div>
+          </Lever>
+          <p className="hint">
+            {quality.choice === 3
+              ? "Ultra: tilt-shift miniature look and full Retina sharpness. Heavier; for a strong GPU."
+              : quality.auto
+                ? "Steps between Low and High to keep the frame rate smooth. Ultra is never picked for you."
+                : "Pinned. Ultra adds the tilt-shift miniature look, and is heavier."}
+          </p>
+        </Section>
+
+        <Section title="World">
+          <WeatherLevers store={store} />
+          <Lever label="Mood" value={store.mood.name}>
+            <div className="moods">
+              {(Object.values(MOODS) as Mood[]).map((mood) => (
+                <button
+                  key={mood.id}
+                  type="button"
+                  className="mood"
+                  aria-pressed={store.mood.id === mood.id}
+                  aria-label={mood.name}
+                  title={mood.name}
+                  onClick={() => store.setMood(mood.id)}
+                  style={{ "--sky": mood.ground, "--fire": mood.fire } as CSSProperties}
+                />
+              ))}
+            </div>
+          </Lever>
+        </Section>
+
+        <Section title="Camera">
+          <Lever label="View">
+            <div className="seg seg-fill">
+              <button
+                type="button"
+                aria-pressed={store.view === "diorama"}
+                onClick={() => store.setView("diorama")}
+              >
+                Diorama
+              </button>
+              <button
+                type="button"
+                aria-pressed={store.view === "explore"}
+                onClick={() => store.setView("explore")}
+              >
+                Explore
+              </button>
+            </div>
+          </Lever>
+          <Switch label="Bard" hint={camera} checked={store.bard} onChange={(on) => store.setBard(on)} />
+          <details className="keys">
+            <summary>Controls</summary>
+            <dl>
+              {KEYS.map(([key, what]) => (
+                <div key={key}>
+                  <dt>
+                    <kbd>{key}</kbd>
+                  </dt>
+                  <dd>{what}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+        </Section>
+
+        {(store.mode === "sim" || !showcase) && (
+          <Section title="Story">
+            <Lever label="Story" quiet>
+              <div className="seg seg-fill">
+                {(Object.keys(SCENARIOS) as ScenarioId[]).map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={store.mode === "sim" && store.scenario === id}
+                    onClick={() => store.load(id)}
+                  >
+                    {STORIES[id]}
+                  </button>
+                ))}
+                {!showcase && (
+                  <button type="button" aria-pressed={store.mode === "live"} onClick={() => store.live()}>
+                    Live
+                  </button>
+                )}
+              </div>
+            </Lever>
+            {store.mode === "sim" && (
+              <Lever label="Pace" value={paused ? "Paused" : undefined}>
+                <div className="seg seg-fill mono">
+                  {SPEEDS.map((speed) => (
+                    <button
+                      key={speed}
+                      type="button"
+                      aria-pressed={store.speed === speed}
+                      aria-label={`${speed} times speed`}
+                      onClick={() => store.setSpeed(speed)}
+                    >
+                      {speed === 0.5 ? "½" : speed}×
+                    </button>
+                  ))}
+                </div>
+              </Lever>
+            )}
+          </Section>
+        )}
+
+        <Section title="Display">
+          <Lever label="HUD" value="press H">
+            <div className="seg seg-fill">
+              {(Object.keys(HUD_MODES) as HudMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={prefs.mode === mode}
+                  title={HUD_MODES[mode].hint}
+                  onClick={() => hudPrefs.set({ mode })}
+                >
+                  {HUD_MODES[mode].label}
+                </button>
+              ))}
+            </div>
+          </Lever>
+          <Switch
+            label="Stats for nerds"
+            hint="Frame rate, draw calls, triangles"
+            checked={prefs.stats}
+            onChange={(stats) => hudPrefs.set({ stats })}
+          />
+        </Section>
+      </div>
+    </aside>
+  )
+}
+
+function Section({ title, value, children }: { title: string; value?: string; children: ReactNode }) {
+  const id = useId()
+  return (
+    <section className="set-section" aria-labelledby={id}>
+      <h3 id={id}>
+        {title}
+        {value && <span className="lever-value">{value}</span>}
+      </h3>
+      {children}
+    </section>
+  )
+}
+
+/** A labelled group of choices; `value` says what is in effect now. */
+export function Lever({
+  label,
+  value,
+  quiet = false,
+  children,
+}: {
+  label: string
+  value?: string
+  /** The section heading already names it: keep the legend for screen readers only. */
+  quiet?: boolean
+  children: ReactNode
+}) {
+  return (
+    <fieldset className="lever">
+      <legend className={quiet ? "visually-hidden" : undefined}>
+        {label}
+        {value && <span className="lever-value">{value}</span>}
+      </legend>
+      {children}
+    </fieldset>
+  )
+}
+
+function Switch({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: string
+  hint: string
+  checked: boolean
+  onChange: (on: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      className="toggle"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+    >
+      <span className="toggle-text">
+        <b>{label}</b>
+        <span>{hint}</span>
+      </span>
+      <span className="switch" aria-hidden="true">
+        <i />
+      </span>
+    </button>
+  )
+}

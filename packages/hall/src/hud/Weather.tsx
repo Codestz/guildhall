@@ -32,7 +32,7 @@ export function WeatherLevers({ store }: { store: GuildStore }) {
         <legend>
           Time <span className="lever-value">{clockOf(env.hour)}</span>
         </legend>
-        <div className="seg">
+        <div className="seg seg-fill">
           {(Object.keys(TIMES) as TimeMode[]).map((mode) => (
             <button
               key={mode}
@@ -50,6 +50,7 @@ export function WeatherLevers({ store }: { store: GuildStore }) {
         {settings.time === "fixed" && (
           <input
             type="range"
+            className="slider"
             min={0}
             max={23.5}
             step={0.5}
@@ -68,7 +69,7 @@ export function WeatherLevers({ store }: { store: GuildStore }) {
             {WEATHERS[env.weather]} · {Math.round(env.temperature)}°C
           </span>
         </legend>
-        <div className="seg">
+        <div className="seg seg-fill">
           {LEVER.map((weather) => (
             <button
               key={weather}

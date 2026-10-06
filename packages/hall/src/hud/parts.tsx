@@ -40,6 +40,7 @@ export function Panel({
   open,
   onToggle,
   className = "",
+  compact = false,
   children,
 }: {
   label: string
@@ -47,17 +48,25 @@ export function Panel({
   open: boolean
   onToggle: () => void
   className?: string
+  /** Collapsing swaps the panel for a compact form elsewhere, rather than folding it shut. */
+  compact?: boolean
   children: ReactNode
 }) {
   const id = useId()
   return (
     <section className={`plaque panel ${className}`} data-open={open} aria-labelledby={`${id}-h`}>
       <h2 className="panel-head" id={`${id}-h`}>
-        <button type="button" aria-expanded={open} aria-controls={`${id}-b`} onClick={onToggle}>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={`${id}-b`}
+          onClick={onToggle}
+          title={compact ? "Collapse" : undefined}
+        >
           <span className="panel-label">{label}</span>
           {meta && <span className="panel-meta">{meta}</span>}
-          <span className="fold">
-            <Icon.chevron />
+          <span className="fold" data-compact={compact}>
+            {compact ? <Icon.collapse /> : <Icon.chevron />}
           </span>
         </button>
       </h2>

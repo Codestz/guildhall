@@ -22,6 +22,41 @@ function Glyph({ children, size = 16 }: { children: ReactNode; size?: number }) 
 }
 
 export const Icon = {
+  gear: () => (
+    <Glyph>
+      <circle cx="8" cy="8" r="2.1" />
+      <path d="M8 1.8v1.6M8 12.6v1.6M14.2 8h-1.6M3.4 8H1.8M12.4 3.6l-1.1 1.1M4.7 11.3l-1.1 1.1M12.4 12.4l-1.1-1.1M4.7 4.7 3.6 3.6" />
+      <circle cx="8" cy="8" r="4.3" />
+    </Glyph>
+  ),
+  /* HUD modes: one pane (minimal), panes (detailed), closed eye (hidden). */
+  minimal: () => (
+    <Glyph>
+      <rect x="2" y="2.5" width="12" height="11" rx="1.5" />
+      <path d="M4.5 5h3" />
+    </Glyph>
+  ),
+  detailed: () => (
+    <Glyph>
+      <rect x="2" y="2.5" width="12" height="11" rx="1.5" />
+      <path d="M6 2.5v11M10 2.5v11M7.5 11h1" />
+    </Glyph>
+  ),
+  hidden: () => (
+    <Glyph>
+      <path d="M2 8s2.4 3.5 6 3.5S14 8 14 8M3.6 10.2 2.5 11.6M12.4 10.2l1.1 1.4M8 11.5V13" />
+    </Glyph>
+  ),
+  expand: () => (
+    <Glyph>
+      <path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9" />
+    </Glyph>
+  ),
+  collapse: () => (
+    <Glyph>
+      <path d="M13.5 6.5h-4v-4M9.5 6.5 14 2M2.5 9.5h4v4M6.5 9.5 2 14" />
+    </Glyph>
+  ),
   crest: () => (
     <Glyph size={28}>
       <path d="M8 1.5 13.5 4v4.2c0 3-2.3 5.3-5.5 6.3-3.2-1-5.5-3.3-5.5-6.3V4z" />

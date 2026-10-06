@@ -5,6 +5,7 @@ import { Chronicle } from "./Chronicle.tsx"
 import { Console } from "./Console.tsx"
 import { Dossier } from "./Dossier.tsx"
 import { Roster } from "./Roster.tsx"
+import { Stats } from "./Stats.tsx"
 
 type Sheet = "roster" | "chronicle" | "stage"
 const SHEETS: { id: Sheet; label: string }[] = [
@@ -25,6 +26,7 @@ export function Hud() {
   const phone = useMedia(PHONE)
   const [rosterOpen, setRosterOpen] = useState(true)
   const [chronOpen, setChronOpen] = useState(true)
+  const [statsOpen, setStatsOpen] = useState(false)
   const [sheet, setSheet] = useState<Sheet | null>(null)
   const view = store.selected ? store.views.find((v) => v.id === store.selected) : undefined
   const dossier = Boolean(store.selected && store.sessionOf(store.selected))
@@ -69,6 +71,7 @@ export function Hud() {
             className={sheet === "chronicle" ? "is-sheet" : ""}
           />
         )}
+        {!phone && <Stats store={store} open={statsOpen} onToggle={() => setStatsOpen((o) => !o)} />}
       </div>
 
       <div className="dock">

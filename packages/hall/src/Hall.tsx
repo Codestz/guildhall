@@ -16,7 +16,7 @@ export function Hall({ store }: { store: GuildStore }) {
         orthographic
         shadows
         dpr={[1, 2]}
-        camera={{ position: [0.01, 70, 1.2], zoom: 14, near: 0.1, far: 400 }}
+        camera={{ position: [0.01, 240, 2], zoom: 6, near: 0.1, far: 900 }}
         gl={{ antialias: false }}
       >
         <Scene />

@@ -107,7 +107,7 @@ export function mergePlacements(
 }
 
 /** Indexed, float32 position/normal/uv only: what mergeGeometries needs from every part. */
-function plain(source: BufferGeometry): BufferGeometry {
+export function plain(source: BufferGeometry): BufferGeometry {
   const out = new BufferGeometry()
   const position = source.getAttribute("position")
   const count = position.count

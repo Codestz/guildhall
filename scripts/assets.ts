@@ -52,7 +52,21 @@ const CLIPS: Record<string, string[]> = {
     "Lie_Idle",
     "Lie_StandUp",
   ],
-  Tools: ["Hammering", "Lockpicking", "Working_A", "Working_B", "Holding_A", "Sawing"],
+  Tools: [
+    "Hammering",
+    "Lockpicking",
+    "Working_A",
+    "Working_B",
+    "Holding_A",
+    "Sawing",
+    "Chopping",
+    "Pickaxing",
+    "Digging",
+    "Fishing_Idle",
+    "Fishing_Cast",
+    "Fishing_Reeling",
+  ],
+  CombatMelee: ["Melee_1H_Attack_Chop", "Melee_2H_Attack_Chop"],
   CombatRanged: [
     "Ranged_Magic_Spellcasting",
     "Ranged_Magic_Raise",
@@ -125,6 +139,8 @@ const KIT: Record<string, string[]> = {
     "journal_open",
     "lantern",
     "hammer",
+    "axe",
+    "pickaxe",
     "tongs",
     "bucket_metal",
   ],
@@ -141,6 +157,77 @@ const KIT: Record<string, string[]> = {
     "axe_2handed",
     "sword_1handed",
     "mug_full",
+  ],
+}
+
+/** The island (ADR 0006): Medieval Hexagon pack pieces, drawn at 5× in the hall. */
+const HEX = "KayKit_Medieval_Hexagon"
+const LANDS: Record<string, string[]> = {
+  [HEX]: [
+    "hex_grass",
+    "hex_grass_sloped_low",
+    "hex_water",
+    "hex_coast_A",
+    "hex_coast_B",
+    "hex_coast_C",
+    "hex_coast_D",
+    "hex_coast_E",
+    "hex_river_A",
+    "hex_river_A_curvy",
+    "hex_river_B",
+    "hex_river_crossing_A",
+    "hex_road_A",
+    "hex_road_B",
+    "hex_road_C",
+    "hex_road_D",
+    "hex_road_E",
+    "hex_road_F",
+    "trees_A_large",
+    "trees_A_medium",
+    "trees_A_small",
+    "trees_B_large",
+    "trees_B_medium",
+    "trees_A_cut",
+    "trees_B_cut",
+    "tree_single_A",
+    "tree_single_B",
+    "tree_single_A_cut",
+    "hills_A_trees",
+    "hills_B",
+    "mountain_A_grass_trees",
+    "mountain_B_grass",
+    "mountain_C",
+    "rock_single_A",
+    "rock_single_C",
+    "cloud_big",
+    "cloud_small",
+    "waterlily_A",
+    "waterplant_A",
+    "building_lumbermill_blue",
+    "building_mine_blue",
+    "building_watermill_blue",
+    "building_tower_A_blue",
+    "building_archeryrange_blue",
+    "building_home_A_blue",
+    "building_home_B_blue",
+    "building_windmill_blue",
+    "building_well_blue",
+    "building_scaffolding",
+    "building_stage_A",
+    "building_stage_B",
+    "building_stage_C",
+    "building_bridge_A",
+    "fence_wood_straight",
+    "target",
+    "tent",
+    "resource_lumber",
+    "resource_stone",
+    "crate_A_big",
+    "wheelbarrow",
+    "pallet",
+    "flag_blue",
+    "sack",
+    "barrel",
   ],
 }
 
@@ -233,12 +320,12 @@ async function animations(): Promise<void> {
   console.log(`anims: ${target.getRoot().listAnimations().length} clips → ${kb(out)}`)
 }
 
-async function kit(): Promise<void> {
+async function kit(name: string, sources: Record<string, string[]>): Promise<void> {
   const target = new Document()
   const scene = target.createScene("kit")
   const bounds: Record<string, { size: number[]; min: number[]; max: number[] }> = {}
 
-  for (const [pack, pieces] of Object.entries(KIT)) {
+  for (const [pack, pieces] of Object.entries(sources)) {
     for (const piece of pieces) {
       const path = find(pack, piece)
       if (!path) {
@@ -269,10 +356,10 @@ async function kit(): Promise<void> {
     prune({ keepLeaves: true }),
     meshopt({ encoder: MeshoptEncoder, level: "medium" }),
   )
-  const out = join(OUT, "kit.glb")
+  const out = join(OUT, `${name}.glb`)
   await io.write(out, target)
-  await writeFile(join(ROOT, "packages/hall/src/world/kit.json"), `${JSON.stringify(bounds, null, 2)}\n`)
-  console.log(`kit: ${Object.keys(bounds).length} pieces → ${kb(out)}`)
+  await writeFile(join(ROOT, `packages/hall/src/world/${name}.json`), `${JSON.stringify(bounds, null, 2)}\n`)
+  console.log(`${name}: ${Object.keys(bounds).length} pieces → ${kb(out)}`)
 }
 
 function round(value: number): number {
@@ -286,4 +373,5 @@ function kb(path: string): string {
 await MeshoptEncoder.ready
 await characters()
 await animations()
-await kit()
+await kit("kit", KIT)
+await kit("lands", LANDS)

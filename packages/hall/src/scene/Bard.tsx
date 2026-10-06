@@ -15,9 +15,10 @@ import { positions, useGuildStore } from "../guild/useGuild.ts"
 
 const REVEAL_S = 3.2
 const HANDBACK_MS = 10_000
-const ISO = new Vector3(34, 32, 34)
-const TOP = new Vector3(0.01, 70, 1.2)
-const HOME = new Vector3(0, 1, 0)
+const ISO = new Vector3(120, 112, 120)
+const TOP = new Vector3(0.01, 240, 2)
+/** Overview centre: the keep, nudged south so the road and the southern sites are in frame. */
+const HOME = new Vector3(0, 1, 10)
 
 export function Bard() {
   const store = useGuildStore()
@@ -27,6 +28,8 @@ export function Bard() {
   const size = useThree((state) => state.size)
   /** Zoom that fits the room at this viewport size. */
   const fit = Math.min(size.width / 44, size.height / 31)
+  /** The overview: the keep and the nearest sites. */
+  const wide = fit * 0.42
 
   useEffect(() => {
     const control = controls.current
@@ -47,7 +50,7 @@ export function Bard() {
       revealed.current = Math.min(1, revealed.current + delta / REVEAL_S)
       const p = easeInOut(revealed.current)
       camera.position.lerpVectors(TOP, ISO, p)
-      camera.zoom = fit * (0.55 + 0.45 * p)
+      camera.zoom = wide * (0.5 + 0.5 * p)
       camera.updateProjectionMatrix()
       control.target.copy(HOME)
       control.update()
@@ -57,8 +60,9 @@ export function Bard() {
 
     const picked = store.selected ? positions.get(store.selected) : undefined
     const focus = picked ?? (store.focus ? positions.get(store.focus.id) : undefined)
-    const goal = focus ? new Vector3(focus.x * (picked ? 1 : 0.4), 1.2, focus.z * (picked ? 1 : 0.4)) : HOME
-    const zoomGoal = fit * (picked ? 1.6 : focus && store.focus ? 1.0 + store.focus.score * 0.035 : 0.95)
+    const goal = focus ? new Vector3(focus.x, 1.2, focus.z) : HOME
+    // Quiet: the overview. Something happening: close enough to read it. Picked: closer still.
+    const zoomGoal = picked ? fit * 1.4 : focus && store.focus ? fit * (0.7 + store.focus.score * 0.05) : wide
     const k = 1 - Math.exp(-delta * 1.1)
 
     const before = control.target.clone()
@@ -84,7 +88,7 @@ export function Bard() {
       enableDamping
       minPolarAngle={0.35}
       maxPolarAngle={1.15}
-      minZoom={fit * 0.6}
+      minZoom={wide * 0.6}
       maxZoom={fit * 3}
       enablePan
     />

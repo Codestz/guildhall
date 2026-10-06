@@ -1,3 +1,4 @@
+import { ROAD_EDGES, ROAD_NODES } from "./lands.ts"
 import type { Spot } from "./layout.ts"
 
 /**
@@ -11,7 +12,7 @@ import type { Spot } from "./layout.ts"
  *   the hearth sits on x = 0 between A and B, so that column is split round it (H-, H+).
  */
 
-const NODES = {
+const HALL = {
   A1: [-16, -5.5],
   A2: [-9, -5.5],
   A3: [-3, -5.5],
@@ -33,6 +34,9 @@ const NODES = {
   C3: [11, 10],
   GATE: [0, 13.6],
 } as const satisfies Record<string, Spot>
+
+/** The hall's aisles plus the island's roads, joined at the gate (ADR 0006). */
+const NODES = { ...HALL, ...ROAD_NODES }
 
 type Id = keyof typeof NODES
 
@@ -63,6 +67,8 @@ const EDGES: readonly (readonly [Id, Id])[] = [
   ["C1", "C2"],
   ["C2", "C3"],
   ["C2", "GATE"],
+  ["GATE", "OUT"],
+  ...ROAD_EDGES,
 ]
 
 const ADJACENT = new Map<Id, Id[]>()
@@ -86,7 +92,7 @@ function nearest(spot: Spot): Id {
 const STRAIGHT_BELOW = 3.5
 
 /**
- * The spots to walk through from `from` to `to`, ending at `to`. Dijkstra over a 20-node graph:
+ * The spots to walk through from `from` to `to`, ending at `to`. Dijkstra over a ~35-node graph:
  * cheap enough to run whenever a target changes.
  */
 export function route(from: Spot, to: Spot): Spot[] {

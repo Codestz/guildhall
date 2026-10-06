@@ -9,6 +9,7 @@ import {
 } from "@guildhall/core"
 import { type DeedLook, deedLook, interestOf, roleOf } from "@guildhall/roster"
 import { Player, party, rush, solo, toEvents } from "@guildhall/sim"
+import { ROLE_SITE, SITES, type SiteId } from "../world/lands.ts"
 import {
   GATE,
   HAND_IN,
@@ -53,6 +54,8 @@ export interface AdventurerView {
   seat?: Seat
   /** The station they are working at, when they are at one: lights its lamp. */
   station?: StationId
+  /** The island job site they work at (ADR 0006), instead of a station. */
+  site?: SiteId
   /** The deed in progress, if any. */
   look?: DeedLook
   /** Its tool name, as OpenCode spells it. */
@@ -111,6 +114,8 @@ export class GuildStore {
   /** Newest last, at most LOG_SIZE. */
   log: LogEntry[] = []
   markers: Marker[] = []
+  /** Completed edits/writes this run: the yard's building grows with it. */
+  progress = 0
 
   private model: Model = emptyModel()
   private player!: Player
@@ -204,6 +209,7 @@ export class GuildStore {
     this.focus = null
     this.lastEventAt = 0
     this.log = []
+    this.progress = 0
   }
 
   private take(change: Change, live: boolean): void {
@@ -239,6 +245,7 @@ export class GuildStore {
     this.sinceViews = 0
     if (this.focus && this.now - this.focus.at > FOCUS_TTL_MS) this.focus = null
     this.views = viewsOf(this.model, this.now)
+    this.progress = progressOf(this.model)
     this.emit()
   }
 
@@ -256,6 +263,7 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
   let stools = 0
   let floor = 0
   let beds = 0
+  const atSite = new Map<SiteId, number>()
   const views: AdventurerView[] = []
 
   for (const s of sessions) {
@@ -274,7 +282,9 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
     let phase: Phase = "working"
     let target: Post
     let station: StationId | undefined
+    let site: SiteId | undefined
     let seat: Seat | undefined
+    const home = ROLE_SITE[s.agent]
     if (isMaster) {
       station = "quest-board"
       target = MASTER_POST
@@ -296,6 +306,14 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
       phase = "failed"
       seat = "bed"
       target = INFIRMARY[beds++ % INFIRMARY.length] ?? INFIRMARY[0] ?? MASTER_POST
+    } else if (home) {
+      // Island workers stay at their site for the whole quest: no jogging back on every deed.
+      site = home
+      phase = s.status === "waiting" ? "waiting" : "working"
+      const n = atSite.get(home) ?? 0
+      atSite.set(home, n + 1)
+      const posts = SITES[home].posts
+      target = posts[n % posts.length] ?? MASTER_POST
     } else if (look?.goTo) {
       station = look.goTo
       const posts = STATIONS[look.goTo].posts
@@ -316,6 +334,7 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
       phase,
       target,
       ...(station ? { station } : {}),
+      ...(site ? { site } : {}),
       ...(seat ? { seat } : {}),
       ...(look ? { look } : {}),
       ...(running ? { tool: running } : {}),
@@ -326,6 +345,22 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
     })
   }
   return views
+}
+
+function progressOf(model: Model): number {
+  let done = 0
+  for (const s of model.sessions.values()) {
+    if (ROLE_SITE[s.agent] !== "yard") continue
+    for (const entry of s.entries) {
+      if (
+        entry.kind === "tool" &&
+        entry.state === "completed" &&
+        (entry.name === "edit" || entry.name === "write")
+      )
+        done++
+    }
+  }
+  return done
 }
 
 const MASTER_POST: Post = STATIONS["quest-board"].posts[0] ?? [0, -7.4, 0]

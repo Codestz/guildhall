@@ -72,7 +72,8 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   }, [body, view.color])
 
   // Gear in the hand slots; a mug instead while resting in the tavern.
-  const gear = GEAR[view.agent] ?? {}
+  const atWork = view.site && (view.phase === "working" || view.phase === "waiting")
+  const gear = (atWork && view.site ? SITE_GEAR[view.site] : undefined) ?? GEAR[view.agent] ?? {}
   const right: Piece | undefined = view.phase === "resting" ? "mug_full" : gear.right
   useHeld(body, kit, "handslot.r", right)
   useHeld(body, kit, "handslot.l", view.phase === "resting" ? undefined : gear.left)
@@ -229,6 +230,7 @@ function clipFor(view: AdventurerView, walking: boolean, speed: number): string 
     default:
       break
   }
+  if (view.site) return siteClip(view)
   if (view.look) {
     if (view.master && (view.tool === "task" || view.tool === "subagent")) return "Ranged_Magic_Summon"
     switch (view.look.clip) {
@@ -246,6 +248,39 @@ function clipFor(view: AdventurerView, walking: boolean, speed: number): string 
     }
   }
   return view.thinking ? "Idle_B" : "Idle_A"
+}
+
+/** Work at an island site (ADR 0006): the site sets the trade, the deed picks the motion. */
+function siteClip(view: AdventurerView): string {
+  const tool = view.tool
+  switch (view.site) {
+    case "yard":
+      if (tool === "write") return "Sawing"
+      if (tool === "edit" || tool === "patch" || tool === "bash" || tool === "shell") return "Hammering"
+      return tool ? "Working_B" : view.thinking ? "Idle_B" : "Working_A"
+    case "forest":
+      if (tool === "grep" || tool === "glob" || tool === "list") return "Chopping"
+      return tool ? "Working_A" : "Idle_B"
+    case "river":
+      if (tool === "webfetch" || tool === "websearch") return "Fishing_Reeling"
+      return tool ? "Fishing_Cast" : "Fishing_Idle"
+    case "proving":
+      if (tool === "bash" || tool === "shell") return "Melee_1H_Attack_Chop"
+      return tool ? "Working_B" : "Idle_B"
+    case "quarry":
+      return tool ? "Pickaxing" : "Idle_A"
+    case "tower":
+      return tool ? "Ranged_Magic_Spellcasting" : "Idle_B"
+    default:
+      return "Idle_A"
+  }
+}
+
+/** Tools of each site's trade, in place of the role's own gear while working there. */
+const SITE_GEAR: Partial<Record<NonNullable<AdventurerView["site"]>, { right?: Piece; left?: Piece }>> = {
+  forest: { right: "axe" },
+  quarry: { right: "pickaxe" },
+  proving: { right: "sword_1handed" },
 }
 
 /** Keeps `piece` attached to the bone named `slot` (nothing when undefined). */

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { SITES } from "../src/world/lands.ts"
 import { GATE, HEARTH, INFIRMARY, type Spot, STATIONS, TAVERN } from "../src/world/layout.ts"
 import { AISLES, route } from "../src/world/paths.ts"
 
@@ -48,6 +49,23 @@ describe("aisles", () => {
       for (const b of POSTS) {
         for (const point of walk(a, route(a, b))) {
           expect(Math.hypot(point[0] - HEARTH[0], point[1] - HEARTH[1])).toBeGreaterThan(1.6)
+        }
+      }
+    }
+  })
+
+  test("every job site is reached out of the gate, along the roads", () => {
+    const forge = STATIONS.forge.posts[0] ?? [0, 0]
+    for (const site of Object.values(SITES)) {
+      for (const post of site.posts) {
+        const path = route([forge[0], forge[1]], [post[0], post[1]])
+        expect(path.at(-1)).toEqual([post[0], post[1]])
+        // Leaves through the doorway: some step is at the gate, x = 0, z ≈ 13.6.
+        expect(path.some((p) => p[0] === 0 && p[1] > 13 && p[1] < 14)).toBe(true)
+        for (const point of walk([forge[0], forge[1]], path)) {
+          const inside = Math.abs(point[0]) < 18 && Math.abs(point[1]) < 12
+          const doorway = Math.abs(point[0]) < 2 && point[1] > 9
+          if (!inside && Math.abs(point[0]) < 19 && Math.abs(point[1]) < 13) expect(doorway).toBe(true)
         }
       }
     }

@@ -24,6 +24,9 @@ export interface Mood {
   /** Effects that read as magic: portals, spells. */
   magic: string
   plea: string
+  /** The sea round the island, and the dirt of its roads. */
+  sea: string
+  road: string
   /** Post-processing: only what is brighter than this glows; vignette strength. */
   bloomThreshold: number
   vignette: number
@@ -32,6 +35,8 @@ export interface Mood {
 export const MOODS: Record<Mood["id"], Mood> = {
   keep: {
     id: "keep",
+    sea: "#6fb0d6",
+    road: "#c9a27a",
     name: "Morning Keep",
     ground: "#cfdcee",
     floor: "#b7c2d2",
@@ -53,6 +58,8 @@ export const MOODS: Record<Mood["id"], Mood> = {
   },
   hearth: {
     id: "hearth",
+    sea: "#2b3a44",
+    road: "#6e5238",
     name: "Candlelit Hearth",
     ground: "#1b130e",
     floor: "#5a3d28",
@@ -74,6 +81,8 @@ export const MOODS: Record<Mood["id"], Mood> = {
   },
   moonstone: {
     id: "moonstone",
+    sea: "#1c2a40",
+    road: "#4f4a48",
     name: "Moonlit Stone",
     ground: "#0f131c",
     floor: "#3b4352",
@@ -95,6 +104,8 @@ export const MOODS: Record<Mood["id"], Mood> = {
   },
   arcane: {
     id: "arcane",
+    sea: "#251d3d",
+    road: "#4a3f5e",
     name: "Arcane Workshop",
     ground: "#110e1b",
     floor: "#2f2742",

@@ -15,16 +15,12 @@ const SIDES: readonly Side[] = ["back", "front", "left", "right"]
  */
 export function Room() {
   const { mood } = useGuild()
-  const fading = useMemo(
-    () => Object.fromEntries(SIDES.map((side) => [side, [] as Material[]])) as Record<Side, Material[]>,
-    [],
-  )
 
   useFrame(({ camera }, delta) => {
-    for (const side of SIDES) {
+    for (const { side, materials } of sides) {
       const [nx, nz] = NORMALS[side]
       const facing = camera.position.x * nx + camera.position.z * nz > 0
-      for (const material of fading[side]) {
+      for (const material of materials) {
         const goal = facing ? 0.07 : 1
         material.opacity += (goal - material.opacity) * Math.min(1, delta * 5)
         material.depthWrite = material.opacity > 0.6
@@ -48,15 +44,15 @@ export function Room() {
   /** Each wall side (segments + what hangs on them), merged per material, with its own fade. */
   const sides = useMemo(
     () =>
-      SIDES.flatMap((side) => {
-        fading[side].length = 0
+      SIDES.map((side) => {
+        const materials: Material[] = []
         const pieces: Placement[] = [
           ...WALLS.filter((wall) => wall.side === side).map((wall) => ({ ...wall, mounted: true })),
           ...WALL_DECOR.filter((decor) => decor.side === side),
         ]
-        return mergePlacements(kit, pieces, fading[side])
+        return { side, meshes: mergePlacements(kit, pieces, materials), materials }
       }),
-    [kit, fading],
+    [kit],
   )
   const plinth = useMemo(() => new MeshStandardMaterial({ color: mood.stone }), [mood.stone])
 
@@ -68,9 +64,7 @@ export function Room() {
       {still.map((mesh) => (
         <primitive key={mesh.uuid} object={mesh} />
       ))}
-      {sides.map((mesh) => (
-        <primitive key={mesh.uuid} object={mesh} />
-      ))}
+      {sides.flatMap(({ meshes }) => meshes.map((mesh) => <primitive key={mesh.uuid} object={mesh} />))}
     </group>
   )
 }

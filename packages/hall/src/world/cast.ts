@@ -10,6 +10,7 @@ export type Model = (typeof MODELS)[number]
 export const modelUrl = (model: Model): string => `${import.meta.env.BASE_URL}assets/characters/${model}.glb`
 export const ANIMS_URL = `${import.meta.env.BASE_URL}assets/anims.glb`
 export const KIT_URL = `${import.meta.env.BASE_URL}assets/kit.glb`
+export const LANDS_URL = `${import.meta.env.BASE_URL}assets/lands.glb`
 
 export interface Gear {
   right?: Piece

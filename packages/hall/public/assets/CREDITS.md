@@ -11,3 +11,5 @@ Sound effects in `public/audio/` by **Kenney** — [kenney.nl](https://kenney.nl
 [RPG Audio](https://kenney.nl/assets/rpg-audio) (book flips, chop, coins, creaks, a door) and
 [Impact Sounds](https://kenney.nl/assets/impact-sounds) (metal, mining, plank, a heavy bell). The
 notes and the ambience are synthesized in the browser (`src/audio/`).
+
+Ships: **Kenney** — [Pirate Kit](https://kenney.nl/assets/pirate-kit), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).

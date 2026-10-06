@@ -65,6 +65,24 @@ const UNDEAD_CLIPS: Record<string, string[]> = {
  * The graveyard (KayKit Halloween Bits 1.0, CC0): its own kit, lazy-loaded with the undead.
  * Shares one palette texture, so the hall can batch it like the main kit.
  */
+/**
+ * Ships for the sea (Kenney Pirate Kit, CC0): one palette texture like KayKit's, ~1.8k triangles
+ * a ship. Merchant ships, a pirate ship, the ghost ship (for the graveyard's story), a wreck and
+ * rowboats. Lazy-loaded with the sea's traffic.
+ */
+const SHIPS: Record<string, string[]> = {
+  "kenney_pirate-kit": [
+    "ship-large",
+    "ship-medium",
+    "ship-small",
+    "ship-pirate-medium",
+    "ship-ghost",
+    "ship-wreck",
+    "boat-row-small",
+    "boat-row-large",
+  ],
+}
+
 const GRAVEYARD: Record<string, string[]> = {
   KayKit_HalloweenBits: [
     "crypt",
@@ -140,6 +158,8 @@ const CLIPS: Record<string, string[]> = {
     "Fishing_Idle",
     "Fishing_Cast",
     "Fishing_Reeling",
+    // Activities (world/behaviours.ts): the catch lifted out of the water.
+    "Fishing_Catch",
   ],
   CombatMelee: ["Melee_1H_Attack_Chop", "Melee_2H_Attack_Chop"],
   CombatRanged: [
@@ -147,6 +167,9 @@ const CLIPS: Record<string, string[]> = {
     "Ranged_Magic_Raise",
     "Ranged_Magic_Summon",
     "Ranged_Bow_Aiming_Idle",
+    // Activities (world/behaviours.ts): the proving grounds' archers draw and loose.
+    "Ranged_Bow_Draw",
+    "Ranged_Bow_Release",
   ],
 }
 
@@ -663,6 +686,7 @@ const STEPS: Record<string, () => Promise<void>> = {
     await animations("anims-undead", UNDEAD_CLIPS)
   },
   graveyard: () => kit("graveyard", GRAVEYARD),
+  ships: () => kit("ships", SHIPS),
 }
 const wanted = process.argv.slice(2)
 for (const name of wanted) if (!STEPS[name]) throw new Error(`unknown output ${name}: ${Object.keys(STEPS)}`)

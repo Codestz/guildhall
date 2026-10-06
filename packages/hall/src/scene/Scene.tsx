@@ -22,6 +22,7 @@ import { Nature } from "./nature/Nature.tsx"
 import { OpeningCue } from "./OpeningCue.tsx"
 import { Quality } from "./Quality.tsx"
 import { Room } from "./Room.tsx"
+import { Ships } from "./Ships.tsx"
 import { Sigils } from "./Sigils.tsx"
 import { Stations } from "./Stations.tsx"
 import { UndeadGate } from "./Undead.tsx"
@@ -58,6 +59,10 @@ export function Scene() {
         <WorldReady />
         {/* Showcase: mounts with the world, then lifts the title card (guild/opening.ts). */}
         {MODE === "showcase" && <OpeningCue />}
+      </Suspense>
+      {/* Ships: their own Suspense, so the sea's traffic never holds up the island. */}
+      <Suspense fallback={null}>
+        <Ships />
       </Suspense>
       <WeatherLayer />
       <CameraRig />

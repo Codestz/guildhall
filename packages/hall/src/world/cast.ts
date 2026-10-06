@@ -13,6 +13,7 @@ export const KIT_URL = `${import.meta.env.BASE_URL}assets/kit.glb`
 export const LANDS_URL = `${import.meta.env.BASE_URL}assets/lands.glb`
 /** The graveyard's props: always-visible scenery, loaded with the world. */
 export const GRAVEYARD_URL = `${import.meta.env.BASE_URL}assets/graveyard.glb`
+export const SHIPS_URL = `${import.meta.env.BASE_URL}assets/ships.glb`
 
 /**
  * The undead (roadmap G1/G4): skeleton models and their own clips. Never preloaded: fetched the

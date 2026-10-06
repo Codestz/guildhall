@@ -14,6 +14,7 @@ import {
 } from "three"
 import { useGuild } from "../../guild/useGuild.ts"
 import { FURNITURE, NORMALS, type Piece, type Side, WALL_DECOR } from "../../world/furniture.ts"
+import { LIGHTS } from "../../world/lights.ts"
 import type { SkyState } from "./sky.ts"
 
 /**
@@ -52,6 +53,16 @@ function lamps(): Lamp[] {
       z: placement.z + Math.cos(rot) * flame.out,
       size: flame.size * (placement.scale ?? 1),
       side: "side" in placement ? (placement.side as Side) : undefined,
+      phase: out.length * 1.7,
+    })
+  }
+  // The island's street torches and lanterns (world/lights.ts).
+  for (const light of LIGHTS) {
+    out.push({
+      x: light.flame[0],
+      y: light.flame[1],
+      z: light.flame[2],
+      size: light.halo,
       phase: out.length * 1.7,
     })
   }

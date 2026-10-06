@@ -138,6 +138,7 @@ const KIT: Record<string, string[]> = {
     "magnifying_glass",
     "journal_open",
     "lantern",
+    "torch",
     "hammer",
     "axe",
     "pickaxe",

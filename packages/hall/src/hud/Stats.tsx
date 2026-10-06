@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from "react"
+import { quality, TIERS } from "../guild/quality.ts"
 import { BUDGET, frameStats } from "../guild/stats.ts"
 import type { GuildStore } from "../guild/store.ts"
 import { Panel } from "./parts.tsx"
@@ -5,6 +7,7 @@ import { Panel } from "./parts.tsx"
 /** "Stats for nerds": what each frame costs, against the budget in docs/perf-budget.md. */
 export function Stats({ store, open, onToggle }: { store: GuildStore; open: boolean; onToggle: () => void }) {
   const s = frameStats
+  const tier = useSyncExternalStore(quality.subscribe, quality.snapshot)
   const rows: { label: string; value: string; budget?: string; over?: boolean }[] = [
     {
       label: "Frame rate",
@@ -34,6 +37,7 @@ export function Stats({ store, open, onToggle }: { store: GuildStore; open: bool
     { label: "Textures", value: s.textures.toLocaleString() },
     { label: "Shaders", value: s.programs.toLocaleString() },
     { label: "Adventurers", value: store.views.length.toLocaleString() },
+    { label: "Quality", value: TIERS[tier].name, budget: "adaptive" },
   ]
   return (
     <Panel

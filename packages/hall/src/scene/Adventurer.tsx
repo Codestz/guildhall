@@ -107,7 +107,10 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   const gear = (atWork && view.site ? SITE_GEAR[view.site] : undefined) ?? GEAR[view.agent] ?? {}
   const right: Piece | undefined = view.phase === "resting" ? "mug_full" : gear.right
   useHeld(body, kit, "handslot.r", right)
-  useHeld(body, kit, "handslot.l", view.phase === "resting" ? undefined : gear.left)
+  // After dark, a free left hand carries a lantern: you can always find your agents at night.
+  const dark = store.environment.daylight < 0.3
+  const left = view.phase === "resting" ? undefined : (gear.left ?? (dark ? "lantern" : undefined))
+  useHeld(body, kit, "handslot.l", left)
 
   useEffect(() => {
     const id = view.id

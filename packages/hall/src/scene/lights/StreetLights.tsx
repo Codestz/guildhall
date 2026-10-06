@@ -12,7 +12,7 @@ import {
   SRGBColorSpace,
   Vector3,
 } from "three"
-import { useGuild } from "../../guild/useGuild.ts"
+import { positions, useGuild } from "../../guild/useGuild.ts"
 import { LIGHTS } from "../../world/lights.ts"
 import { sky } from "../atmosphere/state.ts"
 import { mergePlacements, useKit } from "../Kit.tsx"
@@ -40,6 +40,7 @@ export function StreetLights() {
         <primitive key={mesh.uuid} object={mesh} />
       ))}
       <Pools />
+      <Followers />
     </group>
   )
 }
@@ -88,6 +89,56 @@ function Pools() {
     <instancedMesh
       ref={mesh}
       args={[geometry, material, LIGHTS.length]}
+      frustumCulled={false}
+      renderOrder={9}
+    />
+  )
+}
+
+/** Adventurers' lanterns: a smaller pool that walks with each of them after dark. */
+const MAX_FOLLOWERS = 40
+function Followers() {
+  const { mood } = useGuild()
+  const mesh = useRef<InstancedMesh>(null)
+  const geometry = useMemo(() => new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), [])
+  const material = useMemo(
+    () =>
+      new MeshBasicMaterial({
+        map: pool(),
+        transparent: true,
+        depthWrite: false,
+        blending: AdditiveBlending,
+        fog: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -4,
+      }),
+    [],
+  )
+  const fire = useMemo(() => new Color(), [])
+
+  useFrame(({ clock }) => {
+    const instances = mesh.current
+    if (!instances) return
+    fire.set(mood.fire).lerp(EMBER, 0.6)
+    const glow = Math.max(0, sky.lamps - 0.3) / 0.7
+    let i = 0
+    for (const [id, at] of positions) {
+      if (i >= MAX_FOLLOWERS) break
+      const flicker = 0.92 + Math.sin(clock.elapsedTime * 9 + id.length + i) * 0.05
+      matrix.compose(position.set(at.x, 0.07, at.z), flat, scale.set(5, 1, 5))
+      instances.setMatrixAt(i, matrix)
+      instances.setColorAt(i, tint.copy(fire).multiplyScalar(glow * 0.32 * flicker))
+      i++
+    }
+    instances.count = i
+    instances.instanceMatrix.needsUpdate = true
+    if (instances.instanceColor) instances.instanceColor.needsUpdate = true
+  })
+
+  return (
+    <instancedMesh
+      ref={mesh}
+      args={[geometry, material, MAX_FOLLOWERS]}
       frustumCulled={false}
       renderOrder={9}
     />

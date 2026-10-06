@@ -8,6 +8,8 @@ import { CameraRig } from "./CameraRig.tsx"
 import { FrameStats } from "./FrameStats.tsx"
 import { Island } from "./Island.tsx"
 import { Life } from "./life/Life.tsx"
+import { NearLights } from "./lights/NearLights.tsx"
+import { NightLife } from "./lights/NightLife.tsx"
 import { StreetLights } from "./lights/StreetLights.tsx"
 import { Nature } from "./nature/Nature.tsx"
 import { Quality } from "./Quality.tsx"
@@ -26,6 +28,8 @@ export function Scene() {
       <Suspense fallback={null}>
         <Island />
         <StreetLights />
+        <NearLights />
+        <NightLife />
         <Nature />
         <Life />
         <Room />

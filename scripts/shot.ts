@@ -18,7 +18,9 @@ type Step =
   | { wheel: number; at?: [number, number] }
 
 const url = process.argv[2] ?? "http://localhost:5199/"
-const steps: Step[] = process.argv[3] ? await Bun.file(process.argv[3]).json() : [{ wait: 6000 }, { shot: "hall" }]
+const steps: Step[] = process.argv[3]
+  ? await Bun.file(process.argv[3]).json()
+  : [{ wait: 6000 }, { shot: "hall" }]
 const chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 // Uncapped frame rate (no vsync, no 60 Hz limit), so fps/frame-time readings show real headroom
@@ -34,6 +36,10 @@ const page = await browser.newPage({
 })
 const errors: string[] = []
 page.on("pageerror", (error) => errors.push(error.message))
+// Shader compile failures and WebGL errors arrive as console errors, not page exceptions.
+page.on("console", (message) => {
+  if (message.type() === "error") errors.push(`console: ${message.text().slice(0, 600)}`)
+})
 await page.goto(url)
 
 for (const step of steps) {

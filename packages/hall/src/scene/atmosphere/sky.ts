@@ -140,8 +140,8 @@ function stop(
 
 // biome-ignore format: a table reads better aligned
 const DAY: readonly Stop[] = [
-  stop(-0.45, { zenith: "#02050d", horizon: "#0a1428", fog: "#0b1424", glow: "#000000", sun: "#000000", sky: "#3c5592", ground: "#0c1120" }, 0, 1.35),
-  stop(-0.2,  { zenith: "#040a1c", horizon: "#13213f", fog: "#111c33", glow: "#140f2a", sun: "#000000", sky: "#41579a", ground: "#0f1322" }, 0, 1.3),
+  stop(-0.45, { zenith: "#02050d", horizon: "#0a1428", fog: "#0b1424", glow: "#000000", sun: "#000000", sky: "#4060a0", ground: "#151c30" }, 0, 1.35),
+  stop(-0.2,  { zenith: "#040a1c", horizon: "#13213f", fog: "#111c33", glow: "#140f2a", sun: "#000000", sky: "#4560a4", ground: "#161c30" }, 0, 1.3),
   stop(-0.08, { zenith: "#122150", horizon: "#3d4676", fog: "#2c3458", glow: "#a24a6e", sun: "#000000", sky: "#6670aa", ground: "#211d2c" }, 0, 1.0),
   stop(0.02,  { zenith: "#2f5290", horizon: "#eb9f86", fog: "#a98c98", glow: "#ff7f56", sun: "#ff9c86", sky: "#a3b0e6", ground: "#3e3a4a" }, 1.3, 1.15),
   stop(0.14,  { zenith: "#4d7fc4", horizon: "#f2d0b4", fog: "#cfc4c4", glow: "#ffaa78", sun: "#ffd6b8", sky: "#c2d0f2", ground: "#5c5a66" }, 2.9, 1.4),
@@ -153,8 +153,9 @@ const MOON = new Color("#9fb6ff")
 /** Overcast: what a cloud-covered sky's colours drift towards (scaled by their own brightness). */
 const OVERCAST = new Color("#c3cad3")
 const STORM_FLASH = new Color("#dfe6ff")
-const NIGHT_SHADOWS = new Color(0.78, 0.9, 1.2)
-const NIGHT_HIGHLIGHTS = new Color(0.94, 0.98, 1.08)
+const NIGHT_SHADOWS = new Color(0.74, 0.9, 1.22)
+/** Night highlights warm, shadows cool: firelight keeps its colour against blue moonlight. */
+const NIGHT_HIGHLIGHTS = new Color(1.08, 1.0, 0.88)
 const GOLDEN_SHADOWS = new Color(0.94, 0.96, 1.08)
 const GOLDEN_HIGHLIGHTS = new Color(1.06, 1.0, 0.95)
 const SNOW_TINT = new Color(0.94, 0.98, 1.06)
@@ -212,7 +213,7 @@ export function updateSky(out: SkyState, env: Environment, mood: Mood, flash = 0
 
   // 3. The moon takes over once the sun is down (both are dark at the hand-over: no pop).
   const moon =
-    0.62 * (1 - smoothstep(-0.14, -0.03, e)) * smoothstep(-0.02, 0.18, moonUp) * (1 - overcast * 0.7)
+    1.05 * (1 - smoothstep(-0.14, -0.03, e)) * smoothstep(-0.02, 0.18, moonUp) * (1 - overcast * 0.7)
   out.sunIntensity = sun
   out.moonIntensity = moon
 
@@ -237,7 +238,7 @@ export function updateSky(out: SkyState, env: Environment, mood: Mood, flash = 0
   out.keyDirection[2] = kz / length
   out.keyColor.copy(sunUp ? out.sunColor : out.moonColor)
   out.keyIntensity = (sunUp ? sun : moon) * mood.key
-  out.keyShadow = (sunUp ? 1 : 0.7) * (1 - overcast * 0.6)
+  out.keyShadow = (sunUp ? 1 : 0.9) * (1 - overcast * 0.6)
 
   // 5. Lightning: a cold, flat flash of the whole sky.
   out.flash = flash
@@ -266,8 +267,9 @@ export function updateSky(out: SkyState, env: Environment, mood: Mood, flash = 0
   out.exposure = (1 + night * 0.25) * (1 - rain * 0.12 - overcast * 0.06)
   out.saturation = (1.04 + golden * 0.04 - night * 0.1) * (1 - overcast * 0.38) * mood.saturation
   // Night vision: what the moon lights goes blue-grey; what a fire lights keeps its colour.
-  out.darkSaturation = out.saturation * (1 - night * 0.62)
-  out.contrast = (1.03 + night * 0.04 - overcast * 0.04) * mood.contrast
+  out.darkSaturation = out.saturation * (1 - night * 0.42)
+  // Moonlight is crisp: more contrast at night, so lit edges read against the dark.
+  out.contrast = (1.03 + night * 0.14 - overcast * 0.04) * mood.contrast
   out.shadows.copy(WHITE).lerp(GOLDEN_SHADOWS, golden).lerp(NIGHT_SHADOWS, night)
   out.highlights.copy(WHITE).lerp(GOLDEN_HIGHLIGHTS, golden).lerp(NIGHT_HIGHLIGHTS, night)
   out.shadows.multiply(normalisedTint(tint, mood.shadows, 0.45))

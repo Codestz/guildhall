@@ -22,8 +22,8 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { basename, join } from "node:path"
 import { Document, type Node as GNode, getBounds, NodeIO } from "@gltf-transform/core"
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions"
-import { dedup, mergeDocuments, meshopt, prune, resample, unpartition } from "@gltf-transform/functions"
-import { MeshoptEncoder } from "meshoptimizer"
+import { dedup, mergeDocuments, meshopt, prune, resample, simplify, unpartition, weld } from "@gltf-transform/functions"
+import { MeshoptEncoder, MeshoptSimplifier } from "meshoptimizer"
 
 const ROOT = join(import.meta.dir, "..")
 const SRC = join(ROOT, "assets/src")
@@ -77,6 +77,12 @@ const CLIPS: Record<string, string[]> = {
     "Ranged_Magic_Summon",
     "Ranged_Bow_Aiming_Idle",
   ],
+}
+
+/** Triangle share kept for pieces planted by the hundred (scene/nature/Fields.tsx). */
+const SIMPLIFY: Record<string, number> = {
+  food_ingredient_lettuce: 0.12,
+  food_ingredient_carrot: 0.3,
 }
 
 /** Pack folder → pieces taken into kit.glb (by file name, without extension). */
@@ -150,6 +156,8 @@ const KIT: Record<string, string[]> = {
     "bucket_metal",
   ],
   KayKit_FantasyWeaponsBits: ["staff_A", "sword_A", "shield_A", "hammer_A"],
+  // The farms' crops and harvest (scene/nature/Fields.tsx): whole vegetables planted in rows.
+  KayKit_Restaurant_Bits: ["food_ingredient_lettuce", "food_ingredient_carrot"],
   KayKit_Adventurers_2: [
     "staff",
     "wand",
@@ -514,6 +522,9 @@ async function kit(name: string, sources: Record<string, string[]>): Promise<voi
         continue
       }
       const doc = await io.read(path)
+      // Pieces drawn by the hundred, small on screen, get fewer triangles (the farms' crops).
+      const ratio = SIMPLIFY[piece]
+      if (ratio) await doc.transform(weld(), simplify({ simplifier: MeshoptSimplifier, ratio, error: 0.08 }))
       const sourceScene = doc.getRoot().getDefaultScene() ?? doc.getRoot().listScenes()[0]
       if (!sourceScene) continue
       const map = mergeDocuments(target, doc)
@@ -567,5 +578,6 @@ const wanted = process.argv.slice(2)
 for (const name of wanted) if (!STEPS[name]) throw new Error(`unknown output ${name}: ${Object.keys(STEPS)}`)
 
 await MeshoptEncoder.ready
+await MeshoptSimplifier.ready
 for (const [name, step] of Object.entries(STEPS))
   if (wanted.length === 0 || wanted.includes(name)) await step()

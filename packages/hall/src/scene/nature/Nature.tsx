@@ -3,13 +3,15 @@ import { useEffect } from "react"
 import type { Vector3 } from "three"
 import { frameStats } from "../../guild/stats.ts"
 import { useTier } from "../Quality.tsx"
+import { Fields } from "./Fields.tsx"
 import { Grass } from "./Grass.tsx"
 import { Water } from "./Water.tsx"
 import { Wilds } from "./Wilds.tsx"
 
 /**
  * Nature: water and grass shaders on island().water / island().meadow, and the character-scale
- * wilds along roads, sites, village and shore (world/wilds.ts). (ADR 0007).
+ * wilds along roads, sites, village and shore (world/wilds.ts), and the farms' crops
+ * (world/fields.ts). (ADR 0007).
  */
 export function Nature() {
   const tier = useTier()
@@ -18,6 +20,7 @@ export function Nature() {
       <Water tier={tier} />
       <Grass tier={tier} />
       <Wilds tier={tier} />
+      <Fields />
       {import.meta.env.DEV && <DevLook />}
     </>
   )

@@ -636,12 +636,20 @@ const hexDistance = ([q, line]: Cell): number => {
  * - Roads, sites, the keep and the space round the gate are flat at y = 0; elevation is only ever
  *   off the walking graph, so adventurers never need a height lookup.
  */
+/** A farm field's hex: wheat, or a vegetable plot. Its crops are drawn by scene/nature/Fields. */
+export interface Field {
+  kind: "wheat" | "crops"
+  x: number
+  z: number
+}
+
 export interface Island {
   tiles: LandPlacement[]
   decor: LandPlacement[]
   water: Spot[]
   meadow: Spot[]
   landmarks: Landmark[]
+  fields: Field[]
 }
 
 const cache = new Map<number, Island>()
@@ -658,6 +666,7 @@ export function island(seed = 7): Island {
   const decor: LandPlacement[] = []
   const water: Spot[] = []
   const meadow: Spot[] = []
+  const fields: Field[] = []
 
   const cells: Cell[] = []
   for (let q = -SEA_RINGS; q <= SEA_RINGS; q++)
@@ -794,7 +803,9 @@ export function island(seed = 7): Island {
         break
       case "w":
       case "d":
-        add(char === "w" ? "building_grain" : "building_dirt", 0, 0, turn(0))
+        // Tilled soil under both; the wheat and the vegetable rows grow on it (scene/nature/Fields).
+        add("building_dirt", 0, 0, turn(0))
+        fields.push({ kind: char === "w" ? "wheat" : "crops", x, z })
         // Fence each side that doesn't run into another field, a road or water.
         for (let dir = 0; dir < 6; dir++) {
           const next = at(step(cell, dir))
@@ -848,7 +859,7 @@ export function island(seed = 7): Island {
       })
     }
   }
-  const result = { tiles, decor, water, meadow, landmarks }
+  const result = { tiles, decor, water, meadow, landmarks, fields }
   cache.set(seed, result)
   return result
 }

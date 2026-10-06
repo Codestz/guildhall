@@ -4,7 +4,7 @@ import {
   AdditiveBlending,
   CanvasTexture,
   Color,
-  type InstancedMesh,
+  InstancedMesh,
   Matrix4,
   MeshBasicMaterial,
   PlaneGeometry,
@@ -15,6 +15,7 @@ import {
 import { useGuild } from "../../guild/useGuild.ts"
 import { FURNITURE, NORMALS, type Piece, type Side, WALL_DECOR } from "../../world/furniture.ts"
 import { LIGHTS } from "../../world/lights.ts"
+import { useOwnedMeshes } from "../owned.ts"
 import type { SkyState } from "./sky.ts"
 
 /**
@@ -72,28 +73,28 @@ function lamps(): Lamp[] {
 export function Lamps({ sky }: { sky: SkyState }) {
   const { mood } = useGuild()
   const list = useMemo(lamps, [])
-  const mesh = useRef<InstancedMesh>(null)
   const fade = useRef(list.map(() => 1))
   const fire = useMemo(() => new Color(), [])
-  const geometry = useMemo(() => new PlaneGeometry(1, 1), [])
-  const material = useMemo(
-    () =>
-      new MeshBasicMaterial({
-        map: halo(),
-        transparent: true,
-        depthWrite: false,
-        blending: AdditiveBlending,
-        fog: false,
-      }),
-    [],
-  )
+  const built = useOwnedMeshes(() => {
+    const material = new MeshBasicMaterial({
+      map: halo(),
+      transparent: true,
+      depthWrite: false,
+      blending: AdditiveBlending,
+      fog: false,
+    })
+    const mesh = new InstancedMesh(new PlaneGeometry(1, 1), material, list.length)
+    mesh.frustumCulled = false
+    mesh.renderOrder = 10
+    return { meshes: [mesh] }
+  }, [list])
 
   useLayoutEffect(() => {
     fire.set(mood.fire)
   }, [fire, mood.fire])
 
   useFrame(({ camera, clock }, delta) => {
-    const instances = mesh.current
+    const instances = built?.meshes[0]
     if (!instances) return
     const t = clock.elapsedTime
     camera.getWorldQuaternion(facing)
@@ -120,14 +121,7 @@ export function Lamps({ sky }: { sky: SkyState }) {
     if (instances.instanceColor) instances.instanceColor.needsUpdate = true
   })
 
-  return (
-    <instancedMesh
-      ref={mesh}
-      args={[geometry, material, list.length]}
-      frustumCulled={false}
-      renderOrder={10}
-    />
-  )
+  return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
 }
 
 const facing = new Quaternion()

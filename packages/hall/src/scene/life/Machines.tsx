@@ -15,8 +15,8 @@ import { useGuildStore } from "../../guild/useGuild.ts"
 import { LANDS_URL } from "../../world/cast.ts"
 import { HEX_SCALE, island, type LandmarkKind } from "../../world/lands.ts"
 import { plain } from "../Kit.tsx"
+import { useOwnedMeshes } from "../owned.ts"
 import { MOVING_PARTS, movingPartsClaimed } from "./moving.ts"
-import { useOwned } from "./owned.ts"
 import { PILES } from "./places.ts"
 import { life } from "./state.ts"
 
@@ -44,11 +44,8 @@ interface Placed {
 export function Machines() {
   const store = useGuildStore()
   const { nodes } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
-  const built = useOwned(
-    () => build(nodes, movingPartsClaimed()),
-    (made) => made?.mesh.dispose(),
-    nodes,
-  )
+  // The batch is this mount's own (scene/owned.ts); its material is the land pack's.
+  const built = useOwnedMeshes(() => build(nodes, movingPartsClaimed()), [nodes], "materials")
 
   useFrame((_, delta) => {
     if (!built) return
@@ -67,11 +64,11 @@ export function Machines() {
       placed.speed = MathUtils.damp(placed.speed, goal, placed.part === "saw" ? 1.5 : 0.8, dt)
       placed.angle = (placed.angle + placed.speed * dt) % (Math.PI * 2)
       spin.makeRotationAxis(placed.axis, -placed.angle)
-      built.mesh.setMatrixAt(placed.id, matrix.multiplyMatrices(placed.base, spin))
+      built.meshes[0]?.setMatrixAt(placed.id, matrix.multiplyMatrices(placed.base, spin))
     }
   })
 
-  return built ? <primitive object={built.mesh} /> : null
+  return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
 }
 
 const matrix = new Matrix4()
@@ -123,7 +120,7 @@ function build(nodes: Record<string, Object3D>, claimed: boolean) {
   }
 
   const material = items[0]?.material
-  if (!material) return null
+  if (!material) return { meshes: [], placed: [] }
   // One material across the pack (one palette texture); anything else would need its own batch.
   const same = items.filter((item) => item.material === material)
   const geometries = [...new Set(same.map((item) => item.geometry))]
@@ -154,7 +151,7 @@ function build(nodes: Record<string, Object3D>, claimed: boolean) {
   // Turning parts move inside their bounds every frame: cull by the whole batch's sphere only.
   mesh.perObjectFrustumCulled = false
   mesh.computeBoundingSphere()
-  return { mesh, placed }
+  return { meshes: [mesh], placed }
 }
 
 function placement(x: number, y: number, z: number, rot: number, scale: number): Matrix4 {

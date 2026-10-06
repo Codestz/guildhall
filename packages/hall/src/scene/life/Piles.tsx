@@ -18,7 +18,7 @@ import {
 } from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import { HEX_SCALE } from "../../world/lands.ts"
-import { useOwned } from "./owned.ts"
+import { useOwnedMeshes } from "../owned.ts"
 import { PILES, type Pile, TARGET_FACE, targets } from "./places.ts"
 import { life } from "./state.ts"
 import {
@@ -50,10 +50,12 @@ interface Item {
 }
 
 export function TracePiles() {
-  const built = useOwned(build, (made) => made.mesh.dispose(), "piles")
+  // Batch and material are this mount's own (scene/owned.ts).
+  const built = useOwnedMeshes(build, [])
 
   useFrame((_, delta) => {
-    if (!built) return
+    const mesh = built?.meshes[0]
+    if (!built || !mesh) return
     const counts = life.traces
     const dt = Math.min(delta, 0.1)
     for (const item of built.items) {
@@ -61,16 +63,16 @@ export function TracePiles() {
       if (item.grown === want) continue
       // Grows in over ~0.4 s; a reset (seek, new run) clears at once.
       item.grown = want === 0 ? 0 : Math.min(1, item.grown + dt * 2.5)
-      built.mesh.setVisibleAt(item.id, item.grown > 0)
+      mesh.setVisibleAt(item.id, item.grown > 0)
       if (item.grown > 0) {
         const s = MathUtils.smoothstep(item.grown, 0, 1) * (1 + 0.15 * Math.sin(item.grown * Math.PI))
         scaled.makeScale(s, s, s)
-        built.mesh.setMatrixAt(item.id, out.multiplyMatrices(item.matrix, scaled))
+        mesh.setMatrixAt(item.id, out.multiplyMatrices(item.matrix, scaled))
       }
     }
   })
 
-  return built ? <primitive object={built.mesh} /> : null
+  return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
 }
 
 const scaled = new Matrix4()
@@ -158,7 +160,7 @@ function build() {
   mesh.receiveShadow = true
   // Instances move (grow in) after this: cull each one by its own sphere, never the batch's.
   mesh.frustumCulled = false
-  return { mesh, items }
+  return { meshes: [mesh], items }
 }
 
 const UP = new Vector3(0, 1, 0)

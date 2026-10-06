@@ -11,6 +11,7 @@ import {
 import { TIERS } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { island } from "../../world/lands.ts"
+import { FRAME } from "../frame.ts"
 import { useTier } from "../Quality.tsx"
 import { flash, stepLightning } from "./flash.ts"
 import { installRadialFog } from "./fog.ts"
@@ -19,6 +20,7 @@ import { SkyDome } from "./SkyDome.tsx"
 import { shadows } from "./shadows.ts"
 import { updateSky } from "./sky.ts"
 import { sky } from "./state.ts"
+import { stepWind } from "./wind.ts"
 
 installRadialFog()
 
@@ -39,8 +41,8 @@ export function Atmosphere() {
 }
 
 /**
- * Reads the environment into `sky`, and sets the fog and the hemisphere fill. Rendered first, so
- * its frame callback runs before every other reader of `sky`.
+ * Reads the environment into `sky` and `wind`, and sets the fog and the hemisphere fill. Runs at
+ * FRAME.SKY (scene/frame.ts): after the guild's clock, before every reader of `sky` and `wind`.
  */
 function Weathervane() {
   const store = useGuildStore()
@@ -72,13 +74,14 @@ function Weathervane() {
     }
   }, [scene, fog])
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     const env = store.environment
     if (env.lightningAt !== lastStrike.current) {
       if (lastStrike.current !== -1 && env.lightningAt >= 0) flash(0.8 + Math.random() * 0.4)
       lastStrike.current = env.lightningAt
     }
     updateSky(sky, env, store.mood, stepLightning(Math.min(delta, 0.1)))
+    stepWind(env.wind, state.clock.elapsedTime, delta)
     // The Low tier has no grade (no post pass): its tone mapping takes the grade's exposure, so a
     // storm still darkens and night still lifts there. With post on, the composer renders with no
     // renderer tone mapping, so this is ignored and the grade does it (GradeEffect.ts).
@@ -92,7 +95,7 @@ function Weathervane() {
       fill.groundColor.copy(sky.hemiGround)
       fill.intensity = sky.hemiIntensity
     }
-  })
+  }, FRAME.SKY)
 
   return <hemisphereLight ref={hemi} />
 }

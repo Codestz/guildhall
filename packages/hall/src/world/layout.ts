@@ -98,6 +98,9 @@ export const TAVERN: readonly Post[] = [
   [6.8, 8.4, -Math.PI / 2],
 ]
 
+/** What an adventurer sits or lies on at their post. */
+export type Seat = "stool" | "floor" | "bed"
+
 /** Infirmary beds, back middle-left: failed adventurers lie here until dismissed. */
 export const INFIRMARY: readonly Post[] = [
   [-6.5, -9.2, 0],

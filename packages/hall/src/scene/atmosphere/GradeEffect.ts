@@ -1,7 +1,7 @@
 import { Effect, EffectAttribute } from "postprocessing"
 import { type Camera, Color, Matrix4, Uniform, Vector2, Vector3 } from "three"
-import { WIND_DIRECTION } from "../weather/shared.ts"
 import type { SkyState } from "./sky.ts"
+import { WIND_DIRECTION } from "./wind.ts"
 
 /**
  * The colour grade (ADR 0007, task "Sky"): cloud shadows, exposure, saturation, a split tone

@@ -12,7 +12,6 @@ uniform float uKeyIntensity;
 uniform vec3 uHemiSky;
 uniform vec3 uHemiGround;
 uniform float uHemiIntensity;
-uniform float uTime;
 
 vec3 fill(vec3 n) {
   return mix(uHemiGround, uHemiSky, 0.5 * n.y + 0.5) * uHemiIntensity;
@@ -30,12 +29,40 @@ const FRAGMENT_HEAD = /* glsl */ `
 #include <shadowmap_pars_fragment>
 #include <shadowmask_pars_fragment>
 ${LIGHT}
+uniform float uTime;
 `
 
 const FRAGMENT_TAIL = /* glsl */ `
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
   #include <fog_fragment>
+`
+
+// ---- Sway --------------------------------------------------------------------------------------
+
+/**
+ * The one wind sway, shared by the grass ShaderMaterial and the wilds' patched standard material
+ * (Wilds.tsx onBeforeCompile). Its uniforms are atmosphere/wind.ts `wind.uniforms`, attached by
+ * reference. Each function returns how far a vertex bends downwind (along uWindDir).
+ */
+export const WIND_SWAY = /* glsl */ `
+uniform float uTime;
+uniform float uWind;
+uniform vec2 uWindDir;
+
+/** A tree or bush: a slow two-sine rock, phased by where it stands; roots still, tops most (h²). */
+float swayPlant(vec2 root, float h) {
+  float phase = uTime * 1.7 + dot(root, vec2(0.23, 0.17));
+  return h * h * 0.03 * (0.25 + uWind) * (0.65 * sin(phase) + 0.35 * sin(phase * 2.3 + 1.0));
+}
+
+/** Grass: a steady lean plus gusts that travel across the island (scale by height² at the blade). */
+float swayGrass(vec2 world) {
+  float phase = dot(world, vec2(0.37, 0.61));
+  float gust = sin(dot(world, uWindDir) * 0.16 - uTime * (1.1 + 1.6 * uWind));
+  float sway = sin(uTime * (1.6 + 2.2 * uWind) + phase) * 0.35 + gust * 0.65;
+  return (0.05 + 0.32 * uWind) * (0.55 + 0.45 * sway) + 0.05 * sway;
+}
 `
 
 // ---- Water -------------------------------------------------------------------------------------
@@ -219,8 +246,7 @@ export const grassVertex = /* glsl */ `
 #include <fog_pars_vertex>
 #include <shadowmap_pars_vertex>
 ${LIGHT}
-uniform float uWind;
-uniform vec2 uWindDir;
+${WIND_SWAY}
 uniform float uSnow;
 uniform sampler2D uPalette;
 #ifdef FLOWERS
@@ -244,11 +270,9 @@ void main() {
   transformed.y *= 1.0 - 0.35 * uSnow;
   vec4 worldPosition = modelMatrix * instanceMatrix * vec4(transformed, 1.0);
 
-  // Wind: a steady lean plus gusts that travel across the island, more at the tips.
+  // Wind (WIND_SWAY): more at the tips.
   float phase = dot(worldPosition.xz, vec2(0.37, 0.61));
-  float gust = sin(dot(worldPosition.xz, uWindDir) * 0.16 - uTime * (1.1 + 1.6 * uWind));
-  float sway = sin(uTime * (1.6 + 2.2 * uWind) + phase) * 0.35 + gust * 0.65;
-  float bend = (0.05 + 0.32 * uWind) * (0.55 + 0.45 * sway) + 0.05 * sway;
+  float bend = swayGrass(worldPosition.xz);
   float k = height * height;
   worldPosition.xz += uWindDir * bend * k;
   worldPosition.y -= bend * bend * k * 0.6;

@@ -1,8 +1,8 @@
 import { useFrame } from "@react-three/fiber"
-import { type RefObject, useEffect, useMemo, useRef } from "react"
+import { type RefObject, useEffect } from "react"
 import {
   CanvasTexture,
-  type InstancedMesh,
+  InstancedMesh,
   Matrix4,
   MeshBasicMaterial,
   type Object3D,
@@ -11,6 +11,7 @@ import {
   Vector3,
 } from "three"
 import { sky } from "./atmosphere/state.ts"
+import { useOwnedMeshes } from "./owned.ts"
 
 /**
  * Soft contact shadows under everyone who walks (docs/perf-budget.md): the sun's shadow map is
@@ -40,34 +41,28 @@ export function useBlob(node: RefObject<Object3D | null>, radius: number, size?:
 }
 
 export function Blobs() {
-  const geometry = useMemo(() => new PlaneGeometry(2, 2).rotateX(-Math.PI / 2), [])
-  const material = useMemo(
-    () =>
-      new MeshBasicMaterial({
-        color: "#000000",
-        map: blobTexture(),
-        transparent: true,
-        depthWrite: false,
-        // Draw just above the ground without z-fighting it.
-        polygonOffset: true,
-        polygonOffsetFactor: -2,
-      }),
-    [],
-  )
-  const mesh = useRef<InstancedMesh>(null)
-
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      material.map?.dispose()
-      material.dispose()
-    },
-    [geometry, material],
-  )
+  const built = useOwnedMeshes(() => {
+    const material = new MeshBasicMaterial({
+      color: "#000000",
+      map: blobTexture(),
+      transparent: true,
+      depthWrite: false,
+      // Draw just above the ground without z-fighting it.
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+    })
+    const mesh = new InstancedMesh(new PlaneGeometry(2, 2).rotateX(-Math.PI / 2), material, MAX)
+    mesh.frustumCulled = false
+    mesh.renderOrder = 1
+    mesh.castShadow = false
+    mesh.receiveShadow = false
+    return { meshes: [mesh] }
+  }, [])
 
   useFrame(() => {
-    const instances = mesh.current
+    const instances = built?.meshes[0]
     if (!instances) return
+    const material = instances.material
     // As dark as the sun's own shadows: softer under cloud, faint by moonlight.
     material.opacity = 0.5 * sky.keyShadow * Math.min(1, sky.keyIntensity / 1.5 + 0.35)
     let k = 0
@@ -84,16 +79,7 @@ export function Blobs() {
     instances.instanceMatrix.needsUpdate = true
   })
 
-  return (
-    <instancedMesh
-      ref={mesh}
-      args={[geometry, material, MAX]}
-      frustumCulled={false}
-      renderOrder={1}
-      castShadow={false}
-      receiveShadow={false}
-    />
-  )
+  return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
 }
 
 /** A radial falloff, dark at the centre: a soft contact shadow. */

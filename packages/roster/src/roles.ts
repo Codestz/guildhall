@@ -23,6 +23,11 @@ export interface Role {
     | "overflow"
   /** Character model key in the hall's asset manifest. */
   character: string
+  /**
+   * The island job site the role works out at (ADR 0006); none for the keep's roles. The hall's
+   * site registry (`packages/hall/src/world/sites.ts`) says what each site looks like and does.
+   */
+  site?: "yard" | "forest" | "river" | "proving" | "quarry" | "tower"
 }
 
 export const ROLES: readonly Role[] = [
@@ -52,6 +57,7 @@ export const ROLES: readonly Role[] = [
     color: "#e0702f",
     station: "forge",
     character: "barbarian",
+    site: "yard",
   },
   {
     id: "guild-verifier",
@@ -61,6 +67,7 @@ export const ROLES: readonly Role[] = [
     color: "#3fae6b",
     station: "inspection-bench",
     character: "rogue",
+    site: "proving",
   },
   {
     id: "guild-librarian",
@@ -70,6 +77,7 @@ export const ROLES: readonly Role[] = [
     color: "#8b6cd9",
     station: "library",
     character: "mage",
+    site: "tower",
   },
   {
     id: "guild-explorer",
@@ -79,6 +87,7 @@ export const ROLES: readonly Role[] = [
     color: "#2fa7a0",
     station: "map-table",
     character: "ranger",
+    site: "forest",
   },
   {
     id: "guild-researcher",
@@ -88,6 +97,7 @@ export const ROLES: readonly Role[] = [
     color: "#6fb3e0",
     station: "map-table",
     character: "rogue-hooded",
+    site: "river",
   },
   {
     id: "guild-designer",
@@ -109,7 +119,10 @@ export const ROLES: readonly Role[] = [
   },
 ]
 
-/** Any agent the roster does not know (OpenCode's own `general`, a user's agent): grey, overflow bench. */
+/**
+ * Any agent the roster does not know (OpenCode's own `general`, a user's agent): grey, overflow
+ * bench, and out at the quarry when it works on the island.
+ */
 export const STRANGER: Omit<Role, "id"> & { id: string } = {
   id: "stranger",
   title: "Wanderer",
@@ -118,8 +131,9 @@ export const STRANGER: Omit<Role, "id"> & { id: string } = {
   color: "#9a8f80",
   station: "overflow",
   character: "rogue-hooded",
+  site: "quarry",
 }
 
-export function roleOf(agent: string): Pick<Role, "title" | "color" | "station" | "character"> {
+export function roleOf(agent: string): Pick<Role, "title" | "color" | "station" | "character" | "site"> {
   return ROLES.find((role) => role.id === agent) ?? STRANGER
 }

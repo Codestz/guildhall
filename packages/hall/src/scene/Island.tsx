@@ -17,6 +17,7 @@ import { LANDS_URL } from "../world/cast.ts"
 import { HEX_SCALE, island, type LandPiece, type LandPlacement, SITES, yardBuilding } from "../world/lands.ts"
 import { plain } from "./Kit.tsx"
 import { isMovingPart } from "./life/moving.ts"
+import { useOwnedMeshes } from "./owned.ts"
 import { tameLime } from "./palette.ts"
 
 useGLTF.preload(LANDS_URL)
@@ -32,13 +33,19 @@ export function Island() {
   const { progress } = useGuild()
   const land = useMemo(() => island(), [])
   useMemo(() => soften(nodes), [nodes])
-  const batches = useMemo(() => batch(nodes, [...land.tiles, ...land.decor]), [nodes, land])
+  // The batches are this mount's own (scene/owned.ts: freed on unmount, StrictMode-safe); their
+  // materials are the land pack's.
+  const built = useOwnedMeshes(
+    () => ({ meshes: batch(nodes, [...land.tiles, ...land.decor]) }),
+    [nodes, land],
+    "materials",
+  )
   const building = yardBuilding(progress)
   const yard = SITES.yard.at
 
   return (
     <group>
-      {batches.map((mesh) => (
+      {built?.meshes.map((mesh) => (
         <primitive key={mesh.uuid} object={mesh} />
       ))}
       <YardBuilding nodes={nodes} piece={building} at={yard} />

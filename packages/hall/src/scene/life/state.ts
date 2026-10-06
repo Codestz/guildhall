@@ -1,4 +1,5 @@
 import type { GuildStore } from "../../guild/store.ts"
+import { SITE_DEFS } from "../../world/sites.ts"
 import { NO_TRACES, TraceLedger, type Traces } from "./traces.ts"
 
 /**
@@ -25,18 +26,15 @@ export function readGuild(store: GuildStore): void {
   const now = store.snapshot()
   if (now === version) return
   version = now
-  let forging = 0
-  let sawing = 0
-  let fishing = 0
+  life.forging = 0
+  life.sawing = 0
+  life.fishing = 0
+  // Which machine a site's workers run is the site registry's (world/sites.ts).
   for (const view of store.views) {
-    if (view.phase !== "working" || !view.tool) continue
-    if (view.site === "yard") forging++
-    else if (view.site === "forest") sawing++
-    else if (view.site === "river") fishing++
+    if (view.phase !== "working" || !view.tool || !view.site) continue
+    const machine = SITE_DEFS[view.site].machine
+    if (machine) life[machine]++
   }
-  life.forging = forging
-  life.sawing = sawing
-  life.fishing = fishing
   // Prefer the store's own traces when it has them (exact across seeks); else the ledger.
   const own = (store as unknown as { traces?: Traces }).traces
   const traces = own ?? ledger.update(idsOf(store), (id) => store.sessionOf(id))

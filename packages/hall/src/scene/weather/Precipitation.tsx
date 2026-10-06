@@ -15,7 +15,8 @@ import {
 } from "three"
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
-import { EASE, pixelsPerUnit, seenWidth, targetOf, WIND_DIRECTION } from "./shared.ts"
+import { WIND_DIRECTION, wind } from "../atmosphere/wind.ts"
+import { EASE, pixelsPerUnit, seenWidth, targetOf } from "./shared.ts"
 
 /**
  * Rain and snow: a box of drops round the camera's target, sized to what the camera sees, so the
@@ -27,7 +28,7 @@ export function Precipitation({ tier }: { tier: Tier }) {
   const store = useGuildStore()
   const rain = useMemo(() => fall("rain", RAIN_COUNT[tier]), [tier])
   const snow = useMemo(() => fall("snow", SNOW_COUNT[tier]), [tier])
-  const state = useMemo(() => ({ rain: 0, snow: 0, wind: 0, time: 0 }), [])
+  const state = useMemo(() => ({ rain: 0, snow: 0, time: 0 }), [])
 
   useEffect(
     () => () => {
@@ -44,7 +45,6 @@ export function Precipitation({ tier }: { tier: Tier }) {
     const snowing = env.weather === "snow"
     state.rain = MathUtils.damp(state.rain, snowing ? 0 : env.precipitation, EASE, delta)
     state.snow = MathUtils.damp(state.snow, snowing ? env.precipitation : 0, EASE, delta)
-    state.wind = MathUtils.damp(state.wind, env.wind, EASE, delta)
     state.time += delta
 
     const target = targetOf(controls)
@@ -56,7 +56,7 @@ export function Precipitation({ tier }: { tier: Tier }) {
     view.pixels = pixelsPerUnit(camera, size) * viewport.dpr
     view.perspective = ortho ? 0 : 1
     view.time = state.time
-    view.wind = state.wind
+    view.wind = wind.strength
     show(rain, state.rain, "rain", view)
     show(snow, state.snow, "snow", view)
   })

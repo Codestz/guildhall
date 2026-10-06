@@ -1,6 +1,6 @@
 import { useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
-import { useEffect, useMemo } from "react"
+import { useMemo } from "react"
 import {
   BufferGeometry,
   Color,
@@ -18,7 +18,6 @@ import {
   type Texture,
   UniformsLib,
   UniformsUtils,
-  Vector2,
   Vector3,
 } from "three"
 import type { Tier } from "../../guild/quality.ts"
@@ -26,7 +25,8 @@ import { useGuildStore } from "../../guild/useGuild.ts"
 import { LANDS_URL } from "../../world/cast.ts"
 import { island } from "../../world/lands.ts"
 import { sky } from "../atmosphere/state.ts"
-import { EASE, WIND_DIRECTION } from "../weather/shared.ts"
+import { wind } from "../atmosphere/wind.ts"
+import { useOwnedMeshes } from "../owned.ts"
 import { FLOWERS, scatter, type Tuft } from "./scatter.ts"
 import { grassFragment, grassVertex } from "./shaders.ts"
 
@@ -41,44 +41,28 @@ const DENSITY: Record<Tier, number> = { 0: 0, 1: 150, 2: 240, 3: 340 }
 export function Grass({ tier }: { tier: Tier }) {
   const store = useGuildStore()
   const { nodes } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
-  const palette = useMemo(() => paletteOf(nodes), [nodes])
-  const geometries = useMemo(() => ({ tuft: tuft(), flower: flower() }), [])
-  const material = useMemo(() => grassMaterial(palette), [palette])
-  const meshes = useMemo(() => meadow(geometries, material, DENSITY[tier]), [geometries, material, tier])
-  const eased = useMemo(() => ({ wind: 0.2, snow: 0, wet: 0 }), [])
+  // Geometry, materials and meshes are this mount's own (scene/owned.ts); the palette is the land's.
+  const built = useOwnedMeshes(
+    () => {
+      if (DENSITY[tier] === 0) return { meshes: [], material: null }
+      const material = grassMaterial(paletteOf(nodes))
+      return { meshes: meadow({ tuft: tuft(), flower: flower() }, material, DENSITY[tier]), material }
+    },
+    [nodes, tier],
+    "textures",
+  )
+  const eased = useMemo(() => ({ snow: 0, wet: 0 }), [])
 
-  useEffect(
-    () => () => {
-      for (const mesh of meshes) mesh.dispose()
-    },
-    [meshes],
-  )
-  useEffect(
-    () => () => {
-      material.dispose()
-      flowerMaterials.get(material)?.dispose()
-    },
-    [material],
-  )
-  useEffect(
-    () => () => {
-      geometries.tuft.dispose()
-      geometries.flower.dispose()
-    },
-    [geometries],
-  )
-
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
+    const material = built?.material
+    if (!material) return
     const env = store.environment
     const u = material.uniforms
     const snowing = env.weather === "snow" || env.temperature < 0
-    eased.wind = MathUtils.damp(eased.wind, env.wind, EASE, delta)
     // Snow builds up and melts slowly; frost alone (cold, no snow falling) is a light dusting.
     const snow = env.weather === "snow" ? 0.55 + 0.45 * env.precipitation : snowing ? 0.3 : 0
     eased.snow = MathUtils.damp(eased.snow, snow, 0.5, delta)
     eased.wet = MathUtils.damp(eased.wet, snowing ? 0 : Math.min(1, env.precipitation * 1.4), 0.8, delta)
-    ;(u.uTime as { value: number }).value = state.clock.elapsedTime
-    ;(u.uWind as { value: number }).value = eased.wind
     ;(u.uSnow as { value: number }).value = eased.snow
     ;(u.uWet as { value: number }).value = eased.wet
     ;(u.uKeyIntensity as { value: number }).value = sky.keyIntensity
@@ -89,7 +73,7 @@ export function Grass({ tier }: { tier: Tier }) {
 
   return (
     <>
-      {meshes.map((mesh) => (
+      {built?.meshes.map((mesh) => (
         <primitive key={mesh.uuid} object={mesh} />
       ))}
     </>
@@ -111,14 +95,11 @@ function grassMaterial(palette: Texture | null): ShaderMaterial {
       UniformsLib.lights,
       UniformsLib.fog,
       {
-        uTime: { value: 0 },
-        uWind: { value: 0.2 },
         uSnow: { value: 0 },
         uWet: { value: 0 },
         uKeyIntensity: { value: 1 },
         uHemiIntensity: { value: 1 },
         uKeyDir: { value: new Vector3(0, 1, 0) },
-        uWindDir: { value: new Vector2(WIND_DIRECTION.x, WIND_DIRECTION.z) },
       },
     ]),
     vertexShader: grassVertex,
@@ -127,7 +108,9 @@ function grassMaterial(palette: Texture | null): ShaderMaterial {
     fog: true,
     side: DoubleSide,
   })
+  // Shared by reference: the sky's colours, and the one wind (atmosphere/wind.ts).
   const u = material.uniforms
+  Object.assign(u, wind.uniforms)
   u.uPalette = { value: palette }
   u.uKeyColor = { value: sky.keyColor }
   u.uHemiSky = { value: sky.hemiSky }

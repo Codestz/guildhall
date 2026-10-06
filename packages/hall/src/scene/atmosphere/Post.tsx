@@ -11,6 +11,7 @@ import {
 import { type BloomEffect, ToneMappingMode, type VignetteEffect } from "postprocessing"
 import { useMemo, useRef } from "react"
 import { TIERS } from "../../guild/quality.ts"
+import { FRAME } from "../frame.ts"
 import { useTier } from "../Quality.tsx"
 import { GradeEffect } from "./GradeEffect.ts"
 import { sky } from "./state.ts"
@@ -44,7 +45,8 @@ export function Post() {
   if (!level.post) return null
   const half = level.ao === "half"
   return (
-    <EffectComposer multisampling={0}>
+    // Draws the frame on every tier with post (scene/frame.ts: on Low, FrameStats does).
+    <EffectComposer multisampling={0} renderPriority={FRAME.RENDER}>
       {level.ao !== "off" ? (
         <N8AO
           aoRadius={2.4}

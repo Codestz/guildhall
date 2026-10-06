@@ -8,23 +8,26 @@ import {
   rootOf,
   type Session,
 } from "@guildhall/core"
-import { type DeedLook, deedLook, interestOf, ROLES, roleOf } from "@guildhall/roster"
+import { type DeedLook, deedLook, interestOf, roleOf } from "@guildhall/roster"
 import { Player, party, rush, solo, toEvents } from "@guildhall/sim"
 import { type Traces, tracesOf } from "../scene/life/traces.ts"
-import { ROLE_SITE, SITES, type SiteId, siteOf } from "../world/lands.ts"
+import type { SiteId } from "../world/lands.ts"
 import {
   GATE,
   HAND_IN,
   hearthSeat,
-  INFIRMARY,
-  INFIRMARY_MATS,
   type Post,
+  type Seat,
   STATIONS,
   type StationId,
   TAVERN,
 } from "../world/layout.ts"
 import { MOODS, type Mood } from "../world/moods.ts"
+import { destinationOf, FATES, type Fates, SITE_DEFS, siteOf } from "../world/sites.ts"
 import { DEFAULT_SETTINGS, type Environment, type EnvironmentSettings, environmentOf } from "./environment.ts"
+import { type Actor, before, happenings, MomentStream } from "./moments.ts"
+
+export type { Seat }
 
 /**
  * The hall's single source of truth: a Player feeds `GuildEvent`s into cockpit's model, and the
@@ -63,7 +66,6 @@ export function liveUrlOf(search: string): string | null {
 }
 
 export type Phase = "working" | "waiting" | "loot" | "resting" | "leaving" | "idle" | "failed"
-export type Seat = "stool" | "floor" | "bed"
 
 export interface AdventurerView {
   id: string
@@ -88,6 +90,8 @@ export interface AdventurerView {
   station?: StationId
   /** The island job site they work at (ADR 0006), instead of a station. */
   site?: SiteId
+  /** Failed: where they were sent (a key of world/sites.ts `DESTINATIONS`). */
+  destination?: string
   /** The deed in progress, if any. */
   look?: DeedLook
   /** Its tool name, as OpenCode spells it. */
@@ -147,6 +151,8 @@ export class GuildStore {
   selected: string | null = null
   /** Newest last, at most LOG_SIZE. */
   log: LogEntry[] = []
+  /** Typed joins, quests, deeds, failures, loot, pleas and departures (guild/moments.ts, ADR 0008). */
+  readonly moments = new MomentStream()
   markers: Marker[] = []
   /** Completed edits/writes this run: the yard's building grows with it. */
   progress = 0
@@ -355,11 +361,19 @@ export class GuildStore {
     this.log = []
     this.logged.clear()
     this.progress = 0
+    this.left.clear()
+    this.rebuilding = true
+    this.moments.rebuild()
   }
 
   private take(change: Change, live: boolean): void {
+    const was = before(this.model, change)
     apply(this.model, change)
     this.record(change)
+    for (const happening of happenings(this.model, change, was)) {
+      const s = this.model.sessions.get(happening.id)
+      if (s) this.moments.add({ ...this.actorOf(s), ...happening, at: change.at - this.start, live })
+    }
     if (this.mode === "live") {
       const kind = markerOf(change)
       if (kind) this.markers.push({ at: change.at - this.start, kind })
@@ -397,12 +411,49 @@ export class GuildStore {
     if (this.log.length > LOG_SIZE) this.log.splice(0, this.log.length - LOG_SIZE)
   }
 
+  /** Who a moment is about, named as the log names them. */
+  private actorOf(s: Session): Actor {
+    const role = s.parentID ? roleOf(s.agent) : GUILDMASTER
+    return {
+      id: s.id,
+      agent: s.agent,
+      title: s.parentID ? numbered(role.title, ordinalOf(this.model, s)) : role.title,
+      color: role.color,
+      ...(s.parentID ? { parent: s.parentID } : {}),
+      master: rootOf(this.model, s.id),
+    }
+  }
+
+  /** Subagents already gone out of the gate (a `leave` moment made), until they work again. */
+  private left = new Set<string>()
+  /** Set by a reset, cleared by the next refresh: departures found meanwhile are history, not news. */
+  private rebuilding = false
+
+  /** `leave` moments: a finished subagent leaves the stage `GONE_MS` after it ended (see `viewsOf`). */
+  private departures(party: readonly Session[]): void {
+    const now = this.now
+    for (const s of party) {
+      const gone =
+        s.parentID !== undefined && s.status === "done" && s.ended !== undefined && now - s.ended > GONE_MS
+      if (!gone) {
+        this.left.delete(s.id)
+        continue
+      }
+      if (this.left.has(s.id) || s.ended === undefined) continue
+      this.left.add(s.id)
+      const at = s.ended + GONE_MS - this.start
+      this.moments.add({ ...this.actorOf(s), kind: "leave", at, live: !this.rebuilding })
+    }
+  }
+
   private refresh(): void {
     this.sinceViews = 0
     if (this.focus && this.now - this.focus.at > FOCUS_TTL_MS) this.focus = null
     this.views = viewsOf(this.model, this.now)
     // The world shows the party on stage, not every guild the hub has heard from.
     const party = partyOf(this.model)
+    this.departures(party)
+    this.rebuilding = false
     this.progress = progressOf(party)
     this.traces = tracesOf(party)
     this.environment = environmentOf({
@@ -451,8 +502,8 @@ export function partyOf(model: Model): Session[] {
   return [...model.sessions.values()].filter((s) => !followed || rootOf(model, s.id) === followed.id)
 }
 
-/** Everyone on stage right now, and where they belong. */
-export function viewsOf(model: Model, now: number): AdventurerView[] {
+/** Everyone on stage right now, and where they belong. `fates` says where failures go. */
+export function viewsOf(model: Model, now: number, fates: Fates = FATES): AdventurerView[] {
   const sessions = partyOf(model).sort(byJoin)
   const master = sessions.find((s) => !s.parentID)
   /** How many of each role have joined so far: counted before anyone leaves, so numbers never shift. */
@@ -460,7 +511,8 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
   const taken = new Map<StationId, number>()
   let stools = 0
   let floor = 0
-  let beds = 0
+  /** How many have been sent to each failure destination so far. */
+  const sent = new Map<string, number>()
   const atSite = new Map<SiteId, number>()
   const views: AdventurerView[] = []
 
@@ -485,12 +537,8 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
     let station: StationId | undefined
     let site: SiteId | undefined
     let seat: Seat | undefined
-    const home = isMaster
-      ? undefined
-      : siteOf(
-          s.agent,
-          ROLES.some((r) => r.id === s.agent),
-        )
+    let destination: string | undefined
+    const home = isMaster ? undefined : siteOf(s.agent)
     if (isMaster) {
       station = "quest-board"
       target = MASTER_POST
@@ -510,20 +558,23 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
       }
     } else if (s.status === "failed") {
       phase = "failed"
-      // Beds first, then bedrolls on the floor; past that they share (rare: 7+ failed at once).
-      const n = beds++
-      seat = n < INFIRMARY.length ? "bed" : "floor"
-      target =
-        n < INFIRMARY.length
-          ? (INFIRMARY[n] ?? MASTER_POST)
-          : (INFIRMARY_MATS[(n - INFIRMARY.length) % INFIRMARY_MATS.length] ?? MASTER_POST)
+      // The destination says where (the infirmary: beds first, then bedrolls on the floor).
+      const sessionOf = (id: string) => model.sessions.get(id)
+      const to = destinationOf({ session: s, now, sessionOf }, fates)
+      const place = fates.destinations[to]
+      const n = sent.get(to) ?? 0
+      sent.set(to, n + 1)
+      const berth = place?.berth(n)
+      destination = to
+      seat = berth?.seat
+      target = berth?.target ?? MASTER_POST
     } else if (home) {
       // Island workers stay at their site for the whole quest: no jogging back on every deed.
       site = home
       phase = s.status === "waiting" ? "waiting" : "working"
       const n = atSite.get(home) ?? 0
       atSite.set(home, n + 1)
-      const posts = SITES[home].posts
+      const posts = SITE_DEFS[home].posts
       target = posts[n % posts.length] ?? MASTER_POST
     } else if (look?.goTo) {
       station = look.goTo
@@ -548,6 +599,7 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
       target,
       ...(station ? { station } : {}),
       ...(site ? { site } : {}),
+      ...(destination ? { destination } : {}),
       ...(seat ? { seat } : {}),
       ...(look ? { look } : {}),
       ...(running ? { tool: running } : {}),
@@ -614,18 +666,15 @@ export function roman(n: number): string {
   return out
 }
 
+/** Completed deeds that grow a site's building (the yard's: edits and writes). */
 function progressOf(sessions: Iterable<Session>): number {
   let done = 0
   for (const s of sessions) {
-    if (ROLE_SITE[s.agent] !== "yard") continue
-    for (const entry of s.entries) {
-      if (
-        entry.kind === "tool" &&
-        entry.state === "completed" &&
-        (entry.name === "edit" || entry.name === "write")
-      )
-        done++
-    }
+    const site = siteOf(s.agent)
+    const builds = site && SITE_DEFS[site].builds
+    if (!builds) continue
+    for (const entry of s.entries)
+      if (entry.kind === "tool" && entry.state === "completed" && builds.has(entry.name)) done++
   }
   return done
 }

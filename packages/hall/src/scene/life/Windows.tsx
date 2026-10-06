@@ -1,10 +1,10 @@
 import { useFrame } from "@react-three/fiber"
-import { useEffect, useMemo, useRef } from "react"
+import { useMemo } from "react"
 import {
   AdditiveBlending,
   CanvasTexture,
   Color,
-  type InstancedMesh,
+  InstancedMesh,
   MathUtils,
   Matrix4,
   MeshBasicMaterial,
@@ -15,6 +15,7 @@ import {
 } from "three"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { HEX_SCALE, island, type LandPiece } from "../../world/lands.ts"
+import { useOwnedMeshes } from "../owned.ts"
 import { hash } from "./traces.ts"
 
 /**
@@ -86,36 +87,32 @@ export function Windows() {
     }
     return out
   }, [])
-  const geometry = useMemo(() => new PlaneGeometry(1, 1), [])
-  const paneMaterial = useMemo(() => new MeshBasicMaterial({ toneMapped: false, fog: false }), [])
-  const haloMaterial = useMemo(
-    () =>
-      new MeshBasicMaterial({
-        map: halo(),
-        transparent: true,
-        depthWrite: false,
-        blending: AdditiveBlending,
-        toneMapped: false,
-        fog: false,
-      }),
-    [],
-  )
-  const panes = useRef<InstancedMesh>(null)
-  const halos = useRef<InstancedMesh>(null)
-
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      paneMaterial.dispose()
-      haloMaterial.map?.dispose()
-      haloMaterial.dispose()
-    },
-    [geometry, paneMaterial, haloMaterial],
-  )
+  // Panes and halos share one plane geometry (scene/owned.ts frees it once).
+  const built = useOwnedMeshes(() => {
+    const geometry = new PlaneGeometry(1, 1)
+    const panes = new InstancedMesh(
+      geometry,
+      new MeshBasicMaterial({ toneMapped: false, fog: false }),
+      windows.length,
+    )
+    const haloMaterial = new MeshBasicMaterial({
+      map: halo(),
+      transparent: true,
+      depthWrite: false,
+      blending: AdditiveBlending,
+      toneMapped: false,
+      fog: false,
+    })
+    const halos = new InstancedMesh(geometry, haloMaterial, windows.length)
+    panes.frustumCulled = false
+    halos.frustumCulled = false
+    halos.renderOrder = 10
+    return { meshes: [panes, halos] }
+  }, [windows])
 
   useFrame(({ camera }, delta) => {
-    const glass = panes.current
-    const glows = halos.current
+    const glass = built?.meshes[0]
+    const glows = built?.meshes[1]
     if (!glass || !glows) return
     const env = store.environment
     const dt = Math.min(delta, 0.1)
@@ -153,13 +150,9 @@ export function Windows() {
 
   return (
     <>
-      <instancedMesh ref={panes} args={[geometry, paneMaterial, windows.length]} frustumCulled={false} />
-      <instancedMesh
-        ref={halos}
-        args={[geometry, haloMaterial, windows.length]}
-        frustumCulled={false}
-        renderOrder={10}
-      />
+      {built?.meshes.map((mesh) => (
+        <primitive key={mesh.uuid} object={mesh} />
+      ))}
     </>
   )
 }

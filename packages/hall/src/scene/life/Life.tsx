@@ -2,6 +2,7 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect } from "react"
 import { quality } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
+import { FRAME } from "../frame.ts"
 import { useTier } from "../Quality.tsx"
 import { Birds } from "./Birds.tsx"
 import { Machines } from "./Machines.tsx"
@@ -30,8 +31,8 @@ import { Windows } from "./Windows.tsx"
 export function Life() {
   const store = useGuildStore()
   const tier = useTier()
-  // Before every Life piece reads it this frame.
-  useFrame(() => readGuild(store), -1)
+  // After the guild's clock, before every Life piece reads it this frame.
+  useFrame(() => readGuild(store), FRAME.SKY)
 
   return (
     <group name="life">

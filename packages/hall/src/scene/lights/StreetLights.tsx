@@ -1,10 +1,10 @@
 import { useFrame } from "@react-three/fiber"
-import { useMemo, useRef } from "react"
+import { useMemo } from "react"
 import {
   AdditiveBlending,
   CanvasTexture,
   Color,
-  type InstancedMesh,
+  InstancedMesh,
   Matrix4,
   MeshBasicMaterial,
   PlaneGeometry,
@@ -16,6 +16,7 @@ import { positions, useGuild } from "../../guild/useGuild.ts"
 import { LIGHTS } from "../../world/lights.ts"
 import { sky } from "../atmosphere/state.ts"
 import { mergePlacements, useKit } from "../Kit.tsx"
+import { useOwnedMeshes } from "../owned.ts"
 
 /**
  * The island's night lights (world/lights.ts): the torch posts and lanterns themselves, merged into
@@ -26,17 +27,20 @@ import { mergePlacements, useKit } from "../Kit.tsx"
  */
 export function StreetLights() {
   const kit = useKit()
-  const models = useMemo(
-    () =>
-      mergePlacements(
+  // Merged geometry is ours; the kit's materials are borrowed (scene/owned.ts).
+  const models = useOwnedMeshes(
+    () => ({
+      meshes: mergePlacements(
         kit,
         LIGHTS.map((l) => l.placement),
       ),
+    }),
     [kit],
+    "materials",
   )
   return (
     <group>
-      {models.map((mesh) => (
+      {models?.meshes.map((mesh) => (
         <primitive key={mesh.uuid} object={mesh} />
       ))}
       <Pools />
@@ -47,25 +51,11 @@ export function StreetLights() {
 
 function Pools() {
   const { mood } = useGuild()
-  const mesh = useRef<InstancedMesh>(null)
-  const geometry = useMemo(() => new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), [])
-  const material = useMemo(
-    () =>
-      new MeshBasicMaterial({
-        map: pool(),
-        transparent: true,
-        depthWrite: false,
-        blending: AdditiveBlending,
-        fog: false,
-        polygonOffset: true,
-        polygonOffsetFactor: -4,
-      }),
-    [],
-  )
+  const built = useOwnedMeshes(() => ({ meshes: [pools(LIGHTS.length)] }), [])
   const fire = useMemo(() => new Color(), [])
 
   useFrame(({ clock }) => {
-    const instances = mesh.current
+    const instances = built?.meshes[0]
     if (!instances) return
     // Firelight, pushed towards orange: additive yellow on the island's green grass reads lime.
     fire.set(mood.fire).lerp(EMBER, 0.6)
@@ -85,39 +75,18 @@ function Pools() {
     if (instances.instanceColor) instances.instanceColor.needsUpdate = true
   })
 
-  return (
-    <instancedMesh
-      ref={mesh}
-      args={[geometry, material, LIGHTS.length]}
-      frustumCulled={false}
-      renderOrder={9}
-    />
-  )
+  return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
 }
 
 /** Adventurers' lanterns: a smaller pool that walks with each of them after dark. */
 const MAX_FOLLOWERS = 40
 function Followers() {
   const { mood } = useGuild()
-  const mesh = useRef<InstancedMesh>(null)
-  const geometry = useMemo(() => new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), [])
-  const material = useMemo(
-    () =>
-      new MeshBasicMaterial({
-        map: pool(),
-        transparent: true,
-        depthWrite: false,
-        blending: AdditiveBlending,
-        fog: false,
-        polygonOffset: true,
-        polygonOffsetFactor: -4,
-      }),
-    [],
-  )
+  const built = useOwnedMeshes(() => ({ meshes: [pools(MAX_FOLLOWERS)] }), [])
   const fire = useMemo(() => new Color(), [])
 
   useFrame(({ clock }) => {
-    const instances = mesh.current
+    const instances = built?.meshes[0]
     if (!instances) return
     fire.set(mood.fire).lerp(EMBER, 0.6)
     const glow = Math.max(0, sky.lamps - 0.3) / 0.7
@@ -135,14 +104,24 @@ function Followers() {
     if (instances.instanceColor) instances.instanceColor.needsUpdate = true
   })
 
-  return (
-    <instancedMesh
-      ref={mesh}
-      args={[geometry, material, MAX_FOLLOWERS]}
-      frustumCulled={false}
-      renderOrder={9}
-    />
-  )
+  return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
+}
+
+/** `count` warm pools on the ground: one additive instanced draw, over the ground (renderOrder 9). */
+function pools(count: number): InstancedMesh {
+  const material = new MeshBasicMaterial({
+    map: pool(),
+    transparent: true,
+    depthWrite: false,
+    blending: AdditiveBlending,
+    fog: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+  })
+  const mesh = new InstancedMesh(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), material, count)
+  mesh.frustumCulled = false
+  mesh.renderOrder = 9
+  return mesh
 }
 
 const EMBER = new Color("#ff7a2e")

@@ -261,12 +261,18 @@ function fit(
 
 export type SiteId = "yard" | "forest" | "river" | "proving" | "quarry" | "tower"
 
+/**
+ * Where a job site is on the map. What happens there (clips, gear, traces…) is the site registry's,
+ * `world/sites.ts`, which builds on this; a new site needs an entry in both (ADR 0008).
+ */
 export interface Site {
   id: SiteId
   label: string
   at: Spot
   /** Where adventurers stand to work, facing the work. */
   posts: readonly Post[]
+  /** The building that marks the site, for the Life layer (`Landmark.site`). */
+  landmark?: LandPiece
 }
 
 /** Facing from a post towards a point. */
@@ -321,30 +327,35 @@ export const SITES: Record<SiteId, Site> = {
     id: "forest",
     label: "Forest edge",
     at: [-56, 7],
+    landmark: "building_lumbermill_blue",
     posts: WORK.forest.map((tree) => stand(tree, W(PLACES.FOREST), 5)),
   },
   river: {
     id: "river",
     label: "River bend",
     at: [-31, 45],
+    landmark: "building_watermill_blue",
     posts: WORK.river.map((water) => stand(water, [-20, water[1]], 3.2)),
   },
   proving: {
     id: "proving",
     label: "Proving grounds",
     at: [40, 36],
+    landmark: "building_archeryrange_blue",
     posts: WORK.targets.map((target) => stand(target, W(PLACES.PROVING), 2.6)),
   },
   quarry: {
     id: "quarry",
     label: "Quarry",
     at: [26, -50],
+    landmark: "building_mine_blue",
     posts: WORK.quarry.map((rock) => stand(rock, W(PLACES.QUARRY), 3.5)),
   },
   tower: {
     id: "tower",
     label: "Wizard tower",
     at: TOWER_AT,
+    landmark: "building_tower_A_blue",
     posts: [toward(-40, -39.5, TOWER_AT[0], TOWER_AT[1]), toward(-46.6, -39.5, TOWER_AT[0], TOWER_AT[1])],
   },
 }
@@ -411,13 +422,9 @@ const CHIMNEY: Partial<Record<LandPiece, readonly [number, number, number]>> = {
   building_home_B_green: [0.14, 1.28, -0.42],
   building_blacksmith_blue: [0.21, 0.98, -0.14],
 }
-const SITE_OF: Partial<Record<LandPiece, SiteId>> = {
-  building_mine_blue: "quarry",
-  building_tower_A_blue: "tower",
-  building_watermill_blue: "river",
-  building_lumbermill_blue: "forest",
-  building_archeryrange_blue: "proving",
-}
+const SITE_OF: Partial<Record<LandPiece, SiteId>> = Object.fromEntries(
+  Object.values(SITES).flatMap((site) => (site.landmark ? [[site.landmark, site.id]] : [])),
+)
 
 // ---- Hand-placed buildings and dressing --------------------------------------------------------
 
@@ -565,20 +572,6 @@ export function yardBuilding(progress: number): LandPiece {
   if (progress >= 4) return "building_stage_B"
   if (progress >= 2) return "building_stage_A"
   return "building_scaffolding"
-}
-
-/** Which roles work out on the island (ADR 0006); the rest of the roster stays in the keep. */
-export const ROLE_SITE: Partial<Record<string, SiteId>> = {
-  "guild-implementer": "yard",
-  "guild-explorer": "forest",
-  "guild-researcher": "river",
-  "guild-verifier": "proving",
-  "guild-librarian": "tower",
-}
-
-/** Agents from outside the guild (OpenCode's own `general`, a user's agents) work the quarry. */
-export function siteOf(agent: string, known: boolean): SiteId | undefined {
-  return ROLE_SITE[agent] ?? (known ? undefined : "quarry")
 }
 
 // ---- Terrain -------------------------------------------------------------------------------

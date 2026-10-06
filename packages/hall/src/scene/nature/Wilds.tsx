@@ -1,30 +1,26 @@
 import { useGLTF } from "@react-three/drei"
-import { useFrame } from "@react-three/fiber"
-import { useEffect, useMemo, useState } from "react"
 import {
   BatchedMesh,
   type BufferGeometry,
   Float32BufferAttribute,
-  MathUtils,
   Matrix4,
   type Mesh,
   type MeshStandardMaterial,
   type Object3D,
   Quaternion,
-  Vector2,
   Vector3,
 } from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import type { Tier } from "../../guild/quality.ts"
-import { useGuildStore } from "../../guild/useGuild.ts"
 import type { Spot } from "../../world/layout.ts"
 import { type Wild, type WildKind, type WildPiece, wilds } from "../../world/wilds.ts"
-import { shadows } from "../atmosphere/shadows.ts"
+import { wind } from "../atmosphere/wind.ts"
 import { plain } from "../Kit.tsx"
 import { PILES } from "../life/places.ts"
 import { ROUNDS } from "../life/rounds.ts"
+import { useOwnedMeshes } from "../owned.ts"
 import { tameLime } from "../palette.ts"
-import { EASE, WIND_DIRECTION } from "../weather/shared.ts"
+import { WIND_SWAY } from "./shaders.ts"
 
 export const FOREST_URL = `${import.meta.env.BASE_URL}assets/forest.glb`
 useGLTF.preload(FOREST_URL)
@@ -50,57 +46,31 @@ const DETAIL: Record<Tier, number> = { 0: 0, 1: 1, 2: 2, 3: 2 }
 const SWAY: Record<WildKind, number> = { tree: 0.5, bush: 0.8, rock: 0, grass: 4 }
 
 export function Wilds({ tier }: { tier: Tier }) {
-  const store = useGuildStore()
   const { nodes } = useGLTF(FOREST_URL) as unknown as { nodes: Record<string, Object3D> }
-  const material = useMemo(() => swayMaterial(nodes), [nodes])
-  const [meshes, setMeshes] = useState<readonly BatchedMesh[]>([])
-  const eased = useMemo(() => ({ wind: 0.2 }), [])
-
-  // Built and freed by the same effect: a BatchedMesh can't be used after dispose() (its matrix
-  // texture is gone), so it must never outlive a cleanup, e.g. StrictMode's double effect run.
-  useEffect(() => {
-    const built = material
-      ? build(
-          nodes,
-          material,
-          ALL.filter((w) => w.detail <= DETAIL[tier]),
-        )
-      : []
-    setMeshes(built)
-    shadows.request()
-    return () => {
-      for (const mesh of built) mesh.dispose()
-      shadows.request()
-    }
-  }, [nodes, material, tier])
-  useEffect(() => () => material?.dispose(), [material])
-
-  useFrame((state, delta) => {
-    if (!material) return
-    eased.wind = MathUtils.damp(eased.wind, store.environment.wind, EASE, delta)
-    const u = material.userData.uniforms as Uniforms
-    u.uTime.value = state.clock.elapsedTime
-    u.uWind.value = eased.wind
-  })
+  // Material and batches are this mount's own (scene/owned.ts); the pack's texture is borrowed.
+  const built = useOwnedMeshes(
+    () => {
+      const material = swayMaterial(nodes)
+      const list = ALL.filter((w) => w.detail <= DETAIL[tier])
+      return { meshes: material ? build(nodes, material, list) : [] }
+    },
+    [nodes, tier],
+    "textures",
+  )
 
   return (
     <>
-      {meshes.map((mesh) => (
+      {built?.meshes.map((mesh) => (
         <primitive key={mesh.uuid} object={mesh} />
       ))}
     </>
   )
 }
 
-interface Uniforms {
-  uTime: { value: number }
-  uWind: { value: number }
-  uWindDir: { value: Vector2 }
-}
-
 /**
- * The pack's material, softened like the island's, with a wind sway added to the vertex shader:
- * each vertex bends downwind by its height² (roots stay put), phased by where the instance stands.
+ * The pack's material, softened like the island's, with the shared wind sway (nature/shaders.ts
+ * WIND_SWAY) added to the vertex shader: each vertex bends downwind by its height² (roots stay put),
+ * phased by where the instance stands.
  */
 function swayMaterial(nodes: Record<string, Object3D>): MeshStandardMaterial | null {
   let source: MeshStandardMaterial | null = null
@@ -113,28 +83,17 @@ function swayMaterial(nodes: Record<string, Object3D>): MeshStandardMaterial | n
   const material = (source as MeshStandardMaterial).clone()
   // Calm the pack's lime greens like the island's (scene/palette.ts); other colours stay true.
   tameLime(material.map)
-  const uniforms: Uniforms = {
-    uTime: { value: 0 },
-    uWind: { value: 0.2 },
-    uWindDir: { value: new Vector2(WIND_DIRECTION.x, WIND_DIRECTION.z) },
-  }
-  material.userData.uniforms = uniforms
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms)
+    Object.assign(shader.uniforms, wind.uniforms)
     shader.vertexShader = shader.vertexShader
-      .replace(
-        "#include <common>",
-        "#include <common>\nattribute float aSway;\nuniform float uTime;\nuniform float uWind;\nuniform vec2 uWindDir;",
-      )
+      .replace("#include <common>", `#include <common>\nattribute float aSway;\n${WIND_SWAY}`)
       .replace(
         "#include <begin_vertex>",
         `#include <begin_vertex>
 #ifdef USE_BATCHING
   {
     vec3 root = batchingMatrix[3].xyz;
-    float h = max(transformed.y, 0.0);
-    float phase = uTime * 1.7 + dot(root.xz, vec2(0.23, 0.17));
-    float bend = aSway * h * h * 0.03 * (0.25 + uWind) * (0.65 * sin(phase) + 0.35 * sin(phase * 2.3 + 1.0));
+    float bend = aSway * swayPlant(root.xz, max(transformed.y, 0.0));
     // World wind direction into the instance's own (rotated, scaled) space.
     vec3 local = transpose(mat3(batchingMatrix)) * vec3(uWindDir.x, 0.0, uWindDir.y);
     transformed += local / dot(batchingMatrix[0].xyz, batchingMatrix[0].xyz) * bend;

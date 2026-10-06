@@ -1,8 +1,8 @@
 import { useFrame } from "@react-three/fiber"
-import { useEffect, useMemo, useRef } from "react"
+import { useMemo } from "react"
 import {
   IcosahedronGeometry,
-  type InstancedMesh,
+  InstancedMesh,
   MathUtils,
   Matrix4,
   MeshStandardMaterial,
@@ -12,7 +12,8 @@ import {
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { island } from "../../world/lands.ts"
-import { WIND_DIRECTION } from "../weather/shared.ts"
+import { WIND_DIRECTION, wind } from "../atmosphere/wind.ts"
+import { useOwnedMeshes } from "../owned.ts"
 import { life } from "./state.ts"
 import { hash } from "./traces.ts"
 
@@ -49,37 +50,29 @@ export function Smoke({ tier }: { tier: Tier }) {
       }))
   }, [])
   // Rounder puffs, softly see-through, a little grey-blue: low-poly smoke, not white dice.
-  const geometry = useMemo(() => new IcosahedronGeometry(0.5, 1), [])
-  const material = useMemo(
-    () =>
-      new MeshStandardMaterial({
-        color: "#d9dde3",
-        roughness: 1,
-        flatShading: true,
-        transparent: true,
-        opacity: 0.62,
-        depthWrite: false,
-      }),
-    [],
-  )
-  const mesh = useRef<InstancedMesh>(null)
-  const state = useMemo(() => ({ wind: 0.2, cold: 0, wet: 0, time: 0 }), [])
-
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      material.dispose()
-    },
-    [geometry, material],
-  )
+  const built = useOwnedMeshes(() => {
+    const material = new MeshStandardMaterial({
+      color: "#d9dde3",
+      roughness: 1,
+      flatShading: true,
+      transparent: true,
+      opacity: 0.62,
+      depthWrite: false,
+    })
+    const mesh = new InstancedMesh(new IcosahedronGeometry(0.5, 1), material, chimneys.length * puffs)
+    mesh.frustumCulled = false
+    mesh.castShadow = false
+    mesh.receiveShadow = false
+    return { meshes: [mesh] }
+  }, [chimneys, puffs])
+  const state = useMemo(() => ({ cold: 0, wet: 0, time: 0 }), [])
 
   useFrame((_, delta) => {
-    const instances = mesh.current
+    const instances = built?.meshes[0]
     if (!instances) return
     const env = store.environment
     const dt = Math.min(delta, 0.1)
     state.time += dt
-    state.wind = MathUtils.damp(state.wind, env.wind, 1, dt)
     state.cold = MathUtils.damp(state.cold, 1 - MathUtils.smoothstep(env.temperature, 4, 22), 1, dt)
     state.wet = MathUtils.damp(state.wet, MathUtils.smoothstep(env.precipitation, 0.45, 0.8), 1, dt)
     // A share of the hearths always burns (cooking); the cold lights the rest.
@@ -92,7 +85,7 @@ export function Smoke({ tier }: { tier: Tier }) {
       const size = (0.8 + 0.6 * state.cold + (forging ? 0.4 : 0)) * chimney.presence
       for (let p = 0; p < puffs; p++) {
         const age = (state.time / PERIOD_S + chimney.phase + p / puffs) % 1
-        const bend = state.wind * 4.5 * age ** 1.5
+        const bend = wind.strength * 4.5 * age ** 1.5
         position.set(
           chimney.x + WIND_DIRECTION.x * bend + Math.sin(age * 9 + p) * 0.12,
           chimney.y + 0.2 + age * RISE,
@@ -108,16 +101,7 @@ export function Smoke({ tier }: { tier: Tier }) {
     instances.instanceMatrix.needsUpdate = true
   })
 
-  return (
-    <instancedMesh
-      key={puffs}
-      ref={mesh}
-      args={[geometry, material, chimneys.length * puffs]}
-      frustumCulled={false}
-      castShadow={false}
-      receiveShadow={false}
-    />
-  )
+  return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
 }
 
 const AXIS = new Vector3(0.3, 1, 0.2).normalize()

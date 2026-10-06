@@ -10,6 +10,7 @@ import { Blobs } from "./Blobs.tsx"
 import { CameraRig } from "./CameraRig.tsx"
 import { Crisp } from "./Crisp.tsx"
 import { FrameStats } from "./FrameStats.tsx"
+import { FRAME } from "./frame.ts"
 import { Island } from "./Island.tsx"
 import { Life } from "./life/Life.tsx"
 import { NearLights } from "./lights/NearLights.tsx"
@@ -67,10 +68,10 @@ function Cast() {
   )
 }
 
-/** Drives the guild's clock from the render loop; long frames (a hidden tab) are capped. */
+/** Drives the guild's clock from the render loop (first, FRAME.SIM); long frames are capped. */
 function Clock() {
   const store = useGuildStore()
-  useFrame((_, delta) => store.tick(Math.min(delta, 0.1) * 1000))
+  useFrame((_, delta) => store.tick(Math.min(delta, 0.1) * 1000), FRAME.SIM)
   return null
 }
 

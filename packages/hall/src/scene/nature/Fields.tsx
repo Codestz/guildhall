@@ -1,16 +1,7 @@
-import { useEffect, useMemo, useState } from "react"
-import {
-  BoxGeometry,
-  InstancedMesh,
-  Matrix4,
-  type Mesh,
-  MeshStandardMaterial,
-  Quaternion,
-  Vector3,
-} from "three"
+import { BoxGeometry, InstancedMesh, Matrix4, MeshStandardMaterial, Quaternion, Vector3 } from "three"
 import { plant, RIDGE_HEIGHT, SOIL } from "../../world/fields.ts"
-import { shadows } from "../atmosphere/shadows.ts"
 import { mergePlacements, useKit } from "../Kit.tsx"
+import { useOwnedMeshes } from "../owned.ts"
 
 /**
  * The farms' plots (world/fields.ts): soil ridges on every plot, lettuce or carrots along them, or
@@ -29,18 +20,13 @@ export function Fields() {
 }
 
 function Ridges() {
-  const geometry = useMemo(() => new BoxGeometry(1, 1, 1).translate(0, 0.5, 0), [])
-  const material = useMemo(
-    () => new MeshStandardMaterial({ color: "#6e4a2c", roughness: 1, flatShading: true }),
-    [],
-  )
-  const [mesh, setMesh] = useState<InstancedMesh | null>(null)
-
-  useEffect(() => {
-    const built = new InstancedMesh(geometry, material, PLANTED.ridges.length)
+  const built = useOwnedMeshes(() => {
+    const geometry = new BoxGeometry(1, 1, 1).translate(0, 0.5, 0)
+    const material = new MeshStandardMaterial({ color: "#6e4a2c", roughness: 1, flatShading: true })
+    const mesh = new InstancedMesh(geometry, material, PLANTED.ridges.length)
     PLANTED.ridges.forEach((r, i) => {
       rotation.setFromAxisAngle(UP, r.rot)
-      built.setMatrixAt(
+      mesh.setMatrixAt(
         i,
         matrix.compose(
           position.set(r.x, SOIL - 0.02, r.z),
@@ -49,43 +35,33 @@ function Ridges() {
         ),
       )
     })
-    built.receiveShadow = true
-    built.computeBoundingSphere()
-    setMesh(built)
-    return () => built.dispose()
-  }, [geometry, material])
+    mesh.receiveShadow = true
+    mesh.computeBoundingSphere()
+    return { meshes: [mesh] }
+  }, [])
 
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      material.dispose()
-    },
-    [geometry, material],
-  )
-
-  return mesh ? <primitive object={mesh} /> : null
+  return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
 }
 
 function Crops() {
   const kit = useKit()
-  const [meshes, setMeshes] = useState<readonly Mesh[]>([])
-
-  useEffect(() => {
-    const built = mergePlacements(kit, PLANTED.crops)
-    for (const mesh of built) {
-      mesh.castShadow = false
-      mesh.receiveShadow = true
-    }
-    setMeshes(built)
-    shadows.request()
-    return () => {
-      for (const mesh of built) mesh.geometry.dispose()
-    }
-  }, [kit])
+  // The kit's materials are borrowed: only the merged geometry is ours.
+  const built = useOwnedMeshes(
+    () => {
+      const meshes = mergePlacements(kit, PLANTED.crops)
+      for (const mesh of meshes) {
+        mesh.castShadow = false
+        mesh.receiveShadow = true
+      }
+      return { meshes }
+    },
+    [kit],
+    "materials",
+  )
 
   return (
     <>
-      {meshes.map((mesh) => (
+      {built?.meshes.map((mesh) => (
         <primitive key={mesh.uuid} object={mesh} />
       ))}
     </>

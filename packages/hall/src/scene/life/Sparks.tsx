@@ -1,15 +1,8 @@
 import { useFrame } from "@react-three/fiber"
-import { useEffect, useMemo, useRef } from "react"
-import {
-  BoxGeometry,
-  Color,
-  type InstancedMesh,
-  Matrix4,
-  MeshBasicMaterial,
-  Quaternion,
-  Vector3,
-} from "three"
+import { useMemo } from "react"
+import { BoxGeometry, Color, InstancedMesh, Matrix4, MeshBasicMaterial, Quaternion, Vector3 } from "three"
 import { island } from "../../world/lands.ts"
+import { useOwnedMeshes } from "../owned.ts"
 import { life } from "./state.ts"
 import { hash } from "./traces.ts"
 
@@ -36,12 +29,16 @@ export function Sparks() {
       smithy.z + (-ANVIL.x * Math.sin(rot) + ANVIL.z * Math.cos(rot)) * s,
     )
   }, [])
-  const geometry = useMemo(() => new BoxGeometry(0.09, 0.09, 0.09), [])
-  const material = useMemo(
-    () => new MeshBasicMaterial({ color: new Color("#ffa640").multiplyScalar(4), toneMapped: false }),
-    [],
-  )
-  const mesh = useRef<InstancedMesh>(null)
+  const built = useOwnedMeshes(() => {
+    if (!at) return { meshes: [] }
+    const material = new MeshBasicMaterial({
+      color: new Color("#ffa640").multiplyScalar(4),
+      toneMapped: false,
+    })
+    const mesh = new InstancedMesh(new BoxGeometry(0.09, 0.09, 0.09), material, COUNT)
+    mesh.frustumCulled = false
+    return { meshes: [mesh] }
+  }, [at])
   const sparks = useMemo(
     () => ({
       age: new Float32Array(COUNT).fill(9),
@@ -55,16 +52,8 @@ export function Sparks() {
     [],
   )
 
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      material.dispose()
-    },
-    [geometry, material],
-  )
-
   useFrame((_, delta) => {
-    const instances = mesh.current
+    const instances = built?.meshes[0]
     if (!instances || !at) return
     const dt = Math.min(delta, 0.05)
     if (life.forging > 0) {
@@ -106,8 +95,7 @@ export function Sparks() {
     instances.instanceMatrix.needsUpdate = true
   })
 
-  if (!at) return null
-  return <instancedMesh ref={mesh} args={[geometry, material, COUNT]} frustumCulled={false} />
+  return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
 }
 
 const IDENTITY = new Quaternion()

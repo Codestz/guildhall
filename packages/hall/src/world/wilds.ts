@@ -3,6 +3,7 @@ import LANDS from "./lands.json"
 import { cellToWorld, HEX_SCALE, island, MAP_FOR_TESTS, ROAD_EDGES, ROAD_NODES, SITES } from "./lands.ts"
 import { ROOM, type Spot } from "./layout.ts"
 import { LIGHTS, toSegment } from "./lights.ts"
+import { SITE_DEFS } from "./sites.ts"
 
 /**
  * The wilds (ADR 0007, Nature): character-scale trees, bushes, rocks and grass from the Forest
@@ -227,22 +228,12 @@ function clear(
 // ---- Placement -------------------------------------------------------------------------------
 
 /** What grows where: weights per kind for each kind of anchor. */
-type Mix = Partial<Record<WildKind, number>>
+export type Mix = Partial<Record<WildKind, number>>
 const CLUMP: Mix = { grass: 0.6, bush: 0.25, rock: 0.15 }
 const TREELINE: Mix = { tree: 0.75, bush: 0.25 }
 const ROADSIDE: Mix = { bush: 0.42, rock: 0.18, grass: 0.4 }
 const VILLAGE: Mix = { tree: 0.15, bush: 0.45, grass: 0.4 }
 const SHORE: Mix = { rock: 0.55, grass: 0.3, bush: 0.15 }
-const SITE_MIX: Record<string, Mix> = {
-  forest: { tree: 0.45, bush: 0.35, grass: 0.2 },
-  river: { bush: 0.35, grass: 0.45, rock: 0.2 },
-  yard: { bush: 0.4, grass: 0.35, rock: 0.25 },
-  proving: { bush: 0.45, grass: 0.4, tree: 0.15 },
-  quarry: { rock: 0.6, grass: 0.25, tree: 0.15 },
-  tower: { tree: 0.35, rock: 0.3, grass: 0.35 },
-}
-/** Sites where a tree is a dead one. */
-const BARREN = new Set(["quarry", "tower"])
 
 function kindOf(mix: Mix, roll: number): WildKind {
   let at = 0
@@ -311,17 +302,13 @@ export function wilds(keep: KeepClear = {}): Wild[] {
   alongRoads(4.5, 5, 9, 0.2, TREELINE)
 
   // Then the job sites, so the work places get their dressing before the verges take the room.
-  for (const site of Object.values(SITES)) {
-    const mix = SITE_MIX[site.id] ?? ROADSIDE
+  // Each site's mix, and whether its trees are dead ones, are the site registry's.
+  for (const site of Object.values(SITE_DEFS)) {
+    const { mix, barren = false } = site.wilds
     for (let ring = 6; ring <= 16; ring += 2.5)
       for (let k = 0; k < 14; k++) {
         const angle = (k / 14) * Math.PI * 2 + ring * 0.37
-        tryAt(
-          site.at[0] + Math.cos(angle) * ring,
-          site.at[1] + Math.sin(angle) * ring,
-          mix,
-          BARREN.has(site.id),
-        )
+        tryAt(site.at[0] + Math.cos(angle) * ring, site.at[1] + Math.sin(angle) * ring, mix, barren)
       }
   }
 

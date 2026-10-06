@@ -1,10 +1,10 @@
 import { useFrame } from "@react-three/fiber"
-import { useEffect, useMemo, useRef } from "react"
+import { useMemo } from "react"
 import {
   BufferGeometry,
   DoubleSide,
   Float32BufferAttribute,
-  type InstancedMesh,
+  InstancedMesh,
   MathUtils,
   Matrix4,
   MeshBasicMaterial,
@@ -13,6 +13,7 @@ import {
 } from "three"
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
+import { useOwnedMeshes } from "../owned.ts"
 import { hash } from "./traces.ts"
 
 /**
@@ -26,8 +27,12 @@ const CENTRE = { x: -58, z: -4 }
 export function Birds({ tier }: { tier: Tier }) {
   const store = useGuildStore()
   const count = COUNT[tier]
-  const geometry = useMemo(wing, [])
-  const material = useMemo(() => new MeshBasicMaterial({ color: "#2b2e33", side: DoubleSide }), [])
+  const built = useOwnedMeshes(() => {
+    const material = new MeshBasicMaterial({ color: "#2b2e33", side: DoubleSide })
+    const mesh = new InstancedMesh(wing(), material, count)
+    mesh.frustumCulled = false
+    return { meshes: [mesh] }
+  }, [count])
   const flock = useMemo(
     () =>
       Array.from({ length: COUNT[3] }, (_, i) => ({
@@ -40,19 +45,10 @@ export function Birds({ tier }: { tier: Tier }) {
       })),
     [],
   )
-  const mesh = useRef<InstancedMesh>(null)
   const state = useMemo(() => ({ out: 0, time: 0 }), [])
 
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      material.dispose()
-    },
-    [geometry, material],
-  )
-
   useFrame((_, delta) => {
-    const instances = mesh.current
+    const instances = built?.meshes[0]
     if (!instances) return
     const env = store.environment
     const dt = Math.min(delta, 0.1)
@@ -91,7 +87,7 @@ export function Birds({ tier }: { tier: Tier }) {
     instances.instanceMatrix.needsUpdate = true
   })
 
-  return <instancedMesh key={count} ref={mesh} args={[geometry, material, count]} frustumCulled={false} />
+  return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
 }
 
 const UP = new Vector3(0, 1, 0)

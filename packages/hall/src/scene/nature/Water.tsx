@@ -18,7 +18,6 @@ import {
   type Texture,
   UniformsLib,
   UniformsUtils,
-  Vector2,
   Vector3,
   Vector4,
   type WebGLRenderer,
@@ -30,7 +29,8 @@ import { LANDS_URL } from "../../world/cast.ts"
 import { cellToWorld, HEX_SCALE, island, MAP_FOR_TESTS } from "../../world/lands.ts"
 import { LIGHTS } from "../../world/lights.ts"
 import { sky } from "../atmosphere/state.ts"
-import { EASE, targetOf, WIND_DIRECTION } from "../weather/shared.ts"
+import { wind } from "../atmosphere/wind.ts"
+import { EASE, targetOf } from "../weather/shared.ts"
 import { noiseTexture } from "./noise.ts"
 import { HEX_RADIUS } from "./scatter.ts"
 import { waterFragment, waterVertex } from "./shaders.ts"
@@ -52,7 +52,7 @@ export function Water({ tier }: { tier: Tier }) {
   const { nodes } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
   const geometry = useMemo(surface, [])
   const material = useMemo(() => waterMaterial(tier === 0), [tier])
-  const eased = useMemo(() => ({ wind: 0.2, rain: 0, gloom: 0, cloud: 0, pick: 0 }), [])
+  const eased = useMemo(() => ({ rain: 0, gloom: 0, cloud: 0, pick: 0 }), [])
 
   // The shore texture: render the tiles' land mask from above once (after the first commit, so a
   // suspended render never pays for it), then measure it on the CPU. Kept for the page's life.
@@ -66,7 +66,6 @@ export function Water({ tier }: { tier: Tier }) {
   useFrame((state, delta) => {
     const env = store.environment
     const u = material.uniforms
-    eased.wind = MathUtils.damp(eased.wind, env.wind, EASE, delta)
     eased.rain = MathUtils.damp(eased.rain, env.weather === "snow" ? 0 : env.precipitation, EASE, delta)
     eased.gloom = MathUtils.damp(
       eased.gloom,
@@ -75,8 +74,6 @@ export function Water({ tier }: { tier: Tier }) {
       delta,
     )
     eased.cloud = MathUtils.damp(eased.cloud, env.cloudCover, EASE, delta)
-    setUniform(u.uTime, state.clock.elapsedTime)
-    setUniform(u.uWind, eased.wind)
     setUniform(u.uRain, eased.rain)
     setUniform(u.uGloom, eased.gloom)
     setUniform(u.uCloud, eased.cloud)
@@ -171,11 +168,9 @@ function waterMaterial(low: boolean): ShaderMaterial {
       UniformsLib.lights,
       UniformsLib.fog,
       {
-        uTime: { value: 0 },
         uNoise: { value: null },
         uShoreHalf: { value: SHORE.half },
         uShoreMax: { value: SHORE.maxDistance },
-        uWind: { value: 0.2 },
         uRain: { value: 0 },
         uGloom: { value: 0 },
         uCloud: { value: 0 },
@@ -187,7 +182,6 @@ function waterMaterial(low: boolean): ShaderMaterial {
         uMoon: { value: 0 },
         uNight: { value: 0 },
         uLamps: { value: 0 },
-        uWindDir: { value: new Vector2(WIND_DIRECTION.x, WIND_DIRECTION.z) },
       },
     ]),
     vertexShader: waterVertex,
@@ -196,9 +190,10 @@ function waterMaterial(low: boolean): ShaderMaterial {
     fog: true,
     defines: low ? { NATURE_LOW: "", FLAMES } : { FLAMES },
   })
-  // UniformsUtils.merge clones values; shared objects (the sky's colours, the noise) are attached
-  // after, by reference, so the sky's per-frame writes reach the shader with no copying.
+  // UniformsUtils.merge clones values; shared objects (the wind, the sky's colours, the noise) are
+  // attached after, by reference, so their per-frame writes reach the shader with no copying.
   const u = material.uniforms
+  Object.assign(u, wind.uniforms)
   u.uShore = { value: shore ?? OPEN_SEA }
   u.uFlames = { value: Array.from({ length: FLAMES }, () => new Vector4()) }
   u.uMoonColor = { value: sky.moonColor }

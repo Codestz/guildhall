@@ -1,6 +1,6 @@
 import { useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
-import { useEffect, useMemo } from "react"
+import { useMemo } from "react"
 import {
   type BufferGeometry,
   Color,
@@ -20,8 +20,10 @@ import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { LANDS_URL } from "../../world/cast.ts"
 import { sky } from "../atmosphere/state.ts"
+import { WIND_DIRECTION, wind } from "../atmosphere/wind.ts"
 import { plain } from "../Kit.tsx"
-import { EASE, WIND_DIRECTION } from "./shared.ts"
+import { useOwnedMeshes } from "../owned.ts"
+import { EASE } from "./shared.ts"
 
 /** Clouds per piece at each quality tier (two pieces: two draw calls, Explore only). */
 const COUNT: Record<Tier, number> = { 0: 12, 1: 20, 2: 32, 3: 40 }
@@ -63,56 +65,34 @@ export function Clouds({ tier }: { tier: Tier }) {
   const store = useGuildStore()
   const { nodes } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
   const count = COUNT[tier]
-  const flock = useMemo(() => {
-    const random = seeded(7)
-    return (["cloud_big", "cloud_small"] as const).flatMap((piece) => {
-      const source = nodes[piece]
-      if (!source) return []
-      return merged(source).map(({ geometry, material }) => ({
-        mesh: new InstancedMesh(geometry, material, count),
-        clouds: Array.from(
-          { length: count },
-          (): Cloud => ({
-            along: (random() * 2 - 1) * SPAN,
-            across: (random() * 2 - 1) * SPAN,
-            y: MathUtils.lerp(ALTITUDE[0], ALTITUDE[1], random()),
-            scale: MathUtils.lerp(SCALE[0], SCALE[1], random()) * (piece === "cloud_big" ? 1 : 0.8),
-            turn: random() * Math.PI * 2,
-            presence: 0,
-          }),
-        ),
-      }))
-    })
-  }, [nodes, count])
-
-  useEffect(() => {
-    for (const { mesh } of flock) {
-      mesh.frustumCulled = false
-      mesh.castShadow = false
-      mesh.receiveShadow = false
-      mesh.visible = false
-    }
-    return () => {
+  // Built per mount and tier (scene/owned.ts): own geometry and see-through material copies; the
+  // pack's textures are borrowed.
+  const built = useOwnedMeshes(
+    () => {
+      const flock = flockOf(nodes, count)
       for (const { mesh } of flock) {
-        mesh.geometry.dispose()
-        ;(mesh.material as Material).dispose()
-        mesh.dispose()
+        mesh.frustumCulled = false
+        mesh.castShadow = false
+        mesh.receiveShadow = false
+        mesh.visible = false
       }
-    }
-  }, [flock])
-
-  const state = useMemo(() => ({ drift: 0, cover: 0, wind: 0 }), [])
+      return { meshes: flock.map(({ mesh }) => mesh), flock }
+    },
+    [nodes, count],
+    "textures",
+  )
+  const state = useMemo(() => ({ drift: 0, cover: 0 }), [])
 
   useFrame(({ camera }, delta) => {
     const env = store.environment
     state.cover = MathUtils.damp(state.cover, env.cloudCover, EASE, delta)
-    state.wind = MathUtils.damp(state.wind, env.wind, EASE, delta)
-    state.drift = (state.drift + DRIFT * (0.15 + state.wind) * delta) % (SPAN * 2)
+    state.drift = (state.drift + DRIFT * (0.15 + wind.strength) * delta) % (SPAN * 2)
+    if (!built) return
     // Only the Explore view looks out at the horizon; the Diorama never sees these (no draw call).
     const shown = store.view === "explore" && !(camera as OrthographicCamera).isOrthographicCamera
     const grey = MathUtils.smoothstep(state.cover, 0.6, 1)
     const night = sky.night
-    for (const { mesh, clouds } of flock) {
+    for (const { mesh, clouds } of built.flock) {
       mesh.visible = shown
       if (!shown) continue
       const material = mesh.material as MeshStandardMaterial
@@ -158,11 +138,34 @@ export function Clouds({ tier }: { tier: Tier }) {
 
   return (
     <>
-      {flock.map(({ mesh }) => (
+      {built?.meshes.map((mesh) => (
         <primitive key={mesh.uuid} object={mesh} />
       ))}
     </>
   )
+}
+
+/** Each cloud piece as an InstancedMesh of `count`, with every cloud's seeded place. */
+function flockOf(nodes: Record<string, Object3D>, count: number): { mesh: InstancedMesh; clouds: Cloud[] }[] {
+  const random = seeded(7)
+  return (["cloud_big", "cloud_small"] as const).flatMap((piece) => {
+    const source = nodes[piece]
+    if (!source) return []
+    return merged(source).map(({ geometry, material }) => ({
+      mesh: new InstancedMesh(geometry, material, count),
+      clouds: Array.from(
+        { length: count },
+        (): Cloud => ({
+          along: (random() * 2 - 1) * SPAN,
+          across: (random() * 2 - 1) * SPAN,
+          y: MathUtils.lerp(ALTITUDE[0], ALTITUDE[1], random()),
+          scale: MathUtils.lerp(SCALE[0], SCALE[1], random()) * (piece === "cloud_big" ? 1 : 0.8),
+          turn: random() * Math.PI * 2,
+          presence: 0,
+        }),
+      ),
+    }))
+  })
 }
 
 /** Into [-SPAN, SPAN). */

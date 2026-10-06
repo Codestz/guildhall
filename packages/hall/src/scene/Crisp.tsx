@@ -1,6 +1,7 @@
 import { useFrame, useThree } from "@react-three/fiber"
 import { useRef } from "react"
 import { LinearFilter, type Material, type Mesh, type Texture } from "three"
+import { FRAME } from "./frame.ts"
 
 /**
  * Crisp colours (the user: "textures are really low quality"). Every KayKit model is coloured by a
@@ -35,7 +36,7 @@ export function Crisp() {
         map.needsUpdate = true
       }
     })
-  }, -2)
+  }, FRAME.WORLD)
 
   return null
 }

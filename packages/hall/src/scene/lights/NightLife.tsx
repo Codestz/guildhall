@@ -1,18 +1,13 @@
 import { useFrame } from "@react-three/fiber"
-import { useMemo, useRef } from "react"
-import {
-  AdditiveBlending,
-  Color,
-  type InstancedMesh,
-  MeshBasicMaterial,
-  Object3D,
-  SphereGeometry,
-} from "three"
+import { useMemo } from "react"
+import { AdditiveBlending, Color, InstancedMesh, MeshBasicMaterial, Object3D, SphereGeometry } from "three"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { island } from "../../world/lands.ts"
 import { HEARTH } from "../../world/layout.ts"
 import { LIGHTS } from "../../world/lights.ts"
 import { sky } from "../atmosphere/state.ts"
+import { wind } from "../atmosphere/wind.ts"
+import { useOwnedMeshes } from "../owned.ts"
 import { useTier } from "../Quality.tsx"
 
 /**
@@ -42,14 +37,8 @@ export function NightLife() {
 
 function Fireflies({ count }: { count: number }) {
   const store = useGuildStore()
-  const mesh = useRef<InstancedMesh>(null)
+  const built = useOwnedMeshes(() => ({ meshes: count > 0 ? [glows(0.09, 6, count)] : [] }), [count])
   const dummy = useMemo(() => new Object3D(), [])
-  const geometry = useMemo(() => new SphereGeometry(0.09, 6, 6), [])
-  const material = useMemo(
-    () =>
-      new MeshBasicMaterial({ transparent: true, depthWrite: false, blending: AdditiveBlending, fog: false }),
-    [],
-  )
   const seeds = useMemo(
     () =>
       Array.from({ length: count }, (_, i) => {
@@ -66,8 +55,8 @@ function Fireflies({ count }: { count: number }) {
   const glow = useMemo(() => new Color(), [])
 
   useFrame(({ clock }) => {
-    const instances = mesh.current
-    if (!instances || count === 0) return
+    const instances = built?.meshes[0]
+    if (!instances) return
     const wet = store.environment.precipitation
     const visible = sky.night * (1 - Math.min(1, wet * 1.5)) * (store.environment.temperature > 4 ? 1 : 0)
     instances.visible = visible > 0.02
@@ -92,8 +81,7 @@ function Fireflies({ count }: { count: number }) {
     if (instances.instanceColor) instances.instanceColor.needsUpdate = true
   })
 
-  if (count === 0) return null
-  return <instancedMesh ref={mesh} args={[geometry, material, count]} frustumCulled={false} />
+  return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
 }
 
 /** Fire sources: the hearth and every street torch flame. */
@@ -104,21 +92,14 @@ const FIRES = [
 
 function Embers({ count }: { count: number }) {
   const store = useGuildStore()
-  const mesh = useRef<InstancedMesh>(null)
+  const built = useOwnedMeshes(() => ({ meshes: count > 0 ? [glows(0.05, 5, count)] : [] }), [count])
   const dummy = useMemo(() => new Object3D(), [])
-  const geometry = useMemo(() => new SphereGeometry(0.05, 5, 5), [])
-  const material = useMemo(
-    () =>
-      new MeshBasicMaterial({ transparent: true, depthWrite: false, blending: AdditiveBlending, fog: false }),
-    [],
-  )
   const ember = useMemo(() => new Color(), [])
 
   useFrame(({ clock }) => {
-    const instances = mesh.current
-    if (!instances || count === 0) return
+    const instances = built?.meshes[0]
+    if (!instances) return
     const strength = Math.max(0.25, sky.lamps) * (1 - Math.min(1, store.environment.precipitation * 2))
-    const wind = store.environment.wind
     const t = clock.elapsedTime
     for (let i = 0; i < count; i++) {
       // The first few always rise from the hearth; the rest are shared round the torches.
@@ -126,7 +107,7 @@ function Embers({ count }: { count: number }) {
       if (!fire) continue
       const life = (t * (0.35 + (i % 5) * 0.06) + i * 0.618) % 1
       dummy.position.set(
-        fire[0] + Math.sin(i * 12.9 + t) * 0.25 + life * wind * 1.8,
+        fire[0] + Math.sin(i * 12.9 + t) * 0.25 + life * wind.strength * 1.8,
         fire[1] + life * 3.2,
         fire[2] + Math.cos(i * 7.3 + t) * 0.25,
       )
@@ -139,8 +120,20 @@ function Embers({ count }: { count: number }) {
     if (instances.instanceColor) instances.instanceColor.needsUpdate = true
   })
 
-  if (count === 0) return null
-  return <instancedMesh ref={mesh} args={[geometry, material, count]} frustumCulled={false} />
+  return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
+}
+
+/** `count` additive, unlit specks of light (a low-poly sphere of `radius`): one instanced draw. */
+function glows(radius: number, segments: number, count: number): InstancedMesh {
+  const material = new MeshBasicMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: AdditiveBlending,
+    fog: false,
+  })
+  const mesh = new InstancedMesh(new SphereGeometry(radius, segments, segments), material, count)
+  mesh.frustumCulled = false
+  return mesh
 }
 
 function jitter(i: number, salt: number): number {

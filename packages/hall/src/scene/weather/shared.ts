@@ -1,12 +1,10 @@
 import { type Camera, MathUtils, type OrthographicCamera, type PerspectiveCamera, Vector3 } from "three"
 
 /**
- * Shared by every weather effect: which way the wind blows (from the west-south-west, so clouds
- * cross the overview diagonally), how fast each effect eases towards the environment's numbers
+ * Shared by every weather effect: how fast each effect eases towards the environment's numbers
  * (the model already moves smoothly; this hides the last steps, a change of weather's band), and
- * what the camera is looking at.
+ * what the camera is looking at. The wind itself (direction, eased strength) is atmosphere/wind.ts.
  */
-export const WIND_DIRECTION = new Vector3(1, 0, 0.35).normalize()
 
 /** Damping rate for `MathUtils.damp`: about 1.5 s to settle. */
 export const EASE = 2

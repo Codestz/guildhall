@@ -1,22 +1,23 @@
 import { useFrame } from "@react-three/fiber"
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo } from "react"
 import {
   BoxGeometry,
   Color,
   DoubleSide,
-  type InstancedMesh,
+  InstancedMesh,
   MathUtils,
   Matrix4,
   MeshStandardMaterial,
   Quaternion,
   Vector3,
 } from "three"
-import type { LogEntry } from "../../guild/store.ts"
+import type { Moment } from "../../guild/moments.ts"
 import { positions, useGuildStore } from "../../guild/useGuild.ts"
+import { useOwnedMeshes } from "../owned.ts"
 import { wing } from "./Birds.tsx"
 
 /**
- * Ravens carry the guild's messages (docs/ideas.md), read from the chronicle like everything else,
+ * Ravens carry the guild's messages (docs/ideas.md), hung on the store's moment stream (ADR 0008),
  * so they fly for live OpenCode sessions, replays and the simulator alike:
  *   join   the guildmaster sends a quest: a raven flies from them to the new adventurer, homing
  *          in on them as they walk
@@ -25,8 +26,6 @@ import { wing } from "./Birds.tsx"
  * Each carries a sealed letter in the sender's colour. Two draw calls (ravens, letters).
  */
 const MAX = 8
-/** Only what happens now sends a raven: never a flock on a seek or a replayed backlog. */
-const FRESH_MS = 1500
 const PLEA_S = 5
 
 interface Flight {
@@ -41,42 +40,48 @@ interface Flight {
 
 export function Ravens() {
   const store = useGuildStore()
-  const geometry = useMemo(wing, [])
-  const letterGeometry = useMemo(() => new BoxGeometry(0.34, 0.06, 0.24), [])
-  // Lit, blue-black with a sheen: flat unlit black read as glitch shards (design review #7).
-  const material = useMemo(
-    () =>
-      new MeshStandardMaterial({
-        color: "#2a3142",
-        roughness: 0.45,
-        metalness: 0.15,
-        side: DoubleSide,
-        flatShading: true,
-      }),
-    [],
-  )
-  const letterMaterial = useMemo(() => new MeshStandardMaterial({ color: "#ffffff", roughness: 0.8 }), [])
-  const ravens = useRef<InstancedMesh>(null)
-  const letters = useRef<InstancedMesh>(null)
-  const sky = useMemo(() => ({ flights: [] as Flight[], seen: -1, time: 0 }), [])
-
-  useEffect(
-    () => () => {
-      geometry.dispose()
-      letterGeometry.dispose()
-      material.dispose()
-      letterMaterial.dispose()
-    },
-    [geometry, letterGeometry, material, letterMaterial],
-  )
+  // Ravens and letters: this mount's own (scene/owned.ts).
+  const built = useOwnedMeshes(() => {
+    // Lit, blue-black with a sheen: flat unlit black read as glitch shards (design review #7).
+    const material = new MeshStandardMaterial({
+      color: "#2a3142",
+      roughness: 0.45,
+      metalness: 0.15,
+      side: DoubleSide,
+      flatShading: true,
+    })
+    const letterMaterial = new MeshStandardMaterial({ color: "#ffffff", roughness: 0.8 })
+    const ravens = new InstancedMesh(wing(), material, MAX)
+    const letters = new InstancedMesh(new BoxGeometry(0.34, 0.06, 0.24), letterMaterial, MAX)
+    ravens.frustumCulled = false
+    letters.frustumCulled = false
+    return { meshes: [ravens, letters] }
+  }, [])
+  const sky = useMemo(() => ({ flights: [] as Flight[], time: 0 }), [])
+  // Only live moments send a raven (never a flock on a seek or a replayed backlog); a rebuild
+  // grounds whatever is in the air. They are queued here and launched in the frame, below.
+  const news = useMemo<Moment[]>(() => [], [])
+  useEffect(() => {
+    const off = store.moments.on((moment) => {
+      if (moment.kind === "join" || moment.kind === "loot" || moment.kind === "plea") news.push(moment)
+    })
+    const offRebuild = store.moments.onRebuild(() => {
+      news.length = 0
+      sky.flights.length = 0
+    })
+    return () => {
+      off()
+      offRebuild()
+    }
+  }, [store, news, sky])
 
   useFrame((_, delta) => {
-    const body = ravens.current
-    const seal = letters.current
+    const body = built?.meshes[0]
+    const seal = built?.meshes[1]
     if (!body || !seal) return
     const dt = Math.min(delta, 0.1)
     sky.time += dt
-    collect(store.log, store.time, store.views, sky)
+    launch(news, store.views, sky.flights)
 
     let k = 0
     for (let i = sky.flights.length - 1; i >= 0; i--) {
@@ -135,35 +140,24 @@ export function Ravens() {
 
   return (
     <>
-      <instancedMesh ref={ravens} args={[geometry, material, MAX]} frustumCulled={false} />
-      <instancedMesh ref={letters} args={[letterGeometry, letterMaterial, MAX]} frustumCulled={false} />
+      {built?.meshes.map((mesh) => (
+        <primitive key={mesh.uuid} object={mesh} />
+      ))}
     </>
   )
 }
 
-/** New chronicle lines → new flights. A rewind (seek, new story) just resets what's been seen. */
-function collect(
-  log: LogEntry[],
-  now: number,
-  views: readonly { id: string; master: boolean }[],
-  sky: { flights: Flight[]; seen: number },
-): void {
-  const newest = log.at(-1)?.key ?? -1
-  if (newest < sky.seen) {
-    sky.seen = newest
-    sky.flights.length = 0
-    return
-  }
-  for (let i = log.length - 1; i >= 0; i--) {
-    const entry = log[i]
-    if (!entry || entry.key <= sky.seen) break
-    if (now - entry.at > FRESH_MS || sky.flights.length >= MAX) continue
+/** New moments → new flights, newest first while there is room in the sky. */
+function launch(news: Moment[], views: readonly { id: string; master: boolean }[], flights: Flight[]): void {
+  for (let i = news.length - 1; i >= 0; i--) {
+    const entry = news[i]
+    if (!entry || flights.length >= MAX) continue
     const master = views.find((v) => v.master)
     const here = positions.get(entry.id)
     const there = master ? positions.get(master.id) : undefined
     const color = new Color(entry.color)
     if (entry.kind === "join" && master && there && entry.id !== master.id) {
-      sky.flights.push({
+      flights.push({
         kind: "carry",
         from: there.clone().setY(there.y + 2.4),
         to: entry.id,
@@ -172,7 +166,7 @@ function collect(
         color,
       })
     } else if (entry.kind === "loot" && master && here && entry.id !== master.id) {
-      sky.flights.push({
+      flights.push({
         kind: "carry",
         from: here.clone().setY(here.y + 2.4),
         to: master.id,
@@ -181,10 +175,10 @@ function collect(
         color,
       })
     } else if (entry.kind === "plea" && here) {
-      sky.flights.push({ kind: "plea", from: here.clone(), to: entry.id, age: 0, duration: PLEA_S, color })
+      flights.push({ kind: "plea", from: here.clone(), to: entry.id, age: 0, duration: PLEA_S, color })
     }
   }
-  sky.seen = newest
+  news.length = 0
 }
 
 const UP = new Vector3(0, 1, 0)

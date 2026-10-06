@@ -1,6 +1,5 @@
 import type { Session } from "@guildhall/core"
-import { ROLES } from "@guildhall/roster"
-import { type SiteId, siteOf } from "../../world/lands.ts"
+import { SITE_DEFS, siteOf } from "../../world/sites.ts"
 
 /**
  * Work leaves traces (ADR 0007, Life): every deed that finishes at a job site leaves something
@@ -14,7 +13,8 @@ import { type SiteId, siteOf } from "../../world/lands.ts"
  *   proving  bash / shell completed → an arrow in a target; any failed deed → a missed arrow
  *
  * A site is the session's role site (`siteOf`), as the store assigns it: the guildmaster and the
- * keep's roles leave nothing. The yard is not here: its building already grows (`progress`).
+ * keep's roles leave nothing. Which pile each site fills is its registry entry's `trace`
+ * (world/sites.ts). The yard is not here: its building already grows (`progress`).
  */
 export interface Traces {
   logs: number
@@ -27,33 +27,22 @@ export interface Traces {
 
 export const NO_TRACES: Traces = { logs: 0, stones: 0, fish: 0, books: 0, hits: 0, misses: 0 }
 
-/** Which completed tools count at each site; `true` means every tool does. */
-const COUNTS: Partial<Record<SiteId, { key: keyof Traces; tools: ReadonlySet<string> | true }>> = {
-  forest: { key: "logs", tools: new Set(["grep", "glob", "list"]) },
-  quarry: { key: "stones", tools: true },
-  river: { key: "fish", tools: new Set(["webfetch", "websearch"]) },
-  tower: { key: "books", tools: true },
-  proving: { key: "hits", tools: new Set(["bash", "shell"]) },
-}
-
-const KNOWN = new Set<string>(ROLES.map((role) => role.id))
-
 /** The traces a set of sessions has left. Root sessions (the guildmaster) never count. */
 export function tracesOf(sessions: Iterable<Session>): Traces {
   const out = { ...NO_TRACES }
   for (const session of sessions) {
     if (!session.parentID) continue
-    const site = siteOf(session.agent, KNOWN.has(session.agent))
-    const rule = site && COUNTS[site]
-    if (!site || !rule) continue
+    const site = siteOf(session.agent)
+    const rule = site && SITE_DEFS[site].trace
+    if (!rule) continue
     for (const entry of session.entries) {
       if (entry.kind !== "tool") continue
       if (entry.state === "failed") {
-        if (site === "proving") out.misses++
+        if (rule.missed) out[rule.missed]++
         continue
       }
       if (entry.state !== "completed") continue
-      if (rule.tools === true || rule.tools.has(entry.name)) out[rule.key]++
+      if (rule.tools === true || rule.tools.has(entry.name)) out[rule.pile]++
     }
   }
   return out

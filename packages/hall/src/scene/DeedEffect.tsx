@@ -1,8 +1,9 @@
 import type { Effect } from "@guildhall/roster"
 import { useFrame } from "@react-three/fiber"
-import { useMemo, useRef } from "react"
-import { type InstancedMesh, Object3D } from "three"
+import { useMemo } from "react"
+import { InstancedMesh, MeshStandardMaterial, Object3D, SphereGeometry } from "three"
 import { useGuild } from "../guild/useGuild.ts"
+import { useOwnedMeshes } from "./owned.ts"
 
 const MAX_MOTES = 10
 
@@ -13,12 +14,16 @@ const MAX_MOTES = 10
  */
 export function DeedEffect({ effect }: { effect: Effect }) {
   const { mood } = useGuild()
-  const motes = useRef<InstancedMesh>(null)
   const dummy = useMemo(() => new Object3D(), [])
   const count = effect === "portal" ? MAX_MOTES : 6
+  const color = colorOf(effect, mood.fire, mood.magic, mood.trim)
+  const built = useOwnedMeshes(
+    () => ({ meshes: effect === "none" ? [] : [motes(effect, color)] }),
+    [effect, color],
+  )
 
   useFrame(({ clock }) => {
-    const mesh = motes.current
+    const mesh = built?.meshes[0]
     if (!mesh) return
     const t = clock.elapsedTime
     for (let i = 0; i < count; i++) {
@@ -38,21 +43,22 @@ export function DeedEffect({ effect }: { effect: Effect }) {
     mesh.instanceMatrix.needsUpdate = true
   })
 
-  if (effect === "none") return null
-  const color = colorOf(effect, mood.fire, mood.magic, mood.trim)
+  return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
+}
 
-  return (
-    <instancedMesh ref={motes} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false}>
-      <sphereGeometry args={[effect === "steam" ? 0.07 : 0.045, 8, 8]} />
-      <meshStandardMaterial
-        color={color}
-        emissive={color}
-        emissiveIntensity={2.2}
-        transparent
-        opacity={0.85}
-      />
-    </instancedMesh>
-  )
+/** Up to MAX_MOTES glowing motes in `color`: one InstancedMesh. */
+function motes(effect: Effect, color: string): InstancedMesh {
+  const material = new MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: 2.2,
+    transparent: true,
+    opacity: 0.85,
+  })
+  const geometry = new SphereGeometry(effect === "steam" ? 0.07 : 0.045, 8, 8)
+  const mesh = new InstancedMesh(geometry, material, MAX_MOTES)
+  mesh.frustumCulled = false
+  return mesh
 }
 
 function speedOf(effect: Effect): number {

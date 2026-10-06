@@ -1,0 +1,30 @@
+{
+  "name": "guildhall-monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "bun --filter @guildhall/hall dev",
+    "test": "bun test",
+    "typecheck": "tsc -b",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "check": "bun run lint && bun run typecheck && bun test"
+  },
+  "engines": {
+    "bun": ">=1.3.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "@types/bun": "^1.4.2",
+    "meshoptimizer": "^1.3.0",
+    "typescript": "7.0.2"
+  }
+}

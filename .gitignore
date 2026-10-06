@@ -1,0 +1,8 @@
+node_modules
+dist
+types
+*.tsbuildinfo
+.DS_Store
+.env*
+assets/raw
+assets/src

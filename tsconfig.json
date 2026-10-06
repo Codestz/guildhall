@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/roster" },
+    { "path": "packages/sim" },
+    { "path": "packages/hub" },
+    { "path": "packages/herald" },
+    { "path": "packages/hall" }
+  ]
+}

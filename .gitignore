@@ -7,3 +7,10 @@ types
 assets/raw
 assets/src
 .probe
+
+# Private: process notes, research and agent tooling (kept locally, never published)
+docs/
+.agents/
+.claude/
+CONTEXT.md
+skills-lock.json

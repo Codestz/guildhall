@@ -472,7 +472,6 @@ const DRESSING: LandPlacement[] = [
   put("building_home_B_yellow", [-3, 3], -3, -3.5, [-3, 5]),
   put("building_blacksmith_blue", [-3, 1], 0, 0, [0, 1]),
   put("building_home_A_green", [-3, -1], -1, 1, [0, -1]),
-  put("tree_single_B", [-3, -1], 3, -3.5),
   put("building_tavern_blue", [-3, -3], 0, 1, [0, -3]),
   put("building_home_B_red", [-2, -4], 0, -1, [-2, -2]),
   put("building_church_blue", [0, -4], 0, -1, [0, -2]),

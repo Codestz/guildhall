@@ -3,7 +3,6 @@ import { useMemo } from "react"
 import {
   BatchedMesh,
   type BufferGeometry,
-  Color,
   type Material,
   Matrix4,
   type Mesh,
@@ -18,6 +17,7 @@ import { LANDS_URL } from "../world/cast.ts"
 import { HEX_SCALE, island, type LandPiece, type LandPlacement, SITES, yardBuilding } from "../world/lands.ts"
 import { plain } from "./Kit.tsx"
 import { isMovingPart } from "./life/moving.ts"
+import { tameLime } from "./palette.ts"
 
 useGLTF.preload(LANDS_URL)
 
@@ -46,23 +46,13 @@ export function Island() {
   )
 }
 
-/**
- * The hexagon pack's palette is a loud lime next to the hall: multiply every land material by a
- * cool grey-green once, so the island sits back and the keep and characters lead.
- */
-const SOFTEN = new Color("#bdd3c6")
-const softened = new WeakSet<Material>()
+/** The land palette: lime grass calmed in the texture itself (scene/palette.ts), nothing else. */
 function soften(nodes: Record<string, Object3D>): void {
-  for (const node of Object.values(nodes)) {
+  for (const node of Object.values(nodes))
     node.traverse((child) => {
       const mesh = child as Mesh
-      if (!mesh.isMesh) return
-      const material = mesh.material as MeshStandardMaterial
-      if (softened.has(material)) return
-      softened.add(material)
-      material.color.multiply(SOFTEN)
+      if (mesh.isMesh) tameLime((mesh.material as MeshStandardMaterial).map)
     })
-  }
 }
 
 /** The yard's building: swaps to the next stage as edits complete. */

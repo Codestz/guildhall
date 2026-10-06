@@ -8,6 +8,7 @@ import { Post } from "./atmosphere/Post.tsx"
 import { shadows } from "./atmosphere/shadows.ts"
 import { Blobs } from "./Blobs.tsx"
 import { CameraRig } from "./CameraRig.tsx"
+import { Crisp } from "./Crisp.tsx"
 import { FrameStats } from "./FrameStats.tsx"
 import { Island } from "./Island.tsx"
 import { Life } from "./life/Life.tsx"
@@ -25,6 +26,7 @@ export function Scene() {
   return (
     <Quality>
       <Clock />
+      <Crisp />
       <FrameStats />
       {PROBE && <DevBridge />}
       <Atmosphere />

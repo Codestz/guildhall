@@ -142,6 +142,19 @@ describe("the island map", () => {
     expect(landmarks.find((mark) => mark.kind === "mine")?.site).toBe("quarry")
   })
 
+  test("no tree grows through a building", () => {
+    const land = island()
+    const buildings = land.decor.filter((d) => d.piece.startsWith("building_") && d.piece !== "building_dirt")
+    for (const tree of land.decor.filter((d) => /^trees?_/.test(d.piece) && !/_cut$/.test(d.piece)))
+      for (const house of buildings)
+        expect({
+          tree: tree.piece,
+          at: [tree.x, tree.z],
+          near: house.piece,
+          d: Math.hypot(tree.x - house.x, tree.z - house.z) > 3,
+        }).toEqual({ tree: tree.piece, at: [tree.x, tree.z], near: house.piece, d: true })
+  })
+
   test("same seed, same island", () => {
     expect(JSON.stringify(island(7))).toBe(JSON.stringify(island(7)))
   })

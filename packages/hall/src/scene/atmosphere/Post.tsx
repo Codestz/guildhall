@@ -1,5 +1,13 @@
 import { useFrame } from "@react-three/fiber"
-import { Bloom, EffectComposer, N8AO, TiltShift2, ToneMapping, Vignette } from "@react-three/postprocessing"
+import {
+  Bloom,
+  EffectComposer,
+  N8AO,
+  SMAA,
+  TiltShift2,
+  ToneMapping,
+  Vignette,
+} from "@react-three/postprocessing"
 import { type BloomEffect, ToneMappingMode, type VignetteEffect } from "postprocessing"
 import { useMemo, useRef } from "react"
 import { TIERS } from "../../guild/quality.ts"
@@ -54,6 +62,9 @@ export function Post() {
       <ToneMapping mode={ToneMappingMode.NEUTRAL} />
       {level.tiltShift ? <TiltShift2 blur={0.12} /> : null}
       <Vignette ref={vignette} offset={0.3} darkness={0.3} />
+      {/* Edges: the canvas has no MSAA (too costly on half-float buffers), so without this every
+          roof, pillar and plank line stair-stepped. SMAA on the final image costs ~0.3–0.6 ms. */}
+      <SMAA />
     </EffectComposer>
   )
 }

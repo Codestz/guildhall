@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react"
 import {
   BatchedMesh,
   type BufferGeometry,
-  Color,
   Float32BufferAttribute,
   MathUtils,
   Matrix4,
@@ -24,6 +23,7 @@ import { shadows } from "../atmosphere/shadows.ts"
 import { plain } from "../Kit.tsx"
 import { PILES } from "../life/places.ts"
 import { ROUNDS } from "../life/rounds.ts"
+import { tameLime } from "../palette.ts"
 import { EASE, WIND_DIRECTION } from "../weather/shared.ts"
 
 export const FOREST_URL = `${import.meta.env.BASE_URL}assets/forest.glb`
@@ -48,8 +48,6 @@ const ALL = wilds(KEEP)
 const DETAIL: Record<Tier, number> = { 0: 0, 1: 1, 2: 2, 3: 2 }
 /** How much each kind bends in the wind (0: rocks stand still). */
 const SWAY: Record<WildKind, number> = { tree: 0.5, bush: 0.8, rock: 0, grass: 4 }
-/** The same cool grey-green the island's hex pieces are multiplied by (scene/Island.tsx). */
-const SOFTEN = new Color("#bdd3c6")
 
 export function Wilds({ tier }: { tier: Tier }) {
   const store = useGuildStore()
@@ -61,7 +59,13 @@ export function Wilds({ tier }: { tier: Tier }) {
   // Built and freed by the same effect: a BatchedMesh can't be used after dispose() (its matrix
   // texture is gone), so it must never outlive a cleanup, e.g. StrictMode's double effect run.
   useEffect(() => {
-    const built = material ? build(nodes, material, ALL.filter((w) => w.detail <= DETAIL[tier])) : []
+    const built = material
+      ? build(
+          nodes,
+          material,
+          ALL.filter((w) => w.detail <= DETAIL[tier]),
+        )
+      : []
     setMeshes(built)
     shadows.request()
     return () => {
@@ -107,7 +111,8 @@ function swayMaterial(nodes: Record<string, Object3D>): MeshStandardMaterial | n
     })
   if (!source) return null
   const material = (source as MeshStandardMaterial).clone()
-  material.color.multiply(SOFTEN)
+  // Calm the pack's lime greens like the island's (scene/palette.ts); other colours stay true.
+  tameLime(material.map)
   const uniforms: Uniforms = {
     uTime: { value: 0 },
     uWind: { value: 0.2 },

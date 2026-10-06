@@ -27,7 +27,9 @@ export function Quality({ children }: { children: ReactNode }) {
       flipflops={3}
       onDecline={() => quality.down()}
       onIncline={() => quality.up()}
-      onFallback={() => quality.set(Math.min(quality.tier, 1) as Tier)}
+      onFallback={() => {
+        if (quality.auto) quality.set(Math.min(quality.tier, 1) as Tier)
+      }}
     >
       {children}
     </PerformanceMonitor>

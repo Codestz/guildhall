@@ -69,8 +69,8 @@ export function Precipitation({ tier }: { tier: Tier }) {
   )
 }
 
-const RAIN_COUNT: Record<Tier, number> = { 0: 2500, 1: 5000, 2: 7000 }
-const SNOW_COUNT: Record<Tier, number> = { 0: 1500, 1: 3000, 2: 4000 }
+const RAIN_COUNT: Record<Tier, number> = { 0: 2500, 1: 5000, 2: 7000, 3: 9000 }
+const SNOW_COUNT: Record<Tier, number> = { 0: 1500, 1: 3000, 2: 4000, 3: 5000 }
 /** How far the wind pushes each, per unit of fall speed. */
 const WIND = { rain: 0.18, snow: 0.06 } as const
 type Fall = LineSegments<BufferGeometry, ShaderMaterial> | Points<BufferGeometry, ShaderMaterial>

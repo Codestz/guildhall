@@ -20,8 +20,8 @@ import { useTier } from "../Quality.tsx"
  * from the hearth and the street torches. Both wake with the night (`sky.night`) and hide in rain.
  * One instanced draw each, positions animated in place — no allocations per frame.
  */
-const FIREFLIES = [0, 90, 160] as const
-const EMBERS = [0, 40, 80] as const
+const FIREFLIES = [0, 90, 160, 240] as const
+const EMBERS = [0, 40, 80, 120] as const
 
 const land = island()
 /** Meadows, plus a ring of spots just outside the forest's trees. */

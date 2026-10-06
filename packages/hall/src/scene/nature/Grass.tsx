@@ -36,7 +36,7 @@ import { grassFragment, grassVertex } from "./shaders.ts"
  * Every tuft sways on the GPU with the wind; frost and snow settle on the blades below freezing;
  * rain darkens them and gives them a sheen. Low quality grows none.
  */
-const DENSITY: Record<Tier, number> = { 0: 0, 1: 150, 2: 240 }
+const DENSITY: Record<Tier, number> = { 0: 0, 1: 150, 2: 240, 3: 340 }
 
 export function Grass({ tier }: { tier: Tier }) {
   const store = useGuildStore()

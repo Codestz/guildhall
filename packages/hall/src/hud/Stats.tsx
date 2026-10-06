@@ -37,7 +37,7 @@ export function Stats({ store, open, onToggle }: { store: GuildStore; open: bool
     { label: "Textures", value: s.textures.toLocaleString() },
     { label: "Shaders", value: s.programs.toLocaleString() },
     { label: "Adventurers", value: store.views.length.toLocaleString() },
-    { label: "Quality", value: TIERS[tier].name, budget: "adaptive" },
+    { label: "Quality", value: TIERS[tier].name, budget: quality.auto ? "auto" : "pinned" },
   ]
   return (
     <Panel

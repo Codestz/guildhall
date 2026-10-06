@@ -23,7 +23,7 @@ import { plain } from "../Kit.tsx"
 import { EASE, seenWidth, targetOf, WIND_DIRECTION } from "./shared.ts"
 
 /** Clouds per piece at each quality tier (two pieces: two draw calls). */
-const COUNT: Record<Tier, number> = { 0: 6, 1: 10, 2: 14 }
+const COUNT: Record<Tier, number> = { 0: 6, 1: 10, 2: 14, 3: 18 }
 /** Clouds wander a band this long across the wind, this wide along it, and wrap round. */
 const SPAN = 300
 const WIDTH = 220

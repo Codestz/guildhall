@@ -20,6 +20,12 @@ describe("simulated runs read like real ones", () => {
     expect(master?.entries.filter((e) => e.kind === "tool")).toHaveLength(6)
   })
 
+  test("rush brings every role, including an outsider", () => {
+    const agents = new Set(rush(12).flatMap((c) => (c.type === "session" && c.agent ? [c.agent] : [])))
+    expect(agents.has("general")).toBe(true)
+    expect(agents.size).toBe(7)
+  })
+
   test("quests become subagents of the guildmaster", () => {
     const model = applyAll(emptyModel(), rush(5))
     const root = [...model.sessions.values()].find((s) => !s.parentID)!

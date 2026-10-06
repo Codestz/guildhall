@@ -239,10 +239,16 @@ export function yardBuilding(progress: number): LandPiece {
   return "building_scaffolding"
 }
 
-/** Which roles work out on the island (ADR 0006); everyone else stays in the keep. */
+/** Which roles work out on the island (ADR 0006); the rest of the roster stays in the keep. */
 export const ROLE_SITE: Partial<Record<string, SiteId>> = {
   "guild-implementer": "yard",
   "guild-explorer": "forest",
   "guild-researcher": "river",
   "guild-verifier": "proving",
+  "guild-librarian": "tower",
+}
+
+/** Agents from outside the guild (OpenCode's own `general`, a user's agents) work the quarry. */
+export function siteOf(agent: string, known: boolean): SiteId | undefined {
+  return ROLE_SITE[agent] ?? (known ? undefined : "quarry")
 }

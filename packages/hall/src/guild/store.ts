@@ -7,9 +7,9 @@ import {
   type Model,
   type Session,
 } from "@guildhall/core"
-import { type DeedLook, deedLook, interestOf, roleOf } from "@guildhall/roster"
+import { type DeedLook, deedLook, interestOf, ROLES, roleOf } from "@guildhall/roster"
 import { Player, party, rush, solo, toEvents } from "@guildhall/sim"
-import { ROLE_SITE, SITES, type SiteId } from "../world/lands.ts"
+import { ROLE_SITE, SITES, type SiteId, siteOf } from "../world/lands.ts"
 import {
   GATE,
   HAND_IN,
@@ -284,7 +284,12 @@ export function viewsOf(model: Model, now: number): AdventurerView[] {
     let station: StationId | undefined
     let site: SiteId | undefined
     let seat: Seat | undefined
-    const home = ROLE_SITE[s.agent]
+    const home = isMaster
+      ? undefined
+      : siteOf(
+          s.agent,
+          ROLES.some((r) => r.id === s.agent),
+        )
     if (isMaster) {
       station = "quest-board"
       target = MASTER_POST

@@ -119,15 +119,17 @@ export function rush(count = 12, seed = 1): Change[] {
     "guild-verifier",
     "guild-librarian",
     "guild-researcher",
+    // OpenCode's own subagent, not one of the guild's: it works the quarry.
+    "general",
   ]
   const tools = ["read", "grep", "edit", "bash", "glob", "webfetch", "context7_query-docs"] as const
   const children = Array.from({ length: count }, (_, i) =>
     master.quest(
-      script.pick(roles),
+      roles[i % roles.length] ?? "general",
       `Module ${i + 1}`,
       (child) => {
         child.wait(i * 150)
-        for (let step = 0; step < 6; step++) child.deed(script.pick(tools), { path: `src/mod${i + 1}` }, 900)
+        for (let step = 0; step < 8; step++) child.deed(script.pick(tools), { path: `src/mod${i + 1}` }, 2600)
         child.finish(`Module ${i + 1} done.`)
       },
       { wait: false },

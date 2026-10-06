@@ -262,10 +262,83 @@ async function characters(): Promise<void> {
     const path = find("KayKit_Adventurers_2", name)
     if (!path) throw new Error(`character ${name} not found`)
     const doc = await io.read(path)
+    mergeSkinned(doc, (mesh) => (/Cape|Hat|Hood/i.test(mesh) ? `${name}_Tinted` : `${name}_Body`))
     await doc.transform(dedup(), prune())
     const out = join(OUT, "characters", `${name.toLowerCase().replace("_", "-")}.glb`)
     await io.write(out, doc)
     console.log(`character ${name} → ${kb(out)}`)
+  }
+}
+
+/**
+ * KayKit characters are 8–9 skinned meshes (arms, legs, body, cape…) — 8–9 draw calls each, twice
+ * with shadows. gltf-transform's join() skips skinned meshes, but skinned vertices live in bind
+ * space (glTF ignores a skinned mesh node's transform), so parts that share a skin and material
+ * can be concatenated as they are. `group` names the merged mesh each part goes into: the hall
+ * keeps cape and hat apart so it can tint them per role (2 draw calls per character).
+ */
+function mergeSkinned(doc: Document, group: (meshName: string) => string): void {
+  const root = doc.getRoot()
+  const buffer = root.listBuffers()[0] ?? doc.createBuffer()
+  const nodes = root.listNodes().filter((node) => node.getMesh() && node.getSkin())
+  const groups = new Map<string, GNode[]>()
+  for (const node of nodes) {
+    const key = group(node.getMesh()?.getName() ?? node.getName())
+    groups.set(key, [...(groups.get(key) ?? []), node])
+  }
+  for (const [name, members] of groups) {
+    const first = members[0]
+    const parent = first?.getParentNode()
+    const skin = first?.getSkin()
+    const primitives = members.flatMap((node) => node.getMesh()?.listPrimitives() ?? [])
+    const material = primitives[0]?.getMaterial()
+    if (!first || !skin || !material || primitives.some((p) => p.getMaterial() !== material)) continue
+
+    const semantics = primitives[0]?.listSemantics() ?? []
+    const merged = doc.createPrimitive().setMaterial(material)
+    for (const semantic of semantics) {
+      const parts = primitives.map((p) => p.getAttribute(semantic))
+      const template = parts[0]
+      if (!template || parts.some((a) => !a)) throw new Error(`${name}: ${semantic} missing on a part`)
+      const size = template.getElementSize()
+      const total = parts.reduce((sum, a) => sum + (a?.getCount() ?? 0), 0)
+      const ArrayType = semantic.startsWith("JOINTS") ? Uint16Array : Float32Array
+      const out = new ArrayType(total * size)
+      let at = 0
+      for (const part of parts) {
+        if (!part) continue
+        const element: number[] = []
+        for (let i = 0; i < part.getCount(); i++) {
+          part.getElement(i, element)
+          out.set(element, at)
+          at += size
+        }
+      }
+      const accessor = doc
+        .createAccessor()
+        .setType(template.getType())
+        .setArray(out)
+        .setBuffer(buffer)
+        .setNormalized(semantic.startsWith("WEIGHTS") ? false : template.getNormalized() && ArrayType !== Float32Array)
+      merged.setAttribute(semantic, accessor)
+    }
+    const indices: number[] = []
+    let offset = 0
+    for (const p of primitives) {
+      const index = p.getIndices()
+      const count = p.getAttribute("POSITION")?.getCount() ?? 0
+      if (index) for (let i = 0; i < index.getCount(); i++) indices.push(index.getScalar(i) + offset)
+      else for (let i = 0; i < count; i++) indices.push(i + offset)
+      offset += count
+    }
+    merged.setIndices(doc.createAccessor().setType("SCALAR").setArray(new Uint32Array(indices)).setBuffer(buffer))
+
+    const node = doc.createNode(name).setMesh(doc.createMesh(name).addPrimitive(merged)).setSkin(skin)
+    parent?.addChild(node)
+    for (const member of members) {
+      member.getMesh()?.dispose()
+      member.dispose()
+    }
   }
 }
 

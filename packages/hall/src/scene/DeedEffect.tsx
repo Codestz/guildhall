@@ -1,53 +1,57 @@
 import type { Effect } from "@guildhall/roster"
 import { useFrame } from "@react-three/fiber"
-import { useRef } from "react"
-import type { Group } from "three"
+import { useMemo, useRef } from "react"
+import { type InstancedMesh, Object3D } from "three"
 import { useGuild } from "../guild/useGuild.ts"
 
+const MAX_MOTES = 10
+
 /**
- * Placeholder deed effects: a few glowing motes whose colour and motion say which kind of deed is
- * running (pages drift up, sparks burst, steam rises slow, portals ring the feet).
+ * Deed effects: a few glowing motes whose colour and motion say which kind of deed is running
+ * (pages drift up, sparks burst, steam rises slow, portals ring the feet). One InstancedMesh, so an
+ * effect costs one draw call however many motes it has.
  */
 export function DeedEffect({ effect }: { effect: Effect }) {
   const { mood } = useGuild()
-  const motes = useRef<Group>(null)
+  const motes = useRef<InstancedMesh>(null)
+  const dummy = useMemo(() => new Object3D(), [])
+  const count = effect === "portal" ? MAX_MOTES : 6
 
   useFrame(({ clock }) => {
-    const group = motes.current
-    if (!group) return
+    const mesh = motes.current
+    if (!mesh) return
     const t = clock.elapsedTime
-    group.children.forEach((mote, i) => {
-      const phase = (t * speedOf(effect) + i / group.children.length) % 1
+    for (let i = 0; i < count; i++) {
+      const phase = (t * speedOf(effect) + i / count) % 1
       const angle = i * 2.4 + t * (effect === "portal" ? 2.5 : 0.8)
       const radius = effect === "portal" ? 0.42 : 0.25 + phase * 0.25
-      mote.position.set(
+      dummy.position.set(
         Math.cos(angle) * radius,
         effect === "portal" ? 0.05 : 0.7 + phase * 0.9,
         Math.sin(angle) * radius,
       )
-      mote.scale.setScalar(effect === "steam" ? 0.6 + phase : 1 - phase * 0.7)
-    })
+      dummy.scale.setScalar(effect === "steam" ? 0.6 + phase : 1 - phase * 0.7)
+      dummy.updateMatrix()
+      mesh.setMatrixAt(i, dummy.matrix)
+    }
+    mesh.count = count
+    mesh.instanceMatrix.needsUpdate = true
   })
 
   if (effect === "none") return null
   const color = colorOf(effect, mood.fire, mood.magic, mood.trim)
 
   return (
-    <group ref={motes}>
-      {Array.from({ length: effect === "portal" ? 10 : 6 }, (_, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: fixed set of identical motes
-        <mesh key={i}>
-          <sphereGeometry args={[effect === "steam" ? 0.07 : 0.045, 8, 8]} />
-          <meshStandardMaterial
-            color={color}
-            emissive={color}
-            emissiveIntensity={2.2}
-            transparent
-            opacity={0.85}
-          />
-        </mesh>
-      ))}
-    </group>
+    <instancedMesh ref={motes} args={[undefined, undefined, MAX_MOTES]} frustumCulled={false}>
+      <sphereGeometry args={[effect === "steam" ? 0.07 : 0.045, 8, 8]} />
+      <meshStandardMaterial
+        color={color}
+        emissive={color}
+        emissiveIntensity={2.2}
+        transparent
+        opacity={0.85}
+      />
+    </instancedMesh>
   )
 }
 

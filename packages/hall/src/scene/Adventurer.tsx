@@ -63,7 +63,7 @@ export function Adventurer({ view }: { view: AdventurerView }) {
       const mesh = child as Mesh
       if (!mesh.isMesh) return
       mesh.castShadow = true
-      if (/Cape|Hat|Hood/i.test(mesh.name)) {
+      if (/Tinted/.test(mesh.name)) {
         const own = (mesh.material as MeshStandardMaterial).clone()
         own.color = tint.clone().lerp(new Color("#ffffff"), 0.25)
         mesh.material = own

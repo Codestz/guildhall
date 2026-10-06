@@ -79,6 +79,10 @@ function Weathervane() {
       lastStrike.current = env.lightningAt
     }
     updateSky(sky, env, store.mood, stepLightning(Math.min(delta, 0.1)))
+    // The Low tier has no grade (no post pass): its tone mapping takes the grade's exposure, so a
+    // storm still darkens and night still lifts there. With post on, the composer renders with no
+    // renderer tone mapping, so this is ignored and the grade does it (GradeEffect.ts).
+    gl.toneMappingExposure = sky.exposure
     fog.color.copy(sky.fog)
     fog.near = sea * sky.fogNear
     fog.far = sea * sky.fogFar

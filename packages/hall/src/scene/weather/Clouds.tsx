@@ -19,25 +19,30 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { LANDS_URL } from "../../world/cast.ts"
+import { sky } from "../atmosphere/state.ts"
 import { plain } from "../Kit.tsx"
-import { EASE, seenWidth, targetOf, WIND_DIRECTION } from "./shared.ts"
+import { EASE, WIND_DIRECTION } from "./shared.ts"
 
-/** Clouds per piece at each quality tier (two pieces: two draw calls). */
-const COUNT: Record<Tier, number> = { 0: 6, 1: 10, 2: 14, 3: 18 }
-/** Clouds wander a band this long across the wind, this wide along it, and wrap round. */
-const SPAN = 300
-const WIDTH = 220
-const ALTITUDE = [24, 38] as const
-const SCALE = [7, 12] as const
+/** Clouds per piece at each quality tier (two pieces: two draw calls, Explore only). */
+const COUNT: Record<Tier, number> = { 0: 12, 1: 20, 2: 32, 3: 40 }
+/** Clouds wander a square this many units each way from the island's centre, and wrap round. */
+const SPAN = 480
+/** They show only in a ring round the island: from beyond its coast out to before the wrap. */
+const RING = [230, 280, 410, 460] as const
+const ALTITUDE = [38, 72] as const
+const SCALE = [20, 34] as const
+/** Fade out this close to the camera (units), and below this far under the horizon (ray y). */
+const NEAR = [140, 210] as const
+const HORIZON = [-0.08, 0.01] as const
 /** World units per second at full wind. */
 const DRIFT = 9
 const WHITE = new Color("#ffffff")
 const GREY = new Color("#a3abb5")
 
 interface Cloud {
-  /** Across the wind, and along it (0–1 of SPAN, before drift). */
-  across: number
+  /** Where it starts, on the wind's axes (along, across), in world units. */
   along: number
+  across: number
   y: number
   scale: number
   turn: number
@@ -46,9 +51,13 @@ interface Cloud {
 }
 
 /**
- * KayKit clouds high over the island: instanced (one draw call per piece), drifting with the wind,
- * as many as the cloud cover asks for. Each grows in or shrinks away rather than popping; the
- * whole flock greys towards a storm. No shadows: they would cost a pass each.
+ * KayKit clouds, only where they read as sky (finding #1 of the design review): far out beyond the
+ * coast, high, at the horizon of the Explore view. The Diorama looks down at the island, so there
+ * the clouds show only as their shadows (the grade, atmosphere/GradeEffect.ts) and these meshes
+ * aren't drawn at all. Instanced (one draw call per piece), drifting with the wind, as many as the
+ * cloud cover asks for; each grows in or shrinks away rather than popping, and fades near the camera
+ * and below the horizon so none ever hangs between the eye and the island. Unfogged and lit by the
+ * sky's own colour: white by day, grey towards a storm, faint and sky-tinted at night.
  */
 export function Clouds({ tier }: { tier: Tier }) {
   const store = useGuildStore()
@@ -64,8 +73,8 @@ export function Clouds({ tier }: { tier: Tier }) {
         clouds: Array.from(
           { length: count },
           (): Cloud => ({
-            across: (random() - 0.5) * WIDTH,
-            along: random(),
+            along: (random() * 2 - 1) * SPAN,
+            across: (random() * 2 - 1) * SPAN,
             y: MathUtils.lerp(ALTITUDE[0], ALTITUDE[1], random()),
             scale: MathUtils.lerp(SCALE[0], SCALE[1], random()) * (piece === "cloud_big" ? 1 : 0.8),
             turn: random() * Math.PI * 2,
@@ -81,6 +90,7 @@ export function Clouds({ tier }: { tier: Tier }) {
       mesh.frustumCulled = false
       mesh.castShadow = false
       mesh.receiveShadow = false
+      mesh.visible = false
     }
     return () => {
       for (const { mesh } of flock) {
@@ -93,38 +103,53 @@ export function Clouds({ tier }: { tier: Tier }) {
 
   const state = useMemo(() => ({ drift: 0, cover: 0, wind: 0 }), [])
 
-  useFrame(({ camera, controls, size }, delta) => {
+  useFrame(({ camera }, delta) => {
     const env = store.environment
-    const target = targetOf(controls)
-    // Keep a window over what the camera looks at: clouds frame the view, never hide the guild.
-    const clearance = seenWidth(camera, size, target) * 0.3
-    const ortho = (camera as OrthographicCamera).isOrthographicCamera
-    camera.getWorldDirection(look)
     state.cover = MathUtils.damp(state.cover, env.cloudCover, EASE, delta)
     state.wind = MathUtils.damp(state.wind, env.wind, EASE, delta)
-    state.drift = (state.drift + (DRIFT * (0.15 + state.wind) * delta) / SPAN) % 1
+    state.drift = (state.drift + DRIFT * (0.15 + state.wind) * delta) % (SPAN * 2)
+    // Only the Explore view looks out at the horizon; the Diorama never sees these (no draw call).
+    const shown = store.view === "explore" && !(camera as OrthographicCamera).isOrthographicCamera
     const grey = MathUtils.smoothstep(state.cover, 0.6, 1)
+    const night = sky.night
     for (const { mesh, clouds } of flock) {
+      mesh.visible = shown
+      if (!shown) continue
       const material = mesh.material as MeshStandardMaterial
-      material.color.copy(WHITE).lerp(GREY, grey)
-      material.opacity = 0.55 + 0.3 * MathUtils.smoothstep(state.cover, 0.1, 0.8)
+      // Lit light by day, barely at night: what's left is the sky's own colour (emissive), a shade
+      // lighter than the dome behind it, so at night a cloud is a faint veil, never a dark slab.
+      material.color
+        .copy(WHITE)
+        .lerp(GREY, grey)
+        .multiplyScalar(1 - night * 0.8)
+      material.emissive
+        .copy(sky.horizon)
+        .lerp(sky.zenith, 0.25)
+        .multiplyScalar(0.3 + night * 1.1)
+      material.opacity = (0.6 + 0.3 * MathUtils.smoothstep(state.cover, 0.1, 0.8)) * (1 - night * 0.62)
       // The first `wanted` clouds of each piece are out; the next one partly, as cover rises.
-      const wanted = state.cover * clouds.length
+      const wanted = (0.25 + state.cover) * clouds.length * 0.8
       clouds.forEach((cloud, i) => {
         const goal = MathUtils.clamp(wanted - i, 0, 1)
         cloud.presence = MathUtils.damp(cloud.presence, goal, EASE, delta)
-        const along = ((cloud.along + state.drift) % 1) - 0.5
-        // Shrink near the ends of the band so the wrap is never seen.
-        const edge = MathUtils.smoothstep(0.5 - Math.abs(along), 0, 0.12)
+        const along = wrap(cloud.along + state.drift)
         position
           .copy(WIND_DIRECTION)
-          .multiplyScalar(along * SPAN)
+          .multiplyScalar(along)
           .addScaledVector(ACROSS, cloud.across)
           .setY(cloud.y)
-        const hidden = covering(position, camera.position, ortho ? look : undefined, target)
-        const open = MathUtils.smoothstep(hidden, clearance * 0.8, clearance * 1.4)
+        // In the ring only: never over the island, gone before the wrap at the square's edge.
+        const radius = Math.hypot(position.x, position.z)
+        const ring =
+          MathUtils.smoothstep(radius, RING[0], RING[1]) *
+          (1 - MathUtils.smoothstep(radius, RING[2], RING[3]))
+        // Never near the eye, and never seen against the ground: only at or above the horizon.
+        ray.subVectors(position, camera.position)
+        const distance = ray.length()
+        const near = MathUtils.smoothstep(distance, NEAR[0], NEAR[1])
+        const horizon = MathUtils.smoothstep(ray.y / (distance || 1), HORIZON[0], HORIZON[1])
         rotation.setFromAxisAngle(UP, cloud.turn)
-        scale.setScalar(cloud.scale * cloud.presence * edge * open)
+        scale.setScalar(cloud.scale * cloud.presence * ring * near * horizon)
         mesh.setMatrixAt(i, matrix.compose(position, rotation, scale))
       })
       mesh.instanceMatrix.needsUpdate = true
@@ -140,20 +165,12 @@ export function Clouds({ tier }: { tier: Tier }) {
   )
 }
 
-/**
- * How far from the target, on the ground, the point a cloud hides is: follow the line of sight
- * through the cloud down to y = 0. A cloud the camera looks up at hides nothing (Infinity).
- */
-function covering(cloud: Vector3, eye: Vector3, forward: Vector3 | undefined, target: Vector3): number {
-  ray.copy(forward ?? ray.subVectors(cloud, eye).normalize())
-  if (ray.y >= -0.01) return Number.POSITIVE_INFINITY
-  ground.copy(cloud).addScaledVector(ray, -cloud.y / ray.y)
-  return Math.hypot(ground.x - target.x, ground.z - target.z)
+/** Into [-SPAN, SPAN). */
+function wrap(value: number): number {
+  return ((((value + SPAN) % (SPAN * 2)) + SPAN * 2) % (SPAN * 2)) - SPAN
 }
 
-const look = new Vector3()
 const ray = new Vector3()
-const ground = new Vector3()
 const UP = new Vector3(0, 1, 0)
 const ACROSS = new Vector3().crossVectors(UP, WIND_DIRECTION).normalize()
 const position = new Vector3()
@@ -179,6 +196,8 @@ function merged(source: Object3D): { geometry: BufferGeometry; material: Materia
     const copy = material.clone()
     copy.transparent = true
     copy.depthWrite = false
+    // Far beyond the fog's radius: fogged, they'd be flat haze-coloured shapes against the sky.
+    ;(copy as MeshStandardMaterial).fog = false
     return [{ geometry, material: copy }]
   })
 }

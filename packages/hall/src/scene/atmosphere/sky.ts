@@ -57,6 +57,15 @@ export interface SkyState {
   bloomIntensity: number
   bloomThreshold: number
   vignette: number
+  /**
+   * Cloud shadows (drawn by the grade, GradeEffect.ts): how dark a patch under a cloud gets (0 =
+   * none, by night), the share of the ground under one (0–1), how soft the edges are (in noise
+   * units), and how fast they drift with the wind (world units per second).
+   */
+  cloudShadow: number
+  cloudCoverage: number
+  cloudSoftness: number
+  cloudSpeed: number
 }
 
 export function createSky(): SkyState {
@@ -93,6 +102,10 @@ export function createSky(): SkyState {
     bloomIntensity: 0.6,
     bloomThreshold: 1,
     vignette: 0.3,
+    cloudShadow: 0,
+    cloudCoverage: 0,
+    cloudSoftness: 0.08,
+    cloudSpeed: 0,
   }
 }
 
@@ -138,13 +151,21 @@ function stop(
   }
 }
 
+/**
+ * The light lags the sun: these keys run past the geometric sunset (e = 0, 18:00), so the evening
+ * keeps a warm, low sun until ~19:30 (golden hour, e ≈ -0.35), then a blue hour to ~20:30, then
+ * night (and the same backwards before dawn). Hours for reference: e 0.24 ≈ 17:00, 0.12 ≈ 17:30,
+ * -0.12 ≈ 18:30, -0.24 ≈ 19:00, -0.35 ≈ 19:30, -0.46 ≈ 20:00, -0.56 ≈ 20:30, -0.91 = midnight.
+ */
 // biome-ignore format: a table reads better aligned
 const DAY: readonly Stop[] = [
-  stop(-0.45, { zenith: "#02050d", horizon: "#0a1428", fog: "#0b1424", glow: "#000000", sun: "#000000", sky: "#4060a0", ground: "#151c30" }, 0, 1.35),
-  stop(-0.2,  { zenith: "#040a1c", horizon: "#13213f", fog: "#111c33", glow: "#140f2a", sun: "#000000", sky: "#4560a4", ground: "#161c30" }, 0, 1.3),
-  stop(-0.08, { zenith: "#122150", horizon: "#3d4676", fog: "#2c3458", glow: "#a24a6e", sun: "#000000", sky: "#6670aa", ground: "#211d2c" }, 0, 1.0),
-  stop(0.02,  { zenith: "#2f5290", horizon: "#eb9f86", fog: "#a98c98", glow: "#ff7f56", sun: "#ff9c86", sky: "#a3b0e6", ground: "#3e3a4a" }, 1.3, 1.15),
-  stop(0.14,  { zenith: "#4d7fc4", horizon: "#f2d0b4", fog: "#cfc4c4", glow: "#ffaa78", sun: "#ffd6b8", sky: "#c2d0f2", ground: "#5c5a66" }, 2.9, 1.4),
+  stop(-0.75, { zenith: "#02050d", horizon: "#0a1428", fog: "#0b1424", glow: "#000000", sun: "#000000", sky: "#4060a0", ground: "#151c30" }, 0, 1.35),
+  stop(-0.56, { zenith: "#040a1c", horizon: "#13213f", fog: "#111c33", glow: "#140f2a", sun: "#000000", sky: "#4560a4", ground: "#161c30" }, 0, 1.3),
+  stop(-0.44, { zenith: "#0f2052", horizon: "#33467a", fog: "#26345c", glow: "#3c3264", sun: "#000000", sky: "#7088cc", ground: "#222842" }, 0, 1.4),
+  stop(-0.32, { zenith: "#18306a", horizon: "#b06a66", fog: "#5e5470", glow: "#d8604a", sun: "#ff7848", sky: "#8a8cc4", ground: "#2c2838" }, 0.9, 1.05),
+  stop(-0.14, { zenith: "#2a4c8c", horizon: "#f0986a", fog: "#b48c86", glow: "#ff8048", sun: "#ff9e5e", sky: "#a8a6d4", ground: "#3e3842" }, 1.9, 1.05),
+  stop(0.04,  { zenith: "#3c6aae", horizon: "#f4bc8c", fog: "#d0b2a2", glow: "#ffa062", sun: "#ffbe86", sky: "#bcc2e6", ground: "#58545c" }, 2.4, 1.18),
+  stop(0.2,   { zenith: "#4a80c6", horizon: "#e8d6c0", fog: "#cdc8c6", glow: "#ffc890", sun: "#ffe2c0", sky: "#d0dcf4", ground: "#6c6e6c" }, 2.8, 1.25),
   stop(0.36,  { zenith: "#4486d2", horizon: "#c4dcf0", fog: "#bfd3e4", glow: "#fff0d2", sun: "#fff0d8", sky: "#dcebff", ground: "#7a8072" }, 2.8, 1.18),
   stop(0.9,   { zenith: "#377ccf", horizon: "#cde2f6", fog: "#c6d9ea", glow: "#fff8ea", sun: "#fff8ee", sky: "#e3efff", ground: "#7c8aa0" }, 3.0, 1.22),
 ]
@@ -156,8 +177,15 @@ const STORM_FLASH = new Color("#dfe6ff")
 const NIGHT_SHADOWS = new Color(0.74, 0.9, 1.22)
 /** Night highlights warm, shadows cool: firelight keeps its colour against blue moonlight. */
 const NIGHT_HIGHLIGHTS = new Color(1.08, 1.0, 0.88)
-const GOLDEN_SHADOWS = new Color(0.94, 0.96, 1.08)
-const GOLDEN_HIGHLIGHTS = new Color(1.06, 1.0, 0.95)
+/** Golden hour: warm light, violet-blue shade. */
+const GOLDEN_SHADOWS = new Color(0.92, 0.94, 1.1)
+const GOLDEN_HIGHLIGHTS = new Color(1.09, 0.97, 0.9)
+/** Blue hour: the whole image cool, the lamps (highlights) barely warmer. */
+const BLUE_SHADOWS = new Color(0.82, 0.92, 1.24)
+const BLUE_HIGHLIGHTS = new Color(1.02, 0.98, 0.96)
+/** A storm grades cool: steel shade, cold highlights. */
+const STORM_SHADOWS = new Color(0.88, 0.96, 1.14)
+const STORM_HIGHLIGHTS = new Color(0.94, 0.99, 1.06)
 const SNOW_TINT = new Color(0.94, 0.98, 1.06)
 const WHITE = new Color(1, 1, 1)
 
@@ -182,16 +210,25 @@ export function updateSky(out: SkyState, env: Environment, mood: Mood, flash = 0
   out.sunColor.lerpColors(a.sun, b.sun, t)
   out.hemiSky.lerpColors(a.hemiSky, b.hemiSky, t)
   out.hemiGround.lerpColors(a.hemiGround, b.hemiGround, t)
-  let sun = lerp(a.sunIntensity, b.sunIntensity, t) * smoothstep(-0.03, 0.08, e)
+  // The low sun lingers through golden hour and is gone by ~19:35 (see DAY).
+  let sun = lerp(a.sunIntensity, b.sunIntensity, t) * smoothstep(-0.38, -0.24, e)
   let hemi = lerp(a.hemiIntensity, b.hemiIntensity, t)
 
-  const night = 1 - smoothstep(-0.16, 0.08, e)
-  const golden = smoothstep(-0.06, 0.04, e) * (1 - smoothstep(0.14, 0.36, e))
+  /** Full night from ~20:30 to ~03:30; blue hour is the half-way band before it. */
+  const night = 1 - smoothstep(-0.6, -0.3, e)
+  /** Golden hour, ~17:15–19:30 (and its mirror at dawn). */
+  const golden = smoothstep(-0.4, -0.26, e) * (1 - smoothstep(0.08, 0.3, e))
+  /** Blue hour, ~19:30–20:30: the sun gone, the sky still lit. */
+  const blue = smoothstep(-0.62, -0.46, e) * (1 - smoothstep(-0.38, -0.28, e))
   out.night = night
 
-  // 2. Clouds: a grey, softer world; the sun dims, the sky's own light carries more of it.
+  // 2. Clouds: a grey, softer world; the sun dims, the sky's own light carries more of it. A storm
+  // (heavy rain under full cover) goes further: sun ~0.35×, a darker, cooler, flatter island.
   const overcast = smoothstep(0.25, 0.95, env.cloudCover)
   const rain = clamp01(env.precipitation)
+  const storm = overcast * smoothstep(0.75, 1, rain)
+  /** By day rain dims the scene; by night it must not crush it (silhouettes still read). */
+  const wetDim = rain * (1 - night * 0.7)
   greyTowards(out.zenith, overcast * 0.8)
   greyTowards(out.horizon, overcast * 0.8)
   greyTowards(out.fog, overcast * 0.8)
@@ -199,21 +236,23 @@ export function updateSky(out: SkyState, env: Environment, mood: Mood, flash = 0
   greyTowards(out.hemiSky, overcast * 0.8)
   greyTowards(out.sunColor, overcast * 0.8)
   out.zenith.lerp(scratch.copy(out.horizon), overcast * 0.55)
-  const dim = 1 - overcast * 0.4 - rain * 0.22
+  const dim = 1 - overcast * 0.4 - wetDim * 0.22 - storm * 0.12
   out.zenith.multiplyScalar(dim)
   out.horizon.multiplyScalar(dim)
   out.fog.multiplyScalar(dim)
   out.glow.multiplyScalar(1 - overcast * 0.85)
-  sun *= 1 - overcast * 0.78
-  hemi *= 1 - overcast * 0.18 - rain * 0.12
+  sun *= (1 - overcast * 0.5) * (1 - storm * 0.3)
+  hemi *= 1 - overcast * 0.15 - wetDim * 0.1 - storm * 0.12
+  out.hemiSky.multiplyScalar(1 - storm * 0.15)
   if (env.weather === "snow") {
     out.fog.multiply(SNOW_TINT)
     out.horizon.multiply(SNOW_TINT)
   }
 
-  // 3. The moon takes over once the sun is down (both are dark at the hand-over: no pop).
+  // 3. The moon takes over once the sun has gone (both are dark at the hand-over: no pop). Cloud
+  // thins it but never puts it out: a rainy night keeps enough moonlight for roofs and walls.
   const moon =
-    0.85 * (1 - smoothstep(-0.14, -0.03, e)) * smoothstep(-0.02, 0.18, moonUp) * (1 - overcast * 0.7)
+    0.85 * (1 - smoothstep(-0.5, -0.36, e)) * smoothstep(-0.02, 0.18, moonUp) * (1 - overcast * 0.45)
   out.sunIntensity = sun
   out.moonIntensity = moon
 
@@ -228,7 +267,7 @@ export function updateSky(out: SkyState, env: Environment, mood: Mood, flash = 0
   out.horizon.multiply(tint)
   out.fog.multiply(tint)
 
-  const sunUp = e > -0.03
+  const sunUp = sun >= moon
   const [kx, ky, kz] = sunUp ? env.sun : env.moon
   // Never let the shadow light graze the ground: very long shadows smear the one shadow map.
   const y = Math.max(ky, 0.42)
@@ -251,7 +290,7 @@ export function updateSky(out: SkyState, env: Environment, mood: Mood, flash = 0
   }
 
   // 6. Fog: the coast fades into the sky; closer in at dawn and dusk, and in the rain.
-  const haze = Math.max(golden * 0.7, rain, overcast * 0.45)
+  const haze = Math.max(golden * 0.6, rain, overcast * 0.45)
   out.fogNear = 1.0 - haze * 0.42
   out.fogFar = 1.55 - haze * 0.4
 
@@ -260,23 +299,46 @@ export function updateSky(out: SkyState, env: Environment, mood: Mood, flash = 0
   out.sunDisc = smoothstep(-0.05, 0.01, e) * (1 - overcast * 0.95)
   out.moonDisc = smoothstep(-0.05, 0.1, moonUp) * (1 - overcast * 0.9) * (0.25 + 0.75 * night)
 
-  // 8. Lamps light as the sun goes, and on dark grey days.
-  out.lamps = Math.max(0.12, 1 - smoothstep(-0.04, 0.3, e), overcast * 0.45)
+  // 8. Lamps are lit through golden hour and full by blue hour; and on dark grey days.
+  out.lamps = Math.max(0.12, 1 - smoothstep(-0.4, 0.1, e), overcast * 0.45 + storm * 0.2)
 
-  // 9. The grade: golden warmth at the ends of the day, blue and calm at night, flat under clouds.
-  out.exposure = (1 + night * 0.25) * (1 - rain * 0.12 - overcast * 0.06)
-  out.saturation = (1.04 + golden * 0.04 - night * 0.1) * (1 - overcast * 0.38) * mood.saturation
+  // 9. The grade: golden warmth at the ends of the day, blue and calm at night, flat and cool
+  // under clouds and in a storm.
+  out.exposure = (1 + night * 0.25 + blue * 0.06) * (1 - wetDim * 0.1 - overcast * 0.05 - storm * 0.1)
+  out.saturation =
+    (1.04 + golden * 0.03 - night * 0.1) * (1 - overcast * 0.22 - storm * 0.08) * mood.saturation
   // Night vision: what the moon lights goes blue-grey; what a fire lights keeps its colour.
   out.darkSaturation = out.saturation * (1 - night * 0.42)
-  // Moonlight is crisp: more contrast at night, so lit edges read against the dark.
-  out.contrast = (1.03 + night * 0.14 - overcast * 0.04) * mood.contrast
-  out.shadows.copy(WHITE).lerp(GOLDEN_SHADOWS, golden).lerp(NIGHT_SHADOWS, night)
-  out.highlights.copy(WHITE).lerp(GOLDEN_HIGHLIGHTS, golden).lerp(NIGHT_HIGHLIGHTS, night)
+  // Moonlight is crisp: more contrast at night, so lit edges read against the dark (less in rain,
+  // where it would crush the wet dark into black).
+  out.contrast = (1.03 + night * (0.14 - rain * 0.1) - overcast * 0.04) * mood.contrast
+  const cool = Math.max(storm, overcast * 0.35) * (1 - night)
+  out.shadows
+    .copy(WHITE)
+    .lerp(GOLDEN_SHADOWS, golden)
+    .lerp(BLUE_SHADOWS, blue)
+    .lerp(NIGHT_SHADOWS, night)
+    .lerp(STORM_SHADOWS, cool)
+  out.highlights
+    .copy(WHITE)
+    .lerp(GOLDEN_HIGHLIGHTS, golden)
+    .lerp(BLUE_HIGHLIGHTS, blue)
+    .lerp(NIGHT_HIGHLIGHTS, night)
+    .lerp(STORM_HIGHLIGHTS, cool)
   out.shadows.multiply(normalisedTint(tint, mood.shadows, 0.45))
   out.highlights.multiply(normalisedTint(tint, mood.highlights, 0.45))
   out.bloomIntensity = 0.55 + night * 0.55
   out.bloomThreshold = lerp(mood.bloomThreshold, mood.bloomThreshold * 0.7, night)
   out.vignette = mood.vignette + night * 0.15
+
+  // 10. Cloud shadows: sparse dapples on a clear day, most of the ground as the sky closes, darker
+  // cells in a storm; they fade with the sun through golden hour and are gone by night.
+  const cover = clamp01(env.cloudCover)
+  const daylit = smoothstep(-0.3, 0.12, e)
+  out.cloudShadow = daylit * (0.36 + 0.08 * overcast + 0.06 * storm)
+  out.cloudCoverage = lerp(0.18, 0.8, smoothstep(0.1, 1, cover))
+  out.cloudSoftness = 0.07 + 0.06 * overcast
+  out.cloudSpeed = 1 + 7 * clamp01(env.wind) * (0.6 + 0.4 * cover)
   return out
 }
 

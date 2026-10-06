@@ -81,3 +81,67 @@ describe("sky over the day", () => {
     expect(sky.hemiIntensity).toBeGreaterThan(calm + 1)
   })
 })
+
+describe("golden hour, blue hour, storms (design review #6)", () => {
+  const warmth = (c: { r: number; b: number }) => c.r / Math.max(c.b, 1e-3)
+
+  test("17:30–19:30 is golden hour: a warm, low sun, not night", () => {
+    updateSky(sky, env(13), MOODS.keep)
+    const noonWarmth = warmth(sky.sunColor)
+    for (const hour of [17.5, 18, 18.5, 19, 19.25]) {
+      updateSky(sky, env(hour), MOODS.keep)
+      expect(sky.night).toBeLessThan(0.05)
+      expect(sky.sunIntensity).toBeGreaterThan(0.3)
+      expect(warmth(sky.sunColor)).toBeGreaterThan(noonWarmth * 1.25)
+    }
+  })
+
+  test("then a blue hour (sun gone, not yet full night), then night", () => {
+    updateSky(sky, env(20), MOODS.keep)
+    expect(sky.sunIntensity).toBe(0)
+    expect(sky.night).toBeGreaterThan(0.2)
+    expect(sky.night).toBeLessThan(0.8)
+    updateSky(sky, env(21), MOODS.keep)
+    expect(sky.night).toBe(1)
+  })
+
+  test("a storm at 14:00: sun ~0.35×, saturation ~30% down, a cool grade", () => {
+    updateSky(sky, env(14), MOODS.keep)
+    const clear = { key: sky.keyIntensity, saturation: sky.saturation }
+    updateSky(sky, env(14, "storm"), MOODS.keep)
+    expect(sky.keyIntensity / clear.key).toBeGreaterThan(0.3)
+    expect(sky.keyIntensity / clear.key).toBeLessThan(0.4)
+    expect(sky.saturation / clear.saturation).toBeGreaterThan(0.65)
+    expect(sky.saturation / clear.saturation).toBeLessThan(0.75)
+    expect(sky.shadows.b).toBeGreaterThan(sky.shadows.r)
+    expect(sky.highlights.b).toBeGreaterThan(sky.highlights.r)
+    expect(sky.exposure).toBeLessThan(0.85)
+  })
+
+  test("night rain keeps a floor of moon and fill, so silhouettes read", () => {
+    updateSky(sky, env(23), MOODS.keep)
+    const clearMoon = sky.keyIntensity
+    const clearFill = sky.hemiIntensity * brightness(sky.hemiSky)
+    updateSky(sky, env(23, "rain"), MOODS.keep)
+    expect(sky.keyIntensity).toBeGreaterThan(clearMoon * 0.5)
+    expect(sky.hemiIntensity * brightness(sky.hemiSky)).toBeGreaterThan(clearFill * 0.75)
+    expect(sky.exposure).toBeGreaterThan(1)
+  })
+})
+
+describe("cloud shadows", () => {
+  test("sparse on a clear day, thicker and faster as it clouds over, none at night", () => {
+    updateSky(sky, env(13), MOODS.keep)
+    const clear = { coverage: sky.cloudCoverage, speed: sky.cloudSpeed, shadow: sky.cloudShadow }
+    expect(clear.shadow).toBeGreaterThan(0.2)
+    expect(clear.coverage).toBeLessThan(0.3)
+    updateSky(sky, { ...env(13, "cloudy"), wind: 0.35 }, MOODS.keep)
+    expect(sky.cloudCoverage).toBeGreaterThan(clear.coverage + 0.2)
+    expect(sky.cloudSpeed).toBeGreaterThan(clear.speed)
+    updateSky(sky, { ...env(13, "storm"), cloudCover: 1, wind: 0.9 }, MOODS.keep)
+    expect(sky.cloudCoverage).toBeGreaterThan(0.7)
+    expect(sky.cloudSpeed).toBeGreaterThan(5)
+    updateSky(sky, env(23, "cloudy"), MOODS.keep)
+    expect(sky.cloudShadow).toBe(0)
+  })
+})

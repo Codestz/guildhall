@@ -31,8 +31,8 @@ export function Post() {
   const bloom = useRef<BloomEffect>(null)
   const vignette = useRef<VignetteEffect>(null)
 
-  useFrame(() => {
-    grade.apply(sky)
+  useFrame(({ camera }, delta) => {
+    grade.apply(sky, camera, delta)
     const glow = bloom.current
     if (glow) {
       glow.intensity = sky.bloomIntensity

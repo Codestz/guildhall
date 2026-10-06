@@ -20,7 +20,6 @@ import {
   type SkinnedMesh,
   SphereGeometry,
 } from "three"
-import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js"
 import type { AdventurerView } from "../guild/store.ts"
 import { positions, useGuildStore } from "../guild/useGuild.ts"
 import { verbOf } from "../hud/format.ts"
@@ -46,6 +45,7 @@ import { addChip, CHIP_HEIGHT, chipSlot, declutter, removeChip } from "./chips.t
 import { DeedEffect } from "./DeedEffect.tsx"
 import { clonePiece, useKit } from "./Kit.tsx"
 import { BEAT_HEIGHT, emitBeat } from "./life/work.ts"
+import { cloneRig } from "./rig.ts"
 
 const WALK_SPEED = 3.4
 /** The infirmary bed's blanket, measured on kit.glb's bed_frame (0.84 up, scale 1). */
@@ -79,7 +79,7 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   const { animations } = useGLTF(ANIMS_URL)
   const kit = useKit()
 
-  const body = useMemo(() => cloneSkinned(scene), [scene])
+  const body = useMemo(() => cloneRig(scene), [scene])
   /** Made in a layout effect, below: a mount (StrictMode's second one too) gets its own. */
   const animator = useRef<{ mixer: AnimationMixer; actions: Map<string, AnimationAction> } | null>(null)
   const current = useRef<AnimationAction | null>(null)

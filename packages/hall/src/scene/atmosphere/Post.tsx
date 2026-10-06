@@ -8,7 +8,7 @@ import {
   ToneMapping,
   Vignette,
 } from "@react-three/postprocessing"
-import { type BloomEffect, ToneMappingMode, type VignetteEffect } from "postprocessing"
+import { type BloomEffect, EdgeDetectionMode, ToneMappingMode, type VignetteEffect } from "postprocessing"
 import { useEffect, useMemo, useRef } from "react"
 import type { Fog } from "three"
 import { PROBE } from "../../guild/mode.ts"
@@ -21,6 +21,14 @@ import { GradeEffect } from "./GradeEffect.ts"
 import { useLooks } from "./looks.ts"
 import { MoodLutEffect } from "./MoodLut.ts"
 import { sky } from "./state.ts"
+
+/**
+ * Bloom's bright-pass resolution, as a share of the frame. postprocessing runs it at full size when
+ * the mipmap blur is on, then halves it straight away for the blur's first level: one full-size
+ * half-float pass for nothing. At half size the same-instant crops differ by 0.2/255 on average,
+ * only in the halo of the brightest specks (docs/perf-budget.md, final pass).
+ */
+const BLOOM_INPUT = 0.5
 
 /**
  * Post-processing per quality tier (ADR 0007, task "Sky"): bloom so flames and the sun glow, the
@@ -59,6 +67,9 @@ export function Post() {
     if (looks.lut) lut.apply(sky, store.mood.id)
     const glow = bloom.current
     if (glow) {
+      // The bright-pass at half size (BLOOM_INPUT): the blur's first level is half size anyway.
+      if (glow.luminancePass.resolution.scale !== BLOOM_INPUT)
+        glow.luminancePass.resolution.scale = BLOOM_INPUT
       glow.intensity = sky.bloomIntensity
       glow.luminanceMaterial.threshold = sky.bloomThreshold
     }
@@ -89,8 +100,9 @@ export function Post() {
       {level.tiltShift ? <TiltShift2 blur={0.12} /> : null}
       <Vignette ref={vignette} offset={0.3} darkness={0.3} />
       {/* Edges: the canvas has no MSAA (too costly on half-float buffers), so without this every
-          roof, pillar and plank line stair-stepped. SMAA on the final image costs ~0.3–0.6 ms. */}
-      <SMAA />
+          roof, pillar and plank line stair-stepped. Edges found from luma (SMAA's own recommended
+          mode), not from all three channels: same-instant crops differ only on a few AA pixels. */}
+      <SMAA edgeDetectionMode={EdgeDetectionMode.LUMA} />
     </EffectComposer>
   )
 }

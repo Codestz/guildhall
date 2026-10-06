@@ -20,6 +20,7 @@ export function DeedEffect({ effect }: { effect: Effect }) {
   const built = useOwnedMeshes(
     () => ({ meshes: effect === "none" ? [] : [motes(effect, color)] }),
     [effect, color],
+    "materials",
   )
 
   useFrame(({ clock }) => {
@@ -48,17 +49,31 @@ export function DeedEffect({ effect }: { effect: Effect }) {
 
 /** Up to MAX_MOTES glowing motes in `color`: one InstancedMesh. */
 function motes(effect: Effect, color: string): InstancedMesh {
-  const material = new MeshStandardMaterial({
-    color,
-    emissive: color,
-    emissiveIntensity: 2.2,
-    transparent: true,
-    opacity: 0.85,
-  })
   const geometry = new SphereGeometry(effect === "steam" ? 0.07 : 0.045, 8, 8)
-  const mesh = new InstancedMesh(geometry, material, MAX_MOTES)
+  const mesh = new InstancedMesh(geometry, glowOf(color), MAX_MOTES)
   mesh.frustumCulled = false
   return mesh
+}
+
+/**
+ * One glow material per colour, kept for the whole run (a handful: the moods' fire, magic and trim,
+ * and steam). Freed with the last effect, its shader program went too, and the next deed to start
+ * compiled it again: a 150–200 ms stall on this Mac each time (docs/perf-budget.md, final pass).
+ */
+const glows = new Map<string, MeshStandardMaterial>()
+function glowOf(color: string): MeshStandardMaterial {
+  let material = glows.get(color)
+  if (!material) {
+    material = new MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 2.2,
+      transparent: true,
+      opacity: 0.85,
+    })
+    glows.set(color, material)
+  }
+  return material
 }
 
 function speedOf(effect: Effect): number {

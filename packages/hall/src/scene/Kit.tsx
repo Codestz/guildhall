@@ -2,6 +2,7 @@ import { useGLTF } from "@react-three/drei"
 import { useMemo } from "react"
 import {
   BufferGeometry,
+  DoubleSide,
   Float32BufferAttribute,
   type Material,
   type Mesh,
@@ -17,7 +18,25 @@ useGLTF.preload(KIT_URL)
 
 /** The kit's pieces by name (one node per piece, see scripts/assets.ts). */
 export function useKit(): Record<string, Object3D> {
-  return useGLTF(KIT_URL).nodes as Record<string, Object3D>
+  const { nodes, materials } = useGLTF(KIT_URL)
+  singlePass(materials)
+  return nodes as Record<string, Object3D>
+}
+
+const checked = new WeakSet<object>()
+
+/**
+ * A transparent double-sided material (the lanterns' glass) is drawn by three in two passes, back
+ * faces then front, flipping `side` and setting `needsUpdate` for each: every lantern on screen then
+ * rebuilt its program parameters twice a frame (≈ 10 MB of garbage a second in rush at night, and
+ * the GC pauses that came with it; docs/perf-budget.md). The glass is a faint pane: one pass looks the
+ * same.
+ */
+export function singlePass(materials: Record<string, Material>): void {
+  if (checked.has(materials)) return
+  checked.add(materials)
+  for (const material of Object.values(materials))
+    if (material.transparent && material.side === DoubleSide) material.forceSinglePass = true
 }
 
 /**

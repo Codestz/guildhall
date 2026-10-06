@@ -100,9 +100,12 @@ function DevBridge() {
   const gl = useThree((state) => state.gl)
   const scene = useThree((state) => state.scene)
   const setDpr = useThree((state) => state.setDpr)
+  const setFrameloop = useThree((state) => state.setFrameloop)
   useEffect(() => {
-    Object.assign(window, { r3f: { advance, gl, scene, setDpr, shadows } })
-  }, [advance, gl, scene, setDpr])
+    // setFrameloop("never") + advance(t) at one timestamp: the same instant re-drawn under two
+    // settings, for pixel-identical A/B crops (docs/perf-budget.md).
+    Object.assign(window, { r3f: { advance, gl, scene, setDpr, setFrameloop, shadows } })
+  }, [advance, gl, scene, setDpr, setFrameloop])
   return null
 }
 

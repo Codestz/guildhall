@@ -16,7 +16,6 @@ import {
   MeshStandardMaterial as StandardMaterial,
   Vector3,
 } from "three"
-import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js"
 import type { Riser } from "../guild/undead.ts"
 import { useGuild, useGuildStore } from "../guild/useGuild.ts"
 import { UNDEAD_ANIMS_URL, undeadUrl } from "../world/cast.ts"
@@ -25,6 +24,7 @@ import { sky } from "./atmosphere/state.ts"
 import { useBlob } from "./Blobs.tsx"
 import { addChip, CHIP_HEIGHT, chipSlot, removeChip } from "./chips.ts"
 import { useOwnedMeshes } from "./owned.ts"
+import { cloneRig } from "./rig.ts"
 
 /**
  * The graveyard's undead (guild/undead.ts): skeletons that claw out of a grave when a session
@@ -90,7 +90,7 @@ function Skeleton({ riser }: { riser: Riser }) {
   const { scene } = useGLTF(undeadUrl(riser.kind))
   const { animations } = useGLTF(UNDEAD_ANIMS_URL)
   const root = useRef<Group>(null)
-  const body = useMemo(() => cloneSkinned(scene), [scene])
+  const body = useMemo(() => cloneRig(scene), [scene])
   const grave = GRAVEYARD.graves[riser.grave] ?? { x: 0, z: 0, rot: 0 }
   const animator = useRef<{ mixer: AnimationMixer; actions: Map<string, AnimationAction> } | null>(null)
   const current = useRef<AnimationAction | null>(null)

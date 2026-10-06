@@ -16,7 +16,6 @@ import {
   type SkinnedMesh,
   Sphere,
 } from "three"
-import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js"
 import { worldEventsOf } from "../../guild/events.ts"
 import { PROBE } from "../../guild/mode.ts"
 import type { Tier } from "../../guild/quality.ts"
@@ -30,6 +29,7 @@ import { useBlob } from "../Blobs.tsx"
 import { FRAME } from "../frame.ts"
 import { clonePiece, useKit } from "../Kit.tsx"
 import { useOwned } from "../owned.ts"
+import { cloneRig } from "../rig.ts"
 import {
   CALLED_AWAY,
   Day,
@@ -338,7 +338,7 @@ function build(
   animations: readonly AnimationClip[],
   kit: Record<string, Object3D>,
 ): Body {
-  const body = cloneSkinned(scene)
+  const body = cloneRig(scene)
   const tint = new Color(npc.tint)
   const materials: MeshStandardMaterial[] = []
   body.traverse((child) => {

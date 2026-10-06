@@ -6,6 +6,7 @@ import { useTier } from "../Quality.tsx"
 import { Birds } from "./Birds.tsx"
 import { Machines } from "./Machines.tsx"
 import { TracePiles } from "./Piles.tsx"
+import { Ravens } from "./Ravens.tsx"
 import { Smoke } from "./Smoke.tsx"
 import { Sparks } from "./Sparks.tsx"
 import { life, readGuild } from "./state.ts"
@@ -21,8 +22,9 @@ import { Windows } from "./Windows.tsx"
  *   birds      a quiet flock over the forest by day, in fair weather
  *   windows    the village's windows glow from dusk, going dark through the night
  *   villagers  a farmer and two townsfolk on their rounds by day, indoors by night
- * Draw calls (High): machines 1, traces 1, smoke 1, sparks 1, birds 1, windows 2, villagers 3 = 10.
- * Medium: 2 villagers = 9. Low: none = 7. Nothing here casts into the (static) sun shadow map;
+ *   ravens     carry quests out, news of loot home, and circle over a plea (Ravens.tsx)
+ * Draw calls (High): machines 1, traces 1, smoke 1, sparks 1, birds 1, windows 2, villagers 3, ravens 2 = 12.
+ * Medium: 2 villagers = 11. Low: none = 9. Nothing here casts into the (static) sun shadow map;
  * villagers get a blob shadow (scene/Blobs.tsx).
  */
 export function Life() {
@@ -38,6 +40,7 @@ export function Life() {
       <Smoke tier={tier} />
       <Sparks />
       <Birds tier={tier} />
+      <Ravens />
       <Windows />
       <Villagers tier={tier} />
       {import.meta.env.DEV && <LookBridge />}

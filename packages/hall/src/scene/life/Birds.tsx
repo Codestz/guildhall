@@ -103,7 +103,7 @@ const scale = new Vector3()
 const matrix = new Matrix4()
 
 /** A bird as a shallow V, flying along +z: scaling y flaps the wings (negative = down-stroke). */
-function wing(): BufferGeometry {
+export function wing(): BufferGeometry {
   const geometry = new BufferGeometry()
   // body nose, tail, and the two wing tips (raised by 0.35, so y-scale bends them).
   const v = [

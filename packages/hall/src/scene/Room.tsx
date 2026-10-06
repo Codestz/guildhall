@@ -17,7 +17,7 @@ export function Room() {
   const { mood } = useGuild()
 
   useFrame(({ camera }, delta) => {
-    for (const { side, materials } of sides) {
+    for (const { side, materials, meshes } of sides) {
       const [nx, nz] = NORMALS[side]
       const facing = camera.position.x * nx + camera.position.z * nz > 0
       for (const material of materials) {
@@ -25,6 +25,9 @@ export function Room() {
         material.opacity += (goal - material.opacity) * Math.min(1, delta * 5)
         material.depthWrite = material.opacity > 0.6
       }
+      // A faded (cut-away) wall casts no shadow: with a moving sun it would shade the hall floor.
+      const solid = (materials[0]?.opacity ?? 1) > 0.5
+      for (const mesh of meshes) mesh.castShadow = solid
     }
   })
 

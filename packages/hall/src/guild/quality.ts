@@ -6,11 +6,20 @@ export type Tier = 0 | 1 | 2
 
 export const TIERS: Record<
   Tier,
-  { name: string; dpr: number; post: boolean; tiltShift: boolean; shadowMap: number }
+  {
+    name: string
+    dpr: number
+    post: boolean
+    tiltShift: boolean
+    shadowMap: number
+    /** Ambient occlusion (N8AO): off, at half resolution, or full. Needs `post`. Off everywhere
+     * for the 120 fps budget (it re-renders the scene); kept for a future Ultra tier. */
+    ao: "off" | "half" | "full"
+  }
 > = {
-  0: { name: "Low", dpr: 1, post: false, tiltShift: false, shadowMap: 1024 },
-  1: { name: "Medium", dpr: 1.5, post: true, tiltShift: false, shadowMap: 2048 },
-  2: { name: "High", dpr: 2, post: true, tiltShift: true, shadowMap: 2048 },
+  0: { name: "Low", dpr: 1, post: false, tiltShift: false, shadowMap: 1024, ao: "off" },
+  1: { name: "Medium", dpr: 1.25, post: true, tiltShift: false, shadowMap: 2048, ao: "off" },
+  2: { name: "High", dpr: 1.5, post: true, tiltShift: false, shadowMap: 2048, ao: "off" },
 }
 
 /** Phones and small machines start at Medium; the monitor moves them from there. */

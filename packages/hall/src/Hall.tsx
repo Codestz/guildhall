@@ -12,13 +12,7 @@ import { Scene } from "./scene/Scene.tsx"
 export function Hall({ store }: { store: GuildStore }) {
   return (
     <GuildContext.Provider value={store}>
-      <Canvas
-        orthographic
-        shadows
-        dpr={1}
-        camera={{ position: [0.01, 240, 2], zoom: 6, near: 0.1, far: 900 }}
-        gl={{ antialias: false }}
-      >
+      <Canvas shadows dpr={1} gl={{ antialias: false }}>
         <Scene />
       </Canvas>
       <Hud />

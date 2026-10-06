@@ -106,6 +106,8 @@ export class GuildStore {
   scenario: ScenarioId = "party"
   mood: Mood = MOODS.keep
   bard = true
+  /** Diorama: the orthographic tabletop. Explore: a perspective camera that can go low and close. */
+  view: "diorama" | "explore" = "diorama"
   views: AdventurerView[] = []
   focus: Focus | null = null
   /** Run time of the newest event: lets the Bard tell a quiet guild from a busy one. */
@@ -234,6 +236,11 @@ export class GuildStore {
 
   setMood(id: Mood["id"]): void {
     this.mood = MOODS[id]
+    this.emit()
+  }
+
+  setView(view: "diorama" | "explore"): void {
+    this.view = view
     this.emit()
   }
 

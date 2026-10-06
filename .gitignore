@@ -6,3 +6,4 @@ types
 .env*
 assets/raw
 assets/src
+.probe

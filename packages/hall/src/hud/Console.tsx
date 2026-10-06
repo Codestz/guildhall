@@ -23,7 +23,7 @@ export function Console({ store, stageOpen }: { store: GuildStore; stageOpen: bo
       ? watched
         ? `Filming ${watched.title}`
         : "Directing"
-      : "Free camera"
+      : "Yours · drag, WASD, Q/E"
 
   function togglePlay() {
     if (paused) store.setSpeed(resume.current)
@@ -139,9 +139,32 @@ export function Console({ store, stageOpen }: { store: GuildStore; stageOpen: bo
           </div>
         </fieldset>
 
+        <fieldset className="lever lever-view">
+          <legend>View</legend>
+          <div className="seg">
+            <button
+              type="button"
+              aria-pressed={store.view === "diorama"}
+              onClick={() => store.setView("diorama")}
+              title="Orthographic tabletop (V)"
+            >
+              Diorama
+            </button>
+            <button
+              type="button"
+              aria-pressed={store.view === "explore"}
+              onClick={() => store.setView("explore")}
+              title="Perspective, low and close (V)"
+            >
+              Explore
+            </button>
+          </div>
+        </fieldset>
+
         <fieldset className="lever lever-bard">
           <legend>Camera</legend>
           <button
+            title="Drag to pan · right-drag to turn · scroll to zoom · WASD Q/E R/F · B toggles the Bard"
             type="button"
             role="switch"
             className="bard"

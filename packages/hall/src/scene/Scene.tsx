@@ -5,7 +5,7 @@ import { type DirectionalLight, Vector3 } from "three"
 import { TIERS } from "../guild/quality.ts"
 import { useGuild, useGuildStore } from "../guild/useGuild.ts"
 import { Adventurer } from "./Adventurer.tsx"
-import { Bard } from "./Bard.tsx"
+import { CameraRig } from "./CameraRig.tsx"
 import { FrameStats } from "./FrameStats.tsx"
 import { Island } from "./Island.tsx"
 import { Quality, useTier } from "./Quality.tsx"
@@ -30,7 +30,7 @@ export function Scene() {
         <Stations />
         <Cast />
       </Suspense>
-      <Bard />
+      <CameraRig />
       {level.post && level.tiltShift && (
         <EffectComposer multisampling={4}>
           <Bloom luminanceThreshold={mood.bloomThreshold} intensity={0.7} mipmapBlur />

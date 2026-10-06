@@ -561,6 +561,44 @@ button {
   height: 14px;
 }
 
+/* ───────────────────────────── replay fast-forward ───────────────────────────── */
+
+/* Top centre, the plea banner's place (a plea stops the fast-forward, so they never meet). Quiet:
+ * a small ink pill, muted brass, fading in and out with the eased speed. */
+.hud > .ffwd {
+  position: absolute;
+  top: calc(var(--gut) + 4px);
+  left: 50%;
+  translate: -50% 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px 0 10px;
+  border-radius: 999px;
+  background: rgba(14, 10, 7, 0.72);
+  box-shadow: 0 0 0 1px var(--brass-line);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--brass-hi);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.hud > .ffwd[data-on="true"] {
+  opacity: 1;
+}
+.ffwd .glyph {
+  width: 14px;
+  height: 14px;
+}
+.ffwd-rate {
+  min-width: 3.2ch;
+}
+
 /* ───────────────────────────── pleas ───────────────────────────── */
 
 .pleas {
@@ -2602,6 +2640,15 @@ button {
   vertical-align: middle;
   background: var(--tone, var(--brass));
 }
+/* a secret world event (guild/events.ts): rarer than anything else, so it wears the brass */
+.story-line[data-kind="renown"] {
+  --tone: var(--brass-hi);
+  box-shadow:
+    0 0 0 1px rgba(241, 213, 144, 0.55),
+    0 0 26px -6px rgba(241, 213, 144, 0.45),
+    0 12px 32px -14px rgba(0, 0, 0, 0.75);
+  font-size: 20px;
+}
 .story-line[data-kind="plea"] {
   --tone: var(--plea);
 }
@@ -3025,6 +3072,136 @@ button {
   font-size: 17.5px;
   color: var(--ink-text);
   text-wrap: balance;
+}
+
+/* Deeds of Renown (guild/events.ts): wax seals for the secret world events this session earned, and
+   a cryptic hint for each one still unsung. Ink on vellum, every text colour ≥ 7:1 (the hint is
+   --ink-soft, 8.3:1). */
+.renown {
+  margin: 4px 0 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+}
+.renown-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 10px;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 18px;
+  letter-spacing: 0.05em;
+  color: var(--ink-text);
+}
+.renown-tally {
+  font-family: var(--body);
+  font-variant-numeric: lining-nums;
+  font-size: 13.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+}
+.renown-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px 22px;
+}
+.renown-deed {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.renown-seal {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-top: 1px;
+  border-radius: 50%;
+  color: #fff4d8;
+  background: radial-gradient(circle at 35% 30%, #a94a32, #7a2a18 70%);
+  box-shadow:
+    0 0 0 2px rgba(122, 42, 24, 0.25),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.18);
+  font-family: var(--display);
+  font-size: 16px;
+}
+.renown-deed[data-kind="festival"] .renown-seal,
+.renown-deed[data-kind="comet"] .renown-seal,
+.renown-deed[data-kind="rainbow"] .renown-seal {
+  color: #2a1e14;
+  background: radial-gradient(circle at 35% 30%, #f1d590, #c99a3c 72%);
+  box-shadow:
+    0 0 0 2px rgba(150, 110, 40, 0.3),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.14);
+}
+.renown-deed[data-kind="ghost-ship"] .renown-seal {
+  background: radial-gradient(circle at 35% 30%, #4c7a5c, #24493a 72%);
+  box-shadow:
+    0 0 0 2px rgba(36, 73, 58, 0.28),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+}
+.renown-deed[data-kind="raid"] .renown-seal {
+  background: radial-gradient(circle at 35% 30%, #4a3f36, #1f1813 72%);
+}
+.renown-deed[data-earned="false"] .renown-seal {
+  color: var(--umber);
+  background: transparent;
+  box-shadow: none;
+  border: 1.5px dashed rgba(118, 81, 21, 0.55);
+}
+.renown-words {
+  min-width: 0;
+}
+.renown-name {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  margin: 0;
+  font-family: var(--display);
+  font-size: 15px;
+  letter-spacing: 0.05em;
+  color: var(--ink-text);
+}
+.renown-deed[data-earned="false"] .renown-name {
+  color: var(--umber);
+}
+.renown-count {
+  font-family: var(--body);
+  font-variant-numeric: lining-nums;
+  font-size: 13px;
+  letter-spacing: 0;
+  color: var(--ink-soft);
+}
+.renown-forced {
+  padding: 0 6px;
+  border-radius: 3px;
+  border: 1px solid var(--rule);
+  font-family: var(--body);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+.renown-text {
+  margin: 1px 0 0;
+  font-size: 15px;
+  line-height: 1.42;
+  color: var(--ink-text);
+  text-wrap: pretty;
+}
+.renown-deed[data-earned="false"] .renown-text {
+  font-style: italic;
+  color: var(--ink-soft);
+}
+.ch-notes li[data-kind="renown"] .glyph,
+.ch-notes li[data-kind="renown"] b {
+  color: #8a5a0c;
 }
 
 @media (max-width: 720px) {

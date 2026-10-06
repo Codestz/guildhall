@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react"
+import { hudInsets } from "../guild/director.ts"
 import { MODE } from "../guild/mode.ts"
 import { useOpening } from "../guild/opening.ts"
 import { useGuild } from "../guild/useGuild.ts"
@@ -6,6 +7,7 @@ import { Brand } from "./Brand.tsx"
 import { Captions } from "./Captions.tsx"
 import { Chronicle, Toasts } from "./Chronicle.tsx"
 import { Dossier } from "./Dossier.tsx"
+import { FastForward } from "./FastForward.tsx"
 import { Icon } from "./icons.tsx"
 import { Legends } from "./Legends.tsx"
 import { Opening } from "./Opening.tsx"
@@ -70,6 +72,7 @@ export function Hud() {
   const pleas = store.views.filter((v) => v.phase === "waiting").length
   const showcase = MODE === "showcase"
   const tape = !showcase && store.mode === "sim"
+  const hidden = mode === "hidden"
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: refold only when the mode changes
   useEffect(() => {
@@ -117,6 +120,21 @@ export function Hud() {
     requestAnimationFrame(() => gear.current?.focus())
   }
 
+  // Tell the camera what the panels cover, so the Bard frames its subject in the clear area
+  // (guild/director.ts clearFrame). Px, matching hall.css: --gut 16, --left-w 304, --right-w 356.
+  const pleaBanner = !hidden && pleas > 0
+  const rightPanel = !hidden && (dossier || settings || open.chronicle)
+  const sheet = phone && !hidden && (dossier || settings || open.roster || open.chronicle)
+  const captionsShown = prefs.captions && mode !== "detailed"
+  useEffect(() => {
+    hudInsets.left = !phone && !hidden && open.roster ? 16 + 304 : 0
+    hudInsets.right = !phone && rightPanel ? 16 + 372 : 0
+    hudInsets.top = pleaBanner ? 84 : 0
+    hudInsets.bottom = sheet
+      ? window.innerHeight * 0.62
+      : (captionsShown ? 84 : 0) + (tape && !hidden ? 56 : 0)
+  }, [phone, hidden, open.roster, rightPanel, pleaBanner, sheet, captionsShown, tape])
+
   // A new pick on a phone closes the other sheets.
   // biome-ignore lint/correctness/useExhaustiveDependencies: react to a new pick only
   useEffect(() => {
@@ -140,8 +158,12 @@ export function Hud() {
         return
       }
       if (event.key !== "Escape") return
+      // Esc is also "back to the Bard": letting go of someone, or of the camera, hands it back.
       if (settings) closeSettings()
-      else if (store.selected) store.select(null)
+      else if (store.selected) {
+        store.select(null)
+        store.setBard(true)
+      } else if (!store.bard) store.setBard(true)
       else if (mode === "hidden") setMode("minimal")
       else if (open.about) setOpen((o) => ({ ...o, about: false }))
     }
@@ -149,7 +171,6 @@ export function Hud() {
     return () => window.removeEventListener("keydown", onKey)
   })
 
-  const hidden = mode === "hidden"
   const ModeGlyph = Icon[mode]
   const next = nextMode(mode, phone)
   const opening = showcase && <Opening state={intro} store={store} phone={phone} />
@@ -283,6 +304,8 @@ export function Hud() {
           {tape && <Timeline store={store} pinned={mode === "detailed"} />}
         </>
       )}
+
+      <FastForward store={store} />
 
       {prefs.captions && (
         <Captions

@@ -1,4 +1,5 @@
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useSyncExternalStore } from "react"
+import type { DirectorStyle } from "../guild/director.ts"
 import { MODE } from "../guild/mode.ts"
 import { type QualityChoice, quality, TIERS, type Tier } from "../guild/quality.ts"
 import { type GuildStore, SCENARIOS, type ScenarioId } from "../guild/store.ts"
@@ -7,6 +8,18 @@ import { Icon } from "./icons.tsx"
 import { HUD_MODES, type HudMode, hudPrefs, useHudPrefs } from "./prefs.ts"
 import { SoundLevers } from "./Sound.tsx"
 import { WeatherLevers } from "./Weather.tsx"
+
+/** How the Bard films (guild/director.ts). */
+const DIRECTORS: Record<DirectorStyle, { label: string; hint: string }> = {
+  calm: {
+    label: "Calm",
+    hint: "Eases toward the action and drifts slowly. Never changes the replay's pace.",
+  },
+  cinematic: {
+    label: "Cinematic",
+    hint: "Cuts to the best action like a broadcast: close-ups, follows, reaction shots. Replays skip quiet stretches.",
+  },
+}
 
 const QUALITY: QualityChoice[] = ["auto", 0, 1, 2, 3]
 const SPEEDS = [0.5, 1, 2, 4] as const
@@ -123,6 +136,21 @@ export function Settings({ store, onClose }: { store: GuildStore; onClose: () =>
             </div>
           </Lever>
           <Switch label="Bard" hint={camera} checked={store.bard} onChange={(on) => store.setBard(on)} />
+          <Lever label="Director" value={DIRECTORS[store.directorStyle].label}>
+            <div className="seg seg-fill">
+              {(Object.keys(DIRECTORS) as DirectorStyle[]).map((style) => (
+                <button
+                  key={style}
+                  type="button"
+                  aria-pressed={store.directorStyle === style}
+                  onClick={() => store.setDirector(style)}
+                >
+                  {DIRECTORS[style].label}
+                </button>
+              ))}
+            </div>
+          </Lever>
+          <p className="hint">{DIRECTORS[store.directorStyle].hint}</p>
           <details className="keys">
             <summary>Controls</summary>
             <dl>

@@ -24,9 +24,18 @@ import {
 } from "../world/layout.ts"
 import { MOODS, type Mood } from "../world/moods.ts"
 import { destinationOf, FATES, type Fates, SITE_DEFS, siteOf } from "../world/sites.ts"
+import {
+  beatTimes,
+  Director,
+  type DirectorStyle,
+  easeSpeed,
+  FF_CALM_BELOW,
+  fastForwardGoal,
+  MIN_SHOT_MS,
+} from "./director.ts"
 import { DEFAULT_SETTINGS, type Environment, type EnvironmentSettings, environmentOf } from "./environment.ts"
 import { type Actor, before, happenings, MomentStream } from "./moments.ts"
-import { Undead } from "./undead.ts"
+import { RISE_MS, Undead } from "./undead.ts"
 
 export type { Seat }
 
@@ -160,6 +169,18 @@ export class GuildStore {
    * every refresh, so a seek re-stands them without a single rise.
    */
   readonly undead = new Undead()
+  /**
+   * The Bard's director (guild/director.ts, roadmap S4): scores live moments and hints, picks shots.
+   * Anything can ask it to look: `store.director.hint(subject, weight, ttlMs)`.
+   */
+  readonly director = new Director()
+  /** Calm: the original gentle Bard. Cinematic: Director v2 (and replay fast-forward). */
+  directorStyle: DirectorStyle = "calm"
+  /**
+   * Replay fast-forward: the multiple on top of the viewer's pace, 1 unless a quiet stretch of a
+   * replay is being skipped (eased up to FF_MAX and back before the next beat).
+   */
+  fastForward = 1
   /** Completed edits/writes this run: the yard's building grows with it. */
   progress = 0
   /** What finished work has left at each job site (logs, stone, fish, books, arrows). */
@@ -182,8 +203,14 @@ export class GuildStore {
   private sinceViews = 0
 
   constructor() {
-    this.moments.on((moment) => this.undead.take(moment))
-    this.moments.onRebuild(() => this.undead.rebuild())
+    this.moments.on((moment) => {
+      this.undead.take(moment)
+      this.director.take(moment)
+    })
+    this.moments.onRebuild(() => {
+      this.undead.rebuild()
+      this.director.rebuild()
+    })
     this.load("party")
   }
 
@@ -275,9 +302,15 @@ export class GuildStore {
     this.seen.set(event.guild, event.seq)
     return true
   }
+  /** The viewer's pace (Settings → Pace): what the replay runs at when not fast-forwarding. */
   get speed(): number {
-    return this.player.speed
+    return this.pace
   }
+  private pace = 1
+  /** Run times (ms, sorted) a fast-forward slows down for: quests, pleas, failures, loot, the end. */
+  private beats: number[] = []
+  /** The graveyard rise last handed to the director as a hint. */
+  private glanced = -1
 
   load(scenario: ScenarioId): void {
     if (this.mode === "live") {
@@ -287,16 +320,17 @@ export class GuildStore {
       this.mode = "sim"
       this.connected = false
     }
-    const speed = this.player?.speed ?? 1
     this.scenario = scenario
     this.events = toEvents(SCENARIOS[scenario](), "demo")
     this.player = new Player(this.events, { loop: true })
-    this.player.speed = speed
+    this.fastForward = 1
+    this.player.speed = this.pace
     const start = this.events[0]?.change.at ?? 0
     this.markers = this.events.flatMap(({ change }) => {
       const kind = markerOf(change)
       return kind ? [{ at: change.at - start, kind }] : []
     })
+    this.beats = beatTimes(this.markers, this.player.duration)
     this.selected = null
     this.reset()
     this.emit()
@@ -318,8 +352,22 @@ export class GuildStore {
   }
 
   setSpeed(speed: number): void {
-    this.player.speed = speed
+    this.pace = speed
+    this.player.speed = speed * this.fastForward
     this.emit()
+  }
+
+  /** Calm or Cinematic (Settings → Director). */
+  setDirector(style: DirectorStyle): void {
+    this.directorStyle = style
+    this.director.restart()
+    this.emit()
+  }
+
+  /** Who the Bard is filming now, for the roster's "on camera" mark. */
+  get onCamera(): string | undefined {
+    if (!this.bard || this.selected) return undefined
+    return this.directorStyle === "cinematic" ? this.director.shot.id : this.focus?.id
   }
 
   setMood(id: Mood["id"]): void {
@@ -339,11 +387,15 @@ export class GuildStore {
   }
 
   setBard(on: boolean): void {
+    // Handed back: the director takes a fresh look rather than resuming a stale shot.
+    if (on && !this.bard) this.director.restart()
     this.bard = on
     this.emit()
   }
 
   seek(time: number): void {
+    this.fastForward = 1
+    this.player.speed = this.pace
     this.reset()
     for (const event of this.player.seek(time)) this.take(event.change, false)
     this.refresh()
@@ -352,16 +404,50 @@ export class GuildStore {
   /** Called every frame with real elapsed ms. */
   tick(realMs: number): void {
     this.realTime += realMs
+    this.director.now = this.realTime
     if (this.mode === "live") {
+      this.fastForward = 1
       this.sinceViews += realMs
       if (this.sinceViews > 100) this.refresh()
       return
     }
+    this.paceReplay(realMs)
     const { events, restarted } = this.player.tick(realMs)
     if (restarted) this.reset()
     for (const event of events) this.take(event.change, true)
     this.sinceViews += realMs
     if (events.length > 0 || restarted || this.sinceViews > 100) this.refresh()
+  }
+
+  /**
+   * Replay fast-forward (roadmap S4, Gource's auto-skip): in a replay, with the Cinematic director
+   * filming, a quiet stretch speeds up smoothly to FF_MAX and is back at 1× before the next beat.
+   * Only the Player's clock moves faster: moments are made exactly as at 1× (live, one each), so
+   * ravens, sound, sigils and captions see the same stream, just sooner. Never live.
+   */
+  private paceReplay(realMs: number): void {
+    const time = this.player.time
+    const next = firstAfter(this.beats, time)
+    const since = next > 0 ? time - (this.beats[next - 1] ?? 0) : time
+    const until = (this.beats[next] ?? this.player.duration) - time
+    const goal = fastForwardGoal({
+      replay: this.mode === "sim",
+      enabled: this.directorStyle === "cinematic" && this.bard && !this.selected && this.pace > 0,
+      sinceBeat: since,
+      untilBeat: until,
+      busy: this.pleading() || this.director.excitement() >= FF_CALM_BELOW,
+    })
+    const was = this.fastForward
+    this.fastForward = easeSpeed(was, goal, realMs)
+    this.player.speed = this.pace * this.fastForward
+    // The indicator appears and goes on the store's change, not every eased step.
+    if (was > 1.05 !== this.fastForward > 1.05) this.emit()
+  }
+
+  /** Someone is waiting on a plea (no closure: runs every frame). */
+  private pleading(): boolean {
+    for (let i = 0; i < this.views.length; i++) if (this.views[i]?.phase === "waiting") return true
+    return false
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -483,6 +569,22 @@ export class GuildStore {
       this.views.filter((view) => view.phase === "failed"),
       this.realTime,
     )
+    // A live rise in the graveyard: the director looks (it used to be the Bard's only glance).
+    const glance = this.undead.glance
+    if (glance && glance.at !== this.glanced) {
+      this.glanced = glance.at
+      // The fall is told by the rise: the fallen's interest goes with it to the grave.
+      const riser = this.undead.risers.find((r) => r.state === "rising" && r.since === glance.at)
+      this.director.hint(
+        { key: "graveyard", x: glance.x, z: glance.z, radius: 3.5 },
+        8,
+        RISE_MS + MIN_SHOT_MS,
+        {
+          shot: "close",
+          ...(riser ? { absorbs: riser.id } : {}),
+        },
+      )
+    }
     // The world shows the party on stage, not every guild the hub has heard from.
     const party = partyOf(this.model)
     this.departures(party)
@@ -840,4 +942,16 @@ function targetOf(input: Record<string, unknown> | undefined): string {
     if (typeof value === "string") return value.split("/").at(-1) ?? value
   }
   return ""
+}
+
+/** Index of the first value in sorted `times` greater than `t` (times.length if none). */
+function firstAfter(times: readonly number[], t: number): number {
+  let lo = 0
+  let hi = times.length
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if ((times[mid] ?? 0) <= t) lo = mid + 1
+    else hi = mid
+  }
+  return lo
 }

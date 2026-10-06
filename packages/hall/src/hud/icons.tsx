@@ -109,6 +109,12 @@ export const Icon = {
       <path d="M5 3.5v9l7.5-4.5z" fill="currentColor" />
     </Glyph>
   ),
+  /* ⏩ Fast-forward: two arrowheads. */
+  fast: () => (
+    <Glyph>
+      <path d="M2.5 4v8L8 8zM8.5 4v8L14 8z" fill="currentColor" />
+    </Glyph>
+  ),
   pause: () => (
     <Glyph>
       <path d="M5.5 3.5v9M10.5 3.5v9" strokeWidth="2.2" />

@@ -10,6 +10,7 @@ import { shadows } from "./atmosphere/shadows.ts"
 import { Blobs } from "./Blobs.tsx"
 import { CameraRig } from "./CameraRig.tsx"
 import { Crisp } from "./Crisp.tsx"
+import { EventsLayer } from "./events/EventsLayer.tsx"
 import { FrameStats } from "./FrameStats.tsx"
 import { FRAME } from "./frame.ts"
 import { Graveyard } from "./Graveyard.tsx"
@@ -64,6 +65,8 @@ export function Scene() {
       <Suspense fallback={null}>
         <Ships />
       </Suspense>
+      {/* Secret world events (guild/events.ts): nothing when idle; each event's code loads on first need. */}
+      <EventsLayer />
       <WeatherLayer />
       <CameraRig />
       <Post />

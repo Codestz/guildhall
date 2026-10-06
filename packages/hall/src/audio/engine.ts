@@ -1,8 +1,9 @@
+import type { EventKind } from "../guild/events.ts"
 import type { Moment } from "../guild/moments.ts"
 import type { SigilKind } from "../scene/sigilBoard.ts"
 import { Ambience, type AmbienceLevels } from "./ambience.ts"
 import { type Bus, Limiter, PleaCalls, type Verdict } from "./limiter.ts"
-import { type Key, keyOf, motifOf, type Note } from "./music.ts"
+import { type Key, keyOf, motifOf, type Note, renownMotifOf } from "./music.ts"
 import { loadSamples, type Rendition, renditionOf, SAMPLES, type SampleName } from "./samples.ts"
 import { type Listener, NO_LISTENER, placeOf } from "./spatial.ts"
 import { play, playBuffer } from "./synth.ts"
@@ -178,6 +179,16 @@ export class AudioEngine {
     const replaced = sample?.kind === "file" && sample.replace
     if (notes.length > 0 && !replaced) this.cue("notes", sound, notes, info.where, 1, moment.id)
     if (sample && info.sample) this.spot(info.sample, sample, info.sampleAt ?? info.where, moment.id)
+  }
+
+  /**
+   * A secret world event begins (guild/events.ts): its motif, once. Through the same limiter as
+   * every cue (its own cooldown, the notes bus's polyphony), silent when muted, locked or hidden.
+   * Unplaced: an event is the whole island's news.
+   */
+  renown(kind: EventKind): void {
+    if (!this.audible) return
+    this.cue("notes", `renown:${kind}`, renownMotifOf(kind, this.key), undefined, 1, `renown:${kind}`)
   }
 
   /** ≈10 Hz: pleas still unanswered call again, softer. `where` finds the one pleading. */

@@ -23,7 +23,7 @@ export function Roster({
 }) {
   const views = sorted(store)
   const pleas = views.filter((v) => v.phase === "waiting").length
-  const watched = store.bard && !store.selected ? store.focus?.id : undefined
+  const watched = store.onCamera
 
   return (
     <Panel

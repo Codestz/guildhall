@@ -1,4 +1,5 @@
 import type { Entry, Session } from "@guildhall/core"
+import { EVENT_KINDS, type EventKind, type Renown, renownOf } from "./events.ts"
 import type { Moment } from "./moments.ts"
 import {
   CRAFT_ORDER,
@@ -12,6 +13,7 @@ import {
   lastReply,
   listOf,
   NOUNS,
+  nth,
   pick,
   quote,
   sameQuest,
@@ -27,7 +29,7 @@ import {
  * seek gives the same book as playing through (test/story.test.ts). hud/Legends.tsx draws it;
  * `legendMarkdown` is the "Copy as text" artifact.
  */
-export type NotableKind = "plea" | "flaw" | "fall" | "rise"
+export type NotableKind = "plea" | "flaw" | "fall" | "rise" | "renown"
 
 export interface Notable {
   kind: NotableKind
@@ -71,6 +73,25 @@ export interface Chapter {
   usageNote?: string
 }
 
+/** One line of the book's Deeds of Renown (guild/events.ts): earned, with how many times. */
+export interface RenownEntry {
+  kind: EventKind
+  /** Groups repeats: the kind, or a comet's milestone. */
+  id: string
+  title: string
+  /** What happened, the first time. */
+  text: string
+  count: number
+  /** Forced by the probe hook, not earned. */
+  forced: boolean
+}
+
+/** A deed of renown not yet earned this session: a cryptic hint, Bruno-style. */
+export interface Unsung {
+  kind: EventKind
+  hint: string
+}
+
 export interface Legend {
   title: string
   /** Everyone in the party, the guildmaster included. */
@@ -85,6 +106,10 @@ export interface Legend {
   /** The guildmaster's last word, when the quest is done. */
   lastWord?: string
   closing: string
+  /** The Deeds of Renown earned this session, in the order first earned. */
+  renown: RenownEntry[]
+  /** The kinds still unearned. */
+  unsung: Unsung[]
 }
 
 const ROMAN: [number, string][] = [
@@ -207,7 +232,12 @@ function notablesOf(moments: readonly Moment[], session: Session | undefined): N
  * through, because it reads neither `seq` nor `live`, nor the `leave` moments a seek finds late.
  * Undefined before the party has a guildmaster.
  */
-export function legendOf(history: readonly Moment[], sessions: readonly Session[]): Legend | undefined {
+export function legendOf(
+  history: readonly Moment[],
+  sessions: readonly Session[],
+  /** Shows the probe hook forced (guild/events.ts `WorldEvents.forced`): listed, marked as forced. */
+  forced: readonly Renown[] = [],
+): Legend | undefined {
   const root = sessions.find((s) => !s.parentID)
   if (!root) return undefined
   const byId = new Map(sessions.map((s) => [s.id, s]))
@@ -374,6 +404,19 @@ export function legendOf(history: readonly Moment[], sessions: readonly Session[
               seed,
             )
 
+  // Deeds of Renown: the list, and a line in the chapter of whoever earned one on a moment.
+  const earned = renownOf(history, sessions)
+  for (const r of earned) {
+    if (!r.anchored || !r.hero || r.kind === "comet" || r.kind === "raid" || r.kind === "rainbow") continue
+    const chapter = chapters.findLast((c) => c.id === r.hero?.id && c.begin <= r.at)
+    if (!chapter) continue
+    chapter.notables.push({ kind: "renown", at: r.at, text: renownNote(r) })
+    chapter.notables.sort((a, b) => a.at - b.at)
+  }
+  const renown = renownEntries([...earned, ...forced.filter((r) => r.master === root.id)])
+  const have = new Set(renown.map((r) => r.kind))
+  const unsung = EVENT_KINDS.filter((kind) => !have.has(kind)).map((kind) => ({ kind, hint: UNSUNG[kind] }))
+
   return {
     title: clip(quest, 80).replace(/\.$/, ""),
     party,
@@ -385,7 +428,111 @@ export function legendOf(history: readonly Moment[], sessions: readonly Session[
     chapters,
     ...(lastWord ? { lastWord } : {}),
     closing,
+    renown,
+    unsung,
   }
+}
+
+// ─────────────────────────────── deeds of renown ───────────────────────────────
+
+const MILESTONE_TITLE: Record<string, string> = {
+  "deeds-100": "The Hundredth Deed",
+  "deeds-500": "Five Hundred Deeds",
+  "deeds-1000": "A Thousand Deeds",
+  "lines-1000": "A Thousand Lines",
+  "lines-5000": "Five Thousand Lines",
+}
+
+/** The name a deed of renown is listed under. */
+export function renownTitle(r: Renown): string {
+  switch (r.kind) {
+    case "festival":
+      return "A Clean Sweep"
+    case "ghost-ship":
+      return "The Ghost Ship"
+    case "rainbow":
+      return "After the Storm"
+    case "raid":
+      return "The Treasury Raided"
+    case "comet":
+      return MILESTONE_TITLE[milestoneOf(r)] ?? "A Falling Star"
+    case "dragon":
+      return "The Dragon of the Peaks"
+  }
+}
+
+function milestoneOf(r: Renown): string {
+  return r.facts.lines ? `lines-${r.facts.lines}` : `deeds-${r.facts.deeds ?? 100}`
+}
+
+/** What a deed of renown was, in one line for the book. */
+export function renownText(r: Renown): string {
+  const who = r.hero ? `the ${r.hero.title}` : "the guild"
+  const f = r.facts
+  switch (r.kind) {
+    case "festival":
+      return f.whole
+        ? `The whole quest came home clean — ${spell(f.deeds ?? 0)} deeds, not one failed — and the village held a festival.`
+        : `${capital(who)} finished ${spell(f.deeds ?? 0)} deeds without a single failure; lanterns went up in the square.`
+    case "ghost-ship":
+      return (f.fallen ?? 1) > 1
+        ? `${capital(spell(f.fallen ?? 2))} fell in one quest, and a ghost ship passed in the mist.`
+        : `${capital(who)} fell after ${spell(f.minutes ?? 6)} minutes, and a ghost ship passed in the mist.`
+    case "rainbow":
+      return "The storm broke, the deeds came back clean, and a rainbow stood over the island."
+    case "raid":
+      return f.spent === "time"
+        ? `After ${f.minutes ?? 45} minutes at work, pirates anchored offshore under the black flag.`
+        : f.spent === "cost"
+          ? "The guild spent past ten in gold, and pirates anchored offshore under the black flag."
+          : "The guild spent past two million tokens, and pirates anchored offshore under the black flag."
+    case "comet":
+      return f.lines
+        ? `A comet crossed the sky as the ${nth(f.lines)} line was written.`
+        : `Stars fell over the island at the guild's ${nth(f.deeds ?? 100)} deed.`
+    case "dragon":
+      return f.tool && r.hero
+        ? `${capital(who)}'s ${f.tool} failed ${spell(f.streak ?? 3)} times running, and a dragon circled the peaks.`
+        : `${capital(spell(f.streak ?? 5))} deeds failed in quick succession, and a dragon circled the peaks.`
+  }
+}
+
+/** The line in the earner's chapter. */
+function renownNote(r: Renown): string {
+  switch (r.kind) {
+    case "festival":
+      return "Came home clean; the village held a festival in their honour."
+    case "ghost-ship":
+      return "A ghost ship passed in the mist for the fallen."
+    default:
+      return "A dragon woke over the peaks."
+  }
+}
+
+/** Earned deeds grouped (a repeat counts, the first one's words stay), in the order first earned. */
+function renownEntries(earned: readonly Renown[]): RenownEntry[] {
+  const out: RenownEntry[] = []
+  for (const r of earned) {
+    const forced = r.key.startsWith("forced:")
+    const id = `${r.kind === "comet" ? milestoneOf(r) : r.kind}${forced ? ":forced" : ""}`
+    const known = out.find((e) => e.id === id)
+    if (known) {
+      known.count++
+      continue
+    }
+    out.push({ kind: r.kind, id, title: renownTitle(r), text: renownText(r), count: 1, forced })
+  }
+  return out
+}
+
+/** Hints for the deeds not yet earned: enough to hunt for, not enough to spoil. */
+export const UNSUNG: Record<EventKind, string> = {
+  festival: "When every deed of a long quest comes home clean…",
+  "ghost-ship": "A sail with no crew, for those who fall…",
+  rainbow: "What follows the storm, if the work comes good…",
+  raid: "Spend long enough, and someone notices the treasury…",
+  comet: "Count the deeds, and look up…",
+  dragon: "Fail the same trial three times running…",
 }
 
 /** The legend as Markdown, to paste anywhere: the shareable artifact. */
@@ -418,6 +565,14 @@ export function legendMarkdown(legend: Legend): string {
     if (c.loot) out.push(`- **Loot:** ${clip(c.loot, 240)}`)
     out.push("")
   }
+  if (legend.renown.length) {
+    out.push("## Deeds of Renown", "")
+    for (const r of legend.renown)
+      out.push(
+        `- **${r.title}**${r.count > 1 ? ` ×${r.count}` : ""}${r.forced ? " *(forced)*" : ""}: ${r.text}`,
+      )
+    out.push("")
+  }
   out.push("---", "")
   if (legend.lastWord) out.push(`> ${clip(legend.lastWord, 240)}`, "")
   out.push(`*${legend.closing}*`, "")
@@ -429,4 +584,5 @@ export const NOTABLE_LABEL: Record<NotableKind, string> = {
   flaw: "Failure",
   fall: "Fall",
   rise: "Rise",
+  renown: "Renown",
 }

@@ -1,4 +1,5 @@
 import type { Entry, Session } from "@guildhall/core"
+import type { Renown } from "./events.ts"
 import type { Moment } from "./moments.ts"
 
 /**
@@ -266,6 +267,7 @@ export function errorLine(text: string | undefined, max = 60): string | undefine
 
 /** A caption's kind of beat, highest priority first. */
 export type BeatKind =
+  | "renown"
   | "complete"
   | "fall"
   | "plea"
@@ -305,6 +307,8 @@ export function beatOf(m: Moment): BeatKind | undefined {
 
 /** Important beats go first; routine ones wait for a quiet moment and go stale sooner. */
 export const PRIORITY: Record<BeatKind, number> = {
+  /** A secret world event (guild/events.ts): rare, so it goes before everything. */
+  renown: 7,
   complete: 6,
   fall: 5,
   plea: 5,
@@ -824,6 +828,107 @@ export function lineOf(
         ),
       )
     }
+
+    // Told by `renownLine` and handed to the narrator whole (`Narrator.proclaim`).
+    case "renown":
+      return line.parts("Something stirs on the island")
+  }
+}
+
+// ─────────────────────────────── deeds of renown ───────────────────────────────
+
+/** `the 100th`. */
+export function nth(n: number): string {
+  const tens = n % 100
+  const ones = n % 10
+  const suffix =
+    tens >= 11 && tens <= 13 ? "th" : ones === 1 ? "st" : ones === 2 ? "nd" : ones === 3 ? "rd" : "th"
+  return `${n.toLocaleString("en")}${suffix}`
+}
+
+/**
+ * The caption for a secret world event (guild/events.ts), as it starts: rare and a little grand,
+ * so it reads like a chapter heading. Variants are picked by the deed's key, so a replay says the
+ * same words.
+ */
+export function renownLine(renown: Renown): CaptionPart[] {
+  const line = new Line()
+  const seed = hash(renown.key)
+  const who = renown.hero ? line.who(renown.hero) : undefined
+  const f = renown.facts
+  switch (renown.kind) {
+    case "festival":
+      return line.parts(
+        f.whole || !who
+          ? pick(
+              [
+                `A clean sweep — ${spell(f.deeds ?? 0)} deeds and not one failed. The village lights its lanterns`,
+                `Not a single deed failed. The village hangs out the bunting for the whole guild`,
+              ],
+              seed,
+            )
+          : pick(
+              [
+                `${who} comes home with ${spell(f.deeds ?? 0)} deeds and not one failed — the village throws a festival`,
+                `Lanterns go up in the square: ${who} finished clean, ${spell(f.deeds ?? 0)} deeds without a slip`,
+              ],
+              seed,
+            ),
+      )
+    case "ghost-ship":
+      return line.parts(
+        (f.fallen ?? 1) > 1
+          ? pick(
+              [
+                `${capital(spell(f.fallen ?? 2))} fell in one quest. Out in the mist, a green sail passes without a sound`,
+                `The sea goes still. A ghost ship glides by for the ${spell(f.fallen ?? 2)} who fell`,
+              ],
+              seed,
+            )
+          : `${who ?? "One"} fell after ${spell(f.minutes ?? 6)} minutes of work. A ghost ship glides past in the mist`,
+      )
+    case "rainbow":
+      return line.parts(
+        pick(
+          [
+            "The storm breaks. The deeds come back clean, and a rainbow stands over the island",
+            "The sky clears after the storm, and a rainbow arcs over the keep",
+          ],
+          seed,
+        ),
+      )
+    case "raid":
+      return line.parts(
+        f.spent === "time"
+          ? `${spell(f.minutes ?? 45)} minutes at the treasury's door: a pirate ship drops anchor offshore`
+          : pick(
+              [
+                f.spent === "cost"
+                  ? "The treasury runs low — a pirate ship drops anchor and runs up the black flag"
+                  : "Two million tokens spent — a pirate ship drops anchor and runs up the black flag",
+                "Pirates! The guild's spending has drawn a raider to the coast",
+              ],
+              seed,
+            ),
+      )
+    case "comet":
+      return line.parts(
+        f.lines
+          ? `The ${nth(f.lines)} line is written, and a comet crosses the sky`
+          : pick(
+              [
+                `The ${nth(f.deeds ?? 100)} deed — and stars fall over the island`,
+                `A comet marks the guild's ${nth(f.deeds ?? 100)} deed`,
+              ],
+              seed,
+            ),
+      )
+    case "dragon":
+      return line.parts(
+        who && f.tool
+          ? `${who}'s ${f.tool === "bash" ? "commands fail" : `${f.tool} fails`} ${spell(f.streak ?? 3)} times running. A dragon wakes over the peaks`
+          : `${capital(spell(f.streak ?? 5))} deeds fail in quick succession. A dragon circles the mountains`,
+      )
   }
 }
 
@@ -902,6 +1007,25 @@ export class Narrator {
   }
 
   /**
+   * A secret world event begins (guild/events.ts): told before anything else, alone, in its own
+   * words. Never merged with a burst. A rebuild forgets it like any other untold beat.
+   */
+  proclaim(renown: Renown, now: number): void {
+    const moment = {
+      kind: "loot",
+      id: renown.hero?.id ?? renown.master,
+      agent: "",
+      title: renown.hero?.title ?? "",
+      color: renown.hero?.color ?? "",
+      master: renown.master,
+      seq: 0,
+      at: renown.at,
+      live: true,
+    } as Moment
+    this.heard.push({ moment, beat: "renown", heard: now, parts: renownLine(renown) })
+  }
+
+  /**
    * History was thrown away (a seek, a loop restart, a live hello): forget what was not yet told.
    * Only the quest's end survives, when it was heard just now — a replay loops the instant its
    * story ends, and the last line of a film should still be said.
@@ -938,6 +1062,21 @@ export class Narrator {
         undefined,
       )
     if (!best) return undefined
+
+    if (best.beat === "renown" && best.parts) {
+      this.heard = this.heard.filter((h) => h !== best)
+      const text = best.parts.map((p) => p.text).join("")
+      this.last = now
+      return {
+        key: ++this.key,
+        kind: "renown",
+        priority: PRIORITY.renown,
+        text,
+        parts: best.parts,
+        hold: Math.min(9000, 6000 + Math.max(0, text.length - 60) * 30),
+        ids: best.moment.title ? [best.moment.id] : [],
+      }
+    }
 
     // The burst: everything waiting in the same beat (a quest takes the joins it caused with it).
     let beat = best.beat
@@ -1009,6 +1148,20 @@ export interface Stream {
  * time (performance.now in the hall); `heard` is told after each live moment so the caller can
  * schedule its next look. Returns the unsubscribe.
  */
+/** Narrators listening to each stream, so a world event can be told on the same strip. */
+const narrators = new WeakMap<object, Set<{ narrator: Narrator; clock: () => number; heard: () => void }>>()
+
+/**
+ * Tell a secret world event (guild/events.ts) on every narrator listening to `stream` (the store's
+ * `moments`): the scheduler speaks through the captions without the HUD wiring anything new.
+ */
+export function proclaim(stream: object, renown: Renown): void {
+  for (const n of narrators.get(stream) ?? []) {
+    n.narrator.proclaim(renown, n.clock())
+    n.heard()
+  }
+}
+
 export function listen(
   stream: Stream,
   narrator: Narrator,
@@ -1020,6 +1173,10 @@ export function listen(
     narrator.hear(moment, clock())
     heard()
   })
+  const entry = { narrator, clock, heard }
+  const set = narrators.get(stream) ?? new Set()
+  set.add(entry)
+  narrators.set(stream, set)
   const offRebuild = stream.onRebuild(() => {
     narrator.reset(clock())
     rebuilt()
@@ -1027,5 +1184,6 @@ export function listen(
   return () => {
     off()
     offRebuild()
+    set.delete(entry)
   }
 }

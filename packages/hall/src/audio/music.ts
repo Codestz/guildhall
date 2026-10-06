@@ -1,3 +1,4 @@
+import type { EventKind } from "../guild/events.ts"
 import type { MomentKind } from "../guild/moments.ts"
 import type { SigilKind } from "../scene/sigilBoard.ts"
 import type { Mood } from "../world/moods.ts"
@@ -178,6 +179,86 @@ export function motifOf(
       ]
     default:
       return []
+  }
+}
+
+/**
+ * The motif for a secret world event (guild/events.ts) as it begins: longer and grander than a
+ * moment's, still in the guild's key and on its pentatonic, still a handful of notes. Pure.
+ *
+ *   festival    a bright fanfare: marimba arpeggio climbing an octave, a bell chord on top
+ *   ghost-ship  a slow, hollow minor arpeggio in glass, low, and one distant bell (minor even by day)
+ *   rainbow     a quick rising glass-and-kalimba run up the scale, landing on a bell
+ *   raid        a horn call in the minor and two drum thuds: the pirates' signal
+ *   comet       a falling shimmer of glass high up, then a soft bell
+ *   dragon      a low horn growl a semitone apart, and the thud of wings
+ */
+export function renownMotifOf(kind: EventKind, key: Key): Note[] {
+  const root = key.root
+  switch (kind) {
+    case "festival": {
+      const run = [0, 2, 3, 4, 5].map((degree, i) => ({
+        timbre: "marimba" as const,
+        midi: degreeOf(key, 5 + degree),
+        delay: i * 0.11,
+        dur: 0.6,
+        gain: 0.4,
+      }))
+      return [
+        ...run,
+        { timbre: "bell", midi: degreeOf(key, 10), delay: 0.6, dur: 1.8, gain: 0.36 },
+        { timbre: "bell", midi: degreeOf(key, 12), delay: 0.62, dur: 1.8, gain: 0.26 },
+        { timbre: "horn", midi: root, delay: 0.55, dur: 1.8, gain: 0.22 },
+      ]
+    }
+    case "ghost-ship":
+      return [
+        ...[0, 3, 7, 10].map((step, i) => ({
+          timbre: "glass" as const,
+          midi: root + step,
+          delay: i * 0.55,
+          dur: 2.2,
+          gain: 0.3 - i * 0.03,
+        })),
+        { timbre: "bell", midi: root - 12, delay: 2.4, dur: 2.6, gain: 0.22 },
+      ]
+    case "rainbow":
+      return [
+        ...[0, 1, 2, 3, 4, 5, 6].map((degree, i) => ({
+          timbre: i % 2 ? ("kalimba" as const) : ("glass" as const),
+          midi: degreeOf(key, 5 + degree),
+          delay: i * 0.09,
+          dur: 0.9,
+          gain: 0.3,
+        })),
+        { timbre: "bell", midi: degreeOf(key, 12), delay: 0.7, dur: 2, gain: 0.32 },
+      ]
+    case "raid":
+      return [
+        { timbre: "thud", midi: root - 12, delay: 0, dur: 0.45, gain: 0.5 },
+        { timbre: "horn", midi: root, delay: 0.1, dur: 0.7, gain: 0.34 },
+        { timbre: "horn", midi: root + 3, delay: 0.55, dur: 0.6, gain: 0.32 },
+        { timbre: "thud", midi: root - 12, delay: 0.95, dur: 0.45, gain: 0.5 },
+        { timbre: "horn", midi: root + 7, delay: 1.0, dur: 1.4, gain: 0.34 },
+      ]
+    case "comet":
+      return [
+        ...[14, 13, 12, 11, 10, 9].map((degree, i) => ({
+          timbre: "glass" as const,
+          midi: degreeOf(key, degree),
+          delay: i * 0.07,
+          dur: 0.8,
+          gain: 0.24,
+        })),
+        { timbre: "bell", midi: degreeOf(key, 10), delay: 0.55, dur: 2.2, gain: 0.28 },
+      ]
+    case "dragon":
+      return [
+        { timbre: "horn", midi: root - 12, delay: 0, dur: 2.2, gain: 0.36 },
+        { timbre: "horn", midi: root - 11, delay: 0.25, dur: 2, gain: 0.2 },
+        { timbre: "thud", midi: root - 17, delay: 0.9, dur: 0.5, gain: 0.5 },
+        { timbre: "thud", midi: root - 17, delay: 1.6, dur: 0.5, gain: 0.45 },
+      ]
   }
 }
 

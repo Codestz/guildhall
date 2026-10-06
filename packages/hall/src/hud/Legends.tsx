@@ -1,4 +1,5 @@
 import { type CSSProperties, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react"
+import { EVENT_KINDS, type EventKind, worldEventsOf } from "../guild/events.ts"
 import {
   type Chapter,
   clockOf,
@@ -20,6 +21,7 @@ const NOTE_GLYPH: Record<NotableKind, keyof typeof Icon> = {
   flaw: "fail",
   fall: "fail",
   rise: "summon",
+  renown: "crown",
 }
 
 /**
@@ -39,10 +41,12 @@ export function Legends({ store, onClose }: { store: GuildStore; onClose: () => 
   const second = Math.floor(store.time / 1000)
   const status = store.views.map((v) => v.phase).join()
 
+  // Shows the probe hook forced (dev / probe builds only; empty otherwise).
+  const forced = worldEventsOf(store).forced
   // biome-ignore lint/correctness/useExhaustiveDependencies: rebuilt when the story moves, not per render
   const legend = useMemo(
-    () => legendOf(store.moments.history, store.party()),
-    [store, store.moments.epoch, history.length, second, status],
+    () => legendOf(store.moments.history, store.party(), forced),
+    [store, store.moments.epoch, history.length, second, status, forced.length],
   )
 
   useEffect(() => {
@@ -153,6 +157,7 @@ export function Legends({ store, onClose }: { store: GuildStore; onClose: () => 
                   <ChapterView key={`${chapter.numeral}-${chapter.id}`} chapter={chapter} />
                 ))}
               </ol>
+              <RenownList legend={legend} />
               <footer className="legends-end">
                 <span className="fleuron" aria-hidden="true">
                   ❦
@@ -230,6 +235,104 @@ function ChapterView({ chapter: c }: { chapter: Chapter }) {
       )}
     </li>
   )
+}
+
+/**
+ * Deeds of Renown (guild/events.ts): the secret world events this session has earned, as wax seals,
+ * and a cryptic hint for each one still unsung — something to hunt for.
+ */
+function RenownList({ legend }: { legend: Legend }) {
+  const kinds = new Set(legend.renown.filter((r) => !r.forced).map((r) => r.kind)).size
+  return (
+    <section className="renown" aria-labelledby="renown-h">
+      <h3 id="renown-h" className="renown-h">
+        <span>Deeds of Renown</span>
+        <span className="renown-tally">
+          {kinds} of {EVENT_KINDS.length}
+        </span>
+      </h3>
+      <ul className="renown-list">
+        {legend.renown.map((r) => (
+          <li key={r.id} className="renown-deed" data-kind={r.kind} data-earned="true">
+            <span className="renown-seal" aria-hidden="true">
+              <RenownGlyph kind={r.kind} />
+            </span>
+            <div className="renown-words">
+              <p className="renown-name">
+                {r.title}
+                {r.count > 1 && <span className="renown-count">×{r.count}</span>}
+                {r.forced && <span className="renown-forced">forced</span>}
+              </p>
+              <p className="renown-text">{r.text}</p>
+            </div>
+          </li>
+        ))}
+        {legend.unsung.map((u) => (
+          <li key={u.kind} className="renown-deed" data-kind={u.kind} data-earned="false">
+            <span className="renown-seal" aria-hidden="true">
+              ?
+            </span>
+            <div className="renown-words">
+              <p className="renown-name">
+                <span className="visually-hidden">Not yet earned: </span>Unsung
+              </p>
+              <p className="renown-text">{u.hint}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+/** One small engraved mark per deed of renown (1.5px strokes on a 16px grid, like hud/icons.tsx). */
+function RenownGlyph({ kind }: { kind: EventKind }) {
+  return (
+    <svg
+      className="glyph"
+      width={18}
+      height={18}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {RENOWN_PATHS[kind].map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  )
+}
+
+const RENOWN_PATHS: Record<EventKind, readonly string[]> = {
+  festival: [
+    "M8 1.5v2",
+    "M4.8 5.4c0-1.1 1.4-1.9 3.2-1.9s3.2.8 3.2 1.9v4.4c0 1.1-1.4 1.9-3.2 1.9s-3.2-.8-3.2-1.9z",
+    "M8 3.5v8.2M4.9 7.6h6.2",
+    "M8 11.7v2.8",
+  ],
+  "ghost-ship": [
+    "M2 10.5h12l-1.8 2.5H3.8z",
+    "M8 2.5v8",
+    "M8 3.4c2.6 1 3.6 3.3 3.4 6.1H8",
+    "M8 4.6c-2 .9-2.8 2.7-2.6 4.9H8",
+    "M1.5 15c1.2 0 1.2-.7 2.4-.7s1.2.7 2.4.7",
+  ],
+  rainbow: [
+    "M1.8 12a6.2 6.2 0 0 1 12.4 0",
+    "M4.4 12a3.6 3.6 0 0 1 7.2 0",
+    "M10.5 13.5h3.6a1.5 1.5 0 0 0-.6-2.9 2 2 0 0 0-3.6.6 1.2 1.2 0 0 0 .6 2.3z",
+  ],
+  raid: ["M4 14.5V1.8", "M4 2.6h8.6l-2 2.7 2 2.7H4", "M6.4 4l2.6 2.4M9 4 6.4 6.4"],
+  comet: ["M14 2 7.2 8.8", "M11 1.8 6 6.8", "M14.2 5 9.2 10", "M4.6 13.6a2.3 2.3 0 1 0 0-.01"],
+  dragon: [
+    "M1.8 13.2C3 8.6 6.6 4.4 14 2.2c-1.3 2.6-1.5 4.8-1 7-1.8-.9-3.4-.6-4.5.7-1.2-1-2.8-.9-4 .3-1 .7-1.9 1.8-2.7 3z",
+    "M14 2.2 8.5 10M14 2.2l-9.5 8.2",
+  ],
 }
 
 function metaOf(legend: Legend): string {

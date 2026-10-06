@@ -106,7 +106,6 @@ function Hearth({ color, intensity }: { color: string; intensity: number }) {
         intensity={intensity * 4}
         distance={22}
         decay={1.4}
-        castShadow
       />
     </group>
   )

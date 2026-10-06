@@ -178,6 +178,45 @@ export class Adventurer {
     return child
   }
 
+  /**
+   * Call a finished adventurer back for more (OpenCode's `task_id` / `sessionID` continuation):
+   * same session, new prompt. In the hall they get up from the tavern and go back to work.
+   */
+  resume(
+    child: Adventurer,
+    task: string,
+    work: (child: Adventurer) => void,
+    options: { wait?: boolean } = {},
+  ): Adventurer {
+    const call = this.script.nextId("call")
+    const started = this.clock
+    const input = { description: task, subagent_type: child.role, task_id: child.id }
+    this.script.emit({
+      type: "tool",
+      id: this.id,
+      call,
+      name: "task",
+      state: "running",
+      input,
+      started,
+      at: started,
+    })
+    child.clock = Math.max(child.clock, started) + this.script.jitter(400)
+    this.script.emit({
+      type: "prompt",
+      id: child.id,
+      key: this.script.nextId("msg"),
+      text: task,
+      at: child.clock,
+    })
+    this.script.emit({ type: "status", id: child.id, status: "busy", at: child.clock })
+    work(child)
+    const ended = child.clock + this.script.jitter(300)
+    this.script.emit({ type: "tool", id: this.id, call, state: "completed", ended, at: ended })
+    if (options.wait !== false) this.clock = ended
+    return child
+  }
+
   /** Catch up with background quests: this clock moves to the last of them to finish. */
   waitFor(...children: Adventurer[]): this {
     this.clock = Math.max(this.clock, ...children.map((child) => child.clock + 400))

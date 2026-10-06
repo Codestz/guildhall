@@ -24,7 +24,8 @@ export function solo(seed = 1): Change[] {
 
 /**
  * The hero run for the website (~67 s, loops): map → plan → three adventurers in parallel (one
- * raises a plea) → the verifier catches an off-by-one → a fix quest → verified → loot home.
+ * raises a plea) → the verifier catches an off-by-one → the query smith is called back from the
+ * tavern (resume) → verified → loot home.
  * Every kind of moment the Bard ranks appears at least once.
  */
 export function party(seed = 1): Change[] {
@@ -91,7 +92,8 @@ export function party(seed = 1): Change[] {
     verifier.finish("FAIL: nextCursor skips the final row on exact page boundaries.")
   })
 
-  master.quest("guild-implementer", "Fix: fetch limit + 1 to detect the next page", (smith) => {
+  // The query smith still has the context: call them back from the tavern instead of a new hire.
+  master.resume(query, "Fix: fetch limit + 1 to detect the next page", (smith) => {
     smith.deed("edit", { filePath: "src/users/queries.ts" }, 2600)
     smith.deed("bash", { command: "bun test users" }, 3800, { summary: "18 pass" })
     smith.finish("Lookahead row added; boundary test passes.")

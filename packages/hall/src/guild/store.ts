@@ -404,6 +404,10 @@ function lineOf(change: Change, s: Session): Pick<LogEntry, "kind" | "text"> | u
       }
       return { kind: "deed", text: `${name} ${shorten(targetOf(change.input), 40)}`.trim() }
     }
+    case "prompt": {
+      const prompts = s.entries.filter((entry) => entry.kind === "prompt").length
+      return prompts > 1 ? { kind: "quest", text: `called back: ${shorten(change.text, 70)}` } : undefined
+    }
     case "thinking":
       return change.done || !change.text ? undefined : { kind: "thought", text: shorten(change.text, 90) }
     default:

@@ -1,9 +1,7 @@
-import { ContactShadows } from "@react-three/drei"
 import { useFrame, useThree } from "@react-three/fiber"
 import { Bloom, EffectComposer, TiltShift2, Vignette } from "@react-three/postprocessing"
 import { Suspense, useEffect } from "react"
 import { useGuild, useGuildStore } from "../guild/useGuild.ts"
-import { ROOM } from "../world/layout.ts"
 import { Adventurer } from "./Adventurer.tsx"
 import { Bard } from "./Bard.tsx"
 import { Room } from "./Room.tsx"
@@ -36,14 +34,6 @@ export function Scene() {
         <Stations />
         <Cast />
       </Suspense>
-      <ContactShadows
-        position={[0, 0.005, 0]}
-        scale={[ROOM.width, ROOM.depth]}
-        resolution={1024}
-        opacity={0.45}
-        blur={2.4}
-        far={3}
-      />
       <Bard />
       <EffectComposer multisampling={4}>
         <Bloom luminanceThreshold={mood.bloomThreshold} intensity={0.7} mipmapBlur />
@@ -59,7 +49,9 @@ function Cast() {
   return (
     <>
       {views.map((view) => (
-        <Adventurer key={view.id} view={view} />
+        <Suspense key={view.id} fallback={null}>
+          <Adventurer view={view} />
+        </Suspense>
       ))}
     </>
   )
@@ -75,8 +67,9 @@ function Clock() {
 /** Dev only: lets automation step frames by hand when the tab is hidden (rAF paused). */
 function DevBridge() {
   const advance = useThree((state) => state.advance)
+  const gl = useThree((state) => state.gl)
   useEffect(() => {
-    Object.assign(window, { r3f: { advance } })
-  }, [advance])
+    Object.assign(window, { r3f: { advance, gl } })
+  }, [advance, gl])
   return null
 }

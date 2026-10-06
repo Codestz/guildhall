@@ -62,6 +62,15 @@ describe("party, the hero run", () => {
     expect(sessions.every((s) => s.status === "done")).toBe(true)
   })
 
+  test("the fix is a resume: the query smith is called back, not replaced", () => {
+    const smiths = sessions.filter((s) => s.agent === "guild-implementer")
+    expect(smiths).toHaveLength(2)
+    const resumed = smiths.find((s) => s.entries.filter((e) => e.kind === "prompt").length === 2)
+    expect(resumed).toBeDefined()
+    const finished = changes.filter((c) => c.type === "status" && c.id === resumed?.id && c.status === "idle")
+    expect(finished.length).toBe(2)
+  })
+
   test("three adventurers work at once", () => {
     const busy = (at: number) =>
       sessions.filter((s) => s.parentID && s.started <= at && (s.ended ?? Infinity) > at).length

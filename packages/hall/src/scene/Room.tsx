@@ -2,9 +2,9 @@ import { useFrame } from "@react-three/fiber"
 import { useMemo } from "react"
 import { type Material, MeshStandardMaterial } from "three"
 import { useGuild } from "../guild/useGuild.ts"
-import { FURNITURE, NORMALS, type Side, WALL_DECOR, WALLS } from "../world/furniture.ts"
+import { FURNITURE, NORMALS, type Placement, type Side, WALL_DECOR, WALLS } from "../world/furniture.ts"
 import { ROOM, TILE } from "../world/layout.ts"
-import { KitPiece } from "./Kit.tsx"
+import { mergePlacements, useKit } from "./Kit.tsx"
 
 const SIDES: readonly Side[] = ["back", "front", "left", "right"]
 
@@ -32,13 +32,31 @@ export function Room() {
     }
   })
 
-  const tiles = useMemo(
+  const kit = useKit()
+  const tiles = useMemo<Placement[]>(
     () =>
       Array.from({ length: ROOM.cols * ROOM.rows }, (_, n) => ({
+        piece: "floor_wood_large",
         x: -ROOM.width / 2 + TILE / 2 + (n % ROOM.cols) * TILE,
         z: -ROOM.depth / 2 + TILE / 2 + Math.floor(n / ROOM.cols) * TILE,
+        mounted: true,
       })),
     [],
+  )
+  /** Floor and furniture: everything that never fades, merged per material. */
+  const still = useMemo(() => mergePlacements(kit, [...tiles, ...FURNITURE]), [kit, tiles])
+  /** Each wall side (segments + what hangs on them), merged per material, with its own fade. */
+  const sides = useMemo(
+    () =>
+      SIDES.flatMap((side) => {
+        fading[side].length = 0
+        const pieces: Placement[] = [
+          ...WALLS.filter((wall) => wall.side === side).map((wall) => ({ ...wall, mounted: true })),
+          ...WALL_DECOR.filter((decor) => decor.side === side),
+        ]
+        return mergePlacements(kit, pieces, fading[side])
+      }),
+    [kit, fading],
   )
   const plinth = useMemo(() => new MeshStandardMaterial({ color: mood.stone }), [mood.stone])
 
@@ -47,31 +65,11 @@ export function Room() {
       <mesh position-y={-0.6} receiveShadow material={plinth}>
         <boxGeometry args={[ROOM.width + 3, 1, ROOM.depth + 3]} />
       </mesh>
-      {tiles.map((tile) => (
-        <KitPiece
-          key={`${tile.x},${tile.z}`}
-          placement={{ piece: "floor_wood_large", x: tile.x, z: tile.z, mounted: true }}
-        />
+      {still.map((mesh) => (
+        <primitive key={mesh.uuid} object={mesh} />
       ))}
-      {WALLS.map((wall) => (
-        <KitPiece
-          key={`${wall.side}${wall.x},${wall.z}`}
-          placement={{ piece: wall.piece, x: wall.x, z: wall.z, rot: wall.rot, mounted: true }}
-          materials={fading[wall.side]}
-        />
-      ))}
-      {WALL_DECOR.map((decor) => (
-        <KitPiece
-          key={`${decor.side}${decor.piece}${decor.x},${decor.z}`}
-          placement={decor}
-          materials={fading[decor.side]}
-        />
-      ))}
-      {FURNITURE.map((placement) => (
-        <KitPiece
-          key={`${placement.piece}${placement.x},${placement.z},${placement.y ?? 0}`}
-          placement={placement}
-        />
+      {sides.map((mesh) => (
+        <primitive key={mesh.uuid} object={mesh} />
       ))}
     </group>
   )

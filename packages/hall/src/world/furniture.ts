@@ -111,7 +111,8 @@ export const FURNITURE: readonly Placement[] = [
   // Overflow bench (right of the hearth).
   { piece: "table_long", x: 6, z: -2, rot: QUARTER },
 
-  // Gate approach and corners.
+  // Gate approach and corners; a stone step outside the gate for arrivals and departures.
+  { piece: "floor_tile_large", x: 0, z: HALF_D + 2.6, mounted: true },
   { piece: "pillar_decorated", x: -3.4, z: HALF_D - 1 },
   { piece: "pillar_decorated", x: 3.4, z: HALF_D - 1 },
   { piece: "pillar", x: -HALF_W + 0.75, z: -HALF_D + 0.75 },

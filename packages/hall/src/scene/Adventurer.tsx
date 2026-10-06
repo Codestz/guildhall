@@ -14,9 +14,10 @@ import {
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js"
 import type { AdventurerView } from "../guild/store.ts"
 import { positions, useGuildStore } from "../guild/useGuild.ts"
-import { ANIMS_URL, GEAR, isModel, modelUrl } from "../world/cast.ts"
+import { ANIMS_URL, GEAR, isModel, MODELS, modelUrl } from "../world/cast.ts"
 import type { Piece } from "../world/furniture.ts"
-import { GATE } from "../world/layout.ts"
+import { GATE, type Spot } from "../world/layout.ts"
+import { route } from "../world/paths.ts"
 import { DeedEffect } from "./DeedEffect.tsx"
 import { clonePiece, useKit } from "./Kit.tsx"
 
@@ -27,6 +28,8 @@ const RUN_ABOVE = 5.2
 const FADE_S = 0.25
 
 useGLTF.preload(ANIMS_URL)
+// Every model up front: a model loading mid-run would suspend and hide the whole cast.
+for (const model of MODELS) useGLTF.preload(modelUrl(model))
 
 /**
  * A KayKit adventurer: the role's model with its gear, animated from the shared Rig_Medium clips.
@@ -48,6 +51,9 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     return map
   }, [animations, mixer])
   const current = useRef<AnimationAction | null>(null)
+  /** Spots still to walk through; recomputed whenever the target moves. */
+  const path = useRef<Spot[]>([])
+  const routedTo = useRef<string>("")
   const start = view.master ? view.target : ([GATE[0], GATE[1], Math.PI] as const)
 
   // Role colour on cape and hat; shadows on.
@@ -77,39 +83,73 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     if (node) positions.set(id, node.position)
     return () => {
       positions.delete(id)
-      mixer.stopAllAction()
     }
-  }, [view.id, mixer])
+  }, [view.id])
 
   useFrame((_, delta) => {
     const node = root.current
     if (!node) return
     const [tx, tz, facing] = view.target
-    const dx = tx - node.position.x
-    const dz = tz - node.position.z
-    const distance = Math.hypot(dx, dz)
-    const walking = distance > 0.12
+    const key = `${tx},${tz}`
+    if (routedTo.current !== key) {
+      routedTo.current = key
+      path.current = route([node.position.x, node.position.z], [tx, tz])
+    }
+    let next = path.current[0]
+    while (
+      next &&
+      path.current.length > 1 &&
+      Math.hypot(next[0] - node.position.x, next[1] - node.position.z) < 0.3
+    ) {
+      path.current.shift()
+      next = path.current[0]
+    }
+    const [nx, nz] = next ?? [tx, tz]
+    const dx = nx - node.position.x
+    const dz = nz - node.position.z
+    const step = Math.hypot(dx, dz)
+    const remaining = step + pathLength(path.current)
+    const walking = remaining > 0.12
     let speed = 0
     if (walking) {
-      speed = Math.max(WALK_SPEED, distance / MAX_WALK_S)
-      const step = Math.min(1, (speed * delta) / distance)
-      node.position.x += dx * step
-      node.position.z += dz * step
+      speed = Math.max(WALK_SPEED, remaining / MAX_WALK_S)
+      const move = Math.min(1, (speed * delta) / Math.max(step, 1e-6))
+      node.position.x += dx * move
+      node.position.z += dz * move
       turn(node, Math.atan2(dx, dz), delta * 10)
     } else {
       turn(node, facing, delta * 5)
     }
+    const distance = remaining
 
     const leaving = view.phase === "leaving" ? distance : 99
     node.scale.setScalar(leaving < 1.2 ? Math.max(0.01, leaving / 1.2) : 1)
 
     play(clipFor(view, walking, speed))
     mixer.update(delta)
+    if (import.meta.env.DEV) {
+      const action = current.current
+      const debug = ((window as unknown as { anim?: Record<string, unknown> }).anim ??= {})
+      debug[view.id] = {
+        who: view.title,
+        phase: view.phase,
+        clip: action?.getClip().name,
+        weight: Math.round((action?.getEffectiveWeight() ?? 0) * 100) / 100,
+        running: action?.isRunning() ?? false,
+      }
+    }
   })
 
   function play(name: string): void {
     const next = actions.get(name) ?? actions.get("Idle_A")
-    if (!next || next === current.current) return
+    if (!next) return
+    // Already playing it — unless something stopped it (a suspended tree, a finished fade): then
+    // it must start again, or the rig falls back to its bind pose (KayKit's T-pose).
+    if (next === current.current && next.isRunning()) return
+    if (next === current.current) {
+      next.reset().setEffectiveWeight(1).play()
+      return
+    }
     next.reset()
     if (name === "Sit_Chair_Down" || name === "Lie_Down") {
       next.setLoop(LoopOnce, 1)
@@ -226,6 +266,17 @@ function useHeld(
       bone.remove(held)
     }
   }, [body, kit, slot, piece])
+}
+
+/** Length of the rest of the walk, after the spot being walked to now. */
+function pathLength(path: Spot[]): number {
+  let total = 0
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1]
+    const b = path[i]
+    if (a && b) total += Math.hypot(b[0] - a[0], b[1] - a[1])
+  }
+  return total
 }
 
 function turn(node: Object3D, heading: number, rate: number): void {

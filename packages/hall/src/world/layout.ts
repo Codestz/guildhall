@@ -85,7 +85,8 @@ export const STATIONS: Record<StationId, Station> = {
 }
 
 export const HEARTH: Spot = [0, -1.5]
-export const GATE: Spot = [0, 13]
+/** Just outside the gate: where adventurers arrive from and fade out to. */
+export const GATE: Spot = [0, 16]
 
 /** Tavern stools, front right: finished adventurers rest here until they leave or are resumed. */
 export const TAVERN: readonly Post[] = [

@@ -48,9 +48,18 @@ export function Smoke({ tier }: { tier: Tier }) {
         presence: 0,
       }))
   }, [])
-  const geometry = useMemo(() => new IcosahedronGeometry(0.5, 0), [])
+  // Rounder puffs, softly see-through, a little grey-blue: low-poly smoke, not white dice.
+  const geometry = useMemo(() => new IcosahedronGeometry(0.5, 1), [])
   const material = useMemo(
-    () => new MeshStandardMaterial({ color: "#e4e2dc", roughness: 1, flatShading: true }),
+    () =>
+      new MeshStandardMaterial({
+        color: "#d9dde3",
+        roughness: 1,
+        flatShading: true,
+        transparent: true,
+        opacity: 0.62,
+        depthWrite: false,
+      }),
     [],
   )
   const mesh = useRef<InstancedMesh>(null)

@@ -21,8 +21,17 @@ const url = process.argv[2] ?? "http://localhost:5199/"
 const steps: Step[] = process.argv[3] ? await Bun.file(process.argv[3]).json() : [{ wait: 6000 }, { shot: "hall" }]
 const chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
-const browser = await chromium.launch({ executablePath: chrome, args: ["--use-angle=metal", "--enable-gpu"] })
-const page = await browser.newPage({ viewport: { width: 1440, height: 860 } })
+// Uncapped frame rate (no vsync, no 60 Hz limit), so fps/frame-time readings show real headroom
+// against the 120 fps budget instead of the headless 60 cap.
+const browser = await chromium.launch({
+  executablePath: chrome,
+  args: ["--use-angle=metal", "--enable-gpu", "--disable-gpu-vsync", "--disable-frame-rate-limit"],
+})
+// Retina-like by default (DPR=2), like the Mac this is built on; DPR=1 bun scripts/shot.ts … to compare.
+const page = await browser.newPage({
+  viewport: { width: 1440, height: 860 },
+  deviceScaleFactor: Number(process.env.DPR ?? 2),
+})
 const errors: string[] = []
 page.on("pageerror", (error) => errors.push(error.message))
 await page.goto(url)

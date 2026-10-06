@@ -1,15 +1,17 @@
 import { Html, useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import {
   type AnimationAction,
   AnimationMixer,
   Color,
   type Group,
   LoopOnce,
+  type Material,
   type Mesh,
   type MeshStandardMaterial,
   type Object3D,
+  type SkinnedMesh,
 } from "three"
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js"
 import type { AdventurerView } from "../guild/store.ts"
@@ -44,32 +46,61 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   const kit = useKit()
 
   const body = useMemo(() => cloneSkinned(scene), [scene])
-  const mixer = useMemo(() => new AnimationMixer(body), [body])
-  const actions = useMemo(() => {
-    const map = new Map<string, AnimationAction>()
-    for (const clip of animations) map.set(clip.name, mixer.clipAction(clip))
-    return map
-  }, [animations, mixer])
+  /** Made in a layout effect, below: a mount (StrictMode's second one too) gets its own. */
+  const animator = useRef<{ mixer: AnimationMixer; actions: Map<string, AnimationAction> } | null>(null)
   const current = useRef<AnimationAction | null>(null)
   /** Spots still to walk through; recomputed whenever the target moves. */
   const path = useRef<Spot[]>([])
   const routedTo = useRef<string>("")
   const start = view.master ? view.target : ([GATE[0], GATE[1], Math.PI] as const)
 
-  // Role colour on cape and hat; shadows on.
+  // Role colour on cape and hat; shadows on. The tinted clones are this adventurer's own: on
+  // unmount (or a new colour) they are disposed and the model's shared materials put back.
   useEffect(() => {
     const tint = new Color(view.color)
+    const tinted: [Mesh, Material][] = []
     body.traverse((child) => {
       const mesh = child as Mesh
       if (!mesh.isMesh) return
       mesh.castShadow = true
       if (/Tinted/.test(mesh.name)) {
-        const own = (mesh.material as MeshStandardMaterial).clone()
+        const shared = mesh.material as MeshStandardMaterial
+        const own = shared.clone()
         own.color = tint.clone().lerp(new Color("#ffffff"), 0.25)
         mesh.material = own
+        tinted.push([mesh, shared])
       }
     })
+    return () => {
+      for (const [mesh, shared] of tinted) {
+        ;(mesh.material as Material).dispose()
+        mesh.material = shared
+      }
+    }
   }, [body, view.color])
+
+  // The mixer and its actions live exactly as long as this mount: made here, before the first frame
+  // (no bind-pose flash), and freed on unmount with each skeleton's bone texture — all made for this
+  // body alone. Geometry and untinted materials are shared with the loaded model (SkeletonUtils.clone),
+  // held gear with the kit: never disposed here. StrictMode's unmount-and-mount gets a fresh mixer,
+  // so nothing keeps using a disposed one; the renderer remakes the bone texture on the next draw.
+  useLayoutEffect(() => {
+    const mixer = new AnimationMixer(body)
+    const actions = new Map<string, AnimationAction>()
+    for (const clip of animations) actions.set(clip.name, mixer.clipAction(clip))
+    animator.current = { mixer, actions }
+    current.current = null
+    return () => {
+      animator.current = null
+      current.current = null
+      mixer.stopAllAction()
+      mixer.uncacheRoot(body)
+      body.traverse((child) => {
+        const skinned = child as SkinnedMesh
+        if (skinned.isSkinnedMesh) skinned.skeleton.dispose()
+      })
+    }
+  }, [body, animations])
 
   // Gear in the hand slots; a mug instead while resting in the tavern.
   const atWork = view.site && (view.phase === "working" || view.phase === "waiting")
@@ -127,22 +158,12 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     node.scale.setScalar(leaving < 1.2 ? Math.max(0.01, leaving / 1.2) : 1)
 
     play(clipFor(view, walking, speed))
-    mixer.update(delta)
-    if (import.meta.env.DEV) {
-      const action = current.current
-      const debug = ((window as unknown as { anim?: Record<string, unknown> }).anim ??= {})
-      debug[view.id] = {
-        who: view.title,
-        phase: view.phase,
-        clip: action?.getClip().name,
-        weight: Math.round((action?.getEffectiveWeight() ?? 0) * 100) / 100,
-        running: action?.isRunning() ?? false,
-      }
-    }
+    animator.current?.mixer.update(delta)
   })
 
   function play(name: string): void {
-    const next = actions.get(name) ?? actions.get("Idle_A")
+    const actions = animator.current?.actions
+    const next = actions?.get(name) ?? actions?.get("Idle_A")
     if (!next) return
     // Already playing it — unless something stopped it (a suspended tree, a finished fade): then
     // it must start again, or the rig falls back to its bind pose (KayKit's T-pose).

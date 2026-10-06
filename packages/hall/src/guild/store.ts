@@ -168,6 +168,10 @@ export class GuildStore {
    * Reconnects with backoff, so the hall can be opened before OpenCode or the hub.
    */
   live(url = "ws://127.0.0.1:4747/ws"): void {
+    // One socket at a time: a second call replaces the first rather than doubling every event.
+    const previous = this.socket
+    this.socket = undefined
+    previous?.close()
     this.mode = "live"
     this.reset()
     this.markers = []
@@ -182,25 +186,42 @@ export class GuildStore {
         this.emit()
       }
       socket.onmessage = (message) => {
+        if (this.socket !== socket) return
         const data = JSON.parse(String(message.data)) as { type: string; events: GuildEvent[] }
         if (data.type === "hello") {
           this.reset()
+          this.seen.clear()
           this.liveStart = data.events[0]?.change.at ?? Date.now()
-          for (const event of data.events) this.take(event.change, false)
+          for (const event of data.events) if (this.fresh(event)) this.take(event.change, false)
         } else {
-          for (const event of data.events) this.take(event.change, true)
+          for (const event of data.events) if (this.fresh(event)) this.take(event.change, true)
         }
         const last = data.events.at(-1)
         if (last) this.guild = last.guild
         this.refresh()
       }
       socket.onclose = () => {
+        if (this.socket !== socket) return
         this.connected = false
         this.emit()
-        if (this.socket === socket) setTimeout(open, (delay = Math.min(delay * 2, 10_000)))
+        // Reconnect unless live() or load() moved on while we waited.
+        delay = Math.min(delay * 2, 10_000)
+        setTimeout(() => {
+          if (this.socket === socket) open()
+        }, delay)
       }
     }
     open()
+  }
+
+  /** Live: the last seq taken per guild, since the last hello. */
+  private seen = new Map<string, number>()
+
+  /** False for an event already taken (a repeat after a reconnect): applied twice, it would count twice. */
+  private fresh(event: GuildEvent): boolean {
+    if (event.seq <= (this.seen.get(event.guild) ?? 0)) return false
+    this.seen.set(event.guild, event.seq)
+    return true
   }
   get speed(): number {
     return this.player.speed

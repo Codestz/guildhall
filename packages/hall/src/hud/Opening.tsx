@@ -3,8 +3,8 @@ import type { OpeningState } from "../guild/opening.ts"
 import type { GuildStore } from "../guild/store.ts"
 import { Icon } from "./icons.tsx"
 
-/** TODO(user): point this at the project's home (repo, docs or landing page) before publishing. */
-export const PROJECT_URL = "https://github.com/your-name/guildhall"
+/** The project's home, linked from the showcase caption. */
+export const PROJECT_URL = "https://github.com/Codestz/guildhall"
 
 const PITCH =
   "Watch AI coding agents work as a living guild: every quest, deed and plea of a multi\u2011agent session, played out on an island."

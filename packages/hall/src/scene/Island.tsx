@@ -7,7 +7,7 @@ import {
   type Material,
   Matrix4,
   type Mesh,
-  MeshStandardMaterial,
+  type MeshStandardMaterial,
   type Object3D,
   Quaternion,
   Vector3,
@@ -37,9 +37,6 @@ export function Island() {
 
   return (
     <group>
-      <mesh rotation-x={-Math.PI / 2} position-y={SEA_LEVEL - 0.02} receiveShadow material={sea}>
-        <circleGeometry args={[420, 64]} />
-      </mesh>
       {batches.map((mesh) => (
         <primitive key={mesh.uuid} object={mesh} />
       ))}
@@ -47,16 +44,6 @@ export function Island() {
     </group>
   )
 }
-
-/**
- * The open sea beyond the sea tiles: the pack's own water colour (softened like the tiles), just
- * under the tiles' water surface, so the tiled sea runs into it with no seam.
- */
-const SEA_LEVEL = -0.2 * HEX_SCALE
-const sea = new MeshStandardMaterial({
-  color: new Color("rgb(37, 131, 193)").multiply(new Color("#bdd3c6")),
-  roughness: 1,
-})
 
 /**
  * The hexagon pack's palette is a loud lime next to the hall: multiply every land material by a

@@ -213,7 +213,7 @@ export function updateSky(out: SkyState, env: Environment, mood: Mood, flash = 0
 
   // 3. The moon takes over once the sun is down (both are dark at the hand-over: no pop).
   const moon =
-    1.05 * (1 - smoothstep(-0.14, -0.03, e)) * smoothstep(-0.02, 0.18, moonUp) * (1 - overcast * 0.7)
+    0.85 * (1 - smoothstep(-0.14, -0.03, e)) * smoothstep(-0.02, 0.18, moonUp) * (1 - overcast * 0.7)
   out.sunIntensity = sun
   out.moonIntensity = moon
 

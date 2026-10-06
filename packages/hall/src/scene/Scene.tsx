@@ -1,5 +1,6 @@
 import { useFrame, useThree } from "@react-three/fiber"
 import { Suspense, useEffect } from "react"
+import { SoundStage } from "../audio/SoundStage.tsx"
 import { MODE, PROBE } from "../guild/mode.ts"
 import { useGuild, useGuildStore } from "../guild/useGuild.ts"
 import { Adventurer } from "./Adventurer.tsx"
@@ -34,6 +35,8 @@ export function Scene() {
       <ReleaseLater />
       <Crisp />
       <FrameStats />
+      {/* Sound: moments and a 10 Hz sample of the world; never renders (audio/README.md). */}
+      <SoundStage />
       {PROBE && <DevBridge />}
       <Atmosphere />
       <Suspense fallback={null}>

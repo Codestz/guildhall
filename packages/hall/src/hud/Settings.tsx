@@ -5,6 +5,7 @@ import { type GuildStore, SCENARIOS, type ScenarioId } from "../guild/store.ts"
 import { MOODS, type Mood } from "../world/moods.ts"
 import { Icon } from "./icons.tsx"
 import { HUD_MODES, type HudMode, hudPrefs, useHudPrefs } from "./prefs.ts"
+import { SoundLevers } from "./Sound.tsx"
 import { WeatherLevers } from "./Weather.tsx"
 
 const QUALITY: QualityChoice[] = ["auto", 0, 1, 2, 3]
@@ -178,6 +179,10 @@ export function Settings({ store, onClose }: { store: GuildStore; onClose: () =>
           </Section>
         )}
 
+        <Section title="Sound">
+          <SoundLevers />
+        </Section>
+
         <Section title="Display">
           <Lever label="HUD" value="press H">
             <div className="seg seg-fill">
@@ -199,6 +204,12 @@ export function Settings({ store, onClose }: { store: GuildStore; onClose: () =>
             hint="An icon for each deed in progress, readable with the HUD hidden"
             checked={prefs.sigils}
             onChange={(sigils) => hudPrefs.set({ sigils })}
+          />
+          <Switch
+            label="Story captions"
+            hint="A narrated line for each beat, like subtitles. Shown in Minimal and Hidden"
+            checked={prefs.captions}
+            onChange={(captions) => hudPrefs.set({ captions })}
           />
           <Switch
             label="Stats for nerds"

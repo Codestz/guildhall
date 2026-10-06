@@ -5,3 +5,9 @@
 Character Pack: Adventurers 2.0, Character Animations 1.1, Dungeon Pack 1.1, Furniture Bits,
 RPG Tools Bits, Fantasy Weapons Bits, Medieval Hexagon Pack, Forest Nature Pack, Restaurant Bits,
 Skeletons 1.1 and Halloween Bits (see `scripts/assets.ts`).
+
+Sound effects in `public/audio/` by **Kenney** — [kenney.nl](https://kenney.nl/), released under
+[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/): a curated subset of
+[RPG Audio](https://kenney.nl/assets/rpg-audio) (book flips, chop, coins, creaks, a door) and
+[Impact Sounds](https://kenney.nl/assets/impact-sounds) (metal, mining, plank, a heavy bell). The
+notes and the ambience are synthesized in the browser (`src/audio/`).

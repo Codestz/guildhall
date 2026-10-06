@@ -79,7 +79,16 @@ const FADE = 1200
  * The chronicle folded away: the last few moments that matter, fading on their own. Lifetimes run
  * on the viewer's clock (not story time), so a paused story still clears its toasts.
  */
-export function Toasts({ store, onExpand }: { store: GuildStore; onExpand: () => void }) {
+export function Toasts({
+  store,
+  onExpand,
+  quiet = false,
+}: {
+  store: GuildStore
+  onExpand: () => void
+  /** Story captions are speaking these beats already: show the toasts, don't announce them twice. */
+  quiet?: boolean
+}) {
   const seen = useRef(new Map<string, number>())
   const now = performance.now()
   const shown: { entry: LogEntry; left: number }[] = []
@@ -104,7 +113,7 @@ export function Toasts({ store, onExpand }: { store: GuildStore; onExpand: () =>
 
   return (
     <section className="toasts" aria-label="Latest in the chronicle">
-      <ol className="toast-list" aria-live="polite" aria-relevant="additions">
+      <ol className="toast-list" aria-live={quiet ? "off" : "polite"} aria-relevant="additions">
         {shown.reverse().map(({ entry, left }) => {
           const tone = LOG_TONE[entry.kind]
           const Glyph = Icon[tone]

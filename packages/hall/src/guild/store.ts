@@ -312,6 +312,11 @@ export class GuildStore {
     return this.model.sessions.get(id)
   }
 
+  /** The followed party's sessions (guildmaster first by join), for the Legends book (guild/story.ts). */
+  party(): Session[] {
+    return partyOf(this.model)
+  }
+
   setSpeed(speed: number): void {
     this.player.speed = speed
     this.emit()

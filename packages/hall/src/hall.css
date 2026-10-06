@@ -1790,7 +1790,8 @@ button {
     padding-bottom: env(safe-area-inset-bottom);
   }
   .region-left {
-    right: calc(var(--gut) + 2 * var(--bar) + 16px);
+    /* the toolbar: HUD mode, Legends, sound, settings */
+    right: calc(var(--gut) + 4 * var(--bar) + 3 * 8px + 8px);
     width: auto;
     min-width: 0;
     max-width: none;
@@ -2493,6 +2494,598 @@ button {
   }
   .opening-caption,
   .hud[data-opening="arrive"] > :not(.opening, .visually-hidden) {
+    animation: none;
+  }
+}
+
+/* ───────────────────────────── sound (hud/Sound.tsx) ───────────────────────────── */
+
+.sound-tool[aria-pressed="true"] {
+  color: var(--brass-hi);
+}
+.sound-tool .tab-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+}
+.lever:disabled {
+  opacity: 0.5;
+}
+
+/* ═════════════════ story captions + the Legends book (hud/Captions.tsx, hud/Legends.tsx) ═════════════════
+ * Captions: a film's subtitle strip, lower centre, above the tape. One line at a time; names carry
+ * their role's colour as an underline, the real content (a quest, an error, the loot) is italic.
+ * Never takes a click: the world behind stays live. Legends: the session's story on parchment —
+ * ink on paper, Marcellus small caps for headings, Alegreya for the telling.
+ */
+
+.hud > .story {
+  --story-bottom: calc(var(--gut) + 30px);
+  position: absolute;
+  left: 50%;
+  bottom: var(--story-bottom);
+  width: min(760px, calc(100% - 2 * (var(--gut) + 416px)));
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  z-index: 1;
+  pointer-events: none;
+}
+.hud[data-tape="true"] > .story {
+  --story-bottom: calc(var(--gut) + var(--tape-h) + 14px);
+}
+/* the showcase's opening caption keeps the bottom: the story sits above it */
+.hud:has(.opening-caption) > .story {
+  --story-bottom: calc(var(--gut) + 64px);
+}
+/* Hidden: nothing else down there; it is a film now */
+.hud[data-mode="hidden"] > .story {
+  --story-bottom: calc(var(--gut) + 40px);
+  width: min(820px, calc(100% - 2 * var(--gut)));
+}
+.story[data-visible="false"] {
+  display: none;
+}
+.story-line {
+  margin: 0;
+  max-width: 100%;
+  padding: 8px 20px 9px;
+  border-radius: 10px;
+  background: rgba(14, 10, 7, 0.8);
+  box-shadow:
+    0 0 0 1px rgba(220, 182, 98, 0.16),
+    0 12px 32px -14px rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(10px) saturate(1.1);
+  -webkit-backdrop-filter: blur(10px) saturate(1.1);
+  font-family: "Alegreya", "Iowan Old Style", Georgia, serif;
+  font-size: 19px;
+  line-height: 1.36;
+  color: var(--paper);
+  text-align: center;
+  text-wrap: balance;
+  animation: story-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transition:
+    opacity 0.65s ease,
+    translate 0.65s ease;
+}
+@keyframes story-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+.story-line[data-leaving="true"] {
+  opacity: 0;
+  translate: 0 -3px;
+}
+.story-line b {
+  font-weight: 600;
+  color: #fff7e6;
+  text-decoration: underline;
+  text-decoration-color: var(--role, var(--brass));
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  text-decoration-skip-ink: auto;
+}
+.story-line q {
+  font-style: italic;
+  quotes: "“" "”" "‘" "’";
+}
+/* the beat's tone, as a small diamond before the line: decorative, the words say it */
+.story-line::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin: 0 11px 2px 0;
+  transform: rotate(45deg);
+  vertical-align: middle;
+  background: var(--tone, var(--brass));
+}
+.story-line[data-kind="plea"] {
+  --tone: var(--plea);
+}
+.story-line:is([data-kind="fall"], [data-kind="flaw"]) {
+  --tone: var(--fail);
+}
+.story-line:is([data-kind="loot"], [data-kind="complete"], [data-kind="rise"]) {
+  --tone: var(--loot);
+}
+.story-line[data-kind="quest"] {
+  --tone: var(--quest);
+}
+.story-line[data-kind="complete"] {
+  font-size: 21px;
+  padding: 10px 24px 11px;
+  box-shadow:
+    0 0 0 1px rgba(166, 221, 143, 0.32),
+    0 12px 32px -14px rgba(0, 0, 0, 0.75);
+}
+
+/* mid widths: the toasts own the bottom-left, the tape the bottom-right; the story sits between */
+@media (max-width: 1400px) and (min-width: 721px) {
+  .hud:not([data-mode="hidden"]) > .story {
+    left: calc(var(--gut) + 416px);
+    right: var(--gut);
+    width: auto;
+    transform: none;
+  }
+  .hud[data-tape="true"]:not([data-mode="hidden"]) > .story {
+    right: calc(var(--gut) + min(560px, calc(100% - 2 * var(--gut) - 420px)) + 16px);
+    --story-bottom: calc(var(--gut) + 30px);
+  }
+}
+@media (max-width: 1240px) and (min-width: 721px) {
+  .hud[data-tape="true"]:not([data-mode="hidden"]) > .story {
+    right: var(--gut);
+    --story-bottom: calc(var(--gut) + var(--tape-h) + 14px);
+  }
+}
+
+@media (max-width: 720px) {
+  .hud > .story {
+    left: var(--gut);
+    right: var(--gut);
+    width: auto;
+    transform: none;
+    /* above the chronicle button */
+    --story-bottom: calc(var(--gut) + 50px);
+  }
+  .hud[data-tape="true"] > .story {
+    --story-bottom: calc(var(--gut) + var(--tape-h) + 58px);
+  }
+  .hud[data-mode="hidden"] > .story {
+    --story-bottom: calc(var(--gut) + 18px + env(safe-area-inset-bottom));
+  }
+  .story-line {
+    font-size: 16px;
+    padding: 7px 14px 8px;
+  }
+  .story-line[data-kind="complete"] {
+    font-size: 17px;
+  }
+  /* one voice at the bottom: with captions on, the toasts fold to their button */
+  .hud[data-captions="true"] .toast-list {
+    display: none;
+  }
+  .hud[data-sheet="true"] > .story,
+  .hud:has(.opening-caption) > .story {
+    display: none;
+  }
+}
+
+/* ───────────── the Legends book ───────────── */
+
+.hud > .legends-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  padding: 28px var(--gut);
+  background: rgba(10, 7, 5, 0.52);
+  animation: scrim-in 0.25s ease-out both;
+}
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+.legends {
+  /* parchment: ink on paper, every text colour ≥ 7:1 on --vellum except the umber eyebrows (5.6:1) */
+  --vellum: #f4ead3;
+  --vellum-edge: #e3cfa5;
+  --ink-text: #2a1e14;
+  --ink-soft: #54412e;
+  --umber: #765115;
+  --rubric: #8a2c1a;
+  --verdant: #2e5a2a;
+  --rule: rgba(110, 78, 34, 0.3);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(720px, 100%);
+  max-height: calc(100dvh - 56px);
+  border-radius: 6px;
+  color: var(--ink-text);
+  background:
+    radial-gradient(ellipse 120% 80% at 50% 0%, rgba(255, 252, 240, 0.7), transparent 60%),
+    radial-gradient(ellipse 140% 100% at 50% 50%, transparent 55%, rgba(170, 128, 60, 0.22) 100%),
+    var(--vellum);
+  box-shadow:
+    0 0 0 1px rgba(90, 62, 26, 0.45),
+    0 0 0 5px var(--vellum-edge),
+    0 0 0 6px rgba(90, 62, 26, 0.5),
+    0 30px 80px -20px rgba(0, 0, 0, 0.8);
+  font-family: "Alegreya", "Iowan Old Style", Georgia, serif;
+  font-size: 16.5px;
+  line-height: 1.5;
+  animation: book-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes book-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+}
+.legends :focus-visible {
+  outline: 2px solid var(--umber);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.legends-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 26px 22px 18px 40px;
+  border-bottom: 1px solid var(--rule);
+}
+.legends-titles {
+  flex: 1;
+  min-width: 0;
+}
+.legends-eyebrow {
+  margin: 0 0 2px;
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  color: var(--umber);
+}
+.legends-head h2 {
+  margin: 0;
+  font-family: "Alegreya", Georgia, serif;
+  font-weight: 600;
+  font-size: 27px;
+  line-height: 1.2;
+  color: var(--ink-text);
+  text-wrap: balance;
+}
+.legends-head h2:focus {
+  outline: none;
+}
+.legends-meta {
+  /* plain case on purpose: Marcellus draws digits as letters ("107k" reads "IO7K") and small
+     caps turn "1m 07s" into "1M 07S" */
+  margin: 6px 0 0;
+  font-family: var(--body);
+  font-variant-numeric: lining-nums;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+}
+.legends-tools {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.legends-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 14px 0 11px;
+  border-radius: 5px;
+  border: 1px solid rgba(90, 62, 26, 0.55);
+  background: rgba(255, 250, 236, 0.6);
+  font-family: var(--body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-text);
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.legends-copy:hover:not(:disabled) {
+  background: #fffaee;
+  border-color: var(--umber);
+}
+.legends-copy:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.legends-close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 5px;
+  color: var(--ink-soft);
+}
+.legends-close:hover {
+  background: rgba(110, 78, 34, 0.12);
+  color: var(--ink-text);
+}
+.legends-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 40px 30px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(110, 78, 34, 0.4) transparent;
+}
+.legends-empty {
+  margin: 8px 0 4px;
+  font-style: italic;
+  color: var(--ink-soft);
+}
+.legends-opening {
+  margin: 0 0 8px;
+  font-size: 17.5px;
+  font-style: italic;
+  text-wrap: pretty;
+}
+.chapters {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.chapter {
+  padding: 18px 0 16px;
+  border-top: 1px solid var(--rule);
+}
+.chapter:first-child {
+  margin-top: 14px;
+}
+.ch-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+.ch-num {
+  flex: none;
+  min-width: 34px;
+  font-family: var(--display);
+  font-size: 20px;
+  color: var(--umber);
+  text-align: right;
+}
+.ch-titles {
+  min-width: 0;
+}
+.ch-titles h3 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 9px;
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 18px;
+  letter-spacing: 0.05em;
+  color: var(--ink-text);
+}
+.ch-pip {
+  width: 9px;
+  height: 9px;
+  transform: rotate(45deg);
+  background: var(--role);
+  box-shadow: 0 0 0 1px rgba(42, 30, 20, 0.55);
+}
+.ch-state {
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-family: var(--body);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  border: 1px solid var(--rule);
+}
+.chapter[data-outcome="fallen"] .ch-state {
+  color: var(--rubric);
+  border-color: rgba(138, 44, 26, 0.45);
+}
+.ch-quest {
+  margin: 1px 0 0;
+  font-style: italic;
+  color: var(--ink-text);
+}
+.ch-quest q {
+  quotes: "“" "”";
+}
+.chapter > :not(.ch-head) {
+  margin-left: 48px;
+}
+.ch-meta {
+  margin-top: 4px;
+  margin-bottom: 0;
+  font-family: var(--body);
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+.ch-deeds {
+  margin-top: 8px;
+  margin-bottom: 0;
+  font-size: 15.5px;
+}
+.ch-label {
+  margin-right: 6px;
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--umber);
+}
+.ch-notes {
+  list-style: none;
+  margin-top: 8px;
+  margin-bottom: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 15.5px;
+}
+.ch-notes li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.ch-notes .glyph {
+  position: relative;
+  top: 2px;
+  color: var(--umber);
+}
+.ch-notes li:is([data-kind="flaw"], [data-kind="fall"]) .glyph,
+.ch-notes li:is([data-kind="flaw"], [data-kind="fall"]) b {
+  color: var(--rubric);
+}
+.ch-notes li[data-kind="rise"] .glyph,
+.ch-notes li[data-kind="rise"] b {
+  color: var(--verdant);
+}
+.ch-notes b {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--umber);
+}
+.ch-at {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.ch-loot {
+  margin-top: 10px;
+  margin-bottom: 0;
+  margin-right: 0;
+  padding: 2px 0 2px 14px;
+  border-left: 2px solid var(--verdant);
+}
+.ch-loot .ch-label {
+  color: var(--verdant);
+}
+.ch-loot p {
+  margin: 1px 0 0;
+  font-style: italic;
+  font-size: 15.5px;
+  overflow-wrap: anywhere;
+}
+.legends-end {
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+  text-align: center;
+}
+.fleuron {
+  display: block;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--umber);
+}
+.last-word {
+  margin: 14px auto 0;
+  max-width: 52ch;
+}
+.last-word p {
+  margin: 0;
+  font-size: 17px;
+  font-style: italic;
+  text-wrap: balance;
+}
+.last-word p::before {
+  content: "“";
+}
+.last-word p::after {
+  content: "”";
+}
+.last-word cite {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--display);
+  font-style: normal;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+}
+.legends-closing {
+  margin: 14px auto 0;
+  max-width: 54ch;
+  font-family: "Alegreya", Georgia, serif;
+  font-variant-numeric: lining-nums;
+  font-size: 17.5px;
+  color: var(--ink-text);
+  text-wrap: balance;
+}
+
+@media (max-width: 720px) {
+  .hud > .legends-scrim {
+    padding: 0;
+    place-items: stretch;
+  }
+  .legends {
+    width: 100%;
+    max-height: none;
+    height: 100%;
+    border-radius: 0;
+    box-shadow: none;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .legends-head {
+    padding: 16px 10px 12px 18px;
+    flex-wrap: wrap;
+  }
+  .legends-titles {
+    flex-basis: calc(100% - 60px);
+  }
+  .legends-tools {
+    order: -1;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .legends-head h2 {
+    font-size: 22px;
+  }
+  .legends-body {
+    padding: 14px 18px 26px;
+  }
+  .ch-num {
+    min-width: 24px;
+    font-size: 17px;
+  }
+  .chapter > :not(.ch-head) {
+    margin-left: 38px;
+  }
+}
+@media (hover: none) and (pointer: coarse) {
+  .legends-copy,
+  .legends-close {
+    min-height: 44px;
+  }
+  .legends-close {
+    width: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-line {
+    animation: none;
+    transition: opacity 0.3s linear;
+  }
+  .story-line[data-leaving="true"] {
+    translate: none;
+  }
+  .hud > .legends-scrim,
+  .legends {
     animation: none;
   }
 }

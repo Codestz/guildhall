@@ -1,0 +1,1031 @@
+import type { Entry, Session } from "@guildhall/core"
+import type { Moment } from "./moments.ts"
+
+/**
+ * The story (roadmap S3): what the moments *mean*, in words. Two tellers, both pure.
+ *
+ *   Narrator   live captions, one line at a time. It hears only live moments (a seek, a loop or a
+ *              live hello never makes one), gathers a burst into one beat, lets important beats
+ *              (a fall, a plea, the quest complete, a rise) go before routine deeds, and keeps a
+ *              gap between lines so they can be read. The words come from a small phrase grammar;
+ *              which variant is chosen depends only on the beat itself, so a replay tells the same
+ *              story in the same words.
+ *
+ *   legendOf   (guild/legends.ts) the session's book, from the same words.
+ *
+ * No LLM, no React, no three: the HUD draws both (hud/Captions.tsx, hud/Legends.tsx).
+ */
+
+// ─────────────────────────────── words ───────────────────────────────
+
+const NUMBERS = [
+  "no",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
+  "eleven",
+  "twelve",
+]
+
+/** `three`, `twenty`: a storyteller spells small numbers out. */
+export function spell(n: number): string {
+  return NUMBERS[n] ?? String(n)
+}
+
+/** `Three`. */
+export function capital(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+/** `a`, `a and b`, `a, b and c`. */
+export function listOf(items: readonly string[]): string {
+  if (items.length <= 1) return items[0] ?? ""
+  return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`
+}
+
+/** The first line of a text, whitespace folded. */
+export function firstLine(text: string): string {
+  const line = text.split(/\r?\n/).find((l) => l.trim() !== "") ?? ""
+  return line.replace(/\s+/g, " ").trim()
+}
+
+/** Cut at a word boundary, with an ellipsis, so a quote never ends mid-word. */
+export function clip(text: string, max: number): string {
+  const line = firstLine(text)
+  if (line.length <= max) return line
+  const cut = line.slice(0, max - 1)
+  const space = cut.lastIndexOf(" ")
+  const base = space > max * 0.6 ? cut.slice(0, space) : cut
+  return `${base.replace(/[\s,;:.—-]+$/, "")}…`
+}
+
+/** A quotation in curly quotes, clipped. */
+export function quote(text: string, max = 64): string {
+  return `“${clip(text, max)}”`
+}
+
+/** End a sentence once: no full stop after one that already ends. */
+function sentence(text: string): string {
+  const t = text.trim()
+  return /[.!?…]["”’)]?$/.test(t) ? t : `${t}.`
+}
+
+/** FNV-1a: a stable 32-bit hash, so a beat picks the same words every time it is told. */
+export function hash(text: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i)
+    h = Math.imul(h, 0x01000193)
+  }
+  return h >>> 0
+}
+
+export function pick<T>(items: readonly T[], seed: number): T {
+  const item = items[seed % items.length]
+  if (item === undefined) throw new Error("pick from nothing")
+  return item
+}
+
+// ─────────────────────────────── crafts ───────────────────────────────
+
+/** What kind of work a tool is, in the story's words. */
+export type Craft = "read" | "search" | "forge" | "test" | "run" | "consult" | "plan" | "quest" | "other"
+
+const CRAFT_OF: Record<string, Craft> = {
+  read: "read",
+  grep: "search",
+  glob: "search",
+  list: "search",
+  ls: "search",
+  codesearch: "search",
+  edit: "forge",
+  write: "forge",
+  patch: "forge",
+  multiedit: "forge",
+  apply_patch: "forge",
+  bash: "run",
+  shell: "run",
+  webfetch: "consult",
+  websearch: "consult",
+  todowrite: "plan",
+  todoread: "plan",
+  task: "quest",
+  subagent: "quest",
+}
+
+const TESTS = /\b(test|tests|vitest|jest|pytest|spec|check)\b/i
+
+/** A tool's craft; a shell command that runs tests is a trial, an MCP tool (`a_b`) a consultation. */
+export function craftOf(tool: string, input: Record<string, unknown> = {}): Craft {
+  const craft = CRAFT_OF[tool] ?? (tool.includes("_") ? "consult" : "other")
+  if (craft === "run" && typeof input.command === "string" && TESTS.test(input.command)) return "test"
+  return craft
+}
+
+/** The thing a deed worked on, short: a file's name, a pattern, a command, a site. */
+export function targetOf(input: Record<string, unknown> = {}): string | undefined {
+  if (typeof input.filePath === "string" && input.filePath) return basename(input.filePath)
+  if (typeof input.pattern === "string") return input.pattern
+  if (typeof input.command === "string") return clip(input.command, 36)
+  if (typeof input.url === "string") {
+    try {
+      const url = new URL(input.url)
+      return url.pathname.split("/").filter(Boolean).at(-1) ?? url.hostname
+    } catch {
+      return clip(input.url, 36)
+    }
+  }
+  if (typeof input.query === "string") return clip(input.query, 36)
+  if (typeof input.path === "string" && input.path) return basename(input.path)
+  return undefined
+}
+
+function basename(path: string): string {
+  return path.split("/").filter(Boolean).at(-1) ?? path
+}
+
+/** Legend nouns: `2 reads`, `3 edits`, `1 test run`. */
+export const NOUNS: Record<Craft, [string, string]> = {
+  read: ["read", "reads"],
+  search: ["search", "searches"],
+  forge: ["edit", "edits"],
+  test: ["test run", "test runs"],
+  run: ["command", "commands"],
+  consult: ["consultation", "consultations"],
+  plan: ["plan", "plans"],
+  quest: ["quest sent", "quests sent"],
+  other: ["other deed", "other deeds"],
+}
+
+/** Caption nouns for a burst across the guild: `three files forged`. */
+const BURST: Record<Craft, [string, string]> = {
+  read: ["file read", "files read"],
+  search: ["search made", "searches made"],
+  forge: ["file forged", "files forged"],
+  test: ["trial run", "trials run"],
+  run: ["command run", "commands run"],
+  consult: ["scroll consulted", "scrolls consulted"],
+  plan: ["plan drawn", "plans drawn"],
+  quest: ["quest sent", "quests sent"],
+  other: ["deed done", "deeds done"],
+}
+
+/** What a crowd was mostly doing: `22 deeds, mostly consulting the archives`. */
+const MOSTLY: Record<Craft, string> = {
+  read: "reading",
+  search: "searching the code",
+  forge: "forging",
+  test: "testing",
+  run: "running commands",
+  consult: "consulting the archives",
+  plan: "planning",
+  quest: "sending quests",
+  other: "odd jobs",
+}
+
+export const CRAFT_ORDER: Craft[] = [
+  "forge",
+  "test",
+  "run",
+  "read",
+  "search",
+  "consult",
+  "plan",
+  "quest",
+  "other",
+]
+
+/** Doing it, for a plea: `running bun run migrate`. */
+function doing(craft: Craft, target: string | undefined): string {
+  const on = target ? ` ${target}` : ""
+  switch (craft) {
+    case "read":
+      return `reading${on}`
+    case "search":
+      return target ? `searching for ${target}` : "searching"
+    case "forge":
+      return target ? `changing ${target}` : "changing the code"
+    case "test":
+      return "running the tests"
+    case "run":
+      return target ? `running ${target}` : "running a command"
+    case "consult":
+      return "reaching beyond the hall"
+    case "plan":
+      return "rewriting the plan"
+    case "quest":
+      return "sending a quest"
+    default:
+      return "going on"
+  }
+}
+
+// ─────────────────────────────── telling a moment ───────────────────────────────
+
+/** What the teller can look up: the session behind an actor, as it stands now. */
+export interface Lookup {
+  session(id: string): Session | undefined
+  /** How the hall named an adventurer last, when it has heard of them. */
+  actor?(id: string): Pick<Moment, "title" | "color"> | undefined
+}
+
+type ToolEntry = Extract<Entry, { kind: "tool" }>
+
+export function toolEntry(session: Session | undefined, call: string): ToolEntry | undefined {
+  const entry = session?.entries.find((e) => e.kind === "tool" && e.call === call)
+  return entry?.kind === "tool" ? entry : undefined
+}
+
+/** The last thing a session said back, finished. */
+export function lastReply(entries: readonly Entry[]): string | undefined {
+  const reply = entries.findLast((e) => e.kind === "reply" && e.done && e.text.trim() !== "")
+  return reply?.kind === "reply" ? reply.text : undefined
+}
+
+/** `3 failed` → 3. */
+export function failing(text: string | undefined): number | undefined {
+  const match = text?.match(/(\d+)\s+(failed|failing|failures?)/i)
+  return match?.[1] ? Number(match[1]) : undefined
+}
+
+/** An error's first line, without the `Error:` noise. */
+export function errorLine(text: string | undefined, max = 60): string | undefined {
+  if (!text) return undefined
+  const line = firstLine(text).replace(/^(error|err|fatal)\s*:\s*/i, "")
+  return line ? clip(line, max) : undefined
+}
+
+// ─────────────────────────────── beats ───────────────────────────────
+
+/** A caption's kind of beat, highest priority first. */
+export type BeatKind =
+  | "complete"
+  | "fall"
+  | "plea"
+  | "rise"
+  | "flaw"
+  | "quest"
+  | "loot"
+  | "answered"
+  | "join"
+  | "deed"
+
+/** Which beat a moment belongs to; `leave` makes no caption (the tavern and gate already say it). */
+export function beatOf(m: Moment): BeatKind | undefined {
+  switch (m.kind) {
+    case "loot":
+      return m.parent ? "loot" : "complete"
+    case "fail":
+      return "fall"
+    case "plea":
+      return "plea"
+    case "recover":
+      return "rise"
+    case "deed-failed":
+      return "flaw"
+    case "quest":
+      return "quest"
+    case "plea-answered":
+      return "answered"
+    case "join":
+      return "join"
+    case "deed":
+      return m.tool === "task" || m.tool === "subagent" ? undefined : "deed"
+    default:
+      return undefined
+  }
+}
+
+/** Important beats go first; routine ones wait for a quiet moment and go stale sooner. */
+export const PRIORITY: Record<BeatKind, number> = {
+  complete: 6,
+  fall: 5,
+  plea: 5,
+  rise: 4,
+  flaw: 3,
+  quest: 3,
+  loot: 2,
+  answered: 1,
+  join: 1,
+  deed: 0,
+}
+
+/** One line of a caption: plain text, or an adventurer's name in their colour. */
+export type CaptionPart = { text: string; color?: string }
+
+export interface Caption {
+  /** Grows by one per caption: a key for the strip's fade. */
+  key: number
+  kind: BeatKind
+  priority: number
+  /** The whole line, for a screen reader and for tests. */
+  text: string
+  parts: CaptionPart[]
+  /** How long to show it, ms: longer lines and bigger beats stay longer. */
+  hold: number
+  /** Sessions it is about. */
+  ids: string[]
+}
+
+/**
+ * Builds a line with names in it. A name is written as a marker into the template's text and
+ * expanded to a part, so templates stay plain strings and the first word is capitalised once.
+ */
+class Line {
+  private names: { text: string; color: string }[] = []
+
+  who(m: Pick<Moment, "title" | "color">): string {
+    this.names.push({ text: `the ${m.title}`, color: m.color })
+    return `\u0000${this.names.length - 1}\u0000`
+  }
+
+  /** `the Explorer and the Architect`, or `the Explorer, the Architect and two others`. */
+  whoAll(actors: readonly Pick<Moment, "title" | "color">[]): string {
+    if (actors.length <= 3) return listOf(actors.map((a) => this.who(a)))
+    const rest = actors.length - 2
+    return `${this.who(actors[0] as Moment)}, ${this.who(actors[1] as Moment)} and ${spell(rest)} others`
+  }
+
+  parts(template: string): CaptionPart[] {
+    const out: CaptionPart[] = []
+    const pieces = sentence(template).split("\u0000")
+    pieces.forEach((piece, i) => {
+      if (i % 2 === 0) {
+        if (piece) out.push({ text: piece })
+        return
+      }
+      const name = this.names[Number(piece)]
+      if (name) out.push({ text: name.text, color: name.color })
+    })
+    const head = out[0]
+    if (head) out[0] = { ...head, text: capital(head.text) }
+    return out
+  }
+}
+
+/** Unique actors, in the order they first appear. */
+function actorsOf(moments: readonly Moment[]): Moment[] {
+  const seen = new Map<string, Moment>()
+  for (const m of moments) if (!seen.has(m.id)) seen.set(m.id, m)
+  return [...seen.values()]
+}
+
+/** What one deed was, looked up in its session. */
+interface Deed {
+  craft: Craft
+  target?: string
+  summary?: string
+  error?: string
+  size?: number
+}
+
+function deedOf(m: Moment, lookup: Lookup): Deed {
+  const call = "call" in m ? m.call : ""
+  const tool = "tool" in m ? m.tool : "tool"
+  const entry = toolEntry(lookup.session(m.id), call)
+  const input = entry?.input ?? {}
+  const target = targetOf(input)
+  const error = m.kind === "deed-failed" ? (m.error ?? entry?.error) : undefined
+  const summary = entry?.summary
+  const size = m.kind === "deed" ? m.size : undefined
+  return {
+    craft: craftOf(tool, input),
+    ...(target ? { target } : {}),
+    ...(summary ? { summary } : {}),
+    ...(error ? { error } : {}),
+    ...(size !== undefined ? { size } : {}),
+  }
+}
+
+/** A verb phrase for one adventurer's deeds of one craft: `reads routes.ts and queries.ts`. */
+function deedPhrase(craft: Craft, deeds: readonly Deed[], seed: number): string {
+  const targets = [...new Set(deeds.flatMap((d) => (d.target ? [d.target] : [])))]
+  const named = targets.length > 0 && targets.length <= 2 ? listOf(targets) : undefined
+  const n = deeds.length
+  const summary = deeds.at(-1)?.summary
+  const tail = summary ? ` — ${summary}` : ""
+  switch (craft) {
+    case "read":
+      return named ? `${pick(["reads", "pores over", "studies"], seed)} ${named}` : `reads ${spell(n)} files`
+    case "search":
+      return named
+        ? `${pick(["searches the code for", "hunts through the code for", "scours the code for"], seed)} ${named}${tail}`
+        : `searches the code ${spell(n)} times${tail}`
+    case "forge": {
+      const lines = deeds.reduce((sum, d) => sum + (d.size ?? 0), 0)
+      const weight = lines > 0 && n === 1 ? `, ${lines} ${lines === 1 ? "line" : "lines"}` : ""
+      return named
+        ? `${pick(["reworks", "sets hammer to", "reshapes", "forges"], seed)} ${named}${weight}`
+        : `forges ${spell(n)} files`
+    }
+    case "test":
+      return summary
+        ? pick([`puts the work to the test${tail}`, `runs the tests${tail}`, `tries the work${tail}`], seed)
+        : pick(["puts the work to the test", "runs the tests"], seed)
+    case "run":
+      return named ? `runs ${named}${tail}` : `runs ${spell(n)} commands${tail}`
+    case "consult":
+      return named
+        ? `${pick(["consults distant scrolls on", "sends for word on", "asks the archives about"], seed)} ${named}`
+        : pick(["consults distant scrolls", "asks the archives", "sends for word from afar"], seed)
+    case "plan":
+      return pick(["sets out the plan", "pins the plan to the board", "draws up the plan"], seed)
+    default:
+      return n === 1 ? "finishes a deed" : `finishes ${spell(n)} deeds`
+  }
+}
+
+/** Deeds across the guild, counted: `three files forged, two read`. */
+function burst(deeds: readonly Deed[]): string {
+  const counts = new Map<Craft, number>()
+  for (const d of deeds) counts.set(d.craft, (counts.get(d.craft) ?? 0) + 1)
+  if (counts.size > 2) {
+    // A crowd: the count and the craft most of them were, not an inventory.
+    const [top] = [...counts].sort(
+      (a, b) => b[1] - a[1] || CRAFT_ORDER.indexOf(a[0]) - CRAFT_ORDER.indexOf(b[0]),
+    )
+    return `${spell(deeds.length)} deeds, mostly ${top ? MOSTLY[top[0]] : "odd jobs"}`
+  }
+  const parts = CRAFT_ORDER.flatMap((craft) => {
+    const n = counts.get(craft)
+    if (!n) return []
+    const [one, many] = BURST[craft]
+    return [`${spell(n)} ${n === 1 ? one : many}`]
+  })
+  return listOf(parts)
+}
+
+/** A quest as an errand: `to map how GET /users flows` when it reads as an order, else quoted. */
+const ORDERS = new Set(
+  (
+    "add map design check verify re-verify fix find write build implement review test refactor explore " +
+    "research plan update remove migrate document investigate sweep retry run create make read look scan " +
+    "audit port rename clean improve wire trace measure debug profile polish draft prepare ship deploy " +
+    "analyse analyze compare summarize summarise list search gather collect learn study draw sketch outline " +
+    "split merge move replace delete upgrade install configure set"
+  ).split(" "),
+)
+
+function errand(text: string): string | undefined {
+  const line = clip(text, 64)
+  const [word = ""] = line.split(" ")
+  if (!/^[A-Z][a-z-]+$/.test(word) || !ORDERS.has(word.toLowerCase())) return undefined
+  return `to ${word.toLowerCase()}${line.slice(word.length)}`
+}
+
+/** Who a quest went to: a resumed session by its `task_id`, else the child it made, else a join. */
+function recipientOf(q: Moment, lookup: Lookup, joins: readonly Moment[]): Session | Moment | undefined {
+  if (q.kind !== "quest") return undefined
+  const input = toolEntry(lookup.session(q.id), q.call)?.input ?? {}
+  const resumed = typeof input.task_id === "string" ? lookup.session(input.task_id) : undefined
+  if (resumed) return resumed
+  const mine = joins.filter((j) => j.parent === q.id)
+  return mine.find((j) => sameQuest(lookup.session(j.id)?.task, q.text)) ?? mine[0]
+}
+
+/** A child's task is the quest it was sent on (OpenCode 2 prefixes a preamble core strips). */
+export function sameQuest(task: string | undefined, text: string): boolean {
+  return task !== undefined && task.trim() === text.trim()
+}
+
+// ─────────────────────────────── lines ───────────────────────────────
+
+/** One caption from a beat's moments. `extra` are deeds a bigger beat absorbed as a lead-in clause. */
+export function lineOf(
+  kind: BeatKind,
+  moments: readonly Moment[],
+  lookup: Lookup,
+  extra: readonly Moment[] = [],
+): CaptionPart[] {
+  const first = moments[0] as Moment
+  const seed = hash(moments.map((m) => `${m.kind}|${m.title}|${m.at}|${"call" in m ? m.call : ""}`).join(";"))
+  const line = new Line()
+  const actors = actorsOf(moments)
+  const many = actors.length > 1
+
+  switch (kind) {
+    case "complete": {
+      const reply = lastReply(lookup.session(first.id)?.entries ?? [])
+      if (!reply) return line.parts(pick(["The quest is complete", "And so the quest is done"], seed))
+      return line.parts(
+        pick(
+          [
+            `The quest is complete: ${quote(reply, 72)}`,
+            `And so it is done: ${quote(reply, 72)}`,
+            `The quest is complete. ${capital(line.who(first))} has the last word: ${quote(reply, 60)}`,
+          ],
+          seed,
+        ),
+      )
+    }
+
+    case "fall": {
+      // A failure settles what the fallen launched: name the first, count the rest.
+      const own = moments.filter((m) => m.kind === "fail" && !/cancel/i.test(m.error ?? ""))
+      const lead = own[0] ?? first
+      const below = actors.length - (own.length || 1)
+      const error = errorLine(lead.kind === "fail" ? lead.error : undefined)
+      if (!lead.parent)
+        return line.parts(
+          error
+            ? `${line.who(lead)} falls: ${quote(error)}. The quest is lost`
+            : `${line.who(lead)} falls, and the quest with them`,
+        )
+      if (own.length > 1)
+        return line.parts(
+          pick(
+            [
+              `${line.whoAll(own)} fall — and the graveyard stirs`,
+              `${capital(spell(own.length))} fall at once; the graveyard stirs`,
+            ],
+            seed,
+          ),
+        )
+      const others = below > 0 ? `, and ${spell(below)} below with them,` : ""
+      return line.parts(
+        error
+          ? pick(
+              [
+                `${line.who(lead)} falls${others} — ${quote(error)} — and rises in the graveyard`,
+                `${line.who(lead)} gives up the quest: ${quote(error)}. The graveyard stirs`,
+                `${line.who(lead)} falls${others} and rises in the graveyard: ${quote(error)}`,
+              ],
+              seed,
+            )
+          : pick(
+              [
+                `${line.who(lead)} falls${others} — and rises in the graveyard`,
+                `${line.who(lead)} falls; a skeleton claws out of the graveyard`,
+              ],
+              seed,
+            ),
+      )
+    }
+
+    case "plea": {
+      if (many) return line.parts(`${line.whoAll(actors)} await your word`)
+      const session = lookup.session(first.id)
+      const asking = session?.entries.findLast(
+        (e) => e.kind === "tool" && (e.state === "running" || e.state === "pending"),
+      )
+      if (asking?.kind === "tool" && asking.name !== "task" && asking.name !== "subagent") {
+        const act = doing(craftOf(asking.name, asking.input), targetOf(asking.input))
+        return line.parts(
+          pick(
+            [
+              `${line.who(first)} asks for your word before ${act}`,
+              `${line.who(first)} will not go on ${act} without your word`,
+              `${line.who(first)} awaits your word before ${act}`,
+            ],
+            seed,
+          ),
+        )
+      }
+      return line.parts(
+        pick(
+          [
+            `${line.who(first)} asks for your word before going on`,
+            `${line.who(first)} stops and awaits your word`,
+            `${line.who(first)} will go no further without your word`,
+          ],
+          seed,
+        ),
+      )
+    }
+
+    case "rise":
+      if (many) return line.parts(`${line.whoAll(actors)} rise again and take up the work`)
+      return line.parts(
+        pick(
+          [
+            `${line.who(first)} rises again and takes up the work`,
+            `Called back, ${line.who(first)} is on their feet again; the skeleton sinks into the earth`,
+            `${line.who(first)} is back on their feet, and back to work`,
+          ],
+          seed,
+        ),
+      )
+
+    case "flaw": {
+      const deeds = moments.map((m) => deedOf(m, lookup))
+      const lead = deeds[0] as Deed
+      const n = failing(lead.error) ?? failing(lead.summary)
+      // Deeds that went with it lead in, when there are enough to matter: "Three files forged; …".
+      const before = extra.length > 1 ? `${capital(burst(extra.map((m) => deedOf(m, lookup))))}; ` : ""
+      if (many)
+        return line.parts(
+          `${before}${capital(spell(moments.length))} deeds fail — ${line.whoAll(actors)}${
+            lead.error ? `: ${quote(errorLine(lead.error) ?? "", 48)}` : ""
+          }`,
+        )
+      const who = line.who(first)
+      if (lead.craft === "test" || n !== undefined) {
+        const count = n !== undefined ? `${spell(n)} failing` : "failures"
+        return line.parts(
+          before +
+            pick(
+              [
+                `${who} finds ${count}`,
+                `${who} runs the tests — ${count}`,
+                `the tests turn on ${who}: ${count}`,
+              ],
+              seed,
+            ),
+        )
+      }
+      const what = lead.target ?? ("tool" in first ? first.tool : "the deed")
+      const err = errorLine(lead.error)
+      return line.parts(
+        before +
+          (err
+            ? pick(
+                [
+                  `${who}'s ${what} fails: ${quote(err, 52)}`,
+                  `${what} breaks in ${who}'s hands: ${quote(err, 52)}`,
+                ],
+                seed,
+              )
+            : `${who}'s ${what} fails`),
+      )
+    }
+
+    case "quest": {
+      const quests = moments.filter((m) => m.kind === "quest")
+      const joins = moments.filter((m) => m.kind === "join")
+      const sender = quests[0] ?? first
+      if (quests.length === 0) return line.parts(`${line.whoAll(actorsOf(joins))} join the party`)
+      if (quests.length > 1) {
+        const named = actorsOf(joins)
+        if (named.length === quests.length && named.length <= 3)
+          return line.parts(
+            pick(
+              [
+                `${line.who(sender)} sends ${line.whoAll(named)} out at once`,
+                `${line.who(sender)} splits the work: ${line.whoAll(named)} set out together`,
+              ],
+              seed,
+            ),
+          )
+        return line.parts(
+          pick(
+            [
+              `${line.who(sender)} sends ${spell(quests.length)} adventurers out at once`,
+              `${capital(spell(quests.length))} quests leave the board at once`,
+              `${line.who(sender)} fans the work out: ${spell(quests.length)} quests, all at once`,
+            ],
+            seed,
+          ),
+        )
+      }
+      const q = sender
+      const text = q.kind === "quest" ? q.text : ""
+      const to = recipientOf(q, lookup, joins)
+      const order = errand(text)
+      if (to && "entries" in to) {
+        // Called back: the session already existed (a `task_id`).
+        const known =
+          joins.find((j) => j.id === to.id) ?? moments.find((m) => m.id === to.id) ?? lookup.actor?.(to.id)
+        const back = known ?? { title: to.title.replace(/ \(@.*\)$/, ""), color: q.color }
+        if (moments.some((m) => m.kind === "recover" && m.id === to.id))
+          return line.parts(
+            pick(
+              [
+                `${line.who(q)} calls ${line.who(back)} back from the fall: ${quote(text, 56)}`,
+                `${line.who(back)} rises again, called back by ${line.who(q)}: ${quote(text, 56)}`,
+              ],
+              seed,
+            ),
+          )
+        return line.parts(
+          pick(
+            [
+              `${line.who(q)} calls ${line.who(back)} back: ${quote(text, 56)}`,
+              `${line.who(back)} is called back from the tavern: ${quote(text, 56)}`,
+            ],
+            seed,
+          ),
+        )
+      }
+      if (to) {
+        return line.parts(
+          order
+            ? pick(
+                [
+                  `${line.who(q)} sends ${line.who(to)} ${order}`,
+                  `${line.who(q)} asks ${line.who(to)} ${order}`,
+                  `A quest leaves the board: ${line.who(to)} is ${order}`,
+                ],
+                seed,
+              )
+            : pick(
+                [
+                  `${line.who(q)} hands ${line.who(to)} a quest: ${quote(text, 56)}`,
+                  `${line.who(q)} sends ${line.who(to)} out: ${quote(text, 56)}`,
+                ],
+                seed,
+              ),
+        )
+      }
+      return line.parts(`${line.who(q)} posts a quest: ${quote(text, 60)}`)
+    }
+
+    case "loot": {
+      if (many) return line.parts(`${line.whoAll(actors)} bring their loot home`)
+      const reply = lastReply(lookup.session(first.id)?.entries ?? [])
+      if (!reply)
+        return line.parts(
+          pick([`${line.who(first)}'s quest is done`, `${line.who(first)} brings the loot home`], seed),
+        )
+      const verdict = /^\s*(fail|✗|✘|error)/i.test(reply)
+        ? "bad"
+        : /^\s*(pass|✓|✔|ok\b)/i.test(reply)
+          ? "good"
+          : ""
+      if (verdict === "bad")
+        return line.parts(
+          pick(
+            [
+              `${line.who(first)} returns with bad news: ${quote(reply)}`,
+              `Ill tidings from ${line.who(first)}: ${quote(reply)}`,
+            ],
+            seed,
+          ),
+        )
+      if (verdict === "good")
+        return line.parts(
+          pick(
+            [
+              `${line.who(first)} returns with good news: ${quote(reply)}`,
+              `Good tidings from ${line.who(first)}: ${quote(reply)}`,
+            ],
+            seed,
+          ),
+        )
+      return line.parts(
+        pick(
+          [
+            `${line.who(first)} returns with the loot: ${quote(reply)}`,
+            `${line.who(first)}'s quest is done: ${quote(reply)}`,
+            `${line.who(first)} comes home: ${quote(reply)}`,
+          ],
+          seed,
+        ),
+      )
+    }
+
+    case "answered":
+      if (many) return line.parts(`${line.whoAll(actors)} have their answers and carry on`)
+      return line.parts(
+        pick(
+          [`${line.who(first)} has your answer and carries on`, `Word given, ${line.who(first)} carries on`],
+          seed,
+        ),
+      )
+
+    case "join":
+      return line.parts(
+        many
+          ? `${line.whoAll(actors)} join the party`
+          : pick([`${line.who(first)} joins the party`, `${line.who(first)} arrives at the hall`], seed),
+      )
+
+    case "deed": {
+      const deeds = moments.map((m) => ({ m, d: deedOf(m, lookup) }))
+      if (!many) {
+        // One adventurer: say what they did, craft by craft, in the order they did it.
+        const crafts = [...new Set(deeds.map((x) => x.d.craft))]
+        const phrases = crafts.map((craft, i) =>
+          deedPhrase(
+            craft,
+            deeds.filter((x) => x.d.craft === craft).map((x) => x.d),
+            seed + i,
+          ),
+        )
+        return line.parts(`${line.who(first)} ${listOf(phrases)}`)
+      }
+      const counted = burst(deeds.map((x) => x.d))
+      return line.parts(
+        pick(
+          [
+            `Across the guild: ${counted}`,
+            `${capital(counted)}, all at once`,
+            actors.length <= 3
+              ? `Busy hands — ${counted}, by ${line.whoAll(actors)}`
+              : `All over the island: ${counted}`,
+          ],
+          seed,
+        ),
+      )
+    }
+  }
+}
+
+// ─────────────────────────────── the narrator ───────────────────────────────
+
+export interface NarratorOptions {
+  /** Least time between two captions, ms. */
+  gap?: number
+  /** Least time after any caption before a routine one (a deed, a join), ms. */
+  routineGap?: number
+  /** How long a beat waits after its first moment for the rest of its burst, ms. */
+  gather?: number
+  /** A routine moment no one had time to tell is dropped after this long, ms. */
+  routineStale?: number
+  /** Anything else is dropped after this long, ms. */
+  stale?: number
+}
+
+/** How recently the quest's end must have been heard to outlive a rebuild. */
+const ENDING_MS = 1500
+
+const DEFAULTS: Required<NarratorOptions> = {
+  gap: 3400,
+  routineGap: 5200,
+  gather: 700,
+  routineStale: 6000,
+  stale: 24_000,
+}
+
+interface Heard {
+  moment: Moment
+  beat: BeatKind
+  /** Told at once, while its session can still be looked up (the quest's end: a loop restarts next). */
+  parts?: CaptionPart[]
+  /** The narrator's clock when it was heard. */
+  heard: number
+}
+
+/**
+ * Live captions. The HUD feeds it `store.moments.on` and asks `next(now)` when `wake(now)` says
+ * something could be due; nothing here re-renders anything. Rebuilt moments (`live: false`) are
+ * ignored by construction, and `reset()` (on `onRebuild`) forgets anything not yet told.
+ */
+export class Narrator {
+  private heard: Heard[] = []
+  /** Every adventurer heard of, as last named: a resumed one is called by their hall name. */
+  private names = new Map<string, Pick<Moment, "title" | "color">>()
+  private last = Number.NEGATIVE_INFINITY
+  private key = 0
+  private options: Required<NarratorOptions>
+  /** No caption before this time: lets the showcase's own opening caption speak first. */
+  quietUntil = Number.NEGATIVE_INFINITY
+
+  private lookup: Lookup
+
+  constructor(lookup: Lookup, options: NarratorOptions = {}) {
+    this.options = { ...DEFAULTS, ...options }
+    this.lookup = {
+      session: (id) => lookup.session(id),
+      actor: (id) => this.names.get(id) ?? lookup.actor?.(id),
+    }
+  }
+
+  /** Waiting to be told, oldest first. */
+  get pending(): readonly Moment[] {
+    return this.heard.map((h) => h.moment)
+  }
+
+  hear(moment: Moment, now: number): void {
+    if (!moment.live) return
+    this.names.set(moment.id, { title: moment.title, color: moment.color })
+    const beat = beatOf(moment)
+    if (!beat) return
+    const parts = beat === "complete" ? lineOf(beat, [moment], this.lookup) : undefined
+    this.heard.push({ moment, beat, heard: now, ...(parts ? { parts } : {}) })
+  }
+
+  /**
+   * History was thrown away (a seek, a loop restart, a live hello): forget what was not yet told.
+   * Only the quest's end survives, when it was heard just now — a replay loops the instant its
+   * story ends, and the last line of a film should still be said.
+   */
+  reset(now = Number.NEGATIVE_INFINITY): void {
+    this.heard = this.heard.filter((h) => h.beat === "complete" && h.parts && now - h.heard < ENDING_MS)
+  }
+
+  /** When `next` could next give a caption (narrator clock, ms), or undefined with nothing waiting. */
+  wake(now: number): number | undefined {
+    this.prune(now)
+    if (this.heard.length === 0) return undefined
+    const { gap, routineGap, gather } = this.options
+    let soonest = Number.POSITIVE_INFINITY
+    for (const h of this.heard) {
+      const spacing = PRIORITY[h.beat] <= 1 ? routineGap : gap
+      soonest = Math.min(soonest, Math.max(h.heard + gather, this.last + spacing, this.quietUntil))
+    }
+    return soonest
+  }
+
+  /** The caption due now, if any: the most important beat waiting, its burst merged into one line. */
+  next(now: number): Caption | undefined {
+    this.prune(now)
+    const { gap, routineGap, gather } = this.options
+    if (now < this.quietUntil || now - this.last < gap) return undefined
+    const ready = this.heard.filter((h) => now - h.heard >= gather)
+    if (ready.length === 0) return undefined
+    const routine = now - this.last < routineGap
+    const best = ready
+      .filter((h) => !routine || PRIORITY[h.beat] > 1)
+      .reduce<Heard | undefined>(
+        (top, h) => (!top || PRIORITY[h.beat] > PRIORITY[top.beat] ? h : top),
+        undefined,
+      )
+    if (!best) return undefined
+
+    // The burst: everything waiting in the same beat (a quest takes the joins it caused with it).
+    let beat = best.beat
+    let taken = this.heard.filter((h) => h.beat === beat)
+    // A rise that a call-back caused is told with the call-back, in that order.
+    const callbacks = this.heard.filter((h) => h.beat === "quest" && this.resumes(h.moment))
+    if (beat === "rise" && callbacks.some((h) => taken.some((r) => r.moment.id === this.resumes(h.moment)))) {
+      beat = "quest"
+      taken = this.heard.filter((h) => h.beat === "quest")
+    }
+    if (beat === "quest") {
+      const back = new Set(taken.map((h) => this.resumes(h.moment)))
+      taken = taken.concat(
+        this.heard.filter((h) => h.beat === "join" || (h.beat === "rise" && back.has(h.moment.id))),
+      )
+    }
+    // A failed deed tells the deeds that went with it, as a lead-in: "Three files forged; …".
+    const extra = beat === "flaw" ? this.heard.filter((h) => h.beat === "deed").map((h) => h.moment) : []
+    const used = new Set([...taken, ...(extra.length ? this.heard.filter((h) => h.beat === "deed") : [])])
+    // An ending says the rest: a fall makes its own failed deed old news, loot its last deeds.
+    const ids = new Set(taken.map((h) => h.moment.id))
+    const ends = beat === "fall" || beat === "loot" || beat === "complete"
+    if (ends)
+      for (const h of this.heard)
+        if (ids.has(h.moment.id) && (h.beat === "deed" || h.beat === "flaw")) used.add(h)
+    this.heard = this.heard.filter((h) => !used.has(h))
+    const moments = taken.map((h) => h.moment).sort((a, b) => a.at - b.at || a.seq - b.seq)
+
+    const told = beat === "complete" ? taken.find((h) => h.parts)?.parts : undefined
+    const parts = told ?? lineOf(beat, moments, this.lookup, extra)
+    const text = parts.map((p) => p.text).join("")
+    this.last = now
+    const priority = PRIORITY[beat]
+    const base = beat === "complete" ? 6500 : priority >= 5 ? 4800 : 3400
+    return {
+      key: ++this.key,
+      kind: beat,
+      priority,
+      text,
+      parts,
+      hold: Math.min(8000, base + Math.max(0, text.length - 60) * 30),
+      ids: [...new Set(moments.map((m) => m.id))],
+    }
+  }
+
+  /** The session a quest calls back (its `task_id`), if it is a call-back. */
+  private resumes(m: Moment): string | undefined {
+    if (m.kind !== "quest") return undefined
+    const input = toolEntry(this.lookup.session(m.id), m.call)?.input ?? {}
+    return typeof input.task_id === "string" ? input.task_id : undefined
+  }
+
+  private prune(now: number): void {
+    const { routineStale, stale } = this.options
+    this.heard = this.heard.filter(
+      (h) => h.beat === "complete" || now - h.heard < (PRIORITY[h.beat] <= 1 ? routineStale : stale),
+    )
+  }
+}
+
+/** What the narrator listens to: a moment stream (the store's `moments`). */
+export interface Stream {
+  on(fn: (moment: Moment) => void): () => void
+  onRebuild(fn: () => void): () => void
+}
+
+/**
+ * Hang a narrator on a moment stream: live moments in, rebuilds forget. `clock` is the narrator's
+ * time (performance.now in the hall); `heard` is told after each live moment so the caller can
+ * schedule its next look. Returns the unsubscribe.
+ */
+export function listen(
+  stream: Stream,
+  narrator: Narrator,
+  clock: () => number,
+  heard: () => void = () => {},
+  rebuilt: () => void = () => {},
+): () => void {
+  const off = stream.on((moment) => {
+    narrator.hear(moment, clock())
+    heard()
+  })
+  const offRebuild = stream.onRebuild(() => {
+    narrator.reset(clock())
+    rebuilt()
+  })
+  return () => {
+    off()
+    offRebuild()
+  }
+}

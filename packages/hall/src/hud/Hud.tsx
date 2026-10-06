@@ -3,18 +3,23 @@ import { MODE } from "../guild/mode.ts"
 import { useOpening } from "../guild/opening.ts"
 import { useGuild } from "../guild/useGuild.ts"
 import { Brand } from "./Brand.tsx"
+import { Captions } from "./Captions.tsx"
 import { Chronicle, Toasts } from "./Chronicle.tsx"
 import { Dossier } from "./Dossier.tsx"
 import { Icon } from "./icons.tsx"
+import { Legends } from "./Legends.tsx"
 import { Opening } from "./Opening.tsx"
 import { Pleas } from "./Pleas.tsx"
 import { HUD_MODES, type HudMode, hudPrefs, useHudPrefs } from "./prefs.ts"
 import { Roster, RosterBadges } from "./Roster.tsx"
 import { Settings } from "./Settings.tsx"
+import { SoundToggle } from "./Sound.tsx"
 import { Stats } from "./Stats.tsx"
 import { Timeline } from "./Timeline.tsx"
 
 const PHONE = "(max-width: 720px)"
+/** The showcase's opening caption speaks first: story captions start this long after the HUD lands. */
+const OPENING_QUIET_MS = 5000
 
 /** Regions that fold into a compact form: the brand's about card, the roster, the chronicle. */
 type Region = "about" | "roster" | "chronicle"
@@ -56,6 +61,8 @@ export function Hud() {
   const [statsOpen, setStatsOpen] = useState(true)
   const modeBtn = useRef<HTMLButtonElement>(null)
   const gear = useRef<HTMLButtonElement>(null)
+  const [legends, setLegends] = useState(false)
+  const book = useRef<HTMLButtonElement>(null)
   const root = useRef<HTMLDivElement>(null)
 
   const view = store.selected ? store.views.find((v) => v.id === store.selected) : undefined
@@ -93,8 +100,16 @@ export function Hud() {
     const inside = root.current?.contains(document.activeElement)
     hudPrefs.set({ mode: next })
     setSaid(`HUD ${HUD_MODES[next].label}`)
-    if (next === "hidden") setSettings(false)
+    if (next === "hidden") {
+      setSettings(false)
+      setLegends(false)
+    }
     if (inside) requestAnimationFrame(() => modeBtn.current?.focus())
+  }
+
+  function closeLegends() {
+    setLegends(false)
+    requestAnimationFrame(() => book.current?.focus())
   }
 
   function closeSettings() {
@@ -115,6 +130,11 @@ export function Hud() {
       const target = event.target
       if (target instanceof HTMLElement && /textarea|select/i.test(target.tagName)) return
       if (target instanceof HTMLInputElement && target.type !== "range") return
+      // The book is modal: Esc closes it, and nothing else reaches the HUD meanwhile.
+      if (legends) {
+        if (event.key === "Escape") closeLegends()
+        return
+      }
       if (event.key === "h" || event.key === "H") {
         setMode(nextMode(mode, phone))
         return
@@ -154,6 +174,7 @@ export function Hud() {
       data-tape={tape}
       data-sheet={dossier || settings || open.roster || open.chronicle}
       data-opening={showcase ? intro.stage : undefined}
+      data-captions={prefs.captions && mode !== "detailed"}
     >
       {opening}
       {!hidden && (
@@ -191,6 +212,25 @@ export function Hud() {
         </button>
         {!hidden && (
           <button
+            ref={book}
+            type="button"
+            className="plaque tool"
+            aria-label="Legends: the story so far"
+            aria-haspopup="dialog"
+            aria-expanded={legends}
+            title="Legends"
+            onClick={() => {
+              only("settings")
+              setSettings(false)
+              setLegends(true)
+            }}
+          >
+            <Icon.book />
+          </button>
+        )}
+        {!hidden && <SoundToggle />}
+        {!hidden && (
+          <button
             ref={gear}
             type="button"
             className="plaque tool"
@@ -212,6 +252,7 @@ export function Hud() {
       </div>
 
       {settings && !hidden && <Settings store={store} onClose={closeSettings} />}
+      {legends && !hidden && <Legends store={store} onClose={closeLegends} />}
 
       {!hidden && (
         <>
@@ -236,9 +277,20 @@ export function Hud() {
             )}
           </div>
 
-          {!open.chronicle && <Toasts store={store} onExpand={() => toggle("chronicle")} />}
+          {!open.chronicle && (
+            <Toasts store={store} onExpand={() => toggle("chronicle")} quiet={prefs.captions} />
+          )}
           {tape && <Timeline store={store} pinned={mode === "detailed"} />}
         </>
+      )}
+
+      {prefs.captions && (
+        <Captions
+          store={store}
+          visible={mode !== "detailed"}
+          announcePleas={hidden}
+          quietMs={showcase ? OPENING_QUIET_MS : 1200}
+        />
       )}
 
       <span className="visually-hidden" aria-live="polite">

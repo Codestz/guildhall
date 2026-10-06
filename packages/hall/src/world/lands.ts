@@ -158,9 +158,50 @@ function nearSite(p: Spot, margin: number): boolean {
   return Object.values(SITES).some((site) => Math.hypot(p[0] - site.at[0], p[1] - site.at[1]) < margin)
 }
 
+/**
+ * Buildings and features the Life layer animates or dresses (ADR 0007): the windmill's sails turn,
+ * the water wheel spins, chimneys smoke, each site's work leaves traces next to it.
+ */
+export type LandmarkKind =
+  | "windmill"
+  | "watermill"
+  | "lumbermill"
+  | "mine"
+  | "tower"
+  | "well"
+  | "home"
+  | "market"
+  | "dock"
+  | "chimney"
+export interface Landmark {
+  kind: LandmarkKind
+  /** The placement drawing it (already in `decor`), or none for a pure marker (a chimney top). */
+  piece?: LandPiece
+  x: number
+  z: number
+  /** Height of the interesting point (a chimney's top, the wheel's axle), world units. */
+  y?: number
+  rot?: number
+  /** The site it belongs to, when it's a workplace. */
+  site?: SiteId
+}
+
+/**
+ * The island, as data every layer reads (ADR 0007). Contract:
+ * - `tiles` and `decor` are drawn by scene/Island.tsx (instanced).
+ * - `water` lists the centre of every water tile (sea, river, lakes): Nature draws water there.
+ * - `meadow` lists the centre of every open grass tile (no road, building, forest or site): Nature
+ *   scatters grass and flowers there.
+ * - `landmarks` are what Life animates.
+ * - Roads, sites, the keep and the space round the gate are flat at y = 0; elevation is only ever
+ *   off the walking graph, so adventurers never need a height lookup.
+ */
 export interface Island {
   tiles: LandPlacement[]
   decor: LandPlacement[]
+  water: Spot[]
+  meadow: Spot[]
+  landmarks: Landmark[]
 }
 
 /** The island for a seed: land tiles, a sea ring, and scattered nature that keeps roads and sites clear. */
@@ -168,6 +209,8 @@ export function island(seed = 7): Island {
   const random = rng(seed)
   const tiles: LandPlacement[] = []
   const decor: LandPlacement[] = []
+  const water: Spot[] = []
+  const meadow: Spot[] = []
   const quarter = (Math.PI / 3) * Math.floor(random() * 6)
 
   for (let q = -SEA_RINGS; q <= SEA_RINGS; q++) {
@@ -178,6 +221,7 @@ export function island(seed = 7): Island {
       const land = d <= LAND_RINGS - (random() < 0.25 && d === LAND_RINGS ? 1 : 0)
       tiles.push({ piece: land ? "hex_grass" : "hex_water", x, z, rot: quarter })
       if (!land) {
+        water.push([x, z])
         if (d === LAND_RINGS + 1 && random() < 0.12) decor.push({ piece: "waterlily_A", x, z })
         continue
       }
@@ -193,10 +237,28 @@ export function island(seed = 7): Island {
       else if (roll < 0.45) piece = "hills_A_trees"
       else if (roll < 0.52) piece = "rock_single_A"
       if (piece) decor.push({ piece, x, z, rot: random() * Math.PI * 2 })
+      else meadow.push([x, z])
     }
   }
   decor.push(...SITE_DRESSING)
-  return { tiles, decor }
+  const landmarks: Landmark[] = SITE_DRESSING.flatMap((placement) => {
+    const kind = LANDMARK_OF[placement.piece]
+    return kind
+      ? [{ kind, piece: placement.piece, x: placement.x, z: placement.z, rot: placement.rot ?? 0 }]
+      : []
+  })
+  return { tiles, decor, water, meadow, landmarks }
+}
+
+const LANDMARK_OF: Partial<Record<LandPiece, LandmarkKind>> = {
+  building_windmill_blue: "windmill",
+  building_watermill_blue: "watermill",
+  building_lumbermill_blue: "lumbermill",
+  building_mine_blue: "mine",
+  building_tower_A_blue: "tower",
+  building_well_blue: "well",
+  building_home_A_blue: "home",
+  building_home_B_blue: "home",
 }
 
 /** What stands at each site (the yard's building is drawn separately: it grows). */

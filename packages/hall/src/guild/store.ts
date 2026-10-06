@@ -22,6 +22,7 @@ import {
   TAVERN,
 } from "../world/layout.ts"
 import { MOODS, type Mood } from "../world/moods.ts"
+import { DEFAULT_SETTINGS, type Environment, type EnvironmentSettings, environmentOf } from "./environment.ts"
 
 /**
  * The hall's single source of truth: a Player feeds `GuildEvent`s into cockpit's model, and the
@@ -119,6 +120,15 @@ export class GuildStore {
   markers: Marker[] = []
   /** Completed edits/writes this run: the yard's building grows with it. */
   progress = 0
+  /** The world's conditions: time of day, weather, temperature (ADR 0007). */
+  environmentSettings: EnvironmentSettings = { ...DEFAULT_SETTINGS }
+  environment: Environment = environmentOf({
+    wallClock: Date.now(),
+    runTime: 0,
+    runStart: 0,
+    model: emptyModel(),
+    settings: DEFAULT_SETTINGS,
+  })
 
   private model: Model = emptyModel()
   private player!: Player
@@ -239,6 +249,12 @@ export class GuildStore {
     this.emit()
   }
 
+  /** Change how time and weather are chosen (HUD levers). */
+  setEnvironment(settings: Partial<EnvironmentSettings>): void {
+    this.environmentSettings = { ...this.environmentSettings, ...settings }
+    this.refresh()
+  }
+
   setView(view: "diorama" | "explore"): void {
     this.view = view
     this.emit()
@@ -330,6 +346,13 @@ export class GuildStore {
     if (this.focus && this.now - this.focus.at > FOCUS_TTL_MS) this.focus = null
     this.views = viewsOf(this.model, this.now)
     this.progress = progressOf(this.model)
+    this.environment = environmentOf({
+      wallClock: Date.now(),
+      runTime: this.time,
+      runStart: this.start,
+      model: this.model,
+      settings: this.environmentSettings,
+    })
     this.emit()
   }
 

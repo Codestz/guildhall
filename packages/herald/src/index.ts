@@ -72,7 +72,8 @@ export default {
     // v1 1.18.29+ also calls setup with a preview context: no tools, no location. Skip it.
     if (!ctx.tool || !ctx.location || !ctx.event) return
     const events = ctx.event
-    const guild = basename(ctx.location.directory)
+    const directory = ctx.location.directory
+    const guild = basename(directory)
     log(`v2 setup in ${ctx.location.directory}`)
     const translator = createV2Translator(unknown(2))
     const courier = createCourier({ guild, opencode: 2, log })
@@ -83,6 +84,10 @@ export default {
         const opened = Date.now()
         try {
           for await (const event of events.subscribe({ signal: stop.signal })) {
+            // The service's stream carries every open location's events: keep this guild's own
+            // (measured: a herald set up for ~ also recorded a session in a project below it).
+            const where = (event as { location?: { directory?: string } }).location?.directory
+            if (where && where !== directory) continue
             try {
               courier.send(translator.event(event, Date.now()), event)
             } catch (error) {

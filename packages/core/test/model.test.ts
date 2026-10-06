@@ -183,3 +183,22 @@ describe("what a subagent is doing now", () => {
     ])
   })
 })
+
+describe("v2 pleas (measured on 2.0.18)", () => {
+  test("permission.asked holds the session, permission.replied lets it go", () => {
+    const translate = createV2Translator()
+    const asked = translate.event(
+      {
+        type: "permission.asked",
+        data: { id: "per_1", sessionID: "ses_9", action: "shell", resources: ["ls"] },
+      },
+      10,
+    )
+    const replied = translate.event(
+      { type: "permission.replied", data: { sessionID: "ses_9", reply: "once" } },
+      20,
+    )
+    expect(asked).toEqual([{ type: "status", id: "ses_9", status: "waiting", at: 10 }])
+    expect(replied).toEqual([{ type: "status", id: "ses_9", status: "busy", at: 20 }])
+  })
+})

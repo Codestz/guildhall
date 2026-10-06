@@ -210,6 +210,18 @@ export function createV2Translator(unknown: (what: string, detail?: Json) => voi
             : []
         case "session.status":
           return id ? statusChange(id, data.status, at) : []
+        /**
+         * Held on a person (a plea): measured on 2.0.18 with `"permission": { "bash": "ask" }` —
+         * `permission.asked` carries `data.sessionID`, `action: "shell"` and the commands. Cockpit's
+         * v2 translator never mapped it, so pleas never showed (guildhall-validation.md).
+         */
+        case "permission.asked":
+        case "question.asked":
+          return id ? [{ type: "status", id, status: "waiting", at }] : []
+        case "permission.replied":
+        case "question.replied":
+        case "question.rejected":
+          return id ? [{ type: "status", id, status: "busy", at }] : []
         default:
           // Deltas of kinds we do not draw, bookkeeping, and everything not about a session.
           if (

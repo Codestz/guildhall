@@ -145,3 +145,60 @@ describe("cloud shadows", () => {
     expect(sky.cloudShadow).toBe(0)
   })
 })
+
+describe("mist, sun shafts and ink (visual upgrades V1, V4)", () => {
+  test("mist is a morning thing: thick at dawn, gone at noon, thinner at dusk", () => {
+    updateSky(sky, env(6), MOODS.keep)
+    const dawn = sky.mist
+    updateSky(sky, env(13), MOODS.keep)
+    expect(sky.mist).toBeLessThan(0.02)
+    updateSky(sky, env(18.75), MOODS.keep)
+    const dusk = sky.mist
+    expect(dawn).toBeGreaterThan(0.25)
+    expect(dusk).toBeGreaterThan(0)
+    expect(dusk).toBeLessThan(dawn * 0.6)
+  })
+
+  test("damp, cold, still air thickens it; wind blows it off; rain raises a taller murk", () => {
+    updateSky(sky, env(6), MOODS.keep)
+    const clear = { mist: sky.mist, top: sky.mistTop }
+    updateSky(sky, { ...env(6), temperature: 3 }, MOODS.keep)
+    expect(sky.mist).toBeGreaterThan(clear.mist)
+    updateSky(sky, { ...env(6), wind: 0.95 }, MOODS.keep)
+    expect(sky.mist).toBeLessThan(clear.mist)
+    updateSky(sky, env(14), MOODS.keep)
+    const dry = { mist: sky.mist, top: sky.mistTop }
+    updateSky(sky, env(14, "rain"), MOODS.keep)
+    expect(sky.mist).toBeGreaterThan(dry.mist + 0.08)
+    expect(sky.mistTop).toBeGreaterThan(Math.max(dry.top, clear.top) + 0.5)
+  })
+
+  test("sun shafts only at golden hour with the sun out, warm", () => {
+    updateSky(sky, env(13), MOODS.keep)
+    expect(sky.shafts).toBe(0)
+    updateSky(sky, env(17.75), MOODS.keep)
+    expect(sky.shafts).toBeGreaterThan(0.5)
+    expect(sky.shaftColor.r).toBeGreaterThan(sky.shaftColor.b)
+    updateSky(sky, env(17.75, "storm"), MOODS.keep)
+    expect(sky.shafts).toBeLessThan(0.1)
+    updateSky(sky, env(23), MOODS.keep)
+    expect(sky.shafts).toBe(0)
+  })
+
+  test("ink is lighter at night (dark on dark) but never gone, so silhouettes still read", () => {
+    updateSky(sky, env(13), MOODS.keep)
+    const day = sky.ink
+    updateSky(sky, env(23), MOODS.keep)
+    expect(sky.ink).toBeLessThan(day)
+    expect(sky.ink).toBeGreaterThan(day * 0.5)
+  })
+
+  test("the LUT's time weights follow the sky: golden at 18:00, storm in a storm", () => {
+    updateSky(sky, env(18), MOODS.keep)
+    expect(sky.golden).toBeGreaterThan(0.8)
+    expect(sky.storm).toBe(0)
+    updateSky(sky, env(14, "storm"), MOODS.keep)
+    expect(sky.storm).toBeGreaterThan(0.9)
+    expect(sky.golden).toBe(0)
+  })
+})

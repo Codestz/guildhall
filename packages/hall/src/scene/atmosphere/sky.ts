@@ -66,6 +66,21 @@ export interface SkyState {
   cloudCoverage: number
   cloudSoftness: number
   cloudSpeed: number
+  /** How much of the day is golden hour, and how stormy it is (0–1): the mood LUT blends on these. */
+  golden: number
+  storm: number
+  /**
+   * Ground mist (drawn by the grade): how thick (0–1), the world height it thins out at, and its
+   * colour (linear, lit). Morning valleys and the river, the sea at dusk, murk in the rain.
+   */
+  mist: number
+  mistTop: number
+  mistColor: Color
+  /** Golden-hour sun shafts (a radial term in the grade): strength 0–1 and their colour (linear). */
+  shafts: number
+  shaftColor: Color
+  /** Ink outlines (High and up): how far an edge darkens the colour under it (0 = none). */
+  ink: number
 }
 
 export function createSky(): SkyState {
@@ -106,6 +121,14 @@ export function createSky(): SkyState {
     cloudCoverage: 0,
     cloudSoftness: 0.08,
     cloudSpeed: 0,
+    golden: 0,
+    storm: 0,
+    mist: 0,
+    mistTop: 0,
+    mistColor: new Color(),
+    shafts: 0,
+    shaftColor: new Color(),
+    ink: 0,
   }
 }
 
@@ -339,6 +362,35 @@ export function updateSky(out: SkyState, env: Environment, mood: Mood, flash = 0
   out.cloudCoverage = lerp(0.18, 0.8, smoothstep(0.1, 1, cover))
   out.cloudSoftness = 0.07 + 0.06 * overcast
   out.cloudSpeed = 1 + 7 * clamp01(env.wind) * (0.6 + 0.4 * cover)
+
+  // 11. Mist. Morning is its time (the sun rises in the east, +x): it lies in the valleys, on the
+  // river and over the sea from before dawn until ~08:00; a thinner veil comes back at dusk and
+  // stays as night ground fog. Damp air (cloud, rain) and cold make more of it, wind blows it off.
+  // Rain brings a taller, greyer murk.
+  const morning = env.sun[0] > 0 ? 1 : 0
+  const twilight = smoothstep(-0.5, -0.08, e) * (1 - smoothstep(0.1, 0.36, e))
+  const humid = clamp01(0.35 + 0.45 * cover + 0.5 * rain)
+  const cold = 0.75 + 0.5 * smoothstep(22, 4, env.temperature)
+  const still = 1 - 0.55 * smoothstep(0.3, 0.9, env.wind)
+  out.mist = clamp01(
+    (twilight * (morning ? 0.9 : 0.3) + night * 0.18) * humid * cold * still + rain * 0.2 + storm * 0.04,
+  )
+  out.mistTop = -0.15 + 1.6 * rain + 0.35 * twilight * morning + 0.1 * night
+  // Lit mist: the fog's own colour, lifted towards the horizon's (and its warm glow at dawn and dusk).
+  out.mistColor
+    .copy(out.fog)
+    .lerp(out.horizon, 0.5)
+    .lerp(out.glow, golden * 0.2)
+    .multiplyScalar(1.15 + night * 0.4)
+
+  // 12. Sun shafts: golden hour with the sun out, warm, gone under cloud.
+  out.golden = golden
+  out.storm = storm
+  out.shafts = golden * (1 - overcast) * smoothstep(0.2, 1.2, sun)
+  out.shaftColor.copy(out.sunColor).multiplyScalar(0.4)
+
+  // 13. Ink: a confident line by day; lighter at night (dark on dark), flatter in a storm.
+  out.ink = 0.8 * (1 - night * 0.35) * (1 - storm * 0.25)
   return out
 }
 

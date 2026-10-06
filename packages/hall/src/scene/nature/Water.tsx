@@ -2,9 +2,11 @@ import { useGLTF } from "@react-three/drei"
 import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo } from "react"
 import {
+  Box3,
   BufferGeometry,
   Color,
   DataTexture,
+  DoubleSide,
   Float32BufferAttribute,
   LinearFilter,
   MathUtils,
@@ -23,18 +25,20 @@ import {
   type WebGLRenderer,
   WebGLRenderTarget,
 } from "three"
+import { reducedMotion } from "../../guild/opening.ts"
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { LANDS_URL } from "../../world/cast.ts"
 import { cellToWorld, HEX_SCALE, island, MAP_FOR_TESTS } from "../../world/lands.ts"
 import { LIGHTS } from "../../world/lights.ts"
+import { useLooks } from "../atmosphere/looks.ts"
 import { sky } from "../atmosphere/state.ts"
 import { wind } from "../atmosphere/wind.ts"
 import { EASE, targetOf } from "../weather/shared.ts"
 import { noiseTexture } from "./noise.ts"
 import { HEX_RADIUS } from "./scatter.ts"
 import { waterFragment, waterVertex } from "./shaders.ts"
-import { riverCells, SHORE, shoreTexels } from "./shore.ts"
+import { distanceToLand, riverCells, riverLine, SHORE, shoreTexels } from "./shore.ts"
 
 /**
  * The island's water (ADR 0007, Nature): one surface, one draw call, for the sea, the lake and the
@@ -42,6 +46,12 @@ import { riverCells, SHORE, shoreTexels } from "./shore.ts"
  * −0.5), so the land's own geometry clips it exactly where the tiles put the shore — no seams to
  * hide. What it can't see from the tiles it reads from a texture baked once at start: how far each
  * point of water is from land (foam, shallows) and which way the river runs there (its flow).
+ *
+ * Water v2 (docs/research/gpu-techniques.md V3), all in this one shader: the body steps through
+ * soft toon bands by depth; caustics shimmer in the sunlit shallows; foam rings ripple out from
+ * whatever stands in the water — dock posts, rocks, the bridge, the mill wheel — read from a
+ * second distance baked into the same texture (from below: the lowest surfaces at the waterline);
+ * and the turning wheel churns a wake down the river's flow.
  */
 const SEA_Y = -0.2 * HEX_SCALE + 0.05
 const RIVER_Y = -0.1 * HEX_SCALE + 0.06
@@ -51,14 +61,17 @@ export function Water({ tier }: { tier: Tier }) {
   const gl = useThree((state) => state.gl)
   const { nodes } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
   const geometry = useMemo(surface, [])
-  const material = useMemo(() => waterMaterial(tier === 0), [tier])
-  const eased = useMemo(() => ({ rain: 0, gloom: 0, cloud: 0, pick: 0 }), [])
+  const v2 = useLooks().water
+  const material = useMemo(() => waterMaterial(tier === 0, v2), [tier, v2])
+  const eased = useMemo(() => ({ rain: 0, gloom: 0, cloud: 0, pick: 0, caustics: 0 }), [])
+  const still = useMemo(reducedMotion, [])
 
   // The shore texture: render the tiles' land mask from above once (after the first commit, so a
   // suspended render never pays for it), then measure it on the CPU. Kept for the page's life.
   useEffect(() => {
     shore ??= bakeShore(gl, nodes)
     if (material.uniforms.uShore) material.uniforms.uShore.value = shore
+    ;(material.uniforms.uWheel as { value: Vector4 }).value.copy(wheel)
   }, [gl, nodes, material])
   useEffect(() => () => material.dispose(), [material])
   useEffect(() => () => geometry.dispose(), [geometry])
@@ -80,6 +93,9 @@ export function Water({ tier }: { tier: Tier }) {
     setUniform(u.uKeyIntensity, sky.keyIntensity)
     setUniform(u.uHemiIntensity, sky.hemiIntensity)
     setUniform(u.uFlash, sky.flash)
+    // Water v2's own clock (caustics, rings, wake): it holds still under prefers-reduced-motion.
+    if (!still) eased.caustics = (eased.caustics + Math.min(delta, 0.1)) % 1000
+    setUniform(u.uCaustics, eased.caustics)
     const [x, y, z] = sky.keyDirection
     ;(u.uKeyDir as { value: Vector3 }).value.set(x, y, z)
     // A photogenic moon: its path swings round towards where the camera looks, so the diorama's
@@ -130,6 +146,8 @@ const SHALLOW = new Color("#3fb0b8")
 
 const noise = noiseTexture()
 const look = new Vector3()
+const scratch = new Vector3()
+const size3 = new Vector3()
 
 /** How many torch reflections the water draws at once. */
 const FLAMES = 8
@@ -161,8 +179,17 @@ function nearestFlames(at: Vector3, out: Vector4[] | undefined): void {
 const OPEN_SEA = new DataTexture(new Uint8Array([255, 128, 128, 255]), 1, 1, RGBAFormat)
 OPEN_SEA.needsUpdate = true
 let shore: DataTexture | undefined
+/** Where the mill wheel's water rejoins the river (xyz) and the wheel's radius (w), found by the bake; w = 0 until then (no wake). */
+const wheel = new Vector4()
+/** Foam rings reach this far from what stands in the water (world units; the texture's alpha). */
+const RING_MAX = 4
+/** Pieces that sit on the water but shouldn't ring it (they float, they don't stand). */
+const AFLOAT = /^(waterlily|waterplant)/
 
-function waterMaterial(low: boolean): ShaderMaterial {
+function waterMaterial(low: boolean, v2: boolean): ShaderMaterial {
+  const defines: Record<string, unknown> = { FLAMES }
+  if (low) defines.NATURE_LOW = ""
+  if (v2) defines.WATER_V2 = ""
   const material = new ShaderMaterial({
     uniforms: UniformsUtils.merge([
       UniformsLib.lights,
@@ -182,13 +209,16 @@ function waterMaterial(low: boolean): ShaderMaterial {
         uMoon: { value: 0 },
         uNight: { value: 0 },
         uLamps: { value: 0 },
+        uCaustics: { value: 0 },
+        uRingMax: { value: RING_MAX },
+        uWheel: { value: new Vector4() },
       },
     ]),
     vertexShader: waterVertex,
     fragmentShader: waterFragment,
     lights: true,
     fog: true,
-    defines: low ? { NATURE_LOW: "", FLAMES } : { FLAMES },
+    defines,
   })
   // UniformsUtils.merge clones values; shared objects (the wind, the sky's colours, the noise) are
   // attached after, by reference, so their per-frame writes reach the shader with no copying.
@@ -311,15 +341,84 @@ function bakeShore(gl: WebGLRenderer, nodes: Record<string, Object3D>): DataText
   const pixels = new Uint8Array(size * size * 4)
   gl.readRenderTargetPixels(target, 0, 0, size, size, pixels)
   gl.setRenderTarget(previous)
-  gl.setClearColor(clear, alpha)
-  gl.shadowMap.autoUpdate = shadows
   target.dispose()
   mask.dispose()
 
   // readPixels' row 0 is the bottom of the image (z = +half): the layout shoreTexels expects.
   const land = new Uint8Array(size * size)
   for (let i = 0; i < land.length; i++) land[i] = (pixels[i * 4] as number) > 127 ? 1 : 0
-  const texture = new DataTexture(shoreTexels(land), size, size, RGBAFormat)
+  const texels = shoreTexels(land)
+
+  // What stands in the water: the decor seen from *below*, where the lowest surface shows — a
+  // post, a rock's foot, a wheel's rim at the waterline marks the mask; a bridge deck or a roof
+  // overhead doesn't. Its distance goes in the alpha, for foam rings.
+  const below = new Scene()
+  for (const piece of island().decor) {
+    const source = nodes[piece.piece]
+    if (!source || AFLOAT.test(piece.piece)) continue
+    const copy = source.clone(true)
+    copy.position.set(piece.x, piece.y ?? 0, piece.z)
+    copy.rotation.set(0, piece.rot ?? 0, 0)
+    copy.scale.setScalar(HEX_SCALE * (piece.scale ?? 1))
+    below.add(copy)
+  }
+  below.updateMatrixWorld(true)
+  const axle = below.getObjectByName("building_watermill_wheel_blue")
+  if (axle) {
+    axle.getWorldPosition(scratch)
+    const radius = new Box3().setFromObject(axle).getSize(size3).y / 2
+    // The wheel turns beside the river, not in it: its water rejoins at the nearest bit of river.
+    let best = Number.POSITIVE_INFINITY
+    for (const [x, z] of riverLine()) {
+      const d = Math.hypot(x - scratch.x, z - scratch.z)
+      if (d < best) {
+        best = d
+        wheel.set(x, RIVER_Y, z, radius)
+      }
+    }
+    if (best > 12) wheel.set(0, 0, 0, 0)
+  }
+  const standing = new ShaderMaterial({
+    side: DoubleSide,
+    vertexShader: /* glsl */ `
+      varying float vY;
+      void main() {
+        vec4 world = modelMatrix * vec4(position, 1.0);
+        vY = world.y;
+        gl_Position = projectionMatrix * viewMatrix * world;
+      }`,
+    fragmentShader: /* glsl */ `
+      varying float vY;
+      void main() {
+        gl_FragColor = vec4(vY < ${(RIVER_Y + 0.35).toFixed(3)} ? 1.0 : 0.0, 0.0, 0.0, 1.0);
+      }`,
+  })
+  below.overrideMaterial = standing
+  // Looking up: left and right swap so the image reads back in the same layout as the top view.
+  const up = new OrthographicCamera(half, -half, half, -half, 1, 200)
+  up.position.set(0, -100, 0)
+  up.up.set(0, 0, -1)
+  up.lookAt(0, 0, 0)
+  up.updateMatrixWorld()
+  const target2 = new WebGLRenderTarget(size, size)
+  gl.setRenderTarget(target2)
+  gl.setClearColor(0x000000, 1)
+  gl.clear()
+  gl.render(below, up)
+  gl.readRenderTargetPixels(target2, 0, 0, size, size, pixels)
+  gl.setRenderTarget(previous)
+  gl.setClearColor(clear, alpha)
+  gl.shadowMap.autoUpdate = shadows
+  target2.dispose()
+  standing.dispose()
+  const posts = new Uint8Array(size * size)
+  for (let i = 0; i < posts.length; i++) posts[i] = (pixels[i * 4] as number) > 127 ? 1 : 0
+  const cell = (half * 2) / size
+  const ring = distanceToLand(posts, size, size)
+  for (let i = 0; i < posts.length; i++)
+    texels[i * 4 + 3] = Math.round(Math.min(1, ((ring[i] as number) * cell) / RING_MAX) * 255)
+
+  const texture = new DataTexture(texels, size, size, RGBAFormat)
   texture.magFilter = LinearFilter
   texture.minFilter = LinearFilter
   texture.needsUpdate = true

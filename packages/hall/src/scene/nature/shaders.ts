@@ -109,6 +109,13 @@ uniform vec3 uMoonColor;
 uniform float uMoon;
 uniform float uNight;
 uniform float uLamps;
+/**
+ * Water v2's own clock (caustics, rings, the wake: held under prefers-reduced-motion), how far the
+ * foam rings reach, and where the mill's tailrace meets the river (xyz) with the wheel's radius (w).
+ */
+uniform float uCaustics;
+uniform float uRingMax;
+uniform vec4 uWheel;
 /** The nearest torch flames: xyz, w = 1 if set. Re-picked on the CPU a couple of times a second. */
 uniform vec4 uFlames[FLAMES];
 varying vec3 vWorld;
@@ -172,11 +179,32 @@ void main() {
   float fresnel = 0.04 + 0.96 * pow(1.0 - facing, 5.0);
   fresnel = mix(fresnel, 0.35 + 0.65 * fresnel, 0.5);
 
-  // Body: shallow by the shore, deep further out, lit like the tiles.
+  // Body: shallow by the shore, deep further out, lit like the tiles. Water v2 steps it through
+  // soft toon bands (the KayKit look: a turquoise lip, a mid band, the deep), each edge wobbling
+  // with the swell.
   float depth = smoothstep(0.4, 7.5, dist);
   if (vRiver > 0.5) depth = 0.35 + 0.35 * smoothstep(0.3, 2.0, dist);
+  #ifdef WATER_V2
+  float steps = depth * 3.0 + (slope.x + slope.y) * 0.6;
+  float banded = (floor(steps) + smoothstep(0.35, 0.65, fract(steps))) / 3.0;
+  depth = mix(depth, clamp(banded, 0.0, 1.0), 0.7);
+  #endif
   vec3 body = mix(uShallow, uDeep, depth) * (1.0 - 0.4 * uGloom);
   vec3 lit = body * (fill(vec3(0.0, 1.0, 0.0)) + key(vec3(0.0, 1.0, 0.0), shadow)) * RECIPROCAL_PI;
+
+  #if defined(WATER_V2) && !defined(NATURE_LOW)
+  // Caustics: where two drifting layers of noise cross, a bright wiggly net, in the sunlit
+  // shallows only (gone under cloud, in shade and by night).
+  float shallow = (1.0 - smoothstep(0.5, vRiver > 0.5 ? 1.8 : 3.5, dist)) * smoothstep(0.15, 0.6, dist);
+  if (shallow > 0.01 && uKeyIntensity > 0.05) {
+    vec2 cq = p * 0.24;
+    float c1 = texture2D(uNoise, cq + vec2(uCaustics * 0.021, uCaustics * 0.013)).a;
+    float c2 = texture2D(uNoise, cq * 1.31 - vec2(uCaustics * 0.017, -uCaustics * 0.019) + vec2(0.5, 0.2)).a;
+    float net = 1.0 - smoothstep(0.0, 0.05, abs(c1 - c2));
+    lit += uKeyColor * vec3(0.85, 1.0, 0.95) * uKeyIntensity * net * net * shallow * shadow * (1.0 - 0.85 * uCloud)
+      * (vRiver > 0.5 ? 0.045 : 0.08);
+  }
+  #endif
 
   // Reflection: the sky's own colours by the reflected ray's height — no render target.
   vec3 r = reflect(-v, n);
@@ -230,6 +258,31 @@ void main() {
     float streak = texture2D(uNoise, p * vec2(0.4) - flow * t * 0.5).a;
     foam = max(foam * 0.8, smoothstep(0.72, 0.9, streak) * 0.35 * (1.0 - smoothstep(0.4, 1.6, dist)));
   }
+  #ifdef WATER_V2
+  // Rings round whatever stands in the water (posts, rocks, piers, the wheel): a hugging rim and
+  // a ripple rolling outward from it.
+  float stand = shore.a * uRingMax;
+  if (stand < uRingMax * 0.98) {
+    float hug = (1.0 - smoothstep(0.02, 0.2 + 0.25 * breakup, stand)) * 0.85;
+    float wave = fract(stand * 0.8 - uCaustics * 0.3 + breakup * 0.35);
+    float ripple = smoothstep(0.82, 0.93, wave) * (1.0 - smoothstep(0.93, 1.0, wave));
+    foam = max(foam, max(hug, ripple * (1.0 - smoothstep(0.3, 2.2, stand)) * 0.8));
+  }
+  // The mill's tailrace: churned foam where the wheel's water rejoins the river, trailing down
+  // the flow.
+  if (uWheel.w > 0.0) {
+    vec2 d = p - uWheel.xz;
+    vec2 along = length(flow) > 0.1 ? normalize(flow) : vec2(1.0, 0.0);
+    float down = dot(d, along);
+    float side = abs(dot(d, vec2(-along.y, along.x)));
+    float reach = smoothstep(-uWheel.w * 0.6, 0.0, down) * (1.0 - smoothstep(0.0, 7.0, down));
+    float width = 1.0 - smoothstep(0.6 + down * 0.18, 1.2 + down * 0.25, side);
+    // Noise stretched down the flow and dragged along it: streaks, not blobs.
+    vec2 q = vec2(down * 0.12 - uCaustics * 0.35, dot(d, vec2(-along.y, along.x)) * 0.9);
+    float churn = texture2D(uNoise, q).a * 0.65 + texture2D(uNoise, q * 2.1 + vec2(0.3, 0.6)).a * 0.35;
+    foam = max(foam, smoothstep(0.62 - 0.12 * reach, 0.78, churn) * reach * width * 0.85);
+  }
+  #endif
   foam *= 0.85 + 0.15 * uWind;
   vec3 foamLit = vec3(0.92, 0.95, 0.97) * (fill(vec3(0.0, 1.0, 0.0)) + key(vec3(0.0, 1.0, 0.0), shadow)) * RECIPROCAL_PI;
   colour = mix(colour, foamLit, clamp(foam, 0.0, 1.0) * (0.9 - 0.4 * uNight));

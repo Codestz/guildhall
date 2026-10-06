@@ -18,12 +18,65 @@ export const TIERS: Record<
     /** Ambient occlusion (N8AO): off, at half resolution, or full. Needs `post`. Off everywhere
      * for the 120 fps budget (it re-renders the scene); kept for a future Ultra tier. */
     ao: "off" | "half" | "full"
-  }
+  } & Looks
 > = {
-  0: { name: "Low", dpr: 1, post: false, tiltShift: false, shadowMap: 1024, ao: "off" },
-  1: { name: "Medium", dpr: 1.25, post: true, tiltShift: false, shadowMap: 2048, ao: "off" },
-  2: { name: "High", dpr: 1.5, post: true, tiltShift: false, shadowMap: 2048, ao: "off" },
-  3: { name: "Ultra", dpr: 2, post: true, tiltShift: true, shadowMap: 4096, ao: "half" },
+  0: {
+    name: "Low",
+    dpr: 1,
+    post: false,
+    tiltShift: false,
+    shadowMap: 1024,
+    ao: "off",
+    ...looks(false, false),
+  },
+  1: {
+    name: "Medium",
+    dpr: 1.25,
+    post: true,
+    tiltShift: false,
+    shadowMap: 2048,
+    ao: "off",
+    ...looks(false, true),
+  },
+  2: {
+    name: "High",
+    dpr: 1.5,
+    post: true,
+    tiltShift: false,
+    shadowMap: 2048,
+    ao: "off",
+    ...looks(true, true),
+  },
+  3: {
+    name: "Ultra",
+    dpr: 2,
+    post: true,
+    tiltShift: true,
+    shadowMap: 4096,
+    ao: "half",
+    ...looks(true, true),
+  },
+}
+
+/**
+ * The per-pixel looks folded into the post pass we already pay for (docs/perf-budget.md, "Visual
+ * upgrades"): none adds a pass.
+ *   outlines  soft ink lines round silhouettes, from the depth buffer (High and up; needs post)
+ *   mist      ground mist and golden-hour sun shafts (Medium and up; needs post)
+ *   lut       the mood's colour-grade LUT, blended through the day (Medium and up; needs post)
+ *   water     water v2 — toon bands, foam rings, the mill's wake on every tier (it's the water's own
+ *             shader, no post needed); its caustics skip Low
+ */
+export interface Looks {
+  outlines: boolean
+  mist: boolean
+  lut: boolean
+  water: boolean
+}
+export type Look = keyof Looks
+
+function looks(outlines: boolean, rest: boolean): Looks {
+  return { outlines, mist: rest, lut: rest, water: true }
 }
 
 /** Highest tier the monitor may climb to on its own. */
@@ -91,4 +144,25 @@ export const quality = {
   snapshot(): Tier {
     return quality.tier
   },
+  /**
+   * Probe lever for A/B measurements (window.quality under PROBE): force a look on or off over the
+   * tier's own choice, or `undefined` to hand it back. Not remembered.
+   */
+  overrides: {} as Partial<Looks>,
+  /** Bumped on every override, so `useLooks` re-renders. */
+  revision: 0,
+  look(name: Look, on: boolean | undefined): void {
+    if (on === undefined) delete quality.overrides[name]
+    else quality.overrides[name] = on
+    quality.revision++
+    for (const listener of listeners) listener()
+  },
+  /** The looks in force: the tier's, with any probe override on top. */
+  looks(): Looks {
+    return { ...pick(TIERS[quality.tier]), ...quality.overrides }
+  },
+}
+
+function pick({ outlines, mist, lut, water }: Looks): Looks {
+  return { outlines, mist, lut, water }
 }

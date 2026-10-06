@@ -16,7 +16,7 @@ import { Pleas } from "./Pleas.tsx"
 import { HUD_MODES, type HudMode, hudPrefs, useHudPrefs } from "./prefs.ts"
 import { Roster, RosterBadges } from "./Roster.tsx"
 import { Settings } from "./Settings.tsx"
-import { SoundToggle } from "./Sound.tsx"
+import { SoundToggle, useSoundWaiting } from "./Sound.tsx"
 import { Stats } from "./Stats.tsx"
 import { Timeline } from "./Timeline.tsx"
 
@@ -67,6 +67,7 @@ export function Hud() {
   const [legends, setLegends] = useState(false)
   const book = useRef<HTMLButtonElement>(null)
   const root = useRef<HTMLDivElement>(null)
+  const soundWaiting = useSoundWaiting()
 
   const view = store.selected ? store.views.find((v) => v.id === store.selected) : undefined
   const dossier = mode !== "hidden" && Boolean(store.selected && store.sessionOf(store.selected))
@@ -113,7 +114,14 @@ export function Hud() {
 
   function closeLegends() {
     setLegends(false)
-    requestAnimationFrame(() => book.current?.focus())
+    // On a phone the book lives in Settings: focus goes back to the gear that leads there.
+    requestAnimationFrame(() => (book.current ?? gear.current)?.focus())
+  }
+
+  function openLegends() {
+    only("settings")
+    setSettings(false)
+    setLegends(true)
   }
 
   function closeSettings() {
@@ -233,7 +241,8 @@ export function Hud() {
             </>
           )}
         </button>
-        {!hidden && (
+        {/* Phones keep the bar to two buttons (HUD mode, Settings): Legends and Sound live in Settings. */}
+        {!hidden && !phone && (
           <button
             ref={book}
             type="button"
@@ -242,22 +251,18 @@ export function Hud() {
             aria-haspopup="dialog"
             aria-expanded={legends}
             title="Legends"
-            onClick={() => {
-              only("settings")
-              setSettings(false)
-              setLegends(true)
-            }}
+            onClick={openLegends}
           >
             <Icon.book />
           </button>
         )}
-        {!hidden && <SoundToggle />}
+        {!hidden && !phone && <SoundToggle />}
         {!hidden && (
           <button
             ref={gear}
             type="button"
             className="plaque tool"
-            aria-label="Settings"
+            aria-label={phone && soundWaiting ? "Settings, sound waiting to start" : "Settings"}
             aria-expanded={settings}
             aria-haspopup="dialog"
             title="Settings"
@@ -270,11 +275,14 @@ export function Hud() {
             }}
           >
             <Icon.gear />
+            {phone && soundWaiting && <i className="tab-dot" aria-hidden="true" />}
           </button>
         )}
       </div>
 
-      {settings && !hidden && <Settings store={store} onClose={closeSettings} />}
+      {settings && !hidden && (
+        <Settings store={store} onClose={closeSettings} onLegends={phone ? openLegends : undefined} />
+      )}
       {legends && !hidden && <Legends store={store} onClose={closeLegends} />}
 
       {!hidden && (

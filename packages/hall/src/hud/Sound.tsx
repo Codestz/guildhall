@@ -17,11 +17,17 @@ export function toggleSound(): void {
   if (!on) audio.unlock()
 }
 
-/** The speaker in the toolbar. */
-export function SoundToggle() {
+/** Sound was left on by a returning viewer and waits for a tap to start (browsers' autoplay rule). */
+export function useSoundWaiting(): boolean {
   const { on } = useSoundPrefs()
   const state = useSyncExternalStore(audio.subscribe, audio.snapshot)
-  const waiting = on && state === "locked"
+  return on && state === "locked"
+}
+
+/** The speaker in the toolbar (desktop; phones reach sound through Settings). */
+export function SoundToggle() {
+  const { on } = useSoundPrefs()
+  const waiting = useSoundWaiting()
   const label = waiting ? "Start sound" : on ? "Mute sound" : "Turn sound on"
   return (
     <button

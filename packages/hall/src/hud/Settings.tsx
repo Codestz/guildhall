@@ -42,8 +42,19 @@ const KEYS: [string, string][] = [
  * Everything the viewer can tune, in one place: quality, the world, the camera, the story and the
  * HUD itself. A side drawer on desktop, a bottom sheet on phones. Non-modal: the hall stays live
  * behind it, Esc closes it and focus returns to the gear.
+ *
+ * `onLegends` (phones): the toolbar there keeps only HUD mode and Settings, so the Legends book and
+ * Sound lead the sheet instead of sitting in the bar.
  */
-export function Settings({ store, onClose }: { store: GuildStore; onClose: () => void }) {
+export function Settings({
+  store,
+  onClose,
+  onLegends,
+}: {
+  store: GuildStore
+  onClose: () => void
+  onLegends?: () => void
+}) {
   const tier = useSyncExternalStore(quality.subscribe, quality.snapshot)
   const prefs = useHudPrefs()
   const showcase = MODE === "showcase"
@@ -72,6 +83,24 @@ export function Settings({ store, onClose }: { store: GuildStore; onClose: () =>
       </header>
 
       <div className="settings-body">
+        {onLegends && (
+          <Section title="Legends">
+            <button type="button" className="set-link" aria-haspopup="dialog" onClick={onLegends}>
+              <Icon.book />
+              <span className="toggle-text">
+                <b>Open the Legends</b>
+                <span>The story so far, chapter by chapter</span>
+              </span>
+              <Icon.chevron />
+            </button>
+          </Section>
+        )}
+        {onLegends && (
+          <Section title="Sound">
+            <SoundLevers />
+          </Section>
+        )}
+
         <Section title="Quality" value={quality.auto ? `Auto · now ${TIERS[tier].name}` : TIERS[tier].name}>
           <Lever label="Quality" quiet>
             <div className="seg seg-fill">
@@ -207,9 +236,11 @@ export function Settings({ store, onClose }: { store: GuildStore; onClose: () =>
           </Section>
         )}
 
-        <Section title="Sound">
-          <SoundLevers />
-        </Section>
+        {!onLegends && (
+          <Section title="Sound">
+            <SoundLevers />
+          </Section>
+        )}
 
         <Section title="Display">
           <Lever label="HUD" value="press H">

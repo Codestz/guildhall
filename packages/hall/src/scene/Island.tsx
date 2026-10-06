@@ -1,11 +1,9 @@
 import { useGLTF } from "@react-three/drei"
 import { useMemo } from "react"
 import {
-  BufferGeometry,
-  CircleGeometry,
+  BatchedMesh,
+  type BufferGeometry,
   Color,
-  Float32BufferAttribute,
-  InstancedMesh,
   type Material,
   Matrix4,
   type Mesh,
@@ -17,59 +15,48 @@ import {
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import { useGuild } from "../guild/useGuild.ts"
 import { LANDS_URL } from "../world/cast.ts"
-import {
-  HEX_SCALE,
-  island,
-  type LandPiece,
-  type LandPlacement,
-  ROAD_EDGES,
-  ROAD_NODES,
-  SITES,
-  yardBuilding,
-} from "../world/lands.ts"
+import { HEX_SCALE, island, type LandPiece, type LandPlacement, SITES, yardBuilding } from "../world/lands.ts"
 import { plain } from "./Kit.tsx"
 
 useGLTF.preload(LANDS_URL)
 
 /**
- * The island round the keep (ADR 0006). Hundreds of tiles and trees, drawn with instancing: one
- * InstancedMesh per piece type and material, so the whole island costs a few dozen draw calls
- * (docs/perf-budget.md).
+ * The island round the keep (ADR 0006, 0007). About 650 tiles and pieces of ~130 kinds, drawn as a
+ * handful of BatchedMeshes: one per material × shadow role, each a single multi-draw call with
+ * per-instance frustum culling (docs/perf-budget.md). Tiles and low clutter don't cast shadows;
+ * only pieces tall enough to throw a readable one do.
  */
 export function Island() {
   const { nodes } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
-  const { mood, progress } = useGuild()
+  const { progress } = useGuild()
   const land = useMemo(() => island(), [])
-  const meshes = useMemo(() => instance(nodes, [...land.tiles, ...land.decor]), [nodes, land])
   useMemo(() => soften(nodes), [nodes])
-  const roads = useMemo(() => roadGeometry(), [])
-  const roadMaterial = useMemo(
-    () =>
-      new MeshStandardMaterial({
-        color: mood.road,
-        roughness: 1,
-        polygonOffset: true,
-        polygonOffsetFactor: -2,
-      }),
-    [mood.road],
-  )
+  const batches = useMemo(() => batch(nodes, [...land.tiles, ...land.decor]), [nodes, land])
   const building = yardBuilding(progress)
   const yard = SITES.yard.at
 
   return (
     <group>
-      <mesh rotation-x={-Math.PI / 2} position-y={-1.2} receiveShadow>
+      <mesh rotation-x={-Math.PI / 2} position-y={SEA_LEVEL - 0.02} receiveShadow material={sea}>
         <circleGeometry args={[420, 64]} />
-        <meshStandardMaterial color={mood.sea} roughness={0.9} />
       </mesh>
-      {meshes.map((mesh) => (
+      {batches.map((mesh) => (
         <primitive key={mesh.uuid} object={mesh} />
       ))}
-      <mesh geometry={roads} material={roadMaterial} receiveShadow />
       <YardBuilding nodes={nodes} piece={building} at={yard} />
     </group>
   )
 }
+
+/**
+ * The open sea beyond the sea tiles: the pack's own water colour (softened like the tiles), just
+ * under the tiles' water surface, so the tiled sea runs into it with no seam.
+ */
+const SEA_LEVEL = -0.2 * HEX_SCALE
+const sea = new MeshStandardMaterial({
+  color: new Color("rgb(37, 131, 193)").multiply(new Color("#bdd3c6")),
+  roughness: 1,
+})
 
 /**
  * The hexagon pack's palette is a loud lime next to the hall: multiply every land material by a
@@ -117,90 +104,90 @@ function YardBuilding({
   return <primitive object={object} position={[at[0], 0, at[1]]} scale={HEX_SCALE * 1.5} rotation-y={-0.4} />
 }
 
-/** Every placement grouped by piece; each piece's parts merged per material; one InstancedMesh each. */
-function instance(nodes: Record<string, Object3D>, placements: readonly LandPlacement[]): InstancedMesh[] {
-  const byPiece = new Map<LandPiece, LandPlacement[]>()
-  for (const placement of placements)
-    byPiece.set(placement.piece, [...(byPiece.get(placement.piece) ?? []), placement])
+/** Low pieces whose shadow nobody would miss: skipping them keeps the shadow pass cheap. */
+const FLAT =
+  /^(hex_|rock_single|building_grain|building_dirt|waterlily|waterplant|floor_wood|pallet|sack|barrel|crate|fence|resource_|tree_single_._cut|trees_._cut|target|flag_|rope|bucket|hill_single|wheelbarrow|weaponrack|ladder|tent)/
+const casts = (piece: LandPiece): boolean => !FLAT.test(piece)
 
-  const out: InstancedMesh[] = []
+/** One piece's geometry per material, in the piece's own space. */
+function parts(source: Object3D): Map<Material, BufferGeometry> {
+  source.updateMatrixWorld(true)
+  const inverse = source.matrixWorld.clone().invert()
+  const byMaterial = new Map<Material, BufferGeometry[]>()
+  source.traverse((child) => {
+    const mesh = child as Mesh
+    if (!mesh.isMesh) return
+    const geometry = plain(mesh.geometry).applyMatrix4(inverse.clone().multiply(mesh.matrixWorld))
+    const material = mesh.material as Material
+    byMaterial.set(material, [...(byMaterial.get(material) ?? []), geometry])
+  })
+  const out = new Map<Material, BufferGeometry>()
+  for (const [material, geometries] of byMaterial) {
+    const merged = mergeGeometries(geometries)
+    if (merged) out.set(material, merged)
+  }
+  return out
+}
+
+/**
+ * Every placement, grouped by material and by whether it casts a shadow; each group is one
+ * BatchedMesh holding each piece's geometry once and one instance per placement.
+ */
+function batch(nodes: Record<string, Object3D>, placements: readonly LandPlacement[]): BatchedMesh[] {
+  const pieces = new Map<LandPiece, Map<Material, BufferGeometry>>()
+  interface Group {
+    material: Material
+    cast: boolean
+    geometries: Map<BufferGeometry, number>
+    instances: { geometry: BufferGeometry; placement: LandPlacement }[]
+  }
+  const groups = new Map<string, Group>()
+  for (const placement of placements) {
+    let byMaterial = pieces.get(placement.piece)
+    if (!byMaterial) {
+      const source = nodes[placement.piece]
+      if (!source) continue
+      byMaterial = parts(source)
+      pieces.set(placement.piece, byMaterial)
+    }
+    const cast = casts(placement.piece)
+    for (const [material, geometry] of byMaterial) {
+      const id = `${material.uuid}:${cast}`
+      const group: Group = groups.get(id) ?? { material, cast, geometries: new Map(), instances: [] }
+      group.geometries.set(geometry, 0)
+      group.instances.push({ geometry, placement })
+      groups.set(id, group)
+    }
+  }
+
   const matrix = new Matrix4()
   const position = new Vector3()
   const rotation = new Quaternion()
   const scale = new Vector3()
   const up = new Vector3(0, 1, 0)
-
-  for (const [piece, list] of byPiece) {
-    const source = nodes[piece]
-    if (!source) continue
-    // The piece's own parts, in the piece's space, merged per material.
-    source.updateMatrixWorld(true)
-    const inverse = source.matrixWorld.clone().invert()
-    const parts = new Map<Material, BufferGeometry[]>()
-    source.traverse((child) => {
-      const mesh = child as Mesh
-      if (!mesh.isMesh) return
-      const local = inverse.clone().multiply(mesh.matrixWorld)
-      const geometry = plain(mesh.geometry).applyMatrix4(local)
-      const material = mesh.material as Material
-      parts.set(material, [...(parts.get(material) ?? []), geometry])
-    })
-    for (const [material, geometries] of parts) {
-      const merged = mergeGeometries(geometries)
-      if (!merged) continue
-      const mesh = new InstancedMesh(merged, material, list.length)
-      list.forEach((placement, i) => {
-        position.set(placement.x, placement.y ?? 0, placement.z)
-        rotation.setFromAxisAngle(up, placement.rot ?? 0)
-        scale.setScalar(HEX_SCALE * (placement.scale ?? 1))
-        mesh.setMatrixAt(i, matrix.compose(position, rotation, scale))
-      })
-      mesh.instanceMatrix.needsUpdate = true
-      mesh.computeBoundingSphere()
-      mesh.castShadow = !piece.startsWith("hex_")
-      mesh.receiveShadow = true
-      out.push(mesh)
+  const out: BatchedMesh[] = []
+  for (const group of groups.values()) {
+    let vertices = 0
+    let indices = 0
+    for (const geometry of group.geometries.keys()) {
+      vertices += geometry.getAttribute("position").count
+      indices += geometry.getIndex()?.count ?? 0
     }
+    const mesh = new BatchedMesh(group.instances.length, vertices, indices, group.material)
+    for (const geometry of group.geometries.keys()) group.geometries.set(geometry, mesh.addGeometry(geometry))
+    for (const { geometry, placement } of group.instances) {
+      const id = mesh.addInstance(group.geometries.get(geometry) ?? 0)
+      position.set(placement.x, placement.y ?? 0, placement.z)
+      rotation.setFromAxisAngle(up, placement.rot ?? 0)
+      scale.setScalar(HEX_SCALE * (placement.scale ?? 1))
+      mesh.setMatrixAt(id, matrix.compose(position, rotation, scale))
+    }
+    // Opaque and depth-tested: sorting would only cost CPU every frame. Culling stays on.
+    mesh.sortObjects = false
+    mesh.castShadow = group.cast
+    mesh.receiveShadow = true
+    mesh.computeBoundingSphere()
+    out.push(mesh)
   }
   return out
-}
-
-const ROAD_WIDTH = 3.4
-
-/** Every road as a flat ribbon, with round joints at the nodes, merged into one mesh. */
-function roadGeometry(): BufferGeometry {
-  const pieces: BufferGeometry[] = []
-  const edges: (readonly [readonly [number, number], readonly [number, number]])[] = [
-    [[0, 13.6], ROAD_NODES.OUT],
-    ...ROAD_EDGES.map(([a, b]) => [ROAD_NODES[a], ROAD_NODES[b]] as const),
-  ]
-  for (const [a, b] of edges) {
-    const dx = b[0] - a[0]
-    const dz = b[1] - a[1]
-    const length = Math.hypot(dx, dz) || 1
-    const nx = (-dz / length) * (ROAD_WIDTH / 2)
-    const nz = (dx / length) * (ROAD_WIDTH / 2)
-    const quad = new BufferGeometry()
-    const y = 0.04
-    quad.setAttribute(
-      "position",
-      new Float32BufferAttribute(
-        [a[0] + nx, y, a[1] + nz, a[0] - nx, y, a[1] - nz, b[0] + nx, y, b[1] + nz, b[0] - nx, y, b[1] - nz],
-        3,
-      ),
-    )
-    quad.setAttribute("normal", new Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0], 3))
-    quad.setAttribute("uv", new Float32BufferAttribute([0, 0, 1, 0, 0, 1, 1, 1], 2))
-    quad.setIndex([0, 2, 1, 1, 2, 3])
-    pieces.push(quad)
-  }
-  for (const node of Object.values(ROAD_NODES)) {
-    const disc = new CircleGeometry(ROAD_WIDTH / 2, 16)
-      .rotateX(-Math.PI / 2)
-      .translate(node[0], 0.04, node[1])
-    pieces.push(plain(disc))
-  }
-  const merged = mergeGeometries(pieces.map((piece) => plain(piece)))
-  if (!merged) throw new Error("roads could not be merged")
-  return merged
 }

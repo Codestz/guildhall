@@ -36,9 +36,11 @@ const HALL = {
 } as const satisfies Record<string, Spot>
 
 /** The hall's aisles plus the island's roads, joined at the gate (ADR 0006). */
-const NODES = { ...HALL, ...ROAD_NODES }
+const NODES: Readonly<Record<string, Spot>> = { ...HALL, ...ROAD_NODES }
 
-type Id = keyof typeof NODES
+/** A hall node, or a road node (named in lands.ts, or a road hex like "R-3_5"). */
+type Id = keyof typeof HALL | (string & {})
+const node = (id: Id): Spot => NODES[id] ?? [0, 0]
 
 const EDGES: readonly (readonly [Id, Id])[] = [
   ["A1", "A2"],
@@ -84,7 +86,7 @@ function distance(a: Spot, b: Spot): number {
 
 function nearest(spot: Spot): Id {
   let best: Id = IDS[0] ?? "A4"
-  for (const id of IDS) if (distance(NODES[id], spot) < distance(NODES[best], spot)) best = id
+  for (const id of IDS) if (distance(node(id), spot) < distance(node(best), spot)) best = id
   return best
 }
 
@@ -109,7 +111,7 @@ export function route(from: Spot, to: Spot): Spot[] {
     if (current === undefined || current === goal) break
     open.delete(current)
     for (const next of ADJACENT.get(current) ?? []) {
-      const through = (cost.get(current) ?? 0) + distance(NODES[current], NODES[next])
+      const through = (cost.get(current) ?? 0) + distance(node(current), node(next))
       if (through < (cost.get(next) ?? Number.POSITIVE_INFINITY)) {
         cost.set(next, through)
         previous.set(next, current)
@@ -119,11 +121,11 @@ export function route(from: Spot, to: Spot): Spot[] {
   }
   const nodes: Spot[] = []
   for (let at: Id | undefined = goal; at !== undefined; at = previous.get(at)) {
-    nodes.unshift(NODES[at])
+    nodes.unshift(node(at))
     if (at === start) break
   }
   // Skip a first node that lies behind us: no stepping back to an aisle we are already past.
-  if (nodes.length > 1 && nodes[1] && distance(from, nodes[1]) < distance(NODES[start], nodes[1]))
+  if (nodes.length > 1 && nodes[1] && distance(from, nodes[1]) < distance(node(start), nodes[1]))
     nodes.shift()
   return [...nodes, to]
 }

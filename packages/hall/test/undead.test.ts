@@ -3,6 +3,7 @@ import type { Moment } from "../src/guild/moments.ts"
 import { GuildStore } from "../src/guild/store.ts"
 import {
   type Fallen,
+  MINION_GRACE_MS as GRACE,
   MAX_MINIONS,
   MAX_STANDING,
   MINION_MS,
@@ -99,18 +100,30 @@ describe("the undead: who stands and how they came", () => {
   test(`a failed deed raises a minion that crumbles; never more than ${MAX_MINIONS}`, () => {
     const undead = settled()
     for (let i = 0; i < MAX_MINIONS + 2; i++) undead.take(moment("deed-failed", "a"))
+    // Held for the grace period first, in case the failure ends its session.
+    expect(undead.minions).toEqual([])
+    undead.sync([], GRACE)
     expect(undead.minions.length).toBe(MAX_MINIONS)
     expect(new Set(undead.minions.map((m) => m.grave)).size).toBe(MAX_MINIONS)
-    undead.sync([], MINION_MS)
+    undead.sync([], GRACE + MINION_MS)
     expect(undead.minions.every((m) => m.state === "sinking")).toBe(true)
-    undead.sync([], MINION_MS + SINK_MS)
+    undead.sync([], GRACE + MINION_MS + SINK_MS)
+    expect(undead.minions).toEqual([])
+  })
+
+  test("a failed deed that ends its session raises the skeleton alone, no minion", () => {
+    const undead = settled()
+    undead.take(moment("deed-failed", "a"))
+    undead.take(moment("fail", "a"))
+    undead.sync([], GRACE)
     expect(undead.minions).toEqual([])
   })
 
   test("a minion never takes a fallen's grave", () => {
     const undead = settled()
     undead.sync(fallen("a", "b"), 0)
-    undead.take(moment("deed-failed", "a"))
+    undead.take(moment("deed-failed", "c"))
+    undead.sync(fallen("a", "b"), GRACE)
     const taken = undead.risers.map((r) => r.grave)
     expect(taken).not.toContain(undead.minions[0]?.grave)
   })
@@ -138,7 +151,8 @@ describe("the undead in the store", () => {
     play(store, 2500)
     expect(store.undead.risers.length).toBe(2)
     expect(store.undead.risers.every((r) => r.state === "rising")).toBe(true)
-    expect(store.undead.minions.length).toBe(2)
+    // The failing tests that ended both quests raise their skeletons, not minions too.
+    expect(store.undead.minions.length).toBe(0)
     expect(store.log.filter((l) => l.text.includes("rises in the graveyard")).map((l) => l.title)).toEqual(
       store.undead.risers.map((r) => r.title),
     )

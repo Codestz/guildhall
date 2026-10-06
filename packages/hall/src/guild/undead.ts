@@ -28,6 +28,8 @@ export const MAX_MINIONS = 3
 export const RISE_MS = 2800
 /** Skeletons_Death (2 s), then down into the earth. */
 export const SINK_MS = 2600
+/** A failed deed's minion waits this long, in case the same failure ends its session. */
+export const MINION_GRACE_MS = 2000
 /** A minion stands this long before it crumbles. */
 export const MINION_MS = 5000
 /** How long the Bard looks at a rise before going back to the action. */
@@ -75,6 +77,8 @@ export class Undead {
   risers: Riser[] = []
   /** Failed deeds' minions, at most MAX_MINIONS. */
   minions: Riser[] = []
+  /** Failed deeds waiting out MINION_GRACE_MS, by session. */
+  private minionsDue: { id: string; at: number }[] = []
   /** Fallen beyond MAX_STANDING (or without a free grave): shown as a count on the crypt. */
   overflow = 0
   /** Set once anyone has stood here: the skeletons are fetched then, and kept (scene/Undead.tsx). */
@@ -108,6 +112,7 @@ export class Undead {
     this.pending.clear()
     this.risers = this.risers.filter((r) => r.state !== "sinking")
     this.minions = []
+    this.minionsDue = []
     this.glance = null
     this.quiet = true
     this.version++
@@ -119,13 +124,16 @@ export class Undead {
     switch (moment.kind) {
       case "fail":
         this.pending.add(moment.id)
+        // The failure that ended a session already raises its skeleton: no minion on top.
+        this.minionsDue = this.minionsDue.filter((due) => due.id !== moment.id)
         break
       case "recover":
       case "leave":
         this.sink(moment.id)
         break
       case "deed-failed":
-        this.raiseMinion()
+        // Held MINION_GRACE_MS: if this failure ends its session, the skeleton tells it alone.
+        this.minionsDue.push({ id: moment.id, at: this.now + MINION_GRACE_MS })
         break
       default:
         break
@@ -136,6 +144,11 @@ export class Undead {
   sync(fallen: readonly Fallen[], now: number): void {
     this.now = now
     this.expire()
+    const due = this.minionsDue.filter((d) => now >= d.at)
+    if (due.length > 0) {
+      this.minionsDue = this.minionsDue.filter((d) => now < d.at)
+      for (const _ of due) this.raiseMinion()
+    }
     const shown = fallen.slice(0, MAX_STANDING)
     const ids = new Set(shown.map((f) => f.id))
     for (const riser of this.risers) {

@@ -153,7 +153,7 @@ describe("parties: the stage", () => {
     expect(master[0]?.target).toEqual(STATIONS["quest-board"].posts[0])
     expect(new Set(views.map((v) => v.party)).size).toBe(1)
     expect(views.find((v) => v.phase === "loot")?.target ?? HAND_IN).toEqual(HAND_IN)
-    expect(views.every((v) => !v.arrives)).toBe(true)
+    expect(views.every((v) => !v.enter)).toBe(true)
     expect(partyOf(sliced).map((s) => s.id)).toEqual(stageOf(sliced, 31_500)[0]?.sessions.map((s) => s.id))
   })
 

@@ -3559,3 +3559,136 @@ button {
     border-top: 1px solid var(--hair);
   }
 }
+
+/* ═════════════════ chapters: a told story's acts (the Saga) ═════════════════
+ * The title card between acts rides the captions' strip (hud/Captions.tsx): the act in small caps,
+ * its title large, its tagline in italic. The tape marks each act with a brass post; the showcase
+ * has a small chip (hud/Chapter.tsx) saying which act plays, with a list to jump to another. */
+
+.story-line[data-kind="chapter"] {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 12px 34px 13px;
+  background: rgba(14, 10, 7, 0.86);
+  box-shadow:
+    0 0 0 1px rgba(241, 213, 144, 0.5),
+    0 0 30px -8px rgba(241, 213, 144, 0.4),
+    0 14px 36px -14px rgba(0, 0, 0, 0.8);
+}
+.story-line[data-kind="chapter"]::before {
+  display: none;
+}
+.story-line[data-kind="chapter"] small {
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.22em;
+  color: var(--brass);
+}
+.story-line[data-kind="chapter"] span {
+  font-family: var(--display);
+  font-size: 30px;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  color: var(--brass-hi);
+}
+.story-line[data-kind="chapter"] em {
+  font-size: 17px;
+  color: var(--paper);
+  opacity: 0.86;
+}
+
+.beat[data-kind="chapter"] {
+  --c: var(--brass-hi);
+  width: 2px;
+  height: 18px;
+  margin: -17px 0 0 -1px;
+  opacity: 0.9;
+}
+
+.hud > .chapter-chip {
+  position: absolute;
+  right: var(--gut);
+  bottom: var(--gut);
+  z-index: 2;
+  color: var(--paper);
+  font-size: 13px;
+}
+.chapter-chip > summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  height: 32px;
+  padding: 0 14px;
+  line-height: 32px;
+  list-style: none;
+  cursor: pointer;
+  border-radius: inherit;
+}
+.chapter-chip > summary::-webkit-details-marker {
+  display: none;
+}
+.chapter-chip > summary:focus-visible {
+  outline: 2px solid var(--brass-hi);
+  outline-offset: 2px;
+}
+.chapter-numeral {
+  min-width: 2.2ch;
+  font-family: var(--display);
+  letter-spacing: 0.08em;
+  color: var(--brass);
+}
+.chapter-title {
+  font-family: var(--display);
+  letter-spacing: 0.04em;
+  color: var(--brass-hi);
+}
+.chapter-list {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  min-width: 250px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--ink);
+  border: 1px solid var(--hair);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+}
+.chapter-list button {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.chapter-list button small {
+  grid-column: 2;
+  color: var(--paper);
+  opacity: 0.7;
+  font-style: italic;
+}
+.chapter-list button:hover,
+.chapter-list button:focus-visible {
+  background: var(--brass-wash);
+  outline: none;
+}
+.chapter-list button[aria-current="step"] {
+  box-shadow: inset 2px 0 0 var(--brass-hi);
+}
+@media (max-width: 720px) {
+  .hud > .chapter-chip {
+    display: none;
+  }
+  .story-line[data-kind="chapter"] span {
+    font-size: 24px;
+  }
+}

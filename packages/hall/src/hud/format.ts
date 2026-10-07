@@ -67,6 +67,7 @@ export const MARKER_LABEL: Record<Marker["kind"], string> = {
   plea: "Plea",
   loot: "Loot returned",
   walk: "Journey",
+  chapter: "Chapter",
 }
 
 /** The most telling argument of a tool call: the file, the command, the url. */

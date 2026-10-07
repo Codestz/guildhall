@@ -1,6 +1,6 @@
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
-import { PROBE } from "./guild/mode.ts"
+import { MODE, PROBE } from "./guild/mode.ts"
 import { quality } from "./guild/quality.ts"
 import { GuildStore, liveUrlOf } from "./guild/store.ts"
 import { Hall } from "./Hall.tsx"
@@ -10,6 +10,8 @@ const root = document.getElementById("root")
 if (!root) throw new Error("#root missing from index.html")
 
 const store = new GuildStore()
+// The showcase tells the Saga (sim/saga.ts): five acts, every world event, the story's own hours.
+if (MODE === "showcase") store.load("saga")
 // Until the world has mounted (scene/Scene.tsx WorldReady): see GuildStore.hold.
 store.hold()
 // The safety release, here rather than only inside the <Canvas>: if WebGL fails the canvas never

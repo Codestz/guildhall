@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { activityOf, applyAll, emptyModel, subagentsOf } from "@guildhall/core"
-import { Player, parties, party, rush, Script, solo, toEvents } from "../src/index.ts"
+import { activityOf, applyAll, emptyModel, rootOf, subagentsOf } from "@guildhall/core"
+import { Player, parties, party, rush, Script, sagaTale, solo, toEvents } from "../src/index.ts"
 
 describe("simulated runs read like real ones", () => {
   test("same seed, same story", () => {
@@ -140,5 +140,31 @@ describe("parties: several conversations at once", () => {
     expect(ends[1]).toBeLessThan(25_000)
     expect(changes.at(-1)?.at ?? 0).toBeGreaterThan(121_000)
     expect(roots.every((r) => r.status === "done")).toBe(true)
+  })
+})
+
+describe("the Saga, the showcase's story", () => {
+  const tale = sagaTale()
+  const model = applyAll(emptyModel(), tale.changes)
+  const roots = [...model.sessions.values()].filter((s) => !s.parentID)
+
+  test("changes in time order; chapters and the clock's hours in order too", () => {
+    const { changes, chapters, hours } = tale
+    for (let i = 1; i < changes.length; i++) expect(changes[i]!.at).toBeGreaterThanOrEqual(changes[i - 1]!.at)
+    expect(chapters.map((c) => c.at)).toEqual([...chapters.map((c) => c.at)].sort((a, b) => a - b))
+    expect(hours.map((h) => h.hour)).toEqual([...hours.map((h) => h.hour)].sort((a, b) => a - b))
+  })
+
+  test("two conversations, both finished; everyone sent out comes back or is called back", () => {
+    expect(roots).toHaveLength(2)
+    expect([...model.sessions.values()].every((s) => s.status === "done")).toBe(true)
+  })
+
+  test("a context that goes back every step: tens of thousands of tokens a step, millions a run", () => {
+    const main = roots[0]!
+    const party = [...model.sessions.values()].filter((s) => rootOf(model, s.id) === main.id)
+    const tokens = party.reduce((sum, s) => sum + s.tokens, 0)
+    expect(tokens).toBeGreaterThan(5_000_000)
+    expect(party.reduce((sum, s) => sum + s.cost, 0)).toBeLessThan(10)
   })
 })

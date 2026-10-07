@@ -9,15 +9,26 @@ import {
   type Session,
 } from "@guildhall/core"
 import { type DeedLook, deedLook, interestOf, roleOf } from "@guildhall/roster"
-import { Player, parties, party, rush, solo, toEvents } from "@guildhall/sim"
+import {
+  type Chapter,
+  Player,
+  parties,
+  party,
+  rush,
+  sagaTale,
+  solo,
+  type Tale,
+  toEvents,
+} from "@guildhall/sim"
 import { type Traces, tracesOf } from "../scene/life/traces.ts"
 import type { SiteId } from "../world/lands.ts"
 import {
-  GATE,
+  HAND_IN,
   HAND_INS,
   hearthSeat,
   type Post,
   type Seat,
+  type Spot,
   STATIONS,
   type StationId,
   TAVERN,
@@ -33,8 +44,14 @@ import {
   fastForwardGoal,
   MIN_SHOT_MS,
 } from "./director.ts"
-import { DEFAULT_SETTINGS, type Environment, type EnvironmentSettings, environmentOf } from "./environment.ts"
-import { SERVED } from "./mode.ts"
+import {
+  DEFAULT_SETTINGS,
+  type Environment,
+  type EnvironmentSettings,
+  environmentOf,
+  type StoryHour,
+} from "./environment.ts"
+import { MODE, SERVED } from "./mode.ts"
 import { type Actor, before, happenings, MomentStream } from "./moments.ts"
 import { byJoin, PARTY_IDLE_MS, type Party, stageOf } from "./parties.ts"
 import { RISE_MS, Undead } from "./undead.ts"
@@ -47,14 +64,19 @@ export type { Seat }
  * The scene only reads views; it never looks at raw changes.
  */
 
-export const SCENARIOS = {
+export const SCENARIOS: Record<"saga" | "party" | "solo" | "rush" | "parties", () => Change[] | Tale> = {
+  /** The showcase's story: five acts, ~17 min watched, every world event (sim/saga.ts). */
+  saga: () => sagaTale(),
   party: () => party(),
   solo: () => solo(),
   rush: () => rush(12),
   /** Three conversations at once: several parties on one island (guild/parties.ts). */
   parties: () => parties(),
-} as const
+}
 export type ScenarioId = keyof typeof SCENARIOS
+
+/** A chapter of the story being played (the Saga's acts), at run time `at` (ms). */
+export type StoryChapter = Chapter
 
 /** The hub a hall follows unless told otherwise (ADR 0003). */
 export const DEFAULT_HUB = "ws://127.0.0.1:4747/ws"
@@ -128,9 +150,36 @@ export interface AdventurerView {
   party: string
   /** Their party's banner colour (guild/parties.ts BANNERS). */
   banner: string
-  /** A guildmaster arriving beside another party: walks in from the gate rather than appearing. */
-  arrives?: boolean
+  /**
+   * A newcomer who joined as the hall watched (not one rebuilt by a seek or a load): where they
+   * appear and how. Read once, when their figure mounts (scene/Adventurer.tsx).
+   */
+  enter?: Entrance
 }
+
+/**
+ * How a newcomer comes on stage. `gate`: from out on the avenue, walking in through the keep's
+ * gate (a new conversation's guildmaster, anyone with no guildmaster on stage to send them).
+ * `dais`: summoned at their guildmaster's side, where loot is handed in, facing them, as the
+ * guildmaster casts the summon (Ranged_Magic_Summon while a task is being sent).
+ */
+export interface Entrance {
+  kind: "gate" | "dais"
+  at: Post
+}
+
+/**
+ * Down the avenue from the keep's gate (the road hex at z 30, one and three-quarter hexes past the
+ * wall): newcomers from afar appear here, and leavers walk here and dissolve. On the road graph
+ * (world/paths.ts), clear of the stalls, the well and the festival's poles (test/arrivals.test.ts).
+ */
+export const AVENUE_END: Spot = [0, 30]
+/** Two who come or go together don't walk inside each other: each keeps to their own side, ±this. */
+export const ROAD_SPREAD = 1
+/** Summoned together, each appears up to this far either side of the hand-in spot. */
+export const DAIS_SPREAD = 0.6
+/** After GONE_MS, a leaver still walks down the avenue this long before the stage lets them go. */
+export const EXIT_MS = 7000
 
 /** One line of the guild chronicle, for the HUD's feed. */
 export interface LogEntry {
@@ -149,7 +198,14 @@ export interface LogEntry {
 /** An interesting moment on the timeline (run time, ms), for scrubber ticks. */
 export interface Marker {
   at: number
-  kind: "quest" | "fail" | "plea" | "loot" | "walk"
+  kind: "quest" | "fail" | "plea" | "loot" | "walk" | "chapter"
+  /** A chapter's name: `Act III — The storm`. */
+  label?: string
+}
+
+/** A chapter as its title card and tick name it: `Act III — The storm`. */
+export function chapterLabel(chapter: Pick<Chapter, "numeral" | "title">): string {
+  return `Act ${chapter.numeral} — ${chapter.title}`
 }
 
 export interface Focus {
@@ -217,7 +273,15 @@ export class GuildStore {
   /** What finished work has left at each job site (logs, stone, fish, books, arrows). */
   traces: Traces = tracesOf([])
   /** The world's conditions: time of day, weather, temperature (ADR 0007). */
-  environmentSettings: EnvironmentSettings = { ...DEFAULT_SETTINGS }
+  /** The showcase plays a story's own hours (the Saga's dawn to night); the app the viewer's clock. */
+  environmentSettings: EnvironmentSettings = {
+    ...DEFAULT_SETTINGS,
+    ...(MODE === "showcase" ? { time: "story" as const } : {}),
+  }
+  /** The chapters of the story being played (run time), empty for a story without acts or live. */
+  chapters: StoryChapter[] = []
+  /** The story's own clock (environment.ts time mode "story"). */
+  private hours: StoryHour[] = []
   environment: Environment = environmentOf({
     wallClock: Date.now(),
     runTime: 0,
@@ -282,6 +346,8 @@ export class GuildStore {
     this.mode = "live"
     this.reset()
     this.markers = []
+    this.chapters = []
+    this.hours = []
     this.liveStart = Date.now()
     let delay = 500
     const open = () => {
@@ -357,15 +423,22 @@ export class GuildStore {
       this.connected = false
     }
     this.scenario = scenario
-    this.events = toEvents(SCENARIOS[scenario](), "demo")
+    const told = SCENARIOS[scenario]()
+    const tale: Tale = Array.isArray(told) ? { changes: told, chapters: [], hours: [] } : told
+    this.events = toEvents(tale.changes, "demo")
     this.player = new Player(this.events, { loop: true })
     this.fastForward = 1
     this.player.speed = this.pace
     const start = this.events[0]?.change.at ?? 0
-    this.markers = this.events.flatMap(({ change }) => {
-      const kind = markerOf(change)
-      return kind ? [{ at: change.at - start, kind }] : []
-    })
+    this.chapters = tale.chapters.map((c) => ({ ...c, at: c.at - start }))
+    this.hours = tale.hours.map((h) => ({ ...h, at: h.at - start }))
+    this.markers = [
+      ...this.chapters.map((c): Marker => ({ at: c.at, kind: "chapter", label: chapterLabel(c) })),
+      ...this.events.flatMap(({ change }) => {
+        const kind = markerOf(change)
+        return kind ? [{ at: change.at - start, kind }] : []
+      }),
+    ]
     this.beats = beatTimes(this.markers, this.player.duration)
     this.selected = null
     this.reset()
@@ -480,12 +553,51 @@ export class GuildStore {
       return
     }
     this.paceReplay(realMs)
+    const was = this.player.time
     const { events, restarted } = this.player.tick(realMs)
     if (restarted) this.reset()
     for (const event of events) this.take(event.change, true)
+    this.turn(restarted ? -1 : was, this.player.time)
     this.sinceViews += realMs
     if (events.length > 0 || restarted || this.sinceViews > 100) this.refresh()
   }
+
+  /** The chapter playing now (the last begun), or undefined before the first or without chapters. */
+  get chapter(): StoryChapter | undefined {
+    return this.chapters.findLast((c) => c.at <= this.time)
+  }
+
+  /** Jump to a chapter's start: its title card is told as it begins (`onChapter`). */
+  seekChapter(index: number): void {
+    const chapter = this.chapters[index]
+    if (chapter) this.seek(chapter.at)
+  }
+
+  private chapterListeners = new Set<(chapter: StoryChapter) => void>()
+
+  /**
+   * Called as a chapter begins while the hall watches (played into, or jumped to its start), never
+   * for one a seek passes over: the captions' title card between acts. Returns the unsubscribe.
+   */
+  onChapter(listener: (chapter: StoryChapter) => void): () => void {
+    this.chapterListeners.add(listener)
+    return () => this.chapterListeners.delete(listener)
+  }
+
+  /**
+   * The replay's clock moved from `from` to `to` (-1: it looped back to the start): a chapter whose
+   * start it reached is told, the one it stood on included (a jump lands exactly on a chapter).
+   */
+  private turn(from: number, to: number): void {
+    if (to <= from) return
+    for (const chapter of this.chapters) {
+      if (chapter.at < from || chapter.at > to || chapter.at === this.chapterTold) continue
+      this.chapterTold = chapter.at
+      for (const listener of this.chapterListeners) listener(chapter)
+    }
+  }
+  /** The run time of the chapter last told, so standing on its start tells it once; reset rebuilds forget it. */
+  private chapterTold = Number.NaN
 
   /**
    * Replay fast-forward (roadmap S4, Gource's auto-skip): in a replay, with the Cinematic director
@@ -536,6 +648,7 @@ export class GuildStore {
     this.arrived.clear()
     this.guilds.clear()
     this.rebuilding = true
+    this.chapterTold = Number.NaN
     this.moments.rebuild(continued)
   }
 
@@ -641,6 +754,29 @@ export class GuildStore {
       for (const id of this.arrived) if (!here.has(id)) this.arrived.delete(id)
     }
   }
+  /** Ids on stage at the last refresh, and those who came on since as the hall watched. */
+  private present = new Set<string>()
+  private entering = new Set<string>()
+
+  /**
+   * The views, with an entrance for whoever came on stage since the last refresh while the hall
+   * watched. Nobody walks in on a rebuild (a seek, a load, a loop, a live hello), nor live for a
+   * session last heard of longer ago than LIVE_MS (backlog): they simply stand at their posts.
+   */
+  private cast(parties: readonly Party[]): AdventurerView[] {
+    if (this.rebuilding) this.entering.clear()
+    else
+      for (const party of parties)
+        for (const s of party.sessions)
+          if (!this.present.has(s.id) && (this.mode !== "live" || this.now - s.seen <= LIVE_MS))
+            this.entering.add(s.id)
+    const views = viewsOf(this.model, this.now, FATES, parties, this.entering)
+    this.present.clear()
+    for (const view of views) this.present.add(view.id)
+    for (const id of this.entering) if (!this.present.has(id)) this.entering.delete(id)
+    return views
+  }
+
   /** Set by a reset, cleared by the next refresh: departures found meanwhile are history, not news. */
   private rebuilding = false
 
@@ -682,7 +818,7 @@ export class GuildStore {
     if (this.focus && this.now - this.focus.at > FOCUS_TTL_MS) this.focus = null
     this.parties = stageOf(this.model, this.now, (id) => this.guilds.get(id))
     if (this.following !== null && !this.parties.some((p) => p.id === this.following)) this.following = null
-    this.views = viewsOf(this.model, this.now, FATES, this.parties)
+    this.views = this.cast(this.parties)
     this.undead.sync(
       this.views.filter((view) => view.phase === "failed"),
       this.realTime,
@@ -724,6 +860,7 @@ export class GuildStore {
       runStart: this.start,
       model: { sessions: new Map(told.map((s) => [s.id, s])) },
       settings: this.environmentSettings,
+      ...(this.mode === "sim" && this.hours.length > 0 ? { story: this.hours } : {}),
     })
     // The director films the followed party only; with all, everyone on stage.
     this.director.scope = followed ? new Set(followed.sessions.map((s) => s.id)) : null
@@ -781,6 +918,7 @@ export function viewsOf(
   now: number,
   fates: Fates = FATES,
   stage: readonly Party[] = stageOf(model, now),
+  entering: ReadonlySet<string> = NO_ONE,
 ): AdventurerView[] {
   const partyOfId = new Map<string, Party>()
   for (const party of stage) for (const s of party.sessions) partyOfId.set(s.id, party)
@@ -805,7 +943,9 @@ export function viewsOf(
     joined.set(counted, ordinal)
     const activity = activityOf(s)
     const since = s.ended !== undefined ? now - s.ended : 0
-    if (!isMaster && s.status === "done" && since > GONE_MS) continue
+    // Gone (GONE_MS, the `leave` moment) is through the gate; the walk down the avenue and the
+    // dissolve take EXIT_MS more before the stage lets them go.
+    if (!isMaster && s.status === "done" && since > GONE_MS + EXIT_MS) continue
 
     const running = activity.kind === "tool" ? activity.tool : undefined
     const look = running ? deedLook(running) : undefined
@@ -822,9 +962,9 @@ export function viewsOf(
     const home = isMaster ? undefined : siteOf(s.agent)
     const dais = SEAT_POSTS[party.seat] ?? MASTER_POST
     if (isMaster && party.leaving) {
-      // The party goes home: its guildmaster walks out through the gate.
+      // The party goes home: its guildmaster walks out through the gate and down the avenue.
       phase = "leaving"
-      target = [GATE[0], GATE[1], 0]
+      target = exitOf(s.id)
     } else if (isMaster) {
       station = "quest-board"
       target = dais
@@ -840,7 +980,7 @@ export function viewsOf(
         target = stool ?? hearthSeat(floor++)
       } else {
         phase = "leaving"
-        target = [GATE[0], GATE[1], 0]
+        target = exitOf(s.id)
       }
     } else if (s.status === "failed") {
       phase = "failed"
@@ -899,10 +1039,41 @@ export function viewsOf(
       stung,
       party: party.id,
       banner: party.color,
-      ...(isMaster && party.arriving ? { arrives: true } : {}),
+      ...(entering.has(s.id) ? { enter: entranceOf(s.id, party, isMaster) } : {}),
     })
   }
   return views
+}
+
+const NO_ONE: ReadonlySet<string> = new Set()
+
+/** -1…1, stable per id: which side of the road (or of the hand-in spot) someone keeps to. */
+function sideOf(id: string): number {
+  let h = 2166136261
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619)
+  return ((h >>> 0) / 4294967295) * 2 - 1
+}
+
+/** Where a leaver walks to, down the avenue (facing on, away from the keep), and dissolves. */
+export function exitOf(id: string): Post {
+  return [AVENUE_END[0] + sideOf(id) * ROAD_SPREAD, AVENUE_END[1], 0]
+}
+
+/**
+ * Where a newcomer appears (see `Entrance`). A subagent whose guildmaster is on stage (and not
+ * going home) is summoned beside them; everyone else walks in from the avenue, facing the keep.
+ */
+export function entranceOf(id: string, party: Party, master: boolean): Entrance {
+  const side = sideOf(id)
+  if (!master && party.root && !party.leaving) {
+    const [x, z, facing] = HAND_INS[party.seat] ?? HAND_IN
+    // Across their facing: side by side in front of the guildmaster, never in a line through them.
+    return {
+      kind: "dais",
+      at: [x + Math.cos(facing) * side * DAIS_SPREAD, z - Math.sin(facing) * side * DAIS_SPREAD, facing],
+    }
+  }
+  return { kind: "gate", at: [AVENUE_END[0] + side * ROAD_SPREAD, AVENUE_END[1], Math.PI] }
 }
 
 /**

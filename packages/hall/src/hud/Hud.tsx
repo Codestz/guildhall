@@ -5,6 +5,7 @@ import { useOpening } from "../guild/opening.ts"
 import { useGuild } from "../guild/useGuild.ts"
 import { Brand } from "./Brand.tsx"
 import { Captions } from "./Captions.tsx"
+import { ChapterChip } from "./Chapter.tsx"
 import { Chronicle, Toasts } from "./Chronicle.tsx"
 import { Dossier } from "./Dossier.tsx"
 import { FastForward } from "./FastForward.tsx"
@@ -312,6 +313,7 @@ export function Hud() {
             <Toasts store={store} onExpand={() => toggle("chronicle")} quiet={prefs.captions} />
           )}
           {tape && <Timeline store={store} pinned={mode === "detailed"} />}
+          {showcase && <ChapterChip store={store} />}
         </>
       )}
 

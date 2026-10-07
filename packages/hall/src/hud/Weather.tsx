@@ -5,6 +5,7 @@ const TIMES: Record<TimeMode, { label: string; title: string }> = {
   real: { label: "Real", title: "Your clock: at night the hall is at night" },
   cycle: { label: "Day cycle", title: "A whole day every few minutes" },
   fixed: { label: "Fixed", title: "Always the hour you pick" },
+  story: { label: "Story", title: "The story's own hours: the Saga runs from dawn to night" },
 }
 const WEATHERS: Record<Weather | "auto", string> = {
   auto: "Auto",

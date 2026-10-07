@@ -23,7 +23,13 @@ const DIRECTORS: Record<DirectorStyle, { label: string; hint: string }> = {
 
 const QUALITY: QualityChoice[] = ["auto", 0, 1, 2, 3]
 const SPEEDS = [0.5, 1, 2, 4] as const
-const STORIES: Record<ScenarioId, string> = { party: "Party", solo: "Solo", rush: "Rush", parties: "Parties" }
+const STORIES: Record<ScenarioId, string> = {
+  saga: "Saga",
+  party: "Party",
+  solo: "Solo",
+  rush: "Rush",
+  parties: "Parties",
+}
 const KEYS: [string, string][] = [
   ["Drag", "Pan"],
   ["Right-drag", "Turn"],

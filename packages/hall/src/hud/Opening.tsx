@@ -78,7 +78,8 @@ export function Opening({ state, store, phone }: { state: OpeningState; store: G
       {caption && (
         <aside className="plaque opening-caption" aria-label="About this view">
           <p className="caption-text">
-            <b>A simulated guild fixing a bug.</b> <span>{touch ? "Tap" : "Click"} anyone to follow.</span>
+            <b>A simulated guild at work on a feature.</b>{" "}
+            <span>{touch ? "Tap" : "Click"} anyone to follow.</span>
           </p>
           <a className="caption-link" href={PROJECT_URL} target="_blank" rel="noopener noreferrer">
             About the project

@@ -7,16 +7,26 @@ import type { Entry, Model, Session } from "@guildhall/core"
  * agree on what time it is and what the weather is doing.
  *
  * What drives what (each idea must mean something — docs/ideas.md):
- *   time of day   the viewer's real clock, a compressed demo day, or a fixed hour
+ *   time of day   the viewer's real clock, a compressed demo day, a fixed hour, or the story's own
+ *                 clock (a told story like the Saga sets the hour of each act)
  *   weather       repo health: the share of recent deeds that failed, and failed sessions
  *   temperature   activity: how busy the guild has been lately (busy = warm, long quiet = cold)
  */
 
 export type Weather = "clear" | "cloudy" | "rain" | "storm" | "snow"
-export type TimeMode = "real" | "cycle" | "fixed"
+export type TimeMode = "real" | "cycle" | "fixed" | "story"
+
+/** One keyframe of a story's clock: the hour of day at a run time (ms). */
+export interface StoryHour {
+  at: number
+  hour: number
+}
 
 export interface EnvironmentSettings {
-  /** real: the viewer's clock · cycle: one day every `cycleMinutes` · fixed: always `hour`. */
+  /**
+   * real: the viewer's clock · cycle: one day every `cycleMinutes` · fixed: always `hour` · story:
+   * the hours the story being played sets (the viewer's clock for a story that sets none).
+   */
   time: TimeMode
   hour: number
   cycleMinutes: number
@@ -40,6 +50,8 @@ export interface EnvironmentInput {
   runStart: number
   model: Model
   settings: EnvironmentSettings
+  /** The played story's clock, keyframes in run-time order (time mode "story"). */
+  story?: readonly StoryHour[]
 }
 
 export type Vec3 = readonly [x: number, y: number, z: number]
@@ -71,9 +83,13 @@ export interface Environment {
 const TAU = Math.PI * 2
 
 /** The hour the settings ask for. */
-export function hourOf(input: Pick<EnvironmentInput, "wallClock" | "runTime" | "settings">): number {
+export function hourOf(
+  input: Pick<EnvironmentInput, "wallClock" | "runTime" | "settings" | "story">,
+): number {
   const { settings } = input
   if (settings.time === "fixed") return ((settings.hour % 24) + 24) % 24
+  if (settings.time === "story" && input.story && input.story.length > 0)
+    return storyHour(input.story, input.runTime)
   if (settings.time === "cycle") {
     const day = Math.max(0.5, settings.cycleMinutes) * 60_000
     // Start the demo day at 7 am so the first thing a visitor sees is a sunrise.
@@ -81,6 +97,24 @@ export function hourOf(input: Pick<EnvironmentInput, "wallClock" | "runTime" | "
   }
   const date = new Date(input.wallClock)
   return date.getHours() + date.getMinutes() / 60 + date.getSeconds() / 3600
+}
+
+/**
+ * The story's hour at `runTime`: straight lines between its keyframes, held before the first and
+ * after the last. Keyframe hours may run past 24 (a night that crosses midnight) and are wrapped.
+ */
+export function storyHour(story: readonly StoryHour[], runTime: number): number {
+  let hour = story[0]?.hour ?? 0
+  for (let i = 0; i < story.length; i++) {
+    const key = story[i] as StoryHour
+    const next = story[i + 1]
+    if (runTime < key.at) break
+    hour =
+      next && next.at > key.at
+        ? key.hour + (next.hour - key.hour) * Math.min(1, (runTime - key.at) / (next.at - key.at))
+        : key.hour
+  }
+  return ((hour % 24) + 24) % 24
 }
 
 /**

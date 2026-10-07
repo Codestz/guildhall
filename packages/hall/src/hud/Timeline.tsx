@@ -52,7 +52,7 @@ export function Timeline({ store, pinned }: { store: GuildStore; pinned: boolean
                   data-kind={m.kind}
                   data-past={m.at <= store.time}
                   style={{ left: `${(m.at / Math.max(1, store.duration)) * 100}%` }}
-                  title={`${MARKER_LABEL[m.kind]} · ${clock(m.at)}`}
+                  title={`${m.label ?? MARKER_LABEL[m.kind]} · ${clock(m.at)}`}
                 />
               ))}
           </div>

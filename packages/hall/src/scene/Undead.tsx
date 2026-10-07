@@ -1,6 +1,6 @@
 import { Html, useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react"
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import {
   type AnimationAction,
   AnimationMixer,
@@ -23,13 +23,16 @@ import { GRAVEYARD } from "../world/graveyard.ts"
 import { sky } from "./atmosphere/state.ts"
 import { useBlob } from "./Blobs.tsx"
 import { addChip, CHIP_HEIGHT, chipSlot, removeChip } from "./chips.ts"
+import { Dissolver, Fade, fadeSeconds } from "./dissolve.ts"
 import { useOwnedMeshes } from "./owned.ts"
 import { cloneRig } from "./rig.ts"
 
 /**
  * The graveyard's undead (guild/undead.ts): skeletons that claw out of a grave when a session
  * fails, keep vigil while it stays failed, and die back into the earth when it recovers; minions
- * that pop up for a failed deed and crumble. Skeleton models and their clips are fetched only once
+ * that claw up for a failed deed and crumble. Nothing pops: a riser dissolves in as it lies in the
+ * earth before stirring (scene/dissolve.ts); the dead go down into the ground, their name and
+ * shadow fading as they sink. Skeleton models and their clips are fetched only once
  * the graveyard first needs them (`UndeadGate`), under their own small Suspense, never in the
  * world's preload: the world never waits on them.
  *
@@ -105,6 +108,10 @@ function Skeleton({ riser }: { riser: Riser }) {
   const sank = useRef(false)
   const nextTaunt = useRef(6 + seeded(riser.key) * 8)
   const eyes = useRef<MeshStandardMaterial[]>([])
+  /** A riser is not there and then suddenly lying on its grave: it dissolves in over the stir. */
+  const [fade] = useState(() => new Fade(riser.state === "rising" ? 0 : 1))
+  const [dissolver] = useState(() => new Dissolver())
+  useEffect(() => () => dissolver.dispose(body), [dissolver, body])
 
   useEffect(() => {
     const glow: MeshStandardMaterial[] = []
@@ -137,14 +144,21 @@ function Skeleton({ riser }: { riser: Riser }) {
     }
   }, [body, animations])
 
-  const size = useCallback(() => {
-    const y = root.current?.position.y ?? 0
-    return y < -0.6 ? 0 : 1
-  }, [])
+  // The shadow fades in with the riser and out as the dead go under (a soft disc: smaller is fainter).
+  const size = useCallback(() => fade.value * earthed(root.current?.position.y ?? 0), [fade])
   useBlob(root, 0.75, size)
 
   // The fallen's name over their bones, in the chips' declutter like everyone else's.
   const chip = useMemo(chipSlot, [])
+  /** The name's own fade, on a wrapper so the chip's classes keep theirs. */
+  const fading = useMemo(() => ({ el: null as HTMLElement | null, shown: -1 }), [])
+  const fadeRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      fading.el = el
+      fading.shown = -1
+    },
+    [fading],
+  )
   const chipRef = useCallback(
     (el: HTMLDivElement | null) => {
       chip.el = el
@@ -221,6 +235,13 @@ function Skeleton({ riser }: { riser: Riser }) {
     }
     node.position.y = y
     body.position.z = forward
+    const shown = fade.step(1, delta, fadeSeconds(STIR_S))
+    dissolver.set(body, shown)
+    const opacity = Math.round(shown * earthed(y) * 20) / 20
+    if (fading.el && opacity !== fading.shown) {
+      fading.shown = opacity
+      fading.el.style.opacity = opacity >= 1 ? "" : String(opacity)
+    }
     animation.mixer.update(delta)
     // The eyes burn brighter after dark: enough for the bloom to catch.
     for (const material of eyes.current) material.emissiveIntensity = 1 + sky.night * 2.6
@@ -253,18 +274,25 @@ function Skeleton({ riser }: { riser: Riser }) {
           style={{ pointerEvents: "none" }}
         >
           {/* Decorative, like every chip: the roster and the chronicle say who fell. */}
-          <div ref={chipRef} aria-hidden="true" className={`chip undead${leaving ? " quiet" : ""}`}>
-            <div className="name">
-              <b>
-                {riser.title}
-                <i className="more" ref={moreRef} />
-              </b>
+          <div ref={fadeRef}>
+            <div ref={chipRef} aria-hidden="true" className={`chip undead${leaving ? " quiet" : ""}`}>
+              <div className="name">
+                <b>
+                  {riser.title}
+                  <i className="more" ref={moreRef} />
+                </b>
+              </div>
             </div>
           </div>
         </Html>
       )}
     </group>
   )
+}
+
+/** 1 on the ground, easing to 0 as the bones sink under it (by ~1.2 down). */
+function earthed(y: number): number {
+  return Math.max(0, Math.min(1, (y + 1.2) / 0.9))
 }
 
 /** Skeletons_Awaken_Floor's length (s). */

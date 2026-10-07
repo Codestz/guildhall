@@ -26,15 +26,64 @@ export interface DeedOptions {
   fail?: string
   /** One-line result, as OpenCode summarises it: `9 matches`, `exit 1`. */
   summary?: string
+  /** What the tool printed (a test run's report): shown in the adventurer's transcript. */
+  output?: string
+  /** Called in the same model step as the deed before it (a batch of parallel reads): no turn first. */
+  batch?: boolean
+}
+
+/**
+ * What a model step costs: tokens and dollars added to the session's running totals by its
+ * `step`-th deed (0-based), which took about `ms`. The default is the stories' small flat rate.
+ */
+export type Economy = (step: number, ms: number) => { tokens: number; cost: number }
+
+const FLAT: Economy = (_, ms) => ({ tokens: Math.round(ms * 2.5), cost: ms * 0.000004 })
+
+/**
+ * A chapter of a told story (the Saga's acts): where it begins (ms from the start, like `Change.at`)
+ * and the hour of the story's own clock it opens at.
+ */
+export interface Chapter {
+  at: number
+  /** `III`. */
+  numeral: string
+  /** `The storm`. */
+  title: string
+  /** One line under the title: `The tests turn red`. */
+  tagline: string
+  /** Hour of day (0–24, may run past 24) the story's clock shows as the chapter opens. */
+  hour: number
+}
+
+export interface ScriptOptions {
+  /** What each model step costs (default: a small flat rate). */
+  economy?: Economy
+  /**
+   * The model's turn before each deed, ms (jittered): a step's thinking and writing, as recorded
+   * runs show it (p50 4–6 s). 0 by default: the short stories fold it into each deed's length.
+   */
+  turnMs?: number
 }
 
 export class Script {
   readonly changes: Change[] = []
+  /** Chapters marked so far (`chapter`), in the order they were marked. */
+  readonly chapters: Chapter[] = []
+  readonly economy: Economy
+  readonly turnMs: number
   private readonly random: () => number
   private ids = 0
 
-  constructor(seed = 1) {
+  constructor(seed = 1, options: ScriptOptions = {}) {
     this.random = rng(seed)
+    this.economy = options.economy ?? FLAT
+    this.turnMs = options.turnMs ?? 0
+  }
+
+  /** A new chapter begins at `at`. */
+  chapter(at: number, chapter: Omit<Chapter, "at">): void {
+    this.chapters.push({ at, ...chapter })
   }
 
   /** `ms` give or take 20%, never under 1. */
@@ -78,6 +127,7 @@ export class Adventurer {
   clock: number
   private tokens = 0
   private cost = 0
+  private steps = 0
 
   constructor(
     private readonly script: Script,
@@ -111,6 +161,7 @@ export class Adventurer {
 
   /** One tool call, from running to completed (or failed). */
   deed(tool: string, input: Record<string, unknown>, ms = 800, options: DeedOptions = {}): this {
+    if (this.script.turnMs > 0 && !options.batch) this.clock += this.script.jitter(this.script.turnMs)
     const call = this.script.nextId("call")
     const started = this.clock
     this.script.emit({
@@ -133,8 +184,19 @@ export class Adventurer {
       at: this.clock,
       ...(options.fail ? { error: options.fail } : {}),
       ...(options.summary ? { summary: options.summary } : {}),
+      ...(options.output ? { output: options.output } : {}),
     })
-    this.spend(ms)
+    if (!options.batch) this.spend(ms)
+    return this
+  }
+
+  /**
+   * Spoken to again in the same session (a user's follow-up in their conversation): it gets to
+   * work once more, the way OpenCode re-opens a session on a new message.
+   */
+  prompt(text: string): this {
+    this.script.emit({ type: "prompt", id: this.id, key: this.script.nextId("msg"), text, at: this.clock })
+    this.script.emit({ type: "status", id: this.id, status: "busy", at: this.clock })
     return this
   }
 
@@ -240,8 +302,9 @@ export class Adventurer {
   }
 
   private spend(ms: number): void {
-    this.tokens += Math.round(ms * 2.5)
-    this.cost += ms * 0.000004
+    const step = this.script.economy(this.steps++, ms)
+    this.tokens += step.tokens
+    this.cost += step.cost
     this.script.emit({ type: "usage", id: this.id, tokens: this.tokens, cost: this.cost, at: this.clock })
   }
 }

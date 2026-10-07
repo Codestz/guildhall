@@ -16,6 +16,9 @@ const FADE_MS = 650
  *                  that banner is gone (the Hidden HUD).
  *   quietMs        Nothing at first, so the showcase's own opening caption speaks alone.
  *
+ * A told story's chapters (the Saga's acts) come as title cards between the lines: the act, its
+ * title and its tagline, each on its own line (store.onChapter).
+ *
  * Screen readers hear a polite live region with the beats that matter (quests, pleas, failures,
  * loot, the end), at most one line per narrator gap: routine deeds are shown, not spoken.
  */
@@ -80,8 +83,13 @@ export const Captions = memo(function Captions({
       setShown((s) => (s && s.caption.kind !== "complete" ? { ...s, leaving: true } : s))
       schedule()
     })
+    const offChapter = store.onChapter((chapter) => {
+      narrator.announce(chapter, clock())
+      schedule()
+    })
     return () => {
       off()
+      offChapter()
       clearTimeout(timer)
       clearTimeout(hide)
       clearTimeout(gone)
@@ -92,7 +100,19 @@ export const Captions = memo(function Captions({
   return (
     <>
       <div className="story" data-visible={visible} aria-hidden="true">
-        {caption && (
+        {caption?.kind === "chapter" && (
+          <p
+            key={caption.key}
+            className="story-line"
+            data-kind="chapter"
+            data-leaving={shown?.leaving ?? false}
+          >
+            <small>{caption.parts[0]?.text}</small>
+            <span>{caption.parts[1]?.text}</span>
+            <em>{caption.parts[2]?.text}</em>
+          </p>
+        )}
+        {caption && caption.kind !== "chapter" && (
           <p
             key={caption.key}
             className="story-line"

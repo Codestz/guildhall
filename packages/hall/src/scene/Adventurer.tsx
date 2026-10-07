@@ -1,6 +1,6 @@
 import { Html, useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import {
   type AnimationAction,
   AnimationMixer,
@@ -27,7 +27,7 @@ import { Icon } from "../hud/icons.tsx"
 import { legOf, placeOf, Routine, seedOf, shifted } from "../world/behaviours.ts"
 import { ANIMS_URL, GEAR, isModel, MODELS, modelUrl } from "../world/cast.ts"
 import type { Piece } from "../world/furniture.ts"
-import { GATE, type Spot } from "../world/layout.ts"
+import type { Spot } from "../world/layout.ts"
 import { route } from "../world/paths.ts"
 import { DESTINATIONS, SITE_DEFS } from "../world/sites.ts"
 import {
@@ -43,6 +43,7 @@ import {
 import { useBlob } from "./Blobs.tsx"
 import { addChip, CHIP_HEIGHT, chipSlot, declutter, removeChip } from "./chips.ts"
 import { DeedEffect } from "./DeedEffect.tsx"
+import { Dissolver, Fade, fadeSeconds } from "./dissolve.ts"
 import { clonePiece, useKit } from "./Kit.tsx"
 import { BEAT_HEIGHT, emitBeat } from "./life/work.ts"
 import { cloneRig } from "./rig.ts"
@@ -59,6 +60,16 @@ const CARRY_SPEED = WALK_SPEED * 0.85
 /** Where the hands are, for a beat that happens there (a page turned, an arrow loosed). */
 const HANDS_AHEAD = 0.45
 const HANDS_UP = 1.4
+/** Out through the gate nobody is hurried: a leaver runs only when the way out is very long. */
+const LEAVE_WALK_S = 8
+/** A leaver starts to dissolve this far before the end of the avenue walk, still walking. */
+const DISSOLVE_FROM = 2.5
+/** Fades (scene/dissolve.ts): in from the avenue while still far off, summoned, gone down the road. */
+const ARRIVE_FADE_S = 0.4
+const SUMMON_FADE_S = 0.6
+const LEAVE_FADE_S = 0.8
+/** Summoned: they rise out of the summons (Spawn_Ground) beside the guildmaster before stepping off. */
+const SUMMON_S = 1.1
 
 useGLTF.preload(ANIMS_URL)
 // Every model up front: a model loading mid-run would suspend and hide the whole cast.
@@ -90,14 +101,29 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   const routine = useRef<Routine | null>(null)
   const hands = useRef<Hands | null>(null)
   const beatsSeen = useRef(0)
-  // A guildmaster is at their post from the start, unless their party has just arrived beside another.
-  const start = view.master && !view.arrives ? view.target : ([GATE[0], GATE[1], Math.PI] as const)
+  // How they came on stage, read once at mount (guild/store.ts `Entrance`): from out on the avenue,
+  // summoned at the guildmaster's side, or (rebuilt by a seek or a load) already at their post. A
+  // leaver mounted by a rebuild is already gone.
+  const [arrival] = useState(() => ({
+    kind: view.enter?.kind,
+    summoning: view.enter?.kind === "dais" ? SUMMON_S : 0,
+    fade: new Fade(view.enter || view.phase === "leaving" ? 0 : 1),
+    // Frozen: R3F re-applies a changed `position` prop, which would teleport them to each new target.
+    start: view.enter?.at ?? view.target,
+  }))
+  const start = arrival.start
+  const [dissolver] = useState(() => new Dissolver())
+  // Declared before the tint below, so on unmount the originals are back before the tint lets go.
+  useEffect(() => {
+    const node = root.current
+    return () => dissolver.dispose(node)
+  }, [dissolver])
 
   // Role colour on cape and hat; shadows on. The tinted clones are this adventurer's own: on
   // unmount (or a new colour) they are disposed and the model's shared materials put back.
   useEffect(() => {
     const tint = new Color(view.color)
-    const tinted: [Mesh, Material][] = []
+    const tinted: [Mesh, Material, Material][] = []
     body.traverse((child) => {
       const mesh = child as Mesh
       if (!mesh.isMesh) return
@@ -109,12 +135,12 @@ export function Adventurer({ view }: { view: AdventurerView }) {
         const own = shared.clone()
         own.color = tint.clone().lerp(new Color("#ffffff"), 0.25)
         mesh.material = own
-        tinted.push([mesh, shared])
+        tinted.push([mesh, shared, own])
       }
     })
     return () => {
-      for (const [mesh, shared] of tinted) {
-        ;(mesh.material as Material).dispose()
+      for (const [mesh, shared, own] of tinted) {
+        own.dispose()
         mesh.material = shared
       }
     }
@@ -187,7 +213,9 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   const left = view.phase === "resting" ? undefined : (gear.left ?? (dark && !bow ? "lantern" : undefined))
   useHeld(body, kit, HAND_SLOT.left, left)
 
-  useBlob(root, 0.85)
+  // The blob under their feet fades with them (it is a soft disc: smaller reads as fainter).
+  const presence = useCallback(() => arrival.fade.value, [arrival])
+  useBlob(root, 0.85, presence)
 
   useEffect(() => {
     const id = view.id
@@ -200,6 +228,15 @@ export function Adventurer({ view }: { view: AdventurerView }) {
 
   // The name chip joins the declutter (scene/chips.ts), which nudges and folds it directly in the DOM.
   const chip = useMemo(chipSlot, [])
+  /** The chip's own fade: a wrapper's opacity, so the chip's classes keep theirs. */
+  const fading = useMemo(() => ({ el: null as HTMLElement | null, shown: -1 }), [])
+  const fadeRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      fading.el = el
+      fading.shown = -1
+    },
+    [fading],
+  )
   const chipRef = useCallback(
     (el: HTMLDivElement | null) => {
       chip.el = el
@@ -225,6 +262,9 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     declutter(state.camera, state.size.width, state.size.height)
     const node = root.current
     if (!node) return
+    // Summoned: they stand where they appeared until they have risen out of it.
+    const holding = arrival.summoning > 0
+    if (holding) arrival.summoning -= delta
     const work = routine.current
     const active = work !== null && view.phase === "working"
     // Off work (a plea, loot, a failure): the loop starts over, hands emptied, when they're back.
@@ -254,15 +294,18 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     const dz = nz - node.position.z
     const step = Math.hypot(dx, dz)
     const remaining = step + pathLength(path.current)
-    const walking = remaining > 0.12
+    const walking = !holding && remaining > 0.12
     const carrying = looping && work.held !== null
+    const leaving = view.phase === "leaving"
     let speed = 0
     if (walking) {
-      speed = carrying ? CARRY_SPEED : Math.max(WALK_SPEED, remaining / MAX_WALK_S)
+      speed = carrying ? CARRY_SPEED : Math.max(WALK_SPEED, remaining / (leaving ? LEAVE_WALK_S : MAX_WALK_S))
       const move = Math.min(1, (speed * delta) / Math.max(step, 1e-6))
       node.position.x += dx * move
       node.position.z += dz * move
       turn(node, Math.atan2(dx, dz), delta * 10)
+    } else if (holding) {
+      // Facing the guildmaster who summoned them.
     } else if (looping) {
       // Face the work, or the post's own way at the post; elsewhere, stay as they stand.
       const face = work.faceAt
@@ -277,8 +320,21 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     const inBed = view.seat === "bed" && !walking
     node.position.y = MathUtils.damp(node.position.y, inBed ? BED_TOP : 0, 6, delta)
 
-    const leaving = view.phase === "leaving" ? distance : 99
-    node.scale.setScalar(leaving < 1.2 ? Math.max(0.01, leaving / 1.2) : 1)
+    // In and out by dissolving (scene/dissolve.ts), never by scale: a leaver fades over the last
+    // steps down the avenue; a newcomer fades in as they set off (or as they are summoned).
+    const goal = leaving && distance < DISSOLVE_FROM ? 0 : 1
+    const seconds = goal === 0 ? LEAVE_FADE_S : arrival.kind === "dais" ? SUMMON_FADE_S : ARRIVE_FADE_S
+    const shown = arrival.fade.step(goal, delta, fadeSeconds(seconds))
+    node.visible = shown > 0
+    dissolver.set(node, shown)
+    // The chip goes with them; gone, it leaves the declutter (no "+N" for someone not there).
+    chip.anchor = shown > 0 ? node : null
+    const opacity = Math.round(shown * 20) / 20
+    if (fading.el && opacity !== fading.shown) {
+      fading.shown = opacity
+      fading.el.style.opacity = opacity >= 1 ? "" : String(opacity)
+    }
+    if (!node.visible) return
 
     if (active) {
       work.update(delta, { thinking: view.thinking, tool: view.tool, arrived: !walking })
@@ -291,7 +347,7 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     // Carrying takes both hands: the trade's own gear is put away meanwhile.
     if (rightHeld.current) rightHeld.current.visible = !carrying
 
-    play(clipFor(view, walking, speed, looping ? work : null))
+    play(holding ? "Spawn_Ground" : clipFor(view, walking, speed, looping ? work : null))
     animator.current?.mixer.update(delta)
   })
 
@@ -326,7 +382,7 @@ export function Adventurer({ view }: { view: AdventurerView }) {
       return
     }
     next.reset()
-    if (name === "Sit_Chair_Down" || name === "Lie_Down") {
+    if (name === "Sit_Chair_Down" || name === "Lie_Down" || name === "Spawn_Ground") {
       next.setLoop(LoopOnce, 1)
       next.clampWhenFinished = true
     }
@@ -383,25 +439,27 @@ export function Adventurer({ view }: { view: AdventurerView }) {
       )}
       {/* Decorative: the roster is the accessible list of who is here and what they are doing. */}
       <Html position={[0, CHIP_HEIGHT, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
-        <div
-          ref={chipRef}
-          aria-hidden="true"
-          className={`chip${selected ? " selected" : ""}${quiet && !selected ? " quiet" : ""}${deed ? " has-deed" : ""}${aside ? " aside" : ""}`}
-          data-tone={glyph}
-        >
-          {pleading && <div className="plea">!</div>}
-          {view.bubble && <div className="bubble">{view.bubble}</div>}
-          <div className="name" style={{ borderColor: view.color }}>
-            {parties > 1 && <Pennant color={view.banner} />}
-            <b>
-              {view.title}
-              <i className="more" ref={moreRef} />
-            </b>
-            <em className="verb">
-              <Glyph />
-              {verb}
-            </em>
-            {deed && <span className="deed">{deed}</span>}
+        <div ref={fadeRef}>
+          <div
+            ref={chipRef}
+            aria-hidden="true"
+            className={`chip${selected ? " selected" : ""}${quiet && !selected ? " quiet" : ""}${deed ? " has-deed" : ""}${aside ? " aside" : ""}`}
+            data-tone={glyph}
+          >
+            {pleading && <div className="plea">!</div>}
+            {view.bubble && <div className="bubble">{view.bubble}</div>}
+            <div className="name" style={{ borderColor: view.color }}>
+              {parties > 1 && <Pennant color={view.banner} />}
+              <b>
+                {view.title}
+                <i className="more" ref={moreRef} />
+              </b>
+              <em className="verb">
+                <Glyph />
+                {verb}
+              </em>
+              {deed && <span className="deed">{deed}</span>}
+            </div>
           </div>
         </div>
       </Html>

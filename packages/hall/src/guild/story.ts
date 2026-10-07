@@ -284,6 +284,7 @@ export function errorLine(text: string | undefined, max = 60): string | undefine
 
 /** A caption's kind of beat, highest priority first. */
 export type BeatKind =
+  | "chapter"
   | "renown"
   | "complete"
   | "fall"
@@ -324,6 +325,8 @@ export function beatOf(m: Moment): BeatKind | undefined {
 
 /** Important beats go first; routine ones wait for a quiet moment and go stale sooner. */
 export const PRIORITY: Record<BeatKind, number> = {
+  /** A chapter's title card between a told story's acts (the Saga's): the story's own voice. */
+  chapter: 8,
   /** A secret world event (guild/events.ts): rare, so it goes before everything. */
   renown: 7,
   complete: 6,
@@ -849,6 +852,9 @@ export function lineOf(
     // Told by `renownLine` and handed to the narrator whole (`Narrator.proclaim`).
     case "renown":
       return line.parts("Something stirs on the island")
+    // Told by `chapterLine` and handed to the narrator whole (`Narrator.announce`).
+    case "chapter":
+      return line.parts("A new chapter")
   }
 }
 
@@ -947,6 +953,24 @@ export function renownLine(renown: Renown): CaptionPart[] {
           : `${capital(spell(f.streak ?? 5))} deeds fail in quick succession. A dragon circles the mountains`,
       )
   }
+}
+
+/** A chapter of a told story, as its title card needs it (the store's `StoryChapter`). */
+export interface ChapterTitle {
+  /** `III`. */
+  numeral: string
+  /** `The storm`. */
+  title: string
+  /** `The tests turn red`. */
+  tagline: string
+}
+
+/**
+ * A chapter's title card, in three parts the strip sets on their own lines: the act, its title and
+ * its tagline (`Act III` · `The storm` · `The tests turn red`).
+ */
+export function chapterLine(chapter: ChapterTitle): CaptionPart[] {
+  return [{ text: `Act ${chapter.numeral}` }, { text: chapter.title }, { text: chapter.tagline }]
 }
 
 // ─────────────────────────────── the narrator ───────────────────────────────
@@ -1049,6 +1073,27 @@ export class Narrator {
   }
 
   /**
+   * A chapter of the story begins (the store's `onChapter`): its title card goes before anything
+   * else, alone, and waits for the strip however long the opening keeps it quiet. A newer chapter
+   * replaces one not yet shown: a title card never tells an act that is over.
+   */
+  announce(chapter: ChapterTitle, now: number): void {
+    const moment = {
+      kind: "loot",
+      id: "",
+      agent: "",
+      title: "",
+      color: "",
+      master: "",
+      seq: 0,
+      at: 0,
+      live: true,
+    } as Moment
+    this.heard = this.heard.filter((h) => h.beat !== "chapter")
+    this.heard.push({ moment, beat: "chapter", heard: now, parts: chapterLine(chapter) })
+  }
+
+  /**
    * History was thrown away (a seek, a loop restart, a live hello): forget what was not yet told.
    * Only the quest's end survives, when it was heard just now — a replay loops the instant its
    * story ends, and the last line of a film should still be said.
@@ -1085,6 +1130,21 @@ export class Narrator {
         undefined,
       )
     if (!best) return undefined
+
+    if (best.beat === "chapter" && best.parts) {
+      this.heard = this.heard.filter((h) => h !== best)
+      this.last = now
+      const [act, title, tagline] = best.parts.map((p) => p.text)
+      return {
+        key: ++this.key,
+        kind: "chapter",
+        priority: PRIORITY.chapter,
+        text: `${act} — ${title}. ${tagline}`,
+        parts: best.parts,
+        hold: 5200,
+        ids: [],
+      }
+    }
 
     if (best.beat === "renown" && best.parts) {
       this.heard = this.heard.filter((h) => h !== best)
@@ -1177,8 +1237,13 @@ export class Narrator {
     const following = this.lookup.following?.() ?? null
     this.heard = this.heard.filter(
       (h) =>
-        (following === null || h.beat === "renown" || h.moment.master === following) &&
-        (h.beat === "complete" || now - h.heard < (PRIORITY[h.beat] <= 1 ? routineStale : stale)),
+        (following === null ||
+          h.beat === "renown" ||
+          h.beat === "chapter" ||
+          h.moment.master === following) &&
+        (h.beat === "complete" ||
+          h.beat === "chapter" ||
+          now - h.heard < (PRIORITY[h.beat] <= 1 ? routineStale : stale)),
     )
   }
 }

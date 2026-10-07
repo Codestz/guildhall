@@ -16,6 +16,7 @@ import {
   type SkinnedMesh,
   Sphere,
 } from "three"
+import { audio } from "../../audio/engine.ts"
 import { worldEventsOf } from "../../guild/events.ts"
 import { PROBE } from "../../guild/mode.ts"
 import type { Tier } from "../../guild/quality.ts"
@@ -26,6 +27,7 @@ import { ANIMS_URL, MODELS, modelUrl } from "../../world/cast.ts"
 import type { Spot } from "../../world/layout.ts"
 import { attachHands, CARRY_WALK, carryClip, HAND_SLOT, type Hands } from "../activity.ts"
 import { useBlob } from "../Blobs.tsx"
+import { Dissolver, Fade, fadeSeconds } from "../dissolve.ts"
 import { FRAME } from "../frame.ts"
 import { clonePiece, useKit } from "../Kit.tsx"
 import { useOwned } from "../owned.ts"
@@ -125,7 +127,12 @@ interface Body {
   hands: Hands
   lantern: Object3D | null
   materials: MeshStandardMaterial[]
+  /** Going in and coming out of their door: dissolved, never shrunk (scene/dissolve.ts). */
+  dissolver: Dissolver
 }
+
+/** A step through their doorway: the dissolve takes about as long. */
+const DOOR_FADE_S = 0.6
 
 function Townsfolk({ npc, index }: { npc: Townsperson; index: number }) {
   const root = useRef<Group>(null)
@@ -151,13 +158,17 @@ function Townsfolk({ npc, index }: { npc: Townsperson; index: number }) {
       trip: -1,
       aimX: Number.NaN,
       aimZ: Number.NaN,
-      presence: day.phase === "indoors" ? 0 : 1,
+      /** How present they are: 0 indoors, 1 out; eased as they step through the door. */
+      fade: new Fade(day.shown ? 1 : 0),
+      /** The door openings already heard (Day.opened). */
+      opened: day.opened,
       beats: 0,
       lag: 0,
       current: null as AnimationAction | null,
     }
   }, [npc])
-  const presence = useCallback(() => life.presence * (npc.scale / 0.82), [life, npc])
+  // The blob fades with them (a soft disc: smaller reads as fainter).
+  const presence = useCallback(() => life.fade.value * (npc.scale / 0.82), [life, npc])
   useBlob(root, 0.8, presence)
   useEffect(() => {
     const node = root.current
@@ -223,11 +234,22 @@ function Townsfolk({ npc, index }: { npc: Townsperson; index: number }) {
       budget = 0
     }
     const arrived = !walking && life.next >= life.path.length
-    here.y = MathUtils.damp(here.y, onQuay(here.x, here.z) ? QUAY_DECK : 0, 8, dt)
+    const door = day.doorway
+    if (door.y > 0 && (day.phase === "enter" || day.phase === "exit" || day.phase === "indoors")) {
+      // Up or down the steps to a raised doorway: the height follows how far through it they are.
+      const span = Math.hypot(door.step[0] - door.sill[0], door.step[1] - door.sill[1]) || 1
+      const through = 1 - Math.min(1, Math.hypot(here.x - door.sill[0], here.z - door.sill[1]) / span)
+      here.y = door.y * through
+    } else here.y = MathUtils.damp(here.y, onQuay(here.x, here.z) ? QUAY_DECK : 0, 8, dt)
 
     // ---- The day, then the work ----
     const free = routine.atPost && arrived && routine.held === null
-    day.update(errandOf(npc, town.now), arrived, free)
+    day.update(errandOf(npc, town.now), arrived, free, dt)
+    // Their door opens (going in at dusk, out at dawn): its sound, from the house, if sound is on.
+    if (day.opened !== life.opened) {
+      life.opened = day.opened
+      knock(door.step)
+    }
     if (day.phase === "work") {
       // Called away (dusk, rain, a festival): the routine's steer walks them back to the post.
       const away = errandOf(npc, town.now) !== "work"
@@ -237,10 +259,10 @@ function Townsfolk({ npc, index }: { npc: Townsperson; index: number }) {
       life.aimX = Number.NaN
     }
 
-    // ---- In or out of the door: shrink away at it, grow back out of it ----
-    life.presence = MathUtils.damp(life.presence, day.phase === "indoors" ? 0 : 1, 3, dt)
-    node.visible = life.presence > 0.02
-    node.scale.setScalar(npc.scale * Math.max(0.02, life.presence))
+    // ---- In or out of the door: dissolve stepping through it, never shrink ----
+    const shown = life.fade.step(day.shown ? 1 : 0, dt, fadeSeconds(DOOR_FADE_S))
+    node.visible = shown > 0
+    built.dissolver.set(built.body, shown)
     if (!node.visible) return
 
     // ---- Facing and the clip ----
@@ -257,6 +279,11 @@ function Townsfolk({ npc, index }: { npc: Townsperson; index: number }) {
       const face = routine.faceAt
       if (face) turn(node, Math.atan2(face[0] - here.x, face[1] - here.z), dt * 5)
       else if (routine.atPost) turn(node, npc.post[2], dt * 4)
+    } else if (day.phase === "enter") {
+      // At their door: facing it, waiting for it to open, then through it.
+      rate = 1
+      clip = "Idle_A"
+      turn(node, door.inward, dt * 6)
     } else {
       rate = 1
       const cheering = day.phase === "cheer" || (day.phase === "post" && town.now.festival)
@@ -372,12 +399,14 @@ function build(
     lantern.visible = false
     left.add(lantern)
   }
-  return { body, mixer, actions: new Map(), clips, hands, lantern, materials }
+  return { body, mixer, actions: new Map(), clips, hands, lantern, materials, dissolver: new Dissolver() }
 }
 
 /** Frees what this mount made: its materials, mixer and bone textures. Geometry, the clips, the
  * held shapes and the kit's lantern materials are shared: detached, never disposed. */
 function free(b: Body): void {
+  // First: the body's own materials back on before they are freed.
+  b.dissolver.dispose(b.body)
   b.hands.dispose()
   b.lantern?.removeFromParent()
   for (const material of b.materials) material.dispose()
@@ -387,6 +416,30 @@ function free(b: Body): void {
     const skinned = child as SkinnedMesh
     if (skinned.isSkinnedMesh) skinned.skeleton.dispose()
   })
+}
+
+/**
+ * A door opening, heard from the house: the `door` spot sound (audio/samples.ts), through the
+ * engine's own gate: silent when muted, locked or hidden; capped by the limiter (one door every
+ * few seconds, the SFX bus's voices); placed by the camera's focus. Carried by a `leave` moment,
+ * whose motif is silent, so the door alone sounds; it never enters the store's moment stream.
+ */
+function knock(at: Spot): void {
+  if (!audio.audible) return
+  audio.moment(
+    {
+      id: "townsfolk:door",
+      agent: "",
+      title: "",
+      color: "",
+      master: "",
+      seq: 0,
+      at: 0,
+      live: true,
+      kind: "leave",
+    },
+    { sample: "door", where: { x: at[0], z: at[1] } },
+  )
 }
 
 function turn(node: Object3D, heading: number, rate: number): void {

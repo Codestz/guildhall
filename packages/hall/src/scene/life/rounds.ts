@@ -9,6 +9,7 @@ import {
   type Tool,
 } from "../../world/behaviours.ts"
 import type { Model } from "../../world/cast.ts"
+import { island, type LandPlacement } from "../../world/lands.ts"
 import type { Post, Spot } from "../../world/layout.ts"
 
 /**
@@ -44,7 +45,7 @@ export const ROUNDS: readonly Round[] = [
     // The farmer: tends the east fields, a strip at a time.
     id: "farmer",
     model: "barbarian",
-    door: { x: 36.5, z: -8.9 },
+    door: { x: 36.63, z: -8.85 },
     stops: [
       { x: 43.3, z: -6 },
       { x: 48, z: -6.4, wait: 14, clip: "Digging", facing: EAST },
@@ -59,7 +60,7 @@ export const ROUNDS: readonly Round[] = [
     // never through it.
     id: "well",
     model: "rogue",
-    door: { x: -15.4, z: 28.9 },
+    door: { x: -15.33, z: 28.85 },
     stops: [
       { x: -11.5, z: 26.5 },
       { x: -9.2, z: 23.9 },
@@ -77,7 +78,7 @@ export const ROUNDS: readonly Round[] = [
     // East of the avenue: down the road to the red market and back.
     id: "market",
     model: "ranger",
-    door: { x: 25.98, z: 19.1 },
+    door: { x: 26.68, z: 19.2 },
     stops: [
       { x: 17.3, z: 20 },
       { x: 8.66, z: 25 },
@@ -276,7 +277,7 @@ export const TOWNSFOLK: readonly Townsperson[] = [
     tint: "#9c7b55",
     scale: ADULT,
     gait: AMBLE,
-    door: [-10.45, 18.4],
+    door: [-10.54, 18.22],
     way: [
       [-6, 20.6],
       [-2.6, 24.2],
@@ -373,8 +374,10 @@ export const TOWNSFOLK: readonly Townsperson[] = [
     tint: "#6f7f86",
     scale: ADULT,
     gait: AMBLE,
-    door: [14.37, 28.28],
+    door: [14.2, 29.01],
     way: [
+      // Off the step, clear of the house's corner, then down the lane.
+      [12.9, 29.6],
       [13.4, 31],
       [13, 37.4],
       [9.6, 40.6],
@@ -477,7 +480,7 @@ export const TOWNSFOLK: readonly Townsperson[] = [
     tint: "#a0806a",
     scale: ADULT,
     gait: AMBLE,
-    door: [14.37, 28.28],
+    door: [14.2, 29.01],
     way: [
       [12.6, 26.2],
       [2.2, 27.6],
@@ -590,7 +593,7 @@ export const TOWNSFOLK: readonly Townsperson[] = [
     tint: "#7c6f5f",
     scale: ADULT,
     gait: AMBLE,
-    door: [-20.15, -7.9],
+    door: [-20.21, -8.72],
     way: [[-19.6, -11.2]],
     post: [-22.2, -13.2, -Math.PI / 2],
     work: job(
@@ -637,7 +640,7 @@ export const TOWNSFOLK: readonly Townsperson[] = [
     tint: "#6a6458",
     scale: ADULT,
     gait: PACE,
-    door: [10.2, 19.25],
+    door: [10.98, 19.27],
     way: [],
     post: [1.8, 23.6, 0],
     work: job(
@@ -760,14 +763,100 @@ export function errandOf(
 
 const postSpot = (npc: Townsperson): Spot => [npc.post[0], npc.post[1]]
 
+// ---- Doors: where a house's door really is ---------------------------------------------------
+
+/**
+ * A house's door in the piece's own frame (the front is +z), in world units at the scale the
+ * island places it (HEX_SCALE), measured from lands.glb: home A's door is in the middle of its
+ * front at ground level; home B's is right of centre (+x), at the top of a flight of steps.
+ *   x      across the front          sill   the doorway itself: in from the front face
+ *   y      the sill's height         step   where you stand outside: a pace off the front, or the
+ *                                           foot of the steps
+ */
+export const DOOR_OF = {
+  A: { x: 0, sill: 1.65, y: 0, step: 2.3 },
+  B: { x: 0.7, sill: 1.8, y: 0.79, step: 3.2 },
+} as const
+
+/** A house's door on the island: stand at `step`, go in through `sill` (at height `y`) facing `inward`. */
+export interface Doorway {
+  step: Spot
+  sill: Spot
+  y: number
+  /** Heading (rotation-y) of someone facing the door, about to go in. */
+  inward: number
+  house: LandPlacement
+}
+
+const HOUSE = /^building_home_([AB])_/
+const round2 = (value: number): number => Math.round(value * 100) / 100
+
+/** Every house door on the island (world/lands.ts decor), from each house's placement and turn. */
+export const DOORWAYS: readonly Doorway[] = island().decor.flatMap((house): Doorway[] => {
+  const type = HOUSE.exec(house.piece)?.[1] as keyof typeof DOOR_OF | undefined
+  if (!type) return []
+  const door = DOOR_OF[type]
+  const rot = house.rot ?? 0
+  const scale = house.scale ?? 1
+  // The piece's own (x, z) to the world: turned by rot about y, like the renderer.
+  const at = (x: number, z: number): Spot => [
+    round2(house.x + (x * Math.cos(rot) + z * Math.sin(rot)) * scale),
+    round2(house.z + (-x * Math.sin(rot) + z * Math.cos(rot)) * scale),
+  ]
+  return [
+    {
+      step: at(door.x, door.step),
+      sill: at(door.x, door.sill),
+      y: door.y * scale,
+      inward: rot + Math.PI,
+      house,
+    },
+  ]
+})
+
+/** The house door whose step `door` is (within a hand's breadth), if it is one. */
+export function doorwayOf(door: Spot): Doorway | undefined {
+  return DOORWAYS.find((d) => Math.hypot(d.step[0] - door[0], d.step[1] - door[1]) < 0.15)
+}
+
+/**
+ * A townsperson's way in and out. Most live in a house (`doorwayOf`); the gate guards' "door" is
+ * the keep's gate, which they never go in by (always on watch): a plain spot, facing the gate.
+ */
+function doorwayFor(npc: Townsperson): Doorway {
+  const house = doorwayOf(npc.door)
+  if (house) return house
+  const [x, z] = npc.door
+  return {
+    step: npc.door,
+    sill: npc.door,
+    y: 0,
+    inward: Math.atan2(x - npc.post[0], z - npc.post[1]),
+    house: { piece: "building_home_A_blue", x, z },
+  }
+}
+
+/** At the door they stop and face it this long before it opens and they step in. */
+export const DOOR_PAUSE_S = 0.6
+/** Housemates come out one after another, this far apart, not all through the doorway at once. */
+export const DOOR_STAGGER_S = 1.4
+
+/** How long after dawn (or the rain) this one comes out: their place among those sharing the door. */
+export function staggerOf(npc: Townsperson): number {
+  const housemates = TOWNSFOLK.filter((n) => n.door[0] === npc.door[0] && n.door[1] === npc.door[1])
+  return Math.max(0, housemates.indexOf(npc)) * DOOR_STAGGER_S
+}
+
 /**
  * Where an NPC is in their day:
  *   indoors   at home, unseen                     out     walking from the door to the post
  *   work      running their loop (the routine)    post    standing at the post (sheltering, cheering)
  *   in        walking home from the post           rally   walking from the post to the square
  *   cheer     cheering on the square               back    walking from the square to the post
+ *   enter     at their door: facing it, then stepping in through it (dissolving as they go)
+ *   exit      stepping out of their doorway (dissolving in), down to the step
  */
-export type Phase = "indoors" | "out" | "work" | "post" | "in" | "rally" | "cheer" | "back"
+export type Phase = "indoors" | "out" | "work" | "post" | "in" | "rally" | "cheer" | "back" | "enter" | "exit"
 
 /**
  * One NPC's day, as a state machine (pure: no three.js, no allocation per update). Errands change
@@ -780,6 +869,15 @@ export class Day {
   /** The polyline to walk now (outside the loop); bumps `trip` when it changes. */
   path: readonly Spot[] = []
   trip = 0
+  /** Their house's door: where they go in and come out. */
+  readonly doorway: Doorway
+  /** Bumps each time their door opens (going in, coming out): the scene plays the door's sound. */
+  opened = 0
+  /** At the door, going in: seconds still to wait facing it before it opens. */
+  private pause = 0
+  /** Indoors, called out: seconds waited so far for their housemates ahead of them. */
+  private waited = 0
+  private readonly stagger: number
   private readonly out: readonly Spot[]
   private readonly home: readonly Spot[]
   private readonly back: readonly Spot[]
@@ -789,6 +887,8 @@ export class Day {
     errand: Errand,
   ) {
     const post = postSpot(npc)
+    this.doorway = doorwayFor(npc)
+    this.stagger = staggerOf(npc)
     this.out = [...npc.way, post]
     this.home = [...[...npc.way].reverse(), npc.door]
     this.back = [...[...npc.rally].reverse().slice(1), post]
@@ -797,19 +897,53 @@ export class Day {
     if (errand !== "home") this.atPost(errand)
   }
 
-  /** Where they are at the start (the door, or the post). */
+  /** Where they are at the start (inside the doorway, or the post). */
   get start(): Spot {
-    return this.phase === "indoors" ? this.npc.door : postSpot(this.npc)
+    return this.phase === "indoors" ? this.doorway.sill : postSpot(this.npc)
+  }
+
+  /** Should they be seen? Not indoors, nor once the door is open and they are stepping in. */
+  get shown(): boolean {
+    return !(this.phase === "indoors" || (this.phase === "enter" && this.pause <= 0))
   }
 
   /**
    * `arrived`: the current path is walked (or, in the loop, the routine's aim is reached).
    * `free`: the routine is back at the post with empty hands, so the loop may be left.
+   * `dt`: seconds since the last update (the pause at the door).
    */
-  update(errand: Errand, arrived: boolean, free: boolean): void {
+  update(errand: Errand, arrived: boolean, free: boolean, dt = 0): void {
     switch (this.phase) {
       case "indoors":
-        if (errand !== "home") this.go("out", this.out)
+        // Out of the door: it opens, and they step down from the doorway to the step.
+        if (errand === "home") {
+          this.waited = 0
+          return
+        }
+        this.waited += dt
+        if (this.waited < this.stagger) return
+        this.waited = 0
+        this.opened++
+        this.go("exit", [this.doorway.step])
+        return
+      case "exit":
+        if (arrived) this.go("out", this.out)
+        return
+      case "enter":
+        if (this.pause > 0) {
+          // Called back out before the door opened (dawn came, the rain stopped): back to work.
+          if (errand !== "home") {
+            this.pause = 0
+            this.go("out", this.out)
+            return
+          }
+          this.pause -= dt
+          if (this.pause > 0) return
+          this.opened++
+          this.go("enter", [this.doorway.sill])
+          return
+        }
+        if (arrived) this.phase = "indoors"
         return
       case "work":
         if (errand !== "work" && free) this.atPost(errand)
@@ -823,8 +957,11 @@ export class Day {
         return
       default:
         if (!arrived) return
-        if (this.phase === "in") this.phase = "indoors"
-        else if (this.phase === "rally") this.phase = "cheer"
+        if (this.phase === "in") {
+          // At the door: stop, face it, and wait for it to open (no path: they stand).
+          this.pause = DOOR_PAUSE_S
+          this.go("enter", [])
+        } else if (this.phase === "rally") this.phase = "cheer"
         else this.atPost(errand)
     }
   }

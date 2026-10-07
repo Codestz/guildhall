@@ -5,12 +5,15 @@ import { attachHands } from "../src/scene/activity.ts"
 import {
   CALLED_AWAY,
   Day,
+  DOOR_PAUSE_S,
+  DOOR_STAGGER_S,
   type Errand,
   errandOf,
   nightOf,
   onQuay,
   placeOfNpc,
   raining,
+  staggerOf,
   TOWNSFOLK,
   TOWNSFOLK_PER_TIER,
   type Townsperson,
@@ -314,7 +317,10 @@ describe("their day", () => {
 
   test("on load they are already about their day: at home, or at the post at work", () => {
     expect(new Day(npc("farmer"), "home").phase).toBe("indoors")
-    expect(new Day(npc("farmer"), "home").start).toEqual(npc("farmer").door)
+    // Indoors: inside their doorway, unseen.
+    const home = new Day(npc("farmer"), "home")
+    expect(home.start).toEqual(home.doorway.sill)
+    expect(home.shown).toBe(false)
     expect(new Day(npc("farmer"), "work").phase).toBe("work")
     expect(new Day(npc("merchant-blue"), "shelter").phase).toBe("post")
   })
@@ -329,8 +335,32 @@ describe("their day", () => {
     expect(day.path).toEqual([...[...keeper.way].reverse(), keeper.door])
     day.update("home", false, true)
     expect(day.phase).toBe("in")
+    // At the door: they stop and face it (no path), still seen, until it opens.
+    step(day, "home")
+    expect(day.phase).toBe("enter")
+    expect(day.path).toEqual([])
+    expect(day.shown).toBe(true)
+    day.update("home", true, true, DOOR_PAUSE_S / 2)
+    expect(day.opened).toBe(0)
+    expect(day.shown).toBe(true)
+    // The door opens (its sound): they step in through the doorway, dissolving.
+    day.update("home", true, true, DOOR_PAUSE_S)
+    expect(day.opened).toBe(1)
+    expect(day.path).toEqual([day.doorway.sill])
+    expect(day.shown).toBe(false)
+    day.update("home", false, true, 0.1)
+    expect(day.phase).toBe("enter")
     step(day, "home")
     expect(day.phase).toBe("indoors")
+    // Dawn: after the housemates ahead of them, the door opens again and they step out of the
+    // doorway (dissolving in), then walk out.
+    day.update("work", true, true, staggerOf(keeper) - 0.1)
+    expect(day.phase).toBe("indoors")
+    day.update("work", true, true, 0.2)
+    expect(day.phase).toBe("exit")
+    expect(day.opened).toBe(2)
+    expect(day.path).toEqual([keeper.door])
+    expect(day.shown).toBe(true)
     step(day, "work")
     expect(day.phase).toBe("out")
     expect(day.path).toEqual([...keeper.way, [keeper.post[0], keeper.post[1]]])
@@ -372,8 +402,37 @@ describe("their day", () => {
     expect(farmer.phase).toBe("post")
   })
 
+  test("housemates come out of their shared door one after another", () => {
+    const house = TOWNSFOLK.filter(
+      (n) => n.door === npc("well").door || String(n.door) === String(npc("well").door),
+    )
+    expect(house.map((n) => n.id)).toEqual(["well", "child-a", "child-b", "keeper"])
+    const after = house.map(staggerOf)
+    expect(after[0]).toBe(0)
+    for (let i = 1; i < after.length; i++)
+      expect((after[i] ?? 0) - (after[i - 1] ?? 0)).toBeCloseTo(DOOR_STAGGER_S)
+    // The first out goes at once.
+    const first = new Day(npc("well"), "home")
+    first.update("work", true, true, 0)
+    expect(first.phase).toBe("exit")
+  })
+
+  test("called back out before the door opens, they turn round without going in", () => {
+    const farmer = npc("farmer")
+    const day = new Day(farmer, "work")
+    day.update("home", true, true)
+    step(day, "home")
+    expect(day.phase).toBe("enter")
+    day.update("work", true, true, 0.1)
+    expect(day.phase).toBe("out")
+    expect(day.opened).toBe(0)
+    expect(day.shown).toBe(true)
+  })
+
   test("a festival at night brings them out of the door and on to the square", () => {
     const day = new Day(npc("well"), "home")
+    step(day, "festival")
+    expect(day.phase).toBe("exit")
     step(day, "festival")
     expect(day.phase).toBe("out")
     step(day, "festival")

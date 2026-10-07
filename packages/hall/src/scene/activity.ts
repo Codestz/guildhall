@@ -1,12 +1,4 @@
-import {
-  AnimationClip,
-  type BufferGeometry,
-  Color,
-  Mesh,
-  MeshStandardMaterial,
-  type Object3D,
-  PropertyBinding,
-} from "three"
+import { AnimationClip, type BufferGeometry, Group, Mesh, MeshStandardMaterial, type Object3D } from "three"
 import {
   type Behaviour,
   type Held,
@@ -15,22 +7,7 @@ import {
   stepsOf,
   type Tool,
 } from "../world/behaviours.ts"
-import {
-  bookGeometry,
-  bowGeometry,
-  broomGeometry,
-  bucketGeometry,
-  crateGeometry,
-  fishGeometry,
-  hoeGeometry,
-  logGeometry,
-  noteGeometry,
-  plankGeometry,
-  produceGeometry,
-  rodGeometry,
-  spearGeometry,
-  stoneGeometry,
-} from "./life/shapes.ts"
+import { attachGrip, keepUpright, PROP_GRIPS } from "./grips.ts"
 
 /**
  * The scene's half of activities (world/behaviours.ts, ADR 0009): who stands at which berth, the
@@ -94,106 +71,22 @@ export function carryClip(animations: readonly AnimationClip[]): AnimationClip |
 
 // ---- In the hands ---------------------------------------------------------------------------
 
-/**
- * The rig's hand slots, as three names them: GLTFLoader drops the dot from glTF node names
- * (`handslot.r` → `handslotr`), so asking for the glTF name finds nothing.
- */
-export const HAND_SLOT = {
-  right: PropertyBinding.sanitizeNodeName("handslot.r"),
-  left: PropertyBinding.sanitizeNodeName("handslot.l"),
-} as const
-
-interface Grip {
-  make: () => BufferGeometry
-  /** The rig bone it rides on. */
-  bone: string
-  scale: number
-  position: readonly [number, number, number]
-  rotation: readonly [number, number, number]
-}
-
-/**
- * How each thing sits in the hands. Loads carried in both arms ride on the chest bone, which keeps
- * the body's axes (+z forward, measured): centred between Holding_A's hands (±0.32 across, 0.56
- * ahead, 0.16 below the chest). Small things and tools sit in a hand slot like the kit's gear.
- */
-const GRIPS: Record<Held | Tool, Grip> = {
-  log: {
-    make: logGeometry,
-    bone: "chest",
-    scale: 0.45,
-    position: [0, -0.1, 0.62],
-    rotation: [0, Math.PI / 2, 0],
-  },
-  stone: { make: stoneGeometry, bone: "chest", scale: 0.72, position: [0, -0.1, 0.6], rotation: [0, 0.6, 0] },
-  plank: { make: plankGeometry, bone: "chest", scale: 0.75, position: [0, -0.12, 0.6], rotation: [0, 0, 0] },
-  fish: {
-    make: fishGeometry,
-    bone: HAND_SLOT.right,
-    scale: 1,
-    position: [0, 0.1, 0],
-    rotation: [0, 0, Math.PI / 2],
-  },
-  book: {
-    make: () => bookGeometry(new Color("#2f5a8a")),
-    bone: HAND_SLOT.right,
-    scale: 0.55,
-    position: [0, 0.12, 0],
-    rotation: [Math.PI / 2, 0, 0],
-  },
-  note: {
-    make: noteGeometry,
-    bone: HAND_SLOT.right,
-    scale: 1,
-    position: [0, 0.15, 0],
-    rotation: [Math.PI / 2, 0, 0],
-  },
-  rod: { make: rodGeometry, bone: HAND_SLOT.right, scale: 1, position: [0, -0.1, 0], rotation: [0, 0, 0] },
-  bow: { make: bowGeometry, bone: HAND_SLOT.left, scale: 1, position: [0, 0, 0], rotation: [0, 0, 0] },
-  // The townsfolk's (scene/life/rounds.ts): loads on the chest like a log, tools in the right hand.
-  produce: {
-    make: produceGeometry,
-    bone: "chest",
-    scale: 0.8,
-    position: [0, -0.12, 0.6],
-    rotation: [0, 0, 0],
-  },
-  crate: { make: crateGeometry, bone: "chest", scale: 0.85, position: [0, -0.1, 0.6], rotation: [0, 0, 0] },
-  hoe: { make: hoeGeometry, bone: HAND_SLOT.right, scale: 1, position: [0, -0.2, 0], rotation: [0, 0, 0] },
-  bucket: {
-    make: bucketGeometry,
-    bone: HAND_SLOT.right,
-    scale: 1,
-    position: [0, 0.05, 0],
-    rotation: [0, 0, 0],
-  },
-  spear: {
-    make: spearGeometry,
-    bone: HAND_SLOT.right,
-    scale: 1,
-    position: [0, -0.3, 0],
-    rotation: [0, 0, 0],
-  },
-  broom: { make: broomGeometry, bone: HAND_SLOT.right, scale: 1, position: [0, 0, 0], rotation: [0, 0, 0] },
-}
+export { HAND_SLOT } from "./grips.ts"
 
 /** One geometry per kind and one material for all of it, for the app's lifetime (never freed). */
-const shapes = new Map<Held | Tool, BufferGeometry>()
+const shapes = new Map<string, BufferGeometry>()
 let material: MeshStandardMaterial | null = null
 
-function meshOf(kind: Held | Tool): Mesh {
-  const grip = GRIPS[kind]
-  let geometry = shapes.get(kind)
+function meshOf(kind: Held | Tool, open = false): Mesh {
+  const key = open ? `${kind}:open` : kind
+  let geometry = shapes.get(key)
   if (!geometry) {
-    geometry = grip.make()
-    shapes.set(kind, geometry)
+    const grip = PROP_GRIPS[kind]
+    geometry = open && grip.open ? grip.open.make() : grip.make()
+    shapes.set(key, geometry)
   }
   material ??= new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 })
   const mesh = new Mesh(geometry, material)
-  mesh.scale.setScalar(grip.scale)
-  mesh.position.set(...grip.position)
-  mesh.rotation.set(...grip.rotation)
-  mesh.visible = false
   // Moving with the body every frame: no shadow-map caster (atmosphere/shadows.ts).
   mesh.castShadow = false
   return mesh
@@ -201,8 +94,13 @@ function meshOf(kind: Held | Tool): Mesh {
 
 /** What a worker's hands show: toggled each frame, without a render. */
 export interface Hands {
-  /** `held` in the hands (or nothing); the trade's tool while the hands are otherwise free. */
-  show(held: Held | null, tool: boolean): void
+  /**
+   * `held` in the hands (or nothing); the trade's tool while the hands are otherwise free. `clip`,
+   * the one playing, opens what is read in it (a book in Working_B).
+   */
+  show(held: Held | null, tool: boolean, clip?: string): void
+  /** After the pose (the mixer's update): levels what hangs level (scene/grips.ts `upright`). */
+  settle(): void
   dispose(): void
 }
 
@@ -211,19 +109,40 @@ export function attachHands(body: Object3D, behaviour: Behaviour): Hands {
   const kinds = new Set<Held | Tool>()
   for (const step of stepsOf(behaviour)) if ("clip" in step && step.take) kinds.add(step.take)
   if (behaviour.tool) kinds.add(behaviour.tool)
-  const meshes = new Map<Held | Tool, Mesh>()
+  /** Each kind's root in the hand: its mesh, or the pivot an upright one hangs from. */
+  const meshes = new Map<Held | Tool, Object3D>()
+  const opening = new Map<Held | Tool, { closed: Object3D; open: Object3D; clips: ReadonlySet<string> }>()
   for (const kind of kinds) {
-    const bone = body.getObjectByName(GRIPS[kind].bone)
+    const grip = PROP_GRIPS[kind]
+    const bone = body.getObjectByName(grip.bone)
     if (!bone) continue
-    const mesh = meshOf(kind)
-    bone.add(mesh)
-    meshes.set(kind, mesh)
+    let thing: Object3D = meshOf(kind)
+    if (grip.open) {
+      // Closed and open, one root: the clip picks which shows.
+      const both = new Group()
+      const open = meshOf(kind, true)
+      open.visible = false
+      both.add(thing, open)
+      opening.set(kind, { closed: thing, open, clips: grip.open.clips })
+      thing = both
+    }
+    const root = attachGrip(bone, thing, grip)
+    root.visible = false
+    meshes.set(kind, root)
   }
   const tool = behaviour.tool
   return {
-    show(held, showTool) {
+    show(held, showTool, clip) {
       for (const [kind, mesh] of meshes)
         mesh.visible = kind === tool ? showTool && held === null : kind === held
+      for (const { closed, open, clips } of opening.values()) {
+        const reading = clip !== undefined && clips.has(clip)
+        open.visible = reading
+        closed.visible = !reading
+      }
+    },
+    settle() {
+      for (const root of meshes.values()) keepUpright(root)
     },
     dispose() {
       // Geometry and material are shared: detach only.

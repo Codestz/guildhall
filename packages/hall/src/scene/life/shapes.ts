@@ -109,6 +109,23 @@ export function bookGeometry(cover: Color): BufferGeometry {
   )
 }
 
+/**
+ * The same book open, as it is read: two halves either side of the spine (along z at the origin),
+ * pages up, rising a little from the spine into a shallow V. Same footprint as the closed one.
+ */
+export function openBookGeometry(cover: Color): BufferGeometry {
+  const half = (side: 1 | -1) => {
+    const board = paint(new BoxGeometry(0.37, 0.03, 0.54).translate(0, -0.03, 0), () => cover)
+    const leaves = paint(new BoxGeometry(0.34, 0.05, 0.5).translate(0, 0.01, 0), (normal) =>
+      normal.y > 0.9 ? PAGES : PAGES.clone().multiplyScalar(0.85),
+    )
+    return merge([board, leaves])
+      .translate(side * 0.185, 0, 0)
+      .rotateZ(side * 0.2)
+  }
+  return merge([half(-1), half(1)])
+}
+
 /** A broken stone, its faces flat. */
 export function stoneGeometry(): BufferGeometry {
   return paint(new IcosahedronGeometry(0.42, 0), () => STONE)

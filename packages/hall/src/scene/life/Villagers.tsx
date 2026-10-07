@@ -25,10 +25,11 @@ import { useGuildStore } from "../../guild/useGuild.ts"
 import { legOf, Routine, seedOf } from "../../world/behaviours.ts"
 import { ANIMS_URL, MODELS, modelUrl } from "../../world/cast.ts"
 import type { Spot } from "../../world/layout.ts"
-import { attachHands, CARRY_WALK, carryClip, HAND_SLOT, type Hands } from "../activity.ts"
+import { attachHands, CARRY_WALK, carryClip, type Hands } from "../activity.ts"
 import { useBlob } from "../Blobs.tsx"
 import { Dissolver, Fade, fadeSeconds } from "../dissolve.ts"
 import { FRAME } from "../frame.ts"
+import { attachGrip, KIT_GRIPS, keepUpright, NIGHT_LANTERN } from "../grips.ts"
 import { clonePiece, useKit } from "../Kit.tsx"
 import { useOwned } from "../owned.ts"
 import { cloneRig } from "../rig.ts"
@@ -309,6 +310,9 @@ function Townsfolk({ npc, index }: { npc: Townsperson; index: number }) {
     if (dx * dx + dy * dy + dz * dz > FAR * FAR && (town.frame + index) % 2 === 1) return
     built.mixer.update(life.lag)
     life.lag = 0
+    // Posed: the bucket and the lantern hang level for this frame's pose (scene/grips.ts).
+    built.hands.settle()
+    keepUpright(built.lantern)
   })
 
   function play(b: Body, name: string, rate: number): void {
@@ -389,15 +393,13 @@ function build(
   if (carry) clips.set(CARRY_WALK, carry)
   const hands = attachHands(body, npc.work)
   let lantern: Object3D | null = null
-  const left = body.getObjectByName(HAND_SLOT.left)
-  if (npc.lantern && left && kit.lantern) {
-    lantern = clonePiece(kit, "lantern")
-    lantern.scale.setScalar(0.55)
+  const left = body.getObjectByName(KIT_GRIPS[NIGHT_LANTERN].bone)
+  if (npc.lantern && left && kit[NIGHT_LANTERN]) {
+    lantern = attachGrip(left, clonePiece(kit, NIGHT_LANTERN), KIT_GRIPS[NIGHT_LANTERN])
     lantern.traverse((child) => {
       child.castShadow = false
     })
     lantern.visible = false
-    left.add(lantern)
   }
   return { body, mixer, actions: new Map(), clips, hands, lantern, materials, dissolver: new Dissolver() }
 }

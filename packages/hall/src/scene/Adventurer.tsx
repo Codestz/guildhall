@@ -30,20 +30,12 @@ import type { Piece } from "../world/furniture.ts"
 import type { Spot } from "../world/layout.ts"
 import { route } from "../world/paths.ts"
 import { DESTINATIONS, SITE_DEFS } from "../world/sites.ts"
-import {
-  attachHands,
-  CARRY_WALK,
-  carryClip,
-  HAND_SLOT,
-  type Hands,
-  probed,
-  release,
-  reserve,
-} from "./activity.ts"
+import { attachHands, CARRY_WALK, carryClip, type Hands, probed, release, reserve } from "./activity.ts"
 import { useBlob } from "./Blobs.tsx"
 import { addChip, CHIP_HEIGHT, chipSlot, declutter, removeChip } from "./chips.ts"
 import { DeedEffect } from "./DeedEffect.tsx"
 import { Dissolver, Fade, fadeSeconds } from "./dissolve.ts"
+import { attachGrip, isHeldPiece, KIT_GRIPS, keepUpright, NIGHT_LANTERN, RESTING_MUG } from "./grips.ts"
 import { clonePiece, useKit } from "./Kit.tsx"
 import { BEAT_HEIGHT, emitBeat } from "./life/work.ts"
 import { cloneRig } from "./rig.ts"
@@ -204,14 +196,15 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   // Gear in the hand slots; a mug instead while resting in the tavern.
   const atWork = view.site && (view.phase === "working" || view.phase === "waiting")
   const gear = (atWork && view.site ? SITE_DEFS[view.site].gear : undefined) ?? GEAR[view.agent] ?? {}
-  const right: Piece | undefined = view.phase === "resting" ? "mug_full" : gear.right
-  const rightHeld = useHeld(body, kit, HAND_SLOT.right, right)
+  const right: Piece | undefined = view.phase === "resting" ? RESTING_MUG : gear.right
+  const rightHeld = useHeld(body, kit, right)
   // After dark, a free left hand carries a lantern: you can always find your agents at night (an
   // archer's left hand holds the bow).
   const dark = store.environment.daylight < 0.3
   const bow = atWork && place?.behaviour.tool === "bow"
-  const left = view.phase === "resting" ? undefined : (gear.left ?? (dark && !bow ? "lantern" : undefined))
-  useHeld(body, kit, HAND_SLOT.left, left)
+  const left =
+    view.phase === "resting" ? undefined : (gear.left ?? (dark && !bow ? NIGHT_LANTERN : undefined))
+  const leftHeld = useHeld(body, kit, left)
 
   // The blob under their feet fades with them (it is a soft disc: smaller reads as fainter).
   const presence = useCallback(() => arrival.fade.value, [arrival])
@@ -343,12 +336,17 @@ export function Adventurer({ view }: { view: AdventurerView }) {
         beat(work, node)
       }
     }
-    hands.current?.show(looping ? work.held : null, active)
+    const clip = holding ? "Spawn_Ground" : clipFor(view, walking, speed, looping ? work : null)
+    hands.current?.show(looping ? work.held : null, active, clip)
     // Carrying takes both hands: the trade's own gear is put away meanwhile.
     if (rightHeld.current) rightHeld.current.visible = !carrying
 
-    play(holding ? "Spawn_Ground" : clipFor(view, walking, speed, looping ? work : null))
+    play(clip)
     animator.current?.mixer.update(delta)
+    // Posed: what hangs level (a mug, a lantern, a bucket) is levelled for this frame's pose.
+    keepUpright(rightHeld.current)
+    keepUpright(leftHeld.current)
+    hands.current?.settle()
   })
 
   /** A beat of work (world/behaviours.ts): where it lands, for scene/life/WorkFx to draw. */
@@ -512,27 +510,29 @@ function clipFor(view: AdventurerView, walking: boolean, speed: number, work: Ro
   return view.thinking ? "Idle_B" : "Idle_A"
 }
 
-/** Keeps `piece` attached to the bone named `slot` (nothing when undefined). */
+/**
+ * Keeps `piece` in the hand its grip names (scene/grips.ts), turned and placed to sit right there:
+ * kit pieces are modelled for the floor, not the hand. Nothing when undefined.
+ */
 function useHeld(
   body: Object3D,
   kit: Record<string, Object3D>,
-  slot: string,
   piece: Piece | undefined,
 ): { readonly current: Object3D | null } {
   const held = useRef<Object3D | null>(null)
   useEffect(() => {
-    if (!piece) return
-    const bone = body.getObjectByName(slot)
+    if (!piece || !isHeldPiece(piece)) return
+    const grip = KIT_GRIPS[piece]
+    const bone = body.getObjectByName(grip.bone)
     if (!bone || !kit[piece]) return
-    const copy = clonePiece(kit, piece)
-    bone.add(copy)
-    held.current = copy
+    const root = attachGrip(bone, clonePiece(kit, piece), grip)
+    held.current = root
     // Materials are shared with the kit: detach only, never dispose.
     return () => {
-      bone.remove(copy)
-      if (held.current === copy) held.current = null
+      bone.remove(root)
+      if (held.current === root) held.current = null
     }
-  }, [body, kit, slot, piece])
+  }, [body, kit, piece])
   return held
 }
 

@@ -9,6 +9,10 @@ import "./hall.css"
 const root = document.getElementById("root")
 if (!root) throw new Error("#root missing from index.html")
 
+// The grip lab (lab/gripLab.ts): dev and probe builds only, `?grips`, instead of the hall.
+const lab = PROBE && new URLSearchParams(location.search).has("grips")
+if (lab) void import("./lab/gripLab.ts").then((module) => module.start(root))
+
 const store = new GuildStore()
 // The showcase tells the Saga (sim/saga.ts): five acts, every world event, the story's own hours.
 if (MODE === "showcase") store.load("saga")
@@ -23,8 +27,9 @@ const live = liveUrlOf(location.search)
 if (live !== null) store.live(live)
 if (PROBE) Object.assign(window, { guild: store, quality })
 
-createRoot(root).render(
-  <StrictMode>
-    <Hall store={store} />
-  </StrictMode>,
-)
+if (!lab)
+  createRoot(root).render(
+    <StrictMode>
+      <Hall store={store} />
+    </StrictMode>,
+  )

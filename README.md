@@ -51,7 +51,8 @@ and upgrade notes are in the [plugin README](packages/opencode-guildhall/README.
 ## Watch it work
 
 <p align="center">
-  <img src=".github/media/watch.webp" alt="An animated loop of the keep at golden hour. Adventurers move between stations, sigils appear over their heads, speech bubbles show their findings and captions narrate the quest." width="100%" />
+  <img src=".github/media/saga-loop.webp" alt="An animated loop of the island at night during the closing festival: lanterns and bunting strung over the village square, the keep's hearth glowing, fireworks bursting above the keep, and a caption reading 'The quest is complete. The Guildmaster has the last word.'" width="100%" />
+  <br /><sub><a href=".github/media/saga-loop.mp4">Watch the loop as MP4</a></sub>
 </p>
 
 <table>

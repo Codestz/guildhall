@@ -6,7 +6,9 @@ import { PROBE } from "../../guild/mode.ts"
 import { frameStats } from "../../guild/stats.ts"
 import { proclaim } from "../../guild/story.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
+import { sky } from "../atmosphere/state.ts"
 import { FRAME } from "../frame.ts"
+import { NIGHT_AT } from "./common.ts"
 import { type EventLook, hintCamera } from "./hint.ts"
 
 /**
@@ -37,15 +39,20 @@ const SCENES: Record<EventKind, ComponentType<ShowProps>> = {
   dragon: lazy(() => import("./Dragon.tsx")),
 }
 
-/** Where the Director should look when each event starts (scene/events/hint.ts). */
+/**
+ * Where the Director should look when each event starts (scene/events/hint.ts). The sky events aim
+ * up (`y`): the dragon circles ~34 over the peaks, the rainbow's arc and the meteors are high above.
+ */
 const LOOK: Record<EventKind, EventLook> = {
   festival: { x: 0, z: 28, radius: 16, weight: 8, ttl: 14_000, shot: "medium" },
   "ghost-ship": { x: -108, z: 70, radius: 30, weight: 8, ttl: 16_000, shot: "establishing" },
-  rainbow: { x: 0, z: 0, radius: 60, weight: 6, ttl: 10_000, shot: "establishing" },
+  rainbow: { x: 0, z: 0, y: 50, radius: 60, weight: 6, ttl: 10_000, shot: "establishing" },
   raid: { x: 30, z: 96, radius: 22, weight: 7, ttl: 14_000, shot: "medium" },
-  comet: { x: 0, z: 0, radius: 60, weight: 5, ttl: 8_000, shot: "establishing" },
-  dragon: { x: 2, z: -58, radius: 34, weight: 8, ttl: 14_000, shot: "establishing" },
+  comet: { x: 0, z: 0, y: 45, radius: 60, weight: 5, ttl: 8_000, shot: "establishing" },
+  dragon: { x: 2, z: -58, y: 30, radius: 34, weight: 8, ttl: 14_000, shot: "establishing" },
 }
+/** By night the festival is fireworks over the keep: the square below, the bursts above it, held longer. */
+const FESTIVAL_NIGHT: EventLook = { x: 0, z: 28, y: 24, radius: 26, weight: 8, ttl: 20_000, shot: "medium" }
 
 const TICK_S = 0.25
 
@@ -59,7 +66,9 @@ export function EventsLayer() {
     const off = events.onStart((show) => {
       proclaim(store.moments, show.renown)
       audio.renown(show.kind)
-      hintCamera(store, LOOK[show.kind], show.kind)
+      // Read as Festival.tsx reads it when the show mounts: fireworks by night, confetti by day.
+      const night = show.kind === "festival" && sky.night > NIGHT_AT
+      hintCamera(store, night ? FESTIVAL_NIGHT : LOOK[show.kind], show.kind)
     })
     if (PROBE)
       Object.assign(window, {

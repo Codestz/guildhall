@@ -35,7 +35,11 @@ export interface Place {
   /** A name for it (scene/events passes `label`); used as the key when `key` is absent. */
   label?: string
   x: number
-  /** Height, accepted and ignored: shots frame the ground. */
+  /**
+   * Height to aim at, world units above the ground (default 0: the shot frames the ground). A sky
+   * event (the dragon over the peaks, the rainbow, a comet shower) gives one: the camera tilts up
+   * to it, and comes back down to the ground when the shot ends.
+   */
   y?: number
   z: number
   /** Ground radius the shot should hold, world units (default 4). */
@@ -184,6 +188,8 @@ export interface Shot {
   /** Where a place (or the establishing centre) is. */
   x: number
   z: number
+  /** Height the shot aims at above the ground: a lifted place's `y`, else 0. */
+  y: number
   /** A place's radius. */
   radius: number
   beat: Beat
@@ -231,6 +237,7 @@ export class Director {
     partner: undefined,
     x: 0,
     z: 10,
+    y: 0,
     radius: 0,
     beat: "establishing",
     since: Number.NEGATIVE_INFINITY,
@@ -405,7 +412,9 @@ export class Director {
         this.chain = undefined
         this.cutTo(chained, beat, centreX, centreZ, stage)
       } else if (!best || best.total < QUIET_SCORE) {
-        if (shot.kind !== "establishing") this.cutTo(undefined, "establishing", centreX, centreZ, stage)
+        // A sky event's wide has run its course: back down to the ground's wide.
+        if (shot.kind !== "establishing" || shot.y !== 0)
+          this.cutTo(undefined, "establishing", centreX, centreZ, stage)
       } else if (shot.kind === "establishing") {
         this.cutTo(best, best.beat, centreX, centreZ, stage)
       } else if (!current?.located) {
@@ -430,6 +439,7 @@ export class Director {
         rec.lastShown = now
         shot.x = rec.x
         shot.z = rec.z
+        shot.y = rec.place?.y ?? 0
         // The subject on camera has a new beat (it pleads, it falls): reframe, without a cut.
         if (rec.beatAt > shot.since && rec.beat !== shot.beat && !shot.partner) {
           shot.beat = rec.beat
@@ -478,6 +488,7 @@ export class Director {
     shot.since = this.now
     shot.partner = undefined
     shot.radius = 0
+    shot.y = 0
     if (!rec) {
       shot.kind = "establishing"
       shot.key = ""
@@ -495,6 +506,7 @@ export class Director {
     shot.beat = beat
     shot.x = rec.x
     shot.z = rec.z
+    shot.y = rec.place?.y ?? 0
     shot.radius = rec.place?.radius ?? 4
     shot.kind =
       beat === "hint" && rec.hintShot

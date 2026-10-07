@@ -26,6 +26,7 @@ import { Room } from "./Room.tsx"
 import { Ships } from "./Ships.tsx"
 import { Sigils } from "./Sigils.tsx"
 import { Stations } from "./Stations.tsx"
+import { stepFrame } from "./step.ts"
 import { UndeadGate } from "./Undead.tsx"
 import { WeatherLayer } from "./weather/WeatherLayer.tsx"
 
@@ -94,9 +95,13 @@ function Clock() {
   return null
 }
 
-/** Dev only: lets automation step frames by hand when the tab is hidden (rAF paused). */
+/**
+ * Dev only: lets automation step frames by hand when the tab is hidden (rAF paused). `step(dt)`
+ * draws the next frame exactly `dt` s later (frameloop "never"): scripts/record.ts films with it.
+ */
 function DevBridge() {
   const advance = useThree((state) => state.advance)
+  const clock = useThree((state) => state.clock)
   const gl = useThree((state) => state.gl)
   const scene = useThree((state) => state.scene)
   const setDpr = useThree((state) => state.setDpr)
@@ -104,8 +109,9 @@ function DevBridge() {
   useEffect(() => {
     // setFrameloop("never") + advance(t) at one timestamp: the same instant re-drawn under two
     // settings, for pixel-identical A/B crops (docs/perf-budget.md).
-    Object.assign(window, { r3f: { advance, gl, scene, setDpr, setFrameloop, shadows } })
-  }, [advance, gl, scene, setDpr, setFrameloop])
+    const step = (dt: number) => stepFrame(clock, advance, dt)
+    Object.assign(window, { r3f: { advance, gl, scene, setDpr, setFrameloop, shadows, step } })
+  }, [advance, clock, gl, scene, setDpr, setFrameloop])
   return null
 }
 

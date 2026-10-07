@@ -11,6 +11,8 @@ export interface EventLook {
   /** The ground point to film, and how much of it (world units). */
   x: number
   z: number
+  /** A sky event: how high above that point to aim (director.ts `Place.y`). */
+  y?: number
   radius: number
   weight: number
   ttl: number
@@ -19,6 +21,7 @@ export interface EventLook {
 
 export function hintCamera(store: Pick<GuildStore, "director">, look: EventLook, label: string): void {
   const place: Place = { key: `event:${label}`, label, x: look.x, z: look.z, radius: look.radius }
+  if (look.y !== undefined) place.y = look.y
   const options: HintOptions = { shot: look.shot }
   store.director.hint(place, look.weight, look.ttl, options)
 }

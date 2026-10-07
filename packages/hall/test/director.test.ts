@@ -19,6 +19,7 @@ import {
 import type { Moment } from "../src/guild/moments.ts"
 import { GuildStore } from "../src/guild/store.ts"
 import { listen, Narrator } from "../src/guild/story.ts"
+import { hintCamera } from "../src/scene/events/hint.ts"
 
 /** A stage of named adventurers at fixed spots, everyone on screen unless listed off. */
 function stageOf(
@@ -330,6 +331,44 @@ describe("director: the hint interface other modules use", () => {
     expect(d.scoreOf("dragon")).toBeGreaterThan(0)
     d.rebuild()
     expect(d.excitement()).toBe(0)
+  })
+})
+
+describe("director: sky events aim up, then come back down", () => {
+  test("a lifted place's shot aims at its height; ground subjects stay on the ground", () => {
+    const stage = stageOf({ A: { x: 15, z: 0 } })
+    const d = settled(stage)
+    expect(d.shot.y).toBe(0)
+    d.hint({ key: "event:dragon", x: 2, y: 30, z: -58, radius: 34 }, 9, 8000, { shot: "establishing" })
+    run(d, stage, MIN_SHOT_MS + 200)
+    expect(d.shot.key).toBe("event:dragon")
+    expect(d.shot.y).toBe(30)
+  })
+
+  test("once the hint has faded on an empty stage, the wide returns to the ground", () => {
+    const stage = stageOf({})
+    const d = new Director()
+    run(d, stage, 10_000)
+    d.hint({ key: "event:rainbow", x: 0, y: 40, z: 0, radius: 60 }, 6, 8000, { shot: "establishing" })
+    run(d, stage, 2000)
+    expect(d.shot.y).toBe(40)
+    run(d, stage, 12_000)
+    expect(d.shot.kind).toBe("establishing")
+    expect(d.shot.key).toBe("")
+    expect(d.shot.y).toBe(0)
+  })
+
+  test("scene/events' hintCamera passes the aim height through", () => {
+    const stage = stageOf({ A: { x: 15, z: 0 } })
+    const d = settled(stage)
+    hintCamera(
+      { director: d },
+      { x: 0, y: 45, z: 0, radius: 60, weight: 9, ttl: 8000, shot: "establishing" },
+      "comet",
+    )
+    run(d, stage, MIN_SHOT_MS + 200)
+    expect(d.shot.key).toBe("event:comet")
+    expect(d.shot.y).toBe(45)
   })
 })
 

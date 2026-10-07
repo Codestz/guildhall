@@ -516,12 +516,15 @@ export function CameraRig() {
     goal.addScaledVector(right, -frameOut.x * halfW).addScaledVector(forward, (-frameOut.y * halfH) / lift)
   }
 
-  /** Where the shot's subject is now (a two-shot: between its two). */
+  /**
+   * Where the shot's subject is now (a two-shot: between its two). A sky event's shot aims `y` above
+   * the ground: the target rises to it (a flight there and back, like any distant subject).
+   */
   function subjectOf(shot: Shot, out: Vector3): Vector3 {
     const at = shot.id ? positions.get(shot.id) : undefined
     if (at) out.set(at.x, 1.2, at.z)
-    else out.set(shot.x, 1.2, shot.z)
-    if (shot.kind === "establishing") out.set(shot.x, 1, shot.z)
+    else out.set(shot.x, 1.2 + shot.y, shot.z)
+    if (shot.kind === "establishing") out.set(shot.x, 1 + shot.y, shot.z)
     const partner = shot.partner ? positions.get(shot.partner) : undefined
     if (shot.kind === "two-shot" && partner) out.lerp(scratch.partner.set(partner.x, 1.2, partner.z), 0.5)
     return out
@@ -539,6 +542,10 @@ export function CameraRig() {
           : 0
     const clear = Math.max(0.3, frameOut.w) * size.width * 0.6
     if (isOrtho) {
+      // A sky event's wide holds its radius (the rainbow's arc and the island under it), never
+      // closer than the usual wide nor past the furthest zoom-out.
+      if (shot.kind === "establishing" && shot.y > 0 && shot.radius > 0)
+        return Math.min(wide, Math.max(widest, clear / (shot.radius * 2.4)))
       if (shot.kind === "establishing") return wide
       const sized = fit * SHOT_ZOOM[shot.kind]
       // Never wider than a third of the way to the island overview: past that it's no two-shot.

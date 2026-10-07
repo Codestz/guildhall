@@ -95,7 +95,7 @@ export function createV1Translator(unknown: (what: string, detail?: Json) => voi
         const output = str(state.output) ?? (status === "running" ? str(metadata.output) : undefined)
         const time = obj(state.time)
         const input = obj(state.input)
-        const summary = summaryOf(str(p.tool), metadata)
+        const summary = summaryOf(metadata)
         const out: Change[] = [
           {
             type: "tool",
@@ -109,6 +109,7 @@ export function createV1Translator(unknown: (what: string, detail?: Json) => voi
             ...(typeof time.start === "number" ? { started: time.start } : {}),
             ...(typeof time.end === "number" ? { ended: time.end } : {}),
             ...(summary ? { summary } : {}),
+            ...(exitOf(metadata) !== undefined ? { exit: exitOf(metadata) as number } : {}),
             at,
           },
         ]
@@ -267,11 +268,20 @@ function denied(rules: unknown): string[] | undefined {
 }
 
 /** A call's result in a few words, when the host gives the number. */
-export function summaryOf(tool: string | undefined, metadata: Json): string | undefined {
+export function summaryOf(metadata: Json): string | undefined {
   if (typeof metadata.matches === "number")
     return `${metadata.matches} match${metadata.matches === 1 ? "" : "es"}`
   if (typeof metadata.count === "number") return `${metadata.count} result${metadata.count === 1 ? "" : "s"}`
-  if ((tool === "bash" || tool === "shell") && typeof metadata.exit === "number" && metadata.exit !== 0)
-    return `exit ${metadata.exit}`
+  const exit = exitOf(metadata)
+  if (exit !== undefined && exit !== 0) return `exit ${exit}`
   return undefined
+}
+
+/**
+ * A shell call's exit code: `metadata.exit` on both OpenCodes (v1's completed `bash` part, v2's
+ * `session.tool.success` and stored `shell` call). Only shells report one. A non-zero exit still
+ * arrives as a completed call; `failedDeed` (model/outcome.ts) says when it is a failure.
+ */
+export function exitOf(metadata: Json): number | undefined {
+  return Number.isInteger(metadata.exit) ? (metadata.exit as number) : undefined
 }

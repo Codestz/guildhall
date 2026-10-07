@@ -30,6 +30,8 @@ const name: Check = (v) => typeof v === "string" && v.length > 0 && v.length <= 
 const text: Check = (v) => typeof v === "string" && v.length <= MAX_TEXT
 const flag: Check = (v) => typeof v === "boolean"
 const count: Check = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0
+/** An exit code: any integer (a signal can make it negative). */
+const code: Check = (v) => Number.isInteger(v)
 const oneOf =
   (...values: string[]): Check =>
   (v) =>
@@ -69,6 +71,7 @@ const SHAPES: Record<Change["type"], { required?: Record<string, Check>; optiona
         started: count,
         ended: count,
         summary: text,
+        exit: code,
       },
     },
     usage: { optional: { tokens: count, cost: count } },

@@ -1,4 +1,4 @@
-import type { Entry, Model, Session } from "@guildhall/core"
+import { type Entry, failedDeed, type Model, type Session } from "@guildhall/core"
 
 /**
  * The world's conditions (ADR 0007): time of day, weather, temperature. One pure function of the
@@ -9,7 +9,8 @@ import type { Entry, Model, Session } from "@guildhall/core"
  * What drives what (each idea must mean something — docs/ideas.md):
  *   time of day   the viewer's real clock, a compressed demo day, a fixed hour, or the story's own
  *                 clock (a told story like the Saga sets the hour of each act)
- *   weather       repo health: the share of recent deeds that failed, and failed sessions
+ *   weather       repo health: the share of recent deeds that failed (a red check included), and failed
+ *                 sessions
  *   temperature   activity: how busy the guild has been lately (busy = warm, long quiet = cold)
  */
 
@@ -360,7 +361,8 @@ function readModel(model: Model, now: number, runStart: number): Reading {
       else busy += fade(now - entry.at, ACTIVITY_WINDOW_MS)
       if (entry.state !== "completed" && entry.state !== "failed") continue
       const ended = entry.ended ?? entry.at
-      const succeeded = entry.state === "completed"
+      // A check that exited non-zero is completed but red (core's `failedDeed`): it brings the weather too.
+      const succeeded = !failedDeed(entry)
       tallies.forEach((tally, k) => {
         const age = now - offsetOf(k) - ended
         const weight = fade(age, HEALTH_WINDOW_MS) ** 2 * easeOf(k, age)

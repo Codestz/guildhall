@@ -1,4 +1,4 @@
-import type { Change, Model, Status, ToolState } from "@guildhall/core"
+import { type Change, failedDeed, type Model, type Status, type ToolState } from "@guildhall/core"
 
 /**
  * Moments: the typed things that *happen* in a guild (ADR 0008), for anything that reacts to an
@@ -10,7 +10,9 @@ import type { Change, Model, Status, ToolState } from "@guildhall/core"
  *   join           a subagent joins a party (its session learns its parent)
  *   quest          an adventurer sends a quest (a `task` / `subagent` call starts)
  *   deed           a tool call completes; `size` is the lines it wrote, when the input says
- *   deed-failed    a tool call fails
+ *   deed-failed    a tool call fails, or a check (tests, lint, typecheck) exits non-zero: a completed
+ *                  call, but red work (core's `failedDeed`); `exit` says so. Other non-zero exits
+ *                  (`grep` finding nothing) stay deeds
  *   fail           a session fails (its own word, or settled when the subagent above it failed)
  *   recover        a failed session works again
  *   loot           a session finishes (done)
@@ -54,7 +56,7 @@ export type Happening =
   | { kind: "join" }
   | { kind: "quest"; tool: string; call: string; text: string }
   | { kind: "deed"; tool: string; call: string; size?: number }
-  | { kind: "deed-failed"; tool: string; call: string; error?: string }
+  | { kind: "deed-failed"; tool: string; call: string; error?: string; exit?: number }
   | { kind: "fail"; error?: string }
   | { kind: "recover" }
   | { kind: "loot" }
@@ -107,17 +109,18 @@ export function happenings(model: Model, change: Change, was: Before): (Happenin
       if (entry.state === "running" && (tool === "task" || tool === "subagent")) {
         const text = typeof entry.input.description === "string" ? entry.input.description : "a quest"
         out.push({ kind: "quest", id: s.id, tool, call: entry.call, text })
-      } else if (entry.state === "completed") {
-        const size = sizeOf(tool, entry.input)
-        out.push({ kind: "deed", id: s.id, tool, call: entry.call, ...(size === undefined ? {} : { size }) })
-      } else if (entry.state === "failed") {
+      } else if (failedDeed(entry)) {
         out.push({
           kind: "deed-failed",
           id: s.id,
           tool,
           call: entry.call,
           ...(entry.error ? { error: entry.error } : {}),
+          ...(entry.state === "completed" && entry.exit !== undefined ? { exit: entry.exit } : {}),
         })
+      } else if (entry.state === "completed") {
+        const size = sizeOf(tool, entry.input)
+        out.push({ kind: "deed", id: s.id, tool, call: entry.call, ...(size === undefined ? {} : { size }) })
       }
     }
   }

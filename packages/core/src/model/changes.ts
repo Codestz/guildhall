@@ -66,6 +66,12 @@ export type Change =
       ended?: number
       /** Its result in a few words, when the host gives the number: `9 matches`, `exit 1`. */
       summary?: string
+      /**
+       * A shell call's exit code, as the host reports it on completion. A non-zero exit is still a
+       * `completed` call — the command ran and answered; whether that answer is a failure is
+       * `failedDeed`'s to say (model/outcome.ts).
+       */
+      exit?: number
       at: number
     }
   /** Running totals for the session, as the host keeps them. */

@@ -26,6 +26,8 @@ export type Entry =
       output: string
       error?: string
       summary?: string
+      /** A shell call's exit code (`Change` tool `exit`). */
+      exit?: number
       at: number
       ended?: number
     }
@@ -248,6 +250,7 @@ export function apply(model: Model, change: Change): void {
       }
       if (change.started !== undefined) entry.at = change.started
       if (change.summary) entry.summary = change.summary
+      if (change.exit !== undefined) entry.exit = change.exit
       if (change.name) entry.name = change.name
       if (change.state) entry.state = change.state
       if (change.input && Object.keys(change.input).length > 0) entry.input = change.input

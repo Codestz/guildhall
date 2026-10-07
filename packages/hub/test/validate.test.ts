@@ -34,6 +34,13 @@ describe("validChange", () => {
     expect(validChange({ ...tool, input: "rm -rf" })).toBe(false)
     expect(validChange({ type: "usage", id: "s", tokens: -1, at: 1 })).toBe(false)
     expect(validChange({ type: "session", id: "s", background: "yes", at: 1 })).toBe(false)
+    expect(validChange({ ...tool, exit: "1" })).toBe(false)
+    expect(validChange({ ...tool, exit: 1.5 })).toBe(false)
+  })
+
+  test("a shell call's exit code passes, zero or not", () => {
+    for (const exit of [0, 1, 2, 127, -1])
+      expect(validChange({ ...tool, name: "bash", state: "completed", exit })).toBe(true)
   })
 
   test("`at` must be a finite time after the epoch, not far in the future", () => {

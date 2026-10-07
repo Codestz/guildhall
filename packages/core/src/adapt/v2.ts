@@ -10,7 +10,7 @@
  */
 
 import type { Change } from "../model/changes.ts"
-import { summaryOf, tokenTotal } from "./v1.ts"
+import { exitOf, summaryOf, tokenTotal } from "./v1.ts"
 
 type Json = Record<string, unknown>
 const obj = (value: unknown): Json => (value && typeof value === "object" ? (value as Json) : {})
@@ -186,8 +186,11 @@ export function createV2Translator(unknown: (what: string, detail?: Json) => voi
                   call: str(data.id) as string,
                   state: "completed",
                   output: contentText(data.content),
-                  ...(summaryOf(undefined, obj(data.metadata))
-                    ? { summary: summaryOf(undefined, obj(data.metadata)) as string }
+                  ...(summaryOf(obj(data.metadata))
+                    ? { summary: summaryOf(obj(data.metadata)) as string }
+                    : {}),
+                  ...(exitOf(obj(data.metadata)) !== undefined
+                    ? { exit: exitOf(obj(data.metadata)) as number }
                     : {}),
                   at,
                 },
@@ -306,8 +309,11 @@ export function createV2Translator(unknown: (what: string, detail?: Json) => voi
                 state: ended,
                 output: contentText(state.content),
                 ...(str(obj(state.error).message) ? { error: str(obj(state.error).message) as string } : {}),
-                ...(summaryOf(str(part.name), obj(state.metadata))
-                  ? { summary: summaryOf(str(part.name), obj(state.metadata)) as string }
+                ...(summaryOf(obj(state.metadata))
+                  ? { summary: summaryOf(obj(state.metadata)) as string }
+                  : {}),
+                ...(exitOf(obj(state.metadata)) !== undefined
+                  ? { exit: exitOf(obj(state.metadata)) as number }
                   : {}),
                 ended: Number(time.completed) || partAt,
                 at: Number(time.completed) || partAt,

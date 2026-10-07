@@ -3,6 +3,7 @@ import {
   apply,
   type Change,
   emptyModel,
+  failedDeed,
   type GuildEvent,
   type Model,
   rootOf,
@@ -678,13 +679,15 @@ export class GuildStore {
           },
         )
     }
+    // A red check (tests, lint, typecheck exiting non-zero) is a failure too, though it completed.
+    const red = redCheck(change, this.model)
     if (this.mode === "live") {
-      const kind = markerOf(change)
+      const kind = red ? "fail" : markerOf(change)
       if (kind) this.markers.push({ at: change.at - this.start, kind })
     }
     if (!live) return
     this.lastEventAt = this.time
-    const score = interestOf(change)
+    const score = red ? 4 : interestOf(change)
     if (score === 0) return
     // Following one party: the calm Bard looks only at it.
     if (this.following !== null && rootOf(this.model, change.id) !== this.following) return
@@ -950,8 +953,7 @@ export function viewsOf(
     const running = activity.kind === "tool" ? activity.tool : undefined
     const look = running ? deedLook(running) : undefined
     const lastTool = s.entries.findLast((entry) => entry.kind === "tool")
-    const stung =
-      lastTool?.kind === "tool" && lastTool.state === "failed" && now - (lastTool.ended ?? 0) < 1400
+    const stung = lastTool?.kind === "tool" && failedDeed(lastTool) && now - (lastTool.ended ?? 0) < 1400
 
     let phase: Phase = "working"
     let target: Post
@@ -1237,6 +1239,14 @@ function lineOf(change: Change, s: Session): Pick<LogEntry, "kind" | "text"> | u
     case "tool": {
       if (change.state === "failed")
         return { kind: "fail", text: `${toolName(s, change.call)} failed: ${change.error ?? ""}` }
+      if (change.state === "completed" && change.exit !== undefined && change.exit !== 0) {
+        const entry = s.entries.find((e) => e.kind === "tool" && e.call === change.call)
+        if (entry?.kind === "tool" && failedDeed(entry))
+          return {
+            kind: "fail",
+            text: `${entry.name} exited ${change.exit}: ${shorten(String(entry.input.command ?? ""), 60)}`,
+          }
+      }
       if (change.state !== "running") return undefined
       const name = change.name ?? "tool"
       if (name === "task" || name === "subagent") {
@@ -1254,6 +1264,15 @@ function lineOf(change: Change, s: Session): Pick<LogEntry, "kind" | "text"> | u
     default:
       return undefined
   }
+}
+
+/** A completed call that is red work: a check (tests, lint, typecheck) that exited non-zero (core's `failedDeed`). */
+function redCheck(change: Change, model: Model): boolean {
+  if (change.type !== "tool" || change.state !== "completed" || !change.exit) return false
+  const entry = model.sessions
+    .get(change.id)
+    ?.entries.find((e) => e.kind === "tool" && e.call === change.call)
+  return entry?.kind === "tool" && failedDeed(entry)
 }
 
 function toolName(s: Session, call: string): string {

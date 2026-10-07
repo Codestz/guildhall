@@ -31,6 +31,7 @@ import { Dissolver, Fade, fadeSeconds } from "../dissolve.ts"
 import { FRAME } from "../frame.ts"
 import { attachGrip, KIT_GRIPS, keepUpright, NIGHT_LANTERN } from "../grips.ts"
 import { clonePiece, useKit } from "../Kit.tsx"
+import { carryLantern } from "../lights/carried.ts"
 import { useOwned } from "../owned.ts"
 import { cloneRig } from "../rig.ts"
 import {
@@ -127,6 +128,8 @@ interface Body {
   clips: Map<string, AnimationClip>
   hands: Hands
   lantern: Object3D | null
+  /** Puts the lantern down (scene/lights/carried.ts): it gives light while this mount holds it. */
+  putDown: () => void
   materials: MeshStandardMaterial[]
   /** Going in and coming out of their door: dissolved, never shrunk (scene/dissolve.ts). */
   dissolver: Dissolver
@@ -401,15 +404,28 @@ function build(
     })
     lantern.visible = false
   }
-  return { body, mixer, actions: new Map(), clips, hands, lantern, materials, dissolver: new Dissolver() }
+  const putDown = lantern ? carryLantern(lantern, body) : () => {}
+  return {
+    body,
+    mixer,
+    actions: new Map(),
+    clips,
+    hands,
+    lantern,
+    putDown,
+    materials,
+    dissolver: new Dissolver(),
+  }
 }
 
 /** Frees what this mount made: its materials, mixer and bone textures. Geometry, the clips, the
- * held shapes and the kit's lantern materials are shared: detached, never disposed. */
+ * held shapes and the kit's lantern materials are shared: detached, never disposed (the lantern's
+ * lit glass is given back to scene/lights/carried.ts, which frees it with the last lantern). */
 function free(b: Body): void {
   // First: the body's own materials back on before they are freed.
   b.dissolver.dispose(b.body)
   b.hands.dispose()
+  b.putDown()
   b.lantern?.removeFromParent()
   for (const material of b.materials) material.dispose()
   b.mixer.stopAllAction()

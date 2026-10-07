@@ -38,6 +38,7 @@ import { Dissolver, Fade, fadeSeconds } from "./dissolve.ts"
 import { attachGrip, isHeldPiece, KIT_GRIPS, keepUpright, NIGHT_LANTERN, RESTING_MUG } from "./grips.ts"
 import { clonePiece, useKit } from "./Kit.tsx"
 import { BEAT_HEIGHT, emitBeat } from "./life/work.ts"
+import { carryLantern } from "./lights/carried.ts"
 import { cloneRig } from "./rig.ts"
 
 const WALK_SPEED = 3.4
@@ -527,8 +528,11 @@ function useHeld(
     if (!bone || !kit[piece]) return
     const root = attachGrip(bone, clonePiece(kit, piece), grip)
     held.current = root
+    // A lantern gives light while held (scene/lights/carried.ts).
+    const putDown = piece === NIGHT_LANTERN ? carryLantern(root, body) : undefined
     // Materials are shared with the kit: detach only, never dispose.
     return () => {
+      putDown?.()
       bone.remove(root)
       if (held.current === root) held.current = null
     }

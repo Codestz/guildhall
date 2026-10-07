@@ -75,19 +75,7 @@ export function Lamps({ sky }: { sky: SkyState }) {
   const list = useMemo(lamps, [])
   const fade = useRef(list.map(() => 1))
   const fire = useMemo(() => new Color(), [])
-  const built = useOwnedMeshes(() => {
-    const material = new MeshBasicMaterial({
-      map: halo(),
-      transparent: true,
-      depthWrite: false,
-      blending: AdditiveBlending,
-      fog: false,
-    })
-    const mesh = new InstancedMesh(new PlaneGeometry(1, 1), material, list.length)
-    mesh.frustumCulled = false
-    mesh.renderOrder = 10
-    return { meshes: [mesh] }
-  }, [list])
+  const built = useOwnedMeshes(() => ({ meshes: [halos(list.length)] }), [list])
 
   useLayoutEffect(() => {
     fire.set(mood.fire)
@@ -122,6 +110,25 @@ export function Lamps({ sky }: { sky: SkyState }) {
   })
 
   return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
+}
+
+/**
+ * `count` flame halos, one draw: camera-facing quads (set each instance's matrix with the camera's
+ * quaternion), additive, depth-tested, over everything else (renderOrder 10). Colour per instance:
+ * HDR at night so bloom catches them. Also the carried lanterns' halos (scene/lights/CarriedLights).
+ */
+export function halos(count: number): InstancedMesh {
+  const material = new MeshBasicMaterial({
+    map: halo(),
+    transparent: true,
+    depthWrite: false,
+    blending: AdditiveBlending,
+    fog: false,
+  })
+  const mesh = new InstancedMesh(new PlaneGeometry(1, 1), material, count)
+  mesh.frustumCulled = false
+  mesh.renderOrder = 10
+  return mesh
 }
 
 const facing = new Quaternion()

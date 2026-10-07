@@ -1,15 +1,18 @@
 import { useFrame } from "@react-three/fiber"
-import { useMemo, useRef } from "react"
+import { useMemo, useRef, useState } from "react"
 import { Color, type PointLight, Vector3 } from "three"
 import { useGuild } from "../../guild/useGuild.ts"
 import { HEARTH } from "../../world/layout.ts"
 import { GLOWS } from "../../world/lights.ts"
 import { sky } from "../atmosphere/state.ts"
+import { AFTER_POSE, carried, type Flame, isCarried, nearestFlames, nightGlow } from "./carried.ts"
 
 /**
  * Real firelight where you are looking: a few point lights that hop to the flames nearest the
  * camera's target, so nearby walls, roofs and adventurers actually catch warm light at night.
- * The count is fixed (shaders compile once); everything farther away keeps the cheap halo + pool.
+ * Carried lanterns (scene/lights/carried.ts) are candidates too: walk one past the camera's target
+ * and it lights the walls and faces beside it. The count is fixed (shaders compile once);
+ * everything farther away keeps the cheap halo + pool.
  */
 /** Two: each point light adds lighting cost to every lit pixel (measured ~1 ms per two at DPR 1.5). */
 const COUNT = 2
@@ -20,39 +23,51 @@ const FLAMES: readonly (readonly [number, number, number])[] = [
   ...GLOWS.map((light) => light.flame),
 ]
 
+/** A carried lantern's light: smaller than a street flame's, and it walks with them. */
+const CARRIED_INTENSITY = 8
+const CARRIED_DISTANCE = 9
+const FIXED_DISTANCE = 14
+
 export function NearLights() {
   const { mood } = useGuild()
   const lights = useRef<(PointLight | null)[]>([])
-  const chosen = useRef<number[]>([])
+  const [pick] = useState(() => ({
+    chosen: new Array<Flame | undefined>(COUNT),
+    distances: new Array<number>(COUNT).fill(0),
+  }))
   const since = useRef(REPICK_S)
   const fire = useMemo(() => new Color(), [])
 
+  // After the carried lanterns have been tracked this frame (StreetLights' `Carried`, AFTER_POSE).
   useFrame((state, delta) => {
     since.current += delta
     const controls = state.controls as unknown as { target?: Vector3 } | null
     const target = controls?.target ?? ORIGIN
     if (since.current >= REPICK_S) {
       since.current = 0
-      chosen.current = nearest(target, COUNT)
+      nearestFlames(target.x, target.z, FLAMES, carried, pick.chosen, pick.distances)
     }
     fire.set(mood.fire).lerp(EMBER, 0.6)
     const t = state.clock.elapsedTime
     for (let i = 0; i < COUNT; i++) {
       const light = lights.current[i]
-      const index = chosen.current[i]
       if (!light) continue
-      const flame = index === undefined ? undefined : FLAMES[index]
-      if (!flame) {
+      const flame = pick.chosen[i]
+      // A lantern put down (or out of sight) since the pick: dark until the next pick.
+      if (!flame || (isCarried(flame) && (!flame.lit || !carried.includes(flame)))) {
         light.intensity = 0
         continue
       }
-      light.position.set(flame[0], flame[1] + 0.3, flame[2])
+      const moving = isCarried(flame)
+      if (moving) light.position.copy(flame.at)
+      else light.position.set(flame[0], flame[1] + 0.3, flame[2])
+      light.distance = moving ? CARRIED_DISTANCE : FIXED_DISTANCE
       light.color.copy(fire)
       const flicker = 0.9 + Math.sin(t * 8.3 + i * 2.1) * 0.06 + Math.sin(t * 13.7 + i) * 0.04
-      const goal = sky.lamps * 32 * flicker
+      const goal = moving ? nightGlow(sky.lamps) * CARRIED_INTENSITY * flicker : sky.lamps * 32 * flicker
       light.intensity += (goal - light.intensity) * Math.min(1, delta * 6)
     }
-  })
+  }, AFTER_POSE + 0.1)
 
   return (
     <>
@@ -64,29 +79,12 @@ export function NearLights() {
             lights.current[i] = light
           }}
           intensity={0}
-          distance={14}
+          distance={FIXED_DISTANCE}
           decay={1.8}
         />
       ))}
     </>
   )
-}
-
-/** Indices of the `count` flames nearest `target` (a tiny partial sort; ~45 flames). */
-function nearest(target: Vector3, count: number): number[] {
-  const best: { index: number; d: number }[] = []
-  for (let i = 0; i < FLAMES.length; i++) {
-    const flame = FLAMES[i]
-    if (!flame) continue
-    const d = (flame[0] - target.x) ** 2 + (flame[2] - target.z) ** 2
-    if (best.length < count) best.push({ index: i, d })
-    else {
-      let worst = 0
-      for (let k = 1; k < best.length; k++) if ((best[k]?.d ?? 0) > (best[worst]?.d ?? 0)) worst = k
-      if (d < (best[worst]?.d ?? Number.POSITIVE_INFINITY)) best[worst] = { index: i, d }
-    }
-  }
-  return best.map((b) => b.index)
 }
 
 const EMBER = new Color("#ff8a3d")

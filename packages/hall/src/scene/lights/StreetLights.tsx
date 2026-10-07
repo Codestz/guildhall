@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber"
-import { useMemo } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import {
   AdditiveBlending,
   CanvasTexture,
@@ -12,11 +12,13 @@ import {
   SRGBColorSpace,
   Vector3,
 } from "three"
-import { positions, useGuild } from "../../guild/useGuild.ts"
+import { useGuild } from "../../guild/useGuild.ts"
 import { GLOWS, LIGHTS } from "../../world/lights.ts"
+import { halos } from "../atmosphere/Lamps.tsx"
 import { sky } from "../atmosphere/state.ts"
 import { mergePlacements, useKit } from "../Kit.tsx"
 import { useOwnedMeshes } from "../owned.ts"
+import { AFTER_POSE, carried, flicker, litGlass, nightGlow, track } from "./carried.ts"
 
 /**
  * The island's night lights (world/lights.ts): the torch posts and lanterns themselves, merged into
@@ -44,7 +46,7 @@ export function StreetLights() {
         <primitive key={mesh.uuid} object={mesh} />
       ))}
       <Pools />
-      <Followers />
+      <Carried />
     </group>
   )
 }
@@ -78,33 +80,93 @@ function Pools() {
   return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
 }
 
-/** Adventurers' lanterns: a smaller pool that walks with each of them after dark. */
-const MAX_FOLLOWERS = 40
-function Followers() {
+/** At most this many lanterns carried at once (adventurers after dark, the guards, the watchman). */
+const MAX_CARRIED = 32
+/** A carried lantern's halo, a little smaller than a street lantern's (world/lights.ts: 3.4). */
+const CARRIED_HALO = 2.6
+/** Its pool's width on the ground (a street lantern's is 9.6). */
+const CARRIED_POOL = 6
+
+/**
+ * Carried lanterns (scene/lights/carried.ts): a flame halo where each lantern swings, the street
+ * lanterns' own look (atmosphere/Lamps `halos`), and a warm pool on the ground under it, as warm as
+ * a street lantern's; their glass glows too. Two draws for all of them; nothing by day; still
+ * under reduced motion. Runs after the pose (`AFTER_POSE`), so the halo is where the hand is now.
+ */
+function Carried() {
   const { mood } = useGuild()
-  const built = useOwnedMeshes(() => ({ meshes: [pools(MAX_FOLLOWERS)] }), [])
-  const fire = useMemo(() => new Color(), [])
-
-  useFrame(({ clock }) => {
-    const instances = built?.meshes[0]
-    if (!instances) return
-    fire.set(mood.fire).lerp(EMBER, 0.6)
-    const glow = Math.max(0, sky.lamps - 0.3) / 0.7
-    let i = 0
-    for (const [id, at] of positions) {
-      if (i >= MAX_FOLLOWERS) break
-      const flicker = 0.92 + Math.sin(clock.elapsedTime * 9 + id.length + i) * 0.05
-      matrix.compose(position.set(at.x, 0.07, at.z), flat, scale.set(5, 1, 5))
-      instances.setMatrixAt(i, matrix)
-      instances.setColorAt(i, tint.copy(fire).multiplyScalar(glow * 0.32 * flicker))
-      i++
+  const built = useOwnedMeshes(() => {
+    const meshes = [halos(MAX_CARRIED), pools(MAX_CARRIED)]
+    for (const mesh of meshes) {
+      // The colour buffer from the start: made on the first lantern lit, it would recompile both.
+      mesh.setColorAt(0, tint.setRGB(0, 0, 0))
+      mesh.count = 0
     }
-    instances.count = i
-    instances.instanceMatrix.needsUpdate = true
-    if (instances.instanceColor) instances.instanceColor.needsUpdate = true
-  })
+    return { meshes }
+  }, [])
+  const fire = useMemo(() => new Color(), [])
+  const ember = useMemo(() => new Color(), [])
+  const still = useStill()
 
-  return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
+  useFrame(({ camera, clock }) => {
+    const halo = built?.meshes[0]
+    const ground = built?.meshes[1]
+    if (!(halo instanceof InstancedMesh) || !(ground instanceof InstancedMesh)) return
+    track()
+    const glow = nightGlow(sky.lamps)
+    fire.set(mood.fire)
+    ember.copy(fire).lerp(EMBER, 0.6)
+    litGlass.set(glow, fire)
+    camera.getWorldQuaternion(facing)
+    const t = clock.elapsedTime
+    let i = 0
+    if (glow > 0)
+      for (const lantern of carried) {
+        if (i >= MAX_CARRIED) break
+        if (!lantern.lit) continue
+        const breath = flicker(t, lantern.phase, still.current)
+        const size = CARRIED_HALO * (0.8 + glow * 0.35) * breath
+        matrix.compose(lantern.at, facing, scale.set(size, size, size))
+        halo.setMatrixAt(i, matrix)
+        halo.setColorAt(i, tint.copy(fire).multiplyScalar(glow * 1.6 * breath))
+        const wide = CARRIED_POOL * breath
+        matrix.compose(
+          position.set(lantern.at.x, lantern.ground + 0.07, lantern.at.z),
+          flat,
+          scale.set(wide, 1, wide),
+        )
+        ground.setMatrixAt(i, matrix)
+        ground.setColorAt(i, tint.copy(ember).multiplyScalar(glow * 0.42 * breath))
+        i++
+      }
+    shown(halo, i)
+    shown(ground, i)
+  }, AFTER_POSE)
+
+  return built?.meshes.map((mesh) => <primitive key={mesh.uuid} object={mesh} />) ?? null
+}
+
+/** The first `count` instances are drawn, as just written. */
+function shown(mesh: InstancedMesh, count: number): void {
+  mesh.count = count
+  mesh.instanceMatrix.needsUpdate = true
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+}
+
+/** prefers-reduced-motion, kept current by its change event (never asked per frame). */
+function useStill(): { readonly current: boolean } {
+  const still = useRef(false)
+  useEffect(() => {
+    const query = window.matchMedia?.("(prefers-reduced-motion: reduce)")
+    if (!query) return
+    still.current = query.matches
+    const change = (event: MediaQueryListEvent) => {
+      still.current = event.matches
+    }
+    query.addEventListener("change", change)
+    return () => query.removeEventListener("change", change)
+  }, [])
+  return still
 }
 
 /** `count` warm pools on the ground: one additive instanced draw, over the ground (renderOrder 9). */
@@ -125,6 +187,7 @@ function pools(count: number): InstancedMesh {
 }
 
 const EMBER = new Color("#ff7a2e")
+const facing = new Quaternion()
 const flat = new Quaternion()
 const matrix = new Matrix4()
 const position = new Vector3()

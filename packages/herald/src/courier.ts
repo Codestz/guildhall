@@ -1,4 +1,5 @@
 import type { Change } from "@guildhall/core"
+import type { ProjectRef } from "@guildhall/core/project"
 import { type Dispatch, HERALD_HEADER, type Health, HUB_PORT, hubBuild } from "@guildhall/hub"
 
 /**
@@ -40,6 +41,8 @@ export function createCourier(options: {
   guild: string
   opencode: 1 | 2
   log: (message: string) => void
+  /** The project the guild is (PROTOCOL.md §3.1): sent with every batch, so the hub keeps one guild per project. */
+  project?: ProjectRef
   port?: number
 }): Courier {
   const base = `http://127.0.0.1:${options.port ?? Number(process.env.GUILDHALL_PORT ?? HUB_PORT)}`
@@ -165,6 +168,7 @@ export function createCourier(options: {
       opencode: options.opencode,
       changes: items.flatMap((item) => ("change" in item ? [item.change] : [])),
       raw: items.flatMap((item) => ("raw" in item ? [item.raw] : [])),
+      ...(options.project ? { project: options.project } : {}),
     }
     try {
       return JSON.stringify(dispatch)

@@ -1,4 +1,5 @@
 import type { Change } from "@guildhall/core"
+import type { ProjectRef } from "@guildhall/core/project"
 
 /**
  * The hub's check of what a herald sends (its trust boundary): each `Change` must be one of the
@@ -102,5 +103,27 @@ export function validGuild(value: unknown): value is string {
     !value.startsWith(".") &&
     // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what it refuses.
     !/[/\\\u0000-\u001f\u007f]/.test(value)
+  )
+}
+
+/**
+ * A dispatch's `project`, as `@guildhall/core/project` makes it: a 16-hex id, a GitHub `owner/name`
+ * and a branch name when present. One that doesn't check out is ignored (the dispatch is taken as one
+ * without a project), not refused: an adapter is never failed over it.
+ */
+export function validProject(value: unknown): value is ProjectRef {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false
+  const { id, github, branch } = value as Record<string, unknown>
+  return (
+    typeof id === "string" &&
+    /^[0-9a-f]{16}$/.test(id) &&
+    (github === undefined ||
+      (typeof github === "string" && /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/.test(github))) &&
+    (branch === undefined ||
+      (typeof branch === "string" &&
+        branch.length > 0 &&
+        branch.length <= 255 &&
+        // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what it refuses.
+        !/[\u0000-\u001f\u007f]/.test(branch)))
   )
 }

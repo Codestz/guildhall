@@ -4,12 +4,14 @@ import { appendFile, mkdir } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
-import { type GuildEvent, WIRE_VERSION } from "@guildhall/core"
+import { type GuildEvent, type SeaEvent, type SeaRecord, WIRE_VERSION } from "@guildhall/core"
 import type { Server, ServerWebSocket } from "bun"
-import { list, loadHistory, PRUNE_EVERY_MS, pruneChronicles } from "./chronicles.ts"
+import { list, loadHistory, loadSea, PRUNE_EVERY_MS, pruneChronicles } from "./chronicles.ts"
+import { createGithub, type GithubMode, type GithubOptions, type SeaTarget } from "./github.ts"
+import { createProjects, type KnownProject } from "./projects.ts"
 import { type Dispatch, HERALD_HEADER, HUB_PORT, type HubMessage } from "./protocol.ts"
 import { serveStatic } from "./static.ts"
-import { MAX_CHANGES, MAX_RAW, MAX_RAW_TOTAL, validChange, validGuild } from "./validate.ts"
+import { MAX_CHANGES, MAX_RAW, MAX_RAW_TOTAL, validChange, validGuild, validProject } from "./validate.ts"
 
 /**
  * The hub (ADR 0003): heralds POST their guild's changes here; halls subscribe over WebSocket.
@@ -37,6 +39,11 @@ export interface HubOptions {
   hall?: string
   /** How often retention is applied again while the hub runs (PRUNE_EVERY_MS); it also is on start. */
   pruneEvery?: number
+  /**
+   * The watch on GitHub for projects with a GitHub remote (github.ts, PROTOCOL.md §7): on unless
+   * `false` or GUILDHALL_GITHUB=0. It does nothing until a project with a GitHub remote is heard from.
+   */
+  github?: (GithubOptions & { every?: number }) | false
 }
 
 /** Largest herald POST. A batch is capped at MAX_CHANGES changes, each capped by the validator. */
@@ -48,6 +55,12 @@ const MAX_BODY = 16 * 1024 * 1024
  */
 export const HELLO_GUILDS = 8
 export const HELLO_EVENTS = 50_000
+/** Sea records kept per guild for a hall's hello. */
+export const SEA_KEEP = 200
+/** A project heard from within this long has its repo watched. */
+export const SEA_ACTIVE_MS = 6 * 60 * 60 * 1000
+/** How often the GitHub watch looks for a repo that is due (each repo has its own interval). */
+const SEA_TICK_MS = 15_000
 
 /**
  * Which hub this is: a hash of the hub's own source files. A herald computes it from the same files
@@ -82,6 +95,8 @@ export interface Health {
   writeFailures: number
   /** The last failed chronicle write, if any. */
   lastWriteError?: { at: string; guild: string; error: string }
+  /** The GitHub watch: off, idle (no GitHub project yet), or polling with gh's token or without. */
+  github: GithubMode | "off"
 }
 
 export function startHub(options: HubOptions = {}): Server<unknown> {
@@ -97,6 +112,8 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
   pruneChronicles(chronicles)
   let pruned = Date.now()
   const events = loadHistory(chronicles, keep)
+  const sea = loadSea(chronicles, SEA_KEEP)
+  const projects = createProjects(join(home, "projects.json"))
   const halls = new Set<ServerWebSocket<unknown>>()
   const inOrder = serially()
   let writeFailures = 0
@@ -139,6 +156,54 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
     return out
   }
 
+  /**
+   * A repo's sea events, for each guild whose project works in it: sent to the halls, kept for the
+   * hello, written beside the guild's events.
+   */
+  async function recordSea(found: SeaEvent[]): Promise<void> {
+    const active = projects.active(Date.now() - SEA_ACTIVE_MS)
+    const records: SeaRecord[] = found.flatMap((event) =>
+      [...new Set(active.filter((p) => p.github === event.repo).map((p) => p.guild))].map(
+        (guild): SeaRecord => ({ v: 1, guild, event }),
+      ),
+    )
+    if (records.length === 0) return
+    broadcast({ type: "sea", events: records })
+    for (const record of records) {
+      const kept = sea.get(record.guild) ?? []
+      kept.push(record)
+      if (kept.length > SEA_KEEP) kept.splice(0, kept.length - SEA_KEEP)
+      sea.set(record.guild, kept)
+      try {
+        const dir = chronicleDir(home, record.guild)
+        await mkdir(dir, { recursive: true })
+        await appendFile(join(dir, `${boot}.sea.jsonl`), `${JSON.stringify(record)}\n`)
+      } catch (error) {
+        writeFailures++
+        lastWriteError = { at: new Date().toISOString(), guild: record.guild, error: String(error) }
+      }
+    }
+  }
+
+  const githubOptions =
+    options.github === false || process.env.GUILDHALL_GITHUB === "0" ? undefined : (options.github ?? {})
+  const github = githubOptions && createGithub(githubOptions)
+  if (github) {
+    let polling = false
+    const timer = setInterval(() => {
+      if (polling) return
+      polling = true
+      github
+        .poll(seaTargets(projects.active(Date.now() - SEA_ACTIVE_MS)))
+        .then(recordSea)
+        .catch((error) => console.warn(`hub: GitHub watch failed: ${String(error)}`))
+        .finally(() => {
+          polling = false
+        })
+    }, githubOptions?.every ?? SEA_TICK_MS)
+    timer.unref()
+  }
+
   function broadcast(message: HubMessage): void {
     const text = JSON.stringify(message)
     for (const hall of halls) {
@@ -172,6 +237,7 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
           halls: halls.size,
           writeFailures,
           ...(lastWriteError ? { lastWriteError } : {}),
+          github: github?.mode() ?? "off",
         } satisfies Health)
       if (url.pathname === "/events" && request.method === "POST") {
         if (request.headers.get(HERALD_HEADER) !== "1") return new Response("forbidden", { status: 403 })
@@ -184,8 +250,9 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
           return new Response("bad dispatch", { status: 400 })
         if (body.changes.length > MAX_CHANGES)
           return new Response(`too many changes: at most ${MAX_CHANGES} per dispatch`, { status: 400 })
-        const guild = body.guild
         const now = Date.now()
+        // With its project, a dispatch goes to that project's own guild (`app`, `app·2`, …).
+        const guild = validProject(body.project) ? projects.claim(body.guild, body.project, now) : body.guild
         const changes = body.changes.filter((change) => validChange(change, now))
         const rejected = body.changes.length - changes.length
         if (rejected > 0) console.warn(`hub: rejected ${rejected} bad change(s) from ${guild}`)
@@ -214,8 +281,15 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
       open(hall) {
         halls.add(hall)
         const recent = helloEvents(events)
+        const guilds = new Set(recent.map((event) => event.guild))
+        const records = [...sea].flatMap(([guild, kept]) => (guilds.has(guild) ? kept : []))
         hall.send(
-          JSON.stringify({ type: "hello", version: WIRE_VERSION, events: recent } satisfies HubMessage),
+          JSON.stringify({
+            type: "hello",
+            version: WIRE_VERSION,
+            events: recent,
+            ...(records.length > 0 ? { sea: records } : {}),
+          } satisfies HubMessage),
         )
       },
       close(hall) {
@@ -226,6 +300,18 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
       },
     },
   })
+}
+
+/** The repos the active projects work in, each with the branches they have checked out. */
+export function seaTargets(active: readonly KnownProject[]): SeaTarget[] {
+  const branches = new Map<string, Set<string>>()
+  for (const project of active) {
+    if (!project.github) continue
+    const set = branches.get(project.github) ?? new Set()
+    if (project.branch) set.add(project.branch)
+    branches.set(project.github, set)
+  }
+  return [...branches].map(([repo, set]) => ({ repo, branches: [...set] }))
 }
 
 /**

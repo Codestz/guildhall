@@ -1,0 +1,41 @@
+import { describe, expect, test } from "bun:test"
+import { applyAll, emptyModel } from "@guildhall/core"
+import { seas } from "../src/index.ts"
+
+describe("seas: a party with GitHub beside it", () => {
+  const { changes, sea } = seas()
+
+  test("same seed, same story", () => {
+    expect(seas(3)).toEqual(seas(3))
+  })
+
+  test("the party finishes, like any other run", () => {
+    const model = applyAll(emptyModel(), changes)
+    expect([...model.sessions.values()].every((s) => s.status === "done")).toBe(true)
+  })
+
+  test("pushes, a PR opened then merged, CI red then green, a release last", () => {
+    const kinds = sea.map((e) => (e.kind === "ci" ? `ci:${e.state}` : e.kind))
+    const first = (kind: string) => kinds.indexOf(kind)
+    expect(kinds.filter((k) => k === "push").length).toBeGreaterThanOrEqual(2)
+    expect(first("pr_opened")).toBeLessThan(first("pr_merged"))
+    expect(first("ci:failed")).toBeLessThan(first("ci:passed"))
+    expect(first("ci:passed")).toBeLessThan(first("pr_merged"))
+    expect(kinds.at(-1)).toBe("release")
+  })
+
+  test("each push follows a passing test run, and the sea stays within the run", () => {
+    const tests = changes.filter(
+      (c) => c.type === "tool" && c.state === "completed" && c.summary?.endsWith("pass"),
+    )
+    for (const push of sea.filter((e) => e.kind === "push" && e.branch !== "main"))
+      expect(tests.some((t) => t.at <= push.at)).toBe(true)
+    const end = changes.at(-1)!.at
+    for (const event of sea) expect(event.at).toBeLessThanOrEqual(end)
+    for (let i = 1; i < sea.length; i++) expect(sea[i]!.at).toBeGreaterThanOrEqual(sea[i - 1]!.at)
+  })
+
+  test("every id is unique (a hall dedupes on it)", () => {
+    expect(new Set(sea.map((e) => e.id)).size).toBe(sea.length)
+  })
+})

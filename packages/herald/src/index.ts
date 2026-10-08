@@ -1,7 +1,8 @@
 import { appendFileSync, mkdirSync } from "node:fs"
 import { homedir } from "node:os"
-import { basename, join } from "node:path"
+import { join } from "node:path"
 import { createV1Translator, createV2Translator } from "@guildhall/core"
+import { projectOf, refOf } from "@guildhall/core/project"
 import { injectV1, injectV2, readOptions, type V2AgentDomain } from "./agents.ts"
 import { createCourier } from "./courier.ts"
 import { type V2ToolCall, v1Guard, v2Guard } from "./guard.ts"
@@ -61,11 +62,11 @@ export default {
    * their shell, the `event` hook sees every bus event.
    */
   server: async (input: V1Input, raw?: unknown) => {
-    const guild = basename(input.directory)
+    const project = projectOf(input.directory)
     log(`v1 server start in ${input.directory}`)
     const options = readOptions(raw, log)
     const translator = createV1Translator(unknown(1))
-    const courier = createCourier({ guild, opencode: 1, log })
+    const courier = createCourier({ guild: project.name, project: refOf(project), opencode: 1, log })
     return {
       ...(options.agents === false ? {} : v1Guard(log)),
       config: async (cfg: { agent?: Record<string, unknown> }) => {
@@ -108,11 +109,11 @@ export default {
     if (!ctx.event) return
     const events = ctx.event
     const directory = ctx.location.directory
-    const guild = basename(directory)
+    const project = projectOf(directory)
     log(`v2 setup in ${ctx.location.directory}`)
     const translator = createV2Translator(unknown(2))
     const ours = createLocationFilter(directory)
-    const courier = createCourier({ guild, opencode: 2, log })
+    const courier = createCourier({ guild: project.name, project: refOf(project), opencode: 2, log })
     const stop = new AbortController()
     void (async () => {
       let delay = 1000

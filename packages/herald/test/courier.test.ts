@@ -269,3 +269,18 @@ describe("courier", () => {
     await withoutBun(() => courier.flush())
   }, 10_000)
 })
+
+describe("courier and the project", () => {
+  test("every batch carries the project, so the hub keeps one guild per project", async () => {
+    const fake = fakeHub(() => Response.json({ ok: true }))
+    const project = { id: "0123456789abcdef", github: "acme/shop", branch: "main" }
+    const courier = createCourier({ guild: "shop", project, opencode: 2, log: () => {}, port: fake.port })
+    await withoutBun(async () => {
+      courier.send([change], { raw: 1 })
+      await courier.flush()
+    })
+    fake.server.stop(true)
+    expect(fake.accepted[0]?.guild).toBe("shop")
+    expect(fake.accepted[0]?.project).toEqual(project)
+  })
+})

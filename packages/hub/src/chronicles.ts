@@ -1,11 +1,21 @@
-import { closeSync, fstatSync, openSync, readdirSync, readSync, statSync, unlinkSync } from "node:fs"
+import {
+  closeSync,
+  fstatSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  readSync,
+  statSync,
+  unlinkSync,
+} from "node:fs"
 import { join } from "node:path"
-import { type GuildEvent, WIRE_VERSION } from "@guildhall/core"
+import { type GuildEvent, isSeaRecord, type SeaRecord, WIRE_VERSION } from "@guildhall/core"
 import { validChange, validGuild } from "./validate.ts"
 
 /**
  * The chronicles on disk (ADR 0003): `<home>/chronicles/<guild>/<boot>.jsonl` holds a boot's events,
- * `<boot>.raw.jsonl` the raw host events behind them. Reading them back on start, and keeping them
+ * `<boot>.raw.jsonl` the raw host events behind them, `<boot>.sea.jsonl` the guild's sea records
+ * (what GitHub said about its project, PROTOCOL.md §7). Reading them back on start, and keeping them
  * from growing without end.
  */
 
@@ -40,7 +50,7 @@ export function loadHistory(root: string, keep: number, now = Date.now()): Map<s
   const since = now - HISTORY_MS
   for (const dir of list(root)) {
     const files = list(join(root, dir))
-      .filter((file) => file.endsWith(".jsonl") && !file.endsWith(".raw.jsonl"))
+      .filter((file) => kindOf(file) === "events")
       .filter((file) => sized(join(root, dir, file)).mtime >= since)
       .sort()
       .reverse()
@@ -123,10 +133,62 @@ export function pruneChronicles(root: string, now = Date.now()): void {
       .filter((file) => file.endsWith(".jsonl"))
       .sort()
       .map((file) => ({ file, path: join(root, dir, file), ...sized(join(root, dir, file)) }))
-    const raw = files.filter(({ file }) => file.endsWith(".raw.jsonl"))
-    const events = files.filter(({ file }) => !file.endsWith(".raw.jsonl"))
+    const raw = files.filter(({ file }) => kindOf(file) === "raw")
+    const events = files.filter(({ file }) => kindOf(file) === "events")
+    const sea = files.filter(({ file }) => kindOf(file) === "sea")
     prune(raw, now - RAW_KEEP_MS, RAW_MAX_BYTES, false)
     prune(events, now - EVENTS_KEEP_MS, EVENTS_MAX_BYTES, true)
+    // Sea records are a few lines a day: kept as long as the events they sit beside.
+    prune(sea, now - EVENTS_KEEP_MS, EVENTS_MAX_BYTES, true)
+  }
+}
+
+/** Which of a guild's files this is: a boot's events, its raw log, or its sea records. */
+function kindOf(file: string): "events" | "raw" | "sea" | undefined {
+  if (!file.endsWith(".jsonl")) return undefined
+  if (file.endsWith(".raw.jsonl")) return "raw"
+  if (file.endsWith(".sea.jsonl")) return "sea"
+  return "events"
+}
+
+/**
+ * Each guild's sea records from the last HISTORY_MS, oldest first, at most `keep` per guild (the
+ * newest). Lines that don't check out are skipped. Sea files are small: each is read whole.
+ */
+export function loadSea(root: string, keep: number, now = Date.now()): Map<string, SeaRecord[]> {
+  const loaded = new Map<string, SeaRecord[]>()
+  const since = now - HISTORY_MS
+  for (const dir of list(root)) {
+    const files = list(join(root, dir))
+      .filter((file) => kindOf(file) === "sea" && sized(join(root, dir, file)).mtime >= since)
+      .sort()
+    for (const file of files) {
+      let text: string
+      try {
+        text = readFileSync(join(root, dir, file), "utf8")
+      } catch {
+        continue
+      }
+      for (const line of text.split("\n")) {
+        const record = parseSea(line)
+        if (!record || record.event.at < since) continue
+        const records = loaded.get(record.guild) ?? []
+        records.push(record)
+        loaded.set(record.guild, records)
+      }
+    }
+  }
+  for (const [guild, records] of loaded) loaded.set(guild, records.slice(-keep))
+  return loaded
+}
+
+function parseSea(line: string): SeaRecord | undefined {
+  if (!line) return undefined
+  try {
+    const record = JSON.parse(line) as unknown
+    return isSeaRecord(record) && validGuild(record.guild) ? record : undefined
+  } catch {
+    return undefined
   }
 }
 

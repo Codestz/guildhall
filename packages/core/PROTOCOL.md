@@ -12,7 +12,8 @@ that file wins if the two ever disagree.
 
 ```
 source ──► adapter ──POST /events──► hub (127.0.0.1:4747) ──WebSocket /ws──► hall
-                                        └─► chronicles (.jsonl on disk)
+                                        ├─► chronicles (.jsonl on disk)
+                          api.github.com ◄─┘ (the sea, §7: polled for projects with a GitHub remote)
 ```
 
 Adapters today:
@@ -29,7 +30,7 @@ changes, so it can't tell which adapter (or which simulation) a guild came from.
 
 | Word | What it is | On the wire |
 |---|---|---|
-| **Guild** | One project or system being watched. Its name is a short string such as `shop` or `my-service`. | `Dispatch.guild`, `GuildEvent.guild` |
+| **Guild** | One project or system being watched. Its name is a short string such as `shop` or `my-service`. Two projects that share a name are two guilds, `app` and `app·2` (§3.1). | `Dispatch.guild`, `GuildEvent.guild` |
 | **Adventurer** (actor) | One worker in the guild: a session. | every change's `id` |
 | **Guildmaster** | An adventurer with no parent: the root of a party. Whatever its agent is called, the hall draws it as the Guildmaster. | `session` change without `parentID` |
 | **Party** | A guildmaster plus everyone it sent, at any depth. | the `parentID` tree |
@@ -41,6 +42,7 @@ changes, so it can't tell which adapter (or which simulation) a guild came from.
 | **Loot** | A finished run: the session goes idle after working. | `status: "idle"` |
 | **Moment** | A typed thing that *happened*, derived by comparing the model just before and just after a change. See §1.5. | derived |
 | **Chronicle** | A recorded stream of guild events, one per line, replayable. | `GuildEvent` lines |
+| **Sea** | What happens to the guild's project on GitHub: pushes, pull requests, CI, releases (§7). | `SeaEvent` |
 
 ### 1.1 Roles
 
@@ -199,11 +201,26 @@ interface Dispatch {
   changes: Change[]    // at most 500
   raw?: unknown[]      // the source's own events, kept on disk for re-translation, never served
   opencode: 1 | 2      // OpenCode adapter only: which OpenCode sent it
+  project?: {          // optional: which project this is (below)
+    id: string         // 16 hex chars: a hash of the project's git root (or its directory outside git)
+    github?: string    // "owner/name" when origin is a GitHub remote. Only the slug, never the URL
+    branch?: string    // the checked-out branch; absent on a detached HEAD
+  }
 }
 ```
 
 The hub reads `opencode` only to label raw events, and treats any value other than `1` as `2`. An
 adapter for any other source should leave out `opencode` and `raw`.
+
+**Projects.** `guild` names what the adapter asks to be called: the git root's directory name. Two
+repos called `app` would ask for the same guild and merge. With `project`, the hub keeps one guild
+per project id instead. The first project heard keeps the plain name and the next gets `app·2`, then
+`app·3`. Each project keeps its guild for good: the hub writes them to `$GUILDHALL_HOME/projects.json`,
+so a restart never swaps them. A dispatch without `project` (an older adapter) goes to the guild it
+names, as before, and chronicles already written keep their names. A `project` that doesn't check out
+is ignored rather than refused. `@guildhall/core/project` builds it: `refOf(projectOf(dir))` reads
+`.git/HEAD` and `.git/config` directly, follows a worktree's or submodule's `.git` file, and runs no
+git. A GitHub `project` also puts the project's repo under the hub's watch (§7).
 
 ### 3.2 GuildEvent: hub → hall and chronicles
 
@@ -221,13 +238,17 @@ interface GuildEvent {
 Over the WebSocket (`ws://127.0.0.1:4747/ws`), a hall first gets
 `{ type: "hello", version: 1, events: GuildEvent[] }` with recent history: the 8 most recently
 active guilds, up to 50,000 events in all. After that it gets
-`{ type: "events", events: GuildEvent[] }` as dispatches arrive. A WebSocket connection is accepted
+`{ type: "events", events: GuildEvent[] }` as dispatches arrive. Two additions, which a hall that
+doesn't know them can ignore: a hello may carry `sea: SeaRecord[]`, the recent sea of its guilds, and
+`{ type: "sea", events: SeaRecord[] }` arrives as GitHub news does (§7). A WebSocket connection is accepted
 only with no `Origin`, or a `localhost` / `127.0.0.1` / `[::1]` one.
 
 Chronicles are written under `$GUILDHALL_HOME` (default `~/.cache/guildhall`):
 
 - `chronicles/<guild>/<boot>.jsonl`: one `GuildEvent` per line.
 - `<boot>.raw.jsonl`: the raw events, as `{ at, opencode, raw }`.
+- `<boot>.sea.jsonl`: the guild's sea records, one `SeaRecord` per line (§7). Kept as long as the event
+  chronicles. Readers of `<boot>.jsonl` never see them.
 
 ### 3.3 Versioning
 
@@ -262,7 +283,8 @@ own. `GET /health` reports the hub's `wire` version.
 | 413 | `raw events over 12000000 chars` | The `raw` events total more than 12,000,000 characters as JSON. A single raw event over 4,000,000 is dropped quietly. |
 
 **Other endpoint**: `GET /health` answers `{ ok, build, started, pid, wire, guilds, halls,
-writeFailures, lastWriteError? }`.
+writeFailures, lastWriteError?, github }`. `github` is the GitHub watch's mode: `off`, `idle` (no
+GitHub project yet), `token` or `anonymous` (§7).
 
 **Order**: the hub records each guild's dispatches one at a time, in the order they arrive. Within
 a dispatch, changes keep their order. The model copes with most reordering, because unknown sessions
@@ -348,7 +370,9 @@ always exits 0. If no hub is listening, it starts one for the events that follow
 every 30 s) and drops the current event.
 
 The **guild** is named after the git root above the event's `cwd`, or after `cwd` itself outside
-git. A project opened in OpenCode at its root and in Claude Code therefore share one guild.
+git. The OpenCode adapter names its guild the same way, after the git root above its directory, so a
+project opened in both shares one guild. `projectRefOf(cwd)` (`src/project.ts`) gives the dispatch's
+`project` (§3.1).
 
 | Claude Code hook event | Changes |
 |---|---|
@@ -380,3 +404,46 @@ Where Claude Code's names become the world's:
 | `mcp__<server>__<tool>` | unchanged |
 | input `file_path`, `notebook_path` / `old_string` / `new_string` | `filePath` / `oldString` / `newString` (other keys kept) |
 | a tool result | `output`: a shell's stdout and stderr, a subagent's text, a file's content, otherwise its JSON. Capped at 16,000 characters. |
+
+---
+
+## 7. The sea: GitHub
+
+The hub watches GitHub for each project with a GitHub remote that it has heard from in the last 6 h
+(`packages/hub/src/github.ts`). It reads the answers as a small vocabulary of **sea events**
+(`SeaEvent` in `packages/core/src/sea.ts`):
+
+| `kind` | Fields | When |
+|---|---|---|
+| `push` | `branch`, `commits`, `author`, `sha` | The head of a branch a guild has checked out moved: `commits` new commits, the newest by `author`. |
+| `pr_opened` | `number`, `title`, `author`, `branch` | A pull request was opened. |
+| `pr_merged` | the same | It was merged. |
+| `pr_closed` | the same | It was closed without merging. |
+| `ci` | `state` (`queued` \| `running` \| `passed` \| `failed`), `name`, `branch`, `sha` | A workflow run on a branch's head commit moved to `state`. A cancelled run says nothing. |
+| `release` | `tag`, `name?` | A release was published. Drafts are not. |
+
+Every event also has `id`, `at` (ms since the epoch, as GitHub dates it), `repo` (`owner/name`) and,
+when there is one, `url` on github.com. The `id` is stable: the same thing seen again (a later poll,
+a hub restart) has the same `id`, so a hall drops repeats by it. A CI run has one id per state.
+
+The hub sends a repo's events to each guild that works in it, as
+`SeaRecord = { v: 1, guild, event }`: over the WebSocket as `{ type: "sea", events: SeaRecord[] }`,
+in the next halls' hello (`sea`), and on disk in `<boot>.sea.jsonl`. `isSeaRecord` checks one.
+
+**How it asks.** Per repo: the commits of each checked-out branch, the workflow runs on each branch's
+head commit, the 20 most recently updated pull requests, the 10 latest releases. Every request is
+conditional (`If-None-Match` with the last ETag; a 304 doesn't count against the rate limit). A repo
+is asked every 60 s at most with a token. The interval grows by half on each quiet poll up to 5 min,
+doubles on errors up to 15 min, and is an hour for a repo GitHub says isn't there. When
+`X-RateLimit-Remaining` nears its floor, polling stops until `X-RateLimit-Reset`. The first poll of a
+repo is a baseline: what is already there is remembered, not announced.
+
+**The token** is gh's: `gh auth token`, read when there is first a repo to poll and again after a 401.
+It is held in the hub's memory only and goes nowhere but the `Authorization` header of requests to
+`api.github.com`. It is never logged, written to a chronicle, put in `/health` or sent to a hall. Without
+gh, or logged out, the hub polls public repos without a token, once every 10 min per repo (GitHub
+allows 60 such requests an hour). Set `GUILDHALL_GITHUB=0`, or pass `github: false` to `startHub`, to
+turn the watch off.
+
+The sim tells the same story keylessly: `seas()` in `packages/sim` is a party with its sea beside it
+(`{ changes, sea }`), timed from the start of the run like the changes.

@@ -8,6 +8,9 @@ import { GuildStore, liveUrlOf } from "./guild/store.ts"
 import { Hall } from "./Hall.tsx"
 import "./hall.css"
 import { hudPrefs } from "./hud/prefs.ts"
+import { HOME, islandView } from "./scene/archipelago/view.ts"
+import { islandIndexOf, parseArchipelagoLink } from "./world/archipelagoLink.ts"
+import { loadArchipelago } from "./world/archipelagoSource.ts"
 
 const root = document.getElementById("root")
 if (!root) throw new Error("#root missing from index.html")
@@ -56,6 +59,19 @@ const linked: LinkedHall = {
   ...(PROBE ? { force: (kind) => void worldEventsOf(store).force(kind) } : {}),
 }
 if (live === null && !lab) applyDeepLink(parseDeepLink(location.search, PROBE).link, linked)
+
+// The archipelago (`?archipelago`, `?repos=`, `&island=`; world/archipelagoLink.ts): the far islands
+// grow beside the home one, and a link's island is where the camera starts.
+const archipelago = live === null && !lab ? parseArchipelagoLink(location.search) : null
+if (archipelago)
+  void loadArchipelago(archipelago.repos).then((grown) => {
+    if (!grown || !archipelago.island) return
+    const stop = islandIndexOf(
+      archipelago.island,
+      grown.islands.map((island) => island.repo),
+    )
+    if (stop !== undefined && stop !== HOME) islandView.go(stop, { cut: true })
+  })
 
 if (PROBE)
   Object.assign(window, {

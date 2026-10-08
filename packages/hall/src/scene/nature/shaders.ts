@@ -94,6 +94,8 @@ ${FRAGMENT_HEAD}
 uniform sampler2D uShore;
 uniform sampler2D uNoise;
 uniform float uShoreHalf;
+/** Where the baked shore is centred: the origin, or a far island's keep (world/archipelago.ts). */
+uniform vec2 uShoreAt;
 uniform float uShoreMax;
 uniform vec3 uZenith;
 uniform vec3 uHorizon;
@@ -140,7 +142,8 @@ vec3 ripples(vec2 p, float t) {
 
 void main() {
   vec2 p = vWorld.xz;
-  vec4 shore = texture2D(uShore, vec2(p.x, -p.y) / (2.0 * uShoreHalf) + 0.5);
+  vec2 sp = p - uShoreAt;
+  vec4 shore = texture2D(uShore, vec2(sp.x, -sp.y) / (2.0 * uShoreHalf) + 0.5);
   float dist = shore.r * uShoreMax;
   vec2 flow = shore.gb * 2.0 - 1.0;
   float t = uTime;

@@ -1,0 +1,719 @@
+{
+  "repo": "Codestz/Mintroot",
+  "branch": "main",
+  "truncated": false,
+  "note": "Nested directory entries dropped to keep it small: the generator reads only top-level trees.",
+  "entries": [
+    { "path": ".github", "type": "tree" },
+    { "path": ".github/workflows/ci.yml", "type": "blob", "size": 1635 },
+    { "path": ".github/workflows/release.yml", "type": "blob", "size": 3288 },
+    { "path": ".gitignore", "type": "blob", "size": 1181 },
+    { "path": "README.md", "type": "blob", "size": 7675 },
+    { "path": "app", "type": "tree" },
+    { "path": "app/.gitignore", "type": "blob", "size": 6 },
+    { "path": "app/build.gradle.kts", "type": "blob", "size": 7517 },
+    { "path": "app/proguard-rules.pro", "type": "blob", "size": 2319 },
+    { "path": "app/schemas/com.example.mintroot.data.db.AppDatabase/1.json", "type": "blob", "size": 61380 },
+    { "path": "app/schemas/com.example.mintroot.data.db.AppDatabase/2.json", "type": "blob", "size": 58770 },
+    { "path": "app/schemas/com.example.mintroot.data.db.AppDatabase/3.json", "type": "blob", "size": 59812 },
+    { "path": "app/src/main/AndroidManifest.xml", "type": "blob", "size": 3824 },
+    { "path": "app/src/main/assets/prompts/classify_transaction/v1.txt", "type": "blob", "size": 2024 },
+    { "path": "app/src/main/assets/prompts/match_internal_transfer/v1.txt", "type": "blob", "size": 1898 },
+    { "path": "app/src/main/java/com/example/mintroot/MainActivity.kt", "type": "blob", "size": 15396 },
+    { "path": "app/src/main/java/com/example/mintroot/MintrootApplication.kt", "type": "blob", "size": 930 },
+    { "path": "app/src/main/java/com/example/mintroot/data/db/AppDatabase.kt", "type": "blob", "size": 3377 },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/MintrootTypeConverters.kt",
+      "type": "blob",
+      "size": 6449
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/dao/AccountDao.kt",
+      "type": "blob",
+      "size": 1301
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/dao/CategoryDao.kt",
+      "type": "blob",
+      "size": 1006
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/dao/ClassificationCacheDao.kt",
+      "type": "blob",
+      "size": 1835
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/dao/CurrencyDao.kt",
+      "type": "blob",
+      "size": 1283
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/dao/ImportLogDao.kt",
+      "type": "blob",
+      "size": 614
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/dao/InstallmentPlanDao.kt",
+      "type": "blob",
+      "size": 1218
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/dao/InternalTransferLinkDao.kt",
+      "type": "blob",
+      "size": 1841
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/dao/LlmInteractionDao.kt",
+      "type": "blob",
+      "size": 870
+    },
+    { "path": "app/src/main/java/com/example/mintroot/data/db/dao/LoanDao.kt", "type": "blob", "size": 788 },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/dao/LoanPaymentDao.kt",
+      "type": "blob",
+      "size": 1036
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/dao/MerchantAliasDao.kt",
+      "type": "blob",
+      "size": 956
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/dao/PersonDao.kt",
+      "type": "blob",
+      "size": 774
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/dao/SettingsDao.kt",
+      "type": "blob",
+      "size": 677
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/dao/StatementDao.kt",
+      "type": "blob",
+      "size": 3178
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/dao/TransactionDao.kt",
+      "type": "blob",
+      "size": 6568
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/entity/AccountEntity.kt",
+      "type": "blob",
+      "size": 1417
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/entity/CategoryEntity.kt",
+      "type": "blob",
+      "size": 1188
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/entity/ClassificationCacheEntity.kt",
+      "type": "blob",
+      "size": 1675
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/entity/CurrencyEntity.kt",
+      "type": "blob",
+      "size": 858
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/entity/ImportLogEntity.kt",
+      "type": "blob",
+      "size": 1055
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/entity/InstallmentPlanEntity.kt",
+      "type": "blob",
+      "size": 2620
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/entity/InternalTransferLinkEntity.kt",
+      "type": "blob",
+      "size": 1634
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/entity/LlmInteractionEntity.kt",
+      "type": "blob",
+      "size": 1308
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/entity/LoanEntity.kt",
+      "type": "blob",
+      "size": 1750
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/entity/LoanPaymentEntity.kt",
+      "type": "blob",
+      "size": 1550
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/entity/MerchantAliasEntity.kt",
+      "type": "blob",
+      "size": 1192
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/entity/PersonEntity.kt",
+      "type": "blob",
+      "size": 1198
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/entity/SettingsEntity.kt",
+      "type": "blob",
+      "size": 345
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/entity/StatementEntity.kt",
+      "type": "blob",
+      "size": 1344
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/entity/TransactionEntity.kt",
+      "type": "blob",
+      "size": 5027
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/db/seed/CategorySeed.kt",
+      "type": "blob",
+      "size": 1388
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/parser/bank/BankAdapter.kt",
+      "type": "blob",
+      "size": 354
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/parser/bank/ParsableFile.kt",
+      "type": "blob",
+      "size": 199
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/parser/bank/Sha256.kt",
+      "type": "blob",
+      "size": 537
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/parser/bank/StatementType.kt",
+      "type": "blob",
+      "size": 127
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/parser/bank/bancolombia/BancolombiaAdapter.kt",
+      "type": "blob",
+      "size": 2001
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/parser/bank/bancolombia/CreditCardParser.kt",
+      "type": "blob",
+      "size": 15324
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/parser/bank/bancolombia/FundParser.kt",
+      "type": "blob",
+      "size": 6189
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/parser/bank/bancolombia/SavingsParser.kt",
+      "type": "blob",
+      "size": 5287
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/repository/RoomAccountRepository.kt",
+      "type": "blob",
+      "size": 1384
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/repository/RoomStatementRepository.kt",
+      "type": "blob",
+      "size": 599
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/repository/RoomTransactionRepository.kt",
+      "type": "blob",
+      "size": 2413
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/text/AccountTypeLabel.kt",
+      "type": "blob",
+      "size": 398
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/text/AmountParser.kt",
+      "type": "blob",
+      "size": 4048
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/text/DescriptionNormalizer.kt",
+      "type": "blob",
+      "size": 1526
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/data/text/DisplayMerchant.kt",
+      "type": "blob",
+      "size": 1147
+    },
+    { "path": "app/src/main/java/com/example/mintroot/di/AdapterModule.kt", "type": "blob", "size": 542 },
+    { "path": "app/src/main/java/com/example/mintroot/di/DatabaseModule.kt", "type": "blob", "size": 5244 },
+    { "path": "app/src/main/java/com/example/mintroot/di/GeminiLlmModule.kt", "type": "blob", "size": 1208 },
+    { "path": "app/src/main/java/com/example/mintroot/di/LlmModule.kt", "type": "blob", "size": 1153 },
+    { "path": "app/src/main/java/com/example/mintroot/di/RepositoryModule.kt", "type": "blob", "size": 1015 },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/classification/CacheHit.kt",
+      "type": "blob",
+      "size": 368
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/classification/CacheLookup.kt",
+      "type": "blob",
+      "size": 2495
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/classification/CacheUpsert.kt",
+      "type": "blob",
+      "size": 2396
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/matching/InternalTransferMatcher.kt",
+      "type": "blob",
+      "size": 8052
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/matching/MatchingReport.kt",
+      "type": "blob",
+      "size": 319
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/matching/MatchingTypes.kt",
+      "type": "blob",
+      "size": 1147
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/parser/ParsedStatement.kt",
+      "type": "blob",
+      "size": 1805
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/repository/AccountRepository.kt",
+      "type": "blob",
+      "size": 438
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/repository/StatementRepository.kt",
+      "type": "blob",
+      "size": 262
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/repository/TransactionRepository.kt",
+      "type": "blob",
+      "size": 906
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/usecase/ClassificationOutcome.kt",
+      "type": "blob",
+      "size": 741
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/usecase/ClassifyBatchUseCase.kt",
+      "type": "blob",
+      "size": 13209
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/usecase/ClassifyTransactionUseCase.kt",
+      "type": "blob",
+      "size": 10152
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/usecase/ExportTransactionsUseCase.kt",
+      "type": "blob",
+      "size": 4575
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/usecase/ImportResult.kt",
+      "type": "blob",
+      "size": 507
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/usecase/ImportStatementUseCase.kt",
+      "type": "blob",
+      "size": 16289
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/usecase/MatchInternalTransfersUseCase.kt",
+      "type": "blob",
+      "size": 17822
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/usecase/PolishBatchUseCase.kt",
+      "type": "blob",
+      "size": 10850
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/domain/usecase/ReconcileOutcome.kt",
+      "type": "blob",
+      "size": 533
+    },
+    { "path": "app/src/main/java/com/example/mintroot/infrastructure/.gitkeep", "type": "blob", "size": 175 },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/llm/LlmClient.kt",
+      "type": "blob",
+      "size": 680
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/llm/LlmInteractionLogger.kt",
+      "type": "blob",
+      "size": 2499
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/llm/LlmRoles.kt",
+      "type": "blob",
+      "size": 526
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/llm/chat/ChatTool.kt",
+      "type": "blob",
+      "size": 1438
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/llm/chat/GeminiChatClient.kt",
+      "type": "blob",
+      "size": 8318
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/llm/chat/MintrootChatTools.kt",
+      "type": "blob",
+      "size": 23510
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/llm/gemini/GeminiLlmClient.kt",
+      "type": "blob",
+      "size": 5167
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/llm/gemini/GeminiSettingsStore.kt",
+      "type": "blob",
+      "size": 3789
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/llm/prompt/Prompt.kt",
+      "type": "blob",
+      "size": 252
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/llm/prompt/PromptId.kt",
+      "type": "blob",
+      "size": 174
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/llm/prompt/PromptRegistry.kt",
+      "type": "blob",
+      "size": 2232
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/llm/prompt/PromptRenderer.kt",
+      "type": "blob",
+      "size": 1443
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/saf/UriDisplayName.kt",
+      "type": "blob",
+      "size": 870
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/security/KeystorePassphraseStore.kt",
+      "type": "blob",
+      "size": 3318
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/update/ApkInstaller.kt",
+      "type": "blob",
+      "size": 3117
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/update/UpdateChecker.kt",
+      "type": "blob",
+      "size": 4129
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/work/CancelWorkReceiver.kt",
+      "type": "blob",
+      "size": 902
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/work/ClassifyAllPendingWorker.kt",
+      "type": "blob",
+      "size": 7583
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/infrastructure/work/PolishAllPendingWorker.kt",
+      "type": "blob",
+      "size": 5393
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/account/AccountDetailScreen.kt",
+      "type": "blob",
+      "size": 18124
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/account/AccountDetailViewModel.kt",
+      "type": "blob",
+      "size": 8717
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/ai/AiActivityScreen.kt",
+      "type": "blob",
+      "size": 18677
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/ai/AiActivityViewModel.kt",
+      "type": "blob",
+      "size": 6150
+    },
+    { "path": "app/src/main/java/com/example/mintroot/ui/ai/AiHubScreen.kt", "type": "blob", "size": 4352 },
+    { "path": "app/src/main/java/com/example/mintroot/ui/ai/AiStatusPill.kt", "type": "blob", "size": 4237 },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/ai/AiStatusViewModel.kt",
+      "type": "blob",
+      "size": 2798
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/brand/MintSproutMark.kt",
+      "type": "blob",
+      "size": 3226
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/brand/MintrootSplash.kt",
+      "type": "blob",
+      "size": 5620
+    },
+    { "path": "app/src/main/java/com/example/mintroot/ui/chat/ChatScreen.kt", "type": "blob", "size": 24335 },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/chat/ChatViewModel.kt",
+      "type": "blob",
+      "size": 19409
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/coverage/CoverageScreen.kt",
+      "type": "blob",
+      "size": 18455
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/coverage/CoverageViewModel.kt",
+      "type": "blob",
+      "size": 5624
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/dashboard/DashboardScreen.kt",
+      "type": "blob",
+      "size": 28808
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/dashboard/DashboardViewModel.kt",
+      "type": "blob",
+      "size": 12268
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/home/AccountCardCarousel.kt",
+      "type": "blob",
+      "size": 18983
+    },
+    { "path": "app/src/main/java/com/example/mintroot/ui/home/HomeScreen.kt", "type": "blob", "size": 47357 },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/home/HomeViewModel.kt",
+      "type": "blob",
+      "size": 22291
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/merchants/MerchantsScreen.kt",
+      "type": "blob",
+      "size": 15946
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/merchants/MerchantsViewModel.kt",
+      "type": "blob",
+      "size": 5029
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/nav/MintrootDestinations.kt",
+      "type": "blob",
+      "size": 1337
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/nav/MintrootNavHost.kt",
+      "type": "blob",
+      "size": 7231
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/settings/SettingsScreen.kt",
+      "type": "blob",
+      "size": 19478
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/settings/SettingsViewModel.kt",
+      "type": "blob",
+      "size": 7023
+    },
+    { "path": "app/src/main/java/com/example/mintroot/ui/theme/Color.kt", "type": "blob", "size": 6110 },
+    { "path": "app/src/main/java/com/example/mintroot/ui/theme/Theme.kt", "type": "blob", "size": 7163 },
+    { "path": "app/src/main/java/com/example/mintroot/ui/theme/Type.kt", "type": "blob", "size": 4594 },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/transactions/TransactionDetailSheet.kt",
+      "type": "blob",
+      "size": 17278
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/transactions/TransactionsScreen.kt",
+      "type": "blob",
+      "size": 17725
+    },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/transactions/TransactionsViewModel.kt",
+      "type": "blob",
+      "size": 3109
+    },
+    { "path": "app/src/main/java/com/example/mintroot/ui/util/AiMeta.kt", "type": "blob", "size": 5806 },
+    {
+      "path": "app/src/main/java/com/example/mintroot/ui/util/ClassificationVisual.kt",
+      "type": "blob",
+      "size": 3234
+    },
+    { "path": "app/src/main/java/com/example/mintroot/ui/util/PrivacyMask.kt", "type": "blob", "size": 878 },
+    { "path": "app/src/main/res/drawable/ic_launcher_background.xml", "type": "blob", "size": 1544 },
+    { "path": "app/src/main/res/drawable/ic_launcher_foreground.xml", "type": "blob", "size": 2809 },
+    { "path": "app/src/main/res/drawable/ic_mint_sprout.xml", "type": "blob", "size": 1331 },
+    { "path": "app/src/main/res/drawable/ic_mint_sprout_mono.xml", "type": "blob", "size": 715 },
+    { "path": "app/src/main/res/mipmap-anydpi/ic_launcher.xml", "type": "blob", "size": 343 },
+    { "path": "app/src/main/res/mipmap-anydpi/ic_launcher_round.xml", "type": "blob", "size": 343 },
+    { "path": "app/src/main/res/mipmap-hdpi/ic_launcher.webp", "type": "blob", "size": 1404 },
+    { "path": "app/src/main/res/mipmap-hdpi/ic_launcher_round.webp", "type": "blob", "size": 2898 },
+    { "path": "app/src/main/res/mipmap-mdpi/ic_launcher.webp", "type": "blob", "size": 982 },
+    { "path": "app/src/main/res/mipmap-mdpi/ic_launcher_round.webp", "type": "blob", "size": 1772 },
+    { "path": "app/src/main/res/mipmap-xhdpi/ic_launcher.webp", "type": "blob", "size": 1900 },
+    { "path": "app/src/main/res/mipmap-xhdpi/ic_launcher_round.webp", "type": "blob", "size": 3918 },
+    { "path": "app/src/main/res/mipmap-xxhdpi/ic_launcher.webp", "type": "blob", "size": 2884 },
+    { "path": "app/src/main/res/mipmap-xxhdpi/ic_launcher_round.webp", "type": "blob", "size": 5914 },
+    { "path": "app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp", "type": "blob", "size": 3844 },
+    { "path": "app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp", "type": "blob", "size": 7778 },
+    { "path": "app/src/main/res/values-v31/themes.xml", "type": "blob", "size": 575 },
+    { "path": "app/src/main/res/values/colors.xml", "type": "blob", "size": 487 },
+    { "path": "app/src/main/res/values/strings.xml", "type": "blob", "size": 70 },
+    { "path": "app/src/main/res/values/themes.xml", "type": "blob", "size": 1004 },
+    { "path": "app/src/main/res/xml/backup_rules.xml", "type": "blob", "size": 478 },
+    { "path": "app/src/main/res/xml/data_extraction_rules.xml", "type": "blob", "size": 551 },
+    { "path": "app/src/main/res/xml/file_provider_paths.xml", "type": "blob", "size": 254 },
+    {
+      "path": "app/src/test/java/com/example/mintroot/data/db/AppDatabaseSmokeTest.kt",
+      "type": "blob",
+      "size": 6303
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/data/parser/CreditCardParserRealFixtureTest.kt",
+      "type": "blob",
+      "size": 4997
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/data/parser/CreditCardParserSyntheticTest.kt",
+      "type": "blob",
+      "size": 13000
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/data/parser/FundParserRealFixtureTest.kt",
+      "type": "blob",
+      "size": 3412
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/data/parser/FundParserSyntheticTest.kt",
+      "type": "blob",
+      "size": 4919
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/data/parser/LocalFixtures.kt",
+      "type": "blob",
+      "size": 2050
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/data/parser/SavingsParserRealFixtureTest.kt",
+      "type": "blob",
+      "size": 2499
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/data/parser/SavingsParserSyntheticTest.kt",
+      "type": "blob",
+      "size": 7427
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/data/text/AmountParserTest.kt",
+      "type": "blob",
+      "size": 2937
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/data/text/DescriptionNormalizerTest.kt",
+      "type": "blob",
+      "size": 1010
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/domain/matching/InternalTransferMatcherTest.kt",
+      "type": "blob",
+      "size": 8906
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/domain/matching/MatchInternalTransfersUseCaseTest.kt",
+      "type": "blob",
+      "size": 20772
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/domain/usecase/ClassifyTransactionUseCaseTest.kt",
+      "type": "blob",
+      "size": 12394
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/infrastructure/llm/FakeLlmClient.kt",
+      "type": "blob",
+      "size": 720
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/infrastructure/llm/cache/CacheLookupTest.kt",
+      "type": "blob",
+      "size": 6037
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/infrastructure/llm/eval/EvalFixture.kt",
+      "type": "blob",
+      "size": 408
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/infrastructure/llm/eval/EvalHarnessSelfTest.kt",
+      "type": "blob",
+      "size": 5974
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/infrastructure/llm/eval/EvalResult.kt",
+      "type": "blob",
+      "size": 1191
+    },
+    {
+      "path": "app/src/test/java/com/example/mintroot/infrastructure/llm/eval/EvalRunner.kt",
+      "type": "blob",
+      "size": 4783
+    },
+    { "path": "app/src/test/resources/eval/classify_transaction/v1.json", "type": "blob", "size": 5135 },
+    { "path": "app/src/test/resources/eval/parse_sms/v1.json", "type": "blob", "size": 10367 },
+    { "path": "build.gradle.kts", "type": "blob", "size": 414 },
+    { "path": "docs", "type": "tree" },
+    { "path": "docs/screenshots/01_home.png", "type": "blob", "size": 564003 },
+    { "path": "docs/screenshots/02_activity.png", "type": "blob", "size": 341122 },
+    { "path": "docs/screenshots/03_ai_hub.png", "type": "blob", "size": 324088 },
+    { "path": "docs/screenshots/04_dashboard.png", "type": "blob", "size": 284992 },
+    { "path": "docs/screenshots/05_files.png", "type": "blob", "size": 398438 },
+    { "path": "docs/screenshots/06_settings.png", "type": "blob", "size": 273532 },
+    { "path": "gradle.properties", "type": "blob", "size": 495 },
+    { "path": "gradle", "type": "tree" },
+    { "path": "gradle/gradle-daemon-jvm.properties", "type": "blob", "size": 1138 },
+    { "path": "gradle/libs.versions.toml", "type": "blob", "size": 6002 },
+    { "path": "gradle/wrapper/gradle-wrapper.jar", "type": "blob", "size": 45457 },
+    { "path": "gradle/wrapper/gradle-wrapper.properties", "type": "blob", "size": 251 },
+    { "path": "gradlew", "type": "blob", "size": 8728 },
+    { "path": "gradlew.bat", "type": "blob", "size": 2937 },
+    { "path": "settings.gradle.kts", "type": "blob", "size": 619 }
+  ]
+}

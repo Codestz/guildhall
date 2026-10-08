@@ -1,0 +1,630 @@
+{
+  "repo": "Codestz/claude-hindsight",
+  "branch": "main",
+  "truncated": false,
+  "note": "Nested directory entries dropped to keep it small: the generator reads only top-level trees.",
+  "entries": [
+    { "path": ".agents", "type": "tree" },
+    { "path": ".agents/skills/frontend-design/LICENSE.txt", "type": "blob", "size": 10174 },
+    { "path": ".agents/skills/frontend-design/SKILL.md", "type": "blob", "size": 4440 },
+    { "path": ".agents/skills/rust-best-practices/SKILL.md", "type": "blob", "size": 4341 },
+    { "path": ".agents/skills/rust-best-practices/references/chapter_01.md", "type": "blob", "size": 17344 },
+    { "path": ".agents/skills/rust-best-practices/references/chapter_02.md", "type": "blob", "size": 5450 },
+    { "path": ".agents/skills/rust-best-practices/references/chapter_03.md", "type": "blob", "size": 8785 },
+    { "path": ".agents/skills/rust-best-practices/references/chapter_04.md", "type": "blob", "size": 7095 },
+    { "path": ".agents/skills/rust-best-practices/references/chapter_05.md", "type": "blob", "size": 14125 },
+    { "path": ".agents/skills/rust-best-practices/references/chapter_06.md", "type": "blob", "size": 6813 },
+    { "path": ".agents/skills/rust-best-practices/references/chapter_07.md", "type": "blob", "size": 8236 },
+    { "path": ".agents/skills/rust-best-practices/references/chapter_08.md", "type": "blob", "size": 10130 },
+    { "path": ".agents/skills/rust-best-practices/references/chapter_09.md", "type": "blob", "size": 9570 },
+    { "path": ".agents/skills/skill-creator/LICENSE.txt", "type": "blob", "size": 11357 },
+    { "path": ".agents/skills/skill-creator/SKILL.md", "type": "blob", "size": 18086 },
+    { "path": ".agents/skills/skill-creator/references/output-patterns.md", "type": "blob", "size": 1813 },
+    { "path": ".agents/skills/skill-creator/references/workflows.md", "type": "blob", "size": 818 },
+    { "path": ".agents/skills/skill-creator/scripts/init_skill.py", "type": "blob", "size": 10865 },
+    { "path": ".agents/skills/skill-creator/scripts/package_skill.py", "type": "blob", "size": 3288 },
+    { "path": ".agents/skills/skill-creator/scripts/quick_validate.py", "type": "blob", "size": 3972 },
+    { "path": ".agents/skills/vercel-composition-patterns/AGENTS.md", "type": "blob", "size": 22627 },
+    { "path": ".agents/skills/vercel-composition-patterns/SKILL.md", "type": "blob", "size": 2886 },
+    {
+      "path": ".agents/skills/vercel-composition-patterns/rules/architecture-avoid-boolean-props.md",
+      "type": "blob",
+      "size": 2267
+    },
+    {
+      "path": ".agents/skills/vercel-composition-patterns/rules/architecture-compound-components.md",
+      "type": "blob",
+      "size": 2600
+    },
+    {
+      "path": ".agents/skills/vercel-composition-patterns/rules/patterns-children-over-render-props.md",
+      "type": "blob",
+      "size": 1886
+    },
+    {
+      "path": ".agents/skills/vercel-composition-patterns/rules/patterns-explicit-variants.md",
+      "type": "blob",
+      "size": 2395
+    },
+    {
+      "path": ".agents/skills/vercel-composition-patterns/rules/react19-no-forwardref.md",
+      "type": "blob",
+      "size": 953
+    },
+    {
+      "path": ".agents/skills/vercel-composition-patterns/rules/state-context-interface.md",
+      "type": "blob",
+      "size": 4974
+    },
+    {
+      "path": ".agents/skills/vercel-composition-patterns/rules/state-decouple-implementation.md",
+      "type": "blob",
+      "size": 2699
+    },
+    {
+      "path": ".agents/skills/vercel-composition-patterns/rules/state-lift-state.md",
+      "type": "blob",
+      "size": 3224
+    },
+    { "path": ".agents/skills/vercel-react-best-practices/AGENTS.md", "type": "blob", "size": 81716 },
+    { "path": ".agents/skills/vercel-react-best-practices/SKILL.md", "type": "blob", "size": 6165 },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/advanced-event-handler-refs.md",
+      "type": "blob",
+      "size": 1483
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/advanced-init-once.md",
+      "type": "blob",
+      "size": 958
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/advanced-use-latest.md",
+      "type": "blob",
+      "size": 1072
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/async-api-routes.md",
+      "type": "blob",
+      "size": 1125
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/async-defer-await.md",
+      "type": "blob",
+      "size": 2028
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/async-dependencies.md",
+      "type": "blob",
+      "size": 1293
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/async-parallel.md",
+      "type": "blob",
+      "size": 654
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/async-suspense-boundaries.md",
+      "type": "blob",
+      "size": 2510
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/bundle-barrel-imports.md",
+      "type": "blob",
+      "size": 2370
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/bundle-conditional.md",
+      "type": "blob",
+      "size": 949
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/bundle-defer-third-party.md",
+      "type": "blob",
+      "size": 920
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/bundle-dynamic-imports.md",
+      "type": "blob",
+      "size": 791
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/bundle-preload.md",
+      "type": "blob",
+      "size": 1149
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/client-event-listeners.md",
+      "type": "blob",
+      "size": 1969
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/client-localstorage-schema.md",
+      "type": "blob",
+      "size": 1950
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/client-passive-event-listeners.md",
+      "type": "blob",
+      "size": 1644
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/client-swr-dedup.md",
+      "type": "blob",
+      "size": 1159
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/js-batch-dom-css.md",
+      "type": "blob",
+      "size": 3266
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/js-cache-function-results.md",
+      "type": "blob",
+      "size": 1949
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/js-cache-property-access.md",
+      "type": "blob",
+      "size": 532
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/js-cache-storage.md",
+      "type": "blob",
+      "size": 1651
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/js-combine-iterations.md",
+      "type": "blob",
+      "size": 753
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/js-early-exit.md",
+      "type": "blob",
+      "size": 1133
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/js-hoist-regexp.md",
+      "type": "blob",
+      "size": 1028
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/js-index-maps.md",
+      "type": "blob",
+      "size": 837
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/js-length-check-first.md",
+      "type": "blob",
+      "size": 1747
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/js-min-max-loop.md",
+      "type": "blob",
+      "size": 2290
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/js-set-map-lookups.md",
+      "type": "blob",
+      "size": 532
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/js-tosorted-immutable.md",
+      "type": "blob",
+      "size": 1782
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rendering-activity.md",
+      "type": "blob",
+      "size": 564
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rendering-animate-svg-wrapper.md",
+      "type": "blob",
+      "size": 1185
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rendering-conditional-render.md",
+      "type": "blob",
+      "size": 980
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rendering-content-visibility.md",
+      "type": "blob",
+      "size": 815
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rendering-hoist-jsx.md",
+      "type": "blob",
+      "size": 1039
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rendering-hydration-no-flicker.md",
+      "type": "blob",
+      "size": 2308
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rendering-hydration-suppress-warning.md",
+      "type": "blob",
+      "size": 872
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rendering-svg-precision.md",
+      "type": "blob",
+      "size": 588
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rendering-usetransition-loading.md",
+      "type": "blob",
+      "size": 2074
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rerender-defer-reads.md",
+      "type": "blob",
+      "size": 973
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rerender-dependencies.md",
+      "type": "blob",
+      "size": 824
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rerender-derived-state-no-effect.md",
+      "type": "blob",
+      "size": 1201
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rerender-derived-state.md",
+      "type": "blob",
+      "size": 728
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rerender-functional-setstate.md",
+      "type": "blob",
+      "size": 2968
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rerender-lazy-state-init.md",
+      "type": "blob",
+      "size": 2016
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rerender-memo-with-default-value.md",
+      "type": "blob",
+      "size": 1173
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rerender-memo.md",
+      "type": "blob",
+      "size": 1148
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rerender-move-effect-to-event.md",
+      "type": "blob",
+      "size": 1268
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rerender-simple-expression-in-memo.md",
+      "type": "blob",
+      "size": 1018
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rerender-transitions.md",
+      "type": "blob",
+      "size": 1055
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/rerender-use-ref-transient-values.md",
+      "type": "blob",
+      "size": 1742
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/server-after-nonblocking.md",
+      "type": "blob",
+      "size": 2012
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/server-auth-actions.md",
+      "type": "blob",
+      "size": 2649
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/server-cache-lru.md",
+      "type": "blob",
+      "size": 1353
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/server-cache-react.md",
+      "type": "blob",
+      "size": 2228
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/server-dedup-props.md",
+      "type": "blob",
+      "size": 2060
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/server-parallel-fetching.md",
+      "type": "blob",
+      "size": 1554
+    },
+    {
+      "path": ".agents/skills/vercel-react-best-practices/rules/server-serialization.md",
+      "type": "blob",
+      "size": 996
+    },
+    { "path": ".agents/skills/web-design-guidelines/SKILL.md", "type": "blob", "size": 1231 },
+    { "path": ".claude", "type": "tree" },
+    { "path": ".claude/CLAUDE.md", "type": "blob", "size": 20 },
+    { "path": ".claude/MCPX.md", "type": "blob", "size": 930 },
+    { "path": ".claude/SERENA.md", "type": "blob", "size": 3511 },
+    { "path": ".claude/skills/frontend-design", "type": "blob", "size": 36 },
+    { "path": ".claude/skills/rust-best-practices", "type": "blob", "size": 40 },
+    { "path": ".claude/skills/skill-creator", "type": "blob", "size": 34 },
+    { "path": ".claude/skills/vercel-composition-patterns", "type": "blob", "size": 48 },
+    { "path": ".claude/skills/vercel-react-best-practices", "type": "blob", "size": 48 },
+    { "path": ".claude/skills/web-design-guidelines", "type": "blob", "size": 42 },
+    { "path": ".github", "type": "tree" },
+    { "path": ".github/FUNDING.yml", "type": "blob", "size": 16 },
+    { "path": ".github/ISSUE_TEMPLATE/bug_report.yml", "type": "blob", "size": 1865 },
+    { "path": ".github/ISSUE_TEMPLATE/config.yml", "type": "blob", "size": 455 },
+    { "path": ".github/ISSUE_TEMPLATE/feature_request.yml", "type": "blob", "size": 1578 },
+    { "path": ".github/PULL_REQUEST_TEMPLATE.md", "type": "blob", "size": 401 },
+    { "path": ".github/dependabot.yml", "type": "blob", "size": 542 },
+    { "path": ".github/labels.yml", "type": "blob", "size": 1405 },
+    { "path": ".github/release-drafter.yml", "type": "blob", "size": 885 },
+    { "path": ".github/workflows/ci.yml", "type": "blob", "size": 897 },
+    { "path": ".github/workflows/labels.yml", "type": "blob", "size": 427 },
+    { "path": ".github/workflows/pages.yml", "type": "blob", "size": 885 },
+    { "path": ".github/workflows/release-drafter.yml", "type": "blob", "size": 409 },
+    { "path": ".github/workflows/release.yml", "type": "blob", "size": 6657 },
+    { "path": ".gitignore", "type": "blob", "size": 577 },
+    { "path": ".mcpx", "type": "tree" },
+    { "path": ".mcpx/config.yml", "type": "blob", "size": 372 },
+    { "path": ".serena", "type": "tree" },
+    { "path": ".serena/.gitignore", "type": "blob", "size": 26 },
+    { "path": ".serena/project.yml", "type": "blob", "size": 8283 },
+    { "path": "CHANGELOG.md", "type": "blob", "size": 10278 },
+    { "path": "CODE_OF_CONDUCT.md", "type": "blob", "size": 1310 },
+    { "path": "CONTRIBUTING.md", "type": "blob", "size": 9516 },
+    { "path": "Cargo.toml", "type": "blob", "size": 1932 },
+    { "path": "Formula", "type": "tree" },
+    { "path": "Formula/claude-hindsight.rb", "type": "blob", "size": 1285 },
+    { "path": "LICENSE", "type": "blob", "size": 1064 },
+    { "path": "Makefile", "type": "blob", "size": 1264 },
+    { "path": "README.md", "type": "blob", "size": 11377 },
+    { "path": "SECURITY.md", "type": "blob", "size": 1385 },
+    { "path": "build.rs", "type": "blob", "size": 3768 },
+    { "path": "site", "type": "tree" },
+    { "path": "site/.gitignore", "type": "blob", "size": 91 },
+    { "path": "site/astro.config.ts", "type": "blob", "size": 277 },
+    { "path": "site/package-lock.json", "type": "blob", "size": 252142 },
+    { "path": "site/package.json", "type": "blob", "size": 358 },
+    { "path": "site/public/favicon.svg", "type": "blob", "size": 421 },
+    { "path": "site/public/og.svg", "type": "blob", "size": 3384 },
+    { "path": "site/public/robots.txt", "type": "blob", "size": 88 },
+    { "path": "site/public/sitemap.xml", "type": "blob", "size": 886 },
+    { "path": "site/src/components/FeatureCard.astro", "type": "blob", "size": 841 },
+    { "path": "site/src/components/Footer.astro", "type": "blob", "size": 2792 },
+    { "path": "site/src/components/Nav.astro", "type": "blob", "size": 6437 },
+    { "path": "site/src/components/SessionDemo.astro", "type": "blob", "size": 31432 },
+    { "path": "site/src/components/TerminalDemo.astro", "type": "blob", "size": 2365 },
+    { "path": "site/src/env.d.ts", "type": "blob", "size": 45 },
+    { "path": "site/src/layouts/Docs.astro", "type": "blob", "size": 17254 },
+    { "path": "site/src/layouts/Landing.astro", "type": "blob", "size": 3628 },
+    { "path": "site/src/lib/version.ts", "type": "blob", "size": 249 },
+    { "path": "site/src/pages/docs/architecture.md", "type": "blob", "size": 643 },
+    { "path": "site/src/pages/docs/commands.md", "type": "blob", "size": 7259 },
+    { "path": "site/src/pages/docs/configuration.md", "type": "blob", "size": 3347 },
+    { "path": "site/src/pages/docs/contributing.md", "type": "blob", "size": 6370 },
+    { "path": "site/src/pages/docs/dashboard.md", "type": "blob", "size": 7334 },
+    { "path": "site/src/pages/docs/getting-started.md", "type": "blob", "size": 4552 },
+    { "path": "site/src/pages/docs/hooks.md", "type": "blob", "size": 4634 },
+    { "path": "site/src/pages/docs/index.astro", "type": "blob", "size": 126 },
+    { "path": "site/src/pages/docs/troubleshooting.md", "type": "blob", "size": 6128 },
+    { "path": "site/src/pages/index.astro", "type": "blob", "size": 41807 },
+    { "path": "site/src/styles/global.css", "type": "blob", "size": 6355 },
+    { "path": "site/tailwind.config.ts", "type": "blob", "size": 694 },
+    { "path": "src", "type": "tree" },
+    { "path": "src/agents/discovery.rs", "type": "blob", "size": 16052 },
+    { "path": "src/agents/mod.rs", "type": "blob", "size": 337 },
+    { "path": "src/agents/parser.rs", "type": "blob", "size": 11842 },
+    { "path": "src/analyzer/mod.rs", "type": "blob", "size": 322 },
+    { "path": "src/analyzer/prompt_detect.rs", "type": "blob", "size": 11893 },
+    { "path": "src/analyzer/session_analytics.rs", "type": "blob", "size": 6844 },
+    { "path": "src/analyzer/simple_tree.rs", "type": "blob", "size": 16076 },
+    { "path": "src/analyzer/smart_label.rs", "type": "blob", "size": 12089 },
+    { "path": "src/analyzer/tree.rs", "type": "blob", "size": 1142 },
+    { "path": "src/api/formatting.rs", "type": "blob", "size": 809 },
+    { "path": "src/api/mod.rs", "type": "blob", "size": 195 },
+    { "path": "src/api/responses.rs", "type": "blob", "size": 10819 },
+    { "path": "src/commands/clean.rs", "type": "blob", "size": 1783 },
+    { "path": "src/commands/config.rs", "type": "blob", "size": 2148 },
+    { "path": "src/commands/daemon.rs", "type": "blob", "size": 1442 },
+    { "path": "src/commands/export.rs", "type": "blob", "size": 203 },
+    { "path": "src/commands/hook.rs", "type": "blob", "size": 9438 },
+    { "path": "src/commands/hook_index.rs", "type": "blob", "size": 2322 },
+    { "path": "src/commands/init.rs", "type": "blob", "size": 2068 },
+    { "path": "src/commands/integrate.rs", "type": "blob", "size": 15298 },
+    { "path": "src/commands/list.rs", "type": "blob", "size": 2365 },
+    { "path": "src/commands/mod.rs", "type": "blob", "size": 312 },
+    { "path": "src/commands/paths.rs", "type": "blob", "size": 3416 },
+    { "path": "src/commands/reindex.rs", "type": "blob", "size": 4276 },
+    { "path": "src/commands/search.rs", "type": "blob", "size": 1077 },
+    { "path": "src/commands/serve.rs", "type": "blob", "size": 2447 },
+    { "path": "src/commands/show.rs", "type": "blob", "size": 878 },
+    { "path": "src/commands/update_check.rs", "type": "blob", "size": 6098 },
+    { "path": "src/commands/watch.rs", "type": "blob", "size": 3855 },
+    { "path": "src/config/mod.rs", "type": "blob", "size": 11180 },
+    { "path": "src/error.rs", "type": "blob", "size": 1120 },
+    { "path": "src/lib.rs", "type": "blob", "size": 561 },
+    { "path": "src/main.rs", "type": "blob", "size": 13483 },
+    { "path": "src/otel/extractor.rs", "type": "blob", "size": 7401 },
+    { "path": "src/otel/mod.rs", "type": "blob", "size": 1646 },
+    { "path": "src/otel/parser.rs", "type": "blob", "size": 5347 },
+    { "path": "src/parser/extract.rs", "type": "blob", "size": 19760 },
+    { "path": "src/parser/mod.rs", "type": "blob", "size": 222 },
+    { "path": "src/parser/models.rs", "type": "blob", "size": 24523 },
+    { "path": "src/parser/transcript.rs", "type": "blob", "size": 40238 },
+    { "path": "src/pricing.rs", "type": "blob", "size": 6498 },
+    { "path": "src/search/filters.rs", "type": "blob", "size": 1078 },
+    { "path": "src/search/mod.rs", "type": "blob", "size": 2383 },
+    { "path": "src/search/results.rs", "type": "blob", "size": 3495 },
+    { "path": "src/server/daemon.rs", "type": "blob", "size": 2846 },
+    { "path": "src/server/dto.rs", "type": "blob", "size": 4217 },
+    { "path": "src/server/error.rs", "type": "blob", "size": 1006 },
+    { "path": "src/server/mod.rs", "type": "blob", "size": 7671 },
+    { "path": "src/server/routes/agents.rs", "type": "blob", "size": 2142 },
+    { "path": "src/server/routes/analytics.rs", "type": "blob", "size": 1509 },
+    { "path": "src/server/routes/events.rs", "type": "blob", "size": 4953 },
+    { "path": "src/server/routes/hooks.rs", "type": "blob", "size": 3294 },
+    { "path": "src/server/routes/mod.rs", "type": "blob", "size": 766 },
+    { "path": "src/server/routes/otel.rs", "type": "blob", "size": 2238 },
+    { "path": "src/server/routes/otel_query.rs", "type": "blob", "size": 4736 },
+    { "path": "src/server/routes/projects.rs", "type": "blob", "size": 472 },
+    { "path": "src/server/routes/prompts.rs", "type": "blob", "size": 2333 },
+    { "path": "src/server/routes/search.rs", "type": "blob", "size": 798 },
+    { "path": "src/server/routes/sessions.rs", "type": "blob", "size": 4100 },
+    { "path": "src/server/routes/telemetry.rs", "type": "blob", "size": 1015 },
+    { "path": "src/storage/discovery.rs", "type": "blob", "size": 9852 },
+    { "path": "src/storage/index.rs", "type": "blob", "size": 105283 },
+    { "path": "src/storage/mod.rs", "type": "blob", "size": 1088 },
+    { "path": "src/tui/app.rs", "type": "blob", "size": 43749 },
+    { "path": "src/tui/code_render.rs", "type": "blob", "size": 8331 },
+    { "path": "src/tui/dashboard_view.rs", "type": "blob", "size": 7759 },
+    { "path": "src/tui/events.rs", "type": "blob", "size": 1223 },
+    { "path": "src/tui/mod.rs", "type": "blob", "size": 1619 },
+    { "path": "src/tui/projects_view.rs", "type": "blob", "size": 24102 },
+    { "path": "src/tui/prompts_view.rs", "type": "blob", "size": 18826 },
+    { "path": "src/tui/render.rs", "type": "blob", "size": 25860 },
+    { "path": "src/tui/router.rs", "type": "blob", "size": 15194 },
+    { "path": "src/tui/search.rs", "type": "blob", "size": 9478 },
+    { "path": "src/tui/search_modal.rs", "type": "blob", "size": 29721 },
+    { "path": "src/tui/sessions_view.rs", "type": "blob", "size": 28866 },
+    { "path": "src/tui/theme.rs", "type": "blob", "size": 819 },
+    { "path": "src/tui/ui.rs", "type": "blob", "size": 24516 },
+    { "path": "src/watcher/mod.rs", "type": "blob", "size": 6015 },
+    { "path": "src/watcher/stream_renderer.rs", "type": "blob", "size": 4842 },
+    { "path": "tests", "type": "tree" },
+    { "path": "tests/fixtures/full_session.jsonl", "type": "blob", "size": 351386 },
+    { "path": "tests/integration_parse.rs", "type": "blob", "size": 5318 },
+    { "path": "tests/integration_pipeline.rs", "type": "blob", "size": 6178 },
+    { "path": "tests/snapshot_tests.rs", "type": "blob", "size": 4032 },
+    { "path": "tests/snapshots/snapshot_tests__assistant_tool_use.snap", "type": "blob", "size": 1481 },
+    { "path": "tests/snapshots/snapshot_tests__first_user_message.snap", "type": "blob", "size": 664 },
+    { "path": "tests/snapshots/snapshot_tests__progress_hook.snap", "type": "blob", "size": 846 },
+    { "path": "tests/snapshots/snapshot_tests__system_node.snap", "type": "blob", "size": 657 },
+    { "path": "tests/snapshots/snapshot_tests__tree_metadata.snap", "type": "blob", "size": 123 },
+    { "path": "web", "type": "tree" },
+    { "path": "web/index.html", "type": "blob", "size": 941 },
+    { "path": "web/package-lock.json", "type": "blob", "size": 107344 },
+    { "path": "web/package.json", "type": "blob", "size": 698 },
+    { "path": "web/postcss.config.mjs", "type": "blob", "size": 94 },
+    { "path": "web/public/favicon.svg", "type": "blob", "size": 568 },
+    { "path": "web/src/App.tsx", "type": "blob", "size": 1884 },
+    { "path": "web/src/components/activity/EventRow.tsx", "type": "blob", "size": 3727 },
+    { "path": "web/src/components/activity/EventTimeline.tsx", "type": "blob", "size": 2293 },
+    { "path": "web/src/components/activity/config.ts", "type": "blob", "size": 1337 },
+    { "path": "web/src/components/activity/index.ts", "type": "blob", "size": 249 },
+    { "path": "web/src/components/activity/types.ts", "type": "blob", "size": 656 },
+    { "path": "web/src/components/charts/BarChart.tsx", "type": "blob", "size": 2546 },
+    { "path": "web/src/components/charts/DayChart.tsx", "type": "blob", "size": 3905 },
+    { "path": "web/src/components/charts/TokenBreakdownBar.tsx", "type": "blob", "size": 2973 },
+    { "path": "web/src/components/charts/index.ts", "type": "blob", "size": 220 },
+    { "path": "web/src/components/charts/types.ts", "type": "blob", "size": 346 },
+    { "path": "web/src/components/layout/CommandPalette.tsx", "type": "blob", "size": 12038 },
+    { "path": "web/src/components/layout/Sidebar.tsx", "type": "blob", "size": 7582 },
+    { "path": "web/src/components/layout/config.ts", "type": "blob", "size": 1638 },
+    { "path": "web/src/components/layout/index.ts", "type": "blob", "size": 252 },
+    { "path": "web/src/components/layout/types.ts", "type": "blob", "size": 554 },
+    { "path": "web/src/components/nodes/NodeRow.tsx", "type": "blob", "size": 4308 },
+    { "path": "web/src/components/nodes/NodeTree.tsx", "type": "blob", "size": 5392 },
+    { "path": "web/src/components/nodes/index.ts", "type": "blob", "size": 188 },
+    { "path": "web/src/components/nodes/types.ts", "type": "blob", "size": 583 },
+    { "path": "web/src/components/projects/ProjectRow.tsx", "type": "blob", "size": 2416 },
+    { "path": "web/src/components/projects/ProjectTable.tsx", "type": "blob", "size": 2192 },
+    { "path": "web/src/components/projects/index.ts", "type": "blob", "size": 157 },
+    { "path": "web/src/components/projects/types.ts", "type": "blob", "size": 241 },
+    { "path": "web/src/components/session/ExecutionGraph.tsx", "type": "blob", "size": 9208 },
+    { "path": "web/src/components/session/ExecutionList.tsx", "type": "blob", "size": 3016 },
+    { "path": "web/src/components/session/ExecutionRow.tsx", "type": "blob", "size": 4584 },
+    { "path": "web/src/components/session/GroupRow.tsx", "type": "blob", "size": 3540 },
+    { "path": "web/src/components/session/ImagePreview.tsx", "type": "blob", "size": 5085 },
+    { "path": "web/src/components/session/NodeDetailPanel.tsx", "type": "blob", "size": 14787 },
+    { "path": "web/src/components/session/ProgressIndicator.tsx", "type": "blob", "size": 1302 },
+    { "path": "web/src/components/session/SessionFilterBar.tsx", "type": "blob", "size": 7088 },
+    { "path": "web/src/components/session/SessionHeader.tsx", "type": "blob", "size": 4716 },
+    { "path": "web/src/components/session/TaskNotificationCard.tsx", "type": "blob", "size": 3473 },
+    { "path": "web/src/components/session/ThinkingBlock.tsx", "type": "blob", "size": 2553 },
+    { "path": "web/src/components/session/TimelineScrubber.tsx", "type": "blob", "size": 5185 },
+    { "path": "web/src/components/session/config.ts", "type": "blob", "size": 2701 },
+    { "path": "web/src/components/session/index.ts", "type": "blob", "size": 804 },
+    { "path": "web/src/components/session/tool-displays.tsx", "type": "blob", "size": 593 },
+    { "path": "web/src/components/session/tool-displays/index.ts", "type": "blob", "size": 433 },
+    { "path": "web/src/components/session/tool-displays/primitives.tsx", "type": "blob", "size": 2629 },
+    { "path": "web/src/components/session/tool-displays/resolve-file-path.ts", "type": "blob", "size": 3234 },
+    { "path": "web/src/components/session/tool-displays/serena.tsx", "type": "blob", "size": 2539 },
+    { "path": "web/src/components/session/tool-displays/strip-utils.ts", "type": "blob", "size": 591 },
+    { "path": "web/src/components/session/tool-displays/tool-renderers.tsx", "type": "blob", "size": 10900 },
+    { "path": "web/src/components/session/types.ts", "type": "blob", "size": 4402 },
+    { "path": "web/src/components/session/utils.ts", "type": "blob", "size": 3629 },
+    { "path": "web/src/components/sessions/SessionRow.tsx", "type": "blob", "size": 4567 },
+    { "path": "web/src/components/sessions/SessionTable.tsx", "type": "blob", "size": 2485 },
+    { "path": "web/src/components/sessions/index.ts", "type": "blob", "size": 157 },
+    { "path": "web/src/components/sessions/types.ts", "type": "blob", "size": 224 },
+    { "path": "web/src/components/ui/Badge.tsx", "type": "blob", "size": 1614 },
+    { "path": "web/src/components/ui/Card.tsx", "type": "blob", "size": 843 },
+    { "path": "web/src/components/ui/CodeRender.tsx", "type": "blob", "size": 2886 },
+    { "path": "web/src/components/ui/ConfigRow.tsx", "type": "blob", "size": 1089 },
+    { "path": "web/src/components/ui/EmptyState.tsx", "type": "blob", "size": 1309 },
+    { "path": "web/src/components/ui/ErrorState.tsx", "type": "blob", "size": 1251 },
+    { "path": "web/src/components/ui/FilterChips.tsx", "type": "blob", "size": 1094 },
+    { "path": "web/src/components/ui/FullPageMessage.tsx", "type": "blob", "size": 539 },
+    { "path": "web/src/components/ui/GraphErrorBoundary.tsx", "type": "blob", "size": 969 },
+    { "path": "web/src/components/ui/HindsightLogo.tsx", "type": "blob", "size": 3080 },
+    { "path": "web/src/components/ui/InlineDiff.tsx", "type": "blob", "size": 4050 },
+    { "path": "web/src/components/ui/LoadingState.tsx", "type": "blob", "size": 807 },
+    { "path": "web/src/components/ui/MarkdownContent.tsx", "type": "blob", "size": 3562 },
+    { "path": "web/src/components/ui/MiniKpi.tsx", "type": "blob", "size": 790 },
+    { "path": "web/src/components/ui/PageShell.tsx", "type": "blob", "size": 365 },
+    { "path": "web/src/components/ui/ResizablePanel.tsx", "type": "blob", "size": 3970 },
+    { "path": "web/src/components/ui/ScopeBadge.tsx", "type": "blob", "size": 704 },
+    { "path": "web/src/components/ui/SectionHeader.tsx", "type": "blob", "size": 2050 },
+    { "path": "web/src/components/ui/StatCard.tsx", "type": "blob", "size": 1796 },
+    { "path": "web/src/components/ui/index.ts", "type": "blob", "size": 712 },
+    { "path": "web/src/components/ui/types.ts", "type": "blob", "size": 3771 },
+    { "path": "web/src/hooks/index.ts", "type": "blob", "size": 316 },
+    { "path": "web/src/hooks/useGraphSetup.ts", "type": "blob", "size": 2765 },
+    { "path": "web/src/hooks/useNodeContent.ts", "type": "blob", "size": 8346 },
+    { "path": "web/src/hooks/useNodeFiltering.ts", "type": "blob", "size": 3385 },
+    { "path": "web/src/hooks/useResizableRatio.ts", "type": "blob", "size": 1761 },
+    { "path": "web/src/hooks/useSessionData.ts", "type": "blob", "size": 2600 },
+    { "path": "web/src/lib/api.ts", "type": "blob", "size": 6449 },
+    { "path": "web/src/lib/node-meta.ts", "type": "blob", "size": 10447 },
+    { "path": "web/src/lib/node-utils.ts", "type": "blob", "size": 9130 },
+    { "path": "web/src/lib/pricing.ts", "type": "blob", "size": 2358 },
+    { "path": "web/src/lib/syntax/colorize.tsx", "type": "blob", "size": 8880 },
+    { "path": "web/src/lib/syntax/index.ts", "type": "blob", "size": 148 },
+    { "path": "web/src/lib/syntax/languages.ts", "type": "blob", "size": 4895 },
+    { "path": "web/src/lib/types.ts", "type": "blob", "size": 18538 },
+    { "path": "web/src/lib/utils.ts", "type": "blob", "size": 3559 },
+    { "path": "web/src/main.tsx", "type": "blob", "size": 343 },
+    { "path": "web/src/pages/Activity.tsx", "type": "blob", "size": 20916 },
+    { "path": "web/src/pages/AgentDetail.tsx", "type": "blob", "size": 12496 },
+    { "path": "web/src/pages/Agents.tsx", "type": "blob", "size": 10507 },
+    { "path": "web/src/pages/Dashboard.tsx", "type": "blob", "size": 14058 },
+    { "path": "web/src/pages/ProjectDetail.tsx", "type": "blob", "size": 9040 },
+    { "path": "web/src/pages/Projects.tsx", "type": "blob", "size": 8933 },
+    { "path": "web/src/pages/Prompts.tsx", "type": "blob", "size": 4429 },
+    { "path": "web/src/pages/SessionDetail.tsx", "type": "blob", "size": 4209 },
+    { "path": "web/src/pages/Sessions.tsx", "type": "blob", "size": 4424 },
+    { "path": "web/src/pages/SkillDetail.tsx", "type": "blob", "size": 14492 },
+    { "path": "web/src/pages/Skills.tsx", "type": "blob", "size": 10493 },
+    { "path": "web/src/router.tsx", "type": "blob", "size": 1457 },
+    { "path": "web/src/styles/globals.css", "type": "blob", "size": 6624 },
+    { "path": "web/tailwind.config.ts", "type": "blob", "size": 2598 },
+    { "path": "web/tsconfig.json", "type": "blob", "size": 579 },
+    { "path": "web/vite-env.d.ts", "type": "blob", "size": 38 },
+    { "path": "web/vite.config.ts", "type": "blob", "size": 350 }
+  ]
+}

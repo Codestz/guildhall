@@ -3868,3 +3868,85 @@ button {
     display: none;
   }
 }
+
+/* ---- The archipelago (`?archipelago`, hud/Islands.tsx, scene/archipelago) ---- */
+.islands {
+  width: var(--left-w);
+  padding: 4px;
+  pointer-events: auto;
+}
+.island-row .repo-swatch {
+  flex: none;
+}
+.island-row kbd {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+}
+.island-map .glyph {
+  flex: none;
+  color: var(--muted);
+}
+.island-map[aria-pressed="true"] .glyph {
+  color: var(--brass-hi);
+}
+.island-failed {
+  padding: 4px 9px 2px;
+  font-size: 12px;
+}
+.islands[data-compact="true"] {
+  width: auto;
+  max-width: 100%;
+  padding: 3px;
+}
+.islands[data-compact="true"] .party-list {
+  flex-direction: row;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.islands[data-compact="true"] .party-row {
+  flex: none;
+  width: auto;
+  min-height: 40px;
+  gap: 6px;
+  padding: 4px 8px;
+}
+/* An island's name on the map: a plate in its language's colour that flies there. */
+.island-mark {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 11px 3px 9px;
+  border-radius: 4px;
+  background: rgba(20, 15, 11, 0.88);
+  border-bottom: 2px solid var(--accent);
+  box-shadow:
+    0 0 0 1px rgba(220, 182, 98, 0.22),
+    0 4px 14px rgba(0, 0, 0, 0.35);
+  color: var(--paper);
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.island-mark:hover,
+.island-mark:focus-visible {
+  transform: translateY(-2px);
+}
+.island-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.island-mark-name {
+  font-family: var(--display);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+.island-mark-lang {
+  font-size: 12px;
+  color: var(--muted);
+}

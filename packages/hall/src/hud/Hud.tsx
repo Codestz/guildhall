@@ -10,6 +10,7 @@ import { ChapterChip } from "./Chapter.tsx"
 import { Chronicle, Toasts } from "./Chronicle.tsx"
 import { Dossier } from "./Dossier.tsx"
 import { FastForward } from "./FastForward.tsx"
+import { IslandKeys, IslandSwitcher } from "./Islands.tsx"
 import { Icon } from "./icons.tsx"
 import { Legends } from "./Legends.tsx"
 import { Opening } from "./Opening.tsx"
@@ -211,10 +212,12 @@ export function Hud() {
       data-captions={prefs.captions && mode !== "detailed"}
     >
       {opening}
+      <IslandKeys />
       {!hidden && (
         <div className="region region-left">
           <Brand store={store} open={open.about} onToggle={() => toggle("about")} />
           <RepoLegend />
+          <IslandSwitcher compact={phone} />
           <PartySwitcher store={store} compact={phone} />
           {open.roster ? (
             <Roster store={store} open onToggle={() => toggle("roster")} compact className="is-sheet" />

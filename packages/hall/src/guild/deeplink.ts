@@ -88,6 +88,9 @@ const RUSH_MAX = 500
 const OTHERS = new Set([
   "live",
   "tsl",
+  "archipelago",
+  "repos",
+  "island",
   "anyhub",
   "showcase",
   "lab",

@@ -1,4 +1,4 @@
-import { use, useSyncExternalStore } from "react"
+import { createContext, use, useContext, useSyncExternalStore } from "react"
 import { setActiveWorld } from "./active.ts"
 import { islandFromTree } from "./gen/islandFromTree.ts"
 import type { Tree } from "./gen/load.ts"
@@ -86,9 +86,19 @@ export function loadRepo(wanted: string): Promise<World> {
   return worldSource.load(wanted, async (name) => (await import("./gen/load.ts")).treeFor(name))
 }
 
-/** The world the scene draws now; re-renders when it changes. */
+/**
+ * A world drawn beside the active one (an archipelago's far island, scene/archipelago): the layers
+ * under it read that world from `useWorld` instead. Only drawing reads it; the guild's own code
+ * (paths, sites, the director) always works on the active world.
+ */
+const Scoped = createContext<World | null>(null)
+export const WorldScope = Scoped.Provider
+
+/** The world the scene draws now (or the one a WorldScope gives); re-renders when it changes. */
 export function useWorld(): World {
-  return useSyncExternalStore(worldSource.subscribe, () => worldSource.world)
+  const scoped = useContext(Scoped)
+  const active = useSyncExternalStore(worldSource.subscribe, () => worldSource.world)
+  return scoped ?? active
 }
 
 export function useWorldStatus(): WorldStatus {

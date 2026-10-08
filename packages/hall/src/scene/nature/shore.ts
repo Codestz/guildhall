@@ -130,13 +130,20 @@ export function flowAt(line: readonly Spot[], x: number, z: number, reach: numbe
 
 /** Shore texture layout: world [-HALF, HALF]² in x and z, `SIZE` texels a side. */
 export const SHORE = { half: 120, size: 1024, maxDistance: 10 } as const
+/** The extent and resolution of one shore bake: the home island's (SHORE), or a far island's patch. */
+export type ShoreLayout = { half: number; size: number }
 
 /**
  * The shore texture's texels from a land mask (row 0 at z = +half, as a top-down render reads
  * back): R distance to land (0–maxDistance world units), G/B the river's flow (0.5 = still), A 255.
  */
-export function shoreTexels(land: Uint8Array, line: readonly Spot[] = riverLine()): Uint8Array {
-  const { half, size, maxDistance } = SHORE
+export function shoreTexels(
+  land: Uint8Array,
+  line: readonly Spot[] = riverLine(),
+  layout: ShoreLayout = SHORE,
+): Uint8Array {
+  const { half, size } = layout
+  const { maxDistance } = SHORE
   const cell = (half * 2) / size
   const distance = distanceToLand(land, size, size)
   const out = new Uint8Array(size * size * 4)
@@ -169,4 +176,44 @@ export function shoreTexels(land: Uint8Array, line: readonly Spot[] = riverLine(
     }
   }
   return out
+}
+
+/**
+ * The open sea as a grid of `cell`-sized squares out to `radius` (xz pairs, two triangles a cell,
+ * counter-clockwise from above), leaving out every square in a hole: a far island's shore patch,
+ * ±half round its keep (world/archipelago.ts). Holes and offsets are multiples of `cell`, so a
+ * patch drawn with the same grid (`patchSquares`) meets the sea vertex to vertex.
+ */
+export function seaSquares(radius: number, holes: readonly Spot[], half: number, cell: number): Spot[] {
+  const out: Spot[] = []
+  const n = Math.ceil(radius / cell)
+  for (let i = -n; i < n; i++)
+    for (let j = -n; j < n; j++) {
+      const cx = (i + 0.5) * cell
+      const cz = (j + 0.5) * cell
+      if (Math.hypot(cx, cz) > radius) continue
+      if (holes.some(([hx, hz]) => Math.abs(cx - hx) < half && Math.abs(cz - hz) < half)) continue
+      out.push(...square(i * cell, j * cell, cell))
+    }
+  return out
+}
+
+/** A patch ±half round the origin as the same grid of `cell` squares. */
+export function patchSquares(half: number, cell: number): Spot[] {
+  const out: Spot[] = []
+  for (let x = -half; x < half; x += cell)
+    for (let z = -half; z < half; z += cell) out.push(...square(x, z, cell))
+  return out
+}
+
+/** One square's two triangles, counter-clockwise seen from above (+y normal). */
+function square(x: number, z: number, cell: number): Spot[] {
+  return [
+    [x, z],
+    [x, z + cell],
+    [x + cell, z + cell],
+    [x, z],
+    [x + cell, z + cell],
+    [x + cell, z],
+  ]
 }

@@ -22,6 +22,7 @@ import {
   type Texture,
   UniformsLib,
   UniformsUtils,
+  Vector2,
   Vector3,
   Vector4,
   type WebGLRenderer,
@@ -31,6 +32,8 @@ import { reducedMotion } from "../../guild/opening.ts"
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { isWebGPU } from "../../render/backend.ts"
+import { PATCH_HALF, SEA_CELL, seaRadiusOf } from "../../world/archipelago.ts"
+import { type Archipelago, useArchipelago } from "../../world/archipelagoSource.ts"
 import { LANDS_URL } from "../../world/cast.ts"
 import { type Cell, cellToWorld, HEX_SCALE } from "../../world/lands.ts"
 import type { Spot } from "../../world/layout.ts"
@@ -45,7 +48,16 @@ import { EASE, targetOf } from "../weather/shared.ts"
 import { noiseTexture } from "./noise.ts"
 import { HEX_RADIUS } from "./scatter.ts"
 import { waterFragment, waterVertex } from "./shaders.ts"
-import { distanceToLand, riverCells, SHORE, shoreTexels, smooth } from "./shore.ts"
+import {
+  distanceToLand,
+  patchSquares,
+  riverCells,
+  SHORE,
+  type ShoreLayout,
+  seaSquares,
+  shoreTexels,
+  smooth,
+} from "./shore.ts"
 
 /**
  * The island's water (ADR 0007, Nature): one surface, one draw call, for the sea, the lake and the
@@ -67,14 +79,27 @@ import { distanceToLand, riverCells, SHORE, shoreTexels, smooth } from "./shore.
  */
 const SEA_Y = -0.2 * HEX_SCALE + 0.05
 const RIVER_Y = -0.1 * HEX_SCALE + 0.06
+/** A far island's shore patch (world/archipelago.ts): its own bake, coarser than the home island's. */
+const PATCH: ShoreLayout = { half: PATCH_HALF, size: 512 }
 
-export function Water({ tier }: { tier: Tier }) {
+/**
+ * Under an archipelago (world/archipelagoSource.ts) the open sea reaches past every island and has
+ * a hole cut for each far island's patch: that island's own Water, drawn with `at` (its offset, the
+ * group round it translated there) over ±PATCH_HALF, reading its own baked shore. The home island's
+ * water and its bake are the same as without an archipelago.
+ */
+export function Water({ tier, at }: { tier: Tier; at?: Spot }) {
   const store = useGuildStore()
   const gl = useThree((state) => state.gl)
   const { nodes } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
   const world = useWorld()
   const node = isWebGPU(gl) || TSL
-  const geometry = useMemo(() => surface(world, node), [world, node])
+  const archipelago = useArchipelago()
+  const geometry = useMemo(
+    () => surface(world, node, at ? "patch" : archipelago),
+    [world, node, at, archipelago],
+  )
+  const layout = at ? PATCH : SHORE
   const v2 = useLooks().water
   const build = node ? use(nodeWater(gl)) : waterMaterial
   // The node material's shadow is the key light's own (waterNodes.ts): found once it has a map.
@@ -83,10 +108,13 @@ export function Water({ tier }: { tier: Tier }) {
   // never reaches WebGPU's bindings): built once without it, once more when the bake lands.
   const [baked, setBaked] = useState<{ world: World; shore: Shore } | null>(null)
   const shore = node && baked?.world === world ? baked.shore : null
-  const { material, uniforms } = useMemo(
-    () => build(tier === 0, v2, key, shore),
-    [build, tier, v2, key, shore],
-  )
+  const { material, uniforms } = useMemo(() => {
+    const built = build(tier === 0, v2, key, shore)
+    built.uniforms.uShoreHalf.value = layout.half
+    if (at) built.uniforms.uShoreAt.value.set(at[0], at[1])
+    return built
+  }, [build, tier, v2, key, shore, layout, at])
+  const flames = useMemo(() => watersideOf(world, at), [world, at])
   const eased = useMemo(() => ({ rain: 0, gloom: 0, cloud: 0, pick: 0, caustics: 0 }), [])
   const still = useMemo(reducedMotion, [])
 
@@ -96,7 +124,9 @@ export function Water({ tier }: { tier: Tier }) {
   useEffect(() => {
     let made = shores.get(world)
     if (!made) {
-      made = isWebGPU(gl) ? bakeShoreGPU(gl, nodes, world) : bakeShore(gl as WebGLRenderer, nodes, world)
+      made = isWebGPU(gl)
+        ? bakeShoreGPU(gl, nodes, world, layout)
+        : bakeShore(gl as WebGLRenderer, nodes, world, layout)
       shores.set(world, made)
     }
     if (!node) {
@@ -112,7 +142,7 @@ export function Water({ tier }: { tier: Tier }) {
     return () => {
       live = false
     }
-  }, [gl, nodes, world, uniforms, node])
+  }, [gl, nodes, world, uniforms, node, layout])
   useEffect(() => () => material.dispose(), [material])
   useEffect(() => () => geometry.dispose(), [geometry])
 
@@ -164,7 +194,7 @@ export function Water({ tier }: { tier: Tier }) {
     eased.pick -= delta
     if (eased.pick <= 0) {
       eased.pick = 0.5
-      nearestFlames(watersideOf(world), targetOf(state.controls), u.uFlames.value)
+      nearestFlames(flames, targetOf(state.controls), u.uFlames.value)
     }
   })
 
@@ -174,7 +204,7 @@ export function Water({ tier }: { tier: Tier }) {
       geometry={geometry}
       material={material}
       receiveShadow
-      frustumCulled={false}
+      frustumCulled={!!at}
       renderOrder={-1}
     />
   )
@@ -234,20 +264,18 @@ const size3 = new Vector3()
 /** How many torch reflections the water draws at once. */
 const FLAMES = 8
 type Flames = { flame: readonly [number, number, number]; d: number }[]
-const waterside = new WeakMap<World, Flames>()
-/** A world's flames close enough to water to be reflected in it (the rest never are). */
-function watersideOf(world: World): Flames {
-  let flames = waterside.get(world)
-  if (!flames) {
-    const { water } = world.island
-    const reach = HEX_RADIUS + 7
-    flames = lightsOf(world)
-      .map((light) => light.flame)
-      .filter(([x, , z]) => water.some(([wx, wz]) => Math.hypot(wx - x, wz - z) < reach))
-      .map((flame) => ({ flame, d: 0 }))
-    waterside.set(world, flames)
-  }
-  return flames
+/**
+ * A world's flames close enough to water to be reflected in it (the rest never are), where the
+ * water sees them: moved by `at` for a far island's patch (its world is in its own coordinates).
+ */
+function watersideOf(world: World, at?: Spot): Flames {
+  const { water } = world.island
+  const reach = HEX_RADIUS + 7
+  const [ox, oz] = at ?? [0, 0]
+  return lightsOf(world)
+    .map((light) => light.flame)
+    .filter(([x, , z]) => water.some(([wx, wz]) => Math.hypot(wx - x, wz - z) < reach))
+    .map(([x, y, z]) => ({ flame: [x + ox, y, z + oz] as const, d: 0 }))
 }
 /** Writes the FLAMES waterside flames nearest `at` into `out` (w = 1), the rest w = 0. */
 function nearestFlames(byDistance: Flames, at: Vector3, out: Vector4[]): void {
@@ -287,7 +315,9 @@ export function waterUniforms() {
     ...wind.uniforms,
     uNoise: { value: noise },
     uShore: { value: OPEN_SEA as DataTexture },
-    uShoreHalf: { value: SHORE.half },
+    uShoreHalf: { value: SHORE.half as number },
+    /** Where the baked shore is centred (world xz): a far island's patch is off the origin. */
+    uShoreAt: { value: new Vector2() },
     uShoreMax: { value: SHORE.maxDistance },
     uRain: { value: 0 },
     uGloom: { value: 0 },
@@ -335,9 +365,11 @@ function waterMaterial(low: boolean, v2: boolean): WaterMaterial {
 
 /**
  * The surface: a wide disc for the sea (past the fog, so it has no edge) and one hexagon per river
- * hex at the river's height; `aRiver` tells the shader which is which.
+ * hex at the river's height; `aRiver` tells the shader which is which. Under an archipelago the sea
+ * is a grid instead, wider, with a hole for each far island; a far island's own (`"patch"`) is the
+ * same grid over its hole.
  */
-function surface(world: World, node: boolean): BufferGeometry {
+function surface(world: World, node: boolean, sea: Archipelago | "patch" | null): BufferGeometry {
   const positions: number[] = []
   const river: number[] = []
   const push = (x: number, y: number, z: number, r: number) => {
@@ -346,14 +378,27 @@ function surface(world: World, node: boolean): BufferGeometry {
   }
   const SEGMENTS = 96
   const RADIUS = 420
-  for (let i = 0; i < SEGMENTS; i++) {
-    const a0 = (i / SEGMENTS) * Math.PI * 2
-    const a1 = ((i + 1) / SEGMENTS) * Math.PI * 2
-    // Counter-clockwise seen from above (+y normal).
-    push(0, SEA_Y, 0, 0)
-    push(Math.cos(a1) * RADIUS, SEA_Y, Math.sin(a1) * RADIUS, 0)
-    push(Math.cos(a0) * RADIUS, SEA_Y, Math.sin(a0) * RADIUS, 0)
-  }
+  const grid =
+    sea === "patch"
+      ? patchSquares(PATCH_HALF, SEA_CELL)
+      : sea
+        ? seaSquares(
+            seaRadiusOf(sea.extent),
+            sea.islands.map((island) => island.at),
+            PATCH_HALF,
+            SEA_CELL,
+          )
+        : null
+  if (grid) for (const [x, z] of grid) push(x, SEA_Y, z, 0)
+  else
+    for (let i = 0; i < SEGMENTS; i++) {
+      const a0 = (i / SEGMENTS) * Math.PI * 2
+      const a1 = ((i + 1) / SEGMENTS) * Math.PI * 2
+      // Counter-clockwise seen from above (+y normal).
+      push(0, SEA_Y, 0, 0)
+      push(Math.cos(a1) * RADIUS, SEA_Y, Math.sin(a1) * RADIUS, 0)
+      push(Math.cos(a0) * RADIUS, SEA_Y, Math.sin(a0) * RADIUS, 0)
+    }
   for (const cell of riverOf(world)) {
     const char = world.terrain.at(cell)
     if (char !== "r" && char !== "#") continue
@@ -406,14 +451,15 @@ export interface ShoreSetup {
   up: OrthographicCamera
   /** The pack's palette (the land mask tells its blue water apart), or null. */
   palette: Texture | null
+  half: number
   size: number
   line: Spot[]
   wheel: Vector4
 }
 
 /** The bake's scenes and cameras, and the mill wheel's tailrace (no GPU work). */
-function shoreSetup(nodes: Record<string, Object3D>, world: World): ShoreSetup {
-  const { half, size } = SHORE
+function shoreSetup(nodes: Record<string, Object3D>, world: World, layout: ShoreLayout): ShoreSetup {
+  const { half, size } = layout
   // The bake sees ±half: land past it would be open sea to the foam. Generated islands reach
   // ~104–120 (tile centres); say so if one ever grows past the edge rather than lose its coast.
   const reach = reachOf(world) + HEX_RADIUS
@@ -477,7 +523,7 @@ function shoreSetup(nodes: Record<string, Object3D>, world: World): ShoreSetup {
   up.up.set(0, 0, -1)
   up.lookAt(0, 0, 0)
   up.updateMatrixWorld()
-  return { land, top, below, up, palette, size, line, wheel }
+  return { land, top, below, up, palette, half, size, line, wheel }
 }
 
 /**
@@ -486,11 +532,10 @@ function shoreSetup(nodes: Record<string, Object3D>, world: World): ShoreSetup {
  * distance to whatever stands in the water in the alpha.
  */
 function shoreOf(setup: ShoreSetup, landPixels: Uint8Array, postPixels: Uint8Array): Shore {
-  const { half } = SHORE
-  const { size } = setup
+  const { half, size } = setup
   const land = new Uint8Array(size * size)
   for (let i = 0; i < land.length; i++) land[i] = (landPixels[i * 4] as number) > 127 ? 1 : 0
-  const texels = shoreTexels(land, setup.line)
+  const texels = shoreTexels(land, setup.line, setup)
   const posts = new Uint8Array(size * size)
   for (let i = 0; i < posts.length; i++) posts[i] = (postPixels[i * 4] as number) > 127 ? 1 : 0
   const cell = (half * 2) / size
@@ -510,8 +555,13 @@ function shoreOf(setup: ShoreSetup, landPixels: Uint8Array, postPixels: Uint8Arr
  * and not the pack's blue), reads it back and turns it into the shore texture. Once per world.
  * WebGL: GLSL masks, read back synchronously.
  */
-function bakeShore(gl: WebGLRenderer, nodes: Record<string, Object3D>, world: World): Shore {
-  const setup = shoreSetup(nodes, world)
+function bakeShore(
+  gl: WebGLRenderer,
+  nodes: Record<string, Object3D>,
+  world: World,
+  layout: ShoreLayout,
+): Shore {
+  const setup = shoreSetup(nodes, world, layout)
   const { size } = setup
   const mask = new ShaderMaterial({
     uniforms: { map: { value: setup.palette } },
@@ -585,8 +635,13 @@ function bakeShore(gl: WebGLRenderer, nodes: Record<string, Object3D>, world: Wo
 }
 
 /** The same bake on WebGPU: node-material masks (waterNodes.ts), each read back once, asynchronously. */
-async function bakeShoreGPU(gl: object, nodes: Record<string, Object3D>, world: World): Promise<Shore> {
-  const setup = shoreSetup(nodes, world)
+async function bakeShoreGPU(
+  gl: object,
+  nodes: Record<string, Object3D>,
+  world: World,
+  layout: ShoreLayout,
+): Promise<Shore> {
+  const setup = shoreSetup(nodes, world, layout)
   const { shoreMasks } = await import("./waterNodes.ts")
   const { land, posts } = await shoreMasks(gl, setup)
   return shoreOf(setup, land, posts)

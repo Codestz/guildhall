@@ -12,6 +12,15 @@ import { clearFrame, hudInsets, type Point, type Shot, type ShotKind, type Stage
 import { MODE } from "../guild/mode.ts"
 import { opening, reducedMotion } from "../guild/opening.ts"
 import { positions, useGuild, useGuildStore } from "../guild/useGuild.ts"
+import { useArchipelago } from "../world/archipelagoSource.ts"
+import {
+  flightSeconds,
+  flightSize,
+  frameOf,
+  HOME as HOME_ISLAND,
+  islandView,
+  mapFrame,
+} from "./archipelago/view.ts"
 import { FRAME } from "./frame.ts"
 import { OpeningProgress } from "./OpeningCue.tsx"
 
@@ -97,6 +106,15 @@ const TURN_WIDE = 0.045
 const TURN_HELD = 0.012
 /** Decisions per second: the director scores a few times a second, the camera moves every frame. */
 const DECIDE_S = 0.125
+/**
+ * An archipelago (scene/archipelago): the orthographic camera stands this far back (not 220), so a
+ * far island on the camera's side of the sea is never behind it; the far planes and the farthest
+ * zoom-out open up to hold the whole map. Without one, nothing changes.
+ */
+const ORTHO_BACK = 220
+const ARCHIPELAGO_BACK = 1200
+/** A long flight between islands pulls out this much halfway (a short one less). */
+const ISLAND_PULL = 0.45
 
 export function CameraRig() {
   const store = useGuildStore()
@@ -119,6 +137,22 @@ export function CameraRig() {
     list.addEventListener("change", change)
     return () => list.removeEventListener("change", change)
   }, [])
+  const archipelago = useArchipelago()
+  const back = archipelago ? ARCHIPELAGO_BACK : ORTHO_BACK
+  /** A flight between islands (scene/archipelago/view.ts): the request flown, and where it is. */
+  const trip = useRef({
+    // From 0, not the current count: a link's `island=` may be asked before the rig mounts.
+    n: 0,
+    flying: false,
+    t: 0,
+    duration: 1,
+    from: new Vector3(),
+    to: new Vector3(),
+    sizeFrom: 1,
+    sizeTo: 1,
+    pull: 0,
+    home: false,
+  })
   /** The Cinematic director's transition state (one object, mutated). */
   const film = useRef({
     active: false,
@@ -148,6 +182,10 @@ export function CameraRig() {
   const fit = base * (1 + PORTRAIT_BOOST * portrait)
   const wide = fit * 0.42
   const widest = base * 0.42 * 0.5
+  /** The archipelago's map: the zoom (orthographic) and distance (perspective) that hold it all. */
+  const mapRadius = archipelago ? mapFrame(archipelago).radius : 0
+  const mapZoom = archipelago ? Math.min(size.width, size.height * 1.4) / (mapRadius * 2) : widest
+  const mapDistance = mapRadius * 2.6
 
   // Your input turns the Bard off — and keeps it off. Listened to on the canvas itself: drei
   // recreates the controls whenever the default camera changes, so a listener on them gets lost.
@@ -238,7 +276,7 @@ export function CameraRig() {
       const o = camera as Ortho
       const distance = position.distanceTo(target)
       o.zoom = zoom > 0 ? zoom : Math.min(fit * 8, Math.max(wide * 0.5, wide * (FAR / Math.max(distance, 1))))
-      o.position.copy(target).addScaledVector(dir, 220)
+      o.position.copy(target).addScaledVector(dir, back)
       o.updateProjectionMatrix()
     } else {
       const distance =
@@ -246,7 +284,7 @@ export function CameraRig() {
       camera.position.copy(target).addScaledVector(dir, distance)
     }
     control.update()
-  }, [defaultCamera, fit, wide])
+  }, [defaultCamera, fit, wide, back])
 
   useFrame((_, delta) => {
     const control = controls.current
@@ -273,7 +311,7 @@ export function CameraRig() {
       const dir = scratch.dir.copy(TOP_DIR).lerp(ISO_DIR, p).normalize()
       control.target.copy(HOME)
       if (isOrtho) {
-        camera.position.copy(HOME).addScaledVector(dir, 220)
+        camera.position.copy(HOME).addScaledVector(dir, back)
         ;(camera as Ortho).zoom = wide * (0.5 + 0.5 * p)
       } else {
         camera.position.copy(HOME).addScaledVector(dir, FAR * (2 - p))
@@ -293,13 +331,23 @@ export function CameraRig() {
       const radius = framing.radius ?? 4
       control.target.set(framing.x, 1 + (framing.y ?? 0), framing.z)
       if (isOrtho) {
-        camera.position.copy(control.target).addScaledVector(ISO_DIR, 220)
+        camera.position.copy(control.target).addScaledVector(ISO_DIR, back)
         ;(camera as Ortho).zoom = Math.min(fit * 8, Math.max(widest, (size.width * 0.6) / (radius * 2.4)))
       } else {
         const d = Math.max(CLOSE, radius * 2.6)
         camera.position.copy(control.target).addScaledVector(scratch.dir.set(1, 0.62, 1).normalize(), d)
       }
       camera.updateProjectionMatrix()
+    }
+
+    // 1c. The archipelago: a flight to an island or the map, asked for by the switcher or a label.
+    //     While it flies nothing else moves the camera; away from home the Bard is off.
+    if (archipelago && fly(delta, camera, control, isOrtho)) {
+      control.update()
+      last.current.target.copy(control.target)
+      last.current.position.copy(camera.position)
+      last.current.zoom = isOrtho ? (camera as Ortho).zoom : 0
+      return
     }
 
     // 2. Your keys.
@@ -380,6 +428,64 @@ export function CameraRig() {
     last.current.position.copy(camera.position)
     last.current.zoom = isOrtho ? (camera as Ortho).zoom : 0
   }, FRAME.WORLD)
+
+  /**
+   * The archipelago's flights (scene/archipelago/view.ts): a new request starts one — a straight
+   * glide over the sea that pulls out halfway, keeping the angle you look from — or, with reduced
+   * motion or a deep link, a cut. Leaving the home island hands the camera to you (the Bard off);
+   * arriving home hands it back. The Bard switched back on away from home flies there itself (its
+   * own flight), so the request just notes that. True while a flight is moving the camera.
+   */
+  function fly(delta: number, camera: Ortho | Persp, control: Controls, isOrtho: boolean): boolean {
+    if (!archipelago) return false
+    const f = trip.current
+    // Away from home with the Bard switched back on (B, Esc): it is taking the camera home.
+    const asked = islandView.get()
+    if (asked.n === f.n && asked.stop !== HOME_ISLAND && store.bard && !f.flying)
+      islandView.go(HOME_ISLAND, { quiet: true })
+    const request = islandView.get()
+    if (request.n !== f.n) {
+      f.n = request.n
+      if (request.quiet) return false
+      const frame = frameOf(request.stop, archipelago)
+      const map = request.stop === "map"
+      f.home = request.stop === HOME_ISLAND
+      if (!f.home && store.bard) store.setBard(false)
+      if (store.selected) store.select(null)
+      f.from.copy(control.target)
+      f.to.set(frame.x, 1, frame.z)
+      const o = camera as Ortho
+      const distance = camera.position.distanceTo(control.target)
+      f.sizeFrom = isOrtho ? o.zoom : distance
+      f.sizeTo = isOrtho ? (map ? mapZoom : wide) : map ? mapDistance : Math.max(FAR, frame.radius * 1.3)
+      const length = f.from.distanceTo(f.to)
+      f.pull = map ? 0 : Math.min(ISLAND_PULL, length / 600)
+      f.duration = flightSeconds(length + (map ? 200 : 0))
+      f.t = request.cut || still.current ? 1 : 0
+      f.flying = true
+    }
+    if (!f.flying) return false
+    f.t = Math.min(1, f.t + delta / f.duration)
+    const p = easeInOut(f.t)
+    control.target.lerpVectors(f.from, f.to, p)
+    const dir = scratch.dir.copy(camera.position).sub(control.target)
+    if (dir.lengthSq() < 1e-6) dir.copy(ISO_DIR)
+    dir.normalize()
+    const size = flightSize(f.sizeFrom, f.sizeTo, p, f.pull, isOrtho)
+    if (isOrtho) {
+      ;(camera as Ortho).zoom = size
+      camera.position.copy(control.target).addScaledVector(dir, back)
+    } else {
+      camera.position.copy(control.target).addScaledVector(dir, size)
+    }
+    camera.updateProjectionMatrix()
+    if (f.t >= 1) {
+      f.flying = false
+      // Home again: the Bard has the camera back.
+      if (f.home && !store.bard) store.setBard(true)
+    }
+    return true
+  }
 
   /** Calm: the season-2 Bard. Eases toward store.focus (or a rise in the graveyard), turntables when quiet. */
   function calm(delta: number, camera: Ortho | Persp, control: Controls, isOrtho: boolean): void {
@@ -591,14 +697,14 @@ export function CameraRig() {
         position={[0.01, 240, 2]}
         zoom={wide * 0.5}
         near={0.1}
-        far={900}
+        far={archipelago ? 2600 : 900}
       />
       <PerspectiveCamera
         ref={persp}
         makeDefault={view === "explore"}
         fov={38}
         near={0.5}
-        far={1200}
+        far={archipelago ? 3600 : 1200}
         position={[60, 60, 60]}
       />
       <MapControls
@@ -610,10 +716,10 @@ export function CameraRig() {
         screenSpacePanning={false}
         minPolarAngle={0.12}
         maxPolarAngle={view === "explore" ? 1.45 : 1.25}
-        minZoom={widest}
+        minZoom={archipelago ? Math.min(widest, mapZoom * 0.8) : widest}
         maxZoom={fit * 8}
         minDistance={4}
-        maxDistance={300}
+        maxDistance={archipelago ? ARCHIPELAGO_BACK * 1.5 : 300}
         mouseButtons={{ LEFT: MOUSE.PAN, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.ROTATE }}
         touches={{ ONE: TOUCH.PAN, TWO: TOUCH.DOLLY_ROTATE }}
       />

@@ -3,6 +3,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import { type DirectionalLight, Fog, type HemisphereLight, Vector3 } from "three"
 import { TIERS } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
+import { fogRadiusOf } from "../../world/archipelago.ts"
+import { useArchipelago } from "../../world/archipelagoSource.ts"
 import { useWorld } from "../../world/source.ts"
 import { FRAME } from "../frame.ts"
 import { useTier } from "../Quality.tsx"
@@ -46,13 +48,18 @@ function Weathervane() {
   const hemi = useRef<HemisphereLight>(null)
   const lastStrike = useRef(-1)
   const post = TIERS[useTier()].post
-  /** Fog radii follow the island: the coast starts to fade, the hex sea is gone by the far radius. */
+  /**
+   * Fog radii follow the island: the coast starts to fade, the hex sea is gone by the far radius.
+   * Under an archipelago they follow all of it: every island clear, the open sea fading past them.
+   */
   const { tiles } = useWorld().island
+  const archipelago = useArchipelago()
   const sea = useMemo(() => {
+    if (archipelago) return fogRadiusOf(archipelago.extent)
     let radius = 0
     for (const tile of tiles) radius = Math.max(radius, Math.hypot(tile.x, tile.z))
     return radius || 110
-  }, [tiles])
+  }, [tiles, archipelago])
   const fog = useMemo(() => new Fog("#c6d9ea", sea, sea * 1.4), [sea])
 
   // One tone mapping everywhere: Neutral keeps KayKit's flat colours true while rolling off the

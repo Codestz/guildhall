@@ -95,6 +95,7 @@ function waterColour(
   const uWind = float_(u.uWind)
   const uWindDir = reference("value", "vec2", u.uWindDir)
   const uShoreHalf = float_(u.uShoreHalf)
+  const uShoreAt = reference("value", "vec2", u.uShoreAt)
   const uShoreMax = float_(u.uShoreMax)
   const uRain = float_(u.uRain)
   const uGloom = float_(u.uGloom)
@@ -126,7 +127,8 @@ function waterColour(
     // The shore as baked when the material was built (Water rebuilds it once the bake lands).
     // Anything read both inside and outside an `If` is a `toVar` here, before the first branch: a
     // node is emitted where it is first used, so one first used in a branch is unset outside it.
-    const shore = texture(u.uShore.value, vec2(p.x, p.y.negate()).div(uShoreHalf.mul(2)).add(0.5)).toVar()
+    const sp = p.sub(uShoreAt)
+    const shore = texture(u.uShore.value, vec2(sp.x, sp.y.negate()).div(uShoreHalf.mul(2)).add(0.5)).toVar()
     const dist = shore.r.mul(uShoreMax).toVar()
     const flow = shore.gb.mul(2).sub(1).toVar()
     const t = uTime

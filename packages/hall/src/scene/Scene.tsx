@@ -9,6 +9,7 @@ import { useGuild, useGuildStore } from "../guild/useGuild.ts"
 import { ANIMS_URL, MODELS, modelUrl } from "../world/cast.ts"
 import { useWorld } from "../world/source.ts"
 import { Adventurer, lookFrom } from "./Adventurer.tsx"
+import { Archipelago } from "./archipelago/Archipelago.tsx"
 import { Atmosphere } from "./atmosphere/Atmosphere.tsx"
 import { Post } from "./atmosphere/Post.tsx"
 import { shadows } from "./atmosphere/shadows.ts"
@@ -92,6 +93,8 @@ export function Scene() {
       </Suspense>
       {/* The guild's GitHub sea (scene/seas): lazy, nothing until the store has a sea event. */}
       <Seas />
+      {/* The archipelago's far islands (scene/archipelago): lazy, nothing without `?archipelago`. */}
+      <Archipelago />
       {/* Secret world events (guild/events.ts): nothing when idle; each event's code loads on first need. */}
       <EventsLayer />
       <WeatherLayer />

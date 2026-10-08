@@ -54,7 +54,8 @@ export function StreetLights() {
   )
 }
 
-function Pools({ glows }: { glows: readonly Glow[] }) {
+/** A warm pool on the ground under each glow: one additive draw (also a far island's, scene/archipelago). */
+export function Pools({ glows }: { glows: readonly Glow[] }) {
   const { mood } = useGuild()
   const built = useOwnedMeshes(() => ({ meshes: [pools(glows.length)] }), [glows])
   const fire = useMemo(() => new Color(), [])

@@ -204,15 +204,15 @@ async function render(port: number, view: View, as: string): Promise<string> {
   const state = `${BASE}&${view.link}`
   const settle = loadSettle(state) + (view.settle ?? 0)
   if (view.click) {
-    await call(port, "/reload", { query: state })
+    // Load, click, wait for the panel to settle and shoot in ONE request: as separate calls, another
+    // probe client's shot could land in between and this view would capture that client's state.
     const click = `document.querySelector(${JSON.stringify(view.click)})?.click()`
-    await call(port, "/eval", {
-      js: `new Promise((done) => setTimeout(() => done((${click}, 1)), ${settle}))`,
+    const out = await call(port, "/shot", {
+      name: as,
+      state,
+      settle,
+      js: `(async () => { ${click}; await (${SETTLED}); await new Promise((done) => setTimeout(done, 300)) })()`,
     })
-    // The panel's opening transition, finished: right after a load the main thread can stall long
-    // enough that a fixed wait catches it half-faded. (Endless animations — spinners — excluded.)
-    await call(port, "/eval", { js: SETTLED })
-    const out = await call(port, "/shot", { name: as, settle: 300 })
     return String(out.path)
   }
   // One request (load, `after`, shot): the probe server runs it whole, so another client's state

@@ -374,6 +374,7 @@ async function handle(path: string, body: Body): Promise<Body> {
         size.every((n) => typeof n === "number" && n >= 200 && n <= 4000)
       const state = str(body, "state")
       const after = str(body, "after")
+      const js = str(body, "js")
       const fresh = state !== undefined && body.fresh !== false
       // A Vite full reload (another edit) between the load and the capture shoots the page
       // half-mounted, or without the `after` link: shot again from the load, once.
@@ -382,6 +383,9 @@ async function handle(path: string, body: Body): Promise<Body> {
         if (sized) await hall.setViewportSize({ width: size[0], height: size[1] })
         if (state !== undefined) notes = await applyState(state, fresh, num(body, "settle"))
         if (after !== undefined) notes.push(...(await applyState(after, false, AFTER_MS)))
+        // Page script run after the state, before the capture (a click that opens a panel), inside
+        // this one request so another client's shot can't land in between.
+        if (js !== undefined) await hall.evaluate(js)
         await capture(hall, path, format)
         if (!fresh || loads === loaded) break
         console.log(`${name}: the page reloaded mid-shot, again`)

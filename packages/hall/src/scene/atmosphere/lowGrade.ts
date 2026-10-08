@@ -1,4 +1,4 @@
-import { ShaderChunk } from "three"
+import { CustomToneMapping, NeutralToneMapping, NoToneMapping, ShaderChunk, type ToneMapping } from "three"
 
 /**
  * The Low tier's colour grade, in the renderer's own tone mapping (no post pass there to grade).
@@ -54,4 +54,16 @@ const STOCK = "vec3 CustomToneMapping( vec3 color ) { return color; }"
 export function installLowGrade(): void {
   if (ShaderChunk.tonemapping_pars_fragment.includes(STOCK))
     ShaderChunk.tonemapping_pars_fragment = ShaderChunk.tonemapping_pars_fragment.replace(STOCK, CUSTOM)
+}
+
+/**
+ * The renderer's tone mapping for a tier, given what it holds now. With post, Neutral (the composer
+ * saves it, draws with NoToneMapping, and puts it back when it goes), unless the composer already
+ * holds NoToneMapping. Low always gets CustomToneMapping, even over the composer's NoToneMapping: a
+ * tier drop runs this before the leaving composer's cleanup, which restores its saved Neutral only
+ * if the renderer still holds NoToneMapping. Neutral on Low would read the packed exposure raw.
+ */
+export function rendererToneMapping(post: boolean, current: ToneMapping): ToneMapping {
+  if (!post) return CustomToneMapping
+  return current === NoToneMapping ? current : NeutralToneMapping
 }

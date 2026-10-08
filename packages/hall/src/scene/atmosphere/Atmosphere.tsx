@@ -1,14 +1,6 @@
 import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
-import {
-  CustomToneMapping,
-  type DirectionalLight,
-  Fog,
-  type HemisphereLight,
-  NeutralToneMapping,
-  NoToneMapping,
-  Vector3,
-} from "three"
+import { type DirectionalLight, Fog, type HemisphereLight, Vector3 } from "three"
 import { TIERS } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { island } from "../../world/lands.ts"
@@ -17,7 +9,7 @@ import { useTier } from "../Quality.tsx"
 import { flash, stepLightning } from "./flash.ts"
 import { installRadialFog } from "./fog.ts"
 import { Lamps } from "./Lamps.tsx"
-import { installLowGrade, packExposure } from "./lowGrade.ts"
+import { installLowGrade, packExposure, rendererToneMapping } from "./lowGrade.ts"
 import { SkyDome } from "./SkyDome.tsx"
 import { shadows } from "./shadows.ts"
 import { updateSky } from "./sky.ts"
@@ -65,10 +57,10 @@ function Weathervane() {
   // One tone mapping everywhere: Neutral keeps KayKit's flat colours true while rolling off the
   // HDR flames and sun. The post pass applies it itself (the composer turns the renderer's off and
   // restores this when it goes). The Low tier, with no post, renders Neutral plus the grade's
-  // saturation (atmosphere/lowGrade.ts). Layout effect: before the composer's own effect saves the
-  // renderer's value.
+  // saturation (atmosphere/lowGrade.ts), set even while a leaving composer holds NoToneMapping.
+  // Layout effect: before the composer's own effect saves the renderer's value.
   useLayoutEffect(() => {
-    if (gl.toneMapping !== NoToneMapping) gl.toneMapping = post ? NeutralToneMapping : CustomToneMapping
+    gl.toneMapping = rendererToneMapping(post, gl.toneMapping)
   }, [gl, post])
 
   useEffect(() => {

@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test"
+import { CustomToneMapping, NeutralToneMapping, NoToneMapping, type ToneMapping } from "three"
 import { type Environment, skyOf } from "../src/guild/environment.ts"
-import { DESATURATE_STEPS, packExposure, unpackExposure } from "../src/scene/atmosphere/lowGrade.ts"
+import {
+  DESATURATE_STEPS,
+  packExposure,
+  rendererToneMapping,
+  unpackExposure,
+} from "../src/scene/atmosphere/lowGrade.ts"
 import { createSky, updateSky } from "../src/scene/atmosphere/sky.ts"
 import { MOODS } from "../src/world/moods.ts"
 
@@ -41,5 +47,37 @@ describe("the Low tier's grade, packed into the tone mapping exposure", () => {
     const [, clear] = unpackExposure(packExposure(sky.exposure, 1 - sky.saturation))
     expect(storm).toBeGreaterThan(0.2)
     expect(clear).toBe(0)
+  })
+})
+
+/**
+ * The tier switch as it commits: Atmosphere's layout effect picks the renderer's tone mapping, then
+ * the leaving composer's passive cleanup puts back the value it saved, but only if the renderer still
+ * holds the NoToneMapping it forced (@react-three/postprocessing's renderer property guard).
+ */
+function dropToLow(): ToneMapping {
+  const saved = NeutralToneMapping
+  let renderer: ToneMapping = NoToneMapping // the composer is drawing
+  renderer = rendererToneMapping(false, renderer)
+  if (renderer === NoToneMapping) renderer = saved // the composer leaves
+  return renderer
+}
+
+describe("the renderer's tone mapping across tiers", () => {
+  test("dropping to Low from a post tier lands on the Low grade, not Neutral", () => {
+    // Neutral would read the packed exposure (~65 at a rainy night) raw: a washed-out noon.
+    expect(dropToLow()).toBe(CustomToneMapping)
+  })
+
+  test("a fresh Low renderer gets the Low grade", () => {
+    expect(rendererToneMapping(false, NeutralToneMapping)).toBe(CustomToneMapping)
+  })
+
+  test("a post tier mounting gets Neutral for the composer to save", () => {
+    expect(rendererToneMapping(true, CustomToneMapping)).toBe(NeutralToneMapping)
+  })
+
+  test("a post tier leaves the composer's NoToneMapping alone while it draws", () => {
+    expect(rendererToneMapping(true, NoToneMapping)).toBe(NoToneMapping)
   })
 })

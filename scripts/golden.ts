@@ -43,7 +43,10 @@ export interface View {
   threshold?: number
 }
 
-/** Every view: paused, the quality pinned at High, the Bard off, the HUD hidden unless said. */
+/**
+ * Every view: paused, the quality pinned at High (a `quality=` in the view's link wins: the last
+ * one counts), the Bard off, the HUD hidden unless said.
+ */
 const BASE = "paused=1&quality=2&bard=0&hud=hidden"
 /**
  * Calibrated on this Mac (three checks against one update): ordinary views differ by 0–0.7% in
@@ -76,6 +79,19 @@ export const VIEWS: View[] = [
     name: "diorama-snow",
     link: "story=saga&t=6:00&hour=10&weather=snow&look=island",
     why: "snow",
+    threshold: 0.03,
+  },
+  {
+    name: "low-diorama-night",
+    link: "story=saga&t=6:00&hour=23&weather=clear&look=island&quality=0",
+    why: "the Low tier at night: tone-mapped grade, no post",
+    // Without post the moonlit sea's glints are sharper: they and the ships are ~0–1.3%.
+    threshold: 0.02,
+  },
+  {
+    name: "low-rush-rain",
+    link: "story=rush&t=0:40&hour=21&weather=rain&quality=0",
+    why: "the Low tier in night rain: darkened and greyed",
     threshold: 0.03,
   },
   { name: "keep-noon", link: "story=saga&t=6:00&hour=12&weather=clear&look=keep", why: "the keep, closer" },

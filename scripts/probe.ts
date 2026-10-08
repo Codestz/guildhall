@@ -13,8 +13,11 @@
  *   bun scripts/probe.ts steps file.json [--lab …]   (shot.ts's steps; plus { "state": "…" })
  *   bun scripts/probe.ts reload
  *
- * Shots land in .probe/<name>.jpg (`--png`: lossless .png, ~4× slower to encode). `--keep` applies a state on top of the current one instead of
- * resetting first. The deep-link params: packages/hall/src/guild/deeplink.ts.
+ * Shots land in .probe/<name>.jpg (`--png`: lossless .png, ~4× slower to encode). A `--state` loads
+ * the page afresh at that link (~1 s more): the same picture as a cold load of it, whatever was
+ * shot before. `--keep` applies it in place on top of the current state instead (faster, but
+ * history carries over: the story, crowd, weather easing, walkers). The deep-link params:
+ * packages/hall/src/guild/deeplink.ts.
  */
 import { closeSync, openSync } from "node:fs"
 import { INFO_PATH, PROBE_DIR, ROOT } from "./steps.ts"

@@ -13,6 +13,7 @@ import {
   Vector2,
   Vector3,
 } from "three"
+import { PROBE } from "../../guild/mode.ts"
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { WIND_DIRECTION, wind } from "../atmosphere/wind.ts"
@@ -45,7 +46,7 @@ export function Precipitation({ tier }: { tier: Tier }) {
     const snowing = env.weather === "snow"
     state.rain = MathUtils.damp(state.rain, snowing ? 0 : env.precipitation, EASE, delta)
     state.snow = MathUtils.damp(state.snow, snowing ? env.precipitation : 0, EASE, delta)
-    state.time += delta
+    state.time = fallTime(state.time, delta, store.speed, store.time)
 
     const target = targetOf(controls)
     const ortho = (camera as OrthographicCamera).isOrthographicCamera
@@ -67,6 +68,16 @@ export function Precipitation({ tier }: { tier: Tier }) {
       <primitive object={snow} />
     </>
   )
+}
+
+/**
+ * The falls' clock, seconds. It runs with the frame clock — except in a probe build with the story
+ * paused, where it is the story's own (stopped) time: a golden view (scripts/golden.ts, always
+ * paused) then draws every drop where the last run did, instead of wherever the frame timing of
+ * this load left it. Production always falls. Exported for tests.
+ */
+export function fallTime(time: number, delta: number, speed: number, storyMs: number, probe = PROBE): number {
+  return probe && speed === 0 ? storyMs / 1000 : time + delta
 }
 
 const RAIN_COUNT: Record<Tier, number> = { 0: 2500, 1: 5000, 2: 7000, 3: 9000 }

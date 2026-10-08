@@ -8,8 +8,8 @@
  *
  * Names may be prefixes (`site-` checks every site close-up). Each view is a deep link
  * (packages/hall/src/guild/deeplink.ts) with the story paused at a fixed moment, a fixed hour and
- * weather, the quality pinned, the Bard off and the camera framed — plus, for a few, a click or a
- * screen size.
+ * weather, the quality pinned, the Bard off and the camera framed — plus, for a few, a click, a
+ * screen size or a second link applied in place (`after`).
  *
  * Where they live: .probe/golden/<name>.jpg are the references; .probe/golden/current/ the last
  * check's renders; .probe/golden/diff/<name>.jpg reference | current | diff (red: differs in a
@@ -25,7 +25,7 @@
  */
 import { mkdir } from "node:fs/promises"
 import { call, ensureServer } from "./probe.ts"
-import { PROBE_DIR } from "./steps.ts"
+import { loadSettle, PROBE_DIR } from "./steps.ts"
 
 export interface View {
   name: string
@@ -34,6 +34,11 @@ export interface View {
   why: string
   /** Extra wait before the shot, ms (a forced event fading in). */
   settle?: number
+  /**
+   * A deep link applied in place once the view has settled (a lever moved live, not loaded): the
+   * shot is taken after it. Not with `click`.
+   */
+  after?: string
   /** A CSS selector clicked after the state is set (a panel to open). */
   click?: string
   viewport?: [number, number]
@@ -86,6 +91,13 @@ export const VIEWS: View[] = [
     link: "story=saga&t=6:00&hour=23&weather=clear&look=island&quality=0",
     why: "the Low tier at night: tone-mapped grade, no post",
     // Without post the moonlit sea's glints are sharper: they and the ships are ~0–1.3%.
+    threshold: 0.02,
+  },
+  {
+    name: "low-switch-night",
+    link: "story=saga&t=6:00&hour=23&weather=clear&look=island",
+    after: "quality=0",
+    why: "High dropped to Low in place (the adaptive tier's path, 0ff7db9): Low's grade, not washed out",
     threshold: 0.02,
   },
   {
@@ -167,12 +179,6 @@ function chosen(names: string[]): View[] {
   return views
 }
 
-/**
- * Clouds, rain and snow ease in from a fresh load's clear sky (scene/weather/shared.ts EASE = 2/s:
- * 30% of the change is left after 600 ms), while the hour snaps. A view with weather other than
- * clear waits WEATHER_MS more (e^−6: under 0.3% left).
- */
-const WEATHER_MS = 2500
 /** Resolves once no finite CSS animation or transition is running (3 s at most). */
 const SETTLED = `new Promise((done) => {
   const until = performance.now() + 3000
@@ -183,12 +189,10 @@ const SETTLED = `new Promise((done) => {
   }
   setTimeout(check, 100)
 })`
-/** After the world mounts: shaders compiled, the first frames drawn, the framing cut. */
-const SETTLE_MS = 1200
 
 /**
  * Renders one view to .probe/<as>.jpg through the probe server; returns its path. Hall views load
- * the page afresh at their deep link (probe-server `reload`): an in-place state carries history —
+ * the page afresh at their deep link (a probe-server state is a fresh load): an in-place state carries history —
  * adventurers still walking from the last one, clouds drifting on from it — and differed by 10–30%
  * between runs; a fresh load with the seeded random repeats.
  */
@@ -197,9 +201,8 @@ async function render(port: number, view: View, as: string): Promise<string> {
     const out = await call(port, "/shot", { name: as, lab: view.lab, settle: 300 + (view.settle ?? 0) })
     return String(out.path)
   }
-  const weather = /(?:^|&)weather=(\w+)/.exec(view.link)?.[1] ?? "clear"
-  const settle = SETTLE_MS + (weather === "clear" ? 0 : WEATHER_MS) + (view.settle ?? 0)
   const state = `${BASE}&${view.link}`
+  const settle = loadSettle(state) + (view.settle ?? 0)
   if (view.click) {
     await call(port, "/reload", { query: state })
     const click = `document.querySelector(${JSON.stringify(view.click)})?.click()`
@@ -212,7 +215,15 @@ async function render(port: number, view: View, as: string): Promise<string> {
     const out = await call(port, "/shot", { name: as, settle: 300 })
     return String(out.path)
   }
-  const out = await call(port, "/shot", { name: as, state, reload: true, viewport: view.viewport, settle })
+  // One request (load, `after`, shot): the probe server runs it whole, so another client's state
+  // can't land in between.
+  const out = await call(port, "/shot", {
+    name: as,
+    state,
+    viewport: view.viewport,
+    settle,
+    ...(view.after !== undefined ? { after: view.after } : {}),
+  })
   return String(out.path)
 }
 
@@ -221,7 +232,7 @@ async function main(argv: string[]): Promise<number> {
   if (command === "list") {
     for (const view of VIEWS)
       console.log(
-        `${view.name.padEnd(16)} ${view.why}\n${"".padEnd(16)} ?${view.lab !== undefined ? `lab=${view.lab}` : `${BASE}&${view.link}`}`,
+        `${view.name.padEnd(16)} ${view.why}\n${"".padEnd(16)} ?${view.lab !== undefined ? `lab=${view.lab}` : `${BASE}&${view.link}`}${view.after ? `  after, in place: ?${view.after}` : ""}`,
       )
     return 0
   }

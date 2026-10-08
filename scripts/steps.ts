@@ -40,6 +40,17 @@ export const CHROME_ARGS = [
 ]
 export const VIEWPORT = { width: 1440, height: 860 }
 
+/**
+ * How long a page freshly loaded at a deep link needs before a shot, ms: shaders compiled, the
+ * first frames drawn, the framing cut (1200) — and, with weather other than clear, the clouds,
+ * rain or snow eased in from the load's clear sky (scene/weather/shared.ts EASE = 2/s: 2500 ms
+ * more leaves e^−6, under 0.3%; the hour snaps).
+ */
+export function loadSettle(query: string): number {
+  const weather = /(?:^|[?&])weather=(\w+)/.exec(query)?.[1] ?? "clear"
+  return 1200 + (weather === "clear" ? 0 : 2500)
+}
+
 export type Format = "jpeg" | "png"
 /**
  * A screenshot of the viewport. JPEG (q90) by default: ~0.35 s at 2880×1720, where PNG's encoder

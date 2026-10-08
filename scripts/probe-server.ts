@@ -9,15 +9,23 @@
  * never your browser, never your tabs. DPR 2 by default (`--dpr 1` for faster, smaller shots).
  * Math.random is seeded on every load, so the island's random dressing is the same each time.
  *
+ * Why a fresh state is a reload: applied in place, a link only changes what it names. The story,
+ * a rush's crowd size (store.ts RUSH, module state), weather still easing, adventurers mid-walk all
+ * carried over from the last state — a crowd shot left 301 adventurers in the next, a storm its
+ * clouds. A load re-runs every module with Math.random re-seeded, so it repeats.
+ *
  * HTTP on 127.0.0.1 only (port 5299 by default; written to .probe/probe-server.json), JSON in/out:
  *
  *   GET  /health                     { ok, url, dpr, meshes, loads, uptime }
- *   POST /state  { query, fresh?, settle? }   a deep link applied in place (guild/deeplink.ts);
- *                                    fresh (default true) first resets pick, framing, events, clock
- *   POST /look   { at, settle? }      just the camera: a site, landmark or "x,z"
- *   POST /shot   { name, state?, lab?, settle?, fresh?, png?, viewport?: [w, h], reload? }
- *                                    reload: load the page afresh at ?state (~2 s) instead of
- *                                    applying it in place — no history, for repeatable renders   → { path, ms }  (.probe/<name>.jpg,
+ *   POST /state  { query, fresh?, settle? }   a deep link (guild/deeplink.ts). fresh (default true):
+ *                                    the page loaded afresh at ?query (~1 s), exactly a cold load of
+ *                                    that link whatever came before; fresh: false applies it in place
+ *                                    on top of the current state (history kept: walkers, weather)
+ *   POST /look   { at, settle? }      just the camera: a site, landmark or "x,z" (in place)
+ *   POST /shot   { name, state?, after?, lab?, settle?, fresh?, png?, viewport?: [w, h] }
+ *                                    state as /state; `after`, a second link applied in place once
+ *                                    that settled (a lever moved live), AFTER_MS before the shot.
+ *                                    One request, so no other client's state lands in between   → { path, ms }  (.probe/<name>.jpg,
  *                                    q90, ~0.35 s at DPR 2; png: true for a lossless .png, ~1.5 s)
  *   POST /eval   { js, lab? }         → { result }
  *   POST /steps  { steps, lab? }      a shot.ts steps array (scripts/steps.ts) → { evals, shots }
@@ -35,11 +43,13 @@
  */
 import { mkdir } from "node:fs/promises"
 import { type Browser, type BrowserContext, chromium, type Page } from "playwright-core"
+import { parseDeepLink } from "../packages/hall/src/guild/deeplink.ts"
 import {
   CHROME,
   CHROME_ARGS,
   capture,
   INFO_PATH,
+  loadSettle,
   PROBE_DIR,
   runSteps,
   type Step,
@@ -61,9 +71,11 @@ const DPR = Number(arg("dpr") ?? process.env.DPR ?? 2)
 const MIN_MESHES = 60
 const MOUNT_TIMEOUT_MS = 45_000
 const SEED = 0x5a6a
-/** After a state: the camera's cut, a seek's re-cast, a new weather settling in. Measured: 150 ms is
+/** After a state applied in place: the camera's cut, a seek's re-cast, a new weather settling in. Measured: 150 ms is
  * already within GPU noise of 3 s for a site close-up; 600 leaves room for slower scenes. */
 const SETTLE_MS = 600
+/** After a shot's `after` link: a quality tier's remount and its first frames. */
+const AFTER_MS = 1200
 
 let browser: Browser
 let context: BrowserContext
@@ -75,7 +87,11 @@ let errors: string[] = []
 const started = Date.now()
 
 async function launch(): Promise<void> {
-  browser = await chromium.launch({ executablePath: CHROME, args: CHROME_ARGS })
+  // Capped at the display rate unless PROBE_UNCAPPED=1: shots need pixels, not headroom, and an
+  // uncapped page burns the GPU (and the battery) for nothing. Frame-rate work uses bench.ts.
+  const args =
+    process.env.PROBE_UNCAPPED === "1" ? CHROME_ARGS : CHROME_ARGS.filter((arg) => !UNCAPPED.has(arg))
+  browser = await chromium.launch({ executablePath: CHROME, args })
   browser.on("disconnected", () => {
     if (!stopping) void relaunch()
   })
@@ -211,7 +227,10 @@ async function reloadHall(query: string): Promise<void> {
     ready = false
     await ensureHall()
   } else ready = true
+  loaded = loads
 }
+/** `loads` when reloadHall last finished: more since means the page navigated on its own (Vite). */
+let loaded = 0
 
 let frozen = false
 /**
@@ -225,6 +244,42 @@ async function setHallFrozen(on: boolean): Promise<void> {
   await cdp.send("Page.setWebLifecycleState", { state: on ? "frozen" : "active" })
   await cdp.detach()
   frozen = on
+}
+
+/**
+ * Idle pages are frozen: both render uncapped, so a warm server left alone drew the whole island
+ * at full speed between checks (two GPU-bound Chrome helpers on battery). After IDLE_MS without a
+ * request every open page is frozen; the next request thaws the ones that were drawing.
+ */
+const IDLE_MS = 20_000
+const UNCAPPED = new Set(["--disable-gpu-vsync", "--disable-frame-rate-limit"])
+let idleTimer: ReturnType<typeof setTimeout> | undefined
+let dozing: Page[] = []
+
+async function setFrozen(page: Page, on: boolean): Promise<void> {
+  if (page.isClosed()) return
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send("Page.setWebLifecycleState", { state: on ? "frozen" : "active" })
+  await cdp.detach()
+}
+
+async function doze(): Promise<void> {
+  const awake = [lab && !lab.isClosed() ? lab : undefined, frozen ? undefined : hall]
+  dozing = awake.filter((page): page is Page => page !== undefined && !page.isClosed())
+  for (const page of dozing) await setFrozen(page, true).catch(() => {})
+}
+
+async function wake(): Promise<void> {
+  if (idleTimer) clearTimeout(idleTimer)
+  idleTimer = undefined
+  const pages = dozing
+  dozing = []
+  for (const page of pages) await setFrozen(page, false).catch(() => {})
+}
+
+function restLater(): void {
+  if (idleTimer) clearTimeout(idleTimer)
+  idleTimer = setTimeout(() => void serial(doze), IDLE_MS)
 }
 
 /** The lab page at `?lab=<query>`, navigated only when the query changes. */
@@ -245,17 +300,23 @@ async function labPage(query: string): Promise<Page> {
   return lab
 }
 
-async function applyState(query: string, fresh: boolean, settle: number): Promise<string[]> {
+/**
+ * A deep link: `fresh`, the hall loaded afresh at it (settled per loadSettle unless `settle` says);
+ * else applied in place on top of the current state. Returns what the link ignored or couldn't do.
+ */
+async function applyState(query: string, fresh: boolean, settle: number | undefined): Promise<string[]> {
+  if (fresh) {
+    await reloadHall(query)
+    await hall.waitForTimeout(settle ?? loadSettle(query))
+    // The load applied it (main.tsx) and keeps no report: what it ignored is parsed again here.
+    return parseDeepLink(query, true).ignored
+  }
   await ensureHall()
   const notes = await hall.evaluate(
-    ({ query, fresh }) => {
-      const link = (window as unknown as { deeplink: { apply(q: string): string[]; reset(): void } }).deeplink
-      if (fresh) link.reset()
-      return link.apply(query)
-    },
-    { query, fresh },
+    (query) => (window as unknown as { deeplink: { apply(q: string): string[] } }).deeplink.apply(query),
+    query,
   )
-  await hall.waitForTimeout(settle)
+  await hall.waitForTimeout(settle ?? SETTLE_MS)
   return notes
 }
 
@@ -286,11 +347,7 @@ async function handle(path: string, body: Body): Promise<Body> {
       }
     case "/state":
       return {
-        notes: await applyState(
-          str(body, "query") ?? "",
-          body.fresh !== false,
-          num(body, "settle") ?? SETTLE_MS,
-        ),
+        notes: await applyState(str(body, "query") ?? "", body.fresh !== false, num(body, "settle")),
       }
     case "/look":
       return { notes: await applyState(`look=${str(body, "at") ?? ""}`, false, num(body, "settle") ?? 300) }
@@ -301,32 +358,35 @@ async function handle(path: string, body: Body): Promise<Body> {
       const t0 = performance.now()
       let notes: string[] = []
       const labQuery = str(body, "lab")
-      let page: Page
-      if (labQuery !== undefined) {
-        page = await labPage(labQuery)
-        await page.waitForTimeout(num(body, "settle") ?? 300)
-      } else {
-        // Another screen size (a phone): set first, so the framing is made for it; put back after.
-        const size = body.viewport
-        if (
-          Array.isArray(size) &&
-          size.length === 2 &&
-          size.every((n) => typeof n === "number" && n >= 200 && n <= 4000)
-        )
-          await hall.setViewportSize({ width: size[0], height: size[1] })
-        const state = str(body, "state")
-        if (state !== undefined && body.reload === true) {
-          await reloadHall(state)
-          await hall.waitForTimeout(num(body, "settle") ?? SETTLE_MS)
-        } else if (state !== undefined)
-          notes = await applyState(state, body.fresh !== false, num(body, "settle") ?? SETTLE_MS)
-        else await ensureHall()
-        page = hall
-      }
       const format = body.png === true ? "png" : "jpeg"
       const path = shotPath(name, format)
-      await capture(page, path, format)
-      if (page === hall && Array.isArray(body.viewport)) await hall.setViewportSize(VIEWPORT)
+      if (labQuery !== undefined) {
+        const page = await labPage(labQuery)
+        await page.waitForTimeout(num(body, "settle") ?? 300)
+        await capture(page, path, format)
+        return { path, ms: Math.round(performance.now() - t0), notes }
+      }
+      // Another screen size (a phone): set first, so the framing is made for it; put back after.
+      const size = body.viewport
+      const sized =
+        Array.isArray(size) &&
+        size.length === 2 &&
+        size.every((n) => typeof n === "number" && n >= 200 && n <= 4000)
+      const state = str(body, "state")
+      const after = str(body, "after")
+      const fresh = state !== undefined && body.fresh !== false
+      // A Vite full reload (another edit) between the load and the capture shoots the page
+      // half-mounted, or without the `after` link: shot again from the load, once.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await ensureHall()
+        if (sized) await hall.setViewportSize({ width: size[0], height: size[1] })
+        if (state !== undefined) notes = await applyState(state, fresh, num(body, "settle"))
+        if (after !== undefined) notes.push(...(await applyState(after, false, AFTER_MS)))
+        await capture(hall, path, format)
+        if (!fresh || loads === loaded) break
+        console.log(`${name}: the page reloaded mid-shot, again`)
+      }
+      if (sized) await hall.setViewportSize(VIEWPORT)
       return { path, ms: Math.round(performance.now() - t0), notes }
     }
     case "/eval": {
@@ -490,7 +550,11 @@ const server = Bun.serve({
     const path = new URL(request.url).pathname
     const body = request.method === "POST" ? ((await request.json().catch(() => ({}))) as Body) : {}
     try {
-      const out = await serial(() => handle(path, body))
+      const out = await serial(async () => {
+        await wake()
+        return handle(path, body)
+      })
+      restLater()
       const said = errors
       errors = []
       return Response.json({ ...out, errors: said })

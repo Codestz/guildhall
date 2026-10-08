@@ -118,7 +118,9 @@ export function DeedEffects() {
       const n = motesOf(deed.effect)
       const k = counts[g] ?? 0
       needed = Math.max(needed, k + n)
-      if (!deed.node.visible || k + n > capacity) continue
+      // The mesh's own room, not `capacity`: a grown capacity reaches here a commit before the
+      // bigger meshes do, and WebGPU rejects the whole frame for a draw past its buffer.
+      if (!deed.node.visible || k + n > mesh.instanceMatrix.count) continue
       deed.node.updateWorldMatrix(true, false)
       base.multiplyMatrices(deed.node.matrixWorld, EFFECT_SCALE)
       const presence = deed.presence()

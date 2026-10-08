@@ -132,7 +132,7 @@ export function Blobs() {
     const alphas = instances.instanceColor?.array
     let k = 0
     for (const walker of walkers) {
-      if (k >= capacity) break
+      if (k >= instances.instanceMatrix.count) break
       if (!blobOf(walker, look)) continue
       walker.node.getWorldPosition(position)
       position.y += 0.03

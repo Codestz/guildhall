@@ -43,7 +43,8 @@ const FRAGMENT_TAIL = /* glsl */ `
 /**
  * The one wind sway, shared by the grass ShaderMaterial and the wilds' patched standard material
  * (Wilds.tsx onBeforeCompile). Its uniforms are atmosphere/wind.ts `wind.uniforms`, attached by
- * reference. Each function returns how far a vertex bends downwind (along uWindDir).
+ * reference. Each function returns how far a vertex bends downwind (along uWindDir). Its TSL twin,
+ * for the node materials, is nature/grassNodes.ts `swayPlant` / `swayGrass`: change both together.
  */
 export const WIND_SWAY = /* glsl */ `
 uniform float uTime;

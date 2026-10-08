@@ -1,17 +1,22 @@
 import { useGLTF } from "@react-three/drei"
+import { useThree } from "@react-three/fiber"
+import { use } from "react"
 import {
   BatchedMesh,
   type BufferGeometry,
   Float32BufferAttribute,
+  type Material,
   Matrix4,
   type Mesh,
   type MeshStandardMaterial,
   type Object3D,
   Quaternion,
   Vector3,
+  type WebGLRenderer,
 } from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import type { Tier } from "../../guild/quality.ts"
+import { isWebGPU } from "../../render/backend.ts"
 import type { Spot } from "../../world/layout.ts"
 import { useWorld } from "../../world/source.ts"
 import { type Wild, type WildKind, type WildPiece, wilds, wildsOf } from "../../world/wilds.ts"
@@ -22,6 +27,7 @@ import { PILES } from "../life/places.ts"
 import { ROUNDS } from "../life/rounds.ts"
 import { useOwnedMeshes } from "../owned.ts"
 import { tameLime } from "../palette.ts"
+import { installNodes, TSL } from "../tsl.ts"
 import { WIND_SWAY } from "./shaders.ts"
 
 export const FOREST_URL = `${import.meta.env.BASE_URL}assets/forest.glb`
@@ -33,6 +39,10 @@ useGLTF.preload(FOREST_URL)
  * BatchedMeshes — what casts a shadow (trees, big bushes and rocks: static, so they join the
  * on-demand shadow map) and the low fill that doesn't — two draw calls, plus one in a shadow redraw.
  * Plants sway in the vertex shader with the wind; rocks don't. Low quality keeps only the big pieces.
+ *
+ * The sway is GLSL (onBeforeCompile) by default; on WebGPU, always, and on WebGL with `?tsl=1`
+ * (scene/tsl.ts), the material is a node material swaying the same way (grassNodes.ts); it
+ * suspends while that loads.
  */
 
 /** Where villagers walk and traces pile up (scene/life): the wilds keep off it. */
@@ -61,14 +71,15 @@ const SWAY: Record<WildKind, number> = { tree: 0.5, bush: 0.8, rock: 0, grass: 4
 export function Wilds({ tier }: { tier: Tier }) {
   const { nodes } = useGLTF(FOREST_URL) as unknown as { nodes: Record<string, Object3D> }
   const all = wildsFor(useWorld())
+  const gl = useThree((state) => state.gl)
+  const sway = isWebGPU(gl) || TSL ? use(nodeSway(gl)) : glslSway
   // Material and batches are this mount's own (scene/owned.ts); the pack's texture is borrowed.
   const built = useOwnedMeshes(
     () => {
-      const material = swayMaterial(nodes)
       const list = all.filter((w) => w.detail <= DETAIL[tier])
-      return { meshes: material ? build(nodes, material, list) : [] }
+      return { meshes: build(nodes, () => swayMaterial(nodes, sway), list) }
     },
-    [nodes, tier, all],
+    [nodes, tier, all, sway],
     "textures",
   )
 
@@ -81,12 +92,14 @@ export function Wilds({ tier }: { tier: Tier }) {
   )
 }
 
+/** Makes a copy of the pack's (lime tamed) material sway: in place on the GLSL path, a node material on the other. */
+type Sway = (material: MeshStandardMaterial) => Material
+
 /**
- * The pack's material, softened like the island's, with the shared wind sway (nature/shaders.ts
- * WIND_SWAY) added to the vertex shader: each vertex bends downwind by its height² (roots stay put),
- * phased by where the instance stands.
+ * The pack's material, softened like the island's, with the shared wind sway: each vertex bends
+ * downwind by its height² (roots stay put), phased by where the instance stands.
  */
-function swayMaterial(nodes: Record<string, Object3D>): MeshStandardMaterial | null {
+function swayMaterial(nodes: Record<string, Object3D>, sway: Sway): Material | null {
   let source: MeshStandardMaterial | null = null
   for (const node of Object.values(nodes))
     node.traverse((child) => {
@@ -97,6 +110,11 @@ function swayMaterial(nodes: Record<string, Object3D>): MeshStandardMaterial | n
   const material = (source as MeshStandardMaterial).clone()
   // Calm the pack's lime greens like the island's (scene/palette.ts); other colours stay true.
   tameLime(material.map)
+  return sway(material)
+}
+
+/** The GLSL sway (nature/shaders.ts WIND_SWAY), added to the standard material's vertex shader. */
+function glslSway(material: MeshStandardMaterial): Material {
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, wind.uniforms)
     shader.vertexShader = shader.vertexShader
@@ -117,6 +135,29 @@ function swayMaterial(nodes: Record<string, Object3D>): MeshStandardMaterial | n
   }
   material.customProgramCacheKey = () => "wilds-sway"
   return material
+}
+
+const nodeBuilds = new WeakMap<object, Promise<Sway>>()
+
+/**
+ * The node-material sway, once the renderer can draw it (one promise per renderer, for `use`).
+ * WebGPU draws node materials natively; WebGL needs the nodes handler first.
+ */
+function nodeSway(gl: WebGLRenderer): Promise<Sway> {
+  let sway = nodeBuilds.get(gl)
+  if (!sway) {
+    const ready = isWebGPU(gl) ? Promise.resolve() : installNodes(gl)
+    sway = ready
+      .then(() => import("./grassNodes.ts"))
+      .then(({ wildsNodeMaterial }) => (material) => {
+        const node = wildsNodeMaterial(material)
+        // The copy shares the clone's map (the pack's: borrowed); the clone itself is done with.
+        material.dispose()
+        return node
+      })
+    nodeBuilds.set(gl, sway)
+  }
+  return sway
 }
 
 /** One piece's geometry (plain floats, in the piece's own space) with its sway weight. */
@@ -142,7 +183,7 @@ const casts = (wild: Wild): boolean => wild.kind === "tree" || (wild.kind !== "g
 /** The wilds as two BatchedMeshes: shadow casters, and the low fill. */
 function build(
   nodes: Record<string, Object3D>,
-  material: MeshStandardMaterial,
+  material: () => Material | null,
   list: readonly Wild[],
 ): BatchedMesh[] {
   const geometries = new Map<WildPiece, BufferGeometry | null>()
@@ -171,7 +212,11 @@ function build(
       vertices += g.getAttribute("position").count
       indices += g.getIndex()?.count ?? 0
     }
-    const mesh = new BatchedMesh(group.length, vertices, indices, material)
+    // A material each: a node material is built for the first batch drawing it (its matrix texture),
+    // and on WebGL's nodes handler a second batch would read the first's. GLSL shares the program.
+    const own = material()
+    if (!own) break
+    const mesh = new BatchedMesh(group.length, vertices, indices, own)
     for (const g of used.keys()) used.set(g, mesh.addGeometry(g))
     for (const wild of group) {
       const id = mesh.addInstance(used.get(geometry(wild) as BufferGeometry) ?? 0)

@@ -38,7 +38,7 @@ describe("scene resources", () => {
       return g
     }
     const geometries = { tuft: geometry(), flower: geometry() }
-    const material = new ShaderMaterial()
+    const material = { tuft: new ShaderMaterial(), flower: new ShaderMaterial() }
     let freed = 0
     geometries.flower.addEventListener("dispose", () => freed++)
     meadow(geometries, material, 150)

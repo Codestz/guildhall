@@ -57,3 +57,15 @@ export function maxAnisotropy(gl: object): number {
   if (typeof webgpu.getMaxAnisotropy === "function") return webgpu.getMaxAnisotropy()
   return (gl as { capabilities: { getMaxAnisotropy(): number } }).capabilities.getMaxAnisotropy()
 }
+
+/** True when the browser has the WebGPU API at all (an adapter is still checked at start: render/renderer.ts). */
+export function webgpuAvailable(): boolean {
+  return typeof navigator !== "undefined" && "gpu" in navigator
+}
+
+/** The same page asking for `backend`: every other parameter kept, `renderer` set (Settings' Renderer choice). */
+export function backendUrl(href: string, backend: Backend): string {
+  const url = new URL(href)
+  url.searchParams.set("renderer", backend)
+  return url.toString()
+}

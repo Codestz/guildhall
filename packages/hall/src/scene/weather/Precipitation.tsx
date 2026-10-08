@@ -19,6 +19,7 @@ import {
 import { PROBE } from "../../guild/mode.ts"
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
+import { isWebGPU } from "../../render/backend.ts"
 import { WIND_DIRECTION, wind } from "../atmosphere/wind.ts"
 import { installNodes, TSL } from "../tsl.ts"
 import { EASE, pixelsPerUnit, seenWidth, targetOf } from "./shared.ts"
@@ -29,13 +30,13 @@ import { EASE, pixelsPerUnit, seenWidth, targetOf } from "./shared.ts"
  * and the time (fall, wind drift, wrap round the box), so nothing is written per frame but a few
  * uniforms, and density is a draw range. One draw call each.
  *
- * With `?tsl=1` (scene/tsl.ts) the same falls are TSL node materials (fallNodes.ts); it suspends
- * while those load.
+ * GLSL by default. The same falls as TSL node materials (fallNodes.ts) on WebGPU, always, and on
+ * WebGL with `?tsl=1` (scene/tsl.ts); it suspends while those load.
  */
 export function Precipitation({ tier }: { tier: Tier }) {
   const store = useGuildStore()
   const gl = useThree((state) => state.gl)
-  const build = TSL ? use(nodeFalls(gl)) : fall
+  const build = isWebGPU(gl) || TSL ? use(nodeFalls(gl)) : fall
   const rain = useMemo(() => build("rain", RAIN_COUNT[tier]), [build, tier])
   const snow = useMemo(() => build("snow", SNOW_COUNT[tier]), [build, tier])
   const state = useMemo(() => ({ rain: 0, snow: 0, time: 0 }), [])
@@ -108,13 +109,15 @@ type Build = (kind: "rain" | "snow", count: number) => Fall
 
 const nodeBuilds = new WeakMap<WebGLRenderer, Promise<Build>>()
 
-/** The node-material falls, once the renderer can draw them (one promise per renderer, for `use`). */
+/**
+ * The node-material falls, once the renderer can draw them (one promise per renderer, for `use`).
+ * WebGPU draws node materials natively; WebGL needs the nodes handler first.
+ */
 function nodeFalls(gl: WebGLRenderer): Promise<Build> {
   let build = nodeBuilds.get(gl)
   if (!build) {
-    build = installNodes(gl)
-      .then(() => import("./fallNodes.ts"))
-      .then((nodes) => nodes.nodeFall)
+    const ready = isWebGPU(gl) ? Promise.resolve() : installNodes(gl)
+    build = ready.then(() => import("./fallNodes.ts")).then((nodes) => nodes.nodeFall)
     nodeBuilds.set(gl, build)
   }
   return build

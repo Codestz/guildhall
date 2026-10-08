@@ -3,6 +3,7 @@ import type { DirectorStyle } from "../guild/director.ts"
 import { MODE } from "../guild/mode.ts"
 import { type QualityChoice, quality, TIERS, type Tier } from "../guild/quality.ts"
 import { type GuildStore, SCENARIOS, type ScenarioId } from "../guild/store.ts"
+import { active, BACKEND_NAME, type Backend, backendUrl, webgpuAvailable } from "../render/backend.ts"
 import { MOODS, type Mood } from "../world/moods.ts"
 import { Icon } from "./icons.tsx"
 import { HUD_MODES, type HudMode, hudPrefs, useHudPrefs } from "./prefs.ts"
@@ -22,6 +23,7 @@ const DIRECTORS: Record<DirectorStyle, { label: string; hint: string }> = {
 }
 
 const QUALITY: QualityChoice[] = ["auto", 0, 1, 2, 3]
+const BACKENDS: Backend[] = ["webgl", "webgpu"]
 const SPEEDS = [0.5, 1, 2, 4] as const
 const STORIES: Record<ScenarioId, string> = {
   saga: "Saga",
@@ -130,6 +132,7 @@ export function Settings({
                 ? "Steps between Low and High to keep the frame rate smooth. Ultra is never picked for you."
                 : "Pinned. Ultra adds the tilt-shift miniature look, and is heavier."}
           </p>
+          {webgpuAvailable() && <RendererLever />}
         </Section>
 
         <Section title="World">
@@ -286,6 +289,38 @@ export function Settings({
         </Section>
       </div>
     </aside>
+  )
+}
+
+/**
+ * WebGL or WebGPU (experimental): the renderer is chosen once, at load (`?renderer=`,
+ * render/backend.ts), so a choice reloads the page with every other parameter kept. Only offered
+ * where the browser has WebGPU. Two tabs side by side, Stats for nerds open in each, compare them.
+ */
+function RendererLever() {
+  const live = active.backend
+  return (
+    <>
+      <Lever label="Renderer" value={BACKEND_NAME[live]}>
+        <div className="seg seg-fill">
+          {BACKENDS.map((backend) => (
+            <button
+              key={backend}
+              type="button"
+              aria-pressed={live === backend}
+              onClick={() => {
+                if (backend !== live) location.assign(backendUrl(location.href, backend))
+              }}
+            >
+              {backend === "webgpu" ? "WebGPU (experimental)" : BACKEND_NAME[backend]}
+            </button>
+          ))}
+        </div>
+      </Lever>
+      <p className="hint">
+        Reloads the page. WebGPU is a preview: cloud shadows, outlines, mist and grass aren't drawn there yet.
+      </p>
+    </>
   )
 }
 

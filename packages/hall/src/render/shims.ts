@@ -47,6 +47,11 @@ export function syncShadows(gl: ShadowSwitches, scene: Object3D): void {
  * saturation packed into `toneMappingExposure`. WebGPU has no CustomToneMapping: the renderer here
  * reports Neutral for it and unpacks the exposure, so Low keeps its curve and its storm/night
  * exposure and loses only the desaturation (instead of an unknown tone mapping and a 4–260× exposure).
+ *
+ * The two reads translate independently: three saves and restores the renderer's state around every
+ * shadow redraw (RendererUtils via ShadowNode), writing back the Neutral it read, and the next packed
+ * exposure must still unpack. Unpacking is safe for any exposure: a plain one is under 4
+ * (lowGrade.ts), and unpacks to itself.
  */
 export function shimLowGrade(renderer: { toneMapping: ToneMapping; toneMappingExposure: number }): void {
   let mapping = renderer.toneMapping
@@ -60,7 +65,7 @@ export function shimLowGrade(renderer: { toneMapping: ToneMapping; toneMappingEx
   })
   Object.defineProperty(renderer, "toneMappingExposure", {
     configurable: true,
-    get: () => (mapping === CustomToneMapping ? unpackExposure(exposure)[0] : exposure),
+    get: () => unpackExposure(exposure)[0],
     set: (value: number) => {
       exposure = value
     },

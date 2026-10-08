@@ -7,7 +7,7 @@ import {
   PointLight,
   Scene,
 } from "three"
-import { frameCounts, maxAnisotropy, requestedBackend } from "../src/render/backend.ts"
+import { backendUrl, frameCounts, maxAnisotropy, requestedBackend } from "../src/render/backend.ts"
 import { glFor } from "../src/render/renderer.ts"
 import { shimLowGrade, shimReadback, syncShadows } from "../src/render/shims.ts"
 import { packExposure } from "../src/scene/atmosphere/lowGrade.ts"
@@ -22,6 +22,25 @@ describe("requestedBackend", () => {
     expect(requestedBackend("?story=party")).toBe("webgl")
     expect(requestedBackend("?renderer=webgl")).toBe("webgl")
     expect(requestedBackend("?renderer=WEBGPU")).toBe("webgl")
+  })
+})
+
+describe("backendUrl", () => {
+  test("sets the renderer and keeps every other parameter and the hash", () => {
+    const url = new URL(backendUrl("http://localhost:5199/?story=saga&hour=23&paused=1#x", "webgpu"))
+    expect(url.searchParams.get("renderer")).toBe("webgpu")
+    expect(url.searchParams.get("story")).toBe("saga")
+    expect(url.searchParams.get("hour")).toBe("23")
+    expect(url.searchParams.get("paused")).toBe("1")
+    expect(url.hash).toBe("#x")
+  })
+  test("replaces a renderer already asked for, and round-trips through requestedBackend", () => {
+    const url = new URL(backendUrl("http://localhost:5199/?renderer=webgpu&quality=2", "webgl"))
+    expect(url.searchParams.getAll("renderer")).toEqual(["webgl"])
+    expect(requestedBackend(url.search)).toBe("webgl")
+  })
+  test("a bare page gains only the renderer", () => {
+    expect(backendUrl("http://localhost:5199/", "webgpu")).toBe("http://localhost:5199/?renderer=webgpu")
   })
 })
 
@@ -103,6 +122,20 @@ describe("shimLowGrade", () => {
     renderer.toneMappingExposure = packExposure(0.7, 0.5)
     expect(renderer.toneMapping).toBe(NeutralToneMapping)
     expect(renderer.toneMappingExposure).toBeCloseTo(0.7, 5)
+  })
+  test("Low survives three's save/restore of the renderer state (each shadow redraw does one)", () => {
+    const renderer = { toneMapping: NoToneMapping as number, toneMappingExposure: 1 }
+    shimLowGrade(renderer)
+    renderer.toneMapping = CustomToneMapping
+    renderer.toneMappingExposure = packExposure(1.25, 0.3)
+    // RendererUtils.saveRendererState / restoreRendererState: read both, write both back.
+    const saved = { toneMapping: renderer.toneMapping, exposure: renderer.toneMappingExposure }
+    renderer.toneMapping = saved.toneMapping
+    renderer.toneMappingExposure = saved.exposure
+    // The next frame's grade writes the packed value again (Atmosphere.tsx).
+    renderer.toneMappingExposure = packExposure(1.25, 0.3)
+    expect(renderer.toneMapping).toBe(NeutralToneMapping)
+    expect(renderer.toneMappingExposure).toBeCloseTo(1.25, 5)
   })
   test("other tone mappings and exposures pass through untouched", () => {
     const renderer = { toneMapping: NoToneMapping as number, toneMappingExposure: 1 }

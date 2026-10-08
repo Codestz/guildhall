@@ -1,6 +1,6 @@
 import type { Entry, Session } from "@guildhall/core"
 import { EVENT_KINDS, type EventKind, type Renown, renownOf } from "./events.ts"
-import type { Moment } from "./moments.ts"
+import { HARBOUR, type Moment } from "./moments.ts"
 import {
   CRAFT_ORDER,
   type Craft,
@@ -36,6 +36,11 @@ export interface Notable {
   /** Run time, ms. */
   at: number
   text: string
+  /**
+   * News from the GitHub sea (a merge, red CI, a recovery, a release), told in the guildmaster's
+   * chapter under the nearest kind's mark; never counted among the party's own troubles.
+   */
+  sea?: true
 }
 
 export interface DeedCount {
@@ -226,6 +231,42 @@ function notablesOf(moments: readonly Moment[], session: Session | undefined): N
   return out
 }
 
+/** What the GitHub sea did, as the book tells it (guild/moments.ts sea moments; a push goes untold). */
+export function seaNote(m: Moment): Notable | undefined {
+  if (!("event" in m)) return undefined
+  const e = m.event
+  const at = m.at
+  if (m.kind === "sea-merged" && e.kind === "pr_merged")
+    return {
+      kind: "renown",
+      at,
+      sea: true,
+      text: `Pull request #${e.number} ${quote(e.title, 60)} was merged; its ship sailed into the harbour.`,
+    }
+  if (m.kind === "sea-red" && e.kind === "ci")
+    return {
+      kind: "flaw",
+      at,
+      sea: true,
+      text: `${e.name} failed on ${e.branch}, and the lighthouse burned red.`,
+    }
+  if (m.kind === "sea-green" && e.kind === "ci")
+    return {
+      kind: "rise",
+      at,
+      sea: true,
+      text: `${e.name} passed again on ${e.branch}; the lighthouse burned warm.`,
+    }
+  if (m.kind === "sea-release" && e.kind === "release")
+    return {
+      kind: "renown",
+      at,
+      sea: true,
+      text: `Released ${e.tag}${e.name ? ` ${quote(e.name, 40)}` : ""}: a galleon came into the harbour.`,
+    }
+  return undefined
+}
+
 /**
  * The legend of the party under `root` (the followed guildmaster), from the moment history and the
  * sessions as they stand. Pure and order-stable: after a seek it is the same book as after playing
@@ -278,7 +319,9 @@ export function legendOf(
   const chapters: Chapter[] = []
   const masterDeeds = countDeeds(root.entries, true)
   const masterMoments = told.filter((m) => m.id === root.id)
-  const masterNotables = notablesOf(masterMoments, root)
+  // The sea's news is the whole quest's doing: told in the guildmaster's chapter, in run-time order.
+  const seaNotes = told.flatMap((m) => seaNote(m) ?? [])
+  const masterNotables = [...notablesOf(masterMoments, root), ...seaNotes].sort((a, b) => a.at - b.at)
   if (masterDeeds.length > 0 || masterNotables.length > 0 || starts.length === 0) {
     const end = masterMoments.find((m) => m.kind === "loot" || m.kind === "fail")
     chapters.push({
@@ -349,7 +392,7 @@ export function legendOf(
     own.cost = root.cost
   }
 
-  const party = new Set(told.map((m) => m.id)).add(root.id).size
+  const party = new Set(told.filter((m) => m.id !== HARBOUR.id).map((m) => m.id)).add(root.id).size
   const span = told.at(-1)?.at ?? 0
   const tokens = sessions.reduce((sum, s) => sum + s.tokens, 0)
   const cost = sessions.reduce((sum, s) => sum + s.cost, 0)
@@ -370,9 +413,11 @@ export function legendOf(
           seed,
         )
 
-  const falls = chapters.flatMap((c) => c.notables.filter((n) => n.kind === "fall")).length
-  const flaws = chapters.flatMap((c) => c.notables.filter((n) => n.kind === "flaw")).length
-  const rises = chapters.flatMap((c) => c.notables.filter((n) => n.kind === "rise")).length
+  const counted = (kind: NotableKind) =>
+    chapters.flatMap((c) => c.notables.filter((n) => n.kind === kind && !n.sea)).length
+  const falls = counted("fall")
+  const flaws = counted("flaw")
+  const rises = counted("rise")
   const troubles = [
     falls ? `${spell(falls)} fell` : "",
     flaws ? `${spell(flaws)} ${flaws === 1 ? "trial" : "trials"} failed` : "",

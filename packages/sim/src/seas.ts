@@ -5,7 +5,9 @@ import { type Adventurer, Script } from "./script.ts"
  * A party's run with its sea beside it (PROTOCOL.md §7): what GitHub would say while the guild works,
  * so the website can show the sea without a hub or a token. The story: a dark-mode change is built
  * and pushed once its tests pass, a pull request opens, CI goes red on Linux, the fix is pushed and
- * CI goes green, the PR is merged, main's CI passes, and a release is cut at the end.
+ * CI goes green, the PR is merged, main's CI passes, and a release is cut; then the librarian writes
+ * it into the changelog, so the story runs on after the release (RELEASE_TAIL_MS at least): the
+ * hall's galleon is seen sailing in and anchoring before a replay loops.
  *
  * Sea events are timed like the changes (ms from the start) and fall at the moments in the run that
  * cause them: a push right after the `git push` deed, CI a little after each push.
@@ -20,6 +22,8 @@ const REPO = "acme/shop"
 const BRANCH = "dark-mode"
 const AUTHOR = "mira"
 const PR = 128
+/** The story goes on at least this long after its release: the hall's galleon sails in (11 s) and its flourish plays (9 s). */
+export const RELEASE_TAIL_MS = 20_000
 
 export function seas(seed = 1): SeaTale {
   const script = new Script(seed)
@@ -121,7 +125,20 @@ export function seas(seed = 1): SeaTale {
     tag: "v1.4.0",
     name: "Dark mode",
   })
-  master.finish("Dark mode shipped: PR #128 merged after a contrast fix, CI green, v1.4.0 released.")
+  master.think("Released. The changelog should say what changed for people who hit the contrast bug.", 2200)
+  master.quest("guild-librarian", "Write the v1.4.0 changelog entry for dark mode", (s) => {
+    s.deed("read", { filePath: "CHANGELOG.md" }, 1600)
+    s.deed("read", { filePath: "src/theme/tokens.ts" }, 1400)
+    s.think("Lead with dark mode, then the muted-text contrast fix for Linux fonts.", 2600)
+    s.deed("edit", { filePath: "CHANGELOG.md" }, 4200)
+    s.deed("edit", { filePath: "docs/theming.md" }, 3800)
+    s.finish("v1.4.0 in the changelog and the theming docs: dark settings page, muted text at 4.6 contrast.")
+  })
+  master.deed("bash", { command: "gh release view v1.4.0" }, 1600, { summary: "v1.4.0" })
+  master.think("Changelog and theming docs in. That's the release done.", 2400)
+  master.finish(
+    "Dark mode shipped: PR #128 merged after a contrast fix, CI green, v1.4.0 released and logged.",
+  )
   return { changes: script.done(), sea: sea.sort((a, b) => a.at - b.at) }
 }
 

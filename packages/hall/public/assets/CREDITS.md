@@ -4,7 +4,7 @@
 [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). Built from the free tiers of:
 Character Pack: Adventurers 2.0, Character Animations 1.1, Dungeon Pack 1.1, Furniture Bits,
 RPG Tools Bits, Fantasy Weapons Bits, Medieval Hexagon Pack, Forest Nature Pack, Restaurant Bits,
-Skeletons 1.1 and Halloween Bits (see `scripts/assets.ts`).
+Skeletons 1.1, Halloween Bits and Resource Bits (see `scripts/assets.ts`).
 
 Sound effects in `public/audio/` by **Kenney** — [kenney.nl](https://kenney.nl/), released under
 [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/): a curated subset of
@@ -12,4 +12,4 @@ Sound effects in `public/audio/` by **Kenney** — [kenney.nl](https://kenney.nl
 [Impact Sounds](https://kenney.nl/assets/impact-sounds) (metal, mining, plank, a heavy bell). The
 notes and the ambience are synthesized in the browser (`src/audio/`).
 
-Ships: **Kenney** — [Pirate Kit](https://kenney.nl/assets/pirate-kit), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+Ships and the release galleon's pennant: **Kenney** — [Pirate Kit](https://kenney.nl/assets/pirate-kit), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).

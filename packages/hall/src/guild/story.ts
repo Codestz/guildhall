@@ -296,6 +296,7 @@ export type BeatKind =
   | "answered"
   | "join"
   | "deed"
+  | "sea"
 
 /** Which beat a moment belongs to; `leave` makes no caption (the tavern and gate already say it). */
 export function beatOf(m: Moment): BeatKind | undefined {
@@ -318,6 +319,12 @@ export function beatOf(m: Moment): BeatKind | undefined {
       return "join"
     case "deed":
       return m.tool === "task" || m.tool === "subagent" ? undefined : "deed"
+    // The GitHub sea: a merge, red CI, a recovery, a release. A push sails quietly.
+    case "sea-merged":
+    case "sea-red":
+    case "sea-green":
+    case "sea-release":
+      return "sea"
     default:
       return undefined
   }
@@ -333,6 +340,8 @@ export const PRIORITY: Record<BeatKind, number> = {
   fall: 5,
   plea: 5,
   rise: 4,
+  /** Something happened on GitHub (guild/moments.ts sea moments): news from outside the hall. */
+  sea: 4,
   flaw: 3,
   quest: 3,
   loot: 2,
@@ -849,12 +858,78 @@ export function lineOf(
       )
     }
 
+    case "sea": {
+      // A burst (a merge and its CI landing together) tells the biggest news: release, red, merge, green.
+      const lead = [...moments].sort((a, b) => SEA_RANK.indexOf(a.kind) - SEA_RANK.indexOf(b.kind))[0]
+      return line.parts(lead ? seaLine(lead, seed) : "News from the harbour")
+    }
+
     // Told by `renownLine` and handed to the narrator whole (`Narrator.proclaim`).
     case "renown":
       return line.parts("Something stirs on the island")
     // Told by `chapterLine` and handed to the narrator whole (`Narrator.announce`).
     case "chapter":
       return line.parts("A new chapter")
+  }
+}
+
+// ─────────────────────────────── the sea ───────────────────────────────
+
+/** Which sea news leads a burst. */
+const SEA_RANK: readonly string[] = ["sea-release", "sea-red", "sea-merged", "sea-green"]
+
+/** A pull request as a storyteller names it: `#128 “Dark mode for the settings page”`. */
+function prName(event: { number: number; title: string }): string {
+  return `#${event.number} ${quote(event.title, 50)}`
+}
+
+/** The caption for a sea moment (guild/moments.ts): what GitHub said, and what the sea does about it. */
+export function seaLine(m: Moment, seed: number): string {
+  if (!("event" in m)) return "News from the harbour"
+  const e = m.event
+  switch (m.kind) {
+    case "sea-merged":
+      return e.kind === "pr_merged"
+        ? pick(
+            [
+              `Pull request ${prName(e)} is merged — its ship sails into the harbour under full sail`,
+              `${prName(e)} is merged, and its ship comes home to the quay`,
+            ],
+            seed,
+          )
+        : "A pull request is merged"
+    case "sea-red":
+      return e.kind === "ci"
+        ? pick(
+            [
+              `The lighthouse burns red: ${e.name} failed on ${e.branch}`,
+              `Red light at the harbour — ${e.name} failed on ${e.branch}`,
+            ],
+            seed,
+          )
+        : "The lighthouse burns red"
+    case "sea-green":
+      return e.kind === "ci"
+        ? pick(
+            [
+              `The lighthouse burns warm again: ${e.name} passes on ${e.branch}`,
+              `Green again on ${e.branch}: the lighthouse's red light goes warm`,
+            ],
+            seed,
+          )
+        : "The lighthouse burns warm again"
+    case "sea-release":
+      return e.kind === "release"
+        ? pick(
+            [
+              `Release ${e.tag}${e.name ? ` ${quote(e.name, 40)}` : ""} is out — a galleon drops anchor, flags flying`,
+              `A galleon sails in for ${e.tag}: the release is out`,
+            ],
+            seed,
+          )
+        : "A galleon sails in"
+    default:
+      return "News from the harbour"
   }
 }
 

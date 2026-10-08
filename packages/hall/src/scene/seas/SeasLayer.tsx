@@ -1,6 +1,6 @@
 import { useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import {
   AdditiveBlending,
   Color,
@@ -33,6 +33,7 @@ import {
   type Harbour,
   type Hull,
   harbourOf,
+  harbourSpotOf,
   lampOf,
   lighthouseSpot,
   MAX_CRATES,
@@ -93,11 +94,27 @@ export default function SeasLayer() {
   const ships = useGLTF(SHIPS_URL) as unknown as { nodes: Record<string, Object3D> }
   const lands = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
   const harbour = useMemo(() => harbourOf(watersOf(world).quay), [world])
-  const spot = useMemo(() => lighthouseSpot(world.island, harbour), [world, harbour])
+  const lighthouse = useMemo(() => lighthouseSpot(world.island, harbour), [world, harbour])
   const layer = useOwnedMeshes(
-    () => build(ships.nodes, seas.nodes, lands.nodes, spot, harbour),
-    [ships.nodes, seas.nodes, lands.nodes, spot, harbour],
+    () => build(ships.nodes, seas.nodes, lands.nodes, lighthouse, harbour),
+    [ships.nodes, seas.nodes, lands.nodes, lighthouse, harbour],
     "textures",
+  )
+
+  // The Bard looks: at the quay for a merge, the anchorage for a release, the lighthouse for red CI.
+  useEffect(
+    () =>
+      store.moments.on((moment) => {
+        const spot = harbourSpotOf(moment.kind)
+        const place = spot
+          ? toWorld(harbour, spot.side, spot.out)
+          : moment.kind === "sea-red"
+            ? lighthouse
+            : undefined
+        if (!place) return
+        store.director.hint({ key: `sea:${moment.kind}`, x: place.x, z: place.z, radius: 16 }, 7, 12_000)
+      }),
+    [store, harbour, lighthouse],
   )
 
   useFrame(() => {

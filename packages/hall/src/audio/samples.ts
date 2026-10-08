@@ -15,7 +15,18 @@ import type { Note } from "./music.ts"
  * Adding one: drop the .ogg in `public/audio/`, list it under a name here, and say when it plays
  * in `sampleFor` (audio/engine.ts).
  */
-export type SampleName = "forge" | "build" | "quarry" | "chop" | "book" | "coins" | "door" | "creak" | "bell"
+export type SampleName =
+  | "forge"
+  | "build"
+  | "quarry"
+  | "chop"
+  | "book"
+  | "coins"
+  | "door"
+  | "creak"
+  | "bell"
+  | "horn"
+  | "toll"
 
 export interface SampleDef {
   files: readonly string[]
@@ -73,6 +84,20 @@ export const SAMPLES: Record<SampleName, SampleDef> = {
   creak: { files: ["creak1.ogg", "creak3.ogg"], gain: 0.2, mode: "augment", rate: [0.85, 1] },
   // The graveyard's bell tolls once for a fallen adventurer — rarely (a long cooldown).
   bell: { files: ["impactBell_heavy_004.ogg"], gain: 0.2, mode: "augment", rate: [0.7, 0.8] },
+  // The harbour (the GitHub sea): a ship's horn as a merged pull request or a release comes in.
+  // No recording in the packs: a low horn swell from the synth.
+  horn: {
+    files: [],
+    gain: 0.3,
+    mode: "augment",
+    rate: [1, 1],
+    synth: [
+      { timbre: "horn", midi: 45, delay: 0, dur: 2.2, gain: 0.34 },
+      { timbre: "horn", midi: 52, delay: 0.1, dur: 2, gain: 0.2 },
+    ],
+  },
+  // Red CI: the same heavy bell as the graveyard's, struck brighter, from the lighthouse.
+  toll: { files: ["impactBell_heavy_004.ogg"], gain: 0.18, mode: "augment", rate: [0.95, 1.05] },
 }
 
 const CHOPPING = new Set(["grep", "glob", "list"])
@@ -83,7 +108,8 @@ const READING = new Set(["library", "scroll-desk"])
  * The spot sound a moment makes, from where the adventurer is working (their view's station or
  * site): the forge rings, the yard builds, the quarry and the forest are worked, books are read;
  * coins on loot, the gate's door on a join, the crypt's creak when the fallen rise and the
- * graveyard's bell when one falls. Null: notes only.
+ * graveyard's bell when one falls; from the harbour, a horn for a merge or a release and a toll for
+ * red CI. Null: notes only.
  */
 export function sampleFor(
   kind: MomentKind,
@@ -107,6 +133,11 @@ export function sampleFor(
       return "bell"
     case "recover":
       return "creak"
+    case "sea-merged":
+    case "sea-release":
+      return "horn"
+    case "sea-red":
+      return "toll"
     default:
       return null
   }

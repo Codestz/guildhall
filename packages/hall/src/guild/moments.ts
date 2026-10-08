@@ -1,4 +1,12 @@
-import { type Change, failedDeed, type Model, type Status, type ToolState } from "@guildhall/core"
+import {
+  type Change,
+  type CiState,
+  failedDeed,
+  type Model,
+  type SeaEvent,
+  type Status,
+  type ToolState,
+} from "@guildhall/core"
 
 /**
  * Moments: the typed things that *happen* in a guild (ADR 0008), for anything that reacts to an
@@ -19,6 +27,16 @@ import { type Change, failedDeed, type Model, type Status, type ToolState } from
  *   plea           a session waits on a human (permission / question)
  *   plea-answered  it stops waiting
  *   leave          a finished subagent walks out of the gate (run time `GONE_MS` after it ended)
+ *
+ * And the sea (PROTOCOL.md §7): what happened on GitHub to the guild's project, told by the store as
+ * its clock reaches each sea event (`seaHappening`). Their actor is the harbour (`HARBOUR`), not an
+ * adventurer: no one in the hall did it, the guild's work did.
+ *
+ *   sea-push       new commits pushed (quiet: a ship sails, nobody is told)
+ *   sea-merged     a pull request merged
+ *   sea-red        a CI run failed
+ *   sea-green      a CI run passed on a branch whose last finished run had failed
+ *   sea-release    a release published
  */
 export type MomentKind = Moment["kind"]
 
@@ -63,6 +81,47 @@ export type Happening =
   | { kind: "plea" }
   | { kind: "plea-answered" }
   | { kind: "leave" }
+  | { kind: SeaMomentKind; event: SeaEvent }
+
+/** The sea's moments (see the list above). */
+export type SeaMomentKind = "sea-push" | "sea-merged" | "sea-red" | "sea-green" | "sea-release"
+
+/** Who a sea moment is about: the harbour, in the guild's own gold. `master` is the store's to set. */
+export const HARBOUR: Omit<Actor, "master"> = {
+  id: "sea",
+  agent: "",
+  title: "Harbour",
+  color: "#dcb662",
+}
+
+/**
+ * The moment a sea event makes, if any. `finished` remembers each repo branch's last finished CI
+ * run (passed or failed), read and updated here, so a pass after a failure is a recovery. Pure but
+ * for `finished`: the same events in the same order always give the same moments.
+ */
+export function seaHappening(
+  event: SeaEvent,
+  finished: Map<string, CiState>,
+): { kind: SeaMomentKind; event: SeaEvent } | undefined {
+  switch (event.kind) {
+    case "push":
+      return { kind: "sea-push", event }
+    case "pr_merged":
+      return { kind: "sea-merged", event }
+    case "release":
+      return { kind: "sea-release", event }
+    case "ci": {
+      if (event.state !== "passed" && event.state !== "failed") return undefined
+      const key = `${event.repo}:${event.branch}`
+      const before = finished.get(key)
+      finished.set(key, event.state)
+      if (event.state === "failed") return { kind: "sea-red", event }
+      return before === "failed" ? { kind: "sea-green", event } : undefined
+    }
+    default:
+      return undefined
+  }
+}
 
 /** What the model said, just before a change, about the sessions the change can move. */
 export interface Before {

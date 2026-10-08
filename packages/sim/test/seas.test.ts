@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { applyAll, emptyModel } from "@guildhall/core"
 import { seas } from "../src/index.ts"
+import { RELEASE_TAIL_MS } from "../src/seas.ts"
 
 describe("seas: a party with GitHub beside it", () => {
   const { changes, sea } = seas()
@@ -33,6 +34,13 @@ describe("seas: a party with GitHub beside it", () => {
     const end = changes.at(-1)!.at
     for (const event of sea) expect(event.at).toBeLessThanOrEqual(end)
     for (let i = 1; i < sea.length; i++) expect(sea[i]!.at).toBeGreaterThanOrEqual(sea[i - 1]!.at)
+  })
+
+  test("the story runs on after its release, long enough to see it arrive", () => {
+    const release = sea.find((e) => e.kind === "release")
+    const end = changes.at(-1)?.at ?? 0
+    expect(release).toBeDefined()
+    expect(end - (release?.at ?? end)).toBeGreaterThanOrEqual(RELEASE_TAIL_MS)
   })
 
   test("every id is unique (a hall dedupes on it)", () => {

@@ -2,6 +2,7 @@ import {
   activityOf,
   apply,
   type Change,
+  type CiState,
   emptyModel,
   failedDeed,
   type GuildEvent,
@@ -63,7 +64,7 @@ import {
   type StoryHour,
 } from "./environment.ts"
 import { MODE, SERVED } from "./mode.ts"
-import { type Actor, before, happenings, MomentStream } from "./moments.ts"
+import { type Actor, before, HARBOUR, happenings, MomentStream, seaHappening } from "./moments.ts"
 import { Ordinals } from "./ordinals.ts"
 import { byJoin, PARTY_IDLE_MS, type Party, stageOf } from "./parties.ts"
 import { RISE_MS, Undead } from "./undead.ts"
@@ -78,9 +79,6 @@ export type { Seat }
 
 /** How many adventurers `rush` sends out (unset: the story's own 12); a deep link's `n` sets it. */
 export const RUSH: { count?: number } = {}
-
-/** How long the seas story holds after its release, so the galleon is seen arriving (scene/seas). */
-const SEAS_HOLD_MS = 30_000
 
 /** A story as told: its changes alone, or with acts and hours, and the GitHub sea beside it. */
 type Told = Change[] | (Tale & { sea?: readonly SeaEvent[] })
@@ -101,12 +99,7 @@ export const SCENARIOS: Record<
   /** A party with its GitHub sea beside it: a push, a PR, red then green CI, a merge, a release (sim/seas.ts). */
   seas: () => {
     const { changes, sea } = seas()
-    // The release is the story's last word: hold the scene a while (one quiet step on the
-    // guildmaster) so its galleon sails in and anchors before the replay loops.
-    const last = changes.at(-1)
-    const master = changes[0]
-    const hold: Change[] = last && master ? [{ type: "step", id: master.id, at: last.at + SEAS_HOLD_MS }] : []
-    return { changes: [...changes, ...hold], chapters: [], hours: [], sea }
+    return { changes, chapters: [], hours: [], sea }
   },
 }
 export type ScenarioId = keyof typeof SCENARIOS
@@ -400,6 +393,7 @@ export class GuildStore {
     this.chapters = []
     this.hours = []
     this.sea = []
+    this.sighted = []
     this.liveStart = Date.now()
     let delay = 500
     const open = () => {
@@ -422,9 +416,13 @@ export class GuildStore {
           this.seen.clear()
           this.liveStart = data.events[0]?.change.at ?? Date.now()
           for (const event of data.events) if (this.fresh(event)) this.take(event.change, false, event.guild)
-          this.sight(data.sea)
+          // The sea so far is history, dated as GitHub dates it.
+          this.sight(data.sea, false)
+          this.tellSea(Number.POSITIVE_INFINITY, false)
         } else if (data.type === "sea") {
-          this.sight(data.sea)
+          // News: dated as it arrives, so a push's voyage is seen however late the poll found it.
+          this.sight(data.sea, true)
+          this.tellSea(Number.POSITIVE_INFINITY, true)
           this.emit()
           return
         } else {
@@ -452,19 +450,46 @@ export class GuildStore {
     open()
   }
 
+  /** Live: each sea event taken, once, with the time (ms since the epoch) the hall dates it by. */
+  private sighted: { event: SeaEvent; when: number }[] = []
+
   /**
-   * Live: sea records from the hub, each event once (a hello repeats what was already sent). Run time
-   * is reckoned from `liveStart`, which a hello may move, so every sighting is re-dated.
+   * Live: sea records from the hub, each event once (a hello repeats what was already sent). History
+   * (a hello's) keeps GitHub's time; `news` (a sea message) is dated as it arrives — the hub polls,
+   * so it hears of a push a minute or more after it, and the ship should still be seen sailing. Run
+   * time is reckoned from `liveStart`, which a hello may move, so every sighting is re-dated.
    */
-  private sight(records: readonly SeaRecord[]): void {
-    const known = new Set(this.sea.map((s) => s.event.id))
-    const events = [...this.sea.map((s) => s.event)]
+  private sight(records: readonly SeaRecord[], news: boolean): void {
+    const known = new Set(this.sighted.map((s) => s.event.id))
+    const now = Date.now()
     for (const { event } of records)
       if (!known.has(event.id)) {
         known.add(event.id)
-        events.push(event)
+        this.sighted.push({ event, when: news ? Math.max(event.at, now) : event.at })
       }
-    this.sea = sightingsOf(events, this.liveStart)
+    this.sea = this.sighted
+      .map(({ event, when }) => ({ event, at: when - this.liveStart }))
+      .sort((a, b) => a.at - b.at || a.event.at - b.event.at)
+  }
+
+  /** Sea events already told as moments, since the last rebuild; and each branch's last finished CI. */
+  private seaTold = new Set<string>()
+  private ciFinished = new Map<string, CiState>()
+
+  /**
+   * The sea's moments (guild/moments.ts `seaHappening`) for every sighting up to run time `to` not
+   * yet told: a merge, red CI, a recovery, a release. Told for the party the hall is about.
+   */
+  private tellSea(to: number, live: boolean): void {
+    for (const { event, at } of this.sea) {
+      if (at > to) break
+      if (this.seaTold.has(event.id)) continue
+      this.seaTold.add(event.id)
+      const happening = seaHappening(event, this.ciFinished)
+      if (!happening) continue
+      const master = this.focalParty?.id ?? partyOf(this.model)[0]?.id ?? ""
+      this.moments.add({ ...HARBOUR, master, ...happening, at, live })
+    }
   }
 
   /** Live: the last seq taken per guild, since the last hello. */
@@ -514,7 +539,14 @@ export class GuildStore {
         return kind ? [{ at: change.at - start, kind }] : []
       }),
     ]
-    this.beats = beatTimes(this.markers, this.player.duration)
+    // A fast-forward slows for the sea's news too: every sea event but CI's in-between states.
+    const sea = this.sea.filter(
+      ({ event }) => event.kind !== "ci" || event.state === "failed" || event.state === "passed",
+    )
+    this.beats = beatTimes(
+      [...this.markers, ...sea.map(({ at }) => ({ at, kind: "sea" }))],
+      this.player.duration,
+    )
     this.selected = null
     this.reset()
     this.emit()
@@ -632,6 +664,7 @@ export class GuildStore {
     this.player.speed = this.pace
     this.reset()
     for (const event of this.player.seek(time)) this.take(event.change, false)
+    this.tellSea(this.player.time, false)
     this.refresh()
   }
 
@@ -650,6 +683,7 @@ export class GuildStore {
     const { events, restarted } = this.player.tick(realMs)
     if (restarted) this.reset()
     for (const event of events) this.take(event.change, true)
+    this.tellSea(this.player.time, true)
     this.turn(restarted ? -1 : was, this.player.time)
     this.sinceViews += realMs
     if (events.length > 0 || restarted || this.sinceViews > 100) this.refresh()
@@ -744,6 +778,8 @@ export class GuildStore {
     this.rebuilds++
     this.chapterTold = Number.NaN
     this.ordinals.forget()
+    this.seaTold.clear()
+    this.ciFinished.clear()
     this.moments.rebuild(continued)
   }
 

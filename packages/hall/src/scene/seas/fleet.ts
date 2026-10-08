@@ -397,3 +397,10 @@ export function lighthouseSpot(
   }
   return best
 }
+
+/** Where a sea moment happens, in the harbour's frame: the quay's berth for a merge, the galleon's anchorage for a release. */
+export function harbourSpotOf(kind: string): { side: number; out: number } | undefined {
+  if (kind === "sea-merged") return { side: BERTH.side, out: BERTH.out + 10 }
+  if (kind === "sea-release") return GALLEON
+  return undefined
+}

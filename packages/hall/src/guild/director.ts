@@ -83,6 +83,12 @@ export const WEIGHTS: Record<MomentKind | "rise", number> = {
   leave: 2,
   deed: 1,
   "plea-answered": 0,
+  // The sea's moments have no one to film: scene/seas hints the harbour, a place, instead.
+  "sea-push": 0,
+  "sea-merged": 0,
+  "sea-red": 0,
+  "sea-green": 0,
+  "sea-release": 0,
 }
 
 /** Score held for as long as an adventurer is in a phase (not decaying). */

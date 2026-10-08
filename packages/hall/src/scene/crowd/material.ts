@@ -1,4 +1,6 @@
-import type { Material, MeshStandardMaterial, Texture, Vector3 } from "three"
+import type { Material, MeshStandardMaterial, Texture, Vector3, WebGLRenderer } from "three"
+import { isWebGPU } from "../../render/backend.ts"
+import { installNodes, TSL } from "../tsl.ts"
 import type { BoneBake } from "./bake.ts"
 
 /**
@@ -24,6 +26,10 @@ import type { BoneBake } from "./bake.ts"
  * the bind frame. The bone's turn is followed by the shortest turn that points it at the world's up,
  * about the bone's head — keepUpright's levelling, per vertex instead of per frame on the CPU. The
  * rig's root only ever turns about y (instance places), so "up" in the rig's space is the world's.
+ *
+ * GLSL by default. On WebGPU (which ignores onBeforeCompile) always, and on WebGL with `?tsl=1`
+ * (scene/tsl.ts), the same skinning is a TSL node material instead (materialNodes.ts): a crowd is
+ * made with the `CrowdShading` its renderer draws (`wantsNodes`, `nodeShading`).
  */
 
 /** Members per row of the stage texture (three texels each). */
@@ -197,6 +203,36 @@ export function crowdMaterial(
   }
   material.customProgramCacheKey = () => "crowd"
   return material
+}
+
+/** How a crowd's materials are made: the uniforms they share, and a part's skinned material. */
+export interface CrowdShading {
+  uniforms(bake: BoneBake): CrowdUniforms
+  material(base: Material, uniforms: CrowdUniforms, bone?: number, up?: Vector3): Material
+}
+
+/** The default: onBeforeCompile on a stock MeshStandardMaterial (above). */
+export const GLSL_SHADING: CrowdShading = { uniforms: crowdUniforms, material: crowdMaterial }
+
+/** True when `gl` draws the crowd as node materials: WebGPU always, WebGL with `?tsl=1`. */
+export function wantsNodes(gl: object): boolean {
+  return isWebGPU(gl) || TSL
+}
+
+const nodeShadings = new WeakMap<object, Promise<CrowdShading>>()
+
+/**
+ * The node-material shading, once `gl` can draw it (one promise per renderer, for `use`). WebGPU
+ * draws node materials natively; WebGL needs the nodes handler first.
+ */
+export function nodeShading(gl: object): Promise<CrowdShading> {
+  let shading = nodeShadings.get(gl)
+  if (!shading) {
+    const ready = isWebGPU(gl) ? Promise.resolve() : installNodes(gl as WebGLRenderer)
+    shading = ready.then(() => import("./materialNodes.ts")).then((nodes) => nodes.NODE_SHADING)
+    nodeShadings.set(gl, shading)
+  }
+  return shading
 }
 
 function glsl(value: number): string {

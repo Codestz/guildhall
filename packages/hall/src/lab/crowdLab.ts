@@ -17,12 +17,15 @@ import {
   Vector3,
   WebGLRenderer,
 } from "three"
+import { BACKEND_NAME, type Backend, frameCounts, isWebGPU, requestedBackend } from "../render/backend.ts"
 import { CARRY_WALK, carryClip } from "../scene/activity.ts"
 import { installRadialFog } from "../scene/atmosphere/fog.ts"
 import { bakeBytes, bakeClips } from "../scene/crowd/bake.ts"
 import { Crowd, type Member } from "../scene/crowd/Crowd.ts"
+import { GLSL_SHADING, nodeShading, wantsNodes } from "../scene/crowd/material.ts"
 import { attachGrip, KIT_GRIPS } from "../scene/grips.ts"
 import { cloneRig } from "../scene/rig.ts"
+import { TSL } from "../scene/tsl.ts"
 import { ANIMS_URL, isModel, KIT_URL, MODELS, type Model, modelUrl } from "../world/cast.ts"
 import { createStage, load } from "./stage.ts"
 
@@ -35,6 +38,9 @@ import { createStage, load } from "./stage.ts"
  *   ?lab=crowd&held=1                   knights chop with an axe riding the baked hand slot
  *   ?lab=crowd&compare=1&clip=Pickaxing&at=0.3   a real SkinnedMesh (left) beside a baked one
  *                                       (right), same clip and time, from four sides
+ *   ?lab=crowd&n=300&renderer=webgpu    the field on WebGPURenderer (node materials, materialNodes.ts)
+ *   ?lab=crowd&n=300&tsl=1              the field's node materials on WebGL (scene/tsl.ts)
+ *   ?lab=crowd&n=300&at=12.5            frozen at crowd second 12.5 (the same pose on any backend)
  *
  * `window.lab`: `measure(seconds)` → fps and frame times, uncapped; `shuffle()` → every member
  * blends to a new clip; `stats()`.
@@ -99,11 +105,11 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
     compare(root, params, bake, scenes, clips, kit?.scene ?? null, summary)
     return
   }
-  field(root, params, bake, scenes, models, clips, kit?.scene ?? null, summary)
+  await field(root, params, bake, scenes, models, clips, kit?.scene ?? null, summary)
 }
 
 /** A field of n: one draw per model part, whatever n is. */
-function field(
+async function field(
   root: HTMLElement,
   params: URLSearchParams,
   bake: ReturnType<typeof bakeClips>,
@@ -112,7 +118,7 @@ function field(
   clips: AnimationClip[],
   kit: Object3D | null,
   summary: string,
-): void {
+): Promise<void> {
   const n = Math.min(5000, Math.max(1, Number(params.get("n") ?? 300) || 300))
   const held = params.get("held") === "1"
   const asked = params.get("clip")
@@ -143,24 +149,30 @@ function field(
   // `skinned=1`: the same field as real SkinnedMeshes with a mixer each (Adventurer's way), to
   // measure against on the same machine at the same moment.
   const skinned = params.get("skinned") === "1"
-  const crowd = new Crowd(bake, scenes, skinned ? [] : members)
-  const axe = held ? kit?.getObjectByName("axe") : undefined
-  if (axe) crowd.hold("knight", axe, KIT_GRIPS.axe)
-  const herd = skinned ? skinnedField(members, scenes, clips) : null
-
+  const backend = requestedBackend(params.toString())
   root.innerHTML = ""
-  const renderer = new WebGLRenderer({ antialias: true })
+  const renderer = await labRenderer(backend)
   renderer.setPixelRatio(window.devicePixelRatio || 1)
   renderer.setSize(window.innerWidth, window.innerHeight)
   root.append(renderer.domElement)
   const label = overlay(root)
+  const shading = wantsNodes(renderer) ? await nodeShading(renderer) : GLSL_SHADING
+
+  const crowd = new Crowd(bake, scenes, skinned ? [] : members, undefined, shading)
+  const axe = held ? kit?.getObjectByName("axe") : undefined
+  if (axe) crowd.hold("knight", axe, KIT_GRIPS.axe)
+  const herd = skinned ? skinnedField(members, scenes, clips) : null
 
   // The island's own radial fog (atmosphere/fog.ts): the crowd's shader must keep receiving it.
   installRadialFog()
   const radius = (side * SPACING) / 2
   const scene = new Scene()
   scene.background = new Color("#d9d3c6")
-  scene.fog = new Fog("#d9d3c6", radius * 0.8, radius * 1.35)
+  const fog = new Fog("#d9d3c6", radius * 0.8, radius * 1.35)
+  scene.fog = fog
+  // WebGPU reads the fog node, not the chunks (render/webgpu.ts does the same for the hall).
+  if (isWebGPU(renderer))
+    Object.assign(scene, { fogNode: (await import("../scene/atmosphere/fogNode.ts")).radialFog(fog) })
   lights(scene)
   const ground = new Mesh(
     new CircleGeometry(radius * 1.6, 64),
@@ -181,8 +193,10 @@ function field(
   })
 
   const t0 = performance.now()
+  const at = params.get("at")
+  const frozen = at === null ? undefined : Number(at) || 0
   const draw = () => {
-    const t = (performance.now() - t0) / 1000
+    const t = frozen ?? (performance.now() - t0) / 1000
     crowd.time = t
     herd?.pose(t)
     renderer.render(scene, camera)
@@ -201,7 +215,7 @@ function field(
     draw()
     if (now - shown > 500) {
       shown = now
-      label.textContent = `n ${n}${skinned ? " SkinnedMesh" : " baked"} · ${stats().calls} draws · ${(stats().triangles / 1000).toFixed(0)}k tris · ${stats().fps.toFixed(0)} fps (capped 60) · ${summary}`
+      label.textContent = `n ${n}${skinned ? " SkinnedMesh" : " baked"} · ${BACKEND_NAME[isWebGPU(renderer) ? "webgpu" : "webgl"]}${TSL && !isWebGPU(renderer) ? " TSL" : ""} · ${stats().calls} draws · ${(stats().triangles / 1000).toFixed(0)}k tris · ${stats().fps.toFixed(0)} fps (capped 60) · ${summary}`
     }
   }
   requestAnimationFrame(loop)
@@ -209,10 +223,12 @@ function field(
   function stats() {
     const sorted = [...frames].sort((a, b) => a - b)
     const p50 = sorted[Math.floor(sorted.length / 2)] ?? 0
+    const counts = frameCounts(renderer.info as never, isWebGPU(renderer) ? "webgpu" : "webgl")
     return {
       n,
-      calls: renderer.info.render.calls,
-      triangles: renderer.info.render.triangles,
+      backend: isWebGPU(renderer) ? "webgpu" : TSL ? "webgl tsl" : "webgl",
+      calls: counts.calls,
+      triangles: counts.triangles,
       fps: p50 > 0 ? 1000 / p50 : 0,
       p50,
       p95: sorted[Math.floor(sorted.length * 0.95)] ?? 0,
@@ -327,6 +343,23 @@ function skinnedField(members: Member[], scenes: Record<string, Object3D>, clips
       last = t
     },
   }
+}
+
+/**
+ * The field's renderer: WebGL by default; three's WebGPURenderer for `renderer=webgpu` (loaded only
+ * then), or WebGL again when the browser has no WebGPU. `?tsl=1` on WebGL is node materials through
+ * the nodes handler (material.ts `nodeShading` installs it).
+ */
+async function labRenderer(backend: Backend): Promise<WebGLRenderer> {
+  if (backend === "webgpu" && (navigator as { gpu?: unknown }).gpu) {
+    const { WebGPURenderer } = await import("three/webgpu")
+    const renderer = new WebGPURenderer({ antialias: true })
+    await renderer.init()
+    if (isWebGPU(renderer) && (renderer.backend as { isWebGPUBackend?: boolean }).isWebGPUBackend)
+      return renderer as unknown as WebGLRenderer
+    renderer.dispose()
+  }
+  return new WebGLRenderer({ antialias: true })
 }
 
 function lights(scene: Scene): void {

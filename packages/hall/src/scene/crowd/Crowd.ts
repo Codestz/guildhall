@@ -24,7 +24,13 @@ import {
 import type { Grip } from "../grips.ts"
 import { type BakedClip, type BoneBake, boneMap, frameAt, socketAt } from "./bake.ts"
 import { type Lens, lens, look, meshLod, tallAt } from "./lod.ts"
-import { type CrowdUniforms, crowdMaterial, crowdUniforms, STAGE_ROW, TEXELS_PER_MEMBER } from "./material.ts"
+import {
+  type CrowdShading,
+  type CrowdUniforms,
+  GLSL_SHADING,
+  STAGE_ROW,
+  TEXELS_PER_MEMBER,
+} from "./material.ts"
 import type { PartLods } from "./simplify.ts"
 
 /**
@@ -153,21 +159,25 @@ export class Crowd {
   private stage: DataTexture
   private clock = 0
   private readonly fade: number
+  private readonly shading: CrowdShading
 
   /**
    * `models`: each model's loaded scene (the glTF's, untouched: geometry and materials are shared,
    * not cloned per member). `members`: who stands there from the start (ids 0…n-1, in order).
-   * `fade`: seconds a clip change blends.
+   * `fade`: seconds a clip change blends. `shading`: GLSL, or node materials for a renderer that
+   * draws them (material.ts `nodeShading`).
    */
   constructor(
     bake: BoneBake,
     models: Record<string, Object3D>,
     members: readonly Member[] = [],
     fade = 0.25,
+    shading: CrowdShading = GLSL_SHADING,
   ) {
     this.bake = bake
     this.scenes = models
-    this.uniforms = crowdUniforms(bake)
+    this.shading = shading
+    this.uniforms = shading.uniforms(bake)
     this.fade = fade
     this.stage = stageTexture(STAGE_ROW)
     this.uniforms.crowdStage.value = this.stage
@@ -324,7 +334,7 @@ export class Crowd {
       if (!mesh.isMesh) return
       troop.addPart({
         geometry: this.gearGeometry(mesh.geometry, bone, mesh.matrixWorld),
-        material: crowdMaterial(mesh.material as Material, this.uniforms, bone),
+        material: this.shading.material(mesh.material as Material, this.uniforms, bone),
         tinted: false,
         name: mesh.name,
       })
@@ -476,7 +486,7 @@ export class Crowd {
       sources.push({
         geometry: part.geometry,
         map,
-        material: crowdMaterial(part.material as Material, this.uniforms),
+        material: this.shading.material(part.material as Material, this.uniforms),
         tinted: /Tinted/.test(part.name),
         name: part.name,
       })
@@ -523,7 +533,7 @@ export class Crowd {
     const troop = new Troop(this.root)
     troop.addPart({
       geometry: this.gearGeometry(gear.geometry, bone, gear.matrix),
-      material: crowdMaterial(gear.material, this.uniforms, bone, up),
+      material: this.shading.material(gear.material, this.uniforms, bone, up),
       tinted: false,
       name: gear.material.name,
     })

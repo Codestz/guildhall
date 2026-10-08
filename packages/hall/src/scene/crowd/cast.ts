@@ -2,6 +2,7 @@ import type { AnimationClip, Object3D } from "three"
 import { CARRY_WALK, carryClip } from "../activity.ts"
 import { bakeClips } from "./bake.ts"
 import { Crowd } from "./Crowd.ts"
+import { type CrowdShading, GLSL_SHADING } from "./material.ts"
 import { simplifyModels } from "./simplify.ts"
 
 /**
@@ -23,14 +24,19 @@ export const FADE_S = 0.25
  */
 export const castClock = { now: 0 }
 
-let made: { animations: readonly AnimationClip[]; crowd: Crowd } | null = null
+let made: { animations: readonly AnimationClip[]; shading: CrowdShading; crowd: Crowd } | null = null
 
 /**
  * The crowd for these clips and models, made on first call (the bake: a one-off ~0.1–0.3 s). Its
- * coarser mesh levels follow once simplified (crowd/simplify.ts: its own chunk, ~40 ms).
+ * coarser mesh levels follow once simplified (crowd/simplify.ts: its own chunk, ~40 ms). `shading`:
+ * GLSL, or the renderer's node materials (material.ts `nodeShading`).
  */
-export function castCrowd(animations: readonly AnimationClip[], models: Record<string, Object3D>): Crowd {
-  if (made?.animations === animations) return made.crowd
+export function castCrowd(
+  animations: readonly AnimationClip[],
+  models: Record<string, Object3D>,
+  shading: CrowdShading = GLSL_SHADING,
+): Crowd {
+  if (made?.animations === animations && made.shading === shading) return made.crowd
   made?.crowd.dispose()
   const clips = [...animations]
   const carry = carryClip(animations)
@@ -38,8 +44,8 @@ export function castCrowd(animations: readonly AnimationClip[], models: Record<s
   const rig = Object.values(models)[0]
   if (!rig) throw new Error("castCrowd: no models")
   const bake = bakeClips(rig, clips, BAKE_FPS, { once: ONCE })
-  const crowd = new Crowd(bake, models, [], FADE_S)
-  made = { animations, crowd }
+  const crowd = new Crowd(bake, models, [], FADE_S, shading)
+  made = { animations, shading, crowd }
   simplifyModels(models).then(
     (lods) => {
       if (made?.crowd === crowd) crowd.levels(lods)

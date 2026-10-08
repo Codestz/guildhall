@@ -3,7 +3,7 @@ import type { HudMode } from "../hud/prefs.ts"
 import { pxPerUnit, sigilRoom, sizeFor } from "./sigilSize.ts"
 
 /**
- * Screen-space declutter for the name chips over adventurers' heads (drei `<Html>`).
+ * Screen-space declutter for the name chips over adventurers' heads (`<Label>`, scene/ChipLayer.tsx).
  *
  * About ten times a second it projects every chip's anchor, sorts nearest first, and:
  *  - folds a pile of three or more overlapping chips into one that reads "+N";
@@ -21,7 +21,11 @@ import { pxPerUnit, sigilRoom, sizeFor } from "./sigilSize.ts"
  *
  * Nothing here goes through React: it writes a CSS variable (`--lift`), two attributes and a text,
  * and only when they change. CSS eases the lift and fades a folded chip, so nothing jumps.
- * No allocations per run: slots, scratch vectors and the sort are all reused.
+ * No allocations per run: slots, scratch vectors, the grid and the sort are all reused.
+ *
+ * Built for crowds (hundreds of chips): a chip's size is measured once when its element appears and
+ * then kept by a ResizeObserver (never read per run, which would force a layout), and "which chips
+ * could touch this one" is asked of a screen-space grid, not of every other chip.
  */
 
 /** Height of the chip's anchor above the adventurer's feet (the `<Html position>`). */
@@ -73,6 +77,11 @@ export interface ChipSlot {
   el: HTMLElement | null
   /** Where "+N" is written. */
   more: HTMLElement | null
+  /** The element whose size `width`/`height` hold (kept by the ResizeObserver). */
+  watched: HTMLElement | null
+  /** The chip's size, px: measured when it appears, then whenever it changes (offsetWidth/Height). */
+  width: number
+  height: number
   /** The selected or pleading chip: never folded, placed before anyone else. */
   pinned: boolean
   /** A deed sigil shows under this chip: keep room for it (set by scene/Sigils.tsx). */
@@ -115,6 +124,9 @@ export function chipSlot(): ChipSlot {
     anchor: null,
     el: null,
     more: null,
+    watched: null,
+    width: 0,
+    height: 0,
     pinned: false,
     sigil: false,
     bubble: false,
@@ -161,6 +173,38 @@ export function chipOf(id: string): ChipSlot | undefined {
 export function removeChip(slot: ChipSlot): void {
   const at = slots.indexOf(slot)
   if (at >= 0) slots.splice(at, 1)
+  watch(slot, null)
+}
+
+// ── sizes: measured when a chip appears, then kept by one ResizeObserver ──
+
+let observer: ResizeObserver | null = null
+const owners = new Map<Element, ChipSlot>()
+
+/** Measure `el` for `slot` now, and whenever it resizes from here on (null: stop). */
+function watch(slot: ChipSlot, el: HTMLElement | null): void {
+  if (slot.watched) {
+    owners.delete(slot.watched)
+    observer?.unobserve(slot.watched)
+  }
+  slot.watched = el
+  slot.width = el ? el.offsetWidth : 0
+  slot.height = el ? el.offsetHeight : 0
+  if (!el) return
+  if (!observer && typeof ResizeObserver !== "undefined") observer = new ResizeObserver(resized)
+  owners.set(el, slot)
+  observer?.observe(el)
+}
+
+/** After layout, so these reads cost nothing: a hidden chip (display none) reads 0 × 0. */
+function resized(entries: ResizeObserverEntry[]): void {
+  for (const entry of entries) {
+    const slot = owners.get(entry.target)
+    if (!slot) continue
+    const el = entry.target as HTMLElement
+    slot.width = el.offsetWidth
+    slot.height = el.offsetHeight
+  }
 }
 
 /**
@@ -175,12 +219,13 @@ export function declutter(camera: Camera, width: number, height: number, now = p
 
 /** One run, exported for tests. */
 export function layout(camera: Camera, width: number, height: number): void {
-  // ── read: every measurement first, then every write, so the browser lays out once ──
+  // ── read: positions and the kept sizes; nothing here touches layout ──
   order.length = 0
   for (const slot of slots) {
     slot.on = false
     const { el, anchor } = slot
     if (!el || !anchor) continue
+    if (el !== slot.watched) watch(slot, el)
     scratch.set(0, CHIP_HEIGHT, 0)
     anchor.localToWorld(scratch)
     const perUnit = pxPerUnit(camera, scratch, height)
@@ -188,8 +233,8 @@ export function layout(camera: Camera, width: number, height: number): void {
     const size = slot.sigil ? sizeFor(perUnit) : 0
     slot.room = size ? sigilRoom(size, perUnit, CHIP_HEIGHT) : 0
     // The band counts as part of the chip, so a sigil alone (Hidden HUD: no plate) declutters too.
-    const w = Math.max(el.offsetWidth, size)
-    const h = el.offsetHeight + slot.room || size
+    const w = Math.max(slot.width, size)
+    const h = slot.height + slot.room || size
     if (w === 0 || h === 0) continue
     scratch.project(camera)
     if (scratch.z > 1 || scratch.z < -1) continue
@@ -200,8 +245,9 @@ export function layout(camera: Camera, width: number, height: number): void {
     slot.w = w
     slot.h = h
     slot.on = true
-    insert(slot)
+    order.push(slot)
   }
+  order.sort(before)
 
   // ── piles: chips whose resting boxes overlap, joined transitively ──
   for (let i = 0; i < order.length; i++) {
@@ -211,12 +257,18 @@ export function layout(camera: Camera, width: number, height: number): void {
     slot.count = 0
     slot.moreN = 0
   }
-  for (let i = 0; i < order.length; i++) {
-    const a = order[i] as ChipSlot
-    for (let j = i + 1; j < order.length; j++) {
-      const b = order[j] as ChipSlot
-      if (overlaps(a, 0, b, 0)) union(i, j)
-    }
+  grid.maxW = 0
+  grid.maxH = 0
+  for (const slot of order) {
+    grid.maxW = Math.max(grid.maxW, slot.w)
+    grid.maxH = Math.max(grid.maxH, slot.h)
+  }
+  grid.clear()
+  for (const slot of order) grid.add(slot, 0)
+  for (const a of order) {
+    // Each pair once, from its higher-priority side.
+    const near = grid.near(a, a.y - a.h, a.y)
+    for (const b of near) if (b.index > a.index && overlaps(a, 0, b, 0)) union(a.index, b.index)
   }
   for (const slot of order) (order[find(slot.index)] as ChipSlot).count++
   for (const slot of order) {
@@ -230,36 +282,49 @@ export function layout(camera: Camera, width: number, height: number): void {
     vote(slot, root.count >= FOLD_AT && slot !== root)
   }
   // "+N" goes on the first chip of the pile still shown; a pile always keeps one chip.
+  hosts.length = order.length
+  hosts.fill(undefined)
+  for (const slot of order) {
+    const root = find(slot.index)
+    if (!slot.folded && !hosts[root]) hosts[root] = slot
+  }
   for (const slot of order) {
     if (!slot.folded) continue
-    const host = hostOf(slot)
+    const root = find(slot.index)
+    const host = hosts[root]
     if (host) host.moreN++
-    else slot.folded = false
+    else {
+      slot.folded = false
+      hosts[root] = slot
+    }
   }
 
   // ── speech: pinned and nearest first, never two bubbles in one place, MAX_SPEAKERS in all ──
-  let speakers = 0
+  speakers.length = 0
   for (const slot of order) slot.speak = false
   for (const slot of order) {
-    if (speakers >= MAX_SPEAKERS) break
+    if (speakers.length >= MAX_SPEAKERS) break
     if (slot.folded || !slot.bubble || !speaks(hud, slot.selected, slot.perUnit)) continue
     if (crowded(slot)) continue
     slot.speak = true
-    speakers++
+    speakers.push(slot)
   }
 
   // ── nudge: place shown chips in priority order, each above whatever it would cover ──
+  // The grid holds the chips placed so far, where they were placed; asked for everything a chip
+  // could meet at any lift it may take, in priority order, it gives what a scan of them all would.
+  grid.clear()
   for (const slot of order) slot.lift = 0
-  for (let i = 0; i < order.length; i++) {
-    const slot = order[i] as ChipSlot
+  for (const slot of order) {
     if (slot.folded) continue
+    const near = grid.near(slot, slot.y - MAX_LIFT - slot.h, slot.y)
+    near.sort(byIndex)
     let moved = true
     let guard = 0
     while (moved && guard++ < 8) {
       moved = false
-      for (let j = 0; j < i; j++) {
-        const other = order[j] as ChipSlot
-        if (other.folded || !overlaps(slot, slot.lift, other, other.lift)) continue
+      for (const other of near) {
+        if (!overlaps(slot, slot.lift, other, other.lift)) continue
         // Bottom of this chip goes GAP above the top of the other.
         const need = slot.y - (other.y - other.lift - other.h) + GAP
         if (need > slot.lift) {
@@ -268,6 +333,7 @@ export function layout(camera: Camera, width: number, height: number): void {
         }
       }
     }
+    grid.add(slot, slot.lift)
   }
 
   // ── write: only what changed ──
@@ -306,20 +372,65 @@ export function layout(camera: Camera, width: number, height: number): void {
   }
 }
 
-/** Into `order`: pinned first, then nearest the camera first. Insertion sort: tiny n, no garbage. */
-function insert(slot: ChipSlot): void {
-  let i = order.length
-  order.push(slot)
-  while (i > 0 && before(slot, order[i - 1] as ChipSlot)) {
-    order[i] = order[i - 1] as ChipSlot
-    i--
-  }
-  order[i] = slot
+/** Priority order: pinned first, then nearest the camera first. */
+function before(a: ChipSlot, b: ChipSlot): number {
+  if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+  return a.z - b.z
 }
 
-function before(a: ChipSlot, b: ChipSlot): boolean {
-  if (a.pinned !== b.pinned) return a.pinned
-  return a.z < b.z
+function byIndex(a: ChipSlot, b: ChipSlot): number {
+  return a.index - b.index
+}
+
+/** First shown chip of each pile, by its root's index (reused). */
+const hosts: (ChipSlot | undefined)[] = []
+/** This run's speakers (at most MAX_SPEAKERS). */
+const speakers: ChipSlot[] = []
+
+/**
+ * Screen-space buckets of CELL px, each chip in the one cell under the middle of its bottom edge.
+ * `near` looks as far around a box as the widest and tallest chip of the run could reach into it,
+ * so it returns every chip that box might touch (and some it doesn't: `overlaps` decides). Cells
+ * past the edges are clamped together, so chips far off screen share a few cells rather than growing
+ * the map. The cells and the result are reused.
+ */
+const CELL = 64
+const SPAN = 1024
+const cells = new Map<number, ChipSlot[]>()
+const met: ChipSlot[] = []
+
+const cellOf = (px: number) => Math.min(SPAN - 1, Math.max(0, Math.floor(px / CELL) + 64))
+
+const grid = {
+  /** The widest and tallest chip of the run, px. */
+  maxW: 0,
+  maxH: 0,
+  clear(): void {
+    for (const cell of cells.values()) cell.length = 0
+  },
+  add(slot: ChipSlot, lift: number): void {
+    const key = cellOf(slot.y - lift) * SPAN + cellOf(slot.x)
+    const cell = cells.get(key)
+    if (cell) cell.push(slot)
+    else cells.set(key, [slot])
+  },
+  /** Chips that could overlap `slot`'s columns anywhere between `top` and `bottom` (px, y down). */
+  near(slot: ChipSlot, top: number, bottom: number): ChipSlot[] {
+    met.length = 0
+    const reach = (slot.w + grid.maxW) / 2 + GAP
+    const x0 = cellOf(slot.x - reach)
+    const x1 = cellOf(slot.x + reach)
+    // Another chip's bottom edge, to overlap: above `bottom` + GAP + its height, below `top` − GAP.
+    const y0 = cellOf(top - GAP)
+    const y1 = cellOf(bottom + GAP + grid.maxH)
+    for (let cy = y0; cy <= y1; cy++)
+      for (let cx = x0; cx <= x1; cx++) {
+        const cell = cells.get(cy * SPAN + cx)
+        if (!cell) continue
+        for (const other of cell) if (other !== slot) met.push(other)
+      }
+    return met
+  },
 }
 
 function overlaps(a: ChipSlot, liftA: number, b: ChipSlot, liftB: number): boolean {
@@ -368,23 +479,21 @@ function vote(slot: ChipSlot, fold: boolean): void {
  * a chip's size, and that must not turn speech on and off from one run to the next.
  */
 function crowded(slot: ChipSlot): boolean {
-  for (const other of order) {
-    if (!other.speak || other === slot) continue
+  for (const other of speakers) {
+    if (other === slot) continue
     if (Math.abs(slot.x - other.x) < BUBBLE_W + GAP && Math.abs(slot.y - other.y) < BUBBLE_H + GAP)
       return true
   }
   return false
 }
 
-/** The first shown chip of `slot`'s pile, in priority order. */
-function hostOf(slot: ChipSlot): ChipSlot | undefined {
-  const root = find(slot.index)
-  for (const other of order) if (!other.folded && find(other.index) === root) return other
-  return undefined
-}
-
 /** Test hook: forget every chip and the clock. */
 export function resetChips(): void {
+  for (const slot of slots) watch(slot, null)
+  observer?.disconnect()
+  observer = null
+  owners.clear()
+  cells.clear()
   slots.length = 0
   order.length = 0
   last = -Infinity

@@ -98,12 +98,66 @@ describe("chip declutter", () => {
     expect(far.attrs.has("data-folded")).toBe(true)
   })
 
+  test("chips far apart on a wide screen are not lifted; two that meet across it are", () => {
+    // 100 px a unit on a 2000 px canvas: chips land in different grid cells.
+    const left = chipAt(-9, 0)
+    const right = chipAt(9, 0)
+    const meet = chipAt(9.2, -1)
+    for (let i = 0; i < 3; i++) layout(camera, 2000, 2000)
+    expect(left.style.get("--lift") ?? "0px").toBe("0px")
+    expect(right.style.get("--lift") ?? "0px").toBe("0px")
+    expect(meet.style.get("--lift")).toBe("23px")
+  })
+
   test("a pile does not fold on a single run (no flicker as chips pass)", () => {
     chipAt(0, 5)
     const mid = chipAt(0.5, 0)
     chipAt(1, -5)
     layout(camera, 200, 200)
     expect(mid.attrs.has("data-folded")).toBe(false)
+  })
+})
+
+describe("chip sizes", () => {
+  /** Hands each observed element's resize to the test, as the browser would after a layout. */
+  class FakeObserver {
+    static last: FakeObserver | null = null
+    constructor(readonly notify: (entries: ResizeObserverEntry[]) => void) {
+      FakeObserver.last = this
+    }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  const real = globalThis.ResizeObserver
+  afterEach(() => {
+    globalThis.ResizeObserver = real
+  })
+
+  test("a chip is measured once when it appears, not on every run (no forced layout)", () => {
+    const near = chipAt(0, 5)
+    let reads = 0
+    Object.defineProperty(near.el, "offsetHeight", {
+      get: () => {
+        reads++
+        return 20
+      },
+    })
+    settle()
+    settle()
+    expect(reads).toBe(1)
+  })
+
+  test("a chip that grows (its observer says so) pushes the chip above it higher", () => {
+    globalThis.ResizeObserver = FakeObserver as unknown as typeof ResizeObserver
+    const near = chipAt(0, 5)
+    const far = chipAt(1, -5)
+    settle()
+    expect(far.style.get("--lift")).toBe("23px")
+    near.el.offsetHeight = 40
+    FakeObserver.last?.notify([{ target: near.el } as unknown as ResizeObserverEntry])
+    settle()
+    expect(far.style.get("--lift")).toBe("43px")
   })
 })
 

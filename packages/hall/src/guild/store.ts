@@ -66,12 +66,15 @@ export type { Seat }
  * The scene only reads views; it never looks at raw changes.
  */
 
+/** How many adventurers `rush` sends out (unset: the story's own 12); a deep link's `n` sets it. */
+export const RUSH: { count?: number } = {}
+
 export const SCENARIOS: Record<"saga" | "party" | "solo" | "rush" | "parties", () => Change[] | Tale> = {
   /** The showcase's story: five acts, ~17 min watched, every world event (sim/saga.ts). */
   saga: () => sagaTale(),
   party: () => party(),
   solo: () => solo(),
-  rush: () => rush(12),
+  rush: () => rush(RUSH.count),
   /** Three conversations at once: several parties on one island (guild/parties.ts). */
   parties: () => parties(),
 }

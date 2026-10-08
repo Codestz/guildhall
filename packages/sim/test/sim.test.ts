@@ -111,6 +111,18 @@ describe("rush", () => {
     const statuses = failed.map((id) => model.sessions.get(id)?.status)
     expect(statuses).toEqual(["failed", "done"])
   })
+
+  test("a crowd of 300 is 300 distinct quests that all end; one stays fallen, the retried one recovers", () => {
+    const changes = rush(300)
+    const model = applyAll(emptyModel(), changes)
+    const root = [...model.sessions.values()].find((s) => !s.parentID)!
+    const quests = [...model.sessions.values()].filter((s) => s.parentID === root.id)
+    expect(quests).toHaveLength(300)
+    expect(new Set(quests.map((s) => s.title)).size).toBe(300)
+    expect(quests.filter((s) => s.status === "failed")).toHaveLength(1)
+    expect(quests.every((s) => s.status === "done" || s.status === "failed")).toBe(true)
+    expect(root.status).toBe("done")
+  })
 })
 
 describe("parties: several conversations at once", () => {

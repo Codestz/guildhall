@@ -4,7 +4,7 @@ import type { Place } from "./director.ts"
 import type { Weather } from "./environment.ts"
 import { EVENT_KINDS, type EventKind } from "./events.ts"
 import type { Tier } from "./quality.ts"
-import { SCENARIOS, type ScenarioId } from "./store.ts"
+import { RUSH, SCENARIOS, type ScenarioId } from "./store.ts"
 
 /**
  * Deep links: the hall's state from the URL, so an exact moment can be shared, recorded or probed.
@@ -14,6 +14,7 @@ import { SCENARIOS, type ScenarioId } from "./store.ts"
  *   story    party | solo | rush | parties | saga
  *   t        mm:ss, a seek into the story (with `act`: counted from that act's start)
  *   act      1–5, a Saga chapter (implies story=saga when no story is given)
+ *   n        1–500, how many adventurers `rush` sends out (only with story=rush; 12 without it)
  *   hour     0–24 (decimals allowed), a fixed time of day
  *   weather  clear | cloudy | rain | storm | snow
  *   quality  0–3 (Low, Medium, High, Ultra), for this visit only (not remembered)
@@ -34,6 +35,8 @@ export interface DeepLink {
   t?: number
   /** Saga act, 1-based. */
   act?: number
+  /** Rush's adventurer count. */
+  n?: number
   hour?: number
   weather?: Weather
   quality?: Tier
@@ -61,6 +64,8 @@ const HUDS: Record<string, HudMode> = {
 }
 /** Furthest a numeric `look` may be from the island's centre, world units (the sea around it). */
 const LOOK_MAX = 200
+/** Most adventurers `n` may ask `rush` for: a stress scene, not a denial of service. */
+const RUSH_MAX = 500
 /** Params owned by other features (`?live`, `?showcase`, the labs): never reported as ignored. */
 const OTHERS = new Set([
   "live",
@@ -88,6 +93,10 @@ export function parseDeepLink(search: string, probe: boolean): Parsed {
     ignored.push(`act=${link.act}`)
     delete link.act
   }
+  if (link.n !== undefined && link.story !== "rush") {
+    ignored.push(`n=${link.n}`)
+    delete link.n
+  }
   return { link, ignored }
 }
 
@@ -108,6 +117,12 @@ function take(link: DeepLink, key: string, value: string, probe: boolean): boole
       const act = intOf(value, 1, 5)
       if (act === undefined) return false
       link.act = act
+      return true
+    }
+    case "n": {
+      const n = intOf(value, 1, RUSH_MAX)
+      if (n === undefined) return false
+      link.n = n
       return true
     }
     case "hour": {
@@ -260,7 +275,11 @@ export const SELECT_WAIT_MS = 30_000
 export function applyDeepLink(link: DeepLink, hall: Hall): string[] {
   const { store } = hall
   const problems: string[] = []
-  if (link.story && link.story !== store.scenario) store.load(link.story)
+  if (link.story === "rush" && link.n !== RUSH.count) {
+    // A different crowd is a different story: reload even when rush is already playing.
+    RUSH.count = link.n
+    store.load("rush")
+  } else if (link.story && link.story !== store.scenario) store.load(link.story)
   let at: number | undefined
   if (link.act !== undefined) {
     const chapter = store.chapters[link.act - 1]

@@ -1,6 +1,6 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { applyDeepLink, type Hall, lookOf, parseDeepLink, pick } from "../src/guild/deeplink.ts"
-import { GuildStore } from "../src/guild/store.ts"
+import { GuildStore, RUSH } from "../src/guild/store.ts"
 import { SITES } from "../src/world/lands.ts"
 
 const parse = (search: string, probe = false) => parseDeepLink(search, probe)
@@ -65,6 +65,22 @@ describe("deep links: parsing", () => {
     expect(parse("act=0").link.act).toBeUndefined()
   })
 
+  test("n sizes the rush: 1–500, whole numbers only", () => {
+    expect(parse("story=rush&n=100")).toEqual({ link: { story: "rush", n: 100 }, ignored: [] })
+    expect(parse("story=rush&n=1").link.n).toBe(1)
+    expect(parse("story=rush&n=500").link.n).toBe(500)
+    for (const bad of ["0", "501", "1.5", "-3", "1e2", "lots", ""]) {
+      const { link, ignored } = parse(`story=rush&n=${bad}`)
+      expect(link).toEqual({ story: "rush" })
+      expect(ignored).toEqual([`n=${bad}`])
+    }
+  })
+
+  test("n with another story, or none, is dropped and reported", () => {
+    expect(parse("story=party&n=50")).toEqual({ link: { story: "party" }, ignored: ["n=50"] })
+    expect(parse("n=50")).toEqual({ link: {}, ignored: ["n=50"] })
+  })
+
   test("event is honoured only in dev and probe builds", () => {
     expect(parse("event=dragon", true).link.event).toBe("dragon")
     const shipped = parse("event=dragon", false)
@@ -95,6 +111,10 @@ describe("deep links: look", () => {
 })
 
 describe("deep links: applying", () => {
+  afterEach(() => {
+    delete RUSH.count
+  })
+
   function hallOf(store = new GuildStore()) {
     const levers = { quality: [] as number[], hud: [] as string[], forced: [] as string[] }
     const hall: Hall = {
@@ -122,6 +142,19 @@ describe("deep links: applying", () => {
     expect(store.framing).toMatchObject({ x: SITES.tower.at[0], z: SITES.tower.at[1] })
     expect(store.bard).toBe(false)
     expect(levers).toEqual({ quality: [1], hud: ["hidden"], forced: [] })
+  })
+
+  test("n reloads the rush with that many adventurers; a rush link without n goes back to 12", () => {
+    const { store, hall } = hallOf()
+    const quests = () => store.markers.filter((m) => m.kind === "quest").length
+    applyDeepLink(parse("story=rush").link, hall)
+    const twelve = quests()
+    // Already playing rush: a new n still reloads it.
+    applyDeepLink(parse("story=rush&n=40").link, hall)
+    expect(store.scenario).toBe("rush")
+    expect(quests() - twelve).toBe(28)
+    applyDeepLink(parse("story=rush").link, hall)
+    expect(quests()).toBe(twelve)
   })
 
   test("act seeks to the chapter, t counting from its start", () => {

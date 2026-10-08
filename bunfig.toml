@@ -1,0 +1,2 @@
+[test]
+preload = ["./packages/hall/test/support/preload.ts"]

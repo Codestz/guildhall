@@ -26,6 +26,13 @@ import { pxPerUnit, sigilRoom, sizeFor } from "./sigilSize.ts"
  * Built for crowds (hundreds of chips): a chip's size is measured once when its element appears and
  * then kept by a ResizeObserver (never read per run, which would force a layout), and "which chips
  * could touch this one" is asked of a screen-space grid, not of every other chip.
+ *
+ * At crowd scale (more than CROWD_AT chips on stage) the rules turn strict, so a crowd never reads as
+ * a smear of translucent plates: a chip is either fully shown or folded into a pile's "+N". Any two
+ * overlapping chips make a pile (and piles gather a little wider, CROWD_PAD), a chip folds at once
+ * and unfolds only once it has stayed clear, a folded chip hides without fading (`data-crowd`, hall.css),
+ * a chip still dissolving in or out waits until it is solid, and a pile is headed by whoever matters
+ * most: the pinned, then a plea or a fall, then the nearest. Normal stories keep the gentle rules.
  */
 
 /** Height of the chip's anchor above the adventurer's feet (the `<Html position>`). */
@@ -40,6 +47,19 @@ const FOLD_AT = 3
 /** Runs a chip must want to fold (or unfold) before it does: chips walking past don't flicker. */
 const FOLD_AFTER = 3
 const UNFOLD_AFTER = 2
+/**
+ * More chips than this on stage is a crowd (a stress cast, `?n=300`): the strict rules apply. The
+ * showcase stories (party, saga, rush) stay well under it. Leaving crowd mode waits for CROWD_UNTIL,
+ * so a cast hovering at the line doesn't switch back and forth.
+ */
+export const CROWD_AT = 24
+const CROWD_UNTIL = 20
+/** At crowd scale: two chips make a pile, a chip folds on the first run it overlaps, unfolds after three clear. */
+const CROWD_FOLD_AT = 2
+const CROWD_FOLD_AFTER = 1
+const CROWD_UNFOLD_AFTER = 3
+/** At crowd scale piles gather chips this close (px), not only touching ones: fewer, fuller piles. */
+const CROWD_PAD = 10
 /** Speech bubbles on screen at once, at most (the followed one counts among them). */
 export const MAX_SPEAKERS = 3
 /**
@@ -63,6 +83,11 @@ export function speaks(mode: HudMode, selected: boolean, perUnit: number): boole
 }
 
 let hud: HudMode = "minimal"
+let crowd = false
+/** Is the declutter at crowd scale (its strict rules)? For tests and the HUD. */
+export function atCrowdScale(): boolean {
+  return crowd
+}
 /** The HUD mode, for the bubble rule (hud/Hud.tsx keeps it current). */
 export function setChipMode(mode: HudMode): void {
   hud = mode
@@ -90,6 +115,11 @@ export interface ChipSlot {
   bubble: boolean
   /** The one you follow (its bubble may show in Minimal at any distance). */
   selected: boolean
+  // ── per run, crowd scale ──
+  /** Pleading or fallen (the chip's `data-tone`): heads its pile before the merely near. */
+  notable: boolean
+  /** Still dissolving in or out (its wrapper is translucent): kept folded until it is solid. */
+  faint: boolean
   // ── per run ──
   on: boolean
   x: number
@@ -116,6 +146,7 @@ export interface ChipSlot {
   votes: number
   shownMore: number
   moreN: number
+  shownCrowd: boolean
 }
 
 export function chipSlot(): ChipSlot {
@@ -131,6 +162,8 @@ export function chipSlot(): ChipSlot {
     sigil: false,
     bubble: false,
     selected: false,
+    notable: false,
+    faint: false,
     on: false,
     x: 0,
     y: 0,
@@ -151,6 +184,7 @@ export function chipSlot(): ChipSlot {
     votes: 0,
     shownMore: 0,
     moreN: 0,
+    shownCrowd: false,
   }
 }
 
@@ -221,11 +255,23 @@ export function declutter(camera: Camera, width: number, height: number, now = p
 export function layout(camera: Camera, width: number, height: number): void {
   // ── read: positions and the kept sizes; nothing here touches layout ──
   order.length = 0
+  crowd = slots.length > (crowd ? CROWD_UNTIL : CROWD_AT)
   for (const slot of slots) {
     slot.on = false
+    slot.faint = false
+    slot.notable = false
     const { el, anchor } = slot
     if (!el || !anchor) continue
     if (el !== slot.watched) watch(slot, el)
+    if (crowd) {
+      // Inline style and an attribute: reads that never force a layout.
+      const tone = el.dataset?.tone
+      slot.notable = tone === "plea" || tone === "fail"
+      // The adventurer's dissolve writes its wrapper's opacity ("" when solid; scene/Adventurer.tsx).
+      const fade = el.parentElement?.style.opacity
+      slot.faint = !slot.pinned && Boolean(fade) && fade !== "1"
+      if (slot.faint) continue
+    }
     scratch.set(0, CHIP_HEIGHT, 0)
     anchor.localToWorld(scratch)
     const perUnit = pxPerUnit(camera, scratch, height)
@@ -235,7 +281,12 @@ export function layout(camera: Camera, width: number, height: number): void {
     // The band counts as part of the chip, so a sigil alone (Hidden HUD: no plate) declutters too.
     const w = Math.max(slot.width, size)
     const h = slot.height + slot.room || size
-    if (w === 0 || h === 0) continue
+    if (w === 0 || h === 0) {
+      // Not measured yet (just back from display none: the observer reports after this layout). At
+      // crowd scale it waits folded rather than show for a run outside the declutter.
+      if (crowd && !slot.pinned) slot.faint = true
+      continue
+    }
     scratch.project(camera)
     if (scratch.z > 1 || scratch.z < -1) continue
     slot.x = (scratch.x * 0.5 + 0.5) * width
@@ -265,12 +316,14 @@ export function layout(camera: Camera, width: number, height: number): void {
   }
   grid.clear()
   for (const slot of order) grid.add(slot, 0)
+  const pad = crowd ? CROWD_PAD : 0
   for (const a of order) {
     // Each pair once, from its higher-priority side.
-    const near = grid.near(a, a.y - a.h, a.y)
-    for (const b of near) if (b.index > a.index && overlaps(a, 0, b, 0)) union(a.index, b.index)
+    const near = grid.near(a, a.y - a.h - pad, a.y + pad, pad)
+    for (const b of near) if (b.index > a.index && overlaps(a, 0, b, 0, pad)) union(a.index, b.index)
   }
   for (const slot of order) (order[find(slot.index)] as ChipSlot).count++
+  const foldAt = crowd ? CROWD_FOLD_AT : FOLD_AT
   for (const slot of order) {
     const root = order[find(slot.index)] as ChipSlot
     if (slot.pinned) {
@@ -279,7 +332,7 @@ export function layout(camera: Camera, width: number, height: number): void {
       continue
     }
     // The first of a pile in priority order is its root (union keeps the lower index): it stays.
-    vote(slot, root.count >= FOLD_AT && slot !== root)
+    vote(slot, root.count >= foldAt && slot !== root)
   }
   // "+N" goes on the first chip of the pile still shown; a pile always keeps one chip.
   hosts.length = order.length
@@ -341,12 +394,17 @@ export function layout(camera: Camera, width: number, height: number): void {
     const el = slot.el
     if (!el) continue
     if (!slot.on) {
-      // Off screen: let it rest, so it comes back where it belongs.
+      // Off screen: let it rest, so it comes back where it belongs. Faint (crowd scale, still
+      // dissolving): folded until solid, then it has to earn its place like any other.
       slot.lift = 0
       slot.moreN = 0
-      slot.folded = false
+      slot.folded = slot.faint
       slot.votes = 0
       slot.room = slot.sigil ? slot.shownRoom : 0
+    }
+    if (crowd !== slot.shownCrowd) {
+      slot.shownCrowd = crowd
+      el.toggleAttribute("data-crowd", crowd)
     }
     if (slot.room !== slot.shownRoom) {
       slot.shownRoom = slot.room
@@ -372,9 +430,10 @@ export function layout(camera: Camera, width: number, height: number): void {
   }
 }
 
-/** Priority order: pinned first, then nearest the camera first. */
+/** Priority order: pinned first, then (crowd scale) a plea or a fall, then nearest the camera first. */
 function before(a: ChipSlot, b: ChipSlot): number {
   if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+  if (a.notable !== b.notable) return a.notable ? -1 : 1
   return a.z - b.z
 }
 
@@ -414,10 +473,10 @@ const grid = {
     if (cell) cell.push(slot)
     else cells.set(key, [slot])
   },
-  /** Chips that could overlap `slot`'s columns anywhere between `top` and `bottom` (px, y down). */
-  near(slot: ChipSlot, top: number, bottom: number): ChipSlot[] {
+  /** Chips that could overlap `slot`'s columns (widened by `pad` px) anywhere between `top` and `bottom` (px, y down). */
+  near(slot: ChipSlot, top: number, bottom: number, pad = 0): ChipSlot[] {
     met.length = 0
-    const reach = (slot.w + grid.maxW) / 2 + GAP
+    const reach = (slot.w + grid.maxW) / 2 + GAP + pad
     const x0 = cellOf(slot.x - reach)
     const x1 = cellOf(slot.x + reach)
     // Another chip's bottom edge, to overlap: above `bottom` + GAP + its height, below `top` − GAP.
@@ -433,10 +492,12 @@ const grid = {
   },
 }
 
-function overlaps(a: ChipSlot, liftA: number, b: ChipSlot, liftB: number): boolean {
+/** Do the two boxes, at these lifts, come within GAP (+ `pad`) px of each other? */
+function overlaps(a: ChipSlot, liftA: number, b: ChipSlot, liftB: number, pad = 0): boolean {
   const ab = a.y - liftA
   const bb = b.y - liftB
-  return Math.abs(a.x - b.x) * 2 < a.w + b.w + GAP * 2 && ab - a.h < bb + GAP && bb - b.h < ab + GAP
+  const gap = GAP + pad
+  return Math.abs(a.x - b.x) * 2 < a.w + b.w + gap * 2 && ab - a.h < bb + gap && bb - b.h < ab + gap
 }
 
 function find(i: number): number {
@@ -467,7 +528,8 @@ function vote(slot: ChipSlot, fold: boolean): void {
     return
   }
   slot.votes++
-  if (slot.votes >= (fold ? FOLD_AFTER : UNFOLD_AFTER)) {
+  const after = crowd ? (fold ? CROWD_FOLD_AFTER : CROWD_UNFOLD_AFTER) : fold ? FOLD_AFTER : UNFOLD_AFTER
+  if (slot.votes >= after) {
     slot.folded = fold
     slot.votes = 0
   }
@@ -498,4 +560,5 @@ export function resetChips(): void {
   order.length = 0
   last = -Infinity
   hud = "minimal"
+  crowd = false
 }

@@ -2,11 +2,14 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { Object3D, OrthographicCamera } from "three"
 import {
   addChip,
+  atCrowdScale,
   type ChipSlot,
+  CROWD_AT,
   chipSlot,
   layout,
   MAX_SPEAKERS,
   READ_AT_PX,
+  removeChip,
   resetChips,
   setChipMode,
   speaks,
@@ -225,3 +228,96 @@ describe("speech bubbles", () => {
     expect(talker.attrs.has("data-speak")).toBe(false)
   })
 })
+
+describe("crowd scale", () => {
+  /** Chips that only make up the numbers: never on stage (no anchor), never in the way. */
+  function extras(n: number) {
+    const out: ChipSlot[] = []
+    for (let i = 0; i < n; i++) {
+      const slot = chipSlot()
+      slot.el = fakeChip().el as unknown as HTMLElement
+      addChip(slot)
+      out.push(slot)
+    }
+    return out
+  }
+  /** A chip with a tone and a dissolve wrapper, as scene/Adventurer.tsx renders it. */
+  function toned(x: number, z: number, tone = "work", fade = "") {
+    const chip = chipAt(x, z)
+    const el = chip.el as unknown as {
+      dataset: { tone: string }
+      parentElement: { style: { opacity: string } }
+    }
+    el.dataset = { tone }
+    el.parentElement = { style: { opacity: fade } }
+    return { ...chip, wrapper: el.parentElement }
+  }
+  const run = () => layout(camera, 200, 200)
+
+  test("past CROWD_AT chips the strict rules apply; back under CROWD_UNTIL they lift", () => {
+    const filler = extras(CROWD_AT)
+    toned(0, 0)
+    run()
+    expect(atCrowdScale()).toBe(true)
+    for (const slot of filler.slice(0, 4)) resetSlot(slot)
+    run()
+    // 21 on stage: still a crowd (hysteresis), not flipping at the line.
+    expect(atCrowdScale()).toBe(true)
+    resetSlot(filler[4] as ChipSlot)
+    run()
+    expect(atCrowdScale()).toBe(false)
+  })
+
+  test("two overlapping chips: the farther folds at once into the nearer's +1, none lifted", () => {
+    extras(CROWD_AT)
+    const near = toned(0, 5)
+    const far = toned(1, -5)
+    run()
+    expect(far.attrs.has("data-folded")).toBe(true)
+    expect(near.attrs.has("data-folded")).toBe(false)
+    expect(near.more.textContent).toBe("+1")
+    expect(near.style.get("--lift") ?? "0px").toBe("0px")
+    expect(near.attrs.has("data-crowd")).toBe(true)
+  })
+
+  test("a fallen or pleading chip heads its pile over a nearer one", () => {
+    extras(CROWD_AT)
+    const near = toned(0, 5)
+    const fallen = toned(1, -5, "fail")
+    run()
+    expect(near.attrs.has("data-folded")).toBe(true)
+    expect(fallen.attrs.has("data-folded")).toBe(false)
+    expect(fallen.more.textContent).toBe("+1")
+  })
+
+  test("a chip still dissolving stays folded and uncounted; solid, it takes its place", () => {
+    extras(CROWD_AT)
+    const near = toned(0, 5)
+    const ghost = toned(1, -5, "work", "0.5")
+    run()
+    expect(ghost.attrs.has("data-folded")).toBe(true)
+    expect(near.more.textContent).toBe("")
+    // Solid, but in a pile: folded into it, counted.
+    ghost.wrapper.style.opacity = ""
+    run()
+    expect(ghost.attrs.has("data-folded")).toBe(true)
+    expect(near.more.textContent).toBe("+1")
+    // Solid and alone (the other one left): a pile always keeps one chip shown.
+    resetSlot(near.slot)
+    run()
+    expect(ghost.attrs.has("data-folded")).toBe(false)
+  })
+
+  test("a pinned chip shows even while dissolving", () => {
+    extras(CROWD_AT)
+    const pinned = toned(0, 0, "plea", "0.5")
+    pinned.slot.pinned = true
+    run()
+    expect(pinned.attrs.has("data-folded")).toBe(false)
+  })
+})
+
+/** Takes a chip off the stage for good (as an adventurer leaving does). */
+function resetSlot(slot: ChipSlot): void {
+  removeChip(slot)
+}

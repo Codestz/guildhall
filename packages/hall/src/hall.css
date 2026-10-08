@@ -1099,6 +1099,105 @@ button {
   font-weight: 400;
 }
 
+/* Crowd scale (hud/crowd.ts): everyone not named sits in a role group, a header that opens. */
+.roster-roles {
+  padding-top: 0;
+}
+.roster-roles::before {
+  content: "";
+  display: block;
+  margin: 0 6px 4px;
+  border-top: 1px solid var(--hair);
+}
+.roster-role-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px 6px 6px;
+  border-radius: var(--r-sm);
+  text-align: left;
+  transition: background 0.15s;
+}
+.roster-role-head:hover {
+  background: var(--raise);
+}
+/* Open: the header stays in view while its members scroll under it. */
+.roster-role-head[aria-expanded="true"] {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ink-solid);
+  box-shadow: 0 1px 0 var(--hair);
+}
+.roster-role-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 14.5px;
+}
+.roster-role-count {
+  min-width: 26px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--raise-2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.role-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--tone);
+  font-size: 12px;
+  font-weight: 700;
+}
+.role-mark .glyph {
+  width: 13px;
+  height: 13px;
+}
+.roster-role-head .fold {
+  display: grid;
+  place-items: center;
+}
+.roster-role-head[aria-expanded="false"] .fold {
+  transform: rotate(-90deg);
+}
+.roster-role-head:hover .fold {
+  color: var(--paper);
+}
+.roster-members {
+  padding: 2px 0 6px 14px;
+}
+
+/* A role's badge at crowd scale: its sigil with a count where a numeral would sit. The first one
+ * starts after a hairline, so the named few read apart from the counted many. */
+.badge-list > li:not(:has(.badge-role)) + li:has(.badge-role) {
+  margin-left: 3px;
+  padding-left: 4px;
+  border-left: 1px solid var(--hair);
+}
+.badge-role .badge-count {
+  position: absolute;
+  right: 0;
+  bottom: 1px;
+  min-width: 16px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--ink-solid);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--role) 70%, transparent);
+  color: var(--paper);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ───────────────────────────── chronicle ───────────────────────────── */
 
 .chronicle {
@@ -2014,6 +2113,14 @@ button {
     transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
     opacity 0.25s ease-out,
     visibility 0s 0.25s;
+}
+/* At crowd scale (scene/chips.ts CROWD_AT) a chip is shown or folded, never half-way: no fade in
+ * or out, so the churn of a crowd never smears into ghosted plates. Its lift still eases. */
+.chip[data-crowd] {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.chip[data-crowd][data-folded] {
+  transition: none;
 }
 .chip .name {
   display: flex;

@@ -31,8 +31,10 @@ import { reducedMotion } from "../../guild/opening.ts"
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { LANDS_URL } from "../../world/cast.ts"
-import { cellToWorld, HEX_SCALE, island, MAP_FOR_TESTS } from "../../world/lands.ts"
-import { LIGHTS } from "../../world/lights.ts"
+import { type Cell, cellToWorld, HEX_SCALE } from "../../world/lands.ts"
+import { lightsOf } from "../../world/lights.ts"
+import { useWorld } from "../../world/source.ts"
+import { reachOf, type World } from "../../world/world.ts"
 import { useLooks } from "../atmosphere/looks.ts"
 import { sky } from "../atmosphere/state.ts"
 import { wind } from "../atmosphere/wind.ts"
@@ -41,7 +43,7 @@ import { EASE, targetOf } from "../weather/shared.ts"
 import { noiseTexture } from "./noise.ts"
 import { HEX_RADIUS } from "./scatter.ts"
 import { waterFragment, waterVertex } from "./shaders.ts"
-import { distanceToLand, riverCells, riverLine, SHORE, shoreTexels } from "./shore.ts"
+import { distanceToLand, riverCells, SHORE, shoreTexels, smooth } from "./shore.ts"
 
 /**
  * The island's water (ADR 0007, Nature): one surface, one draw call, for the sea, the lake and the
@@ -66,7 +68,8 @@ export function Water({ tier }: { tier: Tier }) {
   const store = useGuildStore()
   const gl = useThree((state) => state.gl)
   const { nodes } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
-  const geometry = useMemo(surface, [])
+  const world = useWorld()
+  const geometry = useMemo(() => surface(world), [world])
   const v2 = useLooks().water
   const build = TSL ? use(nodeWater(gl)) : waterMaterial
   // The node material's shadow is the key light's own (waterNodes.ts): found once it has a map.
@@ -75,13 +78,17 @@ export function Water({ tier }: { tier: Tier }) {
   const eased = useMemo(() => ({ rain: 0, gloom: 0, cloud: 0, pick: 0, caustics: 0 }), [])
   const still = useMemo(reducedMotion, [])
 
-  // The shore texture: render the tiles' land mask from above once (after the first commit, so a
-  // suspended render never pays for it), then measure it on the CPU. Kept for the page's life.
+  // The shore texture: render the tiles' land mask from above once per world (after the first
+  // commit, so a suspended render never pays for it), then measure it on the CPU. Kept per world.
   useEffect(() => {
-    shore ??= bakeShore(gl, nodes)
-    uniforms.uShore.value = shore
-    uniforms.uWheel.value.copy(wheel)
-  }, [gl, nodes, uniforms])
+    let baked = shores.get(world)
+    if (!baked) {
+      baked = bakeShore(gl, nodes, world)
+      shores.set(world, baked)
+    }
+    uniforms.uShore.value = baked.texture
+    uniforms.uWheel.value.copy(baked.wheel)
+  }, [gl, nodes, world, uniforms])
   useEffect(() => () => material.dispose(), [material])
   useEffect(() => () => geometry.dispose(), [geometry])
 
@@ -133,7 +140,7 @@ export function Water({ tier }: { tier: Tier }) {
     eased.pick -= delta
     if (eased.pick <= 0) {
       eased.pick = 0.5
-      nearestFlames(targetOf(state.controls), u.uFlames.value)
+      nearestFlames(watersideOf(world), targetOf(state.controls), u.uFlames.value)
     }
   })
 
@@ -194,21 +201,24 @@ const size3 = new Vector3()
 
 /** How many torch reflections the water draws at once. */
 const FLAMES = 8
-/** Flames close enough to water to be reflected in it (the rest never are). */
-const WATERSIDE = (() => {
-  const water = island().water
-  const reach = HEX_RADIUS + 7
-  return LIGHTS.map((light) => light.flame).filter(([x, , z]) =>
-    water.some(([wx, wz]) => Math.hypot(wx - x, wz - z) < reach),
-  )
-})()
-const byDistance: { flame: readonly [number, number, number]; d: number }[] = WATERSIDE.map((flame) => ({
-  flame,
-  d: 0,
-}))
+type Flames = { flame: readonly [number, number, number]; d: number }[]
+const waterside = new WeakMap<World, Flames>()
+/** A world's flames close enough to water to be reflected in it (the rest never are). */
+function watersideOf(world: World): Flames {
+  let flames = waterside.get(world)
+  if (!flames) {
+    const { water } = world.island
+    const reach = HEX_RADIUS + 7
+    flames = lightsOf(world)
+      .map((light) => light.flame)
+      .filter(([x, , z]) => water.some(([wx, wz]) => Math.hypot(wx - x, wz - z) < reach))
+      .map((flame) => ({ flame, d: 0 }))
+    waterside.set(world, flames)
+  }
+  return flames
+}
 /** Writes the FLAMES waterside flames nearest `at` into `out` (w = 1), the rest w = 0. */
-function nearestFlames(at: Vector3, out: Vector4[] | undefined): void {
-  if (!out) return
+function nearestFlames(byDistance: Flames, at: Vector3, out: Vector4[]): void {
   for (const entry of byDistance) entry.d = Math.hypot(entry.flame[0] - at.x, entry.flame[2] - at.z)
   byDistance.sort((a, b) => a.d - b.d)
   for (let i = 0; i < out.length; i++) {
@@ -221,9 +231,11 @@ function nearestFlames(at: Vector3, out: Vector4[] | undefined): void {
 /** Far from any shore everywhere: what the water reads until the bake is done. */
 const OPEN_SEA = new DataTexture(new Uint8Array([255, 128, 128, 255]), 1, 1, RGBAFormat)
 OPEN_SEA.needsUpdate = true
-let shore: DataTexture | undefined
-/** Where the mill wheel's water rejoins the river (xyz) and the wheel's radius (w), found by the bake; w = 0 until then (no wake). */
-const wheel = new Vector4()
+/**
+ * A world's baked shore: the texture, and where the mill wheel's water rejoins the river (xyz)
+ * with the wheel's radius (w; 0: no wheel, no wake).
+ */
+const shores = new WeakMap<World, { texture: DataTexture; wheel: Vector4 }>()
 /** Foam rings reach this far from what stands in the water (world units; the texture's alpha). */
 const RING_MAX = 4
 /** Pieces that sit on the water but shouldn't ring it (they float, they don't stand). */
@@ -238,7 +250,7 @@ export function waterUniforms() {
   return {
     ...wind.uniforms,
     uNoise: { value: noise },
-    uShore: { value: shore ?? OPEN_SEA },
+    uShore: { value: OPEN_SEA as DataTexture },
     uShoreHalf: { value: SHORE.half },
     uShoreMax: { value: SHORE.maxDistance },
     uRain: { value: 0 },
@@ -289,7 +301,7 @@ function waterMaterial(low: boolean, v2: boolean): WaterMaterial {
  * The surface: a wide disc for the sea (past the fog, so it has no edge) and one hexagon per river
  * hex at the river's height; `aRiver` tells the shader which is which.
  */
-function surface(): BufferGeometry {
+function surface(world: World): BufferGeometry {
   const positions: number[] = []
   const river: number[] = []
   const push = (x: number, y: number, z: number, r: number) => {
@@ -306,8 +318,8 @@ function surface(): BufferGeometry {
     push(Math.cos(a1) * RADIUS, SEA_Y, Math.sin(a1) * RADIUS, 0)
     push(Math.cos(a0) * RADIUS, SEA_Y, Math.sin(a0) * RADIUS, 0)
   }
-  for (const cell of riverCells()) {
-    const char = MAP_FOR_TESTS.at(cell)
+  for (const cell of riverOf(world)) {
+    const char = world.terrain.at(cell)
     if (char !== "r" && char !== "#") continue
     const [cx, cz] = cellToWorld(cell)
     for (let k = 0; k < 6; k++) {
@@ -336,14 +348,33 @@ function surface(): BufferGeometry {
 }
 
 /**
- * Renders the island's tiles from straight above into a mask (land = above the water it borders
- * and not the pack's blue), reads it back and turns it into the shore texture. Once, at start.
+ * The river's hexes, source first. Only the hand map has one (shore.ts reads its course from the
+ * hand map's river links); a repo's island has no river, so no river hexes and no flow.
  */
-function bakeShore(gl: WebGLRenderer, nodes: Record<string, Object3D>): DataTexture {
+function riverOf(world: World): Cell[] {
+  return world.kind === "hand" ? riverCells() : []
+}
+
+/**
+ * Renders the island's tiles from straight above into a mask (land = above the water it borders
+ * and not the pack's blue), reads it back and turns it into the shore texture. Once per world.
+ */
+function bakeShore(
+  gl: WebGLRenderer,
+  nodes: Record<string, Object3D>,
+  world: World,
+): { texture: DataTexture; wheel: Vector4 } {
   const { half, size } = SHORE
+  // The bake sees ±half: land past it would be open sea to the foam. Generated islands reach
+  // ~104–120 (tile centres); say so if one ever grows past the edge rather than lose its coast.
+  const reach = reachOf(world) + HEX_RADIUS
+  if (reach > half)
+    console.warn(`water: the island reaches ${reach.toFixed(0)}, the shore bake only ±${half}`)
+  const line = world.kind === "hand" ? smooth(riverOf(world).map(cellToWorld), 3) : []
+  const wheel = new Vector4()
   const scene = new Scene()
   let palette: Texture | null = null
-  for (const tile of island().tiles) {
+  for (const tile of world.island.tiles) {
     const source = nodes[tile.piece]
     if (!source) continue
     const copy = source.clone(true)
@@ -404,13 +435,13 @@ function bakeShore(gl: WebGLRenderer, nodes: Record<string, Object3D>): DataText
   // readPixels' row 0 is the bottom of the image (z = +half): the layout shoreTexels expects.
   const land = new Uint8Array(size * size)
   for (let i = 0; i < land.length; i++) land[i] = (pixels[i * 4] as number) > 127 ? 1 : 0
-  const texels = shoreTexels(land)
+  const texels = shoreTexels(land, line)
 
   // What stands in the water: the decor seen from *below*, where the lowest surface shows — a
   // post, a rock's foot, a wheel's rim at the waterline marks the mask; a bridge deck or a roof
   // overhead doesn't. Its distance goes in the alpha, for foam rings.
   const below = new Scene()
-  for (const piece of island().decor) {
+  for (const piece of world.island.decor) {
     const source = nodes[piece.piece]
     if (!source || AFLOAT.test(piece.piece)) continue
     const copy = source.clone(true)
@@ -426,7 +457,7 @@ function bakeShore(gl: WebGLRenderer, nodes: Record<string, Object3D>): DataText
     const radius = new Box3().setFromObject(axle).getSize(size3).y / 2
     // The wheel turns beside the river, not in it: its water rejoins at the nearest bit of river.
     let best = Number.POSITIVE_INFINITY
-    for (const [x, z] of riverLine()) {
+    for (const [x, z] of line) {
       const d = Math.hypot(x - scratch.x, z - scratch.z)
       if (d < best) {
         best = d
@@ -479,5 +510,5 @@ function bakeShore(gl: WebGLRenderer, nodes: Record<string, Object3D>): DataText
   texture.magFilter = LinearFilter
   texture.minFilter = LinearFilter
   texture.needsUpdate = true
-  return texture
+  return { texture, wheel }
 }

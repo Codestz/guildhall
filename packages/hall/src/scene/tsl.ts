@@ -66,12 +66,46 @@ interface SceneContext {
   scene: Object3D & { fog?: Fog | FogExp2 | null }
 }
 
+/** A node builder, as far as the handler's uniform plumbing reads it. */
+interface Built {
+  uniformGroups: Record<string, { uniforms: { name: string }[] }>
+}
+
+/** A uniform of a linked program (WebGLUniforms' seq), keyed by its name. */
+interface ProgramUniform {
+  id: string
+  setValue(gl: WebGL2RenderingContext, value: unknown): void
+}
+
+type Uniforms = Record<string, { value: unknown }>
+
 /** The handler's internals the subclass below reaches (not in its typings). */
 interface Internals {
   renderer: WebGLRenderer
   renderStack: { sceneContext: SceneContext }[]
   sceneContexts: WeakMap<Object3D, SceneContext>
+  programCache: Map<Material, Map<unknown, { uniforms: Uniforms; uniformsList: ProgramUniform[] }>>
   getOutputCallback: (output: Node<"vec4">, builder: { material: Material }) => Node<"vec4">
+  onBeforeRenderCallback: (this: Material, renderer: WebGLRenderer, ...rest: unknown[]) => void
+  updateShaderParameters: (
+    builder: Built,
+    parameters: { vertexShader: string; fragmentShader: string; uniforms: Uniforms },
+  ) => void
+  collectUniformsGroups: (builder: Built) => { name: string }[]
+}
+
+/**
+ * `shader` with its uniform groups' std140 blocks (`layout( std140 ) uniform object { … };`, as
+ * GLSLNodeBuilder writes them) declared as plain uniforms instead. Buffers (`uniform NodeBuffer_…`)
+ * are no std140 blocks and stay.
+ */
+export function unblocked(shader: string): string {
+  return shader.replace(/layout\( std140 \) uniform \w+ \{\n([^}]*)\n\};/g, (_, members: string) =>
+    members
+      .split("\n")
+      .map((member) => `uniform ${member.trim()}`)
+      .join("\n"),
+  )
 }
 
 /** lowGrade.ts packs `4 · desaturate steps + exposure` into toneMappingExposure. */
@@ -106,9 +140,14 @@ export async function nodesHandler(): Promise<WebGLNodesHandler> {
       return T.vec4(T.mix(color, T.vec3(luma), slot.div(DESATURATE_STEPS)), input.a)
     })()
 
-  /** Fog applied to an already-output colour, as three's built-ins do on the canvas. */
-  const fogged = (input: Node<"vec4">, fog: Fog | FogExp2): Node<"vec4"> => {
-    const color = T.reference("color", "color", fog)
+  /**
+   * Fog applied to an already-output colour, as three's built-ins do on the canvas — with the fog's
+   * colour in that output's colour space, as they take it (WebGLMaterials: `getUnlitUniformColorSpace`).
+   * `scene.fog.color` is stored linear: mixed in as it is, full fog came out darker than GLSL's.
+   */
+  const fogged = (input: Node<"vec4">, fog: Fog | FogExp2, colorSpace: string): Node<"vec4"> => {
+    const linear = T.vec4(T.reference("color", "color", fog), 1)
+    const color = (T.workingToColorSpace(linear, colorSpace) as unknown as Node<"vec4">).rgb
     const factor = (fog as FogExp2).isFogExp2
       ? T.densityFogFactor(T.reference("density", "float", fog))
       : radialFogFactor(T.reference("near", "float", fog), T.reference("far", "float", fog))
@@ -142,7 +181,60 @@ export async function nodesHandler(): Promise<WebGLNodesHandler> {
           node = node.toneMapping(toneMapping) as unknown as Node<"vec4">
         if (colorSpace !== ColorManagement.workingColorSpace)
           node = T.workingToColorSpace(node, colorSpace) as unknown as Node<"vec4">
-        return this.late ? fogged(node, this.late) : node
+        return this.late ? fogged(node, this.late, colorSpace) : node
+      }
+      this.plainUniforms(self)
+    }
+
+    /**
+     * The stock handler gives each node material's uniform groups (`object`, `render`) a uniform
+     * block of their own, and WebGLRenderer a binding point to each, held until the material is
+     * disposed — 32 in all on ANGLE/Metal, so ~16 node materials (each crowd gear piece is one)
+     * exhausted them and the rest drew black. Here the groups are plain uniforms: none take a
+     * binding point. A buffer (`uniformArray`, an instancing buffer) keeps its block.
+     *
+     * Plain uniforms WebGLRenderer uploads only when the program or material changes; a group's
+     * values change per object (its matrices). So they are uploaded every draw, after the stock
+     * callback has updated the nodes for that object — which is what the per-draw block update did.
+     */
+    private plainUniforms(self: Internals): void {
+      const grouped = new WeakMap<Uniforms, Set<string>>()
+      const perDraw = new WeakMap<object, ProgramUniform[]>()
+
+      const updateShaderParameters = self.updateShaderParameters.bind(this)
+      self.updateShaderParameters = (builder, parameters) => {
+        updateShaderParameters(builder, parameters)
+        parameters.vertexShader = unblocked(parameters.vertexShader)
+        parameters.fragmentShader = unblocked(parameters.fragmentShader)
+        const names = Object.values(builder.uniformGroups).flatMap((group) =>
+          group.uniforms.map((u) => u.name),
+        )
+        grouped.set(parameters.uniforms, new Set(names))
+      }
+
+      const collectUniformsGroups = self.collectUniformsGroups.bind(this)
+      self.collectUniformsGroups = (builder) =>
+        collectUniformsGroups(builder).filter((group) => !(group.name in builder.uniformGroups))
+
+      const before = self.onBeforeRenderCallback
+      self.onBeforeRenderCallback = function (renderer, ...rest) {
+        before.call(this, renderer, ...rest)
+        if (!renderer.properties.has(this)) return
+        const program = (renderer.properties.get(this) as { currentProgram?: { program: WebGLProgram } })
+          .currentProgram
+        const built = program && self.programCache.get(this)?.get(program)
+        const names = built && grouped.get(built.uniforms)
+        if (!program || !built || !names) return
+        let list = perDraw.get(program)
+        if (!list) {
+          list = built.uniformsList.filter((u) => names.has(u.id))
+          perDraw.set(program, list)
+        }
+        // Bound early: if this draw needs another program, WebGLRenderer binds it and uploads all.
+        // biome-ignore lint/correctness/useHookAtTopLevel: WebGLState's, not a React hook
+        renderer.state.useProgram(program.program)
+        const gl = renderer.getContext() as WebGL2RenderingContext
+        for (const u of list) u.setValue(gl, built.uniforms[u.id]?.value)
       }
     }
 

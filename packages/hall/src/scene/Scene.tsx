@@ -4,13 +4,15 @@ import { SoundStage } from "../audio/SoundStage.tsx"
 import { MODE, PROBE } from "../guild/mode.ts"
 import type { AdventurerView } from "../guild/store.ts"
 import { useGuild, useGuildStore } from "../guild/useGuild.ts"
-import { Adventurer } from "./Adventurer.tsx"
+import { Adventurer, lookFrom } from "./Adventurer.tsx"
 import { Atmosphere } from "./atmosphere/Atmosphere.tsx"
 import { Post } from "./atmosphere/Post.tsx"
 import { shadows } from "./atmosphere/shadows.ts"
 import { Blobs } from "./Blobs.tsx"
 import { CameraRig } from "./CameraRig.tsx"
 import { Crisp } from "./Crisp.tsx"
+import { declutter } from "./chips.ts"
+import { DeedEffects } from "./DeedEffect.tsx"
 import { EventsLayer } from "./events/EventsLayer.tsx"
 import { Exits } from "./exits.ts"
 import { FrameStats } from "./FrameStats.tsx"
@@ -24,6 +26,7 @@ import { StreetLights } from "./lights/StreetLights.tsx"
 import { Nature } from "./nature/Nature.tsx"
 import { OpeningCue } from "./OpeningCue.tsx"
 import { Quality } from "./Quality.tsx"
+import { Rings } from "./Rings.tsx"
 import { Room } from "./Room.tsx"
 import { Ships } from "./Ships.tsx"
 import { Sigils } from "./Sigils.tsx"
@@ -79,7 +82,10 @@ export function Scene() {
 
 /**
  * Everyone on stage. A leaver the store has let go of stays mounted until their dissolve is done
- * (scene/exits.ts): fast-forward never cuts one off mid-walk.
+ * (scene/exits.ts): fast-forward never cuts one off mid-walk. Each figure is memoised: what it reads
+ * off the store is passed down as plain values, so a refresh re-renders only those that changed.
+ * Their rings and deed motes are drawn together (one instanced layer each). Models are preloaded
+ * (scene/Adventurer.tsx), so one Suspense boundary holds the whole cast.
  */
 function Cast() {
   const store = useGuild()
@@ -92,14 +98,30 @@ function Cast() {
     [exits],
   )
   const views = exits.stage(store.views, store.rebuilds, performance.now())
+  // The camera's view, once a frame, before any adventurer reads it (mixer culling).
+  // One frustum and one declutter run (throttled in chips.ts) for the whole cast, not one per adventurer.
+  useFrame((state) => {
+    lookFrom(state.camera)
+    declutter(state.camera, state.size.width, state.size.height)
+  }, FRAME.SKY)
+  const banners = store.parties.length > 1
+  const dark = store.environment.daylight < 0.3
   return (
-    <>
+    <Suspense fallback={null}>
       {views.map((view) => (
-        <Suspense key={view.id} fallback={null}>
-          <Adventurer view={view} onGone={onGone} />
-        </Suspense>
+        <Adventurer
+          key={view.id}
+          view={view}
+          onGone={onGone}
+          selected={store.selected === view.id}
+          following={store.following}
+          banners={banners}
+          dark={dark}
+        />
       ))}
-    </>
+      <Rings />
+      <DeedEffects />
+    </Suspense>
   )
 }
 

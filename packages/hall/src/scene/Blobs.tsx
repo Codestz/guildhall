@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber"
-import { type RefObject, useEffect } from "react"
+import { type RefObject, useEffect, useState } from "react"
 import {
   CanvasTexture,
   InstancedBufferAttribute,
@@ -45,7 +45,17 @@ export function blobOf(walker: Walker, out: BlobLook): boolean {
 }
 
 const walkers = new Set<Walker & { node: Object3D }>()
-const MAX = 64
+
+/**
+ * How many instances a layer needs room for: `capacity` while `needed` fits, else doubled until it
+ * does (a crowd grows the buffer; it never drops anyone). Never shrinks. Shared by the cast's
+ * instanced layers (Rings, DeedEffects).
+ */
+export function capacityFor(needed: number, capacity: number): number {
+  let size = Math.max(1, capacity)
+  while (size < needed) size *= 2
+  return size
+}
 
 /**
  * Puts a soft shadow under `node` while mounted. `size` and `opacity` must be stable (ref'd
@@ -68,6 +78,7 @@ export function useBlob(
 }
 
 export function Blobs() {
+  const [capacity, setCapacity] = useState(64)
   const built = useOwnedMeshes(() => {
     const material = new MeshBasicMaterial({
       color: "#000000",
@@ -86,16 +97,19 @@ export function Blobs() {
       )
     }
     material.customProgramCacheKey = () => "blob-alpha"
-    const mesh = new InstancedMesh(new PlaneGeometry(2, 2).rotateX(-Math.PI / 2), material, MAX)
-    mesh.instanceColor = new InstancedBufferAttribute(new Float32Array(MAX * 3).fill(1), 3)
+    const mesh = new InstancedMesh(new PlaneGeometry(2, 2).rotateX(-Math.PI / 2), material, capacity)
+    mesh.instanceColor = new InstancedBufferAttribute(new Float32Array(capacity * 3).fill(1), 3)
     mesh.frustumCulled = false
     mesh.renderOrder = 1
     mesh.castShadow = false
     mesh.receiveShadow = false
     return { meshes: [mesh] }
-  }, [])
+  }, [capacity])
 
   useFrame(() => {
+    // More walkers than discs: rebuilt bigger (until then, the first `capacity` keep theirs).
+    const wanted = capacityFor(walkers.size, capacity)
+    if (wanted !== capacity) setCapacity(wanted)
     const instances = built?.meshes[0]
     if (!instances) return
     const material = instances.material
@@ -104,7 +118,7 @@ export function Blobs() {
     const alphas = instances.instanceColor?.array
     let k = 0
     for (const walker of walkers) {
-      if (k >= MAX) break
+      if (k >= capacity) break
       if (!blobOf(walker, look)) continue
       walker.node.getWorldPosition(position)
       position.y += 0.03

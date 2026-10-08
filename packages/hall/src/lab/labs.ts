@@ -7,6 +7,7 @@
  *   ?lab=character&model=mage&clip=Walking_A    a model from four sides, playing (or `&at=0.4`: frozen)
  *   ?lab=prop&piece=lantern                     a kit piece or drawn prop from four sides
  *   ?lab=event&kind=dragon&night=1              a world event alone over a flat sea, on repeat
+ *   ?lab=crowd&n=300 (&compare=1)               the baked-bone crowd: a field of n, or one beside a real rig
  *
  * Each lab hangs its levers on `window.lab`. A new lab: a module with `start(root, params)`, and a
  * line here.
@@ -16,6 +17,7 @@ export const LABS = {
   character: () => import("./characterLab.ts"),
   prop: () => import("./propLab.ts"),
   event: () => import("./eventLab.tsx"),
+  crowd: () => import("./crowdLab.ts"),
 } satisfies Record<string, () => Promise<{ start(root: HTMLElement, params: URLSearchParams): unknown }>>
 
 export type LabName = keyof typeof LABS

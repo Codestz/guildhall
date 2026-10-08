@@ -69,6 +69,7 @@ const RUSH_MAX = 500
 /** Params owned by other features (`?live`, `?showcase`, the labs): never reported as ignored. */
 const OTHERS = new Set([
   "live",
+  "tsl",
   "anyhub",
   "showcase",
   "lab",

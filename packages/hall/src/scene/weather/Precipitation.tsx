@@ -1,22 +1,26 @@
-import { useFrame } from "@react-three/fiber"
-import { useEffect, useMemo } from "react"
+import { useFrame, useThree } from "@react-three/fiber"
+import { use, useEffect, useMemo } from "react"
 import {
   AdditiveBlending,
   BufferGeometry,
   Color,
   Float32BufferAttribute,
   LineSegments,
+  type Material,
   MathUtils,
+  type Mesh,
   type OrthographicCamera,
   Points,
   ShaderMaterial,
   Vector2,
   Vector3,
+  type WebGLRenderer,
 } from "three"
 import { PROBE } from "../../guild/mode.ts"
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { WIND_DIRECTION, wind } from "../atmosphere/wind.ts"
+import { installNodes, TSL } from "../tsl.ts"
 import { EASE, pixelsPerUnit, seenWidth, targetOf } from "./shared.ts"
 
 /**
@@ -24,16 +28,21 @@ import { EASE, pixelsPerUnit, seenWidth, targetOf } from "./shared.ts"
  * overview and a close-up both look wet. Every drop's place is computed on the GPU from its seed
  * and the time (fall, wind drift, wrap round the box), so nothing is written per frame but a few
  * uniforms, and density is a draw range. One draw call each.
+ *
+ * With `?tsl=1` (scene/tsl.ts) the same falls are TSL node materials (fallNodes.ts); it suspends
+ * while those load.
  */
 export function Precipitation({ tier }: { tier: Tier }) {
   const store = useGuildStore()
-  const rain = useMemo(() => fall("rain", RAIN_COUNT[tier]), [tier])
-  const snow = useMemo(() => fall("snow", SNOW_COUNT[tier]), [tier])
+  const gl = useThree((state) => state.gl)
+  const build = TSL ? use(nodeFalls(gl)) : fall
+  const rain = useMemo(() => build("rain", RAIN_COUNT[tier]), [build, tier])
+  const snow = useMemo(() => build("snow", SNOW_COUNT[tier]), [build, tier])
   const state = useMemo(() => ({ rain: 0, snow: 0, time: 0 }), [])
 
   useEffect(
     () => () => {
-      for (const object of [rain, snow]) {
+      for (const { object } of [rain, snow]) {
         object.geometry.dispose()
         object.material.dispose()
       }
@@ -64,8 +73,8 @@ export function Precipitation({ tier }: { tier: Tier }) {
 
   return (
     <>
-      <primitive object={rain} />
-      <primitive object={snow} />
+      <primitive object={rain.object} />
+      <primitive object={snow.object} />
     </>
   )
 }
@@ -84,21 +93,44 @@ const RAIN_COUNT: Record<Tier, number> = { 0: 2500, 1: 5000, 2: 7000, 3: 9000 }
 const SNOW_COUNT: Record<Tier, number> = { 0: 1500, 1: 3000, 2: 4000, 3: 5000 }
 /** How far the wind pushes each, per unit of fall speed. */
 const WIND = { rain: 0.18, snow: 0.06 } as const
-type Fall = LineSegments<BufferGeometry, ShaderMaterial> | Points<BufferGeometry, ShaderMaterial>
+
+/** One fall, whichever shader draws it: the object, its uniforms, its drops, and how to draw only some. */
+export interface Fall {
+  object:
+    | LineSegments<BufferGeometry, Material>
+    | Points<BufferGeometry, Material>
+    | Mesh<BufferGeometry, Material>
+  uniforms: Uniforms
+  drops: number
+  draw(drops: number): void
+}
+type Build = (kind: "rain" | "snow", count: number) => Fall
+
+const nodeBuilds = new WeakMap<WebGLRenderer, Promise<Build>>()
+
+/** The node-material falls, once the renderer can draw them (one promise per renderer, for `use`). */
+function nodeFalls(gl: WebGLRenderer): Promise<Build> {
+  let build = nodeBuilds.get(gl)
+  if (!build) {
+    build = installNodes(gl)
+      .then(() => import("./fallNodes.ts"))
+      .then((nodes) => nodes.nodeFall)
+    nodeBuilds.set(gl, build)
+  }
+  return build
+}
 
 /** This frame's camera and wind, shared by both falls (one object, reused: no per-frame garbage). */
 const view = { target: new Vector3(), span: 100, pixels: 10, perspective: 0, time: 0, wind: 0 }
 
 /** Point one fall at this frame: how much of it, where, how slanted. */
-function show(object: Fall, amount: number, kind: "rain" | "snow", frame: typeof view): void {
+function show(fall: Fall, amount: number, kind: "rain" | "snow", frame: typeof view): void {
   const visible = amount > 0.01
-  object.visible = visible
+  fall.object.visible = visible
   if (!visible) return
-  const vertices = kind === "rain" ? 2 : 1
-  const drops = object.geometry.getAttribute("seed").count / vertices
-  object.geometry.setDrawRange(0, Math.round(drops * MathUtils.clamp(amount, 0, 1)) * vertices)
+  fall.draw(Math.round(fall.drops * MathUtils.clamp(amount, 0, 1)))
   const { span } = frame
-  const u = object.material.uniforms as Uniforms
+  const u = fall.uniforms
   u.uTime.value = frame.time
   u.uCenter.value.copy(frame.target)
   u.uSpan.value = span
@@ -112,30 +144,12 @@ function show(object: Fall, amount: number, kind: "rain" | "snow", frame: typeof
   u.uOpacity.value = (kind === "rain" ? 0.55 : 0.9) * MathUtils.smoothstep(amount, 0, 0.25)
 }
 
-/** A box of `count` seeded drops: rain as streaks (two vertices each), snow as points. */
-/** Exported for tests. */
+/** A box of `count` seeded drops: rain as streaks (two vertices each), snow as points. Exported for tests. */
 export function fall(kind: "rain" | "snow", count: number): Fall {
-  const vertices = kind === "rain" ? 2 : 1
-  const seeds = new Float32Array(count * vertices * 4)
-  let a = kind === "rain" ? 11 : 23
-  const random = () => {
-    a = (a * 16807) % 2147483647
-    return a / 2147483647
-  }
-  for (let i = 0; i < count; i++) {
-    const seed = [random(), random(), random(), random()]
-    for (let v = 0; v < vertices; v++) {
-      const at = (i * vertices + v) * 4
-      seeds.set(seed, at)
-      // The fourth number tells a streak's tail (≥ 2) from its head.
-      if (kind === "rain" && v === 1) seeds[at + 3] = (seeds[at + 3] ?? 0) + 2
-    }
-  }
-  const geometry = new BufferGeometry()
-  geometry.setAttribute("position", new Float32BufferAttribute(new Float32Array(count * vertices * 3), 3))
-  geometry.setAttribute("seed", new Float32BufferAttribute(seeds, 4))
+  const geometry = seeds(kind, count)
+  const u = uniforms(kind)
   const material = new ShaderMaterial({
-    uniforms: uniforms(kind),
+    uniforms: u,
     vertexShader: kind === "rain" ? RAIN_VERTEX : SNOW_VERTEX,
     fragmentShader: kind === "rain" ? RAIN_FRAGMENT : SNOW_FRAGMENT,
     transparent: true,
@@ -147,10 +161,39 @@ export function fall(kind: "rain" | "snow", count: number): Fall {
   object.frustumCulled = false
   object.visible = false
   object.renderOrder = 10
-  return object
+  const vertices = kind === "rain" ? 2 : 1
+  return { object, uniforms: u, drops: count, draw: (drops) => geometry.setDrawRange(0, drops * vertices) }
 }
 
-function uniforms(kind: "rain" | "snow") {
+/**
+ * The drops' seeds, the same for either shader: four numbers each, once per vertex (a streak's
+ * two vertices share theirs; the fourth tells its tail, ≥ 2, from its head). Positions are unused.
+ */
+export function seeds(kind: "rain" | "snow", count: number): BufferGeometry {
+  const vertices = kind === "rain" ? 2 : 1
+  const values = new Float32Array(count * vertices * 4)
+  let a = kind === "rain" ? 11 : 23
+  const random = () => {
+    a = (a * 16807) % 2147483647
+    return a / 2147483647
+  }
+  for (let i = 0; i < count; i++) {
+    const seed = [random(), random(), random(), random()]
+    for (let v = 0; v < vertices; v++) {
+      const at = (i * vertices + v) * 4
+      values.set(seed, at)
+      // The fourth number tells a streak's tail (≥ 2) from its head.
+      if (kind === "rain" && v === 1) values[at + 3] = (values[at + 3] ?? 0) + 2
+    }
+  }
+  const geometry = new BufferGeometry()
+  geometry.setAttribute("position", new Float32BufferAttribute(new Float32Array(count * vertices * 3), 3))
+  geometry.setAttribute("seed", new Float32BufferAttribute(values, 4))
+  return geometry
+}
+
+/** The falls' uniforms: GLSL's, and the starting values of the node path's. */
+export function uniforms(kind: "rain" | "snow") {
   return {
     uTime: { value: 0 },
     uCenter: { value: new Vector3() },
@@ -166,7 +209,7 @@ function uniforms(kind: "rain" | "snow") {
     uColor: { value: new Color(kind === "rain" ? "#b9cadb" : "#ffffff") },
   }
 }
-type Uniforms = ReturnType<typeof uniforms>
+export type Uniforms = ReturnType<typeof uniforms>
 
 /** Where a drop is: falling from the box's top, pushed by the wind, wrapped round the target. */
 const DROP = /* glsl */ `

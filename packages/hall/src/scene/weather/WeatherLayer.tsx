@@ -16,7 +16,10 @@ export function WeatherLayer() {
       <Suspense fallback={null}>
         <Clouds tier={tier} />
       </Suspense>
-      <Precipitation tier={tier} />
+      {/* Suspends only with `?tsl=1`, while the node materials load (scene/tsl.ts). */}
+      <Suspense fallback={null}>
+        <Precipitation tier={tier} />
+      </Suspense>
       <Lightning />
     </>
   )

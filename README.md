@@ -12,6 +12,7 @@
 </p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/opencode-guildhall"><img alt="npm" src="https://img.shields.io/npm/v/opencode-guildhall?color=c9a227&label=npm" /></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-c9a227" /></a>
   <img alt="OpenCode 1 and 2" src="https://img.shields.io/badge/OpenCode-v1%20%C2%B7%20v2-4f8fd6" />
 </p>
@@ -36,8 +37,7 @@ the story as captions and collects it into a book of Legends, and the guild make
 Nothing to install.
 
 <a id="install"></a>**With your own agents.** Add the plugin to `opencode.json`, restart OpenCode,
-and open <http://127.0.0.1:4747>. *(The npm release is on its way; until then, point OpenCode at
-`packages/opencode-guildhall` from a clone of this repo.)*
+and open <http://127.0.0.1:4747>.
 
 ```jsonc
 { "plugin": ["opencode-guildhall"] }

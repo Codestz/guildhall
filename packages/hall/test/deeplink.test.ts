@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { applyDeepLink, type Hall, lookOf, parseDeepLink, pick } from "../src/guild/deeplink.ts"
 import { GuildStore, RUSH } from "../src/guild/store.ts"
+import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
+import type { RepoEntry } from "../src/world/gen/repo.ts"
 import { SITES } from "../src/world/lands.ts"
+import { sitesOf } from "../src/world/siteMap.ts"
+import { handWorld, reachOf, repoWorld } from "../src/world/world.ts"
+import REACT from "./fixtures/repos/facebook__react.json"
 
 const parse = (search: string, probe = false) => parseDeepLink(search, probe)
 
@@ -110,6 +115,53 @@ describe("deep links: look", () => {
   })
 })
 
+describe("deep links: look on a repo's island", () => {
+  const react = repoWorld(islandFromTree(REACT.entries as RepoEntry[]), {
+    repo: REACT.repo,
+    source: "fixture",
+  })
+  const district = (id: string) => react.repo?.districts.find((d) => d.id === id)
+
+  test("a site is the world's mapped district, not the hand map's spot", () => {
+    const quarry = sitesOf(react).quarry.at
+    expect(lookOf("quarry", react)).toMatchObject({ x: quarry[0], z: quarry[1] })
+    expect(quarry).not.toEqual(SITES.quarry.at)
+    expect(lookOf("quarry", handWorld())).toMatchObject({ x: SITES.quarry.at[0], z: SITES.quarry.at[1] })
+  })
+
+  test("districts answer to their name and their folder, any case", () => {
+    const at = district("packages/react-dom")?.at ?? [Number.NaN, Number.NaN]
+    for (const name of ["react-dom", "React-DOM", "packages/react-dom"])
+      expect(lookOf(name, react)).toMatchObject({ x: at[0], z: at[1] })
+    expect(lookOf("react-dom", handWorld())).toBeUndefined()
+  })
+
+  test("the island is framed whole round the keep; the hand map's own places are not there", () => {
+    expect(lookOf("island", react)).toMatchObject({ x: 0, z: 0, radius: reachOf(react) })
+    expect(lookOf("graveyard", react)).toBeUndefined()
+    expect(lookOf("square", react)).toBeUndefined()
+  })
+
+  test("with a repo, a name waits for the island; a point doesn't; nonsense is still ignored", () => {
+    expect(parse("repo=facebook/react&look=react-dom")).toEqual({
+      link: { repo: "facebook/react", lookName: "react-dom" },
+      ignored: [],
+    })
+    // The order of the params doesn't matter.
+    expect(parse("look=quarry&repo=facebook/react").link).toEqual({
+      repo: "facebook/react",
+      lookName: "quarry",
+    })
+    expect(parse("repo=facebook/react&look=12,-40").link).toMatchObject({ look: { x: 12, z: -40 } })
+    expect(parse("repo=facebook/react&look=<b>")).toEqual({
+      link: { repo: "facebook/react" },
+      ignored: ["look=<b>"],
+    })
+    // Without one, an unknown name is ignored at once.
+    expect(parse("look=react-dom")).toEqual({ link: {}, ignored: ["look=react-dom"] })
+  })
+})
+
 describe("deep links: applying", () => {
   afterEach(() => {
     delete RUSH.count
@@ -169,6 +221,14 @@ describe("deep links: applying", () => {
     const { store, hall } = hallOf()
     applyDeepLink(parse("look=quarry&bard=1").link, hall)
     expect(store.bard).toBe(true)
+  })
+
+  test("a repo's island keeps the Bard on unless bard=0", () => {
+    const { store, hall } = hallOf()
+    applyDeepLink(parse("repo=facebook/react").link, hall)
+    expect(store.bard).toBe(true)
+    applyDeepLink(parse("repo=facebook/react&bard=0").link, hall)
+    expect(store.bard).toBe(false)
   })
 
   test("event goes to the hall's force lever", () => {

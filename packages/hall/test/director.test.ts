@@ -20,6 +20,8 @@ import type { Moment } from "../src/guild/moments.ts"
 import { GuildStore } from "../src/guild/store.ts"
 import { listen, Narrator } from "../src/guild/story.ts"
 import { hintCamera } from "../src/scene/events/hint.ts"
+import { setActiveWorld } from "../src/world/active.ts"
+import type { World } from "../src/world/world.ts"
 
 /** A stage of named adventurers at fixed spots, everyone on screen unless listed off. */
 function stageOf(
@@ -160,6 +162,22 @@ describe("director: scoring and decay", () => {
     const d = new Director()
     run(d, stage, 60_000)
     expect(d.shot.kind).toBe("establishing")
+  })
+
+  test("the wide leans to the middle of the island drawn now: south of the keep, or a repo's round it", () => {
+    const stage = stageOf({ A: { x: 10, z: 0, phase: "resting" } })
+    const wide = () => {
+      const d = new Director()
+      run(d, stage, 60_000)
+      return [d.shot.x, d.shot.z]
+    }
+    expect(wide()).toEqual([5, 5])
+    setActiveWorld({ kind: "repo" } as World)
+    try {
+      expect(wide()).toEqual([5, 0])
+    } finally {
+      setActiveWorld(undefined)
+    }
   })
 })
 

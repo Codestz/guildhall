@@ -179,6 +179,38 @@ describe("the crowd's members (crowd/Crowd.ts)", () => {
     expect(Array.from(stage.slice(id * 12, id * 12 + 4)).map((x) => +x.toFixed(4))).toEqual([3, 0.5, -7, 2.2])
   })
 
+  test("a troop spread over a big island is fitted round every member, the far ones too", () => {
+    // The React rush: most of a troop round the hall, a few at the far districts (the quarry, a
+    // package village, the shore): none of them may fall outside the troop's culling sphere.
+    const crowd = crowdOf()
+    const spots: [number, number][] = []
+    for (let i = 0; i < 83; i++) spots.push([12 + ((i * 7) % 23) - 11, 16 + ((i * 11) % 23) - 11])
+    for (let i = 0; i < 8; i++) spots.push([-43.3 + (i % 3), -35 + Math.floor(i / 3)])
+    spots.push([95.3, -35], [69.3, 50])
+    const ids = spots.map(() => crowd.join("knight"))
+    const at = (x: number, z: number) => new Matrix4().makeTranslation(x, 0.2, z)
+    ids.forEach((id, i) => {
+      crowd.place(id, at(...(spots[i] as [number, number])))
+    })
+    crowd.flush()
+    const enclosed = () => {
+      const mesh = crowd.root.children.find((c) => c.name === "Knight_Body" && c.visible) as Mesh
+      const sphere = mesh.boundingSphere
+      if (!sphere) return false
+      // The root and a head and a raised arm above it.
+      return spots.every(([x, z]) =>
+        [0, 2.5].every((up) => sphere.containsPoint(new Vector3(x, 0.2 + up, z))),
+      )
+    }
+    expect(drawn(crowd)).toHaveLength(spots.length)
+    expect(enclosed()).toBe(true)
+    // They walk off to the far edge: the next flush follows them.
+    spots[0] = [-110, 60]
+    crowd.place(ids[0] as number, at(-110, 60))
+    crowd.flush()
+    expect(enclosed()).toBe(true)
+  })
+
   test("gear joins and leaves a member's hands as one troop per piece", () => {
     const crowd = crowdOf()
     const a = crowd.join("knight")

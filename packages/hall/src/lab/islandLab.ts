@@ -28,7 +28,9 @@ import { load } from "./stage.ts"
 
 /**
  * The island lab (dev and probe only): a repo grown into an island by world/gen, drawn with the land
- * pack's own tiles, top-down (left, north up, districts labelled) beside the diorama's angle.
+ * pack's own tiles, top-down (left, north up, districts labelled) beside the diorama's angle. The
+ * labels keep clear of each other (`declutter`), the biggest districts first; one with no room is a
+ * numbered dot, named in the legend at the top left.
  *
  *   ?lab=island&repo=sample            this repo's public tree (test/fixtures/repos/guildhall.json)
  *   ?lab=island&repo=facebook/react    a bundled fixture if there is one (owner__name.json), else
@@ -86,12 +88,27 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
   const top = new PerspectiveCamera(30, 1, 1, 5000)
   const diorama = new PerspectiveCamera(30, 1, 1, 5000)
 
-  const labels = generated.districts.map((district) => {
+  // Biggest first: they keep their labels; whoever can't be placed clear is a numbered dot and a
+  // line in the legend.
+  const ranked = [...generated.districts].sort((a, b) => b.bytes - a.bytes)
+  const legend = document.createElement("div")
+  legend.style.cssText =
+    "position:absolute;left:12px;top:12px;font:11px/1.5 ui-monospace,monospace;color:#1d1813;background:#f4efe4e6;padding:4px 8px;border-radius:4px;pointer-events:none;white-space:pre"
+  root.append(legend)
+  const labels = ranked.map((district, i) => {
     const tag = document.createElement("div")
     tag.textContent = `${district.label} · ${district.biome}`
-    tag.style.cssText = `position:absolute;transform:translate(-50%,-140%);font:600 11px ui-monospace,monospace;color:#fff;background:${district.accent};padding:1px 5px;border-radius:3px;pointer-events:none;white-space:nowrap`
-    root.append(tag)
-    return { tag, at: new Vector3(district.at[0], 2, district.at[1]) }
+    tag.style.cssText = `position:absolute;font:600 11px ui-monospace,monospace;color:#fff;background:${district.accent};padding:1px 5px;border-radius:3px;pointer-events:none;white-space:nowrap`
+    const dot = document.createElement("div")
+    dot.textContent = String(i + 1)
+    dot.style.cssText = `position:absolute;transform:translate(-50%,-50%);font:600 10px ui-monospace,monospace;color:#fff;background:${district.accent};min-width:12px;text-align:center;padding:0 3px;border-radius:8px;pointer-events:none;box-shadow:0 0 0 1px #fff8`
+    root.append(tag, dot)
+    return {
+      tag,
+      dot,
+      line: `${i + 1}  ${district.label} · ${district.biome}`,
+      at: new Vector3(district.at[0], 2, district.at[1]),
+    }
   })
 
   const total = generated.districts.reduce((sum, d) => sum + d.files, 0)
@@ -124,11 +141,33 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
       renderer.setScissor(x, 0, w, h)
       renderer.render(scene, camera)
     }
-    for (const { tag, at } of labels) {
+    const boxes = labels.map(({ tag, at }) => {
       projected.copy(at).project(top)
-      tag.style.left = `${((projected.x + 1) / 2) * w}px`
-      tag.style.top = `${((1 - projected.y) / 2) * h}px`
-    }
+      return {
+        x: ((projected.x + 1) / 2) * w,
+        y: ((1 - projected.y) / 2) * h,
+        w: tag.offsetWidth,
+        h: tag.offsetHeight,
+      }
+    })
+    const placed = declutter(boxes, { w, h })
+    const listed: string[] = []
+    labels.forEach(({ tag, dot, line }, i) => {
+      const spot = placed[i]
+      const anchor = boxes[i] as Box
+      tag.style.display = spot ? "" : "none"
+      dot.style.display = spot ? "none" : ""
+      if (spot) {
+        tag.style.left = `${spot.left}px`
+        tag.style.top = `${spot.top}px`
+      } else {
+        dot.style.left = `${anchor.x}px`
+        dot.style.top = `${anchor.y}px`
+        listed.push(line)
+      }
+    })
+    legend.textContent = listed.join("\n")
+    legend.style.display = listed.length > 0 ? "" : "none"
   }
   frame()
   // A still: redraw only on resize (the probe caps nothing for a lab that never animates).
@@ -150,6 +189,65 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
           language: language.name,
         })),
     },
+  })
+}
+
+/** A label to place: its anchor (the district's spot on screen) and its size, px. */
+export interface Box {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/**
+ * Where a label may sit round its anchor, tried in order: [left, top] as shares of its own size.
+ * Stacked above and below first (the labels are wide), then beside it.
+ */
+const SPOTS: readonly (readonly [number, number])[] = [
+  [-0.5, -1.4],
+  [-0.5, 0.4],
+  [-0.5, -2.6],
+  [-0.5, 1.6],
+  [-0.5, -3.8],
+  [-0.5, 2.8],
+  [0.08, -0.5],
+  [-1.08, -0.5],
+]
+/** Clear space kept between two labels, px. */
+const GAP = 2
+
+/**
+ * Labels placed clear of each other, in the order given (the first wins a contested spot): for
+ * each, the first of SPOTS where it overlaps no label placed before it and stays inside `view`;
+ * null where none does (shown as a numbered dot and listed in the legend instead). Pure.
+ */
+export function declutter(
+  boxes: readonly Box[],
+  view: { w: number; h: number },
+): ({ left: number; top: number } | null)[] {
+  const taken: { left: number; top: number; w: number; h: number }[] = []
+  const clear = (left: number, top: number, w: number, h: number) =>
+    left >= 0 &&
+    top >= 0 &&
+    left + w <= view.w &&
+    top + h <= view.h &&
+    taken.every(
+      (o) =>
+        left + w + GAP <= o.left ||
+        o.left + o.w + GAP <= left ||
+        top + h + GAP <= o.top ||
+        o.top + o.h + GAP <= top,
+    )
+  return boxes.map(({ x, y, w, h }) => {
+    for (const [dx, dy] of SPOTS) {
+      const left = x + dx * w
+      const top = y + dy * h
+      if (!clear(left, top, w, h)) continue
+      taken.push({ left, top, w, h })
+      return { left, top }
+    }
+    return null
   })
 }
 

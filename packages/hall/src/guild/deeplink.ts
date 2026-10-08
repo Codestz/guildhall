@@ -1,8 +1,10 @@
 import type { HudMode } from "../hud/prefs.ts"
+import { activeWorld } from "../world/active.ts"
 import { parseRepo } from "../world/gen/fetch.ts"
-import { GRAVEYARD_PLOT, island, type LandmarkKind, SITES } from "../world/lands.ts"
+import { GRAVEYARD_PLOT, type LandmarkKind } from "../world/lands.ts"
+import { sitesOf } from "../world/siteMap.ts"
 import { loadRepo } from "../world/source.ts"
-import { reachOf } from "../world/world.ts"
+import { handWorld, reachOf, type World } from "../world/world.ts"
 import type { Place } from "./director.ts"
 import type { Weather } from "./environment.ts"
 import { EVENT_KINDS, type EventKind } from "./events.ts"
@@ -25,12 +27,15 @@ import { RUSH, SCENARIOS, type ScenarioId } from "./store.ts"
  *   bard     0 | 1, the director off or on
  *   view     diorama | explore
  *   select   an adventurer's title (`Implementer II`, any case) or session id: followed, dossier open
- *   look     a site, landmark or `x,z`: the camera frames it (and the Bard lets go)
+ *   look     a site, landmark or `x,z`: the camera frames it (and the Bard lets go). Names are the
+ *            world's: on a repo's island the story's sites are its mapped districts (world/siteMap.ts),
+ *            and every district answers to its name (`react-dom`) or folder (`packages/react-dom`)
  *   paused   1: the story's clock stopped
  *   event    a world event forced now (EVENT_KINDS) — dev and probe builds only
  *   repo     `owner/name` (or a GitHub URL, or `sample`): the island grown from that repo's tree
- *            (world/gen) instead of the guild's own, framed whole with the Bard off. Bundled
- *            fixtures first, else the public GitHub API; on failure the guild's island stays.
+ *            (world/gen) instead of the guild's own. The Bard directs there as anywhere (with
+ *            `bard=0`, the island is framed whole). Bundled fixtures first, else the public GitHub
+ *            API; on failure the guild's island stays. A `look` name waits for the island to grow.
  *
  * Every value is validated strictly; anything unknown or invalid is ignored (and listed in
  * `ignored`, for the probe tools to report). Production honours all of it except `event`.
@@ -51,6 +56,11 @@ export interface DeepLink {
   view?: "diorama" | "explore"
   select?: string
   look?: Place
+  /**
+   * A `look` name to find on the repo's island once it has grown (with `repo` only: before then the
+   * island, and so what the name means, is unknown).
+   */
+  lookName?: string
   paused?: boolean
   event?: EventKind
   /** "sample" or "owner/name". */
@@ -105,6 +115,14 @@ export function parseDeepLink(search: string, probe: boolean): Parsed {
   if (link.n !== undefined && link.story !== "rush") {
     ignored.push(`n=${link.n}`)
     delete link.n
+  }
+  if (link.lookName !== undefined) {
+    const raw = link.lookName
+    // A point means the same on every island; a name is the island's, so with a repo it waits.
+    const place = pointOf(raw) ?? (link.repo === undefined ? lookOf(raw) : undefined)
+    if (place) link.look = place
+    if (place || link.repo === undefined || !LOOK_NAME.test(raw)) delete link.lookName
+    if (!place && link.lookName === undefined) ignored.push(`look=${raw}`)
   }
   return { link, ignored }
 }
@@ -171,12 +189,10 @@ function take(link: DeepLink, key: string, value: string, probe: boolean): boole
       if (!/^[\w .:-]{1,64}$/.test(value)) return false
       link.select = value
       return true
-    case "look": {
-      const place = lookOf(value)
-      if (!place) return false
-      link.look = place
+    case "look":
+      // Resolved once the whole link is read (parseDeepLink): a name may be a repo island's.
+      link.lookName = value
       return true
-    }
     case "event":
       if (!probe || !EVENT_KINDS.includes(value as EventKind)) return false
       link.event = value as EventKind
@@ -222,34 +238,59 @@ const NAMED_LANDMARKS: readonly LandmarkKind[] = [
   "dock",
 ]
 
+/** What a `look` name may look like (a district's folder included). */
+const LOOK_NAME = /^[\w.@+/ -]{1,80}$/
+/** How much ground a district's framing holds, per √hex of it (world units), and its bounds. */
+const DISTRICT_SPREAD = 4
+const DISTRICT_RADIUS: readonly [number, number] = [10, 28]
+
 /**
- * The places `look` knows by name: the job sites (world/lands.ts SITES, by id), the graveyard, the
- * keep, the island overview, and the village's landmarks. Built on first use (it reads the map).
+ * The places `look` knows by name on `world` (the active one by default): the story's job sites
+ * (world/siteMap.ts `sitesOf`, by id), the keep, the island overview, the landmarks; on the hand
+ * lands the square and the graveyard, on a repo's island every district by name and by folder.
+ * Built once per world.
  */
-let named: Map<string, Place> | undefined
-export function lookPlaces(): ReadonlyMap<string, Place> {
-  if (named) return named
+const named = new WeakMap<World, ReadonlyMap<string, Place>>()
+export function lookPlaces(world: World = activeWorld() ?? handWorld()): ReadonlyMap<string, Place> {
+  const known = named.get(world)
+  if (known) return known
   const places = new Map<string, Place>()
-  places.set("island", { key: "look:island", x: 0, z: 10, radius: 60 })
-  places.set("keep", { key: "look:keep", x: 0, z: 4, radius: 14 })
-  places.set("square", { key: "look:square", x: 0, z: 28, radius: 14 })
-  for (const site of Object.values(SITES))
-    places.set(site.id, { key: `look:${site.id}`, x: site.at[0], z: site.at[1], radius: 10 })
-  const { x0, x1, z0, z1 } = GRAVEYARD_PLOT
-  places.set("graveyard", { key: "look:graveyard", x: (x0 + x1) / 2, z: (z0 + z1) / 2, radius: 11 })
-  const { landmarks } = island()
-  for (const kind of NAMED_LANDMARKS) {
-    const mark = landmarks.find((l) => l.kind === kind)
-    if (mark && !places.has(kind)) places.set(kind, { key: `look:${kind}`, x: mark.x, z: mark.z, radius: 8 })
+  const put = (name: string, x: number, z: number, radius: number) => {
+    const id = name.toLowerCase()
+    if (!places.has(id)) places.set(id, { key: `look:${id}`, x, z, radius })
   }
-  named = places
+  const hand = world.kind === "hand"
+  if (hand) put("island", 0, 10, 60)
+  else put("island", 0, 0, reachOf(world))
+  put("keep", 0, hand ? 4 : 0, 14)
+  if (hand) put("square", 0, 28, 14)
+  for (const site of Object.values(sitesOf(world))) put(site.id, site.at[0], site.at[1], 10)
+  if (hand) {
+    const { x0, x1, z0, z1 } = GRAVEYARD_PLOT
+    put("graveyard", (x0 + x1) / 2, (z0 + z1) / 2, 11)
+  }
+  for (const district of world.repo?.districts ?? []) {
+    const [low, high] = DISTRICT_RADIUS
+    const radius = Math.min(high, Math.max(low, Math.sqrt(district.hexes) * DISTRICT_SPREAD))
+    put(district.label, district.at[0], district.at[1], radius)
+    put(district.id, district.at[0], district.at[1], radius)
+  }
+  for (const kind of NAMED_LANDMARKS) {
+    const mark = world.island.landmarks.find((l) => l.kind === kind)
+    if (mark) put(kind, mark.x, mark.z, 8)
+  }
+  named.set(world, places)
   return places
 }
 
-/** A named place, or `x,z` (world units, within LOOK_MAX of the centre). */
-export function lookOf(value: string): Place | undefined {
-  const name = lookPlaces().get(value.toLowerCase())
-  if (name) return { ...name }
+/** A named place on `world` (the active one by default), or `x,z` (within LOOK_MAX of the centre). */
+export function lookOf(value: string, world?: World): Place | undefined {
+  const name = lookPlaces(world).get(value.toLowerCase())
+  return name ? { ...name } : pointOf(value)
+}
+
+/** `x,z`, world units, within LOOK_MAX of the centre. */
+function pointOf(value: string): Place | undefined {
   const match = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(value)
   if (!match) return undefined
   const x = Number(match[1])
@@ -321,12 +362,16 @@ export function applyDeepLink(link: DeepLink, hall: Hall): string[] {
   if (link.paused !== undefined) store.setSpeed(link.paused ? 0 : 1)
   if (link.look) store.frame(link.look)
   if (link.repo !== undefined) {
-    // A grown island has no adventurers on it yet: no Bard to follow them, the island framed whole.
-    store.setBard(false)
-    const look = link.look
+    // What a name means waits for the island; with the Bard off and nothing named, it is framed whole.
+    const { look, lookName, bard } = link
     void loadRepo(link.repo).then((world) => {
-      if (world.kind === "repo" && !look)
-        store.frame({ key: "look:island", x: 0, z: 0, radius: reachOf(world) })
+      const place =
+        (lookName !== undefined ? lookOf(lookName, world) : undefined) ??
+        (bard === false && !look ? lookOf("island", world) : undefined)
+      if (!place) return
+      store.frame(place)
+      // Framing hands the Bard off: an explicit bard=1 still wins.
+      if (bard === true) store.setBard(true)
     })
   }
   if (link.bard !== undefined) store.setBard(link.bard)

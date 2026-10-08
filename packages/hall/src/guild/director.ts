@@ -1,3 +1,4 @@
+import { activeWorld } from "../world/active.ts"
 import type { Moment, MomentKind } from "./moments.ts"
 
 /**
@@ -233,6 +234,16 @@ interface Rec {
 
 const point: Point = { x: 0, z: 0 }
 
+/**
+ * Where the establishing wide leans (halfway from the crowd's middle): the middle of the island
+ * drawn now. The hand lands spread south of the keep; a repo's island is grown round it.
+ */
+export function homeOf(world = activeWorld()): Readonly<Point> {
+  return world?.kind === "repo" ? REPO_HOME : HAND_HOME
+}
+const HAND_HOME: Point = { x: 0, z: 10 }
+const REPO_HOME: Point = { x: 0, z: 0 }
+
 export class Director {
   /** The director's clock, ms: the store's real elapsed time (pace and fast-forward don't touch it). */
   now = 0
@@ -402,8 +413,9 @@ export class Director {
       if (!best || total > best.total) best = rec
       if (impulse < 0.05 && hint <= 0 && rec.steady === 0 && !isCurrent) this.drop(i)
     }
-    const centreX = located > 0 ? (sumX / located) * 0.5 : 0
-    const centreZ = located > 0 ? (sumZ / located + 10) * 0.5 : 10
+    const home = homeOf()
+    const centreX = located > 0 ? (sumX / located + home.x) * 0.5 : home.x
+    const centreZ = located > 0 ? (sumZ / located + home.z) * 0.5 : home.z
 
     // 2. Decide.
     const urgent = best !== undefined && best.total >= URGENT && best !== current

@@ -162,6 +162,21 @@ To turn off **all** the agents and keep only the hall:
 { "plugin": [["opencode-guildhall", { "agents": false }]] }
 ```
 
+## Claude Code
+
+The package also carries a hook that brings your Claude Code sessions into the same hall. Install
+the package globally, so the hook's path stays put, then print the hooks block:
+
+```sh
+npm install -g opencode-guildhall
+opencode-guildhall claude-code --print
+```
+
+Merge the printed `hooks` into `~/.claude/settings.json` (every project) or a project's
+`.claude/settings.local.json`. The command only prints; it never edits your settings. The hook says
+nothing back to Claude Code, always lets it go on, and starts the hub (with Bun from your `PATH`)
+the first time it's needed. A project open in both OpenCode and Claude Code is one guild.
+
 ## Eject the agents
 
 The prompts live inside the package. To read or edit them, eject them into your project:
@@ -188,6 +203,10 @@ Everything stays on your machine.
   your shell history. Nothing is ever uploaded. Delete the folder at any time; set `GUILDHALL_HOME`
   to keep them somewhere else.
 - The plugin's log is `~/.cache/guildhall/herald.log`.
+- For a project whose remote is on GitHub, the hub asks api.github.com about the repo (commits, pull
+  requests, CI, releases) to fill the hall's sea. It uses `gh auth token` if the GitHub CLI is logged
+  in, keeps the token in memory only, and never stores or logs it. Set `GUILDHALL_GITHUB=0` to turn
+  this off.
 - When you open the hall, your browser loads its fonts from Google Fonts. No session data is sent
   with that request.
 

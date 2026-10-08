@@ -1,13 +1,14 @@
 {
   "name": "opencode-guildhall",
-  "version": "0.1.0",
-  "description": "Nine guild agents for OpenCode, and a live 3D hall where you watch them work.",
+  "version": "0.2.0",
+  "description": "Nine guild agents for OpenCode, and a live 3D hall where you watch them work. Claude Code too.",
   "type": "module",
   "license": "MIT",
   "author": "Codestz",
   "keywords": [
     "opencode",
     "opencode-plugin",
+    "claude-code",
     "agents",
     "subagents",
     "multi-agent",
@@ -31,6 +32,7 @@
   },
   "files": [
     "dist",
+    "CHANGELOG.md",
     "server.js"
   ],
   "engines": {
@@ -42,6 +44,7 @@
     "prepack": "bun scripts/build.ts"
   },
   "devDependencies": {
+    "@guildhall/claude-code": "workspace:*",
     "@guildhall/herald": "workspace:*",
     "@guildhall/hub": "workspace:*",
     "@guildhall/roster": "workspace:*"

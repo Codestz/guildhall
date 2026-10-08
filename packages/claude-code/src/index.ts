@@ -1,4 +1,4 @@
-export { run } from "./hook.ts"
+export { main, run, setHubEntry } from "./hook.ts"
 export { EVENTS, settings } from "./install.ts"
 export { guildOf } from "./project.ts"
 export {

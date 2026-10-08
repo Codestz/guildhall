@@ -5,7 +5,8 @@ import { join } from "node:path"
  * Builds what `opencode-guildhall` publishes into `dist/`:
  *   server.js  the plugin (herald + roster + core), for OpenCode's Bun
  *   hub.js     the hub, which the herald starts as its own Bun process
- *   cli.js     `npx opencode-guildhall eject`, for Node
+ *   cli.js     `npx opencode-guildhall eject | claude-code --print`, for Node
+ *   claude-code.js  the Claude Code hook, for Node (or Bun), one process per hook event
  *   hall/      the hall's production build, served by the hub at `/`
  * Everything is bundled: the package has no runtime dependencies.
  */
@@ -34,6 +35,7 @@ await bundle("server.ts", "bun")
 await bundle("hub.ts", "bun")
 await bundle("cli.ts", "node", "#!/usr/bin/env node")
 chmodSync(join(dist, "cli.js"), 0o755)
+await bundle("claude-code.ts", "node")
 
 // The hall, built to follow the hub that serves it (packages/hall/src/guild/mode.ts SERVED).
 const vite = Bun.spawnSync(["bun", "x", "vite", "build", "--outDir", join(dist, "hall"), "--emptyOutDir"], {

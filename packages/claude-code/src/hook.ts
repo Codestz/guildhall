@@ -54,7 +54,18 @@ export async function run(text: string): Promise<void> {
   }
 }
 
-/** Starts the hub (this repo's source) as a detached process, unless one was started recently. */
+/** The script that runs the hub: its source in this repo; the npm package points it at its bundle. */
+let hubEntry = new URL("../../hub/src/main.ts", import.meta.url).pathname
+
+/** Where `startHub` finds the hub's entry script (the npm package's `dist/hub.js`). */
+export function setHubEntry(path: string): void {
+  hubEntry = path
+}
+
+/**
+ * Starts the hub as a detached process, unless one was started recently. The hub runs on Bun, found
+ * on PATH: the hook itself may run on Node (the npm package's bundle), which can't run the hub.
+ */
 function startHub(): void {
   const stamp = join(home, "claude-code.hub-start")
   try {
@@ -65,18 +76,26 @@ function startHub(): void {
   try {
     mkdirSync(home, { recursive: true })
     writeFileSync(stamp, new Date().toISOString())
-    const entry = new URL("../../hub/src/main.ts", import.meta.url).pathname
-    spawn(process.execPath, [entry], { detached: true, stdio: "ignore" }).unref()
+    const child = spawn("bun", [hubEntry], { detached: true, stdio: "ignore" })
+    // No Bun on PATH arrives as an `error` event, after this returns; unhandled, it would throw.
+    child.on("error", () => {})
+    child.unref()
   } catch {
     // The hook must never fail Claude Code; the hub can be started by hand.
   }
 }
 
-if (import.meta.main) {
+/** The hook as a process: the event from stdin, then exit 0 whatever happened. Node or Bun. */
+export async function main(): Promise<never> {
   try {
-    await run(await Bun.stdin.text())
+    let text = ""
+    process.stdin.setEncoding("utf8")
+    for await (const chunk of process.stdin) text += chunk
+    await run(text)
   } catch {
     // Never throw into Claude Code.
   }
   process.exit(0)
 }
+
+if (import.meta.main) await main()

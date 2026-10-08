@@ -72,11 +72,12 @@
     },
     "packages/opencode-guildhall": {
       "name": "opencode-guildhall",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "bin": {
         "opencode-guildhall": "dist/cli.js",
       },
       "devDependencies": {
+        "@guildhall/claude-code": "workspace:*",
         "@guildhall/herald": "workspace:*",
         "@guildhall/hub": "workspace:*",
         "@guildhall/roster": "workspace:*",

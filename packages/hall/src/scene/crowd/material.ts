@@ -1,4 +1,4 @@
-import { type Material, type MeshStandardMaterial, type Texture, type Vector3, Vector4 } from "three"
+import type { Material, MeshStandardMaterial, Texture, Vector3 } from "three"
 import type { BoneBake } from "./bake.ts"
 
 /**
@@ -7,44 +7,50 @@ import type { BoneBake } from "./bake.ts"
  * these take their place. Everything else — lights, the island's radial fog (atmosphere/fog.ts
  * patches the shared fog chunks, which stay included), instance colours — is the stock material's.
  *
- * Per instance (InstancedBufferAttributes, written only when a clip changes):
- *   crowdNow = (clip, start, speed)   what it plays: started at `start` on the crowd clock
- *   crowdWas = (clip, start, speed)   what it played before; faded out over `crowdFade` s from `start`
- * The clip's rows come from the bake (bake.ts); two rows blend by nlerp, as do the two clips.
+ * Per instance, one attribute: `crowdMember`, whose three texels in the stage texture (`crowdStage`,
+ * written by crowd/Crowd.ts once a frame for everyone) say
+ *   place  = (x, y, z, yaw)                         where its rig's root stands, which way it faces
+ *   frames = (row, blend, row before, blend before) the bake's rows to blend now, in the clip it
+ *                                                   plays and in the one it is fading out of
+ *   fade   = (in, -, -, -)                          how far the clip has faded in (1: done)
+ * so a member's body and everything it holds read one record. What is the same for every vertex
+ * of a member — which rows its clips are at — is worked out once a member on the CPU (bake.ts
+ * frameAt), in double precision: the shader never sees the clock. Two rows blend by nlerp, as do
+ * the two clips. The place is applied in the shader (the mesh's own instance matrices stay
+ * identity): a rig's root only ever stands upright and turns about y.
  *
  * `bone` (gear): the mesh rides that one bone whole instead of reading skinIndex/skinWeight.
+ * `up` (a levelled grip, scene/grips.ts `upright`: a mug, a staff, a book): the item's own up, in
+ * the bind frame. The bone's turn is followed by the shortest turn that points it at the world's up,
+ * about the bone's head — keepUpright's levelling, per vertex instead of per frame on the CPU. The
+ * rig's root only ever turns about y (instance places), so "up" in the rig's space is the world's.
  */
+
+/** Members per row of the stage texture (three texels each). */
+export const STAGE_ROW = 64
+export const TEXELS_PER_MEMBER = 3
 
 export interface CrowdUniforms {
   crowdBones: { value: Texture }
-  /** The crowd clock, seconds: the one number written per frame for the whole crowd. */
-  crowdTime: { value: number }
-  /** Seconds a clip change takes to blend in (0: cut). */
-  crowdFade: { value: number }
-  /** Per clip: first row, rows, duration, loops (1/0). */
-  crowdClips: { value: Vector4[] }
+  /** Every member's place and clips (crowd/Crowd.ts): STAGE_ROW members a row. */
+  crowdStage: { value: Texture | null }
   /** Per bone: its bind position, what it turns about. */
   crowdPivots: { value: Vector3[] }
 }
 
-export function crowdUniforms(bake: BoneBake, fade: number): CrowdUniforms {
+export function crowdUniforms(bake: BoneBake): CrowdUniforms {
   return {
     crowdBones: { value: bake.texture },
-    crowdTime: { value: 0 },
-    crowdFade: { value: fade },
-    crowdClips: { value: bake.clips.map((c) => new Vector4(c.row, c.frames, c.duration, c.loop ? 1 : 0)) },
+    crowdStage: { value: null },
     crowdPivots: { value: bake.pivots.map((pivot) => pivot.clone()) },
   }
 }
 
 const PARS = /* glsl */ `
 uniform highp sampler2D crowdBones;
-uniform float crowdTime;
-uniform float crowdFade;
-uniform vec4 crowdClips[ CROWD_CLIPS ];
+uniform highp sampler2D crowdStage;
 uniform vec3 crowdPivots[ CROWD_BONES ];
-attribute vec3 crowdNow;
-attribute vec3 crowdWas;
+attribute float crowdMember;
 #ifndef CROWD_BONE
 	attribute vec4 skinIndex;
 	attribute vec4 skinWeight;
@@ -53,22 +59,12 @@ attribute vec3 crowdWas;
 // A bone's pose: q turns about its pivot, head.xyz is where the pivot is now, head.w its scale.
 struct CrowdPose { vec4 q; vec4 head; };
 
+vec4 crowdPlace;
 int crowdRowNow;
 int crowdRowWas;
 float crowdBlendNow;
 float crowdBlendWas;
 float crowdIn;
-
-// The two rows of a clip to blend at its time, and how far (bake.ts frameAt).
-void crowdFrame( const in vec3 play, out int row, out float blend ) {
-	vec4 clip = crowdClips[ int( play.x ) ];
-	float u = ( crowdTime - play.y ) * play.z / clip.z;
-	u = clip.w > 0.5 ? fract( u ) : clamp( u, 0.0, 1.0 );
-	float x = u * ( clip.y - 1.0 );
-	float first = min( floor( x ), clip.y - 2.0 );
-	row = int( clip.x + first );
-	blend = x - first;
-}
 
 CrowdPose crowdRead( const in int row, const in int bone ) {
 	return CrowdPose(
@@ -97,18 +93,50 @@ vec3 crowdTurn( const in vec4 q, const in vec3 v ) {
 	return v + 2.0 * cross( q.xyz, cross( q.xyz, v ) + q.w * v );
 }
 
+#ifdef CROWD_UP
+// q, then the shortest turn taking the item's up (CROWD_UP, bind frame) to +y.
+vec4 crowdLevel( const in vec4 q ) {
+	vec3 up = normalize( crowdTurn( q, CROWD_UP ) );
+	vec4 level = vec4( - up.z, 0.0, up.x, 1.0 + up.y );
+	level = level.w < 1e-4 ? vec4( 1.0, 0.0, 0.0, 0.0 ) : normalize( level );
+	return vec4( level.w * q.xyz + q.w * level.xyz + cross( level.xyz, q.xyz ), level.w * q.w - dot( level.xyz, q.xyz ) );
+}
+#endif
+
+// Texel k of this instance's member in the stage.
+vec4 crowdStageAt( const in int k ) {
+	int member = int( crowdMember + 0.5 );
+	return texelFetch( crowdStage, ivec2( ( member % CROWD_STAGE_ROW ) * 3 + k, member / CROWD_STAGE_ROW ), 0 );
+}
+
+// The member's turn about y (crowdPlace.w), as Matrix4.makeRotationY.
+vec3 crowdYaw( const in vec3 v ) {
+	float c = cos( crowdPlace.w );
+	float s = sin( crowdPlace.w );
+	return vec3( c * v.x + s * v.z, v.y, c * v.z - s * v.x );
+}
+
 vec3 crowdMove( const in CrowdPose pose, const in int bone, const in vec3 p ) {
 	return pose.head.xyz + pose.head.w * crowdTurn( pose.q, p - crowdPivots[ bone ] );
 }
 `
 
 const BASE = /* glsl */ `
-	crowdFrame( crowdNow, crowdRowNow, crowdBlendNow );
-	crowdIn = crowdFade > 0.0 ? clamp( ( crowdTime - crowdNow.y ) / crowdFade, 0.0, 1.0 ) : 1.0;
-	if ( crowdIn < 1.0 ) crowdFrame( crowdWas, crowdRowWas, crowdBlendWas );
+	crowdPlace = crowdStageAt( 0 );
+	{
+		vec4 frames = crowdStageAt( 1 );
+		crowdRowNow = int( frames.x + 0.5 );
+		crowdBlendNow = frames.y;
+		crowdRowWas = int( frames.z + 0.5 );
+		crowdBlendWas = frames.w;
+		crowdIn = crowdStageAt( 2 ).x;
+	}
 	#ifdef CROWD_BONE
 		CrowdPose crowdPoses[ 1 ];
 		crowdPoses[ 0 ] = crowdPose( CROWD_BONE );
+		#ifdef CROWD_UP
+			crowdPoses[ 0 ].q = crowdLevel( crowdPoses[ 0 ].q );
+		#endif
 		ivec4 crowdJoints = ivec4( CROWD_BONE, 0, 0, 0 );
 		vec4 crowdWeights = vec4( 1.0, 0.0, 0.0, 0.0 );
 		const int crowdInfluences = 1;
@@ -126,7 +154,7 @@ const NORMAL = /* glsl */ `
 		vec3 turned = vec3( 0.0 );
 		for ( int i = 0; i < crowdInfluences; i ++ )
 			if ( crowdWeights[ i ] > 0.0 ) turned += crowdWeights[ i ] * crowdTurn( crowdPoses[ i ].q, objectNormal );
-		objectNormal = turned;
+		objectNormal = crowdYaw( turned );
 	}
 `
 
@@ -135,23 +163,29 @@ const POSITION = /* glsl */ `
 		vec3 moved = vec3( 0.0 );
 		for ( int i = 0; i < crowdInfluences; i ++ )
 			if ( crowdWeights[ i ] > 0.0 ) moved += crowdWeights[ i ] * crowdMove( crowdPoses[ i ], crowdJoints[ i ], transformed );
-		transformed = moved;
+		transformed = crowdYaw( moved ) + crowdPlace.xyz;
 	}
 `
 
 /**
  * A copy of `base` (its map, colour, roughness…) skinned by the bake. Materials made from the same
- * `uniforms` share the clock, the texture and the clip table.
+ * `uniforms` share the bake and the stage.
  */
-export function crowdMaterial(base: Material, uniforms: CrowdUniforms, bone?: number): MeshStandardMaterial {
+export function crowdMaterial(
+  base: Material,
+  uniforms: CrowdUniforms,
+  bone?: number,
+  up?: Vector3,
+): MeshStandardMaterial {
   const material = base.clone() as MeshStandardMaterial
   if (!(material as MeshStandardMaterial).isMeshStandardMaterial)
     throw new Error(`crowdMaterial: ${base.type} is not a MeshStandardMaterial`)
   material.defines = {
     ...material.defines,
-    CROWD_CLIPS: uniforms.crowdClips.value.length,
     CROWD_BONES: uniforms.crowdPivots.value.length,
+    CROWD_STAGE_ROW: STAGE_ROW,
     ...(bone === undefined ? {} : { CROWD_BONE: bone }),
+    ...(bone === undefined || !up ? {} : { CROWD_UP: `vec3( ${glsl(up.x)}, ${glsl(up.y)}, ${glsl(up.z)} )` }),
   }
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms)
@@ -163,4 +197,8 @@ export function crowdMaterial(base: Material, uniforms: CrowdUniforms, bone?: nu
   }
   material.customProgramCacheKey = () => "crowd"
   return material
+}
+
+function glsl(value: number): string {
+  return value.toFixed(6)
 }

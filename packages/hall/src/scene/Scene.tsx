@@ -1,9 +1,12 @@
+import { useGLTF } from "@react-three/drei"
 import { useFrame, useThree } from "@react-three/fiber"
-import { Suspense, useCallback, useEffect, useReducer, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useReducer, useState } from "react"
+import type { Object3D } from "three"
 import { SoundStage } from "../audio/SoundStage.tsx"
 import { MODE, PROBE } from "../guild/mode.ts"
 import type { AdventurerView } from "../guild/store.ts"
 import { useGuild, useGuildStore } from "../guild/useGuild.ts"
+import { ANIMS_URL, MODELS, modelUrl } from "../world/cast.ts"
 import { Adventurer, lookFrom } from "./Adventurer.tsx"
 import { Atmosphere } from "./atmosphere/Atmosphere.tsx"
 import { Post } from "./atmosphere/Post.tsx"
@@ -12,6 +15,8 @@ import { Blobs } from "./Blobs.tsx"
 import { CameraRig } from "./CameraRig.tsx"
 import { Crisp } from "./Crisp.tsx"
 import { declutter } from "./chips.ts"
+import { castClock, castCrowd } from "./crowd/cast.ts"
+import { ALL_HEROES } from "./crowd/lod.ts"
 import { DeedEffects } from "./DeedEffect.tsx"
 import { EventsLayer } from "./events/EventsLayer.tsx"
 import { Exits } from "./exits.ts"
@@ -20,6 +25,7 @@ import { FRAME } from "./frame.ts"
 import { Graveyard } from "./Graveyard.tsx"
 import { Island } from "./Island.tsx"
 import { Life } from "./life/Life.tsx"
+import { AFTER_POSE } from "./lights/carried.ts"
 import { NearLights } from "./lights/NearLights.tsx"
 import { NightLife } from "./lights/NightLife.tsx"
 import { StreetLights } from "./lights/StreetLights.tsx"
@@ -86,6 +92,10 @@ export function Scene() {
  * off the store is passed down as plain values, so a refresh re-renders only those that changed.
  * Their rings and deed motes are drawn together (one instanced layer each). Models are preloaded
  * (scene/Adventurer.tsx), so one Suspense boundary holds the whole cast.
+ *
+ * Past ALL_HEROES adventurers the cast has a baked crowd (scene/crowd/): whoever the camera isn't
+ * close to joins it, one draw per model part for all of them (scene/crowd/lod.ts). At or under it —
+ * every story the hall ships — there is no crowd at all and everyone draws as they always did.
  */
 function Cast() {
   const store = useGuild()
@@ -98,12 +108,17 @@ function Cast() {
     [exits],
   )
   const views = exits.stage(store.views, store.rebuilds, performance.now())
-  // The camera's view, once a frame, before any adventurer reads it (mixer culling).
+  const crowd = useCrowd(views.length > ALL_HEROES)
+  // The camera's view, once a frame, before any adventurer reads it (mixer culling, who is a hero).
   // One frustum and one declutter run (throttled in chips.ts) for the whole cast, not one per adventurer.
-  useFrame((state) => {
-    lookFrom(state.camera)
+  useFrame((state, delta) => {
+    castClock.now += delta
+    if (crowd) crowd.time = castClock.now
+    lookFrom(state.camera, state.size.height)
     declutter(state.camera, state.size.width, state.size.height)
   }, FRAME.SKY)
+  // Every member written (the figures, at WORLD): the crowd's slots go up once.
+  useFrame(() => crowd?.flush(), AFTER_POSE)
   const banners = store.parties.length > 1
   const dark = store.environment.daylight < 0.3
   return (
@@ -117,12 +132,32 @@ function Cast() {
           following={store.following}
           banners={banners}
           dark={dark}
+          crowd={crowd}
         />
       ))}
+      {crowd && <primitive object={crowd.root} />}
       <Rings />
       <DeedEffects />
     </Suspense>
   )
+}
+
+/**
+ * The cast's baked crowd while `wanted` (made on first want, kept after: crowd/cast.ts), else null.
+ * Every model is preloaded (scene/Adventurer.tsx), so reading them here never suspends for long.
+ */
+function useCrowd(wanted: boolean) {
+  const { animations } = useGLTF(ANIMS_URL)
+  const scenes = useGLTF(MODELS.map(modelUrl))
+  return useMemo(() => {
+    if (!wanted) return null
+    const models: Record<string, Object3D> = {}
+    MODELS.forEach((model, i) => {
+      const loaded = scenes[i]
+      if (loaded) models[model] = loaded.scene
+    })
+    return castCrowd(animations, models)
+  }, [wanted, animations, scenes])
 }
 
 /** Drives the guild's clock from the render loop (first, FRAME.SIM); long frames are capped. */

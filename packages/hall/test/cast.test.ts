@@ -3,6 +3,7 @@ import { Object3D } from "three"
 import type { AdventurerView } from "../src/guild/store.ts"
 import { type AdventurerProps, mixerStep, sameProps, sameView } from "../src/scene/Adventurer.tsx"
 import { capacityFor } from "../src/scene/Blobs.tsx"
+import type { Crowd } from "../src/scene/crowd/Crowd.ts"
 import { glowOfEffect, moteAt, motesOf } from "../src/scene/DeedEffect.tsx"
 import { ringOf } from "../src/scene/Rings.tsx"
 
@@ -56,6 +57,8 @@ describe("the cast re-renders only what changed (scene/Adventurer memo)", () => 
     expect(sameProps(base, props({ following: "p2" }))).toBe(false)
     expect(sameProps(base, props({ banners: true }))).toBe(false)
     expect(sameProps(base, props({ dark: true }))).toBe(false)
+    // The cast growing past ALL_HEROES hands everyone the crowd (scene/crowd/lod.ts).
+    expect(sameProps(base, props({ crowd: {} as Crowd }))).toBe(false)
   })
 })
 

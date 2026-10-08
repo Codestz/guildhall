@@ -2,8 +2,6 @@ import { useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import {
-  type AnimationAction,
-  AnimationMixer,
   type BufferGeometry,
   type Camera,
   Color,
@@ -11,18 +9,17 @@ import {
   DoubleSide,
   Frustum,
   Group,
-  LoopOnce,
   type Material,
-  MathUtils,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
   type Object3D,
+  type OrthographicCamera,
+  type PerspectiveCamera,
   RingGeometry,
   Shape,
   ShapeGeometry,
-  type SkinnedMesh,
   Sphere,
   SphereGeometry,
   Vector3,
@@ -31,15 +28,18 @@ import type { AdventurerView } from "../guild/store.ts"
 import { positions, useGuildStore } from "../guild/useGuild.ts"
 import { verbOf } from "../hud/format.ts"
 import { Icon } from "../hud/icons.tsx"
-import { legOf, placeOf, Routine, seedOf, shifted } from "../world/behaviours.ts"
+import { placeOf, Routine, seedOf, shifted } from "../world/behaviours.ts"
 import { ANIMS_URL, GEAR, isModel, MODELS, modelUrl } from "../world/cast.ts"
 import type { Piece } from "../world/furniture.ts"
-import type { Spot } from "../world/layout.ts"
-import { route } from "../world/paths.ts"
-import { DESTINATIONS, SITE_DEFS } from "../world/sites.ts"
-import { attachHands, CARRY_WALK, carryClip, type Hands, probed, release, reserve } from "./activity.ts"
+import { SITE_DEFS } from "../world/sites.ts"
+import { attachHands, type Hands, probed, release, reserve } from "./activity.ts"
 import { useBlob } from "./Blobs.tsx"
+import { Body } from "./body.ts"
+import { Brain, clipFor } from "./brain.ts"
 import { addChip, CHIP_HEIGHT, chipSlot, removeChip } from "./chips.ts"
+import type { Crowd } from "./crowd/Crowd.ts"
+import { castClock } from "./crowd/cast.ts"
+import { FIGURE_HEIGHT, heroic } from "./crowd/lod.ts"
 import { useDeedEffect } from "./DeedEffect.tsx"
 import { Dissolver, Fade, fadeSeconds } from "./dissolve.ts"
 import { attachGrip, isHeldPiece, KIT_GRIPS, keepUpright, NIGHT_LANTERN, RESTING_MUG } from "./grips.ts"
@@ -50,20 +50,9 @@ import { carryLantern } from "./lights/carried.ts"
 import { type RingLook, useRing } from "./Rings.tsx"
 import { cloneRig } from "./rig.ts"
 
-const WALK_SPEED = 3.4
-/** The infirmary bed's blanket, measured on kit.glb's bed_frame (0.84 up, scale 1). */
-const BED_TOP = 0.84
-/** No walk lasts longer than this: far trips run instead (Motion language board). */
-const MAX_WALK_S = 5
-const RUN_ABOVE = 5.2
-const FADE_S = 0.25
-/** Carrying slows the walk a little. */
-const CARRY_SPEED = WALK_SPEED * 0.85
 /** Where the hands are, for a beat that happens there (a page turned, an arrow loosed). */
 const HANDS_AHEAD = 0.45
 const HANDS_UP = 1.4
-/** Out through the gate nobody is hurried: a leaver runs only when the way out is very long. */
-const LEAVE_WALK_S = 8
 /** A leaver starts to dissolve this far before the end of the avenue walk, still walking. */
 const DISSOLVE_FROM = 2.5
 /** Fades (scene/dissolve.ts): in from the avenue while still far off, summoned, gone down the road. */
@@ -93,6 +82,11 @@ export interface AdventurerProps {
   banners: boolean
   /** After dark: a free left hand carries a lantern. */
   dark: boolean
+  /**
+   * The cast's baked crowd, when the cast is big enough to use it (scene/crowd/lod.ts): this one
+   * joins it unless it must stay a hero. Null: always a hero.
+   */
+  crowd?: Crowd | null
 }
 
 /**
@@ -125,6 +119,7 @@ export function sameProps(a: AdventurerProps, b: AdventurerProps): boolean {
     a.banners === b.banners &&
     a.dark === b.dark &&
     a.onGone === b.onGone &&
+    a.crowd === b.crowd &&
     sameView(a.view, b.view)
   )
 }
@@ -138,16 +133,39 @@ export const sight = {
   frame: 0,
   frustum: new Frustum(),
   camera: new Vector3(),
+  /** Where the camera looks: its view's centre on the ground (y = 0). */
+  target: new Vector3(),
+  /** CSS px per world unit at the target (how big a figure there is drawn). */
+  scale: 1,
 }
 const projection = new Matrix4()
+const forward = new Vector3()
 
-/** Reads `camera` into `sight`: once a frame, before the cast's own frame callbacks. */
-export function lookFrom(camera: Camera): void {
+/**
+ * Reads `camera` into `sight`: once a frame, before the cast's own frame callbacks. `height`: the
+ * canvas's height in CSS px.
+ */
+export function lookFrom(camera: Camera, height: number): void {
   sight.frame++
   sight.frustum.setFromProjectionMatrix(
     projection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse),
   )
   sight.camera.setFromMatrixPosition(camera.matrixWorld)
+  // Read off the matrix the last frame drew with: getWorldDirection would update the camera's
+  // matrices here, before the rig moves it, and change what everything after this reads.
+  forward.setFromMatrixColumn(camera.matrixWorld, 2).normalize().negate()
+  const along = forward.y < -1e-3 ? -sight.camera.y / forward.y : 0
+  sight.target.copy(sight.camera).addScaledVector(forward, along)
+  sight.scale = height / viewHeight(camera, along)
+}
+
+/** World units the view spans top to bottom at `distance` along its axis. */
+function viewHeight(camera: Camera, distance: number): number {
+  const ortho = camera as OrthographicCamera
+  if (ortho.isOrthographicCamera) return Math.max(1e-6, (ortho.top - ortho.bottom) / ortho.zoom)
+  const persp = camera as PerspectiveCamera
+  const fov = persp.isPerspectiveCamera ? persp.getEffectiveFOV() : 50
+  return Math.max(1e-6, 2 * Math.max(distance, 1e-3) * Math.tan((fov * Math.PI) / 360))
 }
 
 /** Beyond this distance from the camera, a mixer steps every other frame (as the townsfolk's). */
@@ -185,7 +203,7 @@ const HIT = {
  */
 export const Adventurer = memo(Figure, sameProps)
 
-function Figure({ view, onGone, selected, following, banners, dark }: AdventurerProps) {
+function Figure({ view, onGone, selected, following, banners, dark, crowd = null }: AdventurerProps) {
   const store = useGuildStore()
   const id = view.id
   const root = useRef<Group>(null)
@@ -194,13 +212,12 @@ function Figure({ view, onGone, selected, following, banners, dark }: Adventurer
   const { animations } = useGLTF(ANIMS_URL)
   const kit = useKit()
 
-  const body = useMemo(() => cloneRig(scene), [scene])
-  /** Made in a layout effect, below: a mount (StrictMode's second one too) gets its own. */
-  const animator = useRef<{ mixer: AnimationMixer; actions: Map<string, AnimationAction> } | null>(null)
-  const current = useRef<AnimationAction | null>(null)
-  /** Spots still to walk through; recomputed whenever the target moves. */
-  const path = useRef<Spot[]>([])
-  const routed = useRef({ x: Number.NaN, z: Number.NaN })
+  /** The rig: drawn as is by a hero body, hidden (its hands still kept) in the crowd. */
+  const rig = useMemo(() => cloneRig(scene), [scene])
+  /** What draws them (scene/body.ts). Made in a layout effect, below: a mount (StrictMode's second one too) gets its own. */
+  const body = useRef<Body | null>(null)
+  /** Where they walk and which way they face (scene/brain.ts). */
+  const [brain] = useState(() => new Brain())
   /** The work loop at this adventurer's place, and what their hands show (scene/activity.ts). */
   const routine = useRef<Routine | null>(null)
   const hands = useRef<Hands | null>(null)
@@ -230,7 +247,7 @@ function Figure({ view, onGone, selected, following, banners, dark }: Adventurer
   useEffect(() => {
     const tint = new Color(view.color)
     const tinted: [Mesh, Material, Material][] = []
-    body.traverse((child) => {
+    rig.traverse((child) => {
       const mesh = child as Mesh
       if (!mesh.isMesh) return
       // Characters move every frame; the shadow map is static (atmosphere/shadows.ts). A soft blob
@@ -250,34 +267,24 @@ function Figure({ view, onGone, selected, following, banners, dark }: Adventurer
         mesh.material = shared
       }
     }
-  }, [body, view.color])
+  }, [rig, view.color])
 
-  // The mixer and its actions live exactly as long as this mount: made here, before the first frame
-  // (no bind-pose flash), and freed on unmount with each skeleton's bone texture — all made for this
-  // body alone. Geometry and untinted materials are shared with the loaded model (SkeletonUtils.clone),
-  // held gear with the kit: never disposed here. StrictMode's unmount-and-mount gets a fresh mixer,
-  // so nothing keeps using a disposed one; the renderer remakes the bone texture on the next draw.
+  // The body (its mixer and actions) lives exactly as long as this mount: made here, before the first
+  // frame (no bind-pose flash), and freed on unmount with each skeleton's bone texture — all made for
+  // this rig alone — leaving the crowd if it was in it. Geometry and untinted materials are shared
+  // with the loaded model (SkeletonUtils.clone), held gear with the kit: never disposed here.
+  // StrictMode's unmount-and-mount gets a fresh body, so nothing keeps using a disposed mixer.
   useLayoutEffect(() => {
-    const mixer = new AnimationMixer(body)
-    const actions = new Map<string, AnimationAction>()
-    for (const clip of animations) actions.set(clip.name, mixer.clipAction(clip))
-    const carry = carryClip(animations)
-    if (carry) actions.set(CARRY_WALK, mixer.clipAction(carry))
     // A touch of each one's own tempo: two smiths side by side never strike in step.
-    mixer.timeScale = 0.94 + (seedOf(id) % 1000) * 0.00012
-    animator.current = { mixer, actions }
-    current.current = null
+    const made = new Body(rig, animations, 0.94 + (seedOf(id) % 1000) * 0.00012)
+    body.current = made
     return () => {
-      animator.current = null
-      current.current = null
-      mixer.stopAllAction()
-      mixer.uncacheRoot(body)
-      body.traverse((child) => {
-        const skinned = child as SkinnedMesh
-        if (skinned.isSkinnedMesh) skinned.skeleton.dispose()
-      })
+      if (body.current === made) body.current = null
+      made.dispose()
     }
-  }, [body, animations, id])
+  }, [rig, animations, id])
+  // A crowd member's cape and hat follow a new colour too.
+  useEffect(() => body.current?.tint(view.color), [view.color])
 
   // Where they work, and the loop they run there (a new place: a new routine, berth reserved).
   const [tx, tz, tf] = view.target
@@ -289,11 +296,11 @@ function Figure({ view, onGone, selected, following, banners, dark }: Adventurer
     if (!place) return
     const lap = reserve(place, id)
     const work = new Routine(shifted(place, lap), seedOf(id))
-    const held = attachHands(body, place.behaviour)
+    const held = attachHands(rig, place.behaviour)
     routine.current = work
     hands.current = held
     beatsSeen.current = 0
-    if (import.meta.env.DEV) probed.set(id, { title: id, routine: work, body })
+    if (import.meta.env.DEV) probed.set(id, { title: id, routine: work, body: rig })
     return () => {
       if (import.meta.env.DEV) probed.delete(id)
       release(place, id)
@@ -301,22 +308,22 @@ function Figure({ view, onGone, selected, following, banners, dark }: Adventurer
       if (routine.current === work) routine.current = null
       if (hands.current === held) hands.current = null
     }
-  }, [place, id, body])
+  }, [place, id, rig])
 
   // Several parties on the island: each guildmaster wears their party's banner on their back.
-  useBackBanner(body, view.banner, view.master && banners)
+  useBackBanner(rig, view.banner, view.master && banners)
 
   // Gear in the hand slots; a mug instead while resting in the tavern.
   const atWork = view.site && (view.phase === "working" || view.phase === "waiting")
   const gear = (atWork && view.site ? SITE_DEFS[view.site].gear : undefined) ?? GEAR[view.agent] ?? {}
   const right: Piece | undefined = view.phase === "resting" ? RESTING_MUG : gear.right
-  const rightHeld = useHeld(body, kit, right)
+  const rightHeld = useHeld(rig, kit, right)
   // After dark, a free left hand carries a lantern: you can always find your agents at night (an
   // archer's left hand holds the bow).
   const bow = atWork && place?.behaviour.tool === "bow"
   const left =
     view.phase === "resting" ? undefined : (gear.left ?? (dark && !bow ? NIGHT_LANTERN : undefined))
-  const leftHeld = useHeld(body, kit, left)
+  const leftHeld = useHeld(rig, kit, left)
 
   // The blob under their feet fades with them as they dissolve (scene/dissolve.ts).
   const presence = useCallback(() => arrival.fade.value, [arrival])
@@ -329,8 +336,8 @@ function Figure({ view, onGone, selected, following, banners, dark }: Adventurer
   useDeedEffect(root, view.phase === "working" ? view.look?.effect : undefined, presence)
   /** Where they stand in the cast's mixer schedule (far ones alternate frames, staggered by this). */
   const [index] = useState(() => seedOf(id) % 2)
-  /** Mixer time not yet stepped (off screen, or a skipped far frame): spent when next stepped. */
-  const lag = useRef(0)
+  /** A lit lantern in hand: its light follows the rig's real hand, so they stay a hero (crowd/lod.ts). */
+  const lantern = left === NIGHT_LANTERN || right === NIGHT_LANTERN
 
   useEffect(() => {
     const id = view.id
@@ -384,62 +391,18 @@ function Figure({ view, onGone, selected, following, banners, dark }: Adventurer
     // Off work (a plea, loot, a failure): the loop starts over, hands emptied, when they're back.
     if (work && !active && work.started) work.reset()
     const looping = active && work.started
-    const aim = looping ? work.aim : view.target
-    const tx = aim[0]
-    const tz = aim[1]
-    if (routed.current.x !== tx || routed.current.z !== tz) {
-      routed.current.x = tx
-      routed.current.z = tz
-      const from: Spot = [node.position.x, node.position.z]
-      // The loop's own walks are short and tested clear; going to a post takes the roads.
-      path.current = looping ? legOf(from, [tx, tz]) : route(from, [tx, tz])
-    }
-    let next = path.current[0]
-    while (
-      next &&
-      path.current.length > 1 &&
-      Math.hypot(next[0] - node.position.x, next[1] - node.position.z) < 0.3
-    ) {
-      path.current.shift()
-      next = path.current[0]
-    }
-    const [nx, nz] = next ?? [tx, tz]
-    const dx = nx - node.position.x
-    const dz = nz - node.position.z
-    const step = Math.hypot(dx, dz)
-    const remaining = step + pathLength(path.current)
-    const walking = !holding && remaining > 0.12
-    const carrying = looping && work.held !== null
+    const { walking, speed, remaining, carrying } = brain.walk(node, view, work, looping, holding, delta)
     const leaving = view.phase === "leaving"
-    let speed = 0
-    if (walking) {
-      speed = carrying ? CARRY_SPEED : Math.max(WALK_SPEED, remaining / (leaving ? LEAVE_WALK_S : MAX_WALK_S))
-      const move = Math.min(1, (speed * delta) / Math.max(step, 1e-6))
-      node.position.x += dx * move
-      node.position.z += dz * move
-      turn(node, Math.atan2(dx, dz), delta * 10)
-    } else if (holding) {
-      // Facing the guildmaster who summoned them.
-    } else if (looping) {
-      // Face the work, or the post's own way at the post; elsewhere, stay as they stand.
-      const face = work.faceAt
-      if (face) turn(node, Math.atan2(face[0] - node.position.x, face[1] - node.position.z), delta * 6)
-      else if (work.atPost) turn(node, view.target[2], delta * 5)
-    } else {
-      turn(node, view.target[2], delta * 5)
-    }
-    const distance = remaining
-    // In bed: up onto the mattress. The post is at floor level beside it, so lying down there
-    // put them on the floor under the bed (the user: "they sleep below the bed").
-    const inBed = view.seat === "bed" && !walking
-    node.position.y = MathUtils.damp(node.position.y, inBed ? BED_TOP : 0, 6, delta)
 
     // In and out by dissolving (scene/dissolve.ts), never by scale: a leaver fades over the last
     // steps down the avenue; a newcomer fades in as they set off (or as they are summoned).
-    const goal = leaving && distance < DISSOLVE_FROM ? 0 : 1
+    const goal = leaving && remaining < DISSOLVE_FROM ? 0 : 1
     const seconds = goal === 0 ? LEAVE_FADE_S : arrival.kind === "dais" ? SUMMON_FADE_S : ARRIVE_FADE_S
     const shown = arrival.fade.step(goal, delta, fadeSeconds(seconds))
     node.visible = shown > 0
+    // Hero or crowd (scene/crowd/lod.ts), before the dissolve: only a hero dissolves.
+    const drawn = body.current
+    if (drawn) cast(drawn, node, shown < 1, delta)
     dissolver.set(node, shown)
     // Dissolved away down the avenue: the stage may let a leaver it was keeping go (scene/exits.ts).
     if (leaving && !arrival.gone && arrival.fade.state === "gone") {
@@ -466,27 +429,39 @@ function Figure({ view, onGone, selected, following, banners, dark }: Adventurer
     hands.current?.show(looping ? work.held : null, active, clip)
     // Carrying takes both hands: the trade's own gear is put away meanwhile.
     if (rightHeld.current) rightHeld.current.visible = !carrying
-
-    play(clip)
+    if (!drawn) return
+    drawn.play(clip, castClock.now)
+    if (!drawn.hero) {
+      // In the crowd: the slot follows the root and holds what the (hidden) hands hold.
+      drawn.follow(node)
+      return
+    }
     // ---- Animate: every frame near, every other frame far, never off screen ----
-    lag.current = Math.min(lag.current + delta, 1)
     bounds.center.set(node.position.x, node.position.y + 1, node.position.z)
     const seen = sight.frustum.intersectsSphere(bounds)
-    const pace = mixerStep(
-      seen,
-      node.position.distanceToSquared(sight.camera),
-      sight.frame,
-      index,
-      store.selected === id,
-    )
-    if (pace === "skip") return
-    animator.current?.mixer.update(lag.current)
-    lag.current = 0
+    const pace = mixerStep(seen, node.position.distanceToSquared(sight.camera), sight.frame, index, selected)
+    if (!drawn.step(delta, pace)) return
     // Posed: what hangs level (a mug, a lantern, a bucket) is levelled for this frame's pose.
     keepUpright(rightHeld.current)
     keepUpright(leftHeld.current)
     hands.current?.settle()
   })
+
+  /**
+   * Hero or crowd this frame (scene/crowd/lod.ts), switching when no crossfade is under way — at
+   * once when it must be a hero to dissolve, or the crowd has gone.
+   */
+  function cast(drawn: Body, node: Object3D, dissolving: boolean, delta: number): void {
+    const now = castClock.now
+    const tall = sight.scale * FIGURE_HEIGHT
+    const distance = Math.hypot(node.position.x - sight.target.x, node.position.z - sight.target.z)
+    const pinned = !crowd || selected || dissolving || lantern
+    const hero = heroic(drawn.hero, pinned, distance, tall)
+    if (hero === drawn.hero) return
+    if (hero) {
+      if (dissolving || !crowd || drawn.settled(now)) drawn.toHero(now, delta)
+    } else if (crowd && drawn.settled(now)) drawn.toCrowd(crowd, model, view.color, node, delta)
+  }
 
   /** A beat of work (world/behaviours.ts): where it lands, for scene/life/WorkFx to draw. */
   function beat(work: Routine, node: Object3D): void {
@@ -505,27 +480,6 @@ function Figure({ view, onGone, selected, following, banners, dark }: Adventurer
     }
     // From where they stand: a chop knows which way to lean the tree.
     emitBeat(kind, at[0], BEAT_HEIGHT[kind], at[1], node.position.x, 0, node.position.z)
-  }
-
-  function play(name: string): void {
-    const actions = animator.current?.actions
-    const next = actions?.get(name) ?? actions?.get("Idle_A")
-    if (!next) return
-    // Already playing it — unless something stopped it (a suspended tree, a finished fade): then
-    // it must start again, or the rig falls back to its bind pose (KayKit's T-pose).
-    if (next === current.current && next.isRunning()) return
-    if (next === current.current) {
-      next.reset().setEffectiveWeight(1).play()
-      return
-    }
-    next.reset()
-    if (name === "Sit_Chair_Down" || name === "Lie_Down" || name === "Spawn_Ground") {
-      next.setLoop(LoopOnce, 1)
-      next.clampWhenFinished = true
-    }
-    next.fadeIn(FADE_S).play()
-    current.current?.fadeOut(FADE_S)
-    current.current = next
   }
 
   /** Resting and leaving adventurers keep a softer label so the busy ones stay readable. */
@@ -561,7 +515,7 @@ function Figure({ view, onGone, selected, following, banners, dark }: Adventurer
         document.body.style.cursor = ""
       }}
     >
-      <primitive object={body} />
+      <primitive object={rig} />
       {/* The ring is drawn with everyone's (scene/Rings.tsx); this invisible twin keeps it clickable. */}
       <mesh
         position-y={0.06}
@@ -600,51 +554,6 @@ function Figure({ view, onGone, selected, following, banners, dark }: Adventurer
 }
 
 /**
- * Which clip the moment calls for. Clip names are KayKit Rig_Medium (scripts/assets.ts CLIPS);
- * `work` is the routine when its loop is running.
- */
-function clipFor(view: AdventurerView, walking: boolean, speed: number, work: Routine | null): string {
-  const moving = work?.held ? CARRY_WALK : speed > RUN_ABOVE ? "Running_A" : "Walking_A"
-  if (walking) return moving
-  if (view.stung) return "Hit_A"
-  switch (view.phase) {
-    case "resting":
-      return view.seat === "floor" ? "Sit_Floor_Idle" : "Sit_Chair_Idle"
-    case "failed":
-      return (view.destination && DESTINATIONS[view.destination]?.clip) || "Lie_Idle"
-    case "waiting":
-      return "Waving"
-    case "loot":
-      return "Cheering"
-    case "leaving":
-      return "Waving"
-    case "idle":
-      return "Idle_A"
-    default:
-      break
-  }
-  // At work: the loop's step. Between two walks (a waypoint), keep walking rather than flicker.
-  if (work) return work.clip ?? moving
-  if (view.look) {
-    if (view.master && (view.tool === "task" || view.tool === "subagent")) return "Ranged_Magic_Summon"
-    switch (view.look.clip) {
-      case "Spellcasting":
-        return "Ranged_Magic_Spellcasting"
-      case "Use_Item":
-        if (view.station === "forge") return "Hammering"
-        if (view.station === "inspection-bench") return "Lockpicking"
-        if (view.station === "drafting-table" || view.station === "scroll-desk") return "Working_A"
-        return "Use_Item"
-      case "Interact":
-        return view.station === "library" || view.station === "map-table" ? "Working_B" : "Interact"
-      default:
-        return view.look.clip
-    }
-  }
-  return view.thinking ? "Idle_B" : "Idle_A"
-}
-
-/**
  * Keeps `piece` in the hand its grip names (scene/grips.ts), turned and placed to sit right there:
  * kit pieces are modelled for the floor, not the hand. Nothing when undefined.
  */
@@ -675,22 +584,6 @@ function useHeld(
 
 /** A figure's bounds for the frustum test (centre set per adventurer, per frame). */
 const bounds = new Sphere(new Vector3(), 1.6)
-
-/** Length of the rest of the walk, after the spot being walked to now. */
-function pathLength(path: Spot[]): number {
-  let total = 0
-  for (let i = 1; i < path.length; i++) {
-    const a = path[i - 1]
-    const b = path[i]
-    if (a && b) total += Math.hypot(b[0] - a[0], b[1] - a[1])
-  }
-  return total
-}
-
-function turn(node: Object3D, heading: number, rate: number): void {
-  const delta = Math.atan2(Math.sin(heading - node.rotation.y), Math.cos(heading - node.rotation.y))
-  node.rotation.y += delta * Math.min(1, rate)
-}
 
 /** The chip's party mark: a small swallowtail banner hanging from the plate's top-left corner. */
 function Pennant({ color }: { color: string }) {

@@ -65,9 +65,8 @@ function fogEveryRender(renderer: WebGPURenderer): void {
  * comes here: the sky dome (atmosphere/skyNodes.ts), rain and snow (weather/fallNodes.ts), the water
  * (nature/waterNodes.ts), the grass (nature/grassNodes.ts) and the sigils (scene/sigilNodes.ts); so
  * have the cast's onBeforeCompile patches (scene/castNodes.ts: dissolve, rings, blobs, deed motes).
- * Still GLSL: the event shows (events/: Dragon, Festival, Comet, Ghost ship, Rainbow). Their own
- * shaders come here and are not drawn; their patched standard materials draw unpatched (no flag
- * flutter, no festival reveal, no dragon wingbeat, no ghost-ship rim or fade), until they are ported.
+ * The event shows (Dragon, Festival, Comet, Ghost ship, Rainbow, Raid) have theirs too
+ * (scene/events/eventNodes.ts), so nothing the hall draws should reach this stand-in any more.
  */
 class GLSLStandIn extends MeshStandardNodeMaterial {
   override setup(builder: NodeBuilder): void {

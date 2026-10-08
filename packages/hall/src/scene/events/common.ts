@@ -11,6 +11,8 @@ import {
 } from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import type { EventKind } from "../../guild/events.ts"
+import { useNodeVariant } from "../Blobs.tsx"
+import { type Borrowed, type Layer, ownLayer, useOwned } from "../owned.ts"
 
 /**
  * What the world events' scene pieces share (scene/events/*.tsx): timings, easing, a one-draw-call
@@ -106,7 +108,11 @@ export function paletteOf(baked: Baked): Texture | null {
  * Flutter for flags and sails (attribute `aFlag`): a travelling wave across the cloth, stronger
  * further from the mast. Injected into a standard material; `uTime` drives it.
  */
-export function flutter(material: Material, uniforms: { uTime: { value: number } }, amount = 0.22): void {
+export function flutter<T extends Material>(
+  material: T,
+  uniforms: { uTime: { value: number } },
+  amount = 0.22,
+): T {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uniforms.uTime
     shader.vertexShader = shader.vertexShader
@@ -121,6 +127,36 @@ export function flutter(material: Material, uniforms: { uTime: { value: number }
       )
   }
   material.customProgramCacheKey = () => `flutter-${amount}`
+  return material
+}
+
+/** The shows' node materials (eventNodes.ts): what they draw with on WebGPU. */
+export type EventNodes = typeof import("./eventNodes.ts")
+let eventNodes: Promise<EventNodes> | null = null
+const loadEventNodes = (): Promise<EventNodes> => {
+  eventNodes ??= import("./eventNodes.ts")
+  return eventNodes
+}
+
+/**
+ * A show's meshes (scene/owned.ts `useOwnedMeshes`), built for the renderer drawing them: `build`
+ * gets false on WebGL (the GLSL) or the node materials on WebGPU, which runs neither the shows'
+ * ShaderMaterials nor their onBeforeCompile patches. Null until built (on WebGPU, while the node
+ * materials load); rebuilt when `deps` change.
+ */
+export function useShowMeshes<T extends Layer>(
+  build: (nodes: EventNodes | false) => T,
+  deps: readonly unknown[],
+  borrowed?: Borrowed,
+): T | null {
+  const nodes = useNodeVariant(loadEventNodes)
+  return (
+    useOwned(
+      () => (nodes === null ? null : ownLayer(() => build(nodes), borrowed)),
+      (owned) => owned?.free(),
+      [nodes, ...deps],
+    )?.layer ?? null
+  )
 }
 
 /** Night 0–1 from the sky (atmosphere/state.ts `sky.night`), read once when a show begins. */

@@ -4,8 +4,7 @@ import { DoubleSide, Mesh, NormalBlending, RingGeometry, ShaderMaterial, Vector3
 import { reducedMotion } from "../../guild/opening.ts"
 import { sky } from "../atmosphere/state.ts"
 import { FRAME } from "../frame.ts"
-import { useOwnedMeshes } from "../owned.ts"
-import { DURATION_S, envelope, NIGHT_AT, smooth } from "./common.ts"
+import { DURATION_S, type EventNodes, envelope, NIGHT_AT, smooth, useShowMeshes } from "./common.ts"
 import type { ShowProps } from "./EventsLayer.tsx"
 
 /**
@@ -13,7 +12,7 @@ import type { ShowProps } from "./EventsLayer.tsx"
  * mesh, one draw call; the bands, their soft edges, the feet dissolving into the haze and the
  * sweep that draws it in from one foot to the other all live in its fragment shader. Like a real
  * rainbow it always faces the viewer (the arc turns with the camera, about the island). At night
- * it is a moonbow: the same arc, pale and silver.
+ * it is a moonbow: the same arc, pale and silver. On WebGPU it is a node material (eventNodes.ts).
  */
 
 /** Where the arc stands: about the island's middle, pushed back from the viewer. */
@@ -33,7 +32,7 @@ export default function Rainbow({ show, events }: ShowProps) {
     uFade: { value: 0 },
     uNight: { value: night ? 1 : 0 },
   }).current
-  const built = useOwnedMeshes(() => ({ meshes: [arc(uniforms)] }), [])
+  const built = useShowMeshes((nodes) => ({ meshes: [arc(uniforms, nodes)] }), [])
 
   useFrame(({ camera }, delta) => {
     const mesh = built?.meshes[0]
@@ -59,9 +58,24 @@ export default function Rainbow({ show, events }: ShowProps) {
   return <primitive object={built.meshes[0] as Mesh} />
 }
 
-function arc(uniforms: { uReveal: { value: number }; uFade: { value: number }; uNight: { value: number } }) {
+/** A type, not an interface: ShaderMaterial takes it as its uniform map. */
+type Uniforms = {
+  uReveal: { value: number }
+  uFade: { value: number }
+  uNight: { value: number }
+}
+
+function arc(uniforms: Uniforms, nodes: EventNodes | false) {
   const geometry = new RingGeometry(RADIUS - WIDTH, RADIUS, 128, 1, 0, Math.PI)
-  const material = new ShaderMaterial({
+  const material = nodes ? nodes.rainbowNodeMaterial(uniforms, RADIUS, WIDTH) : arcMaterial(uniforms)
+  const mesh = new Mesh(geometry, material)
+  mesh.frustumCulled = false
+  mesh.renderOrder = -1
+  return mesh
+}
+
+function arcMaterial(uniforms: Uniforms): ShaderMaterial {
+  return new ShaderMaterial({
     uniforms,
     vertexShader: /* glsl */ `
       varying vec2 vLocal;
@@ -105,8 +119,4 @@ function arc(uniforms: { uReveal: { value: number }; uFade: { value: number }; u
     side: DoubleSide,
     blending: NormalBlending,
   })
-  const mesh = new Mesh(geometry, material)
-  mesh.frustumCulled = false
-  mesh.renderOrder = -1
-  return mesh
 }

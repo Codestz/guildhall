@@ -12,15 +12,15 @@ import {
 } from "three"
 import { sky } from "../atmosphere/state.ts"
 import { FRAME } from "../frame.ts"
-import { useOwnedMeshes } from "../owned.ts"
-import { DURATION_S, envelope, hash01, NIGHT_AT } from "./common.ts"
+import { DURATION_S, type EventNodes, envelope, hash01, NIGHT_AT, useShowMeshes } from "./common.ts"
 import type { ShowProps } from "./EventsLayer.tsx"
 
 /**
  * A milestone (the 100th deed, the 1000th line, guild/events.ts): by night a shower of shooting
  * stars streaks over the island; by day one great comet crosses the sky, its tail streaming
  * behind. One instanced mesh of camera-facing streaks, each placed, stretched and faded entirely
- * in the vertex shader from its launch time — the CPU only advances a clock.
+ * in the vertex shader from its launch time — the CPU only advances a clock. On WebGPU the streaks
+ * are node materials (eventNodes.ts).
  */
 
 /** Meteors at night (staggered); one comet by day. */
@@ -31,7 +31,10 @@ export default function Comet({ show, events }: ShowProps) {
   const finished = useRef(false)
   const night = useRef(sky.night > NIGHT_AT).current
   const uniforms = useRef({ uTime: { value: 0 }, uFade: { value: 0 } }).current
-  const built = useOwnedMeshes(() => ({ meshes: [night ? meteors(uniforms) : comet(uniforms)] }), [])
+  const built = useShowMeshes(
+    (nodes) => ({ meshes: [night ? meteors(uniforms, nodes) : comet(uniforms, nodes)] }),
+    [],
+  )
 
   useFrame((_, delta) => {
     if (!built) return
@@ -124,7 +127,7 @@ interface Streak {
 }
 
 /** Night: a shower, radiating from one point of the sky so it reads as one event, not noise. */
-function meteors(uniforms: Uniforms): InstancedMesh {
+function meteors(uniforms: Uniforms, nodes: EventNodes | false): InstancedMesh {
   const radiant = new Vector3(-120, 140, -160)
   const geometry = streaks(METEORS, (i, s) => {
     // Spread over the sky above the island, all falling away from the radiant.
@@ -139,7 +142,15 @@ function meteors(uniforms: Uniforms): InstancedMesh {
     s.size = 0.9 + hash01(i * 11) * 0.8
     s.tail = 14 + hash01(i * 13) * 12
   })
-  const material = new ShaderMaterial({
+  const material = nodes ? nodes.meteorNodeMaterial(uniforms) : meteorMaterial(uniforms)
+  const mesh = new InstancedMesh(geometry, material, METEORS)
+  mesh.frustumCulled = false
+  mesh.renderOrder = 20
+  return mesh
+}
+
+function meteorMaterial(uniforms: Uniforms): ShaderMaterial {
+  return new ShaderMaterial({
     uniforms: { ...uniforms },
     vertexShader: STREAK_VERTEX,
     fragmentShader: /* glsl */ `
@@ -161,14 +172,10 @@ function meteors(uniforms: Uniforms): InstancedMesh {
     side: DoubleSide,
     blending: AdditiveBlending,
   })
-  const mesh = new InstancedMesh(geometry, material, METEORS)
-  mesh.frustumCulled = false
-  mesh.renderOrder = 20
-  return mesh
 }
 
 /** Day: one great comet, slow and bright, a pale gold head and a long fading tail. */
-function comet(uniforms: Uniforms): InstancedMesh {
+function comet(uniforms: Uniforms, nodes: EventNodes | false): InstancedMesh {
   const geometry = streaks(2, (i, s) => {
     // The comet and, a little behind it, the fainter ion tail.
     s.from.set(-110, 78, -60)
@@ -178,7 +185,15 @@ function comet(uniforms: Uniforms): InstancedMesh {
     s.size = i === 0 ? 5.6 : 2.6
     s.tail = i === 0 ? 46 : 64
   })
-  const material = new ShaderMaterial({
+  const material = nodes ? nodes.cometNodeMaterial(uniforms) : cometMaterial(uniforms)
+  const mesh = new InstancedMesh(geometry, material, 2)
+  mesh.frustumCulled = false
+  mesh.renderOrder = 20
+  return mesh
+}
+
+function cometMaterial(uniforms: Uniforms): ShaderMaterial {
+  return new ShaderMaterial({
     uniforms: { ...uniforms },
     vertexShader: STREAK_VERTEX,
     fragmentShader: /* glsl */ `
@@ -202,8 +217,4 @@ function comet(uniforms: Uniforms): InstancedMesh {
     side: DoubleSide,
     blending: NormalBlending,
   })
-  const mesh = new InstancedMesh(geometry, material, 2)
-  mesh.frustumCulled = false
-  mesh.renderOrder = 20
-  return mesh
 }

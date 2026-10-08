@@ -1,12 +1,11 @@
 import { useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
 import { useRef } from "react"
-import { type Group, Mesh, MeshStandardMaterial, type Object3D } from "three"
+import { type Group, type Material, Mesh, MeshStandardMaterial, type Object3D } from "three"
 import { SHIPS_URL } from "../../world/cast.ts"
 import { HEX_SCALE } from "../../world/lands.ts"
 import { FRAME } from "../frame.ts"
-import { useOwnedMeshes } from "../owned.ts"
-import { bakeNode, clamp01, flutter, lerp, smooth } from "./common.ts"
+import { bakeNode, clamp01, type EventNodes, flutter, lerp, smooth, useShowMeshes } from "./common.ts"
 import type { ShowProps } from "./EventsLayer.tsx"
 
 /**
@@ -42,8 +41,8 @@ export default function Raid({ show, events }: ShowProps) {
   const left = useRef<{ at: number; x: number; z: number; heading: number } | null>(null)
   const finished = useRef(false)
   const uniforms = useRef({ uTime: { value: 0 } }).current
-  const built = useOwnedMeshes(
-    () => buildRaid(nodes["ship-pirate-medium"], nodes["boat-row-small"], uniforms),
+  const built = useShowMeshes(
+    (shaders) => buildRaid(nodes["ship-pirate-medium"], nodes["boat-row-small"], uniforms, shaders),
     [nodes],
     "textures",
   )
@@ -132,13 +131,19 @@ function buildRaid(
   shipNode: Object3D | undefined,
   boatNode: Object3D | undefined,
   uniforms: { uTime: { value: number } },
+  shaders: EventNodes | false,
 ) {
   const meshes: Mesh[] = []
   const make = (node: Object3D | undefined, flutters: boolean): Mesh | null => {
     const baked = node ? bakeNode(node) : null
     if (!baked) return null
-    const material = new MeshStandardMaterial({ map: baked.material.map, roughness: 0.85 })
-    if (flutters) flutter(material, uniforms, 0.18)
+    const base = new MeshStandardMaterial({ map: baked.material.map, roughness: 0.85 })
+    // The flags snap and the sails fill (on WebGPU, eventNodes.ts's node copy).
+    const material: Material = !flutters
+      ? base
+      : shaders
+        ? shaders.flutterNodeMaterial(base, uniforms, 0.18)
+        : flutter(base, uniforms, 0.18)
     const mesh = new Mesh(baked.geometry, material)
     // It moves: never in the static shadow map (atmosphere/shadows.ts).
     mesh.castShadow = false

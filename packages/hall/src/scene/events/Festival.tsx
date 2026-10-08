@@ -26,8 +26,16 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { reducedMotion } from "../../guild/opening.ts"
 import { sky } from "../atmosphere/state.ts"
 import { FRAME } from "../frame.ts"
-import { useOwnedMeshes } from "../owned.ts"
-import { clamp01, DURATION_S, envelope, hash01, NIGHT_AT, smooth } from "./common.ts"
+import {
+  clamp01,
+  DURATION_S,
+  type EventNodes,
+  envelope,
+  hash01,
+  NIGHT_AT,
+  smooth,
+  useShowMeshes,
+} from "./common.ts"
 import type { ShowProps } from "./EventsLayer.tsx"
 
 /**
@@ -35,7 +43,8 @@ import type { ShowProps } from "./EventsLayer.tsx"
  * village square and down the avenue, pennant by pennant; by night fireworks burst over the keep,
  * by day confetti volleys over the square. Three draw calls: the poles, cords and pennants (one
  * merged mesh), the lanterns (one merged mesh, glowing at night), and every spark or scrap of
- * confetti (one instanced mesh whose motion lives entirely in its vertex shader).
+ * confetti (one instanced mesh whose motion lives entirely in its vertex shader). On WebGPU all
+ * three are node materials (eventNodes.ts).
  */
 export default function Festival({ show, events }: ShowProps) {
   const night = useRef(sky.night > NIGHT_AT).current
@@ -43,7 +52,7 @@ export default function Festival({ show, events }: ShowProps) {
   const finished = useRef(false)
   const uniforms = useRef({ uTime: { value: 0 }, uReveal: { value: 0 }, uFade: { value: 0 } }).current
 
-  const built = useOwnedMeshes(() => buildFestival(uniforms, night), [])
+  const built = useShowMeshes((nodes) => buildFestival(uniforms, night, nodes), [])
 
   useFrame((_, delta) => {
     if (!built) return
@@ -209,7 +218,7 @@ function pennant(left: Vector3, right: Vector3, drop: number): BufferGeometry {
 // ─────────────────────────────── the reveal, on the GPU ───────────────────────────────
 
 /** Each vertex grows out of its anchor once `uReveal` passes its order; cloth sways with `aSway`. */
-function reveal(material: MeshStandardMaterial | MeshBasicMaterial, uniforms: Uniforms): void {
+function reveal<T extends MeshStandardMaterial | MeshBasicMaterial>(material: T, uniforms: Uniforms): T {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uReveal = uniforms.uReveal
     shader.uniforms.uTime = uniforms.uTime
@@ -229,6 +238,7 @@ function reveal(material: MeshStandardMaterial | MeshBasicMaterial, uniforms: Un
       )
   }
   material.customProgramCacheKey = () => "festival-reveal"
+  return material
 }
 
 interface Uniforms {
@@ -239,7 +249,7 @@ interface Uniforms {
 
 // ─────────────────────────────── build ───────────────────────────────
 
-function buildFestival(uniforms: Uniforms, night: boolean) {
+function buildFestival(uniforms: Uniforms, night: boolean, nodes: EventNodes | false) {
   const bunting: BufferGeometry[] = []
   const lanterns: BufferGeometry[] = []
   const p = new Vector3()
@@ -355,12 +365,16 @@ function buildFestival(uniforms: Uniforms, night: boolean) {
     flatShading: true,
     side: DoubleSide,
   })
-  reveal(clothMaterial, uniforms)
-  const cloth = new Mesh(mergeGeometries(bunting) ?? new BoxGeometry(), clothMaterial)
+  const cloth = new Mesh(
+    mergeGeometries(bunting) ?? new BoxGeometry(),
+    nodes ? nodes.revealNodeMaterial(clothMaterial, uniforms) : reveal(clothMaterial, uniforms),
+  )
   for (const g of bunting) g.dispose()
   const paperMaterial = new MeshBasicMaterial({ vertexColors: true, toneMapped: true })
-  reveal(paperMaterial, uniforms)
-  const lit = new Mesh(mergeGeometries(lanterns) ?? new BoxGeometry(), paperMaterial)
+  const lit = new Mesh(
+    mergeGeometries(lanterns) ?? new BoxGeometry(),
+    nodes ? nodes.revealNodeMaterial(paperMaterial, uniforms) : reveal(paperMaterial, uniforms),
+  )
   for (const g of lanterns) g.dispose()
   for (const mesh of [cloth, lit]) {
     // The festival comes and goes: never in the static shadow map.
@@ -369,7 +383,7 @@ function buildFestival(uniforms: Uniforms, night: boolean) {
     mesh.frustumCulled = false
   }
 
-  const sparks = night ? fireworks(uniforms) : confetti(uniforms)
+  const sparks = night ? fireworks(uniforms, nodes) : confetti(uniforms, nodes)
   return { meshes: [cloth, lit, sparks] as Mesh[], lanterns: lit as Mesh & { material: MeshBasicMaterial } }
 }
 
@@ -380,7 +394,7 @@ const SPARK_COLORS = ["#ff5a4a", "#ffd25a", "#5ad0ff", "#9cff6a", "#ff7ad9", "#f
 )
 
 /** Bursts over the keep: a rocket climbs, bursts into a sphere of sparks that droop and twinkle out. */
-function fireworks(uniforms: Uniforms): InstancedMesh {
+function fireworks(uniforms: Uniforms, nodes: EventNodes | false): InstancedMesh {
   const BURSTS = 13
   const PER = 52
   const count = BURSTS * PER
@@ -419,8 +433,18 @@ function fireworks(uniforms: Uniforms): InstancedMesh {
   geometry.setAttribute("aDir", new InstancedBufferAttribute(dir, 3))
   geometry.setAttribute("aColor", new InstancedBufferAttribute(color, 3))
   geometry.setAttribute("aLead", new InstancedBufferAttribute(lead, 1))
-  const material = new ShaderMaterial({
-    uniforms: { uTime: uniforms.uTime, uFade: uniforms.uFade, uStill: { value: reducedMotion() ? 1 : 0 } },
+  const material = nodes
+    ? nodes.fireworkNodeMaterial(uniforms, reducedMotion())
+    : fireworkMaterial(uniforms, reducedMotion())
+  const mesh = new InstancedMesh(geometry, material, count)
+  mesh.frustumCulled = false
+  mesh.renderOrder = 20
+  return mesh
+}
+
+function fireworkMaterial(uniforms: Uniforms, still: boolean): ShaderMaterial {
+  return new ShaderMaterial({
+    uniforms: { uTime: uniforms.uTime, uFade: uniforms.uFade, uStill: { value: still ? 1 : 0 } },
     vertexShader: /* glsl */ `
       attribute float aBirth; attribute vec3 aOrigin; attribute vec3 aDir; attribute vec3 aColor; attribute float aLead;
       uniform float uTime; uniform float uStill;
@@ -479,14 +503,10 @@ function fireworks(uniforms: Uniforms): InstancedMesh {
     depthWrite: false,
     blending: AdditiveBlending,
   })
-  const mesh = new InstancedMesh(geometry, material, count)
-  mesh.frustumCulled = false
-  mesh.renderOrder = 20
-  return mesh
 }
 
 /** Volleys of paper confetti over the square, tumbling down on the breeze. */
-function confetti(uniforms: Uniforms): InstancedMesh {
+function confetti(uniforms: Uniforms, nodes: EventNodes | false): InstancedMesh {
   const VOLLEYS = 9
   const PER = 60
   const count = VOLLEYS * PER
@@ -522,7 +542,14 @@ function confetti(uniforms: Uniforms): InstancedMesh {
   geometry.setAttribute("aDir", new InstancedBufferAttribute(dir, 3))
   geometry.setAttribute("aColor", new InstancedBufferAttribute(color, 3))
   geometry.setAttribute("aLead", new InstancedBufferAttribute(lead, 1))
-  const material = new ShaderMaterial({
+  const material = nodes ? nodes.confettiNodeMaterial(uniforms) : confettiMaterial(uniforms)
+  const mesh = new InstancedMesh(geometry, material, count)
+  mesh.frustumCulled = false
+  return mesh
+}
+
+function confettiMaterial(uniforms: Uniforms): ShaderMaterial {
+  return new ShaderMaterial({
     uniforms: { uTime: uniforms.uTime, uFade: uniforms.uFade },
     vertexShader: /* glsl */ `
       attribute float aBirth; attribute vec3 aOrigin; attribute vec3 aDir; attribute vec3 aColor; attribute float aLead;
@@ -564,7 +591,4 @@ function confetti(uniforms: Uniforms): InstancedMesh {
     side: DoubleSide,
     blending: NormalBlending,
   })
-  const mesh = new InstancedMesh(geometry, material, count)
-  mesh.frustumCulled = false
-  return mesh
 }

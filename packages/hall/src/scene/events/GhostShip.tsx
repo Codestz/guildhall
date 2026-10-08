@@ -17,8 +17,16 @@ import { SHIPS_URL } from "../../world/cast.ts"
 import { HEX_SCALE } from "../../world/lands.ts"
 import { sky } from "../atmosphere/state.ts"
 import { FRAME } from "../frame.ts"
-import { useOwnedMeshes } from "../owned.ts"
-import { bakeNode, DURATION_S, envelope, flutter, hash01, lerp } from "./common.ts"
+import {
+  bakeNode,
+  DURATION_S,
+  type EventNodes,
+  envelope,
+  flutter,
+  hash01,
+  lerp,
+  useShowMeshes,
+} from "./common.ts"
 import type { ShowProps } from "./EventsLayer.tsx"
 
 /**
@@ -26,7 +34,8 @@ import type { ShowProps } from "./EventsLayer.tsx"
  * ghost ship glides silently past the graveyard's coast through a rising sea mist, its tattered
  * sails stirring, will-o'-the-wisps drifting round it, and fades as it came. Two draw calls (the
  * ship baked into one mesh, the wisps one instanced mesh); the mist is the grade pass's own ground
- * mist (atmosphere/GradeEffect.ts), thickened while it passes, so it costs nothing extra.
+ * mist (atmosphere/GradeEffect.ts), thickened while it passes, so it costs nothing extra. On WebGPU
+ * both are node materials (eventNodes.ts).
  */
 
 const SEA_Y = -0.2 * HEX_SCALE + 0.05
@@ -46,7 +55,11 @@ export default function GhostShip({ show, events }: ShowProps) {
   const age = useRef(0)
   const finished = useRef(false)
   const uniforms = useRef({ uTime: { value: 0 }, uFade: { value: 0 } }).current
-  const built = useOwnedMeshes(() => buildGhost(nodes["ship-ghost"], uniforms), [nodes], "textures")
+  const built = useShowMeshes(
+    (shaders) => buildGhost(nodes["ship-ghost"], uniforms, shaders),
+    [nodes],
+    "textures",
+  )
 
   useFrame((_, delta) => {
     const g = group.current
@@ -101,11 +114,11 @@ interface Uniforms {
   uFade: { value: number }
 }
 
-function buildGhost(node: Object3D | undefined, uniforms: Uniforms) {
+function buildGhost(node: Object3D | undefined, uniforms: Uniforms, nodes: EventNodes | false) {
   const baked = node ? bakeNode(node) : null
   const meshes: Mesh[] = []
   if (baked) {
-    const material = new MeshStandardMaterial({
+    const hull = new MeshStandardMaterial({
       map: baked.material.map,
       color: new Color(0.3, 0.46, 0.42),
       emissive: new Color(0.03, 0.16, 0.11),
@@ -114,44 +127,55 @@ function buildGhost(node: Object3D | undefined, uniforms: Uniforms) {
       depthWrite: true,
     })
     // Not swallowed by the storm's fog: a ghost carries its own light through the weather.
-    material.fog = false
-    flutter(material, uniforms, 0.32)
-    const base = material.onBeforeCompile
-    material.onBeforeCompile = (shader, renderer) => {
-      base(shader, renderer)
-      shader.uniforms.uFade = uniforms.uFade
-      shader.vertexShader = shader.vertexShader
-        .replace("#include <common>", "#include <common>\nvarying float vHullY;")
-        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvHullY = position.y;")
-      shader.fragmentShader = shader.fragmentShader
-        .replace(
-          "#include <common>",
-          "#include <common>\nuniform float uFade;\nuniform float uTime;\nvarying float vHullY;",
-        )
-        .replace(
-          "#include <emissivemap_fragment>",
-          `#include <emissivemap_fragment>
-          // A spectral rim: brightest where the hull turns away from the eye.
-          float rim = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition))), 2.0);
-          float pulse = 0.85 + 0.25 * sin(uTime * 1.7);
-          totalEmissiveRadiance += vec3(0.32, 1.0, 0.7) * (rim * 2.1 + 0.26) * pulse;`,
-        )
-        .replace(
-          "#include <opaque_fragment>",
-          // Half there, and the hull dissolves into the sea below the waterline's mist.
-          `diffuseColor.a *= uFade * 0.8 * smoothstep(0.2, 2.4, vHullY);
-          #include <opaque_fragment>`,
-        )
-    }
-    material.customProgramCacheKey = () => "ghost-ship"
+    hull.fog = false
+    const material = nodes
+      ? nodes.ghostHullNodeMaterial(hull, uniforms, SAIL_FLUTTER)
+      : spectral(hull, uniforms)
     const ship = new Mesh(baked.geometry, material)
     ship.castShadow = false
     ship.receiveShadow = false
     ship.renderOrder = 5
     meshes.push(ship)
   }
-  meshes.push(wisps(uniforms))
+  meshes.push(wisps(uniforms, nodes))
   return { meshes }
+}
+
+/** How far the tattered sails stir (common.ts `flutter`). */
+const SAIL_FLUTTER = 0.32
+
+/** The sails' flutter, the spectral rim and the fade, patched into the hull's standard material (WebGL). */
+function spectral(material: MeshStandardMaterial, uniforms: Uniforms): MeshStandardMaterial {
+  flutter(material, uniforms, SAIL_FLUTTER)
+  const base = material.onBeforeCompile
+  material.onBeforeCompile = (shader, renderer) => {
+    base(shader, renderer)
+    shader.uniforms.uFade = uniforms.uFade
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying float vHullY;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvHullY = position.y;")
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nuniform float uFade;\nuniform float uTime;\nvarying float vHullY;",
+      )
+      .replace(
+        "#include <emissivemap_fragment>",
+        `#include <emissivemap_fragment>
+          // A spectral rim: brightest where the hull turns away from the eye.
+          float rim = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition))), 2.0);
+          float pulse = 0.85 + 0.25 * sin(uTime * 1.7);
+          totalEmissiveRadiance += vec3(0.32, 1.0, 0.7) * (rim * 2.1 + 0.26) * pulse;`,
+      )
+      .replace(
+        "#include <opaque_fragment>",
+        // Half there, and the hull dissolves into the sea below the waterline's mist.
+        `diffuseColor.a *= uFade * 0.8 * smoothstep(0.2, 2.4, vHullY);
+          #include <opaque_fragment>`,
+      )
+  }
+  material.customProgramCacheKey = () => "ghost-ship"
+  return material
 }
 
 /**
@@ -159,7 +183,7 @@ function buildGhost(node: Object3D | undefined, uniforms: Uniforms) {
  * hull, and one wide halo behind it all (the ship's glow, so its shape reads from the overview and
  * through storm rain) in ship space: one instanced mesh, every motion in its vertex shader.
  */
-function wisps(uniforms: Uniforms): InstancedMesh {
+function wisps(uniforms: Uniforms, nodes: EventNodes | false): InstancedMesh {
   const WISPS = 14
   const BANKS = 12
   const COUNT = WISPS + BANKS + 1
@@ -184,7 +208,15 @@ function wisps(uniforms: Uniforms): InstancedMesh {
   geometry.setAttribute("aSeat", new InstancedBufferAttribute(seat, 3))
   geometry.setAttribute("aSeed", new InstancedBufferAttribute(seed, 1))
   geometry.setAttribute("aBank", new InstancedBufferAttribute(bank, 1))
-  const material = new ShaderMaterial({
+  const material = nodes ? nodes.wispNodeMaterial(uniforms) : wispMaterial(uniforms)
+  const mesh = new InstancedMesh(geometry, material, COUNT)
+  mesh.frustumCulled = false
+  mesh.renderOrder = 6
+  return mesh
+}
+
+function wispMaterial(uniforms: Uniforms): ShaderMaterial {
+  return new ShaderMaterial({
     uniforms: { uTime: uniforms.uTime, uFade: uniforms.uFade },
     vertexShader: /* glsl */ `
       attribute vec3 aSeat; attribute float aSeed; attribute float aBank;
@@ -245,8 +277,4 @@ function wisps(uniforms: Uniforms): InstancedMesh {
     depthWrite: false,
     blending: AdditiveBlending,
   })
-  const mesh = new InstancedMesh(geometry, material, COUNT)
-  mesh.frustumCulled = false
-  mesh.renderOrder = 6
-  return mesh
 }

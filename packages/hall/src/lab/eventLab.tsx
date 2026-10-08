@@ -4,6 +4,8 @@ import { type ComponentType, lazy, Suspense, useEffect, useSyncExternalStore } f
 import { createRoot } from "react-dom/client"
 import { EVENT_KINDS, type EventKind, worldEventsOf } from "../guild/events.ts"
 import { GuildStore } from "../guild/store.ts"
+import { requestedBackend } from "../render/backend.ts"
+import { glFor } from "../render/renderer.ts"
 import { sky } from "../scene/atmosphere/state.ts"
 import type { ShowProps } from "../scene/events/EventsLayer.tsx"
 
@@ -79,6 +81,7 @@ export function start(root: HTMLElement, params: URLSearchParams): void {
     return (
       <Canvas
         key={kind}
+        gl={glFor(requestedBackend(location.search))}
         camera={{
           position: [
             aim.at[0] + aim.distance * 0.6,

@@ -27,8 +27,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { reducedMotion } from "../../guild/opening.ts"
 import { sky } from "../atmosphere/state.ts"
 import { FRAME } from "../frame.ts"
-import { useOwnedMeshes } from "../owned.ts"
-import { clamp01, hash01, lerp, smooth } from "./common.ts"
+import { clamp01, type EventNodes, hash01, lerp, smooth, useShowMeshes } from "./common.ts"
 import type { ShowProps } from "./EventsLayer.tsx"
 
 /**
@@ -40,6 +39,7 @@ import type { ShowProps } from "./EventsLayer.tsx"
  * in the packs' manner: chunky, flat-shaded, a few flat colours. Two draw calls: the dragon (one
  * merged mesh; the wing beat and the tail's sway are in its vertex shader, bent about the
  * shoulders and the tail root), and its fire (one instanced mesh, every flame in the shader).
+ * On WebGPU both are node materials (eventNodes.ts).
  */
 
 /** The orbit round the peaks (world/lands.ts: the high mountains sit about (0, -62)). */
@@ -72,7 +72,7 @@ export default function Dragon({ show, events }: ShowProps) {
     uBreath: { value: 0 },
     uEmber: { value: 0 },
   }).current
-  const built = useOwnedMeshes(() => buildDragon(uniforms), [])
+  const built = useShowMeshes((nodes) => buildDragon(uniforms, nodes), [])
 
   useFrame((_, delta) => {
     const g = group.current
@@ -233,12 +233,14 @@ function panel(points: readonly Vector3[]): BufferGeometry {
 const SHOULDER_X = 0.7
 const SHOULDER_Y = 0.75
 
-function buildDragon(uniforms: {
+interface Uniforms {
   uTime: { value: number }
   uFlap: { value: number }
   uBreath: { value: number }
   uEmber: { value: number }
-}) {
+}
+
+function buildDragon(uniforms: Uniforms, nodes: EventNodes | false) {
   const parts: BufferGeometry[] = []
   const I = new Matrix4()
   // Body: chest and haunches, faceted; belly plates underneath.
@@ -339,12 +341,25 @@ function buildDragon(uniforms: {
 
   const geometry = mergeGeometries(parts) ?? new IcosahedronGeometry(1, 0)
   for (const g of parts) g.dispose()
-  const material = new MeshStandardMaterial({
+  const skin = new MeshStandardMaterial({
     vertexColors: true,
     flatShading: true,
     roughness: 0.75,
     side: DoubleSide,
   })
+  const material = nodes
+    ? nodes.dragonNodeMaterial(skin, uniforms, { x: SHOULDER_X, y: SHOULDER_Y })
+    : wingbeat(skin, uniforms)
+  const dragon = new Mesh(geometry, material)
+  // It flies: never in the static shadow map.
+  dragon.castShadow = false
+  dragon.receiveShadow = false
+  dragon.frustumCulled = false
+  return { meshes: [dragon, fire(uniforms, nodes)] }
+}
+
+/** The wing beat, the tail's sway and the glow, patched into the hide's standard material (WebGL). */
+function wingbeat(material: MeshStandardMaterial, uniforms: Uniforms): MeshStandardMaterial {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uniforms.uTime
     shader.uniforms.uFlap = uniforms.uFlap
@@ -391,18 +406,13 @@ function buildDragon(uniforms: {
       )
   }
   material.customProgramCacheKey = () => "dragon"
-  const dragon = new Mesh(geometry, material)
-  // It flies: never in the static shadow map.
-  dragon.castShadow = false
-  dragon.receiveShadow = false
-  dragon.frustumCulled = false
-  return { meshes: [dragon, fire(uniforms)] }
+  return material
 }
 
 // ─────────────────────────────── fire ───────────────────────────────
 
 /** Flames from the jaws, in model space: a cone of puffs, each looping while the breath lasts. */
-function fire(uniforms: { uTime: { value: number }; uBreath: { value: number } }): InstancedMesh {
+function fire(uniforms: Uniforms, nodes: EventNodes | false): InstancedMesh {
   const COUNT = 46
   const seed = new Float32Array(COUNT)
   const spread = new Float32Array(COUNT * 2)
@@ -413,7 +423,15 @@ function fire(uniforms: { uTime: { value: number }; uBreath: { value: number } }
   const geometry = new PlaneGeometry(1, 1)
   geometry.setAttribute("aSeed", new InstancedBufferAttribute(seed, 1))
   geometry.setAttribute("aSpread", new InstancedBufferAttribute(spread, 2))
-  const material = new ShaderMaterial({
+  const material = nodes ? nodes.dragonFireNodeMaterial(uniforms) : fireMaterial(uniforms)
+  const mesh = new InstancedMesh(geometry, material, COUNT)
+  mesh.frustumCulled = false
+  mesh.renderOrder = 7
+  return mesh
+}
+
+function fireMaterial(uniforms: Uniforms): ShaderMaterial {
+  return new ShaderMaterial({
     uniforms: { uTime: uniforms.uTime, uBreath: uniforms.uBreath },
     vertexShader: /* glsl */ `
       attribute float aSeed; attribute vec2 aSpread;
@@ -447,8 +465,4 @@ function fire(uniforms: { uTime: { value: number }; uBreath: { value: number } }
     depthWrite: false,
     blending: NormalBlending,
   })
-  const mesh = new InstancedMesh(geometry, material, COUNT)
-  mesh.frustumCulled = false
-  mesh.renderOrder = 7
-  return mesh
 }

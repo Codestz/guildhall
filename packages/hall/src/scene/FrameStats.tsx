@@ -2,6 +2,8 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect } from "react"
 import { TIERS } from "../guild/quality.ts"
 import { frameStats } from "../guild/stats.ts"
+import { active, frameCounts } from "../render/backend.ts"
+import { syncShadows } from "../render/shims.ts"
 import { FRAME } from "./frame.ts"
 import { useTier } from "./Quality.tsx"
 
@@ -28,17 +30,21 @@ export function FrameStats() {
     // composer (FRAME.RENDER) draws the frame; without it, this is the one place that does.
     if (!post) {
       gl.info.reset()
+      // WebGPU: the on-demand shadow cache's request, handed to the lights (render/shims.ts).
+      if (active.backend === "webgpu") syncShadows(gl, scene)
       gl.render(scene, camera)
     }
     const info = gl.info
     const ms = delta * 1000
     frameStats.ms = frameStats.ms === 0 ? ms : frameStats.ms * 0.92 + ms * 0.08
     frameStats.fps = frameStats.ms > 0 ? 1000 / frameStats.ms : 0
-    frameStats.calls = info.render.calls
-    frameStats.triangles = info.render.triangles
+    // The two renderers name this frame's counts differently (render/backend.ts).
+    const counts = frameCounts(info, active.backend)
+    frameStats.calls = counts.calls
+    frameStats.triangles = counts.triangles
     frameStats.geometries = info.memory.geometries
     frameStats.textures = info.memory.textures
-    frameStats.programs = info.programs?.length ?? 0
+    frameStats.programs = counts.programs
     info.reset()
   }, FRAME.STATS)
 

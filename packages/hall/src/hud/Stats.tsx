@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react"
 import { quality, TIERS } from "../guild/quality.ts"
 import { BUDGET, frameStats } from "../guild/stats.ts"
 import type { GuildStore } from "../guild/store.ts"
+import { active, BACKEND_NAME } from "../render/backend.ts"
 import { Panel } from "./parts.tsx"
 
 /** "Stats for nerds": what each frame costs, against the budget in docs/perf-budget.md. */
@@ -38,13 +39,14 @@ export function Stats({ store, open, onToggle }: { store: GuildStore; open: bool
     { label: "Shaders", value: s.programs.toLocaleString() },
     { label: "Adventurers", value: store.views.length.toLocaleString() },
     { label: "Quality", value: TIERS[tier].name, budget: quality.auto ? "auto" : "pinned" },
+    { label: "Renderer", value: BACKEND_NAME[active.backend] },
   ]
   return (
     <Panel
       label="Stats for nerds"
       meta={
         <span className="mono">
-          {Math.round(s.fps)} fps · {s.calls} calls
+          {Math.round(s.fps)} fps · {s.calls} calls · {BACKEND_NAME[active.backend]}
         </span>
       }
       open={open}

@@ -9,12 +9,13 @@ import {
   Vignette,
 } from "@react-three/postprocessing"
 import { type BloomEffect, EdgeDetectionMode, ToneMappingMode, type VignetteEffect } from "postprocessing"
-import { useEffect, useMemo, useRef } from "react"
+import { lazy, Suspense, useEffect, useMemo, useRef } from "react"
 import type { Fog } from "three"
 import { PROBE } from "../../guild/mode.ts"
 import { reducedMotion } from "../../guild/opening.ts"
 import { TIERS } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
+import { isWebGPU } from "../../render/backend.ts"
 import { FRAME } from "../frame.ts"
 import { useTier } from "../Quality.tsx"
 import { GradeEffect } from "./GradeEffect.ts"
@@ -41,6 +42,19 @@ const BLOOM_INPUT = 0.5
  * it re-renders the scene (+50–80 draw calls) and halved Medium's frame rate even at half size.
  */
 export function Post() {
+  const gl = useThree((state) => state.gl)
+  if (!isWebGPU(gl)) return <PostGL />
+  return (
+    <Suspense fallback={null}>
+      <PostGPU />
+    </Suspense>
+  )
+}
+
+/** The `?renderer=webgpu` post chain (TSL, no pmndrs): loaded only on that path, with three's WebGPU build. */
+const PostGPU = lazy(() => import("./PostGPU.tsx").then((module) => ({ default: module.PostGPU })))
+
+function PostGL() {
   const level = TIERS[useTier()]
   const looks = useLooks()
   const store = useGuildStore()

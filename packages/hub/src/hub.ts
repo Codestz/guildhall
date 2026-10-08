@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto"
-import { readdirSync, readFileSync, statSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { appendFile, mkdir } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { type GuildEvent, WIRE_VERSION } from "@guildhall/core"
 import type { Server, ServerWebSocket } from "bun"
+import { list, loadHistory, PRUNE_EVERY_MS, pruneChronicles } from "./chronicles.ts"
 import { type Dispatch, HERALD_HEADER, HUB_PORT, type HubMessage } from "./protocol.ts"
 import { serveStatic } from "./static.ts"
 import { MAX_CHANGES, MAX_RAW, MAX_RAW_TOTAL, validChange, validGuild } from "./validate.ts"
@@ -15,7 +16,8 @@ import { MAX_CHANGES, MAX_RAW, MAX_RAW_TOTAL, validChange, validGuild } from "./
  * It numbers events per guild, keeps recent events in memory so a hall that connects late still
  * sees everything, and writes every event to a chronicle (and the raw host events to a raw log)
  * under GUILDHALL_HOME. On start it reads back the last day's chronicles, so a hub restart doesn't
- * blank the halls. Bound to 127.0.0.1 only.
+ * blank the halls. Old chronicles are pruned on start and as the hub runs (see chronicles.ts), and a
+ * hall's hello carries the recent guilds only (HELLO_GUILDS, HELLO_EVENTS). Bound to 127.0.0.1 only.
  */
 
 export interface HubOptions {
@@ -33,12 +35,19 @@ export interface HubOptions {
    * the hub serves only its API and the hall runs from its own dev server.
    */
   hall?: string
+  /** How often retention is applied again while the hub runs (PRUNE_EVERY_MS); it also is on start. */
+  pruneEvery?: number
 }
 
 /** Largest herald POST. A batch is capped at MAX_CHANGES changes, each capped by the validator. */
 const MAX_BODY = 16 * 1024 * 1024
-/** Chronicles older than this aren't read back on start: those sessions are long over. */
-const HISTORY_MS = 24 * 60 * 60 * 1000
+/**
+ * What a hall gets in its hello: the events of the HELLO_GUILDS guilds most recently active (by their
+ * last event), newest events first up to HELLO_EVENTS in all. Each guild keeps at most `keep` events
+ * in memory already; this bounds how many guilds' worth one connection is sent.
+ */
+export const HELLO_GUILDS = 8
+export const HELLO_EVENTS = 50_000
 
 /**
  * Which hub this is: a hash of the hub's own source files. A herald computes it from the same files
@@ -69,6 +78,10 @@ export interface Health {
   wire: number
   guilds: string[]
   halls: number
+  /** Chronicle writes that failed since start (the events were still numbered and sent). */
+  writeFailures: number
+  /** The last failed chronicle write, if any. */
+  lastWriteError?: { at: string; guild: string; error: string }
 }
 
 export function startHub(options: HubOptions = {}): Server<unknown> {
@@ -79,19 +92,15 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
   const started = new Date().toISOString()
   const build = hubBuild()
   const boot = started.replace(/[:.]/g, "-")
-  const events = loadHistory(join(home, "chronicles"), keep)
+  const pruneEvery = options.pruneEvery ?? PRUNE_EVERY_MS
+  const chronicles = join(home, "chronicles")
+  pruneChronicles(chronicles)
+  let pruned = Date.now()
+  const events = loadHistory(chronicles, keep)
   const halls = new Set<ServerWebSocket<unknown>>()
-  /** Per guild, the dispatch being recorded: the next waits for it, so seq and broadcasts agree. */
-  const queues = new Map<string, Promise<unknown>>()
-
-  function inOrder<T>(guild: string, work: () => Promise<T>): Promise<T> {
-    const run = (queues.get(guild) ?? Promise.resolve()).then(work)
-    queues.set(
-      guild,
-      run.catch(() => {}),
-    )
-    return run
-  }
+  const inOrder = serially()
+  let writeFailures = 0
+  let lastWriteError: Health["lastWriteError"]
 
   /** Numbers the changes, sends them to the halls, then writes them down. Run in order per guild. */
   async function record(guild: string, dispatch: Dispatch): Promise<GuildEvent[]> {
@@ -117,7 +126,15 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
       }
     } catch (error) {
       // The events are numbered and sent already: failing the POST would have the herald resend them.
+      // /health says so instead.
+      writeFailures++
+      lastWriteError = { at: new Date().toISOString(), guild, error: String(error) }
       console.warn(`hub: could not write ${guild}'s chronicle: ${String(error)}`)
+    }
+    // Retention again, at most every `pruneEvery`: chronicles only grow when they are written to.
+    if (Date.now() - pruned >= pruneEvery) {
+      pruned = Date.now()
+      pruneChronicles(chronicles)
     }
     return out
   }
@@ -153,6 +170,8 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
           wire: WIRE_VERSION,
           guilds: [...events.keys()],
           halls: halls.size,
+          writeFailures,
+          ...(lastWriteError ? { lastWriteError } : {}),
         } satisfies Health)
       if (url.pathname === "/events" && request.method === "POST") {
         if (request.headers.get(HERALD_HEADER) !== "1") return new Response("forbidden", { status: 403 })
@@ -194,8 +213,10 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
     websocket: {
       open(hall) {
         halls.add(hall)
-        const all = [...events.values()].flat()
-        hall.send(JSON.stringify({ type: "hello", version: WIRE_VERSION, events: all } satisfies HubMessage))
+        const recent = helloEvents(events)
+        hall.send(
+          JSON.stringify({ type: "hello", version: WIRE_VERSION, events: recent } satisfies HubMessage),
+        )
       },
       close(hall) {
         halls.delete(hall)
@@ -208,75 +229,47 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
 }
 
 /**
- * Each guild's recent events from earlier boots: its chronicles of the last HISTORY_MS, newest
- * first, for as long as their seqs run on from each other (a boot that started over at 1 ends it),
- * up to `keep`. Lines that don't parse or check out — a half-written last line — are skipped.
+ * A queue per key: each piece of work starts once the previous one for its key has settled. A key's
+ * queue is forgotten once it runs empty, so guilds that went quiet don't stay in the map. `size` is
+ * how many keys have work queued or running.
  */
-function loadHistory(root: string, keep: number): Map<string, GuildEvent[]> {
-  const loaded = new Map<string, GuildEvent[]>()
-  const since = Date.now() - HISTORY_MS
-  for (const dir of list(root)) {
-    const files = list(join(root, dir))
-      .filter((file) => file.endsWith(".jsonl") && !file.endsWith(".raw.jsonl"))
-      .filter((file) => modified(join(root, dir, file)) >= since)
-      .sort()
-      .reverse()
-    let history: GuildEvent[] = []
-    for (const file of files) {
-      const older = read(join(root, dir, file))
-      const first = history[0]
-      if (first && older.some((event) => event.guild !== first.guild || event.seq >= first.seq)) break
-      history = [...older, ...history]
-      if (history.length >= keep) break
+export function serially(): (<T>(key: string, work: () => Promise<T>) => Promise<T>) & { size(): number } {
+  const queues = new Map<string, Promise<unknown>>()
+  const inOrder = <T>(key: string, work: () => Promise<T>): Promise<T> => {
+    const run = (queues.get(key) ?? Promise.resolve()).then(work)
+    const tail: Promise<void> = run.then(
+      () => settled(),
+      () => settled(),
+    )
+    const settled = () => {
+      if (queues.get(key) === tail) queues.delete(key)
     }
-    const guild = history[0]?.guild
-    if (guild && !loaded.has(guild)) loaded.set(guild, history.slice(-keep))
+    queues.set(key, tail)
+    return run
   }
-  return loaded
+  return Object.assign(inOrder, { size: () => queues.size })
 }
 
-function read(file: string): GuildEvent[] {
-  const out: GuildEvent[] = []
-  let text = ""
-  try {
-    text = readFileSync(file, "utf8")
-  } catch {
-    return out
+/**
+ * The hello's events (see HELLO_GUILDS, HELLO_EVENTS): the most recently active guilds, each a
+ * contiguous run of its newest events, the most recent guild last (a hall follows the last guild it
+ * hears from).
+ */
+export function helloEvents(events: Map<string, GuildEvent[]>): GuildEvent[] {
+  const last = (list: GuildEvent[]) => list.at(-1)?.change.at ?? 0
+  const recent = [...events.values()]
+    .filter((list) => list.length > 0)
+    .sort((a, b) => last(b) - last(a))
+    .slice(0, HELLO_GUILDS)
+  const picked: GuildEvent[][] = []
+  let budget = HELLO_EVENTS
+  for (const list of recent) {
+    if (budget <= 0) break
+    const some = list.slice(-budget)
+    budget -= some.length
+    picked.unshift(some)
   }
-  for (const line of text.split("\n")) {
-    if (!line) continue
-    try {
-      const event = JSON.parse(line) as GuildEvent
-      const last = out.at(-1)
-      if (
-        event?.v === WIRE_VERSION &&
-        validGuild(event.guild) &&
-        Number.isInteger(event.seq) &&
-        validChange(event.change) &&
-        (!last || (event.guild === last.guild && event.seq > last.seq))
-      )
-        out.push(event)
-    } catch {
-      // A line cut short when the last hub stopped.
-    }
-  }
-  return out
-}
-
-function list(dir: string): string[] {
-  try {
-    return readdirSync(dir)
-  } catch {
-    return []
-  }
-}
-
-function modified(file: string): number {
-  try {
-    return statSync(file).mtimeMs
-  } catch {
-    return 0
-  }
+  return picked.flat()
 }
 
 /** A hall may connect from a page served on this machine only. */

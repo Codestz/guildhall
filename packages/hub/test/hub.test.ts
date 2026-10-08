@@ -1,7 +1,18 @@
 import { afterAll, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { type GuildEvent, WIRE_VERSION } from "@guildhall/core"
+import { RAW_KEEP_MS } from "../src/chronicles.ts"
+import { HELLO_EVENTS, HELLO_GUILDS, helloEvents, serially } from "../src/hub.ts"
 import type { HubMessage } from "../src/index.ts"
 import { HERALD_HEADER, type Health, hubBuild, startHub } from "../src/index.ts"
 import { MAX_RAW, MAX_RAW_TOTAL } from "../src/validate.ts"
@@ -322,5 +333,120 @@ describe("hub request checks", () => {
       changes: [status(0), status(-1), status(1)],
     })
     expect(await response.json()).toEqual({ ok: true, count: 1, rejected: 2 })
+  })
+})
+
+/** A raw log in `home` for guild "g", last modified past RAW_KEEP_MS. */
+function staleRaw(home: string): string {
+  const dir = join(home, "chronicles", "g")
+  mkdirSync(dir, { recursive: true })
+  const path = join(dir, "old.raw.jsonl")
+  writeFileSync(path, "{}\n")
+  const when = (Date.now() - RAW_KEEP_MS - 60_000) / 1000
+  utimesSync(path, when, when)
+  return path
+}
+
+describe("hub retention", () => {
+  test("a hub applies retention to its chronicles when it starts", () => {
+    const shared = mkdtempSync(join(tmpdir(), "guildhall-retain-"))
+    const path = staleRaw(shared)
+    const local = startHub({ port: 0, home: shared })
+    local.stop(true)
+    expect(existsSync(path)).toBe(false)
+  })
+
+  test("a running hub applies it again once `pruneEvery` has passed", async () => {
+    const shared = mkdtempSync(join(tmpdir(), "guildhall-retain-"))
+    const local = startHub({ port: 0, home: shared, pruneEvery: 0 })
+    const path = staleRaw(shared)
+    await post(`http://127.0.0.1:${local.port}`, { guild: "other", opencode: 2, changes: [status(1)] })
+    local.stop(true)
+    expect(existsSync(path)).toBe(false)
+  })
+})
+
+describe("hub queues", () => {
+  test("a guild's queue is forgotten once its work settles, failed work included", async () => {
+    const inOrder = serially()
+    const order: number[] = []
+    const first = inOrder("a", async () => {
+      await wait(20)
+      order.push(1)
+    })
+    const second = inOrder("a", async () => {
+      order.push(2)
+      throw new Error("boom")
+    })
+    const third = inOrder("b", async () => order.push(3))
+    expect(inOrder.size()).toBe(2)
+    await Promise.allSettled([first, second, third])
+    await wait(0)
+    expect(order).toEqual([3, 1, 2])
+    expect(inOrder.size()).toBe(0)
+  })
+})
+
+describe("hub hello", () => {
+  test("a hall gets the most recently active guilds only, the most recent last", async () => {
+    const local = startHub({ port: 0, home: mkdtempSync(join(tmpdir(), "guildhall-hello-")) })
+    const to = `http://127.0.0.1:${local.port}`
+    const count = HELLO_GUILDS + 2
+    // Guild g0 is the most recently active: its last change is dated latest.
+    for (let n = count - 1; n >= 0; n--)
+      await post(to, { guild: `g${n}`, opencode: 2, changes: [status(1000 - n)] })
+    const watcher = hall(local.port as number)
+    await watcher.ready
+    watcher.socket.close()
+    local.stop(true)
+    const hello = watcher.messages[0]
+    const guilds = hello?.type === "hello" ? hello.events.map((e) => e.guild) : []
+    expect(guilds).toEqual(Array.from({ length: HELLO_GUILDS }, (_, n) => `g${HELLO_GUILDS - 1 - n}`))
+  })
+
+  test("the hello holds HELLO_EVENTS in all, each guild a run of its newest events", () => {
+    const run = (guild: string, length: number, at: number) =>
+      Array.from(
+        { length },
+        (_, n): GuildEvent => ({
+          v: WIRE_VERSION,
+          guild,
+          seq: n + 1,
+          change: { ...status(at), type: "step" },
+        }),
+      )
+    const half = HELLO_EVENTS / 2
+    const events = new Map([
+      ["old", run("old", half, 1)],
+      ["mid", run("mid", half, 2)],
+      ["new", run("new", half + 10, 3)],
+    ])
+    const hello = helloEvents(events)
+    expect(hello.length).toBe(HELLO_EVENTS)
+    expect(hello[0]?.guild).toBe("mid")
+    expect(hello.filter((e) => e.guild === "mid").map((e) => e.seq)[0]).toBe(11)
+    expect(hello.at(-1)).toMatchObject({ guild: "new", seq: half + 10 })
+    expect(hello.some((e) => e.guild === "old")).toBe(false)
+  })
+})
+
+describe("hub health", () => {
+  test("a chronicle that can't be written is counted in /health, and the events still go out", async () => {
+    const shared = mkdtempSync(join(tmpdir(), "guildhall-unwritable-"))
+    writeFileSync(join(shared, "chronicles"), "not a directory")
+    const local = startHub({ port: 0, home: shared })
+    const to = `http://127.0.0.1:${local.port}`
+    const response = await post(to, { guild: "lost", opencode: 2, changes: [status(1)] })
+    const health = (await (await fetch(`${to}/health`)).json()) as Health
+    local.stop(true)
+    expect(await response.json()).toEqual({ ok: true, count: 1 })
+    expect(health.writeFailures).toBe(1)
+    expect(health.lastWriteError?.guild).toBe("lost")
+  })
+
+  test("a hub that wrote everything reports no failures", async () => {
+    const health = (await (await fetch(`${base}/health`)).json()) as Health
+    expect(health.writeFailures).toBe(0)
+    expect(health.lastWriteError).toBeUndefined()
   })
 })

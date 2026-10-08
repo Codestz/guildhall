@@ -17,7 +17,9 @@ export function Hall({ store }: { store: GuildStore }) {
         and what they are doing, the dossier tells one adventurer's story. So the canvas, and the
         name chips drei mounts beside it, stay out of the accessibility tree.
       */}
-      <Canvas shadows dpr={1} gl={{ antialias: false }} aria-hidden="true">
+      {/* PCF shadows, named: `shadows` alone asks for PCFSoft, which three r18x no longer has (it
+          warned and fell back to PCF on every load). The same picture, without the warning. */}
+      <Canvas shadows="percentage" dpr={1} gl={{ antialias: false }} aria-hidden="true">
         <Scene />
       </Canvas>
       <Hud />

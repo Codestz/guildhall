@@ -420,6 +420,41 @@ describe("audio: engine", () => {
     expect(engine.state).toBe("running")
   })
 
+  test("a spot sound plays only when heard: silent locked, muted or hidden", () => {
+    const { engine, probe, on } = rig()
+    engine.spot("forge", { x: 0, z: 0 })
+    expect(probe).toHaveLength(0)
+    on()
+    engine.setLevels({ ...SOUND_DEFAULTS, on: false })
+    engine.spot("forge", { x: 0, z: 0 })
+    expect(probe).toHaveLength(0)
+    engine.setLevels({ ...SOUND_DEFAULTS, on: true })
+    engine.setHidden(true)
+    engine.spot("forge", { x: 0, z: 0 })
+    expect(probe).toHaveLength(0)
+    engine.setHidden(false)
+    engine.spot("forge", { x: 0, z: 0 })
+    expect(probe).toMatchObject([{ sound: "sample:forge", bus: "sfx", verdict: "play", sample: "synth" }])
+  })
+
+  test("a spot sound is placed by the camera and capped by its cooldown", () => {
+    const { engine, probe, on } = rig()
+    on()
+    engine.setListener({ x: 0, z: 0, rx: 1, rz: 0, radius: 20 })
+    engine.spot("forge", { x: 15, z: 0 })
+    engine.spot("forge", { x: 15, z: 0 })
+    expect(probe[0]?.pan).toBeGreaterThan(0.5)
+    expect(probe[0]?.verdict).toBe("play")
+    expect(probe[1]?.verdict).not.toBe("play")
+  })
+
+  test("a spot sound with nothing to play (no file loaded, no synth) records nothing", () => {
+    const { engine, probe, on } = rig()
+    on()
+    engine.spot("door", { x: 0, z: 0 })
+    expect(probe).toHaveLength(0)
+  })
+
   test("a live deed plays one note on the notes bus", () => {
     const { engine, probe, on } = rig()
     on()

@@ -2242,8 +2242,14 @@ button {
 :root[data-hud="minimal"] .chip .verb {
   font-size: 11px;
 }
-/* Hidden: a pure view. Speech and the plea mark stay; they are part of the world. */
-:root[data-hud="hidden"] .chip .name {
+/* Hidden: a pure view. The plea mark stays (it is part of the world); speech goes, and the story
+   captions carry the narrative. */
+:root[data-hud="hidden"] .chip .name,
+:root[data-hud="hidden"] .chip .bubble {
+  display: none;
+}
+/* Speech shows only where the declutter allows it (scene/chips.ts speaks): never a wall of text. */
+.chip:not([data-speak]) .bubble {
   display: none;
 }
 

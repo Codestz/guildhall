@@ -89,9 +89,12 @@ export function applyGrip(object: Object3D, grip: Grip): void {
 /**
  * Adds `object` to `bone` in its grip. Returns what was added: the object itself, or for an upright
  * grip the pivot it hangs from (toggle visibility on that, and pass it to `keepUpright`).
+ * What is held moves with the hand, so it never casts into the static sun shadow map
+ * (atmosphere/shadows.ts): a kit piece cloned with shadows on would leave its shadow behind.
  */
 export function attachGrip(bone: Object3D, object: Object3D, grip: Grip): Object3D {
   applyGrip(object, grip)
+  object.traverse(noCaster)
   if (!grip.upright) {
     bone.add(object)
     return object
@@ -103,6 +106,10 @@ export function attachGrip(bone: Object3D, object: Object3D, grip: Grip): Object
   pivot.add(object)
   bone.add(pivot)
   return pivot
+}
+
+function noCaster(child: Object3D): void {
+  child.castShadow = false
 }
 
 const UP = new Vector3(0, 1, 0)

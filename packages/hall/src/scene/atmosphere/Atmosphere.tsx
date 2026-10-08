@@ -1,6 +1,7 @@
 import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import {
+  CustomToneMapping,
   type DirectionalLight,
   Fog,
   type HemisphereLight,
@@ -16,6 +17,7 @@ import { useTier } from "../Quality.tsx"
 import { flash, stepLightning } from "./flash.ts"
 import { installRadialFog } from "./fog.ts"
 import { Lamps } from "./Lamps.tsx"
+import { installLowGrade, packExposure } from "./lowGrade.ts"
 import { SkyDome } from "./SkyDome.tsx"
 import { shadows } from "./shadows.ts"
 import { updateSky } from "./sky.ts"
@@ -23,6 +25,7 @@ import { sky } from "./state.ts"
 import { stepWind } from "./wind.ts"
 
 installRadialFog()
+installLowGrade()
 
 /**
  * Sky and light (ADR 0007, task "Sky"): the dome, radial fog, the hemisphere fill, the sun or moon
@@ -50,6 +53,7 @@ function Weathervane() {
   const gl = useThree((state) => state.gl)
   const hemi = useRef<HemisphereLight>(null)
   const lastStrike = useRef(-1)
+  const post = TIERS[useTier()].post
   /** Fog radii follow the island: the coast starts to fade, the hex sea is gone by the far radius. */
   const sea = useMemo(() => {
     let radius = 0
@@ -60,11 +64,12 @@ function Weathervane() {
 
   // One tone mapping everywhere: Neutral keeps KayKit's flat colours true while rolling off the
   // HDR flames and sun. The post pass applies it itself (the composer turns the renderer's off and
-  // restores this when it goes, so the Low tier, with no post, matches). Layout effect: before the
-  // composer's own effect saves the renderer's value.
+  // restores this when it goes). The Low tier, with no post, renders Neutral plus the grade's
+  // saturation (atmosphere/lowGrade.ts). Layout effect: before the composer's own effect saves the
+  // renderer's value.
   useLayoutEffect(() => {
-    if (gl.toneMapping !== NoToneMapping) gl.toneMapping = NeutralToneMapping
-  }, [gl])
+    if (gl.toneMapping !== NoToneMapping) gl.toneMapping = post ? NeutralToneMapping : CustomToneMapping
+  }, [gl, post])
 
   useEffect(() => {
     scene.fog = fog
@@ -82,10 +87,11 @@ function Weathervane() {
     }
     updateSky(sky, env, store.mood, stepLightning(Math.min(delta, 0.1)))
     stepWind(env.wind, state.clock.elapsedTime, delta)
-    // The Low tier has no grade (no post pass): its tone mapping takes the grade's exposure, so a
-    // storm still darkens and night still lifts there. With post on, the composer renders with no
-    // renderer tone mapping, so this is ignored and the grade does it (GradeEffect.ts).
-    gl.toneMappingExposure = sky.exposure
+    // The Low tier has no grade (no post pass): its tone mapping takes the grade's exposure and
+    // saturation (lowGrade.ts), so a storm still darkens and greys and night still lifts there.
+    // With post on, the composer renders with no renderer tone mapping and the grade does it
+    // (GradeEffect.ts): the plain exposure, never packed.
+    gl.toneMappingExposure = post ? sky.exposure : packExposure(sky.exposure, 1 - sky.saturation)
     fog.color.copy(sky.fog)
     fog.near = sea * sky.fogNear
     fog.far = sea * sky.fogFar

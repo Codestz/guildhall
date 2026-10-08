@@ -1,7 +1,8 @@
 import { useFrame, useThree } from "@react-three/fiber"
-import { Suspense, useEffect } from "react"
+import { Suspense, useCallback, useEffect, useReducer, useState } from "react"
 import { SoundStage } from "../audio/SoundStage.tsx"
 import { MODE, PROBE } from "../guild/mode.ts"
+import type { AdventurerView } from "../guild/store.ts"
 import { useGuild, useGuildStore } from "../guild/useGuild.ts"
 import { Adventurer } from "./Adventurer.tsx"
 import { Atmosphere } from "./atmosphere/Atmosphere.tsx"
@@ -11,6 +12,7 @@ import { Blobs } from "./Blobs.tsx"
 import { CameraRig } from "./CameraRig.tsx"
 import { Crisp } from "./Crisp.tsx"
 import { EventsLayer } from "./events/EventsLayer.tsx"
+import { Exits } from "./exits.ts"
 import { FrameStats } from "./FrameStats.tsx"
 import { FRAME } from "./frame.ts"
 import { Graveyard } from "./Graveyard.tsx"
@@ -75,13 +77,26 @@ export function Scene() {
   )
 }
 
+/**
+ * Everyone on stage. A leaver the store has let go of stays mounted until their dissolve is done
+ * (scene/exits.ts): fast-forward never cuts one off mid-walk.
+ */
 function Cast() {
-  const { views } = useGuild()
+  const store = useGuild()
+  const [exits] = useState(() => new Exits<AdventurerView>())
+  const [, redraw] = useReducer((n: number) => n + 1, 0)
+  const onGone = useCallback(
+    (id: string) => {
+      if (exits.gone(id)) redraw()
+    },
+    [exits],
+  )
+  const views = exits.stage(store.views, store.rebuilds, performance.now())
   return (
     <>
       {views.map((view) => (
         <Suspense key={view.id} fallback={null}>
-          <Adventurer view={view} />
+          <Adventurer view={view} onGone={onGone} />
         </Suspense>
       ))}
     </>

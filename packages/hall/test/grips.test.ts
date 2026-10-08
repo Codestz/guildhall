@@ -173,6 +173,18 @@ describe("keepUpright", () => {
     expect(pages.y).toBeCloseTo(1, 5)
   })
 
+  test("held gear never casts into the static shadow map, however it was cloned", () => {
+    const { hand } = twistedHand()
+    const lantern = new Group()
+    const glass = new Mesh()
+    glass.castShadow = true
+    lantern.add(glass)
+    lantern.castShadow = true
+    attachGrip(hand, lantern, KIT_GRIPS[NIGHT_LANTERN])
+    expect(glass.castShadow).toBe(false)
+    expect(lantern.castShadow).toBe(false)
+  })
+
   test("a fixed grip is the object itself, and keepUpright leaves it alone", () => {
     const { hand } = twistedHand()
     const pick = new Mesh()

@@ -180,7 +180,18 @@ export class AudioEngine {
       : (null as Rendition<AudioBuffer>)
     const replaced = sample?.kind === "file" && sample.replace
     if (notes.length > 0 && !replaced) this.cue("notes", sound, notes, info.where, 1, moment.id)
-    if (sample && info.sample) this.spot(info.sample, sample, info.sampleAt ?? info.where, moment.id)
+    if (sample && info.sample) this.playSpot(info.sample, sample, info.sampleAt ?? info.where, moment.id)
+  }
+
+  /**
+   * A spot sound on its own, not carried by a moment (a townsfolk's door, scene/life/Villagers.tsx).
+   * The same gate as every cue: silent when muted, locked or hidden; through the limiter (the sound's
+   * cooldown, the SFX bus's voices); placed by the camera when `where` is given, centred otherwise.
+   */
+  spot(name: SampleName, where?: Where): void {
+    if (!this.audible) return
+    const rendition = renditionOf(name, this.buffers, Math.random())
+    if (rendition) this.playSpot(name, rendition, where, `spot:${name}`)
   }
 
   /**
@@ -235,7 +246,7 @@ export class AudioEngine {
     play(this.graph.ctx, this.graph.buses[bus], notes, place.pan, place.gain * gain)
   }
 
-  private spot(
+  private playSpot(
     name: SampleName,
     rendition: NonNullable<Rendition<AudioBuffer>>,
     where: Where | undefined,

@@ -113,6 +113,8 @@ function buildGhost(node: Object3D | undefined, uniforms: Uniforms) {
       transparent: true,
       depthWrite: true,
     })
+    // Not swallowed by the storm's fog: a ghost carries its own light through the weather.
+    material.fog = false
     flutter(material, uniforms, 0.32)
     const base = material.onBeforeCompile
     material.onBeforeCompile = (shader, renderer) => {
@@ -132,12 +134,12 @@ function buildGhost(node: Object3D | undefined, uniforms: Uniforms) {
           // A spectral rim: brightest where the hull turns away from the eye.
           float rim = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition))), 2.0);
           float pulse = 0.85 + 0.25 * sin(uTime * 1.7);
-          totalEmissiveRadiance += vec3(0.3, 1.0, 0.68) * (rim * 1.3 + 0.12) * pulse;`,
+          totalEmissiveRadiance += vec3(0.32, 1.0, 0.7) * (rim * 2.1 + 0.26) * pulse;`,
         )
         .replace(
           "#include <opaque_fragment>",
-          // Thin as smoke, and the hull dissolves into the sea below the waterline's mist.
-          `diffuseColor.a *= uFade * 0.55 * smoothstep(0.4, 3.2, vHullY);
+          // Half there, and the hull dissolves into the sea below the waterline's mist.
+          `diffuseColor.a *= uFade * 0.8 * smoothstep(0.2, 2.4, vHullY);
           #include <opaque_fragment>`,
         )
     }
@@ -153,26 +155,30 @@ function buildGhost(node: Object3D | undefined, uniforms: Uniforms) {
 }
 
 /**
- * Will-o'-the-wisps bobbing round the deck and the bow, and low banks of sea mist clinging to the
- * hull (ship space): one instanced mesh, every motion in its vertex shader.
+ * Will-o'-the-wisps bobbing round the deck and the bow, low banks of sea mist clinging to the
+ * hull, and one wide halo behind it all (the ship's glow, so its shape reads from the overview and
+ * through storm rain) in ship space: one instanced mesh, every motion in its vertex shader.
  */
 function wisps(uniforms: Uniforms): InstancedMesh {
   const WISPS = 14
   const BANKS = 12
-  const COUNT = WISPS + BANKS
+  const COUNT = WISPS + BANKS + 1
   const seat = new Float32Array(COUNT * 3)
   const seed = new Float32Array(COUNT)
   const bank = new Float32Array(COUNT)
   for (let i = 0; i < COUNT; i++) {
     const mist = i >= WISPS
+    const halo = i === COUNT - 1
     seat.set(
-      mist
-        ? [(hash01(i * 3) - 0.5) * 16, 2.2 + hash01(i * 3 + 1) * 1.8, (hash01(i * 3 + 2) - 0.5) * 22]
-        : [(hash01(i * 3) - 0.5) * 6, 2.5 + hash01(i * 3 + 1) * 6, (hash01(i * 3 + 2) - 0.5) * 11],
+      halo
+        ? [0, 5.5, 0]
+        : mist
+          ? [(hash01(i * 3) - 0.5) * 16, 2.2 + hash01(i * 3 + 1) * 1.8, (hash01(i * 3 + 2) - 0.5) * 22]
+          : [(hash01(i * 3) - 0.5) * 6, 2.5 + hash01(i * 3 + 1) * 6, (hash01(i * 3 + 2) - 0.5) * 11],
       i * 3,
     )
     seed[i] = hash01(i * 17)
-    bank[i] = mist ? 1 : 0
+    bank[i] = halo ? 2 : mist ? 1 : 0
   }
   const geometry = new PlaneGeometry(1, 1)
   geometry.setAttribute("aSeat", new InstancedBufferAttribute(seat, 3))
@@ -190,18 +196,25 @@ function wisps(uniforms: Uniforms): InstancedMesh {
         float t = uTime * (0.5 + aSeed * 0.5) + aSeed * 40.0;
         vec3 p = aSeat;
         float size;
-        if (aBank > 0.5) {
+        vec2 stretch = vec2(1.0);
+        if (aBank > 1.5) {
+          // The halo: still, breathing slowly, tall as the masts.
+          size = 20.0;
+          stretch = vec2(1.0, 0.85);
+          vGlow = 0.85 + 0.15 * sin(uTime * 1.1);
+        } else if (aBank > 0.5) {
           // Mist banks: slow rolling drift, wide and flat on screen.
           p += vec3(sin(t * 0.3) * 1.5, 0.0, cos(t * 0.25) * 2.0);
           size = 9.0 + aSeed * 7.0;
+          stretch = vec2(1.0, 0.45);
           vGlow = 0.6 + 0.4 * sin(t * 0.5);
         } else {
           p += vec3(sin(t) * 0.9, sin(t * 1.7) * 0.6, cos(t * 0.8) * 1.2);
-          size = 1.0 + 0.5 * aSeed;
+          size = 1.5 + 0.8 * aSeed;
           vGlow = 0.55 + 0.45 * sin(t * 3.0);
         }
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
-        mv.xy += position.xy * size * vec2(1.0, aBank > 0.5 ? 0.45 : 1.0);
+        mv.xy += position.xy * size * stretch;
         gl_Position = projectionMatrix * mv;
       }
     `,
@@ -211,15 +224,21 @@ function wisps(uniforms: Uniforms): InstancedMesh {
       void main() {
         float d = length(vUv - 0.5) * 2.0;
         float a = 1.0 - smoothstep(0.0, 1.0, d);
+        if (vBank > 1.5) {
+          a = a * 0.32 * vGlow * uFade;
+          if (a < 0.004) discard;
+          gl_FragColor = vec4(vec3(0.35, 1.0, 0.7), a);
+          return;
+        }
         if (vBank > 0.5) {
-          a = a * 0.24 * vGlow * uFade;
+          a = a * 0.3 * vGlow * uFade;
           if (a < 0.004) discard;
           gl_FragColor = vec4(vec3(0.55, 0.8, 0.7), a);
           return;
         }
         a = a * a * vGlow * uFade;
         if (a < 0.004) discard;
-        gl_FragColor = vec4(vec3(0.55, 1.0, 0.75) * 2.2, a);
+        gl_FragColor = vec4(vec3(0.55, 1.0, 0.75) * 2.6, a);
       }
     `,
     transparent: true,

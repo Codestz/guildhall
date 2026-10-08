@@ -185,8 +185,8 @@ const DAY: readonly Stop[] = [
   stop(-0.75, { zenith: "#02050d", horizon: "#0a1428", fog: "#0b1424", glow: "#000000", sun: "#000000", sky: "#4060a0", ground: "#151c30" }, 0, 1.35),
   stop(-0.56, { zenith: "#040a1c", horizon: "#13213f", fog: "#111c33", glow: "#140f2a", sun: "#000000", sky: "#4560a4", ground: "#161c30" }, 0, 1.3),
   stop(-0.44, { zenith: "#0f2052", horizon: "#33467a", fog: "#26345c", glow: "#3c3264", sun: "#000000", sky: "#7088cc", ground: "#222842" }, 0, 1.4),
-  stop(-0.32, { zenith: "#18306a", horizon: "#b06a66", fog: "#5e5470", glow: "#d8604a", sun: "#ff7848", sky: "#8a8cc4", ground: "#2c2838" }, 0.9, 1.05),
-  stop(-0.14, { zenith: "#2a4c8c", horizon: "#f0986a", fog: "#b48c86", glow: "#ff8048", sun: "#ff9e5e", sky: "#a8a6d4", ground: "#3e3842" }, 1.9, 1.05),
+  stop(-0.32, { zenith: "#18306a", horizon: "#b06a66", fog: "#5e5470", glow: "#d8604a", sun: "#ff7848", sky: "#7a90c4", ground: "#2c2838" }, 0.9, 1.05),
+  stop(-0.14, { zenith: "#2a4c8c", horizon: "#f0986a", fog: "#b48c86", glow: "#ff8048", sun: "#ff9e5e", sky: "#98aad4", ground: "#3e3842" }, 1.9, 1.05),
   stop(0.04,  { zenith: "#3c6aae", horizon: "#f4bc8c", fog: "#d0b2a2", glow: "#ffa062", sun: "#ffbe86", sky: "#bcc2e6", ground: "#58545c" }, 2.4, 1.18),
   stop(0.2,   { zenith: "#4a80c6", horizon: "#e8d6c0", fog: "#cdc8c6", glow: "#ffc890", sun: "#ffe2c0", sky: "#d0dcf4", ground: "#6c6e6c" }, 2.8, 1.25),
   stop(0.36,  { zenith: "#4486d2", horizon: "#c4dcf0", fog: "#bfd3e4", glow: "#fff0d2", sun: "#fff0d8", sky: "#dcebff", ground: "#7a8072" }, 2.8, 1.18),
@@ -200,8 +200,12 @@ const STORM_FLASH = new Color("#dfe6ff")
 const NIGHT_SHADOWS = new Color(0.74, 0.9, 1.22)
 /** Night highlights warm, shadows cool: firelight keeps its colour against blue moonlight. */
 const NIGHT_HIGHLIGHTS = new Color(1.08, 1.0, 0.88)
-/** Golden hour: warm light, violet-blue shade. */
-const GOLDEN_SHADOWS = new Color(0.92, 0.94, 1.1)
+/**
+ * Golden hour: warm light, cool shade. The shade leans blue-green, not violet: orange light on
+ * green grass already sits near olive, and red in the shade tipped it there (19:15, the grass went
+ * khaki). Less red down there keeps the meadow a rich, cool green out of the sun.
+ */
+const GOLDEN_SHADOWS = new Color(0.86, 0.96, 1.1)
 const GOLDEN_HIGHLIGHTS = new Color(1.09, 0.97, 0.9)
 /** Blue hour: the whole image cool, the lamps (highlights) barely warmer. */
 const BLUE_SHADOWS = new Color(0.82, 0.92, 1.24)

@@ -96,6 +96,16 @@ describe("golden hour, blue hour, storms (design review #6)", () => {
     }
   })
 
+  test("golden-hour shade is cool green, never olive: less red than green, and blue on top", () => {
+    for (const hour of [18.5, 19, 19.25]) {
+      updateSky(sky, env(hour), MOODS.keep)
+      expect(sky.shadows.r).toBeLessThan(sky.shadows.g)
+      expect(sky.shadows.b).toBeGreaterThan(sky.shadows.g)
+      // The shade's fill light leans blue, not lavender.
+      expect(sky.hemiSky.r).toBeLessThan(sky.hemiSky.b * 0.85)
+    }
+  })
+
   test("then a blue hour (sun gone, not yet full night), then night", () => {
     updateSky(sky, env(20), MOODS.keep)
     expect(sky.sunIntensity).toBe(0)

@@ -233,6 +233,8 @@ export class GuildStore {
   /** Diorama: the orthographic tabletop. Explore: a perspective camera that can go low and close. */
   view: "diorama" | "explore" = "diorama"
   views: AdventurerView[] = []
+  /** Counts history rebuilds (a seek, a restart, a load): the stage forgets who was leaving. */
+  rebuilds = 0
   /**
    * The parties on the island (guild/parties.ts), the dais's first: one per conversation, at most
    * MAX_PARTIES. One party is the hall as it always was.
@@ -668,6 +670,7 @@ export class GuildStore {
     this.arrived.clear()
     this.guilds.clear()
     this.rebuilding = true
+    this.rebuilds++
     this.chapterTold = Number.NaN
     this.moments.rebuild(continued)
   }

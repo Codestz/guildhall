@@ -1,4 +1,4 @@
-import { Html, useGLTF } from "@react-three/drei"
+import { useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import {
@@ -24,6 +24,7 @@ import { sky } from "./atmosphere/state.ts"
 import { useBlob } from "./Blobs.tsx"
 import { addChip, CHIP_HEIGHT, chipSlot, removeChip } from "./chips.ts"
 import { Dissolver, Fade, fadeSeconds } from "./dissolve.ts"
+import { Label } from "./Label.tsx"
 import { useOwnedMeshes } from "./owned.ts"
 import { cloneRig } from "./rig.ts"
 
@@ -64,13 +65,13 @@ function Undead() {
       ))}
       <Puffs />
       {undead.overflow > 0 && (
-        <Html position={GRAVEYARD.plaque} center zIndexRange={[19, 0]} style={{ pointerEvents: "none" }}>
+        <Label position={GRAVEYARD.plaque} center zIndexRange={[19, 0]} style={{ pointerEvents: "none" }}>
           <div aria-hidden="true" className="chip undead">
             <div className="name">
               <b>☠ +{undead.overflow}</b>
             </div>
           </div>
-        </Html>
+        </Label>
       )}
     </group>
   )
@@ -144,9 +145,9 @@ function Skeleton({ riser }: { riser: Riser }) {
     }
   }, [body, animations])
 
-  // The shadow fades in with the riser and out as the dead go under (a soft disc: smaller is fainter).
-  const size = useCallback(() => fade.value * earthed(root.current?.position.y ?? 0), [fade])
-  useBlob(root, 0.75, size)
+  // The shadow fades in with the riser's dissolve, and out as the dead go under (never shrinks).
+  const presence = useCallback(() => fade.value * earthed(root.current?.position.y ?? 0), [fade])
+  useBlob(root, 0.75, undefined, presence)
 
   // The fallen's name over their bones, in the chips' declutter like everyone else's.
   const chip = useMemo(chipSlot, [])
@@ -267,7 +268,7 @@ function Skeleton({ riser }: { riser: Riser }) {
     <group ref={root} position={[grave.x, 0, grave.z]} rotation-y={grave.rot}>
       <primitive object={body} />
       {riser.title && (
-        <Html
+        <Label
           position={[0, CHIP_HEIGHT - 0.8, 0]}
           center
           zIndexRange={[19, 0]}
@@ -284,7 +285,7 @@ function Skeleton({ riser }: { riser: Riser }) {
               </div>
             </div>
           </div>
-        </Html>
+        </Label>
       )}
     </group>
   )

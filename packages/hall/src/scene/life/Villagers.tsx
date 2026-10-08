@@ -171,9 +171,10 @@ function Townsfolk({ npc, index }: { npc: Townsperson; index: number }) {
       current: null as AnimationAction | null,
     }
   }, [npc])
-  // The blob fades with them (a soft disc: smaller reads as fainter).
-  const presence = useCallback(() => life.fade.value * (npc.scale / 0.82), [life, npc])
-  useBlob(root, 0.8, presence)
+  // The blob is sized to the body and fades with them through the door (scene/dissolve.ts).
+  const size = useCallback(() => npc.scale / 0.82, [npc])
+  const presence = useCallback(() => life.fade.value, [life])
+  useBlob(root, 0.8, size, presence)
   useEffect(() => {
     const node = root.current
     if (!import.meta.env.DEV || !node) return
@@ -437,27 +438,12 @@ function free(b: Body): void {
 }
 
 /**
- * A door opening, heard from the house: the `door` spot sound (audio/samples.ts), through the
- * engine's own gate: silent when muted, locked or hidden; capped by the limiter (one door every
- * few seconds, the SFX bus's voices); placed by the camera's focus. Carried by a `leave` moment,
- * whose motif is silent, so the door alone sounds; it never enters the store's moment stream.
+ * A door opening, heard from the house: the `door` spot sound (audio/samples.ts) through the
+ * engine's own gate (silent when muted, locked or hidden; capped by the limiter), placed by the
+ * camera's focus.
  */
 function knock(at: Spot): void {
-  if (!audio.audible) return
-  audio.moment(
-    {
-      id: "townsfolk:door",
-      agent: "",
-      title: "",
-      color: "",
-      master: "",
-      seq: 0,
-      at: 0,
-      live: true,
-      kind: "leave",
-    },
-    { sample: "door", where: { x: at[0], z: at[1] } },
-  )
+  audio.spot("door", { x: at[0], z: at[1] })
 }
 
 function turn(node: Object3D, heading: number, rate: number): void {

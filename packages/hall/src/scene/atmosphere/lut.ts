@@ -113,7 +113,7 @@ export const DAY_STOCK: Record<Mood["id"], LutLook> = {
 /**
  * What the time of day adds, the same for every mood (each mood's character stays in its day
  * stock). Golden hour: the warm light against a cooler shade, a firmer curve, and the sunlit grass
- * taken out of mustard into olive-green. Night: the blue kept rich, everything but firelight a
+ * taken out of mustard and olive into a fuller green. Night: the blue kept rich, everything but firelight a
  * little calmer, a faint blue toe so silhouettes read. Storm: steel — cooler, firmer, less colour.
  */
 export const TIME_STOCK = {
@@ -121,8 +121,8 @@ export const TIME_STOCK = {
     slope: [1.02, 1.0, 0.98],
     offset: [0, 0, 0.006],
     curve: 0.12,
-    foliageHue: 0.035,
-    foliageSat: 1.0,
+    foliageHue: 0.05,
+    foliageSat: 1.08,
     warmSat: 1.06,
     coolSat: 1.04,
     split: 0.1,

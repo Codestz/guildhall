@@ -3,6 +3,7 @@ import { hudInsets } from "../guild/director.ts"
 import { MODE } from "../guild/mode.ts"
 import { useOpening } from "../guild/opening.ts"
 import { useGuild } from "../guild/useGuild.ts"
+import { setChipMode } from "../scene/chips.ts"
 import { Brand } from "./Brand.tsx"
 import { Captions } from "./Captions.tsx"
 import { ChapterChip } from "./Chapter.tsx"
@@ -81,6 +82,7 @@ export function Hud() {
   useEffect(() => {
     setOpen(regionsFor(mode, phone))
     document.documentElement.dataset.hud = mode
+    setChipMode(mode)
   }, [mode])
 
   /** On a phone one sheet at a time: opening one closes the rest. */

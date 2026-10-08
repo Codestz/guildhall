@@ -1,4 +1,4 @@
-import { Html, useGLTF } from "@react-three/drei"
+import { useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import {
@@ -37,6 +37,7 @@ import { DeedEffect } from "./DeedEffect.tsx"
 import { Dissolver, Fade, fadeSeconds } from "./dissolve.ts"
 import { attachGrip, isHeldPiece, KIT_GRIPS, keepUpright, NIGHT_LANTERN, RESTING_MUG } from "./grips.ts"
 import { clonePiece, useKit } from "./Kit.tsx"
+import { Label } from "./Label.tsx"
 import { BEAT_HEIGHT, emitBeat } from "./life/work.ts"
 import { carryLantern } from "./lights/carried.ts"
 import { cloneRig } from "./rig.ts"
@@ -74,7 +75,7 @@ for (const model of MODELS) useGLTF.preload(modelUrl(model))
  * site or station they run its behaviour's loop (world/behaviours.ts, ADR 0009): chop, carry, put
  * down, walk back — thinking or calling tools, never just standing there.
  */
-export function Adventurer({ view }: { view: AdventurerView }) {
+export function Adventurer({ view, onGone }: { view: AdventurerView; onGone?: (id: string) => void }) {
   const store = useGuildStore()
   const id = view.id
   const root = useRef<Group>(null)
@@ -103,6 +104,8 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     fade: new Fade(view.enter || view.phase === "leaving" ? 0 : 1),
     // Frozen: R3F re-applies a changed `position` prop, which would teleport them to each new target.
     start: view.enter?.at ?? view.target,
+    /** Reported dissolved (once). */
+    gone: false,
   }))
   const start = arrival.start
   const [dissolver] = useState(() => new Dissolver())
@@ -207,9 +210,9 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     view.phase === "resting" ? undefined : (gear.left ?? (dark && !bow ? NIGHT_LANTERN : undefined))
   const leftHeld = useHeld(body, kit, left)
 
-  // The blob under their feet fades with them (it is a soft disc: smaller reads as fainter).
+  // The blob under their feet fades with them as they dissolve (scene/dissolve.ts).
   const presence = useCallback(() => arrival.fade.value, [arrival])
-  useBlob(root, 0.85, presence)
+  useBlob(root, 0.85, undefined, presence)
 
   useEffect(() => {
     const id = view.id
@@ -321,6 +324,11 @@ export function Adventurer({ view }: { view: AdventurerView }) {
     const shown = arrival.fade.step(goal, delta, fadeSeconds(seconds))
     node.visible = shown > 0
     dissolver.set(node, shown)
+    // Dissolved away down the avenue: the stage may let a leaver it was keeping go (scene/exits.ts).
+    if (leaving && !arrival.gone && arrival.fade.state === "gone") {
+      arrival.gone = true
+      onGone?.(id)
+    }
     // The chip goes with them; gone, it leaves the declutter (no "+N" for someone not there).
     chip.anchor = shown > 0 ? node : null
     const opacity = Math.round(shown * 20) / 20
@@ -396,6 +404,7 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   const pleading = view.phase === "waiting"
   // Read by the declutter on its next run (refs, not state: no re-render for it).
   chip.pinned = selected || pleading
+  chip.selected = selected
   // Its deed sigil (scene/Sigils.tsx) finds this chip by id, to sit under it and follow its lift.
   chip.id = view.id
   const { verb, glyph } = verbOf(view)
@@ -404,6 +413,8 @@ export function Adventurer({ view }: { view: AdventurerView }) {
   const deed = view.doing && !quiet ? view.doing : ""
   /** Following another party: this one's chip steps back so the followed party reads first. */
   const aside = store.following !== null && view.party !== store.following && !selected && !pleading
+  // Speech, for the declutter's bubble rule (scene/chips.ts speaks); softer labels never speak.
+  chip.bubble = Boolean(view.bubble) && !quiet && !aside
 
   return (
     <group
@@ -437,7 +448,7 @@ export function Adventurer({ view }: { view: AdventurerView }) {
         </group>
       )}
       {/* Decorative: the roster is the accessible list of who is here and what they are doing. */}
-      <Html position={[0, CHIP_HEIGHT, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
+      <Label position={[0, CHIP_HEIGHT, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
         <div ref={fadeRef}>
           <div
             ref={chipRef}
@@ -461,7 +472,7 @@ export function Adventurer({ view }: { view: AdventurerView }) {
             </div>
           </div>
         </div>
-      </Html>
+      </Label>
     </group>
   )
 }

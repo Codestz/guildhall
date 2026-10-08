@@ -1,6 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { Object3D, OrthographicCamera } from "three"
-import { addChip, type ChipSlot, chipSlot, layout, resetChips } from "../src/scene/chips.ts"
+import {
+  addChip,
+  type ChipSlot,
+  chipSlot,
+  layout,
+  MAX_SPEAKERS,
+  READ_AT_PX,
+  resetChips,
+  setChipMode,
+  speaks,
+} from "../src/scene/chips.ts"
 
 /** Just enough of an HTMLElement for the declutter: a size, a style, attributes. */
 function fakeChip(w = 60, h = 20) {
@@ -94,5 +104,70 @@ describe("chip declutter", () => {
     chipAt(1, -5)
     layout(camera, 200, 200)
     expect(mid.attrs.has("data-folded")).toBe(false)
+  })
+})
+
+describe("speech bubbles", () => {
+  test("Hidden: never; Detailed: always; Minimal: the followed one, or close enough to read", () => {
+    expect(speaks("hidden", true, 100)).toBe(false)
+    expect(speaks("detailed", false, 1)).toBe(true)
+    expect(speaks("minimal", true, 1)).toBe(true)
+    expect(speaks("minimal", false, READ_AT_PX - 1)).toBe(false)
+    expect(speaks("minimal", false, READ_AT_PX)).toBe(true)
+  })
+
+  /** This camera spans 10 px a unit: the diorama's distance, too far to read speech unasked. */
+  function speaker(x: number, z: number, selected = false) {
+    const chip = chipAt(x, z, selected)
+    chip.slot.bubble = true
+    chip.slot.selected = selected
+    return chip
+  }
+
+  test("Minimal at overview distance: only the followed adventurer speaks", () => {
+    setChipMode("minimal")
+    const followed = speaker(-8, 0, true)
+    const other = speaker(8, 0)
+    settle()
+    expect(followed.attrs.has("data-speak")).toBe(true)
+    expect(other.attrs.has("data-speak")).toBe(false)
+  })
+
+  test("Hidden: no bubble at all, the followed one included", () => {
+    setChipMode("hidden")
+    const followed = speaker(0, 0, true)
+    settle()
+    expect(followed.attrs.has("data-speak")).toBe(false)
+  })
+
+  test("never two bubbles over one another: the nearer speaks", () => {
+    setChipMode("detailed")
+    const near = speaker(0, 5)
+    const far = speaker(2, -5)
+    settle()
+    expect(near.attrs.has("data-speak")).toBe(true)
+    expect(far.attrs.has("data-speak")).toBe(false)
+  })
+
+  test("at most MAX_SPEAKERS on screen, the followed one first", () => {
+    setChipMode("detailed")
+    // 100 px a unit: 450 px apart, no two bubbles touch; only the cap holds them back.
+    const chips = [speaker(-9, 4), speaker(-4.5, 3), speaker(4.5, 2), speaker(9, 1), speaker(0, -9, true)]
+    for (let i = 0; i < 3; i++) layout(camera, 2000, 2000)
+    const speaking = chips.filter((chip) => chip.attrs.has("data-speak"))
+    expect(speaking.length).toBe(MAX_SPEAKERS)
+    expect(chips[4]?.attrs.has("data-speak")).toBe(true)
+  })
+
+  test("nothing to say, nothing shown; a chip that stops speaking loses its bubble", () => {
+    setChipMode("detailed")
+    const quiet = chipAt(0, 0)
+    const talker = speaker(-8, 0)
+    settle()
+    expect(quiet.attrs.has("data-speak")).toBe(false)
+    expect(talker.attrs.has("data-speak")).toBe(true)
+    talker.slot.bubble = false
+    settle()
+    expect(talker.attrs.has("data-speak")).toBe(false)
   })
 })

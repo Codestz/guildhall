@@ -1,4 +1,5 @@
 import { type Camera, type Object3D, Vector3 } from "three"
+import type { HudMode } from "../hud/prefs.ts"
 import { pxPerUnit, sigilRoom, sizeFor } from "./sigilSize.ts"
 
 /**
@@ -12,6 +13,11 @@ import { pxPerUnit, sigilRoom, sizeFor } from "./sigilSize.ts"
  * A chip whose adventurer shows a deed sigil (scene/Sigils.tsx) keeps a band under itself for it
  * (`--room`, sigilSize.ts), and that band counts as part of the chip: no other chip is placed over a
  * sigil, and in the Hidden HUD (no name plate) the sigils alone still declutter.
+ *
+ * Speech bubbles are the declutter's too (`speaks`, below): with no HUD the world speaks only through
+ * the story captions; in Minimal a bubble shows for whoever you follow, or once the camera is close
+ * enough that speech belongs to a figure you can see; never two bubbles over one another and at most
+ * MAX_SPEAKERS on screen, nearest first, so they never stack into a wall of text.
  *
  * Nothing here goes through React: it writes a CSS variable (`--lift`), two attributes and a text,
  * and only when they change. CSS eases the lift and fades a folded chip, so nothing jumps.
@@ -30,6 +36,33 @@ const FOLD_AT = 3
 /** Runs a chip must want to fold (or unfold) before it does: chips walking past don't flicker. */
 const FOLD_AFTER = 3
 const UNFOLD_AFTER = 2
+/** Speech bubbles on screen at once, at most (the followed one counts among them). */
+export const MAX_SPEAKERS = 3
+/**
+ * CSS px a world unit must span before Minimal shows speech unasked: a figure ~45 px tall, close
+ * enough to read as a person. The diorama overview is ~6; Explore close-ups are 25 and up.
+ */
+export const READ_AT_PX = 18
+/** A bubble's widest box, px (hall.css `.chip .bubble`: 220 wide, two lines and the name). */
+const BUBBLE_W = 220
+const BUBBLE_H = 64
+
+/**
+ * May this chip's bubble show, by the HUD mode, who you follow and how close the camera is?
+ * Hidden: never (the captions carry the story). Detailed: always. Minimal: the followed one, or
+ * when close enough to read. (The declutter then caps it: no overlapping bubbles, MAX_SPEAKERS in all.)
+ */
+export function speaks(mode: HudMode, selected: boolean, perUnit: number): boolean {
+  if (mode === "hidden") return false
+  if (mode === "detailed" || selected) return true
+  return perUnit >= READ_AT_PX
+}
+
+let hud: HudMode = "minimal"
+/** The HUD mode, for the bubble rule (hud/Hud.tsx keeps it current). */
+export function setChipMode(mode: HudMode): void {
+  hud = mode
+}
 
 export interface ChipSlot {
   /** The adventurer's session id ("" for chips that are not an adventurer's): sigils find their chip by it. */
@@ -44,6 +77,10 @@ export interface ChipSlot {
   pinned: boolean
   /** A deed sigil shows under this chip: keep room for it (set by scene/Sigils.tsx). */
   sigil: boolean
+  /** This adventurer has something to say (a `.bubble` is in the chip). */
+  bubble: boolean
+  /** The one you follow (its bubble may show in Minimal at any distance). */
+  selected: boolean
   // ── per run ──
   on: boolean
   x: number
@@ -58,9 +95,14 @@ export interface ChipSlot {
   lift: number
   /** Px kept under the chip for its sigil, this run. */
   room: number
+  /** CSS px a world unit spans at the anchor, this run. */
+  perUnit: number
+  /** Its bubble shows, this run. */
+  speak: boolean
   // ── written state ──
   shownLift: number
   shownRoom: number
+  shownSpeak: boolean
   folded: boolean
   votes: number
   shownMore: number
@@ -75,6 +117,8 @@ export function chipSlot(): ChipSlot {
     more: null,
     pinned: false,
     sigil: false,
+    bubble: false,
+    selected: false,
     on: false,
     x: 0,
     y: 0,
@@ -86,8 +130,11 @@ export function chipSlot(): ChipSlot {
     count: 0,
     lift: 0,
     room: 0,
+    perUnit: 0,
+    speak: false,
     shownLift: 0,
     shownRoom: 0,
+    shownSpeak: false,
     folded: false,
     votes: 0,
     shownMore: 0,
@@ -136,7 +183,8 @@ export function layout(camera: Camera, width: number, height: number): void {
     if (!el || !anchor) continue
     scratch.set(0, CHIP_HEIGHT, 0)
     anchor.localToWorld(scratch)
-    const perUnit = slot.sigil ? pxPerUnit(camera, scratch, height) : 0
+    const perUnit = pxPerUnit(camera, scratch, height)
+    slot.perUnit = perUnit
     const size = slot.sigil ? sizeFor(perUnit) : 0
     slot.room = size ? sigilRoom(size, perUnit, CHIP_HEIGHT) : 0
     // The band counts as part of the chip, so a sigil alone (Hidden HUD: no plate) declutters too.
@@ -189,6 +237,17 @@ export function layout(camera: Camera, width: number, height: number): void {
     else slot.folded = false
   }
 
+  // ── speech: pinned and nearest first, never two bubbles in one place, MAX_SPEAKERS in all ──
+  let speakers = 0
+  for (const slot of order) slot.speak = false
+  for (const slot of order) {
+    if (speakers >= MAX_SPEAKERS) break
+    if (slot.folded || !slot.bubble || !speaks(hud, slot.selected, slot.perUnit)) continue
+    if (crowded(slot)) continue
+    slot.speak = true
+    speakers++
+  }
+
   // ── nudge: place shown chips in priority order, each above whatever it would cover ──
   for (const slot of order) slot.lift = 0
   for (let i = 0; i < order.length; i++) {
@@ -234,6 +293,11 @@ export function layout(camera: Camera, width: number, height: number): void {
     }
     // Attributes React never sets on the chip, so its re-renders can't undo them.
     if (el.hasAttribute("data-folded") !== slot.folded) el.toggleAttribute("data-folded", slot.folded)
+    if (!slot.on) slot.speak = false
+    if (slot.speak !== slot.shownSpeak) {
+      slot.shownSpeak = slot.speak
+      el.toggleAttribute("data-speak", slot.speak)
+    }
     if (slot.moreN !== slot.shownMore) {
       slot.shownMore = slot.moreN
       if (slot.more) slot.more.textContent = slot.moreN > 0 ? `+${slot.moreN}` : ""
@@ -298,6 +362,20 @@ function vote(slot: ChipSlot, fold: boolean): void {
   }
 }
 
+/**
+ * Would `slot`'s bubble crowd one already speaking? Judged on a bubble's full box (BUBBLE_W ×
+ * BUBBLE_H) at the chips' resting places, never on measured chips: whether a bubble shows changes
+ * a chip's size, and that must not turn speech on and off from one run to the next.
+ */
+function crowded(slot: ChipSlot): boolean {
+  for (const other of order) {
+    if (!other.speak || other === slot) continue
+    if (Math.abs(slot.x - other.x) < BUBBLE_W + GAP && Math.abs(slot.y - other.y) < BUBBLE_H + GAP)
+      return true
+  }
+  return false
+}
+
 /** The first shown chip of `slot`'s pile, in priority order. */
 function hostOf(slot: ChipSlot): ChipSlot | undefined {
   const root = find(slot.index)
@@ -310,4 +388,5 @@ export function resetChips(): void {
   slots.length = 0
   order.length = 0
   last = -Infinity
+  hud = "minimal"
 }

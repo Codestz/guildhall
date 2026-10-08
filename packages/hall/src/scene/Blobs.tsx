@@ -2,6 +2,7 @@ import { useFrame } from "@react-three/fiber"
 import { type RefObject, useEffect } from "react"
 import {
   CanvasTexture,
+  InstancedBufferAttribute,
   InstancedMesh,
   Matrix4,
   MeshBasicMaterial,
@@ -17,27 +18,53 @@ import { useOwnedMeshes } from "./owned.ts"
  * Soft contact shadows under everyone who walks (docs/perf-budget.md): the sun's shadow map is
  * static and drawn on demand (atmosphere/shadows.ts), so moving characters don't cast into it.
  * A blurred dark disc at their feet grounds them instead — one instanced draw call for all.
- * Walkers register their root; `size` scales the disc (0 hides it, e.g. a villager indoors).
+ * Walkers register their root; `size` scales the disc (0 hides it, e.g. a villager indoors) and
+ * `opacity` fades it (a character dissolving in or out: its shadow fades with it, never shrinks).
+ * Each disc's opacity rides in its instance colour's red channel (the disc itself is always black).
  */
 export interface Walker {
-  node: Object3D
+  node: Pick<Object3D, "visible">
   radius: number
-  size?: () => number
+  size?: (() => number) | undefined
+  opacity?: (() => number) | undefined
 }
 
-const walkers = new Set<Walker>()
+/** One walker's disc this frame: its radius and opacity. Pure, for tests. */
+export interface BlobLook {
+  size: number
+  alpha: number
+}
+
+/** Fills `out` with `walker`'s disc; false when there is nothing to draw (hidden, tiny or faded out). */
+export function blobOf(walker: Walker, out: BlobLook): boolean {
+  if (!walker.node.visible) return false
+  out.size = (walker.size?.() ?? 1) * walker.radius
+  const opacity = walker.opacity?.() ?? 1
+  out.alpha = opacity < 0 ? 0 : opacity > 1 ? 1 : opacity
+  return out.size > 0.01 && out.alpha > 0.005
+}
+
+const walkers = new Set<Walker & { node: Object3D }>()
 const MAX = 64
 
-/** Puts a soft shadow under `node` while mounted. `size` must be stable (a ref'd closure). */
-export function useBlob(node: RefObject<Object3D | null>, radius: number, size?: () => number): void {
+/**
+ * Puts a soft shadow under `node` while mounted. `size` and `opacity` must be stable (ref'd
+ * closures): `opacity` is how present the character is (its dissolve, scene/dissolve.ts).
+ */
+export function useBlob(
+  node: RefObject<Object3D | null>,
+  radius: number,
+  size?: () => number,
+  opacity?: () => number,
+): void {
   useEffect(() => {
     if (!node.current) return
-    const entry: Walker = { node: node.current, radius, size }
+    const entry: Walker & { node: Object3D } = { node: node.current, radius, size, opacity }
     walkers.add(entry)
     return () => {
       walkers.delete(entry)
     }
-  }, [node, radius, size])
+  }, [node, radius, size, opacity])
 }
 
 export function Blobs() {
@@ -51,7 +78,16 @@ export function Blobs() {
       polygonOffset: true,
       polygonOffsetFactor: -2,
     })
+    // Per-disc opacity: the instance colour's red channel scales alpha; the colour stays black.
+    material.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <color_fragment>",
+        "#ifdef USE_COLOR\n\tdiffuseColor.a *= vColor.r;\n#endif",
+      )
+    }
+    material.customProgramCacheKey = () => "blob-alpha"
     const mesh = new InstancedMesh(new PlaneGeometry(2, 2).rotateX(-Math.PI / 2), material, MAX)
+    mesh.instanceColor = new InstancedBufferAttribute(new Float32Array(MAX * 3).fill(1), 3)
     mesh.frustumCulled = false
     mesh.renderOrder = 1
     mesh.castShadow = false
@@ -65,18 +101,20 @@ export function Blobs() {
     const material = instances.material
     // As dark as the sun's own shadows: softer under cloud, faint by moonlight.
     material.opacity = 0.5 * sky.keyShadow * Math.min(1, sky.keyIntensity / 1.5 + 0.35)
+    const alphas = instances.instanceColor?.array
     let k = 0
     for (const walker of walkers) {
       if (k >= MAX) break
-      const size = (walker.size?.() ?? 1) * walker.radius
-      if (size <= 0.01 || !walker.node.visible) continue
+      if (!blobOf(walker, look)) continue
       walker.node.getWorldPosition(position)
       position.y += 0.03
-      scale.set(size, 1, size)
+      scale.set(look.size, 1, look.size)
+      if (alphas) alphas[k * 3] = look.alpha
       instances.setMatrixAt(k++, matrix.compose(position, IDENTITY, scale))
     }
     instances.count = k
     instances.instanceMatrix.needsUpdate = true
+    if (instances.instanceColor) instances.instanceColor.needsUpdate = true
   })
 
   return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
@@ -102,3 +140,4 @@ const IDENTITY = new Quaternion()
 const position = new Vector3()
 const scale = new Vector3()
 const matrix = new Matrix4()
+const look: BlobLook = { size: 0, alpha: 0 }

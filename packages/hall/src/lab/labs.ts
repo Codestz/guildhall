@@ -18,6 +18,7 @@ export const LABS = {
   prop: () => import("./propLab.ts"),
   event: () => import("./eventLab.tsx"),
   crowd: () => import("./crowdLab.ts"),
+  island: () => import("./islandLab.ts"),
 } satisfies Record<string, () => Promise<{ start(root: HTMLElement, params: URLSearchParams): unknown }>>
 
 export type LabName = keyof typeof LABS

@@ -1,0 +1,19 @@
+{
+  "repo": "jonschlinkert/is-odd",
+  "branch": "master",
+  "truncated": false,
+  "entries": [
+    { "path": ".editorconfig", "type": "blob", "size": 289 },
+    { "path": ".eslintrc.json", "type": "blob", "size": 3797 },
+    { "path": ".gitattributes", "type": "blob", "size": 127 },
+    { "path": ".gitignore", "type": "blob", "size": 302 },
+    { "path": ".npmrc", "type": "blob", "size": 19 },
+    { "path": ".travis.yml", "type": "blob", "size": 127 },
+    { "path": ".verb.md", "type": "blob", "size": 230 },
+    { "path": "LICENSE", "type": "blob", "size": 1091 },
+    { "path": "README.md", "type": "blob", "size": 3495 },
+    { "path": "index.js", "type": "blob", "size": 543 },
+    { "path": "package.json", "type": "blob", "size": 1381 },
+    { "path": "test.js", "type": "blob", "size": 1057 }
+  ]
+}

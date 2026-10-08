@@ -6,6 +6,7 @@
     { "path": "packages/sim" },
     { "path": "packages/hub" },
     { "path": "packages/herald" },
+    { "path": "packages/claude-code" },
     { "path": "packages/opencode-guildhall" },
     { "path": "packages/hall" }
   ]

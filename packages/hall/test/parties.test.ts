@@ -124,6 +124,8 @@ describe("parties: names", () => {
     expect(partyNameOf("Sweep the repo: 12 parallel quests")).toBe("Repo")
     expect(partyNameOf("")).toBe("")
     expect(partyNameOf("add")).toBe("")
+    expect(partyNameOf("Add rate limiting to the public API")).toBe("Rate limiting")
+    expect(partyNameOf("Why does the nightly export time out?")).toBe("Export time")
   })
 
   test("two parties about the same thing are told apart", () => {

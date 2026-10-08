@@ -12,6 +12,7 @@ import {
 import { type DeedLook, deedLook, interestOf, roleOf } from "@guildhall/roster"
 import {
   type Chapter,
+  factions,
   Player,
   parties,
   party,
@@ -73,7 +74,10 @@ export type { Seat }
 /** How many adventurers `rush` sends out (unset: the story's own 12); a deep link's `n` sets it. */
 export const RUSH: { count?: number } = {}
 
-export const SCENARIOS: Record<"saga" | "party" | "solo" | "rush" | "parties", () => Change[] | Tale> = {
+export const SCENARIOS: Record<
+  "saga" | "party" | "solo" | "rush" | "parties" | "factions",
+  () => Change[] | Tale
+> = {
   /** The showcase's story: five acts, ~17 min watched, every world event (sim/saga.ts). */
   saga: () => sagaTale(),
   party: () => party(),
@@ -81,6 +85,8 @@ export const SCENARIOS: Record<"saga" | "party" | "solo" | "rush" | "parties", (
   rush: () => rush(RUSH.count),
   /** Three conversations at once: several parties on one island (guild/parties.ts). */
   parties: () => parties(),
+  /** Two harnesses at once: an OpenCode party and a Claude Code party (sim/factions.ts). */
+  factions: () => factions(),
 }
 export type ScenarioId = keyof typeof SCENARIOS
 

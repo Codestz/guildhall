@@ -1,0 +1,256 @@
+{
+  "note": "SYNTHESIZED, not recorded: written by hand from the documented hook input schema (https://code.claude.com/docs/en/hooks, fetched 2026-10-08). Replace with recorded payloads when available.",
+  "events": [
+    {
+      "session_id": "5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13",
+      "transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13.jsonl",
+      "cwd": "/Users/dev/shop",
+      "permission_mode": "default",
+      "hook_event_name": "UserPromptSubmit",
+      "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
+      "prompt": "Add cursor pagination to GET /users"
+    },
+    {
+      "session_id": "5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13",
+      "transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13.jsonl",
+      "cwd": "/Users/dev/shop",
+      "permission_mode": "default",
+      "hook_event_name": "PreToolUse",
+      "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
+      "tool_name": "Agent",
+      "tool_input": {
+        "description": "Map how GET /users flows",
+        "prompt": "Trace GET /users from route to query. Report file paths.",
+        "subagent_type": "Explore"
+      },
+      "tool_use_id": "toolu_02Explore"
+    },
+    {
+      "session_id": "5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13",
+      "transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13.jsonl",
+      "cwd": "/Users/dev/shop",
+      "permission_mode": "default",
+      "hook_event_name": "SubagentStart",
+      "agent_id": "agent-b81f0c2d9e4a6713",
+      "agent_type": "Explore"
+    },
+    {
+      "session_id": "5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13",
+      "transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13.jsonl",
+      "cwd": "/Users/dev/shop",
+      "permission_mode": "default",
+      "hook_event_name": "PostToolUse",
+      "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
+      "tool_name": "Agent",
+      "tool_input": {
+        "description": "Map how GET /users flows",
+        "prompt": "Trace GET /users from route to query. Report file paths.",
+        "subagent_type": "Explore"
+      },
+      "tool_response": {
+        "status": "async_launched",
+        "agentId": "b81f0c2d9e4a6713",
+        "description": "Map how GET /users flows",
+        "prompt": "Trace GET /users from route to query. Report file paths.",
+        "outputFile": "/tmp/claude/tasks/b81f0c2d9e4a6713.output",
+        "resolvedModel": "claude-haiku-4-5"
+      },
+      "tool_use_id": "toolu_02Explore",
+      "duration_ms": 40
+    },
+    {
+      "session_id": "5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13",
+      "transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13.jsonl",
+      "cwd": "/Users/dev/shop",
+      "permission_mode": "default",
+      "hook_event_name": "PreToolUse",
+      "agent_id": "b81f0c2d9e4a6713",
+      "agent_type": "Explore",
+      "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
+      "tool_name": "Grep",
+      "tool_input": {
+        "pattern": "findUsers",
+        "path": "/Users/dev/shop/src",
+        "output_mode": "files_with_matches"
+      },
+      "tool_use_id": "toolu_02Grep"
+    },
+    {
+      "session_id": "5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13",
+      "transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13.jsonl",
+      "cwd": "/Users/dev/shop",
+      "permission_mode": "default",
+      "hook_event_name": "PostToolUse",
+      "agent_id": "b81f0c2d9e4a6713",
+      "agent_type": "Explore",
+      "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
+      "tool_name": "Grep",
+      "tool_input": {
+        "pattern": "findUsers",
+        "path": "/Users/dev/shop/src",
+        "output_mode": "files_with_matches"
+      },
+      "tool_response": {
+        "mode": "files_with_matches",
+        "filenames": ["/Users/dev/shop/src/users/queries.ts"],
+        "numFiles": 1
+      },
+      "tool_use_id": "toolu_02Grep",
+      "duration_ms": 25
+    },
+    {
+      "session_id": "5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13",
+      "transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13.jsonl",
+      "cwd": "/Users/dev/shop",
+      "permission_mode": "default",
+      "hook_event_name": "SubagentStop",
+      "agent_id": "agent-b81f0c2d9e4a6713",
+      "agent_type": "Explore",
+      "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
+      "stop_hook_active": false,
+      "agent_transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13/subagents/agent-b81f0c2d9e4a6713.jsonl",
+      "last_assistant_message": "routes.ts -> service.ts -> queries.ts",
+      "background_tasks": [],
+      "session_crons": []
+    },
+    {
+      "session_id": "5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13",
+      "transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13.jsonl",
+      "cwd": "/Users/dev/shop",
+      "permission_mode": "default",
+      "hook_event_name": "PreToolUse",
+      "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
+      "tool_name": "Agent",
+      "tool_input": {
+        "description": "Implement cursor pagination",
+        "prompt": "Add an opaque cursor on (created_at, id) to GET /users.",
+        "subagent_type": "agentry:implementer"
+      },
+      "tool_use_id": "toolu_02Impl"
+    },
+    {
+      "session_id": "5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13",
+      "transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13.jsonl",
+      "cwd": "/Users/dev/shop",
+      "permission_mode": "default",
+      "hook_event_name": "SubagentStart",
+      "agent_id": "a4d2c8f1e0b3a297",
+      "agent_type": "agentry:implementer"
+    },
+    {
+      "session_id": "5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13",
+      "transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13.jsonl",
+      "cwd": "/Users/dev/shop",
+      "permission_mode": "default",
+      "hook_event_name": "PreToolUse",
+      "agent_id": "a4d2c8f1e0b3a297",
+      "agent_type": "agentry:implementer",
+      "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "/Users/dev/shop/src/users/cursor.ts",
+        "content": "export const encode = (c) => btoa(JSON.stringify(c))\nexport const decode = (s) => JSON.parse(atob(s))\n"
+      },
+      "tool_use_id": "toolu_02Write"
+    },
+    {
+      "session_id": "5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13",
+      "transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13.jsonl",
+      "cwd": "/Users/dev/shop",
+      "permission_mode": "default",
+      "hook_event_name": "PostToolUse",
+      "agent_id": "a4d2c8f1e0b3a297",
+      "agent_type": "agentry:implementer",
+      "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
+      "tool_name": "Write",
+      "tool_input": {
+        "file_path": "/Users/dev/shop/src/users/cursor.ts",
+        "content": "export const encode = (c) => btoa(JSON.stringify(c))\nexport const decode = (s) => JSON.parse(atob(s))\n"
+      },
+      "tool_response": {
+        "type": "create",
+        "filePath": "/Users/dev/shop/src/users/cursor.ts"
+      },
+      "tool_use_id": "toolu_02Write",
+      "duration_ms": 9
+    },
+    {
+      "session_id": "5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13",
+      "transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13.jsonl",
+      "cwd": "/Users/dev/shop",
+      "permission_mode": "default",
+      "hook_event_name": "SubagentStop",
+      "agent_id": "a4d2c8f1e0b3a297",
+      "agent_type": "agentry:implementer",
+      "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
+      "stop_hook_active": false,
+      "agent_transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13/subagents/agent-a4d2c8f1e0b3a297.jsonl",
+      "last_assistant_message": "DONE: cursor pagination on GET /users, tests green.",
+      "background_tasks": [],
+      "session_crons": []
+    },
+    {
+      "session_id": "5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13",
+      "transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13.jsonl",
+      "cwd": "/Users/dev/shop",
+      "permission_mode": "default",
+      "hook_event_name": "PostToolUse",
+      "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
+      "tool_name": "Agent",
+      "tool_input": {
+        "description": "Implement cursor pagination",
+        "prompt": "Add an opaque cursor on (created_at, id) to GET /users.",
+        "subagent_type": "agentry:implementer"
+      },
+      "tool_response": {
+        "status": "completed",
+        "agentId": "a4d2c8f1e0b3a297",
+        "content": [
+          {
+            "type": "text",
+            "text": "DONE: cursor pagination on GET /users, tests green."
+          }
+        ],
+        "resolvedModel": "claude-sonnet-4-5",
+        "totalTokens": 12450,
+        "totalDurationMs": 48211,
+        "totalToolUseCount": 2,
+        "usage": {
+          "input_tokens": 8320,
+          "output_tokens": 410,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 3720
+        }
+      },
+      "tool_use_id": "toolu_02Impl",
+      "duration_ms": 48300
+    },
+    {
+      "session_id": "5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13",
+      "transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13.jsonl",
+      "cwd": "/Users/dev/shop",
+      "permission_mode": "default",
+      "hook_event_name": "SubagentStop",
+      "agent_id": "c0ffee00c0ffee00",
+      "agent_type": "",
+      "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
+      "stop_hook_active": false,
+      "agent_transcript_path": "",
+      "last_assistant_message": "Try: run the tests",
+      "background_tasks": [],
+      "session_crons": []
+    },
+    {
+      "session_id": "5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13",
+      "transcript_path": "/Users/dev/.claude/projects/-Users-dev-shop/5c0a7b1e-3f2d-4b8e-9a61-0d2c4e8f7a13.jsonl",
+      "cwd": "/Users/dev/shop",
+      "permission_mode": "default",
+      "hook_event_name": "Stop",
+      "prompt_id": "550e8400-e29b-41d4-a716-446655440000",
+      "stop_hook_active": false,
+      "last_assistant_message": "Pagination is in: opaque cursor, limit up to 100.",
+      "background_tasks": [],
+      "session_crons": []
+    }
+  ]
+}

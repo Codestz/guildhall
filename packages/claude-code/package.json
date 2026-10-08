@@ -1,0 +1,16 @@
+{
+  "name": "@guildhall/claude-code",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@guildhall/core": "workspace:*",
+    "@guildhall/roster": "workspace:*"
+  },
+  "devDependencies": {
+    "@guildhall/hub": "workspace:*"
+  }
+}

@@ -279,7 +279,7 @@ function lowestFree(taken: readonly number[], size: number): number {
 
 /** Words that open a request without saying what it is about. */
 const LEAD = new Set(
-  "add fix make build create implement update refactor write sweep improve remove delete rename move check debug investigate review help please can could would you i we let lets let's the a an our my some new get set up do go try use run find look explore plan design migrate port clean tidy speed support handle".split(
+  "add fix make build create implement update refactor write sweep improve remove delete rename move check debug investigate review help please can could would you i we let lets let's the a an our my some new get set up do go try use run find look explore plan design migrate port clean tidy speed support handle why how what which where who does did is was were".split(
     " ",
   ),
 )
@@ -291,7 +291,7 @@ const STOP = new Set(
 )
 /** A last word too plain to stand alone: `timezone bug`, not `bug`. */
 const PLAIN = new Set(
-  "bug bugs issue issues error errors problem problems feature features page pages test tests flow flows thing things stuff module modules code file files api endpoint endpoints quests quest work store stores service services system layer handler model table cache client server job script config".split(
+  "bug bugs issue issues error errors problem problems feature features page pages test tests flow flows thing things stuff module modules code file files api endpoint endpoints quests quest work store stores service services system layer handler model table cache client server job script config time".split(
     " ",
   ),
 )
@@ -329,7 +329,9 @@ export function partyNameOf(text: string | undefined): string {
   }
   if (phrase.length === 0) return ""
   const last = phrase.at(-1) ?? ""
-  const picked = PLAIN.has(last.toLowerCase()) && phrase.length > 1 ? phrase.slice(-2) : [last]
+  // A plain head (`bug`) or a gerund (`limiting`) reads better with the word before it.
+  const lean = PLAIN.has(last.toLowerCase()) || /ing$/i.test(last)
+  const picked = lean && phrase.length > 1 ? phrase.slice(-2) : [last]
   const name = picked.join(" ")
   const short = name.length > 22 ? `${name.slice(0, 21)}…` : name
   // Keep a word's own capitals (formatDate, OAuth); otherwise capitalise the first letter.

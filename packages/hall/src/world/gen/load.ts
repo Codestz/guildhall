@@ -33,9 +33,30 @@ const fixtures = (): Record<string, () => Promise<Fixture>> =>
 const SAMPLE = "guildhall"
 const CACHE = "guildhall.repo:"
 
-/** The tree for `wanted` ("sample", "owner/name" or a GitHub URL). Rejects with a friendly reason. */
+/** Why a tree couldn't be had, for a HUD that answers each differently (hud/RepoDoor.tsx). */
+export type RepoFailure = "invalid" | "missing" | "rate" | "network" | "github"
+
+/** treeFor's rejection: the friendly reason as its message, plus what kind of failure it was. */
+export class RepoLoadError extends Error {
+  override name = "RepoLoadError"
+  constructor(
+    message: string,
+    readonly kind: RepoFailure,
+    /** When GitHub's rate limit resets (`rate` only, when GitHub said). */
+    readonly resetAt?: Date,
+  ) {
+    super(message)
+  }
+}
+
+/** The tree for `wanted` ("sample", "owner/name" or a GitHub URL). Rejects with a RepoLoadError. */
 export async function treeFor(wanted: string): Promise<Tree> {
-  const repo = wanted === "sample" ? undefined : parseRepo(wanted)
+  let repo: string | undefined
+  try {
+    repo = wanted === "sample" ? undefined : parseRepo(wanted)
+  } catch (error) {
+    throw new RepoLoadError((error as Error).message, "invalid")
+  }
   const name = repo ? repo.replace("/", "__").toLowerCase() : SAMPLE
   const bundled = Object.entries(fixtures()).find(([path]) => path.toLowerCase().endsWith(`/${name}.json`))
   if (bundled) {
@@ -51,8 +72,28 @@ export async function treeFor(wanted: string): Promise<Tree> {
     remember(out)
     return out
   } catch (error) {
-    throw new Error(reasonOf(error, repo))
+    throw failureOf(error, repo)
   }
+}
+
+/** A failed fetch of `repo`'s tree as a RepoLoadError: the reason in words, its kind, the reset time. */
+export function failureOf(error: unknown, repo: string): RepoLoadError {
+  return new RepoLoadError(reasonOf(error, repo), kindOf(error), resetOf(error))
+}
+
+function kindOf(error: unknown): RepoFailure {
+  if (!(error instanceof GitHubError)) return "network"
+  if (error.status === 404) return "missing"
+  if (error.status === 403 || error.status === 429) return "rate"
+  return "github"
+}
+
+/** The reset time fetchPublicTree writes into its rate-limit message ("resets at <ISO>"). */
+function resetOf(error: unknown): Date | undefined {
+  if (!(error instanceof GitHubError)) return undefined
+  const iso = /resets at ([0-9T:.-]+Z)/.exec(error.message)?.[1]
+  const when = iso ? new Date(iso) : undefined
+  return when && Number.isFinite(when.getTime()) ? when : undefined
 }
 
 /** What went wrong, in words for the HUD. */

@@ -326,14 +326,17 @@ const FERRY_SCALE = 1
 const FERRY_DRAFT = 1
 
 /**
- * An island's name on its far coast in the map view (clear of the adventurers' chips over the keep), in its main language's colour: a button that flies
- * there. Also an invisible disc over its land in the map view, so a click on the island itself
- * does the same.
+ * An island's name on its far coast in the map view, in its main language's colour: a button that
+ * flies there. Drawn over the adventurers' chips; the home island's on its near coast, clear of them.
+ * Also an invisible disc over its land in the map view, so a click on the island itself does the same.
  */
 function IslandMark({ island, stop, map }: { island: IslandInfo; stop: Stop; map: boolean }) {
   const disc = useMemo(() => new CircleGeometry(island.reach, 24).rotateX(-Math.PI / 2), [island.reach])
   useEffect(() => () => disc.dispose(), [disc])
   if (!map) return null
+  // The home island's keep is where the guild stands, and its chips climb up the screen from there
+  // into the plate's usual spot (the far coast): that plate goes to the near coast, under them.
+  const out = island.reach * (stop === HOME ? HOME_PLATE_OUT : PLATE_OUT)
   return (
     <group position={[island.at[0], 0, island.at[1]]}>
       <mesh
@@ -346,7 +349,7 @@ function IslandMark({ island, stop, map }: { island: IslandInfo; stop: Stop; map
       >
         <meshBasicMaterial colorWrite={false} depthWrite={false} />
       </mesh>
-      <Label position={[-island.reach * 0.5, 10, -island.reach * 0.5]} center zIndexRange={[18, 0]}>
+      <Label position={[-out, 10, -out]} center zIndexRange={PLATE_Z}>
         <button
           type="button"
           className="island-mark"
@@ -362,6 +365,16 @@ function IslandMark({ island, stop, map }: { island: IslandInfo; stop: Stop; map
     </group>
   )
 }
+
+/** A plate's spot, as a share of its island's reach out along the far diagonal. */
+const PLATE_OUT = 0.5
+/** The home island's: negative, the near coast. */
+const HOME_PLATE_OUT = -0.6
+/**
+ * Over the adventurers' chips (scene/Adventurer.tsx, 20…0): on the map an island's name is what the
+ * view is for, so a chip passing under it never covers it.
+ */
+const PLATE_Z: readonly [number, number] = [24, 21]
 
 const facing = new Quaternion()
 const place = new Vector3()

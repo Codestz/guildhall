@@ -17,6 +17,7 @@ import { Opening } from "./Opening.tsx"
 import { PartySwitcher } from "./Parties.tsx"
 import { Pleas } from "./Pleas.tsx"
 import { HUD_MODES, type HudMode, hudPrefs, useHudPrefs } from "./prefs.ts"
+import { RepoDoor, repoDoor, useRepoDoor } from "./RepoDoor.tsx"
 import { RepoLegend } from "./RepoLegend.tsx"
 import { Roster, RosterBadges } from "./Roster.tsx"
 import { Settings } from "./Settings.tsx"
@@ -72,6 +73,7 @@ export function Hud() {
   const book = useRef<HTMLButtonElement>(null)
   const root = useRef<HTMLDivElement>(null)
   const soundWaiting = useSoundWaiting()
+  const door = useRepoDoor()
 
   const view = store.selected ? store.views.find((v) => v.id === store.selected) : undefined
   const dossier = mode !== "hidden" && Boolean(store.selected && store.sessionOf(store.selected))
@@ -134,6 +136,18 @@ export function Hud() {
     requestAnimationFrame(() => gear.current?.focus())
   }
 
+  // On a phone the door replaces the sheet it was opened from (Settings), one sheet at a time; once
+  // it closes, focus that had nowhere to go back to lands on the gear.
+  const doorWas = useRef(false)
+  useEffect(() => {
+    if (door && phone && settings) setSettings(false)
+    if (doorWas.current && !door)
+      requestAnimationFrame(() => {
+        if (document.activeElement === document.body) gear.current?.focus()
+      })
+    doorWas.current = door
+  }, [door, phone, settings])
+
   // Tell the camera what the panels cover, so the Bard frames its subject in the clear area
   // (guild/director.ts clearFrame). Px, matching hall.css: --gut 16, --left-w 304, --right-w 356.
   const pleaBanner = !hidden && pleas > 0
@@ -162,6 +176,11 @@ export function Hud() {
       const target = event.target
       if (target instanceof HTMLElement && /textarea|select/i.test(target.tagName)) return
       if (target instanceof HTMLInputElement && target.type !== "range") return
+      // The repo door is modal (hud/RepoDoor.tsx): Esc closes it, nothing else reaches the HUD.
+      if (door) {
+        if (event.key === "Escape") repoDoor.close()
+        return
+      }
       // The book is modal: Esc closes it, and nothing else reaches the HUD meanwhile.
       if (legends) {
         if (event.key === "Escape") closeLegends()
@@ -325,6 +344,7 @@ export function Hud() {
       )}
 
       <FastForward store={store} />
+      {door && <RepoDoor />}
 
       {prefs.captions && (
         <Captions

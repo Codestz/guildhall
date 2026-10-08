@@ -1,4 +1,6 @@
 import { useWorld, useWorldStatus } from "../world/source.ts"
+import { Icon } from "./icons.tsx"
+import { repoDoor } from "./RepoDoor.tsx"
 
 /** How each biome reads in the legend. */
 const BIOME: Record<string, string> = {
@@ -33,6 +35,10 @@ export function RepoLegend() {
         <p className="repo-note">
           Couldn't grow {status.repo}: {status.reason}. This is the guild's own island.
         </p>
+        <button type="button" className="repo-again" aria-haspopup="dialog" onClick={repoDoor.open}>
+          <Icon.retry />
+          Try another repo
+        </button>
       </section>
     )
   if (!repo) return null
@@ -40,7 +46,19 @@ export function RepoLegend() {
   const files = repo.districts.reduce((sum, district) => sum + district.files, 0)
   return (
     <section className="plaque repo-legend" aria-label={`Island grown from ${repo.repo}`}>
-      <h2 className="repo-name">{repo.repo}</h2>
+      <div className="repo-head">
+        <h2 className="repo-name">{repo.repo}</h2>
+        <button
+          type="button"
+          className="icon-btn repo-door"
+          aria-haspopup="dialog"
+          aria-label="Your repo as an island: grow another, share this one"
+          title="Grow another · share"
+          onClick={repoDoor.open}
+        >
+          <Icon.island />
+        </button>
+      </div>
       <p className="repo-meta">
         {files.toLocaleString("en")} files · {repo.districts.length} districts
         {repo.truncated ? " · partial tree" : ""}

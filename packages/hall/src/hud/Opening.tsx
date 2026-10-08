@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import type { OpeningState } from "../guild/opening.ts"
 import type { GuildStore } from "../guild/store.ts"
 import { Icon } from "./icons.tsx"
+import { repoDoor } from "./RepoDoor.tsx"
 
 /** The project's home, linked from the showcase caption. */
 export const PROJECT_URL = "https://github.com/Codestz/guildhall"
@@ -81,25 +82,31 @@ export function Opening({ state, store, phone }: { state: OpeningState; store: G
             <b>A simulated guild at work on a feature.</b>{" "}
             <span>{touch ? "Tap" : "Click"} anyone to follow.</span>
           </p>
-          <a className="caption-link" href={PROJECT_URL} target="_blank" rel="noopener noreferrer">
-            About the project
-            <svg
-              className="glyph"
-              width="13"
-              height="13"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-              focusable="false"
-            >
-              <path d="M6 3.5H3.5v9h9V10M9 3h4v4M13 3 7.5 8.5" />
-            </svg>
-            <span className="visually-hidden"> (opens in a new tab)</span>
-          </a>
+          <span className="caption-links">
+            <button type="button" className="caption-link" aria-haspopup="dialog" onClick={repoDoor.open}>
+              <Icon.island />
+              Your repo as an island
+            </button>
+            <a className="caption-link" href={PROJECT_URL} target="_blank" rel="noopener noreferrer">
+              About the project
+              <svg
+                className="glyph"
+                width="13"
+                height="13"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="M6 3.5H3.5v9h9V10M9 3h4v4M13 3 7.5 8.5" />
+              </svg>
+              <span className="visually-hidden"> (opens in a new tab)</span>
+            </a>
+          </span>
           <button
             type="button"
             className="icon-btn caption-close"

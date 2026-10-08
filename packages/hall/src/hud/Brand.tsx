@@ -1,8 +1,19 @@
 import { useEffect, useState } from "react"
+import { MODE } from "../guild/mode.ts"
 import type { GuildStore } from "../guild/store.ts"
 import { Icon } from "./icons.tsx"
+import { repoDoor } from "./RepoDoor.tsx"
 
 const SNIPPET = `"plugin": ["opencode-guildhall"]`
+
+/**
+ * The "How it's built" page (how.html). The site and the dev server serve it at /how; a hall served
+ * by the hub links the public copy, in a new tab so the live guild stays open.
+ */
+const HOW =
+  MODE === "showcase" || import.meta.env.DEV
+    ? { href: "/how", away: false }
+    : { href: "https://guildhall.codestz.dev/how", away: true }
 
 /**
  * Who we are, in one line: the crest, the name and a status line that says honestly what is on
@@ -83,6 +94,7 @@ export function Brand({ store, open, onToggle }: { store: GuildStore; open: bool
               : "Start OpenCode with the guildhall plugin; the hub starts with it."
             : "A scripted run, not live telemetry. Installed, the hall shows your own agents as they work."}
         </p>
+        <DoorLink />
         <div className="install">
           <span className="install-label">
             Add to <code>opencode.json</code>
@@ -103,7 +115,30 @@ export function Brand({ store, open, onToggle }: { store: GuildStore; open: bool
             {copied ? "Install line copied to clipboard" : ""}
           </span>
         </div>
+        <a
+          className="about-how"
+          href={HOW.href}
+          {...(HOW.away ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        >
+          How it's built
+          <span className="about-how-note">crowds, WebGPU, measured</span>
+          {HOW.away && <span className="visually-hidden"> (opens in a new tab)</span>}
+        </a>
       </div>
     </header>
+  )
+}
+
+/** The repo door's way in (hud/RepoDoor.tsx), shared by the about card and Settings. */
+export function DoorLink() {
+  return (
+    <button type="button" className="set-link door-link" aria-haspopup="dialog" onClick={repoDoor.open}>
+      <Icon.island />
+      <span className="toggle-text">
+        <b>Your repo as an island</b>
+        <span>Grow one from any public GitHub repo</span>
+      </span>
+      <Icon.chevron />
+    </button>
   )
 }

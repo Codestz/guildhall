@@ -1,6 +1,8 @@
 import { type CSSProperties, useEffect, useRef } from "react"
 import { HOME, islandView, type Stop, useIslandView } from "../scene/archipelago/view.ts"
 import { archipelagoSource, useArchipelago, useArchipelagoStatus } from "../world/archipelagoSource.ts"
+import { Icon } from "./icons.tsx"
+import { repoDoor } from "./RepoDoor.tsx"
 
 /**
  * The archipelago's switcher (`?archipelago`, world/archipelagoSource.ts): the map, then every
@@ -75,6 +77,19 @@ export function IslandSwitcher({ compact = false }: { compact?: boolean }) {
             </li>
           )
         })}
+        <li>
+          <button
+            type="button"
+            className="party-row island-row island-add"
+            aria-haspopup="dialog"
+            onClick={repoDoor.open}
+            aria-label="Add an island: grow your repo"
+            title="Add an island"
+          >
+            <Icon.plus />
+            {!compact && <span className="party-name">Add an island</span>}
+          </button>
+        </li>
       </ul>
       {failed.length > 0 && !compact && (
         <p className="repo-note island-failed">
@@ -97,6 +112,8 @@ export function IslandKeys() {
       if (!archipelago || event.metaKey || event.ctrlKey || event.altKey) return
       const target = event.target
       if (target instanceof HTMLElement && /input|textarea|select/i.test(target.tagName)) return
+      // A modal (the Legends, the repo door) keeps its keys to itself.
+      if (target instanceof HTMLElement && target.closest('[aria-modal="true"]')) return
       const now = islandView.get().stop
       if (event.key === "m" || event.key === "M") {
         if (now === "map") islandView.go(before.current)

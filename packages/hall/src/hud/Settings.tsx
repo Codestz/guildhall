@@ -5,6 +5,7 @@ import { type QualityChoice, quality, TIERS, type Tier } from "../guild/quality.
 import { type GuildStore, SCENARIOS, type ScenarioId } from "../guild/store.ts"
 import { active, BACKEND_NAME, type Backend, backendUrl, webgpuAvailable } from "../render/backend.ts"
 import { MOODS, type Mood } from "../world/moods.ts"
+import { DoorLink } from "./Brand.tsx"
 import { Icon } from "./icons.tsx"
 import { HUD_MODES, type HudMode, hudPrefs, useHudPrefs } from "./prefs.ts"
 import { SoundLevers } from "./Sound.tsx"
@@ -93,6 +94,9 @@ export function Settings({
       </header>
 
       <div className="settings-body">
+        <Section title="Your repo">
+          <DoorLink />
+        </Section>
         {onLegends && (
           <Section title="Legends">
             <button type="button" className="set-link" aria-haspopup="dialog" onClick={onLegends}>

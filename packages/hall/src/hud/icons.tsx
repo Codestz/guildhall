@@ -99,6 +99,31 @@ export const Icon = {
       <path d="m4 4 8 8M12 4l-8 8" />
     </Glyph>
   ),
+  /* The repo door (hud/RepoDoor.tsx): an island on a wave, a link, a plus, try again. */
+  island: () => (
+    <Glyph>
+      <path d="M3 10.5c1-2.6 2.8-4 5-4s4 1.4 5 4" />
+      <path d="M8 6.5V3l2.6 1.2L8 5.4" />
+      <path d="M1.5 13c1.1 0 1.6-.8 2.7-.8s1.6.8 2.7.8 1.6-.8 2.7-.8 1.6.8 2.7.8 1.1-.4 2.2-.8" />
+    </Glyph>
+  ),
+  link: () => (
+    <Glyph>
+      <path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2.2-2.2a2.6 2.6 0 0 0-3.7-3.7l-.9.9" />
+      <path d="M9.2 6.8a2.6 2.6 0 0 0-3.7 0L3.3 9a2.6 2.6 0 0 0 3.7 3.7l.9-.9" />
+    </Glyph>
+  ),
+  plus: () => (
+    <Glyph>
+      <path d="M8 3v10M3 8h10" />
+    </Glyph>
+  ),
+  retry: () => (
+    <Glyph>
+      <path d="M12.8 6.2A5 5 0 1 0 13 9.5" />
+      <path d="M13.2 2.8v3.6H9.6" />
+    </Glyph>
+  ),
   chevron: () => (
     <Glyph>
       <path d="m4 6 4 4 4-4" />

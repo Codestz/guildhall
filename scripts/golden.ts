@@ -127,7 +127,7 @@ export const VIEWS: View[] = [
     name: "festival-night",
     link: "story=saga&t=30:00&hour=21&weather=clear&look=square&event=festival",
     why: "the festival: lanterns, fireworks",
-    settle: 2500,
+    settle: 4000,
     threshold: 0.02,
   },
   {
@@ -151,6 +151,11 @@ export const VIEWS: View[] = [
     name: "dossier",
     link: "story=saga&t=6:00&hour=12&weather=clear&hud=minimal&look=keep&select=Guildmaster",
     why: "an adventurer picked: dossier open, camera following",
+    // The follow camera tracks the Guildmaster, whose idle animation runs on real frame deltas, so
+    // the framing lands a few pixels apart per load (0.1-4.5% measured). The view guards the dossier
+    // panel (a third of the frame), so a looser limit still catches it breaking.
+    settle: 4000,
+    threshold: 0.06,
   },
   {
     name: "legends",

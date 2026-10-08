@@ -175,10 +175,18 @@ function useCrowd(wanted: boolean) {
   }, [wanted, animations, scenes, shading])
 }
 
-/** Drives the guild's clock from the render loop (first, FRAME.SIM); long frames are capped. */
+/**
+ * Drives the guild's clock from the render loop (first, FRAME.SIM); long frames are capped. In a
+ * probe build with the story paused, the render clock is pinned to the story's stopped time, so
+ * everything that animates on `clock.elapsedTime` (wind, sails, grass, water) draws the same frame
+ * on every load: golden views stop flaking on ship sails and grass shimmer. Production never pins.
+ */
 function Clock() {
   const store = useGuildStore()
-  useFrame((_, delta) => store.tick(Math.min(delta, 0.1) * 1000), FRAME.SIM)
+  useFrame((state, delta) => {
+    store.tick(Math.min(delta, 0.1) * 1000)
+    if (PROBE && store.speed === 0) state.clock.elapsedTime = store.time / 1000
+  }, FRAME.SIM)
   return null
 }
 

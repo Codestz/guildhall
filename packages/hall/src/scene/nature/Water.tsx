@@ -1,14 +1,16 @@
 import { useGLTF } from "@react-three/drei"
 import { useFrame, useThree } from "@react-three/fiber"
-import { useEffect, useMemo } from "react"
+import { use, useEffect, useMemo, useState } from "react"
 import {
   Box3,
   BufferGeometry,
   Color,
   DataTexture,
+  type DirectionalLight,
   DoubleSide,
   Float32BufferAttribute,
   LinearFilter,
+  type Material,
   MathUtils,
   type Mesh,
   type MeshStandardMaterial,
@@ -34,6 +36,7 @@ import { LIGHTS } from "../../world/lights.ts"
 import { useLooks } from "../atmosphere/looks.ts"
 import { sky } from "../atmosphere/state.ts"
 import { wind } from "../atmosphere/wind.ts"
+import { installNodes, TSL } from "../tsl.ts"
 import { EASE, targetOf } from "../weather/shared.ts"
 import { noiseTexture } from "./noise.ts"
 import { HEX_RADIUS } from "./scatter.ts"
@@ -52,6 +55,9 @@ import { distanceToLand, riverCells, riverLine, SHORE, shoreTexels } from "./sho
  * whatever stands in the water — dock posts, rocks, the bridge, the mill wheel — read from a
  * second distance baked into the same texture (from below: the lowest surfaces at the waterline);
  * and the turning wheel churns a wake down the river's flow.
+ *
+ * With `?tsl=1` (scene/tsl.ts) the same water is a TSL node material (waterNodes.ts), reading the
+ * same uniforms; it suspends while that loads. The shore bake stays GLSL either way.
  */
 const SEA_Y = -0.2 * HEX_SCALE + 0.05
 const RIVER_Y = -0.1 * HEX_SCALE + 0.06
@@ -62,7 +68,10 @@ export function Water({ tier }: { tier: Tier }) {
   const { nodes } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
   const geometry = useMemo(surface, [])
   const v2 = useLooks().water
-  const material = useMemo(() => waterMaterial(tier === 0, v2), [tier, v2])
+  const build = TSL ? use(nodeWater(gl)) : waterMaterial
+  // The node material's shadow is the key light's own (waterNodes.ts): found once it has a map.
+  const [key, setKey] = useState<DirectionalLight | null>(null)
+  const { material, uniforms } = useMemo(() => build(tier === 0, v2, key), [build, tier, v2, key])
   const eased = useMemo(() => ({ rain: 0, gloom: 0, cloud: 0, pick: 0, caustics: 0 }), [])
   const still = useMemo(reducedMotion, [])
 
@@ -70,15 +79,19 @@ export function Water({ tier }: { tier: Tier }) {
   // suspended render never pays for it), then measure it on the CPU. Kept for the page's life.
   useEffect(() => {
     shore ??= bakeShore(gl, nodes)
-    if (material.uniforms.uShore) material.uniforms.uShore.value = shore
-    ;(material.uniforms.uWheel as { value: Vector4 }).value.copy(wheel)
-  }, [gl, nodes, material])
+    uniforms.uShore.value = shore
+    uniforms.uWheel.value.copy(wheel)
+  }, [gl, nodes, uniforms])
   useEffect(() => () => material.dispose(), [material])
   useEffect(() => () => geometry.dispose(), [geometry])
 
   useFrame((state, delta) => {
+    if (TSL && !key?.parent) {
+      const found = keyLight(state.scene)
+      if (found !== key) setKey(found)
+    }
     const env = store.environment
-    const u = material.uniforms
+    const u = uniforms
     eased.rain = MathUtils.damp(eased.rain, env.weather === "snow" ? 0 : env.precipitation, EASE, delta)
     eased.gloom = MathUtils.damp(
       eased.gloom,
@@ -87,17 +100,17 @@ export function Water({ tier }: { tier: Tier }) {
       delta,
     )
     eased.cloud = MathUtils.damp(eased.cloud, env.cloudCover, EASE, delta)
-    setUniform(u.uRain, eased.rain)
-    setUniform(u.uGloom, eased.gloom)
-    setUniform(u.uCloud, eased.cloud)
-    setUniform(u.uKeyIntensity, sky.keyIntensity)
-    setUniform(u.uHemiIntensity, sky.hemiIntensity)
-    setUniform(u.uFlash, sky.flash)
+    u.uRain.value = eased.rain
+    u.uGloom.value = eased.gloom
+    u.uCloud.value = eased.cloud
+    u.uKeyIntensity.value = sky.keyIntensity
+    u.uHemiIntensity.value = sky.hemiIntensity
+    u.uFlash.value = sky.flash
     // Water v2's own clock (caustics, rings, wake): it holds still under prefers-reduced-motion.
     if (!still) eased.caustics = (eased.caustics + Math.min(delta, 0.1)) % 1000
-    setUniform(u.uCaustics, eased.caustics)
+    u.uCaustics.value = eased.caustics
     const [x, y, z] = sky.keyDirection
-    ;(u.uKeyDir as { value: Vector3 }).value.set(x, y, z)
+    u.uKeyDir.value.set(x, y, z)
     // A photogenic moon: its path swings round towards where the camera looks, so the diorama's
     // high, fixed angle still sees it (a true mirror image is mostly behind or off screen).
     const [mx, my, mz] = env.moon
@@ -105,7 +118,7 @@ export function Water({ tier }: { tier: Tier }) {
     look.y = 0
     look.normalize()
     const lift = Math.max(0.15, Math.min(0.75, (my + 0.6) * 0.5))
-    ;(u.uMoonDir as { value: Vector3 }).value
+    u.uMoonDir.value
       .set(mx, 0, mz)
       .normalize()
       .lerp(look, 0.75)
@@ -113,14 +126,14 @@ export function Water({ tier }: { tier: Tier }) {
       .normalize()
       .multiplyScalar(Math.sqrt(1 - lift * lift))
       .setY(lift)
-    setUniform(u.uNight, sky.night)
-    setUniform(u.uMoon, sky.moonDisc * sky.night)
-    setUniform(u.uLamps, sky.lamps * sky.night)
+    u.uNight.value = sky.night
+    u.uMoon.value = sky.moonDisc * sky.night
+    u.uLamps.value = sky.lamps * sky.night
     // The flames nearest what the camera looks at, re-picked twice a second (no per-frame garbage).
     eased.pick -= delta
     if (eased.pick <= 0) {
       eased.pick = 0.5
-      nearestFlames(targetOf(state.controls), u.uFlames?.value as Vector4[])
+      nearestFlames(targetOf(state.controls), u.uFlames.value)
     }
   })
 
@@ -136,8 +149,38 @@ export function Water({ tier }: { tier: Tier }) {
   )
 }
 
-const setUniform = (uniform: { value: unknown } | undefined, value: number) => {
-  if (uniform) uniform.value = value
+/** The water's material, either path, and the uniforms it reads (Water writes them each frame). */
+interface WaterMaterial {
+  material: Material
+  uniforms: WaterUniforms
+}
+type Build = (low: boolean, v2: boolean, key: DirectionalLight | null) => WaterMaterial
+
+const nodeBuilds = new WeakMap<WebGLRenderer, Promise<Build>>()
+
+/** The node-material water, once the renderer can draw it (one promise per renderer, for `use`). */
+function nodeWater(gl: WebGLRenderer): Promise<Build> {
+  let build = nodeBuilds.get(gl)
+  if (!build) {
+    build = installNodes(gl)
+      .then(() => import("./waterNodes.ts"))
+      .then(({ waterNodeMaterial }) => (low, v2, key) => {
+        const uniforms = waterUniforms()
+        return { material: waterNodeMaterial(uniforms, { low, v2, flames: FLAMES, key }), uniforms }
+      })
+    nodeBuilds.set(gl, build)
+  }
+  return build
+}
+
+/** The scene's shadow-casting directional light (Atmosphere's key), once its shadow map exists. */
+function keyLight(scene: Object3D): DirectionalLight | null {
+  let found: DirectionalLight | null = null
+  scene.traverse((object) => {
+    const light = object as DirectionalLight
+    if (!found && light.isDirectionalLight && light.castShadow && light.shadow.map) found = light
+  })
+  return found
 }
 
 /** Deep and shallow water (sRGB, softened like the tiles); the sky lights them. */
@@ -186,56 +229,60 @@ const RING_MAX = 4
 /** Pieces that sit on the water but shouldn't ring it (they float, they don't stand). */
 const AFLOAT = /^(waterlily|waterplant)/
 
-function waterMaterial(low: boolean, v2: boolean): ShaderMaterial {
+/**
+ * The water's own uniforms, read by either path. Shared objects (the wind, the sky's colours, the
+ * noise) are attached by reference, so their per-frame writes reach the shader with no copying.
+ * Exported for tests.
+ */
+export function waterUniforms() {
+  return {
+    ...wind.uniforms,
+    uNoise: { value: noise },
+    uShore: { value: shore ?? OPEN_SEA },
+    uShoreHalf: { value: SHORE.half },
+    uShoreMax: { value: SHORE.maxDistance },
+    uRain: { value: 0 },
+    uGloom: { value: 0 },
+    uCloud: { value: 0 },
+    uFlash: { value: 0 },
+    uKeyIntensity: { value: 1 },
+    uHemiIntensity: { value: 1 },
+    uKeyDir: { value: new Vector3(0, 1, 0) },
+    uMoonDir: { value: new Vector3(0, 1, 0) },
+    uMoon: { value: 0 },
+    uNight: { value: 0 },
+    uLamps: { value: 0 },
+    uCaustics: { value: 0 },
+    uRingMax: { value: RING_MAX },
+    uWheel: { value: new Vector4() },
+    uFlames: { value: Array.from({ length: FLAMES }, () => new Vector4()) },
+    uMoonColor: { value: sky.moonColor },
+    uZenith: { value: sky.zenith },
+    uHorizon: { value: sky.horizon },
+    uKeyColor: { value: sky.keyColor },
+    uHemiSky: { value: sky.hemiSky },
+    uHemiGround: { value: sky.hemiGround },
+    uDeep: { value: DEEP },
+    uShallow: { value: SHALLOW },
+  }
+}
+export type WaterUniforms = ReturnType<typeof waterUniforms>
+
+function waterMaterial(low: boolean, v2: boolean): WaterMaterial {
   const defines: Record<string, unknown> = { FLAMES }
   if (low) defines.NATURE_LOW = ""
   if (v2) defines.WATER_V2 = ""
+  const uniforms = waterUniforms()
   const material = new ShaderMaterial({
-    uniforms: UniformsUtils.merge([
-      UniformsLib.lights,
-      UniformsLib.fog,
-      {
-        uNoise: { value: null },
-        uShoreHalf: { value: SHORE.half },
-        uShoreMax: { value: SHORE.maxDistance },
-        uRain: { value: 0 },
-        uGloom: { value: 0 },
-        uCloud: { value: 0 },
-        uFlash: { value: 0 },
-        uKeyIntensity: { value: 1 },
-        uHemiIntensity: { value: 1 },
-        uKeyDir: { value: new Vector3(0, 1, 0) },
-        uMoonDir: { value: new Vector3(0, 1, 0) },
-        uMoon: { value: 0 },
-        uNight: { value: 0 },
-        uLamps: { value: 0 },
-        uCaustics: { value: 0 },
-        uRingMax: { value: RING_MAX },
-        uWheel: { value: new Vector4() },
-      },
-    ]),
+    // Three's light (the key's shadow) and fog uniforms, then the water's own, not cloned.
+    uniforms: { ...UniformsUtils.merge([UniformsLib.lights, UniformsLib.fog]), ...uniforms },
     vertexShader: waterVertex,
     fragmentShader: waterFragment,
     lights: true,
     fog: true,
     defines,
   })
-  // UniformsUtils.merge clones values; shared objects (the wind, the sky's colours, the noise) are
-  // attached after, by reference, so their per-frame writes reach the shader with no copying.
-  const u = material.uniforms
-  Object.assign(u, wind.uniforms)
-  u.uShore = { value: shore ?? OPEN_SEA }
-  u.uFlames = { value: Array.from({ length: FLAMES }, () => new Vector4()) }
-  u.uMoonColor = { value: sky.moonColor }
-  u.uNoise = { value: noise }
-  u.uZenith = { value: sky.zenith }
-  u.uHorizon = { value: sky.horizon }
-  u.uKeyColor = { value: sky.keyColor }
-  u.uHemiSky = { value: sky.hemiSky }
-  u.uHemiGround = { value: sky.hemiGround }
-  u.uDeep = { value: DEEP }
-  u.uShallow = { value: SHALLOW }
-  return material
+  return { material, uniforms }
 }
 
 /**
@@ -274,6 +321,16 @@ function surface(): BufferGeometry {
   const geometry = new BufferGeometry()
   geometry.setAttribute("position", new Float32BufferAttribute(positions, 3))
   geometry.setAttribute("aRiver", new Float32BufferAttribute(river, 1))
+  // The node material's shadow offsets along the normal (normalBias), read from the geometry; the
+  // GLSL hard-codes it (up).
+  if (TSL)
+    geometry.setAttribute(
+      "normal",
+      new Float32BufferAttribute(
+        river.flatMap(() => [0, 1, 0]),
+        3,
+      ),
+    )
   geometry.computeBoundingSphere()
   return geometry
 }

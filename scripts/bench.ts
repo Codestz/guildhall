@@ -2,6 +2,7 @@
  * The benchmark scoreboard: what the shipped hall costs, scene by scene, as one JSON file per commit.
  *
  *   bun scripts/bench.ts [--scenes party,crowd-100] [--seconds 5] [--rounds 3] [--dpr 2] [--out path]
+ *                        [--extra 'tsl=1']   more deep-link params on every scene (an A/B of a flag)
  *
  *   party            the party story at 13:00, clear                     ?story=party&t=0:30&hour=13
  *   rush-night-rain  the rush (12) at 22:00 in the rain                  ?story=rush&t=0:20&hour=22&weather=rain
@@ -48,6 +49,7 @@ if (unknown.length) fail(`unknown scene ${unknown.join(", ")}; known: ${Object.k
 const SECONDS = Number(arg("seconds") ?? 5)
 const ROUNDS = Number(arg("rounds") ?? 3)
 const DPR = Number(arg("dpr") ?? 2)
+const EXTRA = arg("extra")
 if (!(SECONDS > 0) || !(ROUNDS >= 1) || !(DPR > 0)) fail("--seconds, --rounds and --dpr must be positive")
 /** After the world mounts: the seek's re-cast, the weather settling, shaders compiled. */
 const WARMUP_S = 4
@@ -239,7 +241,10 @@ const samples: Record<string, Sample[]> = Object.fromEntries(names.map((name) =>
 try {
   for (let round = 0; round < ROUNDS; round++)
     for (const name of names) {
-      const sample = await measure(browser, `${server.url}?${BASE}&${SCENES[name]}`)
+      const sample = await measure(
+        browser,
+        `${server.url}?${BASE}&${SCENES[name]}${EXTRA ? `&${EXTRA}` : ""}`,
+      )
       samples[name]?.push(sample)
       console.log(
         `  round ${round + 1}/${ROUNDS} ${name.padEnd(16)} ${sample.fps.toFixed(0)} fps  p95 ${sample.p95.toFixed(2)} ms` +
@@ -280,6 +285,7 @@ const scenes = Object.fromEntries(
 const board = {
   sha,
   dirty,
+  ...(EXTRA ? { extra: EXTRA } : {}),
   date: new Date().toISOString(),
   config: { seconds: SECONDS, rounds: ROUNDS, warmup: WARMUP_S, dpr: DPR, viewport: VIEWPORT, tier: "High" },
   scenes,

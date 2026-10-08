@@ -1,7 +1,9 @@
-import { useFrame } from "@react-three/fiber"
-import { useMemo, useRef } from "react"
-import { BackSide, Color, type Mesh, ShaderMaterial, Vector3 } from "three"
+import { useFrame, useThree } from "@react-three/fiber"
+import { use, useMemo, useRef } from "react"
+import { BackSide, Color, type Material, type Mesh, ShaderMaterial, Vector3, type WebGLRenderer } from "three"
 import { useGuildStore } from "../../guild/useGuild.ts"
+import { isWebGPU } from "../../render/backend.ts"
+import { installNodes, TSL } from "../tsl.ts"
 import type { SkyState } from "./sky.ts"
 
 /**
@@ -10,40 +12,16 @@ import type { SkyState } from "./sky.ts"
  * sun, the sun and moon discs, and procedural stars — all one draw call. It is drawn first, never
  * writes depth, and never fogs. The Diorama looks down, so there it is the haze under the horizon;
  * Explore looks out, and sees the sky.
+ *
+ * GLSL by default. The same dome as a TSL node material (skyNodes.ts) on WebGPU, always, and on
+ * WebGL with `?tsl=1` (scene/tsl.ts); it suspends while that loads.
  */
 export function SkyDome({ sky }: { sky: SkyState }) {
   const store = useGuildStore()
+  const gl = useThree((state) => state.gl)
+  const build = isWebGPU(gl) || TSL ? use(nodeDomes(gl)) : glslDome
+  const { material, uniforms } = useMemo(() => build(), [build])
   const mesh = useRef<Mesh>(null)
-  const uniforms = useMemo(
-    () => ({
-      zenith: { value: new Color() },
-      horizon: { value: new Color() },
-      fogColor: { value: new Color() },
-      glow: { value: new Color() },
-      sunColor: { value: new Color() },
-      moonColor: { value: new Color("#e6edff") },
-      sunDirection: { value: new Vector3(0, 1, 0) },
-      moonDirection: { value: new Vector3(0, -1, 0) },
-      sunDisc: { value: 0 },
-      moonDisc: { value: 0 },
-      stars: { value: 0 },
-      time: { value: 0 },
-    }),
-    [],
-  )
-  const material = useMemo(
-    () =>
-      new ShaderMaterial({
-        uniforms,
-        vertexShader: VERTEX,
-        fragmentShader: FRAGMENT,
-        side: BackSide,
-        depthWrite: false,
-        depthTest: false,
-        fog: false,
-      }),
-    [uniforms],
-  )
 
   useFrame(({ camera, clock }) => {
     if (mesh.current) mesh.current.position.copy(camera.position)
@@ -67,6 +45,62 @@ export function SkyDome({ sky }: { sky: SkyState }) {
       <sphereGeometry args={[400, 48, 24]} />
     </mesh>
   )
+}
+
+/** What the dome is fed each frame (GLSL uniforms, or uniform nodes: both hold a `value`). */
+export function skyUniforms() {
+  return {
+    zenith: { value: new Color() },
+    horizon: { value: new Color() },
+    fogColor: { value: new Color() },
+    glow: { value: new Color() },
+    sunColor: { value: new Color() },
+    moonColor: { value: new Color("#e6edff") },
+    sunDirection: { value: new Vector3(0, 1, 0) },
+    moonDirection: { value: new Vector3(0, -1, 0) },
+    sunDisc: { value: 0 },
+    moonDisc: { value: 0 },
+    stars: { value: 0 },
+    time: { value: 0 },
+  }
+}
+export type SkyUniforms = ReturnType<typeof skyUniforms>
+
+/** A dome's material and the uniforms SkyDome writes. */
+export interface Dome {
+  material: Material
+  uniforms: SkyUniforms
+}
+
+/** The GLSL dome (the default on WebGL). */
+export function glslDome(): Dome {
+  const uniforms = skyUniforms()
+  const material = new ShaderMaterial({
+    uniforms,
+    vertexShader: VERTEX,
+    fragmentShader: FRAGMENT,
+    side: BackSide,
+    depthWrite: false,
+    depthTest: false,
+    fog: false,
+  })
+  return { material, uniforms }
+}
+
+const nodeBuilds = new WeakMap<object, Promise<() => Dome>>()
+
+/**
+ * The node-material dome, once the renderer can draw it (one promise per renderer, for `use`).
+ * WebGPU draws node materials natively; WebGL needs the nodes handler first.
+ */
+function nodeDomes(gl: WebGLRenderer): Promise<() => Dome> {
+  let build = nodeBuilds.get(gl)
+  if (!build) {
+    const ready = isWebGPU(gl) ? Promise.resolve() : installNodes(gl)
+    build = ready.then(() => import("./skyNodes.ts")).then((nodes) => nodes.nodeDome)
+    nodeBuilds.set(gl, build)
+  }
+  return build
 }
 
 const VERTEX = /* glsl */ `

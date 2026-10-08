@@ -1,4 +1,4 @@
-import { type Material, type Mesh, type MeshStandardMaterial, type Object3D, Vector3 } from "three"
+import { type Material, Matrix4, type Mesh, type MeshStandardMaterial, type Object3D, Vector3 } from "three"
 import { FRAME } from "../frame.ts"
 
 /**
@@ -8,6 +8,10 @@ import { FRAME } from "../frame.ts"
  * scene/lights/CarriedLights draws a halo and a ground pool there, and scene/lights/NearLights lets
  * the nearest of them carry one of its two real point lights. Their glass wears one shared lit
  * copy of the kit's glass (`LitGlass`), glowing with the night.
+ *
+ * A carrier drawn by the baked crowd (scene/body.ts) has its rig out of the scene: its glass has no
+ * world matrix worth reading. While it is, its body names a stand-in (`standIn`) that says where
+ * the crowd draws the glass — the crowd's baked hand (crowd/Crowd.ts `held`) — and the light follows that.
  */
 
 /** After every pose and levelling (characters animate at WORLD), before the frame is drawn (RENDER). */
@@ -33,6 +37,22 @@ export interface Carried {
 
 /** Every lantern held right now, in the order they were taken up. */
 export const carried: Carried[] = []
+
+/** Where a body drawn by something other than its rig (a crowd member) draws what it holds. */
+export interface StandIn {
+  /** `glass`'s world matrix as drawn now, into `target`; false when it isn't drawn. */
+  place(glass: Mesh, target: Matrix4): boolean
+  /** The ground's height under the body. */
+  ground(): number
+}
+
+const standIns = new WeakMap<Object3D, StandIn>()
+
+/** `body`'s lanterns are where `stand` says from now on; null: where its own rig has them again. */
+export function standIn(body: Object3D, stand: StandIn | null): void {
+  if (stand) standIns.set(body, stand)
+  else standIns.delete(body)
+}
 
 let taken = 0
 
@@ -80,11 +100,19 @@ export function glassOf(held: Object3D): Mesh | null {
 
 /**
  * Once a frame, after the pose: which lanterns are seen, and where their flames are. Each glass's
- * world matrix is brought up to date through its bones first (the renderer would only do it later).
- * No allocation.
+ * world matrix is brought up to date through its bones first (the renderer would only do it later);
+ * a stand-in's body is asked instead. No allocation.
  */
 export function track(): void {
   for (const entry of carried) {
+    const stand = standIns.get(entry.body)
+    if (stand) {
+      entry.lit = stand.place(entry.glass, drawn)
+      if (!entry.lit) continue
+      entry.at.copy(entry.center).applyMatrix4(drawn)
+      entry.ground = stand.ground()
+      continue
+    }
     entry.lit = shown(entry.glass)
     if (!entry.lit) continue
     entry.glass.updateWorldMatrix(true, false)
@@ -92,6 +120,8 @@ export function track(): void {
     entry.ground = entry.body.matrixWorld.elements[13] ?? 0
   }
 }
+
+const drawn = new Matrix4()
 
 /** Every ancestor visible, up to a scene: hidden lanterns, hidden or dissolved-out carriers are not. */
 export function shown(object: Object3D): boolean {

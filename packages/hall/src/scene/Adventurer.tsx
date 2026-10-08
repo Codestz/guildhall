@@ -336,8 +336,6 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
   useDeedEffect(root, view.phase === "working" ? view.look?.effect : undefined, presence)
   /** Where they stand in the cast's mixer schedule (far ones alternate frames, staggered by this). */
   const [index] = useState(() => seedOf(id) % 2)
-  /** A lit lantern in hand: its light follows the rig's real hand, so they stay a hero (crowd/lod.ts). */
-  const lantern = left === NIGHT_LANTERN || right === NIGHT_LANTERN
 
   useEffect(() => {
     const id = view.id
@@ -455,7 +453,7 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
     const now = castClock.now
     const tall = sight.scale * FIGURE_HEIGHT
     const distance = Math.hypot(node.position.x - sight.target.x, node.position.z - sight.target.z)
-    const pinned = !crowd || selected || dissolving || lantern
+    const pinned = !crowd || selected || dissolving
     const hero = heroic(drawn.hero, pinned, distance, tall)
     if (hero === drawn.hero) return
     if (hero) {

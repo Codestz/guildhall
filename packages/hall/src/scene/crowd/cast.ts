@@ -2,6 +2,7 @@ import type { AnimationClip, Object3D } from "three"
 import { CARRY_WALK, carryClip } from "../activity.ts"
 import { bakeClips } from "./bake.ts"
 import { Crowd } from "./Crowd.ts"
+import { simplifyModels } from "./simplify.ts"
 
 /**
  * The cast's crowd (scene/Scene.tsx Cast, scene/body.ts): every adventurer clip baked once, every
@@ -24,7 +25,10 @@ export const castClock = { now: 0 }
 
 let made: { animations: readonly AnimationClip[]; crowd: Crowd } | null = null
 
-/** The crowd for these clips and models, made on first call (the bake: a one-off ~0.1–0.3 s). */
+/**
+ * The crowd for these clips and models, made on first call (the bake: a one-off ~0.1–0.3 s). Its
+ * coarser mesh levels follow once simplified (crowd/simplify.ts: its own chunk, ~40 ms).
+ */
 export function castCrowd(animations: readonly AnimationClip[], models: Record<string, Object3D>): Crowd {
   if (made?.animations === animations) return made.crowd
   made?.crowd.dispose()
@@ -36,5 +40,12 @@ export function castCrowd(animations: readonly AnimationClip[], models: Record<s
   const bake = bakeClips(rig, clips, BAKE_FPS, { once: ONCE })
   const crowd = new Crowd(bake, models, [], FADE_S)
   made = { animations, crowd }
+  simplifyModels(models).then(
+    (lods) => {
+      if (made?.crowd === crowd) crowd.levels(lods)
+    },
+    // Without them everyone draws the full mesh, as before there were levels.
+    (error: unknown) => console.warn("crowd: no mesh levels", error),
+  )
   return crowd
 }

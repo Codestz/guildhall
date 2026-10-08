@@ -1,6 +1,7 @@
 import {
   BufferAttribute,
   BufferGeometry,
+  type Camera,
   Color,
   type ColorRepresentation,
   DataTexture,
@@ -11,21 +12,30 @@ import {
   type Material,
   Matrix4,
   type Mesh,
+  type MeshStandardMaterial,
   NearestFilter,
   type Object3D,
+  Quaternion,
   RGBAFormat,
   type SkinnedMesh,
   Sphere,
-  type Vector3,
+  Vector3,
 } from "three"
 import type { Grip } from "../grips.ts"
-import { type BakedClip, type BoneBake, boneMap, frameAt } from "./bake.ts"
+import { type BakedClip, type BoneBake, boneMap, frameAt, socketAt } from "./bake.ts"
+import { type Lens, lens, look, meshLod, tallAt } from "./lod.ts"
 import { type CrowdUniforms, crowdMaterial, crowdUniforms, STAGE_ROW, TEXELS_PER_MEMBER } from "./material.ts"
+import type { PartLods } from "./simplify.ts"
 
 /**
- * A crowd of adventurers drawn from the baked bone texture (bake.ts, material.ts): per model, one
- * InstancedMesh per part (body, tinted cape/hat), every member of that model in it; per piece of
- * gear, one InstancedMesh riding its bone, every member who holds it in it.
+ * A crowd of adventurers drawn from the baked bone texture (bake.ts, material.ts): per model and
+ * mesh level, one InstancedMesh per part (body, tinted cape/hat), every member of that model drawn
+ * at that level in it; per piece of gear, one InstancedMesh riding its bone, every member who holds
+ * it in it.
+ *
+ * Mesh levels (crowd/lod.ts MESH_LODS): given the camera, `flush` moves each member to the level its
+ * size on screen calls for. The coarser levels are the parts' own vertices with a simplified index
+ * (crowd/simplify.ts, handed over by `levels` once made): until then there is only the full mesh.
  *
  * Every member's place and clips live in one small float texture, the stage (material.ts): a troop's
  * slot only says which member it draws. So a member is written once whatever it is made of and
@@ -77,6 +87,21 @@ interface Seat {
   member: number
 }
 
+/** A model part as loaded, for the crowd: its geometry, joints renumbered into the bake's order. */
+interface Source {
+  geometry: BufferGeometry
+  map: number[]
+  material: Material
+  tinted: boolean
+  name: string
+}
+
+/** A model's parts and its troops, one per mesh level (0: the full mesh). */
+interface Model {
+  sources: Source[]
+  troops: Troop[]
+}
+
 interface Part {
   geometry: BufferGeometry
   material: Material
@@ -92,6 +117,9 @@ interface Play {
 }
 
 interface Enrolled {
+  model: Model
+  /** The mesh level it draws at: its body's troop is `model.troops[level]`. */
+  level: number
   body: Seat
   gear: Map<Gear, Seat>
   tint: Color
@@ -115,9 +143,11 @@ export class Crowd {
   readonly root = new Group()
   readonly uniforms: CrowdUniforms
   private readonly bake: BoneBake
-  private readonly models: Record<string, Object3D>
-  private readonly troops = new Map<string, Troop>()
+  private readonly scenes: Record<string, Object3D>
+  private readonly models = new Map<string, Model>()
   private readonly geared = new Map<Gear, Troop>()
+  private lods: PartLods = new Map()
+  private readonly lens = lens()
   private readonly members: (Enrolled | undefined)[] = []
   private readonly free: number[] = []
   private stage: DataTexture
@@ -136,7 +166,7 @@ export class Crowd {
     fade = 0.25,
   ) {
     this.bake = bake
-    this.models = models
+    this.scenes = models
     this.uniforms = crowdUniforms(bake)
     this.fade = fade
     this.stage = stageTexture(STAGE_ROW)
@@ -169,11 +199,14 @@ export class Crowd {
 
   /** A new member of `model`'s troop, standing at the origin in its first clip. Returns its id. */
   join(model: string, tint?: ColorRepresentation): number {
-    const troop = this.troopOf(model)
+    const shape = this.modelOf(model)
+    const troop = shape.troops[0] as Troop
     const id = this.free.pop() ?? this.members.length
     if ((id + 1) * STAGE_FLOATS > this.stageData.length) this.growStage()
     this.stageData.fill(0, id * STAGE_FLOATS, (id + 1) * STAGE_FLOATS)
     const member: Enrolled = {
+      model: shape,
+      level: 0,
       body: { troop, slot: -1, member: id },
       gear: new Map(),
       tint: new Color(tint ?? WHITE).lerp(WHITE, TINT_LIFT),
@@ -275,7 +308,8 @@ export class Crowd {
    * cast gives each member its own gear with `carry`). Levelled grips ride the bone as it turns.
    */
   hold(model: string, item: Object3D, grip: Grip): InstancedMesh[] {
-    const troop = this.troops.get(model)
+    // The full mesh's troop: the lab flushes without a camera, so no one draws a coarser level.
+    const troop = this.models.get(model)?.troops[0]
     if (!troop) return []
     const bone = this.boneIndex(grip.bone)
     // A parentless copy: its matrices are the grip's alone, not wherever the kit keeps the piece.
@@ -299,27 +333,63 @@ export class Crowd {
   }
 
   /**
-   * Once a frame, after every member's writes: each troop's slots go up if they changed and it fits
-   * its bounds (an empty troop draws nothing). The stage goes up once, at the next draw.
+   * The models' coarser mesh levels (crowd/simplify.ts): every model, mustered or yet to be, draws
+   * them from the next `flush` with a camera on.
    */
-  flush(): void {
+  levels(lods: PartLods): void {
+    this.lods = lods
+    for (const model of this.models.values()) this.addLevels(model)
+  }
+
+  /**
+   * Once a frame, after every member's writes: given the `camera` (drawn `height` CSS px tall),
+   * each member moves to the mesh level its size on screen calls for; then each troop's slots go up
+   * if they changed and it fits its bounds (an empty troop draws nothing). The stage goes up once,
+   * at the next draw. Without a camera, everyone keeps the level they have.
+   */
+  flush(camera?: Camera, height = 0): void {
     const data = this.stageData
-    for (const troop of this.troops.values()) troop.flush(data)
-    for (const troop of this.geared.values()) troop.flush(data)
+    if (camera && height > 0) this.choose(look(camera, height, this.lens), data)
+    for (const model of this.models.values()) for (const troop of model.troops) troop.flush(data)
+    for (const [gear, troop] of this.geared) {
+      troop.flush(data)
+      if (troop.count > 0) troop.match(gear.material)
+    }
+  }
+
+  /** The mesh level member `id` draws at (0: the full mesh). */
+  levelOf(id: number): number {
+    return this.memberOf(id).level
+  }
+
+  /**
+   * Where the crowd draws `gear` in member `id`'s hand now, world space, into `target`: the frame
+   * of the piece as the shader puts it (levelled for a levelled grip). From the clip it plays now: during
+   * a clip change's fade (FADE_S) the shader is still blending out of the last one, a few cm off.
+   */
+  held(id: number, gear: Gear, target: Matrix4): Matrix4 {
+    const { now } = this.memberOf(id)
+    socketAt(this.bake, now.clip, (this.clock - now.start) * now.speed, this.boneIndex(gear.bone), target)
+    if (gear.up) level(target, gear.up)
+    target.multiply(gear.matrix)
+    const data = this.stageData
+    const at = id * STAGE_FLOATS
+    const place = scratch.matrix.makeRotationY(data[at + 3] as number)
+    place.setPosition(data[at] as number, data[at + 1] as number, data[at + 2] as number)
+    return target.premultiply(place)
   }
 
   /** Draw calls the crowd makes now (one per mesh of each non-empty troop, before culling). */
   get draws(): number {
     let calls = 0
-    for (const troop of [...this.troops.values(), ...this.geared.values()])
-      if (troop.count > 0) calls += troop.meshes.length
+    for (const troop of this.allTroops()) if (troop.count > 0) calls += troop.meshes.length
     return calls
   }
 
   /** Frees what the crowd made: its geometries (copies), materials (clones) and stage. The bake stays. */
   dispose(): void {
-    for (const troop of [...this.troops.values(), ...this.geared.values()]) troop.dispose()
-    this.troops.clear()
+    for (const troop of this.allTroops()) troop.dispose()
+    this.models.clear()
     this.geared.clear()
     this.stage.dispose()
     this.root.clear()
@@ -363,26 +433,83 @@ export class Crowd {
     old.dispose()
   }
 
-  /** One model's parts as a troop, all reading the same per-instance attributes. */
-  private troopOf(model: string): Troop {
-    const known = this.troops.get(model)
+  /**
+   * Members whose size on screen calls for another mesh level move to it (crowd/lod.ts). Only a
+   * change of level touches a troop's slots.
+   */
+  private choose(view: Lens, data: Float32Array): void {
+    for (let id = 0; id < this.members.length; id++) {
+      const member = this.members[id]
+      if (!member) continue
+      const { troops } = member.model
+      if (troops.length < 2 && member.level === 0) continue
+      const at = id * STAGE_FLOATS
+      const tall = tallAt(view, data[at] as number, data[at + 1] as number, data[at + 2] as number)
+      const next = meshLod(member.level, tall, troops.length)
+      if (next === member.level) continue
+      const { body } = member
+      body.troop.unseat(body)
+      body.troop = troops[next] as Troop
+      body.troop.enrol(body)
+      body.troop.writeTint(body.slot, member.tint)
+      member.level = next
+    }
+  }
+
+  private *allTroops(): Iterable<Troop> {
+    for (const model of this.models.values()) yield* model.troops
+    yield* this.geared.values()
+  }
+
+  /** One model's parts, and its full mesh's troop (with its coarser ones, once made). */
+  private modelOf(name: string): Model {
+    const known = this.models.get(name)
     if (known) return known
-    const source = this.models[model]
-    if (!source) throw new Error(`Crowd: no model "${model}"`)
-    const troop = new Troop(this.root)
-    source.traverse((node) => {
+    const scene = this.scenes[name]
+    if (!scene) throw new Error(`Crowd: no model "${name}"`)
+    const sources: Source[] = []
+    scene.traverse((node) => {
       const part = node as SkinnedMesh
       if (!part.isSkinnedMesh) return
       const map = boneMap(this.bake, part)
       if (!map) throw new Error(`Crowd: ${part.name} is not on the baked rig`)
-      troop.addPart({
-        geometry: shareGeometry(part.geometry, map),
+      sources.push({
+        geometry: part.geometry,
+        map,
         material: crowdMaterial(part.material as Material, this.uniforms),
         tinted: /Tinted/.test(part.name),
         name: part.name,
       })
     })
-    this.troops.set(model, troop)
+    const model: Model = { sources, troops: [] }
+    model.troops.push(this.troopAt(sources, 0))
+    this.addLevels(model)
+    this.models.set(name, model)
+    return model
+  }
+
+  /** The coarser levels every part of `model` has a simplified index for, as troops. */
+  private addLevels(model: Model): void {
+    const levels = Math.min(
+      ...model.sources.map((source) => (this.lods.get(source.geometry)?.length ?? 0) + 1),
+    )
+    for (let level = model.troops.length; level < levels; level++)
+      model.troops.push(this.troopAt(model.sources, level))
+  }
+
+  /** One mesh level of a model's parts as a troop, all reading the same per-instance attributes. */
+  private troopAt(sources: readonly Source[], level: number): Troop {
+    const troop = new Troop(this.root)
+    for (const source of sources) {
+      const index = level > 0 ? this.lods.get(source.geometry)?.[level - 1] : undefined
+      troop.addPart({
+        geometry: shareGeometry(source.geometry, source.map, index),
+        // One material per part, whatever the level: the same program and uniforms.
+        material: source.material,
+        tinted: source.tinted,
+        name: level > 0 ? `${source.name}_LOD${level}` : source.name,
+      })
+    }
     return troop
   }
 
@@ -492,6 +619,22 @@ class Troop {
     this.changed = true
   }
 
+  /**
+   * Its materials follow `source` where it changes by the frame (the lit lantern glass glows with
+   * the night, scene/lights/carried.ts): its glow and opacity.
+   */
+  match(source: Material): void {
+    const from = source as MeshStandardMaterial
+    for (const mesh of this.meshes) {
+      const to = mesh.material as MeshStandardMaterial
+      to.opacity = from.opacity
+      if (from.emissive && to.emissive) {
+        to.emissive.copy(from.emissive)
+        to.emissiveIntensity = from.emissiveIntensity
+      }
+    }
+  }
+
   writeTint(slot: number, color: Color): void {
     this.tints.setXYZ(slot, color.r, color.g, color.b)
     this.changed = true
@@ -531,6 +674,7 @@ class Troop {
     this.parts.forEach((part, i) => {
       const old = this.meshes[i] as InstancedMesh
       const geometry = new BufferGeometry()
+      geometry.userData = part.geometry.userData
       geometry.setIndex(part.geometry.index)
       for (const [name, attribute] of Object.entries(part.geometry.attributes))
         if (!SLOTS.has(name)) geometry.setAttribute(name, attribute)
@@ -616,19 +760,19 @@ export function fit(
  * SkinnedMesh still drawing them. A copy (gear) is all its own.
  */
 function release(geometry: BufferGeometry): void {
-  if (geometry.userData.copied !== true) keepOnly(geometry, OWN)
+  if (geometry.userData.copied !== true) keepOnly(geometry, OWN, geometry.userData.ownIndex === true)
   geometry.dispose()
 }
 
 /** A troop's geometry outgrown: only its per-slot attributes are freed (the rest moved on). */
 function retire(geometry: BufferGeometry): void {
-  keepOnly(geometry, SLOTS)
+  keepOnly(geometry, SLOTS, false)
   geometry.dispose()
 }
 
-function keepOnly(geometry: BufferGeometry, names: ReadonlySet<string>): void {
+function keepOnly(geometry: BufferGeometry, names: ReadonlySet<string>, index: boolean): void {
   for (const name of Object.keys(geometry.attributes)) if (!names.has(name)) geometry.deleteAttribute(name)
-  geometry.setIndex(null)
+  if (!index) geometry.setIndex(null)
 }
 
 /** The attributes a shared crowd geometry has of its own, and the per-slot ones. */
@@ -637,11 +781,18 @@ const OWN: ReadonlySet<string> = new Set([...SLOTS, "skinIndex"])
 
 /**
  * A model part's geometry for the crowd: the loaded one's attributes shared (never copied), but
- * its joints renumbered into the bake's bone order.
+ * its joints renumbered into the bake's bone order. `index`: a coarser level's own (simplify.ts).
  */
-function shareGeometry(source: BufferGeometry, map: readonly number[]): BufferGeometry {
+function shareGeometry(
+  source: BufferGeometry,
+  map: readonly number[],
+  index?: Uint16Array | Uint32Array,
+): BufferGeometry {
   const geometry = new BufferGeometry()
-  geometry.setIndex(source.index)
+  if (index) {
+    geometry.setIndex(new BufferAttribute(index, 1))
+    geometry.userData.ownIndex = true
+  } else geometry.setIndex(source.index)
   for (const [name, attribute] of Object.entries(source.attributes)) geometry.setAttribute(name, attribute)
   const joints = source.getAttribute("skinIndex")
   const renumbered = new Uint8Array(joints.count * 4)
@@ -668,4 +819,29 @@ function floatCopy(source: BufferGeometry): BufferGeometry {
     geometry.setAttribute(name, new BufferAttribute(floats, 3))
   }
   return geometry
+}
+
+const scratch = {
+  matrix: new Matrix4(),
+  turn: new Matrix4(),
+  head: new Vector3(),
+  up: new Vector3(),
+  level: new Quaternion(),
+}
+const UP = new Vector3(0, 1, 0)
+
+/**
+ * A levelled grip (material.ts `crowdLevel`), on the CPU: `socket` (a bone's frame, as baked) then
+ * the shortest turn taking the piece's `up` (in the bone's frame) to the world's up, about the
+ * bone's head. In place.
+ */
+export function level(socket: Matrix4, up: Vector3): Matrix4 {
+  const { turn, head, level: q } = scratch
+  head.setFromMatrixPosition(socket)
+  q.setFromUnitVectors(scratch.up.copy(up).transformDirection(socket), UP)
+  turn.makeRotationFromQuaternion(q)
+  // About the head: head − turn·head.
+  const offset = scratch.up.copy(head).applyMatrix4(turn).negate().add(head)
+  turn.setPosition(offset)
+  return socket.premultiply(turn)
 }

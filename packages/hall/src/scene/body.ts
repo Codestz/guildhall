@@ -4,13 +4,16 @@ import {
   AnimationMixer,
   type ColorRepresentation,
   LoopOnce,
+  type Matrix4,
+  type Mesh,
   type Object3D,
   type SkinnedMesh,
 } from "three"
 import { CARRY_WALK, carryClip } from "./activity.ts"
 import type { Crowd, Gear } from "./crowd/Crowd.ts"
 import { FADE_S, ONCE } from "./crowd/cast.ts"
-import { GEAR_BONES, gearOf } from "./crowd/gear.ts"
+import { GEAR_BONES, gearOf, pieceOf } from "./crowd/gear.ts"
+import { type StandIn, shown, standIn } from "./lights/carried.ts"
 
 /**
  * An adventurer's body: what draws the figure the brain (scene/brain.ts) walks. Two kinds, one
@@ -26,6 +29,9 @@ import { GEAR_BONES, gearOf } from "./crowd/gear.ts"
  * sets the mixer's action to the baked clip's time. It waits until no crossfade is under way (at
  * most FADE_S), unless forced (a dissolve can't wait). Both clocks are the cast's crowd clock
  * (`now`, seconds) and this adventurer's tempo.
+ *
+ * In the crowd, a lantern in the rig's hand still gives light (scene/lights/carried.ts): the body
+ * stands in for its rig, placing the glass where the crowd draws it (Crowd `held`).
  */
 export class Body {
   private readonly mixer: AnimationMixer
@@ -43,6 +49,11 @@ export class Body {
   private readonly gear: Gear[] = []
   /** Where the rig stands in the scene while it is out of it (in the crowd). */
   private stage: Object3D | null = null
+  /** Where the crowd draws what the rig holds, for its lanterns' light. */
+  private readonly stand: StandIn = {
+    place: (glass, target) => this.held(glass, target),
+    ground: () => this.stage?.matrixWorld.elements[13] ?? 0,
+  }
 
   /** `tempo`: the mixer's time scale (each adventurer's own, so no two smiths strike in step). */
   constructor(
@@ -137,6 +148,7 @@ export class Body {
     this.lag = 0
     this.show(false)
     this.follow(root)
+    standIn(this.rig, this.stand)
   }
 
   /**
@@ -150,6 +162,7 @@ export class Body {
     crowd.leave(this.member)
     this.member = -1
     this.crowd = null
+    standIn(this.rig, null)
     const action = this.actions.get(clip)
     this.mixer.stopAllAction()
     this.current = action ?? null
@@ -178,6 +191,7 @@ export class Body {
     if (this.crowd && this.member >= 0) this.crowd.leave(this.member)
     this.crowd = null
     this.member = -1
+    standIn(this.rig, null)
     this.show(true)
     this.current = null
     this.mixer.stopAllAction()
@@ -186,6 +200,23 @@ export class Body {
       const skinned = child as SkinnedMesh
       if (skinned.isSkinnedMesh) skinned.skeleton.dispose()
     })
+  }
+
+  /**
+   * In the crowd: where it draws `mesh` (held somewhere under one of the rig's bones), world space.
+   * False when it isn't drawn: the figure is hidden, or the piece or anything between it and its bone.
+   */
+  private held(mesh: Mesh, target: Matrix4): boolean {
+    if (!this.crowd || this.member < 0 || !this.stage || !shown(this.stage)) return false
+    let bone = mesh.parent
+    if (!mesh.visible) return false
+    while (bone && !(bone as { isBone?: boolean }).isBone) {
+      if (!bone.visible) return false
+      bone = bone.parent
+    }
+    if (!bone) return false
+    this.crowd.held(this.member, pieceOf(mesh, bone), target)
+    return true
   }
 
   /** Has the crowd member's clip (played once) reached its end? */

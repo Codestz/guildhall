@@ -117,8 +117,8 @@ function Cast() {
     lookFrom(state.camera, state.size.height)
     declutter(state.camera, state.size.width, state.size.height)
   }, FRAME.SKY)
-  // Every member written (the figures, at WORLD): the crowd's slots go up once.
-  useFrame(() => crowd?.flush(), AFTER_POSE)
+  // Every member written (the figures, at WORLD): each takes its mesh level, the slots go up once.
+  useFrame((state) => crowd?.flush(state.camera, state.size.height), AFTER_POSE)
   const banners = store.parties.length > 1
   const dark = store.environment.daylight < 0.3
   return (

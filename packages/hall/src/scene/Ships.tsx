@@ -11,11 +11,11 @@ import { FRAME } from "./frame.ts"
 
 /**
  * Ships on the sea (Kenney Pirate Kit, CC0): merchant ships sailing slow laps around the island,
- * a rowboat tied up at the quay. Ambient for now — the user wants ships to carry the world beyond
- * the session (git pushes, merged PRs, releases); that hookup is a later discussion
- * (docs/research/roadmap.md). Moving, so they never cast into the static shadow map.
+ * a rowboat tied up at the quay. Ambient: the ships that carry the guild's GitHub sea (pushes, pull
+ * requests, releases) sail in scene/seas, round the same quay. Moving, so they never cast into the
+ * static shadow map.
  */
-const SEA_Y = -0.2 * HEX_SCALE + 0.05
+export const SEA_Y = -0.2 * HEX_SCALE + 0.05
 /** The lap: an ellipse ≥ 19 units off every coast (measured against island() tiles). */
 const LAP = { rx: 95, rz: 115 }
 const QUAY: readonly [number, number] = [5.5, 84]
@@ -24,7 +24,7 @@ const OFFSHORE = 26
 const MOORING: readonly [number, number] = [5.5, 6]
 
 /** The lap and the rowboat's mooring for a world: the hand map's measured ones, else from its land. */
-function watersOf(world: World): { lap: { rx: number; rz: number }; quay: readonly [number, number] } {
+export function watersOf(world: World): { lap: { rx: number; rz: number }; quay: readonly [number, number] } {
   if (world.kind === "hand") return { lap: LAP, quay: QUAY }
   const reach = reachOf(world) + OFFSHORE
   const dock = world.island.landmarks.find((mark) => mark.kind === "dock")

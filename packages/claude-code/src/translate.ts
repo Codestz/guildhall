@@ -165,12 +165,21 @@ export function subagentId(agentId: string): string {
 
 const ROLE_IDS: ReadonlySet<string> = new Set(ROLES.map((role) => role.id))
 
+/** Claude Code's own subagent types, by the roster role that does their work. */
+const BUILT_IN: Readonly<Record<string, string>> = {
+  Explore: "guild-explorer",
+  Plan: "guild-architect",
+}
+
 /**
  * The agent name the world knows a Claude Code agent type by: a roster role when the name matches
- * one (`implementer`, `agentry:implementer`, `guild-implementer` → `guild-implementer`), else the
+ * one (`implementer`, `agentry:implementer`, `guild-implementer` → `guild-implementer`) or is a
+ * built-in type that does a role's work (`Explore` → the explorer, `Plan` → the architect), else the
  * type as Claude Code names it, which the hall shows as a Wanderer.
  */
 export function agentOf(type: string): string {
+  const builtIn = BUILT_IN[type]
+  if (builtIn) return builtIn
   const bare = type
     .slice(type.lastIndexOf(":") + 1)
     .trim()

@@ -11,6 +11,7 @@
  *                           palette texture per pack, meshopt-compressed.
  * - packages/hall/src/world/kit.json — each kit piece's bounding box, for layout code.
  * - lands.glb / lands.json — the island's hex tiles and dressing (ADR 0006), the same way.
+ * - seas.glb             — the GitHub sea's cargo, gold and flag (lazy; no bounds file).
  * - forest.glb / forest.json — character-scale trees, bushes, rocks and grass from the Forest
  *                           Nature Pack (one palette, one material), placed by world/wilds.ts.
  *
@@ -81,6 +82,16 @@ const SHIPS: Record<string, string[]> = {
     "boat-row-small",
     "boat-row-large",
   ],
+}
+
+/**
+ * The GitHub sea's own pieces (scene/seas): cargo for the ships a push sends out, the gold and the
+ * flag a release's galleon flies (its hull is ships.glb's). Lazy-loaded only when a guild has sea
+ * events, so it sits outside the always-loaded budget. No bounds file: nothing lays it out by size.
+ */
+const SEAS: Record<string, string[]> = {
+  KayKit_ResourceBits: ["Wood_Planks_Stack_Small", "Gold_Bars_Stack_Small"],
+  "kenney_pirate-kit": ["flag-high-pennant"],
 }
 
 const GRAVEYARD: Record<string, string[]> = {
@@ -617,10 +628,11 @@ async function animations(name = "anims", clips: Record<string, string[]> = CLIP
   console.log(`${name}: ${target.getRoot().listAnimations().length} clips → ${kb(out)}`)
 }
 
-async function kit(name: string, sources: Record<string, string[]>): Promise<void> {
+/** `bounds`: also write packages/hall/src/world/<name>.json, each piece's box for layout code. */
+async function kit(name: string, sources: Record<string, string[]>, bounds = true): Promise<void> {
   const target = new Document()
   const scene = target.createScene("kit")
-  const bounds: Record<string, { size: number[]; min: number[]; max: number[] }> = {}
+  const boxes: Record<string, { size: number[]; min: number[]; max: number[] }> = {}
 
   for (const [pack, pieces] of Object.entries(sources)) {
     for (const piece of pieces) {
@@ -643,7 +655,7 @@ async function kit(name: string, sources: Record<string, string[]>): Promise<voi
       merged.dispose()
       scene.addChild(group)
       const box = getBounds(group)
-      bounds[named] = {
+      boxes[named] = {
         min: box.min.map(round),
         max: box.max.map(round),
         size: box.max.map((v, i) => round(v - (box.min[i] ?? 0))),
@@ -659,12 +671,13 @@ async function kit(name: string, sources: Record<string, string[]>): Promise<voi
   )
   const out = join(OUT, `${name}.glb`)
   await io.write(out, target)
+  console.log(`${name}: ${Object.keys(boxes).length} pieces → ${kb(out)}`)
+  if (!bounds) return
   const json = join(ROOT, `packages/hall/src/world/${name}.json`)
-  await writeFile(json, `${JSON.stringify(bounds, null, 2)}\n`)
+  await writeFile(json, `${JSON.stringify(boxes, null, 2)}\n`)
   // In the repo's own format, so `biome check .` stays clean after a regeneration.
   const format = Bun.spawnSync([process.execPath, "x", "biome", "format", "--write", json], { cwd: ROOT })
   if (format.exitCode !== 0) throw new Error(`biome could not format ${json}: ${format.stderr.toString()}`)
-  console.log(`${name}: ${Object.keys(bounds).length} pieces → ${kb(out)}`)
 }
 
 function round(value: number): number {
@@ -687,6 +700,7 @@ const STEPS: Record<string, () => Promise<void>> = {
   },
   graveyard: () => kit("graveyard", GRAVEYARD),
   ships: () => kit("ships", SHIPS),
+  seas: () => kit("seas", SEAS, false),
 }
 const wanted = process.argv.slice(2)
 for (const name of wanted) if (!STEPS[name]) throw new Error(`unknown output ${name}: ${Object.keys(STEPS)}`)

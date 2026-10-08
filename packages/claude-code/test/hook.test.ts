@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { GuildEvent } from "@guildhall/core"
+import { projectId } from "@guildhall/core/project"
 import { type HubMessage, startHub } from "@guildhall/hub"
 import { EVENTS, settings } from "../src/install.ts"
 import { guildOf } from "../src/project.ts"
@@ -65,6 +66,33 @@ describe("the hook", () => {
     expect(code).toBe(0)
     expect(stdout).toBe("")
     expect(performance.now() - started).toBeLessThan(2000)
+  })
+
+  test("the dispatch carries the project, so the hub can tell two `app`s apart", async () => {
+    const root = join(mkdtempSync(join(tmpdir(), "guildhall-claude-code-project-")), "app")
+    mkdirSync(join(root, ".git"), { recursive: true })
+    writeFileSync(join(root, ".git", "HEAD"), "ref: refs/heads/main\n")
+    writeFileSync(
+      join(root, ".git", "config"),
+      '[remote "origin"]\n\turl = https://github.com/acme/app.git\n',
+    )
+    let body: unknown
+    const listener = Bun.serve({
+      port: 0,
+      fetch: async (request) => {
+        body = await request.json()
+        return new Response()
+      },
+    })
+    try {
+      await hook(JSON.stringify({ ...session.events[1], cwd: join(root) }), listener.port)
+    } finally {
+      listener.stop(true)
+    }
+    expect(body).toMatchObject({
+      guild: "app",
+      project: { id: projectId(root), github: "acme/app", branch: "main" },
+    })
   })
 
   test("garbage on stdin exits 0, saying nothing", async () => {

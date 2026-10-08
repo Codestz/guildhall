@@ -39,6 +39,7 @@ import { Room } from "./Room.tsx"
 import { Ships } from "./Ships.tsx"
 import { Sigils } from "./Sigils.tsx"
 import { Stations } from "./Stations.tsx"
+import { Seas } from "./seas/Seas.tsx"
 import { stepFrame } from "./step.ts"
 import { UndeadGate } from "./Undead.tsx"
 import { WeatherLayer } from "./weather/WeatherLayer.tsx"
@@ -89,6 +90,8 @@ export function Scene() {
       <Suspense fallback={null}>
         <Ships />
       </Suspense>
+      {/* The guild's GitHub sea (scene/seas): lazy, nothing until the store has a sea event. */}
+      <Seas />
       {/* Secret world events (guild/events.ts): nothing when idle; each event's code loads on first need. */}
       <EventsLayer />
       <WeatherLayer />

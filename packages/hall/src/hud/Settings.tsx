@@ -32,6 +32,7 @@ const STORIES: Record<ScenarioId, string> = {
   rush: "Rush",
   parties: "Parties",
   factions: "Factions",
+  seas: "Seas",
 }
 const KEYS: [string, string][] = [
   ["Drag", "Pan"],

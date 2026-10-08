@@ -2,7 +2,7 @@ import { spawn } from "node:child_process"
 import { mkdirSync, statSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { guildOf } from "./project.ts"
+import { guildOf, projectRefOf } from "./project.ts"
 import { translate } from "./translate.ts"
 
 /**
@@ -36,13 +36,16 @@ export async function run(text: string): Promise<void> {
   const changes = translate(payload, Date.now())
   if (changes.length === 0) return
   const cwd = (payload as { cwd?: unknown }).cwd
-  const guild = guildOf(typeof cwd === "string" && cwd ? cwd : process.cwd())
+  const dir = typeof cwd === "string" && cwd ? cwd : process.cwd()
+  const guild = guildOf(dir)
+  // The project (PROTOCOL.md §3.1): the hub gives it its own guild (`app`, `app·2`), as for OpenCode.
+  const project = projectRefOf(dir)
   const port = Number(process.env.GUILDHALL_PORT ?? HUB_PORT)
   try {
     await fetch(`http://127.0.0.1:${port}/events`, {
       method: "POST",
       headers: { "content-type": "application/json", [HERALD_HEADER]: "1" },
-      body: JSON.stringify({ guild, changes }),
+      body: JSON.stringify({ guild, changes, project }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
   } catch (error) {

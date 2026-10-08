@@ -102,11 +102,11 @@ describe("a subagent tree", () => {
     expect([...model.sessions.keys()]).toHaveLength(3)
   })
 
-  test("a roster name becomes its role; any other agent is a Wanderer", () => {
+  test("a roster name becomes its role, and so does a built-in that does a role's work", () => {
     expect(implementer?.agent).toBe("guild-implementer")
     expect(roleOf(implementer?.agent ?? "").title).toBe("Implementer")
-    expect(explorer?.agent).toBe("Explore")
-    expect(roleOf(explorer?.agent ?? "").title).toBe("Wanderer")
+    expect(explorer?.agent).toBe("guild-explorer")
+    expect(roleOf(explorer?.agent ?? "").title).toBe("Explorer")
   })
 
   test("the quest names the child: title from its description, task from its prompt", () => {
@@ -259,8 +259,19 @@ describe("names", () => {
 
   test("agent types that don't are kept as they are", () => {
     expect(agentOf("general-purpose")).toBe("general-purpose")
-    expect(agentOf("Plan")).toBe("Plan")
     expect(agentOf("my-plugin:reviewer")).toBe("my-plugin:reviewer")
+  })
+
+  test("Claude Code's built-in Explore and Plan are the explorer and the architect", () => {
+    expect(agentOf("Explore")).toBe("guild-explorer")
+    expect(agentOf("Plan")).toBe("guild-architect")
+    expect(roleOf(agentOf("Explore")).id).toBe("guild-explorer")
+    expect(roleOf(agentOf("Plan")).id).toBe("guild-architect")
+  })
+
+  test("only the built-ins themselves: a plugin's own plan agent is not the architect", () => {
+    expect(agentOf("my-plugin:Plan")).toBe("my-plugin:Plan")
+    expect(agentOf("statusline-setup")).toBe("statusline-setup")
   })
 
   test("tool names", () => {

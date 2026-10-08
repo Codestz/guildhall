@@ -5,8 +5,11 @@ import {
   emptyModel,
   failedDeed,
   type GuildEvent,
+  isSeaRecord,
   type Model,
   rootOf,
+  type SeaEvent,
+  type SeaRecord,
   type Session,
 } from "@guildhall/core"
 import { type DeedLook, deedLook, interestOf, roleOf } from "@guildhall/roster"
@@ -18,6 +21,7 @@ import {
   party,
   rush,
   sagaTale,
+  seas,
   solo,
   type Tale,
   toEvents,
@@ -75,9 +79,15 @@ export type { Seat }
 /** How many adventurers `rush` sends out (unset: the story's own 12); a deep link's `n` sets it. */
 export const RUSH: { count?: number } = {}
 
+/** How long the seas story holds after its release, so the galleon is seen arriving (scene/seas). */
+const SEAS_HOLD_MS = 30_000
+
+/** A story as told: its changes alone, or with acts and hours, and the GitHub sea beside it. */
+type Told = Change[] | (Tale & { sea?: readonly SeaEvent[] })
+
 export const SCENARIOS: Record<
-  "saga" | "party" | "solo" | "rush" | "parties" | "factions",
-  () => Change[] | Tale
+  "saga" | "party" | "solo" | "rush" | "parties" | "factions" | "seas",
+  () => Told
 > = {
   /** The showcase's story: five acts, ~17 min watched, every world event (sim/saga.ts). */
   saga: () => sagaTale(),
@@ -88,11 +98,27 @@ export const SCENARIOS: Record<
   parties: () => parties(),
   /** Two harnesses at once: an OpenCode party and a Claude Code party (sim/factions.ts). */
   factions: () => factions(),
+  /** A party with its GitHub sea beside it: a push, a PR, red then green CI, a merge, a release (sim/seas.ts). */
+  seas: () => {
+    const { changes, sea } = seas()
+    // The release is the story's last word: hold the scene a while (one quiet step on the
+    // guildmaster) so its galleon sails in and anchors before the replay loops.
+    const last = changes.at(-1)
+    const master = changes[0]
+    const hold: Change[] = last && master ? [{ type: "step", id: master.id, at: last.at + SEAS_HOLD_MS }] : []
+    return { changes: [...changes, ...hold], chapters: [], hours: [], sea }
+  },
 }
 export type ScenarioId = keyof typeof SCENARIOS
 
 /** A chapter of the story being played (the Saga's acts), at run time `at` (ms). */
 export type StoryChapter = Chapter
+
+/** Something that happened on GitHub to the guild's project (PROTOCOL.md §7), at run time `at` (ms). */
+export interface Sighting {
+  event: SeaEvent
+  at: number
+}
 
 /** The hub a hall follows unless told otherwise (ADR 0003). */
 export const DEFAULT_HUB = "ws://127.0.0.1:4747/ws"
@@ -299,6 +325,12 @@ export class GuildStore {
   }
   /** The chapters of the story being played (run time), empty for a story without acts or live. */
   chapters: StoryChapter[] = []
+  /**
+   * The sea (scene/seas): what happened on GitHub to the guild's project, oldest first, each event
+   * once. A told story's whole sea is known from its start, and the scene shows what `time` has
+   * reached; live, it is what the hub has sent since the page opened (hellos included).
+   */
+  sea: Sighting[] = []
   /** The story's own clock (environment.ts time mode "story"). */
   private hours: StoryHour[] = []
   environment: Environment = environmentOf({
@@ -367,6 +399,7 @@ export class GuildStore {
     this.markers = []
     this.chapters = []
     this.hours = []
+    this.sea = []
     this.liveStart = Date.now()
     let delay = 500
     const open = () => {
@@ -389,6 +422,11 @@ export class GuildStore {
           this.seen.clear()
           this.liveStart = data.events[0]?.change.at ?? Date.now()
           for (const event of data.events) if (this.fresh(event)) this.take(event.change, false, event.guild)
+          this.sight(data.sea)
+        } else if (data.type === "sea") {
+          this.sight(data.sea)
+          this.emit()
+          return
         } else {
           // A change older than LIVE_MS is backlog (the herald's courier flushing its queue after a
           // hub restart, review-2 #10): applied, but history, not news — no burst of ravens and cues.
@@ -412,6 +450,21 @@ export class GuildStore {
       }
     }
     open()
+  }
+
+  /**
+   * Live: sea records from the hub, each event once (a hello repeats what was already sent). Run time
+   * is reckoned from `liveStart`, which a hello may move, so every sighting is re-dated.
+   */
+  private sight(records: readonly SeaRecord[]): void {
+    const known = new Set(this.sea.map((s) => s.event.id))
+    const events = [...this.sea.map((s) => s.event)]
+    for (const { event } of records)
+      if (!known.has(event.id)) {
+        known.add(event.id)
+        events.push(event)
+      }
+    this.sea = sightingsOf(events, this.liveStart)
   }
 
   /** Live: the last seq taken per guild, since the last hello. */
@@ -443,7 +496,9 @@ export class GuildStore {
     }
     this.scenario = scenario
     const told = SCENARIOS[scenario]()
-    const tale: Tale = Array.isArray(told) ? { changes: told, chapters: [], hours: [] } : told
+    const tale: Exclude<Told, Change[]> = Array.isArray(told)
+      ? { changes: told, chapters: [], hours: [] }
+      : told
     this.events = toEvents(tale.changes, "demo")
     this.player = new Player(this.events, { loop: true })
     this.fastForward = 1
@@ -451,6 +506,7 @@ export class GuildStore {
     const start = this.events[0]?.change.at ?? 0
     this.chapters = tale.chapters.map((c) => ({ ...c, at: c.at - start }))
     this.hours = tale.hours.map((h) => ({ ...h, at: h.at - start }))
+    this.sea = sightingsOf(tale.sea ?? [], start)
     this.markers = [
       ...this.chapters.map((c): Marker => ({ at: c.at, kind: "chapter", label: chapterLabel(c) })),
       ...this.events.flatMap(({ change }) => {
@@ -1265,10 +1321,16 @@ function shorten(text: string, max: number): string {
 
 /**
  * A hub message, checked: the socket is a trust boundary too (a stray or broken peer must not throw
- * in the hall). Undefined for anything that isn't a hello or events; events not shaped like a
- * `GuildEvent` are left out.
+ * in the hall). Undefined for anything that isn't a hello, events or sea; events not shaped like a
+ * `GuildEvent`, and sea records not shaped like a `SeaRecord`, are left out.
  */
-function messageOf(raw: unknown): { type: "hello" | "events"; events: GuildEvent[] } | undefined {
+function messageOf(
+  raw: unknown,
+):
+  | { type: "hello"; events: GuildEvent[]; sea: SeaRecord[] }
+  | { type: "events"; events: GuildEvent[] }
+  | { type: "sea"; sea: SeaRecord[] }
+  | undefined {
   let data: unknown
   try {
     data = JSON.parse(String(raw))
@@ -1276,9 +1338,17 @@ function messageOf(raw: unknown): { type: "hello" | "events"; events: GuildEvent
     return undefined
   }
   if (typeof data !== "object" || data === null) return undefined
-  const { type, events } = data as { type?: unknown; events?: unknown }
-  if ((type !== "hello" && type !== "events") || !Array.isArray(events)) return undefined
-  return { type, events: events.filter(isEvent) }
+  const { type, events, sea } = data as { type?: unknown; events?: unknown; sea?: unknown }
+  if (!Array.isArray(events)) return undefined
+  if (type === "sea") return { type, sea: events.filter(isSeaRecord) }
+  if (type === "events") return { type, events: events.filter(isEvent) }
+  if (type !== "hello") return undefined
+  return { type, events: events.filter(isEvent), sea: Array.isArray(sea) ? sea.filter(isSeaRecord) : [] }
+}
+
+/** Sea events at run time from `start`, oldest first (ties keep their order). */
+function sightingsOf(events: readonly SeaEvent[], start: number): Sighting[] {
+  return events.map((event) => ({ event, at: event.at - start })).sort((a, b) => a.at - b.at)
 }
 
 function isEvent(value: unknown): value is GuildEvent {

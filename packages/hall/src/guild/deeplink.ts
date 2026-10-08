@@ -14,7 +14,7 @@ import { RUSH, SCENARIOS, type ScenarioId } from "./store.ts"
  *
  *   ?story=saga&t=11:53&hour=23&weather=clear&look=quarry&hud=hidden&paused=1
  *
- *   story    party | solo | rush | parties | factions | saga
+ *   story    party | solo | rush | parties | factions | saga | seas
  *   t        mm:ss, a seek into the story (with `act`: counted from that act's start)
  *   act      1–5, a Saga chapter (implies story=saga when no story is given)
  *   n        1–500, how many adventurers `rush` sends out (only with story=rush; 12 without it)

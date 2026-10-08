@@ -73,13 +73,17 @@ describe("site registry", () => {
 })
 
 describe("failure destinations", () => {
-  test("today every failure goes to the infirmary: beds first, then mats, then they share", () => {
+  test("today every failure goes to the infirmary: beds first, then mats, then the floor round them", () => {
     const views = viewsOf(failedParty("guild-implementer", [10, 10, 10, 10, 10, 10, 10]), 20)
     const failed = views.filter((v) => v.phase === "failed")
     expect(failed).toHaveLength(7)
     expect(failed.every((v) => v.destination === "infirmary" && v.site === undefined)).toBe(true)
     expect(failed.map((v) => v.seat)).toEqual(["bed", "bed", "bed", "floor", "floor", "floor", "floor"])
-    expect(failed.map((v) => v.target)).toEqual([...INFIRMARY, ...INFIRMARY_MATS, INFIRMARY_MATS[0]])
+    expect(failed.slice(0, 6).map((v) => v.target)).toEqual([...INFIRMARY, ...INFIRMARY_MATS])
+    // The seventh shares no one's berth: free floor near the bedrolls (guild/crowd.ts).
+    const [x = 0, z = 0] = failed[6]?.target ?? []
+    expect([...INFIRMARY, ...INFIRMARY_MATS].some((p) => p[0] === x && p[1] === z)).toBe(false)
+    expect(Math.hypot(x - -6.5, z - -5.4)).toBeLessThan(3)
     expect(DESTINATIONS.infirmary?.clip).toBe("Lie_Idle")
   })
 

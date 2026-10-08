@@ -26,6 +26,8 @@ import type { SiteId } from "../world/lands.ts"
 import {
   HAND_IN,
   HAND_INS,
+  HEARTH,
+  HEARTH_SEATS,
   hearthSeat,
   type Post,
   type Seat,
@@ -36,6 +38,7 @@ import {
 } from "../world/layout.ts"
 import { MOODS, type Mood } from "../world/moods.ts"
 import { destinationOf, FATES, type Fates, SITE_DEFS, siteOf } from "../world/sites.ts"
+import { Crowd } from "./crowd.ts"
 import {
   beatTimes,
   Director,
@@ -55,6 +58,7 @@ import {
 } from "./environment.ts"
 import { MODE, SERVED } from "./mode.ts"
 import { type Actor, before, happenings, MomentStream } from "./moments.ts"
+import { Ordinals } from "./ordinals.ts"
 import { byJoin, PARTY_IDLE_MS, type Party, stageOf } from "./parties.ts"
 import { RISE_MS, Undead } from "./undead.ts"
 
@@ -235,6 +239,7 @@ export class GuildStore {
   bard = true
   /** Diorama: the orthographic tabletop. Explore: a perspective camera that can go low and close. */
   view: "diorama" | "explore" = "diorama"
+  /** Who is on stage. A new array every refresh, but an unchanged adventurer keeps its object (`viewsOf`). */
   views: AdventurerView[] = []
   /** Counts history rebuilds (a seek, a restart, a load): the stage forgets who was leaving. */
   rebuilds = 0
@@ -675,13 +680,16 @@ export class GuildStore {
     this.rebuilding = true
     this.rebuilds++
     this.chapterTold = Number.NaN
+    this.ordinals.forget()
     this.moments.rebuild(continued)
   }
 
   private take(change: Change, live: boolean, guild?: string): void {
     if (guild !== undefined && !this.guilds.has(change.id)) this.guilds.set(change.id, guild)
     const was = before(this.model, change)
+    const mark = this.ordinals.mark(this.model, change.id)
     apply(this.model, change)
+    this.ordinals.took(this.model, change.id, mark)
     this.record(change)
     for (const happening of happenings(this.model, change, was)) {
       const s = this.model.sessions.get(happening.id)
@@ -720,6 +728,9 @@ export class GuildStore {
     if (!this.focus || !held || score > this.focus.score) this.focus = { id: change.id, score, at: change.at }
   }
 
+  /** Each session's number within its role and party, for the log and moments (guild/ordinals.ts). */
+  private ordinals = new Ordinals()
+
   /** Tool calls already written to the log: OpenCode 1 re-sends a running call as its output streams. */
   private logged = new Set<string>()
 
@@ -733,7 +744,7 @@ export class GuildStore {
     const line = lineOf(change, s)
     if (!line) return
     const role = s.parentID ? roleOf(s.agent) : GUILDMASTER
-    const title = s.parentID ? numbered(role.title, ordinalOf(this.model, s)) : role.title
+    const title = s.parentID ? numbered(role.title, this.ordinals.of(this.model, s)) : role.title
     this.write(
       { at: change.at - this.start, id: s.id, title, color: role.color, party: rootOf(this.model, s.id) },
       line,
@@ -755,7 +766,7 @@ export class GuildStore {
     return {
       id: s.id,
       agent: s.agent,
-      title: s.parentID ? numbered(role.title, ordinalOf(this.model, s)) : role.title,
+      title: s.parentID ? numbered(role.title, this.ordinals.of(this.model, s)) : role.title,
       color: role.color,
       ...(s.parentID ? { parent: s.parentID } : {}),
       master: rootOf(this.model, s.id),
@@ -798,7 +809,7 @@ export class GuildStore {
         for (const s of party.sessions)
           if (!this.present.has(s.id) && (this.mode !== "live" || this.now - s.seen <= LIVE_MS))
             this.entering.add(s.id)
-    const views = viewsOf(this.model, this.now, FATES, parties, this.entering)
+    const views = viewsOf(this.model, this.now, FATES, parties, this.entering, this.views)
     this.present.clear()
     for (const view of views) this.present.add(view.id)
     for (const id of this.entering) if (!this.present.has(id)) this.entering.delete(id)
@@ -940,6 +951,10 @@ export function partyOf(model: Model): Session[] {
  * the parties on the island (guild/parties.ts), each with its guildmaster at its own seat. Posts at
  * the shared sites and stations are handed out across all parties in join order, so a party that
  * arrives later never moves anyone already working.
+ *
+ * Given the `previous` views, an adventurer whose view is unchanged (every field equal, posts and
+ * looks compared by value) gets back the very same object: the scene can memo by reference, and
+ * re-renders only those who changed. Views are never mutated after they are made.
  */
 export function viewsOf(
   model: Model,
@@ -947,6 +962,7 @@ export function viewsOf(
   fates: Fates = FATES,
   stage: readonly Party[] = stageOf(model, now),
   entering: ReadonlySet<string> = NO_ONE,
+  previous: readonly AdventurerView[] = [],
 ): AdventurerView[] {
   const partyOfId = new Map<string, Party>()
   for (const party of stage) for (const s of party.sessions) partyOfId.set(s.id, party)
@@ -959,6 +975,8 @@ export function viewsOf(
   /** How many have been sent to each failure destination so far. */
   const sent = new Map<string, number>()
   const atSite = new Map<SiteId, number>()
+  /** Whoever rests or lies past a place's own seats takes free floor round it (guild/crowd.ts). */
+  const crowd = new Crowd()
   const views: AdventurerView[] = []
 
   for (const s of sessions) {
@@ -1004,7 +1022,7 @@ export function viewsOf(
         phase = "resting"
         const stool = TAVERN[stools++]
         seat = stool ? "stool" : "floor"
-        target = stool ?? hearthSeat(floor++)
+        target = stool ?? (floor < HEARTH_SEATS ? hearthSeat(floor++) : crowd.near(HEARTH))
       } else {
         phase = "leaving"
         target = exitOf(s.id)
@@ -1020,7 +1038,7 @@ export function viewsOf(
       const berth = place?.berth(n)
       destination = to
       seat = berth?.seat
-      target = berth?.target ?? MASTER_POST
+      target = berth?.target ?? (place?.crowd ? crowd.near(place.crowd) : MASTER_POST)
     } else if (home) {
       // Island workers stay at their site for the whole quest: no jogging back on every deed.
       site = home
@@ -1028,6 +1046,8 @@ export function viewsOf(
       const n = atSite.get(home) ?? 0
       atSite.set(home, n + 1)
       const posts = SITE_DEFS[home].posts
+      // Past the posts they share them: the scene sets each extra worker beside the post's first
+      // (scene/activity.ts reserve, world/behaviours.ts shifted), routine and all.
       target = posts[n % posts.length] ?? MASTER_POST
     } else if (look?.goTo === "quest-board") {
       // A quest of their own: sent from their party's place at the board.
@@ -1069,10 +1089,32 @@ export function viewsOf(
       ...(entering.has(s.id) ? { enter: entranceOf(s.id, party, isMaster) } : {}),
     })
   }
-  return views
+  return previous.length > 0 ? kept(previous, views) : views
 }
 
 const NO_ONE: ReadonlySet<string> = new Set()
+
+/** `views`, with each one equal to its previous view swapped for that (see `viewsOf`). */
+function kept(previous: readonly AdventurerView[], views: AdventurerView[]): AdventurerView[] {
+  const before = new Map(previous.map((view) => [view.id, view]))
+  for (let i = 0; i < views.length; i++) {
+    const view = views[i] as AdventurerView
+    const was = before.get(view.id)
+    if (was && same(was, view)) views[i] = was
+  }
+  return views
+}
+
+/** Equal by value: views are plain data (strings, numbers, booleans, posts, looks, entrances). */
+function same(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false
+  const keys = Object.keys(a)
+  if (keys.length !== Object.keys(b).length) return false
+  for (const key of keys)
+    if (!same((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])) return false
+  return true
+}
 
 /** -1…1, stable per id: which side of the road (or of the hand-in spot) someone keeps to. */
 function sideOf(id: string): number {
@@ -1171,6 +1213,10 @@ const MASTER_POST: Post = STATIONS["quest-board"].posts[0] ?? [0, -7.4, 0]
 /** Each party's guildmaster's place: the dais, then the seats beside it (guild/parties.ts). */
 const SEAT_POSTS: readonly Post[] = STATIONS["quest-board"].posts
 
+/**
+ * A station's next free post, then the overflow bench's; past those they share the bench's posts,
+ * and the scene sets each beside the post's first (as at a site).
+ */
 function postAt(id: StationId, taken: Map<StationId, number>): Post {
   const n = taken.get(id) ?? 0
   const posts = STATIONS[id].posts

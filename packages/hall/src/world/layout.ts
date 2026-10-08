@@ -129,9 +129,12 @@ export const INFIRMARY_MATS: readonly Post[] = [
   [-9.5, -5.4, 0],
 ]
 
+/** Seats on the floor round the hearth (`hearthSeat`); past them a crowd finds floor nearby (guild/crowd.ts). */
+export const HEARTH_SEATS = 9
+
 /** When the tavern is full: sit on the floor around the hearth. */
 export function hearthSeat(n: number): Post {
-  const angle = Math.PI * 0.2 + n * ((Math.PI * 2) / 9)
+  const angle = Math.PI * 0.2 + n * ((Math.PI * 2) / HEARTH_SEATS)
   const x = HEARTH[0] + Math.cos(angle) * 3.4
   const z = HEARTH[1] + Math.sin(angle) * 3.4
   return [x, z, Math.atan2(HEARTH[0] - x, HEARTH[1] - z)]

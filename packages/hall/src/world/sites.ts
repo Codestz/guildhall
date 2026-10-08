@@ -3,7 +3,7 @@ import { roleOf } from "@guildhall/roster"
 import { type Behaviour, SITE_WORK } from "./behaviours.ts"
 import type { Piece } from "./furniture.ts"
 import { SITES, type Site, type SiteId } from "./lands.ts"
-import { INFIRMARY, INFIRMARY_MATS, type Post, type Seat } from "./layout.ts"
+import { INFIRMARY, INFIRMARY_MATS, type Post, type Seat, type Spot } from "./layout.ts"
 import type { Mix } from "./wilds.ts"
 
 /**
@@ -104,8 +104,13 @@ export function siteOf(agent: string): SiteId | undefined {
 /** Where a failed adventurer is sent, and how they lie there. */
 export interface Destination {
   label: string
-  /** The n-th adventurer sent here (0-based, in join order): where they go and on what. */
+  /**
+   * The n-th adventurer sent here (0-based, in join order): where they go and on what. No target
+   * past its berths: they take free ground round `crowd` (guild/crowd.ts).
+   */
   berth(n: number): { target: Post | undefined; seat?: Seat }
+  /** Where those past its berths gather, on the keep's floor. */
+  crowd?: Spot
   /** What they play once there. */
   clip: string
 }
@@ -126,13 +131,15 @@ export interface FailureRule {
 }
 
 export const DESTINATIONS: Record<string, Destination> = {
-  /** The keep's infirmary: beds first, then bedrolls on the floor; past that they share. */
+  /** The keep's infirmary: beds first, then bedrolls on the floor, then the floor round them. */
   infirmary: {
     label: "Infirmary",
     berth: (n) =>
       n < INFIRMARY.length
         ? { target: INFIRMARY[n], seat: "bed" }
-        : { target: INFIRMARY_MATS[(n - INFIRMARY.length) % INFIRMARY_MATS.length], seat: "floor" },
+        : { target: INFIRMARY_MATS[n - INFIRMARY.length], seat: "floor" },
+    // The middle bedroll (INFIRMARY_MATS[0]).
+    crowd: [-6.5, -5.4],
     clip: "Lie_Idle",
   },
 }

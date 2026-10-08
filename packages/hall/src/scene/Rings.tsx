@@ -11,7 +11,7 @@ import {
   RingGeometry,
   type WebGLProgramParametersWithUniforms,
 } from "three"
-import { capacityFor } from "./Blobs.tsx"
+import { capacityFor, useCastNodes } from "./Blobs.tsx"
 import { DITHER_GLSL } from "./dissolve.ts"
 import { useOwnedMeshes } from "./owned.ts"
 
@@ -21,6 +21,7 @@ import { useOwnedMeshes } from "./owned.ts"
  * root, dissolves with it (its presence, dithered as scene/dissolve.ts does) and hides with it.
  * Selected, it is wider (outer 1.05, not 0.9) and stronger (0.95, not 0.55): the ring's outer edge
  * is moved per instance in the vertex shader, so both are the same 40-segment ring as before.
+ * GLSL (an onBeforeCompile patch) on WebGL; the same ring as a node material on WebGPU (castNodes.ts).
  */
 export interface RingLook {
   color: string
@@ -72,10 +73,10 @@ const UNDERFOOT = new Matrix4()
 
 export function Rings() {
   const [capacity, setCapacity] = useState(64)
+  const nodes = useCastNodes()
   const built = useOwnedMeshes(() => {
-    const material = new MeshBasicMaterial({ transparent: true, depthWrite: false })
-    material.onBeforeCompile = patchRing
-    material.customProgramCacheKey = () => "cast-ring"
+    if (nodes === null) return { meshes: [] }
+    const material = nodes ? nodes.ringNodeMaterial(MID) : glslRing()
     const mesh = new InstancedMesh(new RingGeometry(INNER, 1, SEGMENTS), material, capacity)
     mesh.instanceColor = new InstancedBufferAttribute(new Float32Array(capacity * 3).fill(1), 3)
     // Per ring: outer radius, opacity, presence.
@@ -84,7 +85,7 @@ export function Rings() {
     mesh.castShadow = false
     mesh.receiveShadow = false
     return { meshes: [mesh] }
-  }, [capacity])
+  }, [capacity, nodes])
 
   useFrame(() => {
     const wanted = capacityFor(rings.size, capacity)
@@ -113,13 +114,24 @@ export function Rings() {
   return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
 }
 
+/** Halfway between the inner and outer radius: outer vertices lie beyond it. */
+const MID = (INNER + 1) / 2
+
+/** The ring's GLSL material (the default, on WebGL). */
+function glslRing(): MeshBasicMaterial {
+  const material = new MeshBasicMaterial({ transparent: true, depthWrite: false })
+  material.onBeforeCompile = patchRing
+  material.customProgramCacheKey = () => "cast-ring"
+  return material
+}
+
 function patchRing(shader: WebGLProgramParametersWithUniforms): void {
   shader.vertexShader = shader.vertexShader
     .replace("#include <common>", "#include <common>\nattribute vec3 aRing;\nvarying vec2 vRing;")
     .replace(
       "#include <begin_vertex>",
       // Outer vertices (radius 1) out to this ring's outer radius; inner ones stay at INNER.
-      `#include <begin_vertex>\nif ( length( position.xy ) > ${((INNER + 1) / 2).toFixed(3)} ) transformed.xy *= aRing.x;\nvRing = aRing.yz;`,
+      `#include <begin_vertex>\nif ( length( position.xy ) > ${MID.toFixed(3)} ) transformed.xy *= aRing.x;\nvRing = aRing.yz;`,
     )
   shader.fragmentShader = shader.fragmentShader
     .replace("#include <common>", `#include <common>\nvarying vec2 vRing;\n${DITHER_FUNCTIONS}`)

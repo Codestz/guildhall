@@ -9,7 +9,7 @@ import {
 } from "three"
 import { backendUrl, frameCounts, maxAnisotropy, requestedBackend } from "../src/render/backend.ts"
 import { glFor } from "../src/render/renderer.ts"
-import { shimLowGrade, shimReadback, syncShadows } from "../src/render/shims.ts"
+import { shimLowGrade, syncShadows } from "../src/render/shims.ts"
 import { packExposure } from "../src/scene/atmosphere/lowGrade.ts"
 
 describe("requestedBackend", () => {
@@ -144,21 +144,5 @@ describe("shimLowGrade", () => {
     renderer.toneMappingExposure = 1.3
     expect(renderer.toneMapping).toBe(NeutralToneMapping)
     expect(renderer.toneMappingExposure).toBe(1.3)
-  })
-})
-
-describe("shimReadback", () => {
-  test("a renderer without synchronous readback gets a no-op that leaves the buffer empty", () => {
-    const renderer: { readRenderTargetPixels?: (...args: unknown[]) => void } = {}
-    shimReadback(renderer)
-    const pixels = new Uint8Array(4)
-    expect(() => renderer.readRenderTargetPixels?.(null, 0, 0, 1, 1, pixels)).not.toThrow()
-    expect([...pixels]).toEqual([0, 0, 0, 0])
-  })
-  test("a renderer that has it keeps its own", () => {
-    const own = () => {}
-    const renderer = { readRenderTargetPixels: own }
-    shimReadback(renderer)
-    expect(renderer.readRenderTargetPixels).toBe(own)
   })
 })

@@ -11,7 +11,7 @@ import {
   type WebGLProgramParametersWithUniforms,
 } from "three"
 import { useGuildStore } from "../guild/useGuild.ts"
-import { capacityFor } from "./Blobs.tsx"
+import { type CastNodes, capacityFor, useCastNodes } from "./Blobs.tsx"
 import { useOwnedMeshes } from "./owned.ts"
 import { DITHER_FUNCTIONS, presenceDiscard } from "./Rings.tsx"
 
@@ -84,15 +84,17 @@ const EFFECT_SCALE = new Matrix4().makeScale(2, 2, 2)
 export function DeedEffects() {
   const store = useGuildStore()
   const [capacity, setCapacity] = useState(64)
+  const nodes = useCastNodes()
   const built = useOwnedMeshes(
     () => {
+      if (nodes === null) return { meshes: [] }
       const meshes = GLOWS.map((glow) => {
         const geometry = new SphereGeometry(glow === "steam" ? 0.07 : 0.045, 8, 8)
         geometry.setAttribute(
           "aPresence",
           new InstancedBufferAttribute(new Float32Array(capacity).fill(1), 1),
         )
-        const mesh = new InstancedMesh(geometry, glowOf(colorOf(glow, store.mood)), capacity)
+        const mesh = new InstancedMesh(geometry, glowOf(colorOf(glow, store.mood), nodes), capacity)
         mesh.frustumCulled = false
         mesh.count = 0
         mesh.visible = false
@@ -100,12 +102,13 @@ export function DeedEffects() {
       })
       return { meshes }
     },
-    [capacity],
+    [capacity, nodes],
     "materials",
   )
 
   useFrame(({ clock }) => {
-    if (!built) return
+    // Nothing built while the node materials load (WebGPU).
+    if (!built || built.meshes.length === 0 || nodes === null) return
     const t = clock.elapsedTime
     const counts = [0, 0, 0, 0]
     let needed = 0
@@ -133,7 +136,7 @@ export function DeedEffects() {
     GLOWS.forEach((glow, g) => {
       const mesh = built.meshes[g] as InstancedMesh
       // The mood can change mid-story: its glow colours with it (materials are kept per colour).
-      mesh.material = glowOf(colorOf(glow, store.mood))
+      mesh.material = glowOf(colorOf(glow, store.mood), nodes)
       mesh.count = counts[g] ?? 0
       mesh.visible = mesh.count > 0
       mesh.instanceMatrix.needsUpdate = true
@@ -148,11 +151,17 @@ export function DeedEffects() {
  * One glow material per colour, kept for the whole run (a handful: the moods' fire, magic and trim,
  * and steam). Freed with the last effect, its shader program went too, and the next deed to start
  * compiled it again: a 150–200 ms stall on this Mac each time (docs/perf-budget.md, final pass).
- * Each mote's presence dithers it in and out with its adventurer (scene/dissolve.ts).
+ * Each mote's presence dithers it in and out with its adventurer (scene/dissolve.ts): a GLSL patch
+ * on WebGL, a node material on WebGPU (castNodes.ts; `nodes`).
  */
 const glows = new Map<string, MeshStandardMaterial>()
-function glowOf(color: string): MeshStandardMaterial {
-  let material = glows.get(color)
+function glowOf(color: string, nodes: CastNodes | false): MeshStandardMaterial {
+  const key = nodes ? `node:${color}` : color
+  let material = glows.get(key)
+  if (!material && nodes) {
+    material = nodes.glowNodeMaterial(color) as unknown as MeshStandardMaterial
+    glows.set(key, material)
+  }
   if (!material) {
     material = new MeshStandardMaterial({
       color,
@@ -163,7 +172,7 @@ function glowOf(color: string): MeshStandardMaterial {
     })
     material.onBeforeCompile = patchPresence
     material.customProgramCacheKey = () => "deed-glow"
-    glows.set(color, material)
+    glows.set(key, material)
   }
   return material
 }

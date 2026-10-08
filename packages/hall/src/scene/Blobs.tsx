@@ -1,4 +1,4 @@
-import { useFrame } from "@react-three/fiber"
+import { useFrame, useThree } from "@react-three/fiber"
 import { type RefObject, useEffect, useState } from "react"
 import {
   CanvasTexture,
@@ -11,6 +11,7 @@ import {
   Quaternion,
   Vector3,
 } from "three"
+import { isWebGPU } from "../render/backend.ts"
 import { sky } from "./atmosphere/state.ts"
 import { useOwnedMeshes } from "./owned.ts"
 
@@ -58,6 +59,33 @@ export function capacityFor(needed: number, capacity: number): number {
 }
 
 /**
+ * A module of node materials, loaded on WebGPU only (which never runs GLSL or its patches): null
+ * while it loads, false on WebGL (the GLSL stands). `load` must be stable (one promise per module).
+ */
+export function useNodeVariant<T>(load: () => Promise<T>): T | null | false {
+  const webgpu = isWebGPU(useThree((state) => state.gl))
+  const [loaded, setLoaded] = useState<T | null>(null)
+  useEffect(() => {
+    if (!webgpu) return
+    let live = true
+    void load().then((module) => live && setLoaded(() => module))
+    return () => {
+      live = false
+    }
+  }, [webgpu, load])
+  return webgpu ? loaded : false
+}
+
+/** The cast's node materials (castNodes.ts): what its instanced layers draw with on WebGPU. */
+export type CastNodes = typeof import("./castNodes.ts")
+let castNodes: Promise<CastNodes> | null = null
+const loadCast = (): Promise<CastNodes> => {
+  castNodes ??= import("./castNodes.ts")
+  return castNodes
+}
+export const useCastNodes = (): CastNodes | null | false => useNodeVariant(loadCast)
+
+/**
  * Puts a soft shadow under `node` while mounted. `size` and `opacity` must be stable (ref'd
  * closures): `opacity` is how present the character is (its dissolve, scene/dissolve.ts).
  */
@@ -79,24 +107,10 @@ export function useBlob(
 
 export function Blobs() {
   const [capacity, setCapacity] = useState(64)
+  const nodes = useCastNodes()
   const built = useOwnedMeshes(() => {
-    const material = new MeshBasicMaterial({
-      color: "#000000",
-      map: blobTexture(),
-      transparent: true,
-      depthWrite: false,
-      // Draw just above the ground without z-fighting it.
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-    })
-    // Per-disc opacity: the instance colour's red channel scales alpha; the colour stays black.
-    material.onBeforeCompile = (shader) => {
-      shader.fragmentShader = shader.fragmentShader.replace(
-        "#include <color_fragment>",
-        "#ifdef USE_COLOR\n\tdiffuseColor.a *= vColor.r;\n#endif",
-      )
-    }
-    material.customProgramCacheKey = () => "blob-alpha"
+    if (nodes === null) return { meshes: [] }
+    const material = nodes ? nodes.blobNodeMaterial(blobTexture()) : blobMaterial()
     const mesh = new InstancedMesh(new PlaneGeometry(2, 2).rotateX(-Math.PI / 2), material, capacity)
     mesh.instanceColor = new InstancedBufferAttribute(new Float32Array(capacity * 3).fill(1), 3)
     mesh.frustumCulled = false
@@ -104,7 +118,7 @@ export function Blobs() {
     mesh.castShadow = false
     mesh.receiveShadow = false
     return { meshes: [mesh] }
-  }, [capacity])
+  }, [capacity, nodes])
 
   useFrame(() => {
     // More walkers than discs: rebuilt bigger (until then, the first `capacity` keep theirs).
@@ -132,6 +146,28 @@ export function Blobs() {
   })
 
   return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
+}
+
+/** The disc's GLSL material (the default, on WebGL). */
+function blobMaterial(): MeshBasicMaterial {
+  const material = new MeshBasicMaterial({
+    color: "#000000",
+    map: blobTexture(),
+    transparent: true,
+    depthWrite: false,
+    // Draw just above the ground without z-fighting it.
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+  })
+  // Per-disc opacity: the instance colour's red channel scales alpha; the colour stays black.
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <color_fragment>",
+      "#ifdef USE_COLOR\n\tdiffuseColor.a *= vColor.r;\n#endif",
+    )
+  }
+  material.customProgramCacheKey = () => "blob-alpha"
+  return material
 }
 
 /** A radial falloff, dark at the centre: a soft contact shadow. */

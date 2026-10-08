@@ -319,7 +319,8 @@ function RendererLever() {
         </div>
       </Lever>
       <p className="hint">
-        Reloads the page. WebGPU is a preview: cloud shadows, outlines, mist and grass aren't drawn there yet.
+        Reloads the page. WebGPU is a preview: ambient occlusion isn't drawn there yet, and the event shows
+        (dragon, festival, comet, ghost ship, rainbow) only partly.
       </p>
     </>
   )

@@ -21,10 +21,12 @@ import { GLYPH_PATHS } from "../hud/glyphs.ts"
 import { hudPrefs } from "../hud/prefs.ts"
 import { sky } from "./atmosphere/state.ts"
 import { wind } from "./atmosphere/wind.ts"
+import { useNodeVariant } from "./Blobs.tsx"
 import { chipOf } from "./chips.ts"
 import { FRAME } from "./frame.ts"
 import { useOwned, useOwnedMeshes } from "./owned.ts"
 import { MAX_PARTICLES, MAX_SIGILS, SIGIL_GLYPHS, SigilBoard } from "./sigilBoard.ts"
+import type { SigilUniforms } from "./sigilNodes.ts"
 import { SIGIL_BOB_PX, SIGIL_GAP_PX, SIGIL_MAX_PX, SIGIL_MIN_PX, SIGIL_WORLD } from "./sigilSize.ts"
 
 /**
@@ -34,6 +36,8 @@ import { SIGIL_BOB_PX, SIGIL_GAP_PX, SIGIL_MAX_PX, SIGIL_MIN_PX, SIGIL_WORLD } f
  * camera-facing quads for every sigil (the glyph picked per instance from an atlas), one for every
  * burst particle (hidden when none is in the air). Both sit in screen space under each name chip,
  * sized in CSS px (scene/sigilSize.ts), drawn over the world like the chips, never in the shadow map.
+ *
+ * GLSL on WebGL; the same two materials as node materials on WebGPU (sigilNodes.ts).
  *
  * Decorative: the roster is the accessible list of who is doing what. Settings → "Sigils over agents".
  */
@@ -62,9 +66,15 @@ export function Sigils() {
 
   // The atlas lives in a uniform, where freeing a layer's materials can't see it: it is owned on its own.
   const atlas = useOwned(sigilAtlas, (texture) => texture.dispose(), [])
+  const nodes = useNodeVariant(loadSigilNodes)
   const built = useOwnedMeshes(
-    () => ({ meshes: atlas ? [sigilMesh(board, uniforms, atlas), burstMesh(board, uniforms)] : [] }),
-    [board, uniforms, atlas],
+    () => ({
+      meshes:
+        atlas && nodes !== null
+          ? [sigilMesh(board, uniforms, atlas, nodes), burstMesh(board, uniforms, nodes)]
+          : [],
+    }),
+    [board, uniforms, atlas, nodes],
   )
 
   // Live moments only: a seek or a replay rebuilds history without a single pop (ADR 0008).
@@ -127,6 +137,14 @@ export function Sigils() {
   )
 }
 
+/** The node materials (sigilNodes.ts), loaded on WebGPU only. */
+type SigilNodes = typeof import("./sigilNodes.ts")
+let sigilNodes: Promise<SigilNodes> | null = null
+const loadSigilNodes = (): Promise<SigilNodes> => {
+  sigilNodes ??= import("./sigilNodes.ts")
+  return sigilNodes
+}
+
 const SIGIL_ATTRIBUTES = ["aAnchor", "aState", "aRim", "aFlash", "aBanner"] as const
 const BURST_ATTRIBUTES = ["aOrigin", "aMotion", "aLook", "aShape"] as const
 
@@ -156,7 +174,12 @@ const SCREEN = /* glsl */ `
 /** The quad spans radius 1; the medallion's edge is at DISC (the rest is its soft shadow). */
 const DISC = 0.8
 
-function sigilMesh(board: SigilBoard, uniforms: Uniforms, atlas: CanvasTexture): InstancedMesh {
+function sigilMesh(
+  board: SigilBoard,
+  uniforms: Uniforms,
+  atlas: CanvasTexture,
+  nodes: SigilNodes | false,
+): InstancedMesh {
   const geometry = new PlaneGeometry(2, 2)
   const { anchor, state, rim, flash, banner } = board.sigils
   geometry.setAttribute("aAnchor", dynamic(anchor, 4))
@@ -164,7 +187,15 @@ function sigilMesh(board: SigilBoard, uniforms: Uniforms, atlas: CanvasTexture):
   geometry.setAttribute("aRim", dynamic(rim, 4))
   geometry.setAttribute("aFlash", dynamic(flash, 4))
   geometry.setAttribute("aBanner", dynamic(banner, 4))
-  const material = new ShaderMaterial({
+  const material = nodes
+    ? nodes.sigilNodeMaterial(uniforms as unknown as SigilUniforms, atlas, DISC)
+    : glslSigil(uniforms, atlas)
+  return overlay(new InstancedMesh(geometry, material, MAX_SIGILS), 30)
+}
+
+/** The medallion's GLSL (the default, on WebGL). */
+function glslSigil(uniforms: Uniforms, atlas: CanvasTexture): ShaderMaterial {
+  return new ShaderMaterial({
     uniforms: { ...uniforms, uAtlas: { value: atlas } },
     vertexShader: /* glsl */ `
       ${SCREEN}
@@ -249,17 +280,24 @@ function sigilMesh(board: SigilBoard, uniforms: Uniforms, atlas: CanvasTexture):
     depthTest: false,
     depthWrite: false,
   })
-  return overlay(new InstancedMesh(geometry, material, MAX_SIGILS), 30)
 }
 
-function burstMesh(board: SigilBoard, uniforms: Uniforms): InstancedMesh {
+function burstMesh(board: SigilBoard, uniforms: Uniforms, nodes: SigilNodes | false): InstancedMesh {
   const geometry = new PlaneGeometry(2, 2)
   const { origin, motion, look, shape } = board.bursts
   geometry.setAttribute("aOrigin", dynamic(origin, 3))
   geometry.setAttribute("aMotion", dynamic(motion, 4))
   geometry.setAttribute("aLook", dynamic(look, 4))
   geometry.setAttribute("aShape", dynamic(shape, 4))
-  const material = new ShaderMaterial({
+  const material = nodes ? nodes.burstNodeMaterial(uniforms as unknown as SigilUniforms) : glslBurst(uniforms)
+  const mesh = overlay(new InstancedMesh(geometry, material, MAX_PARTICLES), 31)
+  mesh.visible = false
+  return mesh
+}
+
+/** The bursts' GLSL (the default, on WebGL). */
+function glslBurst(uniforms: Uniforms): ShaderMaterial {
+  return new ShaderMaterial({
     uniforms,
     vertexShader: /* glsl */ `
       ${SCREEN}
@@ -320,9 +358,6 @@ function burstMesh(board: SigilBoard, uniforms: Uniforms): InstancedMesh {
     depthTest: false,
     depthWrite: false,
   })
-  const mesh = overlay(new InstancedMesh(geometry, material, MAX_PARTICLES), 31)
-  mesh.visible = false
-  return mesh
 }
 
 /** Drawn over the world like the chips: no culling (the quads are placed in the shader), no shadows, no picking. */

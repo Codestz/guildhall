@@ -71,20 +71,3 @@ export function shimLowGrade(renderer: { toneMapping: ToneMapping; toneMappingEx
     },
   })
 }
-
-/**
- * Water's shore bake (nature/Water.tsx bakeShore) reads its mask back with the synchronous
- * `readRenderTargetPixels`; WebGPU only reads back asynchronously, and the call is missing. Here it
- * leaves the buffer as it is (zeros: no land, no standing posts), so the bake finishes with an
- * open-sea shore instead of throwing on load. The real fix bakes the mask offline (codebase-map §3.1).
- */
-export function shimReadback(renderer: object): void {
-  const target = renderer as { readRenderTargetPixels?: unknown }
-  if (typeof target.readRenderTargetPixels === "function") return
-  let warned = false
-  target.readRenderTargetPixels = () => {
-    if (warned) return
-    warned = true
-    console.info("[hall] WebGPU: no synchronous readback; the water's shore mask is left empty")
-  }
-}

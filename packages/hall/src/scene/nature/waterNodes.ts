@@ -1,4 +1,4 @@
-import type { DirectionalLight, Texture } from "three"
+import { Color, type DirectionalLight, DoubleSide, RenderTarget, type Texture } from "three"
 import {
   abs,
   attribute,
@@ -21,32 +21,35 @@ import {
   reference,
   reflect,
   select,
-  shadow,
   sin,
   smoothstep,
   step,
   texture,
   uniformArray,
+  uv,
   vec2,
   vec3,
   vec4,
 } from "three/tsl"
-import { type Node, NodeMaterial } from "three/webgpu"
-import type { WaterUniforms } from "./Water.tsx"
+import { type Node, NodeMaterial, type WebGPURenderer } from "three/webgpu"
+import { keyShadow } from "./grassNodes.ts"
+import { LAND_ABOVE, type ShoreSetup, STANDS_BELOW, type WaterUniforms } from "./Water.tsx"
 
 /**
- * The water as a TSL node material (`?tsl=1`, scene/tsl.ts): nature/shaders.ts `waterFragment`,
+ * The water as a TSL node material (WebGPU, always; WebGL with `?tsl=1`, scene/tsl.ts): nature/shaders.ts `waterFragment`,
  * node for node, so either path draws the same picture. It reads the very uniform objects Water
  * writes each frame (`reference`), so nothing else changes with the path.
  *
  * Lighting: as in the GLSL, none of three's lights — the sky state's key and hemisphere colours
  * arrive as uniforms. The one thing three supplies is the key light's shadow (GLSL
- * `getShadowMask()`); here it is that light's `shadow()` node, read from the map WebGLRenderer
- * already draws (the handler points shadow nodes at it), so the material needs the light itself.
- * Without it (the first frames, before the key light has drawn its map) the water is unshadowed.
+ * `getShadowMask()`); here it is grassNodes.ts `keyShadow`, read from the map the light already
+ * draws (never a second map of its own: on WebGPU the on-demand cache would leave one empty), so
+ * the material needs the light itself. Without it (the first frames, before the key light has
+ * drawn its map) the water is unshadowed.
  *
- * Fog: `fog` on, the handler's radial fog (scene/tsl.ts). Output: the handler's output step, which
- * follows the target as the GLSL chunks do.
+ * Fog: `fog` on, the scene's radial fog (WebGL: the handler's, scene/tsl.ts; WebGPU: render/webgpu.ts).
+ * Output: WebGL, the handler's output step, which follows the target as the GLSL chunks do;
+ * WebGPU, the renderer's own (the post pipeline's linear target, or the canvas on Low).
  */
 export function waterNodeMaterial(
   u: WaterUniforms,
@@ -120,12 +123,10 @@ function waterColour(
 
   return Fn(() => {
     const p = positionWorld.xz
-    // The shore bake lands after the first frames: the texture is re-read from its uniform.
+    // The shore as baked when the material was built (Water rebuilds it once the bake lands).
     // Anything read both inside and outside an `If` is a `toVar` here, before the first branch: a
     // node is emitted where it is first used, so one first used in a branch is unset outside it.
-    const shore = texture(u.uShore.value, vec2(p.x, p.y.negate()).div(uShoreHalf.mul(2)).add(0.5))
-      .onObjectUpdate(() => u.uShore.value)
-      .toVar()
+    const shore = texture(u.uShore.value, vec2(p.x, p.y.negate()).div(uShoreHalf.mul(2)).add(0.5)).toVar()
     const dist = shore.r.mul(uShoreMax).toVar()
     const flow = shore.gb.mul(2).sub(1).toVar()
     const t = uTime
@@ -160,7 +161,7 @@ function waterColour(
     const n = normalize(vec3(slope.x.negate(), 1, slope.y.negate())).toVar()
 
     const v = normalize(cameraPosition.sub(positionWorld)).toVar()
-    const shade = (key ? (shadow(key) as unknown as Node<"float">) : float(1)).toVar()
+    const shade = (key ? keyShadow(key) : float(1)).toVar()
     const facing = max(dot(n, v), 0)
     const schlick = float(0.04).add(pow(facing.oneMinus(), 5).mul(0.96))
     const fresnel = mix(schlick, schlick.mul(0.65).add(0.35), 0.5)
@@ -324,4 +325,65 @@ function waterColour(
     colour.assign(mix(colour, foamLit, clamp(foam, 0, 1).mul(uNight.mul(-0.4).add(0.9))))
     return vec4(colour, 1)
   })()
+}
+
+/**
+ * Water.tsx's shore bake on WebGPU: its two GLSL masks as node materials, drawn into a target each
+ * and read back once, asynchronously (WebGPU has no synchronous readback). Returned in WebGL's
+ * readPixels layout (row 0 at the bottom of the image), so the bake's CPU half reads either alike.
+ */
+export async function shoreMasks(
+  gl: object,
+  setup: ShoreSetup,
+): Promise<{ land: Uint8Array; posts: Uint8Array }> {
+  const renderer = gl as WebGPURenderer
+  const land = new NodeMaterial()
+  land.fog = false
+  // As the GLSL: the palette's blue is the pack's water, not land; nor is sand under the surface.
+  const c = setup.palette ? texture(setup.palette, uv()).rgb : vec3(0)
+  const blue = c.b.greaterThan(c.r.add(0.1)).and(c.b.greaterThan(c.g))
+  land.colorNode = vec4(select(blue.not().and(positionWorld.y.greaterThan(LAND_ABOVE)), 1, 0), 0, 0, 1)
+  const standing = new NodeMaterial()
+  standing.fog = false
+  standing.side = DoubleSide
+  standing.colorNode = vec4(select(positionWorld.y.lessThan(STANDS_BELOW), 1, 0), 0, 0, 1)
+  setup.land.overrideMaterial = land
+  setup.below.overrideMaterial = standing
+  try {
+    return {
+      land: await maskOf(renderer, setup.land, setup.top, setup.size),
+      posts: await maskOf(renderer, setup.below, setup.up, setup.size),
+    }
+  } finally {
+    land.dispose()
+    standing.dispose()
+  }
+}
+
+/** One mask: drawn into its own target, read back, its rows turned over (WebGPU reads top-down). */
+async function maskOf(
+  renderer: WebGPURenderer,
+  scene: ShoreSetup["land"],
+  camera: ShoreSetup["top"],
+  size: number,
+): Promise<Uint8Array> {
+  const target = new RenderTarget(size, size)
+  const previous = renderer.getRenderTarget()
+  const clear = renderer.getClearColor(new Color())
+  const alpha = renderer.getClearAlpha()
+  renderer.setRenderTarget(target)
+  renderer.setClearColor(0x000000, 1)
+  renderer.clear()
+  renderer.render(scene, camera)
+  renderer.setRenderTarget(previous)
+  renderer.setClearColor(clear, alpha)
+  try {
+    const read = new Uint8Array((await renderer.readRenderTargetPixelsAsync(target, 0, 0, size, size)).buffer)
+    const row = size * 4
+    const out = new Uint8Array(size * row)
+    for (let y = 0; y < size; y++) out.set(read.subarray(y * row, (y + 1) * row), (size - 1 - y) * row)
+    return out
+  } finally {
+    target.dispose()
+  }
 }

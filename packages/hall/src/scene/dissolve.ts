@@ -93,12 +93,25 @@ export function ditherShader(fragment: string): string {
   return fragment.replace("void main() {", `${DITHER_GLSL}\nvoid main() {\n\t${DISCARD_GLSL}`)
 }
 
+type Dither = (material: Material, amount: { value: number }) => Material
+
+/**
+ * WebGPU never runs onBeforeCompile: there the dither is a node material's mask instead
+ * (castNodes.ts `ditheredNode`), set by render/webgpu.ts once its renderer has started. Unset (the
+ * default, WebGL), `dithered` patches the GLSL.
+ */
+let nodeDither: Dither | null = null
+export function setNodeDither(dither: Dither | null): void {
+  nodeDither = dither
+}
+
 /**
  * A dithered copy of `material` whose presence is `amount` (a uniform shared by one character's
  * copies). Any patch the original had runs first; the program is shared by every copy of the same
  * kind of material (one compile per kind, not per character).
  */
 export function dithered(material: Material, amount: { value: number }): Material {
+  if (nodeDither) return nodeDither(material, amount)
   const copy = material.clone()
   const base = material.onBeforeCompile
   const key = material.customProgramCacheKey()

@@ -1,8 +1,10 @@
-import type { Color, Fog, Scene } from "three"
-import { bool, mix, uniform } from "three/tsl"
+import type { Fog, Scene } from "three"
+import { bool } from "three/tsl"
 import { MeshStandardNodeMaterial, type NodeBuilder, WebGPURenderer } from "three/webgpu"
 import { radialFog } from "../scene/atmosphere/fogNode.ts"
-import { shimLowGrade, shimReadback } from "./shims.ts"
+import { ditheredNode } from "../scene/castNodes.ts"
+import { setNodeDither } from "../scene/dissolve.ts"
+import { shimLowGrade } from "./shims.ts"
 
 /**
  * The `?renderer=webgpu` renderer (loaded on demand by render/renderer.ts): three's WebGPURenderer,
@@ -19,9 +21,10 @@ export async function createWebGPURenderer(canvas: object): Promise<WebGPURender
   })
   await renderer.init()
   shimLowGrade(renderer)
-  shimReadback(renderer)
   renderer.library.addMaterial(GLSLStandIn, "ShaderMaterial")
   fogEveryRender(renderer)
+  // Characters dissolve with a node mask here: WebGPU never runs the GLSL patch (scene/dissolve.ts).
+  setNodeDither(ditheredNode)
   return renderer
 }
 
@@ -54,31 +57,21 @@ function fogEveryRender(renderer: WebGPURenderer): void {
 }
 
 /**
- * What WebGPU draws for a `ShaderMaterial` (GLSL, which node materials cannot run). three copies
- * the GLSL material's own fields onto this one, `uniforms` included, so it can pick by what the
- * shader was fed, and read the very same uniform objects (their per-frame writes stay live):
+ * What WebGPU draws for a `ShaderMaterial` (GLSL, which node materials cannot run): nothing (it is
+ * discarded). Without this, three logs "Material ShaderMaterial is not compatible" and draws each
+ * one as a blank, white node material.
  *
- *   water (nature/Water.tsx: uShallow/uDeep)   an unlit, fogged sea between the two
- *   anything else (grass, sigils, events)      not drawn (discarded), until ported to TSL
- *
- * The sky dome (atmosphere/skyNodes.ts) and rain/snow (weather/fallNodes.ts) are node materials on
- * WebGPU and never come here. Without this, three logs "Material ShaderMaterial is not compatible"
- * and draws each one as a blank node material (a white sea).
+ * Every GLSL material the island draws every day has a node-material twin on WebGPU and never
+ * comes here: the sky dome (atmosphere/skyNodes.ts), rain and snow (weather/fallNodes.ts), the water
+ * (nature/waterNodes.ts), the grass (nature/grassNodes.ts) and the sigils (scene/sigilNodes.ts); so
+ * have the cast's onBeforeCompile patches (scene/castNodes.ts: dissolve, rings, blobs, deed motes).
+ * Still GLSL: the event shows (events/: Dragon, Festival, Comet, Ghost ship, Rainbow). Their own
+ * shaders come here and are not drawn; their patched standard materials draw unpatched (no flag
+ * flutter, no festival reveal, no dragon wingbeat, no ghost-ship rim or fade), until they are ported.
  */
 class GLSLStandIn extends MeshStandardNodeMaterial {
-  declare uniforms?: Record<string, { value: unknown } | undefined>
-
   override setup(builder: NodeBuilder): void {
-    const u = this.uniforms ?? {}
-    const shallow = u.uShallow?.value as Color | undefined
-    const deep = u.uDeep?.value as Color | undefined
-    if (shallow && deep) {
-      // Unlit: the sea's geometry carries no normals (its GLSL lit it from a flat up vector).
-      this.lights = false
-      this.colorNode = mix(uniform(deep), uniform(shallow), 0.6)
-    } else {
-      this.maskNode = bool(false)
-    }
+    this.maskNode = bool(false)
     super.setup(builder)
   }
 }

@@ -1,8 +1,18 @@
 import { describe, expect, test } from "bun:test"
 import { apply, applyAll, emptyModel, type Model } from "@guildhall/core"
 import { rush } from "@guildhall/sim"
+import { Crowd } from "../src/guild/crowd.ts"
 import { type AdventurerView, viewsOf } from "../src/guild/store.ts"
-import { HEARTH_SEATS, hearthSeat, INFIRMARY, INFIRMARY_MATS, ROOM, TAVERN } from "../src/world/layout.ts"
+import { onKeepFloor } from "../src/world/clearance.ts"
+import {
+  HAND_INS,
+  HEARTH_SEATS,
+  hearthSeat,
+  INFIRMARY,
+  INFIRMARY_MATS,
+  ROOM,
+  TAVERN,
+} from "../src/world/layout.ts"
 import { BODY, blocker, KEEP_OBSTACLES } from "./support/clearance.ts"
 
 /**
@@ -129,5 +139,23 @@ describe("a rush of 300", () => {
       expect(crowd.length).toBeGreaterThan(TAVERN.length + HEARTH_SEATS)
       expect({ t, shared: crowding(crowd).shared }).toEqual({ t, shared: 0 })
     }
+  })
+})
+
+describe("a shared post", () => {
+  test("the first stands on it; the rest take free floor round it, apart, facing its way", () => {
+    const crowd = new Crowd()
+    const post = HAND_INS[0] ?? [0, 0, 0]
+    const stands = Array.from({ length: 30 }, () => crowd.share(post))
+    expect(stands[0]).toEqual(post)
+    for (const [x, z, facing] of stands.slice(1)) {
+      expect(onKeepFloor([x, z])).toBe(true)
+      expect(facing).toBe(post[2])
+      expect(Math.hypot(x - post[0], z - post[1])).toBeLessThan(5)
+    }
+    expect(new Set(stands.map(([x, z]) => `${x},${z}`)).size).toBe(stands.length)
+    // The rest of the keep's crowd never lands on them.
+    const resting = crowd.near([post[0], post[1]])
+    expect(stands.some(([x, z]) => x === resting[0] && z === resting[1])).toBe(false)
   })
 })

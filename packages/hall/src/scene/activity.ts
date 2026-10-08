@@ -4,9 +4,11 @@ import {
   type Held,
   type Place,
   type Routine,
+  spreadSharersWith,
   stepsOf,
   type Tool,
 } from "../world/behaviours.ts"
+import { spread } from "../world/sharers.ts"
 import { attachGrip, keepUpright, PROP_GRIPS } from "./grips.ts"
 
 /**
@@ -16,20 +18,26 @@ import { attachGrip, keepUpright, PROP_GRIPS } from "./grips.ts"
 
 // ---- Reservations ---------------------------------------------------------------------------
 
-/** Who holds each berth, in arrival order: `site:forest#0` → [ids]. */
-const holders = new Map<string, string[]>()
+/** Who holds each berth, by lap: `site:forest#0` → [ids], a hole where one has left. */
+const holders = new Map<string, (string | undefined)[]>()
 
 /**
  * Reserve a berth for `id`: 0 for the first to hold it, 1 for the next (more workers than posts),
- * and so on — that lap shifts their spots beside the first one's (`shifted`), so two workers never
- * share a standing spot. Held until `release`.
+ * and so on — the lowest lap nobody holds, so a newcomer never takes the lap of someone still
+ * there. Each lap stands on its own spots round the post (`shifted`; a crowd spreads over the open
+ * ground round it, world/sharers.ts), so two workers never share a standing spot. Held until
+ * `release`.
  */
 export function reserve(place: Place, id: string): number {
   const key = `${place.key}#${place.berth}`
   const list = holders.get(key) ?? []
-  if (!list.includes(id)) list.push(id)
   holders.set(key, list)
-  return list.indexOf(id)
+  const held = list.indexOf(id)
+  if (held >= 0) return held
+  const free = list.indexOf(undefined)
+  const lap = free >= 0 ? free : list.length
+  list[lap] = id
+  return lap
 }
 
 export function release(place: Place, id: string): void {
@@ -37,9 +45,13 @@ export function release(place: Place, id: string): void {
   const list = holders.get(key)
   if (!list) return
   const at = list.indexOf(id)
-  if (at >= 0) list.splice(at, 1)
+  if (at >= 0) list[at] = undefined
+  while (list.length > 0 && list.at(-1) === undefined) list.pop()
   if (list.length === 0) holders.delete(key)
 }
+
+// A crowd at a berth spreads round its post (the default is a line beside it).
+spreadSharersWith(spread)
 
 // ---- The carrying walk ------------------------------------------------------------------------
 

@@ -719,14 +719,36 @@ export function spotsOf(behaviour: Behaviour, post: Post, berth: number): Spots 
 }
 
 /**
- * The same place, shifted sideways for the `lap`-th worker sent to a berth already taken (more
- * workers than posts): their own standing spots beside the first one's.
+ * Where the `lap`-th sharer of a berth stands (lap ≥ 1), as an offset from the post: every standing
+ * spot of theirs moves by it, the marks they face and work on stay. `beside` is the default.
+ */
+export type Spread = (place: Place, lap: number) => Spot
+
+/** A line beside the post, 1.5 apart: room for the few a story sends to one berth. */
+export const beside: Spread = (place, lap) => {
+  const facing = place.post[2]
+  return [Math.cos(facing) * 1.5 * lap, -Math.sin(facing) * 1.5 * lap]
+}
+
+let spread: Spread = beside
+
+/**
+ * How sharers are spread from now on. world/sharers.ts spreads a crowd over the open ground round
+ * the post; it reads the island's wilds, which read these behaviours, so it can't be imported here:
+ * the scene installs it (scene/activity.ts).
+ */
+export function spreadSharersWith(how: Spread): void {
+  spread = how
+}
+
+/**
+ * The same place for the `lap`-th worker sent to a berth already taken (more workers than posts):
+ * their own standing spots, moved off the first one's (`spreadSharersWith`), on the same marks.
  */
 export function shifted(place: Place, lap: number): Place {
   if (lap === 0) return place
   const [x, z, facing] = place.post
-  const dx = Math.cos(facing) * 1.5 * lap
-  const dz = -Math.sin(facing) * 1.5 * lap
+  const [dx, dz] = spread(place, lap)
   const spots: Record<string, Spot> = {}
   for (const [name, value] of Object.entries(place.spots))
     spots[name] = place.behaviour.marks.has(name) ? value : [r2(value[0] + dx), r2(value[1] + dz)]

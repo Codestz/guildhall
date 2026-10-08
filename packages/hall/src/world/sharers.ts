@@ -1,3 +1,4 @@
+import { activeWorld } from "./active.ts"
 import { beside, LOCAL_WALK, type Place, type Spots, type Step, spotsOf } from "./behaviours.ts"
 import {
   BODY,
@@ -8,8 +9,9 @@ import {
   onDryLand,
   onKeepFloor,
 } from "./clearance.ts"
-import { SITES, type SiteId } from "./lands.ts"
+import type { SiteId } from "./lands.ts"
 import { type Post, type Spot, STATIONS, type StationId } from "./layout.ts"
+import { sitesOf } from "./siteMap.ts"
 
 /**
  * Room for a crowd at a berth (Chapter 2: 100–300 adventurers). Past a place's posts the store
@@ -50,22 +52,27 @@ export function spread(place: Place, lap: number): Spot {
 /** More rounds than any berth has open spots: the search stops there. */
 const MAX_ROUNDS = 120
 
-const fields = new Map<string, Field | null>()
+/** Each world's fields, by place key (the active world's: world/active.ts; the hand map's by default). */
+const fields = new WeakMap<object, Map<string, Field | null>>()
+const HAND = {}
 
 function fieldOf(place: Place): Field | undefined {
-  let field = fields.get(place.key)
+  const world = activeWorld()
+  const known = fields.get(world ?? HAND) ?? new Map<string, Field | null>()
+  fields.set(world ?? HAND, known)
+  let field = known.get(place.key)
   if (field === undefined) {
     const posts = postsOf(place.key)
     field = posts ? new Field(place, posts) : null
-    fields.set(place.key, field)
+    known.set(place.key, field)
   }
   return field ?? undefined
 }
 
-/** The posts of a place, from its key (`site:forest`, `station:forge`). */
+/** The posts of a place, from its key (`site:forest`, `station:forge`), on the active world. */
 function postsOf(key: string): readonly Post[] | undefined {
   const [kind, id] = key.split(":")
-  if (kind === "site") return SITES[id as SiteId]?.posts
+  if (kind === "site") return sitesOf()[id as SiteId]?.posts
   if (kind === "station") return STATIONS[id as StationId]?.posts
   return undefined
 }

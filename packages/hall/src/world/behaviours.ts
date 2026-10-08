@@ -1,7 +1,10 @@
-import { PILES, targets } from "../scene/life/places.ts"
+import { PILES, type Pile, targets } from "../scene/life/places.ts"
+import { activeWorld } from "./active.ts"
 import { SITES, type SiteId } from "./lands.ts"
 import { type Post, type Spot, STATIONS, type StationId } from "./layout.ts"
 import { route } from "./paths.ts"
+import { sitesOf } from "./siteMap.ts"
+import type { World } from "./world.ts"
 
 /**
  * Activities (ADR 0009): what an adventurer does at their place while their session is busy.
@@ -399,6 +402,100 @@ export const SITE_WORK: Record<SiteId, Behaviour> = {
   },
 }
 
+// ---- The same trades on a repo's island --------------------------------------------------------
+
+/**
+ * A repo's island has no hand-placed piles, benches or racks: each site's work is laid out round
+ * its own posts instead (world/siteMap.ts puts them on the square's side of the district's landmark,
+ * facing it). Every trade drops what it carries on one heap per site, a couple of steps behind
+ * its first post, away from the landmark; each worker stands beside it on their own side.
+ */
+const HEAP_BACK = 3.4
+const HEAP_SIDE = 1.4
+/** How far from the heap its workers stand to drop their load: off the widest pile (the logs, 1.9). */
+const AT_HEAP = 2.5
+
+/** Where a site's trace heap lies on a repo's island: behind and beside its first post. */
+function heapOf(posts: readonly Post[]): Spot {
+  const first = posts[0]
+  return first ? ahead(first, -HEAP_BACK, HEAP_SIDE) : [0, 0]
+}
+
+/** The forest's work trees for a set of posts (the hand map's are `WORK_TREES`). */
+function treesFor(posts: readonly Post[]): Spot[] {
+  return posts.map((post, n) => ahead(post, 1.55, n === 0 ? 0.9 : n === 1 ? -0.7 : 0.6))
+}
+
+/** Each trade's spots round a repo site's posts: the hand map's names, so the loops run unchanged. */
+function repoSpots(id: SiteId, at: Spot, posts: readonly Post[]): Behaviour["spots"] {
+  const heap = heapOf(posts)
+  const trees = treesFor(posts)
+  return (post, n): Spots => {
+    const stand = near(heap, [post[0], post[1]], AT_HEAP)
+    switch (id) {
+      case "forest":
+        return { work: trees[n % trees.length] ?? ahead(post, 1.55), lane: stand, pile: stand, stack: heap }
+      case "quarry":
+        return { work: ahead(post, 1.7), drop: stand, heap }
+      case "river":
+        return { work: ahead(post, 3.4), basket: stand, bin: heap }
+      case "proving":
+        return { work: at, line: near(at, [post[0], post[1]], LINE[n % LINE.length] ?? 7) }
+      case "yard":
+        return { work: ahead(post, 2.4), lane: [post[0], post[1]], bench: stand, timber: heap }
+      case "tower":
+        return { work: at, stack: stand, books: heap }
+    }
+  }
+}
+
+const isHand = (world: World | undefined): boolean => !world || world.kind === "hand"
+
+const repoWork = new WeakMap<World, Record<SiteId, Behaviour>>()
+/** Each site's behaviour on a world: the hand map's `SITE_WORK`, or its trades laid out on a repo's island. */
+export function siteWorkOf(world: World | undefined = activeWorld()): Record<SiteId, Behaviour> {
+  if (!world || isHand(world)) return SITE_WORK
+  let work = repoWork.get(world)
+  if (!work) {
+    const sites = sitesOf(world)
+    const built = {} as Record<SiteId, Behaviour>
+    for (const id of Object.keys(SITE_WORK) as SiteId[])
+      built[id] = { ...SITE_WORK[id], spots: repoSpots(id, sites[id].at, sites[id].posts) }
+    work = built
+    repoWork.set(world, work)
+  }
+  return work
+}
+
+/** The forest's work trees on a world (scene/life/WorkFx draws and shakes them): one array per world. */
+export function workTreesOf(world: World | undefined = activeWorld()): readonly Spot[] {
+  if (!world || isHand(world)) return WORK_TREES
+  let trees = repoTrees.get(world)
+  if (!trees) {
+    trees = treesFor(sitesOf(world).forest.posts)
+    repoTrees.set(world, trees)
+  }
+  return trees
+}
+const repoTrees = new WeakMap<World, readonly Spot[]>()
+
+/** Where each site's traces pile up on a world (the hand map's are scene/life/places.ts `PILES`). */
+export function pilesOf(world: World | undefined = activeWorld()): Record<keyof typeof PILES, Pile> {
+  if (!world || isHand(world)) return PILES
+  let piles = repoPiles.get(world)
+  if (!piles) {
+    const sites = sitesOf(world)
+    const pile = (id: SiteId): Pile => {
+      const [x, z] = heapOf(sites[id].posts)
+      return { x, z, yaw: 0 }
+    }
+    piles = { logs: pile("forest"), stones: pile("quarry"), fish: pile("river"), books: pile("tower") }
+    repoPiles.set(world, piles)
+  }
+  return piles
+}
+const repoPiles = new WeakMap<World, Record<keyof typeof PILES, Pile>>()
+
 /** Draw, aim, loose: an arrow flies at `work` (the target) as the string is released. */
 function volley(): Step[] {
   return [
@@ -698,8 +795,9 @@ export function placeOf(
   site: SiteId | undefined,
   station: StationId | undefined,
   target: Post,
+  world: World | undefined = activeWorld(),
 ): Place | undefined {
-  if (site) return at(`site:${site}`, SITE_WORK[site], SITES[site].posts, target)
+  if (site) return at(`site:${site}`, siteWorkOf(world)[site], sitesOf(world)[site].posts, target)
   if (!station) return undefined
   return (
     at(`station:${station}`, STATION_WORK[station], STATIONS[station].posts, target) ??

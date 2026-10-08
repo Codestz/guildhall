@@ -1,7 +1,9 @@
+import LANDS from "../lands.json"
 import {
   type Cell,
   cellToWorld,
   type Field,
+  HEX_SCALE,
   type Island,
   type Landmark,
   type LandmarkKind,
@@ -127,8 +129,12 @@ export function dress(plan: IslandPlan): RepoIsland {
       walked.add(edge)
       edges.push([nodeName(a), nodeName(b)])
     }
-  // The quay: the hub's road opens south onto it (a drawn stub, like lands.ts' DOCKS).
+  // The quay: the hub's road opens south onto it (a drawn stub, like lands.ts' DOCKS). The keep's
+  // gate: the avenue opens north onto its apron, the apron south onto the avenue (lands.ts' STUBS).
   link(plan.hub, direction(plan.hub, plan.quay))
+  const avenue = step(plan.gate, 1)
+  link(avenue, direction(avenue, plan.gate))
+  link(plan.gate, direction(plan.gate, avenue))
 
   // ---- Levels, foothills that can't slope sinking to knolls (lands.ts' rule) ----
   const levels = new Map<string, number>()
@@ -204,6 +210,11 @@ export function dress(plan: IslandPlan): RepoIsland {
         continue
       }
 
+      if (char === "K") {
+        // The keep: level grass under Room (scene/Room.tsx), never a shore (land rings it).
+        tile("hex_grass")
+        continue
+      }
       const height = level(cell)
       if (height > 0) {
         const lower = lowerOf(cell, height)
@@ -248,7 +259,7 @@ export function dress(plan: IslandPlan): RepoIsland {
         const coast = fit(COAST_TILES, wet)
         if (!coast) throw new Error(`coast at ${key(cell)}: no tile opens onto ${wet}`)
         tile(`hex_coast_${coast.tile}` as LandPiece, coast.m)
-        if (site === undefined) {
+        if (site === undefined && char !== "V") {
           if (coast.tile === "A" && (char === "F" || char === "f")) {
             const away = (((wet[0] ?? 0) + 3) * Math.PI) / 3 + Math.PI / 6
             add(pick(["trees_A_small", "trees_B_small"] as const), Math.cos(away) * 2, Math.sin(away) * 2)
@@ -301,6 +312,10 @@ export function dress(plan: IslandPlan): RepoIsland {
           if (random() < 0.3) add(pick(["barrel", "crate_A_small", "sack"] as const), ...offset(3.6))
           break
         }
+        case "V":
+          // The lots round the keep: open ground (the wilds grow there, clear of its walls).
+          meadow.push([x, z])
+          break
         case "s":
           // Training ground (the proving grounds' spare hexes): a target or a tent.
           if (random() < 0.6) add("target", ...offset(1.5), facing([x, z], square), 0, 1.4)
@@ -357,7 +372,9 @@ export function dress(plan: IslandPlan): RepoIsland {
       hexes: district.hexes,
       at: siteAt ?? square,
       node: nodeName(district.square),
-      posts: siteAt ? postsAround(siteAt, square) : [[square[0], square[1], 0]],
+      posts: siteAt
+        ? postsAround(siteAt, square, LANDMARK[district.biome](folder.language.kit))
+        : [[square[0], square[1], 0]],
       ...(siteAt ? { landmark: LANDMARK[district.biome](folder.language.kit) } : {}),
     }
   })
@@ -387,13 +404,21 @@ const place = (
   y,
 })
 
-/** Three posts on the square's side of a landmark, 4 from it (inside its hex), facing it. */
-function postsAround(site: Spot, square: Spot): Post[] {
+/** How far in front of a landmark's front face its posts stand, and the nearest to its centre. */
+const FRONT_GAP = 1
+const NEAREST_POST = 3.4
+/**
+ * Three posts in front of a landmark (it faces the square), a step off its front face, facing it:
+ * on the square's side, where its road ends.
+ */
+function postsAround(site: Spot, square: Spot, landmark: LandPiece): Post[] {
   const toSquare = Math.atan2(square[0] - site[0], square[1] - site[1])
-  return [-0.6, 0, 0.6].map((spread) => {
+  const front = Math.max(NEAREST_POST, (LANDS[landmark].max[2] ?? 0) * HEX_SCALE + FRONT_GAP)
+  return [-0.35, 0, 0.35].map((spread) => {
     const angle = toSquare + spread
-    const x = round(site[0] + Math.sin(angle) * 4)
-    const z = round(site[1] + Math.cos(angle) * 4)
+    const reach = front / Math.cos(spread)
+    const x = round(site[0] + Math.sin(angle) * reach)
+    const z = round(site[1] + Math.cos(angle) * reach)
     return [x, z, facing([x, z], site)] as Post
   })
 }

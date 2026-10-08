@@ -1,4 +1,5 @@
 import { use, useSyncExternalStore } from "react"
+import { setActiveWorld } from "./active.ts"
 import { islandFromTree } from "./gen/islandFromTree.ts"
 import type { Tree } from "./gen/load.ts"
 import { handWorld, repoWorld, type World } from "./world.ts"
@@ -29,6 +30,8 @@ class WorldSource {
   ready: Promise<void> = Object.assign(Promise.resolve(), { status: "fulfilled", value: undefined })
   private listeners = new Set<Listener>()
   private asked = 0
+  /** The last island asked for, and what loading it settles to. */
+  private last: { wanted: string; done: Promise<World> } | undefined
 
   subscribe = (listener: Listener): (() => void) => {
     this.listeners.add(listener)
@@ -40,6 +43,9 @@ class WorldSource {
    * one when it failed). `fetchTree` is the source of trees (world/gen/load.ts in the hall).
    */
   load(wanted: string, fetchTree: (wanted: string) => Promise<Tree>): Promise<World> {
+    // Asked again for the island it has (or is growing), as a re-applied deep link does: the same
+    // world, kept, so nothing built per world is built again.
+    if (this.last && this.last.wanted === wanted) return this.last.done
     const n = ++this.asked
     this.set(this.world, { state: "loading", repo: wanted })
     const done = (async () => {
@@ -61,11 +67,13 @@ class WorldSource {
       return this.world
     })()
     this.ready = done.then(() => undefined)
+    this.last = { wanted, done }
     return done
   }
 
   private set(world: World, status: WorldStatus): void {
     this.world = world
+    setActiveWorld(world)
     this.status = status
     for (const listener of this.listeners) listener()
   }

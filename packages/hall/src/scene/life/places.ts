@@ -1,4 +1,6 @@
 import { island } from "../../world/lands.ts"
+import { sitesOf } from "../../world/siteMap.ts"
+import type { World } from "../../world/world.ts"
 
 /**
  * Where each site's traces pile up (world units, yaw turns the pile). Chosen by eye off the walking
@@ -18,10 +20,18 @@ export const PILES = {
   books: { x: -35.6, z: -40.4, yaw: -0.4 },
 } as const satisfies Record<string, Pile>
 
-/** The proving grounds' targets (from the map): arrows land in them. */
-export function targets(): { x: number; z: number; rot: number; scale: number }[] {
-  return island()
-    .decor.filter((piece) => piece.piece === "target")
+/** How far from a repo island's proving grounds its targets count as theirs. */
+const RANGE = 12
+
+/**
+ * The proving grounds' targets (from the map): arrows land in them. On a repo's island (`world`),
+ * the targets round the district the proving grounds took (world/siteMap.ts).
+ */
+export function targets(world?: World): { x: number; z: number; rot: number; scale: number }[] {
+  const at = world && world.kind !== "hand" ? sitesOf(world).proving.at : undefined
+  return (world?.island ?? island()).decor
+    .filter((piece) => piece.piece === "target")
+    .filter((piece) => !at || Math.hypot(piece.x - at[0], piece.z - at[1]) < RANGE)
     .map((piece) => ({ x: piece.x, z: piece.z, rot: piece.rot ?? 0, scale: piece.scale ?? 1 }))
 }
 

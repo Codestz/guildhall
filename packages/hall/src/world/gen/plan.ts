@@ -10,8 +10,11 @@ import { contiguous } from "./tiles.ts"
  * . meadow, f/F woods, h knoll, H foothill, m/M mountain, w/d fields, v village lot, s site ground)
  * so the adapter (dress.ts) can tile it exactly the way lands.ts tiles the hand-drawn map.
  *
- * The harbour (the root's own files) is the hub at hex [0, 0], its quay running south into a bay
- * nothing may fill. The top-level folders sit round it in sectors sized by their land, each grown
+ * The keep stands at the origin, as on the hand-drawn map (lands.ts' K block: Room, the stations
+ * and the hall's aisles are placed there), its gate opening south down a short avenue onto the
+ * harbour (the root's own files): the hub, two hexes south, its quay running on south into a bay
+ * nothing may fill. The keep's block and the ring of land round it are reserved before anything
+ * grows: level harbour ground no district, road or shore may take. The top-level folders sit round it in sectors sized by their land, each grown
  * hex by hex from a seed (its square, where its road ends), so every district is one piece. Roads
  * run from the hub to every square (Dijkstra over the hexes, reusing roads already laid; a road over
  * sea is a causeway and makes land). Then the shore is smoothed until every land hex meets the sea
@@ -47,17 +50,43 @@ export interface IslandPlan {
   land: Map<string, PlanHex>
   /** [0] is the harbour (the root), then the folders in RepoShape order. */
   districts: PlanDistrict[]
-  /** Hub → each square, hex by hex; consecutive hexes are neighbours. */
+  /** The avenue (hub → the gate's apron), then hub → each square, hex by hex; consecutive hexes are neighbours. */
   roads: Cell[][]
   /** The hub, and the sea hex its quay runs out over (straight south). */
   hub: Cell
   quay: Cell
+  /** The road hex at the keep's gate: drawn, opening south onto the avenue, not walked (lands.ts' [0, 2] stub). */
+  gate: Cell
   /** Rings from the hub that hold all the land. */
   radius: number
 }
 
-export const HUB: Cell = [0, 0]
-const QUAY: Cell = [0, 2]
+export const HUB: Cell = [0, 6]
+const QUAY: Cell = [0, 8]
+/** The gate's apron, and the avenue's one hex between it and the hub (lands.ts' [0, 2] and OUT). */
+const GATE: Cell = [0, 2]
+const AVENUE: Cell = [0, 4]
+/** The keep's block: lands.ts' K hexes, and the V lots either side of its gate. */
+export const KEEP: ReadonlyMap<string, "K" | "V"> = new Map([
+  ...(
+    [
+      [-2, -2],
+      [0, -2],
+      [2, -2],
+      [-1, -1],
+      [1, -1],
+      [-2, 0],
+      [0, 0],
+      [2, 0],
+      [-1, 1],
+      [1, 1],
+      [-2, 2],
+      [2, 2],
+    ] as const
+  ).map(([q, line]) => [`${q},${line}`, "K"] as const),
+  ["-1,3", "V"],
+  ["1,3", "V"],
+])
 /** Half-angle of the bay kept open south of the hub: the quay always faces open sea. */
 const BAY = (35 * Math.PI) / 180
 /** World radius of a round patch of n hexes (a hex is 86.6 square units). */
@@ -76,17 +105,57 @@ function levelOf(folder: Folder): 0 | 1 | 2 {
   return base
 }
 
+const [HUB_X, HUB_Z] = cellToWorld(HUB)
 const inBay = (cell: Cell): boolean => {
   if (cell[0] === HUB[0] && cell[1] === HUB[1]) return false
   const [x, z] = cellToWorld(cell)
-  return z > 0 && Math.abs(x) <= z * Math.tan(BAY)
+  return z - HUB_Z > 0 && Math.abs(x - HUB_X) <= (z - HUB_Z) * Math.tan(BAY)
 }
 
-export function planIsland(shape: RepoShape, seed: number): IslandPlan {
+/** The keep's block, its gate and avenue, and the ring of land round them: the harbour's, kept level and clear. */
+const RESERVED: ReadonlySet<string> = (() => {
+  const out = new Set<string>([...KEEP.keys(), key(GATE), key(AVENUE)])
+  for (const id of KEEP.keys()) for (const next of neighbours(unkey(id))) if (!inBay(next)) out.add(key(next))
+  out.delete(key(HUB))
+  return out
+})()
+
+/**
+ * How far the land may reach from the origin along x or z, world units: the shore's distance bake
+ * covers ±120 (scene/nature/shore.ts SHORE.half), and a coast tile's sand runs to its hex's edge.
+ */
+export const LAND_HALF = 118
+/** Each try shrinks every district's land by this much until the island fits. */
+const SHRINK = 0.85
+/** The smallest share of its land a district is shrunk to (a giant monorepo still gets an island). */
+const SMALLEST = 0.3
+
+/** How far a plan's land reaches along x or z, to its hexes' edges. */
+export function extentOf(plan: IslandPlan): number {
+  let extent = 0
+  for (const id of plan.land.keys()) {
+    const [x, z] = cellToWorld(unkey(id))
+    extent = Math.max(extent, Math.abs(x) + HEX_RADIUS, Math.abs(z) + HEX_APOTHEM)
+  }
+  return extent
+}
+const HEX_RADIUS = 10 / Math.sqrt(3)
+const HEX_APOTHEM = 5
+
+/** The island for a repo's shape, its land shrunk until it fits inside ±LAND_HALF. */
+export function fitIsland(shape: RepoShape, seed: number): IslandPlan {
+  let plan = planIsland(shape, seed)
+  for (let scale = SHRINK; extentOf(plan) > LAND_HALF && scale >= SMALLEST; scale *= SHRINK)
+    plan = planIsland(shape, seed, scale)
+  return plan
+}
+
+export function planIsland(shape: RepoShape, seed: number, scale = 1): IslandPlan {
   const random = rng(seed)
   const folders = [shape.root, ...shape.folders]
   const districts: PlanDistrict[] = folders.map((folder, i) => {
-    const quota = i === 0 ? Math.max(7, quotaOf(folder.bytes)) : quotaOf(folder.bytes)
+    const own = Math.max(3, Math.round(quotaOf(folder.bytes) * scale))
+    const quota = i === 0 ? Math.max(7, own) : own
     return {
       folder,
       biome: folder.biome,
@@ -106,7 +175,7 @@ export function planIsland(shape: RepoShape, seed: number): IslandPlan {
   }
   const total = order.reduce((sum, i) => sum + (districts[i]?.quota ?? 0), 0)
   const rootRadius = patch(districts[0]?.quota ?? 7)
-  const seeded = new Set([key(HUB)])
+  const seeded = new Set([key(HUB), ...RESERVED])
   let swept = 0
   for (const i of order) {
     const district = districts[i]
@@ -114,10 +183,11 @@ export function planIsland(shape: RepoShape, seed: number): IslandPlan {
     const angle = BAY + (2 * Math.PI - 2 * BAY) * ((swept + district.quota / 2) / total)
     swept += district.quota
     let distance = rootRadius + patch(district.quota) + 4
-    let cell = cellAt([distance * Math.sin(angle), distance * Math.cos(angle)])
+    const at = (): Cell => cellAt([HUB_X + distance * Math.sin(angle), HUB_Z + distance * Math.cos(angle)])
+    let cell = at()
     while (seeded.has(key(cell)) || inBay(cell)) {
       distance += 5
-      cell = cellAt([distance * Math.sin(angle), distance * Math.cos(angle)])
+      cell = at()
     }
     seeded.add(key(cell))
     district.square = cell
@@ -135,6 +205,7 @@ export function planIsland(shape: RepoShape, seed: number): IslandPlan {
       if (!owner.has(nextId) && !inBay(next)) frontiers[i]?.add(nextId)
     }
   }
+  for (const id of RESERVED) owner.set(id, 0)
   districts.forEach((district, i) => {
     claim(district.square, i)
   })
@@ -205,9 +276,9 @@ export function planIsland(shape: RepoShape, seed: number): IslandPlan {
       if (count >= 4) owner.set(key(cell), district)
     }
 
-  // ---- Roads: hub → every square, nearest first, reusing what's laid ----
-  const road = new Set<string>([key(HUB)])
-  const roads: Cell[][] = []
+  // ---- Roads: the avenue, then hub → every square, nearest first, reusing what's laid ----
+  const road = new Set<string>([key(HUB), key(AVENUE), key(GATE)])
+  const roads: Cell[][] = [[HUB, AVENUE]]
   const byDistance = districts
     .map((district, i) => ({ i, d: rings(district.square) }))
     .filter(({ i }) => i > 0)
@@ -216,8 +287,8 @@ export function planIsland(shape: RepoShape, seed: number): IslandPlan {
     const district = districts[i]
     if (!district) continue
     const path = cheapest(HUB, district.square, radius + 2, (cell) => {
-      if (inBay(cell)) return undefined
       const id = key(cell)
+      if (inBay(cell) || (RESERVED.has(id) && !road.has(id)) || id === key(GATE)) return undefined
       if (road.has(id)) return 0.4
       return owner.has(id) ? 1 : 8
     })
@@ -235,7 +306,7 @@ export function planIsland(shape: RepoShape, seed: number): IslandPlan {
   const erode = (): boolean => {
     let changed = false
     for (const id of [...owner.keys()]) {
-      if (road.has(id)) continue
+      if (road.has(id) || RESERVED.has(id)) continue
       if (!drawable(wet(unkey(id)))) {
         owner.delete(id)
         changed = true
@@ -268,7 +339,7 @@ export function planIsland(shape: RepoShape, seed: number): IslandPlan {
     let bestScore = Number.NEGATIVE_INFINITY
     for (const cell of neighbours(district.square)) {
       const id = key(cell)
-      if (road.has(id) || sites.has(id) || !owner.has(id)) continue
+      if (road.has(id) || sites.has(id) || KEEP.has(id) || !owner.has(id)) continue
       const [x, z] = cellToWorld(cell)
       const score =
         (owner.get(id) === i ? 100 : 0) +
@@ -308,7 +379,10 @@ export function planIsland(shape: RepoShape, seed: number): IslandPlan {
       const id = key(cell)
       let char: string
       if (road.has(id)) char = "="
+      else if (KEEP.has(id)) char = KEEP.get(id) ?? "K"
       else if (sites.has(id)) char = "s"
+      // The ring round the keep: open lots, kept clear like the hand map's (lands.ts' V).
+      else if (RESERVED.has(id)) char = "V"
       else if (raised.has(id))
         char =
           district.level === 1 ? "H" : neighbours(cell).every((next) => raised.has(key(next))) ? "M" : "m"
@@ -317,7 +391,7 @@ export function planIsland(shape: RepoShape, seed: number): IslandPlan {
     }
   })
 
-  return { hash: shape.hash, seed, land, districts, roads, hub: HUB, quay: QUAY, radius }
+  return { hash: shape.hash, seed, land, districts, roads, hub: HUB, quay: QUAY, gate: GATE, radius }
 }
 
 /** A hex's ground in a district's biome; `roll` against its density decides how full it is. */

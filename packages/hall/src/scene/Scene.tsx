@@ -44,10 +44,10 @@ import { UndeadGate } from "./Undead.tsx"
 import { WeatherLayer } from "./weather/WeatherLayer.tsx"
 
 /**
- * Everything inside the Canvas. A repo's island (`?repo=`, world/source.ts) draws the land, its
- * nature, lights, machines and ships; the keep, the graveyard, the cast and the world events are
- * the hand map's, placed for its roads and sites, so they wait until the story's sites are mapped
- * onto the island's districts.
+ * Everything inside the Canvas. A repo's island (`?repo=`, world/source.ts) has the keep at the
+ * origin like the hand map, and the story's sites mapped onto its districts (world/siteMap.ts), so
+ * the guild works there as on the hand map; only the graveyard (and the undead it raises) is the
+ * hand map's own.
  */
 export function Scene() {
   const hand = useWorld().kind === "hand"
@@ -75,16 +75,12 @@ export function Scene() {
         <NightLife />
         <Nature />
         <Life />
-        {hand && (
-          <>
-            <Room />
-            <Stations />
-            <Cast />
-            <Blobs />
-            {/* What everyone is doing, as an icon over their head: readable with the HUD hidden. */}
-            <Sigils />
-          </>
-        )}
+        <Room />
+        <Stations />
+        <Cast />
+        <Blobs />
+        {/* What everyone is doing, as an icon over their head: readable with the HUD hidden. */}
+        <Sigils />
         <WorldReady />
         {/* Showcase: mounts with the world, then lifts the title card (guild/opening.ts). */}
         {MODE === "showcase" && <OpeningCue />}
@@ -94,7 +90,7 @@ export function Scene() {
         <Ships />
       </Suspense>
       {/* Secret world events (guild/events.ts): nothing when idle; each event's code loads on first need. */}
-      {hand && <EventsLayer />}
+      <EventsLayer />
       <WeatherLayer />
       <CameraRig />
       <Post />

@@ -10,9 +10,12 @@ import {
   Quaternion,
   Vector3,
 } from "three"
+import { pilesOf } from "../../world/behaviours.ts"
 import { HEX_SCALE } from "../../world/lands.ts"
+import { useWorld } from "../../world/source.ts"
+import type { World } from "../../world/world.ts"
 import { useOwnedMeshes } from "../owned.ts"
-import { PILES, type Pile, TARGET_FACE, targets } from "./places.ts"
+import { type Pile, TARGET_FACE, targets } from "./places.ts"
 import { arrowGeometry, bookGeometry, COVERS, fishGeometry, logGeometry, stoneGeometry } from "./shapes.ts"
 import { life } from "./state.ts"
 import {
@@ -32,7 +35,8 @@ import {
  * Work leaves traces (ADR 0007, Life; counts in traces.ts): logs by the lumber mill, stones by the
  * quarry, fish on the river rack, books by the tower, arrows in the proving grounds' targets —
  * failed deeds are arrows that missed, red-fletched and stuck in the ground. Every trace is a slot
- * in one BatchedMesh (one draw call, no shadow pass: piles are low); a new one grows in.
+ * in one BatchedMesh (one draw call, no shadow pass: piles are low); a new one grows in. Where the
+ * piles lie is the world's (world/behaviours.ts `pilesOf`: on a repo's island, by each site's posts).
  */
 interface Item {
   kind: keyof Traces
@@ -44,8 +48,9 @@ interface Item {
 }
 
 export function TracePiles() {
+  const world = useWorld()
   // Batch and material are this mount's own (scene/owned.ts).
-  const built = useOwnedMeshes(build, [])
+  const built = useOwnedMeshes(() => build(world), [world])
 
   useFrame((_, delta) => {
     const mesh = built?.meshes[0]
@@ -75,7 +80,8 @@ const out = new Matrix4()
 const MISSED = new Color("#e0473a")
 const WHITE = new Color("#ffffff")
 
-function build() {
+function build(world: World) {
+  const piles = pilesOf(world)
   const shapes = {
     log: logGeometry(),
     stone: stoneGeometry(),
@@ -105,31 +111,31 @@ function build() {
     items.push({ kind, index, id, matrix, grown: 0 })
   }
 
-  for (let i = 0; i < CAPACITY.logs; i++) add("logs", i, shapes.log, onPile(PILES.logs, logSlot(i)))
+  for (let i = 0; i < CAPACITY.logs; i++) add("logs", i, shapes.log, onPile(piles.logs, logSlot(i)))
   for (let i = 0; i < CAPACITY.stones; i++) {
     const shade = 0.82 + hash(i + 40) * 0.3
     add(
       "stones",
       i,
       shapes.stone,
-      onPile(PILES.stones, heapSlot(i), 0.9 + hash(i) * 0.35),
+      onPile(piles.stones, heapSlot(i), 0.9 + hash(i) * 0.35),
       new Color(shade, shade, shade * 0.97),
     )
   }
   // The rack's pallet top: 0.08 in the piece's units, drawn at HEX_SCALE × 1.55 (Machines).
   for (let i = 0; i < CAPACITY.fish; i++)
-    add("fish", i, shapes.fish, onPile(PILES.fish, lift(rackSlot(i), 0.08 * HEX_SCALE * 1.55 + 0.05)))
+    add("fish", i, shapes.fish, onPile(piles.fish, lift(rackSlot(i), 0.08 * HEX_SCALE * 1.55 + 0.05)))
   // Books a size up: readable as a library's stacks from the overview, not as a single volume.
   for (let i = 0; i < CAPACITY.books; i++)
     add(
       "books",
       i,
       shapes.books[Math.floor(hash(i + 5) * COVERS.length)] ?? shapes.log,
-      onPile(PILES.books, scaleSlot(stackSlot(i), BOOK), BOOK),
+      onPile(piles.books, scaleSlot(stackSlot(i), BOOK), BOOK),
     )
 
   // Arrows: hits spread over the three targets' faces, misses in the grass in front of them.
-  const boards = targets()
+  const boards = targets(world)
   for (let i = 0; i < CAPACITY.hits; i++) {
     const board = boards[i % boards.length]
     if (board) add("hits", i, shapes.arrow, inTarget(board, hitSlot(Math.floor(i / boards.length) + i)))

@@ -10,7 +10,8 @@ import { handWorld, type World } from "./world.ts"
  * and every job site, a pair of great torches at the gate. Placed from the map's data, never by
  * hand: one torch per road hex, alternating sides, skipped wherever it would stand in water, in
  * the keep or inside a building. Placed for a world (world/world.ts): the hand map's, or a repo
- * island's, whose roads and districts get the same treatment (it has no keep or graveyard). Each
+ * island's, whose roads and districts get the same treatment (the keep and its gate too; it has no
+ * graveyard). Each
  * light has a flame (a halo in scene/atmosphere/Lamps) and a pool of light on the ground
  * (scene/lights/StreetLights).
  */
@@ -87,9 +88,8 @@ function groundOf(world: World): Ground {
 }
 
 function clear(ground: Ground, [x, z]: Spot, spacing: Spot[], rules: Rules = TORCH_RULES): boolean {
-  // The keep and the graveyard are the hand map's.
-  if (ground.hand && Math.abs(x) < ROOM.width / 2 + KEEP_MARGIN && Math.abs(z) < ROOM.depth / 2 + KEEP_MARGIN)
-    return false
+  // Every world has the keep at the origin; only the hand map has the graveyard.
+  if (Math.abs(x) < ROOM.width / 2 + KEEP_MARGIN && Math.abs(z) < ROOM.depth / 2 + KEEP_MARGIN) return false
   if (ground.water.some((w) => Math.hypot(w[0] - x, w[1] - z) < WATER_CLEARANCE)) return false
   if (ground.buildings.some((b) => Math.hypot(b[0] - x, b[1] - z) < rules.building)) return false
   if (ground.roads.some(([a, b]) => toSegment([x, z], a, b) < rules.road)) return false
@@ -127,10 +127,8 @@ function build(world: World): Light[] {
   }
 
   // The keep's gate: two great torches flanking the road out.
-  if (ground.hand) {
-    add(torch(-3.2, ROOM.depth / 2 + 3.4, 1.35))
-    add(torch(3.2, ROOM.depth / 2 + 3.4, 1.35))
-  }
+  add(torch(-3.2, ROOM.depth / 2 + 3.4, 1.35))
+  add(torch(3.2, ROOM.depth / 2 + 3.4, 1.35))
 
   // Roads: one torch per road hex, beside the road (perpendicular to it), alternating sides.
   const neighbours = new Map<string, string[]>()

@@ -1,10 +1,10 @@
-import { PILES } from "../scene/life/places.ts"
 import { ROUNDS } from "../scene/life/rounds.ts"
-import { FORGE_BUCKETS, WORK_TREES } from "./behaviours.ts"
+import { activeWorld } from "./active.ts"
+import { FORGE_BUCKETS, pilesOf, workTreesOf } from "./behaviours.ts"
 import { FURNITURE } from "./furniture.ts"
 import KIT from "./kit.json"
 import LANDS from "./lands.json"
-import { cellToWorld, HEX_SCALE, island, MAP_FOR_TESTS as MAP, SITES } from "./lands.ts"
+import { cellToWorld, HEX_SCALE, MAP_FOR_TESTS as MAP, SITES } from "./lands.ts"
 import {
   HAND_INS,
   HEARTH,
@@ -17,15 +17,17 @@ import {
   STATIONS,
   TAVERN,
 } from "./layout.ts"
-import { LIGHTS, toSegment } from "./lights.ts"
-import { WATER_CLEARANCE, wilds } from "./wilds.ts"
+import { lightsOf, toSegment } from "./lights.ts"
+import { WATER_CLEARANCE, wildsOf } from "./wilds.ts"
+import { handWorld, type World } from "./world.ts"
 
 /**
  * Where a body may stand: the island's and the keep's obstacles as footprints on the ground, dry
  * level land, and the keep's open floor. Read by the crowds (guild/crowd.ts, world/sharers.ts) and
  * by the tests that keep every standing spot and walk clear (test/support/clearance.ts).
  *
- * Built the first time it's asked for and kept: a story that never crowds never pays for it.
+ * Built the first time it's asked for and kept, per world (the active one, world/active.ts, unless
+ * one is given): a story that never crowds never pays for it.
  */
 
 /** A body's radius: a spot must keep this far off everything. */
@@ -74,38 +76,47 @@ const FLAT = /^(hex_|building_dirt|waterlily|waterplant|floor_wood|rug_|fence_|t
 /** Hex-scale tree clusters: their footprint box is the whole canopy; the trunks stand well inside it. */
 const CANOPY = /^trees_/
 
-let ISLAND: Obstacle[] | undefined
+const ISLAND = new WeakMap<World, Obstacle[]>()
 /** Everything standing on the island: decor, the wilds as drawn, the yard's building, piles, lamps. */
-export function islandObstacles(): readonly Obstacle[] {
-  if (ISLAND) return ISLAND
+export function islandObstacles(world: World = activeWorld() ?? handWorld()): readonly Obstacle[] {
+  const known = ISLAND.get(world)
+  if (known) return known
+  const hand = world.kind === "hand"
+  const piles = pilesOf(world)
   const out: Obstacle[] = []
-  for (const piece of island().decor) {
+  for (const piece of world.island.decor) {
     if (FLAT.test(piece.piece)) continue
     const bounds = (LANDS as Record<string, Bounds>)[piece.piece]
     if (!bounds) continue
     const scale = HEX_SCALE * (piece.scale ?? 1) * (CANOPY.test(piece.piece) ? 0.6 : 1)
     out.push(box(piece.piece, bounds, piece.x, piece.z, piece.rot ?? 0, scale))
   }
-  // The wilds as scene/nature/Wilds.tsx places them: off the villagers' rounds and the piles.
+  // The wilds as scene/nature/Wilds.tsx places them: off the villagers' rounds (the hand map's
+  // village) and the piles.
   const keep = {
-    paths: ROUNDS.map((round) => [round.door, ...round.stops, round.door].map((s): Spot => [s.x, s.z])),
-    spots: Object.values(PILES).map((pile): Spot => [pile.x, pile.z]),
+    paths: hand
+      ? ROUNDS.map((round) => [round.door, ...round.stops, round.door].map((s): Spot => [s.x, s.z]))
+      : [],
+    spots: Object.values(piles).map((pile): Spot => [pile.x, pile.z]),
   }
-  for (const wild of wilds(keep))
+  for (const wild of wildsOf(world, keep))
     if (wild.kind !== "grass") out.push(circle(`wild ${wild.kind}`, wild.x, wild.z, wild.radius * 0.7))
-  // The yard's building at its widest stage (scene/Island.tsx draws it unturned at the yard).
-  out.push(box("yard building", LANDS.building_scaffolding, SITES.yard.at[0], SITES.yard.at[1], 0, HEX_SCALE))
-  out.push(circle("log pile", PILES.logs.x, PILES.logs.z, 1.9))
-  out.push(circle("stone heap", PILES.stones.x, PILES.stones.z, 1.55))
-  out.push(circle("fish rack", PILES.fish.x, PILES.fish.z, 1.2))
-  out.push(circle("book stacks", PILES.books.x, PILES.books.z, 1.7))
-  for (const tree of WORK_TREES) out.push(circle("work tree", tree[0], tree[1], 0.45))
+  // The yard's building at its widest stage (scene/Island.tsx draws it unturned at the hand map's yard).
+  if (hand)
+    out.push(
+      box("yard building", LANDS.building_scaffolding, SITES.yard.at[0], SITES.yard.at[1], 0, HEX_SCALE),
+    )
+  out.push(circle("log pile", piles.logs.x, piles.logs.z, 1.9))
+  out.push(circle("stone heap", piles.stones.x, piles.stones.z, 1.55))
+  out.push(circle("fish rack", piles.fish.x, piles.fish.z, 1.2))
+  out.push(circle("book stacks", piles.books.x, piles.books.z, 1.7))
+  for (const tree of workTreesOf(world)) out.push(circle("work tree", tree[0], tree[1], 0.45))
   // Lanterns and torches (world/lights.ts), each on whatever it stands on.
-  for (const { placement: p } of LIGHTS) {
+  for (const { placement: p } of lightsOf(world)) {
     const bounds = (KIT as Record<string, Bounds>)[p.piece]
     if (bounds) out.push(box(`light ${p.piece}`, bounds, p.x, p.z, p.rot ?? 0, p.scale ?? 1))
   }
-  ISLAND = out
+  ISLAND.set(world, out)
   return out
 }
 
@@ -136,10 +147,10 @@ const OFF_LAND = new Set(["~", "o", "#", "w", "d"])
  * Level dry land a body can stand on: not the sea, the lake or the beach sloping down to them, not
  * a river's channel (its banks are dry), not raised ground and not in the crops.
  */
-export function onDryLand(spot: Spot): boolean {
+export function onDryLand(spot: Spot, world: World = activeWorld() ?? handWorld()): boolean {
   const cell = MAP.cellOf(spot)
-  const char = MAP.at(cell)
-  if (OFF_LAND.has(char) || MAP.level(cell) !== 0) return false
+  const char = world.terrain.at(cell)
+  if (OFF_LAND.has(char) || world.terrain.level(cell) !== 0) return false
   if (char === "r") {
     const centre = cellToWorld(cell)
     for (const dir of MAP.riverLinks.get(cell.join(",")) ?? []) {
@@ -148,14 +159,18 @@ export function onDryLand(spot: Spot): boolean {
       if (toSegment(spot, centre, edge) < CHANNEL + BODY) return false
     }
   }
-  return !seaNear(spot)
+  return !seaNear(spot, world)
 }
 
-let SEA: Spot[] | undefined
+const SEA = new WeakMap<World, Spot[]>()
 /** Within a sea or lake hex's sloping beach (world/wilds.ts WATER_CLEARANCE). */
-function seaNear(spot: Spot): boolean {
-  SEA ??= island().water.filter((w) => ["~", "o"].includes(MAP.at(MAP.cellOf(w))))
-  return SEA.some((w) => Math.hypot(w[0] - spot[0], w[1] - spot[1]) < WATER_CLEARANCE)
+function seaNear(spot: Spot, world: World): boolean {
+  let sea = SEA.get(world)
+  if (!sea) {
+    sea = world.island.water.filter((w) => ["~", "o"].includes(world.terrain.at(MAP.cellOf(w))))
+    SEA.set(world, sea)
+  }
+  return sea.some((w) => Math.hypot(w[0] - spot[0], w[1] - spot[1]) < WATER_CLEARANCE)
 }
 
 // ---- The keep's floor -------------------------------------------------------------------------

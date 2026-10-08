@@ -1,5 +1,6 @@
-import { describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, test } from "bun:test"
 import { parseDeepLink } from "../src/guild/deeplink.ts"
+import { activeWorld, setActiveWorld } from "../src/world/active.ts"
 import { GitHubError } from "../src/world/gen/fetch.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
 import { reasonOf, type Tree } from "../src/world/gen/load.ts"
@@ -42,9 +43,17 @@ describe("a repo's world", () => {
     test(`${name}: its districts' landmarks are its work places, posts and all`, () => {
       const landmarks = world.repo?.districts.filter((d) => d.landmark) ?? []
       expect(world.kind).toBe("repo")
-      expect(world.sites.length).toBe(landmarks.length)
+      for (const district of landmarks)
+        expect(world.sites.some((site) => site.at === district.at && site.posts === district.posts)).toBe(
+          true,
+        )
       expect(world.sites.length).toBeGreaterThan(1)
       for (const site of world.sites) expect(site.posts.length).toBeGreaterThan(0)
+    })
+
+    test(`${name}: every story site's posts are among its work places`, () => {
+      for (const site of Object.values(world.storySites))
+        expect(world.sites.some((place) => place.posts === site.posts)).toBe(true)
     })
 
     test(`${name}: its terrain is the plan's — land where the plan has land, sea round it`, () => {
@@ -54,7 +63,9 @@ describe("a repo's world", () => {
         expect(terrain.at([q, line])).not.toBe("~")
       }
       expect(terrain.at([0, 40])).toBe("~")
-      expect(terrain.at([0, 0])).toBe("=")
+      // The keep at the origin, its gate's apron and avenue, the harbour's hub south of them.
+      expect(terrain.at([0, 0])).toBe("K")
+      expect([terrain.at([0, 2]), terrain.at([0, 4]), terrain.at([0, 6])]).toEqual(["=", "=", "="])
     })
 
     test(`${name}: lit along its roads, never in water, on a road, in a building or on a post`, () => {
@@ -70,7 +81,8 @@ describe("a repo's world", () => {
         for (const post of posts) expect(Math.hypot(post[0] - p.x, post[1] - p.z)).toBeGreaterThan(1.7)
         for (const [a, b] of roadsOf(world)) expect(toSegment([p.x, p.z], a, b)).toBeGreaterThan(1.6)
       }
-      // No keep, so no gate torches, and no graveyard glows.
+      // The keep's gate has its two great torches; there is no graveyard to glow.
+      expect(torches.filter((t) => Math.abs(t.placement.x) === 3.2 && t.placement.z === 15.4)).toHaveLength(2)
       expect(glowsOf(world)).toBe(lights)
     })
 
@@ -103,6 +115,8 @@ describe("a repo's world", () => {
 
 describe("the world source", () => {
   const tree: Tree = { repo: "Codestz/guildhall", source: "fixture", entries: SELF.entries as RepoEntry[] }
+  // The source makes its world the active one (world/active.ts): leave the hand lands for the rest.
+  afterAll(() => setActiveWorld(undefined))
 
   test("a repo that loads becomes the world; one that fails leaves the hand island and says why", async () => {
     const seen: string[] = []
@@ -110,6 +124,7 @@ describe("the world source", () => {
     const loaded = await worldSource.load("sample", async () => tree)
     expect(loaded.kind).toBe("repo")
     expect(worldSource.world).toBe(loaded)
+    expect(activeWorld()).toBe(loaded)
     expect(loaded.repo?.repo).toBe("Codestz/guildhall")
     expect(seen).toEqual(["loading", "repo"])
 
@@ -117,12 +132,30 @@ describe("the world source", () => {
       throw new Error("GitHub has no public repo called acme/missing")
     })
     expect(failed).toBe(handWorld())
+    expect(activeWorld()).toBe(handWorld())
     expect(worldSource.status).toEqual({
       state: "failed",
       repo: "acme/missing",
       reason: "GitHub has no public repo called acme/missing",
     })
     off()
+  })
+
+  test("asked again for the same repo, it keeps the world it grew: one build, no reload", async () => {
+    let fetched = 0
+    const fetchTree = async () => {
+      fetched++
+      return tree
+    }
+    const first = await worldSource.load("Codestz/guildhall", fetchTree)
+    const seen: string[] = []
+    const off = worldSource.subscribe(() => seen.push(worldSource.status.state))
+    const again = await worldSource.load("Codestz/guildhall", fetchTree)
+    off()
+    expect(again).toBe(first)
+    expect(worldSource.world).toBe(first)
+    expect(fetched).toBe(1)
+    expect(seen).toEqual([])
   })
 
   test("only the last repo asked for wins", async () => {

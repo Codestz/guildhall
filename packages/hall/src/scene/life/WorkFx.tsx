@@ -16,7 +16,9 @@ import {
   Vector3,
 } from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
-import { FORGE_BUCKETS, WORK_TREES } from "../../world/behaviours.ts"
+import { FORGE_BUCKETS, workTreesOf } from "../../world/behaviours.ts"
+import type { Spot } from "../../world/layout.ts"
+import { useWorld } from "../../world/source.ts"
 import { KitPiece, plain } from "../Kit.tsx"
 import { FOREST_URL } from "../nature/Wilds.tsx"
 import { useOwnedMeshes } from "../owned.ts"
@@ -88,10 +90,10 @@ const RECIPES: Record<(typeof BEAT_KINDS)[number], Recipe> = {
 }
 
 /** Which of the forest's work trees a "chop" at (x, z) bites, if any. */
-function treeAt(x: number, z: number): number {
+function treeAt(trees: readonly Spot[], x: number, z: number): number {
   let best = -1
   let distance = 2.5
-  WORK_TREES.forEach((tree, i) => {
+  trees.forEach((tree, i) => {
     const d = Math.hypot(tree[0] - x, tree[1] - z)
     if (d < distance) {
       distance = d
@@ -103,6 +105,8 @@ function treeAt(x: number, z: number): number {
 
 export function WorkFx() {
   const { nodes } = useGLTF(FOREST_URL) as unknown as { nodes: Record<string, Object3D> }
+  // The forest's work trees stand by its posts on whichever island is drawn (world/behaviours.ts).
+  const treeSpots = workTreesOf(useWorld())
   // Particles and arrows are this mount's own (scene/owned.ts).
   const built = useOwnedMeshes(() => {
     const material = new MeshBasicMaterial({ toneMapped: false })
@@ -122,7 +126,11 @@ export function WorkFx() {
     return { meshes: [particles, arrows] }
   }, [])
   // The work trees: the pack's geometry (own) in the pack's material (borrowed).
-  const trees = useOwnedMeshes(() => ({ meshes: workTrees(nodes) }), [nodes], "materials")
+  const trees = useOwnedMeshes(
+    () => ({ meshes: workTrees(nodes, treeSpots) }),
+    [nodes, treeSpots],
+    "materials",
+  )
   const state = useMemo(
     () => ({
       read: beats.written,
@@ -138,10 +146,10 @@ export function WorkFx() {
       arrowAge: new Float32Array(ARROWS).fill(99),
       arrow: new Float32Array(ARROWS * 6),
       nextArrow: 0,
-      shake: new Float32Array(WORK_TREES.length),
-      lean: new Float32Array(WORK_TREES.length * 2),
+      shake: new Float32Array(treeSpots.length),
+      lean: new Float32Array(treeSpots.length * 2),
     }),
-    [],
+    [treeSpots],
   )
 
   useFrame((_, delta) => {
@@ -166,12 +174,12 @@ export function WorkFx() {
         continue
       }
       if (kind === "chop") {
-        const tree = treeAt(x, z)
+        const tree = treeAt(treeSpots, x, z)
         if (tree >= 0) {
           state.shake[tree] = 1
           // Leans away from the axe: from the swing's side (the beat's `from`) through the trunk.
-          const tx = WORK_TREES[tree]?.[0] ?? x
-          const tz = WORK_TREES[tree]?.[1] ?? z
+          const tx = treeSpots[tree]?.[0] ?? x
+          const tz = treeSpots[tree]?.[1] ?? z
           const fx = tx - (beats.at[i * 6 + 3] ?? tx)
           const fz = tz - (beats.at[i * 6 + 5] ?? tz)
           const length = Math.hypot(fx, fz) || 1
@@ -230,7 +238,7 @@ export function WorkFx() {
 
     const forest = trees?.meshes[0] as InstancedMesh | undefined
     if (forest) {
-      for (let t = 0; t < WORK_TREES.length; t++) {
+      for (let t = 0; t < treeSpots.length; t++) {
         const shake = state.shake[t] ?? 0
         if (shake <= 0) continue
         const next = Math.max(0, shake - dt * 1.8)
@@ -239,7 +247,7 @@ export function WorkFx() {
         // Tilt about the horizontal axis across the lean (y × lean).
         axis.set(state.lean[t * 2 + 1] ?? 0, 0, -(state.lean[t * 2] ?? 1))
         if (axis.lengthSq() < 1e-6) axis.set(1, 0, 0)
-        forest.setMatrixAt(t, treeMatrix(t, rotation.setFromAxisAngle(axis.normalize(), swing)))
+        forest.setMatrixAt(t, treeMatrix(treeSpots, t, rotation.setFromAxisAngle(axis.normalize(), swing)))
       }
       forest.instanceMatrix.needsUpdate = true
     }
@@ -302,7 +310,7 @@ function rand(n: number): number {
 const TREE = "Tree_4_A"
 const TREE_SCALE = 0.8
 
-function workTrees(nodes: Record<string, Object3D>): InstancedMesh[] {
+function workTrees(nodes: Record<string, Object3D>, treeSpots: readonly Spot[]): InstancedMesh[] {
   const source = nodes[TREE]
   if (!source) return []
   source.updateMatrixWorld(true)
@@ -318,8 +326,8 @@ function workTrees(nodes: Record<string, Object3D>): InstancedMesh[] {
   const geometry = parts.length === 1 ? parts[0] : mergeGeometries(parts)
   if (!geometry || !material) return []
   if (geometry !== parts[0]) for (const part of parts) part.dispose()
-  const mesh = new InstancedMesh(geometry, material, WORK_TREES.length)
-  for (let t = 0; t < WORK_TREES.length; t++) mesh.setMatrixAt(t, treeMatrix(t, IDENTITY))
+  const mesh = new InstancedMesh(geometry, material, treeSpots.length)
+  for (let t = 0; t < treeSpots.length; t++) mesh.setMatrixAt(t, treeMatrix(treeSpots, t, IDENTITY))
   mesh.castShadow = true
   mesh.receiveShadow = true
   mesh.computeBoundingSphere()
@@ -327,8 +335,8 @@ function workTrees(nodes: Record<string, Object3D>): InstancedMesh[] {
   return [mesh]
 }
 
-function treeMatrix(t: number, tilt: Quaternion): Matrix4 {
-  const [x, z] = WORK_TREES[t] ?? [0, 0]
+function treeMatrix(trees: readonly Spot[], t: number, tilt: Quaternion): Matrix4 {
+  const [x, z] = trees[t] ?? [0, 0]
   turn.setFromAxisAngle(UP, t * 2.1).premultiply(tilt)
   position.set(x, 0, z)
   scale.setScalar(TREE_SCALE)

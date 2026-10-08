@@ -38,6 +38,7 @@ import {
   TAVERN,
 } from "../world/layout.ts"
 import { MOODS, type Mood } from "../world/moods.ts"
+import { sitesOf } from "../world/siteMap.ts"
 import { destinationOf, FATES, type Fates, SITE_DEFS, siteOf } from "../world/sites.ts"
 import { Crowd } from "./crowd.ts"
 import {
@@ -1051,7 +1052,8 @@ export function viewsOf(
       phase = s.status === "waiting" ? "waiting" : "working"
       const n = atSite.get(home) ?? 0
       atSite.set(home, n + 1)
-      const posts = SITE_DEFS[home].posts
+      // The site's posts on the island drawn now (world/siteMap.ts: a repo's districts, or the hand map's).
+      const posts = sitesOf()[home].posts
       // Past the posts they share them: the scene sets each extra worker beside the post's first
       // (scene/activity.ts reserve, world/behaviours.ts shifted), routine and all.
       target = posts[n % posts.length] ?? MASTER_POST

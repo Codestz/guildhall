@@ -1,5 +1,6 @@
+import { activeWorld } from "./active.ts"
 import { ROAD_EDGES, ROAD_NODES } from "./lands.ts"
-import type { Spot } from "./layout.ts"
+import { ROOM, type Spot } from "./layout.ts"
 
 /**
  * Walkable aisles through the great hall, as a small graph. Adventurers walk node to node instead
@@ -35,14 +36,13 @@ const HALL = {
   GATE: [0, 13.6],
 } as const satisfies Record<string, Spot>
 
-/** The hall's aisles plus the island's roads, joined at the gate (ADR 0006). */
-const NODES: Readonly<Record<string, Spot>> = { ...HALL, ...ROAD_NODES }
-
 /** A hall node, or a road node (named in lands.ts, or a road hex like "R-3_5"). */
 type Id = keyof typeof HALL | (string & {})
-const node = (id: Id): Spot => NODES[id] ?? [0, 0]
 
-const EDGES: readonly (readonly [Id, Id])[] = [
+/** The island's walking graph (world/world.ts `World.roads`). */
+type Roads = { nodes: Readonly<Record<string, Spot>>; edges: readonly (readonly [string, string])[] }
+
+const HALL_EDGES: readonly (readonly [Id, Id])[] = [
   ["A1", "A2"],
   ["A2", "A3"],
   ["A3", "A4"],
@@ -69,36 +69,76 @@ const EDGES: readonly (readonly [Id, Id])[] = [
   ["C1", "C2"],
   ["C2", "C3"],
   ["C2", "GATE"],
-  ["GATE", "OUT"],
-  ...ROAD_EDGES,
 ]
 
-const ADJACENT = new Map<Id, Id[]>()
-for (const [a, b] of EDGES) {
-  ADJACENT.set(a, [...(ADJACENT.get(a) ?? []), b])
-  ADJACENT.set(b, [...(ADJACENT.get(b) ?? []), a])
+/** The hall's aisles plus an island's roads, joined at the gate (ADR 0006). */
+interface Graph {
+  nodes: Readonly<Record<string, Spot>>
+  edges: readonly (readonly [Id, Id])[]
+  adjacent: Map<Id, Id[]>
+  ids: Id[]
+  /** The island's road nodes (no hall aisles), where spots outside the keep join the graph. */
+  roadIds: Id[]
 }
-const IDS = Object.keys(NODES) as Id[]
+
+function graphOf(roads: Roads): Graph {
+  const nodes: Readonly<Record<string, Spot>> = { ...HALL, ...roads.nodes }
+  // The gate opens onto the road hex nearest it (the hand map's OUT; a repo island's avenue).
+  let out: string | undefined
+  for (const [id, at] of Object.entries(roads.nodes))
+    if (out === undefined || distance(at, HALL.GATE) < distance(roads.nodes[out] ?? at, HALL.GATE)) out = id
+  const edges: (readonly [Id, Id])[] = [
+    ...HALL_EDGES,
+    ...(out ? [["GATE", out] as const] : []),
+    ...roads.edges,
+  ]
+  const adjacent = new Map<Id, Id[]>()
+  for (const [a, b] of edges) {
+    adjacent.set(a, [...(adjacent.get(a) ?? []), b])
+    adjacent.set(b, [...(adjacent.get(b) ?? []), a])
+  }
+  return { nodes, edges, adjacent, ids: Object.keys(nodes) as Id[], roadIds: Object.keys(roads.nodes) }
+}
+
+const HAND_ROADS: Roads = { nodes: ROAD_NODES, edges: ROAD_EDGES }
+const graphs = new WeakMap<Roads, Graph>()
+function graphFor(roads: Roads): Graph {
+  let graph = graphs.get(roads)
+  if (!graph) {
+    graph = graphOf(roads)
+    graphs.set(roads, graph)
+  }
+  return graph
+}
 
 function distance(a: Spot, b: Spot): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1])
 }
 
-function nearest(spot: Spot): Id {
-  let best: Id = IDS[0] ?? "A4"
-  for (const id of IDS) if (distance(node(id), spot) < distance(node(best), spot)) best = id
-  return best
+/** Inside the keep's walls, or on the apron at its gate (the aisles' GATE node is just inside). */
+function inKeep([x, z]: Spot): boolean {
+  return Math.abs(x) <= ROOM.width / 2 && z >= -ROOM.depth / 2 && z <= ROOM.depth / 2 + 4
 }
 
 /** Short trips (same corner of the hall) go straight; longer ones take the aisles. */
 const STRAIGHT_BELOW = 3.5
 
 /**
- * The spots to walk through from `from` to `to`, ending at `to`. Dijkstra over a ~35-node graph:
- * cheap enough to run whenever a target changes.
+ * The spots to walk through from `from` to `to`, ending at `to`, on the active world's roads
+ * (world/active.ts; the hand map's by default). Dijkstra over a graph of a few dozen to a few
+ * hundred nodes: cheap enough to run whenever a target changes.
  */
-export function route(from: Spot, to: Spot): Spot[] {
+export function route(from: Spot, to: Spot, roads: Roads = activeWorld()?.roads ?? HAND_ROADS): Spot[] {
   if (distance(from, to) < STRAIGHT_BELOW) return [to]
+  const { nodes: points, adjacent, ids, roadIds } = graphFor(roads)
+  const node = (id: Id): Spot => points[id] ?? [0, 0]
+  // A spot out on the island joins the graph at a road, never at an aisle behind the keep's wall.
+  const nearest = (spot: Spot): Id => {
+    const pool = inKeep(spot) ? ids : roadIds
+    let best: Id = pool[0] ?? "A4"
+    for (const id of pool) if (distance(node(id), spot) < distance(node(best), spot)) best = id
+    return best
+  }
   const start = nearest(from)
   const goal = nearest(to)
   const cost = new Map<Id, number>([[start, 0]])
@@ -110,7 +150,7 @@ export function route(from: Spot, to: Spot): Spot[] {
       if (current === undefined || (cost.get(id) ?? 0) < (cost.get(current) ?? 0)) current = id
     if (current === undefined || current === goal) break
     open.delete(current)
-    for (const next of ADJACENT.get(current) ?? []) {
+    for (const next of adjacent.get(current) ?? []) {
       const through = (cost.get(current) ?? 0) + distance(node(current), node(next))
       if (through < (cost.get(next) ?? Number.POSITIVE_INFINITY)) {
         cost.set(next, through)
@@ -130,5 +170,5 @@ export function route(from: Spot, to: Spot): Spot[] {
   return [...nodes, to]
 }
 
-/** Exported for tests and the Lab: the graph itself. */
-export const AISLES = { nodes: NODES, edges: EDGES }
+/** Exported for tests and the Lab: the hand map's graph itself. */
+export const AISLES = (({ nodes, edges }: Graph) => ({ nodes, edges }))(graphFor(HAND_ROADS))

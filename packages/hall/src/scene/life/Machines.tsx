@@ -12,6 +12,7 @@ import {
   Vector3,
 } from "three"
 import { useGuildStore } from "../../guild/useGuild.ts"
+import { pilesOf } from "../../world/behaviours.ts"
 import { LANDS_URL } from "../../world/cast.ts"
 import { HEX_SCALE, type LandmarkKind } from "../../world/lands.ts"
 import { useWorld } from "../../world/source.ts"
@@ -19,7 +20,6 @@ import type { World } from "../../world/world.ts"
 import { plain } from "../Kit.tsx"
 import { useOwnedMeshes } from "../owned.ts"
 import { MOVING_PARTS, movingPartsClaimed } from "./moving.ts"
-import { PILES } from "./places.ts"
 import { life } from "./state.ts"
 
 /**
@@ -104,15 +104,15 @@ function build(nodes: Record<string, Object3D>, claimed: boolean, world: World) 
     }
   }
 
-  // The fish rack: a pallet by the (hand map's) river bend.
+  // The fish rack: a pallet by the river bend (on a repo's island, by the fishing posts' heap).
   const pallet = nodes.pallet
-  if (pallet && world.kind === "hand") {
+  if (pallet) {
     pallet.updateMatrixWorld(true)
     const inverse = pallet.matrixWorld.clone().invert()
     pallet.traverse((child) => {
       const mesh = child as Mesh
       if (!mesh.isMesh) return
-      const rack = PILES.fish
+      const rack = pilesOf(world).fish
       items.push({
         geometry: plain(mesh.geometry).applyMatrix4(inverse.clone().multiply(mesh.matrixWorld)),
         material: mesh.material as Material,

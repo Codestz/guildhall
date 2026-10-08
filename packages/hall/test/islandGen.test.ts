@@ -3,7 +3,7 @@ import { biomeOf, languageOf } from "../src/world/gen/biomes.ts"
 import type { RepoIsland } from "../src/world/gen/dress.ts"
 import { cellAt, key, rng } from "../src/world/gen/hex.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
-import { quotaOf } from "../src/world/gen/plan.ts"
+import { extentOf, KEEP, LAND_HALF, quotaOf } from "../src/world/gen/plan.ts"
 import { MAX_DISTRICTS, type RepoEntry, summarize } from "../src/world/gen/repo.ts"
 import { fit, PATH_TILES, turn } from "../src/world/gen/tiles.ts"
 import { cellToWorld, island, MAP_FOR_TESTS } from "../src/world/lands.ts"
@@ -137,6 +137,28 @@ describe("islandFromTree", () => {
     }
   })
 
+  test("every island fits inside the shore's bake, ±LAND_HALF along x and z", () => {
+    for (const [name, made] of ALL)
+      expect({ name, fits: extentOf(made.plan) <= LAND_HALF }).toEqual({ name, fits: true })
+    // A big monorepo shrinks to fit rather than spilling past it.
+    const big = islandFromTree(
+      treeOf(
+        Object.fromEntries(Array.from({ length: 16 }, (_, i) => [`pkg${i}`, [300, 40_000, 3] as const])),
+      ),
+    )
+    expect(extentOf(big.plan)).toBeLessThanOrEqual(LAND_HALF)
+  })
+
+  test("the keep stands at the origin, its gate opening down the avenue onto the harbour's hub", () => {
+    for (const [name, made] of ALL) {
+      for (const [id, char] of KEEP)
+        expect({ name, id, char: made.plan.land.get(id)?.char }).toEqual({ name, id, char })
+      expect(made.roads.nodes.HARBOUR).toEqual(cellToWorld(made.plan.hub))
+      expect(made.plan.land.get("0,2")?.char).toBe("=")
+      expect(made.roads.edges).toContainEqual(["HARBOUR", "R0_4"])
+    }
+  })
+
   test("land scales with code size, log-scaled", () => {
     const made = islandFromTree(treeOf({ big: [100, 10_000], small: [10, 1000] }))
     const hexes = (id: string) => made.districts.find((d) => d.id === id)?.hexes ?? 0
@@ -174,17 +196,20 @@ describe("islandFromTree", () => {
   })
 })
 
-/** Regenerate when the generator changes on purpose (and look at the lab shot). */
+/**
+ * Regenerate when the generator changes on purpose (and look at the lab shot). Last: the keep's
+ * block reserved at the origin, the hub moved south of it (the harbour holds the keep and its ring).
+ */
 const SAMPLE = {
   hash: 1887736964,
-  land: 160,
+  land: 181,
   tiles: 631,
-  decor: 139,
+  decor: 105,
   districts: [
-    "/ harbour Markdown 30",
-    "packages village TypeScript 51",
-    ".github farms Image 51",
-    "scripts farms TypeScript 28",
+    "/ harbour Markdown 58",
+    "packages village TypeScript 49",
+    ".github farms Image 47",
+    "scripts farms TypeScript 27",
   ],
 }
 

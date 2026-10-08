@@ -35,8 +35,9 @@ import { WorkFx } from "./WorkFx.tsx"
  * showing. Nothing here casts into the (static) sun shadow map; townsfolk get a blob shadow
  * (scene/Blobs.tsx).
  *
- * A repo's island (world/world.ts) has its machines and birds; the rest is the hand map's village,
- * sites and keep, placed by hand, so it waits for the story's sites to be mapped onto districts.
+ * A repo's island (world/world.ts) has its machines, birds, ravens and the guild's work: traces and
+ * work trees by the districts its sites took (world/siteMap.ts). The village's smoke, sparks,
+ * windows and townsfolk are the hand map's, placed for its houses and rounds.
  */
 export function Life() {
   const store = useGuildStore()
@@ -48,18 +49,14 @@ export function Life() {
   return (
     <group name="life">
       <Machines />
+      <TracePiles />
+      <WorkFx />
+      <Birds tier={tier} />
+      <Ravens />
       {hand && (
         <>
-          <TracePiles />
           <Smoke tier={tier} />
           <Sparks />
-          <WorkFx />
-        </>
-      )}
-      <Birds tier={tier} />
-      {hand && (
-        <>
-          <Ravens />
           <Windows />
           <Villagers tier={tier} />
         </>

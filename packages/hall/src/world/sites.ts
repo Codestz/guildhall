@@ -8,7 +8,8 @@ import type { Mix } from "./wilds.ts"
 
 /**
  * The site registry (ADR 0008): every fact about a job site that code used to switch on, as data.
- * Where a site is (its spot, posts and landmark) is map data in `lands.ts` `SITES`; this adds what
+ * Where a site is (its spot, posts and landmark) is map data: the hand lands' `lands.ts` `SITES`, or
+ * on a repo's island the district it took (`sitesOf(world)`, world/siteMap.ts); this adds what
  * happens there. Everything that varies by site reads it: the work loop and gear (scene/Adventurer), the
  * traces (scene/life/traces), the machines (scene/life/state), the yard's growth (guild/store) and
  * the wilds (world/wilds).

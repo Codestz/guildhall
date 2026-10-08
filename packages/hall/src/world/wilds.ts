@@ -13,8 +13,9 @@ import { handWorld, type Terrain, type World } from "./world.ts"
  * lights.ts): candidates are sampled round each anchor, jittered by a seeded hash of their position,
  * and kept only where they clear the roads, the walking approaches to the work posts, buildings and
  * other decor, water, the keep, the lights and each other. Only level open ground grows wilds.
- * Grown for a world (world/world.ts): the hand map's, or a repo island's (no keep, yard or
- * graveyard to keep clear of; its districts' landmarks are its sites).
+ * Grown for a world (world/world.ts): the hand map's, or a repo island's (the keep at the origin as
+ * on the hand map, but no yard building or graveyard to keep clear of; its districts' landmarks are
+ * its sites).
  */
 
 export type WildPiece = keyof typeof FOREST
@@ -164,9 +165,14 @@ function groundOf(world: World): Ground {
     const to = graph[b]
     return from && to ? [[from, to] as const] : []
   })
-  // The keep's gate apron: the avenue's drawn stub from the gate up to the first road hex.
-  const OUT = graph.OUT
-  if (hand && OUT) roads.push([[0, ROOM.depth / 2], OUT])
+  // The keep's gate apron: the avenue's drawn stub from the gate up to the road hex nearest it
+  // (the hand map's OUT; a repo island's avenue).
+  const gate: Spot = [0, ROOM.depth / 2]
+  let out: Spot | undefined
+  for (const at of Object.values(graph))
+    if (!out || Math.hypot(at[0] - gate[0], at[1] - gate[1]) < Math.hypot(out[0] - gate[0], out[1] - gate[1]))
+      out = at
+  if (out) roads.push([gate, out])
   const nodes = Object.values(graph)
   const isSea = (w: Spot) => ["~", "o"].includes(terrain.at(MAP_FOR_TESTS.cellOf(w)))
   const posts: Spot[] = world.sites.flatMap((site) => site.posts.map((p) => [p[0], p[1]] as Spot))
@@ -227,11 +233,7 @@ function clear(
   placed: readonly Wild[],
   extra: Required<KeepClear>,
 ): boolean {
-  if (
-    ground.hand &&
-    Math.abs(x) < ROOM.width / 2 + KEEP_MARGIN + r &&
-    Math.abs(z) < ROOM.depth / 2 + KEEP_MARGIN + r
-  )
+  if (Math.abs(x) < ROOM.width / 2 + KEEP_MARGIN + r && Math.abs(z) < ROOM.depth / 2 + KEEP_MARGIN + r)
     return false
   // The footprint stands on growable ground all round, not just at its centre.
   const edge = r * 0.7

@@ -238,10 +238,11 @@ export function wildsNodeMaterial(base: Material): MeshStandardNodeMaterial {
 }
 
 class WildsNodeMaterial extends MeshStandardNodeMaterial {
-  /** The batching (three's), then the sway, in the mesh's space. */
+  /** The batching (three's), then the sway, in the mesh's space; or a merged mesh's (Wilds.tsx on WebGPU). */
   override setupPosition(builder: NodeBuilder): Node {
     super.setupPosition(builder)
     if ((builder.object as BatchedMesh).isBatchedMesh) wildsVertex(builder.object as BatchedMesh)()
+    else if (builder.geometry.hasAttribute("aRoot")) mergedWildsVertex()
     return positionLocal
   }
 
@@ -269,3 +270,14 @@ function wildsVertex(mesh: BatchedMesh) {
     positionLocal.addAssign(vec3(dir.x, 0, dir.y).mul(bend))
   }, "void")
 }
+
+/**
+ * The same sway on a merged mesh (every instance baked into world space): each vertex carries its
+ * instance's root and its own height (`aRoot`: x, z, height), so it bends exactly as when batched.
+ */
+const mergedWildsVertex = Fn(() => {
+  const root = attribute<"vec3">("aRoot", "vec3")
+  const { dir } = windNodes()
+  const bend = attribute<"float">("aSway", "float").mul(swayPlant(root.xy, max(root.z, 0)))
+  positionLocal.addAssign(vec3(dir.x, 0, dir.y).mul(bend))
+}, "void")

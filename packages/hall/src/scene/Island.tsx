@@ -1,11 +1,12 @@
 import { useGLTF } from "@react-three/drei"
+import { useThree } from "@react-three/fiber"
 import { useMemo } from "react"
 import {
   BatchedMesh,
   type BufferGeometry,
   type Material,
   Matrix4,
-  type Mesh,
+  Mesh,
   type MeshStandardMaterial,
   type Object3D,
   Quaternion,
@@ -13,6 +14,8 @@ import {
 } from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import { useGuild } from "../guild/useGuild.ts"
+import { isWebGPU } from "../render/backend.ts"
+import { bakeStatic } from "../render/bake.ts"
 import { LANDS_URL } from "../world/cast.ts"
 import { HEX_SCALE, type LandPiece, type LandPlacement, SITES, yardBuilding } from "../world/lands.ts"
 import { useWorld, useWorldReady } from "../world/source.ts"
@@ -27,7 +30,8 @@ useGLTF.preload(LANDS_URL)
  * The island round the keep (ADR 0006, 0007). About 650 tiles and pieces of ~130 kinds, drawn as a
  * handful of BatchedMeshes: one per material × shadow role, each a single multi-draw call with
  * per-instance frustum culling (docs/perf-budget.md). Tiles and low clutter don't cast shadows;
- * only pieces tall enough to throw a readable one do.
+ * only pieces tall enough to throw a readable one do. On WebGPU (no multi-draw: a BatchedMesh
+ * there is a call per instance) each batch is one merged mesh instead (render/bake.ts).
  *
  * It draws the scene's world (world/source.ts): the hand-drawn lands, or a repo's island while one
  * loads it suspends, holding the whole world's Suspense with it.
@@ -38,12 +42,13 @@ export function Island() {
   const { progress } = useGuild()
   const world = useWorld()
   const land = world.island
+  const webgpu = isWebGPU(useThree((state) => state.gl))
   useMemo(() => soften(nodes), [nodes])
   // The batches are this mount's own (scene/owned.ts: freed on unmount, StrictMode-safe); their
   // materials are the land pack's.
   const built = useOwnedMeshes(
-    () => ({ meshes: batch(nodes, [...land.tiles, ...land.decor]) }),
-    [nodes, land],
+    () => ({ meshes: batch(nodes, [...land.tiles, ...land.decor], webgpu) }),
+    [nodes, land, webgpu],
     "materials",
   )
   const building = yardBuilding(progress)
@@ -123,9 +128,14 @@ function parts(source: Object3D): Map<Material, BufferGeometry> {
 
 /**
  * Every placement, grouped by material and by whether it casts a shadow; each group is one
- * BatchedMesh holding each piece's geometry once and one instance per placement.
+ * BatchedMesh holding each piece's geometry once and one instance per placement — or, for
+ * WebGPU (`merge`), one mesh with every placement baked in.
  */
-function batch(nodes: Record<string, Object3D>, placements: readonly LandPlacement[]): BatchedMesh[] {
+function batch(
+  nodes: Record<string, Object3D>,
+  placements: readonly LandPlacement[],
+  merge: boolean,
+): Mesh[] {
   const pieces = new Map<LandPiece, Map<Material, BufferGeometry>>()
   interface Group {
     material: Material
@@ -157,8 +167,27 @@ function batch(nodes: Record<string, Object3D>, placements: readonly LandPlaceme
   const rotation = new Quaternion()
   const scale = new Vector3()
   const up = new Vector3(0, 1, 0)
-  const out: BatchedMesh[] = []
+  const place = (placement: LandPlacement) => {
+    position.set(placement.x, placement.y ?? 0, placement.z)
+    rotation.setFromAxisAngle(up, placement.rot ?? 0)
+    scale.setScalar(HEX_SCALE * (placement.scale ?? 1))
+    return matrix.compose(position, rotation, scale)
+  }
+  const out: Mesh[] = []
   for (const group of groups.values()) {
+    if (merge) {
+      const placed = group.instances.map(({ geometry, placement }) => ({
+        geometry,
+        matrix: place(placement).clone(),
+      }))
+      const merged = bakeStatic(placed)
+      if (!merged) continue
+      const mesh = new Mesh(merged, group.material)
+      mesh.castShadow = group.cast
+      mesh.receiveShadow = true
+      out.push(mesh)
+      continue
+    }
     let vertices = 0
     let indices = 0
     for (const geometry of group.geometries.keys()) {
@@ -169,10 +198,7 @@ function batch(nodes: Record<string, Object3D>, placements: readonly LandPlaceme
     for (const geometry of group.geometries.keys()) group.geometries.set(geometry, mesh.addGeometry(geometry))
     for (const { geometry, placement } of group.instances) {
       const id = mesh.addInstance(group.geometries.get(geometry) ?? 0)
-      position.set(placement.x, placement.y ?? 0, placement.z)
-      rotation.setFromAxisAngle(up, placement.rot ?? 0)
-      scale.setScalar(HEX_SCALE * (placement.scale ?? 1))
-      mesh.setMatrixAt(id, matrix.compose(position, rotation, scale))
+      mesh.setMatrixAt(id, place(placement))
     }
     // Opaque and depth-tested: sorting would only cost CPU every frame. Culling stays on.
     mesh.sortObjects = false

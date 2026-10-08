@@ -8,8 +8,11 @@ import {
   NoToneMapping,
   SRGBColorSpace,
   type Uniform,
+  Vector2,
 } from "three"
 import { bloom } from "three/addons/tsl/display/BloomNode.js"
+import { depthAwareBlur } from "three/addons/tsl/display/depthAwareBlur.js"
+import { ao } from "three/addons/tsl/display/GTAONode.js"
 import { lut3D } from "three/addons/tsl/display/Lut3DNode.js"
 import { smaa } from "three/addons/tsl/display/SMAANode.js"
 import {
@@ -48,6 +51,7 @@ import {
   vec4,
 } from "three/tsl"
 import { type Node, RenderPipeline, type TextureNode, type WebGPURenderer } from "three/webgpu"
+import { PROBE } from "../../guild/mode.ts"
 import { reducedMotion } from "../../guild/opening.ts"
 import { TIERS } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
@@ -82,7 +86,9 @@ const VIGNETTE_OFFSET = 0.3
  * effect reads the renderer's `toneMappingExposure`, which Atmosphere.tsx sets to `sky.exposure`
  * under post.
  *
- * Not drawn here yet: the ambient occlusion (N8AO, High and up on WebGL).
+ * Ambient occlusion first, on the tiers that have it (`TIERS.ao`), as N8AO leads the WebGL
+ * composer: three's GTAO node from the scene pass's depth (normals rebuilt from it, as N8AO does),
+ * blurred depth-aware, then laid over the frame as N8AO lays its own (`aoOver`).
  *
  * Like the composer, it draws the frame (FRAME.RENDER) on the tiers with post; Low draws in FrameStats.
  */
@@ -109,13 +115,16 @@ export function PostGPU() {
       exposure: uniform(1),
       darkness: uniform(0.3),
       lut: uniform(0),
+      fog: uniform(new Vector2(1e4, 2e4)),
     }
     const scenePass = pass(scene, camera)
     const color = scenePass.getTextureNode("output")
     const depth = scenePass.getTextureNode("depth")
-    const glow = bloom(color, 0.6, 0.5, 1)
+    const occlusion = level.ao === "off" ? null : aoOver(depth, camera, level.ao === "half", u.fog)
+    const shaded = occlusion ? vec4(color.rgb.mul(occlusion.factor), 1) : color
+    const glow = bloom(shaded, 0.6, 0.5, 1)
     glow.smoothWidth.value = 0.25
-    const lit = screenBlend(color.rgb, glow.rgb)
+    const lit = screenBlend(shaded.rgb, glow.rgb)
     const looksOn = { outlines: looks.outlines, mist: looks.mist }
     const graded = grade(lit, depth, gradeNodes(gradeLevers, camera), looksOn)
     const mapped = (toneMapping(NeutralToneMapping, u.exposure, graded) as unknown as Node<"vec4">).rgb
@@ -128,10 +137,20 @@ export function PostGPU() {
     const display = renderOutput(vec4(vignetted, 1), NoToneMapping, SRGBColorSpace)
     const pipeline = new RenderPipeline(gl, smaa(display))
     pipeline.outputColorTransform = false
-    return { pipeline, glow, u }
-  }, [gl, scene, camera, lut, gradeLevers, level.tiltShift, looks.outlines, looks.mist])
+    return { pipeline, glow, occlusion, u }
+  }, [gl, scene, camera, lut, gradeLevers, level.tiltShift, level.ao, looks.outlines, looks.mist])
 
-  useEffect(() => () => chain.pipeline.dispose(), [chain])
+  useEffect(() => {
+    // Probe hook, as on WebGL (Post.tsx): `postLook.grade.still = true` freezes the clouds; `ao` is the GTAO node.
+    if (PROBE) Object.assign(window, { postLook: { grade: gradeLevers, lut, ao: chain.occlusion?.node } })
+  }, [chain, gradeLevers, lut])
+  useEffect(
+    () => () => {
+      chain.pipeline.dispose()
+      chain.occlusion?.dispose()
+    },
+    [chain],
+  )
 
   useFrame((_, delta) => {
     if (!level.post) return
@@ -139,6 +158,7 @@ export function PostGPU() {
     const fog = scene.fog as Fog | null
     radii.near = fog?.near ?? 1e4
     radii.far = fog?.far ?? 2e4
+    u.fog.value.set(radii.near, radii.far)
     gradeLevers.apply(sky, camera, delta, radii, gl.getPixelRatio())
     u.exposure.value = sky.exposure
     u.darkness.value = sky.vignette
@@ -151,6 +171,50 @@ export function PostGPU() {
   }, FRAME.RENDER)
 
   return null
+}
+
+/**
+ * N8AO as Post.tsx sets it, in GTAO's terms: the same reach (N8AO's `aoRadius` 2.4) and sample
+ * counts; GTAO's `scale` is the exponent on the visibility, as N8AO's `intensity` is, but GTAO's
+ * visibility is far lighter, so it takes a larger one. Tuned side by side against the WebGL composer
+ * on the keep and the yard at noon on Ultra (.probe/gpucmp/aosweep.ts): the frame's brightness
+ * matched, and the contact shadows under furniture, posts and people. N8AO's dark rims round
+ * silhouettes (its halo) GTAO does not draw: those stay lighter.
+ */
+const AO = {
+  half: { radius: 2.4, thickness: 3, scale: 5, samples: 8 },
+  full: { radius: 2.4, thickness: 3, scale: 5.9, samples: 12 },
+}
+
+/**
+ * The ambient occlusion, as a factor to multiply the frame by: GTAO from `depth` (at half size on
+ * "half"), two depth-aware blur passes (N8AO's denoise), faded out with distance into the fog
+ * (N8AO's own fog fade: the fog's planar near → far). `fog` holds the fog's near and far.
+ */
+function aoOver(depth: TextureNode, camera: Camera, half: boolean, fog: Node<"vec2">) {
+  const look = half ? AO.half : AO.full
+  // No normals pass: GTAO rebuilds them from depth (`null`).
+  const gtao = ao(depth, null as unknown as Node, camera)
+  gtao.resolutionScale = half ? 0.5 : 1
+  gtao.radius.value = look.radius
+  gtao.thickness.value = look.thickness
+  gtao.scale.value = look.scale
+  gtao.samples.value = look.samples
+  const raw = gtao.getTextureNode()
+  const step = vec2(half ? 4 : 2).div(screenSize)
+  const across = convertToTexture(depthAwareBlur(raw, depth, vec2(step.x, 0), camera, 2, look.radius))
+  const blurred = convertToTexture(depthAwareBlur(across, depth, vec2(0, step.y), camera, 2, look.radius))
+  const near = reference("near", "float", camera) as F
+  const far = reference("far", "float", camera) as F
+  const distance = (perspectiveDepthToViewZ(depth.sample(screenUV).x, near, far) as unknown as F).negate()
+  const factor = mix(blurred.sample(screenUV).x as unknown as F, float(1), smoothstep(fog.x, fog.y, distance))
+  return {
+    factor,
+    node: gtao,
+    dispose() {
+      gtao.dispose()
+    },
+  }
 }
 
 /** pmndrs' SCREEN blend, as its Bloom effect lays the glow over the frame. */
@@ -371,7 +435,8 @@ function tiltShift(frame: TextureNode): Node<"vec3"> {
     const radius = smoothstep(0, 1, abs(screenUV.x.sub(0.5).mul(screenSize.x)).div(gradientRadius)).mul(
       blurRadius,
     )
-    const step = normalize(vec2(1, 1)).div(screenSize).mul(radius)
+    // pmndrs' direction (1, 1) is in GL's uv, y up; screenUV runs y down, so the same diagonal is (1, -1).
+    const step = normalize(vec2(1, -1)).div(screenSize).mul(radius)
     const half = TILT.samples / 2
     let sum: Node<"vec3"> = vec3(0)
     let total: Node<"float"> = float(0)

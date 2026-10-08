@@ -8,6 +8,7 @@ import {
   type InstancedMesh,
   type Material,
   type Mesh,
+  Mesh as MeshClass,
   MeshStandardMaterial,
   PerspectiveCamera,
   Scene,
@@ -142,5 +143,25 @@ describe("the wilds' sway as a node material", () => {
     const { vertex } = shaders(wilds() as unknown as Mesh)
     expect(vertex).toContain("aSway")
     expect(vertex).toContain("sin(")
+  })
+
+  /** Wilds.tsx on WebGPU: the batch merged into one mesh, each vertex with its root and height. */
+  function merged(root: boolean): Mesh {
+    const piece = triangle()
+    piece.setAttribute("aSway", new Float32BufferAttribute([0.5, 0.5, 0.5], 1))
+    if (root) piece.setAttribute("aRoot", new Float32BufferAttribute([4, 2, 0, 4, 2, 0, 4, 2, 1], 3))
+    return new MeshClass(piece, wildsNodeMaterial(new MeshStandardMaterial()))
+  }
+
+  test("sways a merged mesh too, from its per-vertex roots (aRoot) instead of a batch's matrices", () => {
+    const { vertex } = shaders(merged(true))
+    expect(vertex).toContain("aRoot")
+    expect(vertex).toContain("aSway")
+    expect(vertex).toContain("sin(")
+  })
+
+  test("leaves a plain mesh (no batch, no roots) unbent", () => {
+    const { vertex } = shaders(merged(false))
+    expect(vertex).not.toContain("aSway")
   })
 })

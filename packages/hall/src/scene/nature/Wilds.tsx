@@ -7,7 +7,7 @@ import {
   Float32BufferAttribute,
   type Material,
   Matrix4,
-  type Mesh,
+  Mesh,
   type MeshStandardMaterial,
   type Object3D,
   Quaternion,
@@ -17,6 +17,7 @@ import {
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import type { Tier } from "../../guild/quality.ts"
 import { isWebGPU } from "../../render/backend.ts"
+import { bakeStatic, type Placed } from "../../render/bake.ts"
 import type { Spot } from "../../world/layout.ts"
 import { useWorld } from "../../world/source.ts"
 import { type Wild, type WildKind, type WildPiece, wilds, wildsOf } from "../../world/wilds.ts"
@@ -39,6 +40,8 @@ useGLTF.preload(FOREST_URL)
  * BatchedMeshes — what casts a shadow (trees, big bushes and rocks: static, so they join the
  * on-demand shadow map) and the low fill that doesn't — two draw calls, plus one in a shadow redraw.
  * Plants sway in the vertex shader with the wind; rocks don't. Low quality keeps only the big pieces.
+ * On WebGPU (no multi-draw: a BatchedMesh there is a call per instance) each batch is one merged
+ * mesh instead, every vertex carrying its instance's root and its own height (`aRoot`) for the sway.
  *
  * The sway is GLSL (onBeforeCompile) by default; on WebGPU, always, and on WebGL with `?tsl=1`
  * (scene/tsl.ts), the material is a node material swaying the same way (grassNodes.ts); it
@@ -72,14 +75,15 @@ export function Wilds({ tier }: { tier: Tier }) {
   const { nodes } = useGLTF(FOREST_URL) as unknown as { nodes: Record<string, Object3D> }
   const all = wildsFor(useWorld())
   const gl = useThree((state) => state.gl)
-  const sway = isWebGPU(gl) || TSL ? use(nodeSway(gl)) : glslSway
+  const webgpu = isWebGPU(gl)
+  const sway = webgpu || TSL ? use(nodeSway(gl)) : glslSway
   // Material and batches are this mount's own (scene/owned.ts); the pack's texture is borrowed.
   const built = useOwnedMeshes(
     () => {
       const list = all.filter((w) => w.detail <= DETAIL[tier])
-      return { meshes: build(nodes, () => swayMaterial(nodes, sway), list) }
+      return { meshes: build(nodes, () => swayMaterial(nodes, sway), list, webgpu) }
     },
-    [nodes, tier, all, sway],
+    [nodes, tier, all, sway, webgpu],
     "textures",
   )
 
@@ -180,12 +184,13 @@ function geometryOf(source: Object3D, sway: number): BufferGeometry | null {
 /** Trees, and bushes and rocks big enough to throw a readable shadow. */
 const casts = (wild: Wild): boolean => wild.kind === "tree" || (wild.kind !== "grass" && wild.detail === 0)
 
-/** The wilds as two BatchedMeshes: shadow casters, and the low fill. */
+/** The wilds as two BatchedMeshes (or, to `merge`, two merged meshes): shadow casters, and the low fill. */
 function build(
   nodes: Record<string, Object3D>,
   material: () => Material | null,
   list: readonly Wild[],
-): BatchedMesh[] {
+  merge: boolean,
+): Mesh[] {
   const geometries = new Map<WildPiece, BufferGeometry | null>()
   const geometry = (wild: Wild) => {
     if (!geometries.has(wild.piece)) {
@@ -200,7 +205,13 @@ function build(
   const rotation = new Quaternion()
   const scale = new Vector3()
   const up = new Vector3(0, 1, 0)
-  const out: BatchedMesh[] = []
+  const place = (wild: Wild) => {
+    position.set(wild.x, wild.y, wild.z)
+    rotation.setFromAxisAngle(up, wild.rot)
+    scale.setScalar(wild.scale)
+    return matrix.compose(position, rotation, scale)
+  }
+  const out: Mesh[] = []
   for (const cast of [true, false]) {
     const group = list.filter((wild) => casts(wild) === cast && geometry(wild))
     if (group.length === 0) continue
@@ -216,16 +227,28 @@ function build(
     // and on WebGL's nodes handler a second batch would read the first's. GLSL shares the program.
     const own = material()
     if (!own) break
+    const name = cast ? "nature-wilds" : "nature-wilds-fill"
+    if (merge) {
+      const placed = group.map((wild) => ({
+        geometry: geometry(wild) as BufferGeometry,
+        matrix: place(wild).clone(),
+      }))
+      const merged = bakeStatic(placed, rooted)
+      if (!merged) continue
+      const mesh = new Mesh(merged, own)
+      mesh.name = name
+      mesh.castShadow = cast
+      mesh.receiveShadow = true
+      out.push(mesh)
+      continue
+    }
     const mesh = new BatchedMesh(group.length, vertices, indices, own)
     for (const g of used.keys()) used.set(g, mesh.addGeometry(g))
     for (const wild of group) {
       const id = mesh.addInstance(used.get(geometry(wild) as BufferGeometry) ?? 0)
-      position.set(wild.x, wild.y, wild.z)
-      rotation.setFromAxisAngle(up, wild.rot)
-      scale.setScalar(wild.scale)
-      mesh.setMatrixAt(id, matrix.compose(position, rotation, scale))
+      mesh.setMatrixAt(id, place(wild))
     }
-    mesh.name = cast ? "nature-wilds" : "nature-wilds-fill"
+    mesh.name = name
     // Opaque and depth-tested: sorting would only cost CPU every frame. Culling stays on.
     mesh.sortObjects = false
     mesh.castShadow = cast
@@ -235,4 +258,21 @@ function build(
   }
   for (const g of geometries.values()) g?.dispose()
   return out
+}
+
+/**
+ * A baked copy's sway inputs, per vertex (grassNodes.ts reads them on a merged mesh): `aRoot` is
+ * its instance's place (x, z) and the vertex's height in the piece's own space (before its scale) —
+ * what a batched vertex gets from the batch's matrix and its own geometry.
+ */
+function rooted(copy: BufferGeometry, at: Placed): void {
+  const e = at.matrix.elements
+  const local = at.geometry.getAttribute("position")
+  const root = new Float32Array(local.count * 3)
+  for (let i = 0; i < local.count; i++) {
+    root[i * 3] = e[12] ?? 0
+    root[i * 3 + 1] = e[14] ?? 0
+    root[i * 3 + 2] = local.getY(i)
+  }
+  copy.setAttribute("aRoot", new Float32BufferAttribute(root, 3))
 }

@@ -44,6 +44,7 @@ import {
   FF_CALM_BELOW,
   fastForwardGoal,
   MIN_SHOT_MS,
+  type Place,
 } from "./director.ts"
 import {
   DEFAULT_SETTINGS,
@@ -525,6 +526,24 @@ export class GuildStore {
 
   setView(view: "diorama" | "explore"): void {
     this.view = view
+    this.emit()
+  }
+
+  /**
+   * A framing asked for (a deep link's `look`, guild/deeplink.ts): scene/CameraRig.tsx puts the
+   * camera on it once, the next frame, then it is the viewer's again. `n` tells a new ask from the
+   * last one. The Bard lets go: it would fly straight off again.
+   */
+  framing: (Place & { n: number }) | null = null
+  /**
+   * Run time the story starts from when the showcase's reveal begins (scene/OpeningCue.tsx): 0, or
+   * a deep link's `t` / `act`, so a shared moment survives the opening.
+   */
+  startAt = 0
+  private framings = 0
+  frame(place: Place | null): void {
+    this.framing = place ? { ...place, n: ++this.framings } : null
+    if (place) this.bard = false
     this.emit()
   }
 

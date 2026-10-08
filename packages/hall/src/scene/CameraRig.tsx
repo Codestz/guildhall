@@ -107,6 +107,8 @@ export function CameraRig() {
   const revealed = useRef(0)
   const keys = useRef(new Set<string>())
   const following = useRef<string | null>(null)
+  /** The last framing put on screen (store.framing `n`). */
+  const framed = useRef(0)
   /** prefers-reduced-motion, kept current without asking every frame. */
   const still = useRef(reducedMotion())
   useEffect(() => {
@@ -252,6 +254,12 @@ export function CameraRig() {
     const camera = control.object as Ortho | Persp
     const isOrtho = (camera as Ortho).isOrthographicCamera === true
 
+    // A deep link's `look` skips the sweep below (once the showcase's title card is down): it cuts
+    // straight to its framing (1b).
+    if (revealed.current < 1 && store.framing && (!SHOWCASE || opening.get().stage !== "card")) {
+      revealed.current = 1
+      if (SHOWCASE) opening.land()
+    }
     // 1. The dollhouse reveal, once. The showcase holds it until the world has loaded (the title
     //    card is up), cuts straight to the end for reduced motion, and lands the opening.
     if (revealed.current < 1) {
@@ -274,6 +282,24 @@ export function CameraRig() {
       control.update()
       if (SHOWCASE && revealed.current >= 1) opening.land()
       return
+    }
+
+    // 1b. A framing asked for (a deep link's `look`): put the camera on it at once, from the
+    //     isometric side (Explore: a three-quarter angle), sized to hold its radius. Once, on the
+    //     camera of the view asked for (a link may switch views in the same breath).
+    const framing = store.framing
+    if (framing && framing.n !== framed.current && isOrtho === (store.view === "diorama")) {
+      framed.current = framing.n
+      const radius = framing.radius ?? 4
+      control.target.set(framing.x, 1 + (framing.y ?? 0), framing.z)
+      if (isOrtho) {
+        camera.position.copy(control.target).addScaledVector(ISO_DIR, 220)
+        ;(camera as Ortho).zoom = Math.min(fit * 8, Math.max(widest, (size.width * 0.6) / (radius * 2.4)))
+      } else {
+        const d = Math.max(CLOSE, radius * 2.6)
+        camera.position.copy(control.target).addScaledVector(scratch.dir.set(1, 0.62, 1).normalize(), d)
+      }
+      camera.updateProjectionMatrix()
     }
 
     // 2. Your keys.

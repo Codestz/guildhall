@@ -1,0 +1,178 @@
+import { describe, expect, test } from "bun:test"
+import { applyDeepLink, type Hall, lookOf, parseDeepLink, pick } from "../src/guild/deeplink.ts"
+import { GuildStore } from "../src/guild/store.ts"
+import { SITES } from "../src/world/lands.ts"
+
+const parse = (search: string, probe = false) => parseDeepLink(search, probe)
+
+describe("deep links: parsing", () => {
+  test("a full link reads every param", () => {
+    const { link, ignored } = parse(
+      "?story=saga&t=11:53&hour=23&weather=storm&quality=2&hud=hidden&bard=0&view=explore&select=Implementer II&look=quarry&paused=1",
+    )
+    expect(ignored).toEqual([])
+    expect(link).toMatchObject({
+      story: "saga",
+      t: (11 * 60 + 53) * 1000,
+      hour: 23,
+      weather: "storm",
+      quality: 2,
+      hud: "hidden",
+      bard: false,
+      view: "explore",
+      select: "Implementer II",
+      paused: true,
+    })
+    expect(link.look).toMatchObject({ x: SITES.quarry.at[0], z: SITES.quarry.at[1] })
+  })
+
+  test("an empty search is an empty link", () => {
+    expect(parse("")).toEqual({ link: {}, ignored: [] })
+  })
+
+  test("invalid values are ignored and reported, valid ones beside them kept", () => {
+    const { link, ignored } = parse(
+      "story=epic&t=1:75&hour=25&weather=fog&quality=4&hud=full&bard=yes&paused=2&look=atlantis&view=top&select=<b>",
+    )
+    expect(link).toEqual({})
+    expect(ignored).toHaveLength(11)
+  })
+
+  test("boundaries: hour 0 and 24 and decimals; t 0:00 and 999:59; quality 0 and 3", () => {
+    expect(parse("hour=0").link.hour).toBe(0)
+    expect(parse("hour=24").link.hour).toBe(24)
+    expect(parse("hour=18.6").link.hour).toBe(18.6)
+    expect(parse("hour=24.5").link.hour).toBeUndefined()
+    expect(parse("hour=-1").link.hour).toBeUndefined()
+    expect(parse("t=0:00").link.t).toBe(0)
+    expect(parse("t=999:59").link.t).toBe((999 * 60 + 59) * 1000)
+    expect(parse("t=12").link.t).toBeUndefined()
+    expect(parse("quality=0").link.quality).toBe(0)
+    expect(parse("quality=3").link.quality).toBe(3)
+    expect(parse("quality=1.5").link.quality).toBeUndefined()
+  })
+
+  test("hud=off is hidden", () => {
+    expect(parse("hud=off").link.hud).toBe("hidden")
+  })
+
+  test("act implies the Saga; with another story it is dropped", () => {
+    expect(parse("act=3").link).toEqual({ act: 3, story: "saga" })
+    const other = parse("story=party&act=2")
+    expect(other.link).toEqual({ story: "party" })
+    expect(other.ignored).toEqual(["act=2"])
+    expect(parse("act=6").link.act).toBeUndefined()
+    expect(parse("act=0").link.act).toBeUndefined()
+  })
+
+  test("event is honoured only in dev and probe builds", () => {
+    expect(parse("event=dragon", true).link.event).toBe("dragon")
+    const shipped = parse("event=dragon", false)
+    expect(shipped.link.event).toBeUndefined()
+    expect(shipped.ignored).toEqual(["event=dragon"])
+    expect(parse("event=kraken", true).link.event).toBeUndefined()
+  })
+
+  test("other features' params are neither read nor reported", () => {
+    expect(parse("live&showcase&lab=prop&piece=axe&grips")).toEqual({ link: {}, ignored: [] })
+  })
+})
+
+describe("deep links: look", () => {
+  test("every job site, the graveyard, the keep and the named landmarks resolve", () => {
+    for (const id of Object.keys(SITES)) expect(lookOf(id)).toBeDefined()
+    for (const name of ["graveyard", "keep", "island", "square", "windmill", "watermill", "well", "dock"])
+      expect(lookOf(name)).toBeDefined()
+  })
+
+  test("names are case-insensitive; x,z points within the sea", () => {
+    expect(lookOf("Quarry")).toMatchObject({ x: SITES.quarry.at[0] })
+    expect(lookOf("12.5,-40")).toMatchObject({ x: 12.5, z: -40 })
+    expect(lookOf("201,0")).toBeUndefined()
+    expect(lookOf("1,2,3")).toBeUndefined()
+    expect(lookOf("x,z")).toBeUndefined()
+  })
+})
+
+describe("deep links: applying", () => {
+  function hallOf(store = new GuildStore()) {
+    const levers = { quality: [] as number[], hud: [] as string[], forced: [] as string[] }
+    const hall: Hall = {
+      store,
+      quality: (tier) => levers.quality.push(tier),
+      hud: (mode) => levers.hud.push(mode),
+      force: (kind) => levers.forced.push(kind),
+    }
+    return { store, hall, levers }
+  }
+
+  test("story, seek, clock, weather, levers and framing land on the store", () => {
+    const { store, hall, levers } = hallOf()
+    const { link } = parse(
+      "story=saga&t=2:00&hour=23&weather=snow&quality=1&hud=hidden&paused=1&look=tower",
+      true,
+    )
+    expect(applyDeepLink(link, hall)).toEqual([])
+    expect(store.scenario).toBe("saga")
+    expect(store.time).toBe(120_000)
+    // …and the showcase's reveal starts the story there, not at 0 (scene/OpeningCue.tsx).
+    expect(store.startAt).toBe(120_000)
+    expect(store.environmentSettings).toMatchObject({ time: "fixed", hour: 23, weather: "snow" })
+    expect(store.speed).toBe(0)
+    expect(store.framing).toMatchObject({ x: SITES.tower.at[0], z: SITES.tower.at[1] })
+    expect(store.bard).toBe(false)
+    expect(levers).toEqual({ quality: [1], hud: ["hidden"], forced: [] })
+  })
+
+  test("act seeks to the chapter, t counting from its start", () => {
+    const { store, hall } = hallOf()
+    applyDeepLink(parse("act=3&t=0:10").link, hall)
+    const third = store.chapters[2]
+    expect(third).toBeDefined()
+    expect(store.time).toBe((third?.at ?? 0) + 10_000)
+  })
+
+  test("an explicit bard=1 wins over a look's hand-off", () => {
+    const { store, hall } = hallOf()
+    applyDeepLink(parse("look=quarry&bard=1").link, hall)
+    expect(store.bard).toBe(true)
+  })
+
+  test("event goes to the hall's force lever", () => {
+    const { hall, levers } = hallOf()
+    applyDeepLink(parse("event=festival", true).link, hall)
+    expect(levers.forced).toEqual(["festival"])
+  })
+
+  test("select picks someone on stage by title", () => {
+    const { store, hall } = hallOf()
+    applyDeepLink(parse("story=rush&t=0:30").link, hall)
+    const someone = store.views[0]
+    expect(someone).toBeDefined()
+    applyDeepLink({ select: someone?.title.toUpperCase() ?? "" }, hall)
+    expect(store.selected).toBe(someone?.id ?? "")
+  })
+
+  test("select of someone not yet on stage waits for them, and says so", () => {
+    const { store, hall } = hallOf()
+    applyDeepLink(parse("story=rush").link, hall)
+    const problems = applyDeepLink({ select: "nobody-by-this-name" }, hall)
+    expect(problems[0]).toContain("waiting")
+    expect(store.selected).toBeNull()
+  })
+})
+
+describe("deep links: pick", () => {
+  const views = [
+    { id: "ses_a", title: "Implementer" },
+    { id: "ses_b", title: "Implementer II" },
+    { id: "ses_c", title: "Verifier" },
+  ]
+  test("by id, then exact title, then title prefix", () => {
+    expect(pick(views, "ses_c")).toBe("ses_c")
+    expect(pick(views, "implementer ii")).toBe("ses_b")
+    expect(pick(views, "Implementer")).toBe("ses_a")
+    expect(pick(views, "Veri")).toBe("ses_c")
+    expect(pick(views, "Bard")).toBeUndefined()
+  })
+})

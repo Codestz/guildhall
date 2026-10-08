@@ -77,8 +77,9 @@ export function OpeningCue() {
 
 function begin(store: ReturnType<typeof useGuildStore>): void {
   if (opening.get().stage !== "card") return
-  // Start the story with the reveal, not somewhere in the middle of the loading.
-  if (store.mode === "sim") store.seek(0)
+  // Start the story with the reveal, not somewhere in the middle of the loading (at its start, or
+  // where a deep link asked: GuildStore.startAt).
+  if (store.mode === "sim") store.seek(store.startAt)
   performance.mark("opening:reveal")
   opening.begin()
 }

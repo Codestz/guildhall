@@ -14,7 +14,9 @@ import {
 } from "three"
 import { useGuild } from "../../guild/useGuild.ts"
 import { FURNITURE, NORMALS, type Piece, type Side, WALL_DECOR } from "../../world/furniture.ts"
-import { GLOWS } from "../../world/lights.ts"
+import { glowsOf } from "../../world/lights.ts"
+import { useWorld } from "../../world/source.ts"
+import type { World } from "../../world/world.ts"
 import { useOwnedMeshes } from "../owned.ts"
 import type { SkyState } from "./sky.ts"
 
@@ -42,9 +44,10 @@ const FLAMES: Partial<Record<Piece, { up: number; out: number; size: number }>> 
   candle_triple: { up: 0.85, out: 0, size: 1.9 },
 }
 
-function lamps(): Lamp[] {
+function lamps(world: World): Lamp[] {
   const out: Lamp[] = []
-  for (const placement of [...FURNITURE, ...WALL_DECOR]) {
+  // The keep's own (the hand map's: a repo's island has no keep).
+  for (const placement of world.kind === "hand" ? [...FURNITURE, ...WALL_DECOR] : []) {
     const flame = FLAMES[placement.piece]
     if (!flame) continue
     const rot = placement.rot ?? 0
@@ -58,7 +61,7 @@ function lamps(): Lamp[] {
     })
   }
   // The island's street torches and lanterns, and the graveyard's (world/lights.ts GLOWS).
-  for (const light of GLOWS) {
+  for (const light of glowsOf(world)) {
     out.push({
       x: light.flame[0],
       y: light.flame[1],
@@ -72,7 +75,8 @@ function lamps(): Lamp[] {
 
 export function Lamps({ sky }: { sky: SkyState }) {
   const { mood } = useGuild()
-  const list = useMemo(lamps, [])
+  const world = useWorld()
+  const list = useMemo(() => lamps(world), [world])
   const fade = useRef(list.map(() => 1))
   const fire = useMemo(() => new Color(), [])
   const built = useOwnedMeshes(() => ({ meshes: [halos(list.length)] }), [list])

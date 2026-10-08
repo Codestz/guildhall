@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import { type DirectionalLight, Fog, type HemisphereLight, Vector3 } from "three"
 import { TIERS } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
-import { island } from "../../world/lands.ts"
+import { useWorld } from "../../world/source.ts"
 import { FRAME } from "../frame.ts"
 import { useTier } from "../Quality.tsx"
 import { flash, stepLightning } from "./flash.ts"
@@ -47,11 +47,12 @@ function Weathervane() {
   const lastStrike = useRef(-1)
   const post = TIERS[useTier()].post
   /** Fog radii follow the island: the coast starts to fade, the hex sea is gone by the far radius. */
+  const { tiles } = useWorld().island
   const sea = useMemo(() => {
     let radius = 0
-    for (const tile of island().tiles) radius = Math.max(radius, Math.hypot(tile.x, tile.z))
+    for (const tile of tiles) radius = Math.max(radius, Math.hypot(tile.x, tile.z))
     return radius || 110
-  }, [])
+  }, [tiles])
   const fog = useMemo(() => new Fog("#c6d9ea", sea, sea * 1.4), [sea])
 
   // One tone mapping everywhere: Neutral keeps KayKit's flat colours true while rolling off the

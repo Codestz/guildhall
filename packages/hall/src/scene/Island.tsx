@@ -14,7 +14,8 @@ import {
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import { useGuild } from "../guild/useGuild.ts"
 import { LANDS_URL } from "../world/cast.ts"
-import { HEX_SCALE, island, type LandPiece, type LandPlacement, SITES, yardBuilding } from "../world/lands.ts"
+import { HEX_SCALE, type LandPiece, type LandPlacement, SITES, yardBuilding } from "../world/lands.ts"
+import { useWorld, useWorldReady } from "../world/source.ts"
 import { plain } from "./Kit.tsx"
 import { isMovingPart } from "./life/moving.ts"
 import { useOwnedMeshes } from "./owned.ts"
@@ -27,11 +28,16 @@ useGLTF.preload(LANDS_URL)
  * handful of BatchedMeshes: one per material × shadow role, each a single multi-draw call with
  * per-instance frustum culling (docs/perf-budget.md). Tiles and low clutter don't cast shadows;
  * only pieces tall enough to throw a readable one do.
+ *
+ * It draws the scene's world (world/source.ts): the hand-drawn lands, or a repo's island while one
+ * loads it suspends, holding the whole world's Suspense with it.
  */
 export function Island() {
+  useWorldReady()
   const { nodes } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
   const { progress } = useGuild()
-  const land = useMemo(() => island(), [])
+  const world = useWorld()
+  const land = world.island
   useMemo(() => soften(nodes), [nodes])
   // The batches are this mount's own (scene/owned.ts: freed on unmount, StrictMode-safe); their
   // materials are the land pack's.
@@ -48,7 +54,7 @@ export function Island() {
       {built?.meshes.map((mesh) => (
         <primitive key={mesh.uuid} object={mesh} />
       ))}
-      <YardBuilding nodes={nodes} piece={building} at={yard} />
+      {world.kind === "hand" && <YardBuilding nodes={nodes} piece={building} at={yard} />}
     </group>
   )
 }

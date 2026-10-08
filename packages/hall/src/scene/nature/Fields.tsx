@@ -1,5 +1,7 @@
 import { BoxGeometry, InstancedMesh, Matrix4, MeshStandardMaterial, Quaternion, Vector3 } from "three"
-import { plant, RIDGE_HEIGHT, SOIL } from "../../world/fields.ts"
+import { type Plantings, plant, RIDGE_HEIGHT, SOIL } from "../../world/fields.ts"
+import { useWorld } from "../../world/source.ts"
+import type { World } from "../../world/world.ts"
 import { mergePlacements, useKit } from "../Kit.tsx"
 import { useOwnedMeshes } from "../owned.ts"
 
@@ -8,23 +10,32 @@ import { useOwnedMeshes } from "../owned.ts"
  * nothing on a plot that's resting. Draw calls: ridges 1, crops 1 (merged, simplified to 30% in
  * scripts/assets.ts). Nothing here casts into the static shadow map: it's all low.
  */
-const PLANTED = plant()
+const plots = new WeakMap<World, Plantings>()
+function plantingsOf(world: World): Plantings {
+  let known = plots.get(world)
+  if (!known) {
+    known = plant(world.island.fields)
+    plots.set(world, known)
+  }
+  return known
+}
 
 export function Fields() {
+  const plantings = plantingsOf(useWorld())
   return (
     <group name="fields">
-      <Ridges />
-      <Crops />
+      <Ridges planted={plantings} />
+      <Crops planted={plantings} />
     </group>
   )
 }
 
-function Ridges() {
+function Ridges({ planted }: { planted: Plantings }) {
   const built = useOwnedMeshes(() => {
     const geometry = new BoxGeometry(1, 1, 1).translate(0, 0.5, 0)
     const material = new MeshStandardMaterial({ color: "#6e4a2c", roughness: 1, flatShading: true })
-    const mesh = new InstancedMesh(geometry, material, PLANTED.ridges.length)
-    PLANTED.ridges.forEach((r, i) => {
+    const mesh = new InstancedMesh(geometry, material, planted.ridges.length)
+    planted.ridges.forEach((r, i) => {
       rotation.setFromAxisAngle(UP, r.rot)
       mesh.setMatrixAt(
         i,
@@ -38,24 +49,24 @@ function Ridges() {
     mesh.receiveShadow = true
     mesh.computeBoundingSphere()
     return { meshes: [mesh] }
-  }, [])
+  }, [planted])
 
   return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
 }
 
-function Crops() {
+function Crops({ planted }: { planted: Plantings }) {
   const kit = useKit()
   // The kit's materials are borrowed: only the merged geometry is ours.
   const built = useOwnedMeshes(
     () => {
-      const meshes = mergePlacements(kit, PLANTED.crops)
+      const meshes = mergePlacements(kit, planted.crops)
       for (const mesh of meshes) {
         mesh.castShadow = false
         mesh.receiveShadow = true
       }
       return { meshes }
     },
-    [kit],
+    [kit, planted],
     "materials",
   )
 

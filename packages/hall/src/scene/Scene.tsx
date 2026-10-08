@@ -1,12 +1,13 @@
 import { useGLTF } from "@react-three/drei"
 import { useFrame, useThree } from "@react-three/fiber"
-import { Suspense, useCallback, useEffect, useMemo, useReducer, useState } from "react"
+import { Suspense, use, useCallback, useEffect, useMemo, useReducer, useState } from "react"
 import type { Object3D } from "three"
 import { SoundStage } from "../audio/SoundStage.tsx"
 import { MODE, PROBE } from "../guild/mode.ts"
 import type { AdventurerView } from "../guild/store.ts"
 import { useGuild, useGuildStore } from "../guild/useGuild.ts"
 import { ANIMS_URL, MODELS, modelUrl } from "../world/cast.ts"
+import { useWorld } from "../world/source.ts"
 import { Adventurer, lookFrom } from "./Adventurer.tsx"
 import { Atmosphere } from "./atmosphere/Atmosphere.tsx"
 import { Post } from "./atmosphere/Post.tsx"
@@ -17,6 +18,7 @@ import { Crisp } from "./Crisp.tsx"
 import { declutter } from "./chips.ts"
 import { castClock, castCrowd } from "./crowd/cast.ts"
 import { ALL_HEROES } from "./crowd/lod.ts"
+import { GLSL_SHADING, nodeShading, wantsNodes } from "./crowd/material.ts"
 import { DeedEffects } from "./DeedEffect.tsx"
 import { EventsLayer } from "./events/EventsLayer.tsx"
 import { Exits } from "./exits.ts"
@@ -41,8 +43,14 @@ import { stepFrame } from "./step.ts"
 import { UndeadGate } from "./Undead.tsx"
 import { WeatherLayer } from "./weather/WeatherLayer.tsx"
 
-/** Everything inside the Canvas. */
+/**
+ * Everything inside the Canvas. A repo's island (`?repo=`, world/source.ts) draws the land, its
+ * nature, lights, machines and ships; the keep, the graveyard, the cast and the world events are
+ * the hand map's, placed for its roads and sites, so they wait until the story's sites are mapped
+ * onto the island's districts.
+ */
 export function Scene() {
+  const hand = useWorld().kind === "hand"
   return (
     <Quality>
       <Clock />
@@ -55,20 +63,28 @@ export function Scene() {
       <Atmosphere />
       <Suspense fallback={null}>
         <Island />
-        <Graveyard />
-        {/* Lazy: the skeletons load on first need, under their own Suspense (scene/Undead.tsx). */}
-        <UndeadGate />
+        {hand && (
+          <>
+            <Graveyard />
+            {/* Lazy: the skeletons load on first need, under their own Suspense (scene/Undead.tsx). */}
+            <UndeadGate />
+          </>
+        )}
         <StreetLights />
         <NearLights />
         <NightLife />
         <Nature />
         <Life />
-        <Room />
-        <Stations />
-        <Cast />
-        <Blobs />
-        {/* What everyone is doing, as an icon over their head: readable with the HUD hidden. */}
-        <Sigils />
+        {hand && (
+          <>
+            <Room />
+            <Stations />
+            <Cast />
+            <Blobs />
+            {/* What everyone is doing, as an icon over their head: readable with the HUD hidden. */}
+            <Sigils />
+          </>
+        )}
         <WorldReady />
         {/* Showcase: mounts with the world, then lifts the title card (guild/opening.ts). */}
         {MODE === "showcase" && <OpeningCue />}
@@ -78,7 +94,7 @@ export function Scene() {
         <Ships />
       </Suspense>
       {/* Secret world events (guild/events.ts): nothing when idle; each event's code loads on first need. */}
-      <EventsLayer />
+      {hand && <EventsLayer />}
       <WeatherLayer />
       <CameraRig />
       <Post />
@@ -145,10 +161,13 @@ function Cast() {
 /**
  * The cast's baked crowd while `wanted` (made on first want, kept after: crowd/cast.ts), else null.
  * Every model is preloaded (scene/Adventurer.tsx), so reading them here never suspends for long.
+ * On WebGPU (or `?tsl=1`) it suspends once more, first time wanted, for the node materials.
  */
 function useCrowd(wanted: boolean) {
   const { animations } = useGLTF(ANIMS_URL)
   const scenes = useGLTF(MODELS.map(modelUrl))
+  const gl = useThree((state) => state.gl)
+  const shading = wanted && wantsNodes(gl) ? use(nodeShading(gl)) : GLSL_SHADING
   return useMemo(() => {
     if (!wanted) return null
     const models: Record<string, Object3D> = {}
@@ -156,8 +175,8 @@ function useCrowd(wanted: boolean) {
       const loaded = scenes[i]
       if (loaded) models[model] = loaded.scene
     })
-    return castCrowd(animations, models)
-  }, [wanted, animations, scenes])
+    return castCrowd(animations, models, shading)
+  }, [wanted, animations, scenes, shading])
 }
 
 /** Drives the guild's clock from the render loop (first, FRAME.SIM); long frames are capped. */

@@ -1,0 +1,61 @@
+import { useWorld, useWorldStatus } from "../world/source.ts"
+
+/** How each biome reads in the legend. */
+const BIOME: Record<string, string> = {
+  harbour: "harbour",
+  village: "village",
+  proving: "proving grounds",
+  library: "library",
+  quarry: "quarry",
+  forest: "forest",
+  farms: "farms",
+  wilds: "wilds",
+}
+
+/**
+ * `?repo=` (world/source.ts): which repo the island was grown from and its districts — one per
+ * top-level folder, coloured by its main language — or why it couldn't be grown (the guild's own
+ * island is shown instead). Nothing without `?repo=`.
+ */
+export function RepoLegend() {
+  const status = useWorldStatus()
+  const { repo } = useWorld()
+
+  if (status.state === "loading")
+    return (
+      <section className="plaque repo-legend" aria-live="polite">
+        <p className="repo-note">Growing {status.repo}'s island…</p>
+      </section>
+    )
+  if (status.state === "failed")
+    return (
+      <section className="plaque repo-legend" role="status">
+        <p className="repo-note">
+          Couldn't grow {status.repo}: {status.reason}. This is the guild's own island.
+        </p>
+      </section>
+    )
+  if (!repo) return null
+
+  const files = repo.districts.reduce((sum, district) => sum + district.files, 0)
+  return (
+    <section className="plaque repo-legend" aria-label={`Island grown from ${repo.repo}`}>
+      <h2 className="repo-name">{repo.repo}</h2>
+      <p className="repo-meta">
+        {files.toLocaleString("en")} files · {repo.districts.length} districts
+        {repo.truncated ? " · partial tree" : ""}
+      </p>
+      <ul className="repo-districts">
+        {repo.districts.map((district) => (
+          <li key={district.id}>
+            <i className="repo-swatch" style={{ background: district.accent }} aria-hidden="true" />
+            <span className="repo-folder">{district.label}</span>
+            <span className="repo-biome">
+              {BIOME[district.biome] ?? district.biome} · {district.language.name}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}

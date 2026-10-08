@@ -1,5 +1,8 @@
 import type { HudMode } from "../hud/prefs.ts"
+import { parseRepo } from "../world/gen/fetch.ts"
 import { GRAVEYARD_PLOT, island, type LandmarkKind, SITES } from "../world/lands.ts"
+import { loadRepo } from "../world/source.ts"
+import { reachOf } from "../world/world.ts"
 import type { Place } from "./director.ts"
 import type { Weather } from "./environment.ts"
 import { EVENT_KINDS, type EventKind } from "./events.ts"
@@ -25,6 +28,9 @@ import { RUSH, SCENARIOS, type ScenarioId } from "./store.ts"
  *   look     a site, landmark or `x,z`: the camera frames it (and the Bard lets go)
  *   paused   1: the story's clock stopped
  *   event    a world event forced now (EVENT_KINDS) — dev and probe builds only
+ *   repo     `owner/name` (or a GitHub URL, or `sample`): the island grown from that repo's tree
+ *            (world/gen) instead of the guild's own, framed whole with the Bard off. Bundled
+ *            fixtures first, else the public GitHub API; on failure the guild's island stays.
  *
  * Every value is validated strictly; anything unknown or invalid is ignored (and listed in
  * `ignored`, for the probe tools to report). Production honours all of it except `event`.
@@ -47,6 +53,8 @@ export interface DeepLink {
   look?: Place
   paused?: boolean
   event?: EventKind
+  /** "sample" or "owner/name". */
+  repo?: string
 }
 
 export interface Parsed {
@@ -173,6 +181,17 @@ function take(link: DeepLink, key: string, value: string, probe: boolean): boole
       if (!probe || !EVENT_KINDS.includes(value as EventKind)) return false
       link.event = value as EventKind
       return true
+    case "repo":
+      if (value === "sample") {
+        link.repo = value
+        return true
+      }
+      try {
+        link.repo = parseRepo(value)
+        return true
+      } catch {
+        return false
+      }
     default:
       return false
   }
@@ -301,6 +320,15 @@ export function applyDeepLink(link: DeepLink, hall: Hall): string[] {
   if (link.view !== undefined) store.setView(link.view)
   if (link.paused !== undefined) store.setSpeed(link.paused ? 0 : 1)
   if (link.look) store.frame(link.look)
+  if (link.repo !== undefined) {
+    // A grown island has no adventurers on it yet: no Bard to follow them, the island framed whole.
+    store.setBard(false)
+    const look = link.look
+    void loadRepo(link.repo).then((world) => {
+      if (world.kind === "repo" && !look)
+        store.frame({ key: "look:island", x: 0, z: 0, radius: reachOf(world) })
+    })
+  }
   if (link.bard !== undefined) store.setBard(link.bard)
   if (link.event && hall.force) hall.force(link.event)
   if (link.select !== undefined) {

@@ -44,6 +44,11 @@ export interface District {
 
 export interface RepoIsland {
   plan: IslandPlan
+  /**
+   * Terrace level of every raised hex by key (1 foothill or mountain, 2 high mountain; absent is
+   * level ground), after foothills that can't slope sank to knolls: lands.ts `level`'s answer.
+   */
+  levels: ReadonlyMap<string, number>
   island: Island
   roads: { nodes: Record<string, Spot>; edges: (readonly [string, string])[] }
   districts: District[]
@@ -359,6 +364,7 @@ export function dress(plan: IslandPlan): RepoIsland {
 
   return {
     plan,
+    levels,
     island: { tiles, decor, water, meadow, landmarks, fields },
     roads: { nodes, edges },
     districts,

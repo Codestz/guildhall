@@ -5,6 +5,8 @@ import type { Group, Mesh, Object3D } from "three"
 import { useGuildStore } from "../guild/useGuild.ts"
 import { SHIPS_URL } from "../world/cast.ts"
 import { HEX_SCALE } from "../world/lands.ts"
+import { useWorld } from "../world/source.ts"
+import { reachOf, type World } from "../world/world.ts"
 import { FRAME } from "./frame.ts"
 
 /**
@@ -17,6 +19,20 @@ const SEA_Y = -0.2 * HEX_SCALE + 0.05
 /** The lap: an ellipse ≥ 19 units off every coast (measured against island() tiles). */
 const LAP = { rx: 95, rz: 115 }
 const QUAY: readonly [number, number] = [5.5, 84]
+/** A repo's island: a round lap this far off its furthest land, the rowboat this far off its dock. */
+const OFFSHORE = 26
+const MOORING: readonly [number, number] = [5.5, 6]
+
+/** The lap and the rowboat's mooring for a world: the hand map's measured ones, else from its land. */
+function watersOf(world: World): { lap: { rx: number; rz: number }; quay: readonly [number, number] } {
+  if (world.kind === "hand") return { lap: LAP, quay: QUAY }
+  const reach = reachOf(world) + OFFSHORE
+  const dock = world.island.landmarks.find((mark) => mark.kind === "dock")
+  return {
+    lap: { rx: reach, rz: reach },
+    quay: dock ? [dock.x + MOORING[0], dock.z + MOORING[1]] : [reach, 0],
+  }
+}
 
 interface Sailor {
   piece: string
@@ -38,6 +54,8 @@ export function Ships() {
   const ships = useMemo(() => SAILORS.map((s) => ({ sailor: s, body: hull(nodes[s.piece]) })), [nodes])
   const boat = useMemo(() => hull(nodes["boat-row-small"]), [nodes])
   const store = useGuildStore()
+  const world = useWorld()
+  const { lap, quay } = useMemo(() => watersOf(world), [world])
   const refs = useRef<(Group | null)[]>([])
   const boatRef = useRef<Group>(null)
 
@@ -48,11 +66,11 @@ export function Ships() {
       const group = refs.current[i]
       if (!group) return
       const a = (sailor.phase + t * sailor.speed) * Math.PI * 2
-      const x = Math.cos(a) * LAP.rx
-      const z = Math.sin(a) * LAP.rz
+      const x = Math.cos(a) * lap.rx
+      const z = Math.sin(a) * lap.rz
       // Heading along the lap (the tangent), bow forward (+z in the model).
       const dir = Math.sign(sailor.speed)
-      const heading = Math.atan2(-Math.sin(a) * LAP.rx * dir, Math.cos(a) * LAP.rz * dir)
+      const heading = Math.atan2(-Math.sin(a) * lap.rx * dir, Math.cos(a) * lap.rz * dir)
       const sway = 0.5 + wind
       group.position.set(x, SEA_Y - sailor.draft * sailor.scale + Math.sin(t * 0.9 + i) * 0.12, z)
       group.rotation.set(
@@ -84,7 +102,7 @@ export function Ships() {
         ) : null,
       )}
       {boat && (
-        <group ref={boatRef} position={[QUAY[0], SEA_Y, QUAY[1]]} scale={1.1}>
+        <group ref={boatRef} position={[quay[0], SEA_Y, quay[1]]} scale={1.1}>
           <primitive object={boat} />
         </group>
       )}

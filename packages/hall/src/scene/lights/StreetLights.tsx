@@ -13,7 +13,8 @@ import {
   Vector3,
 } from "three"
 import { useGuild } from "../../guild/useGuild.ts"
-import { GLOWS, LIGHTS } from "../../world/lights.ts"
+import { type Glow, glowsOf, lightsOf } from "../../world/lights.ts"
+import { useWorld } from "../../world/source.ts"
 import { halos } from "../atmosphere/Lamps.tsx"
 import { sky } from "../atmosphere/state.ts"
 import { mergePlacements, useKit } from "../Kit.tsx"
@@ -29,15 +30,17 @@ import { AFTER_POSE, carried, flicker, litGlass, nightGlow, track } from "./carr
  */
 export function StreetLights() {
   const kit = useKit()
+  const world = useWorld()
+  const lights = lightsOf(world)
   // Merged geometry is ours; the kit's materials are borrowed (scene/owned.ts).
   const models = useOwnedMeshes(
     () => ({
       meshes: mergePlacements(
         kit,
-        LIGHTS.map((l) => l.placement),
+        lights.map((l) => l.placement),
       ),
     }),
-    [kit],
+    [kit, lights],
     "materials",
   )
   return (
@@ -45,15 +48,15 @@ export function StreetLights() {
       {models?.meshes.map((mesh) => (
         <primitive key={mesh.uuid} object={mesh} />
       ))}
-      <Pools />
+      <Pools glows={glowsOf(world)} />
       <Carried />
     </group>
   )
 }
 
-function Pools() {
+function Pools({ glows }: { glows: readonly Glow[] }) {
   const { mood } = useGuild()
-  const built = useOwnedMeshes(() => ({ meshes: [pools(GLOWS.length)] }), [])
+  const built = useOwnedMeshes(() => ({ meshes: [pools(glows.length)] }), [glows])
   const fire = useMemo(() => new Color(), [])
 
   useFrame(({ clock }) => {
@@ -62,8 +65,8 @@ function Pools() {
     // Firelight, pushed towards orange: additive yellow on the island's green grass reads lime.
     fire.set(mood.fire).lerp(EMBER, 0.6)
     const t = clock.elapsedTime
-    for (let i = 0; i < GLOWS.length; i++) {
-      const light = GLOWS[i]
+    for (let i = 0; i < glows.length; i++) {
+      const light = glows[i]
       if (!light) continue
       const flicker = 0.93 + Math.sin(t * 7.3 + i * 1.9) * 0.04 + Math.sin(t * 12.1 + i) * 0.03
       const size = light.pool * 2 * flicker

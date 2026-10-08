@@ -1,18 +1,9 @@
 import FOREST from "./forest.json"
 import LANDS from "./lands.json"
-import {
-  cellToWorld,
-  HEX_SCALE,
-  island,
-  MAP_FOR_TESTS,
-  ROAD_EDGES,
-  ROAD_NODES,
-  SITES,
-  toPlot,
-} from "./lands.ts"
+import { type Cell, cellToWorld, HEX_SCALE, MAP_FOR_TESTS, SITES, toPlot } from "./lands.ts"
 import { ROOM, type Spot } from "./layout.ts"
-import { LIGHTS, toSegment } from "./lights.ts"
-import { SITE_DEFS } from "./sites.ts"
+import { type Light, lightsOf, toSegment } from "./lights.ts"
+import { handWorld, type Terrain, type World } from "./world.ts"
 
 /**
  * The wilds (ADR 0007, Nature): character-scale trees, bushes, rocks and grass from the Forest
@@ -22,6 +13,8 @@ import { SITE_DEFS } from "./sites.ts"
  * lights.ts): candidates are sampled round each anchor, jittered by a seeded hash of their position,
  * and kept only where they clear the roads, the walking approaches to the work posts, buildings and
  * other decor, water, the keep, the lights and each other. Only level open ground grows wilds.
+ * Grown for a world (world/world.ts): the hand map's, or a repo island's (no keep, yard or
+ * graveyard to keep clear of; its districts' landmarks are its sites).
  */
 
 export type WildPiece = keyof typeof FOREST
@@ -147,65 +140,98 @@ const pick = <T>(list: readonly T[], roll: number): T =>
 
 // ---- The map, as obstacles ---------------------------------------------------------------------
 
-const land = island()
-const roads: (readonly [Spot, Spot])[] = ROAD_EDGES.flatMap(([a, b]) => {
-  const from = ROAD_NODES[a]
-  const to = ROAD_NODES[b]
-  return from && to ? [[from, to] as const] : []
-})
-// The gate's apron: the avenue's drawn stub from the gate up to the first road hex.
-const OUT = ROAD_NODES.OUT
-if (OUT) roads.push([[0, ROOM.depth / 2], OUT])
-const nodes = Object.values(ROAD_NODES)
-const isSea = (w: Spot) => ["~", "o"].includes(MAP_FOR_TESTS.at(MAP_FOR_TESTS.cellOf(w)))
-const sea = land.water.filter(isSea)
-const river = land.water.filter((w) => !isSea(w))
-const posts: Spot[] = Object.values(SITES).flatMap((site) => site.posts.map((p) => [p[0], p[1]] as Spot))
-/** How adventurers reach their posts: straight from the nearest road node. */
-const approaches: (readonly [Spot, Spot])[] = posts.map((post) => {
-  let best = nodes[0] as Spot
-  for (const node of nodes)
-    if (Math.hypot(node[0] - post[0], node[1] - post[1]) < Math.hypot(best[0] - post[0], best[1] - post[1]))
-      best = node
-  return [best, post] as const
-})
-/** Every placed land piece (buildings, fences, crates, hex trees…) as a circle on the ground. */
-const decor = land.decor.map((d) => {
-  const { x0, z0, x1, z1 } = box(LANDS[d.piece])
-  const scale = HEX_SCALE * (d.scale ?? 1)
-  const cx = ((x0 + x1) / 2) * scale
-  const cz = ((z0 + z1) / 2) * scale
-  const rot = d.rot ?? 0
+/** A world's ground, as what the wilds must keep clear of. */
+interface Ground {
+  hand: boolean
+  terrain: Terrain
+  roads: (readonly [Spot, Spot])[]
+  sea: Spot[]
+  river: Spot[]
+  posts: Spot[]
+  /** How adventurers reach their posts: straight from the nearest road node. */
+  approaches: (readonly [Spot, Spot])[]
+  /** Every placed land piece (buildings, fences, crates, hex trees…) as a circle on the ground. */
+  decor: { x: number; z: number; r: number }[]
+  lights: readonly Light[]
+}
+
+function groundOf(world: World): Ground {
+  const hand = world.kind === "hand"
+  const { terrain } = world
+  const { nodes: graph, edges } = world.roads
+  const roads: (readonly [Spot, Spot])[] = edges.flatMap(([a, b]) => {
+    const from = graph[a]
+    const to = graph[b]
+    return from && to ? [[from, to] as const] : []
+  })
+  // The keep's gate apron: the avenue's drawn stub from the gate up to the first road hex.
+  const OUT = graph.OUT
+  if (hand && OUT) roads.push([[0, ROOM.depth / 2], OUT])
+  const nodes = Object.values(graph)
+  const isSea = (w: Spot) => ["~", "o"].includes(terrain.at(MAP_FOR_TESTS.cellOf(w)))
+  const posts: Spot[] = world.sites.flatMap((site) => site.posts.map((p) => [p[0], p[1]] as Spot))
   return {
-    x: d.x + cx * Math.cos(rot) + cz * Math.sin(rot),
-    z: d.z - cx * Math.sin(rot) + cz * Math.cos(rot),
-    r: (Math.max(x1 - x0, z1 - z0) / 2) * scale + (d.piece.startsWith("building_") ? BUILDING_CLEARANCE : 0),
+    hand,
+    terrain,
+    roads,
+    sea: world.island.water.filter(isSea),
+    river: world.island.water.filter((w) => !isSea(w)),
+    posts,
+    approaches: posts.map((post) => {
+      let best = nodes[0] as Spot
+      for (const node of nodes)
+        if (
+          Math.hypot(node[0] - post[0], node[1] - post[1]) < Math.hypot(best[0] - post[0], best[1] - post[1])
+        )
+          best = node
+      return [best, post] as const
+    }),
+    decor: world.island.decor.map((d) => {
+      const { x0, z0, x1, z1 } = box(LANDS[d.piece])
+      const scale = HEX_SCALE * (d.scale ?? 1)
+      const cx = ((x0 + x1) / 2) * scale
+      const cz = ((z0 + z1) / 2) * scale
+      const rot = d.rot ?? 0
+      return {
+        x: d.x + cx * Math.cos(rot) + cz * Math.sin(rot),
+        z: d.z - cx * Math.sin(rot) + cz * Math.cos(rot),
+        r:
+          (Math.max(x1 - x0, z1 - z0) / 2) * scale +
+          (d.piece.startsWith("building_") ? BUILDING_CLEARANCE : 0),
+      }
+    }),
+    lights: lightsOf(world),
   }
-})
+}
 /** The yard's growing building isn't in decor (scene/Island.tsx swaps it): a home at 1.5×. */
 const YARD_RADIUS = 4.5
 
 /** Is the ground at (x, z) level open land wilds may grow on? */
-function ground(x: number, z: number): boolean {
+function grows(terrain: Terrain, x: number, z: number): boolean {
   const cell = MAP_FOR_TESTS.cellOf([x, z])
-  if (!GROUND.has(MAP_FOR_TESTS.at(cell)) || MAP_FOR_TESTS.level(cell) !== 0) return false
+  if (!GROUND.has(terrain.at(cell)) || terrain.level(cell) !== 0) return false
   // A coast open to the sea on three or more sides is mostly beach, low under the grass line.
-  return wetSides(cell[0], cell[1]) < 3
+  return wetSides(terrain, cell) < 3
 }
 
 const OPEN_WATER = new Set(["~", "o"])
-function wetSides(q: number, line: number): number {
-  return NEIGHBOURS.filter(([dq, dl]) => OPEN_WATER.has(MAP_FOR_TESTS.at([q + dq, line + dl]))).length
+function wetSides(terrain: Terrain, [q, line]: Cell): number {
+  return NEIGHBOURS.filter(([dq, dl]) => OPEN_WATER.has(terrain.at([q + dq, line + dl]))).length
 }
 
 function clear(
+  ground: Ground,
   x: number,
   z: number,
   r: number,
   placed: readonly Wild[],
   extra: Required<KeepClear>,
 ): boolean {
-  if (Math.abs(x) < ROOM.width / 2 + KEEP_MARGIN + r && Math.abs(z) < ROOM.depth / 2 + KEEP_MARGIN + r)
+  if (
+    ground.hand &&
+    Math.abs(x) < ROOM.width / 2 + KEEP_MARGIN + r &&
+    Math.abs(z) < ROOM.depth / 2 + KEEP_MARGIN + r
+  )
     return false
   // The footprint stands on growable ground all round, not just at its centre.
   const edge = r * 0.7
@@ -216,19 +242,21 @@ function clear(
       [-edge, 0],
       [0, edge],
       [0, -edge],
-    ].every(([dx = 0, dz = 0]) => ground(x + dx, z + dz))
+    ].every(([dx = 0, dz = 0]) => grows(ground.terrain, x + dx, z + dz))
   )
     return false
-  if (toPlot(x, z) < GRAVEYARD_CLEARANCE + r) return false
-  if (sea.some((w) => Math.hypot(w[0] - x, w[1] - z) < WATER_CLEARANCE + r)) return false
-  if (river.some((w) => Math.hypot(w[0] - x, w[1] - z) < RIVER_CLEARANCE + r)) return false
-  if (roads.some(([a, b]) => toSegment([x, z], a, b) < ROAD_HALF + r)) return false
-  if (approaches.some(([a, b]) => toSegment([x, z], a, b) < PATH_CLEARANCE + r)) return false
-  if (posts.some((p) => Math.hypot(p[0] - x, p[1] - z) < POST_CLEARANCE + r)) return false
-  const yard = SITES.yard.at
-  if (Math.hypot(yard[0] - x, yard[1] - z) < YARD_RADIUS + r) return false
-  if (decor.some((d) => Math.hypot(d.x - x, d.z - z) < d.r + DECOR_CLEARANCE + r)) return false
-  for (const light of LIGHTS)
+  if (ground.hand && toPlot(x, z) < GRAVEYARD_CLEARANCE + r) return false
+  if (ground.sea.some((w) => Math.hypot(w[0] - x, w[1] - z) < WATER_CLEARANCE + r)) return false
+  if (ground.river.some((w) => Math.hypot(w[0] - x, w[1] - z) < RIVER_CLEARANCE + r)) return false
+  if (ground.roads.some(([a, b]) => toSegment([x, z], a, b) < ROAD_HALF + r)) return false
+  if (ground.approaches.some(([a, b]) => toSegment([x, z], a, b) < PATH_CLEARANCE + r)) return false
+  if (ground.posts.some((p) => Math.hypot(p[0] - x, p[1] - z) < POST_CLEARANCE + r)) return false
+  if (ground.hand) {
+    const yard = SITES.yard.at
+    if (Math.hypot(yard[0] - x, yard[1] - z) < YARD_RADIUS + r) return false
+  }
+  if (ground.decor.some((d) => Math.hypot(d.x - x, d.z - z) < d.r + DECOR_CLEARANCE + r)) return false
+  for (const light of ground.lights)
     if (Math.hypot(light.placement.x - x, light.placement.z - z) < LIGHT_CLEARANCE + r) return false
   for (const path of extra.paths)
     for (let i = 1; i < path.length; i++)
@@ -257,10 +285,17 @@ function kindOf(mix: Mix, roll: number): WildKind {
 }
 
 /**
- * The island's wilds. Deterministic: the same map always grows the same wilds. `keep` adds ground
+ * The hand map's wilds. Deterministic: the same map always grows the same wilds. `keep` adds ground
  * the scene knows must stay clear (villagers' rounds, trace piles).
  */
 export function wilds(keep: KeepClear = {}): Wild[] {
+  return wildsOf(handWorld(), keep)
+}
+
+/** A world's wilds: deterministic, as `wilds`. */
+export function wildsOf(world: World, keep: KeepClear = {}): Wild[] {
+  const ground = groundOf(world)
+  const { terrain, roads } = ground
   const extra = { paths: keep.paths ?? [], spots: keep.spots ?? [] }
   const placed: Wild[] = []
   const tryAt = (x: number, z: number, mix: Mix, bare = false, companions = true): void => {
@@ -272,7 +307,7 @@ export function wilds(keep: KeepClear = {}): Wild[] {
     // Nudge the candidate a little so rows never line up.
     const jx = round(x + (hash(x, z, 4) - 0.5) * 1.6)
     const jz = round(z + (hash(x, z, 5) - 0.5) * 1.6)
-    if (!clear(jx, jz, radius, placed, extra)) return
+    if (!clear(ground, jx, jz, radius, placed, extra)) return
     placed.push({
       piece,
       kind,
@@ -314,8 +349,8 @@ export function wilds(keep: KeepClear = {}): Wild[] {
   alongRoads(4.5, 5, 9, 0.2, TREELINE)
 
   // Then the job sites, so the work places get their dressing before the verges take the room.
-  // Each site's mix, and whether its trees are dead ones, are the site registry's.
-  for (const site of Object.values(SITE_DEFS)) {
+  // Each site's mix, and whether its trees are dead ones, are the site registry's (the world's).
+  for (const site of world.sites) {
     const { mix, barren = false } = site.wilds
     for (let ring = 6; ring <= 16; ring += 2.5)
       for (let k = 0; k < 14; k++) {
@@ -325,9 +360,9 @@ export function wilds(keep: KeepClear = {}): Wild[] {
   }
 
   // The village: a few in every lot, between the houses.
-  for (const key of MAP_FOR_TESTS.cells()) {
+  for (const key of terrain.cells()) {
     const [q, line] = key.split(",").map(Number) as [number, number]
-    const char = MAP_FOR_TESTS.at([q, line])
+    const char = terrain.at([q, line])
     if (char !== "v" && char !== "V") continue
     const [cx, cz] = cellToWorld([q, line])
     for (let k = 0; k < 9; k++) {
@@ -340,10 +375,10 @@ export function wilds(keep: KeepClear = {}): Wild[] {
   alongRoads(2.4, ROAD_HALF + 0.6, ROAD_HALF + 4, 0.15, ROADSIDE)
 
   // The shore: land hexes beside the sea or the lake, on the dry side.
-  for (const key of MAP_FOR_TESTS.cells()) {
+  for (const key of terrain.cells()) {
     const [q, line] = key.split(",").map(Number) as [number, number]
-    if (!GROUND.has(MAP_FOR_TESTS.at([q, line]))) continue
-    if (wetSides(q, line) === 0) continue
+    if (!GROUND.has(terrain.at([q, line]))) continue
+    if (wetSides(terrain, [q, line]) === 0) continue
     const [cx, cz] = cellToWorld([q, line])
     for (let k = 0; k < 6; k++) {
       const angle = hash(cx, cz, 50 + k) * Math.PI * 2

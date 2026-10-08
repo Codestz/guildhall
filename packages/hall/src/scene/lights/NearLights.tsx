@@ -3,7 +3,9 @@ import { useMemo, useRef, useState } from "react"
 import { Color, type PointLight, Vector3 } from "three"
 import { useGuild } from "../../guild/useGuild.ts"
 import { HEARTH } from "../../world/layout.ts"
-import { GLOWS } from "../../world/lights.ts"
+import { glowsOf } from "../../world/lights.ts"
+import { useWorld } from "../../world/source.ts"
+import type { World } from "../../world/world.ts"
 import { sky } from "../atmosphere/state.ts"
 import { AFTER_POSE, carried, type Flame, isCarried, nearestFlames, nightGlow } from "./carried.ts"
 
@@ -18,10 +20,18 @@ import { AFTER_POSE, carried, type Flame, isCarried, nearestFlames, nightGlow } 
 const COUNT = 2
 const REPICK_S = 0.4
 
-const FLAMES: readonly (readonly [number, number, number])[] = [
-  [HEARTH[0], 1.6, HEARTH[1]],
-  ...GLOWS.map((light) => light.flame),
-]
+type Fixed = readonly (readonly [number, number, number])[]
+const flames = new WeakMap<World, Fixed>()
+/** The fixed flames: the keep's hearth (the hand map's) and every glow outdoors. */
+function flamesOf(world: World): Fixed {
+  let known = flames.get(world)
+  if (!known) {
+    const outdoors = glowsOf(world).map((light) => light.flame)
+    known = world.kind === "hand" ? [[HEARTH[0], 1.6, HEARTH[1]], ...outdoors] : outdoors
+    flames.set(world, known)
+  }
+  return known
+}
 
 /** A carried lantern's light: smaller than a street flame's, and it walks with them. */
 const CARRIED_INTENSITY = 8
@@ -37,6 +47,7 @@ export function NearLights() {
   }))
   const since = useRef(REPICK_S)
   const fire = useMemo(() => new Color(), [])
+  const fixed = flamesOf(useWorld())
 
   // After the carried lanterns have been tracked this frame (StreetLights' `Carried`, AFTER_POSE).
   useFrame((state, delta) => {
@@ -45,7 +56,7 @@ export function NearLights() {
     const target = controls?.target ?? ORIGIN
     if (since.current >= REPICK_S) {
       since.current = 0
-      nearestFlames(target.x, target.z, FLAMES, carried, pick.chosen, pick.distances)
+      nearestFlames(target.x, target.z, fixed, carried, pick.chosen, pick.distances)
     }
     fire.set(mood.fire).lerp(EMBER, 0.6)
     const t = state.clock.elapsedTime

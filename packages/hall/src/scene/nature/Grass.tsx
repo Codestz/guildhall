@@ -23,7 +23,8 @@ import {
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { LANDS_URL } from "../../world/cast.ts"
-import { island } from "../../world/lands.ts"
+import { useWorld } from "../../world/source.ts"
+import { handWorld, type World } from "../../world/world.ts"
 import { sky } from "../atmosphere/state.ts"
 import { wind } from "../atmosphere/wind.ts"
 import { useOwnedMeshes } from "../owned.ts"
@@ -41,14 +42,15 @@ const DENSITY: Record<Tier, number> = { 0: 0, 1: 150, 2: 240, 3: 340 }
 export function Grass({ tier }: { tier: Tier }) {
   const store = useGuildStore()
   const { nodes } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
+  const world = useWorld()
   // Geometry, materials and meshes are this mount's own (scene/owned.ts); the palette is the land's.
   const built = useOwnedMeshes(
     () => {
       if (DENSITY[tier] === 0) return { meshes: [], material: null }
       const material = grassMaterial(paletteOf(nodes))
-      return { meshes: meadow({ tuft: tuft(), flower: flower() }, material, DENSITY[tier]), material }
+      return { meshes: meadow({ tuft: tuft(), flower: flower() }, material, DENSITY[tier], world), material }
     },
-    [nodes, tier],
+    [nodes, tier, world],
     "textures",
   )
   const eased = useMemo(() => ({ snow: 0, wet: 0 }), [])
@@ -142,8 +144,9 @@ export function meadow(
   geometries: { tuft: BufferGeometry; flower: BufferGeometry },
   material: ShaderMaterial,
   density: number,
+  world: World = handWorld(),
 ): InstancedMesh[] {
-  const tufts = scatter(island(), density)
+  const tufts = scatter(world.island, density, undefined, world.kind === "hand")
   if (tufts.length === 0) return []
   const flowered = tufts.filter((tuft) => tuft.flower >= 0)
   const grass = new InstancedMesh(geometries.tuft, material, tufts.length)

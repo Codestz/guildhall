@@ -2,9 +2,10 @@ import { useFrame } from "@react-three/fiber"
 import { useMemo } from "react"
 import { AdditiveBlending, Color, InstancedMesh, MeshBasicMaterial, Object3D, SphereGeometry } from "three"
 import { useGuildStore } from "../../guild/useGuild.ts"
-import { island } from "../../world/lands.ts"
-import { HEARTH } from "../../world/layout.ts"
-import { LIGHTS } from "../../world/lights.ts"
+import { HEARTH, type Spot } from "../../world/layout.ts"
+import { lightsOf } from "../../world/lights.ts"
+import { useWorld } from "../../world/source.ts"
+import type { World } from "../../world/world.ts"
 import { sky } from "../atmosphere/state.ts"
 import { wind } from "../atmosphere/wind.ts"
 import { useOwnedMeshes } from "../owned.ts"
@@ -18,31 +19,56 @@ import { useTier } from "../Quality.tsx"
 const FIREFLIES = [0, 90, 160, 240] as const
 const EMBERS = [0, 40, 80, 120] as const
 
-const land = island()
-/** Meadows, plus a ring of spots just outside the forest's trees. */
-const HOMES = [
-  ...land.meadow,
-  ...land.decor.filter((d) => d.piece.startsWith("trees_")).map((d) => [d.x + 3, d.z + 2] as const),
-]
+type Flame = readonly [number, number, number]
+interface Haunts {
+  /** Meadows, plus a ring of spots just outside the forest's trees: where fireflies drift. */
+  homes: readonly Spot[]
+  /** Fire sources: the hearth (the hand map's keep), then every street torch flame. */
+  fires: readonly Flame[]
+  /** How many embers always rise from the hearth (none without one). */
+  hearth: number
+}
+const haunts = new WeakMap<World, Haunts>()
+function hauntsOf(world: World): Haunts {
+  let known = haunts.get(world)
+  if (!known) {
+    const land = world.island
+    const torches = lightsOf(world)
+      .filter((l) => l.placement.piece === "torch")
+      .map((l) => l.flame)
+    const hand = world.kind === "hand"
+    known = {
+      homes: [
+        ...land.meadow,
+        ...land.decor.filter((d) => d.piece.startsWith("trees_")).map((d) => [d.x + 3, d.z + 2] as const),
+      ],
+      fires: hand ? [[HEARTH[0], 1.4, HEARTH[1]] as const, ...torches] : torches,
+      hearth: hand ? 12 : 0,
+    }
+    haunts.set(world, known)
+  }
+  return known
+}
 
 export function NightLife() {
   const tier = useTier()
+  const where = hauntsOf(useWorld())
   return (
     <>
-      <Fireflies count={FIREFLIES[tier]} />
-      <Embers count={EMBERS[tier]} />
+      <Fireflies count={FIREFLIES[tier]} homes={where.homes} />
+      <Embers count={EMBERS[tier]} where={where} />
     </>
   )
 }
 
-function Fireflies({ count }: { count: number }) {
+function Fireflies({ count, homes }: { count: number; homes: readonly Spot[] }) {
   const store = useGuildStore()
   const built = useOwnedMeshes(() => ({ meshes: count > 0 ? [glows(0.09, 6, count)] : [] }), [count])
   const dummy = useMemo(() => new Object3D(), [])
   const seeds = useMemo(
     () =>
       Array.from({ length: count }, (_, i) => {
-        const home = HOMES[(i * 7919) % Math.max(1, HOMES.length)] ?? [0, 0]
+        const home = homes[(i * 7919) % Math.max(1, homes.length)] ?? [0, 0]
         return {
           x: home[0] + jitter(i, 1) * 4,
           z: home[1] + jitter(i, 2) * 4,
@@ -50,7 +76,7 @@ function Fireflies({ count }: { count: number }) {
           speed: 0.4 + (i % 7) * 0.08,
         }
       }),
-    [count],
+    [count, homes],
   )
   const glow = useMemo(() => new Color(), [])
 
@@ -84,13 +110,7 @@ function Fireflies({ count }: { count: number }) {
   return built?.meshes[0] ? <primitive object={built.meshes[0]} /> : null
 }
 
-/** Fire sources: the hearth and every street torch flame. */
-const FIRES = [
-  [HEARTH[0], 1.4, HEARTH[1]] as const,
-  ...LIGHTS.filter((l) => l.placement.piece === "torch").map((l) => l.flame),
-]
-
-function Embers({ count }: { count: number }) {
+function Embers({ count, where }: { count: number; where: Haunts }) {
   const store = useGuildStore()
   const built = useOwnedMeshes(() => ({ meshes: count > 0 ? [glows(0.05, 5, count)] : [] }), [count])
   const dummy = useMemo(() => new Object3D(), [])
@@ -103,7 +123,9 @@ function Embers({ count }: { count: number }) {
     const t = clock.elapsedTime
     for (let i = 0; i < count; i++) {
       // The first few always rise from the hearth; the rest are shared round the torches.
-      const fire = i < 12 ? FIRES[0] : FIRES[1 + ((i * 31) % Math.max(1, FIRES.length - 1))]
+      const { fires, hearth } = where
+      const torches = hearth > 0 ? 1 : 0
+      const fire = i < hearth ? fires[0] : fires[torches + ((i * 31) % Math.max(1, fires.length - torches))]
       if (!fire) continue
       const life = (t * (0.35 + (i % 5) * 0.06) + i * 0.618) % 1
       dummy.position.set(

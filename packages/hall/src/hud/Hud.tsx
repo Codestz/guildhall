@@ -16,6 +16,7 @@ import { Opening } from "./Opening.tsx"
 import { PartySwitcher } from "./Parties.tsx"
 import { Pleas } from "./Pleas.tsx"
 import { HUD_MODES, type HudMode, hudPrefs, useHudPrefs } from "./prefs.ts"
+import { RepoLegend } from "./RepoLegend.tsx"
 import { Roster, RosterBadges } from "./Roster.tsx"
 import { Settings } from "./Settings.tsx"
 import { SoundToggle, useSoundWaiting } from "./Sound.tsx"
@@ -213,6 +214,7 @@ export function Hud() {
       {!hidden && (
         <div className="region region-left">
           <Brand store={store} open={open.about} onToggle={() => toggle("about")} />
+          <RepoLegend />
           <PartySwitcher store={store} compact={phone} />
           {open.roster ? (
             <Roster store={store} open onToggle={() => toggle("roster")} compact className="is-sheet" />

@@ -3805,3 +3805,66 @@ button {
     font-size: 24px;
   }
 }
+
+/* ---- The repo legend (`?repo=`, hud/RepoLegend.tsx) ---- */
+.repo-legend {
+  width: var(--left-w);
+  padding: 10px 14px 12px;
+  color: var(--paper);
+  font-size: 13px;
+  pointer-events: auto;
+}
+.repo-name {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--brass-hi);
+  overflow-wrap: anywhere;
+}
+.repo-meta,
+.repo-note {
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+.repo-note {
+  margin: 0;
+}
+.repo-districts {
+  display: grid;
+  gap: 3px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.repo-districts li {
+  display: grid;
+  grid-template-columns: 10px auto 1fr;
+  align-items: baseline;
+  column-gap: 8px;
+}
+.repo-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.repo-folder {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.repo-biome {
+  justify-self: end;
+  color: var(--faint);
+  font-size: 12px;
+  text-align: right;
+}
+@media (max-width: 720px) {
+  .repo-legend {
+    width: 100%;
+  }
+  .repo-districts {
+    display: none;
+  }
+}

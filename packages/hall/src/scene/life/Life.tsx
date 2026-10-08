@@ -2,6 +2,7 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect } from "react"
 import { quality } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
+import { useWorld } from "../../world/source.ts"
 import { FRAME } from "../frame.ts"
 import { useTier } from "../Quality.tsx"
 import { Birds } from "./Birds.tsx"
@@ -33,24 +34,36 @@ import { WorkFx } from "./WorkFx.tsx"
  * plus one per townsperson out (14 at High, 8 Medium, 4 Low) and one per held thing or lantern
  * showing. Nothing here casts into the (static) sun shadow map; townsfolk get a blob shadow
  * (scene/Blobs.tsx).
+ *
+ * A repo's island (world/world.ts) has its machines and birds; the rest is the hand map's village,
+ * sites and keep, placed by hand, so it waits for the story's sites to be mapped onto districts.
  */
 export function Life() {
   const store = useGuildStore()
   const tier = useTier()
+  const hand = useWorld().kind === "hand"
   // After the guild's clock, before every Life piece reads it this frame.
   useFrame(() => readGuild(store), FRAME.SKY)
 
   return (
     <group name="life">
       <Machines />
-      <TracePiles />
-      <Smoke tier={tier} />
-      <Sparks />
-      <WorkFx />
+      {hand && (
+        <>
+          <TracePiles />
+          <Smoke tier={tier} />
+          <Sparks />
+          <WorkFx />
+        </>
+      )}
       <Birds tier={tier} />
-      <Ravens />
-      <Windows />
-      <Villagers tier={tier} />
+      {hand && (
+        <>
+          <Ravens />
+          <Windows />
+          <Villagers tier={tier} />
+        </>
+      )}
       {import.meta.env.DEV && <LookBridge />}
     </group>
   )

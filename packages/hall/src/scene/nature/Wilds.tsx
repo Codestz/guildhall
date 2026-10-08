@@ -13,7 +13,9 @@ import {
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import type { Tier } from "../../guild/quality.ts"
 import type { Spot } from "../../world/layout.ts"
-import { type Wild, type WildKind, type WildPiece, wilds } from "../../world/wilds.ts"
+import { useWorld } from "../../world/source.ts"
+import { type Wild, type WildKind, type WildPiece, wilds, wildsOf } from "../../world/wilds.ts"
+import type { World } from "../../world/world.ts"
 import { wind } from "../atmosphere/wind.ts"
 import { plain } from "../Kit.tsx"
 import { PILES } from "../life/places.ts"
@@ -38,7 +40,18 @@ const KEEP = {
   paths: ROUNDS.map((round) => [round.door, ...round.stops, round.door].map((s): Spot => [s.x, s.z])),
   spots: Object.values(PILES).map((pile): Spot => [pile.x, pile.z]),
 }
-const ALL = wilds(KEEP)
+const HAND = wilds(KEEP)
+/** A world's wilds: the hand map's (clear of the villagers' rounds), or a repo island's. */
+const grown = new WeakMap<World, readonly Wild[]>()
+function wildsFor(world: World): readonly Wild[] {
+  if (world.kind === "hand") return HAND
+  let known = grown.get(world)
+  if (!known) {
+    known = wildsOf(world)
+    grown.set(world, known)
+  }
+  return known
+}
 
 /** The highest `detail` each tier draws (world/wilds.ts `Wild.detail`). */
 const DETAIL: Record<Tier, number> = { 0: 0, 1: 1, 2: 2, 3: 2 }
@@ -47,14 +60,15 @@ const SWAY: Record<WildKind, number> = { tree: 0.5, bush: 0.8, rock: 0, grass: 4
 
 export function Wilds({ tier }: { tier: Tier }) {
   const { nodes } = useGLTF(FOREST_URL) as unknown as { nodes: Record<string, Object3D> }
+  const all = wildsFor(useWorld())
   // Material and batches are this mount's own (scene/owned.ts); the pack's texture is borrowed.
   const built = useOwnedMeshes(
     () => {
       const material = swayMaterial(nodes)
-      const list = ALL.filter((w) => w.detail <= DETAIL[tier])
+      const list = all.filter((w) => w.detail <= DETAIL[tier])
       return { meshes: material ? build(nodes, material, list) : [] }
     },
-    [nodes, tier],
+    [nodes, tier, all],
     "textures",
   )
 

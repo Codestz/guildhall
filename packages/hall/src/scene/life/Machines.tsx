@@ -13,7 +13,9 @@ import {
 } from "three"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { LANDS_URL } from "../../world/cast.ts"
-import { HEX_SCALE, island, type LandmarkKind } from "../../world/lands.ts"
+import { HEX_SCALE, type LandmarkKind } from "../../world/lands.ts"
+import { useWorld } from "../../world/source.ts"
+import type { World } from "../../world/world.ts"
 import { plain } from "../Kit.tsx"
 import { useOwnedMeshes } from "../owned.ts"
 import { MOVING_PARTS, movingPartsClaimed } from "./moving.ts"
@@ -44,8 +46,9 @@ interface Placed {
 export function Machines() {
   const store = useGuildStore()
   const { nodes } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
+  const world = useWorld()
   // The batch is this mount's own (scene/owned.ts); its material is the land pack's.
-  const built = useOwnedMeshes(() => build(nodes, movingPartsClaimed()), [nodes], "materials")
+  const built = useOwnedMeshes(() => build(nodes, movingPartsClaimed(), world), [nodes, world], "materials")
 
   useFrame((_, delta) => {
     if (!built) return
@@ -74,8 +77,8 @@ export function Machines() {
 const matrix = new Matrix4()
 const spin = new Matrix4()
 
-function build(nodes: Record<string, Object3D>, claimed: boolean) {
-  const land = island()
+function build(nodes: Record<string, Object3D>, claimed: boolean, world: World) {
+  const land = world.island
   const items: { geometry: BufferGeometry; material: Material; base: Matrix4; part?: Part; axis: Vector3 }[] =
     []
 
@@ -101,9 +104,9 @@ function build(nodes: Record<string, Object3D>, claimed: boolean) {
     }
   }
 
-  // The fish rack: a pallet by the river bend.
+  // The fish rack: a pallet by the (hand map's) river bend.
   const pallet = nodes.pallet
-  if (pallet) {
+  if (pallet && world.kind === "hand") {
     pallet.updateMatrixWorld(true)
     const inverse = pallet.matrixWorld.clone().invert()
     pallet.traverse((child) => {

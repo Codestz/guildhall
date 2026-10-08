@@ -1,15 +1,18 @@
 import type { Placement } from "./furniture.ts"
 import { GRAVEYARD } from "./graveyard.ts"
-import { island, ROAD_EDGES, ROAD_NODES, SITES, toPlot } from "./lands.ts"
+import { toPlot } from "./lands.ts"
 import { ROOM, type Spot } from "./layout.ts"
+import { handWorld, type World } from "./world.ts"
 
 /**
  * The island's night lights (conductor; the user asked for "more lamps, torches, anything that
  * provides light in the night"): tall torches along the roads, lanterns at the well, markets, dock
  * and every job site, a pair of great torches at the gate. Placed from the map's data, never by
  * hand: one torch per road hex, alternating sides, skipped wherever it would stand in water, in
- * the keep or inside a building. Each light has a flame (a halo in scene/atmosphere/Lamps) and a
- * pool of light on the ground (scene/lights/StreetLights).
+ * the keep or inside a building. Placed for a world (world/world.ts): the hand map's, or a repo
+ * island's, whose roads and districts get the same treatment (it has no keep or graveyard). Each
+ * light has a flame (a halo in scene/atmosphere/Lamps) and a pool of light on the ground
+ * (scene/lights/StreetLights).
  */
 
 /** A flame that glows after dusk: a halo (scene/atmosphere/Lamps) and a pool on the ground (StreetLights). */
@@ -43,15 +46,6 @@ const GRAVEYARD_CLEARANCE = 3
 const BUILDING_CLEARANCE = 4.2
 const MIN_SPACING = 7.5
 
-const land = island()
-const buildings: Spot[] = land.decor.filter((d) => d.piece.startsWith("building_")).map((d) => [d.x, d.z])
-const roads: (readonly [Spot, Spot])[] = ROAD_EDGES.flatMap(([a, b]) => {
-  const from = ROAD_NODES[a]
-  const to = ROAD_NODES[b]
-  return from && to ? [[from, to] as const] : []
-})
-const posts: Spot[] = Object.values(SITES).flatMap((site) => site.posts.map((p) => [p[0], p[1]] as Spot))
-
 /** Distance from a point to a segment. */
 export function toSegment(p: Spot, a: Spot, b: Spot): number {
   const dx = b[0] - a[0]
@@ -68,13 +62,39 @@ interface Rules {
 const TORCH_RULES: Rules = { road: ROAD_CLEARANCE, building: BUILDING_CLEARANCE }
 const LANTERN_RULES: Rules = { road: 1.7, building: 3.2 }
 
-function clear([x, z]: Spot, spacing: Spot[], rules: Rules = TORCH_RULES): boolean {
-  if (Math.abs(x) < ROOM.width / 2 + KEEP_MARGIN && Math.abs(z) < ROOM.depth / 2 + KEEP_MARGIN) return false
-  if (land.water.some((w) => Math.hypot(w[0] - x, w[1] - z) < WATER_CLEARANCE)) return false
-  if (buildings.some((b) => Math.hypot(b[0] - x, b[1] - z) < rules.building)) return false
-  if (roads.some(([a, b]) => toSegment([x, z], a, b) < rules.road)) return false
-  if (posts.some((p) => Math.hypot(p[0] - x, p[1] - z) < POST_CLEARANCE)) return false
-  if (toPlot(x, z) < GRAVEYARD_CLEARANCE) return false
+/** What the lights keep clear of, from a world's data. */
+interface Ground {
+  hand: boolean
+  water: readonly Spot[]
+  buildings: readonly Spot[]
+  roads: readonly (readonly [Spot, Spot])[]
+  posts: readonly Spot[]
+}
+
+function groundOf(world: World): Ground {
+  const { nodes, edges } = world.roads
+  return {
+    hand: world.kind === "hand",
+    water: world.island.water,
+    buildings: world.island.decor.filter((d) => d.piece.startsWith("building_")).map((d) => [d.x, d.z]),
+    roads: edges.flatMap(([a, b]) => {
+      const from = nodes[a]
+      const to = nodes[b]
+      return from && to ? [[from, to] as const] : []
+    }),
+    posts: world.sites.flatMap((site) => site.posts.map((p) => [p[0], p[1]] as Spot)),
+  }
+}
+
+function clear(ground: Ground, [x, z]: Spot, spacing: Spot[], rules: Rules = TORCH_RULES): boolean {
+  // The keep and the graveyard are the hand map's.
+  if (ground.hand && Math.abs(x) < ROOM.width / 2 + KEEP_MARGIN && Math.abs(z) < ROOM.depth / 2 + KEEP_MARGIN)
+    return false
+  if (ground.water.some((w) => Math.hypot(w[0] - x, w[1] - z) < WATER_CLEARANCE)) return false
+  if (ground.buildings.some((b) => Math.hypot(b[0] - x, b[1] - z) < rules.building)) return false
+  if (ground.roads.some(([a, b]) => toSegment([x, z], a, b) < rules.road)) return false
+  if (ground.posts.some((p) => Math.hypot(p[0] - x, p[1] - z) < POST_CLEARANCE)) return false
+  if (ground.hand && toPlot(x, z) < GRAVEYARD_CLEARANCE) return false
   return !spacing.some((s) => Math.hypot(s[0] - x, s[1] - z) < MIN_SPACING)
 }
 
@@ -96,7 +116,9 @@ function lantern(x: number, z: number): Light {
   }
 }
 
-function build(): Light[] {
+function build(world: World): Light[] {
+  const ground = groundOf(world)
+  const { nodes, edges } = world.roads
   const out: Light[] = []
   const taken: Spot[] = []
   const add = (light: Light) => {
@@ -104,20 +126,22 @@ function build(): Light[] {
     taken.push([light.placement.x, light.placement.z])
   }
 
-  // The gate: two great torches flanking the road out.
-  add(torch(-3.2, ROOM.depth / 2 + 3.4, 1.35))
-  add(torch(3.2, ROOM.depth / 2 + 3.4, 1.35))
+  // The keep's gate: two great torches flanking the road out.
+  if (ground.hand) {
+    add(torch(-3.2, ROOM.depth / 2 + 3.4, 1.35))
+    add(torch(3.2, ROOM.depth / 2 + 3.4, 1.35))
+  }
 
   // Roads: one torch per road hex, beside the road (perpendicular to it), alternating sides.
   const neighbours = new Map<string, string[]>()
-  for (const [a, b] of ROAD_EDGES) {
+  for (const [a, b] of edges) {
     neighbours.set(a, [...(neighbours.get(a) ?? []), b])
     neighbours.set(b, [...(neighbours.get(b) ?? []), a])
   }
   let side = 1
-  for (const [name, at] of Object.entries(ROAD_NODES)) {
+  for (const [name, at] of Object.entries(nodes)) {
     const next = neighbours.get(name)?.[0]
-    const to = next ? ROAD_NODES[next] : undefined
+    const to = next ? nodes[next] : undefined
     const dx = to ? to[0] - at[0] : 1
     const dz = to ? to[1] - at[1] : 0
     const length = Math.hypot(dx, dz) || 1
@@ -126,7 +150,7 @@ function build(): Light[] {
       [at[0] + (-dz / length) * SIDE_OFFSET * side, at[1] + (dx / length) * SIDE_OFFSET * side],
       [at[0] - (-dz / length) * SIDE_OFFSET * side, at[1] - (dx / length) * SIDE_OFFSET * side],
     ]
-    const spot = candidates.find((c) => clear(c, taken))
+    const spot = candidates.find((c) => clear(ground, c, taken))
     if (spot) add(torch(spot[0], spot[1]))
   }
 
@@ -137,23 +161,46 @@ function build(): Light[] {
       for (let k = 0; k < 10 && placed < count; k++) {
         const angle = 0.4 + (k / 10) * Math.PI * 2
         const spot: Spot = [cx + Math.cos(angle) * ring, cz + Math.sin(angle) * ring]
-        if (clear(spot, taken, LANTERN_RULES)) {
+        if (clear(ground, spot, taken, LANTERN_RULES)) {
           add(lantern(spot[0], spot[1]))
           placed++
         }
       }
     }
   }
-  for (const l of land.landmarks)
+  for (const l of world.island.landmarks)
     if (l.kind === "well" || l.kind === "market" || l.kind === "dock") lanternsAround(l.x, l.z, 2)
-  for (const site of Object.values(SITES)) lanternsAround(site.at[0], site.at[1], 2)
+  for (const site of world.sites) lanternsAround(site.at[0], site.at[1], 2)
   return out
 }
 
-export const LIGHTS: readonly Light[] = build()
+const lights = new WeakMap<World, readonly Light[]>()
+/** A world's street lights (placed once per world). */
+export function lightsOf(world: World): readonly Light[] {
+  let known = lights.get(world)
+  if (!known) {
+    known = build(world)
+    lights.set(world, known)
+  }
+  return known
+}
 
+const glows = new WeakMap<World, readonly Glow[]>()
 /**
- * Every flame that glows at night: the street lights, plus the graveyard's lanterns and candles
- * (world/graveyard.ts; their models are the graveyard's own, drawn by scene/Graveyard).
+ * Every flame that glows at night in a world: its street lights, plus (the hand map's) the
+ * graveyard's lanterns and candles (world/graveyard.ts; drawn by scene/Graveyard).
  */
-export const GLOWS: readonly Glow[] = [...LIGHTS, ...GRAVEYARD.glows]
+export function glowsOf(world: World): readonly Glow[] {
+  let known = glows.get(world)
+  if (!known) {
+    known = world.kind === "hand" ? [...lightsOf(world), ...GRAVEYARD.glows] : lightsOf(world)
+    glows.set(world, known)
+  }
+  return known
+}
+
+/** The hand map's street lights. */
+export const LIGHTS: readonly Light[] = lightsOf(handWorld())
+
+/** The hand map's flames: its street lights and the graveyard's. */
+export const GLOWS: readonly Glow[] = glowsOf(handWorld())

@@ -33,9 +33,15 @@ export function insideHex(dx: number, dz: number, margin = 0): boolean {
 
 /**
  * Tufts for the island. `density` is tufts per meadow hex (forest hexes get a quarter); 0 grows none.
- * Decor standing on a hex keeps a clear circle round it (a tree's trunk, a rock).
+ * Decor standing on a hex keeps a clear circle round it (a tree's trunk, a rock). `graveyard`: keep
+ * off the hand map's graveyard plot (a repo's island has none).
  */
-export function scatter(land: Pick<Island, "meadow" | "tiles" | "decor">, density: number, seed = 3): Tuft[] {
+export function scatter(
+  land: Pick<Island, "meadow" | "tiles" | "decor">,
+  density: number,
+  seed = 3,
+  graveyard = true,
+): Tuft[] {
   if (density <= 0) return []
   const random = rng(seed)
   const tufts: Tuft[] = []
@@ -59,7 +65,7 @@ export function scatter(land: Pick<Island, "meadow" | "tiles" | "decor">, densit
       const z = centre[1] + dz
       if (blockers.some((b) => Math.hypot(b.x - x, b.z - z) < b.r)) continue
       // The graveyard's plot is dirt and graves; a neighbouring meadow's grass stops at its fence.
-      if (toPlot(x, z) < 0.4) continue
+      if (graveyard && toPlot(x, z) < 0.4) continue
       const flowered = random() < 0.13
       tufts.push({
         x,

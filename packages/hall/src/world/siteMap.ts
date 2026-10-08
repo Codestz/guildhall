@@ -36,7 +36,8 @@ const CLEAR = 2.5
 
 /**
  * Each site's district on a repo's island, deterministically: its trade's biome first (the largest
- * such district), the river the largest district on the shore; any site left over takes the
+ * such district; the yard the biggest package's village of a split workspace when there is one, so
+ * the builders work in the monorepo's biggest package), the river the largest district on the shore; any site left over takes the
  * unclaimed district nearest the keep. Districts without a landmark are passed over (no room on
  * the shore for one), the harbour too unless nothing else is left. When there are fewer districts
  * than sites, the leftover ones share the nearest district, each moved clear of the others' posts.
@@ -50,15 +51,22 @@ export function mapSites(made: RepoIsland): Record<SiteId, Site> {
   const coastal = new Set(towns.filter((district) => shoreOf(made, indexOf.get(district) ?? -1).length > 0))
   const largest = (list: readonly District[]) =>
     [...list].sort((a, b) => b.hexes - a.hexes || (a.id < b.id ? -1 : 1))[0]
+  const biggest = (list: readonly District[]) =>
+    [...list].sort((a, b) => b.bytes - a.bytes || (a.id < b.id ? -1 : 1))[0]
   const nearest = (list: readonly District[]) =>
     [...list].sort((a, b) => Math.hypot(...a.at) - Math.hypot(...b.at) || (a.id < b.id ? -1 : 1))[0]
 
   const chosen = new Map<SiteId, District>()
   const free = (list: readonly District[]) =>
     list.filter((district) => ![...chosen.values()].includes(district))
+  const isPackage = (district: District): boolean => {
+    const folder = plan.districts[indexOf.get(district) ?? -1]?.folder
+    return folder?.group !== undefined && !folder.pooled
+  }
   for (const id of ORDER) {
     if (id === "river") continue
-    const match = largest(free(towns).filter((district) => district.biome === TRADE[id]))
+    const trade = free(towns).filter((district) => district.biome === TRADE[id])
+    const match = (id === "yard" ? biggest(trade.filter(isPackage)) : undefined) ?? largest(trade)
     if (match) chosen.set(id, match)
   }
   const shore = largest(free(towns).filter((district) => coastal.has(district)))

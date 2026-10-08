@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import { biomeOf, languageOf } from "../src/world/gen/biomes.ts"
 import type { RepoIsland } from "../src/world/gen/dress.ts"
-import { cellAt, key, rng } from "../src/world/gen/hex.ts"
+import { cellAt, key, neighbours, rng, unkey } from "../src/world/gen/hex.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
 import { extentOf, KEEP, LAND_HALF, quotaOf } from "../src/world/gen/plan.ts"
-import { MAX_DISTRICTS, type RepoEntry, summarize } from "../src/world/gen/repo.ts"
+import { MAX_DISTRICTS, MAX_PACKAGES, type RepoEntry, summarize } from "../src/world/gen/repo.ts"
 import { fit, PATH_TILES, turn } from "../src/world/gen/tiles.ts"
 import { cellToWorld, island, MAP_FOR_TESTS } from "../src/world/lands.ts"
 import type { Spot } from "../src/world/layout.ts"
@@ -197,19 +197,25 @@ describe("islandFromTree", () => {
 })
 
 /**
- * Regenerate when the generator changes on purpose (and look at the lab shot). Last: the keep's
- * block reserved at the origin, the hub moved south of it (the harbour holds the keep and its ring).
+ * Regenerate when the generator changes on purpose (and look at the lab shot). Last: packages/
+ * split into a town of villages north of the keep, one per package (hall the biggest at its heart).
  */
 const SAMPLE = {
   hash: 1887736964,
-  land: 181,
-  tiles: 631,
-  decor: 105,
+  land: 241,
+  tiles: 721,
+  decor: 141,
   districts: [
-    "/ harbour Markdown 58",
-    "packages village TypeScript 49",
+    "/ harbour Markdown 65",
+    "packages/hall village TypeScript 27",
+    "packages/core village TypeScript 17",
+    "packages/herald village TypeScript 13",
+    "packages/sim village TypeScript 13",
+    "packages/hub village TypeScript 12",
+    "packages/roster village TypeScript 12",
+    "packages/opencode-guildhall village TypeScript 9",
     ".github farms Image 47",
-    "scripts farms TypeScript 27",
+    "scripts farms TypeScript 26",
   ],
 }
 
@@ -245,6 +251,87 @@ describe("the repo summary", () => {
     expect(shape.folders).toHaveLength(MAX_DISTRICTS)
     expect(shape.folders.at(-1)).toMatchObject({ name: "+9 more", biome: "wilds", files: 9 })
     expect(shape.folders[0]?.name).toBe("f19")
+  })
+})
+
+describe("a monorepo's workspace", () => {
+  /** A workspace of `count` packages, the i-th (i + 1) × 10 KB, under `container`. */
+  const workspace = (container: string, count: number, extra: RepoEntry[] = []): RepoEntry[] => [
+    { path: "README.md", type: "blob", size: 2000 },
+    { path: "docs/a.md", type: "blob", size: 5000 },
+    ...Array.from({ length: count }, (_, i) => ({
+      path: `${container}/pkg${i}/src/index.rs`,
+      type: "blob" as const,
+      size: (i + 1) * 10_000,
+    })),
+    ...extra,
+  ]
+
+  test("splits into a village per package, named after it, coloured by its own language", () => {
+    const shape = summarize([
+      ...workspace("packages", 3),
+      { path: "packages/web/src/app.ts", type: "blob", size: 1000 },
+    ])
+    expect(shape.folders.map((f) => [f.name, f.biome, f.group, f.language.name])).toEqual([
+      ["packages/pkg2", "village", "packages", "Rust"],
+      ["packages/pkg1", "village", "packages", "Rust"],
+      ["packages/pkg0", "village", "packages", "Rust"],
+      ["packages/web", "village", "packages", "TypeScript"],
+      ["docs", "library", undefined, "Markdown"],
+    ])
+    // Depth counts from the container (pkg2/src/index.rs is 2), as a top-level folder's does from the root.
+    expect(shape.folders[0]?.depth).toBe(2)
+    const made = islandFromTree(workspace("packages", 3))
+    expect(made.districts.find((d) => d.id === "packages/pkg2")?.label).toBe("pkg2")
+  })
+
+  test(`past ${MAX_PACKAGES} packages the smallest pool into one village, loose files with them`, () => {
+    const loose: RepoEntry = { path: "packages/README.md", type: "blob", size: 7 }
+    const shape = summarize(workspace("crates", 12, [{ ...loose, path: "crates/README.md" }]))
+    const villages = shape.folders.filter((f) => f.group === "crates")
+    expect(villages).toHaveLength(MAX_PACKAGES)
+    expect(villages[0]?.name).toBe("crates/pkg11")
+    expect(villages.at(-1)).toMatchObject({
+      name: "crates/+4 crates",
+      biome: "village",
+      pooled: true,
+      files: 5,
+    })
+    // Every file is still counted once.
+    expect(villages.reduce((sum, f) => sum + f.files, 0)).toBe(13)
+  })
+
+  test("a container with one package, or a folder that isn't a workspace, stays one district", () => {
+    expect(summarize(workspace("packages", 1)).folders.map((f) => f.name)).toEqual(["packages", "docs"])
+    expect(summarize(workspace("things", 3)).folders.map((f) => f.name)).toEqual(["things", "docs"])
+  })
+
+  test("its villages stand together, their roads branching from the biggest's square", () => {
+    for (const made of [islandFromTree(FIXTURES.react), islandFromTree(FIXTURES.guildhall)]) {
+      const villages = made.plan.districts
+        .map((district, i) => ({ district, i }))
+        .filter(({ district }) => district.folder.group === "packages")
+      const [head, ...rest] = villages
+      expect(rest.length).toBeGreaterThan(1)
+      // Each package's road starts at the biggest package's square, not the hub.
+      for (const { district } of rest) {
+        const road = made.plan.roads.find((r) => key(r.at(-1) ?? [0, 0]) === key(district.square))
+        expect(key(road?.[0] ?? [0, 0])).toBe(key(head?.district.square ?? [0, 0]))
+      }
+      // One town: every village borders another of its workspace.
+      const ids = new Set(villages.map(({ i }) => i))
+      for (const { i } of villages) {
+        const borders = [...made.plan.land].some(
+          ([id, hex]) =>
+            hex.district === i &&
+            neighbours(unkey(id)).some((next) => {
+              const other = made.plan.land.get(key(next))?.district
+              return other !== undefined && other !== i && ids.has(other)
+            }),
+        )
+        expect({ i, borders }).toEqual({ i, borders: true })
+      }
+    }
   })
 })
 

@@ -25,7 +25,7 @@ import { COAST_TILES, contiguous, fit, PATH_TILES, turn } from "./tiles.ts"
  */
 
 export interface District {
-  /** The folder ("/" is the root's own files). */
+  /** The folder ("/" is the root's own files, "packages/react" a workspace's package). */
   id: string
   label: string
   biome: Biome
@@ -363,7 +363,12 @@ export function dress(plan: IslandPlan): RepoIsland {
     const folder = district.folder
     return {
       id: folder.name,
-      label: folder.name === "/" ? "Harbour" : folder.name,
+      label:
+        folder.name === "/"
+          ? "Harbour"
+          : folder.group === undefined
+            ? folder.name
+            : folder.name.slice(folder.group.length + 1),
       biome: district.biome,
       language: folder.language,
       accent: folder.language.colour,

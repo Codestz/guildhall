@@ -49,7 +49,8 @@ describe("a repo's island", () => {
     const sites = sitesOf(react)
     const district = (id: SiteId) => districtAt(react, sites[id].at)
     expect(IDS.map((id) => [id, district(id)?.id])).toEqual([
-      ["yard", "packages"],
+      // A split workspace: the yard is its biggest package's village.
+      ["yard", "packages/react-dom"],
       ["forest", ".codesandbox"],
       ["river", expect.any(String)],
       ["proving", "fixtures"],

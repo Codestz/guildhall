@@ -15,7 +15,9 @@ import { contiguous } from "./tiles.ts"
  * harbour (the root's own files): the hub, two hexes south, its quay running on south into a bay
  * nothing may fill. The keep's block and the ring of land round it are reserved before anything
  * grows: level harbour ground no district, road or shore may take. The top-level folders sit round it in sectors sized by their land, each grown
- * hex by hex from a seed (its square, where its road ends), so every district is one piece. Roads
+ * hex by hex from a seed (its square, where its road ends), so every district is one piece. A split
+ * workspace's packages (repo.ts) share one sector as a cluster: the biggest at its heart, the rest
+ * fanned round it away from the hub, its road from the hub and theirs from its square: a town. Roads
  * run from the hub to every square (Dijkstra over the hexes, reusing roads already laid; a road over
  * sea is a causeway and makes land). Then the shore is smoothed until every land hex meets the sea
  * along one run of at most four sides (what the pack's coast tiles can draw).
@@ -150,11 +152,34 @@ export function fitIsland(shape: RepoShape, seed: number): IslandPlan {
   return plan
 }
 
+/** A workspace's land: its whole size's quota times this, shared among its packages ∝ their own. */
+const TOWN = 2
+/** The arc a workspace's packages fan over round its biggest, centred on the way out from the hub. */
+const FAN = (240 * Math.PI) / 180
+
+/** Each district's quota before scaling: its own, or its share of its workspace's. */
+function quotasOf(folders: readonly Folder[]): number[] {
+  const groups = new Map<string, { bytes: number; own: number }>()
+  for (const folder of folders) {
+    if (folder.group === undefined) continue
+    const group = groups.get(folder.group) ?? { bytes: 0, own: 0 }
+    group.bytes += folder.bytes
+    group.own += quotaOf(folder.bytes)
+    groups.set(folder.group, group)
+  }
+  return folders.map((folder) => {
+    const group = folder.group === undefined ? undefined : groups.get(folder.group)
+    if (!group) return quotaOf(folder.bytes)
+    return (quotaOf(group.bytes) * TOWN * quotaOf(folder.bytes)) / group.own
+  })
+}
+
 export function planIsland(shape: RepoShape, seed: number, scale = 1): IslandPlan {
   const random = rng(seed)
   const folders = [shape.root, ...shape.folders]
+  const quotas = quotasOf(folders)
   const districts: PlanDistrict[] = folders.map((folder, i) => {
-    const own = Math.max(3, Math.round(quotaOf(folder.bytes) * scale))
+    const own = Math.max(3, Math.round((quotas[i] ?? 0) * scale))
     const quota = i === 0 ? Math.max(7, own) : own
     return {
       folder,
@@ -168,29 +193,57 @@ export function planIsland(shape: RepoShape, seed: number, scale = 1): IslandPla
   })
 
   // ---- Seeds: the folders round the hub in sectors ∝ their land, the bay left open ----
-  const order = districts.slice(1).map((_, i) => i + 1)
-  for (let i = order.length - 1; i > 0; i--) {
+  // A workspace's packages are one unit there: one sector, one cluster (heads[i] is its first, biggest).
+  const units: number[][] = []
+  const heads = new Map<number, number>()
+  districts.forEach((district, i) => {
+    if (i === 0) return
+    const group = district.folder.group
+    const unit =
+      group === undefined ? undefined : units.find((u) => districts[u[0] ?? 0]?.folder.group === group)
+    if (unit) {
+      heads.set(i, unit[0] ?? i)
+      unit.push(i)
+    } else units.push([i])
+  })
+  for (let i = units.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1))
-    ;[order[i], order[j]] = [order[j] ?? 0, order[i] ?? 0]
+    ;[units[i], units[j]] = [units[j] ?? [], units[i] ?? []]
   }
-  const total = order.reduce((sum, i) => sum + (districts[i]?.quota ?? 0), 0)
+  const quotaOfUnit = (unit: readonly number[]): number =>
+    unit.reduce((sum, i) => sum + (districts[i]?.quota ?? 0), 0)
+  const total = units.reduce((sum, unit) => sum + quotaOfUnit(unit), 0)
   const rootRadius = patch(districts[0]?.quota ?? 7)
   const seeded = new Set([key(HUB), ...RESERVED])
-  let swept = 0
-  for (const i of order) {
-    const district = districts[i]
-    if (!district) continue
-    const angle = BAY + (2 * Math.PI - 2 * BAY) * ((swept + district.quota / 2) / total)
-    swept += district.quota
-    let distance = rootRadius + patch(district.quota) + 4
-    const at = (): Cell => cellAt([HUB_X + distance * Math.sin(angle), HUB_Z + distance * Math.cos(angle)])
+  /** The first free hex out along a ray from [x, z]: no seed yet, not in the bay. */
+  const seedAt = (x: number, z: number, angle: number, distance: number): Cell => {
+    const at = (): Cell => cellAt([x + distance * Math.sin(angle), z + distance * Math.cos(angle)])
     let cell = at()
     while (seeded.has(key(cell)) || inBay(cell)) {
       distance += 5
       cell = at()
     }
     seeded.add(key(cell))
-    district.square = cell
+    return cell
+  }
+  let swept = 0
+  for (const unit of units) {
+    const land = quotaOfUnit(unit)
+    const angle = BAY + (2 * Math.PI - 2 * BAY) * ((swept + land / 2) / total)
+    swept += land
+    const [first, ...ring] = unit
+    const head = districts[first ?? 0]
+    if (!head) continue
+    head.square = seedAt(HUB_X, HUB_Z, angle, rootRadius + patch(land) + 4)
+    // The rest of a workspace fan round its biggest package on the side away from the hub (a ray
+    // towards it would be pushed on through the harbour), each a patch's width off its square.
+    const [cx, cz] = cellToWorld(head.square)
+    ring.forEach((i, n) => {
+      const district = districts[i]
+      if (!district) return
+      const around = angle + FAN * ((n + 0.5) / ring.length - 0.5)
+      district.square = seedAt(cx, cz, around, patch(head.quota) + patch(district.quota))
+    })
   }
 
   // ---- Growth: each district claims the frontier hex nearest its seed, the emptiest first ----
@@ -276,17 +329,20 @@ export function planIsland(shape: RepoShape, seed: number, scale = 1): IslandPla
       if (count >= 4) owner.set(key(cell), district)
     }
 
-  // ---- Roads: the avenue, then hub → every square, nearest first, reusing what's laid ----
+  // ---- Roads: the avenue, then hub → every square, nearest first, reusing what's laid; a
+  // workspace's packages after it, each from its biggest package's square ----
   const road = new Set<string>([key(HUB), key(AVENUE), key(GATE)])
   const roads: Cell[][] = [[HUB, AVENUE]]
   const byDistance = districts
     .map((district, i) => ({ i, d: rings(district.square) }))
     .filter(({ i }) => i > 0)
-    .sort((a, b) => a.d - b.d || a.i - b.i)
+    .sort((a, b) => Number(heads.has(a.i)) - Number(heads.has(b.i)) || a.d - b.d || a.i - b.i)
   for (const { i } of byDistance) {
     const district = districts[i]
     if (!district) continue
-    const path = cheapest(HUB, district.square, radius + 2, (cell) => {
+    const head = heads.get(i)
+    const from = head === undefined ? HUB : (districts[head]?.square ?? HUB)
+    const path = cheapest(from, district.square, radius + 2, (cell) => {
       const id = key(cell)
       if (inBay(cell) || (RESERVED.has(id) && !road.has(id)) || id === key(GATE)) return undefined
       if (road.has(id)) return 0.4

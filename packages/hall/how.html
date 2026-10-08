@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>How it's built · Guildhall</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Marcellus+SC&family=Alegreya:ital,wght@0,400;0,500;0,600;1,400&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <meta name="theme-color" content="#15110d" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="canonical" href="https://guildhall.codestz.dev/how" />
+    <meta name="description" content="How Guildhall draws 300 adventurers at 175 fps in the browser: baked bone textures, mesh LOD, WebGL against WebGPU, TSL gotchas, repos grown into islands, and GitHub as a sea. Every number measured, every claim a live link." />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Guildhall" />
+    <meta property="og:url" content="https://guildhall.codestz.dev/how" />
+    <meta property="og:title" content="How Guildhall is built" />
+    <meta property="og:description" content="300 adventurers at 175 fps, WebGL against WebGPU, TSL gotchas, repos as islands. Measured, with live links into the hall." />
+    <meta property="og:image" content="https://guildhall.codestz.dev/og.png" />
+    <meta property="og:image:alt" content="A voxel island at golden hour, its guildhall lit by a fire, with the title Guildhall." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="stylesheet" href="/src/how/how.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to the article</a>
+
+    <header class="top">
+      <a class="home" href="/" aria-label="Guildhall: back to the island">
+        <span class="crest" aria-hidden="true">
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+            <path d="M8 1.5 13.5 4v4.2c0 3-2.3 5.3-5.5 6.3-3.2-1-5.5-3.3-5.5-6.3V4z" />
+            <path d="M5.2 9.5V7.2L8 5.4l2.8 1.8v2.3" />
+            <path d="M6.6 9.5V8.3h2.8v1.2" />
+          </svg>
+        </span>
+        Guildhall
+      </a>
+      <nav class="top-links" aria-label="Site">
+        <a href="/">Visit the guild</a>
+        <a class="wide" href="https://github.com/Codestz/guildhall">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <div class="hero">
+        <p class="eyebrow">How it's built</p>
+        <h1>Fast web 3D, with the numbers</h1>
+        <span class="rule" aria-hidden="true"></span>
+        <p class="lede">
+          Guildhall turns AI coding sessions into a living island, drawn with three.js in your browser.
+          It is also a place to push web 3D and <strong>measure what each idea is worth</strong>. This page
+          walks through what we built, what it cost, and what went wrong. Every section ends in a link
+          that opens the thing it describes.
+        </p>
+
+        <ul class="stats" aria-label="Headline numbers">
+          <li><span class="stat-n">300</span><span class="stat-l">adventurers on one island</span></li>
+          <li><span class="stat-n">175<small> fps</small></span><span class="stat-l">uncapped, up from 51</span></li>
+          <li><span class="stat-n">143</span><span class="stat-l">draw calls, down from 1,226</span></li>
+        </ul>
+        <p class="note">
+          How we measure: a production build in Chrome on a MacBook, uncapped (no vsync) at pixel
+          density 2, High quality, medians of interleaved rounds. <strong>60 fps is the bar.</strong> Uncapped
+          numbers above it are headroom: how much room a feature leaves, not whether it ships.
+        </p>
+      </div>
+
+      <nav class="toc" aria-label="Contents">
+        <ol>
+          <li><a href="#crowds">Crowds: 300 adventurers</a></li>
+          <li><a href="#webgpu">WebGL against WebGPU, honestly</a></li>
+          <li><a href="#tsl">TSL on WebGL: the gotchas</a></li>
+          <li><a href="#islands">Repos as islands</a></li>
+          <li><a href="#seas">GitHub as a sea</a></li>
+          <li><a href="#verify">How we know it still works</a></li>
+        </ol>
+      </nav>
+
+      <!-- ─────────────────────────── I. crowds ─────────────────────────── -->
+      <section id="crowds" aria-labelledby="crowds-h">
+        <p class="eyebrow">I</p>
+        <h2 id="crowds-h">Crowds: 300 adventurers</h2>
+        <p>
+          Every adventurer is a skinned character with its own skeleton, a mixer playing its clips, a
+          name chip and a handful of meshes. At 13 that is cheap. At 300 it was <strong>51 fps with 1,226
+          draw calls</strong>, and the slowest frames took 28 ms. Skinned meshes can't be batched like
+          furniture, because every skeleton is different. So the crowd stopped being 300 characters and
+          became one.
+        </p>
+
+        <figure class="plaque">
+          <div class="table-wrap">
+            <table>
+              <caption>300 adventurers, before and after</caption>
+              <thead>
+                <tr><th scope="col">Metric</th><th scope="col" class="n">Before</th><th scope="col" class="n">After</th><th scope="col" class="n">Change</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">Frame rate, uncapped</th><td class="n">51 fps</td><td class="n win">175 fps</td><td class="n gain">3.4×</td></tr>
+                <tr><th scope="row">Draw calls a frame</th><td class="n">1,226</td><td class="n win">143</td><td class="n gain">−88%</td></tr>
+                <tr><th scope="row">Triangles a frame</th><td class="n">2.94M</td><td class="n win">1.28M</td><td class="n gain">−56%</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="fig-note">Triangles are counted either side of the mesh LOD step, the one that cut them.</p>
+        </figure>
+
+        <figure class="plaque" aria-labelledby="crowd-chart-h">
+          <div class="chart-head">
+            <figcaption id="crowd-chart-h">Frame rate at 300, step by step</figcaption>
+            <span class="chart-key" aria-hidden="true"><i class="dash"></i>60 fps, the bar</span>
+          </div>
+          <ol class="bars" data-target style="--at: 30%">
+                        <li class="bar-row">
+              <span class="bar-label">Where we started<small>one skeleton, mixer and chip each</small></span>
+              <span class="bar-value">51 fps <small>· 1,226 calls</small></span>
+              <span class="bar-track" aria-hidden="true"><i style="--w: 25.5%"></i></span>
+            </li>
+            <li class="bar-row">
+              <span class="bar-label">One store, one label layer<small>state that scales, chips drawn together</small></span>
+              <span class="bar-value">68 fps <small>· 837 calls</small></span>
+              <span class="bar-track" aria-hidden="true"><i style="--w: 34%"></i></span>
+            </li>
+            <li class="bar-row">
+              <span class="bar-label">Baked bone texture<small>the crowd as one instanced body</small></span>
+              <span class="bar-value">118 fps <small>· 143 calls</small></span>
+              <span class="bar-track" aria-hidden="true"><i style="--w: 59%"></i></span>
+            </li>
+            <li class="bar-row" data-win>
+              <span class="bar-label">Mesh LOD at load<small>simpler bodies far away</small></span>
+              <span class="bar-value">175 fps <small>· 143 calls</small></span>
+              <span class="bar-track" aria-hidden="true"><i style="--w: 87.5%"></i></span>
+            </li>
+          </ol>
+          <p class="fig-note">
+            Each step was measured against the one before it, in its own run. Absolute frame rates drift a
+            few fps with machine load, so read the steps, not the decimals.
+          </p>
+        </figure>
+
+        <h3>What did it</h3>
+        <ul class="techs">
+          <li>
+            <h4>One bone texture for everyone</h4>
+            <p>
+              Every clip of the shared rig is sampled once at load into a single texture. Per bone and
+              frame it stores a turn and a scale about a fixed pivot, plus where that pivot is now: two
+              texels. The vertex shader reads it, and <strong>crossfades two clips on the GPU</strong>. No mixer, no
+              skeleton upload per character.
+            </p>
+          </li>
+          <li>
+            <h4>Simpler meshes, made at load</h4>
+            <p>
+              meshoptimizer gives each body part two simplified index buffers, at half and a quarter of
+              the triangles, sharing the same vertices and skin weights. About 39 ms once, in a lazy 19 KB
+              chunk. Each member picks a level by its height on screen.
+            </p>
+          </li>
+          <li>
+            <h4>One shared label layer</h4>
+            <p>
+              Name chips used to be one DOM element per adventurer, each repositioned every frame. Now
+              they are one layer, drawn together, and they fold away when they would crowd each other.
+            </p>
+          </li>
+          <li>
+            <h4>Hidden models leave the scene</h4>
+            <p>
+              A model that isn't showing is parked out of the scene graph, not just made invisible, so
+              three doesn't walk it, sort it or update its matrices each frame.
+            </p>
+          </li>
+          <li>
+            <h4>One upload a frame</h4>
+            <p>
+              Where each member stands, faces, which clip it plays and its tint all go into one data
+              texture, <strong>uploaded once a frame</strong>, instead of many instance buffers updated one by one.
+            </p>
+          </li>
+          <li>
+            <h4>Heroes up close</h4>
+            <p>
+              Whoever you select, whoever is near and large on screen, keeps a full skinned body. The
+              brain is shared, so a member swaps between the two with its pose carried exactly. Up to 16
+              adventurers, nothing changes at all.
+            </p>
+          </li>
+        </ul>
+        <p>
+          One detail worth stealing: blending two baked frames by lerping whole matrices put a vertex
+          up to 5 cm off. Storing the motion as a turn about a pivot and blending that instead stays
+          close to what the mixer would draw, and a test holds it there.
+        </p>
+
+        <div class="plaque try">
+          <span class="try-label">Try it</span>
+          <a href="/?story=rush&amp;n=300"><code>?story=rush&amp;n=300</code></a>
+          <p>Any crowd from 1 to 500. Settings&nbsp;›&nbsp;Stats for nerds shows frame rate and draw calls live.</p>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── II. webgpu ─────────────────────────── -->
+      <section id="webgpu" aria-labelledby="webgpu-h">
+        <p class="eyebrow">II</p>
+        <h2 id="webgpu-h">WebGL against WebGPU, honestly</h2>
+        <p>
+          WebGPU is faster, and also not a free switch. The hall can run on either: WebGL stays the
+          default, and <strong>Settings&nbsp;›&nbsp;Renderer</strong> switches to WebGPU where the browser has it. The
+          shaders are being moved to TSL, three.js's node language, so one description of a material
+          compiles to GLSL for WebGL and WGSL for WebGPU.
+        </p>
+
+        <figure class="plaque" aria-labelledby="gpu-chart-h">
+          <div class="chart-head">
+            <figcaption id="gpu-chart-h">1,000 adventurers, one crowd, three renderers</figcaption>
+          </div>
+          <ol class="bars">
+            <li class="bar-row">
+              <span class="bar-label">WebGL<small>hand-written GLSL</small></span>
+              <span class="bar-value">184 fps</span>
+              <span class="bar-track" aria-hidden="true"><i style="--w: 73.6%"></i></span>
+            </li>
+            <li class="bar-row">
+              <span class="bar-label">WebGL + TSL<small>the same crowd as node materials</small></span>
+              <span class="bar-value">199 fps</span>
+              <span class="bar-track" aria-hidden="true"><i style="--w: 79.6%"></i></span>
+            </li>
+            <li class="bar-row" data-win>
+              <span class="bar-label">WebGPU<small>TSL compiled to WGSL</small></span>
+              <span class="bar-value">235 fps</span>
+              <span class="bar-track" aria-hidden="true"><i style="--w: 94%"></i></span>
+            </li>
+          </ol>
+          <p class="fig-note">
+            The crowd alone, 12 to 13 draw calls in each case. Bars start at zero; the scale runs to 250 fps.
+          </p>
+        </figure>
+
+        <p>
+          The catch was batching. The island's static pieces live in <code>BatchedMesh</code>es, which on
+          WebGL draw many objects in one call with multi-draw. WebGPU in three.js has no multi-draw yet,
+          so the same batches fell apart into <strong>one draw call per piece</strong>: about 1,000 calls at a
+          normal view. The fix on WebGPU is to bake each static batch into one merged mesh per material
+          at load. WebGL keeps its own path.
+        </p>
+
+        <figure class="plaque">
+          <div class="table-wrap">
+            <table>
+              <caption>Getting WebGPU to draw the same island</caption>
+              <thead>
+                <tr><th scope="col">What</th><th scope="col" class="n">Before</th><th scope="col" class="n">After</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">Draw calls, standard views</th><td class="n">1,010–1,040</td><td class="n win">154–182</td></tr>
+                <tr><th scope="row">Picture change from merging</th><td class="n">—</td><td class="n win">0.07–0.22 / 255</td></tr>
+                <tr><th scope="row">WebGL vs WebGPU, mean pixel difference</th><td class="n">20–70 / 255</td><td class="n win">0.9–1.8 / 255</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="fig-note">
+            Parity across four hours of the day (6, 13, 19 and 23 h) after porting water, sigils, rings,
+            cloud shadows, outlines and mist. WebGPU also counts post-processing passes as draws, so its
+            call counts read about twice as high for the same frame.
+          </p>
+        </figure>
+
+        <div class="plaque try">
+          <span class="try-label">Try it</span>
+          <a href="/?story=rush&amp;n=300&amp;renderer=webgpu"><code>?story=rush&amp;n=300&amp;renderer=webgpu</code></a>
+          <p>
+            Or open Settings&nbsp;›&nbsp;Renderer in the hall. Needs a browser with WebGPU; it falls back to WebGL
+            otherwise. The 1,000-adventurer lab runs from a checkout:
+            <code>bun run dev</code>, then <code>?lab=crowd&amp;n=1000&amp;renderer=webgpu</code>.
+          </p>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── III. tsl ─────────────────────────── -->
+      <section id="tsl" aria-labelledby="tsl-h">
+        <p class="eyebrow">III</p>
+        <h2 id="tsl-h">TSL on WebGL: the gotchas</h2>
+        <p>
+          Running node materials on the WebGL renderer is the gentle way into WebGPU: port a shader,
+          check it pixel for pixel against the GLSL, move on. It mostly works. These five did not.
+        </p>
+
+        <ol class="gotchas">
+          <li>
+            <h3>Uniform blocks run out</h3>
+            <dl>
+              <dt>Symptom</dt>
+              <dd>With 300 adventurers on node materials, some of the crowd drew black.</dd>
+              <dt>Cause</dt>
+              <dd>
+                On WebGL each node material declared its own object and render uniform blocks. ANGLE on
+                Metal (Chrome on a Mac) has 32 binding points, and the crowd used them all.
+              </dd>
+              <dt>Fix</dt>
+              <dd>Declare those groups as plain uniforms, uploaded per draw: <strong>32 bindings down to 1–2</strong>.</dd>
+            </dl>
+          </li>
+          <li>
+            <h3>Double sRGB inside render targets</h3>
+            <dl>
+              <dt>Symptom</dt>
+              <dd>Node materials drawn into the post chain came out too light.</dd>
+              <dt>Cause</dt>
+              <dd>
+                The node output step tone-mapped and encoded colour inside the composer's buffer, and
+                the post chain encoded it again on the way out.
+              </dd>
+              <dt>Fix</dt>
+              <dd>
+                Do nothing in a render target; tone-map and encode only on the canvas, the way the
+                built-in WebGL materials do.
+              </dd>
+            </dl>
+          </li>
+          <li>
+            <h3>Fog in the wrong colour space</h3>
+            <dl>
+              <dt>Symptom</dt>
+              <dd>Node fog was darker than the GLSL fog on WebGL, and lighter on WebGPU.</dd>
+              <dt>Cause</dt>
+              <dd>The fog colour was mixed in before converting it to the output colour space.</dd>
+              <dt>Fix</dt>
+              <dd>Convert <code>fog.color</code> first and fog last, as the built-ins do. Full fog now matches GLSL exactly.</dd>
+            </dl>
+          </li>
+          <li>
+            <h3>Swapped textures never reach WebGPU</h3>
+            <dl>
+              <dt>Symptom</dt>
+              <dd>The water's baked shoreline, set after the material was built, never showed on WebGPU.</dd>
+              <dt>Cause</dt>
+              <dd>
+                Assigning a new texture to a node material that was already built works on WebGL, but
+                WebGPU keeps the binding it made the first time.
+              </dd>
+              <dt>Fix</dt>
+              <dd>Build the material without the texture, then build it once more when the bake lands.</dd>
+            </dl>
+          </li>
+          <li>
+            <h3><code>.toVar()</code> before the first branch</h3>
+            <dl>
+              <dt>Symptom</dt>
+              <dd>A value read inside an <code>If</code> and again after it came out unset after it.</dd>
+              <dt>Cause</dt>
+              <dd>A node is emitted where it is first used. First used inside a branch, it only exists there.</dd>
+              <dt>Fix</dt>
+              <dd>Anything read both inside and outside a branch becomes a <code>.toVar()</code> before the first one.</dd>
+            </dl>
+          </li>
+        </ol>
+      </section>
+
+      <!-- ─────────────────────────── IV. islands ─────────────────────────── -->
+      <section id="islands" aria-labelledby="islands-h">
+        <p class="eyebrow">IV</p>
+        <h2 id="islands-h">Repos as islands</h2>
+        <p>
+          The guild's home is a hand-drawn hex map. Any other repo grows its own island from its file
+          tree: two calls to GitHub's public API, then a planner that works hex by hex. The same repo
+          always grows the same island.
+        </p>
+
+        <figure class="plaque">
+          <figcaption>A file tree, read as land</figcaption>
+          <dl class="map">
+            <dt>Each top-level folder</dt>
+            <dd>a district, in a sector round the keep, grown as one piece from its square</dd>
+            <dt>Its size in bytes</dt>
+            <dd>its land, on a log scale, so one huge folder can't swallow the island</dd>
+            <dt>Its main language</dt>
+            <dd>its colour, after GitHub's own language colours</dd>
+            <dt>Its folder name</dt>
+            <dd>its biome: tests are proving grounds, docs a library, assets a quarry, scripts farmland, vendor a forest</dd>
+            <dt>How deep it nests</dt>
+            <dd>its height, from level ground to mountains</dd>
+            <dt>Files per hex</dt>
+            <dd>how built-up or wooded it is</dd>
+            <dt>A monorepo's packages</dt>
+            <dd>a town: the biggest at its heart, the rest fanned round it</dd>
+            <dt>The root's own files</dt>
+            <dd>the harbour, south of the keep, with roads to every district</dd>
+          </dl>
+        </figure>
+
+        <figure class="plaque" aria-labelledby="land-h">
+          <div class="chart-head">
+            <figcaption id="land-h">How much land a folder gets</figcaption>
+          </div>
+          <ol class="bars">
+            <li class="bar-row">
+              <span class="bar-label">1 KB of code</span>
+              <span class="bar-value">7 hexes</span>
+              <span class="bar-track" aria-hidden="true"><i style="--w: 14%"></i></span>
+            </li>
+            <li class="bar-row">
+              <span class="bar-label">100 KB</span>
+              <span class="bar-value">25 hexes</span>
+              <span class="bar-track" aria-hidden="true"><i style="--w: 50%"></i></span>
+            </li>
+            <li class="bar-row" data-win>
+              <span class="bar-label">10 MB</span>
+              <span class="bar-value">47 hexes</span>
+              <span class="bar-track" aria-hidden="true"><i style="--w: 94%"></i></span>
+            </li>
+          </ol>
+          <p class="fig-note">
+            <code>4 + 3.2 · log₂(1 + KB)</code>. Ten thousand times the code gets under seven times the land.
+            Roads are laid by shortest path over the hexes, and the shore is smoothed until the coast tiles
+            can draw it.
+          </p>
+        </figure>
+
+        <p>
+          <strong>The archipelago</strong> puts several repos on one sea, in a ring round the guild's own island.
+          A map view names each island in its language's colour, the camera flies between them, and
+          ferries cross on the story clock. Far islands drop their grass and small plants, and the map
+          view draws in 58 to 66 calls. The public site uses trees fetched once, so it makes no API
+          calls of its own.
+        </p>
+
+        <div class="plaque try">
+          <span class="try-label">Try it</span>
+          <a href="/?repo=facebook/react"><code>?repo=facebook/react</code></a>
+          <a href="/?archipelago"><code>?archipelago</code></a>
+          <p>Swap in any public <code>owner/name</code>. In the archipelago, press M for the map.</p>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── V. seas ─────────────────────────── -->
+      <section id="seas" aria-labelledby="seas-h">
+        <p class="eyebrow">V</p>
+        <h2 id="seas-h">GitHub as a sea</h2>
+        <p>
+          When a project's remote is on GitHub, the water round its island fills with it. Commits and
+          pull requests sail in as ships. The <strong>lighthouse</strong> burns steady while CI passes and pulses
+          red when it fails. A release arrives as a <strong>galleon</strong>.
+        </p>
+
+        <figure class="plaque">
+          <figcaption>Where the data goes</figcaption>
+          <ol class="flow">
+            <li class="node"><b>GitHub</b>commits, pull requests, CI runs, releases</li>
+            <li class="arrow" aria-hidden="true"><span class="h">⇄</span><span class="v">⇅</span></li>
+            <li class="node"><b>The hub</b>on your machine, polling with ETags; holds the token</li>
+            <li class="arrow" aria-hidden="true"><span class="h">→</span><span class="v">↓</span></li>
+            <li class="node"><b>The hall</b>sea events only, over a local WebSocket</li>
+          </ol>
+        </figure>
+
+        <ul class="prose-list">
+          <li>
+            <strong>Every request is conditional.</strong> The hub sends the last ETag, and a
+            <code>304 Not Modified</code> costs nothing against the rate limit.
+          </li>
+          <li>
+            <strong>Gentle by default.</strong> A repo is asked at most once a minute with a token, every ten
+            minutes without. A quiet repo is asked less and less often, a failing one backs off to fifteen
+            minutes, and the hub stops before the hourly limit runs out.
+          </li>
+          <li>
+            <strong>The token never leaves the hub.</strong> It is the GitHub CLI's own, read when it's first
+            needed, held in memory, and sent only in the Authorization header to api.github.com. It is
+            never logged, written down or passed to the hall.
+          </li>
+          <li>
+            <strong>Nothing old is announced.</strong> The first look at a repo is a baseline. Only what happens
+            after it sails in.
+          </li>
+        </ul>
+
+        <div class="plaque try">
+          <span class="try-label">Try it</span>
+          <a href="/?story=seas"><code>?story=seas</code></a>
+          <p>A simulated party's run with its sea beside it, from the first push to the release.</p>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── VI. verify ─────────────────────────── -->
+      <section id="verify" aria-labelledby="verify-h">
+        <p class="eyebrow">VI</p>
+        <h2 id="verify-h">How we know it still works</h2>
+        <p>
+          A 3D scene can break without a single test going red: a light turns off, a shader goes
+          black, the fog shifts a shade. So the rule is to look at real rendered pixels, but only as many
+          as a change needs.
+        </p>
+
+        <ul class="techs">
+          <li>
+            <h3>Golden views</h3>
+            <p>
+              24 reference shots, each a deep link with the story paused at a fixed moment, a fixed hour
+              and weather, quality pinned and the camera framed. A paused build <strong>pins the render
+              clock</strong>, so wind, sails, grass and water draw the same frame on every load. A check
+              diffs each view and flags clusters of change, not lone noisy pixels.
+            </p>
+          </li>
+          <li>
+            <h3>A warm probe</h3>
+            <p>
+              A browser kept running beside the dev server. A shot costs about a second, against about
+              eighteen for a cold launch, so looking is cheap enough to do every time.
+            </p>
+          </li>
+          <li>
+            <h3>Labs</h3>
+            <p>
+              One thing alone, without the island: a character playing one clip, one prop, one event, a
+              crowd of a thousand. They load in about a second and isolate the thing being changed.
+            </p>
+          </li>
+          <li>
+            <h3>Bundled A/B</h3>
+            <p>
+              A visual pass is measured as one comparison, everything on against everything off, on a
+              production build, in interleaved rounds with paired medians. It is broken down feature by
+              feature only when the bundle is over budget.
+            </p>
+          </li>
+        </ul>
+        <p>
+          The numbers on this page come from a laptop that was usually doing other work too. That is why
+          they are reported as ranges and paired differences, and why the interesting reading is the step,
+          not the absolute.
+        </p>
+
+        <div class="plaque try">
+          <span class="try-label">Try it</span>
+          <a href="/?story=saga&amp;t=6:00&amp;hour=18.5&amp;weather=clear&amp;look=island"><code>?story=saga&amp;t=6:00&amp;hour=18.5&amp;weather=clear&amp;look=island</code></a>
+          <p>The same kind of deep link the golden views are made of: a moment, an hour, a camera.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="foot-inner">
+        <p>Guildhall · MIT · built with three.js and React Three Fiber.</p>
+        <nav class="foot-links" aria-label="More">
+          <a href="/">Visit the guild</a>
+          <a href="https://github.com/Codestz/guildhall">Source on GitHub</a>
+          <a href="https://www.npmjs.com/package/opencode-guildhall">npm</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

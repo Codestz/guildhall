@@ -13,6 +13,8 @@
  * - packages/hall/src/world/kit.json — each kit piece's bounding box, for layout code.
  * - lands.glb / lands.json — the island's hex tiles and dressing (ADR 0006), the same way.
  * - seas.glb             — the GitHub sea's cargo, gold and flag (lazy; no bounds file).
+ * - animals.glb           — the island's animals (scene/life/Critters.tsx): Kenney Cube Pets, one
+ *                           palette, ~500 triangles each. Lazy, with the folk of a gen 2 island.
  * - growth.glb            — a repo's growth timelapse (`?grow`, scene/growth): scaffolds, planks and
  *                           the ghost districts' tents (Kenney Survival Kit). Lazy; no bounds file.
  * - forest.glb / forest.json — character-scale trees, bushes, rocks and grass from the Forest
@@ -105,6 +107,22 @@ const SEAS: Record<string, string[]> = {
  */
 const GROWTH: Record<string, string[]> = {
   "kenney_survival-kit": ["structure", "resource-planks", "tent-canvas"],
+}
+
+/**
+ * The animals that share a gen 2 island with its folk (world/folk/critters.ts): Kenney's Cube Pets
+ * (CC0), blocky and palette-coloured like the rest. Fields get cows and pigs, doors chicks and cats,
+ * squares dogs, the meadow rabbits. Lazy-loaded only with the folk.
+ */
+const ANIMALS: Record<string, string[]> = {
+  "kenney_cube-pets": [
+    "animal-dog",
+    "animal-cat",
+    "animal-chick",
+    "animal-cow",
+    "animal-pig",
+    "animal-bunny",
+  ],
 }
 
 const GRAVEYARD: Record<string, string[]> = {
@@ -694,6 +712,10 @@ async function kit(name: string, sources: Record<string, string[]>, bounds = tru
     prune({ keepLeaves: true }),
     meshopt({ encoder: MeshoptEncoder, level: "medium" }),
   )
+  // Pieces are drawn still (the hall moves what moves itself): a pack's own clips (Kenney's pets) go.
+  const clips = target.getRoot().listAnimations()
+  for (const clip of clips) clip.dispose()
+  if (clips.length > 0) await target.transform(prune({ keepLeaves: true }))
   const out = join(OUT, `${name}.glb`)
   await io.write(out, target)
   console.log(`${name}: ${Object.keys(boxes).length} pieces → ${kb(out)}`)
@@ -744,6 +766,7 @@ const STEPS: Record<string, () => Promise<void>> = {
   ships: () => kit("ships", SHIPS),
   seas: () => kit("seas", SEAS, false),
   growth: () => kit("growth", GROWTH, false),
+  animals: () => kit("animals", ANIMALS, false),
 }
 const wanted = process.argv.slice(2)
 for (const name of wanted) if (!STEPS[name]) throw new Error(`unknown output ${name}: ${Object.keys(STEPS)}`)

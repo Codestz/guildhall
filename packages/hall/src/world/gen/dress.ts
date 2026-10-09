@@ -1,9 +1,11 @@
+import type { Home } from "../homes.ts"
 import { cellToWorld, type Island, type LandPiece } from "../lands.ts"
 import type { Post, Spot } from "../layout.ts"
 import type { Venue } from "../venues.ts"
 import type { Biome, Language } from "./biomes.ts"
 import { civicOf, type Fame } from "./dress/civic.ts"
 import { dressHexes } from "./dress/hexes.ts"
+import { homesOf } from "./dress/homes.ts"
 import { dressRoads } from "./dress/roads.ts"
 import { LANDMARK, landmarksOf, postsAround, quayOf } from "./dress/sites.ts"
 import { terraceOf } from "./dress/terrace.ts"
@@ -52,6 +54,8 @@ export interface RepoIsland {
   districts: District[]
   /** Generator v2: the buildings people go into, one per district that has a venue (world/venues.ts). */
   venues: Venue[]
+  /** Generator v2: the doors of the town's houses, where the townsfolk live (world/homes.ts). */
+  homes: Home[]
 }
 
 /** Lots the civic centre, a venue or the wall stand on are dropped. */
@@ -87,6 +91,7 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
     ...venues.map(({ venue }): Anchor => [venue.at[0], venue.at[1], VENUE_CLEAR]),
   ]
   if (town) clearLots(town.lots, clear, civic?.wall ?? [])
+  const homes = town ? homesOf(plan, town.lots) : []
   const { tiles, decor, water, meadow, fields } = dressHexes(
     plan,
     roads.links,
@@ -153,5 +158,6 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
     roads: { nodes: roads.nodes, edges: roads.edges },
     districts,
     venues: venues.map(({ venue }) => venue),
+    homes,
   }
 }

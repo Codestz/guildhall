@@ -1,5 +1,11 @@
+import { useSyncExternalStore } from "react"
+import { quality } from "../guild/quality.ts"
 import { growth } from "../world/chronicle/growthControl.ts"
+import { censusOf } from "../world/folk/census.ts"
+import { hasFolk } from "../world/folk/plan.ts"
+import { ROLES } from "../world/folk/types.ts"
 import { useWorld, useWorldStatus } from "../world/source.ts"
+import type { World } from "../world/world.ts"
 import { deepenLink } from "./chronicleLinks.ts"
 import { Icon } from "./icons.tsx"
 import { repoDoor } from "./RepoDoor.tsx"
@@ -18,6 +24,30 @@ const BIOME: Record<string, string> = {
   wilds: "wilds",
 }
 
+const ROLE_NAMES: Record<(typeof ROLES)[number], string> = {
+  villager: "villagers",
+  guard: "guards",
+  farmer: "farmers",
+  fisher: "fishers",
+  trader: "traders",
+  miner: "miners",
+}
+
+/** A gen 2 island's life: how many folk and animals it shows at this quality, by trade (world/folk). */
+function Life({ world }: { world: World }) {
+  const tier = useSyncExternalStore(quality.subscribe, quality.snapshot)
+  if (!hasFolk(world)) return null
+  const census = censusOf(world, tier)
+  const trades = ROLES.filter((role) => census.roles[role] > 0)
+    .map((role) => `${census.roles[role]} ${ROLE_NAMES[role]}`)
+    .join(", ")
+  return (
+    <p className="repo-meta" title={trades}>
+      Life · {census.folk} folk · {census.animals} animals
+    </p>
+  )
+}
+
 /**
  * `?repo=` (world/source.ts): which repo the island was grown from and its districts — one per
  * top-level folder, coloured by its main language — or why it couldn't be grown (the guild's own
@@ -26,7 +56,8 @@ const BIOME: Record<string, string> = {
  */
 export function RepoLegend() {
   const status = useWorldStatus()
-  const { repo } = useWorld()
+  const world = useWorld()
+  const { repo } = world
   const filming = useGrowthPhase()
   const deep = useDeepChronicle(repo?.repo)
 
@@ -70,6 +101,7 @@ export function RepoLegend() {
         {files.toLocaleString("en")} files · {repo.districts.length} districts
         {repo.truncated ? " · partial tree" : ""}
       </p>
+      <Life world={world} />
       {/* Its history as a timelapse, first commit to today (`?grow`, scene/growth). */}
       {filming !== "playing" && filming !== "paused" && (
         <button type="button" className="repo-again" onClick={() => growth.request(repo.repo)}>

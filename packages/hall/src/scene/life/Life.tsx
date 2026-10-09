@@ -1,11 +1,13 @@
 import { useFrame, useThree } from "@react-three/fiber"
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
 import { quality } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
+import { hasFolk } from "../../world/folk/plan.ts"
 import { useWorld } from "../../world/source.ts"
 import { FRAME } from "../frame.ts"
 import { useTier } from "../Quality.tsx"
 import { Birds } from "./Birds.tsx"
+import { Folk, homeLamps } from "./Folk.tsx"
 import { Machines } from "./Machines.tsx"
 import { TracePiles } from "./Piles.tsx"
 import { Ravens } from "./Ravens.tsx"
@@ -29,6 +31,10 @@ import { WorkFx } from "./WorkFx.tsx"
  *              about their day (rounds.ts, Villagers.tsx): home at dusk and in the rain, guards and a
  *              night watchman out after dark with lanterns, on the square at a festival
  *   venues     a gen 2 island's occupied venues light their windows and smoke their chimneys (Venues.tsx)
+ *   folk       a gen 2 island's townsfolk keep the world clock's hours: out of their doors at dawn, at
+ *              work, in the square and the inn at dusk, home with a window lit; guards on the wall,
+ *              traders with barrows on the road, fishers on the quay, farmers in the fields, and the
+ *              animals beside them (Folk.tsx, world/folk)
  *   ravens     carry quests out, news of loot home, and circle over a plea (Ravens.tsx)
  *   work       what working looks like between results: chips, sparks, steam, splashes, arrows in
  *              flight, the forest's shaking work trees, the forge's quench buckets (WorkFx.tsx)
@@ -46,6 +52,8 @@ export function Life() {
   const tier = useTier()
   const world = useWorld()
   const hand = world.kind === "hand"
+  // A venue lights its windows while anyone is in it, and so does a home (the folk's: Folk.tsx).
+  const lit = useMemo(() => [...(world.venues ?? []), ...homeLamps(world)], [world])
   // After the guild's clock, before every Life piece reads it this frame.
   useFrame(() => readGuild(store), FRAME.SKY)
 
@@ -56,7 +64,8 @@ export function Life() {
       <WorkFx />
       <Birds tier={tier} />
       <Ravens />
-      {world.venues && <Venues venues={world.venues} tier={tier} />}
+      {lit.length > 0 && <Venues venues={lit} tier={tier} />}
+      {hasFolk(world) && <Folk tier={tier} />}
       {hand && (
         <>
           <Smoke tier={tier} />

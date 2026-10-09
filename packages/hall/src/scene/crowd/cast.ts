@@ -26,6 +26,9 @@ export const castClock = { now: 0 }
 
 let made: { animations: readonly AnimationClip[]; shading: CrowdShading; crowd: Crowd } | null = null
 
+/** The cast's crowd while there is one (the folk join it: scene/life/troupe.ts). */
+export const castedCrowd = (): Crowd | null => made?.crowd ?? null
+
 /**
  * The crowd for these clips and models, made on first call (the bake: a one-off ~0.1–0.3 s). Its
  * coarser mesh levels follow once simplified (crowd/simplify.ts: its own chunk, ~40 ms). `shading`:

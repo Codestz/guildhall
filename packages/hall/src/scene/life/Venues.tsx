@@ -51,7 +51,10 @@ interface Flue {
   presence: number
 }
 
-export function Venues({ venues, tier }: { venues: readonly Venue[]; tier: Tier }) {
+/** What a venue lights and smokes by; the homes (scene/life/Folk.tsx) have windows and no chimney. */
+export type Lit = Pick<Venue, "id" | "windows" | "chimneys">
+
+export function Venues({ venues, tier }: { venues: readonly Lit[]; tier: Tier }) {
   const store = useGuildStore()
   const puffs = PUFFS[tier]
   const { lamps, flues } = useMemo(() => {

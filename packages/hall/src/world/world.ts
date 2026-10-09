@@ -6,6 +6,7 @@ import { forestOf } from "./gen/relief/forest.ts"
 import { type Relief, type ReliefStyle, reliefOf } from "./gen/relief/index.ts"
 import type { Folder } from "./gen/repo.ts"
 import { dressRivers, riversOf } from "./gen/rivers/index.ts"
+import type { Home } from "./homes.ts"
 import {
   type Cell,
   cellToWorld,
@@ -100,6 +101,8 @@ export interface World {
   storySites: Readonly<Record<SiteId, Site>>
   /** The buildings people go into, a gen 2 island's (world/venues.ts); none on the hand lands. */
   venues?: readonly Venue[]
+  /** The houses people live in, a gen 2 island's (world/homes.ts); none on the hand lands. */
+  homes?: readonly Home[]
   repo?: RepoInfo
 }
 
@@ -192,6 +195,8 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
     ? { ...wet, decor: [...wet.decor, ...forestOf(mountain, made.plan.seed, rivers?.hexes)] }
     : wet
   const { open, decor } = standing(made.venues, island.decor)
+  // A mountain or a river that took the ground under a house took the house.
+  const homes = made.homes.filter((home) => !covered(home.door.step[0], home.door.step[1]))
   return {
     kind: "repo",
     island: decor === island.decor ? island : { ...island, decor },
@@ -213,6 +218,7 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
     sites: [...districts, ...moved],
     storySites,
     ...(open.length > 0 ? { venues: open } : {}),
+    ...(homes.length > 0 ? { homes } : {}),
     repo: { ...info, districts: made.districts, folders: made.plan.districts.map((d) => d.folder) },
   }
 }

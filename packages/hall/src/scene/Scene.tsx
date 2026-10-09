@@ -17,6 +17,7 @@ import type { AdventurerView } from "../guild/store.ts"
 import { town } from "../guild/town/town.ts"
 import { useGuild, useGuildStore } from "../guild/useGuild.ts"
 import { ANIMS_URL, AUTOMATON, MODELS, modelUrl } from "../world/cast.ts"
+import { hasFolk } from "../world/folk/plan.ts"
 import { useWorld } from "../world/source.ts"
 import { Adventurer, lookFrom } from "./Adventurer.tsx"
 import { Archipelago } from "./archipelago/Archipelago.tsx"
@@ -165,7 +166,8 @@ function Cast({ today }: { today: boolean }) {
     ...exits.town.stage(town.views, town.epoch, now),
     ...exits.petitions.stage(today ? petitioners : NO_ONE, store.rebuilds, now),
   ]
-  const crowd = useCrowd(views.length > ALL_HEROES)
+  // The island's folk (scene/life/Folk.tsx) are members of the same crowd.
+  const crowd = useCrowd(views.length > ALL_HEROES || hasFolk(world))
   // The camera's view, once a frame, before any adventurer reads it (mixer culling, who is a hero).
   // One frustum and one declutter run (throttled in chips.ts) for the whole cast, not one per adventurer.
   useFrame((state, delta) => {

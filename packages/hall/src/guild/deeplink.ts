@@ -2,6 +2,7 @@ import type { HudMode } from "../hud/prefs.ts"
 import { activeWorld } from "../world/active.ts"
 import { parseRepo } from "../world/gen/fetch.ts"
 import { GRAVEYARD_PLOT, type LandmarkKind } from "../world/lands.ts"
+import { peakOf } from "../world/peak.ts"
 import { sitesOf } from "../world/siteMap.ts"
 import { HOME_ISLAND, showIsland } from "../world/source.ts"
 import { handWorld, reachOf, type World } from "../world/world.ts"
@@ -253,7 +254,7 @@ const DISTRICT_RADIUS: readonly [number, number] = [10, 28]
 
 /**
  * The places `look` knows by name on `world` (the active one by default): the story's job sites
- * (world/siteMap.ts `sitesOf`, by id), the keep, the island overview, the landmarks; on the hand
+ * (world/siteMap.ts `sitesOf`, by id), the keep, the island overview (its mountains in frame), the landmarks; on the hand
  * lands the square and the graveyard, on a repo's island every district by name and by folder.
  * Built once per world.
  */
@@ -262,13 +263,13 @@ export function lookPlaces(world: World = activeWorld() ?? handWorld()): Readonl
   const known = named.get(world)
   if (known) return known
   const places = new Map<string, Place>()
-  const put = (name: string, x: number, z: number, radius: number) => {
+  const put = (name: string, x: number, z: number, radius: number, y = 0) => {
     const id = name.toLowerCase()
-    if (!places.has(id)) places.set(id, { key: `look:${id}`, x, z, radius })
+    if (!places.has(id)) places.set(id, { key: `look:${id}`, x, z, radius, ...(y > 0 ? { y } : {}) })
   }
   const hand = world.kind === "hand"
   if (hand) put("island", 0, 10, 60)
-  else put("island", 0, 0, reachOf(world))
+  else put("island", 0, 0, reachOf(world), peakOf(world) / 2) // aimed at half the peaks' height: all of it in frame
   put("keep", 0, hand ? 4 : 0, 14)
   if (hand) put("square", 0, 28, 14)
   for (const site of Object.values(sitesOf(world))) put(site.id, site.at[0], site.at[1], 10)

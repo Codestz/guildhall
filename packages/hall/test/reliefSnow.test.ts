@@ -42,7 +42,7 @@ describe("the snow line's GLSL patch (WebGL)", () => {
     expect(shader.fragmentShader).toContain("uSnowline")
     // It samples the kit's own white swatch, not a colour of its own.
     expect(shader.fragmentShader).toContain(SWATCH.snow.u.toFixed(3))
-    expect(copy.customProgramCacheKey()).toBe(`${base.customProgramCacheKey()}|snowline`)
+    expect(copy.customProgramCacheKey()).toBe(`${base.customProgramCacheKey()}|snowline|cut`)
   })
 
   test("no snow until the line is set: it starts out of reach", () => {
@@ -78,13 +78,18 @@ describe("the snow line's node twin (WebGPU)", () => {
     const copy = snowNodeMaterial(base, newSnowline()) as MeshStandardMaterial & { colorNode: unknown }
     expect(copy.colorNode).toBeTruthy()
     expect(copy.map).toBe(base.map)
-    expect(copy.customProgramCacheKey()).toBe(`${base.customProgramCacheKey()}|snowline`)
+    expect(copy.customProgramCacheKey()).toBe(`${base.customProgramCacheKey()}|snowline|cut`)
   })
 
   test("it builds into WGSL that samples the palette twice (the land, the white) and blends", () => {
     const wgsl = fragment(snowNodeMaterial(landMaterial(), newSnowline()))
     expect(wgsl.match(/texture(Sample|Load)\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
     expect(wgsl).toContain("smoothstep")
+  })
+
+  test("the see-through cut builds in too: the relief discards where the holes are", () => {
+    const wgsl = fragment(snowNodeMaterial(landMaterial(), newSnowline()))
+    expect(wgsl).toContain("discard")
   })
 })
 

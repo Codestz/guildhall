@@ -13,7 +13,7 @@
   "packages/hall/src/hud/RepoDoor.tsx": 562,
   "packages/hall/src/lab/crowdLab.ts": 403,
   "packages/hall/src/scene/Adventurer.tsx": 655,
-  "packages/hall/src/scene/CameraRig.tsx": 794,
+  "packages/hall/src/scene/CameraRig.tsx": 775,
   "packages/hall/src/scene/Sigils.tsx": 411,
   "packages/hall/src/scene/atmosphere/PostGPU.tsx": 453,
   "packages/hall/src/scene/atmosphere/sky.ts": 440,

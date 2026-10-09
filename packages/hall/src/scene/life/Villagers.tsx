@@ -34,6 +34,7 @@ import { clonePiece, useKit } from "../Kit.tsx"
 import { carryLantern } from "../lights/carried.ts"
 import { useOwned } from "../owned.ts"
 import { cloneRig } from "../rig.ts"
+import { townsfolkAt } from "../terrain/useCutaway.ts"
 import {
   CALLED_AWAY,
   Day,
@@ -175,6 +176,13 @@ function Townsfolk({ npc, index }: { npc: Townsperson; index: number }) {
   const size = useCallback(() => npc.scale / 0.82, [npc])
   const presence = useCallback(() => life.fade.value, [life])
   useBlob(root, 0.8, size, presence)
+  // The relief's see-through cut (scene/terrain/cutaway.ts) looks for them behind the mountains.
+  useEffect(() => {
+    const node = root.current
+    if (!node) return
+    townsfolkAt.set(npc.id, node.position)
+    return () => void townsfolkAt.delete(npc.id)
+  }, [npc])
   useEffect(() => {
     const node = root.current
     if (!import.meta.env.DEV || !node) return

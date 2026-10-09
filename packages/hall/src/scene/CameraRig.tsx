@@ -13,7 +13,9 @@ import { MODE } from "../guild/mode.ts"
 import { opening, reducedMotion } from "../guild/opening.ts"
 import { positions, useGuild, useGuildStore } from "../guild/useGuild.ts"
 import { useArchipelago } from "../world/archipelagoSource.ts"
+import { peakOf } from "../world/peak.ts"
 import { useWorld } from "../world/source.ts"
+import { reachOf } from "../world/world.ts"
 import {
   flightSeconds,
   flightSize,
@@ -22,9 +24,13 @@ import {
   islandView,
   mapFrame,
 } from "./archipelago/view.ts"
+import { bezier, closeIn, easeInOut } from "./cameraMath.ts"
 import { FRAME } from "./frame.ts"
 import { outreachOf } from "./nature/shoreTiles.ts"
 import { OpeningProgress } from "./OpeningCue.tsx"
+import { ClearAngle } from "./terrain/clearAngle.ts"
+import { aboveGround, widestZoom } from "./terrain/framing.ts"
+import { useCutaway } from "./terrain/useCutaway.ts"
 
 /**
  * The camera: yours first, the Bard's when you hand it over (ADR 0005, season 2).
@@ -143,7 +149,10 @@ export function CameraRig() {
   const archipelago = useArchipelago()
   const world = useWorld()
   const outreach = useMemo(() => outreachOf(world), [world])
-  const back = archipelago ? ARCHIPELAGO_BACK : ORTHO_BACK * outreach
+  // Tall ground (a gen 2 island's massifs): the cameras stand and see further by what it rises.
+  const peak = useMemo(() => peakOf(world), [world])
+  const reach = useMemo(() => reachOf(world), [world])
+  const back = archipelago ? ARCHIPELAGO_BACK : ORTHO_BACK * outreach + 2 * peak
   /** A flight between islands (scene/archipelago/view.ts): the request flown, and where it is. */
   const trip = useRef({
     // From 0, not the current count: a link's `island=` may be asked before the rig mounts.
@@ -173,6 +182,8 @@ export function CameraRig() {
     turn: 0,
     last: 0,
   })
+  /** The cinematic camera's swing round a mountain that hides its subject (scene/terrain/clearAngle.ts). */
+  const clear = useRef(new ClearAngle())
   const size = useThree((state) => state.size)
   /** The default camera: switching views makes the other one default, and drei rebuilds the controls. */
   const defaultCamera = useThree((state) => state.camera)
@@ -186,7 +197,7 @@ export function CameraRig() {
   const portrait = Math.min(1, Math.max(0, upright))
   const fit = base * (1 + PORTRAIT_BOOST * portrait)
   const wide = fit * 0.42
-  const widest = (base * 0.42 * 0.5) / outreach
+  const widest = widestZoom((base * 0.42 * 0.5) / outreach, size.height, reach, peak)
   /** The archipelago's map: the zoom (orthographic) and distance (perspective) that hold it all. */
   const mapRadius = archipelago ? mapFrame(archipelago).radius : 0
   const mapZoom = archipelago ? Math.min(size.width, size.height * 1.4) / (mapRadius * 2) : widest
@@ -339,7 +350,7 @@ export function CameraRig() {
         camera.position.copy(control.target).addScaledVector(ISO_DIR, back)
         ;(camera as Ortho).zoom = Math.min(fit * 8, Math.max(widest, (size.width * 0.6) / (radius * 2.4)))
       } else {
-        const d = Math.max(CLOSE, radius * 2.6)
+        const d = Math.max(CLOSE, radius * 2.6 + (framing.y ?? 0) * 2.4)
         camera.position.copy(control.target).addScaledVector(scratch.dir.set(1, 0.62, 1).normalize(), d)
       }
       camera.updateProjectionMatrix()
@@ -404,7 +415,7 @@ export function CameraRig() {
     // 3. Following the selected adventurer: keep them centred, let the viewer turn and zoom.
     const selected = store.selected ? positions.get(store.selected) : undefined
     if (selected) {
-      const goal = scratch.goal.set(selected.x, 1.2, selected.z)
+      const goal = scratch.goal.set(selected.x, 1.2 + rise(selected.x, selected.z), selected.z)
       clearShift(camera, control, isOrtho, goal)
       const fresh = following.current !== store.selected
       // A new pick: glide there quickly; then track tightly so walking never leaves the frame.
@@ -428,11 +439,14 @@ export function CameraRig() {
       calm(delta, camera, control, isOrtho)
     }
     film.current.active = directing && store.directorStyle === "cinematic"
+    if (!isOrtho && world.relief) aboveGround(camera, world.ground.heightAt)
     control.update()
     last.current.target.copy(control.target)
     last.current.position.copy(camera.position)
     last.current.zoom = isOrtho ? (camera as Ortho).zoom : 0
   }, FRAME.WORLD)
+  // After the camera has moved: the relief's see-through cut follows the figures it hides.
+  useCutaway(world)
 
   /**
    * The archipelago's flights (scene/archipelago/view.ts): a new request starts one — a straight
@@ -550,12 +564,15 @@ export function CameraRig() {
     const offset = scratch.offset.copy(camera.position).sub(control.target)
     const distance = offset.length()
     const framing = shotSize(shot, isOrtho, goal)
+    // A mountain between camera and subject: swing round it (the see-through cut covers the rest).
+    if (world.relief) clear.current.update(delta, camera, control.target, goal, world.relief.heightAt, peak)
     // Land the subject in the HUD's clear area.
     clearShift(camera, control, isOrtho, goal)
 
     // A new shot: fly, cut or ease.
     if (shot.cut !== f.cut || !f.active) {
       f.cut = shot.cut
+      clear.current.reset()
       const far = control.target.distanceTo(goal) > FLIGHT_MIN
       f.flying = false
       if (far && reduced) {
@@ -659,12 +676,18 @@ export function CameraRig() {
    */
   function subjectOf(shot: Shot, out: Vector3): Vector3 {
     const at = shot.id ? positions.get(shot.id) : undefined
-    if (at) out.set(at.x, 1.2, at.z)
-    else out.set(shot.x, 1.2 + shot.y, shot.z)
+    if (at) out.set(at.x, 1.2 + rise(at.x, at.z), at.z)
+    else out.set(shot.x, 1.2 + shot.y + rise(shot.x, shot.z), shot.z)
     if (shot.kind === "establishing") out.set(shot.x, 1 + shot.y, shot.z)
     const partner = shot.partner ? positions.get(shot.partner) : undefined
-    if (shot.kind === "two-shot" && partner) out.lerp(scratch.partner.set(partner.x, 1.2, partner.z), 0.5)
+    if (shot.kind === "two-shot" && partner)
+      out.lerp(scratch.partner.set(partner.x, 1.2 + rise(partner.x, partner.z), partner.z), 0.5)
     return out
+  }
+
+  /** How high the ground stands at a point, for the camera to follow a figure up a mountain (0 on a flat world). */
+  function rise(x: number, z: number): number {
+    return world.relief ? world.ground.heightAt(x, z) : 0
   }
 
   /** The shot's size: orthographic zoom, or perspective distance. */
@@ -702,14 +725,14 @@ export function CameraRig() {
         position={[0.01, 240, 2]}
         zoom={wide * 0.5}
         near={0.1}
-        far={archipelago ? 2600 : 900 * outreach}
+        far={archipelago ? 2600 : 900 * outreach + 2 * peak}
       />
       <PerspectiveCamera
         ref={persp}
         makeDefault={view === "explore"}
         fov={38}
         near={0.5}
-        far={archipelago ? 3600 : 1200 * outreach}
+        far={archipelago ? 3600 : 1200 * outreach + 2 * peak}
         position={[60, 60, 60]}
       />
       <MapControls
@@ -750,50 +773,3 @@ const MOVE_KEYS = new Set([
   "-",
   "_",
 ])
-
-/**
- * Close in on whoever was just picked (once, so the viewer can zoom back out). In Explore the
- * camera also drops to a three-quarter angle: low enough to see the character's animation, not
- * the top of their head.
- */
-function closeIn(camera: Ortho | Persp, control: Controls, goal: number): void {
-  if ((camera as Ortho).isOrthographicCamera) {
-    const o = camera as Ortho
-    o.zoom = Math.max(o.zoom, goal)
-    o.updateProjectionMatrix()
-    return
-  }
-  const offset = camera.position.clone().sub(control.target)
-  const azimuth = Math.atan2(offset.x, offset.z)
-  const elevation = FOLLOW_ELEVATION
-  camera.position
-    .copy(control.target)
-    .add(
-      new Vector3(
-        Math.sin(azimuth) * Math.cos(elevation),
-        Math.sin(elevation),
-        Math.cos(azimuth) * Math.cos(elevation),
-      ).multiplyScalar(goal),
-    )
-}
-
-/** Following someone in Explore: ~30° above the ground. */
-const FOLLOW_ELEVATION = 0.52
-
-function easeInOut(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
-}
-
-/** Cubic Bézier at `t` into `out` (no allocation). */
-function bezier(a: Vector3, b: Vector3, c: Vector3, d: Vector3, t: number, out: Vector3): Vector3 {
-  const u = 1 - t
-  const w0 = u * u * u
-  const w1 = 3 * u * u * t
-  const w2 = 3 * u * t * t
-  const w3 = t * t * t
-  return out.set(
-    a.x * w0 + b.x * w1 + c.x * w2 + d.x * w3,
-    a.y * w0 + b.y * w1 + c.y * w2 + d.y * w3,
-    a.z * w0 + b.z * w1 + c.z * w2 + d.z * w3,
-  )
-}

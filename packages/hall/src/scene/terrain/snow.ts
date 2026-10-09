@@ -1,5 +1,6 @@
 import type { Material, MeshStandardMaterial, WebGLProgramParametersWithUniforms } from "three"
 import { SWATCH, swatchV } from "../../world/gen/relief/swatches.ts"
+import { CUT_FRAGMENT, CUT_FRAGMENT_PARS, CUT_VERTEX, CUT_VERTEX_PARS, cutaway } from "./cutaway.ts"
 
 /**
  * The massifs' snow line: a copy of the land material (same palette, same atlas) that turns faces
@@ -11,8 +12,8 @@ import { SWATCH, swatchV } from "../../world/gen/relief/swatches.ts"
  *   from `snowlineOf(relief, winter)`, lowered in winter. WebGPU never runs onBeforeCompile: its twin is
  *   snowNodes.ts, fed the same uniform object.
  *
- * A second hook sits here for slice 2e: the dithered cutaway (a capsule from camera to subject,
- * discarded on a Bayer pattern) is another fragment-side uniform block on this same material.
+ * The same material carries the see-through cut (cutaway.ts): fragments of the relief that hide a
+ * figure from the camera are discarded on a Bayer pattern, from the shared `cutaway` uniforms.
  */
 
 /** A `{ value }` uniform, shared by every material of the relief. */
@@ -63,14 +64,16 @@ export function snowMaterial(base: Material, snowline: Snowline): Material {
   const key = base.customProgramCacheKey()
   copy.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     shader.uniforms.uSnowline = snowline
+    shader.uniforms.uCutDots = { value: cutaway.dots }
+    shader.uniforms.uCutView = { value: cutaway.view }
     shader.vertexShader = shader.vertexShader
-      .replace("void main() {", `${VERTEX_PARS}\nvoid main() {`)
-      .replace("#include <project_vertex>", `#include <project_vertex>\n${VERTEX}`)
+      .replace("void main() {", `${VERTEX_PARS}\n${CUT_VERTEX_PARS}\nvoid main() {`)
+      .replace("#include <project_vertex>", `#include <project_vertex>\n${VERTEX}\n${CUT_VERTEX}`)
     shader.fragmentShader = shader.fragmentShader
-      .replace("void main() {", `${FRAGMENT_PARS}\nvoid main() {`)
-      .replace("#include <map_fragment>", `#include <map_fragment>\n${SNOW_FRAGMENT}`)
+      .replace("void main() {", `${FRAGMENT_PARS}\n${CUT_FRAGMENT_PARS}\nvoid main() {`)
+      .replace("#include <map_fragment>", `${CUT_FRAGMENT}\n#include <map_fragment>\n${SNOW_FRAGMENT}`)
   }
-  copy.customProgramCacheKey = () => `${key}|snowline`
+  copy.customProgramCacheKey = () => `${key}|snowline|cut`
   return copy
 }
 

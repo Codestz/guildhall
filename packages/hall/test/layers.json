@@ -1,0 +1,40 @@
+{
+  "runtime": [
+    "audio/SoundStage.tsx -> hud/prefs.ts",
+    "audio/SoundStage.tsx -> scene/atmosphere/wind.ts",
+    "audio/SoundStage.tsx -> scene/sigilBoard.ts",
+    "guild/store.ts -> scene/life/traces.ts",
+    "hud/Hud.tsx -> scene/chips.ts",
+    "hud/Islands.tsx -> scene/archipelago/view.ts",
+    "hud/RecapCapture.ts -> scene/Ships.tsx",
+    "hud/RecapCapture.ts -> scene/seas/fleet.ts",
+    "hud/Settings.tsx -> render/backend.ts",
+    "hud/Stats.tsx -> render/backend.ts",
+    "main.tsx -> world/archipelagoLink.ts",
+    "main.tsx -> world/archipelagoSource.ts",
+    "render/shims.ts -> scene/atmosphere/lowGrade.ts",
+    "render/webgpu.ts -> scene/atmosphere/fogNode.ts",
+    "render/webgpu.ts -> scene/castNodes.ts",
+    "render/webgpu.ts -> scene/dissolve.ts",
+    "scene/Adventurer.tsx -> hud/format.ts",
+    "scene/Adventurer.tsx -> hud/icons.tsx",
+    "scene/Sigils.tsx -> hud/glyphs.ts",
+    "scene/Sigils.tsx -> hud/prefs.ts",
+    "scene/sigilBoard.ts -> hud/format.ts",
+    "world/behaviours.ts -> scene/life/places.ts",
+    "world/clearance.ts -> scene/life/rounds.ts"
+  ],
+  "type": [
+    "audio/engine.ts -> scene/sigilBoard.ts",
+    "audio/music.ts -> scene/sigilBoard.ts",
+    "guild/deeplink.ts -> hud/prefs.ts",
+    "scene/chips.ts -> hud/prefs.ts",
+    "scene/sigilBoard.ts -> hud/glyphs.ts"
+  ],
+  "cycles": [
+    "scene/atmosphere/SkyDome.tsx | scene/atmosphere/skyNodes.ts",
+    "scene/crowd/material.ts | scene/crowd/materialNodes.ts",
+    "scene/nature/Water.tsx | scene/nature/waterNodes.ts",
+    "scene/weather/Precipitation.tsx | scene/weather/fallNodes.ts"
+  ]
+}

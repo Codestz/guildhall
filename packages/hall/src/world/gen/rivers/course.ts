@@ -3,6 +3,7 @@ import { TERRACE } from "../../waterways.ts"
 import { Heap } from "../heap.ts"
 import { direction, key, neighbours, rings, unkey } from "../hex.ts"
 import { RESERVED } from "../plan/keep.ts"
+import { keepOf } from "../plan/lakes.ts"
 import type { IslandPlan } from "../plan.ts"
 import { type Relief, tierOf } from "../relief/index.ts"
 
@@ -91,14 +92,8 @@ function crossable(plan: IslandPlan): Map<string, number> {
   return out
 }
 
-/** The rivers of an island: their courses, spring to sea, and the road hexes they cross. Deterministic. */
-export function coursesOf(
-  plan: IslandPlan,
-  relief: Relief,
-  ground: Ground,
-): { courses: Course[]; bridges: Map<string, number> } {
-  const tier = tierOf(plan.districts.reduce((sum, d) => sum + d.folder.files, 0))
-  const bridges = crossable(plan)
+/** The hexes water never takes: lots, fields, the keep, squares, sites, and every road hex but the crossable ones. */
+export function dryOf(plan: IslandPlan, bridges: ReadonlyMap<string, number>): Set<string> {
   const roads = new Set(plan.roads.flat().map(key))
   const dry = new Set<string>()
   for (const [id, hex] of plan.land)
@@ -107,6 +102,20 @@ export function coursesOf(
     dry.add(key(square))
     if (site) dry.add(key(site))
   }
+  return dry
+}
+
+/** The rivers of an island: their courses, spring to sea, and the road hexes they cross. Deterministic. */
+export function coursesOf(
+  plan: IslandPlan,
+  relief: Relief,
+  ground: Ground,
+): { courses: Course[]; bridges: Map<string, number> } {
+  const tier = tierOf(plan.districts.reduce((sum, d) => sum + d.folder.files, 0))
+  const bridges = crossable(plan)
+  const dry = dryOf(plan, bridges)
+  // A lake's basin, shore and stream corridor are the lake's own: no river runs through them.
+  for (const id of keepOf(plan.lakes)) dry.add(id)
   // Floods repeat, closing any road hex a river would run along instead of across.
   for (let attempt = 0; attempt < 6; attempt++) {
     const drain = drainOf(plan, ground, dry)
@@ -122,7 +131,7 @@ export function coursesOf(
 }
 
 /** The road hexes a course enters or leaves by the road's own axis. */
-function alongRoad(course: Course, bridges: ReadonlyMap<string, number>): string[] {
+export function alongRoad(course: Course, bridges: ReadonlyMap<string, number>): string[] {
   const out: string[] = []
   course.cells.forEach((cell, i) => {
     const axis = bridges.get(key(cell))
@@ -245,7 +254,7 @@ function follow(
   return { cells, levels, joins }
 }
 
-const naturalLevel = (ground: Ground, cell: Cell): number =>
+export const naturalLevel = (ground: Ground, cell: Cell): number =>
   ground.massif.has(key(cell))
     ? Math.max(0, Math.floor(heightOf(ground, cell) / TERRACE))
     : ground.level(cell)

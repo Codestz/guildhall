@@ -2,14 +2,15 @@ import { cellToWorld, type Island, type LandPiece, type LandPlacement } from "..
 import { TERRACE, type Waterways } from "../../waterways.ts"
 import { cellAt, key } from "../hex.ts"
 import { fit, PATH_TILES, turn } from "../tiles.ts"
+import { dressLakes } from "./dressLakes.ts"
 
 /**
  * The rivers' hexes in the lowland, tiled: where a river runs outside the massifs its hex gets the
  * kit's river tile (fitted to the edges the water comes in and goes out by, as the water lab does),
  * on its level's terrace, with a filler every two levels beneath. A river hex that was a straight
  * road gets a bridge over it, spanning along the road. Whatever stood on the hex (its old tile,
- * trees, grass, fields) is taken away. The massifs' river hexes are not here: the relief is carved
- * (rivers/carve.ts) and draws its own.
+ * trees, grass, fields) is taken away. A valley lake and its shore are tiled alike (dressLakes.ts).
+ * The massifs' river hexes are not here: the relief is carved (rivers/carve.ts) and draws its own.
  */
 
 const at = (x: number, z: number): string => key(cellAt([x, z]))
@@ -22,8 +23,9 @@ export function dressRivers(
   bridges: ReadonlyMap<string, number>,
 ): Island {
   const hexes = waters.rivers.flatMap((reach) => reach.hexes).filter((hex) => !massif.has(key(hex.cell)))
-  if (hexes.length === 0) return island
-  const wet = new Set(hexes.map((hex) => key(hex.cell)))
+  if (hexes.length === 0 && waters.lakes.length === 0) return island
+  const lakes = dressLakes(waters, massif)
+  const wet = new Set([...hexes.map((hex) => key(hex.cell)), ...lakes.taken])
   const tiles: LandPlacement[] = island.tiles.filter((t) => !wet.has(at(t.x, t.z)))
   const decor: LandPlacement[] = island.decor.filter((d) => !wet.has(at(d.x, d.z)))
   const water = [...island.water]
@@ -51,9 +53,9 @@ export function dressRivers(
   }
   return {
     ...island,
-    tiles,
-    decor,
-    water,
+    tiles: [...tiles, ...lakes.tiles],
+    decor: [...decor, ...lakes.decor],
+    water: [...water, ...lakes.water],
     meadow: island.meadow.filter(([x, z]) => !wet.has(at(x, z))),
     fields: island.fields.filter((f) => !wet.has(at(f.x, f.z))),
   }

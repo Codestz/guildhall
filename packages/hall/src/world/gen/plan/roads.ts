@@ -3,10 +3,13 @@ import { Heap } from "../heap.ts"
 import { key, neighbours, rings, unkey } from "../hex.ts"
 import type { PlanDistrict } from "../plan.ts"
 import { AVENUE, type Form, GATE, HUB, RESERVED, RING } from "./keep.ts"
+import type { PlanLake } from "./lakes.ts"
 import type { Owners } from "./land.ts"
 
 /** What a road pays to cross a range's hex, over a plain hex's 1. */
 const CLIMB = 2.5
+/** What a road pays to cross a lake's stream corridor. */
+const STREAM = 6
 const NONE: ReadonlySet<string> = new Set()
 
 /**
@@ -22,7 +25,11 @@ export function layRoads(
   radius: number,
   { bay }: Form = RING,
   ranges: ReadonlySet<string> = NONE,
+  lakes: readonly PlanLake[] = [],
 ): { road: Set<string>; roads: Cell[][] } {
+  // A lake's basin and shore are never crossed; its stream is, at a price (the rivers bridge it where the road runs straight).
+  const wet = new Set(lakes.flatMap((lake) => [...lake.cells, ...lake.shore]))
+  const streams = new Set(lakes.flatMap((lake) => lake.inlet))
   const road = new Set<string>([key(HUB), key(AVENUE), key(GATE)])
   const roads: Cell[][] = [[HUB, AVENUE]]
   const byDistance = districts
@@ -36,9 +43,10 @@ export function layRoads(
     const from = head === undefined ? HUB : (districts[head]?.square ?? HUB)
     const path = cheapest(from, district.square, radius + 2, (cell) => {
       const id = key(cell)
-      if (bay(cell) || (RESERVED.has(id) && !road.has(id)) || id === key(GATE)) return undefined
+      if (bay(cell) || (RESERVED.has(id) && !road.has(id)) || id === key(GATE) || wet.has(id))
+        return undefined
       if (road.has(id)) return 0.4
-      return (owner.has(id) ? 1 : 8) + (ranges.has(id) ? CLIMB : 0)
+      return (owner.has(id) ? 1 : 8) + (ranges.has(id) ? CLIMB : 0) + (streams.has(id) ? STREAM : 0)
     })
     for (const cell of path) {
       const id = key(cell)

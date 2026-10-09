@@ -54,6 +54,7 @@ export function groundOf(
   seed: number,
   ranges: ReadonlySet<string> = new Set(),
   hills = false,
+  kept: ReadonlySet<string> = new Set(),
 ): Map<string, PlanHex> {
   const land = new Map<string, PlanHex>()
   const nearRoad = (cell: Cell): boolean => neighbours(cell).some((next) => road.has(key(next)))
@@ -74,6 +75,7 @@ export function groundOf(
             !road.has(key(cell)) &&
             !sites.has(key(cell)) &&
             !nearRoad(cell) &&
+            !kept.has(key(cell)) &&
             !(hills && (RESERVED.has(key(cell)) || ranges.has(key(cell)) || wet(owner, cell).length > 0)),
         )
         .map((cell) => {
@@ -94,6 +96,8 @@ export function groundOf(
       else if (sites.has(id)) char = "s"
       // The ring round the keep: open lots, kept clear like the hand map's (lands.ts' V).
       else if (RESERVED.has(id)) char = "V"
+      // A lake's ground stays open meadow, level, for the water and its shore.
+      else if (kept.has(id)) char = "."
       else if (ranges.has(id))
         char = neighbours(cell).every((next) => ranges.has(key(next)) || !owner.has(key(next))) ? "M" : "m"
       else if (hills && raised.has(id))
@@ -102,7 +106,7 @@ export function groundOf(
         char =
           district.level === 1 ? "H" : neighbours(cell).every((next) => raised.has(key(next))) ? "M" : "m"
       else char = ground(district, noise(seed, cell, "ground"), noise(seed, cell, "crop"))
-      if (foot.has(id) && ".fh".includes(char) && noise(seed, cell, "foot") < 0.6) char = "H"
+      if (foot.has(id) && !kept.has(id) && ".fh".includes(char) && noise(seed, cell, "foot") < 0.6) char = "H"
       const terrace = hills && !ranges.has(id) ? raised.get(id) : undefined
       land.set(id, { char, district: i, ...(terrace && ".fFhv".includes(char) ? { level: terrace } : {}) })
     }

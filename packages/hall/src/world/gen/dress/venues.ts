@@ -2,7 +2,8 @@ import { type Cell, cellToWorld, type LandPlacement } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
 import { DOOR_DEPTH, doorsOf, fixturesOf, instantiate, type Prefab, prefab } from "../../prefabs/index.ts"
 import { VENUE_KINDS, type Venue, venueKindOf } from "../../venues.ts"
-import { cellAt, key, neighbours } from "../hex.ts"
+import { cellAt, key, neighbours, unkey } from "../hex.ts"
+import { keepOf } from "../plan/lakes.ts"
 import type { IslandPlan, PlanDistrict } from "../plan.ts"
 import type { Cover } from "./cover.ts"
 import type { DressedRoads } from "./roads.ts"
@@ -36,6 +37,8 @@ export interface PlacedVenue {
 
 /** Ground a venue may stand on when it leaves its landmark hex: plain meadow, woods or a village lot. */
 const BUILDABLE = ".fv"
+/** A door's step keeps this far (world units) from a river hex's centre when it can: a bridge's footprint. */
+const BRIDGE = 8
 
 const NO_COVER: Cover = { massifs: new Set(), rivers: new Set() }
 
@@ -49,6 +52,8 @@ export function venuesOf(
     .filter((district) => district.biome === "village")
     .sort((a, b) => b.folder.bytes - a.folder.bytes || (a.folder.name < b.folder.name ? -1 : 1))[0]
   const taken = new Set(plan.districts.flatMap((district) => (district.site ? [key(district.site)] : [])))
+  // A lake's ground (basin, shore, streams) is no place for a building.
+  const lakes = keepOf(plan.lakes)
   const out: PlacedVenue[] = []
   plan.districts.forEach((district, i) => {
     const { folder } = district
@@ -64,6 +69,7 @@ export function venuesOf(
       return (
         !cover.massifs.has(key(cell)) &&
         !cover.rivers.has(key(cell)) &&
+        !lakes.has(key(cell)) &&
         avoid.every(([ax, az, r]) => Math.hypot(x - ax, z - az) >= r)
       )
     }
@@ -89,16 +95,22 @@ export function venuesOf(
         .filter(spare)
         .map((cell) => ({ cell, towards: square })),
     ]
-    let placed: PlacedVenue | undefined
+    // The first whose door's step is off the beach and clear of any river's bridge, else the first off the beach, else the first.
+    let first: PlacedVenue | undefined
+    let inland: PlacedVenue | undefined
+    let clear: PlacedVenue | undefined
     for (const { cell, towards } of choices) {
       const next = place(prefab(VENUE_KINDS[kind].prefab), kind, district, cell, towards, roads)
       if (!next) continue
-      placed ??= next
-      if (!onBeach(next.venue.door.step, plan.land)) {
-        placed = next
+      first ??= next
+      if (onBeach(next.venue.door.step, plan.land)) continue
+      inland ??= next
+      if (!byWater(next.venue.door.step, cover.rivers)) {
+        clear = next
         break
       }
     }
+    const placed = clear ?? inland ?? first
     if (!placed) return
     taken.add(key(placed.cell))
     out.push(placed)
@@ -171,6 +183,14 @@ function onBeach(spot: Spot, land: ReadonlyMap<string, unknown>): boolean {
   return [here, ...neighbours(here)].some((next) => {
     const [x, z] = cellToWorld(next)
     return !land.has(key(next)) && Math.hypot(x - spot[0], z - spot[1]) < BEACH
+  })
+}
+
+/** Whether a river's hex (where a bridge may stand) lies within a bridge's clearance of a spot. */
+function byWater(spot: Spot, rivers: ReadonlySet<string>): boolean {
+  return [...rivers].some((id) => {
+    const [x, z] = cellToWorld(unkey(id))
+    return Math.hypot(x - spot[0], z - spot[1]) < BRIDGE
   })
 }
 

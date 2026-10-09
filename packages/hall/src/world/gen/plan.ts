@@ -4,6 +4,7 @@ import { rng, unkey } from "./hex.ts"
 import { smoothCoast } from "./plan/coast.ts"
 import { groundOf, placeSites } from "./plan/ground.ts"
 import { type Form, GATE, HUB, QUAY, RESERVED, RING } from "./plan/keep.ts"
+import { keepOf, type PlanLake, reserveLakes } from "./plan/lakes.ts"
 import { layRoads } from "./plan/roads.ts"
 import { growSectors } from "./plan/sectors.ts"
 import { reserveRanges } from "./plan/zones.ts"
@@ -21,6 +22,7 @@ export { HUB, KEEP } from "./plan/keep.ts"
  * block and the ring round it reserved (plan/keep.ts). Then, in order:
  *   sectors   the folders round the hub, each grown from its square into one piece (plan/sectors.ts)
  *   ranges    v2 only: the mountain ranges' ground, laid across the island before anything is built on it (plan/zones.ts)
+ *   lakes     v2 only: each valley lake's basin, shore and stream corridor, reserved the same way (plan/lakes.ts)
  *   roads     hub → every square, reusing what's laid (plan/roads.ts)
  *   coast     smoothed until the coast tiles can draw every hex (plan/coast.ts)
  *   ground    a landmark site per district, elevation, and each biome's ground (plan/ground.ts)
@@ -68,6 +70,8 @@ export interface IslandPlan {
   radius: number
   /** Generator v2: the mountain ranges' reserved ground, main range first, as hex keys (none in v1). */
   ranges: ReadonlySet<string>[]
+  /** Generator v2: the valley lakes' reserved ground (plan/lakes.ts); the rivers fill it with water (none in v1). */
+  lakes: readonly PlanLake[]
   /** Generator v2 only: its towns and civic centre are dressed from the prefab catalogue. */
   gen?: 2
 }
@@ -167,10 +171,12 @@ export function planIsland(
   const { owner, heads, radius: searched } = growSectors(districts, seed, rng(seed), form)
   const reserved = form.mass ? reserveRanges(districts, owner, seed) : []
   const mountains = new Set(reserved.flatMap((range) => [...range]))
-  const { road, roads } = layRoads(districts, owner, heads, searched, form, mountains)
+  const lakes = form.mass ? reserveLakes(districts, owner, reserved, seed) : []
+  const kept = keepOf(lakes)
+  const { road, roads } = layRoads(districts, owner, heads, searched, form, mountains, lakes)
   const radius = smoothCoast(owner, road, form)
   const sites = placeSites(districts, owner, road, seed)
-  const land = groundOf(districts, owner, road, sites, seed, mountains, Boolean(form.mass))
+  const land = groundOf(districts, owner, road, sites, seed, mountains, Boolean(form.mass), kept)
   const ranges = reserved.map((range) => new Set([...range].filter((id) => land.has(id))))
   return {
     hash: shape.hash,
@@ -183,6 +189,7 @@ export function planIsland(
     gate: GATE,
     radius,
     ranges,
+    lakes,
     ...(form.mass ? { gen: 2 as const } : {}),
   }
 }

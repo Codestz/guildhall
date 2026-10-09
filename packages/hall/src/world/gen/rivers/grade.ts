@@ -43,6 +43,8 @@ export interface GradeGround {
   relief(cell: Cell): boolean
   /** A hex's terrace level (a river hex's own), 0 at sea. */
   level(cell: Cell): number
+  /** Whether a hex is under a lake (whose water lies lower than a river's on its level). */
+  lake?(cell: Cell): boolean
 }
 
 const same = (a: Cell | undefined, b: Cell | undefined): boolean => !!a && !!b && key(a) === key(b)
@@ -73,7 +75,7 @@ export function gradeWaters(waters: Waterways, ground: GradeGround): Waterways {
   const graded = new Map<string, Point3[]>()
   const joined = (cell: Cell, [x, z]: Spot): number => {
     const grade = graded.get(key(cell))
-    if (!grade) return surfaceY("river", ground.level(cell))
+    if (!grade) return surfaceY(ground.lake?.(cell) ? "lake" : "river", ground.level(cell))
     const near = (p: Point3) => Math.hypot(p[0] - x, p[2] - z)
     return grade.reduce((best, p) => (near(p) < near(best) ? p : best))[1]
   }

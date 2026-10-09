@@ -23,7 +23,13 @@ const springs = (w: typeof CITY) => w.world.water?.rivers.filter((reach) => !rea
 
 describe("rivers", () => {
   test("a tier gets one, two or three rivers; a hamlet and generator 1 none", () => {
-    expect([springs(VILLAGE), springs(TOWN), springs(CITY)]).toEqual([1, 2, 3])
+    // A valley lake (rivers/lakes.ts) is fed by a stream of its own: the rivers a tier gets, and one for each lake.
+    const lakes = (w: typeof CITY) => w.world.water?.lakes.length ?? 0
+    expect([
+      (springs(VILLAGE) ?? 0) - lakes(VILLAGE),
+      (springs(TOWN) ?? 0) - lakes(TOWN),
+      (springs(CITY) ?? 0) - lakes(CITY),
+    ]).toEqual([1, 2, 3])
     expect(worldOf(IS_ODD.entries).world.water).toBeUndefined()
     expect(worldOf(REACT.entries, 1).world.water).toBeUndefined()
   })

@@ -2,9 +2,11 @@ import { useThree } from "@react-three/fiber"
 import { useEffect } from "react"
 import type { Vector3 } from "three"
 import { frameStats } from "../../guild/stats.ts"
+import { useWorld } from "../../world/source.ts"
 import { useTier } from "../Quality.tsx"
 import { Fields } from "./Fields.tsx"
 import { Grass } from "./Grass.tsx"
+import { Rivers } from "./Rivers.tsx"
 import { Water } from "./Water.tsx"
 import { Wilds } from "./Wilds.tsx"
 
@@ -15,9 +17,11 @@ import { Wilds } from "./Wilds.tsx"
  */
 export function Nature() {
   const tier = useTier()
+  const waters = useWorld().water
   return (
     <>
       <Water tier={tier} />
+      {waters && <Rivers waters={waters} tier={tier} />}
       <Grass tier={tier} />
       <Wilds tier={tier} />
       <Fields />

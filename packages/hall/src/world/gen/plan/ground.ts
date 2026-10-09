@@ -43,6 +43,8 @@ export function placeSites(
 /**
  * What grows where, in lands.ts' MAP legend: elevation from each district's level (its inland
  * hexes furthest from its square raised), then each biome's ground. Writes each district's `hexes`.
+ * With `hills` (generator v2) a raised hex keeps its biome's ground and carries a terrace `level`
+ * instead of becoming bare foothill or mountain: hill country with lots on its terraces.
  */
 export function groundOf(
   districts: readonly PlanDistrict[],
@@ -51,6 +53,7 @@ export function groundOf(
   sites: ReadonlySet<string>,
   seed: number,
   ranges: ReadonlySet<string> = new Set(),
+  hills = false,
 ): Map<string, PlanHex> {
   const land = new Map<string, PlanHex>()
   const nearRoad = (cell: Cell): boolean => neighbours(cell).some((next) => road.has(key(next)))
@@ -62,18 +65,26 @@ export function groundOf(
   districts.forEach((district, i) => {
     const own = [...owner].filter(([, d]) => d === i).map(([id]) => unkey(id))
     district.hexes = own.length
-    const raised = new Set<string>()
+    const raised = new Map<string, 1 | 2>()
     if (district.level > 0) {
       const [sx, sz] = cellToWorld(district.square)
       const inland = own
-        .filter((cell) => !road.has(key(cell)) && !sites.has(key(cell)) && !nearRoad(cell))
+        .filter(
+          (cell) =>
+            !road.has(key(cell)) &&
+            !sites.has(key(cell)) &&
+            !nearRoad(cell) &&
+            !(hills && (RESERVED.has(key(cell)) || ranges.has(key(cell)) || wet(owner, cell).length > 0)),
+        )
         .map((cell) => {
           const [x, z] = cellToWorld(cell)
           return { cell, far: Math.hypot(x - sx, z - sz) + noise(seed, cell, "rise") * 5 }
         })
         .sort((a, b) => b.far - a.far)
       const count = Math.round(inland.length * (district.level === 1 ? 0.35 : 0.5))
-      for (const { cell } of inland.slice(0, count)) raised.add(key(cell))
+      inland.slice(0, count).forEach(({ cell }, n) => {
+        raised.set(key(cell), district.level === 2 && n < count * 0.45 ? 2 : 1)
+      })
     }
     for (const cell of own) {
       const id = key(cell)
@@ -85,12 +96,15 @@ export function groundOf(
       else if (RESERVED.has(id)) char = "V"
       else if (ranges.has(id))
         char = neighbours(cell).every((next) => ranges.has(key(next)) || !owner.has(key(next))) ? "M" : "m"
+      else if (hills && raised.has(id))
+        char = ground(district, noise(seed, cell, "ground"), noise(seed, cell, "crop"))
       else if (raised.has(id))
         char =
           district.level === 1 ? "H" : neighbours(cell).every((next) => raised.has(key(next))) ? "M" : "m"
       else char = ground(district, noise(seed, cell, "ground"), noise(seed, cell, "crop"))
       if (foot.has(id) && ".fh".includes(char) && noise(seed, cell, "foot") < 0.6) char = "H"
-      land.set(id, { char, district: i })
+      const terrace = hills && !ranges.has(id) ? raised.get(id) : undefined
+      land.set(id, { char, district: i, ...(terrace && ".fFhv".includes(char) ? { level: terrace } : {}) })
     }
   })
   return land

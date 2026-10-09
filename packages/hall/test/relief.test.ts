@@ -335,11 +335,12 @@ describe("the world with a relief", () => {
     expect(handWorld().relief).toBeUndefined()
   })
 
-  test("the hexes a massif covers are not tiled, and the per-hex mountain cones are gone", () => {
+  test("the hexes a massif covers are not tiled, and the per-hex mountain cones are gone (its forest stands on it)", () => {
     const keys = world.relief?.keys ?? new Set<string>()
-    for (const tile of [...world.island.tiles, ...world.island.decor]) {
-      expect(keys.has(key(cellAt([tile.x, tile.z])))).toBe(false)
-      expect(tile.piece.startsWith("mountain_")).toBe(false)
+    for (const tile of world.island.tiles) expect(keys.has(key(cellAt([tile.x, tile.z])))).toBe(false)
+    for (const piece of world.island.decor) {
+      expect(piece.piece.startsWith("mountain_")).toBe(false)
+      if (keys.has(key(cellAt([piece.x, piece.z])))) expect(piece.piece).toMatch(/^trees?_/)
     }
     expect(CITY.island.decor.some((d) => d.piece.startsWith("mountain_"))).toBe(true)
   })

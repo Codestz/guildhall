@@ -2,8 +2,10 @@ import type { Biome } from "./gen/biomes.ts"
 import type { District, RepoIsland } from "./gen/dress.ts"
 import { cellAt, key } from "./gen/hex.ts"
 import type { Gen } from "./gen/islandFromTree.ts"
+import { forestOf } from "./gen/relief/forest.ts"
 import { type Relief, reliefOf } from "./gen/relief/index.ts"
 import type { Folder } from "./gen/repo.ts"
+import { dressRivers, riversOf } from "./gen/rivers/index.ts"
 import {
   type Cell,
   cellToWorld,
@@ -19,7 +21,7 @@ import {
 import type { Post, Spot } from "./layout.ts"
 import { mapSites } from "./siteMap.ts"
 import { SITE_DEFS } from "./sites.ts"
-import { TERRACE } from "./waterways.ts"
+import { TERRACE, type Waterways } from "./waterways.ts"
 import type { Mix } from "./wilds.ts"
 
 /**
@@ -85,6 +87,8 @@ export interface World {
   ground: Ground
   /** The mountains of a gen 2 island (world/gen/relief), drawn in place of the hexes they cover. */
   relief?: Relief
+  /** The rivers and falls of a gen 2 island (world/gen/rivers), drawn by scene/nature/Rivers.tsx. */
+  water?: Waterways
   /** Every place people work, for what grows and burns round them (wilds.ts, lights.ts). */
   sites: readonly WorkPlace[]
   /** The story's job sites on this island (`sitesOf`, world/siteMap.ts). */
@@ -134,9 +138,11 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
   const level = (cell: Cell): number => made.levels.get(key(cell)) ?? 0
   const relief = info.gen === 2 ? reliefOf({ plan: made.plan, level }) : undefined
   const mountain = relief && relief.massifs.length > 0 ? relief : undefined
+  // Rivers spring on the ranges: the relief is carved to their beds before anything reads its ground.
+  const rivers = mountain ? riversOf(made.plan, mountain, level) : undefined
   const covered = (x: number, z: number): boolean => mountain?.keys.has(key(cellAt([x, z]))) ?? false
   // The hexes a massif covers are drawn by the massif (scene/Island.tsx), not by their tiles.
-  const island = mountain
+  const dry = mountain
     ? {
         ...made.island,
         tiles: made.island.tiles.filter((t) => !covered(t.x, t.z)),
@@ -145,12 +151,17 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
         meadow: made.island.meadow.filter(([x, z]) => !covered(x, z)),
       }
     : made.island
+  const wet = rivers && mountain ? dressRivers(dry, rivers.waters, mountain.keys, rivers.bridges) : dry
+  // Forest on the mountains' lower slopes, thinning to the treeline.
+  const island = mountain
+    ? { ...wet, decor: [...wet.decor, ...forestOf(mountain, made.plan.seed, rivers?.hexes)] }
+    : wet
   return {
     kind: "repo",
     island,
     roads: made.roads,
     terrain: {
-      at: ([q, line]) => land.get(`${q},${line}`)?.char ?? "~",
+      at: ([q, line]) => (rivers?.hexes.has(`${q},${line}`) ? "r" : (land.get(`${q},${line}`)?.char ?? "~")),
       // A hex under a massif is raised (wilds and walkers keep off it), by its centre's height.
       level: (cell) => {
         if (!mountain?.massifAt(cell)) return level(cell)
@@ -162,6 +173,7 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
     },
     ground: { heightAt: (x, z) => mountain?.heightAt(x, z) ?? level(cellAt([x, z])) * TERRACE },
     ...(mountain ? { relief: mountain } : {}),
+    ...(rivers ? { water: rivers.waters } : {}),
     sites: [...districts, ...moved],
     storySites,
     repo: { ...info, districts: made.districts, folders: made.plan.districts.map((d) => d.folder) },

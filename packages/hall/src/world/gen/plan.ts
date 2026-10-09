@@ -46,6 +46,8 @@ export interface PlanDistrict {
 export interface PlanHex {
   char: string
   district: number
+  /** Generator v2: the terrace a lot or meadow stands on in hill country (1 or 2); absent is level ground. */
+  level?: 1 | 2
 }
 
 export interface IslandPlan {
@@ -166,7 +168,7 @@ export function planIsland(
   const { road, roads } = layRoads(districts, owner, heads, searched, form, mountains)
   const radius = smoothCoast(owner, road, form)
   const sites = placeSites(districts, owner, road, seed)
-  const land = groundOf(districts, owner, road, sites, seed, mountains)
+  const land = groundOf(districts, owner, road, sites, seed, mountains, Boolean(form.mass))
   const ranges = reserved.map((range) => new Set([...range].filter((id) => land.has(id))))
   return { hash: shape.hash, seed, land, districts, roads, hub: HUB, quay: QUAY, gate: GATE, radius, ranges }
 }

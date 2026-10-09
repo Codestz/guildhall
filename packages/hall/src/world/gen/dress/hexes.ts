@@ -51,13 +51,16 @@ export function dressHexes(
       const kit = district?.folder.language.kit ?? "blue"
       const tile = (piece: LandPiece, m = 0, y = 0) =>
         tiles.push({ piece, x, z, rot: turn(m), ...(y ? { y } : {}) })
+      // Hill country: a lot or meadow on a terrace stands on its top, and so does what is added to it.
+      const terraced = plan.land.get(key(cell))?.level !== undefined && level(cell) > 0
+      const lift = terraced ? level(cell) * TERRACE : 0
       const add = (piece: LandPiece, dx = 0, dz = 0, rot = spin(), y = 0, scale?: number) =>
         decor.push({
           piece,
           x: round(x + dx),
           z: round(z + dz),
           rot,
-          ...(y ? { y } : {}),
+          ...(y + lift ? { y: y + lift } : {}),
           ...(scale ? { scale } : {}),
         })
       const offset = (distance: number): [number, number] => {
@@ -84,7 +87,16 @@ export function dressHexes(
         continue
       }
       const height = level(cell)
-      if (height > 0) {
+      if (terraced) {
+        // A meadow on the edge of a terrace slopes down to the lower ground; the rest are flat tops.
+        const ramp = char === "." ? rampOf(cell, lowerOf(cell, height)) : undefined
+        if (ramp !== undefined) {
+          tile("hex_grass_sloped_low", ramp + 3, (height - 1) * TERRACE)
+          continue
+        }
+        tile("hex_grass", 0, lift)
+        for (let below = height - 2; below >= 0; below -= 2) tile("hex_grass", 0, below * TERRACE)
+      } else if (height > 0) {
         const lower = lowerOf(cell, height)
         const ramp = char === "H" ? rampOf(cell, lower) : undefined
         if (ramp !== undefined) {
@@ -135,7 +147,7 @@ export function dressHexes(
             add(pick(["rock_single_A", "rock_single_C"] as const), ...offset(2.5))
           continue
         }
-      } else tile("hex_grass")
+      } else if (!terraced) tile("hex_grass")
 
       if (site !== undefined) {
         const owner = plan.districts[site]
@@ -154,7 +166,7 @@ export function dressHexes(
           else {
             add(pick(["tree_single_A", "tree_single_B"] as const), ...offset(2.5))
             add(pick(["tree_single_A", "tree_single_B"] as const), ...offset(2.8))
-            meadow.push([x, z])
+            if (!terraced) meadow.push([x, z])
           }
           break
         case "h":
@@ -182,7 +194,7 @@ export function dressHexes(
         }
         case "V":
           // The lots round the keep: open ground (the wilds grow there, clear of its walls).
-          meadow.push([x, z])
+          if (!terraced) meadow.push([x, z])
           break
         case "s":
           // Training ground (the proving grounds' spare hexes): a target or a tent.
@@ -190,7 +202,7 @@ export function dressHexes(
           else add("tent", ...offset(1))
           break
         case ".": {
-          meadow.push([x, z])
+          if (!terraced) meadow.push([x, z])
           const roll = random()
           if (district?.biome === "quarry" && roll < 0.5)
             add(

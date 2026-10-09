@@ -49,6 +49,7 @@ import { noiseTexture } from "./noise.ts"
 import { HEX_RADIUS } from "./scatter.ts"
 import { waterFragment, waterVertex } from "./shaders.ts"
 import {
+  Bakes,
   distanceToLand,
   patchSquares,
   riverCells,
@@ -119,7 +120,8 @@ export function Water({ tier, at }: { tier: Tier; at?: Spot }) {
   const still = useMemo(reducedMotion, [])
 
   // The shore texture: render the tiles' land mask from above once per world (after the first
-  // commit, so a suspended render never pays for it), then measure it on the CPU. Kept per world.
+  // commit, so a suspended render never pays for it), then measure it on the CPU. Kept per world
+  // while a water draws it (Bakes).
   // WebGPU reads it back asynchronously: the water takes it a few frames later.
   useEffect(() => {
     let made = shores.get(world)
@@ -129,11 +131,12 @@ export function Water({ tier, at }: { tier: Tier; at?: Spot }) {
         : bakeShore(gl as WebGLRenderer, nodes, world, layout)
       shores.set(world, made)
     }
+    const release = shores.hold(world)
     if (!node) {
       const glsl = made as Shore
       uniforms.uShore.value = glsl.texture
       uniforms.uWheel.value.copy(glsl.wheel)
-      return
+      return release
     }
     let live = true
     Promise.resolve(made)
@@ -141,6 +144,7 @@ export function Water({ tier, at }: { tier: Tier; at?: Spot }) {
       .catch((error) => console.warn("water: the shore bake failed", error))
     return () => {
       live = false
+      release()
     }
   }, [gl, nodes, world, uniforms, node, layout])
   useEffect(() => () => material.dispose(), [material])
@@ -299,7 +303,11 @@ interface Shore {
   texture: DataTexture
   wheel: Vector4
 }
-const shores = new WeakMap<World, Shore | Promise<Shore>>()
+/** Each world's bake, while a water draws it; a repo's is freed once none does (shore.ts Bakes). */
+const shores = new Bakes<World, Shore>(
+  (shore) => shore.texture.dispose(),
+  (world) => world.kind === "hand",
+)
 /** Foam rings reach this far from what stands in the water (world units; the texture's alpha). */
 const RING_MAX = 4
 /** Pieces that sit on the water but shouldn't ring it (they float, they don't stand). */

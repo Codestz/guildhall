@@ -3,7 +3,7 @@ import { activeWorld } from "../world/active.ts"
 import { parseRepo } from "../world/gen/fetch.ts"
 import { GRAVEYARD_PLOT, type LandmarkKind } from "../world/lands.ts"
 import { sitesOf } from "../world/siteMap.ts"
-import { loadRepo } from "../world/source.ts"
+import { HOME_ISLAND, showIsland } from "../world/source.ts"
 import { handWorld, reachOf, type World } from "../world/world.ts"
 import type { Place } from "./director.ts"
 import type { Weather } from "./environment.ts"
@@ -36,6 +36,7 @@ import { RUSH, SCENARIOS, type ScenarioId } from "./store.ts"
  *            (world/gen) instead of the guild's own. The Bard directs there as anywhere (with
  *            `bard=0`, the island is framed whole). Bundled fixtures first, else the public GitHub
  *            API; on failure the guild's island stays. A `look` name waits for the island to grow.
+ *            `home`: back to the guild's own island. Applied in place, the world swaps live.
  *
  * Every value is validated strictly; anything unknown or invalid is ignored (and listed in
  * `ignored`, for the probe tools to report). Production honours all of it except `event`.
@@ -63,7 +64,7 @@ export interface DeepLink {
   lookName?: string
   paused?: boolean
   event?: EventKind
-  /** "sample" or "owner/name". */
+  /** "sample", "home" (the guild's own island) or "owner/name". */
   repo?: string
 }
 
@@ -201,7 +202,7 @@ function take(link: DeepLink, key: string, value: string, probe: boolean): boole
       link.event = value as EventKind
       return true
     case "repo":
-      if (value === "sample") {
+      if (value === "sample" || value === HOME_ISLAND) {
         link.repo = value
         return true
       }
@@ -367,7 +368,7 @@ export function applyDeepLink(link: DeepLink, hall: Hall): string[] {
   if (link.repo !== undefined) {
     // What a name means waits for the island; with the Bard off and nothing named, it is framed whole.
     const { look, lookName, bard } = link
-    void loadRepo(link.repo).then((world) => {
+    void showIsland(link.repo).then((world) => {
       const place =
         (lookName !== undefined ? lookOf(lookName, world) : undefined) ??
         (bard === false && !look ? lookOf("island", world) : undefined)

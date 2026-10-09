@@ -10,22 +10,40 @@ import { shadows } from "./atmosphere/shadows.ts"
  * every mount builds its own and frees exactly that one.
  */
 
+/** What a mount holds: the value and the deps it was made for. */
+export interface Held<T> {
+  readonly value: T
+  readonly deps: DependencyList
+}
+
+/**
+ * The held value, if it was made for `deps`; null once they have changed. The render that sees new
+ * deps (a new world) commits before the effect frees the old value, and a frame can run in between:
+ * whatever that render hands out — to `useFrame`, to a `<primitive>` — must already be null, or the
+ * frame draws or writes into a value about to be freed (a BatchedMesh's `setMatrixAt` on its
+ * dropped matrix texture: "Cannot read properties of null (reading 'image')").
+ */
+export function heldFor<T>(held: Held<T> | null, deps: DependencyList): T | null {
+  if (!held || held.deps.length !== deps.length) return null
+  return held.deps.every((dep, i) => Object.is(dep, deps[i])) ? held.value : null
+}
+
 /** A value made and freed by the same mount; rebuilt (old one freed) when `deps` change. */
 export function useOwned<T>(make: () => T, free: (value: T) => void, deps: DependencyList): T | null {
-  const [value, setValue] = useState<T | null>(null)
+  const [held, setHeld] = useState<Held<T> | null>(null)
   useEffect(
     () => {
       const made = make()
-      setValue(made)
+      setHeld({ value: made, deps })
       return () => {
-        setValue(null)
+        setHeld(null)
         free(made)
       }
     },
     // biome-ignore lint/correctness/useExhaustiveDependencies: the caller's `deps` decide when to rebuild
     deps,
   )
-  return value
+  return heldFor(held, deps)
 }
 
 /** What a layer's build returns: the meshes it draws, plus anything else the layer keeps. */

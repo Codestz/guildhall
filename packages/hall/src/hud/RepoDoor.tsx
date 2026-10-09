@@ -7,22 +7,25 @@ import {
   useState,
   useSyncExternalStore,
 } from "react"
+import { parseDeepLink } from "../guild/deeplink.ts"
+import type { GuildStore } from "../guild/store.ts"
+import { useGuildStore } from "../guild/useGuild.ts"
 import { MAX_ISLANDS } from "../world/archipelago.ts"
 import { parseRepo } from "../world/gen/fetch.ts"
 import type { RepoFailure } from "../world/gen/load.ts"
-import { useWorld } from "../world/source.ts"
+import { HOME_ISLAND, showIsland, useWorld, worldSource } from "../world/source.ts"
 import { FOCUSABLE, tabStops, wrapOf } from "./focus.ts"
 import { Icon } from "./icons.tsx"
 import { addToArchipelago, islandLink, shareLink } from "./repoLinks.ts"
 
 /**
  * The public front door: "your repo as an island". Paste a GitHub link or owner/name and the hall
- * reloads on the island grown from it (`?repo=`, world/gen/load.ts); or adds it to the archipelago
- * (`?repos=`). The tree is fetched here first, so a missing repo, a private one or GitHub's rate
- * limit is said in the dialog, with a retry, before the page is left; what was fetched is kept for
- * the session (load.ts), so the reload doesn't ask GitHub twice.
- *
- * Always a reload, never a swap in place: the scene doesn't survive its world changing under it.
+ * swaps in place to the island grown from it (`?repo=`, world/gen/load.ts), under a short veil, with
+ * the address kept in step (a history entry each, so Back and Forward walk the islands); or adds it
+ * to the archipelago (`?repos=`, a reload: the far islands are grown at startup). The tree is
+ * fetched here first, so a missing repo, a private one or GitHub's rate limit is said in the dialog,
+ * with a retry, before the island changes; what was fetched is kept for the session (load.ts), so
+ * the swap doesn't ask GitHub twice.
  *
  * Opened from the brand's about card, Settings, the showcase's opening caption, the repo legend and
  * the archipelago switcher (`repoDoor.open`). Modal: focus is held inside, Esc or the scrim closes
@@ -72,6 +75,80 @@ export function useRepoDoor(): boolean {
   return useSyncExternalStore(repoDoor.subscribe, () => isOpen)
 }
 
+// ── going to an island in place ──
+
+/** How long the veil takes to fall, and to lift, ms (quicker with reduced motion). */
+const VEIL_MS = 260
+const VEIL_QUICK_MS = 120
+/** Frames drawn on the new island under the veil before it lifts: its layers build in effects. */
+const SETTLE_FRAMES = 3
+
+let veil: HTMLDivElement | null = null
+let visits = 0
+let following = false
+
+/**
+ * Swaps the hall to `repo`'s island (HOME_ISLAND: the guild's own) without leaving the page: a veil
+ * falls over the world (not the HUD), the world swaps under it (world/source.ts showIsland), and it
+ * lifts once the new island has drawn. A pick or framing belonged to the island left, so both go,
+ * as a reload's `islandLink` drops them. `url`: the address to push for it (the door); Back and
+ * Forward pass none, the address being already theirs.
+ */
+export async function visitIsland(store: GuildStore, repo: string, url?: string): Promise<void> {
+  if (url !== undefined) {
+    history.pushState(history.state, "", url)
+    followHistory(store)
+  }
+  const n = ++visits
+  const ms = matchMedia("(prefers-reduced-motion: reduce)").matches ? VEIL_QUICK_MS : VEIL_MS
+  const shade = veilOf(ms)
+  shade.style.opacity = "1"
+  await wait(ms)
+  if (n !== visits) return
+  store.select(null)
+  store.frame(null)
+  await showIsland(repo)
+  await worldSource.ready
+  for (let i = 0; i < SETTLE_FRAMES; i++) await new Promise(requestAnimationFrame)
+  if (n !== visits) return
+  shade.style.opacity = "0"
+}
+
+/** Back and Forward between islands the door went to: each entry's `?repo=` (none: home), in place. */
+function followHistory(store: GuildStore): void {
+  if (following) return
+  following = true
+  addEventListener("popstate", () => {
+    const repo = parseDeepLink(location.search, false).link.repo ?? HOME_ISLAND
+    void visitIsland(store, repo)
+  })
+}
+
+/** The veil over the world: below the HUD (z 40), above the canvas and its name chips (z 0–20). */
+function veilOf(ms: number): HTMLDivElement {
+  if (!veil) {
+    veil = document.createElement("div")
+    veil.setAttribute("aria-hidden", "true")
+    Object.assign(veil.style, {
+      position: "fixed",
+      inset: "0",
+      zIndex: "30",
+      background: "var(--ink-solid)",
+      opacity: "0",
+      pointerEvents: "none",
+    })
+    document.body.append(veil)
+    // Laid out at 0 first, so the first fall eases instead of popping.
+    veil.getBoundingClientRect()
+  }
+  veil.style.transition = `opacity ${ms}ms ease`
+  return veil
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 // ── the dialog ──
 
 type Action = "visit" | "add"
@@ -90,6 +167,7 @@ type Phase =
     }
 
 export function RepoDoor() {
+  const store = useGuildStore()
   const { repo: grown } = useWorld()
   const current = grown?.repo
   const [text, setText] = useState(current ?? "")
@@ -179,8 +257,12 @@ export function RepoDoor() {
   function go(action: Action, repo: string) {
     setPhase({ state: "going", repo, action })
     const added = addToArchipelago(repo, location.search)
-    const search = action === "add" && added.ok ? added.search : islandLink(repo, location.search)
-    location.assign(`${location.pathname}${search}`)
+    if (action === "add" && added.ok) {
+      location.assign(`${location.pathname}${added.search}`)
+      return
+    }
+    repoDoor.close()
+    void visitIsland(store, repo, `${location.pathname}${islandLink(repo, location.search)}${location.hash}`)
   }
 
   function submit(event: FormEvent) {

@@ -217,3 +217,50 @@ function square(x: number, z: number, cell: number): Spot[] {
     [x + cell, z],
   ]
 }
+
+/**
+ * Bakes kept per key (a world) while something draws them. `hold` marks one in use and returns its
+ * release; once nothing holds a key, its bake is freed (`free`) unless `keep` says it stays (the
+ * hand-drawn world: one for the session). The check waits for the commit to finish, since an
+ * effect re-run (a rebuilt material) releases and takes the same key back at once. Without this
+ * a repo's world, grown afresh on every visit, left its bake on the GPU for the session.
+ */
+export class Bakes<K extends object, T> {
+  private made = new Map<K, T | Promise<T>>()
+  private users = new Map<K, number>()
+
+  constructor(
+    private readonly free: (bake: T) => void,
+    private readonly keep: (key: K) => boolean,
+  ) {}
+
+  get(key: K): T | Promise<T> | undefined {
+    return this.made.get(key)
+  }
+
+  set(key: K, bake: T | Promise<T>): void {
+    this.made.set(key, bake)
+  }
+
+  hold(key: K): () => void {
+    this.users.set(key, (this.users.get(key) ?? 0) + 1)
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      const left = (this.users.get(key) ?? 1) - 1
+      if (left > 0) {
+        this.users.set(key, left)
+        return
+      }
+      this.users.delete(key)
+      if (this.keep(key)) return
+      queueMicrotask(() => {
+        const bake = this.made.get(key)
+        if (this.users.has(key) || bake === undefined) return
+        this.made.delete(key)
+        void Promise.resolve(bake).then(this.free, () => {})
+      })
+    }
+  }
+}

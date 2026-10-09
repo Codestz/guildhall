@@ -27,7 +27,7 @@ class WorldSource {
    * Settles when the island being loaded is in (or failed): what the scene suspends on. The first
    * is already settled and marked so for React's `use`, so the hand island never suspends.
    */
-  ready: Promise<void> = Object.assign(Promise.resolve(), { status: "fulfilled", value: undefined })
+  ready: Promise<void> = settled()
   private listeners = new Set<Listener>()
   private asked = 0
   /** The last island asked for, and what loading it settles to. */
@@ -71,6 +71,18 @@ class WorldSource {
     return done
   }
 
+  /**
+   * Back to the hand-drawn lands (`repo=home`), at once: whatever island was growing is let go (its
+   * load still settles, but no longer changes the world), so asking for it again grows it again.
+   */
+  home(): World {
+    this.asked++
+    this.last = undefined
+    this.ready = settled()
+    if (this.status.state !== "hand") this.set(handWorld(), { state: "hand" })
+    return this.world
+  }
+
   private set(world: World, status: WorldStatus): void {
     this.world = world
     setActiveWorld(world)
@@ -79,11 +91,24 @@ class WorldSource {
   }
 }
 
+/** A promise already settled, and marked so for React's `use`: nothing suspends on it. */
+function settled(): Promise<void> {
+  return Object.assign(Promise.resolve(), { status: "fulfilled", value: undefined })
+}
+
 export const worldSource = new WorldSource()
+
+/** What `repo=` names to go back to the guild's own island: `home`, as the archipelago's `island=home`. */
+export const HOME_ISLAND = "home"
 
 /** Starts loading a repo's island (`?repo=`): fixtures or GitHub, loaded on first need. */
 export function loadRepo(wanted: string): Promise<World> {
   return worldSource.load(wanted, async (name) => (await import("./gen/load.ts")).treeFor(name))
+}
+
+/** Shows `repo`'s island (`HOME_ISLAND`: the hand-drawn lands), swapped in place on a running hall. */
+export function showIsland(repo: string): Promise<World> {
+  return repo === HOME_ISLAND ? Promise.resolve(worldSource.home()) : loadRepo(repo)
 }
 
 /**

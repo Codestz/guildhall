@@ -167,6 +167,34 @@ describe("the world source", () => {
     expect(worldSource.world).toBe(fast)
     expect(worldSource.status).toEqual({ state: "repo" })
   })
+
+  test("home goes back to the hand island at once, and a repo asked for again grows again", async () => {
+    let fetched = 0
+    const fetchTree = async () => {
+      fetched++
+      return tree
+    }
+    const grown = await worldSource.load("Codestz/guildhall", fetchTree)
+    expect(worldSource.home()).toBe(handWorld())
+    expect(worldSource.world).toBe(handWorld())
+    expect(activeWorld()).toBe(handWorld())
+    expect(worldSource.status).toEqual({ state: "hand" })
+    // Left, the old island is not handed back from the cache: the swap back builds it afresh.
+    const again = await worldSource.load("Codestz/guildhall", fetchTree)
+    expect(again).not.toBe(grown)
+    expect(worldSource.world).toBe(again)
+    expect(fetched).toBe(2)
+  })
+
+  test("home lets go of an island still growing: it lands, but the hand island stays", async () => {
+    let release: (tree: Tree) => void = () => {}
+    const slow = worldSource.load("slow/one", () => new Promise<Tree>((resolve) => (release = resolve)))
+    worldSource.home()
+    release({ ...tree, repo: "slow/one" })
+    await slow
+    expect(worldSource.world).toBe(handWorld())
+    expect(worldSource.status).toEqual({ state: "hand" })
+  })
 })
 
 describe("repo errors, in words", () => {
@@ -191,5 +219,10 @@ describe("the repo deep link", () => {
     const bad = parseDeepLink("repo=../etc&repo=not a repo", false)
     expect(bad.link.repo).toBeUndefined()
     expect(bad.ignored).toEqual(["repo=../etc", "repo=not a repo"])
+  })
+
+  test("home names the guild's own island (the way back); an empty repo is ignored", () => {
+    expect(parseDeepLink("repo=home", false).link.repo).toBe("home")
+    expect(parseDeepLink("repo=", false).ignored).toEqual(["repo="])
   })
 })

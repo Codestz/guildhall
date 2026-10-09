@@ -1,5 +1,5 @@
 import type { Change } from "@guildhall/core"
-import { ROLES } from "@guildhall/roster"
+import { type ArchetypeId, ROLES } from "@guildhall/roster"
 
 /**
  * Claude Code's hook events, translated into the world's `Change`s. Pure and stateless: every hook
@@ -49,7 +49,7 @@ export function translate(payload: unknown, at: number): Change[] {
           id: main,
           ...(str(input.model) ? { model: str(input.model) } : {}),
           ...(str(input.session_title) ? { title: str(input.session_title) } : {}),
-          ...(input.agent_type ? { agent: agentOf(input.agent_type) } : {}),
+          ...(input.agent_type ? actorOf(input.agent_type) : {}),
           at,
         },
       ]
@@ -165,27 +165,34 @@ export function subagentId(agentId: string): string {
 
 const ROLE_IDS: ReadonlySet<string> = new Set(ROLES.map((role) => role.id))
 
-/** Claude Code's own subagent types, by the roster role that does their work. */
-const BUILT_IN: Readonly<Record<string, string>> = {
-  Explore: "guild-explorer",
-  Plan: "guild-architect",
+/** Claude Code's own subagent types, by the archetype that does their work in the world. */
+const BUILT_IN: Readonly<Record<string, ArchetypeId>> = {
+  Explore: "scout",
+  Plan: "architect",
 }
 
 /**
  * The agent name the world knows a Claude Code agent type by: a roster role when the name matches
- * one (`implementer`, `agentry:implementer`, `guild-implementer` → `guild-implementer`) or is a
- * built-in type that does a role's work (`Explore` → the explorer, `Plan` → the architect), else the
- * type as Claude Code names it, which the hall shows as a Wanderer.
+ * one (`implementer`, `agentry:implementer`, `guild-implementer` → `guild-implementer`), else the
+ * type as Claude Code names it (`Explore`, `general-purpose`).
  */
 export function agentOf(type: string): string {
-  const builtIn = BUILT_IN[type]
-  if (builtIn) return builtIn
   const bare = type
     .slice(type.lastIndexOf(":") + 1)
     .trim()
     .toLowerCase()
   const id = bare.startsWith("guild-") ? bare : `guild-${bare}`
   return ROLE_IDS.has(id) ? id : type
+}
+
+/**
+ * A session change's `agent`, plus the `archetype` for a built-in type that does an archetype's work
+ * (`Explore` → the Scout, `Plan` → the Architect: PROTOCOL.md §1.1). Anything else is drawn from
+ * its agent name (a roster role's archetype, or a Wanderer).
+ */
+export function actorOf(type: string): { agent: string; archetype?: ArchetypeId } {
+  const archetype = BUILT_IN[type]
+  return archetype ? { agent: type, archetype } : { agent: agentOf(type) }
 }
 
 /**
@@ -267,7 +274,7 @@ function questOf(input: HookInput, parent: string, call: string, now: number): C
       type: "session",
       id,
       parentID: parent,
-      ...(type ? { agent: agentOf(type) } : {}),
+      ...(type ? actorOf(type) : {}),
       ...(title ? { title } : {}),
       at,
     },
@@ -280,7 +287,7 @@ function sessionOf(input: HookInput, id: string, parentID: string, at: number): 
     type: "session",
     id,
     parentID,
-    ...(input.agent_type ? { agent: agentOf(input.agent_type) } : {}),
+    ...(input.agent_type ? actorOf(input.agent_type) : {}),
     at,
   }
 }

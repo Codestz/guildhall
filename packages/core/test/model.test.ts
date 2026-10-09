@@ -202,3 +202,18 @@ describe("v2 pleas (measured on 2.0.18)", () => {
     expect(replied).toEqual([{ type: "status", id: "ses_9", status: "busy", at: 20 }])
   })
 })
+
+describe("a session's archetype", () => {
+  test("is kept when the source sends one, and a later session change without it keeps it", () => {
+    const model = applyAll(emptyModel(), [
+      { type: "session", id: "b", agent: "ci", archetype: "automaton", at: 1 },
+      { type: "session", id: "b", title: "Nightly build", at: 2 },
+    ])
+    expect(model.sessions.get("b")?.archetype).toBe("automaton")
+  })
+
+  test("is absent when the source never says", () => {
+    const model = applyAll(emptyModel(), [{ type: "session", id: "a", agent: "general", at: 1 }])
+    expect(model.sessions.get("a")?.archetype).toBeUndefined()
+  })
+})

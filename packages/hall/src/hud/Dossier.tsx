@@ -1,5 +1,6 @@
 import type { Entry } from "@guildhall/core"
 import { useEffect, useRef } from "react"
+import { initials, RANK_LABEL } from "../guild/casting.ts"
 import type { AdventurerView, GuildStore } from "../guild/store.ts"
 import { cost, phaseOf, STATUS, span, targetOf, tokens } from "./format.ts"
 import { Icon } from "./icons.tsx"
@@ -44,11 +45,9 @@ export function Dossier({
   return (
     <aside className={`plaque dossier ${className ?? ""}`} aria-labelledby="dossier-h">
       <header className="dossier-head">
-        <Sigil title={view?.role ?? title} color={color} ordinal={view?.ordinal} size="lg" />
+        <Sigil glyph={view?.glyph ?? initials(title)} color={color} ordinal={view?.ordinal} size="lg" />
         <div className="dossier-id">
-          <span className="eyebrow">
-            {view?.master ? "Guildmaster" : "Adventurer"} · {party ? `${party.name} quest` : "Dossier"}
-          </span>
+          <span className="eyebrow">{eyebrowOf(view, party?.name)}</span>
           <h2 id="dossier-h">{title}</h2>
           <Status tone={state.tone} label={state.label} />
         </div>
@@ -157,4 +156,11 @@ function Line({ entry }: { entry: Entry }) {
       )
     }
   }
+}
+
+/** Over the name: their rank and the source's own name for them, and whose quest it is. */
+function eyebrowOf(view: AdventurerView | undefined, party: string | undefined): string {
+  const parts = [view ? RANK_LABEL[view.rank] : "Adventurer", view?.subtitle, party && `${party} quest`]
+  const said = parts.filter(Boolean)
+  return (said.length > 1 ? said : [...said, "Dossier"]).join(" · ")
 }

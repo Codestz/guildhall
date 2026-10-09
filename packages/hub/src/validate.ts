@@ -51,7 +51,15 @@ const input: Check = (v) => {
 const SHAPES: Record<Change["type"], { required?: Record<string, Check>; optional?: Record<string, Check> }> =
   {
     session: {
-      optional: { parentID: name, agent: name, title: text, model: name, background: flag, denied: names },
+      optional: {
+        parentID: name,
+        agent: name,
+        archetype: name,
+        title: text,
+        model: name,
+        background: flag,
+        denied: names,
+      },
     },
     step: {},
     status: {

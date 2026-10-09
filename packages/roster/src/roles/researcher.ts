@@ -1,3 +1,4 @@
+import { ARCHETYPES } from "../archetypes.ts"
 import type { Role } from "../role.ts"
 import { SUBAGENT_RULES } from "./common.ts"
 
@@ -48,8 +49,6 @@ export const researcher: Role = {
   prompt,
   permissions: { edit: "deny", bash: "deny", web: "allow", dispatch: [] },
   tier: "standard",
-  color: "#6fb3e0",
-  station: "map-table",
-  character: "rogue-hooded",
-  site: "river",
+  color: ARCHETYPES.scholar.color,
+  archetype: "scholar",
 }

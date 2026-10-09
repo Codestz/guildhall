@@ -36,6 +36,8 @@ export interface Session {
   id: string
   parentID?: string
   agent: string
+  /** The archetype the source asked for (`session.archetype`), if any. */
+  archetype?: string
   title: string
   /** The task it was given — its first prompt. */
   task?: string
@@ -189,6 +191,7 @@ export function apply(model: Model, change: Change): void {
     case "session":
       if (change.parentID) s.parentID = change.parentID
       if (change.agent) s.agent = change.agent
+      if (change.archetype) s.archetype = change.archetype
       if (change.title) s.title = change.title
       if (change.model) s.model = change.model
       if (change.background) s.background = true

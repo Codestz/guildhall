@@ -1,3 +1,4 @@
+import { ARCHETYPES } from "../archetypes.ts"
 import { checksAnd, type Role } from "../role.ts"
 import { SUBAGENT_RULES } from "./common.ts"
 
@@ -51,8 +52,6 @@ export const verifier: Role = {
   prompt,
   permissions: { edit: "deny", bash: checksAnd("deny"), web: "deny", dispatch: [] },
   tier: "strong",
-  color: "#3fae6b",
-  station: "inspection-bench",
-  character: "rogue",
-  site: "proving",
+  color: ARCHETYPES.warden.color,
+  archetype: "warden",
 }

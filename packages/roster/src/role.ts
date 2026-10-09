@@ -1,6 +1,8 @@
+import type { ArchetypeId } from "./archetypes.ts"
+
 /**
- * What a role is (CONTEXT.md: Role). One record drives both sides: the herald injects it into
- * OpenCode as an agent (ADR 0002), the hall uses it to pick a character, a station and a site.
+ * What a role is (CONTEXT.md: Role). The herald injects it into OpenCode as an agent (ADR 0002);
+ * the hall draws it as its archetype (archetypes.ts, ADR 0010).
  * Each role lives in its own module under `roles/`, prompt included.
  */
 
@@ -50,25 +52,10 @@ export interface Role {
   prompt: string
   permissions: Permissions
   tier: Tier
-  /** Hex color, shared by the OpenCode TUI and the hall. */
+  /** Hex color for the OpenCode TUI: its archetype's (archetypes.ts), so both sides agree. */
   color: string
-  station:
-    | "quest-board"
-    | "drafting-table"
-    | "forge"
-    | "inspection-bench"
-    | "library"
-    | "map-table"
-    | "easel"
-    | "scroll-desk"
-    | "overflow"
-  /** Character model key in the hall's asset manifest. */
-  character: string
-  /**
-   * The island job site the role works out at (ADR 0006); none for the keep's roles. The hall's
-   * site registry (`packages/hall/src/world/sites.ts`) says what each site looks like and does.
-   */
-  site?: "yard" | "forest" | "river" | "proving" | "quarry" | "tower"
+  /** What the hall draws it as (archetypes.ts, ADR 0010): name, model, station, site, gear. */
+  archetype: ArchetypeId
 }
 
 /**

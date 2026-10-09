@@ -176,9 +176,9 @@ describe("parties: the stage", () => {
         expect(views.filter((v) => v.party === party.id).every((v) => v.banner === party.color)).toBe(true)
       }
       expect(collisions(views)).toEqual([])
-      // Numbering is per party: each party's first implementer is plain "Implementer".
+      // Numbering is per party: each party's first artisan is plain "Artisan".
       for (const party of stage)
-        expect(views.find((v) => v.party === party.id && v.role === "Implementer")?.ordinal).toBe(1)
+        expect(views.find((v) => v.party === party.id && v.role === "Artisan")?.ordinal).toBe(1)
     })
   }
 

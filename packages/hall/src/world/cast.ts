@@ -1,8 +1,7 @@
-import type { Piece } from "./furniture.ts"
-
 /**
- * How each role looks in the hall: which KayKit model, what it holds. The roster's `character` key
- * picks the model file; props are kit.glb pieces attached to the rig's hand slots.
+ * The character models the hall draws (an archetype's `model`, roster archetypes.ts, picks one).
+ * The six adventurers are preloaded; what each holds is the archetype's `gear` (kit.glb pieces in
+ * the rig's hand slots, scene/grips.ts).
  */
 export const MODELS = ["knight", "barbarian", "mage", "rogue", "rogue-hooded", "ranger"] as const
 export type Model = (typeof MODELS)[number]
@@ -25,23 +24,22 @@ export const undeadUrl = (kind: UndeadKind): string =>
   `${import.meta.env.BASE_URL}assets/characters/skeleton-${kind}.glb`
 export const UNDEAD_ANIMS_URL = `${import.meta.env.BASE_URL}assets/anims-undead.glb`
 
-export interface Gear {
-  right?: Piece
-  left?: Piece
-}
-
-export const GEAR: Record<string, Gear> = {
-  "guild-master": { right: "staff" },
-  "guild-architect": { left: "spellbook_open" },
-  "guild-implementer": { right: "hammer_A" },
-  "guild-verifier": { right: "dagger" },
-  "guild-librarian": { left: "spellbook_closed" },
-  "guild-explorer": { right: "crossbow_1handed" },
-  "guild-researcher": { right: "wand" },
-  "guild-designer": { left: "shield_badge_color" },
-  "guild-product-owner": { right: "map_rolled" },
-}
-
 export function isModel(value: string): value is Model {
   return (MODELS as readonly string[]).includes(value)
 }
+
+/**
+ * The Automaton's body (ADR 0010): KayKit's Skeleton_Minion on the adventurers' own rig (it plays
+ * anims.glb as is), re-cast in bronze by scene/automaton.ts. Loaded on first need, like the undead:
+ * the first bot on stage fetches it.
+ */
+export const AUTOMATON = "automaton"
+export type Figure = Model | typeof AUTOMATON
+
+/** The figure for an archetype's model key: anything unknown is drawn as a Wanderer. */
+export function figureOf(model: string): Figure {
+  return isModel(model) || model === AUTOMATON ? model : "rogue-hooded"
+}
+
+export const figureUrl = (figure: Figure): string =>
+  figure === AUTOMATON ? undeadUrl("minion") : modelUrl(figure)

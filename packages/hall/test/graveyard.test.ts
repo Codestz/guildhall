@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { ROUNDS } from "../src/scene/life/rounds.ts"
-import { MODELS } from "../src/world/cast.ts"
+import { AUTOMATON, figureOf, figureUrl, MODELS } from "../src/world/cast.ts"
 import BOUNDS from "../src/world/graveyard.json"
 import { castsShadow, GRAVEYARD, GRAVEYARD_REACH, type GravePlacement } from "../src/world/graveyard.ts"
 import { cellToWorld, GRAVEYARD_PLOT, MAP_FOR_TESTS as MAP, toPlot } from "../src/world/lands.ts"
@@ -111,6 +111,13 @@ describe("the graveyard", () => {
 describe("the undead load lazily", () => {
   test("no skeleton is among the adventurers' preloaded models", () => {
     for (const model of MODELS) expect(model).not.toContain("skeleton")
+  })
+
+  test("the Automaton is a skeleton re-cast (scene/automaton.ts), lazy like them: not among the preloaded", () => {
+    expect(figureOf(AUTOMATON)).toBe(AUTOMATON)
+    expect(figureUrl(AUTOMATON)).toContain("skeleton-minion.glb")
+    expect(MODELS as readonly string[]).not.toContain(AUTOMATON)
+    expect(figureOf("no-such-model")).toBe("rogue-hooded")
   })
 
   test("nothing preloads the skeletons or their clips: they load on first need, in scene/Undead", () => {

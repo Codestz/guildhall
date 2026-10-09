@@ -1,3 +1,4 @@
+import { ARCHETYPES } from "../archetypes.ts"
 import type { Role } from "../role.ts"
 import { SUBAGENT_RULES } from "./common.ts"
 
@@ -52,8 +53,6 @@ export const librarian: Role = {
   prompt,
   permissions: { edit: "deny", bash: "deny", web: "allow", dispatch: [] },
   tier: "fast",
-  color: "#8b6cd9",
-  station: "library",
-  character: "mage",
-  site: "tower",
+  color: ARCHETYPES.archivist.color,
+  archetype: "archivist",
 }

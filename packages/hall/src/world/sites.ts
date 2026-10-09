@@ -1,5 +1,5 @@
 import type { Session } from "@guildhall/core"
-import { roleOf } from "@guildhall/roster"
+import { castOf } from "@guildhall/roster"
 import { type Behaviour, SITE_WORK } from "./behaviours.ts"
 import type { Piece } from "./furniture.ts"
 import { SITES, type Site, type SiteId } from "./lands.ts"
@@ -15,7 +15,7 @@ import type { Mix } from "./wilds.ts"
  * the wilds (world/wilds).
  *
  * Adding a site: an id in `SiteId`, its map entry in `SITES` (spot, posts, landmark — its art), and
- * its entry here; the compiler asks for each. Which roles go there is the roster's (`Role.site`).
+ * its entry here; the compiler asks for each. Which archetypes go there is the roster's (`Archetype.site`).
  */
 
 /** Trace piles (scene/life/traces.ts `Traces`). */
@@ -93,11 +93,11 @@ export const SITE_DEFS: Record<SiteId, SiteDef> = {
 }
 
 /**
- * The site an agent works at for a quest (ADR 0006: chosen once per quest, by role). The roster
- * says (`Role.site`); agents it does not know work the quarry, the keep's roles none.
+ * The site an agent works at for a quest (ADR 0006: chosen once per quest, by archetype). The
+ * roster says (`Archetype.site`); wanderers and automatons work the quarry, the keep's own none.
  */
-export function siteOf(agent: string): SiteId | undefined {
-  return roleOf(agent).site
+export function siteOf(agent: string, declared?: string): SiteId | undefined {
+  return castOf(agent, declared).archetype.site
 }
 
 // ---- Failure destinations ------------------------------------------------------------------------

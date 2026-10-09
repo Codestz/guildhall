@@ -13,7 +13,7 @@ import {
   type SeaRecord,
   type Session,
 } from "@guildhall/core"
-import { type DeedLook, deedLook, interestOf, roleOf } from "@guildhall/roster"
+import { type ArchetypeId, type DeedLook, deedLook, interestOf, type Rank } from "@guildhall/roster"
 import {
   type Chapter,
   factions,
@@ -45,6 +45,7 @@ import {
 import { MOODS, type Mood } from "../world/moods.ts"
 import { sitesOf } from "../world/siteMap.ts"
 import { destinationOf, FATES, type Fates, SITE_DEFS, siteOf } from "../world/sites.ts"
+import { type Names, namedOf, rankOf } from "./casting.ts"
 import { Crowd } from "./crowd.ts"
 import {
   beatTimes,
@@ -149,14 +150,24 @@ export interface AdventurerView {
   id: string
   /** OpenCode agent name (`guild-implementer`). */
   agent: string
-  /** What the hall calls them: the role, numbered when it repeats (`Implementer II`). */
+  /** What the hall calls them: their archetype, numbered when it repeats (`Artisan II`; guild/casting.ts). */
   title: string
-  /** The role's own name, never numbered (`Implementer`): sigils take their letters from it. */
+  /** The name never numbered (`Artisan`, or `Implementer` with source names). */
   role: string
+  /** The source's own name under the title (`implementer`), or empty. */
+  subtitle: string
+  /** The sigil's two letters. */
+  glyph: string
+  /** `Artisans`. */
+  plural: string
+  /** What draws them (roster archetypes.ts): the HUD groups by it. */
+  archetype: ArchetypeId
+  /** How seasoned they are: gear, dye and the chip's pips (roster ranks.ts). */
+  rank: Rank
   /** 1 for the first of a role in the party, 2 for the second to join, …; stable while the session lasts. */
   ordinal: number
   color: string
-  /** Character model key (roster). */
+  /** Character model key (the archetype's). */
   character: string
   master: boolean
   phase: Phase
@@ -652,6 +663,21 @@ export class GuildStore {
     this.emit()
   }
 
+  /**
+   * How the cast is named (guild/casting.ts; Settings → Names). A told story is rebuilt where it
+   * stands, so the log, captions and Legends say the new names too; live, the views take them at
+   * once and lines written from now on.
+   */
+  names: Names = "world"
+
+  setNames(names: Names): void {
+    if (names === this.names) return
+    this.names = names
+    this.ordinals.rename(names)
+    if (this.mode === "sim") this.seek(this.time)
+    else this.refresh()
+  }
+
   setBard(on: boolean): void {
     // Handed back: the director takes a fresh look rather than resuming a stale shot.
     if (on && !this.bard) this.director.restart()
@@ -827,7 +853,7 @@ export class GuildStore {
     if (!this.focus || !held || score > this.focus.score) this.focus = { id: change.id, score, at: change.at }
   }
 
-  /** Each session's number within its role and party, for the log and moments (guild/ordinals.ts). */
+  /** Each session's number within its kind and party, for the log and moments (guild/ordinals.ts). */
   private ordinals = new Ordinals()
 
   /** Tool calls already written to the log: OpenCode 1 re-sends a running call as its output streams. */
@@ -842,10 +868,16 @@ export class GuildStore {
     }
     const line = lineOf(change, s)
     if (!line) return
-    const role = s.parentID ? roleOf(s.agent) : GUILDMASTER
-    const title = s.parentID ? numbered(role.title, this.ordinals.of(this.model, s)) : role.title
+    const named = namedOf(s, this.names)
+    const title = s.parentID ? numbered(named.name, this.ordinals.of(this.model, s)) : named.name
     this.write(
-      { at: change.at - this.start, id: s.id, title, color: role.color, party: rootOf(this.model, s.id) },
+      {
+        at: change.at - this.start,
+        id: s.id,
+        title,
+        color: named.archetype.color,
+        party: rootOf(this.model, s.id),
+      },
       line,
     )
   }
@@ -861,12 +893,12 @@ export class GuildStore {
 
   /** Who a moment is about, named as the log names them. */
   private actorOf(s: Session): Actor {
-    const role = s.parentID ? roleOf(s.agent) : GUILDMASTER
+    const named = namedOf(s, this.names)
     return {
       id: s.id,
       agent: s.agent,
-      title: s.parentID ? numbered(role.title, this.ordinals.of(this.model, s)) : role.title,
-      color: role.color,
+      title: s.parentID ? numbered(named.name, this.ordinals.of(this.model, s)) : named.name,
+      color: named.archetype.color,
       ...(s.parentID ? { parent: s.parentID } : {}),
       master: rootOf(this.model, s.id),
     }
@@ -908,7 +940,7 @@ export class GuildStore {
         for (const s of party.sessions)
           if (!this.present.has(s.id) && (this.mode !== "live" || this.now - s.seen <= LIVE_MS))
             this.entering.add(s.id)
-    const views = viewsOf(this.model, this.now, FATES, parties, this.entering, this.views)
+    const views = viewsOf(this.model, this.now, FATES, parties, this.entering, this.views, this.names)
     this.present.clear()
     for (const view of views) this.present.add(view.id)
     for (const id of this.entering) if (!this.present.has(id)) this.entering.delete(id)
@@ -1062,6 +1094,7 @@ export function viewsOf(
   stage: readonly Party[] = stageOf(model, now),
   entering: ReadonlySet<string> = NO_ONE,
   previous: readonly AdventurerView[] = [],
+  names: Names = "world",
 ): AdventurerView[] {
   const partyOfId = new Map<string, Party>()
   for (const party of stage) for (const s of party.sessions) partyOfId.set(s.id, party)
@@ -1082,8 +1115,9 @@ export function viewsOf(
     const party = partyOfId.get(s.id) as Party
     const isMaster = s === party.root
     // The root session is the guildmaster whatever agent runs it (OpenCode's `build`, a user's own).
-    const role = isMaster ? GUILDMASTER : roleOf(s.agent)
-    const counted = `${party.id}\u0000${role.title}`
+    const named = namedOf(s, names, isMaster)
+    const { archetype } = named
+    const counted = `${party.id}\u0000${named.name}`
     const ordinal = (joined.get(counted) ?? 0) + 1
     joined.set(counted, ordinal)
     const activity = activityOf(s)
@@ -1103,7 +1137,7 @@ export function viewsOf(
     let site: SiteId | undefined
     let seat: Seat | undefined
     let destination: string | undefined
-    const home = isMaster ? undefined : siteOf(s.agent)
+    const home = isMaster ? undefined : archetype.site
     const dais = SEAT_POSTS[party.seat] ?? MASTER_POST
     if (isMaster && party.leaving) {
       // The party goes home: its guildmaster walks out through the gate and down the avenue.
@@ -1159,18 +1193,23 @@ export function viewsOf(
       target = posts[posts.length - 1] ?? MASTER_POST
     } else {
       phase = s.status === "waiting" ? "waiting" : "working"
-      station = role.station
-      target = postAt(role.station, taken)
+      station = archetype.station
+      target = postAt(archetype.station, taken)
     }
 
     views.push({
       id: s.id,
       agent: s.agent,
-      title: numbered(role.title, ordinal),
-      role: role.title,
+      title: numbered(named.name, ordinal),
+      role: named.name,
+      subtitle: named.subtitle,
+      glyph: named.glyph,
+      plural: named.plural,
+      archetype: archetype.id,
+      rank: rankOf(s),
       ordinal,
-      color: role.color,
-      character: role.character,
+      color: archetype.color,
+      character: archetype.model,
       master: isMaster,
       phase,
       target,
@@ -1249,13 +1288,13 @@ export function entranceOf(id: string, party: Party, master: boolean): Entrance 
  * Which of its role `s` is in its party, by join order (1-based) — the same number `viewsOf` gives
  * it, for lines written as events arrive.
  */
-export function ordinalOf(model: Model, s: Session): number {
+export function ordinalOf(model: Model, s: Session, names: Names = "world"): number {
   const root = rootOf(model, s.id)
-  const title = (s.parentID ? roleOf(s.agent) : GUILDMASTER).title
+  const title = namedOf(s, names).name
   let n = 1
   for (const other of model.sessions.values()) {
     if (other === s || rootOf(model, other.id) !== root) continue
-    const otherTitle = (other.parentID ? roleOf(other.agent) : GUILDMASTER).title
+    const otherTitle = namedOf(other, names).name
     if (otherTitle === title && byJoin(other, s) < 0) n++
   }
   return n
@@ -1298,7 +1337,7 @@ export function roman(n: number): string {
 function progressOf(sessions: Iterable<Session>): number {
   let done = 0
   for (const s of sessions) {
-    const site = siteOf(s.agent)
+    const site = siteOf(s.agent, s.archetype)
     const builds = site && SITE_DEFS[site].builds
     if (!builds) continue
     for (const entry of s.entries)
@@ -1306,8 +1345,6 @@ function progressOf(sessions: Iterable<Session>): number {
   }
   return done
 }
-
-const GUILDMASTER = roleOf("guild-master")
 
 const MASTER_POST: Post = STATIONS["quest-board"].posts[0] ?? [0, -7.4, 0]
 /** Each party's guildmaster's place: the dais, then the seats beside it (guild/parties.ts). */

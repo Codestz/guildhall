@@ -21,8 +21,8 @@ function groupsOf(store: GuildStore): { party: Party | undefined; views: Adventu
   }))
 }
 
-/** A role group's key: its party and role (one party's Explorers open apart from another's). */
-const roleKey = (party: Party | undefined, role: string) => `${party?.id ?? ""}:${role}`
+/** A role group's key: its party and archetype (one party's Scouts open apart from another's). */
+const roleKey = (party: Party | undefined, archetype: string) => `${party?.id ?? ""}:${archetype}`
 
 /**
  * The role group a badge asked the roster to open with (crowd scale): set by a role badge just
@@ -103,7 +103,7 @@ export function Roster({
               {split && split.roles.length > 0 && (
                 <ul className="roster-list roster-roles" aria-label="Everyone else, by role">
                   {split.roles.map((role) => {
-                    const key = roleKey(group.party, role.role)
+                    const key = roleKey(group.party, role.archetype)
                     return (
                       <RoleRows
                         key={key}
@@ -138,10 +138,11 @@ function RosterRow({ store, view: v }: { store: GuildStore; view: AdventurerView
         data-tone={phase.tone}
         onClick={() => store.select(active ? null : v.id)}
       >
-        <Sigil title={v.role} color={v.color} ordinal={v.ordinal} />
+        <Sigil glyph={v.glyph} color={v.color} ordinal={v.ordinal} />
         <span className="roster-text">
           <span className="roster-name">
             {v.title}
+            {v.subtitle && <span className="roster-source"> · {v.subtitle}</span>}
             {v.master && (
               <span className="crown" title="Guildmaster">
                 <Icon.crown />
@@ -220,11 +221,11 @@ function RoleRows({
         className="roster-role-head"
         aria-expanded={open}
         aria-controls={id}
-        aria-label={`${n} ${plural(group.role, n)}${marks ? `, ${marks}` : ""}`}
+        aria-label={`${n} ${plural(group, n)}${marks ? `, ${marks}` : ""}`}
         onClick={onToggle}
       >
-        <Sigil title={group.role} color={group.color} />
-        <span className="roster-role-name">{plural(group.role, n)}</span>
+        <Sigil glyph={group.glyph} color={group.color} />
+        <span className="roster-role-name">{plural(group, n)}</span>
         <RoleMarks group={group} />
         <span className="roster-role-count">{n}</span>
         <span className="fold">
@@ -278,7 +279,7 @@ export function RosterBadges({ store, onExpand }: { store: GuildStore; onExpand:
                         onClick={() => store.select(active ? null : v.id)}
                         style={{ "--role": v.color } as CSSProperties}
                       >
-                        <Sigil title={v.role} color={v.color} ordinal={v.ordinal} />
+                        <Sigil glyph={v.glyph} color={v.color} ordinal={v.ordinal} />
                         {mark && (
                           <span className="badge-mark" aria-hidden="true">
                             <Mark />
@@ -293,11 +294,11 @@ export function RosterBadges({ store, onExpand }: { store: GuildStore; onExpand:
                   )
                 })}
                 {split?.roles.map((role) => (
-                  <li key={role.role}>
+                  <li key={role.archetype}>
                     <RoleBadge
                       group={role}
                       onOpen={() => {
-                        wanted = roleKey(group.party, role.role)
+                        wanted = roleKey(group.party, role.archetype)
                         onExpand()
                       }}
                     />
@@ -337,11 +338,11 @@ function RoleBadge({ group, onOpen }: { group: RoleGroup; onOpen: () => void }) 
       type="button"
       className="badge badge-role"
       data-tone={tone}
-      aria-label={`${n} ${plural(group.role, n)}${marks ? `, ${marks}` : ""}. Show them in the roster.`}
+      aria-label={`${n} ${plural(group, n)}${marks ? `, ${marks}` : ""}. Show them in the roster.`}
       onClick={onOpen}
       style={{ "--role": group.color } as CSSProperties}
     >
-      <Sigil title={group.role} color={group.color} />
+      <Sigil glyph={group.glyph} color={group.color} />
       <span className="badge-count" aria-hidden="true">
         {n}
       </span>
@@ -352,7 +353,7 @@ function RoleBadge({ group, onOpen }: { group: RoleGroup; onOpen: () => void }) 
       )}
       <span className="tip" aria-hidden="true">
         <b>
-          {n} {plural(group.role, n)}
+          {n} {plural(group, n)}
         </b>
         <span>{marks || "Show them in the roster"}</span>
       </span>

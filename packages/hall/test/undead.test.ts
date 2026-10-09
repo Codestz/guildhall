@@ -145,6 +145,8 @@ describe("the undead: who stands and how they came", () => {
     expect(undeadOf("guild-implementer")).toBe("warrior")
     expect(undeadOf("guild-verifier")).toBe("rogue")
     expect(undeadOf("general")).toBe("minion")
+    expect(undeadOf("dependabot[bot]")).toBe("minion")
+    expect(undeadOf("Explore", "scout")).toBe("rogue")
   })
 })
 

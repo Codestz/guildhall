@@ -1,3 +1,4 @@
+import type { Site as SiteName } from "@guildhall/roster"
 import LANDS from "./lands.json"
 import type { Post, Spot } from "./layout.ts"
 
@@ -259,7 +260,8 @@ function fit(
 
 // ---- Sites ---------------------------------------------------------------------------------
 
-export type SiteId = "yard" | "forest" | "river" | "proving" | "quarry" | "tower"
+/** The job sites: the roster names them (archetypes.ts `Site`), the map places them. */
+export type SiteId = SiteName
 
 /**
  * Where a job site is on the map. What happens there (clips, gear, traces…) is the site registry's,

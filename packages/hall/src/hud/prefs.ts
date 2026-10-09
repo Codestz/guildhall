@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react"
+import type { Names } from "../guild/casting.ts"
 
 /**
  * The viewer's HUD choices, remembered per browser. Minimal by default: the world is the hero.
@@ -14,6 +15,8 @@ export interface HudPrefs {
   sigils: boolean
   /** Story captions: one narrated line at a time, lower centre (hud/Captions.tsx). On by default. */
   captions: boolean
+  /** The cast's names: the world's archetypes (default) or the source's own (guild/casting.ts). */
+  names: Names
 }
 
 export const HUD_MODES: Record<HudMode, { label: string; next: HudMode; hint: string }> = {
@@ -23,7 +26,7 @@ export const HUD_MODES: Record<HudMode, { label: string; next: HudMode; hint: st
 }
 
 const KEY = "guildhall.hud"
-const DEFAULTS: HudPrefs = { mode: "minimal", stats: false, sigils: true, captions: true }
+const DEFAULTS: HudPrefs = { mode: "minimal", stats: false, sigils: true, captions: true, names: "world" }
 
 function read(): HudPrefs {
   try {
@@ -35,6 +38,7 @@ function read(): HudPrefs {
       stats: typeof value.stats === "boolean" ? value.stats : DEFAULTS.stats,
       sigils: typeof value.sigils === "boolean" ? value.sigils : DEFAULTS.sigils,
       captions: typeof value.captions === "boolean" ? value.captions : DEFAULTS.captions,
+      names: value.names === "source" || value.names === "world" ? value.names : DEFAULTS.names,
     }
   } catch {
     return DEFAULTS

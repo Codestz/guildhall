@@ -1,3 +1,4 @@
+import { ARCHETYPES } from "../archetypes.ts"
 import { CODE, checksAnd, type Role } from "../role.ts"
 import { SUBAGENT_RULES } from "./common.ts"
 
@@ -54,8 +55,6 @@ export const implementer: Role = {
   prompt,
   permissions: { edit: CODE, bash: checksAnd("ask"), web: "deny", dispatch: [] },
   tier: "standard",
-  color: "#e0702f",
-  station: "forge",
-  character: "barbarian",
-  site: "yard",
+  color: ARCHETYPES.artisan.color,
+  archetype: "artisan",
 }

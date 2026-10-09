@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { CHECKS, ROLES, roleOf, STRANGER } from "../src/index.ts"
+import { ARCHETYPES, CHECKS, ROLES, roleOf } from "../src/index.ts"
 
 const subagents = ROLES.filter((role) => role.mode === "subagent")
 
@@ -14,12 +14,13 @@ describe("the roster", () => {
     expect(ROLES.filter((role) => role.mode === "primary").map((role) => role.id)).toEqual(["guild-master"])
   })
 
-  test("every role is complete: title, prompt, colour, station, tier", () => {
+  test("every role is complete: title, prompt, colour, archetype, tier", () => {
     for (const role of ROLES) {
       expect(role.title.length).toBeGreaterThan(0)
       expect(role.prompt.length).toBeGreaterThan(1000)
       expect(role.color).toMatch(/^#[0-9a-f]{6}$/)
-      expect(role.station).not.toBe("overflow")
+      expect(role.color).toBe(ARCHETYPES[role.archetype].color)
+      expect(ARCHETYPES[role.archetype].station).not.toBe("overflow")
       expect(["strong", "standard", "fast"]).toContain(role.tier)
     }
   })
@@ -88,12 +89,12 @@ describe("the roster", () => {
 
 describe("roleOf", () => {
   test("maps an agent id to its role", () => {
-    expect(roleOf("guild-implementer").title).toBe("Implementer")
-    expect(roleOf("guild-master").title).toBe("Guildmaster")
+    expect(roleOf("guild-implementer")?.title).toBe("Implementer")
+    expect(roleOf("guild-master")?.title).toBe("Guildmaster")
   })
 
-  test("anything else is a wanderer", () => {
-    expect(roleOf("general")).toBe(STRANGER)
-    expect(roleOf("build")).toBe(STRANGER)
+  test("anything else is not the guild's", () => {
+    expect(roleOf("general")).toBeUndefined()
+    expect(roleOf("build")).toBeUndefined()
   })
 })

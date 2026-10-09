@@ -10,8 +10,8 @@ import {
   type Session,
   subagentsOf,
 } from "@guildhall/core"
-import { roleOf } from "@guildhall/roster"
-import { agentOf, deedName, MAX_OUTPUT, outputOf, translate } from "../src/translate.ts"
+import { castOf } from "@guildhall/roster"
+import { actorOf, agentOf, deedName, MAX_OUTPUT, outputOf, translate } from "../src/translate.ts"
 import failures from "./fixtures/failures.json"
 import session from "./fixtures/session.json"
 import subagents from "./fixtures/subagents.json"
@@ -102,11 +102,12 @@ describe("a subagent tree", () => {
     expect([...model.sessions.keys()]).toHaveLength(3)
   })
 
-  test("a roster name becomes its role, and so does a built-in that does a role's work", () => {
+  test("a roster name becomes its role; a built-in keeps its name and is drawn as its archetype", () => {
     expect(implementer?.agent).toBe("guild-implementer")
-    expect(roleOf(implementer?.agent ?? "").title).toBe("Implementer")
-    expect(explorer?.agent).toBe("guild-explorer")
-    expect(roleOf(explorer?.agent ?? "").title).toBe("Explorer")
+    expect(castOf(implementer?.agent ?? "").archetype.name).toBe("Artisan")
+    expect(explorer?.agent).toBe("Explore")
+    expect(explorer?.archetype).toBe("scout")
+    expect(castOf(explorer?.agent ?? "", explorer?.archetype).archetype.name).toBe("Scout")
   })
 
   test("the quest names the child: title from its description, task from its prompt", () => {
@@ -262,16 +263,15 @@ describe("names", () => {
     expect(agentOf("my-plugin:reviewer")).toBe("my-plugin:reviewer")
   })
 
-  test("Claude Code's built-in Explore and Plan are the explorer and the architect", () => {
-    expect(agentOf("Explore")).toBe("guild-explorer")
-    expect(agentOf("Plan")).toBe("guild-architect")
-    expect(roleOf(agentOf("Explore")).id).toBe("guild-explorer")
-    expect(roleOf(agentOf("Plan")).id).toBe("guild-architect")
+  test("Claude Code's built-in Explore and Plan keep their names and are the Scout and the Architect", () => {
+    expect(actorOf("Explore")).toEqual({ agent: "Explore", archetype: "scout" })
+    expect(actorOf("Plan")).toEqual({ agent: "Plan", archetype: "architect" })
+    expect(actorOf("implementer")).toEqual({ agent: "guild-implementer" })
   })
 
   test("only the built-ins themselves: a plugin's own plan agent is not the architect", () => {
-    expect(agentOf("my-plugin:Plan")).toBe("my-plugin:Plan")
-    expect(agentOf("statusline-setup")).toBe("statusline-setup")
+    expect(actorOf("my-plugin:Plan")).toEqual({ agent: "my-plugin:Plan" })
+    expect(actorOf("statusline-setup")).toEqual({ agent: "statusline-setup" })
   })
 
   test("tool names", () => {

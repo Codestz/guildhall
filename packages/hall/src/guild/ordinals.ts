@@ -1,9 +1,9 @@
 import { type Model, rootOf, type Session } from "@guildhall/core"
-import { roleOf } from "@guildhall/roster"
+import { type Names, namedOf } from "./casting.ts"
 import { byJoin } from "./parties.ts"
 
 /**
- * Which of its role each session is in its party (`Implementer II`), for lines written as events
+ * Which of its kind each session is in its party (`Artisan II`), for lines written as events
  * arrive: the same numbers `viewsOf` gives. Counted for the whole model at once and kept — asking
  * one session at a time walked every session's root per log line, which at 300 adventurers was
  * most of a rebuild (docs/perf-budget.md, Chapter 2).
@@ -19,6 +19,15 @@ export class Ordinals {
   /** Every parent id named so far: a newcomer in it adopts sessions already counted. */
   private parents = new Set<string>()
   private size = -1
+
+  /** Counted by the names shown (guild/casting.ts): two source names under one archetype count apart. */
+  constructor(private names: Names = "world") {}
+
+  /** Count by other names from the next ask. */
+  rename(names: Names): void {
+    this.names = names
+    this.forget()
+  }
 
   forget(): void {
     this.size = -1
@@ -39,7 +48,7 @@ export class Ordinals {
   }
 
   private joined(model: Model, s: Session): void {
-    const key = keyOf(model, s)
+    const key = keyOf(model, s, this.names)
     const group = this.groups.get(key)
     const last = group?.at(-1)
     if (this.size !== model.sessions.size - 1 || this.parents.has(s.id) || (last && byJoin(last, s) > 0)) {
@@ -64,7 +73,7 @@ export class Ordinals {
     this.parents.clear()
     this.size = model.sessions.size
     for (const s of model.sessions.values()) {
-      const key = keyOf(model, s)
+      const key = keyOf(model, s, this.names)
       const group = this.groups.get(key)
       if (group) group.push(s)
       else this.groups.set(key, [s])
@@ -77,10 +86,9 @@ export class Ordinals {
   }
 }
 
-const identityOf = (s: Session): string => `${s.parentID}\u0000${s.agent}\u0000${s.started}`
+const identityOf = (s: Session): string =>
+  `${s.parentID}\u0000${s.agent}\u0000${s.archetype}\u0000${s.started}`
 
-const GUILDMASTER = roleOf("guild-master").title
-
-/** Party and role: the root session is the guildmaster whatever agent runs it. */
-const keyOf = (model: Model, s: Session): string =>
-  `${rootOf(model, s.id)}\u0000${s.parentID ? roleOf(s.agent).title : GUILDMASTER}`
+/** Party and name: the root session is the guildmaster whatever agent runs it (guild/casting.ts). */
+const keyOf = (model: Model, s: Session, names: Names): string =>
+  `${rootOf(model, s.id)}\u0000${namedOf(s, names).name}`

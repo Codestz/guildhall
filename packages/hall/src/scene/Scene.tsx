@@ -6,7 +6,7 @@ import { SoundStage } from "../audio/SoundStage.tsx"
 import { MODE, PROBE } from "../guild/mode.ts"
 import type { AdventurerView } from "../guild/store.ts"
 import { useGuild, useGuildStore } from "../guild/useGuild.ts"
-import { ANIMS_URL, MODELS, modelUrl } from "../world/cast.ts"
+import { ANIMS_URL, AUTOMATON, MODELS, modelUrl } from "../world/cast.ts"
 import { useWorld } from "../world/source.ts"
 import { Adventurer, lookFrom } from "./Adventurer.tsx"
 import { Archipelago } from "./archipelago/Archipelago.tsx"
@@ -109,7 +109,8 @@ export function Scene() {
  * (scene/exits.ts): fast-forward never cuts one off mid-walk. Each figure is memoised: what it reads
  * off the store is passed down as plain values, so a refresh re-renders only those that changed.
  * Their rings and deed motes are drawn together (one instanced layer each). Models are preloaded
- * (scene/Adventurer.tsx), so one Suspense boundary holds the whole cast.
+ * (scene/Adventurer.tsx), so one Suspense boundary holds the whole cast; only an Automaton, whose
+ * body loads on first need, waits in its own.
  *
  * Past ALL_HEROES adventurers the cast has a baked crowd (scene/crowd/): whoever the camera isn't
  * close to joins it, one draw per model part for all of them (scene/crowd/lod.ts). At or under it —
@@ -141,18 +142,28 @@ function Cast() {
   const dark = store.environment.daylight < 0.3
   return (
     <Suspense fallback={null}>
-      {views.map((view) => (
-        <Adventurer
-          key={view.id}
-          view={view}
-          onGone={onGone}
-          selected={store.selected === view.id}
-          following={store.following}
-          banners={banners}
-          dark={dark}
-          crowd={crowd}
-        />
-      ))}
+      {views.map((view) => {
+        const figure = (
+          <Adventurer
+            key={view.id}
+            view={view}
+            onGone={onGone}
+            selected={store.selected === view.id}
+            following={store.following}
+            banners={banners}
+            dark={dark}
+            crowd={crowd}
+          />
+        )
+        // The Automaton's body loads on first need (world/cast.ts): it waits alone, not the cast.
+        return view.character === AUTOMATON ? (
+          <Suspense key={view.id} fallback={null}>
+            {figure}
+          </Suspense>
+        ) : (
+          figure
+        )
+      })}
       {crowd && <primitive object={crowd.root} />}
       <Rings />
       <DeedEffects />

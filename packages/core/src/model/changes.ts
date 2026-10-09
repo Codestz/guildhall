@@ -19,6 +19,11 @@ export type Change =
       id: string
       parentID?: string
       agent?: string
+      /**
+       * Which world archetype draws it (`warden`, `automaton`: @guildhall/roster archetypes), when
+       * the source knows better than its agent name says. Optional; the hall maps `agent` otherwise.
+       */
+      archetype?: string
       title?: string
       /** The model it runs on, as the host names it: `space-bunny-free`. */
       model?: string

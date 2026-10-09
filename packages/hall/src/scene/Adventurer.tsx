@@ -1,3 +1,4 @@
+import { gearAt, pipsOf } from "@guildhall/roster"
 import { useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
@@ -29,19 +30,22 @@ import { positions, useGuildStore } from "../guild/useGuild.ts"
 import { verbOf } from "../hud/format.ts"
 import { Icon } from "../hud/icons.tsx"
 import { placeOf, Routine, seedOf, shifted } from "../world/behaviours.ts"
-import { ANIMS_URL, GEAR, isModel, MODELS, modelUrl } from "../world/cast.ts"
+import { ANIMS_URL, AUTOMATON, figureOf, figureUrl, MODELS, modelUrl } from "../world/cast.ts"
 import type { Piece } from "../world/furniture.ts"
 import { SITE_DEFS } from "../world/sites.ts"
 import { attachHands, type Hands, probed, release, reserve } from "./activity.ts"
+import { construct } from "./automaton.ts"
 import { useBlob } from "./Blobs.tsx"
 import { Body } from "./body.ts"
 import { Brain, clipFor } from "./brain.ts"
+import { Pennant, Pips } from "./ChipMarks.tsx"
 import { addChip, CHIP_HEIGHT, chipSlot, removeChip } from "./chips.ts"
 import type { Crowd } from "./crowd/Crowd.ts"
 import { castClock } from "./crowd/cast.ts"
 import { FIGURE_HEIGHT, heroic } from "./crowd/lod.ts"
 import { useDeedEffect } from "./DeedEffect.tsx"
 import { Dissolver, Fade, fadeSeconds } from "./dissolve.ts"
+import { dyeOf } from "./dye.ts"
 import { attachGrip, isHeldPiece, KIT_GRIPS, keepUpright, NIGHT_LANTERN, RESTING_MUG } from "./grips.ts"
 import { clonePiece, useKit } from "./Kit.tsx"
 import { Label } from "./Label.tsx"
@@ -207,8 +211,13 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
   const store = useGuildStore()
   const id = view.id
   const root = useRef<Group>(null)
-  const model = isModel(view.character) ? view.character : "rogue-hooded"
-  const { scene } = useGLTF(modelUrl(model))
+  const model = figureOf(view.character)
+  const { scene: loaded } = useGLTF(figureUrl(model))
+  // The Automaton is a re-cast copy (scene/automaton.ts); the crowd, if any, learns its body.
+  const scene = model === AUTOMATON ? construct(loaded) : loaded
+  useLayoutEffect(() => crowd?.muster(model, scene), [crowd, model, scene])
+  /** The cape's dye: the archetype's colour, deeper with rank (scene/dye.ts). */
+  const dye = dyeOf(view.color, view.rank)
   const { animations } = useGLTF(ANIMS_URL)
   const kit = useKit()
 
@@ -242,10 +251,10 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
     return () => dissolver.dispose(node)
   }, [dissolver])
 
-  // Role colour on cape and hat; shadows on. The tinted clones are this adventurer's own: on
+  // The archetype's dye on cape and hat; shadows on. The tinted clones are this adventurer's own: on
   // unmount (or a new colour) they are disposed and the model's shared materials put back.
   useEffect(() => {
-    const tint = new Color(view.color)
+    const tint = new Color(dye)
     const tinted: [Mesh, Material, Material][] = []
     rig.traverse((child) => {
       const mesh = child as Mesh
@@ -267,7 +276,7 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
         mesh.material = shared
       }
     }
-  }, [rig, view.color])
+  }, [rig, dye])
 
   // The body (its mixer and actions) lives exactly as long as this mount: made here, before the first
   // frame (no bind-pose flash), and freed on unmount with each skeleton's bone texture — all made for
@@ -284,7 +293,7 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
     }
   }, [rig, animations, id])
   // A crowd member's cape and hat follow a new colour too.
-  useEffect(() => body.current?.tint(view.color), [view.color])
+  useEffect(() => body.current?.tint(dye), [dye])
 
   // Where they work, and the loop they run there (a new place: a new routine, berth reserved).
   const [tx, tz, tf] = view.target
@@ -315,14 +324,17 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
 
   // Gear in the hand slots; a mug instead while resting in the tavern.
   const atWork = view.site && (view.phase === "working" || view.phase === "waiting")
-  const gear = (atWork && view.site ? SITE_DEFS[view.site].gear : undefined) ?? GEAR[view.agent] ?? {}
-  const right: Piece | undefined = view.phase === "resting" ? RESTING_MUG : gear.right
+  const gear =
+    (atWork && view.site ? SITE_DEFS[view.site].gear : undefined) ?? gearAt(view.archetype, view.rank)
+  const right = view.phase === "resting" ? RESTING_MUG : (gear.right as Piece | undefined)
   const rightHeld = useHeld(rig, kit, right)
   // After dark, a free left hand carries a lantern: you can always find your agents at night (an
   // archer's left hand holds the bow).
   const bow = atWork && place?.behaviour.tool === "bow"
   const left =
-    view.phase === "resting" ? undefined : (gear.left ?? (dark && !bow ? NIGHT_LANTERN : undefined))
+    view.phase === "resting"
+      ? undefined
+      : ((gear.left as Piece | undefined) ?? (dark && !bow ? NIGHT_LANTERN : undefined))
   const leftHeld = useHeld(rig, kit, left)
 
   // The blob under their feet fades with them as they dissolve (scene/dissolve.ts).
@@ -458,7 +470,7 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
     if (hero === drawn.hero) return
     if (hero) {
       if (dissolving || !crowd || drawn.settled(now)) drawn.toHero(now, delta)
-    } else if (crowd && drawn.settled(now)) drawn.toCrowd(crowd, model, view.color, node, delta)
+    } else if (crowd && drawn.settled(now)) drawn.toCrowd(crowd, model, dye, node, delta)
   }
 
   /** A beat of work (world/behaviours.ts): where it lands, for scene/life/WorkFx to draw. */
@@ -482,6 +494,8 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
 
   /** Resting and leaving adventurers keep a softer label so the busy ones stay readable. */
   const quiet = view.phase === "resting" || view.phase === "leaving"
+  /** Rank pips on the name's banner: one for a journeyman, two for a master (roster ranks.ts). */
+  const pips = pipsOf(view.rank)
   const pleading = view.phase === "waiting"
   // Read by the declutter on its next run (refs, not state: no re-render for it).
   chip.pinned = selected || pleading
@@ -536,6 +550,7 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
               {banners && <Pennant color={view.banner} />}
               <b>
                 {view.title}
+                {pips > 0 && <Pips n={pips} />}
                 <i className="more" ref={moreRef} />
               </b>
               <em className="verb">
@@ -582,15 +597,6 @@ function useHeld(
 
 /** A figure's bounds for the frustum test (centre set per adventurer, per frame). */
 const bounds = new Sphere(new Vector3(), 1.6)
-
-/** The chip's party mark: a small swallowtail banner hanging from the plate's top-left corner. */
-function Pennant({ color }: { color: string }) {
-  return (
-    <svg className="pennant" width="9" height="14" viewBox="0 0 9 14" aria-hidden="true">
-      <path d="M0.5 0.5h8v12.6l-4-3.2-4 3.2z" fill={color} stroke="rgba(12,9,7,0.85)" strokeWidth="1" />
-    </svg>
-  )
-}
 
 /** Shared by every back-banner, for the app's lifetime (never freed). */
 let bannerParts: {

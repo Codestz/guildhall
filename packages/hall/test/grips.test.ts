@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { join } from "node:path"
+import { ARCHETYPE_IDS, gearAt, RANKS } from "@guildhall/roster"
 import { Bone, Group, Mesh, PropertyBinding, Quaternion, Vector3 } from "three"
 import { attachHands } from "../src/scene/activity.ts"
 import {
@@ -22,7 +23,6 @@ import {
   stepsOf,
   type Tool,
 } from "../src/world/behaviours.ts"
-import { GEAR } from "../src/world/cast.ts"
 import { SITE_DEFS } from "../src/world/sites.ts"
 import { glbJson } from "./support/glb.ts"
 
@@ -45,10 +45,13 @@ function heldPieces(): { piece: string; hand: "right" | "left"; who: string }[] 
     { piece: RESTING_MUG, hand: "right", who: "resting" },
     { piece: NIGHT_LANTERN, hand: "left", who: "night" },
   ]
-  for (const [who, gear] of Object.entries(GEAR)) {
-    if (gear.right) held.push({ piece: gear.right, hand: "right", who })
-    if (gear.left) held.push({ piece: gear.left, hand: "left", who })
-  }
+  for (const id of ARCHETYPE_IDS)
+    for (const rank of RANKS) {
+      const gear = gearAt(id, rank)
+      const who = `${id} (${rank})`
+      if (gear.right) held.push({ piece: gear.right, hand: "right", who })
+      if (gear.left) held.push({ piece: gear.left, hand: "left", who })
+    }
   for (const [site, def] of Object.entries(SITE_DEFS)) {
     if (def.gear?.right) held.push({ piece: def.gear.right, hand: "right", who: site })
     if (def.gear?.left) held.push({ piece: def.gear.left, hand: "left", who: site })

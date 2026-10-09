@@ -1,4 +1,5 @@
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useSyncExternalStore } from "react"
+import type { Names } from "../guild/casting.ts"
 import type { DirectorStyle } from "../guild/director.ts"
 import { MODE } from "../guild/mode.ts"
 import { type QualityChoice, quality, TIERS, type Tier } from "../guild/quality.ts"
@@ -7,6 +8,7 @@ import { active, BACKEND_NAME, type Backend, backendUrl, webgpuAvailable } from 
 import { MOODS, type Mood } from "../world/moods.ts"
 import { DoorLink } from "./Brand.tsx"
 import { Icon } from "./icons.tsx"
+import { Lever, LeverValue, Switch } from "./levers.tsx"
 import { HUD_MODES, type HudMode, hudPrefs, useHudPrefs } from "./prefs.ts"
 import { SoundLevers } from "./Sound.tsx"
 import { WeatherLevers } from "./Weather.tsx"
@@ -57,6 +59,12 @@ const KEYS: [string, string][] = [
  * `onLegends` (phones): the toolbar there keeps only HUD mode and Settings, so the Legends book and
  * Sound lead the sheet instead of sitting in the bar.
  */
+/** Settings → Names (guild/casting.ts): the world's archetypes, or the source's own names. */
+const NAMES: readonly [Names, string, string][] = [
+  ["world", "World", "The guild's names, with the source's under them: Warden · verifier"],
+  ["source", "Source", "The source's own names: Verifier, general"],
+]
+
 export function Settings({
   store,
   onClose,
@@ -273,6 +281,21 @@ export function Settings({
               ))}
             </div>
           </Lever>
+          <Lever label="Names" value={prefs.names === "world" ? "Warden · verifier" : "Verifier"}>
+            <div className="seg seg-fill">
+              {NAMES.map(([names, label, hint]) => (
+                <button
+                  key={names}
+                  type="button"
+                  aria-pressed={prefs.names === names}
+                  title={hint}
+                  onClick={() => hudPrefs.set({ names })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </Lever>
           <Switch
             label="Sigils over agents"
             hint="An icon for each deed in progress, readable with the HUD hidden"
@@ -340,73 +363,5 @@ function Section({ title, value, children }: { title: string; value?: string; ch
       </h3>
       {children}
     </section>
-  )
-}
-
-/** A labelled group of choices; `value` says what is in effect now. */
-export function Lever({
-  label,
-  value,
-  quiet = false,
-  children,
-}: {
-  label: string
-  value?: string
-  /** The section heading already names it: keep the legend for screen readers only. */
-  quiet?: boolean
-  children: ReactNode
-}) {
-  return (
-    <fieldset className="lever">
-      <legend className={quiet ? "visually-hidden" : undefined}>
-        {label}
-        <LeverValue value={value} />
-      </legend>
-      {children}
-    </fieldset>
-  )
-}
-
-/**
- * What is in effect now, after a label. The comma is for screen readers only: without it a legend
- * reads as one word ("MoodMorning Keep"); the gap you see is CSS.
- */
-function LeverValue({ value }: { value: string | undefined }) {
-  if (!value) return null
-  return (
-    <>
-      <span className="visually-hidden">, </span>
-      <span className="lever-value">{value}</span>
-    </>
-  )
-}
-
-function Switch({
-  label,
-  hint,
-  checked,
-  onChange,
-}: {
-  label: string
-  hint: string
-  checked: boolean
-  onChange: (on: boolean) => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      className="toggle"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-    >
-      <span className="toggle-text">
-        <b>{label}</b>
-        <span>{hint}</span>
-      </span>
-      <span className="switch" aria-hidden="true">
-        <i />
-      </span>
-    </button>
   )
 }

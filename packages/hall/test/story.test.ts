@@ -256,12 +256,10 @@ describe("story: the narrator", () => {
 
   test("the party's real story reads like one: quests, a plea, a failing test, good news", () => {
     const text = captions(fresh(), 69_000).map((c) => c.caption.text)
-    expect(text[0]).toBe(
-      "The Guildmaster sends the Explorer to map how GET /users flows from route to query.",
-    )
+    expect(text[0]).toBe("The Guildmaster asks the Scout to map how GET /users flows from route to query.")
     expect(text.some((t) => /your word/.test(t))).toBe(true)
     expect(text.some((t) => /one failing/.test(t))).toBe(true)
-    expect(text.some((t) => /called back|calls the Implementer/.test(t))).toBe(true)
+    expect(text.some((t) => /called back|calls the Artisan/.test(t))).toBe(true)
     expect(text.some((t) => /good news: “PASS/.test(t))).toBe(true)
     expect(text.every((t) => !/undefined|NaN/.test(t) && !t.includes("\u0000"))).toBe(true)
   })
@@ -298,7 +296,7 @@ describe("story: legends", () => {
     expect(legend?.title).toBe("Add cursor pagination to GET /users")
     expect(legend?.outcome).toBe("complete")
     const verifier = legend?.chapters.find((c) => c.quest === "Verify against the contract")
-    expect(verifier?.who).toBe("Verifier")
+    expect(verifier?.who).toBe("Warden")
     expect(verifier?.sentBy).toBe("Guildmaster")
     expect(verifier?.deeds.map((d) => d.label)).toEqual(["1 test run", "1 read"])
     expect(verifier?.notables.map((n) => n.kind)).toEqual(["flaw"])
@@ -322,7 +320,7 @@ describe("story: legends", () => {
     const lines = md.split("\n")
     expect(lines[0]).toBe("# The Legend of “Sweep the repo: 12 parallel quests”")
     expect(lines[2]).toMatch(/^\*A party of 13 · \d+s · [\d.]+k tokens · \$[\d.]+\*$/)
-    expect(md).toContain("## I. The Implementer — “Module 1”")
+    expect(md).toContain("## I. The Artisan — “Module 1”")
     expect(md).toMatch(
       /- \*\*Fall\*\* \(0:\d\d\): Fell: “Gave up: the module's tests keep failing”, and rose in the graveyard\./,
     )

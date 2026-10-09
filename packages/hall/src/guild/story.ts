@@ -538,7 +538,8 @@ export function lineOf(
   extra: readonly Moment[] = [],
 ): CaptionPart[] {
   const first = moments[0] as Moment
-  const seed = hash(moments.map((m) => `${m.kind}|${m.title}|${m.at}|${"call" in m ? m.call : ""}`).join(";"))
+  // Seeded by who (their session id), not by what they are called: Settings → Names never rewords a line.
+  const seed = hash(moments.map((m) => `${m.kind}|${m.id}|${m.at}|${"call" in m ? m.call : ""}`).join(";"))
   const line = new Line()
   const actors = actorsOf(moments)
   const many = actors.length > 1

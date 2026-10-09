@@ -1,3 +1,4 @@
+import { ARCHETYPES } from "../archetypes.ts"
 import { CODE, checksAnd, type Role } from "../role.ts"
 import { SUBAGENT_RULES } from "./common.ts"
 
@@ -49,7 +50,6 @@ export const designer: Role = {
   prompt,
   permissions: { edit: CODE, bash: checksAnd("ask"), web: "deny", dispatch: [] },
   tier: "standard",
-  color: "#e070a8",
-  station: "easel",
-  character: "rogue",
+  color: ARCHETYPES.illuminator.color,
+  archetype: "illuminator",
 }

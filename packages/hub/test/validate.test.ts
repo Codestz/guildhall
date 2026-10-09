@@ -38,6 +38,14 @@ describe("validChange", () => {
     expect(validChange({ ...tool, exit: 1.5 })).toBe(false)
   })
 
+  test("a session's archetype is a name: any string the hall may know, not a payload", () => {
+    const session = { type: "session", id: "s", agent: "ci", at: 1 }
+    expect(validChange({ ...session, archetype: "automaton" })).toBe(true)
+    expect(validChange({ ...session, archetype: "a-kind-from-a-newer-hall" })).toBe(true)
+    for (const archetype of ["", 7, "x".repeat(MAX_NAME + 1)])
+      expect(validChange({ ...session, archetype })).toBe(false)
+  })
+
   test("a shell call's exit code passes, zero or not", () => {
     for (const exit of [0, 1, 2, 127, -1])
       expect(validChange({ ...tool, name: "bash", state: "completed", exit })).toBe(true)

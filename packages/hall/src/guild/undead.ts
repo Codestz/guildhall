@@ -1,4 +1,4 @@
-import { ROLES } from "@guildhall/roster"
+import { castOf } from "@guildhall/roster"
 import type { UndeadKind } from "../world/cast.ts"
 import { GRAVEYARD } from "../world/graveyard.ts"
 import type { Moment } from "./moments.ts"
@@ -60,15 +60,15 @@ export interface Riser {
 }
 
 /**
- * Which skeleton a fallen agent becomes, by the look of its role: knights and barbarians are
- * warriors, rogues and rangers rogues, mages mages. Agents the roster doesn't know are minions.
+ * Which skeleton a fallen agent becomes, by the look of its archetype: knights and barbarians are
+ * warriors, rogues and rangers rogues, mages mages. Wanderers and automatons are minions.
  */
-export function undeadOf(agent: string): UndeadKind {
-  const role = ROLES.find((r) => r.id === agent)
-  if (!role) return "minion"
-  if (role.character === "knight" || role.character === "barbarian") return "warrior"
-  if (role.character === "mage") return "mage"
-  if (role.character.startsWith("rogue") || role.character === "ranger") return "rogue"
+export function undeadOf(agent: string, declared?: string): UndeadKind {
+  const { id, model } = castOf(agent, declared).archetype
+  if (id === "wanderer" || id === "automaton") return "minion"
+  if (model === "knight" || model === "barbarian") return "warrior"
+  if (model === "mage") return "mage"
+  if (model.startsWith("rogue") || model === "ranger") return "rogue"
   return "minion"
 }
 

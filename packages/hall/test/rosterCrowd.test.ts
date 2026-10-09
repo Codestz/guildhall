@@ -2,15 +2,22 @@ import { describe, expect, test } from "bun:test"
 import type { AdventurerView } from "../src/guild/store.ts"
 import { crowdOf, isCrowd, NOTABLE_MAX, plural, ROSTER_CROWD_AT } from "../src/hud/crowd.ts"
 
-const ROLES = ["Implementer", "Explorer", "Verifier"]
+const KINDS = [
+  ["artisan", "Artisan"],
+  ["scout", "Scout"],
+  ["warden", "Warden"],
+] as const
 
 /** Just the fields the roster's split reads. */
 function view(i: number, over: Partial<AdventurerView> = {}): AdventurerView {
-  const role = ROLES[i % ROLES.length] as string
+  const [archetype, role] = KINDS[i % KINDS.length] as (typeof KINDS)[number]
   return {
     id: `s${i}`,
     title: `${role} ${i}`,
     role,
+    archetype,
+    plural: `${role}s`,
+    glyph: role.slice(0, 2),
     ordinal: i + 1,
     color: `#${i}`,
     master: false,
@@ -29,15 +36,23 @@ describe("roster at crowd scale", () => {
 
   test("the followed, the pleading, the fallen and the guildmaster are named; the rest grouped by role", () => {
     const views = Array.from({ length: 30 }, (_, i) => view(i))
-    views[0] = view(0, { master: true, role: "Guildmaster" })
+    views[0] = view(0, { master: true, role: "Guildmaster", archetype: "guildmaster" })
     views[4] = view(4, { phase: "waiting" })
     views[7] = view(7, { phase: "failed" })
     const crowd = crowdOf(views, "s20")
     expect(crowd.notable.map((v) => v.id)).toEqual(["s0", "s4", "s7", "s20"])
-    expect(crowd.roles.map((r) => r.role)).toEqual(["Explorer", "Verifier", "Implementer"])
+    expect(crowd.roles.map((r) => r.role)).toEqual(["Scout", "Warden", "Artisan"])
     const counted = crowd.roles.reduce((n, r) => n + r.views.length, 0)
     expect(counted + crowd.notable.length).toBe(30)
-    for (const role of crowd.roles) for (const v of role.views) expect(v.role).toBe(role.role)
+    for (const role of crowd.roles) for (const v of role.views) expect(v.archetype).toBe(role.archetype)
+  })
+
+  test("groups by archetype, not by the name shown: two source names under one archetype are one group", () => {
+    const views = Array.from({ length: 30 }, (_, i) =>
+      view(i, { archetype: "scout", role: i % 2 ? "Explore" : "Explorer", plural: "Explorers" }),
+    )
+    const crowd = crowdOf(views, null)
+    expect(crowd.roles.map((r) => r.archetype)).toEqual(["scout"])
   })
 
   test("named rows are capped; overflowing pleas are counted and marked on their role", () => {
@@ -51,8 +66,8 @@ describe("roster at crowd scale", () => {
     expect(pleas).toBe(40 - NOTABLE_MAX)
   })
 
-  test("plural", () => {
-    expect(plural("Explorer", 1)).toBe("Explorer")
-    expect(plural("Explorer", 49)).toBe("Explorers")
+  test("plural: the group's own, which knows Automatons from Scouts", () => {
+    expect(plural({ role: "Scout", plural: "Scouts" }, 1)).toBe("Scout")
+    expect(plural({ role: "Scout", plural: "Scouts" }, 49)).toBe("Scouts")
   })
 })

@@ -40,18 +40,18 @@ describe("duplicate role names", () => {
     const views = viewsOf(party(), 3000)
     expect(views.map((v) => v.title)).toEqual([
       "Guildmaster",
-      "Implementer",
-      "Explorer",
-      "Implementer II",
-      "Verifier",
-      "Explorer II",
-      "Implementer III",
+      "Artisan",
+      "Scout",
+      "Artisan II",
+      "Warden",
+      "Scout II",
+      "Artisan III",
     ])
   })
 
   test("the base role and ordinal ride along for sigils", () => {
     const third = viewsOf(party(), 3000).find((v) => v.id === "imp-b")
-    expect(third?.role).toBe("Implementer")
+    expect(third?.role).toBe("Artisan")
     expect(third?.ordinal).toBe(3)
     expect(viewsOf(party(), 3000).find((v) => v.id === "ver")?.ordinal).toBe(1)
   })
@@ -64,14 +64,14 @@ describe("duplicate role names", () => {
     const later = titles(model, 4000 + 60_000)
     expect(later["imp-c"]).toBeUndefined()
     expect(later["imp-a"]).toBe(before["imp-a"])
-    expect(later["imp-b"]).toBe("Implementer III")
+    expect(later["imp-b"]).toBe("Artisan III")
   })
 
   test("a newcomer takes the next number, never a freed one", () => {
     const model = party()
     done(model, "imp-c", 4000)
     join(model, "imp-d", "guild-implementer", 5000, "root")
-    expect(titles(model, 4000 + 60_000)["imp-d"]).toBe("Implementer IV")
+    expect(titles(model, 4000 + 60_000)["imp-d"]).toBe("Artisan IV")
   })
 
   test("events written as they arrive name the same adventurer the views do", () => {
@@ -83,6 +83,28 @@ describe("duplicate role names", () => {
       const view = viewsOf(model, 3000).find((v) => v.id === id)
       expect(numbered(view?.role ?? "", ordinalOf(model, s))).toBe(byView[id] ?? "")
     }
+  })
+
+  test("with source names, the roster's own titles, numbered the same way", () => {
+    const views = viewsOf(party(), 3000, undefined, undefined, undefined, [], "source")
+    expect(views.map((v) => v.title)).toEqual([
+      "Guildmaster",
+      "Implementer",
+      "Explorer",
+      "Implementer II",
+      "Verifier",
+      "Explorer II",
+      "Implementer III",
+    ])
+    expect(views.every((v) => v.subtitle === "")).toBe(true)
+  })
+
+  test("events written as they arrive count by the same names, in either naming", () => {
+    const model = party()
+    const s = model.sessions.get("imp-b")
+    if (!s) throw new Error("imp-b")
+    expect(ordinalOf(model, s, "source")).toBe(3)
+    expect(ordinalOf(model, s, "world")).toBe(3)
   })
 
   test("roman numerals", () => {

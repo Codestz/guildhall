@@ -82,6 +82,9 @@ export function Hud() {
   const tape = !showcase && store.mode === "sim"
   const hidden = mode === "hidden"
 
+  // The cast's names follow Settings → Names (guild/casting.ts): a told story is retold in them.
+  useEffect(() => store.setNames(prefs.names), [store, prefs.names])
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: refold only when the mode changes
   useEffect(() => {
     setOpen(regionsFor(mode, phone))

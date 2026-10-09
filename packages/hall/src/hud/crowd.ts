@@ -11,7 +11,12 @@ export const ROSTER_CROWD_AT = 24
 export const NOTABLE_MAX = 8
 
 export interface RoleGroup {
+  /** Keyed by archetype (never by the shown name, which the Names setting changes). */
+  archetype: string
+  /** The first member's unnumbered name and plural, sigil and colour. */
   role: string
+  plural: string
+  glyph: string
   color: string
   /** Everyone of the role not named above, in roster order. */
   views: AdventurerView[]
@@ -56,10 +61,19 @@ export function crowdOf(views: readonly AdventurerView[], selected: string | nul
   const roles = new Map<string, RoleGroup>()
   for (const view of views) {
     if (named.has(view.id)) continue
-    let group = roles.get(view.role)
+    let group = roles.get(view.archetype)
     if (!group) {
-      group = { role: view.role, color: view.color, views: [], pleas: 0, fallen: 0 }
-      roles.set(view.role, group)
+      group = {
+        archetype: view.archetype,
+        role: view.role,
+        plural: view.plural,
+        glyph: view.glyph,
+        color: view.color,
+        views: [],
+        pleas: 0,
+        fallen: 0,
+      }
+      roles.set(view.archetype, group)
     }
     group.views.push(view)
     if (view.phase === "waiting") group.pleas++
@@ -68,7 +82,7 @@ export function crowdOf(views: readonly AdventurerView[], selected: string | nul
   return { notable, roles: [...roles.values()] }
 }
 
-/** "Explorer" → "Explorers", "Guildmaster" → "Guildmasters": every role name in the hall takes an s. */
-export function plural(role: string, count: number): string {
-  return count === 1 ? role : `${role}s`
+/** A group's name for `count` of them: `Scout`, `Scouts`. */
+export function plural(group: Pick<RoleGroup, "role" | "plural">, count: number): string {
+  return count === 1 ? group.role : group.plural
 }

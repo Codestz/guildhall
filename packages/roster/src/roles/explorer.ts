@@ -1,3 +1,4 @@
+import { ARCHETYPES } from "../archetypes.ts"
 import { READ_ONLY, type Role } from "../role.ts"
 import { SUBAGENT_RULES } from "./common.ts"
 
@@ -50,8 +51,6 @@ export const explorer: Role = {
   prompt,
   permissions: READ_ONLY,
   tier: "fast",
-  color: "#2fa7a0",
-  station: "map-table",
-  character: "ranger",
-  site: "forest",
+  color: ARCHETYPES.scout.color,
+  archetype: "scout",
 }

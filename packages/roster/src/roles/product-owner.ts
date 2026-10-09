@@ -1,3 +1,4 @@
+import { ARCHETYPES } from "../archetypes.ts"
 import { DOCS_ONLY, type Role } from "../role.ts"
 import { SUBAGENT_RULES } from "./common.ts"
 
@@ -54,7 +55,6 @@ export const productOwner: Role = {
   prompt,
   permissions: { edit: DOCS_ONLY, bash: "deny", web: "deny", dispatch: [] },
   tier: "standard",
-  color: "#b8864a",
-  station: "scroll-desk",
-  character: "knight",
+  color: ARCHETYPES.herald.color,
+  archetype: "herald",
 }

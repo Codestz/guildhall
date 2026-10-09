@@ -85,13 +85,6 @@ function tail(path: string): string {
   return parts.slice(-2).join("/")
 }
 
-/** Two letters for a sigil: `Guildmaster` → `Gm`, `Product Owner` → `PO`. */
-export function initials(title: string): string {
-  const words = title.split(/[\s-]+/).filter(Boolean)
-  if (words.length > 1) return (words[0]?.[0] ?? "") + (words[1]?.[0] ?? "")
-  return title.slice(0, 2)
-}
-
 /** A glyph from `Icon` that goes with a verb. */
 export type VerbGlyph =
   | "read"

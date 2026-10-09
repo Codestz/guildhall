@@ -133,7 +133,10 @@ export function keepUpright(root: Object3D | null): void {
   root.quaternion.copy(hand).invert().multiply(align).multiply(hand)
 }
 
-/** The kit pieces anyone holds: the roles' gear (world/cast.ts), the sites' tools, mug and lantern. */
+/**
+ * The kit pieces anyone holds: the archetypes' gear and their masters' finer tools (roster
+ * archetypes.ts), the sites' tools, mug and lantern.
+ */
 export type HeldPiece = Extract<
   Piece,
   | "pickaxe"
@@ -149,6 +152,13 @@ export type HeldPiece = Extract<
   | "wand"
   | "shield_badge_color"
   | "map_rolled"
+  | "hammer"
+  | "sword_1handed"
+  | "shield_A"
+  | "magnifying_glass"
+  | "drafting_compass"
+  | "candle_lit"
+  | "journal_open"
 >
 
 const R = HAND_SLOT.right
@@ -188,6 +198,21 @@ export const KIT_GRIPS: Record<HeldPiece, Grip> = {
   wand: { bone: R, position: NONE, rotation: NONE, scale: 1 },
   shield_badge_color: { bone: L, position: NONE, rotation: NONE, scale: 1 },
   map_rolled: { bone: R, position: NONE, rotation: NONE, scale: 1 },
+  // A master's finer tools (roster ranks.ts).
+  hammer: { bone: R, position: [0, -0.2, 0], rotation: NONE, scale: 0.8 },
+  sword_1handed: { bone: R, position: NONE, rotation: NONE, scale: 0.9 },
+  shield_A: { bone: L, position: NONE, rotation: NONE, scale: 1 },
+  magnifying_glass: { bone: L, position: NONE, rotation: NONE, scale: 1 },
+  drafting_compass: { bone: R, position: NONE, rotation: NONE, scale: 1.1 },
+  candle_lit: { bone: R, position: [0, 0.1, 0], rotation: NONE, scale: 0.45, upright: true },
+  journal_open: {
+    bone: L,
+    position: [0, 0, -0.2],
+    rotation: [-Math.PI / 2, Math.PI / 2, 0],
+    scale: 0.8,
+    upright: true,
+    up: [0, 0, 1],
+  },
 }
 
 /** What a resting adventurer holds in the tavern (scene/Adventurer). */

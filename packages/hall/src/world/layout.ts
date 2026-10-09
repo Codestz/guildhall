@@ -1,4 +1,4 @@
-import type { Role } from "@guildhall/roster"
+import type { Station as RosterStation } from "@guildhall/roster"
 
 /**
  * The great hall, in KayKit's native units (a floor tile is 4×4, a wall 4 high, a character ~2.5 tall).
@@ -6,7 +6,7 @@ import type { Role } from "@guildhall/roster"
  * layout can be tuned (and later edited in the Lab) without touching scene code.
  */
 
-export type StationId = Role["station"]
+export type StationId = RosterStation
 export type Spot = readonly [x: number, z: number]
 /** Where someone stands and which way they face (radians, 0 = facing +z / the camera side). */
 export type Post = readonly [x: number, z: number, facing: number]

@@ -1,3 +1,4 @@
+import { ARCHETYPES } from "../archetypes.ts"
 import type { Role } from "../role.ts"
 
 const prompt = `
@@ -99,7 +100,6 @@ export const master: Role = {
     ],
   },
   tier: "strong",
-  color: "#d4ad3a",
-  station: "quest-board",
-  character: "mage",
+  color: ARCHETYPES.guildmaster.color,
+  archetype: "guildmaster",
 }

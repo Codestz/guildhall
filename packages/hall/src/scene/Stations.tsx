@@ -1,4 +1,4 @@
-import { ROLES } from "@guildhall/roster"
+import { ARCHETYPE_IDS, ARCHETYPES } from "@guildhall/roster"
 import { useFrame } from "@react-three/fiber"
 import { useMemo, useRef } from "react"
 import type { MeshBasicMaterial, PointLight } from "three"
@@ -29,7 +29,8 @@ export function Stations() {
 
 function Sigil({ station, busy }: { station: Station; busy: boolean }) {
   const material = useRef<MeshBasicMaterial>(null)
-  const color = ROLES.find((role) => role.station === station.id)?.color ?? "#9a8f80"
+  const color =
+    ARCHETYPE_IDS.map((id) => ARCHETYPES[id]).find((a) => a.station === station.id)?.color ?? "#9a8f80"
   const [x, z] = centreOf(station)
 
   const base = useMemo(() => new Color(color), [color])

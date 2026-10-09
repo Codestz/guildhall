@@ -207,6 +207,14 @@ export class Crowd {
     return this.members.length - this.free.length
   }
 
+  /**
+   * A model loaded after the crowd was made (the Automaton, lazy: world/cast.ts): its members may
+   * join from now on. A name already known keeps its scene.
+   */
+  muster(name: string, scene: Object3D): void {
+    if (!this.scenes[name]) this.scenes[name] = scene
+  }
+
   /** A new member of `model`'s troop, standing at the origin in its first clip. Returns its id. */
   join(model: string, tint?: ColorRepresentation): number {
     const shape = this.modelOf(model)

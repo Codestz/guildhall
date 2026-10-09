@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { apply, emptyModel, type Model } from "@guildhall/core"
-import { ROLES, STRANGER } from "@guildhall/roster"
+import { ARCHETYPE_IDS, ARCHETYPES } from "@guildhall/roster"
 import { viewsOf } from "../src/guild/store.ts"
 import { island, SITES } from "../src/world/lands.ts"
 import { INFIRMARY, INFIRMARY_MATS } from "../src/world/layout.ts"
@@ -29,7 +29,7 @@ describe("site registry", () => {
     }
   })
 
-  test("role → site is the roster's: guild roles by their own site, strangers at the quarry", () => {
+  test("agent → site is its archetype's: guild roles by their own site, wanderers and bots at the quarry", () => {
     expect(siteOf("guild-implementer")).toBe("yard")
     expect(siteOf("guild-explorer")).toBe("forest")
     expect(siteOf("guild-researcher")).toBe("river")
@@ -38,7 +38,12 @@ describe("site registry", () => {
     expect(siteOf("guild-architect")).toBeUndefined()
     expect(siteOf("guild-master")).toBeUndefined()
     expect(siteOf("general")).toBe("quarry")
-    for (const role of [...ROLES, STRANGER]) if (role.site) expect(SITE_DEFS[role.site]).toBeDefined()
+    expect(siteOf("renovate[bot]")).toBe("quarry")
+    expect(siteOf("Explore", "scout")).toBe("forest")
+    for (const id of ARCHETYPE_IDS) {
+      const site = ARCHETYPES[id].site
+      if (site) expect(SITE_DEFS[site]).toBeDefined()
+    }
   })
 
   test("each site's trade: its loop works the trade, and the trade's deeds steer it", () => {

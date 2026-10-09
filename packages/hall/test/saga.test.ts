@@ -84,7 +84,7 @@ describe("the Saga: every world event, earned through the rules, in its act", ()
 
   test("Act III: three failed commands in a row from one Implementer wake the dragon", () => {
     const [dragon] = earned("dragon")
-    expect(dragon?.hero?.title).toStartWith("Implementer")
+    expect(dragon?.hero?.title).toStartWith("Artisan")
     expect(dragon?.facts).toMatchObject({ streak: RULES.dragonRun, tool: "bash" })
     expect(actOf(dragon?.at ?? -1)).toBe(III)
   })
@@ -140,7 +140,7 @@ describe("the Saga: every world event, earned through the rules, in its act", ()
 
   test("Act V: the final verification comes home clean, by night: the festival", () => {
     const [festival] = earned("festival")
-    expect(festival?.hero?.title).toBe("Verifier")
+    expect(festival?.hero?.title).toBe("Warden")
     expect(festival?.facts.deeds).toBeGreaterThanOrEqual(RULES.festivalDeeds)
     expect(actOf(festival?.at ?? -1)).toBe(V)
     expect(storyHour(sagaTale().hours, festival?.at ?? 0)).toBeGreaterThan(21)

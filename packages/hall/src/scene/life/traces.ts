@@ -32,7 +32,7 @@ export function tracesOf(sessions: Iterable<Session>): Traces {
   const out = { ...NO_TRACES }
   for (const session of sessions) {
     if (!session.parentID) continue
-    const site = siteOf(session.agent)
+    const site = siteOf(session.agent, session.archetype)
     const rule = site && SITE_DEFS[site].trace
     if (!rule) continue
     for (const entry of session.entries) {

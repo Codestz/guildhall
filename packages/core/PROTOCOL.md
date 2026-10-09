@@ -35,6 +35,7 @@ changes, so it can't tell which adapter (or which simulation) a guild came from.
 | **Guildmaster** | An adventurer with no parent: the root of a party. Whatever its agent is called, the hall draws it as the Guildmaster. | `session` change without `parentID` |
 | **Party** | A guildmaster plus everyone it sent, at any depth. | the `parentID` tree |
 | **Role** | What kind of adventurer it is, read from its agent name. | `session.agent` |
+| **Archetype** | Who the world draws it as: Artisan, Warden, Scout, Automaton… (§1.1). Mapped from the role, or sent by the source. | `session.archetype` (optional) |
 | **Quest** | Work handed to a new adventurer: a deed named `task` or `subagent`. Its `input.description` is the quest's text. | `tool` change |
 | **Deed** | One action: a tool call, moving from `pending`/`running` to `completed` or `failed`. | `tool` change |
 | **Outcome** | Whether a deed failed. One rule, `failedDeed`, decides it. See §1.3. | derived |
@@ -44,25 +45,40 @@ changes, so it can't tell which adapter (or which simulation) a guild came from.
 | **Chronicle** | A recorded stream of guild events, one per line, replayable. | `GuildEvent` lines |
 | **Sea** | What happens to the guild's project on GitHub: pushes, pull requests, CI, releases (§7). | `SeaEvent` |
 
-### 1.1 Roles
+### 1.1 Roles and archetypes
 
-A session's `agent` names its role. The roster (`packages/roster/src/roles.ts`) ships nine:
+A session's `agent` names its role, and the world draws each role as an **archetype**
+(`packages/roster/src/archetypes.ts`). The agent name stays on the wire as the source spells it; the
+hall shows the archetype's name with the source's own as a subtitle (`Warden · verifier`), or the
+source's names alone when the viewer picks plain names in Settings. The roster
+(`packages/roster/src/roles.ts`) ships nine roles:
 
-| Agent name | Role |
-|---|---|
-| `guild-master` | Guildmaster |
-| `guild-architect` | Architect |
-| `guild-implementer` | Implementer |
-| `guild-verifier` | Verifier |
-| `guild-librarian` | Librarian |
-| `guild-explorer` | Explorer |
-| `guild-researcher` | Researcher |
-| `guild-designer` | Designer |
-| `guild-product-owner` | Product owner |
+| Agent name | Role | Archetype |
+|---|---|---|
+| `guild-master` | Guildmaster | Guildmaster |
+| `guild-architect` | Architect | Architect |
+| `guild-implementer` | Implementer | Artisan |
+| `guild-verifier` | Verifier | Warden |
+| `guild-librarian` | Librarian | Archivist |
+| `guild-explorer` | Explorer | Scout |
+| `guild-researcher` | Researcher | Scholar |
+| `guild-designer` | Designer | Illuminator |
+| `guild-product-owner` | Product owner | Herald |
 
-Any other agent name is drawn as a **Wanderer**, a grey adventurer from outside the guild
-(`STRANGER`). An adapter should send the source's own agent name unchanged unless it is truly one of
-the roles above. Wanderers are expected.
+Any other agent name is drawn as a **Wanderer**, a grey adventurer from outside the guild, except
+a GitHub app account (a name ending in `[bot]`), which is an **Automaton**. An adapter should send
+the source's own agent name unchanged unless it is truly one of the roles above. Wanderers are
+expected.
+
+When the source knows better than the name says, it may send `archetype` on a `session` change:
+one of `guildmaster`, `architect`, `artisan`, `warden`, `archivist`, `scout`, `scholar`,
+`illuminator`, `herald`, `wanderer`, `automaton`. It wins over the agent name (a CI runner sends
+`automaton`; Claude Code sends `scout` for its `Explore` agent). An id the hall doesn't know is
+ignored. It is optional and additive: a hall that predates it reads the agent name as before.
+
+An adventurer's **rank** (apprentice, journeyman, master) comes from what it has done, not from
+the wire: for agents, a journeyman past 20 deeds or 1M tokens, a master past 60 deeds or 4M tokens
+(`packages/roster/src/ranks.ts`).
 
 ### 1.2 Deeds: names and inputs the world reads
 
@@ -166,7 +182,7 @@ safe to repeat: a second identical `session`, `status` or `tool` change leaves t
 
 | `type` | Required | Optional | Meaning |
 |---|---|---|---|
-| `session` | | `parentID`, `agent`, `title`, `model`, `background`, `denied` (string[] ≤ 100) | The session exists or learned something about itself. `parentID` makes it a subagent of that session. An `at` earlier than when it was first heard of becomes its start. |
+| `session` | | `parentID`, `agent`, `archetype` (§1.1), `title`, `model`, `background`, `denied` (string[] ≤ 100) | The session exists or learned something about itself. `parentID` makes it a subagent of that session. An `at` earlier than when it was first heard of becomes its start. |
 | `status` | `status`: `busy` \| `idle` \| `failed` \| `waiting` | `error`, `settled` | Whether it is working (§1.4). |
 | `prompt` | `key`, `text` | | Something said *to* it. The first prompt is its task. A repeated `key` is ignored. |
 | `thinking` | `key` | `text`, `delta`, `done` | Its thinking: `text` replaces, `delta` appends, `done` closes the block named `key`. |
@@ -179,7 +195,7 @@ Limits on fields (`packages/hub/src/validate.ts`):
 
 | What | Limit |
 |---|---|
-| ids, keys, names (`id`, `call`, `key`, `name`, `agent`, `parentID`, `model`) | 1–1024 characters |
+| ids, keys, names (`id`, `call`, `key`, `name`, `agent`, `archetype`, `parentID`, `model`) | 1–1024 characters |
 | text (`text`, `delta`, `output`, `error`, `title`, `summary`) | ≤ 1,000,000 characters |
 | `input` as JSON | ≤ 1,000,000 characters |
 | numbers (`started`, `ended`, `tokens`, `cost`) | finite, ≥ 0 |
@@ -397,7 +413,7 @@ Where Claude Code's names become the world's:
 |---|---|
 | `session_id` | the guildmaster's session id |
 | `agent_id` (with or without an `agent-` prefix) | a subagent's session id. Every event a subagent fires also re-sends its `session` with `parentID: session_id`. |
-| `agent_type` | `agent`: a roster role when the name matches one with or without a plugin scope (`implementer`, `agentry:implementer` → `guild-implementer`). Otherwise kept as is (`Explore`, `general-purpose`) and drawn as a Wanderer. |
+| `agent_type` | `agent`: a roster role when the name matches one with or without a plugin scope (`implementer`, `agentry:implementer` → `guild-implementer`). Otherwise kept as is (`Explore`, `general-purpose`). The built-ins `Explore` and `Plan` also send `archetype` (`scout`, `architect`); anything else unknown is drawn as a Wanderer. |
 | tool `Agent` (formerly `Task`) | deed `task`: a quest |
 | tools `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, `WebFetch`, `WebSearch`, `TodoWrite`, … | the same name in lower case |
 | tool `PowerShell` | `shell` |

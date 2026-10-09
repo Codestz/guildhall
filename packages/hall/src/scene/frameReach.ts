@@ -112,8 +112,32 @@ export function viewReachOf(screen: Screen, land: Land): number {
   return (land.reach * TARGET + widestGround(screen, land).radius) * MARGIN
 }
 
+/** The fog starts no nearer than this share of its radius, in any weather (atmosphere/sky.ts: `fogNear`, 1 - 0.42 haze). */
+const FOG_NEAR = 0.58
+
+/**
+ * The radius the island fog (atmosphere/Atmosphere.tsx) is scaled by in an orthographic view of
+ * `land`, given `coast`, the radius it takes from the island's own tiles. Fog is radial from the
+ * island's middle, so ground further out than it starts is only fog colour: a portrait phone
+ * (and the film pulling back on it) sees several reaches of sea past a small island, a flat pale
+ * void with the sea's own shadows on it. Where the screen is upright the fog is pushed out until
+ * none starts inside the widest ground seen; a landscape screen keeps its coast fade.
+ */
+export function fogReachOf(screen: Screen, land: Land, coast: number): number {
+  const clear = (land.reach * TARGET + widestGround(screen, land).radius) / FOG_NEAR
+  return coast + Math.max(0, clear - coast) * uprightOf(screen)
+}
+
 /** The orthographic camera stands this far back from its target (a multiple of the sea tiles' reach). */
 export const ORTHO_BACK = 220
+
+/**
+ * The furthest the camera controls let an orthographic camera stand from its target (CameraRig
+ * `maxDistance`): they pull it back in when it is further, each frame, so a `back` past it put the
+ * camera where the grade (which reads the camera before the film moves it again) and the depth
+ * it was drawn at disagreed, and the ground nearest the lens fell inside its near plane.
+ */
+export const orthoMaxOf = (outreach: number, back: number): number => Math.max(300 * outreach, back * 1.05)
 
 /**
  * How far back the orthographic camera stands: the usual distance, or further when the ground nearest

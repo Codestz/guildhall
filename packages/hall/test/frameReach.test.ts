@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import {
   filmZoom,
+  fogReachOf,
   groundOf,
   type Land,
   landOf,
   ORTHO_BACK,
   orthoBackOf,
+  orthoMaxOf,
   roundLand,
   viewReachOf,
   widestOf,
@@ -128,5 +130,50 @@ describe("the film's fit of a land's extents", () => {
 
   test("a keep alone is not framed tighter than a floor", () => {
     expect(filmZoom(PHONE, { across: 2, deep: 2 })).toBe(filmZoom(PHONE, { across: 16, deep: 16 }))
+  })
+})
+
+describe("the island fog", () => {
+  /** The furthest ground from the origin any orthographic framing on `screen` shows (frameReach.ts viewReachOf, without its margin). */
+  const seen = (screen: { width: number; height: number }, land: Land) =>
+    land.reach * 0.5 +
+    groundOf(screen, Math.min(widestOf(screen, land), filmZoom(screen, roundLand(land.reach * 1.25)))).radius
+  /** Fog starts at this share of its radius at the least (atmosphere/sky.ts `fogNear`, in the haziest weather). */
+  const NEAR = 0.58
+
+  // (A phone is 0.4% short of fully upright, uprightOf.)
+  test("starts past the ground a phone shows (the film's pull-back and the controls' zoom-out), not inside it", () => {
+    for (const land of [BIG, SMALL, landOf(handWorld())]) {
+      const coast = land.reach * 1.2
+      expect(fogReachOf(PHONE, land, coast) * NEAR).toBeGreaterThanOrEqual(seen(PHONE, land) * 0.99)
+    }
+  })
+
+  test("keeps the coast fade on a landscape screen, as it always was", () => {
+    for (const land of [BIG, SMALL, landOf(handWorld())])
+      expect(fogReachOf(DESKTOP, land, land.reach * 1.2)).toBe(land.reach * 1.2)
+  })
+
+  test("never closes in on the island's own coast, and eases in as a screen turns upright", () => {
+    const tablet = { width: 820, height: 1180 }
+    const coast = SMALL.reach * 1.2
+    expect(fogReachOf(PHONE, SMALL, coast)).toBeGreaterThanOrEqual(coast)
+    expect(fogReachOf(tablet, SMALL, coast)).toBeGreaterThan(coast)
+    expect(fogReachOf(tablet, SMALL, coast)).toBeLessThan(fogReachOf(PHONE, SMALL, coast))
+  })
+})
+
+describe("the camera controls' furthest distance", () => {
+  test("holds the camera where the film and the zoom-out stand it, on every screen", () => {
+    for (const screen of SCREENS)
+      for (const land of [BIG, SMALL])
+        expect(orthoMaxOf(land.outreach, orthoBackOf(screen, land))).toBeGreaterThan(
+          orthoBackOf(screen, land),
+        )
+  })
+
+  test("is what it was where the camera stands at its usual distance", () => {
+    const hand = landOf(handWorld())
+    expect(orthoMaxOf(hand.outreach, orthoBackOf(DESKTOP, hand))).toBe(300 * hand.outreach)
   })
 })

@@ -10,6 +10,7 @@ import { peakOf } from "../../world/peak.ts"
 import { useWorld } from "../../world/source.ts"
 import { reachOf } from "../../world/world.ts"
 import { FRAME } from "../frame.ts"
+import { fogReachOf, landOf } from "../frameReach.ts"
 import { useTier } from "../Quality.tsx"
 import { CascadeKey } from "./CascadeKey.tsx"
 import { installCascadeChunks } from "./cascadeChunk.ts"
@@ -67,6 +68,13 @@ function Weathervane() {
     return radius || 110
   }, [tiles, archipelago])
   const fog = useMemo(() => new Fog("#c6d9ea", sea, sea * 1.4), [sea])
+  // What an orthographic view can show past that (scene/frameReach.ts): the fog is drawn out to it, or the sea beyond is fog colour.
+  const size = useThree((state) => state.size)
+  const world = useWorld()
+  const seen = useMemo(
+    () => (archipelago ? sea : fogReachOf(size, landOf(world), sea)),
+    [archipelago, size, world, sea],
+  )
 
   // One tone mapping everywhere: Neutral keeps KayKit's flat colours true while rolling off the
   // HDR flames and sun. The post pass applies it itself (the composer turns the renderer's off and
@@ -99,8 +107,9 @@ function Weathervane() {
     // (GradeEffect.ts): the plain exposure, never packed.
     gl.toneMappingExposure = post ? sky.exposure : packExposure(sky.exposure, 1 - sky.saturation)
     fog.color.copy(sky.fog)
-    fog.near = sea * sky.fogNear
-    fog.far = sea * sky.fogFar
+    const reach = (state.camera as { isOrthographicCamera?: boolean }).isOrthographicCamera ? seen : sea
+    fog.near = reach * sky.fogNear
+    fog.far = reach * sky.fogFar
     const fill = hemi.current
     if (fill) {
       fill.color.copy(sky.hemiSky)

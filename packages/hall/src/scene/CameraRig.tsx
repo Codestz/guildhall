@@ -25,7 +25,7 @@ import {
 } from "./archipelago/view.ts"
 import { bezier, closeIn, easeInOut } from "./cameraMath.ts"
 import { FRAME } from "./frame.ts"
-import { baseZoomOf, landOf, ORTHO_BACK, orthoBackOf, uprightOf, widestOf } from "./frameReach.ts"
+import { baseZoomOf, landOf, ORTHO_BACK, orthoBackOf, orthoMaxOf, uprightOf, widestOf } from "./frameReach.ts"
 import { OpeningProgress } from "./OpeningCue.tsx"
 import { ClearAngle } from "./terrain/clearAngle.ts"
 import { aboveGround } from "./terrain/framing.ts"
@@ -738,7 +738,9 @@ export function CameraRig() {
         minZoom={archipelago ? Math.min(widest, mapZoom * 0.8) : widest}
         maxZoom={fit * 8}
         minDistance={4}
-        maxDistance={depths ? depths.back * 1.5 : 300 * outreach}
+        maxDistance={
+          depths ? depths.back * 1.5 : view === "explore" ? 300 * outreach : orthoMaxOf(outreach, back)
+        }
         mouseButtons={{ LEFT: MOUSE.PAN, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.ROTATE }}
         touches={{ ONE: TOUCH.PAN, TWO: TOUCH.DOLLY_ROTATE }}
       />

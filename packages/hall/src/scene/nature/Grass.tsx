@@ -39,6 +39,7 @@ import { tiered, useTiered } from "../tiers.ts"
 import { installNodes, TSL } from "../tsl.ts"
 import { FLOWERS, scatter, type Tuft } from "./scatter.ts"
 import { grassFragment, grassVertex } from "./shaders.ts"
+import { keyLight } from "./waterSky.ts"
 
 /**
  * Grass and wild flowers on the meadows (ADR 0007, Nature): two InstancedMeshes (tufts, and the
@@ -201,16 +202,6 @@ function nodeGrass(gl: WebGLRenderer): Promise<Build> {
     nodeBuilds.set(gl, build)
   }
   return build
-}
-
-/** The scene's shadow-casting directional light (Atmosphere's key), once its shadow map exists. */
-function keyLight(scene: Object3D): DirectionalLight | null {
-  let found: DirectionalLight | null = null
-  scene.traverse((object) => {
-    const light = object as DirectionalLight
-    if (!found && light.isDirectionalLight && light.castShadow && light.shadow.map) found = light
-  })
-  return found
 }
 
 /** Exported for tests. */

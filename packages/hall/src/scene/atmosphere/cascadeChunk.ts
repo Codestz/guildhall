@@ -16,7 +16,7 @@ import { ShaderChunk } from "three"
  */
 
 /** How much of a map's width, from its edge, blends into the next one out. */
-const FADE = 0.12
+export const FADE = 0.12
 
 const FUNCTION = /* glsl */ `
 #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 1

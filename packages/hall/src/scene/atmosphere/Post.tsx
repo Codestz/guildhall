@@ -20,6 +20,7 @@ import { useWorld } from "../../world/source.ts"
 import { reachOf } from "../../world/world.ts"
 import { FRAME } from "../frame.ts"
 import { useTier } from "../Quality.tsx"
+import { HAZE } from "./aerial.ts"
 import { GradeEffect } from "./GradeEffect.ts"
 import { useLooks } from "./looks.ts"
 import { MoodLutEffect } from "./MoodLut.ts"
@@ -33,8 +34,6 @@ import { WIDE_VIEW } from "./wideView.ts"
  * only in the halo of the brightest specks (docs/perf-budget.md, final pass).
  */
 const BLOOM_INPUT = 0.5
-/** How much of the sky's tint the far side of a gen 2 island takes (GradeEffect.aerial). */
-const HAZE = 0.28
 const ORIGIN = new Vector3()
 
 /**

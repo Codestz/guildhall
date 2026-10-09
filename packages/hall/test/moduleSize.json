@@ -15,7 +15,6 @@
   "packages/hall/src/scene/Adventurer.tsx": 655,
   "packages/hall/src/scene/CameraRig.tsx": 773,
   "packages/hall/src/scene/Sigils.tsx": 411,
-  "packages/hall/src/scene/atmosphere/PostGPU.tsx": 453,
   "packages/hall/src/scene/atmosphere/sky.ts": 440,
   "packages/hall/src/scene/chips.ts": 564,
   "packages/hall/src/scene/crowd/Crowd.ts": 857,

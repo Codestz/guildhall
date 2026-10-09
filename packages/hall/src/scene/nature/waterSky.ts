@@ -79,12 +79,21 @@ export function useWaterSky(
 
 const look = new Vector3()
 
-/** The scene's shadow-casting directional light (Atmosphere's key), once its shadow map exists. */
-function keyLight(scene: Object3D): DirectionalLight | null {
+/**
+ * The scene's shadow-casting directional light (Atmosphere's key), once its shadow map exists, or
+ * on a cascaded WebGPU key (whose maps are its cascade node's) as soon as it has the node.
+ */
+export function keyLight(scene: Object3D): DirectionalLight | null {
   let found: DirectionalLight | null = null
   scene.traverse((object) => {
     const light = object as DirectionalLight
-    if (!found && light.isDirectionalLight && light.castShadow && light.shadow.map) found = light
+    if (
+      !found &&
+      light.isDirectionalLight &&
+      light.castShadow &&
+      (light.shadow.map || light.shadow.shadowNode)
+    )
+      found = light
   })
   return found
 }

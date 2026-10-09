@@ -1,5 +1,8 @@
 import { Color } from "three"
 
+/** How much of the sky's tint the far side of a gen 2 island takes (GradeEffect.aerial; both backends' grades). */
+export const HAZE = 0.28
+
 const BLUE = new Color(0.66, 0.78, 1)
 const scratch = new Color()
 

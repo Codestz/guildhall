@@ -1,5 +1,5 @@
 import { useFrame, useThree } from "@react-three/fiber"
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import { type DirectionalLight, Fog, type HemisphereLight, Vector3 } from "three"
 import { TIERS } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
@@ -113,25 +113,37 @@ function Weathervane() {
 }
 
 /**
- * A gen 2 island is too big for one shadow box: its key light is cascaded (CascadeKey.tsx) on
- * WebGL. The hand island, gen 1 repos and WebGPU (whose shadow nodes have no cascade patch) keep
- * the single box below, so their pictures are what they were.
+ * A gen 2 island is too big for one shadow box: its key light is cascaded, on WebGL as one
+ * directional light per cascade (CascadeKey.tsx), on WebGPU as one light over a cascade shadow node
+ * (CascadeKeyGPU.tsx). The hand island and gen 1 repos keep the single box below, so their pictures
+ * are what they were.
  */
 function KeyLight() {
   const world = useWorld()
   const gl = useThree((state) => state.gl)
   const tier = TIERS[useTier()]
-  const cascaded = world.repo?.gen === 2 && WIDE_VIEW.cascades && !isWebGPU(gl) && installCascadeChunks()
+  const gpu = isWebGPU(gl)
+  const wide = world.repo?.gen === 2 && WIDE_VIEW.cascades
+  const cascaded = wide && (gpu || installCascadeChunks())
   if (!cascaded) return <Key />
+  const props = {
+    count: tier.cascades,
+    map: tier.shadowMap,
+    far: reachOf(world) + 12,
+    ceiling: peakOf(world),
+  }
+  if (!gpu) return <CascadeKey {...props} />
   return (
-    <CascadeKey
-      count={tier.cascades}
-      map={tier.shadowMap}
-      far={reachOf(world) + 12}
-      ceiling={peakOf(world)}
-    />
+    <Suspense fallback={null}>
+      <CascadeKeyGPU {...props} />
+    </Suspense>
   )
 }
+
+/** The WebGPU cascades (three/webgpu's nodes): loaded only on that path, as Post.tsx loads PostGPU. */
+const CascadeKeyGPU = lazy(() =>
+  import("./CascadeKeyGPU.tsx").then((module) => ({ default: module.CascadeKeyGPU })),
+)
 
 /**
  * The one shadow-casting light: the sun by day, the moon by night (handed over below the horizon,

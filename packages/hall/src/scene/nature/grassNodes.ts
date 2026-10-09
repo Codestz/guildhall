@@ -8,6 +8,7 @@ import {
   float,
   int,
   ivec2,
+  lightShadowMatrix,
   max,
   mix,
   modelWorldMatrix,
@@ -30,7 +31,15 @@ import {
   vec3,
   vec4,
 } from "three/tsl"
-import { MeshStandardNodeMaterial, type Node, type NodeBuilder, NodeMaterial } from "three/webgpu"
+import {
+  MeshStandardNodeMaterial,
+  type Node,
+  type NodeBuilder,
+  NodeMaterial,
+  type ShadowBaseNode,
+} from "three/webgpu"
+import { cascadeKey } from "../atmosphere/cascadeLights.ts"
+import { cascadeLookup, farFilter } from "../atmosphere/cascadeShadowNode.ts"
 import { wind } from "../atmosphere/wind.ts"
 import type { GrassUniforms } from "./Grass.tsx"
 
@@ -97,19 +106,38 @@ export function swayGrass(world: Vec2): Float {
 // ---- The key light's shadow ---------------------------------------------------------------------
 
 /**
- * The key light's shadow (GLSL `getShadowMask()`), read from the map the light already draws: its
- * own shadow node on WebGPU, WebGLRenderer on WebGL (where the nodes handler does the same). A
- * shadow node of its own would draw a second map, and on WebGPU the on-demand cache's one redraw
- * (render/shims.ts `syncShadows`) would go to whichever drew first, leaving the other empty. So:
- * call once the light's `shadow.map` exists.
+ * The key light's shadow (GLSL `getShadowMask()`), read from the maps the light already draws: on
+ * WebGPU its own shadow node when it has one (the cascades', cascadeShadowNode.ts) or else its one
+ * map; on WebGL (where the nodes handler does the same) its map, or all of a cascaded key's, as the
+ * GLSL does. A shadow node of its own would draw a second map, and on WebGPU the on-demand cache's
+ * one redraw (render/shims.ts `syncShadows`) would go to whichever drew first, leaving the other
+ * empty. So: call once the light's `shadow.map` (or its cascade node) exists.
  */
 export function keyShadow(key: DirectionalLight): Float {
-  const node = shadow(key) as unknown as {
+  if (key.shadow.shadowNode) return key.shadow.shadowNode as unknown as Float
+  const cascades = cascadeKey.lights
+  if (cascades.length < 2 || cascades[0] !== key) return mapShadow(key)
+  return cascadeLookup(
+    cascades.map((light, k) => {
+      const node = mapShadow(light)
+      if (k > 0) farFilter(light.shadow)
+      return {
+        shadow: node as unknown as Node<"float">,
+        matrix: lightShadowMatrix(light) as unknown as Node<"mat4">,
+        position: node as unknown as ShadowBaseNode,
+      }
+    }),
+  ) as unknown as Float
+}
+
+/** A light's own map (drawn by the renderer) as a shadow lookup that draws nothing. */
+function mapShadow(light: DirectionalLight): Float {
+  const node = shadow(light) as unknown as {
     setupRenderTarget: (shadow: LightShadow) => object
     updateBefore: () => void
   }
-  node.setupRenderTarget = (light) => {
-    const map = light.map as NonNullable<LightShadow["map"]>
+  node.setupRenderTarget = (lit) => {
+    const map = lit.map as NonNullable<LightShadow["map"]>
     return { shadowMap: map, depthTexture: map.depthTexture }
   }
   node.updateBefore = () => {}

@@ -11,7 +11,7 @@ import {
 } from "../../waterways.ts"
 import { key } from "../hex.ts"
 import type { Relief } from "../relief/index.ts"
-import { CORNERS, centreOf, pointOf, RES } from "../relief/lattice.ts"
+import { CIRCUM, CORNERS, centreOf, pointOf, RES } from "../relief/lattice.ts"
 
 /**
  * The relief cut to the water's contract (terrain v2 §4.1), in place. A flat reach (a river hex
@@ -32,6 +32,8 @@ const FREEBOARD = 0.34
 /** Past the channel the banks hold for SHOULDER, then ease out to the natural ground over EASE. */
 const SHOULDER = 1.6
 const EASE = 2.4
+/** The lattice's step: the ground between vertices is a blend of those within this of a point. */
+const PITCH = CIRCUM / RES
 
 /** Distance from a point to a polyline. */
 function distanceTo(line: readonly Spot[], x: number, z: number): number {
@@ -55,11 +57,17 @@ function flatCut(reach: Reach, top: number): Cut {
   return (x, z) => (distanceTo(line, x, z) <= BANK ? { bed: top - BED } : { bank: top - BANK_TOP })
 }
 
-/** A graded reach's cut: by the nearest stretch of its surface. */
+/**
+ * A graded reach's cut: by the nearest stretch of its surface. A channel vertex is cut under the
+ * lowest water within a lattice step of it, not just the nearest: the ground between vertices
+ * blends them, and where the surface drops faster than the lattice can follow (a river down a ledge's
+ * riser) the nearest alone would leave the bed standing over the water below.
+ */
 function gradedCut(grade: readonly Point3[]): Cut {
   const slopes = gradeSlopes(grade)
   return (x, z, ground) => {
     let best = { d: Number.POSITIVE_INFINITY, y: 0, half: BANK }
+    let lowest = Number.POSITIVE_INFINITY
     for (let k = 0; k + 1 < grade.length; k++) {
       const [a, b] = [grade[k] as Point3, grade[k + 1] as Point3]
       const len = (b[0] - a[0]) ** 2 + (b[2] - a[2]) ** 2
@@ -68,12 +76,13 @@ function gradedCut(grade: readonly Point3[]): Cut {
           ? 0
           : Math.max(0, Math.min(1, ((x - a[0]) * (b[0] - a[0]) + (z - a[2]) * (b[2] - a[2])) / len))
       const d = Math.hypot(x - (a[0] + (b[0] - a[0]) * t), z - (a[2] + (b[2] - a[2]) * t))
+      if (d <= PITCH) lowest = Math.min(lowest, a[1] + (b[1] - a[1]) * t)
       if (d < best.d) {
         const slope = (slopes[k] as number) * (1 - t) + (slopes[k + 1] as number) * t
         best = { d, y: a[1] + (b[1] - a[1]) * t, half: gradeHalfWidth(slope) }
       }
     }
-    if (best.d <= best.half) return { bed: best.y - DEPTH }
+    if (best.d <= best.half) return { bed: Math.min(best.y, lowest) - DEPTH }
     const ease = 1 - Math.min(1, Math.max(0, (best.d - best.half - SHOULDER) / EASE))
     const held = best.y + FREEBOARD
     return ease > 0 && held > ground ? { bank: ground + (held - ground) * ease } : {}

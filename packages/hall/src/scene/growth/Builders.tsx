@@ -5,9 +5,7 @@ import { InstancedMesh, Matrix4, type Mesh, type Object3D, Quaternion, Vector3 }
 import { ageOf, type Site as BuildSite, siteKey } from "../../world/chronicle/growthBuild.ts"
 import { DEPTH, pieceAt, roleOf, saltOf } from "../../world/chronicle/growthPieces.ts"
 import { emptyStage, type Stage, stageAt } from "../../world/chronicle/growthStages.ts"
-import LANDS from "../../world/lands.json"
-import { HEX_SCALE } from "../../world/lands.ts"
-import TOWN2 from "../../world/town2.json"
+import { HEX_SCALE, PIECES } from "../../world/lands.ts"
 import type { World } from "../../world/world.ts"
 import { bakeNode } from "../events/common.ts"
 import { FRAME } from "../frame.ts"
@@ -164,7 +162,7 @@ function sitesOf(world: World, driver: GrowthDriver): { buildings: Site[]; tents
   const buildings: Site[] = []
   for (const piece of world.island.decor) {
     if (roleOf(piece.piece) !== "build") continue
-    const size = (LANDS as Bounds)[piece.piece]?.size ?? (TOWN2 as Bounds)[piece.piece]?.size ?? [1, 1, 1]
+    const size = (PIECES as Bounds)[piece.piece]?.size ?? [1, 1, 1]
     const k = HEX_SCALE * (piece.scale ?? 1)
     buildings.push({
       x: piece.x,

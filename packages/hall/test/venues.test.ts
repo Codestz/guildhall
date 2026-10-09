@@ -14,8 +14,7 @@ import { decodeChronicle } from "../src/world/chronicle/format.ts"
 import { cellAt, unkey } from "../src/world/gen/hex.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
-import LANDS from "../src/world/lands.json"
-import { cellToWorld, HEX_SCALE, MAP_FOR_TESTS } from "../src/world/lands.ts"
+import { cellToWorld, HEX_SCALE, MAP_FOR_TESTS, PIECES } from "../src/world/lands.ts"
 import { GATE, type Spot, STATIONS } from "../src/world/layout.ts"
 import { route } from "../src/world/paths.ts"
 import { prefab } from "../src/world/prefabs/index.ts"
@@ -154,8 +153,9 @@ describe("venues on a gen 2 island", () => {
         expect({ at, level: world.terrain.level(cell) }).toEqual({ at, level: 0 })
         const node = world.roads.nodes[v.node]
         expect(node).toBeDefined()
+        // Beside the road: 8.5 where a hex clear of the other venues allows, 14 where only a stray one does.
         expect(Math.hypot(v.door.step[0] - (node?.[0] ?? 0), v.door.step[1] - (node?.[1] ?? 0))).toBeLessThan(
-          9,
+          14,
         )
         expect(footprints(v).some((f) => f(v.door.sill))).toBe(true)
         // Facing the door from the step looks at the sill.
@@ -228,7 +228,7 @@ function footprints(v: Venue): ((p: Spot) => boolean)[] {
   return item.parts
     .filter((part) => part.piece.startsWith("building_"))
     .map((part) => {
-      const box = (LANDS as unknown as Record<string, { min: number[]; max: number[] }>)[part.piece]
+      const box = (PIECES as Record<string, { min: number[]; max: number[] }>)[part.piece]
       const k = HEX_SCALE * (part.scale ?? 1)
       const turn = v.rot + (part.rot ?? 0)
       // The part's own origin in the world, by the prefab's turn.

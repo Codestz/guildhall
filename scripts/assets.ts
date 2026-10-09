@@ -17,6 +17,8 @@
  *                           palette, ~500 triangles each. Lazy, with the folk of a gen 2 island.
  * - growth.glb            — a repo's growth timelapse (`?grow`, scene/growth): scaffolds, planks and
  *                           the ghost districts' tents (Kenney Survival Kit). Lazy; no bounds file.
+ * - civic.glb / civic.json — gen 2's castle, towers, curtain wall, and the tavern's tables and stools and the library's
+ *                           books (the hex pack's own palette). Lazy, with town2.
  * - town2.glb / town2.json — the second town kit (gen 2, the default for repo islands): Kenney Fantasy Town, Castle and
  *                           pieces for the buildings KayKit has none of (world/prefabs/town2.ts),
  *                           their colormaps baked onto KayKit's hexagon palette (scripts/palette.ts).
@@ -417,18 +419,6 @@ const LANDS: Record<string, string[]> = {
     "building_church_blue",
     "building_blacksmith_blue",
     "building_barracks_blue",
-    // The civic centres (world/prefabs): castle, towers and the curtain wall, in the pack's own palette.
-    "building_castle_blue",
-    "building_tower_B_blue",
-    "building_tower_base_blue",
-    "building_tower_catapult_blue",
-    "wall_straight",
-    "wall_straight_gate",
-    "wall_corner_A_gate",
-    "wall_corner_A_inside",
-    "wall_corner_A_outside",
-    "wall_corner_B_inside",
-    "wall_corner_B_outside",
     "building_grain",
     "building_dirt",
     "building_scaffolding",
@@ -464,6 +454,29 @@ const LANDS: Record<string, string[]> = {
   // The docks: plank floor from the dungeon pack, rope from the tools pack.
   KayKit_Dungeon_Pack_1: ["floor_wood_large"],
   KayKit_RPGToolsBits: ["rope_bundle_A"],
+}
+
+/**
+ * The civic centres and the venues' yards (world/prefabs, gen 2 only): castle, towers and the curtain
+ * wall in the hex pack's own palette, and the tavern's tables and stools and the library's books. Lazy, like town2 (scene/civic.ts):
+ * the hand island and its visitors never fetch them, so they sit outside lands.glb.
+ */
+const CIVIC: Record<string, string[]> = {
+  [HEX]: [
+    "building_castle_blue",
+    "building_tower_B_blue",
+    "building_tower_base_blue",
+    "building_tower_catapult_blue",
+    "wall_straight",
+    "wall_straight_gate",
+    "wall_corner_A_gate",
+    "wall_corner_A_inside",
+    "wall_corner_A_outside",
+    "wall_corner_B_inside",
+    "wall_corner_B_outside",
+  ],
+  KayKit_Dungeon_Pack_1: ["table_long", "stool"],
+  KayKit_Furniture_Bits: ["book_set"],
 }
 
 /**
@@ -863,6 +876,7 @@ const STEPS: Record<string, () => Promise<void>> = {
   seas: () => kit("seas", SEAS, false),
   growth: () => kit("growth", GROWTH, false),
   animals: () => kit("animals", ANIMALS, false),
+  civic: () => kit("civic", CIVIC),
   town2: () => kit("town2", TOWN2, true, { name: town2Name, grade: toKayKit }),
 }
 const wanted = process.argv.slice(2)

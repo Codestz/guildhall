@@ -18,6 +18,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from "three"
+import { CIVIC_URL } from "../scene/civic.ts"
 import { LANDS_URL } from "../world/cast.ts"
 import { turn } from "../world/gen/tiles.ts"
 import { cellToWorld, HEX_SCALE } from "../world/lands.ts"
@@ -85,9 +86,9 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
   sea.receiveShadow = true
   scene.add(sea)
 
-  // The land pack and the second town kit, as one pack of named pieces.
-  const [lands, extra] = await Promise.all([load(LANDS_URL), load(town2)])
-  const pack = new Group().add(lands.scene, extra.scene)
+  // The land pack, its civic pieces and the second town kit, as one pack of named pieces.
+  const [lands, civic, extra] = await Promise.all([load(LANDS_URL), load(CIVIC_URL), load(town2)])
+  const pack = new Group().add(lands.scene, civic.scene, extra.scene)
   const info = pieceInfo(pack)
 
   const camera = new PerspectiveCamera(30, 1, 1, 4000)

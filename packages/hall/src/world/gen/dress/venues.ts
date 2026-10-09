@@ -6,6 +6,7 @@ import { cellAt, key, neighbours, unkey } from "../hex.ts"
 import { keepOf } from "../plan/lakes.ts"
 import type { IslandPlan, PlanDistrict } from "../plan.ts"
 import type { Cover } from "./cover.ts"
+import { crowds, footprintsOf } from "./footprints.ts"
 import type { DressedRoads } from "./roads.ts"
 import { facing, round } from "./sites.ts"
 
@@ -19,6 +20,13 @@ import { facing, round } from "./sites.ts"
 
 /** Natural clutter within this of a venue is cleared (trees, rocks, fields' fences); lots too. */
 export const VENUE_CLEAR = 6
+
+/** A door's step lies within this (world units) of its road node, or when no hex clear of the other venues allows, this. */
+const BY_ROAD = 8.5
+const STRAY = 14
+
+/** The room kept between one venue's buildings and another's. */
+const VENUE_GAP = 0.5
 
 /** A spot (x, z) and a radius round it that a venue keeps clear of. */
 export type Anchor = readonly [number, number, number]
@@ -95,22 +103,39 @@ export function venuesOf(
         .filter(spare)
         .map((cell) => ({ cell, towards: square })),
     ]
-    // The first whose door's step is off the beach and clear of any river's bridge, else the first off the beach, else the first.
-    let first: PlacedVenue | undefined
-    let inland: PlacedVenue | undefined
-    let clear: PlacedVenue | undefined
-    for (const { cell, towards } of choices) {
-      const next = place(prefab(VENUE_KINDS[kind].prefab), kind, district, cell, towards, roads)
-      if (!next) continue
-      first ??= next
-      if (onBeach(next.venue.door.step, plan.land)) continue
-      inland ??= next
-      if (!byWater(next.venue.door.step, cover.rivers)) {
-        clear = next
-        break
+    // The first whose door's step is off the beach and clear of any river's bridge, else the first off the beach, else the first;
+    // standing clear of the venues already placed if any hex allows, else wherever that rule picks.
+    const choose = (rejected: (next: PlacedVenue) => boolean): PlacedVenue | undefined => {
+      let first: PlacedVenue | undefined
+      let inland: PlacedVenue | undefined
+      let clear: PlacedVenue | undefined
+      for (const { cell, towards } of choices) {
+        const next = place(prefab(VENUE_KINDS[kind].prefab), kind, district, cell, towards, roads)
+        if (!next || rejected(next)) continue
+        first ??= next
+        if (onBeach(next.venue.door.step, plan.land)) continue
+        inland ??= next
+        if (!byWater(next.venue.door.step, cover.rivers)) {
+          clear = next
+          break
+        }
       }
+      return clear ?? inland ?? first
     }
-    const placed = clear ?? inland ?? first
+    const standing = out.flatMap((venue) => footprintsOf(venue.placements))
+    const touches = (next: PlacedVenue): boolean =>
+      footprintsOf(next.placements).some((shape) => standing.some((other) => crowds(shape, other, VENUE_GAP)))
+    // A door's step stays on the road graph's side, where a venue that clears the others allows; failing that,
+    // a looser reach for the step; failing that, a venue that crowds one beside it (as ever), and wherever.
+    const reach = (next: PlacedVenue): number => {
+      const [nx, nz] = roads.nodes[next.venue.node] ?? [0, 0]
+      return Math.hypot(next.venue.door.step[0] - nx, next.venue.door.step[1] - nz)
+    }
+    const placed =
+      choose((next) => touches(next) || reach(next) >= BY_ROAD) ??
+      choose((next) => touches(next) || reach(next) >= STRAY) ??
+      choose((next) => reach(next) >= BY_ROAD) ??
+      choose(() => false)
     if (!placed) return
     taken.add(key(placed.cell))
     out.push(placed)

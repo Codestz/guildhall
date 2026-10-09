@@ -1,9 +1,8 @@
-import LANDS from "../../lands.json"
-import { HEX_SCALE, type LandPlacement } from "../../lands.ts"
+import { HEX_SCALE, type LandPlacement, PIECES } from "../../lands.ts"
 
 /**
  * What a building takes up on the ground, so the town can keep its lots off the civic centre, the
- * wall and the venues (dress.ts): each building or wall piece's bounding box (lands.json) at its
+ * wall and the venues (dress.ts): each building or wall piece's bounding box (lands.ts PIECES) at its
  * placement, as four corners.
  */
 
@@ -19,7 +18,7 @@ const BUILT = /^(building_|wall_)/
 export function footprintsOf(placements: readonly LandPlacement[]): Footprint[] {
   const out: Footprint[] = []
   for (const piece of placements) {
-    const bounds = (LANDS as Record<string, Bounds>)[piece.piece]
+    const bounds = (PIECES as Record<string, Bounds>)[piece.piece]
     if (!bounds || !BUILT.test(piece.piece) || UNDERFOOT.test(piece.piece)) continue
     const scale = HEX_SCALE * (piece.scale ?? 1)
     const rot = piece.rot ?? 0

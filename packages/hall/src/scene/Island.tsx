@@ -23,6 +23,7 @@ import { genOf } from "../world/gen/islandFromTree.ts"
 import { HEX_SCALE, type LandPiece, type LandPlacement, SITES, yardBuilding } from "../world/lands.ts"
 import { useWorld, useWorldReady } from "../world/source.ts"
 import { tiltQuaternion } from "../world/tilt.ts"
+import { loadCivic, shareMaterials, useCivic } from "./civic.ts"
 import { markGrowable, useGrowable } from "./growth/registry.ts"
 import { plain } from "./Kit.tsx"
 import { isMovingPart } from "./life/moving.ts"
@@ -45,11 +46,15 @@ import { loadTown2, useTown2 } from "./town2.ts"
 import { TSL } from "./tsl.ts"
 
 useGLTF.preload(LANDS_URL)
-// Generator 2's second town kit (scene/town2.ts) is fetched beside the land pack, for a link that asks
-// a repo island (`?repo=`, `?archipelago`, `?repos=`) and not `?gen=1`; the hand island never needs it.
+// Generator 2's second town kit (scene/town2.ts) and civic pieces (scene/civic.ts) are fetched beside the
+// land pack, for a link that asks a repo island (`?repo=`, `?archipelago`, `?repos=`) and not `?gen=1`;
+// the hand island never needs them.
 if (typeof location !== "undefined" && genOf(location.search) === 2) {
   const link = new URLSearchParams(location.search)
-  if (link.has("repo") || link.has("archipelago") || link.has("repos")) void loadTown2()
+  if (link.has("repo") || link.has("archipelago") || link.has("repos")) {
+    void loadTown2()
+    void loadCivic()
+  }
 }
 /** The far tier's simplifier, fetched beside the land pack (it is needed before the batches build). */
 const SIMPLIFIER = loadSimplifier()
@@ -75,9 +80,13 @@ export function Island({ detail = 1 }: { detail?: number }) {
   const { progress } = useGuild()
   const world = useWorld()
   const land = world.island
-  // The land pack's pieces, and gen 2's second town kit's when the island's prefabs use it.
+  // The land pack's pieces, and gen 2's civic pieces and second town kit's when the island's prefabs use them.
   const town2 = useTown2(land.decor)
-  const nodes = useMemo(() => ({ ...lands, ...town2 }), [lands, town2])
+  const civic = useCivic(land.decor)
+  const nodes = useMemo(() => {
+    if (civic) shareMaterials(civic, lands)
+    return { ...lands, ...civic, ...town2 }
+  }, [lands, civic, town2])
   const gl = useThree((state) => state.gl)
   const webgpu = isWebGPU(gl)
   const simplifier = use(SIMPLIFIER)

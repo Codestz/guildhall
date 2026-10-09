@@ -2,6 +2,7 @@ import {
   AmbientLight,
   Color,
   DirectionalLight,
+  Group,
   InstancedMesh,
   type Material,
   Matrix4,
@@ -17,6 +18,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from "three"
+import { CIVIC_URL } from "../scene/civic.ts"
 import { tameLime } from "../scene/palette.ts"
 import { LANDS_URL } from "../world/cast.ts"
 import type { RepoIsland } from "../world/gen/dress.ts"
@@ -81,8 +83,10 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
   sea.position.y = -1.2
   scene.add(sea)
 
-  const gltf = await load(LANDS_URL)
-  scene.add(...draw(gltf.scene, [...generated.island.tiles, ...generated.island.decor]))
+  const [gltf, civic] = await Promise.all([load(LANDS_URL), load(CIVIC_URL)])
+  scene.add(
+    ...draw(new Group().add(gltf.scene, civic.scene), [...generated.island.tiles, ...generated.island.decor]),
+  )
 
   // Frame the land: its extent from the hub, plus a ring of sea.
   const extent = (generated.plan.radius + 2) * 10

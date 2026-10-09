@@ -9,16 +9,19 @@ import { MAP_FOR_TESTS } from "../src/world/lands.ts"
 import type { Spot } from "../src/world/layout.ts"
 import { GLOWS, glowsOf, LIGHTS, lightsOf, toSegment } from "../src/world/lights.ts"
 import { worldSource } from "../src/world/source.ts"
-import { ROAD_HALF, WATER_CLEARANCE, wilds, wildsOf } from "../src/world/wilds.ts"
+import { RIVER_CLEARANCE, ROAD_HALF, WATER_CLEARANCE, wilds, wildsOf } from "../src/world/wilds.ts"
 import { handWorld, reachOf, repoWorld, type World } from "../src/world/world.ts"
 import REACT from "./fixtures/repos/facebook__react.json"
 import SELF from "./fixtures/repos/guildhall.json"
+import { gen2Worlds } from "./support/fixtures.ts"
 
 const grow = (entries: unknown[], repo: string): World =>
   repoWorld(islandFromTree(entries as RepoEntry[]), { repo, source: "fixture" })
 const WORLDS: [string, World][] = [
   ["guildhall", grow(SELF.entries, SELF.repo)],
   ["react", grow(REACT.entries, REACT.repo)],
+  // The default world, every bundled fixture.
+  ...gen2Worlds().map(([repo, world]): [string, World] => [`${repo} (gen 2)`, world]),
 ]
 
 const roadsOf = (world: World): [Spot, Spot][] =>
@@ -95,8 +98,11 @@ describe("a repo's world", () => {
         const cell = MAP_FOR_TESTS.cellOf([wild.x, wild.z])
         expect(world.terrain.level(cell)).toBe(0)
         expect(".fvVs=".includes(world.terrain.at(cell))).toBe(true)
+        // A gen 2 island's water also holds its rivers and lakes, which wilds keep RIVER_CLEARANCE from.
         for (const w of sea)
-          expect(Math.hypot(w[0] - wild.x, w[1] - wild.z)).toBeGreaterThanOrEqual(WATER_CLEARANCE)
+          expect(Math.hypot(w[0] - wild.x, w[1] - wild.z)).toBeGreaterThanOrEqual(
+            name.endsWith("(gen 2)") ? RIVER_CLEARANCE : WATER_CLEARANCE,
+          )
         for (const [a, b] of roads)
           expect(toSegment([wild.x, wild.z], a, b)).toBeGreaterThanOrEqual(ROAD_HALF)
       }

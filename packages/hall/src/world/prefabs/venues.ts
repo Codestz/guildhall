@@ -41,8 +41,8 @@ export const VENUES: readonly Prefab[] = [
     kind: "venue",
     rings: 1,
     parts: [
-      { piece: "building_church_blue", x: 2.8, z: -0.6, scale: 1.25 },
-      { piece: "building_tower_A_blue", x: -3.4, z: -1.2, scale: 1.3 },
+      { piece: "building_church_blue", x: 3.2, z: -0.6, scale: 1.25 },
+      { piece: "building_tower_A_blue", x: -4, z: -1.2, scale: 1.3 },
       { piece: "crate_A_big", x: -1.2, z: 3.9, rot: 0.2, scale: 1.2 },
       { piece: "book_set", x: -1.2, y: 1.3, z: 3.9, rot: 0.3, scale: 0.35 },
       { piece: "crate_open", x: 5.6, z: 3.8, rot: -0.4 },
@@ -50,10 +50,10 @@ export const VENUES: readonly Prefab[] = [
       { piece: "flag_blue", x: 0.4, z: 4.6 },
       { piece: "bucket_water", x: -5.6, z: 3.2 },
     ],
-    doors: [{ x: 2.8, z: 4.6, rot: 0, depth: 1.6 }],
+    doors: [{ x: 3.2, z: 4.6, rot: 0, depth: 1.6 }],
     windows: [
-      { x: -3.4, y: 3, z: 3 },
-      { x: 2.8, y: 3, z: 3.4 },
+      { x: -4, y: 3, z: 3 },
+      { x: 3.2, y: 3, z: 3.4 },
     ],
   },
   {
@@ -125,7 +125,7 @@ export const VENUES: readonly Prefab[] = [
     kind: "venue",
     rings: 1,
     parts: [
-      { piece: "building_home_B_blue", x: 0, z: -2.2, scale: 1.4 },
+      { piece: "building_home_B_blue", x: 0, z: -4.6, scale: 1.4 },
       { piece: "building_market_blue", x: -4.2, z: 2.6, rot: 0.3, scale: 0.62 },
       { piece: "building_market_red", x: 5.2, z: 2.6, rot: -0.3, scale: 0.62 },
       { piece: "crate_A_big", x: -5.6, z: -1, rot: 0.2, scale: 1.2 },
@@ -134,11 +134,11 @@ export const VENUES: readonly Prefab[] = [
       { piece: "sack", x: 5.2, z: -2.2, rot: 1.4, scale: 1.3 },
       { piece: "wheelbarrow", x: 0.6, z: 4.8, rot: 1.6, scale: 1.2 },
     ],
-    doors: [{ x: 1.3, z: 2.6, rot: 0, depth: 1.9, y: 1 }],
+    doors: [{ x: 1.3, z: 2.6, rot: 0, depth: 3.6, y: 1 }],
     windows: [
-      { x: -1.1, y: 3.2, z: 1.9 },
-      { x: 1.4, y: 6.2, z: 1.9 },
+      { x: -1.1, y: 3.2, z: -0.5 },
+      { x: 1.4, y: 6.2, z: -0.5 },
     ],
-    chimneys: [{ x: 1.7, y: 9, z: -2.9 }],
+    chimneys: [{ x: 1.7, y: 9, z: -5.3 }],
   },
 ]

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { BODY, blocker, box, islandObstacles } from "../src/world/clearance.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
-import LANDS from "../src/world/lands.json"
+import { PIECES } from "../src/world/lands.ts"
 import { prefab } from "../src/world/prefabs/index.ts"
 import { repoWorld } from "../src/world/world.ts"
 import HINDSIGHT from "./fixtures/repos/codestz__claude-hindsight.json"
@@ -28,7 +28,7 @@ describe("a venue prefab's door step", () => {
       const step = venue.doors[0]
       expect(step).toBeDefined()
       const crowded = venue.parts.flatMap((part) => {
-        const bounds = (LANDS as Record<string, Bounds>)[part.piece.replace("{kit}", "blue")]
+        const bounds = (PIECES as Record<string, Bounds>)[part.piece.replace("{kit}", "blue")]
         if (!bounds || part.piece.startsWith("hex_")) return []
         const own = box(part.piece, bounds, part.x, part.z, part.rot ?? 0, 5 * (part.scale ?? 1))
         return own.distance(step?.x ?? 0, step?.z ?? 0) < BODY ? [part.piece] : []

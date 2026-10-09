@@ -1,4 +1,5 @@
 import type { Site as SiteName } from "@guildhall/roster"
+import CIVIC from "./civic.json"
 import LANDS from "./lands.json"
 import type { Post, Spot } from "./layout.ts"
 import TOWN2 from "./town2.json"
@@ -10,10 +11,11 @@ import TOWN2 from "./town2.json"
  * drift apart. Hex pieces are drawn at HEX_SCALE.
  */
 
-export type LandPiece = keyof typeof LANDS | keyof typeof TOWN2
-/** Every piece's bounding box (hex pack and the second town kit), in its own units: drawn at HEX_SCALE. */
+export type LandPiece = keyof typeof LANDS | keyof typeof CIVIC | keyof typeof TOWN2
+/** Every piece's bounding box (hex pack, its civic pieces and the second town kit), in its own units: drawn at HEX_SCALE. */
 export const PIECES: Record<LandPiece, { min: number[]; max: number[]; size: number[] }> = {
   ...LANDS,
+  ...CIVIC,
   ...TOWN2,
 }
 export const HEX_SCALE = 5

@@ -3,15 +3,9 @@ import { clearLots, LOT_GAP } from "../src/world/gen/dress/clearLots.ts"
 import { crowds, type Footprint, footprintsOf } from "../src/world/gen/dress/footprints.ts"
 import type { Lot } from "../src/world/gen/dress/town.ts"
 import { key, unkey } from "../src/world/gen/hex.ts"
-import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
-import type { RepoEntry } from "../src/world/gen/repo.ts"
 import { cellToWorld, type LandPlacement } from "../src/world/lands.ts"
-import { instantiate, prefab } from "../src/world/prefabs/index.ts"
-import { repoWorld } from "../src/world/world.ts"
-import HINDSIGHT from "./fixtures/repos/codestz__claude-hindsight.json"
-import COCKPIT from "./fixtures/repos/codestz__opencode-cockpit.json"
-import REACT from "./fixtures/repos/facebook__react.json"
-import SELF from "./fixtures/repos/guildhall.json"
+import { instantiate, PREFABS, prefab } from "../src/world/prefabs/index.ts"
+import { gen2Worlds } from "./support/fixtures.ts"
 
 /**
  * Room between buildings on a gen 2 island (dress/footprints.ts, dress/clearLots.ts): the town's
@@ -84,21 +78,23 @@ describe("clearing lots", () => {
   })
 })
 
-const WORLDS: [string, ReturnType<typeof repoWorld>][] = [REACT, SELF, COCKPIT, HINDSIGHT].map((fixture) => [
-  fixture.repo,
-  repoWorld(islandFromTree(fixture.entries as RepoEntry[], 0, 2), {
-    repo: fixture.repo,
-    source: "fixture",
-    gen: 2,
-  }),
-])
-
 /** Homes and wells are the town's; the rest of the civic centre's buildings and the wall are not. */
 const TOWN = /^building_(home_|well_)/
 const CIVIC = /^(wall_|building_(tower_B|castle|barracks|tower_base|church))/
+/** The wall's own run: its pieces and the towers it joins meet end to end by design. */
+const RUN = /^(wall_|building_tower_B)/
+
+describe("a prefab's own buildings", () => {
+  for (const item of PREFABS.filter((one) => !one.id.startsWith("wall-")))
+    test(`${item.id}: no two of its buildings overlap`, () => {
+      const shapes = instantiate(item, [0, 0], 0, "blue").flatMap((part) => footprintsOf([part]))
+      const touching = shapes.flatMap((a, i) => shapes.slice(i + 1).filter((b) => crowds(a, b, 0)))
+      expect(touching).toEqual([])
+    })
+})
 
 describe("a gen 2 island's buildings", () => {
-  for (const [name, world] of WORLDS) {
+  for (const [name, world] of gen2Worlds()) {
     const decor = world.island.decor
     const town = decor.filter((item) => TOWN.test(item.piece))
     const civic = decor.filter((item) => CIVIC.test(item.piece))
@@ -120,6 +116,19 @@ describe("a gen 2 island's buildings", () => {
           const [a, b] = [homes[i] as LandPlacement, homes[j] as LandPlacement]
           if (Math.hypot(a.x - b.x, a.z - b.z) < 10 && crowds(one(a), one(b), 0))
             crowded.push(`${a.x},${a.z} / ${b.x},${b.z}`)
+        }
+      expect(crowded).toEqual([])
+    })
+
+    test(`${name}: no two buildings overlap, venues included (the wall's own run apart)`, () => {
+      const built = decor.filter((item) => footprintsOf([item]).length > 0)
+      const crowded: string[] = []
+      for (let i = 0; i < built.length; i++)
+        for (let j = i + 1; j < built.length; j++) {
+          const [a, b] = [built[i] as LandPlacement, built[j] as LandPlacement]
+          if (RUN.test(a.piece) && RUN.test(b.piece)) continue
+          if (Math.hypot(a.x - b.x, a.z - b.z) < 16 && crowds(one(a), one(b), 0))
+            crowded.push(`${a.piece}@${a.x},${a.z} / ${b.piece}@${b.x},${b.z}`)
         }
       expect(crowded).toEqual([])
     })

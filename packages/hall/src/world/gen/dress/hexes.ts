@@ -1,10 +1,12 @@
 import { type Cell, cellToWorld, type Field, type LandPiece, type LandPlacement } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
+import { instantiate } from "../../prefabs/index.ts"
 import { key, neighbours, rings, step } from "../hex.ts"
 import type { IslandPlan } from "../plan.ts"
 import { COAST_TILES, fit, PATH_TILES, turn } from "../tiles.ts"
 import { facing, round, siteDressing } from "./sites.ts"
 import type { Terrace } from "./terrace.ts"
+import type { Lot } from "./town.ts"
 
 /** Height of one terrace (lands.ts TERRACE at HEX_SCALE 5). */
 const TERRACE = 2.5
@@ -24,6 +26,7 @@ export function dressHexes(
   links: ReadonlyMap<string, ReadonlySet<number>>,
   terrace: Terrace,
   random: () => number,
+  lots?: ReadonlyMap<string, Lot>,
 ): DressedHexes {
   const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)] as T
   const spin = (): number => turn(Math.floor(random() * 6))
@@ -185,6 +188,12 @@ export function dressHexes(
           }
           break
         case "v": {
+          // Generator v2: a lot from the prefab catalogue (dress/town.ts), in the district's colour.
+          const lot = lots?.get(key(cell))
+          if (lot) {
+            decor.push(...instantiate(lot.prefab, [x, z], lot.rot, kit, lift))
+            break
+          }
           // A home in the district's colour, its door to the nearest road (or its square).
           const road = neighbours(cell).find((next) => at(next) === "=")
           const look = road ? cellToWorld(road) : square

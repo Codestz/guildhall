@@ -1,11 +1,13 @@
 import { cellToWorld, type Island, type LandPiece } from "../lands.ts"
 import type { Post, Spot } from "../layout.ts"
 import type { Biome, Language } from "./biomes.ts"
+import { type Civic, civicOf, type Fame } from "./dress/civic.ts"
 import { dressHexes } from "./dress/hexes.ts"
 import { dressRoads } from "./dress/roads.ts"
 import { LANDMARK, landmarksOf, postsAround, quayOf } from "./dress/sites.ts"
 import { terraceOf } from "./dress/terrace.ts"
-import { key, rng } from "./hex.ts"
+import { type Lot, townOf } from "./dress/town.ts"
+import { key, rng, unkey } from "./hex.ts"
 import type { IslandPlan } from "./plan.ts"
 
 /**
@@ -48,11 +50,32 @@ export interface RepoIsland {
   districts: District[]
 }
 
-export function dress(plan: IslandPlan): RepoIsland {
+/** Lots the civic centre or its wall stands on are dropped. */
+function clearLots(lots: Map<string, Lot>, civic: Civic): void {
+  for (const id of [...lots.keys()]) {
+    const [x, z] = cellToWorld(unkey(id))
+    const crowded =
+      civic.clear.some(([cx, cz, r]) => Math.hypot(x - cx, z - cz) < r + 4) ||
+      civic.wall.some(([wx, wz]) => Math.hypot(x - wx, z - wz) < 7)
+    if (crowded) lots.delete(id)
+  }
+}
+
+export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
   const random = rng(plan.seed ^ 0x9e3779b9)
   const roads = dressRoads(plan)
   const terrace = terraceOf(plan, (cell) => !plan.land.has(key(cell)))
-  const { tiles, decor, water, meadow, fields } = dressHexes(plan, roads.links, terrace, random)
+  // Generator v2: towns and a civic centre from the prefab catalogue (dress/town.ts, dress/civic.ts).
+  const civic = plan.gen === 2 ? civicOf(plan, fame) : undefined
+  const town = plan.gen === 2 ? townOf(plan, roads.links) : undefined
+  if (town && civic) clearLots(town.lots, civic)
+  const { tiles, decor, water, meadow, fields } = dressHexes(plan, roads.links, terrace, random, town?.lots)
+  if (town && civic) {
+    decor.push(...town.plazas, ...civic.placements)
+    const open = (spot: Spot): boolean =>
+      civic.clear.every(([x, z, r]) => Math.hypot(spot[0] - x, spot[1] - z) > r)
+    meadow.splice(0, meadow.length, ...meadow.filter(open))
+  }
   decor.push(...quayOf(plan.hub))
   const landmarks = landmarksOf(plan.hub, decor)
 

@@ -68,6 +68,8 @@ export interface IslandPlan {
   radius: number
   /** Generator v2: the mountain ranges' reserved ground, main range first, as hex keys (none in v1). */
   ranges: ReadonlySet<string>[]
+  /** Generator v2 only: its towns and civic centre are dressed from the prefab catalogue. */
+  gen?: 2
 }
 
 /** Land ∝ code size, log-scaled: 1 KB ≈ 7 hexes, 100 KB ≈ 25, 10 MB ≈ 47. */
@@ -170,5 +172,17 @@ export function planIsland(
   const sites = placeSites(districts, owner, road, seed)
   const land = groundOf(districts, owner, road, sites, seed, mountains, Boolean(form.mass))
   const ranges = reserved.map((range) => new Set([...range].filter((id) => land.has(id))))
-  return { hash: shape.hash, seed, land, districts, roads, hub: HUB, quay: QUAY, gate: GATE, radius, ranges }
+  return {
+    hash: shape.hash,
+    seed,
+    land,
+    districts,
+    roads,
+    hub: HUB,
+    quay: QUAY,
+    gate: GATE,
+    radius,
+    ranges,
+    ...(form.mass ? { gen: 2 as const } : {}),
+  }
 }

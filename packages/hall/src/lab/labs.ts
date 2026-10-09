@@ -10,6 +10,7 @@
  *   ?lab=crowd&n=300 (&compare=1)               the baked-bone crowd: a field of n, or one beside a real rig
  *   ?lab=water&hour=18.5 (&look=falls)          rivers, a lake and waterfalls on a terraced patch
  *   ?lab=relief&repo=facebook/react (&light=dusk)  a gen 2 island's massifs: noon or dusk, snow line, growth rise
+ *   ?lab=prefabs (&only=castle &hour=11)        every prefab (world/prefabs) on a hex grid, named, turning slowly
  *
  * Each lab hangs its levers on `window.lab`. A new lab: a module with `start(root, params)`, and a
  * line here.
@@ -23,6 +24,7 @@ export const LABS = {
   island: () => import("./islandLab.ts"),
   water: () => import("./waterLab.tsx"),
   relief: () => import("./reliefLab.ts"),
+  prefabs: () => import("./prefabLab.ts"),
 } satisfies Record<string, () => Promise<{ start(root: HTMLElement, params: URLSearchParams): unknown }>>
 
 export type LabName = keyof typeof LABS

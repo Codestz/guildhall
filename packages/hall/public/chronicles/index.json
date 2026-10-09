@@ -1,0 +1,75 @@
+{
+  "v": 1,
+  "updated": "2026-10-09",
+  "repos": [
+    {
+      "repo": "react/react",
+      "description": "The library for web and native user interfaces.",
+      "stars": 250753,
+      "languages": ["JavaScript", "Rust", "TypeScript"],
+      "years": [2013, 2026],
+      "files": 7252,
+      "bytes": 40629727,
+      "built": "2026-10-09"
+    },
+    {
+      "repo": "anomalyco/opencode",
+      "description": "The open source coding agent.",
+      "stars": 212206,
+      "languages": ["TypeScript", "MDX", "CSS"],
+      "years": [2025, 2026],
+      "files": 6630,
+      "bytes": 124355822,
+      "built": "2026-10-09"
+    },
+    {
+      "repo": "Codestz/claude-hindsight",
+      "description": "Claude Hindsight is a powerful observability tool for Claude Code that transforms raw JSONL transcripts into beautiful, interactive visualizations. Debug sessions, optimize costs, and understand Clau…",
+      "stars": 21,
+      "languages": ["Rust", "TypeScript", "Astro"],
+      "years": [2026, 2026],
+      "files": 352,
+      "bytes": 2446013,
+      "built": "2026-10-09"
+    },
+    {
+      "repo": "Codestz/mcpx",
+      "description": "MCP servers as CLI tools — built for AI agents",
+      "stars": 13,
+      "languages": ["Go", "Vue", "CSS"],
+      "years": [2026, 2026],
+      "files": 147,
+      "bytes": 753993,
+      "built": "2026-10-09"
+    },
+    {
+      "repo": "Codestz/opencode-cockpit",
+      "description": "OpenCode superpowers: background shells the agent can start, wait on and drive, with a docked TUI panel",
+      "stars": 4,
+      "languages": ["TypeScript", "MDX", "CSS"],
+      "years": [2026, 2026],
+      "files": 784,
+      "bytes": 9485417,
+      "built": "2026-10-09"
+    },
+    {
+      "repo": "Codestz/guildhall",
+      "description": "Watch AI coding agents work as a living guild: a 3D live visualizer and agent harness for OpenCode.",
+      "stars": 0,
+      "languages": ["TypeScript", "CSS", "HTML"],
+      "years": [2026, 2026],
+      "files": 495,
+      "bytes": 24513664,
+      "built": "2026-10-09"
+    },
+    {
+      "repo": "Codestz/Mintroot",
+      "stars": 0,
+      "languages": ["Kotlin"],
+      "years": [2026, 2026],
+      "files": 199,
+      "bytes": 3318678,
+      "built": "2026-10-09"
+    }
+  ]
+}

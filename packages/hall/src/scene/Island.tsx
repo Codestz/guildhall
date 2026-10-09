@@ -17,8 +17,10 @@ import { useGuild } from "../guild/useGuild.ts"
 import { isWebGPU } from "../render/backend.ts"
 import { bakeStatic } from "../render/bake.ts"
 import { LANDS_URL } from "../world/cast.ts"
+import { roleOf } from "../world/chronicle/growthPieces.ts"
 import { HEX_SCALE, type LandPiece, type LandPlacement, SITES, yardBuilding } from "../world/lands.ts"
 import { useWorld, useWorldReady } from "../world/source.ts"
+import { markGrowable, useGrowable } from "./growth/registry.ts"
 import { plain } from "./Kit.tsx"
 import { isMovingPart } from "./life/moving.ts"
 import { useOwnedMeshes } from "./owned.ts"
@@ -51,6 +53,8 @@ export function Island() {
     [nodes, land, webgpu],
     "materials",
   )
+  // The growth timelapse (`?grow`) rides these instances up out of the sea (scene/growth).
+  useGrowable(built?.meshes)
   const building = yardBuilding(progress)
   const yard = SITES.yard.at
 
@@ -199,6 +203,7 @@ function batch(
     for (const { geometry, placement } of group.instances) {
       const id = mesh.addInstance(group.geometries.get(geometry) ?? 0)
       mesh.setMatrixAt(id, place(placement))
+      markGrowable(mesh, id, roleOf(placement.piece), placement.x, placement.z)
     }
     // Opaque and depth-tested: sorting would only cost CPU every frame. Culling stays on.
     mesh.sortObjects = false

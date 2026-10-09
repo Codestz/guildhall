@@ -31,6 +31,7 @@ import { useWorld } from "../../world/source.ts"
 import { handWorld, type World } from "../../world/world.ts"
 import { sky } from "../atmosphere/state.ts"
 import { wind } from "../atmosphere/wind.ts"
+import { riseGrass, useRiseMask } from "../growth/mask.ts"
 import { useOwnedMeshes } from "../owned.ts"
 import { installNodes, TSL } from "../tsl.ts"
 import { FLOWERS, scatter, type Tuft } from "./scatter.ts"
@@ -57,14 +58,18 @@ export function Grass({ tier }: { tier: Tier }) {
   // The node materials' shadow is the key light's own (grassNodes.ts): found once it has a map.
   const [key, setKey] = useState<DirectionalLight | null>(null)
   // Geometry, materials and meshes are this mount's own (scene/owned.ts); the palette is the land's.
+  // The growth timelapse (`?grow`): tufts grow with their hex's land (scene/growth/mask.ts).
+  const rise = useRiseMask()
   const built = useOwnedMeshes(
     () => {
       if (DENSITY[tier] === 0) return { meshes: [], uniforms: null }
       const uniforms = grassUniforms(paletteOf(nodes))
-      const meshes = meadow({ tuft: tuft(), flower: flower() }, build(uniforms, key), DENSITY[tier], world)
+      const materials = build(uniforms, key)
+      if (rise && !node) riseGrass([materials.tuft, materials.flower], rise)
+      const meshes = meadow({ tuft: tuft(), flower: flower() }, materials, DENSITY[tier], world)
       return { meshes, uniforms }
     },
-    [nodes, tier, world, build, key],
+    [nodes, tier, world, build, key, rise, node],
     "textures",
   )
   const eased = useMemo(() => ({ snow: 0, wet: 0 }), [])

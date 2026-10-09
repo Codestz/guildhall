@@ -24,6 +24,7 @@ import { Settings } from "./Settings.tsx"
 import { SoundToggle, useSoundWaiting } from "./Sound.tsx"
 import { Stats } from "./Stats.tsx"
 import { Timeline } from "./Timeline.tsx"
+import { TimelineGrowth, useGrowthPhase } from "./TimelineGrowth.tsx"
 
 const PHONE = "(max-width: 720px)"
 /** The showcase's opening caption speaks first: story captions start this long after the HUD lands. */
@@ -79,6 +80,7 @@ export function Hud() {
   const dossier = mode !== "hidden" && Boolean(store.selected && store.sessionOf(store.selected))
   const pleas = store.views.filter((v) => v.phase === "waiting").length
   const showcase = MODE === "showcase"
+  const film = useGrowthPhase() !== "off"
   const tape = !showcase && store.mode === "sim"
   const hidden = mode === "hidden"
 
@@ -341,13 +343,15 @@ export function Hud() {
           {!open.chronicle && (
             <Toasts store={store} onExpand={() => toggle("chronicle")} quiet={prefs.captions} />
           )}
-          {tape && <Timeline store={store} pinned={mode === "detailed"} />}
+          {tape && !film && <Timeline store={store} pinned={mode === "detailed"} />}
           {showcase && <ChapterChip store={store} />}
         </>
       )}
 
       <FastForward store={store} />
       {door && <RepoDoor />}
+      {/* A repo's growth timelapse (`?grow`): its tape and milestones own the bottom while it plays. */}
+      <TimelineGrowth hidden={hidden} />
 
       {prefs.captions && (
         <Captions

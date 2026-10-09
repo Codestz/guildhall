@@ -1,6 +1,10 @@
+import { growth } from "../world/chronicle/growthControl.ts"
 import { useWorld, useWorldStatus } from "../world/source.ts"
+import { deepenLink } from "./chronicleLinks.ts"
 import { Icon } from "./icons.tsx"
 import { repoDoor } from "./RepoDoor.tsx"
+import { useGrowthPhase } from "./TimelineGrowth.tsx"
+import { useDeepChronicle } from "./useCatalog.ts"
 
 /** How each biome reads in the legend. */
 const BIOME: Record<string, string> = {
@@ -17,11 +21,14 @@ const BIOME: Record<string, string> = {
 /**
  * `?repo=` (world/source.ts): which repo the island was grown from and its districts — one per
  * top-level folder, coloured by its main language — or why it couldn't be grown (the guild's own
- * island is shown instead). Nothing without `?repo=`.
+ * island is shown instead). Nothing without `?repo=`. An island whose history is only a quick sketch
+ * (no deep chronicle in world/chronicle/catalog.ts) offers "Deepen this island": a request on GitHub.
  */
 export function RepoLegend() {
   const status = useWorldStatus()
   const { repo } = useWorld()
+  const filming = useGrowthPhase()
+  const deep = useDeepChronicle(repo?.repo)
 
   if (status.state === "loading")
     return (
@@ -63,6 +70,25 @@ export function RepoLegend() {
         {files.toLocaleString("en")} files · {repo.districts.length} districts
         {repo.truncated ? " · partial tree" : ""}
       </p>
+      {/* Its history as a timelapse, first commit to today (`?grow`, scene/growth). */}
+      {filming !== "playing" && filming !== "paused" && (
+        <button type="button" className="repo-again" onClick={() => growth.request(repo.repo)}>
+          <Icon.play />
+          Watch it grow
+        </button>
+      )}
+      {deep === false && (
+        <a
+          className="repo-again"
+          href={deepenLink(repo.repo)}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Its history here is a quick sketch. Ask for the whole of it (opens a GitHub issue)"
+        >
+          <Icon.book />
+          Deepen this island
+        </a>
+      )}
       <ul className="repo-districts">
         {repo.districts.map((district) => (
           <li key={district.id}>

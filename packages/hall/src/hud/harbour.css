@@ -1,0 +1,398 @@
+/*
+ * The Harbour (harbour.html): the chronicled repos as a ledger of moorings. Tokens and frame mirror
+ * how/how.css (and through it hall.css' :root): ink plaques, paper text, brass hairlines. Neither
+ * sheet is loaded here, so the page stays a few kilobytes.
+ */
+
+:root {
+  --ink-solid: #15110d;
+  --ink: #1d1712;
+  --raise: rgba(255, 238, 205, 0.05);
+  --raise-2: rgba(255, 238, 205, 0.09);
+  --hair: rgba(243, 233, 212, 0.1);
+  --hair-2: rgba(243, 233, 212, 0.16);
+  --paper: #f3e9d4;
+  --muted: #cdbfa3;
+  --faint: #ab9e85;
+  --brass: #dcb662;
+  --brass-hi: #f1d590;
+  --brass-line: rgba(220, 182, 98, 0.34);
+  --brass-wash: rgba(220, 182, 98, 0.16);
+  --display: "Marcellus SC", "Cormorant SC", Georgia, serif;
+  --body: "Alegreya Sans", "Gill Sans", "Trebuchet MS", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --r: 7px;
+  --r-sm: 5px;
+  --gut: 16px;
+  --col: 1040px;
+
+  color-scheme: dark;
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--paper);
+  background: var(--ink-solid);
+  -webkit-font-smoothing: antialiased;
+  text-size-adjust: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 520px at 50% -180px, rgba(220, 182, 98, 0.09), transparent 70%), var(--ink-solid);
+}
+:focus-visible {
+  outline: 2px solid var(--brass-hi);
+  outline-offset: 3px;
+  border-radius: var(--r-sm);
+}
+a {
+  color: var(--brass-hi);
+  text-decoration: underline;
+  text-decoration-color: var(--brass-line);
+  text-underline-offset: 3px;
+}
+a:hover {
+  color: var(--paper);
+  text-decoration-color: currentColor;
+}
+.skip {
+  position: absolute;
+  left: var(--gut);
+  top: -60px;
+  z-index: 5;
+  padding: 8px 14px;
+  background: var(--ink);
+  border: 1px solid var(--brass-line);
+  border-radius: var(--r-sm);
+}
+.skip:focus {
+  top: var(--gut);
+}
+
+/* ───────────── frame ───────────── */
+
+.top,
+main,
+.foot {
+  width: 100%;
+  max-width: calc(var(--col) + 2 * var(--gut));
+  margin: 0 auto;
+  padding: 0 var(--gut);
+}
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 20px;
+}
+.home {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  color: var(--paper);
+  text-decoration: none;
+  font-family: var(--display);
+  font-size: 18px;
+  letter-spacing: 0.04em;
+}
+.crest {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--brass-hi);
+  border: 1px solid var(--brass-line);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, rgba(220, 182, 98, 0.18), transparent 70%);
+}
+.top-links {
+  display: flex;
+  gap: 18px;
+  font-size: 15px;
+}
+.top-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* ───────────── hero ───────────── */
+
+.hero {
+  max-width: 720px;
+  padding: 56px 0 8px;
+}
+.eyebrow {
+  margin: 0 0 10px;
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  color: var(--brass);
+}
+h1,
+h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+h1 {
+  font-size: clamp(34px, 6vw, 52px);
+}
+.rule {
+  display: block;
+  width: 72px;
+  height: 1px;
+  margin: 22px 0;
+  background: linear-gradient(90deg, var(--brass), transparent);
+}
+.lede {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 19px;
+  color: var(--muted);
+}
+
+/* ───────────── the voyage bar: sticky, so Sail is in reach after scrolling the list ───────────── */
+
+.voyage {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 32px calc(-1 * var(--gut)) 0;
+  padding: 12px var(--gut);
+  background: color-mix(in srgb, var(--ink-solid) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--hair);
+}
+.voyage-count {
+  margin: 0;
+  font-size: 15px;
+  color: var(--muted);
+}
+.sail {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px 0 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--brass);
+  background: var(--brass-wash);
+  color: var(--brass-hi);
+  font-weight: 500;
+  text-decoration: none;
+}
+.sail:hover {
+  background: rgba(220, 182, 98, 0.26);
+  color: var(--paper);
+}
+.sail[aria-disabled="true"] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ───────────── moorings ───────────── */
+
+.moorings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.mooring {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px 14px;
+  border-radius: var(--r);
+  border: 1px solid var(--hair-2);
+  background: linear-gradient(180deg, var(--raise), transparent 70%), var(--ink);
+}
+.mooring:has(input:checked) {
+  border-color: var(--brass);
+  box-shadow: inset 0 0 0 1px var(--brass-line);
+}
+.mooring-name {
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+.mooring-owner {
+  color: var(--faint);
+}
+.mooring-about {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.mooring-facts {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--brass-hi);
+}
+.mooring-langs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mooring-langs li {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--hair-2);
+  font-size: 13px;
+  color: var(--muted);
+}
+.mooring-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+.mooring-open {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--brass-line);
+  background: var(--raise);
+  color: var(--paper);
+  font-weight: 500;
+  text-decoration: none;
+}
+.mooring-open:hover {
+  background: var(--raise-2);
+  border-color: var(--brass);
+}
+.mooring-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  font-size: 14px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.mooring-pick input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--brass);
+}
+.mooring-pick:has(input:disabled) {
+  opacity: 0.45;
+  cursor: default;
+}
+.mooring-built {
+  margin: 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* ───────────── ask, source, foot ───────────── */
+
+.ask {
+  margin: 40px 0 0;
+  padding: 20px 22px;
+  border-radius: var(--r);
+  border: 1px solid var(--brass-line);
+  background: var(--ink);
+}
+.ask h2 {
+  font-size: 24px;
+}
+.ask p {
+  max-width: 62ch;
+  margin: 8px 0 12px;
+  color: var(--muted);
+}
+.ask-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 500;
+}
+.source {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--faint);
+}
+.foot {
+  margin-top: 64px;
+  padding-bottom: 48px;
+}
+.foot-inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 24px;
+  border-top: 1px solid var(--hair);
+  font-size: 15px;
+  color: var(--faint);
+}
+.foot-inner p {
+  margin: 0;
+}
+.foot-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+@media (max-width: 560px) {
+  .hero {
+    padding-top: 36px;
+  }
+  .lede {
+    font-size: 17px;
+  }
+  .top-links .wide {
+    display: none;
+  }
+  .voyage-count {
+    font-size: 13.5px;
+  }
+  .moorings {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sail,
+  .mooring-open,
+  .mooring {
+    transition:
+      background 0.15s ease,
+      border-color 0.15s ease;
+  }
+}

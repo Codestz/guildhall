@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Harbour · Guildhall</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Marcellus+SC&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <meta name="theme-color" content="#15110d" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="canonical" href="https://guildhall.codestz.dev/harbour" />
+    <meta name="description" content="The Harbour: every repo whose whole history Guildhall has chronicled. Open one to watch it grow from its first commit, or sail several as an archipelago." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Guildhall" />
+    <meta property="og:url" content="https://guildhall.codestz.dev/harbour" />
+    <meta property="og:title" content="The Harbour · Guildhall" />
+    <meta property="og:description" content="Repos chronicled from their first commit, each a voxel island you can watch grow. Sail them as an archipelago." />
+    <meta property="og:image" content="https://guildhall.codestz.dev/og.png" />
+    <meta property="og:image:alt" content="A voxel island at golden hour, its guildhall lit by a fire, with the title Guildhall." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="stylesheet" href="/src/hud/harbour.css" />
+    <script type="module" src="/src/hud/harbour.ts"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to the islands</a>
+
+    <header class="top">
+      <a class="home" href="/" aria-label="Guildhall: back to the island">
+        <span class="crest" aria-hidden="true">
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+            <path d="M8 1.5 13.5 4v4.2c0 3-2.3 5.3-5.5 6.3-3.2-1-5.5-3.3-5.5-6.3V4z" />
+            <path d="M5.2 9.5V7.2L8 5.4l2.8 1.8v2.3" />
+            <path d="M6.6 9.5V8.3h2.8v1.2" />
+          </svg>
+        </span>
+        Guildhall
+      </a>
+      <nav class="top-links" aria-label="Site">
+        <a href="/">Visit the guild</a>
+        <a class="wide" href="/how">How it's built</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <div class="hero">
+        <p class="eyebrow">The Harbour</p>
+        <h1>Repos chronicled from their first commit</h1>
+        <span class="rule" aria-hidden="true"></span>
+        <p class="lede">
+          Every repo moored here has had its whole history read: each folder a district, each release a
+          milestone, each contributor a townsfolk. Open one to watch it grow, or choose up to six and sail
+          them as an archipelago.
+        </p>
+      </div>
+
+      <section class="voyage" aria-label="Voyage">
+        <p class="voyage-count" id="voyage-count" aria-live="polite">Reading the harbour's ledger…</p>
+        <a class="sail" id="sail" href="/" aria-disabled="true">
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+            <path d="M8 2v9M8 2l4.5 8H8M2.5 12.5h11l-1.5 2h-8z" />
+          </svg>
+          <span id="sail-label">Sail them all</span>
+        </a>
+      </section>
+
+      <ul class="moorings" id="moorings" aria-label="Chronicled repos"></ul>
+
+      <div class="plaque ask">
+        <h2>Moor your own</h2>
+        <p>
+          Any public repo can be chronicled: ask on GitHub with its name, and a build reads its history
+          (counts and folder names only, never its code). It lands here when it's done.
+        </p>
+        <a class="ask-link" id="ask" href="https://github.com/Codestz/guildhall-chronicles/issues/new?template=chronicle.yml" target="_blank" rel="noopener noreferrer">Ask for a chronicle</a>
+      </div>
+      <p class="source" id="source"></p>
+    </main>
+
+    <footer class="foot">
+      <div class="foot-inner">
+        <p>Guildhall · MIT · built with three.js and React Three Fiber.</p>
+        <nav class="foot-links" aria-label="More">
+          <a href="/">Visit the guild</a>
+          <a href="https://github.com/Codestz/guildhall-chronicles">Chronicles on GitHub</a>
+          <a href="https://github.com/Codestz/guildhall">Source on GitHub</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

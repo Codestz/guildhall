@@ -43,6 +43,7 @@ import { reachOf, type World } from "../../world/world.ts"
 import { useLooks } from "../atmosphere/looks.ts"
 import { sky } from "../atmosphere/state.ts"
 import { wind } from "../atmosphere/wind.ts"
+import { riseWater, useRiseMask } from "../growth/mask.ts"
 import { installNodes, TSL } from "../tsl.ts"
 import { EASE, targetOf } from "../weather/shared.ts"
 import { noiseTexture } from "./noise.ts"
@@ -109,12 +110,15 @@ export function Water({ tier, at }: { tier: Tier; at?: Spot }) {
   // never reaches WebGPU's bindings): built once without it, once more when the bake lands.
   const [baked, setBaked] = useState<{ world: World; shore: Shore } | null>(null)
   const shore = node && baked?.world === world ? baked.shore : null
+  // The growth timelapse (`?grow`): only the land up so far has a shore (scene/growth/mask.ts).
+  const rise = useRiseMask(Boolean(at))
   const { material, uniforms } = useMemo(() => {
     const built = build(tier === 0, v2, key, shore)
     built.uniforms.uShoreHalf.value = layout.half
     if (at) built.uniforms.uShoreAt.value.set(at[0], at[1])
+    if (rise && !node) riseWater(built.material, rise)
     return built
-  }, [build, tier, v2, key, shore, layout, at])
+  }, [build, tier, v2, key, shore, layout, at, rise, node])
   const flames = useMemo(() => watersideOf(world, at), [world, at])
   const eased = useMemo(() => ({ rain: 0, gloom: 0, cloud: 0, pick: 0, caustics: 0 }), [])
   const still = useMemo(reducedMotion, [])

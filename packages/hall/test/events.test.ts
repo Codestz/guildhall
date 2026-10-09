@@ -688,7 +688,12 @@ describe("events: lazy, nothing when idle", () => {
     for (const file of walk(root)) {
       if (file.startsWith(dir)) continue
       const source = readFileSync(file, "utf8")
-      for (const scene of scenes) expect(source).not.toContain(`events/${scene}`)
+      // A static import (`from "…/events/Dragon.tsx"` or a bare `import "…"`) would pull the scene into
+      // the main bundle; a dynamic `import("…")` keeps it lazy and is fine.
+      for (const scene of scenes) {
+        const statically = new RegExp(`(from\\s+|^import\\s+)["'][^"']*events/${scene}`, "m")
+        expect(statically.test(source)).toBe(false)
+      }
     }
   })
 

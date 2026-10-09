@@ -4592,6 +4592,10 @@ button {
   opacity: 0.5;
   cursor: default;
 }
+/* "Deepen this island" is a link (a new tab), dressed as its neighbours */
+a.door-act {
+  text-decoration: none;
+}
 .door-fine {
   flex-basis: 100%;
   margin: 2px 0 0;

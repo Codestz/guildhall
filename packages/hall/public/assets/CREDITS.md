@@ -13,3 +13,5 @@ Sound effects in `public/audio/` by **Kenney** — [kenney.nl](https://kenney.nl
 notes and the ambience are synthesized in the browser (`src/audio/`).
 
 Ships and the release galleon's pennant: **Kenney** — [Pirate Kit](https://kenney.nl/assets/pirate-kit), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+
+The growth timelapse's scaffolds, planks and tents (`growth.glb`): **Kenney** — [Survival Kit](https://kenney.nl/assets/survival-kit), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).

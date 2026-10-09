@@ -1,0 +1,150 @@
+/*
+ * The growth timelapse's tape and captions (hud/TimelineGrowth.tsx, ADR 0010). Built on hall.css'
+ * tokens and pieces (.plaque, .play, .track, .beat, .story-line[data-kind="chapter"]); only the
+ * layout is its own. Desktop: one row, bottom centre. Phones: two rows, edge to edge in the gutter.
+ */
+
+.hud > .growth-tape {
+  position: absolute;
+  left: 50%;
+  bottom: var(--gut);
+  width: min(720px, calc(100% - 2 * var(--gut)));
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: auto minmax(128px, auto) 1fr auto auto;
+  align-items: center;
+  gap: var(--s3);
+  min-height: var(--tape-h);
+  padding: 8px 10px 8px 10px;
+  z-index: 2;
+}
+.growth-when {
+  display: grid;
+  min-width: 0;
+  line-height: 1.15;
+}
+.growth-date {
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--brass-hi);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.growth-count {
+  font-size: 11.5px;
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.growth-track {
+  min-width: 0;
+}
+.growth-speed {
+  min-width: 40px;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--brass-line);
+  background: var(--raise);
+  color: var(--paper);
+  font-size: 12.5px;
+}
+.growth-speed:hover {
+  background: var(--raise-2);
+  border-color: var(--brass);
+}
+.growth-close {
+  width: 32px;
+  height: 32px;
+  color: var(--muted);
+}
+.hud > .growth-tape.growth-note {
+  grid-template-columns: 1fr auto;
+  font-size: 13.5px;
+  color: var(--muted);
+  padding-left: 16px;
+}
+
+/* the milestone above the tape, in the title card's look, a size down */
+.hud > .story.growth-story {
+  --story-bottom: calc(var(--gut) + var(--tape-h) + 22px);
+  width: min(760px, calc(100% - 2 * var(--gut)));
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+}
+.hud[data-mode="hidden"] > .story.growth-story {
+  --story-bottom: calc(var(--gut) + 24px);
+}
+.story-line.growth-line span {
+  font-size: 23px;
+  overflow-wrap: anywhere;
+}
+.story-line.growth-line em {
+  font-size: 15px;
+}
+
+@media (max-width: 720px) {
+  .hud > .growth-tape {
+    left: var(--gut);
+    right: var(--gut);
+    width: auto;
+    transform: none;
+    bottom: calc(var(--gut) + env(safe-area-inset-bottom));
+    grid-template-columns: auto 1fr auto auto;
+    grid-template-areas:
+      "play when speed close"
+      "track track track track";
+    row-gap: 4px;
+    padding: 8px 8px 6px 10px;
+  }
+  .growth-tape > .play {
+    grid-area: play;
+  }
+  .growth-tape > .growth-when {
+    grid-area: when;
+  }
+  .growth-count {
+    font-size: 10.5px;
+  }
+  .growth-tape > .growth-track {
+    grid-area: track;
+  }
+  .growth-tape > .growth-speed {
+    grid-area: speed;
+    min-height: 38px;
+  }
+  .growth-tape > .growth-close {
+    grid-area: close;
+    width: 38px;
+    height: 38px;
+  }
+  .hud > .growth-tape.growth-note {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: none;
+  }
+  .hud > .story.growth-story {
+    left: var(--gut);
+    right: var(--gut);
+    width: auto;
+    transform: none;
+    --story-bottom: calc(var(--gut) + 112px + env(safe-area-inset-bottom));
+  }
+  .story-line.growth-line {
+    padding: 9px 16px 10px;
+  }
+  .story-line.growth-line span {
+    font-size: 18px;
+  }
+  .story-line.growth-line em {
+    font-size: 13.5px;
+  }
+  /* the film owns the bottom: the toasts fold away while it plays */
+  .hud:has(> .growth-tape) .toasts {
+    display: none;
+  }
+}

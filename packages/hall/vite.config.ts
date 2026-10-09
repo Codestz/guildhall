@@ -4,26 +4,27 @@ import { type Connect, defineConfig, type Plugin } from "vite"
 
 const page = (name: string) => fileURLToPath(new URL(name, import.meta.url))
 
-/** `/how` serves how.html in dev and preview, as vercel.json's rewrite does on the site. */
-function cleanHow(): Plugin {
+/** `/how` and `/harbour` serve their .html in dev and preview, as vercel.json's rewrites do on the site. */
+function cleanPages(): Plugin {
   const rewrite: Connect.NextHandleFunction = (req, _res, next) => {
-    const clean = /^\/how\/?(\?.*)?$/.exec(req.url ?? "")
-    if (clean) req.url = `/how.html${clean[1] ?? ""}`
+    const clean = /^\/(how|harbour)\/?(\?.*)?$/.exec(req.url ?? "")
+    if (clean) req.url = `/${clean[1]}.html${clean[2] ?? ""}`
     next()
   }
   return {
-    name: "guildhall-clean-how",
+    name: "guildhall-clean-pages",
     configureServer: (server) => void server.middlewares.use(rewrite),
     configurePreviewServer: (server) => void server.middlewares.use(rewrite),
   }
 }
 
 export default defineConfig({
-  plugins: [react(), cleanHow()],
+  plugins: [react(), cleanPages()],
   build: {
     rollupOptions: {
-      // The hall, and the "How it's built" page (/how): a static long read with no app code.
-      input: { main: page("index.html"), how: page("how.html") },
+      // The hall; the "How it's built" page (/how), a static long read with no app code; and the
+      // Harbour (/harbour), the chronicled repos, a few kilobytes of plain DOM (hud/harbour.ts).
+      input: { main: page("index.html"), how: page("how.html"), harbour: page("harbour.html") },
     },
   },
 })

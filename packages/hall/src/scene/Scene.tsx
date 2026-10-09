@@ -26,6 +26,7 @@ import { Exits } from "./exits.ts"
 import { FrameStats } from "./FrameStats.tsx"
 import { FRAME } from "./frame.ts"
 import { Graveyard } from "./Graveyard.tsx"
+import { Growth, useGrowing } from "./growth/Growth.tsx"
 import { Island } from "./Island.tsx"
 import { Life } from "./life/Life.tsx"
 import { AFTER_POSE } from "./lights/carried.ts"
@@ -53,6 +54,8 @@ import { WeatherLayer } from "./weather/WeatherLayer.tsx"
  */
 export function Scene() {
   const hand = useWorld().kind === "hand"
+  // A growth timelapse (`?grow`, scene/growth) holds the island: what lives on today's waits for it.
+  const today = !useGrowing()
   return (
     <Quality>
       <Clock />
@@ -72,17 +75,17 @@ export function Scene() {
             <UndeadGate />
           </>
         )}
-        <StreetLights />
-        <NearLights />
-        <NightLife />
+        {today && <StreetLights />}
+        {today && <NearLights />}
+        {today && <NightLife />}
         <Nature />
-        <Life />
+        {today && <Life />}
         <Room />
-        <Stations />
-        <Cast />
-        <Blobs />
+        {today && <Stations />}
+        {today && <Cast />}
+        {today && <Blobs />}
         {/* What everyone is doing, as an icon over their head: readable with the HUD hidden. */}
-        <Sigils />
+        {today && <Sigils />}
         <WorldReady />
         {/* Showcase: mounts with the world, then lifts the title card (guild/opening.ts). */}
         {MODE === "showcase" && <OpeningCue />}
@@ -97,6 +100,7 @@ export function Scene() {
       <Archipelago />
       {/* Secret world events (guild/events.ts): nothing when idle; each event's code loads on first need. */}
       <EventsLayer />
+      <Growth />
       <WeatherLayer />
       <CameraRig />
       <Post />

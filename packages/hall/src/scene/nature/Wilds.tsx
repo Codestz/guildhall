@@ -23,6 +23,7 @@ import { useWorld } from "../../world/source.ts"
 import { type Wild, type WildKind, type WildPiece, wilds, wildsOf } from "../../world/wilds.ts"
 import type { World } from "../../world/world.ts"
 import { wind } from "../atmosphere/wind.ts"
+import { markGrowable, useGrowable } from "../growth/registry.ts"
 import { plain } from "../Kit.tsx"
 import { PILES } from "../life/places.ts"
 import { ROUNDS } from "../life/rounds.ts"
@@ -86,6 +87,8 @@ export function Wilds({ tier }: { tier: Tier }) {
     [nodes, tier, all, sway, webgpu],
     "textures",
   )
+  // The growth timelapse (`?grow`) grows them once their land is up (scene/growth).
+  useGrowable(built?.meshes)
 
   return (
     <>
@@ -247,6 +250,7 @@ function build(
     for (const wild of group) {
       const id = mesh.addInstance(used.get(geometry(wild) as BufferGeometry) ?? 0)
       mesh.setMatrixAt(id, place(wild))
+      markGrowable(mesh, id, "nature", wild.x, wild.z)
     }
     mesh.name = name
     // Opaque and depth-tested: sorting would only cost CPU every frame. Culling stays on.

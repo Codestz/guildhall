@@ -4,7 +4,10 @@
   "buildCommand": "cd packages/hall && VITE_GUILDHALL_SHOWCASE=1 bunx vite build",
   "outputDirectory": "packages/hall/dist",
   "framework": null,
-  "rewrites": [{ "source": "/how", "destination": "/how.html" }],
+  "rewrites": [
+    { "source": "/how", "destination": "/how.html" },
+    { "source": "/harbour", "destination": "/harbour.html" }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)\\.(js|css)",

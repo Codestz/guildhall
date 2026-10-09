@@ -92,6 +92,9 @@ void main() {
 export const waterFragment = /* glsl */ `
 ${FRAGMENT_HEAD}
 uniform sampler2D uShore;
+#ifdef WATER_RISE
+uniform sampler2D uRise;
+#endif
 uniform sampler2D uNoise;
 uniform float uShoreHalf;
 /** Where the baked shore is centred: the origin, or a far island's keep (world/archipelago.ts). */
@@ -145,6 +148,12 @@ void main() {
   vec2 sp = p - uShoreAt;
   vec4 shore = texture2D(uShore, vec2(sp.x, -sp.y) / (2.0 * uShoreHalf) + 0.5);
   float dist = shore.r * uShoreMax;
+#ifdef WATER_RISE
+  // A growth timelapse: open sea wherever no land that is up now is near (scene/growth/mask.ts).
+  float risen = texture2D(uRise, vec2(sp.x, -sp.y) / (2.0 * uShoreHalf) + 0.5).g;
+  dist = mix(uShoreMax, dist, risen);
+  shore.a = mix(1.0, shore.a, risen);
+#endif
   vec2 flow = shore.gb * 2.0 - 1.0;
   float t = uTime;
 
@@ -306,6 +315,10 @@ ${LIGHT}
 ${WIND_SWAY}
 uniform float uSnow;
 uniform sampler2D uPalette;
+#ifdef GRASS_RISE
+uniform sampler2D uRise;
+uniform float uRiseHalf;
+#endif
 #ifdef FLOWERS
 attribute vec3 aTint;
 #endif
@@ -326,6 +339,11 @@ void main() {
   // Snow presses the tufts down a little.
   transformed.y *= 1.0 - 0.35 * uSnow;
   vec4 worldPosition = modelMatrix * instanceMatrix * vec4(transformed, 1.0);
+#ifdef GRASS_RISE
+  // A growth timelapse: the tuft grows with its hex's green (scene/growth/mask.ts).
+  vec3 root = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+  worldPosition.xyz = root + (worldPosition.xyz - root) * texture2D(uRise, vec2(root.x, -root.z) / (2.0 * uRiseHalf) + 0.5).r;
+#endif
 
   // Wind (WIND_SWAY): more at the tips.
   float phase = dot(worldPosition.xz, vec2(0.37, 0.61));

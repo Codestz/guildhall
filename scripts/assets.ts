@@ -12,6 +12,8 @@
  * - packages/hall/src/world/kit.json — each kit piece's bounding box, for layout code.
  * - lands.glb / lands.json — the island's hex tiles and dressing (ADR 0006), the same way.
  * - seas.glb             — the GitHub sea's cargo, gold and flag (lazy; no bounds file).
+ * - growth.glb            — a repo's growth timelapse (`?grow`, scene/growth): scaffolds, planks and
+ *                           the ghost districts' tents (Kenney Survival Kit). Lazy; no bounds file.
  * - forest.glb / forest.json — character-scale trees, bushes, rocks and grass from the Forest
  *                           Nature Pack (one palette, one material), placed by world/wilds.ts.
  *
@@ -92,6 +94,14 @@ const SHIPS: Record<string, string[]> = {
 const SEAS: Record<string, string[]> = {
   KayKit_ResourceBits: ["Wood_Planks_Stack_Small", "Gold_Bars_Stack_Small"],
   "kenney_pirate-kit": ["flag-high-pennant"],
+}
+
+/**
+ * The growth timelapse's pieces (scene/growth/Builders.tsx): a building's scaffold and its stack of
+ * planks while it goes up, and the tents on a ghost district's borrowed land. Loaded only with `?grow`.
+ */
+const GROWTH: Record<string, string[]> = {
+  "kenney_survival-kit": ["structure", "resource-planks", "tent-canvas"],
 }
 
 const GRAVEYARD: Record<string, string[]> = {
@@ -701,6 +711,7 @@ const STEPS: Record<string, () => Promise<void>> = {
   graveyard: () => kit("graveyard", GRAVEYARD),
   ships: () => kit("ships", SHIPS),
   seas: () => kit("seas", SEAS, false),
+  growth: () => kit("growth", GROWTH, false),
 }
 const wanted = process.argv.slice(2)
 for (const name of wanted) if (!STEPS[name]) throw new Error(`unknown output ${name}: ${Object.keys(STEPS)}`)

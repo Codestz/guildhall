@@ -1,4 +1,5 @@
 import { bundledChronicle } from "../chronicle/bundled.ts"
+import { CHRONICLES_CDN } from "../chronicle/catalog.ts"
 import { type Chronicle, decodeChronicle, encodeChronicle } from "../chronicle/format.ts"
 import { quickChronicle } from "../chronicle/quick.ts"
 import { fetchPublicTree, GitHubError, parseRepo } from "./fetch.ts"
@@ -111,18 +112,22 @@ export function reasonOf(error: unknown, repo: string): string {
 }
 
 /**
- * The history of `wanted`'s island (world/chronicle/format.ts): its bundled deep chronicle when the
- * hall ships one, else one quick-built live from GitHub (~20 of the hour's 60 unauthenticated calls,
- * so it is asked for on demand, not with every tree), kept for the tab's session. Undefined when
- * neither can be had: the island is then tree-only, as before. Never rejects.
+ * The history of `wanted`'s island (world/chronicle/format.ts), the deepest to be had: its deep
+ * chronicle from the chronicles repo's CDN (world/chronicle/catalog.ts; the freshest, refreshed
+ * weekly), else the one the hall ships, else one quick-built live from GitHub (~20 of the hour's 60
+ * unauthenticated calls, so it is asked for on demand, not with every tree), kept for the tab's
+ * session. Undefined when none can be had: the island is then tree-only, as before. Never rejects.
  */
 export async function chronicleFor(
   wanted: string,
   tree?: Tree,
   fetcher: typeof fetch = fetch,
 ): Promise<Chronicle | undefined> {
-  const bundled = await bundledChronicle(wanted, fetcher)
-  if (bundled) return bundled
+  // Bundled first (no network, and the showcase stays deterministic), then the chronicles repo's CDN
+  // for repos the hall doesn't ship, then a quick build.
+  const deep =
+    (await bundledChronicle(wanted, fetcher)) ?? (await bundledChronicle(wanted, fetcher, CHRONICLES_CDN))
+  if (deep) return deep
   let repo: string
   try {
     repo = parseRepo(tree?.repo ?? wanted)

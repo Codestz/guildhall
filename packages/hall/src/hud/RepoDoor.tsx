@@ -11,9 +11,12 @@ import { parseDeepLink } from "../guild/deeplink.ts"
 import type { GuildStore } from "../guild/store.ts"
 import { useGuildStore } from "../guild/useGuild.ts"
 import { MAX_ISLANDS } from "../world/archipelago.ts"
+import { growth } from "../world/chronicle/growthControl.ts"
 import { parseRepo } from "../world/gen/fetch.ts"
 import type { RepoFailure } from "../world/gen/load.ts"
 import { HOME_ISLAND, showIsland, useWorld, worldSource } from "../world/source.ts"
+import { copyText } from "./clipboard.ts"
+import { DoorChronicle } from "./DoorChronicle.tsx"
 import { FOCUSABLE, tabStops, wrapOf } from "./focus.ts"
 import { Icon } from "./icons.tsx"
 import { addToArchipelago, islandLink, shareLink } from "./repoLinks.ts"
@@ -279,12 +282,14 @@ export function RepoDoor() {
   async function share() {
     if (!subject) return
     const link = `${location.origin}${location.pathname}${shareLink(subject, location.search)}`
-    try {
-      await navigator.clipboard.writeText(link)
-      setCopied("done")
-    } catch {
-      setCopied(fallbackCopy(link) ? "done" : "failed")
-    }
+    setCopied((await copyText(link)) ? "done" : "failed")
+  }
+
+  /** Its history as a timelapse (`?grow`): here, or on its island grown afresh. */
+  function watch(repo: string) {
+    repoDoor.close()
+    if (repo === current) growth.request(repo)
+    else location.assign(`${location.pathname}${islandLink(repo, location.search)}&grow`)
   }
 
   function onKeyDown(event: KeyboardEvent) {
@@ -421,6 +426,16 @@ export function RepoDoor() {
             <Icon.plus />
             <span>{busy && phase.action === "add" ? "Adding…" : "Add to archipelago"}</span>
           </button>
+          <button
+            type="button"
+            className="door-act"
+            onClick={() => subject && watch(subject)}
+            disabled={!subject}
+          >
+            <Icon.play />
+            <span>Watch it grow</span>
+          </button>
+          <DoorChronicle subject={subject} />
           <p className="door-fine">
             Public repos only. GitHub allows 60 calls an hour without sign-in; each new repo takes two.
           </p>
@@ -544,23 +559,4 @@ function validRepo(text: string): string | undefined {
   } catch {
     return undefined
   }
-}
-
-/** For browsers that refuse the async clipboard (an insecure origin, an old WebView). */
-function fallbackCopy(text: string): boolean {
-  const area = document.createElement("textarea")
-  area.value = text
-  area.setAttribute("readonly", "")
-  area.style.position = "fixed"
-  area.style.opacity = "0"
-  document.body.append(area)
-  area.select()
-  let ok = false
-  try {
-    ok = document.execCommand("copy")
-  } catch {
-    ok = false
-  }
-  area.remove()
-  return ok
 }

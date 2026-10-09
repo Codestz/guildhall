@@ -2,10 +2,15 @@
  * Deep chronicles (packages/hall/src/world/chronicle/format.ts) from a repo's whole history.
  *
  *   bun scripts/chronicle.ts deep <owner/name> [--out file] [--keep]
- *   bun scripts/chronicle.ts bundle            every repo the hall ships one for, one after another
+ *   bun scripts/chronicle.ts bundle            every repo the hall ships one for, then their index
+ *   bun scripts/chronicle.ts index <dir> [--out file]   the catalog (index.json) of dir's chronicles
  *
  * Without --out it writes packages/hall/public/chronicles/<owner__name>.json.gz (GitHub's current
- * spelling, lower case), the asset world/chronicle/bundled.ts fetches.
+ * spelling, lower case), the asset world/chronicle/bundled.ts fetches; `index` writes <dir>/index.json
+ * (world/chronicle/catalog.ts), the Harbour's list.
+ *
+ * The GitHub token is $GITHUB_TOKEN (or $GH_TOKEN) when set, as in the chronicles repo's Action, else
+ * the local `gh`'s. That repo runs this file bundled into one (scripts/chronicle-build.ts).
  *
  * How: a treeless-of-blobs clone (`git clone --bare --filter=blob:none`) into the system's temp dir,
  * never inside this repo, deleted after (--keep leaves it for a re-run). Two logs, both trees-only
@@ -17,9 +22,10 @@
  * code_frequency. Immutable answers (trees, logins, closed weeks' counts) are cached in the temp dir.
  * git runs under `nice`, and at most two API calls are in flight.
  */
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises"
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { buildCatalog } from "../packages/hall/src/world/chronicle/catalog.ts"
 import {
   type AuthorCommit,
   axisOf,
@@ -30,7 +36,13 @@ import {
   pickSnapshots,
   visibleHistory,
 } from "../packages/hall/src/world/chronicle/deep.ts"
-import { dayOf, encodeChronicle, isoOf } from "../packages/hall/src/world/chronicle/format.ts"
+import {
+  type Chronicle,
+  dayOf,
+  encodeChronicle,
+  isoOf,
+  readChronicle,
+} from "../packages/hall/src/world/chronicle/format.ts"
 import type { RepoEntry } from "../packages/hall/src/world/gen/repo.ts"
 
 /** The repos the hall ships a chronicle for (hud/RepoDoor.tsx' examples, and this repo). */
@@ -60,14 +72,26 @@ async function main(): Promise<void> {
   const [command, repo, ...rest] = Bun.argv.slice(2)
   const keep = rest.includes("--keep")
   const outAt = rest.indexOf("--out")
-  token = (await run(["gh", "auth", "token"], ROOT).catch(() => "")).trim() || undefined
+  const out = outAt >= 0 ? rest[outAt + 1] : undefined
+  if (command === "index" && repo) {
+    await index(repo, out)
+    return
+  }
+  token =
+    process.env.GITHUB_TOKEN ||
+    process.env.GH_TOKEN ||
+    (await run(["gh", "auth", "token"], ROOT).catch(() => "")).trim() ||
+    undefined
   if (!token) console.warn("no gh token: GitHub calls are unauthenticated (60 an hour) and may fail soft")
   if (command === "deep" && repo) {
-    await deep(repo, outAt >= 0 ? rest[outAt + 1] : undefined, keep)
+    await deep(repo, out, keep)
   } else if (command === "bundle") {
     for (const one of BUNDLE) await deep(one, undefined, keep)
+    await index(OUT_DIR, undefined)
   } else {
-    console.error("usage: bun scripts/chronicle.ts deep <owner/name> [--out file] [--keep] | bundle")
+    console.error(
+      "usage: bun scripts/chronicle.ts deep <owner/name> [--out file] [--keep] | bundle | index <dir> [--out file]",
+    )
     process.exit(1)
   }
 }
@@ -219,6 +243,18 @@ async function deep(wanted: string, out: string | undefined, keep: boolean): Pro
       .filter(Boolean)
       .join("\n"),
   )
+}
+
+/** The catalog of every chronicle in `dir` (*.json.gz), written to `out` (default dir/index.json). */
+async function index(dir: string, out: string | undefined): Promise<void> {
+  const files = (await readdir(dir)).filter((name) => name.endsWith(".json.gz")).sort()
+  const chronicles: Chronicle[] = []
+  for (const name of files)
+    chronicles.push(await readChronicle(new Uint8Array(await readFile(join(dir, name)))))
+  const catalog = buildCatalog(chronicles, new Date().toISOString())
+  const file = out ?? join(dir, "index.json")
+  await writeFile(file, `${JSON.stringify(catalog, null, 1)}\n`)
+  console.log(`${catalog.repos.length} chronicles  →  ${file.replace(`${ROOT}/`, "")}`)
 }
 
 /** A sampled commit's tree with sizes (cached: a commit's tree never changes). */

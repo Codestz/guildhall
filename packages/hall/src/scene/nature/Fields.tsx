@@ -1,7 +1,17 @@
-import { BoxGeometry, InstancedMesh, Matrix4, MeshStandardMaterial, Quaternion, Vector3 } from "three"
+import { useMemo, useState } from "react"
+import {
+  BoxGeometry,
+  type Group,
+  InstancedMesh,
+  Matrix4,
+  MeshStandardMaterial,
+  Quaternion,
+  Vector3,
+} from "three"
 import { type Plantings, plant, RIDGE_HEIGHT, SOIL } from "../../world/fields.ts"
 import { useWorld } from "../../world/source.ts"
 import type { World } from "../../world/world.ts"
+import { useGrowableGroup } from "../growth/registry.ts"
 import { mergePlacements, useKit } from "../Kit.tsx"
 import { useOwnedMeshes } from "../owned.ts"
 
@@ -21,9 +31,16 @@ function plantingsOf(world: World): Plantings {
 }
 
 export function Fields() {
-  const plantings = plantingsOf(useWorld())
+  const world = useWorld()
+  const plantings = plantingsOf(world)
+  // The growth timelapse (`?grow`) shows the plots once their land is up and green (scene/growth).
+  const [group, setGroup] = useState<Group | null>(null)
+  useGrowableGroup(
+    group,
+    useMemo(() => world.island.fields.map((f) => [f.x, f.z] as const), [world]),
+  )
   return (
-    <group name="fields">
+    <group name="fields" ref={setGroup}>
       <Ridges planted={plantings} />
       <Crops planted={plantings} />
     </group>

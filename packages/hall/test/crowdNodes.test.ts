@@ -4,7 +4,7 @@ import { join } from "node:path"
 import {
   BoxGeometry,
   Color,
-  type InstancedMesh,
+  InstancedMesh,
   type Material,
   Matrix4,
   MeshStandardMaterial,
@@ -16,7 +16,7 @@ import {
 } from "three"
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
-import { MeshStandardNodeMaterial, WebGPURenderer, WGSLNodeBuilder } from "three/webgpu"
+import { MeshStandardNodeMaterial, NodeMaterial, WebGPURenderer, WGSLNodeBuilder } from "three/webgpu"
 import { bakeClips } from "../src/scene/crowd/bake.ts"
 import { Crowd, type Gear } from "../src/scene/crowd/Crowd.ts"
 import { FADE_S, ONCE } from "../src/scene/crowd/cast.ts"
@@ -160,6 +160,25 @@ describe("the crowd as node materials (WebGPU, ?tsl=1)", () => {
       material.metalness,
       material.name,
     ]).toEqual([new Color("#336699").getHex(), map, 0.3, 0.1, "cape"])
+  })
+
+  test("the characters' shadow pass skins the same, but drops members outside the box before any bone read", () => {
+    const crowd = new Crowd(bake, { knight }, [], FADE_S, NODE_SHADING)
+    crowd.join("knight")
+    const body = meshNamed(crowd, "Knight_Body")
+    const material = body.material as MeshStandardNodeMaterial
+    expect(material.castShadowPositionNode?.isNode).toBe(true)
+    // What three's shadow pass makes of it: its plain material, with this for the position.
+    const pass = new NodeMaterial()
+    pass.positionNode = material.castShadowPositionNode
+    const cast = vertexShader(new InstancedMesh(body.geometry, pass, 1))
+    const lit = vertexShader(body)
+    const bones = (wgsl: string) => wgsl.indexOf("textureLoad")
+    expect(lit).not.toContain("distance(")
+    expect(cast).toContain("distance(")
+    // The first bone fetch of the stage's own place comes before the guard; the pose reads after it.
+    expect(cast.indexOf("distance(")).toBeLessThan(cast.lastIndexOf("textureLoad"))
+    expect(bones(cast)).toBeGreaterThan(-1)
   })
 
   test("refuses GLSL uniforms (the two shadings' uniforms don't mix)", () => {

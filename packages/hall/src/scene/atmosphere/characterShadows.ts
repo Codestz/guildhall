@@ -1,13 +1,17 @@
 import {
   type DirectionalLight,
   type Mesh,
-  Object3D,
+  type Object3D,
   type OrthographicCamera,
   type PerspectiveCamera,
+  Scene,
 } from "three"
 import { walkers } from "../Blobs.tsx"
 import { castedCrowd } from "../crowd/cast.ts"
 import { castBox } from "../crowd/material.ts"
+import { aim, type CascadeLight } from "./cascadeDrive.ts"
+import { fitCascade, type Span } from "./cascades.ts"
+import { sky } from "./state.ts"
 
 /**
  * Real shadows for characters, inside the near cascade only (cascades.ts). The cascades are static
@@ -22,6 +26,10 @@ import { castBox } from "../crowd/material.ts"
  * box (a hero's rig and gear: Blobs.tsx) and, at "crowd", the baked crowd, whose depth shader
  * (crowd/material.ts) drops members outside the box before it reads their bones. Meshes cast only for
  * the length of that draw, so the cascade passes never see them.
+ *
+ * WebGPU has the same plan with the draw in its own shadow node (characterShadowNode.ts): the same
+ * roots, box and tiers; the crowd's depth twin is its node material's `castShadowPositionNode`
+ * (crowd/materialNodes.ts).
  */
 
 /** A character's height: how far its shadow reaches is its height over the sun's tangent. */
@@ -47,7 +55,10 @@ export function inReach(x: number, z: number, box: Box, margin: number): boolean
   return Math.hypot(x - box.cx, z - box.cz) <= box.radius + margin
 }
 
-const proxy = new Object3D()
+/** The roots this frame's pass draws: a scene only so a renderer takes it; the nodes keep their parents. */
+export const castRoots = new Scene()
+castRoots.matrixWorldAutoUpdate = false
+const proxy = castRoots
 const meshes: Mesh[] = []
 const was: boolean[] = []
 
@@ -87,6 +98,51 @@ export function planCharacters(
   return plan.count
 }
 
+/** Runs `draw` with the planned roots' meshes casting (castShadow on for the length of the call). */
+export function castingNow(draw: () => void): void {
+  meshes.length = 0
+  was.length = 0
+  for (const root of proxy.children)
+    root.traverse((node) => {
+      const mesh = node as Mesh
+      if (!mesh.isMesh) return
+      meshes.push(mesh)
+      was.push(mesh.castShadow)
+      mesh.castShadow = true
+    })
+  try {
+    draw()
+  } finally {
+    meshes.forEach((mesh, i) => {
+      mesh.castShadow = was[i] as boolean
+    })
+  }
+}
+
+/** The tier's say over characters' shadows (guild/quality.ts). */
+export interface CharacterTier {
+  casts: "off" | "heroes" | "crowd"
+  reach: number
+  map: number
+}
+
+/**
+ * One frame of the characters' light, on either backend: who casts (`planCharacters`), the
+ * shadow's strength (0 when no one does, so no lookup reads a stale map), and the light camera
+ * fitted to the near box (the near cascade's disc as it was last drawn).
+ */
+export function driveCharacters(
+  light: CascadeLight,
+  box: Box | undefined,
+  tier: CharacterTier,
+  span: Span,
+): number {
+  const casting = planCharacters(box, tier.casts, tier.reach, sky.keyDirection)
+  light.shadow.intensity = casting > 0 ? sky.keyShadow : 0
+  if (casting > 0 && box) aim(light, fitCascade(sky.keyDirection, box.cx, box.cz, box.radius, span, tier.map))
+  return casting
+}
+
 /** The slice of three's shadow map this needs. */
 interface ShadowStep {
   needsUpdate: boolean
@@ -108,22 +164,9 @@ export function installCharacterPass(map: ShadowStep, light: DirectionalLight): 
     // shadow sampler cannot read, and every draw that reads it fails.
     if ((plan.count === 0 && light.shadow.map !== null) || plan.drawn === plan.frame) return
     plan.drawn = plan.frame
-    meshes.length = 0
-    was.length = 0
-    for (const root of proxy.children)
-      root.traverse((node) => {
-        const mesh = node as Mesh
-        if (!mesh.isMesh) return
-        meshes.push(mesh)
-        was.push(mesh.castShadow)
-        mesh.castShadow = true
-      })
     this.needsUpdate = true
     light.shadow.needsUpdate = true
-    stock.call(this, [light], proxy, camera)
-    meshes.forEach((mesh, i) => {
-      mesh.castShadow = was[i] as boolean
-    })
+    castingNow(() => stock.call(this, [light], proxy, camera))
   }
   return () => {
     map.render = stock

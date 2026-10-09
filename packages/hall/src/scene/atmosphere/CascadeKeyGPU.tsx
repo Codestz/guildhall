@@ -1,8 +1,10 @@
 import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import { DirectionalLight, type OrthographicCamera, type PerspectiveCamera, Vector3 } from "three"
+import { FRAME } from "../frame.ts"
 import { freshDrawn, stepCascades } from "./cascadeDrive.ts"
 import { CascadeShadowNode, Caster } from "./cascadeShadowNode.ts"
+import { type CharacterTier, driveCharacters } from "./characterShadows.ts"
 import { shadows } from "./shadows.ts"
 import { sky } from "./state.ts"
 
@@ -12,6 +14,8 @@ import { sky } from "./state.ts"
  * turns, the near one is redrawn when the camera's target leaves its grid cell), behind ONE
  * light. That light only lights: it points along the sun and its shadow is the cascade node
  * (cascadeShadowNode.ts), so the lighting loop runs one light however many cascades there are.
+ * With `characters` on (Medium and up) the shadow node also holds the characters' own map
+ * (characterShadows.ts, characterShadowNode.ts), redrawn each frame it has casters.
  * The loaded module is lazy (three/webgpu): atmosphere/Atmosphere.tsx KeyLight suspends on it.
  */
 export function CascadeKeyGPU({
@@ -19,6 +23,7 @@ export function CascadeKeyGPU({
   map,
   far,
   ceiling,
+  characters,
 }: {
   count: number
   map: number
@@ -26,19 +31,24 @@ export function CascadeKeyGPU({
   far: number
   /** The tallest ground or roof, world units: the cylinders reach this high. */
   ceiling: number
+  /** Which characters cast real shadows in the near box, and how big (guild/quality.ts). */
+  characters: CharacterTier
 }) {
   const scene = useThree((state) => state.scene)
   const gl = useThree((state) => state.gl)
   const span = useMemo(() => ({ floor: -2, ceiling: Math.max(ceiling + 8, 24) }), [ceiling])
+  const cast = characters.casts !== "off"
   // A new count or map size is a fresh set of empty maps (and a fresh shadow node: the lit
-  // materials rebuild on it).
+  // materials rebuild on it). The characters' map is one more, redrawn every frame it is used.
   const key = useMemo(() => {
     const light = new DirectionalLight()
     light.castShadow = true
     const casters = Array.from({ length: count }, (_, k) => new Caster(map, k > 0))
-    light.shadow.shadowNode = new CascadeShadowNode(light, casters)
-    return { light, casters }
-  }, [count, map])
+    const held = cast ? new Caster(characters.map, false) : undefined
+    if (held) held.shadow.autoUpdate = false
+    light.shadow.shadowNode = new CascadeShadowNode(light, casters, held)
+    return { light, casters, held }
+  }, [count, map, cast, characters.map])
   const drawn = useRef(freshDrawn())
 
   useEffect(() => {
@@ -51,6 +61,15 @@ export function CascadeKeyGPU({
       light.shadow.shadowNode?.dispose()
     }
   }, [scene, key])
+
+  // The characters' map, after the world has moved them: who is in the near box, the light fitted to
+  // it, and the draw asked for only when someone is (the node draws it, characterShadowNode.ts).
+  useFrame(() => {
+    const { held } = key
+    if (!held) return
+    const casting = driveCharacters(held, drawn.current.cells[0], characters, span)
+    held.shadow.needsUpdate = casting > 0
+  }, FRAME.WORLD + 0.75)
 
   useFrame((state) => {
     const { light, casters } = key

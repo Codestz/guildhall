@@ -12,6 +12,7 @@ import {
   attribute,
   cos,
   cross,
+  distance,
   dot,
   Fn,
   If,
@@ -23,16 +24,18 @@ import {
   normalize,
   normalLocal,
   positionLocal,
+  renderGroup,
   select,
   sin,
   texture,
+  uniform,
   vec3,
   vec4,
 } from "three/tsl"
 import { MeshStandardNodeMaterial, type Node, type NodeBuilder, type TextureNode } from "three/webgpu"
 import type { BoneBake } from "./bake.ts"
 import type { CrowdShading, CrowdUniforms } from "./material.ts"
-import { STAGE_ROW, TEXELS_PER_MEMBER } from "./material.ts"
+import { castBox, STAGE_ROW, TEXELS_PER_MEMBER } from "./material.ts"
 
 /**
  * The crowd's skinning as a TSL node material (WebGPU, always; WebGL with `?tsl=1`): material.ts's
@@ -64,6 +67,13 @@ function nodeUniforms(bake: BoneBake): CrowdUniforms {
     crowdStage: texels(null),
     crowdPivots: { value: bake.pivots.map((pivot) => pivot.clone()) },
   } as unknown as CrowdUniforms
+}
+
+/** material.ts `castBox` as a uniform node: the same vector, so the plan's `set` reaches it. */
+let castUniform: Node<"vec3"> | undefined
+function castNode(): Node<"vec3"> {
+  castUniform ??= uniform(castBox.value).setGroup(renderGroup) as unknown as Node<"vec3">
+  return castUniform
 }
 
 function texels(value: Texture | null): TextureNode {
@@ -129,8 +139,12 @@ function levelled(q: Vec4, up: Vector3): Vec4 {
 /**
  * Moves positionLocal and normalLocal in place (the stock `skinning` node's way): a member's
  * bones, blended and weighted, then its yaw and place from the stage.
+ *
+ * `cast`, the characters' shadow pass (atmosphere/characterShadows.ts): the ground it draws, x and
+ * z of its centre then its radius. A member beyond it reads no pose and collapses to its place, as
+ * material.ts `DEPTH_BASE` does; depth needs no normals.
  */
-function skin(uniforms: CrowdUniforms, bone?: number, up?: Vector3) {
+function skin(uniforms: CrowdUniforms, bone?: number, up?: Vector3, cast?: Node<"vec3">) {
   const bones = textureNode(uniforms.crowdBones, "crowdBones")
   const stage = textureNode(uniforms.crowdStage, "crowdStage")
   const pivots = pivotsOf(uniforms)
@@ -140,29 +154,11 @@ function skin(uniforms: CrowdUniforms, bone?: number, up?: Vector3) {
     const stageAt = (k: number): Vec4 =>
       fetch(stage, ivec2(member.mod(STAGE_ROW).mul(TEXELS_PER_MEMBER).add(k), member.div(STAGE_ROW)))
     const place = stageAt(0).toVar()
-    const frames = stageAt(1).toVar()
-    const rowNow = int(frames.x.add(0.5)).toVar()
-    const rowWas = int(frames.z.add(0.5)).toVar()
-    const fadeIn = stageAt(2).x.toVar()
 
     const read = (row: Int, joint: Int): Pose => ({
       q: fetch(bones, ivec2(joint.mul(2), row)),
       head: fetch(bones, ivec2(joint.mul(2).add(1), row)),
     })
-
-    const pose = (joint: Int): Pose => {
-      const now = blend(read(rowNow, joint), read(rowNow.add(1), joint), frames.y)
-      const q = now.q.toVar()
-      const head = now.head.toVar()
-      If(fadeIn.lessThan(1), () => {
-        const was = blend(read(rowWas, joint), read(rowWas.add(1), joint), frames.w)
-        const mixed = blend(was, { q, head }, fadeIn)
-        q.assign(mixed.q)
-        head.assign(mixed.head)
-      })
-      q.assign(normalize(q))
-      return { q, head }
-    }
 
     const move = (p: Pose, joint: Int, v: Vec3): Vec3 =>
       p.head.xyz.add(turn(p.q, v.sub(fetch(pivots, ivec2(joint, 0)).xyz)).mul(p.head.w)) as Vec3
@@ -172,32 +168,56 @@ function skin(uniforms: CrowdUniforms, bone?: number, up?: Vector3) {
     const normal = normalLocal.toVar()
     const moved = vec3(0).toVar()
     const turned = vec3(0).toVar()
-    if (bone !== undefined) {
-      const joint = int(bone)
-      const p = pose(joint)
-      if (up) p.q = levelled(p.q, up).toVar()
-      moved.assign(move(p, joint, position))
-      turned.assign(turn(p.q, normal))
-    } else {
-      // Typed by the geometry (uint8 joints: uvec4 on WebGPU); only ever converted to int.
-      const joints = attribute<"uvec4">("skinIndex")
-      const weights = attribute<"vec4">("skinWeight", "vec4")
-      for (const c of ["x", "y", "z", "w"] as const) {
-        const w = weights[c] as Float
-        If(w.greaterThan(0), () => {
-          const joint = int(joints[c]).toVar()
-          const p = pose(joint)
-          moved.addAssign(move(p, joint, position).mul(w))
-          turned.addAssign(turn(p.q, normal).mul(w))
+
+    const posed = () => {
+      const frames = stageAt(1).toVar()
+      const rowNow = int(frames.x.add(0.5)).toVar()
+      const rowWas = int(frames.z.add(0.5)).toVar()
+      const fadeIn = stageAt(2).x.toVar()
+
+      const pose = (joint: Int): Pose => {
+        const now = blend(read(rowNow, joint), read(rowNow.add(1), joint), frames.y)
+        const q = now.q.toVar()
+        const head = now.head.toVar()
+        If(fadeIn.lessThan(1), () => {
+          const was = blend(read(rowWas, joint), read(rowWas.add(1), joint), frames.w)
+          const mixed = blend(was, { q, head }, fadeIn)
+          q.assign(mixed.q)
+          head.assign(mixed.head)
         })
+        q.assign(normalize(q))
+        return { q, head }
+      }
+
+      if (bone !== undefined) {
+        const joint = int(bone)
+        const p = pose(joint)
+        if (up) p.q = levelled(p.q, up).toVar()
+        moved.assign(move(p, joint, position))
+        if (!cast) turned.assign(turn(p.q, normal))
+      } else {
+        // Typed by the geometry (uint8 joints: uvec4 on WebGPU); only ever converted to int.
+        const joints = attribute<"uvec4">("skinIndex")
+        const weights = attribute<"vec4">("skinWeight", "vec4")
+        for (const c of ["x", "y", "z", "w"] as const) {
+          const w = weights[c] as Float
+          If(w.greaterThan(0), () => {
+            const joint = int(joints[c]).toVar()
+            const p = pose(joint)
+            moved.addAssign(move(p, joint, position).mul(w))
+            if (!cast) turned.addAssign(turn(p.q, normal).mul(w))
+          })
+        }
       }
     }
+    if (cast) If(distance(place.xz, cast.xy).lessThanEqual(cast.z), posed)
+    else posed()
 
     // The member's turn about y (place.w), as Matrix4.makeRotationY, then its place.
     const c = cos(place.w).toVar()
     const s = sin(place.w).toVar()
     const yaw = (v: Vec3): Vec3 => vec3(c.mul(v.x).add(s.mul(v.z)), v.y, c.mul(v.z).sub(s.mul(v.x))) as Vec3
-    normalLocal.assign(yaw(turned))
+    if (!cast) normalLocal.assign(yaw(turned))
     positionLocal.assign(yaw(moved).add(place.xyz))
   }, "void")
 }
@@ -242,6 +262,13 @@ export function crowdNodeMaterial(
   const key = `crowd:${bone ?? "skin"}:${up ? up.toArray().map((v) => v.toFixed(6)) : "-"}`
   const material = new CrowdNodeMaterial(skin(uniforms, bone, up), key)
   material.copy(base)
+  // The characters' shadow pass takes this for the vertex position (three's `_getShadowNodes`): the
+  // same skinning, culled to the box (characterShadows.ts), the instance matrices left unread.
+  const cast = skin(uniforms, bone, up, castNode())
+  material.castShadowPositionNode = Fn(() => {
+    cast()
+    return positionLocal
+  })()
   return material
 }
 

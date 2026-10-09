@@ -2,10 +2,10 @@ import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import { type DirectionalLight, type OrthographicCamera, type PerspectiveCamera, Vector3 } from "three"
 import { FRAME } from "../frame.ts"
-import { aim, freshDrawn, stepCascades } from "./cascadeDrive.ts"
+import { TSL } from "../tsl.ts"
+import { freshDrawn, stepCascades } from "./cascadeDrive.ts"
 import { cascadeKey } from "./cascadeLights.ts"
-import { fitCascade } from "./cascades.ts"
-import { installCharacterPass, planCharacters } from "./characterShadows.ts"
+import { driveCharacters, installCharacterPass } from "./characterShadows.ts"
 import { shadows } from "./shadows.ts"
 import { sky } from "./state.ts"
 
@@ -44,6 +44,11 @@ export function CascadeKey({
   const gl = useThree((state) => state.gl)
   const span = useMemo(() => ({ floor: -2, ceiling: Math.max(ceiling + 8, 24) }), [ceiling])
   const drawn = useRef(freshDrawn())
+  // The crowd's depth twin here is GLSL; under ?tsl=1 (node materials on WebGL) the crowd has none.
+  const tier = useMemo(
+    () => (TSL && characters.casts === "crowd" ? { ...characters, casts: "heroes" as const } : characters),
+    [characters],
+  )
 
   useEffect(() => {
     gl.shadowMap.autoUpdate = false
@@ -86,11 +91,7 @@ export function CascadeKey({
   useFrame(() => {
     const light = held.current
     if (!light) return
-    const box = drawn.current.cells[0]
-    const casting = planCharacters(box, characters.casts, characters.reach, sky.keyDirection)
-    light.shadow.intensity = casting > 0 ? sky.keyShadow : 0
-    if (casting > 0 && box)
-      aim(light, fitCascade(sky.keyDirection, box.cx, box.cz, box.radius, span, characters.map))
+    driveCharacters(light, drawn.current.cells[0], tier, span)
   }, FRAME.WORLD + 0.75)
 
   useFrame((state) => {

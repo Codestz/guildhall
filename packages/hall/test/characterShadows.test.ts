@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import { Object3D, ShaderChunk } from "three"
+import { Object3D, type OrthographicCamera, ShaderChunk } from "three"
 import { installCascadeChunks } from "../src/scene/atmosphere/cascadeChunk.ts"
-import { inReach, planCharacters, upstream } from "../src/scene/atmosphere/characterShadows.ts"
+import { Caster } from "../src/scene/atmosphere/cascadeShadowNode.ts"
+import {
+  driveCharacters,
+  inReach,
+  planCharacters,
+  upstream,
+} from "../src/scene/atmosphere/characterShadows.ts"
+import { sky } from "../src/scene/atmosphere/state.ts"
 import { blobOf, type Walker, walkers } from "../src/scene/Blobs.tsx"
 import { DEPTH_BASE } from "../src/scene/crowd/material.ts"
 
@@ -58,6 +65,25 @@ describe("who casts a real shadow", () => {
     const hidden = stand(2, 2)
     hidden.node.visible = false
     expect(planCharacters(BOX, "heroes", 28, KEY)).toBe(0)
+    walkers.clear()
+  })
+})
+
+describe("one frame of the characters' light, on either backend", () => {
+  const tier = { casts: "heroes" as const, reach: 28, map: 1024 }
+  const span = { floor: -2, ceiling: 40 }
+
+  test("is lit and fitted to the box when someone is in it, and off when no one is", () => {
+    sky.keyDirection = KEY
+    sky.keyShadow = 0.8
+    walkers.clear()
+    const light = new Caster(1024, false)
+    expect(driveCharacters(light, BOX, tier, span)).toBe(0)
+    expect(light.shadow.intensity).toBe(0)
+    stand(2, 2)
+    expect(driveCharacters(light, BOX, tier, span)).toBe(1)
+    expect(light.shadow.intensity).toBe(0.8)
+    expect((light.shadow.camera as OrthographicCamera).right).toBeGreaterThan(0)
     walkers.clear()
   })
 })

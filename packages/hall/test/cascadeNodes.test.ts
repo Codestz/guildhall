@@ -15,6 +15,8 @@ import { WebGPURenderer, WGSLNodeBuilder } from "three/webgpu"
 import { freshDrawn, stepCascades } from "../src/scene/atmosphere/cascadeDrive.ts"
 import { cascadeKey } from "../src/scene/atmosphere/cascadeLights.ts"
 import { CascadeShadowNode, Caster } from "../src/scene/atmosphere/cascadeShadowNode.ts"
+import { CharacterShadowNode } from "../src/scene/atmosphere/characterShadowNode.ts"
+import { castRoots } from "../src/scene/atmosphere/characterShadows.ts"
 import { shadows } from "../src/scene/atmosphere/shadows.ts"
 import { sky } from "../src/scene/atmosphere/state.ts"
 import { grassUniforms } from "../src/scene/nature/Grass.tsx"
@@ -76,6 +78,54 @@ describe("a WebGPU key's cascade shadow node", () => {
     const wgsl = grassUnder(light)
     // Each cascade's weight is gated, so a pixel deep in the near map never samples the far one.
     expect(wgsl.match(/if \(/g)?.length).toBeGreaterThanOrEqual(4)
+  })
+})
+
+describe("the characters' map in a WebGPU key's lookup", () => {
+  function keyWith(count: number, characters: boolean): DirectionalLight {
+    const light = new DirectionalLight()
+    light.castShadow = true
+    const casters = Array.from({ length: count }, (_, k) => new Caster(1024, k > 0))
+    light.shadow.shadowNode = new CascadeShadowNode(
+      light,
+      casters,
+      characters ? new Caster(1024, false) : undefined,
+    )
+    return light
+  }
+
+  test("is one more map beside the cascades, and none on a tier without characters", () => {
+    expect(maps(grassUnder(keyWith(3, false)))).toBe(3)
+    expect(maps(grassUnder(keyWith(3, true)))).toBe(4)
+  })
+
+  test("is read only where someone is drawn: the lookup is gated on its intensity", () => {
+    const gates = (wgsl: string) => wgsl.match(/if \(/g)?.length ?? 0
+    expect(gates(grassUnder(keyWith(2, true)))).toBeGreaterThan(gates(grassUnder(keyWith(2, false))))
+  })
+
+  test("is drawn from the planned roots only, castShadow on for the length of the draw", () => {
+    const hero = new Mesh()
+    hero.castShadow = false
+    castRoots.children.length = 0
+    castRoots.children.push(hero)
+    const caster = new Caster(1024, false)
+    const node = new CharacterShadowNode(caster as never, caster.shadow)
+    Object.assign(node, { shadowMap: { setSize() {}, depth: 1 } })
+    const override = {} as Material
+    const seen: { scene: unknown; casting: boolean; override: unknown }[] = []
+    const frame = {
+      scene: { overrideMaterial: override },
+      renderer: {
+        render: (scene: Scene) =>
+          seen.push({ scene, casting: hero.castShadow, override: scene.overrideMaterial }),
+      },
+    }
+    node.renderShadow(frame as never)
+    expect(seen).toEqual([{ scene: castRoots, casting: true, override }])
+    expect(hero.castShadow).toBe(false)
+    expect(castRoots.overrideMaterial).toBeNull()
+    castRoots.children.length = 0
   })
 })
 

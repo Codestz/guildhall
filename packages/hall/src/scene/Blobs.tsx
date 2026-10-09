@@ -28,6 +28,8 @@ export interface Walker {
   radius: number
   size?: (() => number) | undefined
   opacity?: (() => number) | undefined
+  /** Set each frame by the characters' shadow pass: this one casts a real shadow, so its blob is only a contact. */
+  cast?: boolean
 }
 
 /** One walker's disc this frame: its radius and opacity. Pure, for tests. */
@@ -41,11 +43,14 @@ export function blobOf(walker: Walker, out: BlobLook): boolean {
   if (!walker.node.visible) return false
   out.size = (walker.size?.() ?? 1) * walker.radius
   const opacity = walker.opacity?.() ?? 1
-  out.alpha = opacity < 0 ? 0 : opacity > 1 ? 1 : opacity
+  out.alpha = (opacity < 0 ? 0 : opacity > 1 ? 1 : opacity) * (walker.cast ? CAST_BLOB : 1)
   return out.size > 0.01 && out.alpha > 0.005
 }
 
-const walkers = new Set<Walker & { node: Object3D }>()
+/** How much of its blob a walker who casts a real shadow keeps. */
+const CAST_BLOB = 0.4
+
+export const walkers = new Set<Walker & { node: Object3D }>()
 
 /**
  * How many instances a layer needs room for: `capacity` while `needed` fits, else doubled until it

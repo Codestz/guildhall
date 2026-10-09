@@ -678,6 +678,7 @@ class Troop {
     for (const mesh of this.meshes) {
       release(mesh.geometry)
       ;(mesh.material as Material).dispose()
+      mesh.customDepthMaterial?.dispose()
       mesh.removeFromParent()
       mesh.dispose()
     }
@@ -716,6 +717,9 @@ class Troop {
     // Characters move every frame; the shadow map is static (atmosphere/shadows.ts).
     mesh.castShadow = false
     mesh.receiveShadow = false
+    // The characters' shadow pass draws it with this (atmosphere/characterShadows.ts); GLSL only.
+    const depth = (part.material.userData as { crowdDepth?: Material }).crowdDepth
+    if (depth) mesh.customDepthMaterial = depth
     this.parent.add(mesh)
     return mesh
   }

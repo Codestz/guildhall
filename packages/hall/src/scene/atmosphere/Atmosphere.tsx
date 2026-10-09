@@ -131,6 +131,7 @@ function KeyLight() {
     map: tier.shadowMap,
     far: reachOf(world) + 12,
     ceiling: peakOf(world),
+    characters: WIDE_VIEW.characters ? tier.characters : { ...tier.characters, casts: "off" as const },
   }
   if (!gpu) return <CascadeKey {...props} />
   return (

@@ -1,8 +1,11 @@
 import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import { type DirectionalLight, type OrthographicCamera, type PerspectiveCamera, Vector3 } from "three"
-import { freshDrawn, stepCascades } from "./cascadeDrive.ts"
+import { FRAME } from "../frame.ts"
+import { aim, freshDrawn, stepCascades } from "./cascadeDrive.ts"
 import { cascadeKey } from "./cascadeLights.ts"
+import { fitCascade } from "./cascades.ts"
+import { installCharacterPass, planCharacters } from "./characterShadows.ts"
 import { shadows } from "./shadows.ts"
 import { sky } from "./state.ts"
 
@@ -14,12 +17,17 @@ import { sky } from "./state.ts"
  * (atmosphere/shadows.ts), refitted by cascadeDrive.ts: redrawn when the sun turns or a caster
  * changes, and otherwise only when the camera's target leaves that cascade's grid cell.
  * WebGPU draws the same cascades behind one light (CascadeKeyGPU.tsx).
+ *
+ * With `characters` on (Medium and up), one more light follows the cascades: it casts nothing but
+ * the characters inside the near cascade's box, redrawn every frame (characterShadows.ts). Its
+ * negative shadow radius is what tells cascadeChunk.ts it is no cascade.
  */
 export function CascadeKey({
   count,
   map,
   far,
   ceiling,
+  characters,
 }: {
   count: number
   map: number
@@ -27,8 +35,11 @@ export function CascadeKey({
   far: number
   /** The tallest ground or roof, world units: the cylinders reach this high. */
   ceiling: number
+  /** Which characters cast real shadows in the near box, and how big (guild/quality.ts). */
+  characters: { casts: "off" | "heroes" | "crowd"; reach: number; map: number }
 }) {
   const lights = useRef<(DirectionalLight | null)[]>([])
+  const held = useRef<DirectionalLight | null>(null)
   const scene = useThree((state) => state.scene)
   const gl = useThree((state) => state.gl)
   const span = useMemo(() => ({ floor: -2, ceiling: Math.max(ceiling + 8, 24) }), [ceiling])
@@ -57,6 +68,30 @@ export function CascadeKey({
       cascadeKey.lights = []
     }
   }, [scene, count, map])
+
+  // The characters' light: its target in the scene, and the pass that draws it inside three's shadow step.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: count and map are the remount's own triggers
+  useEffect(() => {
+    const light = held.current
+    if (!light) return
+    scene.add(light.target)
+    light.shadow.autoUpdate = false
+    const restore = installCharacterPass(gl.shadowMap, light)
+    return () => {
+      restore()
+      scene.remove(light.target)
+    }
+  }, [scene, gl, count, map, characters.map])
+
+  useFrame(() => {
+    const light = held.current
+    if (!light) return
+    const box = drawn.current.cells[0]
+    const casting = planCharacters(box, characters.casts, characters.reach, sky.keyDirection)
+    light.shadow.intensity = casting > 0 ? sky.keyShadow : 0
+    if (casting > 0 && box)
+      aim(light, fitCascade(sky.keyDirection, box.cx, box.cz, box.radius, span, characters.map))
+  }, FRAME.WORLD + 0.75)
 
   useFrame((state) => {
     const set = lights.current
@@ -93,6 +128,16 @@ export function CascadeKey({
           shadow-mapSize={[map, map]}
         />
       ))}
+      {characters.casts !== "off" && (
+        <directionalLight
+          key={`held-${count}-${map}-${characters.map}`}
+          ref={held}
+          intensity={0}
+          castShadow
+          shadow-mapSize={[characters.map, characters.map]}
+          shadow-radius={-1}
+        />
+      )}
     </>
   )
 }

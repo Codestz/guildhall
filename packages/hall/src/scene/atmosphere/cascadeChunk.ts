@@ -28,19 +28,36 @@ float getFarShadow( sampler2DShadow map, float intensity, float bias, vec4 coord
 	uvz.z += bias;
 	return mix( 1.0, texture( map, uvz ), intensity );
 }
+float getHeldShadow( sampler2DShadow map, float intensity, float bias, vec4 coord ) {
+	return getFarShadow( map, intensity, bias, coord );
+}
+#else
+float getHeldShadow( sampler2D map, float intensity, float bias, vec4 coord ) {
+	return getShadow( map, vec2( 1024.0 ), intensity, bias, 1.0, coord );
+}
 #endif
 float getCascadedShadow() {
 	float lit = 0.0;
 	float rest = 1.0;
+	float held = 1.0;
 	DirectionalLightShadow cascade;
 	#pragma unroll_loop_start
 	for ( int i = 0; i < NUM_DIR_LIGHT_SHADOWS; i ++ ) {
-		if ( rest > 0.001 ) {
+		cascade = directionalLightShadows[ i ];
+		// The characters' map (atmosphere/characterShadows.ts) is marked by a negative radius: not a
+		// cascade, but a second lookup inside the near box, the darker of the two winning.
+		if ( cascade.shadowRadius < 0.0 ) {
+			if ( cascade.shadowIntensity > 0.0 ) {
+				vec3 coord = vDirectionalShadowCoord[ i ].xyz / vDirectionalShadowCoord[ i ].w;
+				vec2 edge = min( coord.xy, 1.0 - coord.xy );
+				float weight = ( coord.z >= 0.0 && coord.z <= 1.0 ) ? smoothstep( 0.0, ${FADE.toFixed(2)}, min( edge.x, edge.y ) ) : 0.0;
+				if ( weight > 0.0 ) held = 1.0 - weight + weight * getHeldShadow( directionalShadowMap[ i ], cascade.shadowIntensity, cascade.shadowBias, vDirectionalShadowCoord[ i ] );
+			}
+		} else if ( rest > 0.001 ) {
 			vec3 coord = vDirectionalShadowCoord[ i ].xyz / vDirectionalShadowCoord[ i ].w;
 			vec2 edge = min( coord.xy, 1.0 - coord.xy );
 			float weight = ( coord.z >= 0.0 && coord.z <= 1.0 ) ? smoothstep( 0.0, ${FADE.toFixed(2)}, min( edge.x, edge.y ) ) : 0.0;
 			if ( weight > 0.0 ) {
-				cascade = directionalLightShadows[ i ];
 				#if defined( SHADOWMAP_TYPE_PCF ) && UNROLLED_LOOP_INDEX > 0
 				lit += rest * weight * getFarShadow( directionalShadowMap[ i ], cascade.shadowIntensity, cascade.shadowBias, vDirectionalShadowCoord[ i ] );
 				#else
@@ -51,7 +68,7 @@ float getCascadedShadow() {
 		}
 	}
 	#pragma unroll_loop_end
-	return lit + rest;
+	return min( lit + rest, held );
 }
 #endif
 `

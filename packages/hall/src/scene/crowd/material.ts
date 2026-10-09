@@ -1,4 +1,11 @@
-import type { Material, MeshStandardMaterial, Texture, Vector3, WebGLRenderer } from "three"
+import {
+  type Material,
+  MeshDepthMaterial,
+  type MeshStandardMaterial,
+  type Texture,
+  Vector3,
+  type WebGLRenderer,
+} from "three"
 import { isWebGPU } from "../../render/backend.ts"
 import { installNodes, TSL } from "../tsl.ts"
 import type { BoneBake } from "./bake.ts"
@@ -202,8 +209,46 @@ export function crowdMaterial(
       .replace("#include <skinning_vertex>", POSITION)
   }
   material.customProgramCacheKey = () => "crowd"
+  material.userData.crowdDepth = crowdDepth(material, uniforms)
   return material
 }
+
+/**
+ * The ground the characters' shadow pass draws (atmosphere/characterShadows.ts): x and z of its
+ * centre, then its radius. A member beyond it has no bone weights in the depth shader, so it reads
+ * no bone texture and its triangles collapse to a point.
+ */
+export const castBox: { value: Vector3 } = { value: new Vector3(0, 0, 1e9) }
+
+/** The body material's depth twin, `customDepthMaterial` of its meshes: the same skinning, drawn from the sun. */
+function crowdDepth(body: MeshStandardMaterial, uniforms: CrowdUniforms): MeshDepthMaterial {
+  const depth = new MeshDepthMaterial()
+  depth.defines = { ...body.defines }
+  depth.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms, { crowdCastBox: castBox })
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <skinning_pars_vertex>", `uniform vec3 crowdCastBox;\n${PARS}`)
+      .replace("#include <skinbase_vertex>", DEPTH_BASE)
+      .replace("#include <skinning_vertex>", POSITION)
+  }
+  depth.customProgramCacheKey = () => "crowd-depth"
+  return depth
+}
+
+/** BASE, except that a member outside `castBox` gets no weights (and, as gear, no pose read). */
+export const DEPTH_BASE = BASE.replace(
+  "crowdPlace = crowdStageAt( 0 );",
+  "crowdPlace = crowdStageAt( 0 );\n\tbool crowdOut = distance( crowdPlace.xz, crowdCastBox.xy ) > crowdCastBox.z;",
+)
+  .replace(
+    "crowdPoses[ 0 ] = crowdPose( CROWD_BONE );",
+    "if ( ! crowdOut ) crowdPoses[ 0 ] = crowdPose( CROWD_BONE );",
+  )
+  .replace(
+    "vec4 crowdWeights = vec4( 1.0, 0.0, 0.0, 0.0 );",
+    "vec4 crowdWeights = crowdOut ? vec4( 0.0 ) : vec4( 1.0, 0.0, 0.0, 0.0 );",
+  )
+  .replace("vec4 crowdWeights = skinWeight;", "vec4 crowdWeights = crowdOut ? vec4( 0.0 ) : skinWeight;")
 
 /** How a crowd's materials are made: the uniforms they share, and a part's skinned material. */
 export interface CrowdShading {

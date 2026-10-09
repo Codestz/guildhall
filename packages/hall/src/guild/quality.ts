@@ -17,6 +17,11 @@ export const TIERS: Record<
     shadowMap: number
     /** Cascades of the key light's shadow on a gen 2 island (scene/atmosphere/cascades.ts). */
     cascades: number
+    /**
+     * Real shadows for characters inside the near cascade (scene/atmosphere/characterShadows.ts):
+     * who casts, the widest near box (world units) they still do in, and their map's size.
+     */
+    characters: { casts: "off" | "heroes" | "crowd"; reach: number; map: number }
     /** Ambient occlusion (N8AO): off, at half resolution, or full. Needs `post`. Off everywhere
      * for the 120 fps budget (it re-renders the scene); kept for a future Ultra tier. */
     ao: "off" | "half" | "full"
@@ -29,6 +34,7 @@ export const TIERS: Record<
     tiltShift: false,
     shadowMap: 1024,
     cascades: 1,
+    characters: { casts: "off", reach: 0, map: 0 },
     ao: "off",
     ...looks(false, false),
   },
@@ -39,6 +45,7 @@ export const TIERS: Record<
     tiltShift: false,
     shadowMap: 2048,
     cascades: 2,
+    characters: { casts: "heroes", reach: 20, map: 1024 },
     ao: "off",
     ...looks(false, true),
   },
@@ -51,6 +58,7 @@ export const TIERS: Record<
     tiltShift: false,
     shadowMap: 2048,
     cascades: 3,
+    characters: { casts: "crowd", reach: 28, map: 1024 },
     ao: "off",
     ...looks(true, true),
   },
@@ -61,6 +69,7 @@ export const TIERS: Record<
     tiltShift: true,
     shadowMap: 4096,
     cascades: 3,
+    characters: { casts: "crowd", reach: 56, map: 2048 },
     ao: "half",
     ...looks(true, true),
   },

@@ -1,5 +1,14 @@
 import type { LightShadow, Object3D, OrthographicCamera, PerspectiveCamera, Vector3 } from "three"
-import { biasOf, cascadeRadii, cellOf, fitCascade, nearRadius, type Span, snap } from "./cascades.ts"
+import {
+  biasOf,
+  cascadeRadii,
+  cellOf,
+  type Fit,
+  fitCascade,
+  nearRadius,
+  type Span,
+  snap,
+} from "./cascades.ts"
 import { shadows } from "./shadows.ts"
 import { sky } from "./state.ts"
 
@@ -69,21 +78,8 @@ export function stepCascades(lights: (CascadeLight | null)[], drawn: Drawn, view
     const was = drawn.cells[k]
     if (!(shadows.dirty || turned || !was || was.cx !== cx || was.cz !== cz || was.radius !== radius))
       continue
-    const fit = fitCascade(sky.keyDirection, cx, cz, radius, view.span, view.map)
+    aim(light, fitCascade(sky.keyDirection, cx, cz, radius, view.span, view.map))
     const shadow = light.shadow
-    light.position.set(...fit.position)
-    light.target.position.set(...fit.target)
-    light.target.updateMatrixWorld()
-    light.updateMatrixWorld()
-    const camera = shadow.camera as OrthographicCamera
-    camera.left = -fit.half
-    camera.right = fit.half
-    camera.top = fit.halfUp
-    camera.bottom = -fit.halfUp
-    camera.near = fit.near
-    camera.far = fit.far
-    camera.updateProjectionMatrix()
-    Object.assign(shadow, biasOf(fit))
     shadow.autoUpdate = false
     shadow.needsUpdate = true
     drawn.cells[k] = { cx, cz, radius }
@@ -98,6 +94,23 @@ export function stepCascades(lights: (CascadeLight | null)[], drawn: Drawn, view
   }
   for (const light of lights) if (light) light.shadow.intensity = sky.keyShadow
   return any
+}
+
+/** Put `light`'s shadow camera where `fit` says, with the bias that goes with its texel. */
+export function aim(light: CascadeLight, fit: Fit): void {
+  light.position.set(...fit.position)
+  light.target.position.set(...fit.target)
+  light.target.updateMatrixWorld()
+  light.updateMatrixWorld()
+  const camera = light.shadow.camera as OrthographicCamera
+  camera.left = -fit.half
+  camera.right = fit.half
+  camera.top = fit.halfUp
+  camera.bottom = -fit.halfUp
+  camera.near = fit.near
+  camera.far = fit.far
+  camera.updateProjectionMatrix()
+  Object.assign(light.shadow, biasOf(fit))
 }
 
 /**

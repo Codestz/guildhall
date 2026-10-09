@@ -6,6 +6,7 @@ import {
   landOf,
   ORTHO_BACK,
   orthoBackOf,
+  roundLand,
   viewReachOf,
   widestOf,
 } from "../src/scene/frameReach.ts"
@@ -39,7 +40,7 @@ describe("the growth film's pull-back", () => {
     test(`${screen.width}x${screen.height}: the sea covers it and the camera stands clear of it`, () => {
       for (const land of [BIG, SMALL]) {
         // The film holds the land's whole radius (growth/orbit.ts), at most the island's reach and a bit.
-        const film = groundOf(screen, filmZoom(screen, land.reach * 1.2))
+        const film = groundOf(screen, filmZoom(screen, roundLand(land.reach * 1.2)))
         expect(viewReachOf(screen, land)).toBeGreaterThan(film.radius + land.reach * 0.2)
         expect(orthoBackOf(screen, land)).toBeGreaterThan(film.depth + 2 * land.peak)
       }
@@ -72,5 +73,60 @@ describe("a portrait phone", () => {
   test("leaves the controls' zoom-out alone where the island already fills the screen, and on a desktop", () => {
     expect(widestOf(PHONE, BIG) * 2 * BIG.reach).toBeGreaterThan(PHONE.width)
     expect(widestOf(DESKTOP, SMALL)).toBeCloseTo((DESKTOP.height / 31) * 0.21, 5)
+  })
+})
+
+describe("the film's fit of a land's extents", () => {
+  const SIN = Math.sin(Math.atan2(0.93, Math.SQRT2))
+  /** The share of the screen's width, and of its height, the land's extents take at the film's zoom. */
+  const fills = (screen: { width: number; height: number }, across: number, deep: number) => {
+    const zoom = filmZoom(screen, { across, deep })
+    return { wide: across / (screen.width / 2 / zoom), high: (deep * SIN) / (screen.height / 2 / zoom) }
+  }
+
+  test("a phone fits an even land by its width, to ~90% of it", () => {
+    const { wide, high } = fills(PHONE, 100, 100)
+    expect(wide).toBeCloseTo(0.9, 2)
+    expect(high).toBeLessThan(0.5)
+  })
+
+  test("a desktop fits it by its height or its width, whichever it meets first, to ~90%", () => {
+    const { wide, high } = fills(DESKTOP, 100, 100)
+    expect(Math.max(wide, high)).toBeGreaterThan(0.8)
+    expect(Math.max(wide, high)).toBeLessThanOrEqual(0.9 + 1e-9)
+  })
+
+  test("a land long across the view frames by that; one long along it frames tighter", () => {
+    expect(filmZoom(DESKTOP, { across: 300, deep: 60 })).toBeCloseTo((DESKTOP.width * 0.9) / 2 / 300, 6)
+    expect(filmZoom(DESKTOP, { across: 60, deep: 400 })).toBeLessThan(
+      filmZoom(DESKTOP, { across: 300, deep: 60 }),
+    )
+  })
+
+  test("never crops the land on any screen", () => {
+    for (const screen of SCREENS)
+      for (const [across, deep] of [
+        [40, 200],
+        [200, 40],
+        [150, 150],
+      ] as const) {
+        const { wide, high } = fills(screen, across, deep)
+        expect(wide).toBeLessThanOrEqual(0.9 + 1e-9)
+        expect(high).toBeLessThanOrEqual(0.9 + 1e-9)
+      }
+  })
+
+  test("eases as land grows: more land is less zoom, in small steps (no jump)", () => {
+    let last = filmZoom(PHONE, { across: 20, deep: 20 })
+    for (let r = 21; r <= 300; r++) {
+      const zoom = filmZoom(PHONE, { across: r, deep: r })
+      expect(zoom).toBeLessThan(last)
+      expect(last / zoom).toBeLessThan(1.1)
+      last = zoom
+    }
+  })
+
+  test("a keep alone is not framed tighter than a floor", () => {
+    expect(filmZoom(PHONE, { across: 2, deep: 2 })).toBe(filmZoom(PHONE, { across: 16, deep: 16 }))
   })
 })

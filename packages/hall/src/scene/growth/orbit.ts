@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from "react"
 import type { OrthographicCamera, PerspectiveCamera, Vector3 } from "three"
 import { EPILOGUE_S } from "../../world/chronicle/growth.ts"
 import type { GrowthFrame } from "../../world/chronicle/growthFrame.ts"
+import { extentsFrom, fitAt } from "../../world/chronicle/growthReach.ts"
 import { useWorld } from "../../world/source.ts"
 import { filmZoom, landOf, orthoBackOf } from "../frameReach.ts"
 
@@ -35,6 +36,11 @@ const MOVE_KEYS = new Set([
   "arrowright",
 ])
 
+/** The frame closes in this much slower than it widens: land rising is met at once, a ghost sinking is not chased. */
+const SHRINK = 0.3
+const easeTo = (now: number, goal: number, k: number): number =>
+  now + (goal - now) * (goal > now ? k : k * SHRINK)
+
 /** The orbit's azimuth at film time `t`: turning, then easing home over the epilogue. Pure. */
 export function azimuthAt(t: number, duration: number): number {
   const turn = (2 * Math.PI) / TURN_S
@@ -56,7 +62,7 @@ export function useOrbit(frame: () => GrowthFrame | undefined, duration: number,
   const land = useMemo(() => landOf(world), [world])
   const dom = useThree((state) => state.gl.domElement)
   const taken = useRef(false)
-  const eased = useRef({ x: 0, z: 0, radius: 0, ready: false })
+  const eased = useRef({ x: 0, z: 0, radius: 0, across: 0, deep: 0, ready: false })
 
   useEffect(() => {
     const take = () => {
@@ -80,11 +86,17 @@ export function useOrbit(frame: () => GrowthFrame | undefined, duration: number,
     if (!controls || !f || taken.current || !on()) return
     const e = eased.current
     const k = e.ready ? 1 - Math.exp(-Math.min(delta, 0.1) * 3) : 1
-    e.x += (f.center[0] - e.x) * k
-    e.z += (f.center[1] - e.z) * k
-    e.radius += (Math.max(24, f.radius) - e.radius) * k
-    e.ready = true
     const azimuth = azimuthAt(f.t, duration)
+    // Frames the risen land's own box from this side, not what the plan holds (ghosts not yet up, ghosts sinking).
+    const fit = fitAt(f.reach, azimuth)
+    e.x += (fit.x - e.x) * k
+    e.z += (fit.z - e.z) * k
+    e.radius += (Math.max(24, f.radius) - e.radius) * k
+    // Its extents about where the camera looks, which is still easing toward the fit's middle.
+    const reach = extentsFrom(fit, e.x, e.z, azimuth)
+    e.across = e.ready ? easeTo(e.across, reach.across, k) : reach.across
+    e.deep = e.ready ? easeTo(e.deep, reach.deep, k) : reach.deep
+    e.ready = true
     const dx = Math.sin(azimuth) * Math.cos(ELEVATION)
     const dy = Math.sin(ELEVATION)
     const dz = Math.cos(azimuth) * Math.cos(ELEVATION)
@@ -95,9 +107,8 @@ export function useOrbit(frame: () => GrowthFrame | undefined, duration: number,
       // As far back as CameraRig stands it: a pull-back over the whole land must not run it into the near plane.
       const back = orthoBackOf(size, land)
       ortho.position.set(e.x + dx * back, 1 + dy * back, e.z + dz * back)
-      // The land's foreshortened height is ~0.6 of its width at this elevation; a portrait phone
-      // fits it by width, a little tighter (the reach is a corner-to-corner radius).
-      ortho.zoom = filmZoom(size, e.radius)
+      // The land's own extents across and along this view, fitted to the screen (frameReach.ts).
+      ortho.zoom = filmZoom(size, e)
     } else {
       const distance = e.radius * 2.7
       camera.position.set(e.x + dx * distance, 1 + dy * distance, e.z + dz * distance)

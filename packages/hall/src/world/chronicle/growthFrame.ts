@@ -1,4 +1,5 @@
 import { dayAt, type GrowthPlan, RISE_S, SINK_S } from "./growth.ts"
+import { REACH_DIRS, reachOf } from "./growthReach.ts"
 import { heldAt, STEP_S } from "./growthSpans.ts"
 
 /** The growth timelapse read at one film time (growth.ts' plan → a frame the scene draws). */
@@ -25,6 +26,8 @@ export interface GrowthFrame {
   /** Where the land up now is centred, and how far it reaches (world units). */
   center: [number, number]
   radius: number
+  /** The risen land's reach in REACH_DIRS directions from the origin (growthReach.ts): how wide it stands across any view. */
+  reach: Float32Array
 }
 
 export function emptyFrame(g: GrowthPlan): GrowthFrame {
@@ -41,6 +44,7 @@ export function emptyFrame(g: GrowthPlan): GrowthFrame {
     alpha: new Float32Array(g.districts.length),
     center: [0, 0],
     radius: 0,
+    reach: new Float32Array(REACH_DIRS),
   }
 }
 
@@ -101,6 +105,7 @@ export function growthAt(g: GrowthPlan, t: number, out: GrowthFrame = emptyFrame
   out.center[0] = lerp(g.frame[i0 * 3] as number, g.frame[i1 * 3] as number)
   out.center[1] = lerp(g.frame[i0 * 3 + 1] as number, g.frame[i1 * 3 + 1] as number)
   out.radius = lerp(g.frame[i0 * 3 + 2] as number, g.frame[i1 * 3 + 2] as number)
+  reachOf(g.spots, out.up, out.reach)
   return out
 }
 

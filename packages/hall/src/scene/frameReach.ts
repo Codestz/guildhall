@@ -1,3 +1,4 @@
+import type { Extents } from "../world/chronicle/growthReach.ts"
 import { peakOf } from "../world/peak.ts"
 import { reachOf, type World } from "../world/world.ts"
 import { outreachOf } from "./nature/shoreTiles.ts"
@@ -71,9 +72,27 @@ export function widestOf(screen: Screen, land: Land): number {
   return widestZoom(wide, screen.height, land.reach, land.peak)
 }
 
-/** The film's zoom for a land `radius` wide (growth/orbit.ts): the whole of it. The radius is the land's half-diagonal, so no turn of the orbit crops it; any tighter crops react's corners on a phone. */
-export const filmZoom = (screen: Screen, radius: number): number =>
-  Math.min(screen.width / 1.75, screen.height / 1.4) / radius
+/** The film fills this much of the limiting dimension of the screen with the land (the rest is sea, and the HUD's room). */
+const FILM_FILL = 0.9
+/** What stands on the land (buildings, trees) rises this high above its ground, world units: the top of the frame needs it. */
+const FILM_RISE = 8
+/** The film never frames less than this much ground each way, world units (the keep alone is a stone). */
+const FILM_LEAST = 16
+
+/**
+ * The film's orthographic zoom for a land of camera-aligned `extents` (growth/orbit.ts, growthReach.ts):
+ * how far it stands from the frame's middle across the view, and along it. It fills FILM_FILL of
+ * whichever of the screen's width and height it meets first (the height reads the ground foreshortened
+ * by the view's elevation, and what stands on it), so a phone fits it by width and a desktop by what is tighter.
+ */
+export function filmZoom(screen: Screen, extents: Extents): number {
+  const across = Math.max(FILM_LEAST, extents.across)
+  const high = Math.max(FILM_LEAST, extents.deep) * SIN + FILM_RISE * COS
+  return Math.min((screen.width * FILM_FILL) / 2 / across, (screen.height * FILM_FILL) / 2 / high)
+}
+
+/** The widest a land of `radius` can frame: it stands no further than that from its middle, whichever way the film looks. */
+export const roundLand = (radius: number): Extents => ({ across: radius, deep: radius })
 
 /** What a frame of `zoom` shows of the ground round its target: the far corner's distance, and how deep along the view. */
 export function groundOf(screen: Screen, zoom: number): { radius: number; depth: number } {
@@ -84,7 +103,7 @@ export function groundOf(screen: Screen, zoom: number): { radius: number; depth:
 
 /** The widest ground any orthographic framing of `land` shows on `screen`: the controls' zoom-out, or the film's. */
 function widestGround(screen: Screen, land: Land): { radius: number; depth: number } {
-  const zoom = Math.min(widestOf(screen, land), filmZoom(screen, land.reach * FILM_RADIUS))
+  const zoom = Math.min(widestOf(screen, land), filmZoom(screen, roundLand(land.reach * FILM_RADIUS)))
   return groundOf(screen, zoom)
 }
 

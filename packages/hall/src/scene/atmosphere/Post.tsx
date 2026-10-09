@@ -10,18 +10,21 @@ import {
 } from "@react-three/postprocessing"
 import { type BloomEffect, EdgeDetectionMode, ToneMappingMode, type VignetteEffect } from "postprocessing"
 import { lazy, Suspense, useEffect, useMemo, useRef } from "react"
-import type { Fog } from "three"
+import { type Fog, Vector3 } from "three"
 import { PROBE } from "../../guild/mode.ts"
 import { reducedMotion } from "../../guild/opening.ts"
 import { TIERS } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { isWebGPU } from "../../render/backend.ts"
+import { useWorld } from "../../world/source.ts"
+import { reachOf } from "../../world/world.ts"
 import { FRAME } from "../frame.ts"
 import { useTier } from "../Quality.tsx"
 import { GradeEffect } from "./GradeEffect.ts"
 import { useLooks } from "./looks.ts"
 import { MoodLutEffect } from "./MoodLut.ts"
 import { sky } from "./state.ts"
+import { WIDE_VIEW } from "./wideView.ts"
 
 /**
  * Bloom's bright-pass resolution, as a share of the frame. postprocessing runs it at full size when
@@ -30,6 +33,9 @@ import { sky } from "./state.ts"
  * only in the halo of the brightest specks (docs/perf-budget.md, final pass).
  */
 const BLOOM_INPUT = 0.5
+/** How much of the sky's tint the far side of a gen 2 island takes (GradeEffect.aerial). */
+const HAZE = 0.28
+const ORIGIN = new Vector3()
 
 /**
  * Post-processing per quality tier (ADR 0007, task "Sky"): bloom so flames and the sun glow, the
@@ -58,6 +64,10 @@ function PostGL() {
   const level = TIERS[useTier()]
   const looks = useLooks()
   const store = useGuildStore()
+  // Aerial perspective is a gen 2 island's (the hand island's pictures stay as they were).
+  const world = useWorld()
+  const haze = world.repo?.gen === 2 && WIDE_VIEW.haze
+  const reach = useMemo(() => reachOf(world), [world])
   const grade = useMemo(() => new GradeEffect(), [])
   const lut = useMemo(() => new MoodLutEffect(), [])
   const bloom = useRef<BloomEffect>(null)
@@ -73,11 +83,13 @@ function PostGL() {
   }, [grade, lut])
   useEffect(() => () => lut.dispose(), [lut])
 
-  useFrame(({ camera, gl }, delta) => {
+  useFrame(({ camera, controls, gl }, delta) => {
     const fog = scene.fog as Fog | null
     radii.near = fog?.near ?? 1e4
     radii.far = fog?.far ?? 2e4
     grade.apply(sky, camera, delta, radii, gl.getPixelRatio())
+    const at = (controls as unknown as { target?: Vector3 } | null)?.target
+    grade.aerial(sky, camera, at ?? ORIGIN, looks.mist && haze ? HAZE : 0, reach)
     if (looks.lut) lut.apply(sky, store.mood.id)
     const glow = bloom.current
     if (glow) {

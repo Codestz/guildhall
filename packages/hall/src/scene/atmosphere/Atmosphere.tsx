@@ -3,11 +3,16 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react"
 import { type DirectionalLight, Fog, type HemisphereLight, Vector3 } from "three"
 import { TIERS } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
+import { isWebGPU } from "../../render/backend.ts"
 import { fogRadiusOf } from "../../world/archipelago.ts"
 import { useArchipelago } from "../../world/archipelagoSource.ts"
+import { peakOf } from "../../world/peak.ts"
 import { useWorld } from "../../world/source.ts"
+import { reachOf } from "../../world/world.ts"
 import { FRAME } from "../frame.ts"
 import { useTier } from "../Quality.tsx"
+import { CascadeKey } from "./CascadeKey.tsx"
+import { installCascadeChunks } from "./cascadeChunk.ts"
 import { flash, stepLightning } from "./flash.ts"
 import { installRadialFog } from "./fog.ts"
 import { Lamps } from "./Lamps.tsx"
@@ -16,6 +21,7 @@ import { SkyDome } from "./SkyDome.tsx"
 import { shadows } from "./shadows.ts"
 import { updateSky } from "./sky.ts"
 import { sky } from "./state.ts"
+import { WIDE_VIEW } from "./wideView.ts"
 import { stepWind } from "./wind.ts"
 
 installRadialFog()
@@ -23,7 +29,7 @@ installLowGrade()
 
 /**
  * Sky and light (ADR 0007, task "Sky"): the dome, radial fog, the hemisphere fill, the sun or moon
- * (one shadow-casting light), and the flames' glow — all from `store.environment` and the mood,
+ * (one shadow-casting light, cascaded on a gen 2 island), and the flames' glow — all from `store.environment` and the mood,
  * through `sky.ts`. Nothing here keeps its own clock.
  */
 export function Atmosphere() {
@@ -31,7 +37,7 @@ export function Atmosphere() {
     <>
       <Weathervane />
       <SkyDome sky={sky} />
-      <Key />
+      <KeyLight />
       <Lamps sky={sky} />
     </>
   )
@@ -104,6 +110,27 @@ function Weathervane() {
   }, FRAME.SKY)
 
   return <hemisphereLight ref={hemi} />
+}
+
+/**
+ * A gen 2 island is too big for one shadow box: its key light is cascaded (CascadeKey.tsx) on
+ * WebGL. The hand island, gen 1 repos and WebGPU (whose shadow nodes have no cascade patch) keep
+ * the single box below, so their pictures are what they were.
+ */
+function KeyLight() {
+  const world = useWorld()
+  const gl = useThree((state) => state.gl)
+  const tier = TIERS[useTier()]
+  const cascaded = world.repo?.gen === 2 && WIDE_VIEW.cascades && !isWebGPU(gl) && installCascadeChunks()
+  if (!cascaded) return <Key />
+  return (
+    <CascadeKey
+      count={tier.cascades}
+      map={tier.shadowMap}
+      far={reachOf(world) + 12}
+      ceiling={peakOf(world)}
+    />
+  )
 }
 
 /**

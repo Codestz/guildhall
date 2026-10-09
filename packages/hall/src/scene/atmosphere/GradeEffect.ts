@@ -1,6 +1,7 @@
 import { Effect, EffectAttribute } from "postprocessing"
 import { type Camera, Color, Matrix4, type OrthographicCamera, Uniform, Vector2, Vector3 } from "three"
 import type { Looks } from "../../guild/quality.ts"
+import { hazeTint } from "./aerial.ts"
 import type { SkyState } from "./sky.ts"
 import { WIND_DIRECTION } from "./wind.ts"
 
@@ -72,6 +73,11 @@ export class GradeEffect extends Effect {
         ["shaftSource", new Uniform(new Vector2(2, 2))],
         ["shaftAxis", new Uniform(new Vector2(1, 0))],
         ["shaftClock", new Uniform(0)],
+        ["haze", new Uniform(0)],
+        ["hazeColor", new Uniform(new Color())],
+        ["hazeEye", new Uniform(new Vector3())],
+        ["hazeForward", new Uniform(new Vector2(0, 1))],
+        ["hazeRange", new Uniform(new Vector2(30, 200))],
       ]),
     })
   }
@@ -163,6 +169,26 @@ export class GradeEffect extends Effect {
     ;(u.get("shafts") as Uniform<number>).value = sky.shafts
     ;(u.get("shaftColor") as Uniform<Color>).value.copy(sky.shaftColor)
   }
+
+  /**
+   * Aerial perspective (a gen 2 island's, `reach` its radius; 0 strength off): the sky's horizon tint
+   * cooled towards blue, thickening from the camera's target outwards (an orthographic view) or
+   * from the lens (a perspective one).
+   */
+  aerial(sky: SkyState, camera: Camera, target: Vector3, strength: number, reach: number): void {
+    const u = this.uniforms
+    const ortho = (camera as OrthographicCamera).isOrthographicCamera
+    ;(u.get("haze") as Uniform<number>).value = strength
+    hazeTint(sky.fog, sky.saturation, (u.get("hazeColor") as Uniform<Color>).value)
+    // An orthographic view measures from the target, a perspective one from the lens.
+    ;(u.get("hazeEye") as Uniform<Vector3>).value.copy(ortho ? target : camera.position)
+    camera.getWorldDirection(view)
+    ;(u.get("hazeForward") as Uniform<Vector2>).value.set(view.x, view.z).normalize()
+    ;(u.get("hazeRange") as Uniform<Vector2>).value.set(
+      ortho ? reach * 0.15 : 25,
+      ortho ? reach * 0.9 : 25 + reach * 1.3,
+    )
+  }
 }
 
 const view = new Vector3()
@@ -203,6 +229,11 @@ uniform vec3 shaftColor;
 uniform vec2 shaftSource;
 uniform vec2 shaftAxis;
 uniform float shaftClock;
+uniform float haze;
+uniform vec3 hazeColor;
+uniform vec3 hazeEye;
+uniform vec2 hazeForward;
+uniform vec2 hazeRange;
 #endif
 
 #define CLOUD_SCALE ${CLOUD_SCALE.toFixed(1)}
@@ -293,6 +324,22 @@ float mistAt(vec3 world, float distance) {
   return mist * low * banks * (0.25 + 0.75 * far);
 }
 
+/**
+ * 0–1: aerial perspective. The further a surface is behind what the camera looks at, the more of
+ * the sky's tint lies between (ground and valleys more than peaks), so a far coast and the ranges
+ * behind the keep read pale and blue while the near ground keeps its colour.
+ */
+float hazeAt(vec3 world) {
+  #ifdef PERSPECTIVE_CAMERA
+  float distance = length(world - hazeEye);
+  #else
+  // Level distance behind the target, along the way the camera looks.
+  float distance = dot(world.xz - hazeEye.xz, hazeForward);
+  #endif
+  float far = smoothstep(hazeRange.x, hazeRange.y, distance);
+  return haze * far * mix(1.0, 0.6, smoothstep(0.0, 40.0, world.y));
+}
+
 /** 1D value noise: 2 hashes. */
 float shaftNoise(float x) {
   float i = floor(x);
@@ -331,6 +378,10 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth,
       m = mistAt(world, -getViewZ(depth)) * clear * (1.0 - smoothstep(0.7, 2.5, dot(c, vec3(0.2126, 0.7152, 0.0722))));
       // Mist only ever lifts: under a storm's dark sky it must not drag the ground down with it.
       c = mix(c, max(c, mistColor * exposure), min(m, 0.85));
+    }
+    if (haze > 0.002) {
+      float glow = 1.0 - smoothstep(0.7, 2.5, dot(c, vec3(0.2126, 0.7152, 0.0722)));
+      c = mix(c, hazeColor * exposure, hazeAt(world) * clear * glow);
     }
     if (shafts > 0.001)
       c += shaftColor * exposure * shafts * shaftAt(uv) * (1.0 - cover) * (0.45 + 0.55 * min(m * 3.0, 1.0));

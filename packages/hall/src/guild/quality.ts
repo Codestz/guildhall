@@ -15,6 +15,8 @@ export const TIERS: Record<
     post: boolean
     tiltShift: boolean
     shadowMap: number
+    /** Cascades of the key light's shadow on a gen 2 island (scene/atmosphere/cascades.ts). */
+    cascades: number
     /** Ambient occlusion (N8AO): off, at half resolution, or full. Needs `post`. Off everywhere
      * for the 120 fps budget (it re-renders the scene); kept for a future Ultra tier. */
     ao: "off" | "half" | "full"
@@ -26,6 +28,7 @@ export const TIERS: Record<
     post: false,
     tiltShift: false,
     shadowMap: 1024,
+    cascades: 1,
     ao: "off",
     ...looks(false, false),
   },
@@ -35,6 +38,7 @@ export const TIERS: Record<
     post: true,
     tiltShift: false,
     shadowMap: 2048,
+    cascades: 2,
     ao: "off",
     ...looks(false, true),
   },
@@ -46,6 +50,7 @@ export const TIERS: Record<
     post: true,
     tiltShift: false,
     shadowMap: 2048,
+    cascades: 3,
     ao: "off",
     ...looks(true, true),
   },
@@ -55,6 +60,7 @@ export const TIERS: Record<
     post: true,
     tiltShift: true,
     shadowMap: 4096,
+    cascades: 3,
     ao: "half",
     ...looks(true, true),
   },

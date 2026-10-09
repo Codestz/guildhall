@@ -3,7 +3,6 @@
     "audio/SoundStage.tsx -> hud/prefs.ts",
     "audio/SoundStage.tsx -> scene/atmosphere/wind.ts",
     "audio/SoundStage.tsx -> scene/sigilBoard.ts",
-    "guild/store.ts -> scene/life/traces.ts",
     "hud/Hud.tsx -> scene/chips.ts",
     "hud/Islands.tsx -> scene/archipelago/view.ts",
     "hud/RecapCapture.ts -> scene/Ships.tsx",

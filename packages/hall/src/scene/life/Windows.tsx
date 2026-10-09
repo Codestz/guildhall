@@ -13,10 +13,10 @@ import {
   SRGBColorSpace,
   Vector3,
 } from "three"
+import { hash } from "../../guild/traces.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { HEX_SCALE, island, type LandPiece } from "../../world/lands.ts"
 import { useOwnedMeshes } from "../owned.ts"
-import { hash } from "./traces.ts"
 
 /**
  * Lit windows (ADR 0007, Life): at dusk the village's windows glow, warm and HDR so bloom carries

@@ -1,5 +1,5 @@
 import type { Session } from "@guildhall/core"
-import { SITE_DEFS, siteOf } from "../../world/sites.ts"
+import { SITE_DEFS, siteOf } from "../world/sites.ts"
 
 /**
  * Work leaves traces (ADR 0007, Life): every deed that finishes at a job site leaves something

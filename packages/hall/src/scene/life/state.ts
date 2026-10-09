@@ -1,6 +1,6 @@
 import type { GuildStore } from "../../guild/store.ts"
+import { NO_TRACES, TraceLedger, type Traces } from "../../guild/traces.ts"
 import { SITE_DEFS } from "../../world/sites.ts"
-import { NO_TRACES, TraceLedger, type Traces } from "./traces.ts"
 
 /**
  * What the Life layer reads from the guild, refreshed once a frame (before any Life piece draws)

@@ -92,3 +92,52 @@ const identityOf = (s: Session): string =>
 /** Party and name: the root session is the guildmaster whatever agent runs it (guild/casting.ts). */
 const keyOf = (model: Model, s: Session, names: Names): string =>
   `${rootOf(model, s.id)}\u0000${namedOf(s, names).name}`
+
+/**
+ * Which of its role `s` is in its party, by join order (1-based) — the same number `viewsOf` gives
+ * it, for lines written as events arrive.
+ */
+export function ordinalOf(model: Model, s: Session, names: Names = "world"): number {
+  const root = rootOf(model, s.id)
+  const title = namedOf(s, names).name
+  let n = 1
+  for (const other of model.sessions.values()) {
+    if (other === s || rootOf(model, other.id) !== root) continue
+    const otherTitle = namedOf(other, names).name
+    if (otherTitle === title && byJoin(other, s) < 0) n++
+  }
+  return n
+}
+
+/** `Implementer`, `Implementer II`, `Implementer III`: the first of a role keeps its plain name. */
+export function numbered(title: string, ordinal: number): string {
+  return ordinal > 1 ? `${title} ${roman(ordinal)}` : title
+}
+
+const ROMAN: [number, string][] = [
+  [1000, "M"],
+  [900, "CM"],
+  [500, "D"],
+  [400, "CD"],
+  [100, "C"],
+  [90, "XC"],
+  [50, "L"],
+  [40, "XL"],
+  [10, "X"],
+  [9, "IX"],
+  [5, "V"],
+  [4, "IV"],
+  [1, "I"],
+]
+
+export function roman(n: number): string {
+  let rest = Math.max(1, Math.floor(n))
+  let out = ""
+  for (const [value, letters] of ROMAN) {
+    while (rest >= value) {
+      out += letters
+      rest -= value
+    }
+  }
+  return out
+}

@@ -11,14 +11,14 @@ import type { Mix } from "./wilds.ts"
  * Where a site is (its spot, posts and landmark) is map data: the hand lands' `lands.ts` `SITES`, or
  * on a repo's island the district it took (`sitesOf(world)`, world/siteMap.ts); this adds what
  * happens there. Everything that varies by site reads it: the work loop and gear (scene/Adventurer), the
- * traces (scene/life/traces), the machines (scene/life/state), the yard's growth (guild/store) and
+ * traces (guild/traces), the machines (scene/life/state), the yard's growth (guild/store) and
  * the wilds (world/wilds).
  *
  * Adding a site: an id in `SiteId`, its map entry in `SITES` (spot, posts, landmark — its art), and
  * its entry here; the compiler asks for each. Which archetypes go there is the roster's (`Archetype.site`).
  */
 
-/** Trace piles (scene/life/traces.ts `Traces`). */
+/** Trace piles (guild/traces.ts `Traces`). */
 export type Pile = "logs" | "stones" | "fish" | "books" | "hits" | "misses"
 /** Life-layer machines a site's workers keep running (scene/life/state.ts). */
 export type Machine = "forging" | "sawing" | "fishing"

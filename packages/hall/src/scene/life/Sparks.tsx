@@ -1,10 +1,10 @@
 import { useFrame } from "@react-three/fiber"
 import { useMemo } from "react"
 import { BoxGeometry, Color, InstancedMesh, Matrix4, MeshBasicMaterial, Quaternion, Vector3 } from "three"
+import { hash } from "../../guild/traces.ts"
 import { island } from "../../world/lands.ts"
 import { useOwnedMeshes } from "../owned.ts"
 import { life } from "./state.ts"
-import { hash } from "./traces.ts"
 
 /**
  * The smithy forges while implementers work at the yard (ADR 0007, Life): a shower of sparks

@@ -16,7 +16,7 @@ import type { World } from "./world.ts"
  * work, wipe a brow); a tool call steers it (a test run at the forge → quench and inspect).
  *
  * The loop is *working*, not *results*: nothing it does touches the traces. Piles, the yard's
- * building and the arrows in the targets still grow only from completed deeds (scene/life/traces).
+ * building and the arrows in the targets still grow only from completed deeds (guild/traces).
  *
  * Pure data and a pure state machine (`Routine`), no three.js: the scene (scene/activity.ts,
  * scene/Adventurer.tsx) walks the body, plays the clip, shows what is held and fires the beats.

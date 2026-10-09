@@ -10,14 +10,6 @@ import {
   Quaternion,
   Vector3,
 } from "three"
-import { pilesOf } from "../../world/behaviours.ts"
-import { HEX_SCALE } from "../../world/lands.ts"
-import { useWorld } from "../../world/source.ts"
-import type { World } from "../../world/world.ts"
-import { useOwnedMeshes } from "../owned.ts"
-import { type Pile, TARGET_FACE, targets } from "./places.ts"
-import { arrowGeometry, bookGeometry, COVERS, fishGeometry, logGeometry, stoneGeometry } from "./shapes.ts"
-import { life } from "./state.ts"
 import {
   CAPACITY,
   hash,
@@ -29,7 +21,15 @@ import {
   type Slot,
   stackSlot,
   type Traces,
-} from "./traces.ts"
+} from "../../guild/traces.ts"
+import { pilesOf } from "../../world/behaviours.ts"
+import { HEX_SCALE } from "../../world/lands.ts"
+import { useWorld } from "../../world/source.ts"
+import type { World } from "../../world/world.ts"
+import { useOwnedMeshes } from "../owned.ts"
+import { type Pile, TARGET_FACE, targets } from "./places.ts"
+import { arrowGeometry, bookGeometry, COVERS, fishGeometry, logGeometry, stoneGeometry } from "./shapes.ts"
+import { life } from "./state.ts"
 
 /**
  * Work leaves traces (ADR 0007, Life; counts in traces.ts): logs by the lumber mill, stones by the

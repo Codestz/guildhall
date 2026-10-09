@@ -1,15 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { applyAll, type Change, emptyModel, type Session } from "@guildhall/core"
 import { party, rush, Script } from "@guildhall/sim"
-import {
-  CAPACITY,
-  heapSlot,
-  logSlot,
-  NO_TRACES,
-  shown,
-  TraceLedger,
-  tracesOf,
-} from "../src/scene/life/traces.ts"
+import { CAPACITY, heapSlot, logSlot, NO_TRACES, shown, TraceLedger, tracesOf } from "../src/guild/traces.ts"
 
 function sessions(changes: readonly Change[], until = Number.POSITIVE_INFINITY): Session[] {
   return [

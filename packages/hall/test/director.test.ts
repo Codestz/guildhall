@@ -455,7 +455,14 @@ describe("replay fast-forward", () => {
 
     const live = new GuildStore()
     live.setDirector("cinematic")
-    live.mode = "live"
+    // Following a hub (guild/feeds/live.ts) that never answers: a socket that does nothing.
+    const socket = globalThis.WebSocket
+    globalThis.WebSocket = class {
+      close() {}
+    } as unknown as typeof WebSocket
+    live.live("ws://127.0.0.1:1/ws")
+    globalThis.WebSocket = socket
+    expect(live.mode).toBe("live")
     for (let t = 0; t < 20_000; t += 16) live.tick(16)
     expect(live.fastForward).toBe(1)
   })

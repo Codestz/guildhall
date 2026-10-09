@@ -12,9 +12,9 @@ import {
   Vector3,
 } from "three"
 import type { Tier } from "../../guild/quality.ts"
+import { hash } from "../../guild/traces.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { useOwnedMeshes } from "../owned.ts"
-import { hash } from "./traces.ts"
 
 /**
  * Quiet ambience (ADR 0007, Life): a few birds wheel over the forest and the lake. They flap now

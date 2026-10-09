@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test"
 import { applyAll, emptyModel, type Session } from "@guildhall/core"
 import { Script } from "@guildhall/sim"
 import { AnimationClip, Bone, Group, QuaternionKeyframeTrack, VectorKeyframeTrack } from "three"
+import { NO_TRACES, tracesOf } from "../src/guild/traces.ts"
 import { attachHands, CARRY_WALK, carryClip, HAND_SLOT, release, reserve } from "../src/scene/activity.ts"
 import { life } from "../src/scene/life/state.ts"
-import { NO_TRACES, tracesOf } from "../src/scene/life/traces.ts"
 import { beats, emitBeat } from "../src/scene/life/work.ts"
 import {
   type Behaviour,

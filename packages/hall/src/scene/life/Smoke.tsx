@@ -10,12 +10,12 @@ import {
   Vector3,
 } from "three"
 import type { Tier } from "../../guild/quality.ts"
+import { hash } from "../../guild/traces.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { island } from "../../world/lands.ts"
 import { WIND_DIRECTION, wind } from "../atmosphere/wind.ts"
 import { useOwnedMeshes } from "../owned.ts"
 import { life } from "./state.ts"
-import { hash } from "./traces.ts"
 
 /**
  * Chimney smoke (ADR 0007, Life): low-poly puffs that rise, swell and shrink away from every

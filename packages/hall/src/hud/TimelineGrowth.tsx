@@ -23,7 +23,7 @@ export function useGrowthPhase(): typeof growth.phase {
 const number = (n: number): string => n.toLocaleString("en")
 
 /**
- * The growth timelapse's HUD (`?grow`, ADR 0010): the date the island has reached, its contributors
+ * The growth timelapse's HUD (`?grow`, ADR 0021): the date the island has reached, its contributors
  * ticking up, and a tape to play, pause, change speed, scrub (drag, or keys: Space plays and
  * pauses, the arrows and Page keys step, Home and End jump) and close; above it, the milestone being
  * told, in the story strip's title-card look. The clock moves every frame without React: one rAF

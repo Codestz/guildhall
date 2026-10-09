@@ -8,7 +8,7 @@ import { sitesOf } from "./siteMap.ts"
 import type { World } from "./world.ts"
 
 /**
- * Work at any district of a repo's island (ADR 0013), not only the six the story's sites took
+ * Work at any district of a repo's island (ADR 0022), not only the six the story's sites took
  * (world/siteMap.ts): the townsfolk work in their own district. A district works the trade its
  * landmark is for, laid out round its own posts as a repo site's is (behaviours.ts `repoSpots`):
  * pickaxes at the mine, spells at the tower, bows at the range. Everywhere else builders hammer at

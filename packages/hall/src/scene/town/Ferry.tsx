@@ -17,7 +17,7 @@ const AWAY = 130
 const DRAFT = 1
 
 /**
- * The town's ferry (ADR 0013): a small ship (ships.glb, the seas' own Kenney hulls) that sails in
+ * The town's ferry (ADR 0022): a small ship (ships.glb, the seas' own Kenney hulls) that sails in
  * and moors at the quay while contributors come ashore or leave (guild/town: the first commit's
  * week, a year past the last), and out of sight when nobody does. Where it is is a pure function
  * of the town's day (world/town/presence.ts `ferryAt`), so the film's scrubbing moves it too.

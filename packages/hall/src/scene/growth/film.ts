@@ -7,7 +7,7 @@ import { summarize } from "../../world/gen/repo.ts"
 import type { World } from "../../world/world.ts"
 
 /**
- * A repo's film (ADR 0010): its tree (cached for the session by world/gen/load.ts, so not fetched
+ * A repo's film (ADR 0021): its tree (cached for the session by world/gen/load.ts, so not fetched
  * again) grown into the same island the hall draws, its chronicle (bundled, or quick-built from
  * GitHub), and the growth plan and story read off them. Resolves with the reason in words when there
  * is no history to tell.

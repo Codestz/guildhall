@@ -32,7 +32,7 @@ interface Site {
 }
 
 /**
- * Construction on the growing island (ADR 0010): a wooden scaffold round every building as it goes
+ * Construction on the growing island (ADR 0021): a wooden scaffold round every building as it goes
  * up, with a stack of planks beside it, and tents pitched on a ghost district's borrowed land. Three
  * instanced meshes, three draw calls, written once a frame from the driver's frame (scene/growth/
  * drive.ts) with growthPieces' stages; no shadows (the static shadow map is the island's).

@@ -134,7 +134,7 @@ export function Scene() {
  * close to joins it, one draw per model part for all of them (scene/crowd/lod.ts). At or under it —
  * every story the hall ships — there is no crowd at all and everyone draws as they always did.
  *
- * On a repo's island with a chronicle the town's townsfolk (guild/town, ADR 0013) join the cast as
+ * On a repo's island with a chronicle the town's townsfolk (guild/town, ADR 0022) join the cast as
  * figures like any other; through a growth film (`today` false) they are the whole cast.
  */
 function Cast({ today }: { today: boolean }) {

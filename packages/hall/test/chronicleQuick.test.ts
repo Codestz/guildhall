@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { chronicleFile } from "../src/world/chronicle/bundled.ts"
+import { chronicleFile, repoDisplayName } from "../src/world/chronicle/bundled.ts"
 import { dayOf, encodeChronicle } from "../src/world/chronicle/format.ts"
 import { QUICK_LIMIT, quickChronicle } from "../src/world/chronicle/quick.ts"
 import { GitHubError } from "../src/world/gen/fetch.ts"
@@ -225,6 +225,14 @@ describe("chronicleFor (?repo=)", () => {
     expect((await chronicleFor("facebook/react", undefined, fetcher))?.depth).toBe("deep")
     expect(asked).toEqual(["/chronicles/react__react.json.gz"])
     expect(chronicleFile("sample")).toBe("codestz__guildhall.json.gz")
+  })
+
+  test("a repo's display name is the one the island was opened with, across a rename", () => {
+    expect(repoDisplayName("facebook/react", "react/react")).toBe("facebook/react")
+    expect(repoDisplayName("acme/tool", "acme/tool")).toBe("acme/tool")
+    expect(repoDisplayName(undefined, "react/react")).toBe("react/react")
+    expect(repoDisplayName("sample", "Codestz/guildhall")).toBe("Codestz/guildhall")
+    expect(repoDisplayName("acme/other", "acme/tool")).toBe("acme/tool")
   })
 
   test("without one it builds quick, and without GitHub it is undefined (tree-only)", async () => {

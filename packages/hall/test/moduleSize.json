@@ -10,7 +10,7 @@
   "packages/hall/src/hud/Legends.tsx": 485,
   "packages/hall/src/hud/Recap.tsx": 477,
   "packages/hall/src/hud/RecapDraw.ts": 490,
-  "packages/hall/src/hud/RepoDoor.tsx": 566,
+  "packages/hall/src/hud/RepoDoor.tsx": 562,
   "packages/hall/src/lab/crowdLab.ts": 403,
   "packages/hall/src/scene/Adventurer.tsx": 655,
   "packages/hall/src/scene/CameraRig.tsx": 794,

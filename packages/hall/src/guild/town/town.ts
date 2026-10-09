@@ -13,7 +13,7 @@ import type { AdventurerView } from "../views.ts"
 import { townViewsOf } from "./views.ts"
 
 /**
- * The town (ADR 0013): on a repo's island with a chronicle, its contributors live there as
+ * The town (ADR 0022): on a repo's island with a chronicle, its contributors live there as
  * townsfolk. This keeps who is in town on the day the island shows — today, or the growth film's
  * day while it plays — and their views for the cast (scene/Scene.tsx), the dossier and the film's
  * tape. The cast ticks it once a frame; it reads the island again at most UPDATE_S apart (the film

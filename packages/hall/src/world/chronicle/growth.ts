@@ -10,7 +10,7 @@ import { districtsAt } from "./reconstruct.ts"
 export { STEP_S } from "./growthSpans.ts"
 
 /**
- * A repo's growth timelapse (`?grow`, ADR 0010) as a pure function of film time: no three, no
+ * A repo's growth timelapse (`?grow`, ADR 0021) as a pure function of film time: no three, no
  * React. The film runs from the first commit to today in `duration` seconds; every hex of today's
  * island (the plan islandFromTree made) is up or under the sea at each moment, so a seek, a paused
  * probe shot and a replay all show the same island (scene/seas/fleet.ts' pattern).

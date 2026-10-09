@@ -5,7 +5,7 @@ import { EPILOGUE_S } from "../../world/chronicle/growth.ts"
 import type { GrowthFrame } from "../../world/chronicle/growthFrame.ts"
 
 /**
- * The timelapse's establishing shot (ADR 0010): a slow orbit round the land that is up, widening
+ * The timelapse's establishing shot (ADR 0021): a slow orbit round the land that is up, widening
  * as the island grows, at the hall's isometric elevation. In the epilogue it turns back to the
  * hall's own angle, so the hand-back to the Bard is seamless. Any pointer, wheel or movement key of
  * yours ends it for this film: the camera is then yours (CameraRig), the film keeps playing.

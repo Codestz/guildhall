@@ -30,7 +30,7 @@ import { filmWindow, HARBOUR, MAX_RESIDENTS, townsfolkAt } from "../src/world/to
 import { repoWorld, type World } from "../src/world/world.ts"
 
 /**
- * Contributors as townsfolk (ADR 0013): the pure reading of a chronicle on a day (world/town), the
+ * Contributors as townsfolk (ADR 0022): the pure reading of a chronicle on a day (world/town), the
  * district places they work at (world/districtWork.ts) and the views the cast draws (guild/town).
  * Against react's real chronicle and tree.
  */

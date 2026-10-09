@@ -14,7 +14,7 @@ export const BURST_S = 9
 const SINK_S = 1.2
 
 /**
- * A major release in the timelapse (ADR 0010): the hall's festival — bunting, lanterns, confetti
+ * A major release in the timelapse (ADR 0021): the hall's festival — bunting, lanterns, confetti
  * by day and fireworks by night — for a few seconds of film, then it sinks into the square like
  * everything else that goes. It is the event as the guild earns it, mounted on its own (never
  * through the scheduler: it isn't the guild's renown and doesn't enter the book).

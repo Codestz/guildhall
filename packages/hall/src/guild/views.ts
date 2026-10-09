@@ -64,7 +64,7 @@ export interface AdventurerView {
   /** The island job site they work at (ADR 0006), instead of a station. */
   site?: SiteId
   /**
-   * A repo island's district they work in (world/districtWork.ts; the townsfolk, ADR 0013): its own
+   * A repo island's district they work in (world/districtWork.ts; the townsfolk, ADR 0022): its own
    * posts, with `site` the trade they work there.
    */
   district?: string

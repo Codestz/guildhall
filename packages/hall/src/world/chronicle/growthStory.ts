@@ -2,7 +2,7 @@ import type { Chronicle, Milestone, MilestoneKind } from "./format.ts"
 import { type GrowthPlan, timeOfDay } from "./growth.ts"
 
 /**
- * The growth timelapse's story layer (ADR 0010), pure: which of the chronicle's milestones are told
+ * The growth timelapse's story layer (ADR 0021), pure: which of the chronicle's milestones are told
  * as captions (and when), which releases throw a festival, and the counters that tick under the
  * year. Everything is a function of film time, so scrubbing tells the same story.
  */

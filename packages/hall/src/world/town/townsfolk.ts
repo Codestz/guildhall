@@ -6,7 +6,7 @@ import { callingOf } from "./calling.ts"
 import { commitsBy, type Presence, presenceAt, STAY_DAYS, WINDOW_DAYS, weeklyTotals } from "./presence.ts"
 
 /**
- * A repo's contributors as its townsfolk (ADR 0013): who is in town on a day, what they are, how
+ * A repo's contributors as its townsfolk (ADR 0022): who is in town on a day, what they are, how
  * seasoned, how busy, and which district they work in. Pure and GPU-free: no three, no React, no
  * clock; the guild's town (guild/town) turns residents into the figures the cast draws.
  *

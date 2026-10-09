@@ -1,7 +1,7 @@
 import type { ArchetypeId } from "@guildhall/roster"
 
 /**
- * What a contributor is in the world, from where they commit (ADR 0013): the archetype whose trade
+ * What a contributor is in the world, from where they commit (ADR 0022): the archetype whose trade
  * matches what their home folder holds. One table, first match wins, read off the folder's own name
  * (a package's, for "packages/react-devtools-core"), so `test-utils` anywhere is a Warden's and
  * `packages/core` an Architect's.

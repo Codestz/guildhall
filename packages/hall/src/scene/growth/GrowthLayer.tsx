@@ -18,7 +18,7 @@ import { restoreGrowables, veilGrowables } from "./registry.ts"
 const SHADOW_EVERY_S = 0.25
 
 /**
- * The growth timelapse on stage (`?grow`, ADR 0010), mounted only while a film is asked
+ * The growth timelapse on stage (`?grow`, ADR 0021), mounted only while a film is asked
  * (scene/growth/Growth.tsx) and fetched as its own chunk. It loads the film once the repo's island
  * is in, then once a frame: advances the clock (world/chronicle/growthControl.ts), draws the frame
  * onto the island's own batches (drive.ts) and the water and grass mask (mask.ts), asks for a shadow

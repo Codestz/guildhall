@@ -9,7 +9,7 @@ import { SHORE } from "../nature/shore.ts"
 import { outreachOf } from "../nature/shoreTiles.ts"
 
 /**
- * The growth timelapse's land mask (ADR 0010): one small texture over the shore bake's square
+ * The growth timelapse's land mask (ADR 0021): one small texture over the shore bake's square
  * (±SHORE.half, laid out like it: row 0 at z = +half), so the water and the grass follow the film
  * without a re-bake. An island that reaches past it (nature/shoreTiles.ts) gets a mask as many of
  * those squares across, at the same density. Red: how green each hex is (the grass grows there:

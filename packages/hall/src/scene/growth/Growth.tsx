@@ -5,7 +5,7 @@ import { growing, growParam, growth } from "../../world/chronicle/growthControl.
 /** The film's layer: its own chunk, fetched the first time a film is asked. */
 const GrowthLayer = lazy(() => import("./GrowthLayer.tsx"))
 
-// A link's `?grow` (with `?repo=`) asks for the film as the hall loads (ADR 0010).
+// A link's `?grow` (with `?repo=`) asks for the film as the hall loads (ADR 0021).
 if (typeof location !== "undefined") {
   const asked = growParam(location.search)
   const repo = new URLSearchParams(location.search).get("repo")
@@ -20,7 +20,7 @@ export function useGrowing(): boolean {
 }
 
 /**
- * The growth timelapse's place in the scene (`?grow`, ADR 0010): nothing at all until a film is
+ * The growth timelapse's place in the scene (`?grow`, ADR 0021): nothing at all until a film is
  * asked (the repo legend's "Watch it grow", the repo door, or the link), then its lazy layer.
  */
 export function Growth() {

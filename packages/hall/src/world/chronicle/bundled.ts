@@ -18,6 +18,17 @@ export function chronicleFile(repo: string): string {
   return `${(ALIASES[name] ?? name).replace("/", "__")}.json.gz`
 }
 
+/**
+ * The name to show for a repo: the one the island was opened with ("facebook/react"), when the
+ * chronicle is of that same repo under GitHub's current spelling ("react/react"); else the
+ * chronicle's. The single source of a repo's display name, for every surface that names it.
+ */
+export function repoDisplayName(opened: string | undefined, chronicleName: string): string {
+  return opened && opened !== "sample" && chronicleFile(opened) === chronicleFile(chronicleName)
+    ? opened
+    : chronicleName
+}
+
 export async function bundledChronicle(
   repo: string,
   fetcher: typeof fetch = fetch,

@@ -6,7 +6,7 @@ import { cellAt, key } from "../../world/gen/hex.ts"
 import { KEEP } from "../../world/gen/plan.ts"
 
 /**
- * What the growth timelapse (`?grow`, ADR 0010) may move: the island's own batches (scene/Island,
+ * What the growth timelapse (`?grow`, ADR 0021) may move: the island's own batches (scene/Island,
  * nature/Wilds) and the fields' group, registered by those layers while they are mounted. Each
  * batch says, per instance it drew, what kind of piece it is and where it stands
  * (`markGrowable`); the film (scene/growth/drive.ts) then rides those instances up and down with

@@ -33,7 +33,7 @@ export const AGENT_RANK: RankRule = ({ deeds, tokens }) => {
   return "apprentice"
 }
 
-/** A repo's contributors rank by commits (ADR 0013): the bars are set by the repo's own spread. */
+/** A repo's contributors rank by commits (ADR 0022): the bars are set by the repo's own spread. */
 export type CommitRule = (commits: number) => Rank
 
 /** Commits a journeyman and a master need at least, however small the repo. */

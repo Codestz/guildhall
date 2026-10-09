@@ -9,7 +9,7 @@ import { initials, type Names } from "../casting.ts"
 import type { AdventurerView } from "../views.ts"
 
 /**
- * The townsfolk as the cast draws them (ADR 0013): each resident (world/town/townsfolk.ts) as an
+ * The townsfolk as the cast draws them (ADR 0022): each resident (world/town/townsfolk.ts) as an
  * AdventurerView, so the hall's own figures, crowd, chips and routines carry them unchanged.
  *
  *   busy      at work at one of their district's posts (a hash of their login picks which), running

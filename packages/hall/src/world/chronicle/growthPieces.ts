@@ -1,5 +1,5 @@
 /**
- * What each placed piece of the island does while it grows (ADR 0010), pure: read off its hex's
+ * What each placed piece of the island does while it grows (ADR 0021), pure: read off its hex's
  * frame (growthFrame.ts) and the piece's role.
  *
  *   sea     never moves (the sea floor's own tiles)

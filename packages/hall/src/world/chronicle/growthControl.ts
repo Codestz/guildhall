@@ -3,7 +3,7 @@ import type { GrowthPlan } from "./growth.ts"
 import type { GrowthStory } from "./growthStory.ts"
 
 /**
- * The growth timelapse's transport (ADR 0010): which repo is asked to grow, the film's clock, play,
+ * The growth timelapse's transport (ADR 0021): which repo is asked to grow, the film's clock, play,
  * pause, speed and seek. No three, no React: the scene drives `tick` once a frame and draws
  * whatever `t` says (scene/growth), the HUD reads and steers it (hud/TimelineGrowth.tsx).
  *

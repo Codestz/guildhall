@@ -8,7 +8,7 @@ import {
 } from "../chronicle/format.ts"
 
 /**
- * When a contributor is in town and how busy (ADR 0013), from their weekly commits alone: pure, so
+ * When a contributor is in town and how busy (ADR 0022), from their weekly commits alone: pure, so
  * the film, a seek and today all agree.
  *
  *   arriving   the first `window` days from their first commit: they come off the ferry

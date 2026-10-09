@@ -1,5 +1,5 @@
 /*
- * The growth timelapse's tape and captions (hud/TimelineGrowth.tsx, ADR 0010). Built on hall.css'
+ * The growth timelapse's tape and captions (hud/TimelineGrowth.tsx, ADR 0021). Built on hall.css'
  * tokens and pieces (.plaque, .play, .track, .beat, .story-line[data-kind="chapter"]); only the
  * layout is its own. Desktop: one row, bottom centre. Phones: two rows, edge to edge in the gutter.
  */

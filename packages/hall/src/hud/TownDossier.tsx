@@ -3,7 +3,9 @@ import { useSyncExternalStore } from "react"
 import { RANK_LABEL } from "../guild/casting.ts"
 import type { GuildStore } from "../guild/store.ts"
 import { town } from "../guild/town/town.ts"
+import { repoDisplayName } from "../world/chronicle/bundled.ts"
 import { isoOf } from "../world/chronicle/format.ts"
+import { useWorld } from "../world/source.ts"
 import { activityBuckets } from "../world/town/presence.ts"
 import type { Resident } from "../world/town/townsfolk.ts"
 import { Icon } from "./icons.tsx"
@@ -27,7 +29,7 @@ export function useResident(id: string | null): Resident | undefined {
 }
 
 /**
- * A contributor up close (ADR 0013): who they are on GitHub, what they are in the town, how
+ * A contributor up close (ADR 0022): who they are on GitHub, what they are in the town, how
  * seasoned, when they came and last committed, and their commits over the repo's history. No
  * avatar: fetching one from GitHub would tell it who is looking.
  */
@@ -41,9 +43,11 @@ export function TownDossier({
   className?: string
 }) {
   const chronicle = town.chronicle
+  const { repo } = useWorld()
   const person = chronicle?.contributors[resident.index]
   if (!chronicle || !person) return null
   const archetype = ARCHETYPES[resident.archetype]
+  const repoName = repoDisplayName(repo?.repo, chronicle.repo.name)
   const buckets = activityBuckets(chronicle, person, BUCKETS)
   const most = Math.max(1, ...buckets)
   const step = SPARK.width / (buckets.length - 1)
@@ -60,7 +64,7 @@ export function TownDossier({
         <Sigil glyph={archetype.glyph} color={archetype.color} size="lg" />
         <div className="dossier-id">
           <span className="eyebrow">
-            {RANK_LABEL[resident.rank]} {archetype.name} · {chronicle.repo.name}
+            {RANK_LABEL[resident.rank]} {archetype.name} · {repoName}
           </span>
           <h2 id="town-dossier-h">{resident.login}</h2>
           {resident.name !== resident.login && <span className="faint">{resident.name}</span>}
@@ -96,10 +100,7 @@ export function TownDossier({
         </div>
       </dl>
 
-      <section
-        className="town-spark"
-        aria-label={`${resident.login}'s commits over ${chronicle.repo.name}'s history`}
-      >
+      <section className="town-spark" aria-label={`${resident.login}'s commits over ${repoName}'s history`}>
         <span className="eyebrow">
           Commits, {isoOf(chronicle.start).slice(0, 4)}–{isoOf(chronicle.end).slice(0, 4)}
         </span>

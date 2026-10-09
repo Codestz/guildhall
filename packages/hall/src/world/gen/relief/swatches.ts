@@ -23,6 +23,14 @@ export const SWATCH = {
   rock: { u: 0.31, light: 0.585, dark: 0.72 },
   dark: { u: 0.44, light: 0.06, dark: 0.19 },
   snow: { u: 0.19, light: 0.04, dark: 0.17 },
+  /** Bright meadow green to deep green (column 4, row 1): the lower flanks. */
+  meadow: { u: 0.56, light: 0.28, dark: 0.48 },
+  /** Emerald to dark teal (column 1, row 2): the shaded, wooded flanks. */
+  conifer: { u: 0.19, light: 0.53, dark: 0.73 },
+  /** Light blue-grey stone (column 2, row 0): sunlit rock. */
+  slate: { u: 0.31, light: 0.02, dark: 0.2 },
+  /** Warm grey-brown (column 6, row 1): weathered rock and scree. */
+  warm: { u: 0.81, light: 0.28, dark: 0.48 },
   path: { u: 0.43, light: 0.59, dark: 0.62 },
 } as const satisfies Record<string, Swatch>
 

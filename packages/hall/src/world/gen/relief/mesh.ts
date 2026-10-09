@@ -30,13 +30,13 @@ export interface MeshArrays {
 const RIM_DROP = 5
 const SEAM_DROP = 3
 /** Grass climbs slopes this steep (degrees from flat) at the foot of a massif... */
-const GRASS_FOOT = 56
+const GRASS_FOOT = 70
 /** ...and only this steep up at the tree line, so the meadow thins into rock rather than ending at a line. */
-const GRASS_HIGH = 26
+const GRASS_HIGH = 48
 /** Beyond this a face is a wall, in dark stone. */
-const WALL_SLOPE = 68
+const WALL_SLOPE = 74
 /** The tree line, a share of the massif's peak: grass thins up to it and is gone a little past. */
-const TREE_LINE = 0.6
+const TREE_LINE = 0.7
 
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
 
@@ -133,9 +133,10 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
 }
 
 /**
- * A face's swatch, as ground ages up a mountain: meadow on the foothills, even on a fair slope,
- * thinning to grass only on the gentler benches towards the tree line (the line itself ragged, face
- * by face), then rock, and dark stone on walls. Grass darkens to olive as it climbs.
+ * A face's swatch, as ground ages up a mountain: meadow and grass on the foothills (greens varying
+ * face by face), a mottled belt where gentle faces keep grass and steep ones show rock (chosen by
+ * the face's own slope, its height and a little noise, so never a ruled line), then rock in a few
+ * greys and warm browns, and dark stone only on walls. Slope is read off the face itself.
  */
 function paint(
   p: readonly number[],
@@ -143,20 +144,38 @@ function paint(
   r: readonly number[],
   peak: number,
 ): [number, number] {
-  const grade = ((p[3] as number) + (q[3] as number) + (r[3] as number)) / 3
-  const slope = (Math.atan(grade) * 180) / Math.PI
+  const ux = (q[0] as number) - (p[0] as number)
+  const uy = (q[1] as number) - (p[1] as number)
+  const uz = (q[2] as number) - (p[2] as number)
+  const vx = (r[0] as number) - (p[0] as number)
+  const vy = (r[1] as number) - (p[1] as number)
+  const vz = (r[2] as number) - (p[2] as number)
+  const nx = uy * vz - uz * vy
+  const ny = uz * vx - ux * vz
+  const nz = ux * vy - uy * vx
+  const slope = (Math.atan2(Math.hypot(nx, nz), Math.abs(ny)) * 180) / Math.PI
   const height = ((p[1] as number) + (q[1] as number) + (r[1] as number)) / 3
   const rel = clamp01(height / Math.max(1, peak))
-  // Stable per-face chance: the kit's facets are never all one shade, and a tree line is never ruled.
-  const chance = hash(`${(p[0] as number).toFixed(1)},${(p[2] as number).toFixed(1)}`) / 4294967296
-  const jitter = (chance - 0.5) * 0.03
-  if (slope >= WALL_SLOPE) return [SWATCH.dark.u, swatchV(SWATCH.dark, 1 - rel + jitter)]
-  const climb = clamp01(rel / TREE_LINE)
-  const limit = GRASS_FOOT + (GRASS_HIGH - GRASS_FOOT) * climb * climb + (chance - 0.5) * 10
-  if (slope < limit && rel < TREE_LINE + (chance - 0.5) * 0.12) {
-    // A tile's own top is v 0.643: flat low ground matches the tiles beside it, steeper and higher turns olive.
-    const t = 0.38 + 0.35 * (slope / GRASS_FOOT) + 0.3 * climb
-    return [SWATCH.grass.u, swatchV(SWATCH.grass, t + jitter)]
+  // Stable per-face chance: the kit's facets are never all one shade, and a belt is never ruled.
+  const cx = ((p[0] as number) + (q[0] as number) + (r[0] as number)) / 3
+  const cz = ((p[2] as number) + (q[2] as number) + (r[2] as number)) / 3
+  const chance = hash(`${cx.toFixed(1)},${cz.toFixed(1)}`) / 4294967296
+  const other = hash(`${cz.toFixed(1)}:${cx.toFixed(1)}`) / 4294967296
+  const jitter = (chance - 0.5) * 0.2
+  if (slope >= WALL_SLOPE) return [SWATCH.warm.u, swatchV(SWATCH.warm, 0.55 + 0.4 * (1 - rel) + jitter)]
+  // Grass holds on slopes up to a limit that falls with height, ragged by chance.
+  const limit = GRASS_FOOT + (GRASS_HIGH - GRASS_FOOT) * clamp01(rel / TREE_LINE) ** 1.6 + (chance - 0.5) * 16
+  if (slope < limit && rel < TREE_LINE + 0.15 + (other - 0.5) * 0.2) {
+    const high = clamp01(rel / TREE_LINE)
+    // Foot: bright yellow-green like the tiles; then meadow, then deeper green and wooded teal.
+    if (high < 0.2 && slope < 24) return [SWATCH.grass.u, swatchV(SWATCH.grass, 0.38 + 0.3 * high + jitter)]
+    if (other < 0.3 + 0.4 * high)
+      return [SWATCH.conifer.u, swatchV(SWATCH.conifer, 0.15 + 0.5 * high + jitter)]
+    return [SWATCH.meadow.u, swatchV(SWATCH.meadow, 0.1 + 0.6 * high + slope / 150 + jitter)]
   }
-  return [SWATCH.rock.u, swatchV(SWATCH.rock, 1 - rel + jitter)]
+  // Rock: light slate on the sunlit upper faces, warm grey-brown on the lower and the rubbly.
+  const shade = clamp01(0.15 + 0.5 * (1 - rel) + jitter)
+  if (other < 0.5 - 0.25 * rel) return [SWATCH.warm.u, swatchV(SWATCH.warm, shade)]
+  if (slope > 58 && chance < 0.2) return [SWATCH.rock.u, swatchV(SWATCH.rock, 0.3 + 0.5 * (1 - rel))]
+  return [SWATCH.slate.u, swatchV(SWATCH.slate, shade)]
 }

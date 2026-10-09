@@ -17,9 +17,9 @@ import { settle } from "./summits.ts"
 /** Where a massif meets the sea: below the waterline, so the shore bake sees a cliff. */
 export const SEA_RIM = -1.5
 /** How far the strata pull a height towards its nearest ledge (0 smooth, 1 terraced). */
-const LEDGE = 0.5
+const LEDGE = 0.65
 /** How sharply a flank falls from its crest: 1 a cone, higher a sharper ridge. */
-const FLANK = 1.15
+const FLANK = 1.7
 /** A crest is this wide a crown, world units each side, before its flank starts falling. */
 const CROWN = 3
 /** Blur passes over the relief (the nearest-crest creases between neighbouring vertices). */
@@ -28,6 +28,11 @@ const SOFTEN = 3
 const LUMPS = [1.3, 2.2] as const
 /** Ridged-noise amplitude, share of the peak. */
 const ROUGH = 0.07
+/** Gully depth, world units, and the width (units) of the noise they follow: valley lines cut down the flanks. */
+const GULLY = 2.6
+const GULLY_SCALE = 7
+/** Ledges only settle ground this gentle (rise over a lattice step): a slope keeps its own smooth facets. */
+const BENCH = 0.6
 /** The steepest a flank may fall, rise over run (56°): taller than that is a cliff, which only the rim's own step makes. */
 const GRADE = 1.5
 /** The steepest a small massif's flank may be made (65°), to keep its peak. */
@@ -206,6 +211,18 @@ export function massifOf(spec: MassifSpec): Massif {
   const raw = new Float32Array(owned.length)
   for (let at = 0; at < raw.length; at++)
     raw[at] = isRim(at) ? (rim[at] as number) : (base[at] as number) + (lift[at] as number) * scale
+  // Gullies: where a noise's ridge line runs (a narrow valley), the flank is cut, deeper higher up.
+  // Cut before the grade limit, so no gully is steeper than a flank may be.
+  for (let j = j0; j <= j1; j++)
+    for (let i = i0; i <= i1; i++) {
+      const at = grid.index(i, j)
+      if (!owned[at] || isRim(at)) continue
+      const [x, z] = pointOf(i, j)
+      const warp = valueNoise(seed, x / 17, z / 17, 5) * 6
+      const line = 1 - Math.abs(2 * valueNoise(seed, x / GULLY_SCALE + warp, z / GULLY_SCALE - warp, 6) - 1)
+      const high = smooth((raw[at] as number) / Math.max(1, height) / 0.7)
+      raw[at] = (raw[at] as number) - GULLY * line ** 5 * high * smooth(((toRim[at] as number) - 4) / 10)
+    }
   const needed = (height - (base[peakAt] as number)) / Math.max(1, toRim[peakAt] as number)
   limit(raw, grid, owned, isRim, Math.min(MOST, Math.max(GRADE, needed * 1.1)))
   // The limit leaves flat planes; lumps of two sizes (more where it is steep) make them rock.
@@ -227,7 +244,7 @@ export function massifOf(spec: MassifSpec): Massif {
         grid.data[at] = rim[at] as number
         continue
       }
-      // Ledges settle gentle ground into benches; a steep flank keeps its own line.
+      // Ledges settle gentle ground into benches; a slope keeps its own smooth line (no stairs).
       let steep = 0
       for (const [di, dj] of SIX) {
         const near = grid.index(i + di, j + dj)
@@ -236,8 +253,18 @@ export function massifOf(spec: MassifSpec): Massif {
       }
       const value = raw[at] as number
       const ledge = Math.round(value / TERRACE) * TERRACE
-      const weight = LEDGE * smooth((toRim[at] as number) / 8) * (1 - smooth((steep - 0.8) / 1.6))
-      grid.data[at] = value + (ledge - value) * weight
+      const weight = LEDGE * smooth((toRim[at] as number) / 8) * (1 - smooth((steep - BENCH) / 1.2))
+      let settled = value + (ledge - value) * weight
+      // Never more than the rim's own cliff (two ledges) from a rim vertex beside it.
+      for (const [di, dj] of SIX) {
+        const near = grid.index(i + di, j + dj)
+        if (near >= 0 && isRim(near))
+          settled = Math.min(
+            Math.max(settled, (rim[near] as number) - 2 * TERRACE),
+            (rim[near] as number) + 2 * TERRACE,
+          )
+      }
+      grid.data[at] = settled
     }
   // The peaks and saddles as the finished ground stands (the skeleton's heights were asks).
   const summits = settle(grid, (i, j) => isRim(grid.index(i, j)), peaks, saddles)

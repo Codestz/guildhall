@@ -291,7 +291,7 @@ describe("the mesh", () => {
 
   test("a face's UV points into a palette swatch the kit itself uses, and its normal is a unit vector", () => {
     const mesh = reliefMesh(CITY_RELIEF, cells, 0)
-    const columns = [SWATCH.grass.u, SWATCH.rock.u, SWATCH.dark.u]
+    const columns = Object.values(SWATCH).map((swatch) => swatch.u)
     for (let v = 0; v < mesh.uv.length; v += 2) {
       expect(columns.some((u) => Math.abs(u - (mesh.uv[v] as number)) < 1e-6)).toBe(true)
       expect(mesh.uv[v + 1] as number).toBeGreaterThan(0)

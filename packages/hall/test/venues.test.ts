@@ -6,7 +6,7 @@ import { applyAll, emptyModel } from "@guildhall/core"
 import { rush } from "@guildhall/sim"
 import { viewsOf } from "../src/guild/store.ts"
 import { townViewsOf } from "../src/guild/town/views.ts"
-import { Visits } from "../src/guild/visits.ts"
+import { QUEUE_MAX, Visits } from "../src/guild/visits.ts"
 import { clearOccupancy, occupants } from "../src/scene/life/occupancy.ts"
 import { Visiting } from "../src/scene/visit.ts"
 import { setActiveWorld } from "../src/world/active.ts"
@@ -270,15 +270,34 @@ describe("who visits", () => {
     expect(new Visits([]).any).toBe(false)
   })
 
-  test("a venue holds its capacity; the rest wait at its step, either side of the door", () => {
+  test("a venue holds its capacity; a short line waits back from its step, spaced; no more join it", () => {
     const visits = new Visits(venues)
     const forge = nearestVenue("forge", [0, 0], react) as Venue
-    const people = Array.from({ length: forge.capacity + 3 }, () => visits.forCraft("write"))
-    expect(people.map((p) => p?.visit.wait)).toEqual([...Array(forge.capacity).fill(false), true, true, true])
-    const waiting = people.slice(forge.capacity).map((p) => p?.target ?? [0, 0, 0])
-    // The first waits on the step; the next two stand off, one each side.
-    expect([waiting[0]?.[0], waiting[0]?.[1]]).toEqual([forge.door.step[0], forge.door.step[1]])
-    expect(waiting[1]?.[0]).not.toBe(waiting[2]?.[0])
+    const people = Array.from({ length: forge.capacity + QUEUE_MAX }, () => visits.forCraft("write"))
+    expect(people.map((p) => p?.visit.wait)).toEqual([
+      ...Array(forge.capacity).fill(false),
+      ...Array(QUEUE_MAX).fill(true),
+    ])
+    // One behind the next, back along the way in, each more than a body apart, none on the step itself.
+    const line = people.slice(forge.capacity).map((p) => p?.target ?? [0, 0, 0])
+    const [sx, sz] = forge.door.step
+    let before = [sx, sz]
+    for (const at of line) {
+      expect(Math.hypot(at[0] - (before[0] ?? 0), at[1] - (before[1] ?? 0))).toBeGreaterThan(1.1)
+      before = at
+    }
+    // The line is full: the next goes to another forge, or does the deed where they stand.
+    expect(visits.forCraft("write")?.visit.venue).not.toBe(forge.id)
+  })
+
+  test("the tavern holds six and a line of three; the tenth agent does the deed where they stand", () => {
+    const visits = new Visits(venues)
+    const tavern = nearestVenue("tavern", [0, 0], react) as Venue
+    expect(tavern.capacity).toBe(6)
+    const people = Array.from({ length: 10 }, () => visits.forCraft("plan"))
+    expect(people.filter((p) => p && !p.visit.wait).length).toBe(6)
+    expect(people.filter((p) => p?.visit.wait).length).toBe(QUEUE_MAX)
+    expect(people[9]).toBeUndefined()
   })
 
   test("the views send a busy agent whose deed has a venue; the hand lands send nobody", () => {

@@ -97,13 +97,16 @@ function plan(world: World): Population {
   const free = new Set(homes)
   const folk: Folk[] = []
   const nth = new Map<Role, number>()
+  // The inn's evening company: what it holds and a few at its step. The rest of the town keeps to
+  // the square and then goes home (and indoors from the rain), so the door never has a crowd at it.
+  const seats = { left: anchors.inn ? anchors.inn.capacity + INN_OUTSIDE : Number.POSITIVE_INFINITY }
   for (const role of roles) {
     const home = homeFor(role, free, anchors, random)
     if (!home) continue
     free.delete(home)
     const n = nth.get(role) ?? 0
     nth.set(role, n + 1)
-    const made = folkOf(role, n, folk.length, { world, anchors, ground, home }, random)
+    const made = folkOf(role, n, folk.length, { world, anchors, ground, home }, random, seats)
     if (made) folk.push(made)
   }
   return { folk, critters: crittersOf(world, anchors, ground, folk.length, random) }
@@ -166,6 +169,9 @@ function homeFor(
   return closest[Math.floor(random() * closest.length)]
 }
 
+/** Beyond the seats inside, this many folk of an evening stand about the inn's step. */
+const INN_OUTSIDE = 3
+
 /** A trade's homes are among this many of the nearest to its place of work. */
 const NEAREST = 5
 
@@ -186,7 +192,14 @@ function anchorOf(role: Role, anchors: Anchors): Spot | undefined {
   }
 }
 
-function folkOf(role: Role, nth: number, index: number, kit: Kit, random: () => number): Folk | undefined {
+function folkOf(
+  role: Role,
+  nth: number,
+  index: number,
+  kit: Kit,
+  random: () => number,
+  seats: { left: number },
+): Folk | undefined {
   const { home } = kit
   const look = LOOK[role]
   const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)] as T
@@ -215,7 +228,8 @@ function folkOf(role: Role, nth: number, index: number, kit: Kit, random: () => 
       work = villagerWork(kit)
   }
   if (work.length === 0) return undefined
-  const social = role !== "villager" || random() < 0.7
+  const social = (role !== "villager" || random() < 0.7) && seats.left > 0
+  if (social) seats.left--
   const plaza = plazaStops(kit, home.district)
   return {
     id: `folk:${index}`,

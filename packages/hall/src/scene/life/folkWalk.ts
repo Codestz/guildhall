@@ -17,8 +17,8 @@ import type { Spot } from "../../world/layout.ts"
 /** What a walker needs of the island: its roads, the venues' room, the ground's height. */
 export interface Around {
   route(from: Spot, to: Spot): readonly Spot[]
-  /** Is `venue` holding all it can (`cap`)? */
-  crowded(venue: string, cap: number): boolean
+  /** Is `venue` holding all it can (`cap`) inside and on the way, `self` apart? */
+  crowded(venue: string, cap: number, self: string): boolean
   ground(x: number, z: number): number
 }
 
@@ -65,6 +65,8 @@ export class Walker {
   moving = false
   /** The venue (or home) they are inside, while they are. */
   venue: string | undefined
+  /** The venue whose door they are walking to, until they are in (or turned away): it counts them already. */
+  bound: string | undefined
   slot: Slot = "home"
   /** How many times a door has opened for them, and where the last was. */
   opened = 0
@@ -97,6 +99,7 @@ export class Walker {
     const stop = this.stops[this.index]
     if (!stop) return
     this.steps.length = 0
+    this.bound = undefined
     this.level = stop.up ?? 0
     this.ahead = this.level
     this.exit = undefined
@@ -138,7 +141,7 @@ export class Walker {
     for (let guard = 0; guard < 4; guard++) {
       const step = this.steps[0]
       if (!step) {
-        this.advance()
+        this.plan(this.next(0))
         if (this.steps.length === 0) return
         continue
       }
@@ -154,6 +157,7 @@ export class Walker {
     this.slot = slot
     this.setStops(slot)
     this.steps.length = 0
+    this.bound = undefined
     // Behind a door when it turns: out of it first.
     if (!this.visible && this.exit) {
       const { at, level, onward } = this.exit
@@ -166,7 +170,7 @@ export class Walker {
       if (onward) this.steps.push({ kind: "walk", path: [onward], i: 0 })
     }
     this.ahead = this.level
-    this.plan(this.stops[0])
+    this.plan(this.full(this.stops[0]) ? this.next(1) : this.stops[0])
   }
 
   private setStops(slot: Slot): void {
@@ -175,10 +179,15 @@ export class Walker {
     this.dir = 1
   }
 
-  /** The next stop of the loop, back and forth. */
-  private advance(): void {
+  /** Is this stop a door whose house is full? They do not queue for it: they go on to the next. */
+  private full(stop: Stop | undefined): boolean {
+    return !!(stop?.door && stop.venue && stop.cap && this.around.crowded(stop.venue, stop.cap, this.folk.id))
+  }
+
+  /** The next stop of the loop, back and forth, past full houses' doors (`skipped`: those passed over so far). */
+  private next(skipped: number): Stop | undefined {
     const count = this.stops.length
-    if (count === 0) return
+    if (count === 0) return undefined
     if (count > 1) {
       this.index += this.dir
       if (this.index >= count) {
@@ -189,7 +198,8 @@ export class Walker {
         this.index = 1
       }
     }
-    this.plan(this.stops[this.index])
+    const stop = this.stops[this.index]
+    return this.full(stop) && skipped < count ? this.next(skipped + 1) : stop
   }
 
   // ---- Planning ---------------------------------------------------------------------------------
@@ -200,6 +210,7 @@ export class Walker {
     const want = stop.up ?? 0
     if (want !== this.ahead) this.stair(want)
     this.walkTo(target)
+    this.bound = stop.door && stop.venue && stop.cap ? stop.venue : undefined
     if (stop.door && stop.venue) {
       this.steps.push({
         kind: "pass",
@@ -339,13 +350,15 @@ export class Walker {
   private pass(step: Extract<Step, { kind: "pass" }>, dt: number, budget: number): number | undefined {
     if (!step.hidden) {
       // Not through a door that is full: skip it (the next stop is outside).
-      if (step.venue && step.cap && this.around.crowded(step.venue, step.cap)) {
+      if (step.venue && step.cap && this.around.crowded(step.venue, step.cap, this.folk.id)) {
+        this.bound = undefined
         this.steps.shift()
         return budget
       }
       const left = this.walk({ kind: "walk", path: [step.to], i: 0 }, budget, dt)
       if (left === undefined) return undefined
       step.hidden = true
+      this.bound = undefined
       this.visible = false
       if (step.venue) this.knock(step.to)
       this.venue = step.venue

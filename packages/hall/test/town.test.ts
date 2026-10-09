@@ -244,14 +244,14 @@ describe("the townsfolk as figures", () => {
     }
   })
 
-  test("the quiet rest round the harbour, each on their own spot", () => {
+  test("the quiet rest about a district's square, each on their own spot", () => {
     const quiet = views.filter((v) => v.phase === "resting" || v.phase === "idle")
     expect(quiet.length).toBe(today.filter((r) => r.presence === "quiet").length)
-    const harbour = districtById(HARBOUR, world)
-    expect(harbour).toBeDefined()
+    expect(districtById(HARBOUR, world)).toBeDefined()
+    const squares = (world.repo?.districts ?? []).map((district) => district.at)
     for (const view of quiet)
       expect(
-        Math.hypot(view.target[0] - (harbour?.at[0] ?? 0), view.target[1] - (harbour?.at[1] ?? 0)),
+        Math.min(...squares.map((at) => Math.hypot(view.target[0] - at[0], view.target[1] - at[1]))),
       ).toBeLessThan(20)
     expect(new Set(quiet.map((v) => `${v.target[0]},${v.target[1]}`)).size).toBe(quiet.length)
   })

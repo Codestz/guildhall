@@ -1,9 +1,9 @@
 import { ARCHETYPES } from "@guildhall/roster"
-import { placeOf, seedOf } from "../../world/behaviours.ts"
-import { districtById, districtPlaceOf, siteOfDistrict, tradeOf } from "../../world/districtWork.ts"
+import { seedOf } from "../../world/behaviours.ts"
+import { districtById, siteOfDistrict, tradeOf } from "../../world/districtWork.ts"
+import { facing, Ground } from "../../world/folk/spots.ts"
 import { hikes, lookoutPost } from "../../world/hikes.ts"
-import type { Post, Spot } from "../../world/layout.ts"
-import { spread } from "../../world/sharers.ts"
+import { GATE, type Post, type Spot } from "../../world/layout.ts"
 import { HARBOUR, type Resident } from "../../world/town/townsfolk.ts"
 import { venuesIn } from "../../world/venues.ts"
 import type { World } from "../../world/world.ts"
@@ -18,15 +18,17 @@ import { type Visit, Visits } from "../visits.ts"
  *   busy      at work at one of their district's posts (a hash of their login picks which), running
  *             its trade's loop; more of them than posts stand in the sharers' rows round it; and on
  *             a gen 2 island they call in at their district's venue now and then (scene/visit.ts)
- *   quiet     resting round the harbour's square, on the open ground past its workers' rows
+ *   quiet     resting about their own district's square (the harbour's, then the gate's, when it is full)
  *   leaving   walking down to the quay, where they dissolve aboard the ferry
  *   arriving  (just come) they step off the ferry at the quay and walk to wherever they belong
  */
 
 /** The party every resident is in: never an agent party's id. */
 export const TOWN_PARTY = "town"
-/** Quiet residents take the harbour's sharer laps from here on, past any of its own workers'. */
-const RESTING_FROM = 12
+/** Rings of standing room round a square for the resting, and how far apart they stand. */
+const REST_RINGS = Array.from({ length: 9 }, (_, n) => 3.6 + n * 1.6)
+const REST_APART = 2
+const GATE_AT: Spot = [GATE[0], GATE[1]]
 /** Of the quiet ones, this share sit on the ground; the rest stand about. */
 const SITTING = 0.6
 
@@ -47,8 +49,8 @@ export function townViewsOf(
 ): AdventurerView[] {
   const landing = landingOf(world)
   const leaving: Post = [landing[0], landing[1] + 1.5, 0]
-  /** Quiet ones round each harbour berth so far. */
-  const resting = new Map<number, number>()
+  /** Who rests where: each their own spot. */
+  const resting = new Ground(world)
   const venues = new Visits(venuesIn(world))
   const venueOf = new Map(venuesIn(world).map((venue) => [venue.district, venue]))
   return residents.map((r) => {
@@ -66,7 +68,7 @@ function viewOf(
   enter: boolean,
   landing: Post,
   leaving: Post,
-  resting: Map<number, number>,
+  resting: Ground,
   visit?: Visit,
 ): AdventurerView {
   const archetype = ARCHETYPES[r.archetype]
@@ -126,23 +128,20 @@ function workPost(
 }
 
 /**
- * A quiet resident's spot round the harbour: a berth by their login, then the next lap of its
- * sharers' open ground (world/sharers.ts) past RESTING_FROM, facing the square.
+ * A quiet resident's spot: on the rings round their own district's square, a body and a half from
+ * the next; when those are full, round the harbour's, the keep's gate, then any other district's. Facing the square.
  */
-function restingSpot(r: Resident, world: World, resting: Map<number, number>): Post {
-  const harbour = districtById(HARBOUR, world)
-  const posts = harbour?.posts ?? []
-  if (!harbour || posts.length === 0) return landingOf(world)
-  const berth = seedOf(r.id) % posts.length
-  const post = posts[berth] as Post
-  const site = siteOfDistrict(HARBOUR, world)
-  const place = site ? placeOf(site, undefined, post, world) : districtPlaceOf(HARBOUR, post, world)
-  const lap = RESTING_FROM + (resting.get(berth) ?? 0)
-  resting.set(berth, lap - RESTING_FROM + 1)
-  const [dx, dz] = place ? spread(place, lap) : ([0, 0] as Spot)
-  const x = round(post[0] + dx)
-  const z = round(post[1] + dz)
-  return [x, z, Math.atan2(harbour.at[0] - x, harbour.at[1] - z)]
+function restingSpot(r: Resident, world: World, ground: Ground): Post {
+  const turn = (seedOf(r.id) % 628) / 100
+  const others = (world.repo?.districts ?? []).map((district) => district.at)
+  const centres = [districtById(r.district, world)?.at, districtById(HARBOUR, world)?.at, GATE_AT, ...others]
+  for (const centre of centres) {
+    if (!centre) continue
+    const square: Spot = [centre[0], centre[1]]
+    const at = ground.near(square, REST_RINGS, turn, REST_APART)
+    if (at) return [at[0], at[1], facing(at, square)]
+  }
+  return landingOf(world)
 }
 
 const round = (value: number): number => Math.round(value * 100) / 100

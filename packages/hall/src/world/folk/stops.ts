@@ -51,13 +51,20 @@ export function plazaStops(kit: Kit, district: string): readonly Stop[] {
   const { anchors, ground } = kit
   // Their own square, then (when it is full) the harbour's, then the keep's gate.
   for (const square of [anchors.squares.get(district), anchors.hub, anchors.gate]) {
-    const at = square ? ground.near(square, SQUARE_RINGS) : undefined
+    const at = square ? ground.near(square, SQUARE_RINGS, 0, GATHER_APART) : undefined
     if (!at || !square) continue
     const face = facing(at, square)
     return [stand(at, face, "Idle_A", 9), stand(at, face, "Waving", 3), stand(at, face, "Idle_B", 8)]
   }
   return homeStops(kit.home)
 }
+
+/** Those gathered in a square or at the inn's step stand this far apart: a group, never a huddle. */
+const GATHER_APART = 1.7
+
+/** Rings of standing room round a venue's step for those at its work, two sides of it. */
+const WORK_RINGS_A = [1.8, 2.8, 3.8, 4.8, 5.8, 6.8, 8.4, 10]
+const WORK_RINGS_B = [2.2, 3.2, 4.2, 5.2, 6.2, 7.2, 8.8, 10.4]
 
 /** Rings of standing room round a square, nearest first. */
 const SQUARE_RINGS = [3.8, 5.2, 6.6, 8.2, 10, 12]
@@ -68,7 +75,7 @@ export function innStops(kit: Kit, district: string): readonly Stop[] {
   const inn = anchors.inn
   if (!inn) return plazaStops(kit, district)
   const { step, inward } = inn.door
-  const at = ground.near(step, [2.4, 3.6, 4.8]) ?? step
+  const at = ground.near(step, [2.4, 3.6, 4.8], 0, GATHER_APART) ?? step
   return [
     visit(inn.door, inn.id, 40, inn.capacity),
     stand(at, facing(at, step), "Idle_A", 14),
@@ -92,14 +99,15 @@ export function villagerWork(kit: Kit): readonly Stop[] {
       ? [post[0], post[1]]
       : (anchors.squares.get(home.district) ?? anchors.gate)
   const clip = venue ? WORK_CLIP[venue.kind] : "Working_A"
-  const a = ground.near(around, [1.8, 2.8, 3.8])
-  const b = ground.near(around, [2.2, 3.2, 4.2], Math.PI)
+  const a = ground.near(around, WORK_RINGS_A, 0, GATHER_APART)
+  const b = ground.near(around, WORK_RINGS_B, Math.PI, GATHER_APART)
   const out: Stop[] = []
   const look = (at: Spot): number => facing(at, venue ? venue.at : (district?.at ?? around))
   if (a) out.push(stand(a, look(a), clip, 18))
   if (venue) out.push(visit(venue.door, venue.id, 14, venue.capacity))
   if (b) out.push(stand(b, look(b), "Idle_B", 7), stand(b, look(b), clip, 12))
-  return out.length > 0 ? out : [stand(around, 0, "Idle_A", 20)]
+  // No room left about the venue: they keep to the square, where there is room for all.
+  return out.length > 0 ? out : plazaStops(kit, home.district)
 }
 
 /** A farmer tends a field, a row at a time, and rests between. */
@@ -130,11 +138,11 @@ export function minerWork(kit: Kit): readonly Stop[] {
   const mine = kit.anchors.mine
   if (!mine) return []
   const { step } = mine.door
-  const a = kit.ground.near(step, [2, 3, 4])
+  const a = kit.ground.near(step, WORK_RINGS_A, 0, GATHER_APART)
   const out: Stop[] = []
   if (a) out.push(stand(a, facing(a, mine.at), "Pickaxing", 20))
   out.push(visit(mine.door, mine.id, 26, mine.capacity))
-  const b = kit.ground.near(step, [2.4, 3.4, 4.4], Math.PI)
+  const b = kit.ground.near(step, WORK_RINGS_B, Math.PI, GATHER_APART)
   if (b) out.push(stand(b, facing(b, mine.at), "Idle_B", 6))
   return out
 }

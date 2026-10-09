@@ -3,7 +3,7 @@ import { audio } from "../../audio/engine.ts"
 import type { Folk } from "../../world/folk/types.ts"
 import type { Crowd } from "../crowd/Crowd.ts"
 import { type Around, Walker } from "./folkWalk.ts"
-import { occupy } from "./occupancy.ts"
+import { approach, occupy } from "./occupancy.ts"
 
 /**
  * The island's folk as members of the cast's crowd (scene/crowd): one Walker each (folkWalk.ts), a
@@ -62,6 +62,7 @@ export class Troupe {
       if (jumped) walker.snap(hour, wet)
       else walker.update(dt, hour, wet)
       if (walker.venue) occupy(walker.venue, walker.folk.id, now)
+      if (walker.bound) approach(walker.bound, walker.folk.id, now)
       // Their door, heard from where it is (silent unless sound is on; the engine places and limits it).
       if (walker.opened !== this.heard[i]) {
         this.heard[i] = walker.opened

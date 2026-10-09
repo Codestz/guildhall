@@ -17,7 +17,7 @@ import { FRAME } from "../frame.ts"
 import { Barrows } from "./Barrows.tsx"
 import { Critters } from "./Critters.tsx"
 import type { Around } from "./folkWalk.ts"
-import { occupants, occupy } from "./occupancy.ts"
+import { load, occupy } from "./occupancy.ts"
 import { raining } from "./rounds.ts"
 import { Troupe } from "./troupe.ts"
 
@@ -95,7 +95,7 @@ function usePlan(world: World): Population {
 function aroundOf(world: World): Around {
   return {
     route: (from, to) => route(from, to, world.roads),
-    crowded: (venue, cap) => occupants(venue, performance.now() / 1000) >= cap,
+    crowded: (venue, cap, self) => load(venue, performance.now() / 1000, self) >= cap,
     ground: (x, z) => world.ground.heightAt(x, z),
   }
 }

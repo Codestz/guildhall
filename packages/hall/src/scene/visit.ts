@@ -4,7 +4,7 @@ import type { Visit } from "../guild/visits.ts"
 import { seedOf } from "../world/behaviours.ts"
 import type { Spot } from "../world/layout.ts"
 import type { VenueDoor } from "../world/venues.ts"
-import { occupy, vacate } from "./life/occupancy.ts"
+import { approach, load, occupy, vacate } from "./life/occupancy.ts"
 
 /**
  * Going into a venue and coming out (scene/brain.ts drives it once a frame): the figure walks to the
@@ -38,6 +38,9 @@ const EVERY_S = 16
 const EVERY_SPREAD_S = 22
 const STAY_S = 8
 const STAY_SPREAD_S = 6
+
+/** Turned away at a full door, a townsperson tries again once this much of their wait has passed. */
+const RETRY_AT = 0.6
 
 /** 0…1, stable per figure and `salt`. */
 const unit = (id: string, salt: number): number => ((seedOf(id) >>> salt) % 1000) / 1000
@@ -137,6 +140,8 @@ export class Visiting {
     }
     if (this.door && (this.phase === "enter" || this.phase === "inside"))
       occupy(this.venue, this.who, this.now())
+    else if (this.door && (this.phase === "go" || this.phase === "knock"))
+      approach(this.venue, this.who, this.now())
     if (node) this.lift(node)
   }
 
@@ -153,8 +158,10 @@ export class Visiting {
     } else if (this.phase === "out") {
       this.idle += dt
       if (this.idle >= this.every) {
-        this.calling = true
-        this.idle = 0
+        // A full house (or a crowd on its way) is passed by: they try again a little later.
+        const full = load(view.venue, this.now()) >= view.capacity
+        this.calling = !full
+        this.idle = full ? this.every * RETRY_AT : 0
       }
     }
     return this.calling ? view : undefined

@@ -49,12 +49,12 @@ export interface Venue {
 
 /** The prefab each kind stands as, and how many fit inside. */
 export const VENUE_KINDS: Readonly<Record<VenueKind, { prefab: string; capacity: number }>> = {
-  forge: { prefab: "forge", capacity: 4 },
-  library: { prefab: "library", capacity: 6 },
-  tavern: { prefab: "tavern", capacity: 8 },
-  mine: { prefab: "mine-entrance", capacity: 4 },
+  forge: { prefab: "forge", capacity: 3 },
+  library: { prefab: "library", capacity: 4 },
+  tavern: { prefab: "tavern", capacity: 6 },
+  mine: { prefab: "mine-entrance", capacity: 3 },
   watchtower: { prefab: "watchtower", capacity: 3 },
-  market: { prefab: "market-hall", capacity: 6 },
+  market: { prefab: "market-hall", capacity: 4 },
 }
 
 /** Workshop and CI folders (the farms biome's names) that are a watch's, not a forge's. */
@@ -130,6 +130,18 @@ export function nearestVenue(
     }
   }
   return best
+}
+
+/** The venues of `kind`, nearest `from` first (ties in id order). */
+export function venuesNear(
+  kind: VenueKind,
+  from: Spot,
+  world: { venues?: readonly Venue[] } | undefined = activeWorld(),
+): Venue[] {
+  const away = (venue: Venue): number => Math.hypot(venue.at[0] - from[0], venue.at[1] - from[1])
+  return venuesIn(world)
+    .filter((venue) => venue.kind === kind)
+    .sort((a, b) => away(a) - away(b) || (a.id < b.id ? -1 : 1))
 }
 
 /** A venue of a world by id. */

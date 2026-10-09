@@ -9,6 +9,7 @@ import type { World } from "../world/world.ts"
 import { deepenLink } from "./chronicleLinks.ts"
 import { Icon } from "./icons.tsx"
 import { repoDoor } from "./RepoDoor.tsx"
+import { repoPanel, useRepoPanel } from "./repoPanel.ts"
 import { useGrowthPhase } from "./TimelineGrowth.tsx"
 import { useDeepChronicle } from "./useCatalog.ts"
 
@@ -60,16 +61,17 @@ export function RepoLegend() {
   const { repo } = world
   const filming = useGrowthPhase()
   const deep = useDeepChronicle(repo?.repo)
+  const open = useRepoPanel()
 
   if (status.state === "loading")
     return (
-      <section className="plaque repo-legend" aria-live="polite">
+      <section className="plaque repo-legend repo-panel" aria-live="polite">
         <p className="repo-note">Growing {status.repo}'s island…</p>
       </section>
     )
   if (status.state === "failed")
     return (
-      <section className="plaque repo-legend" role="status">
+      <section className="plaque repo-legend repo-panel" role="status">
         <p className="repo-note">
           Couldn't grow {status.repo}: {status.reason}. This is the guild's own island.
         </p>
@@ -81,57 +83,80 @@ export function RepoLegend() {
     )
   if (!repo) return null
 
+  // The growth film owns the screen while it plays: the panel waits, the viewer's choice stays.
+  const shown = open && (filming === "off" || filming === "failed")
   const files = repo.districts.reduce((sum, district) => sum + district.files, 0)
   return (
-    <section className="plaque repo-legend" aria-label={`Island grown from ${repo.repo}`}>
-      <div className="repo-head">
-        <h2 className="repo-name">{repo.repo}</h2>
-        <button
-          type="button"
-          className="icon-btn repo-door"
-          aria-haspopup="dialog"
-          aria-label="Your repo as an island: grow another, share this one"
-          title="Grow another · share"
-          onClick={repoDoor.open}
-        >
-          <Icon.island />
-        </button>
-      </div>
-      <p className="repo-meta">
-        {files.toLocaleString("en")} files · {repo.districts.length} districts
-        {repo.truncated ? " · partial tree" : ""}
-      </p>
-      <Life world={world} />
-      {/* Its history as a timelapse, first commit to today (`?grow`, scene/growth). */}
-      {filming !== "playing" && filming !== "paused" && (
-        <button type="button" className="repo-again" onClick={() => growth.request(repo.repo)}>
-          <Icon.play />
-          Watch it grow
-        </button>
-      )}
-      {deep === false && (
-        <a
-          className="repo-again"
-          href={deepenLink(repo.repo)}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Its history here is a quick sketch. Ask for the whole of it (opens a GitHub issue)"
-        >
-          <Icon.book />
-          Deepen this island
-        </a>
-      )}
-      <ul className="repo-districts">
-        {repo.districts.map((district) => (
-          <li key={district.id}>
-            <i className="repo-swatch" style={{ background: district.accent }} aria-hidden="true" />
-            <span className="repo-folder">{district.label}</span>
-            <span className="repo-biome">
-              {BIOME[district.biome] ?? district.biome} · {district.language.name}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <>
+      {/* Folded: one chip with the repo's name, set like the toolbar's buttons; unfolded: the full panel below it. */}
+      <button
+        type="button"
+        className="plaque repo-chip"
+        aria-expanded={shown}
+        aria-controls="repo-panel"
+        aria-label={`Island grown from ${repo.repo}: districts`}
+        title={repo.repo}
+        onClick={() => repoPanel.set(!open)}
+      >
+        <Icon.island />
+        <span className="repo-chip-name">
+          <span className="repo-owner">{repo.repo.split("/")[0]}/</span>
+          {repo.repo.split("/").slice(1).join("/")}
+        </span>
+        <span className="fold" aria-hidden="true">
+          <Icon.chevron />
+        </span>
+      </button>
+      <section className="plaque repo-legend repo-panel" id="repo-panel" hidden={!shown}>
+        <div className="repo-head">
+          <h2 className="repo-name">{repo.repo}</h2>
+          <button
+            type="button"
+            className="icon-btn repo-door"
+            aria-haspopup="dialog"
+            aria-label="Your repo as an island: grow another, share this one"
+            title="Grow another · share"
+            onClick={repoDoor.open}
+          >
+            <Icon.island />
+          </button>
+        </div>
+        <p className="repo-meta">
+          {files.toLocaleString("en")} files · {repo.districts.length} districts
+          {repo.truncated ? " · partial tree" : ""}
+        </p>
+        <Life world={world} />
+        {/* Its history as a timelapse, first commit to today (`?grow`, scene/growth). */}
+        {filming !== "playing" && filming !== "paused" && (
+          <button type="button" className="repo-again" onClick={() => growth.request(repo.repo)}>
+            <Icon.play />
+            Watch it grow
+          </button>
+        )}
+        {deep === false && (
+          <a
+            className="repo-again"
+            href={deepenLink(repo.repo)}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Its history here is a quick sketch. Ask for the whole of it (opens a GitHub issue)"
+          >
+            <Icon.book />
+            Deepen this island
+          </a>
+        )}
+        <ul className="repo-districts">
+          {repo.districts.map((district) => (
+            <li key={district.id}>
+              <i className="repo-swatch" style={{ background: district.accent }} aria-hidden="true" />
+              <span className="repo-folder">{district.label}</span>
+              <span className="repo-biome">
+                {BIOME[district.biome] ?? district.biome} · {district.language.name}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
   )
 }

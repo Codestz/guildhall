@@ -1,8 +1,8 @@
-import { Fragment, useEffect, useState } from "react"
+import { Fragment, useEffect, useRef, useState } from "react"
 import type { GuildStore } from "../guild/store.ts"
 import { sitePage } from "./directing.ts"
 import { Icon } from "./icons.tsx"
-import { repoDoor } from "./RepoDoor.tsx"
+import { repoDoor, useRepoDoor } from "./RepoDoor.tsx"
 import "./wayfinding.css"
 
 /** The project's home on GitHub; the protocol doc for "your own" sources lives there. */
@@ -25,14 +25,19 @@ const PAGES = [
 ] as const
 
 /**
- * Who we are, in one line: the crest, the name and a status line that says honestly what is on
- * screen (a simulated guild, or your live one). Unfolds into the about card: the headline, what can
- * feed the world, and the install lines folded behind "Set up a source" so the card stays light.
+ * Who we are, as one icon button set like the toolbar's (the crest; "Guildhall" in its tooltip and
+ * label). It opens the about card as a popover anchored under it: a head with the name and a status
+ * line that says honestly what is on screen (a simulated guild, or your live one), the headline,
+ * what can feed the world, and the install lines folded behind "Set up a source". Esc or a click
+ * outside closes it and hands focus back to the crest. A plea waiting shows as a dot on the crest.
  */
 export function Brand({ store, open, onToggle }: { store: GuildStore; open: boolean; onToggle: () => void }) {
   const count = store.views.length
   const pleas = store.views.filter((v) => v.phase === "waiting").length
   const live = store.mode === "live"
+  const root = useRef<HTMLElement>(null)
+  const button = useRef<HTMLButtonElement>(null)
+  const door = useRepoDoor()
 
   const source = live
     ? store.connected
@@ -40,46 +45,68 @@ export function Brand({ store, open, onToggle }: { store: GuildStore; open: bool
       : "Live · connecting…"
     : "Simulated guild"
 
+  // Esc (before the HUD's own handler sees it) and a press outside both fold the card.
+  useEffect(() => {
+    if (!open) return
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "Escape" || event.defaultPrevented) return
+      event.stopPropagation()
+      onToggle()
+      button.current?.focus()
+    }
+    function onPress(event: PointerEvent) {
+      if (!root.current?.contains(event.target as Node)) onToggle()
+    }
+    window.addEventListener("keydown", onKey, true)
+    document.addEventListener("pointerdown", onPress, true)
+    return () => {
+      window.removeEventListener("keydown", onKey, true)
+      document.removeEventListener("pointerdown", onPress, true)
+    }
+  })
+
+  // The repo door is a dialog of its own: the card steps aside for it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the door opens
+  useEffect(() => {
+    if (door && open) onToggle()
+  }, [door])
+
   return (
-    <header className="plaque brand" data-open={open}>
+    <header className="brand" data-open={open} ref={root}>
       <h1 className="brand-h">
         <button
+          ref={button}
           type="button"
-          className="brand-btn"
+          className="plaque tool brand-btn"
           aria-expanded={open}
           aria-controls="brand-about"
+          aria-label={
+            pleas > 0 ? `Guildhall, ${pleas} ${pleas === 1 ? "plea" : "pleas"} waiting` : "Guildhall"
+          }
+          title="Guildhall"
           onClick={onToggle}
         >
-          <span className="crest">
-            <Icon.crest />
-          </span>
-          <span className="brand-words">
-            <span className="brand-name">Guildhall</span>
-            <span className="status-line">
-              <i
-                className="source-dot"
-                data-live={live}
-                data-connected={store.connected}
-                aria-hidden="true"
-              />
-              <span className="source">{source}</span>
-              <span className="sl-part sl-count">
-                {count} {count === 1 ? "adventurer" : "adventurers"}
-              </span>
-              {pleas > 0 && (
-                <span className="sl-part sl-plea">
-                  {pleas} {pleas === 1 ? "plea" : "pleas"}
-                </span>
-              )}
-            </span>
-          </span>
-          <span className="fold" aria-hidden="true">
-            <Icon.chevron />
-          </span>
+          <Icon.crest />
+          {pleas > 0 && <i className="tab-dot" aria-hidden="true" />}
         </button>
       </h1>
 
-      <div className="about" id="brand-about" hidden={!open}>
+      <section className="plaque about" id="brand-about" aria-label="About Guildhall" hidden={!open}>
+        <div className="about-head">
+          <span className="brand-name">Guildhall</span>
+          <span className="status-line">
+            <i className="source-dot" data-live={live} data-connected={store.connected} aria-hidden="true" />
+            <span className="source">{source}</span>
+            <span className="sl-part sl-count">
+              {count} {count === 1 ? "adventurer" : "adventurers"}
+            </span>
+            {pleas > 0 && (
+              <span className="sl-part sl-plea">
+                {pleas} {pleas === 1 ? "plea" : "pleas"}
+              </span>
+            )}
+          </span>
+        </div>
         <p className="tagline">Events in. A living world out.</p>
         <p className="sim-note">
           {live
@@ -145,7 +172,7 @@ export function Brand({ store, open, onToggle }: { store: GuildStore; open: bool
             )
           })}
         </nav>
-      </div>
+      </section>
     </header>
   )
 }

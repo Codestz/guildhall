@@ -5,6 +5,8 @@ import { useOpening } from "../guild/opening.ts"
 import { useGuild } from "../guild/useGuild.ts"
 import { setChipMode } from "../scene/chips.ts"
 import { Brand } from "./Brand.tsx"
+import "./headbar.css"
+import "./phonebar.css"
 import { Captions } from "./Captions.tsx"
 import { ChapterChip } from "./Chapter.tsx"
 import { Chronicle, Toasts } from "./Chronicle.tsx"
@@ -20,6 +22,7 @@ import { HUD_MODES, type HudMode, hudPrefs, useHudPrefs } from "./prefs.ts"
 import { RepoDoor, repoDoor, useRepoDoor } from "./RepoDoor.tsx"
 import { RepoLegend } from "./RepoLegend.tsx"
 import { Roster, RosterBadges } from "./Roster.tsx"
+import { RosterStack } from "./RosterStack.tsx"
 import { Settings } from "./Settings.tsx"
 import { SoundToggle, useSoundWaiting } from "./Sound.tsx"
 import { Stats } from "./Stats.tsx"
@@ -242,14 +245,18 @@ export function Hud() {
       <IslandKeys />
       {!hidden && (
         <div className="region region-left">
-          <Brand store={store} open={open.about} onToggle={() => toggle("about")} />
-          <RepoLegend />
+          {/* The top-left bar: the crest, the repo's chip (its panel wraps below) and, on a phone, the roster's stack. */}
+          <div className="hud-head">
+            <Brand store={store} open={open.about} onToggle={() => toggle("about")} />
+            <RepoLegend />
+            {phone && !open.roster && <RosterStack store={store} onExpand={() => toggle("roster")} />}
+          </div>
           <IslandSwitcher compact={phone} />
           <PartySwitcher store={store} compact={phone} />
           {open.roster ? (
             <Roster store={store} open onToggle={() => toggle("roster")} compact className="is-sheet" />
           ) : (
-            <RosterBadges store={store} onExpand={() => toggle("roster")} />
+            !phone && <RosterBadges store={store} onExpand={() => toggle("roster")} />
           )}
         </div>
       )}

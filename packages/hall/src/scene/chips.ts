@@ -54,6 +54,9 @@ const UNFOLD_AFTER = 2
  */
 export const CROWD_AT = 24
 const CROWD_UNTIL = 20
+/** On a phone (CSS media query) the strict rules start at this many chips: a few small chips, the rest folded. */
+const PHONE = "(max-width: 720px)"
+const PHONE_AT = 3
 /** At crowd scale: two chips make a pile, a chip folds on the first run it overlaps, unfolds after three clear. */
 const CROWD_FOLD_AT = 2
 const CROWD_FOLD_AFTER = 1
@@ -255,7 +258,8 @@ export function declutter(camera: Camera, width: number, height: number, now = p
 export function layout(camera: Camera, width: number, height: number): void {
   // ── read: positions and the kept sizes; nothing here touches layout ──
   order.length = 0
-  crowd = slots.length > (crowd ? CROWD_UNTIL : CROWD_AT)
+  const phone = typeof matchMedia === "function" && matchMedia(PHONE).matches
+  crowd = slots.length > (crowd ? CROWD_UNTIL : CROWD_AT) || (phone && slots.length > PHONE_AT)
   for (const slot of slots) {
     slot.on = false
     slot.faint = false
@@ -290,6 +294,11 @@ export function layout(camera: Camera, width: number, height: number): void {
     scratch.project(camera)
     if (scratch.z > 1 || scratch.z < -1) continue
     slot.x = (scratch.x * 0.5 + 0.5) * width
+    // A phone folds a chip the edge would clip (the one you follow or a plea stays).
+    if (phone && !slot.pinned && !slot.notable && Math.abs(slot.x - width / 2) > (width - w) / 2) {
+      slot.faint = true
+      continue
+    }
     // The chip's bottom edge sits on the anchor (drei centres it; `.chip` lifts itself by half).
     slot.y = (-scratch.y * 0.5 + 0.5) * height
     slot.z = scratch.z

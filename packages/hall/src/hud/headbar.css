@@ -1,0 +1,195 @@
+/*
+ * The top-left bar (hud/Hud.tsx `.hud-head`): the crest (hud/Brand.tsx), the repo's chip
+ * (hud/RepoLegend.tsx) and, on a phone, the roster's stack (hud/RosterStack.tsx) — each a plaque set
+ * like the toolbar's buttons (hall.css `.tool`: --bar square, glass, focus ring). Their panels
+ * unfold beneath. Phone: one row at rest, 44px targets, the toolbar's two buttons to its right.
+ * hall.css' tokens throughout.
+ */
+
+.hud-head {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  box-sizing: border-box;
+  width: var(--left-w);
+  max-width: 100%;
+}
+.brand {
+  position: relative;
+  flex: none;
+}
+.brand-btn .glyph {
+  width: 22px;
+  height: 22px;
+  color: var(--brass-hi);
+}
+.brand-btn .tab-dot,
+.roster-stack .tab-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+}
+
+/* the about card: a popover under the crest */
+.hud-head .about {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 6;
+  box-sizing: border-box;
+  width: var(--left-w);
+  max-height: calc(100vh - var(--gut) - var(--bar) - 3 * var(--gut));
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--hair-2) transparent;
+  box-shadow:
+    var(--shadow),
+    0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.about-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--hair);
+}
+.about-head .status-line {
+  white-space: normal;
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+/* the repo chip: its name, the island mark and a chevron */
+.hud-head .repo-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--bar);
+  min-width: 0;
+  max-width: calc(100% - var(--bar) - 8px);
+  padding: 0 10px 0 12px;
+  color: var(--muted);
+  transition: color 0.15s;
+}
+.repo-chip:hover,
+.repo-chip[aria-expanded="true"] {
+  color: var(--brass-hi);
+}
+.repo-chip[aria-expanded="true"] {
+  background: rgba(38, 29, 19, 0.92);
+  border-color: var(--brass-line);
+}
+.repo-chip .glyph {
+  width: 18px;
+  height: 18px;
+}
+.repo-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--display);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--brass-hi);
+}
+.repo-chip[aria-expanded="true"] .fold {
+  transform: rotate(180deg);
+}
+.repo-chip .fold .glyph {
+  width: 14px;
+  height: 14px;
+}
+.hud-head .repo-panel {
+  box-sizing: border-box;
+  flex: 0 0 100%;
+  order: 9;
+}
+.repo-panel[hidden] {
+  display: none;
+}
+/* the panel carries its own name only when the chip is not above it saying it */
+.repo-legend .repo-name {
+  font-size: 14px;
+}
+
+/* the roster, folded (phones): a few sigils overlapped, "+N" for the rest */
+.hud-head .roster-stack {
+  display: flex;
+  align-items: center;
+  width: auto;
+  min-width: var(--bar);
+  padding: 0 8px 0 6px;
+  color: var(--muted);
+}
+.stack-sigil {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 28px;
+}
+.stack-sigil + .stack-sigil {
+  margin-left: -4px;
+}
+.stack-more {
+  margin-left: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.about .status-line:has(.sl-plea) .sl-count {
+  display: inline;
+}
+
+@media (max-width: 720px) {
+  :root .hud {
+    --bar: 44px;
+  }
+  .hud-head {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: env(safe-area-inset-top);
+  }
+  /* the crest, the chip (taking what is left) and the stack share one row; panels drop beneath it */
+  .hud-head .repo-chip {
+    flex: 0 1 auto;
+    max-width: none;
+  }
+  .hud-head .roster-stack {
+    margin-left: auto;
+  }
+  /* the owner is in the title and the panel; the chip keeps the repo's own name */
+  .repo-owner {
+    display: none;
+  }
+  .hud-head .repo-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    box-sizing: border-box;
+    width: calc(100vw - 2 * var(--gut));
+    z-index: 5;
+    max-height: 62vh;
+    overflow-y: auto;
+  }
+  .hud-head .about {
+    box-sizing: border-box;
+    width: calc(100vw - 2 * var(--gut));
+    max-height: 70vh;
+  }
+  :root .hud-head .repo-districts {
+    display: grid;
+  }
+  .brand-name {
+    font-size: 17px;
+  }
+  .status-line {
+    font-size: 12px;
+  }
+  .pleas {
+    top: calc(var(--gut) + var(--bar) + 12px + env(safe-area-inset-top));
+  }
+}

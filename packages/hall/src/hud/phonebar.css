@@ -1,0 +1,70 @@
+/*
+ * The phone's bottom bar: the Chronicle button (hud/Chronicle.tsx Toasts) and the story's tape
+ * (hud/Timeline.tsx) share one 44px row, safe-area aware, instead of two stacked plaques; only a
+ * plea or a fall still toasts above it (the rest is in the Chronicle sheet and the captions).
+ * With headbar.css, the HUD at rest is two slim rows. hall.css' tokens throughout.
+ */
+
+@media (max-width: 720px) {
+  :root .hud {
+    --tape-h: var(--bar);
+    --foot: calc(var(--gut) + env(safe-area-inset-bottom));
+  }
+  .hud .toasts {
+    left: var(--gut);
+    bottom: var(--foot);
+    width: auto;
+  }
+  :root .hud[data-tape="true"] .toasts {
+    bottom: var(--foot);
+  }
+  .hud .toast:not([data-kind="plea"], [data-kind="fail"]) {
+    display: none;
+  }
+  .hud .toast-list .toast:nth-last-child(n + 2) {
+    display: none;
+  }
+  /* the chronicle: an icon button like the toolbar's; its name and clock stay in the label */
+  .hud .chron-open {
+    justify-content: center;
+    width: var(--bar);
+    height: var(--bar);
+    padding: 0;
+  }
+  .hud .chron-open > span {
+    display: none;
+  }
+  .hud .chron-open .glyph {
+    width: 18px;
+    height: 18px;
+  }
+  .hud .timeline {
+    left: calc(var(--gut) + var(--bar) + 8px);
+    right: var(--gut);
+    bottom: var(--foot);
+    height: var(--bar);
+  }
+  .hud .tape {
+    gap: 8px;
+    padding: 0 12px 0 4px;
+  }
+  .hud .tape-time {
+    min-width: 0;
+  }
+  .hud .play {
+    width: 36px;
+    height: 36px;
+  }
+  .hud .track {
+    height: var(--bar);
+  }
+
+  /* Name chips over the world: the name alone (what they are doing is in the dossier, the captions
+     and the Chronicle); the followed one and a plea keep their line. */
+  :root[data-hud] .chip:not(.selected):not([data-tone="plea"], [data-tone="fail"]) .verb {
+    display: none;
+  }
+  :root[data-hud] .chip .name {
+    padding: 2px 6px 1px;
+  }
+}

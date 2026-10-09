@@ -90,8 +90,7 @@
   max-height: calc(100% - 2 * var(--gut) - 150px);
   align-items: flex-start;
 }
-.region-left > .panel,
-.region-left > .brand[data-open="true"] {
+.region-left > .panel {
   width: var(--left-w);
 }
 .region-right {
@@ -287,21 +286,6 @@ button {
   margin: 0;
   font: inherit;
 }
-.brand-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 10px 7px 7px;
-  text-align: left;
-  border-radius: var(--r);
-}
-.brand-btn:hover .fold {
-  color: var(--paper);
-}
-.brand[data-open="false"] .fold {
-  transform: rotate(-90deg);
-}
 .crest {
   display: grid;
   place-items: center;
@@ -316,13 +300,6 @@ button {
 .crest .glyph {
   width: 22px;
   height: 22px;
-}
-.brand-words {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
 }
 .brand-name {
   font-family: var(--display);
@@ -1978,19 +1955,8 @@ button {
     max-width: none;
     max-height: none;
   }
-  .region-left > .brand[data-open="true"] {
-    width: 100%;
-  }
-  .brand[data-open="true"] {
-    position: relative;
-    z-index: 2;
-  }
   .brand-name {
     font-size: 17px;
-  }
-  .crest {
-    width: 32px;
-    height: 32px;
   }
   .status-line {
     font-size: 12px;

@@ -22,6 +22,7 @@ import { type Chunks, chunksOf } from "../world/chunks.ts"
 import { genOf } from "../world/gen/islandFromTree.ts"
 import { HEX_SCALE, type LandPiece, type LandPlacement, SITES, yardBuilding } from "../world/lands.ts"
 import { useWorld, useWorldReady } from "../world/source.ts"
+import { tiltQuaternion } from "../world/tilt.ts"
 import { markGrowable, useGrowable } from "./growth/registry.ts"
 import { plain } from "./Kit.tsx"
 import { isMovingPart } from "./life/moving.ts"
@@ -219,9 +220,11 @@ function batch(
   const rotation = new Quaternion()
   const scale = new Vector3()
   const up = new Vector3(0, 1, 0)
+  const lean = new Quaternion()
   const place = (placement: LandPlacement) => {
     position.set(placement.x, placement.y ?? 0, placement.z)
     rotation.setFromAxisAngle(up, placement.rot ?? 0)
+    if (placement.tilt) rotation.premultiply(lean.fromArray(tiltQuaternion(placement.tilt)))
     scale.setScalar(HEX_SCALE * (placement.scale ?? 1))
     return matrix.compose(position, rotation, scale).clone()
   }

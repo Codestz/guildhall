@@ -28,9 +28,11 @@ export interface Ground {
 
 export function groundOf(massif: Massif): Ground {
   const { grid, ledgeTop } = massif
-  /** The rise of the ground in the four directions, `d` units off. */
-  const around = (x: number, z: number, h: number, d: number): number[] =>
-    [0, 1, 2, 3].map((k) => (grid.heightAt(x + d * Math.cos(k * 1.57), z + d * Math.sin(k * 1.57)) ?? h) - h)
+  /** The rise of the ground in the four directions, `d` units off (`edge`, where the massif's ground ends there). */
+  const around = (x: number, z: number, h: number, d: number, edge = 0): number[] =>
+    [0, 1, 2, 3].map(
+      (k) => (grid.heightAt(x + d * Math.cos(k * 1.57), z + d * Math.sin(k * 1.57)) ?? h + edge) - h,
+    )
   const diagonals = (x: number, z: number, h: number, d: number): number[] =>
     [0.785, 2.356, 3.927, 5.498].map(
       (a) => (grid.heightAt(x + d * Math.cos(a), z + d * Math.sin(a)) ?? h) - h,
@@ -42,7 +44,8 @@ export function groundOf(massif: Massif): Ground {
         Math.abs((grid.heightAt(x + 1.2, z) ?? h) - h),
         Math.abs((grid.heightAt(x, z + 1.2) ?? h) - h),
       ) / 1.2,
-    flatAt: (x, z, h) => h > ledgeTop + 0.01 || around(x, z, h, 1.2).every((rise) => Math.abs(rise) < FLAT),
+    flatAt: (x, z, h) =>
+      h > ledgeTop + 0.01 || around(x, z, h, 1.2, 1).every((rise) => Math.abs(rise) < FLAT),
     footAt: (x, z, h) => around(x, z, h, 2).some((rise) => rise >= RISER),
     lipAt: (x, z, h) => around(x, z, h, 2).some((rise) => rise <= -RISER),
     floorAt: (x, z, h, r) => h + Math.min(0, ...around(x, z, h, r), ...diagonals(x, z, h, r)) * 0.6,

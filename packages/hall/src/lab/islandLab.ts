@@ -24,6 +24,7 @@ import { fetchPublicTree, parseRepo } from "../world/gen/fetch.ts"
 import { islandFromTree } from "../world/gen/islandFromTree.ts"
 import type { RepoEntry } from "../world/gen/repo.ts"
 import { HEX_SCALE, type LandPlacement } from "../world/lands.ts"
+import { tiltQuaternion } from "../world/tilt.ts"
 import { load } from "./stage.ts"
 
 /**
@@ -299,9 +300,11 @@ export function draw(pack: Object3D, placements: readonly LandPlacement[]): Inst
       const local = inverse.clone().multiply(mesh.matrixWorld)
       const instances = new InstancedMesh(mesh.geometry, material, list.length)
       list.forEach((placement, i) => {
+        const turn = new Quaternion().setFromAxisAngle(up, placement.rot ?? 0)
+        if (placement.tilt) turn.premultiply(new Quaternion().fromArray(tiltQuaternion(placement.tilt)))
         place.compose(
           new Vector3(placement.x, placement.y ?? 0, placement.z),
-          new Quaternion().setFromAxisAngle(up, placement.rot ?? 0),
+          turn,
           new Vector3().setScalar(HEX_SCALE * (placement.scale ?? 1)),
         )
         instances.setMatrixAt(i, place.clone().multiply(local))

@@ -1,5 +1,6 @@
 import { cellToWorld, type LandPlacement } from "../../lands.ts"
 import { cellAt, key, rng } from "../hex.ts"
+import { cragAt } from "./crags.ts"
 import { groundOf } from "./ground.ts"
 import type { Relief } from "./index.ts"
 import { outcropsAt } from "./outcrops.ts"
@@ -21,6 +22,8 @@ const WOODED = 0.75
 const CLUMPS = 5
 const REACH = 3.2
 const ROCK_SPOTS = 6
+/** The spots a hex tries for rocks lying along a cliff (crags.ts). */
+const CLIFF_SPOTS = 8
 
 export function dressingOf(
   relief: Relief,
@@ -79,6 +82,23 @@ export function dressingOf(
         if (h === undefined) continue
         for (const rock of outcropsAt({ x, z, h }, { ground, height, ledgeTop, random }))
           put(rock.piece, rock.x, rock.z, rock.y, rock.scale)
+      }
+      // Rocks and crags tipped onto the peak's cliffs.
+      for (let r = 0; r < CLIFF_SPOTS; r++) {
+        const [x, z] = [cx + (random() - 0.5) * 8, cz + (random() - 0.5) * 8]
+        const h = on(x, z)
+        const crag = h === undefined ? undefined : cragAt({ x, z, h }, { ground, height, ledgeTop, random })
+        if (!crag || onShelf(massif, x, z)) continue
+        const [tx, tz] = crag.tilt
+        out.push({
+          piece: crag.piece,
+          x: Math.round(crag.x * 100) / 100,
+          z: Math.round(crag.z * 100) / 100,
+          y: Math.round(crag.y * 100) / 100,
+          rot: Math.round(crag.rot * 100) / 100,
+          scale: Math.round(crag.scale * 100) / 100,
+          tilt: [Math.round(tx * 1000) / 1000, Math.round(tz * 1000) / 1000],
+        })
       }
     }
   }

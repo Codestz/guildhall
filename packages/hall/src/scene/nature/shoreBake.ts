@@ -8,6 +8,7 @@ import {
   type MeshStandardMaterial,
   type Object3D,
   OrthographicCamera,
+  Quaternion,
   RGBAFormat,
   Scene,
   ShaderMaterial,
@@ -20,6 +21,7 @@ import {
 import { isWebGPU } from "../../render/backend.ts"
 import { type Cell, cellToWorld, HEX_SCALE, type LandPlacement } from "../../world/lands.ts"
 import type { Spot } from "../../world/layout.ts"
+import { tiltQuaternion } from "../../world/tilt.ts"
 import { reachOf, type World } from "../../world/world.ts"
 import { HEX_RADIUS } from "./scatter.ts"
 import { distanceToLand, riverCells, type ShoreLayout, shoreTexels, smooth } from "./shore.ts"
@@ -120,6 +122,7 @@ function shoreSetup(nodes: Record<string, Object3D>, world: World, layout: Shore
     const copy = source.clone(true)
     copy.position.set(piece.x, piece.y ?? 0, piece.z)
     copy.rotation.set(0, piece.rot ?? 0, 0)
+    if (piece.tilt) copy.quaternion.premultiply(new Quaternion().fromArray(tiltQuaternion(piece.tilt)))
     copy.scale.setScalar(HEX_SCALE * (piece.scale ?? 1))
     below.add(copy)
   }

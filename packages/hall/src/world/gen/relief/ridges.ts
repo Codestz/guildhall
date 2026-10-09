@@ -37,9 +37,11 @@ export interface Skeleton {
 }
 
 /** Peaks are at least this far apart, world units (about four rings). */
-const PEAK_GAP = 38
+const PEAK_GAP = 28
 /** A saddle dips to this share of the lower of its two peaks. */
-const SADDLE = [0.55, 0.7] as const
+const SADDLE = [0.4, 0.55] as const
+/** How sharply a crest falls from a peak to the pass: above 1, a spike with a low col rather than a plateau. */
+const SPIKE = 1.25
 
 /** Rings from each footprint hex to the nearest hex outside it (1 on the rim). */
 export function depthsOf(keys: ReadonlySet<string>): Map<string, number> {
@@ -144,8 +146,9 @@ export function skeletonOf(
         dist(worldOf(b), hub) + jitter(b, "peak") * 12 - (dist(worldOf(a), hub) + jitter(a, "peak") * 12),
     )[0] as Cell
   const peaks: Peak[] = [{ cell: main, at: worldOf(main), height }]
-  const wanted = Math.min(4, 1 + Math.floor(cells.length / 45))
-  const inner = cells.filter((c) => (depth.get(key(c)) ?? 0) >= Math.max(1, Math.floor(deepest / 2)))
+  // A range of any size holds two to four summits (a small piece, one).
+  const wanted = cells.length < 14 ? 1 : Math.min(4, 2 + Math.floor(cells.length / 80))
+  const inner = cells.filter((c) => (depth.get(key(c)) ?? 0) >= Math.min(deepest, 2))
   while (peaks.length < wanted) {
     let pick: Cell | undefined
     let far = PEAK_GAP
@@ -157,7 +160,7 @@ export function skeletonOf(
       }
     }
     if (!pick) break
-    peaks.push({ cell: pick, at: worldOf(pick), height: height * (0.6 + 0.25 * jitter(pick, "tall")) })
+    peaks.push({ cell: pick, at: worldOf(pick), height: height * (0.6 + 0.12 * jitter(pick, "tall")) })
   }
 
   // Ridges: Prim's tree over the peaks, each edge routed through the middle of the footprint.
@@ -186,7 +189,7 @@ export function skeletonOf(
     const dip = low * (SADDLE[0] + (SADDLE[1] - SADDLE[0]) * jitter(to.cell, "saddle"))
     const crest = s.map((t) => {
       const end = t < 0.5 ? from.height : to.height
-      return dip + (end - dip) * Math.abs(2 * t - 1) ** 1.25
+      return dip + (end - dip) * Math.abs(2 * t - 1) ** SPIKE
     })
     const mid = s.findIndex((t) => t >= 0.5)
     saddles.push({ at: points[mid] as Spot, height: dip, between: [a, b] })

@@ -36,6 +36,8 @@ export interface LandPlacement {
   y?: number
   rot?: number
   scale?: number
+  /** The ground's unit normal's horizontal part, for a piece lying along a slope (tilt.ts); upright when absent. */
+  tilt?: readonly [number, number]
 }
 
 // ---- The map -------------------------------------------------------------------------------

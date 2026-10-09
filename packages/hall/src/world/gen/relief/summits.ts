@@ -17,6 +17,8 @@ import type { Peak, Saddle } from "./ridges.ts"
 const REACH = 1.5 * CIRCUM
 /** A saddle lies at least this far below the lower of its peaks. */
 const DEPTH = TERRACE
+/** A pass lies at most this share of its lower peak's height: the summits stand clear of it. */
+const PROMINENCE = 0.62
 /** A saddle that cannot be cut this far below its lower peak merges that peak away. */
 const LEAST = 0.5
 /** How steeply the ground climbs out of a cut saddle (rise over run): a pass, not a trench. */
@@ -72,7 +74,7 @@ export function settle(
       .filter(({ a, b }) => alive[a] && alive[b])
   for (let round = 0; round <= peaks.length; round++) {
     for (const { saddle, a, b } of joined())
-      cut(grid, fixed, saddle.at, Math.min(peaks[a]?.height ?? 0, peaks[b]?.height ?? 0) - DEPTH)
+      cut(grid, fixed, saddle.at, pass(Math.min(peaks[a]?.height ?? 0, peaks[b]?.height ?? 0)))
     refresh?.()
     peaks = peaks.map((peak) => ({ ...peak, height: groundAt(peak.at, peak.height) }))
     let merged = false
@@ -99,7 +101,7 @@ export function settle(
       }
     }
   const crown: Peak = { cell: cellAt([topAt[0], topAt[1]]), at: [topAt[0], topAt[1]], height: top }
-  const under = kept.find(({ peak }) => Math.hypot(peak.at[0] - topAt[0], peak.at[1] - topAt[1]) <= REACH)
+  const under = kept.find(({ peak }) => Math.hypot(peak.at[0] - topAt[0], peak.at[1] - topAt[1]) <= 2 * REACH)
   if (!under) kept.push({ peak: crown, from: -1 })
   else if (under.peak.height < top) under.peak = { ...under.peak, at: crown.at, height: top }
   kept.sort((p, q) => q.peak.height - p.peak.height || p.from - q.from)
@@ -115,6 +117,9 @@ export function settle(
     }),
   }
 }
+
+/** The height a pass between peaks the lower of which stands `low` is cut to. */
+const pass = (low: number): number => Math.min(low - DEPTH, PROMINENCE * low)
 
 /** Lowers the grid round `at` to at most `ceiling`, climbing out of the cut at CUT; the fixed vertices stay. */
 function cut(grid: HeightGrid, fixed: (i: number, j: number) => boolean, at: Spot2, ceiling: number): void {

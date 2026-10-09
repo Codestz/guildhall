@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { surfaceGeometry } from "../src/scene/nature/riverMesh.ts"
+import { SEA_Y } from "../src/scene/nature/waterline.ts"
 import { key, neighbours, rings, unkey } from "../src/world/gen/hex.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
 import { keepOf } from "../src/world/gen/plan/lakes.ts"
@@ -148,5 +150,37 @@ describe("valley lakes", () => {
 
   test("the same seed makes the same lakes", () => {
     expect(lakesOf(worldOf(REACT.entries))).toEqual(lakesOf(CITY))
+  })
+})
+
+describe("a lake's surface", () => {
+  const geometry = surfaceGeometry(CITY.world.water as NonNullable<typeof CITY.world.water>)
+  const position = geometry.getAttribute("position")
+  const index = geometry.getIndex()
+
+  test("has no two triangles on the same corners (coplanar duplicates z-fight)", () => {
+    const seen = new Set<string>()
+    for (let i = 0; i < (index?.count ?? 0); i += 3) {
+      const corners = [0, 1, 2].map((j) => {
+        const v = index?.getX(i + j) ?? 0
+        return [position.getX(v), position.getY(v), position.getZ(v)].map((n) => n.toFixed(3)).join(",")
+      })
+      const id = corners.sort().join("|")
+      expect(seen.has(id)).toBe(false)
+      seen.add(id)
+    }
+  })
+
+  test("lies above the sea's own plane, which runs under a level-0 lake and would z-fight with it", () => {
+    for (const lake of lakesOf(CITY).filter((l) => l.level === 0)) {
+      const [x, z] = cellToWorld(lake.cells[0] as never)
+      let found = false
+      for (let v = 0; v < position.count; v++)
+        if (Math.hypot(position.getX(v) - x, position.getZ(v) - z) < 1e-6) {
+          expect(position.getY(v)).toBeGreaterThan(SEA_Y + 0.02)
+          found = true
+        }
+      expect(found).toBe(true)
+    }
   })
 })

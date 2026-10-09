@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { type BufferGeometry, Vector3 } from "three"
 import { patchWaters } from "../src/lab/waterPatch.ts"
 import { fallsGeometry } from "../src/scene/nature/fallMesh.ts"
-import { surfaceGeometry } from "../src/scene/nature/riverMesh.ts"
+import { LAKE_LIFT, surfaceGeometry } from "../src/scene/nature/riverMesh.ts"
 import { fallNodeMaterial, riverNodeMaterial } from "../src/scene/nature/riverNodes.ts"
 import { waterUniforms } from "../src/scene/nature/Water.tsx"
 import { cellToWorld } from "../src/world/lands.ts"
@@ -65,7 +65,7 @@ describe("inland water surfaces", () => {
     const [x, z] = cellToWorld([0, 0])
     expect(nearestVertex(surface, x, z).y).toBeCloseTo(surfaceY("river", 2))
     const [lx, lz] = cellToWorld([3, 3])
-    expect(nearestVertex(surface, lx, lz).y).toBeCloseTo(1 * TERRACE + surfaceY("lake", 0))
+    expect(nearestVertex(surface, lx, lz).y).toBeCloseTo(1 * TERRACE + surfaceY("lake", 0) + LAKE_LIFT)
   })
 
   test("a river runs down its course, mid-channel far from its banks; a lake barely drifts", () => {

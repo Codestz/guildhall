@@ -42,6 +42,12 @@ const RINGS = 3
 /** How much faster a river runs as it nears a lip, and from how far. */
 const LIP_BOOST = 0.7
 const LIP_REACH = 4.5
+/**
+ * How far a lake's surface lies over its level's height. A lake on level 0 is at the sea's own
+ * height (waterline.ts SEA_Y), and the sea's patches (Water.tsx) run under the whole island, so the
+ * two coplanar surfaces would z-fight in stripes; a hair above, the lake wins everywhere.
+ */
+export const LAKE_LIFT = 0.04
 /** A fall's jet: how far out past its lip it leaves (fallMesh.ts), and how far out it lands. */
 export const THROW_AT_LIP = 0.12
 export const THROW = 0.55
@@ -288,7 +294,7 @@ function still(out: Builder, lake: Lake, falls: readonly Fall[]): void {
   const drain = edgeOf(W(lake.outlet.cell), lake.outlet.dir)
   const exit = mid(drain[0], drain[1])
   const feet = falls.filter((fall) => lake.cells.some((cell) => same(cell, fall.to))).map(footOf)
-  const y = surfaceY("lake", lake.level)
+  const y = surfaceY("lake", lake.level) + LAKE_LIFT
   for (const cell of [...lake.cells, ...lake.shore]) {
     const wet = inside.has(key(cell))
     const centre = W(cell)

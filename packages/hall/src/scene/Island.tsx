@@ -25,6 +25,7 @@ import { useWorld, useWorldReady } from "../world/source.ts"
 import { markGrowable, useGrowable } from "./growth/registry.ts"
 import { plain } from "./Kit.tsx"
 import { isMovingPart } from "./life/moving.ts"
+import { missingPieces, reportMissing } from "./missing.ts"
 import { useOwnedMeshes } from "./owned.ts"
 import { tameLime } from "./palette.ts"
 import { reliefLayer } from "./terrain/reliefMeshes.ts"
@@ -197,6 +198,7 @@ function batch(
 ): { meshes: Mesh[]; tiers: TieredLayer } {
   // A piece's coarse copy may move its surface FAR_ERROR world units wherever it stands, so its
   // error in its own units is set by its biggest copy.
+  reportMissing(missingPieces(nodes, placements))
   const biggest = new Map<LandPiece, number>()
   for (const { piece, scale = 1 } of placements) biggest.set(piece, Math.max(biggest.get(piece) ?? 0, scale))
   const pieces = new Map<LandPiece, Map<Material, TieredPiece>>()

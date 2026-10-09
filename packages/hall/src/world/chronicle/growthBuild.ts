@@ -7,6 +7,7 @@ import { roleOf } from "./growthPieces.ts"
 import { angleGap } from "./growthSpans.ts"
 import { type Kind, SPAN } from "./growthStages.ts"
 import { contributorsAt, filesAt, type People } from "./growthStory.ts"
+import { town2Buildings } from "./growthTown2.ts"
 
 /**
  * Growth film v2's build schedule (ADR 0021, world-gen v2 §4 (d)), pure: when each building of a
@@ -14,6 +15,8 @@ import { contributorsAt, filesAt, type People } from "./growthStory.ts"
  * island's pieces and the growth plan alone (no prefab metadata: a piece's name and place say what
  * it is), so what the venues agent adds to the catalogue is picked up as it is named.
  *
+ *   town2     a second-kit building (growthTown2.ts) is one lot: its ground floor rises together, its
+ *             roofs and upper pieces pop in order once the walls are up
  *   lots      a building is begun when its hex is up, and no sooner than the district has grown to
  *             need the hexes its lot-mates stand on (a denser lot fills in later as the district
  *             grows by files), a beat later the farther it is from the district's plaza
@@ -30,6 +33,8 @@ export interface Site {
   born: number
   /** Seconds after that, on top of the hex's own age, it waits. */
   delay: number
+  /** One of several pieces of a building (a second-kit wall panel): no stack of planks of its own. */
+  follower?: boolean
 }
 
 export interface Moment {
@@ -184,8 +189,11 @@ export function planBuild(
 
   // ---- lots: houses and halls, by their hex ----
   const lots = new Map<number, LandPlacement[]>()
+  const t2 = town2Buildings(decor, (p) => hexIndex(g, p.x, p.z))
+  const t2Of = new Map(t2.map((b) => [b.lead, b]))
+  const t2Rest = new Set(t2.flatMap((b) => b.parts.map((part) => part.piece).filter((p) => p !== b.lead)))
   for (const p of decor) {
-    if (roleOf(p.piece) !== "build" || sites.has(siteKey(p.piece, p.x, p.z))) continue
+    if (roleOf(p.piece) !== "build" || t2Rest.has(p) || sites.has(siteKey(p.piece, p.x, p.z))) continue
     const h = hexIndex(g, p.x, p.z)
     lots.set(h, [...(lots.get(h) ?? []), p])
   }
@@ -194,7 +202,8 @@ export function planBuild(
     list.sort((a, b) => a.z - b.z || a.x - b.x)
     const at = rank.get(h)
     list.forEach((p, j) => {
-      const kind = lotKind(p.piece)
+      const building = t2Of.get(p)
+      const kind = building?.kind ?? lotKind(p.piece)
       let site: Site
       if (at) {
         const [di, k] = at
@@ -209,6 +218,15 @@ export function planBuild(
       } else {
         // On the keep block (an inn, a town hall): the harbour's first buildings.
         site = put(p, kind, 0.4, 0.8 + 0.02 * Math.hypot(p.x, p.z))
+      }
+      for (const { piece, level } of building?.parts ?? []) {
+        if (piece === p) continue
+        // The ground floor rises with the lead; roofs and upper pieces pop in after the walls.
+        const part =
+          level === 0
+            ? put(piece, kind, site.born, site.delay)
+            : put(piece, "prop", site.born, site.delay + SPAN[kind] * 0.7 + 0.2 * (level - 1))
+        part.follower = true
       }
       builders.push({ x: p.x, z: p.z, site })
     })

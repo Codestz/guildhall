@@ -31,6 +31,10 @@ export function roleOf(piece: string): Role {
     return "nature"
   if (/^building_dirt/.test(piece)) return "prop"
   if (/^building_/.test(piece)) return "build"
+  // The second town kit (world/prefabs/town2.ts): its walls, roofs and towers build, its trees grow,
+  // the rest (stalls, fences, fountain, hedges, lanterns, the windmill's sails) are props.
+  if (/^t2_tree/.test(piece)) return "nature"
+  if (/^t2_(wall|roof|chimney|c_tower|c_wall)/.test(piece)) return "build"
   return "prop"
 }
 

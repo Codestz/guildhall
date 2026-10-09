@@ -5,6 +5,8 @@
  *   GET /repos/{o}/{r}/actions/runs       "List workflow runs for a repository"
  *   GET /repos/{o}/{r}/pulls              "List pull requests"
  *   GET /repos/{o}/{r}/releases           "List releases"
+ *   GET /repos/{o}/{r}/issues             "List repository issues" (pull requests are listed too)
+ *   GET /repos/{o}/{r}/pulls/{n}          "Get a pull request" (additions, deletions)
  * Trimmed to the fields the poller reads plus a few neighbours, so an off-shape change shows up.
  */
 
@@ -65,7 +67,15 @@ export function run(
 export function pull(
   number: number,
   created: string,
-  options: { merged?: string; closed?: string; title?: string } = {},
+  options: {
+    merged?: string
+    closed?: string
+    title?: string
+    draft?: boolean
+    reviewers?: number
+    autoMerge?: boolean
+    updated?: string
+  } = {},
 ) {
   return {
     id: 9000 + number,
@@ -75,12 +85,43 @@ export function pull(
     user: { login: "hubot", id: 3, type: "User" },
     html_url: `https://github.com/acme/shop/pull/${number}`,
     created_at: created,
-    updated_at: options.merged ?? options.closed ?? created,
+    updated_at: options.updated ?? options.merged ?? options.closed ?? created,
     closed_at: options.closed ?? options.merged ?? null,
     merged_at: options.merged ?? null,
     head: { ref: `feature-${number}`, sha: sha(500 + number) },
     base: { ref: "main", sha: sha(1) },
-    draft: false,
+    draft: options.draft ?? false,
+    requested_reviewers: Array.from({ length: options.reviewers ?? 0 }, (_, i) => ({ login: `rev${i}` })),
+    requested_teams: [],
+    auto_merge: options.autoMerge ? { merge_method: "squash" } : null,
+  }
+}
+
+/** "Get a pull request": the page of one, with the size of its diff. */
+export function pullPage(number: number, additions: number, deletions: number) {
+  return { number, additions, deletions, changed_files: 3 }
+}
+
+/** An issue as "List repository issues" returns it; with `pullRequest`, a pull request listed there. */
+export function issue(
+  number: number,
+  created: string,
+  options: { closed?: string; labels?: string[]; pullRequest?: boolean } = {},
+) {
+  return {
+    id: 7000 + number,
+    number,
+    state: options.closed ? "closed" : "open",
+    title: `Issue ${number}`,
+    user: { login: "reporter", id: 4, type: "User" },
+    html_url: `https://github.com/acme/shop/issues/${number}`,
+    labels: (options.labels ?? []).map((name) => ({ id: 1, name, color: "d73a4a" })),
+    created_at: created,
+    updated_at: options.closed ?? created,
+    closed_at: options.closed ?? null,
+    ...(options.pullRequest
+      ? { pull_request: { url: "https://api.github.com/repos/acme/shop/pulls/1" } }
+      : {}),
   }
 }
 
@@ -109,6 +150,8 @@ export function fakeGithub(repo: string, t0: number) {
     runs: new Map<string, ReturnType<typeof run>[]>(),
     pulls: [pull(1, iso(t0 - 86_400_000), { merged: iso(t0 - 80_000_000) })] as ReturnType<typeof pull>[],
     releases: [release(1, "v1.0.0", iso(t0 - 86_400_000))] as ReturnType<typeof release>[],
+    issues: [] as ReturnType<typeof issue>[],
+    pages: new Map<number, ReturnType<typeof pullPage>>(),
     remaining: 4000,
     reset: Math.floor(t0 / 1000) + 3600,
     status: undefined as number | undefined,
@@ -133,7 +176,11 @@ export function fakeGithub(repo: string, t0: number) {
             ? state.pulls
             : path === "/releases"
               ? state.releases
-              : undefined
+              : path === "/issues"
+                ? state.issues
+                : path.startsWith("/pulls/")
+                  ? state.pages.get(Number(path.slice(7)))
+                  : undefined
     if (body === undefined) return new Response("{}", { status: 404, headers: rate })
     const text = JSON.stringify(body)
     const etag = `"${Bun.hash(text).toString(16)}"`

@@ -1,4 +1,5 @@
-import type { Change, CiState, SeaEvent } from "@guildhall/core"
+import type { Change, CiState, PrStatus, SeaEvent } from "@guildhall/core"
+import { backlog } from "./backlog.ts"
 import { type Adventurer, Script } from "./script.ts"
 
 /**
@@ -7,7 +8,9 @@ import { type Adventurer, Script } from "./script.ts"
  * and pushed once its tests pass, a pull request opens, CI goes red on Linux, the fix is pushed and
  * CI goes green, the PR is merged, main's CI passes, and a release is cut; then the librarian writes
  * it into the changelog, so the story runs on after the release (RELEASE_TAIL_MS at least): the
- * hall's galleon is seen sailing in and anchoring before a replay loops.
+ * hall's galleon is seen sailing in and anchoring before a replay loops. Round it, the repo's open
+ * work (backlog.ts): other people's pull requests at anchor and their issues waiting at the quay; the
+ * contrast bug someone files when CI fails is closed by the merge.
  *
  * Sea events are timed like the changes (ms from the start) and fall at the moments in the run that
  * cause them: a push right after the `git push` deed, CI a little after each push.
@@ -22,6 +25,7 @@ const REPO = "acme/shop"
 const BRANCH = "dark-mode"
 const AUTHOR = "mira"
 const PR = 128
+const ISSUE = 141
 /** The story goes on at least this long after its release: the hall's galleon sails in (11 s) and its flourish plays (9 s). */
 export const RELEASE_TAIL_MS = 20_000
 
@@ -67,16 +71,30 @@ export function seas(seed = 1): SeaTale {
       })
     return states[2]?.[1] ?? at
   }
-  const pr = (kind: "pr_opened" | "pr_merged", at: number) =>
+  const pr = (kind: "pr_opened" | "pr_updated" | "pr_merged", at: number, status: PrStatus = "draft") =>
     sea.push({
       kind,
-      id: `${kind}:${REPO}#${PR}`,
+      id: kind === "pr_updated" ? `${kind}:${REPO}#${PR}:${status}` : `${kind}:${REPO}#${PR}`,
       at,
       repo: REPO,
       number: PR,
       title: "Dark mode for the settings page",
       author: AUTHOR,
       branch: BRANCH,
+      ...(kind === "pr_merged" ? {} : { status }),
+      ...(kind === "pr_opened" ? { size: 212 } : {}),
+    } as SeaEvent)
+  /** Someone files the contrast bug the failing CI points at; the merge closes it. */
+  const issue = (kind: "issue_opened" | "issue_closed", at: number) =>
+    sea.push({
+      kind,
+      id: `${kind}:${REPO}#${ISSUE}`,
+      at,
+      repo: REPO,
+      number: ISSUE,
+      title: "Dark mode: muted text is hard to read",
+      author: "lou",
+      labels: ["bug", "a11y"],
     })
 
   const master = script.guildmaster("Ship dark mode for the settings page, behind a PR")
@@ -94,6 +112,7 @@ export function seas(seed = 1): SeaTale {
   master.deed("bash", { command: "gh pr create --fill" }, 1800, { summary: "#128" })
   pr("pr_opened", master.clock)
   const red = ci(pushed, first, "failed", 18_000)
+  issue("issue_opened", red + 400)
   master.think("Waiting on CI before calling it done.", 2400)
   master.clock = Math.max(master.clock, red + 800)
   master.deed("bash", { command: "gh run view --log-failed" }, 1400, {
@@ -109,10 +128,12 @@ export function seas(seed = 1): SeaTale {
   gitPush(master)
   const fix = push(master.clock, 1)
   const green = ci(master.clock, fix, "passed", 16_000)
+  pr("pr_updated", green + 200, "ready")
   master.think("Green. Merge it.", 1200)
   master.clock = Math.max(master.clock, green + 600)
   master.deed("bash", { command: "gh pr merge 128 --squash" }, 1600, { summary: "merged" })
   pr("pr_merged", master.clock)
+  issue("issue_closed", master.clock + 600)
   const merged = push(master.clock + 300, 1, "main")
   const mainGreen = ci(master.clock + 300, merged, "passed", 14_000, "main")
   master.clock = Math.max(master.clock, mainGreen + 600)
@@ -139,6 +160,7 @@ export function seas(seed = 1): SeaTale {
   master.finish(
     "Dark mode shipped: PR #128 merged after a contrast fix, CI green, v1.4.0 released and logged.",
   )
+  sea.push(...backlog())
   return { changes: script.done(), sea: sea.sort((a, b) => a.at - b.at) }
 }
 

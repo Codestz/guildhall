@@ -1153,7 +1153,7 @@
       "working|bash|bash · gh pr create --base release…|false => running run | run | Use_Item/steam/-",
       "working|bash|bash · gh run view --log-failed|false => running run | run | Use_Item/steam/-",
       "working|bash|bash · git bisect run bun test src…|false => testing test | test | Use_Item/steam/-",
-      "working|bash|bash · git bisect skip && git bise…|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · git bisect skip && git bise…|false => testing test | test | Use_Item/steam/-",
       "working|bash|bash · git bisect start HEAD main …|false => running run | run | Use_Item/steam/-",
       "working|bash|bash · git commit -am \"fix(search)…|false => running run | run | Use_Item/steam/-",
       "working|bash|bash · git push -u origin fix/emoj…|false => running run | run | Use_Item/steam/-",
@@ -1345,7 +1345,7 @@
       "deed-failed bash call_sim0215 => - | - | test",
       "deed bash call_sim0203 => run | - | run",
       "deed bash call_sim0204 => test | - | test",
-      "deed-failed bash call_sim0217 => - | - | run"
+      "deed-failed bash call_sim0217 => - | - | test"
     ],
     "captions": [
       "The Guildmaster splits the work: the Scholar and the Scout set out together.",
@@ -2186,6 +2186,7 @@
     "captions": [
       "The Guildmaster sends the Artisan to add dark theme tokens and wire the settings page.",
       "The Artisan pores over tokens.ts and sets hammer to tokens.ts.",
+      "The Artisan reshapes SettingsPage.tsx.",
       "The Artisan comes home: “Dark tokens added; the settings page follows…”",
       "The Guildmaster runs git push -u origin dark-mode and gh pr create --fill — #128.",
       "The lighthouse burns red: CI failed on dark-mode.",

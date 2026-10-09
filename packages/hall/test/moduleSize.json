@@ -25,14 +25,12 @@
   "packages/hall/src/scene/life/Villagers.tsx": 511,
   "packages/hall/src/scene/life/rounds.ts": 990,
   "packages/hall/src/scene/nature/Water.tsx": 474,
-  "packages/hall/src/scene/seas/fleet.ts": 406,
   "packages/hall/src/scene/sigilBoard.ts": 472,
   "packages/hall/src/world/behaviours.ts": 1100,
   "packages/hall/src/world/chronicle/deep.ts": 541,
   "packages/hall/src/world/chronicle/quick.ts": 425,
   "packages/hall/src/world/lands.ts": 969,
   "packages/hall/src/world/wilds.ts": 402,
-  "packages/hub/src/github.ts": 454,
   "packages/hub/src/hub.ts": 420,
   "packages/sim/src/saga.ts": 1001
 }

@@ -2,12 +2,9 @@ import { useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
 import { useEffect, useMemo } from "react"
 import {
-  AdditiveBlending,
   Color,
-  ConeGeometry,
   DynamicDrawUsage,
   Euler,
-  Float32BufferAttribute,
   InstancedMesh,
   Matrix4,
   Mesh,
@@ -20,9 +17,10 @@ import {
   Vector3,
 } from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
+import { CAPS } from "../../guild/docket.ts"
+import { quality } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { LANDS_URL, SHIPS_URL } from "../../world/cast.ts"
-import { HEX_SCALE } from "../../world/lands.ts"
 import { useWorld } from "../../world/source.ts"
 import { bakeNode, hash01 } from "../events/common.ts"
 import { FRAME } from "../frame.ts"
@@ -37,11 +35,15 @@ import {
   lampOf,
   lighthouseSpot,
   MAX_CRATES,
+  MAX_PULL_SHIPS,
   MAX_SHIPS,
   seaAt,
   toWorld,
   type Voyage,
 } from "./fleet.ts"
+import { lighthouse } from "./lighthouse.ts"
+import type { Mark } from "./passage.ts"
+import { pennants } from "./pennants.ts"
 
 /** The sea's own pieces (scripts/assets.ts `seas`): loaded with this module, only when a guild has a sea. */
 export const SEAS_URL = `${import.meta.env.BASE_URL}assets/seas.glb`
@@ -63,10 +65,19 @@ const CRATE_SPOTS: readonly (readonly [number, number])[] = [
   [0.75, -2],
 ]
 const CRATE_SCALE = 1.1
-/** The lighthouse: the hex pack's tower at the island's scale, its lamp a beacon on the roof's point. */
-const LAMP_Y = 11.8
-const BEAM_LENGTH = 70
 const SPARKS = 48
+/** A pull request's pennant flies its status; once the ship is merged or closed, how it ended. */
+const PENNANT: Record<Mark, number> = {
+  draft: 0x9aa7b4,
+  open: 0xf1ecdf,
+  review: 0xf2b134,
+  ready: 0x4cc16b,
+  merged: 0x8f63e0,
+  closed: 0xd65a4f,
+}
+/** The hull grows with its diff: a one-liner is this big, ten thousand lines the other. */
+const SMALLEST = 0.8
+const BIGGEST = 1.3
 
 const dummy = {
   position: new Vector3(),
@@ -120,7 +131,7 @@ export default function SeasLayer() {
   useFrame(() => {
     if (!layer) return
     const time = store.time
-    const view = seaAt(store.sea, time)
+    const view = seaAt(store.sea, time, CAPS[quality.tier])
     const t = time / 1000
     const counts: Record<Hull, number> = { cargo: 0, pr: 0, galleon: 0 }
     let crates = 0
@@ -138,7 +149,16 @@ export default function SeasLayer() {
         layer.gold.visible = true
         continue
       }
-      ;(mesh as InstancedMesh).setMatrixAt(counts[voyage.hull]++, dummy.matrix)
+      const index = counts[voyage.hull]++
+      ;(mesh as InstancedMesh).setMatrixAt(index, dummy.matrix)
+      if (voyage.hull === "pr") {
+        // Its pennant at the masthead, fluttering; the colour is the pull request's status.
+        dummy.local.makeRotationY(Math.sin(t * 2.4 + voyage.side) * 0.35)
+        dummy.local.setPosition(0, layer.mast.y, layer.mast.z)
+        dummy.out.multiplyMatrices(dummy.matrix, dummy.local)
+        layer.flags.setMatrixAt(index, dummy.out)
+        layer.flags.setColorAt(index, dummy.color.setHex(PENNANT[voyage.mark ?? "open"]))
+      }
       for (let i = 0; i < voyage.crates; i++) {
         const [x, z] = CRATE_SPOTS[i] as readonly [number, number]
         dummy.local.makeRotationY((hash01(i * 7 + voyage.key.length) - 0.5) * 0.5)
@@ -154,6 +174,9 @@ export default function SeasLayer() {
       mesh.count = counts[hull]
       mesh.instanceMatrix.needsUpdate = true
     }
+    layer.flags.count = counts.pr
+    layer.flags.instanceMatrix.needsUpdate = true
+    if (layer.flags.instanceColor) layer.flags.instanceColor.needsUpdate = true
     layer.crates.count = crates
     layer.crates.instanceMatrix.needsUpdate = true
 
@@ -206,7 +229,8 @@ function shipMatrix(voyage: Voyage, harbour: Harbour, t: number): void {
     Math.sin(t * 0.8 + phase) * 0.04 * sway,
   )
   dummy.quaternion.setFromEuler(dummy.euler)
-  dummy.scale.setScalar(hull.scale * (0.4 + 0.6 * voyage.shown))
+  const grown = voyage.size === undefined ? 1 : SMALLEST + (BIGGEST - SMALLEST) * voyage.size
+  dummy.scale.setScalar(hull.scale * grown * (0.4 + 0.6 * voyage.shown))
   dummy.matrix.compose(dummy.position, dummy.quaternion, dummy.scale)
 }
 
@@ -290,10 +314,11 @@ function build(
 
   const hulls: Record<Hull, Mesh> = {
     cargo: instanced(ships[HULLS.cargo.piece], MAX_SHIPS),
-    pr: instanced(ships[HULLS.pr.piece], MAX_SHIPS),
+    pr: instanced(ships[HULLS.pr.piece], MAX_PULL_SHIPS),
     galleon,
   }
   const crates = instanced(seas.Wood_Planks_Stack_Small, MAX_SHIPS * MAX_CRATES)
+  const { flags, mast } = pennants(hulls.pr as InstancedMesh, keep)
 
   const goldBake = seas.Gold_Bars_Stack_Small ? bakeNode(seas.Gold_Bars_Stack_Small) : null
   const gold = keep(
@@ -315,59 +340,14 @@ function build(
     sparks.setColorAt(i, dummy.color.setHex(FESTIVE[i % FESTIVE.length] as number).multiplyScalar(2))
   sparks.count = 0
 
-  return { meshes, hulls, crates, gold, sparks, lighthouse: lighthouse(lands, spot, harbour, meshes) }
-}
-
-/** The tower (it stands still: it casts), its lamp, and the beam (a long open cone, additive). */
-function lighthouse(
-  lands: Record<string, Object3D>,
-  spot: { x: number; z: number } | undefined,
-  harbour: Harbour,
-  meshes: Mesh[],
-) {
-  const towerBake = lands.building_tower_A_blue ? bakeNode(lands.building_tower_A_blue) : null
-  if (!spot || !towerBake) return undefined
-  const tower = new Mesh(
-    towerBake.geometry,
-    new MeshStandardMaterial({ map: towerBake.material.map, roughness: 0.9 }),
-  )
-  tower.position.set(spot.x, 0, spot.z)
-  tower.scale.setScalar(HEX_SCALE)
-  // Its door to the island.
-  tower.rotation.y = Math.atan2(-harbour.outX, -harbour.outZ)
-  tower.castShadow = true
-  tower.receiveShadow = true
-  meshes.push(tower)
-
-  const lampMaterial = new MeshBasicMaterial({ color: 0x3a3a44, toneMapped: false })
-  const lamp = new Mesh(new SphereGeometry(0.9, 12, 8), lampMaterial)
-  lamp.position.set(spot.x, LAMP_Y, spot.z)
-  meshes.push(lamp)
-
-  // The cone lies along +z from its tip at the lamp, widening out to sea, dipping a little.
-  const cone = new ConeGeometry(7, BEAM_LENGTH, 20, 6, true)
-  cone.translate(0, -BEAM_LENGTH / 2, 0)
-  // Bright at the lamp, gone at the far end: additive, so a black vertex adds nothing.
-  const along = cone.getAttribute("position")
-  const fade = new Float32Array(along.count * 3)
-  for (let i = 0; i < along.count; i++) fade.fill((1 + along.getY(i) / BEAM_LENGTH) ** 2, i * 3, i * 3 + 3)
-  cone.setAttribute("color", new Float32BufferAttribute(fade, 3))
-  cone.rotateX(-Math.PI / 2 + 0.06)
-  const beamMaterial = new MeshBasicMaterial({
-    color: 0xffd9a0,
-    transparent: true,
-    opacity: 0.2,
-    blending: AdditiveBlending,
-    vertexColors: true,
-    depthWrite: false,
-    toneMapped: false,
-  })
-  const beam = new Mesh(cone, beamMaterial)
-  beam.position.copy(lamp.position)
-  beam.renderOrder = 2
-  beam.frustumCulled = false
-  meshes.push(beam)
-  // A steady beam looks out to sea: away from the island's centre, through the tower.
-  const seaward = Math.atan2(spot.x, spot.z)
-  return { lamp, lampMaterial, beam, beamMaterial, seaward }
+  return {
+    meshes,
+    hulls,
+    crates,
+    flags,
+    mast,
+    gold,
+    sparks,
+    lighthouse: lighthouse(lands, spot, harbour, meshes),
+  }
 }

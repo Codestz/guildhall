@@ -1,5 +1,29 @@
 import { execFile } from "node:child_process"
-import type { CiState, SeaEvent } from "@guildhall/core"
+import type { PrStatus, SeaEvent } from "@guildhall/core"
+import {
+  ciOf,
+  headOf,
+  issuesOf,
+  object,
+  pullsOf,
+  pushOf,
+  releasesOf,
+  standing,
+  statusMoves,
+} from "./githubRead.ts"
+
+// What the poller's answers are read as lives in githubRead.ts; these are re-exported for callers.
+export {
+  ciOf,
+  ciState,
+  issuesOf,
+  prStatus,
+  pullsOf,
+  pushOf,
+  releasesOf,
+  standing,
+  statusMoves,
+} from "./githubRead.ts"
 
 /**
  * The hub's watch on GitHub (PROTOCOL.md §7): for each repo a recently active guild works in, it asks
@@ -15,8 +39,14 @@ import type { CiState, SeaEvent } from "@guildhall/core"
  * api.github.com: never logged, recorded or sent to a hall. Without gh, or logged out, public repos
  * are polled without a token, every ANONYMOUS_POLL_MS (GitHub allows 60 requests an hour so).
  *
- * The first poll of a repo is its baseline: what is already there is remembered, not announced. After
- * that, an event is new when its id was never seen and it happened after the baseline.
+ * The first poll of a repo is its baseline: what is already there is remembered, not announced, but
+ * for what is still open (pull requests, issues): those are announced as they are, so the sea shows
+ * the repo's open work from the start. After that, an event is new when its id was never seen and it
+ * happened after the baseline.
+ *
+ * Two reads are garnish and never move a repo's backoff: the issues list (one conditional request a
+ * poll) and, for each pull request about to be announced, its own page for the size of its diff (at
+ * most DETAILS_PER_POLL a poll, each pull request once).
  */
 
 export const API = "https://api.github.com"
@@ -41,8 +71,8 @@ const SEEN_MAX = 2000
 const ETAGS_MAX = 500
 /** GitHub's clock and this one differ a little: an event this much before the baseline still counts. */
 const SKEW_MS = 2 * 60_000
-/** Longest text taken from GitHub (titles, names): it is shown, never trusted. */
-const MAX_TEXT = 300
+/** Pull requests whose own page is read for their size, at most, in one poll. */
+const DETAILS_PER_POLL = 5
 
 /** A repo to watch, and the branches its guilds have checked out. */
 export interface SeaTarget {
@@ -81,6 +111,8 @@ interface RepoState {
   /** Branch → the newest commit seen on it. */
   heads: Map<string, string>
   seen: Set<string>
+  /** Open pull request number → the status last seen, to tell when one moves. */
+  statuses: Map<number, PrStatus>
 }
 
 type Answer =
@@ -183,6 +215,19 @@ export function createGithub(options: GithubOptions = {}): GithubPoller {
     if (etags.size > ETAGS_MAX) etags.delete(etags.keys().next().value as string)
   }
 
+  /** Reads the diff size of the pull requests about to be announced (their own page), a few a poll. */
+  async function measure(events: SeaEvent[], repo: string, now: number): Promise<void> {
+    let spent = 0
+    for (const event of events) {
+      if (event.kind !== "pr_opened" || spent >= DETAILS_PER_POLL) continue
+      spent++
+      const detail = await get(`/repos/${repo}/pulls/${event.number}`, now)
+      const body = detail.kind === "ok" ? object(detail.body) : undefined
+      const size = Number(body?.additions) + Number(body?.deletions)
+      if (Number.isFinite(size)) event.size = size
+    }
+  }
+
   /** One repo's requests: its new events, and how the poll went. */
   async function pollRepo(
     target: SeaTarget,
@@ -212,14 +257,20 @@ export function createGithub(options: GithubOptions = {}): GithubPoller {
       }
     }
     const pulls = await ask("/pulls?state=all&sort=updated&direction=desc&per_page=20")
-    if (pulls.kind === "ok") found.push(...pullsOf(repo, pulls.body))
+    if (pulls.kind === "ok")
+      found.push(...pullsOf(repo, pulls.body), ...statusMoves(repo, pulls.body, state.statuses))
     const releases = await ask("/releases?per_page=10")
     if (releases.kind === "ok") found.push(...releasesOf(repo, releases.body))
+    const issues = await get(`/repos/${repo}/issues?state=all&sort=updated&direction=desc&per_page=30`, now)
+    if (issues.kind === "ok") found.push(...issuesOf(repo, issues.body))
 
     const baseline = state.since === undefined
     state.since ??= now
     const since = state.since - SKEW_MS
-    const fresh = found.filter((event) => !state.seen.has(event.id) && !baseline && event.at >= since)
+    const fresh = baseline
+      ? standing(found)
+      : found.filter((event) => !state.seen.has(event.id) && event.at >= since)
+    await measure(fresh, repo, now)
     for (const event of found) {
       state.seen.delete(event.id)
       state.seen.add(event.id)
@@ -256,7 +307,7 @@ export function createGithub(options: GithubOptions = {}): GithubPoller {
       for (const target of targets) {
         let state = states.get(target.repo)
         if (!state) {
-          state = { due: 0, interval: base, heads: new Map(), seen: new Set() }
+          state = { due: 0, interval: base, heads: new Map(), seen: new Set(), statuses: new Map() }
           states.set(target.repo, state)
         }
         if (now < state.due) continue
@@ -308,147 +359,5 @@ function ghTokenNode(): Promise<string | undefined> {
     } catch {
       settle(undefined)
     }
-  })
-}
-
-// The answers, read as sea events. GitHub's shapes are documented
-// (docs.github.com/rest: commits, actions/workflow-runs, pulls, releases); anything off-shape is skipped.
-
-type Json = Record<string, unknown>
-
-const object = (value: unknown): Json | undefined =>
-  typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Json) : undefined
-const list = (value: unknown): Json[] =>
-  Array.isArray(value) ? value.flatMap((item) => (object(item) ? [item as Json] : [])) : []
-const text = (value: unknown, fallback = ""): string =>
-  typeof value === "string" ? value.slice(0, MAX_TEXT) : fallback
-const time = (value: unknown): number | undefined => {
-  const at = typeof value === "string" ? Date.parse(value) : Number.NaN
-  return Number.isFinite(at) ? at : undefined
-}
-const page = (value: unknown): { url?: string } =>
-  typeof value === "string" && value.startsWith("https://github.com/") ? { url: value.slice(0, 1000) } : {}
-
-function headOf(commits: unknown): string | undefined {
-  const sha = list(commits)[0]?.sha
-  return typeof sha === "string" && /^[0-9a-f]{40}$/.test(sha) ? sha : undefined
-}
-
-/**
- * A push, when the branch's head moved since `before`: the commits above `before` in the newest-first
- * list (all of the list when `before` isn't in it: a force push, or more than a page), by the newest
- * commit's author. None without a `before` (the baseline).
- */
-export function pushOf(
-  repo: string,
-  branch: string,
-  commits: unknown,
-  before: string | undefined,
-  now: number,
-): SeaEvent | undefined {
-  const all = list(commits)
-  const head = headOf(commits)
-  const newest = all[0]
-  if (!before || !head || !newest || head === before) return undefined
-  const index = all.findIndex((commit) => commit.sha === before)
-  const detail = object(newest.commit)
-  const author = text(object(newest.author)?.login) || text(object(detail?.author)?.name) || "someone"
-  return {
-    kind: "push",
-    id: `push:${repo}:${branch}:${head}`,
-    at: time(object(detail?.committer)?.date) ?? time(object(detail?.author)?.date) ?? now,
-    repo,
-    branch,
-    commits: index === -1 ? all.length : index,
-    author,
-    sha: head,
-    ...page(newest.html_url),
-  }
-}
-
-/** A workflow run's state; undefined for one cancelled or gone stale, which says nothing either way. */
-export function ciState(status: unknown, conclusion: unknown): CiState | undefined {
-  if (status === "in_progress") return "running"
-  if (status === "queued" || status === "waiting" || status === "requested" || status === "pending")
-    return "queued"
-  if (status !== "completed") return undefined
-  if (conclusion === "success" || conclusion === "neutral" || conclusion === "skipped") return "passed"
-  if (
-    conclusion === "failure" ||
-    conclusion === "timed_out" ||
-    conclusion === "startup_failure" ||
-    conclusion === "action_required"
-  )
-    return "failed"
-  return undefined
-}
-
-/** Each workflow run on the head, in the state it is in now (one id per run and state). */
-export function ciOf(repo: string, branch: string, body: unknown): SeaEvent[] {
-  return list(object(body)?.workflow_runs).flatMap((run): SeaEvent[] => {
-    const state = ciState(run.status, run.conclusion)
-    const at = time(run.updated_at) ?? time(run.run_started_at) ?? time(run.created_at)
-    if (!state || at === undefined || typeof run.id !== "number" || typeof run.head_sha !== "string")
-      return []
-    return [
-      {
-        kind: "ci",
-        id: `ci:${repo}:${run.id}:${state}`,
-        at,
-        repo,
-        state,
-        name: text(run.name, "CI") || "CI",
-        branch,
-        sha: run.head_sha.slice(0, 40),
-        ...page(run.html_url),
-      },
-    ]
-  })
-}
-
-/** Each pull request's opening, and its merge or close once it has one. */
-export function pullsOf(repo: string, body: unknown): SeaEvent[] {
-  return list(body).flatMap((pull): SeaEvent[] => {
-    const number = pull.number
-    const opened = time(pull.created_at)
-    if (typeof number !== "number" || opened === undefined) return []
-    const base = {
-      repo,
-      number,
-      title: text(pull.title),
-      author: text(object(pull.user)?.login, "someone"),
-      branch: text(object(pull.head)?.ref),
-      ...page(pull.html_url),
-    }
-    const out: SeaEvent[] = [{ kind: "pr_opened", id: `pr_opened:${repo}#${number}`, at: opened, ...base }]
-    const merged = time(pull.merged_at)
-    const closed = time(pull.closed_at)
-    if (merged !== undefined)
-      out.push({ kind: "pr_merged", id: `pr_merged:${repo}#${number}`, at: merged, ...base })
-    else if (closed !== undefined && pull.state === "closed")
-      out.push({ kind: "pr_closed", id: `pr_closed:${repo}#${number}`, at: closed, ...base })
-    return out
-  })
-}
-
-/** Each published release (drafts aren't news yet). */
-export function releasesOf(repo: string, body: unknown): SeaEvent[] {
-  return list(body).flatMap((release): SeaEvent[] => {
-    const at = time(release.published_at)
-    if (release.draft === true || at === undefined || typeof release.id !== "number") return []
-    const tag = text(release.tag_name)
-    if (!tag) return []
-    const name = text(release.name)
-    return [
-      {
-        kind: "release",
-        id: `release:${repo}:${release.id}`,
-        at,
-        repo,
-        tag,
-        ...(name ? { name } : {}),
-        ...page(release.html_url),
-      },
-    ]
   })
 }

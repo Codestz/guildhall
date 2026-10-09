@@ -46,4 +46,21 @@ describe("seas: a party with GitHub beside it", () => {
   test("every id is unique (a hall dedupes on it)", () => {
     expect(new Set(sea.map((e) => e.id)).size).toBe(sea.length)
   })
+
+  test("the repo's open work: pull requests in every status, one closed unmerged", () => {
+    const opened = sea.flatMap((e) => (e.kind === "pr_opened" ? [e] : []))
+    expect([...new Set(opened.map((e) => e.status))].sort()).toEqual(["draft", "open", "ready", "review"])
+    expect(opened.every((e) => typeof e.size === "number")).toBe(true)
+    expect(sea.filter((e) => e.kind === "pr_closed")).toHaveLength(1)
+  })
+
+  test("more issues are open than the queue seats, and the merge closes the contrast bug", () => {
+    const closed = new Set(sea.flatMap((e) => (e.kind === "issue_closed" ? [e.number] : [])))
+    const open = sea.flatMap((e) => (e.kind === "issue_opened" && !closed.has(e.number) ? [e] : []))
+    expect(open.length).toBeGreaterThan(10)
+    expect(open.some((e) => e.labels?.includes("bug"))).toBe(true)
+    const merge = sea.find((e) => e.kind === "pr_merged")
+    const fixed = sea.find((e) => e.kind === "issue_closed" && e.number === 141)
+    expect(fixed?.at).toBeGreaterThan(merge?.at ?? Number.POSITIVE_INFINITY)
+  })
 })

@@ -52,6 +52,7 @@ import { Ships } from "./Ships.tsx"
 import { Sigils } from "./Sigils.tsx"
 import { Stations } from "./Stations.tsx"
 import { Seas } from "./seas/Seas.tsx"
+import { usePetitioners } from "./seas/usePetitioners.ts"
 import { stepFrame } from "./step.ts"
 import { Ferry } from "./town/Ferry.tsx"
 import { UndeadGate } from "./Undead.tsx"
@@ -135,17 +136,23 @@ export function Scene() {
  * every story the hall ships — there is no crowd at all and everyone draws as they always did.
  *
  * On a repo's island with a chronicle the town's townsfolk (guild/town, ADR 0022) join the cast as
- * figures like any other; through a growth film (`today` false) they are the whole cast.
+ * figures like any other; through a growth film (`today` false) they are the whole cast. So do the
+ * petitioners, the queue of open issues at the quay (guild/petitions.ts), while the sea has any.
  */
 function Cast({ today }: { today: boolean }) {
   const store = useGuild()
   const world = useWorld()
   useSyncExternalStore(town.subscribe, town.snapshot)
-  const [exits] = useState(() => ({ guild: new Exits<AdventurerView>(), town: new Exits<AdventurerView>() }))
+  const petitioners = usePetitioners()
+  const [exits] = useState(() => ({
+    guild: new Exits<AdventurerView>(),
+    town: new Exits<AdventurerView>(),
+    petitions: new Exits<AdventurerView>(),
+  }))
   const [, redraw] = useReducer((n: number) => n + 1, 0)
   const onGone = useCallback(
     (id: string) => {
-      if (exits.guild.gone(id) || exits.town.gone(id)) redraw()
+      if (exits.guild.gone(id) || exits.town.gone(id) || exits.petitions.gone(id)) redraw()
     },
     [exits],
   )
@@ -153,6 +160,7 @@ function Cast({ today }: { today: boolean }) {
   const views = [
     ...exits.guild.stage(today ? store.views : NO_ONE, store.rebuilds, now),
     ...exits.town.stage(town.views, town.epoch, now),
+    ...exits.petitions.stage(today ? petitioners : NO_ONE, store.rebuilds, now),
   ]
   const crowd = useCrowd(views.length > ALL_HEROES)
   // The camera's view, once a frame, before any adventurer reads it (mixer culling, who is a hero).

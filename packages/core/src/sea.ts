@@ -19,24 +19,50 @@ interface Base {
   url?: string
 }
 
+/**
+ * Where an open pull request stands, as the list endpoint tells it without another request:
+ * `draft`; `open` (no one asked for a review yet); `review` (reviewers are requested); `ready`
+ * (auto-merge is armed: it waits only on its checks). Approved and changes-requested need each
+ * PR's reviews, one request apiece, so they are not read.
+ */
+export type PrStatus = "draft" | "open" | "review" | "ready"
+
 interface PullRequest extends Base {
   number: number
   title: string
   author: string
   /** The branch it would merge. */
   branch: string
+  /** Where it stands (optional: older records, and a hub that did not read it, have none). */
+  status?: PrStatus
+  /** Lines added and removed, when the hub read the pull request's own page. */
+  size?: number
+}
+
+interface Issue extends Base {
+  number: number
+  title: string
+  author: string
+  /** Label names, when it has any. */
+  labels?: string[]
 }
 
 export type SeaEvent =
   /** New commits on a branch the guild works on: `commits` of them, the newest by `author`. */
   | (Base & { kind: "push"; branch: string; commits: number; author: string; sha: string })
   | (PullRequest & { kind: "pr_opened" })
+  /** An open pull request's status moved to `status` (a draft marked ready, a review asked for). */
+  | (PullRequest & { kind: "pr_updated"; status: PrStatus })
   | (PullRequest & { kind: "pr_merged" })
   /** Closed without merging. */
   | (PullRequest & { kind: "pr_closed" })
   /** A CI workflow run on a branch's head commit moved to `state`. `name` is the workflow's. */
   | (Base & { kind: "ci"; state: CiState; name: string; branch: string; sha: string })
   | (Base & { kind: "release"; tag: string; name?: string })
+  /** An issue was opened (or was open when the hub began to watch). */
+  | (Issue & { kind: "issue_opened" })
+  /** It was closed, however it was resolved. */
+  | (Issue & { kind: "issue_closed" })
 
 export type SeaKind = SeaEvent["kind"]
 
@@ -47,7 +73,17 @@ export interface SeaRecord {
   event: SeaEvent
 }
 
-const KINDS: readonly string[] = ["push", "pr_opened", "pr_merged", "pr_closed", "ci", "release"]
+const KINDS: readonly string[] = [
+  "push",
+  "pr_opened",
+  "pr_updated",
+  "pr_merged",
+  "pr_closed",
+  "ci",
+  "release",
+  "issue_opened",
+  "issue_closed",
+]
 
 /**
  * A sea record, checked for the fields every kind has: what a hall reads off the socket or a reader

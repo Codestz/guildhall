@@ -447,11 +447,14 @@ The hub watches GitHub for each project with a GitHub remote that it has heard f
 | `kind` | Fields | When |
 |---|---|---|
 | `push` | `branch`, `commits`, `author`, `sha` | The head of a branch a guild has checked out moved: `commits` new commits, the newest by `author`. |
-| `pr_opened` | `number`, `title`, `author`, `branch` | A pull request was opened. |
+| `pr_opened` | `number`, `title`, `author`, `branch`; optional `status`, `size` | A pull request was opened, or was open when the hub began to watch. `status` is `draft`, `open`, `review` (reviewers requested) or `ready` (auto-merge armed); `size` is lines added plus removed. |
+| `pr_updated` | the same, `status` | An open pull request's status moved (a draft marked ready, a review asked for). |
 | `pr_merged` | the same | It was merged. |
 | `pr_closed` | the same | It was closed without merging. |
 | `ci` | `state` (`queued` \| `running` \| `passed` \| `failed`), `name`, `branch`, `sha` | A workflow run on a branch's head commit moved to `state`. A cancelled run says nothing. |
 | `release` | `tag`, `name?` | A release was published. Drafts are not. |
+| `issue_opened` | `number`, `title`, `author`; optional `labels` | An issue was opened, or was open when the hub began to watch. |
+| `issue_closed` | the same | It was closed. |
 
 Every event also has `id`, `at` (ms since the epoch, as GitHub dates it), `repo` (`owner/name`) and,
 when there is one, `url` on github.com. The `id` is stable: the same thing seen again (a later poll,
@@ -462,12 +465,17 @@ The hub sends a repo's events to each guild that works in it, as
 in the next halls' hello (`sea`), and on disk in `<boot>.sea.jsonl`. `isSeaRecord` checks one.
 
 **How it asks.** Per repo: the commits of each checked-out branch, the workflow runs on each branch's
-head commit, the 20 most recently updated pull requests, the 10 latest releases. Every request is
+head commit, the 20 most recently updated pull requests, the 10 latest releases, the 30 most recently updated issues. Two reads are garnish and never move a
+repo's backoff: the issues list (one conditional request a poll, pull requests filtered out) and, for
+a pull request about to be announced, its own page for `size` (at most 5 a poll, each pull request
+once). Approved and changes-requested need each pull request's reviews, a request apiece, so `status`
+stops at what the list already says. Every request is
 conditional (`If-None-Match` with the last ETag; a 304 doesn't count against the rate limit). A repo
 is asked every 60 s at most with a token. The interval grows by half on each quiet poll up to 5 min,
 doubles on errors up to 15 min, and is an hour for a repo GitHub says isn't there. When
 `X-RateLimit-Remaining` nears its floor, polling stops until `X-RateLimit-Reset`. The first poll of a
-repo is a baseline: what is already there is remembered, not announced.
+repo is a baseline: what is already there is remembered, not announced, except the pull requests
+and issues still open, which are announced as they are so the hall shows the repo's open work at once.
 
 **The token** is gh's: `gh auth token`, read when there is first a repo to poll and again after a 401.
 It is held in the hub's memory only and goes nowhere but the `Authorization` header of requests to

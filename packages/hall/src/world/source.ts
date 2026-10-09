@@ -1,8 +1,10 @@
 import { createContext, use, useContext, useSyncExternalStore } from "react"
 import { setActiveWorld } from "./active.ts"
-import { type Gen, genOf, islandFromTree } from "./gen/islandFromTree.ts"
+import { type Gen, genOf } from "./gen/islandFromTree.ts"
 import type { Tree } from "./gen/load.ts"
-import { handWorld, repoWorld, type World } from "./world.ts"
+import { growSync } from "./grow/grow.ts"
+import { growPool } from "./grow/pool.ts"
+import { handWorld, type World } from "./world.ts"
 
 /**
  * Which world the scene draws (world/world.ts): the hand-drawn lands unless `?repo=` asked for an
@@ -24,16 +26,10 @@ type Listener = () => void
 const LINKED_GEN: Gen = typeof location === "undefined" ? 2 : genOf(location.search)
 
 /** A repo's island as this visit's link asks it grown (`?gen=`): the home island's, and every far one's. */
-export function growWorld(tree: Tree): World {
-  const { repo, source, branch, truncated } = tree
-  return repoWorld(islandFromTree(tree.entries, 0, LINKED_GEN), {
-    repo,
-    source,
-    ...(LINKED_GEN === 2 ? { gen: LINKED_GEN } : {}),
-    ...(branch ? { branch } : {}),
-    ...(truncated ? { truncated } : {}),
-  })
-}
+export const growWorld = (tree: Tree): World => growSync(tree, LINKED_GEN)
+
+/** The same island grown in a Web Worker, off the main thread (world/grow/pool.ts; here, when there is none). */
+export const growWorldAsync = (tree: Tree): Promise<World> => growPool.grow(tree, LINKED_GEN)
 
 class WorldSource {
   world: World = handWorld()
@@ -65,7 +61,7 @@ class WorldSource {
     this.set(this.world, { state: "loading", repo: wanted })
     const done = (async () => {
       try {
-        const world = growWorld(await fetchTree(wanted))
+        const world = await growWorldAsync(await fetchTree(wanted))
         if (n === this.asked) this.set(world, { state: "repo" })
       } catch (error) {
         if (n === this.asked)

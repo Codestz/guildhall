@@ -4,6 +4,7 @@ import { key } from "../hex.ts"
 import { HUB } from "../plan/keep.ts"
 import type { IslandPlan } from "../plan.ts"
 import { type Massif, massifOf, SEA_RIM } from "./field.ts"
+import { HeightGrid } from "./lattice.ts"
 import { CAP, footprintsOf, type Tier, tierOf } from "./massifs.ts"
 import { PEAK_BOOST } from "./shape.ts"
 
@@ -73,6 +74,16 @@ export function reliefOf({ plan, level, years = 0 }: ReliefInput): Relief {
       topOf,
     })
   })
+  return reliefOver(tier, massifs)
+}
+
+/**
+ * A relief over its massifs: the closures (`massifAt`, `heightAt`) closed over data a Web Worker can
+ * post (world/gen/grow.ts); a massif that was posted gets its grid's methods back.
+ */
+export function reliefOver(tier: Tier, massifs: readonly Massif[]): Relief {
+  for (const m of massifs)
+    if (!(m.grid instanceof HeightGrid)) Object.setPrototypeOf(m.grid, HeightGrid.prototype)
   const keys = new Set(massifs.flatMap((m) => [...m.keys]))
   return {
     tier,

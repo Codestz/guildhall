@@ -3,7 +3,7 @@ import type { District, RepoIsland } from "./gen/dress.ts"
 import { cellAt, key } from "./gen/hex.ts"
 import type { Gen } from "./gen/islandFromTree.ts"
 import { dressingOf } from "./gen/relief/dressing.ts"
-import { type Relief, reliefOf } from "./gen/relief/index.ts"
+import { type Relief, reliefOf, reliefOver } from "./gen/relief/index.ts"
 import { joinRoads, type TrailNet, trailsOf } from "./gen/relief/trails.ts"
 import type { Folder } from "./gen/repo.ts"
 import { dressRivers, riversOf } from "./gen/rivers/index.ts"
@@ -164,8 +164,22 @@ function standing(
   }
 }
 
-/** An island grown from a repo's tree (world/gen `islandFromTree`), as a world. */
-export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "folders">): World {
+/**
+ * A repo world without its closures: plain data a Web Worker can post (world/gen/grow.ts), which
+ * `worldOf` closes into the World the scene draws. `repoWorld` is the two in one.
+ */
+export interface WorldParts extends Omit<World, "terrain" | "ground" | "relief"> {
+  /** Every land hex by key: its legend character and district. */
+  land: ReadonlyMap<string, { char: string; district?: number }>
+  /** Terrace level of every raised hex outside the massifs (the dresser's `levels`). */
+  levels: ReadonlyMap<string, number>
+  /** The hexes under rivers, drawn "r". */
+  riverHexes?: ReadonlySet<string>
+  relief?: Pick<Relief, "tier" | "massifs">
+}
+
+/** An island grown from a repo's tree (world/gen `islandFromTree`), as the data its world is made of. */
+export function repoParts(made: RepoIsland, info: Omit<RepoInfo, "districts" | "folders">): WorldParts {
   const { land } = made.plan
   const storySites = mapSites(made)
   const districts: WorkPlace[] = made.districts
@@ -215,8 +229,29 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
     kind: "repo",
     island: decor === island.decor ? island : { ...island, decor },
     roads: trails && trails.trails.length > 0 ? joinRoads(made.roads, trails) : made.roads,
+    land: new Map([...land].map(([id, hex]) => [id, { char: hex.char, district: hex.district }])),
+    levels: made.levels,
+    ...(rivers ? { riverHexes: rivers.hexes } : {}),
+    ...(mountain ? { relief: { tier: mountain.tier, massifs: mountain.massifs } } : {}),
+    ...(rivers ? { water: rivers.waters } : {}),
+    ...(trails && trails.trails.length > 0 ? { trails } : {}),
+    sites: [...districts, ...moved],
+    storySites,
+    ...(open.length > 0 ? { venues: open } : {}),
+    ...(homes.length > 0 ? { homes } : {}),
+    repo: { ...info, districts: made.districts, folders: made.plan.districts.map((d) => d.folder) },
+  }
+}
+
+/** The world a repo island's parts make: its terrain and ground closed over them. */
+export function worldOf(parts: WorldParts): World {
+  const { land, levels, riverHexes, relief, ...rest } = parts
+  const mountain = relief && reliefOver(relief.tier, relief.massifs)
+  const level = (cell: Cell): number => levels.get(key(cell)) ?? 0
+  return {
+    ...rest,
     terrain: {
-      at: ([q, line]) => (rivers?.hexes.has(`${q},${line}`) ? "r" : (land.get(`${q},${line}`)?.char ?? "~")),
+      at: ([q, line]) => (riverHexes?.has(`${q},${line}`) ? "r" : (land.get(`${q},${line}`)?.char ?? "~")),
       // A hex under a massif is raised (wilds and walkers keep off it), by its centre's height.
       level: (cell) => {
         if (!mountain?.massifAt(cell)) return level(cell)
@@ -228,14 +263,12 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
     },
     ground: { heightAt: (x, z) => mountain?.heightAt(x, z) ?? level(cellAt([x, z])) * TERRACE },
     ...(mountain ? { relief: mountain } : {}),
-    ...(rivers ? { water: rivers.waters } : {}),
-    ...(trails && trails.trails.length > 0 ? { trails } : {}),
-    sites: [...districts, ...moved],
-    storySites,
-    ...(open.length > 0 ? { venues: open } : {}),
-    ...(homes.length > 0 ? { homes } : {}),
-    repo: { ...info, districts: made.districts, folders: made.plan.districts.map((d) => d.folder) },
   }
+}
+
+/** An island grown from a repo's tree (world/gen `islandFromTree`), as a world. */
+export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "folders">): World {
+  return worldOf(repoParts(made, info))
 }
 
 /** How far the land reaches from the origin, world units (the sea's own tiles left out). */

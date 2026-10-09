@@ -12,7 +12,7 @@ import {
 import { type Language, languageOf } from "./gen/biomes.ts"
 import type { Tree } from "./gen/load.ts"
 import type { Spot } from "./layout.ts"
-import { growWorld, worldSource } from "./source.ts"
+import { growWorldAsync, worldSource } from "./source.ts"
 import { reachOf, type World } from "./world.ts"
 
 /**
@@ -90,9 +90,12 @@ class ArchipelagoSource {
         repos.map(async (repo): Promise<Grown> => {
           try {
             const tree = await fetchTree(repo)
-            // A big island takes a while to grow: a frame between each, so the page stays alive.
-            await new Promise((resume) => setTimeout(resume))
-            return { repo: tree.repo, world: growWorld(tree), language: mainLanguage(tree.entries) }
+            // A big island takes a while to grow: a worker grows it (world/grow), so the page stays alive.
+            return {
+              repo: tree.repo,
+              world: await growWorldAsync(tree),
+              language: mainLanguage(tree.entries),
+            }
           } catch (error) {
             return { repo, reason: (error as Error).message }
           }

@@ -78,6 +78,11 @@ export function populationOf(world: World): Population {
   return population
 }
 
+/** Keeps a population made elsewhere (a Web Worker's, world/gen/grow.ts) as this world's, so it is not planned again here. */
+export function primePopulation(world: World, population: Population): void {
+  made.set(world, population)
+}
+
 /** How many of the plan's `count` a quality tier shows. */
 export const shown = (count: number, quality: 0 | 1 | 2 | 3): number => Math.ceil(count * FOLK_SHARE[quality])
 

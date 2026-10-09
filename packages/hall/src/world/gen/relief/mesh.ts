@@ -15,7 +15,11 @@ import { paintRiser, paintStrata, paintZones, TILE_TOP } from "./zones.ts"
  * UV'd onto one palette swatch (swatches.ts) by its slope and height, so it joins the lands batch.
  *
  * Tiers nest: tier 0 is the lattice's finest (96 triangles a hex), tier 1 every other vertex (24),
- * tier 2 only the hex corners and centre (6).
+ * tier 2 only the hex corners and centre (6): the far tier, which keeps the hybrid's stairs (cut at
+ * its corners) and loses the sculpted summit's facets. The chunky styles keep a river hex's lattice at
+ * every tier.
+ * A river hex's edge facing a coarse hex is set on that hex's edge whether or not the coarse hex is in
+ * the set, so a chunk's mesh joins its neighbour's, at any tier of either, without a crack of its own.
  *
  * The chunky styles (style.ts) mesh a hex at every `strideOf`-th vertex (24 triangles for the facets), except a hex a
  * river carved (it keeps its lattice) whose edge vertices facing a coarse hex are set on that hex's
@@ -94,10 +98,11 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
     const massif = relief.massifAt(cell)
     if (!massif) continue
     const { grid } = massif
-    // A hex's lattice: the style's coarse one, or the tier's when a river's bed was cut into it.
+    // A hex's lattice: the style's coarse one (or the tier's, if coarser), but a river's bed cut into a
+    // hex keeps the finest at every tier, or the far ground would bury the stream.
     const coarse = RES / strideOf(relief.style)
     const nOf = (c: Cell): number =>
-      chunky && isFaceted(grid, c, strideOf(relief.style)) ? Math.min(tierN, coarse) : tierN
+      !chunky ? tierN : isFaceted(grid, c, strideOf(relief.style)) ? Math.min(tierN, coarse) : RES
     const n = nOf(cell)
     const stride = RES / n
     const [ci, cj] = centreOf(cell)
@@ -106,7 +111,7 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
     if (chunky && n === RES)
       for (let d = 0; d < 6; d++) {
         const next = step(cell, d)
-        if (!inSet.has(key(next)) || !relief.massifAt(next) || nOf(next) >= n) continue
+        if (!relief.massifAt(next) || nOf(next) >= n) continue
         const [ai, aj] = CORNERS[d] as readonly [number, number]
         const [bi, bj] = CORNERS[(d + 1) % 6] as readonly [number, number]
         const at = (a: number): readonly [number, number] => [

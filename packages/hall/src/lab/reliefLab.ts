@@ -18,13 +18,16 @@ import {
   WebGLRenderer,
 } from "three"
 import { tameLime } from "../scene/palette.ts"
-import { reliefMeshes } from "../scene/terrain/reliefMeshes.ts"
+import { reliefLayer } from "../scene/terrain/reliefMeshes.ts"
 import { newSnowline, snowMaterial } from "../scene/terrain/snow.ts"
 import { LANDS_URL } from "../world/cast.ts"
+import { chunksOf } from "../world/chunks.ts"
 import { key, step } from "../world/gen/hex.ts"
 import { islandFromTree } from "../world/gen/islandFromTree.ts"
 import { RES, reliefStyleOf, snowlineOf } from "../world/gen/relief/index.ts"
+import { reliefMesh } from "../world/gen/relief/mesh.ts"
 import { cellToWorld } from "../world/lands.ts"
+import { reliefCells } from "../world/reliefChunks.ts"
 import { repoWorld, type World } from "../world/world.ts"
 import { draw, treeOf } from "./islandLab.ts"
 import { load } from "./stage.ts"
@@ -111,7 +114,7 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
   if (!base) throw new Error("relief lab: no land material")
   tameLime((base as MeshStandardMaterial).map)
   const snowline = newSnowline()
-  const meshes = reliefMeshes(relief, snowMaterial(base, snowline), false)
+  const meshes = reliefLayer(relief, snowMaterial(base, snowline), false, chunksOf(world)).meshes
   scene.add(...meshes)
 
   const main = relief.massifs[Number(params.get("massif") ?? 0)] ?? relief.massifs[0]
@@ -177,14 +180,19 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
   const snow = (): void => {
     snowline.value = params.has("snow") ? Number(params.get("snow")) : snowlineOf(relief, winter)
   }
-  // The growth film's rise: each massif is one instance, lifted by its matrix like a land tile.
+  // The growth film's rise: each region's relief is one instance (in region order), lifted by its
+  // matrix like a land tile.
+  const regions = reliefCells(relief, chunksOf(world)).filter((cells) => cells.length > 0)
+  const lifts = regions.map(
+    (cells) => Math.ceil(Math.max(...cells.map((cell) => relief.massifAt(cell)?.height ?? 0))) + 1,
+  )
   const rise = (t: number): void => {
     riseNow = t
     for (const mesh of meshes) {
       const batch = mesh as BatchedMesh
       if (!batch.isBatchedMesh) continue
-      for (let id = 0; id < relief.massifs.length; id++) {
-        const lift = Math.ceil(relief.massifs[id]?.height ?? 0) + 1
+      for (let id = 0; id < lifts.length; id++) {
+        const lift = lifts[id] ?? 0
         matrix.makeTranslation(0, lift - (1 - t) * (lift + 6), 0)
         batch.setMatrixAt(id, matrix)
       }
@@ -195,8 +203,8 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
   const frame = (): void => {
     renderer.render(scene, camera)
   }
-  const reliefTriangles = meshes.reduce(
-    (sum, mesh) => sum + mesh.geometry.getAttribute("position").count / 3,
+  const reliefTriangles = regions.reduce(
+    (sum, cells) => sum + reliefMesh(relief, cells, 0).position.length / 9,
     0,
   )
   const refresh = (): void => {

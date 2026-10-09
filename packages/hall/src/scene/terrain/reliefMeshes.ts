@@ -1,19 +1,30 @@
-import { BatchedMesh, BufferGeometry, Float32BufferAttribute, type Material, Matrix4, Mesh } from "three"
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
+import { BufferGeometry, Float32BufferAttribute, type Material, Matrix4, type Mesh } from "three"
+import { FAR } from "../../render/tiers.ts"
+import type { Chunks } from "../../world/chunks.ts"
 import type { Relief } from "../../world/gen/relief/index.ts"
 import { type MeshArrays, reliefMesh } from "../../world/gen/relief/mesh.ts"
+import { cellToWorld } from "../../world/lands.ts"
+import { reliefCells } from "../../world/reliefChunks.ts"
 import { markGrowable } from "../growth/registry.ts"
+import { type TieredInstance, type TieredLayer, tiered, tieredBatch, tieredMerge } from "../tiers.ts"
 
 /**
  * A relief as meshes (terrain v2 §6.1), on the island's own terms: the massifs' geometries
  * (world/gen/relief/mesh.ts, in world units, UV'd onto the land palette) drawn with `material`, the
- * land material's snow-line copy (snow.ts). WebGL: one BatchedMesh, one instance per massif, so the
- * growth film (`?grow`, scene/growth) rides each massif up like a land tile and a chunk can swap a
- * tier's geometry in place (`setGeometryIdAt`); WebGPU, which has no multi-draw: one merged mesh.
- *
- * Until world/chunks.ts lands each massif is one hex set at tier 0: the same `reliefMesh(relief,
- * cells, tier)` call a chunk will make, so nothing here changes then but the sets it is called with.
+ * land material's snow-line copy (snow.ts). The relief is cut by the island's regions
+ * (world/reliefChunks.ts) and tiered with them (scene/tiers.ts): a region draws its massif hexes in
+ * full (the mesh's tier 0) or, far out, as the mesh's tier 2 (a lattice of hex corners and centres, the
+ * hybrid's stairs kept), both built once up front and swapped in place. WebGL: one BatchedMesh, one
+ * instance per region, so the growth film (`?grow`, scene/growth) rides each region up like a land
+ * tile; WebGPU, which has no multi-draw: one merged mesh per region and tier.
  */
+
+/**
+ * Where the relief goes far, as a share of the land's own threshold (render/tiers.ts FAR_BELOW).
+ * Its coarse copy is not bound by FAR_ERROR as the land's pieces are (its stairs sit on a hex-sized
+ * lattice, up to a couple of units off), so it holds its full tier until the island is seen whole.
+ */
+export const RELIEF_FAR_AT = 0.6
 
 export function reliefGeometry(arrays: MeshArrays): BufferGeometry {
   const geometry = new BufferGeometry()
@@ -24,40 +35,49 @@ export function reliefGeometry(arrays: MeshArrays): BufferGeometry {
   return geometry
 }
 
+export interface ReliefLayer {
+  meshes: Mesh[]
+  tiers: TieredLayer
+}
+
 /** The relief's meshes: they cast and receive shadows (a ridge shades the valley behind it). */
-export function reliefMeshes(relief: Relief, material: Material, merge: boolean): Mesh[] {
-  const geometries = relief.massifs.map((massif) => reliefGeometry(reliefMesh(relief, massif.cells, 0)))
-  if (geometries.length === 0) return []
-  if (merge) {
-    const merged = mergeGeometries(geometries)
-    for (const geometry of geometries) geometry.dispose()
-    if (!merged) return []
-    const mesh = new Mesh(merged, material)
+export function reliefLayer(relief: Relief, material: Material, merge: boolean, chunks: Chunks): ReliefLayer {
+  // Each region is built `lift` below its place and set up by its instance matrix: the growth film
+  // sinks an instance by (DEPTH + its base height) × rise, so a region whose base matrix holds its own
+  // height sinks right out of sight, and rises out of the sea as the land under its middle does.
+  const instances: (TieredInstance & { spot: readonly [number, number] })[] = []
+  reliefCells(relief, chunks).forEach((cells, chunk) => {
+    if (cells.length === 0) return
+    const lift = Math.ceil(Math.max(...cells.map((cell) => relief.massifAt(cell)?.height ?? 0))) + 1
+    const place = (tier: 0 | 2): BufferGeometry =>
+      reliefGeometry(reliefMesh(relief, cells, tier)).translate(0, -lift, 0)
+    // The film raises it with the land under its middle.
+    const points = cells.map((cell) => cellToWorld(cell))
+    const spot: readonly [number, number] = [
+      points.reduce((sum, [x]) => sum + x, 0) / points.length,
+      points.reduce((sum, [, z]) => sum + z, 0) / points.length,
+    ]
+    instances.push({
+      piece: { near: place(0), far: place(FAR) },
+      matrix: new Matrix4().makeTranslation(0, lift, 0),
+      chunk,
+      spot,
+    })
+  })
+  if (instances.length === 0) return { meshes: [], tiers: tiered(chunks, () => {}) }
+  const count = chunks.list.length
+  const built = merge
+    ? tieredMerge(material, instances, count)
+    : tieredBatch(material, instances, count, (mesh, id, { spot }) =>
+        markGrowable(mesh, id, "land", spot[0], spot[1]),
+      )
+  for (const { piece } of instances) {
+    piece.near.dispose()
+    piece.far?.dispose()
+  }
+  for (const mesh of built.meshes) {
     mesh.castShadow = true
     mesh.receiveShadow = true
-    return [mesh]
   }
-  // Each massif is built `lift` below its place and set up by its instance matrix: the growth film
-  // sinks an instance by (DEPTH + its base height) × rise, so a massif whose base matrix holds its own
-  // height sinks right out of sight, and rises out of the sea as the land under its middle does.
-  const lifts = relief.massifs.map((massif) => Math.ceil(massif.height) + 1)
-  let vertices = 0
-  geometries.forEach((geometry, i) => {
-    geometry.translate(0, -(lifts[i] as number), 0)
-    vertices += geometry.getAttribute("position").count
-  })
-  const batch = new BatchedMesh(geometries.length, vertices, 0, material)
-  const matrix = new Matrix4()
-  geometries.forEach((geometry, i) => {
-    const id = batch.addInstance(batch.addGeometry(geometry))
-    batch.setMatrixAt(id, matrix.makeTranslation(0, lifts[i] as number, 0))
-    const peak = relief.massifs[i]?.peaks[0]?.at ?? [0, 0]
-    markGrowable(batch, id, "land", peak[0], peak[1])
-    geometry.dispose()
-  })
-  batch.sortObjects = false
-  batch.castShadow = true
-  batch.receiveShadow = true
-  batch.computeBoundingSphere()
-  return [batch]
+  return { meshes: built.meshes, tiers: tiered(chunks, built.swap, RELIEF_FAR_AT) }
 }

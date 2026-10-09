@@ -26,7 +26,7 @@ import { plain } from "./Kit.tsx"
 import { isMovingPart } from "./life/moving.ts"
 import { useOwnedMeshes } from "./owned.ts"
 import { tameLime } from "./palette.ts"
-import { reliefMeshes } from "./terrain/reliefMeshes.ts"
+import { reliefLayer } from "./terrain/reliefMeshes.ts"
 import { newSnowline, type SnowMaker, snowMaterial } from "./terrain/snow.ts"
 import { nodeSnow, useSnowline } from "./terrain/useSnowline.ts"
 import {
@@ -78,17 +78,18 @@ export function Island() {
     () => {
       const layer = batch(nodes, [...land.tiles, ...land.decor], webgpu, simplifier, chunksOf(world))
       const base = landMaterial(nodes)
-      if (world.relief && base)
-        layer.meshes.push(...reliefMeshes(world.relief, makeSnow(base, snowline), webgpu))
-      return layer
+      if (!world.relief || !base) return { ...layer, relief: undefined }
+      const relief = reliefLayer(world.relief, makeSnow(base, snowline), webgpu, chunksOf(world))
+      return { meshes: [...layer.meshes, ...relief.meshes], tiers: layer.tiers, relief: relief.tiers }
     },
     [nodes, land, webgpu, simplifier, world, makeSnow, snowline],
     "materials",
   )
   // The growth timelapse (`?grow`) rides these instances up out of the sea (scene/growth).
   useGrowable(built?.meshes)
-  // Far regions draw coarse copies (scene/tiers.ts).
+  // Far regions draw coarse copies (scene/tiers.ts), the relief's own tiers apart (terrain/reliefMeshes.ts).
   useTiered(built?.tiers)
+  useTiered(built?.relief)
   const building = yardBuilding(progress)
   const yard = SITES.yard.at
 

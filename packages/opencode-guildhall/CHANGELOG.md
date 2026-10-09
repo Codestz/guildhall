@@ -7,7 +7,8 @@
 - **Claude Code.** The package now carries a hook for Claude Code. Run
   `opencode-guildhall claude-code --print` and merge the printed `hooks` block into your Claude Code
   settings; your Claude Code sessions then show up in the hall beside your OpenCode ones. The command
-  only prints, and the hook starts the hub when it's needed.
+  only prints, and the hook starts the hub when it's needed: with Bun when it's on your `PATH`, with
+  Node otherwise (the hub now runs on either).
 - **GitHub seas.** For a project whose remote is on GitHub, the hub watches the repo and the hall's
   sea shows it: commits and pull requests as ships, CI on the lighthouse, a release as a galleon.
   It uses `gh auth token` when the GitHub CLI is logged in, and watches public repos without a token

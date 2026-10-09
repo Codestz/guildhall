@@ -1,7 +1,7 @@
-import { spawn } from "node:child_process"
-import { mkdirSync, statSync, writeFileSync } from "node:fs"
+import { accessSync, constants, mkdirSync, statSync, writeFileSync } from "node:fs"
+import { createConnection } from "node:net"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 import { guildOf, projectRefOf } from "./project.ts"
 import { translate } from "./translate.ts"
 
@@ -41,17 +41,41 @@ export async function run(text: string): Promise<void> {
   // The project (PROTOCOL.md §3.1): the hub gives it its own guild (`app`, `app·2`), as for OpenCode.
   const project = projectRefOf(dir)
   const port = Number(process.env.GUILDHALL_PORT ?? HUB_PORT)
-  try {
-    await fetch(`http://127.0.0.1:${port}/events`, {
-      method: "POST",
-      headers: { "content-type": "application/json", [HERALD_HEADER]: "1" },
-      body: JSON.stringify({ guild, changes, project }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    })
-  } catch (error) {
-    // Nothing listening: start a hub for the events to come. A hub that hangs holds the port already.
-    if ((error as Error)?.name !== "TimeoutError") startHub()
-  }
+  // Nothing listening: start a hub for the events to come. A hub that hangs holds the port already.
+  if ((await post(port, JSON.stringify({ guild, changes, project }))) === "down") await startHub()
+}
+
+/**
+ * POSTs one dispatch to the hub and settles when it answers, when it doesn't (no answer in
+ * TIMEOUT_MS, or the connection closed unanswered: something holds the port), or when nothing
+ * listens ("down"). Never rejects. Plain HTTP/1.1 over `node:net`: on Node, `fetch` loads
+ * undici, and so does an ESM import of `node:http` (its facade touches every lazy export), which
+ * costs more than everything else the hook does.
+ */
+function post(port: number, body: string): Promise<"answered" | "silent" | "down"> {
+  return new Promise((settle) => {
+    try {
+      const socket = createConnection({ host: "127.0.0.1", port })
+      socket.setTimeout(TIMEOUT_MS, () => {
+        settle("silent")
+        socket.destroy()
+      })
+      socket.on("error", () => settle("down"))
+      // The hub's answer has begun: it has the whole dispatch.
+      socket.on("data", () => {
+        settle("answered")
+        socket.destroy()
+      })
+      socket.on("close", () => settle("silent"))
+      // Written, not ended: a half-closed connection may be taken as an aborted request.
+      socket.write(
+        `POST /events HTTP/1.1\r\nhost: 127.0.0.1:${port}\r\ncontent-type: application/json\r\n` +
+          `content-length: ${Buffer.byteLength(body)}\r\n${HERALD_HEADER}: 1\r\nconnection: close\r\n\r\n${body}`,
+      )
+    } catch {
+      settle("down")
+    }
+  })
 }
 
 /** The script that runs the hub: its source in this repo; the npm package points it at its bundle. */
@@ -63,10 +87,11 @@ export function setHubEntry(path: string): void {
 }
 
 /**
- * Starts the hub as a detached process, unless one was started recently. The hub runs on Bun, found
- * on PATH: the hook itself may run on Node (the npm package's bundle), which can't run the hub.
+ * Starts the hub as a detached process, unless one was started recently: with Bun from PATH when
+ * there is one, otherwise with the runtime running this hook (the npm package's hub bundle runs on
+ * Node too). `node:child_process` is loaded only here, off the path of an event the hub takes.
  */
-function startHub(): void {
+async function startHub(): Promise<void> {
   const stamp = join(home, "claude-code.hub-start")
   try {
     if (Date.now() - statSync(stamp).mtimeMs < START_EVERY_MS) return
@@ -76,13 +101,30 @@ function startHub(): void {
   try {
     mkdirSync(home, { recursive: true })
     writeFileSync(stamp, new Date().toISOString())
-    const child = spawn("bun", [hubEntry], { detached: true, stdio: "ignore" })
-    // No Bun on PATH arrives as an `error` event, after this returns; unhandled, it would throw.
+    const { spawn } = await import("node:child_process")
+    const runtime = process.versions.bun || !onPath("bun") ? process.execPath : "bun"
+    const child = spawn(runtime, [hubEntry], { detached: true, stdio: "ignore" })
+    // A failed start arrives as an `error` event, after this returns; unhandled, it would throw.
     child.on("error", () => {})
     child.unref()
   } catch {
     // The hook must never fail Claude Code; the hub can be started by hand.
   }
+}
+
+/** Whether `name` is an executable on PATH, looked up without running anything. */
+function onPath(name: string): boolean {
+  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
+    for (const file of [name, `${name}.exe`]) {
+      try {
+        accessSync(join(dir, file), constants.X_OK)
+        return true
+      } catch {
+        // Not here.
+      }
+    }
+  }
+  return false
 }
 
 /** The hook as a process: the event from stdin, then exit 0 whatever happened. Node or Bun. */

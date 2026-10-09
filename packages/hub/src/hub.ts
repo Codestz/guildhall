@@ -5,11 +5,11 @@ import { homedir } from "node:os"
 import { dirname, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { type GuildEvent, type SeaEvent, type SeaRecord, WIRE_VERSION } from "@guildhall/core"
-import type { Server, ServerWebSocket } from "bun"
 import { list, loadHistory, loadSea, PRUNE_EVERY_MS, pruneChronicles } from "./chronicles.ts"
 import { createGithub, type GithubMode, type GithubOptions, type SeaTarget } from "./github.ts"
 import { createProjects, type KnownProject } from "./projects.ts"
 import { type Dispatch, HERALD_HEADER, HUB_PORT, type HubMessage } from "./protocol.ts"
+import { type HubServer, type HubSocket, type ServeOptions, serveNode } from "./serve-node.ts"
 import { serveStatic } from "./static.ts"
 import { MAX_CHANGES, MAX_RAW, MAX_RAW_TOTAL, validChange, validGuild, validProject } from "./validate.ts"
 
@@ -55,6 +55,8 @@ const MAX_BODY = 16 * 1024 * 1024
  */
 export const HELLO_GUILDS = 8
 export const HELLO_EVENTS = 50_000
+/** WebSocket's OPEN readyState (Node 20 has no global WebSocket to read it from). */
+const OPEN = 1
 /** Sea records kept per guild for a hall's hello. */
 export const SEA_KEEP = 200
 /** A project heard from within this long has its repo watched. */
@@ -99,7 +101,11 @@ export interface Health {
   github: GithubMode | "off"
 }
 
-export function startHub(options: HubOptions = {}): Server<unknown> {
+/**
+ * Starts the hub: on Bun with `Bun.serve`, on Node with `serveNode` (serve-node.ts), the same handlers
+ * either way.
+ */
+export function startHub(options: HubOptions = {}): HubServer {
   const port = options.port ?? Number(process.env.GUILDHALL_PORT ?? HUB_PORT)
   const home = options.home ?? process.env.GUILDHALL_HOME ?? join(homedir(), ".cache", "guildhall")
   const keep = options.keep ?? 20_000
@@ -114,7 +120,7 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
   const events = loadHistory(chronicles, keep)
   const sea = loadSea(chronicles, SEA_KEEP)
   const projects = createProjects(join(home, "projects.json"))
-  const halls = new Set<ServerWebSocket<unknown>>()
+  const halls = new Set<HubSocket>()
   const inOrder = serially()
   let writeFailures = 0
   let lastWriteError: Health["lastWriteError"]
@@ -207,11 +213,11 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
   function broadcast(message: HubMessage): void {
     const text = JSON.stringify(message)
     for (const hall of halls) {
-      if (hall.readyState !== WebSocket.OPEN) {
+      if (hall.readyState !== OPEN) {
         halls.delete(hall)
         continue
       }
-      // Bun: 0 = dropped, -1 = queued behind bytes the hall hasn't read yet.
+      // 0 = dropped, -1 = queued behind bytes the hall hasn't read yet (Bun's meaning; serveNode's too).
       const sent = hall.send(text)
       if (sent === 0 || (sent === -1 && hall.getBufferedAmount() > maxBuffered)) {
         halls.delete(hall)
@@ -220,7 +226,7 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
     }
   }
 
-  return Bun.serve({
+  const serve: ServeOptions = {
     hostname: "127.0.0.1",
     port,
     maxRequestBodySize: MAX_BODY,
@@ -299,7 +305,8 @@ export function startHub(options: HubOptions = {}): Server<unknown> {
         // Control messages (answering pleas) come later, behind a per-boot token (ADR 0003).
       },
     },
-  })
+  }
+  return typeof Bun === "undefined" ? serveNode(serve) : Bun.serve(serve)
 }
 
 /** The repos the active projects work in, each with the branches they have checked out. */

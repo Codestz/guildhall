@@ -174,8 +174,8 @@ opencode-guildhall claude-code --print
 
 Merge the printed `hooks` into `~/.claude/settings.json` (every project) or a project's
 `.claude/settings.local.json`. The command only prints; it never edits your settings. The hook says
-nothing back to Claude Code, always lets it go on, and starts the hub (with Bun from your `PATH`)
-the first time it's needed. A project open in both OpenCode and Claude Code is one guild.
+nothing back to Claude Code, always lets it go on, and starts the hub (with Bun from your `PATH`, or
+Node without it) the first time it's needed. A project open in both OpenCode and Claude Code is one guild.
 
 ## Eject the agents
 

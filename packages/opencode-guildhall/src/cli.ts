@@ -37,10 +37,9 @@ const [command, ...flags] = process.argv.slice(2)
 if (command === "claude-code" && flags.length === 1 && flags[0] === "--print") {
   const hook = fileURLToPath(new URL("./claude-code.js", import.meta.url))
   const bun = onPath("bun")
-  // Claude Code waits for the hook on every event: Bun starts it in ~40 ms, Node in ~60 ms (measured).
+  // Claude Code waits for the hook on every event: Bun runs it in ~30 ms, Node in ~40 ms (measured).
+  // Without Bun the hub it starts runs on Node too.
   console.log(JSON.stringify(settings(hook, bun ? "bun" : "node"), null, 2))
-  if (!bun)
-    console.error("\nnote: the hub runs on Bun (https://bun.sh); without it the hook has no hall to tell.")
   // npx and bunx run the package from a cache that gets cleared; the hook needs a path that stays.
   if (/[\\/](_npx|bunx-)/.test(hook)) {
     console.error(

@@ -4,7 +4,7 @@ import { join } from "node:path"
 /**
  * Builds what `opencode-guildhall` publishes into `dist/`:
  *   server.js  the plugin (herald + roster + core), for OpenCode's Bun
- *   hub.js     the hub, which the herald starts as its own Bun process
+ *   hub.js     the hub, its own process: Bun when a herald starts it, Node or Bun from the hook
  *   cli.js     `npx opencode-guildhall eject | claude-code --print`, for Node
  *   claude-code.js  the Claude Code hook, for Node (or Bun), one process per hook event
  *   hall/      the hall's production build, served by the hub at `/`
@@ -32,7 +32,8 @@ async function bundle(entry: string, target: "bun" | "node", banner?: string): P
 }
 
 await bundle("server.ts", "bun")
-await bundle("hub.ts", "bun")
+// The hub runs on Bun (a herald starts it so) or on Node (the Claude Code hook, with no Bun on PATH).
+await bundle("hub.ts", "node")
 await bundle("cli.ts", "node", "#!/usr/bin/env node")
 chmodSync(join(dist, "cli.js"), 0o755)
 await bundle("claude-code.ts", "node")

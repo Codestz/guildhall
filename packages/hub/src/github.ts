@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process"
 import type { CiState, SeaEvent } from "@guildhall/core"
 
 /**
@@ -282,6 +283,7 @@ export function createGithub(options: GithubOptions = {}): GithubPoller {
 
 /** `gh auth token`'s answer, or undefined when gh is missing, logged out, or slow. Never throws. */
 export async function ghToken(): Promise<string | undefined> {
+  if (typeof Bun === "undefined") return ghTokenNode()
   try {
     const gh = Bun.which("gh", { PATH: process.env.PATH ?? "" })
     if (!gh) return undefined
@@ -293,6 +295,20 @@ export async function ghToken(): Promise<string | undefined> {
   } catch {
     return undefined
   }
+}
+
+/** `ghToken` on Node (serve-node.ts): the same question through `node:child_process`. */
+function ghTokenNode(): Promise<string | undefined> {
+  return new Promise((settle) => {
+    try {
+      execFile("gh", ["auth", "token"], { timeout: 5000 }, (error, stdout) => {
+        const text = String(stdout).trim()
+        settle(!error && /^[A-Za-z0-9_.-]{20,255}$/.test(text) ? text : undefined)
+      })
+    } catch {
+      settle(undefined)
+    }
+  })
 }
 
 // The answers, read as sea events. GitHub's shapes are documented

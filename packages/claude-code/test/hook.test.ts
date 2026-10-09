@@ -1,5 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { createServer } from "node:http"
+import type { AddressInfo } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { GuildEvent } from "@guildhall/core"
@@ -13,13 +15,19 @@ import session from "./fixtures/session.json"
 import subagents from "./fixtures/subagents.json"
 
 const HOOK = join(import.meta.dir, "../src/hook.ts")
+const NODE = Bun.which("node")
 const home = mkdtempSync(join(tmpdir(), "guildhall-claude-code-"))
 const hub = startHub({ port: 0, home })
 afterAll(() => hub.stop(true))
 
 /** Runs the hook as Claude Code does: a process per event, the payload on stdin. */
-async function hook(payload: string, port: number | undefined = hub.port, hubHome = home) {
-  const child = Bun.spawn(["bun", HOOK], {
+async function hook(
+  payload: string,
+  port: number | undefined = hub.port,
+  hubHome = home,
+  command = ["bun", HOOK],
+) {
+  const child = Bun.spawn(command, {
     stdin: new TextEncoder().encode(payload),
     stdout: "pipe",
     stderr: "pipe",
@@ -66,6 +74,38 @@ describe("the hook", () => {
     expect(code).toBe(0)
     expect(stdout).toBe("")
     expect(performance.now() - started).toBeLessThan(2000)
+  })
+
+  test("a hub that takes the connection and never answers is let go, and no hub is started", async () => {
+    const quiet = mkdtempSync(join(tmpdir(), "guildhall-claude-code-hang-"))
+    const listener = createServer(() => {
+      // Never answers.
+    }).listen(0, "127.0.0.1")
+    await new Promise((resolve) => listener.once("listening", resolve))
+    const { port } = listener.address() as AddressInfo
+    try {
+      const started = performance.now()
+      const { stdout, code } = await hook(JSON.stringify(session.events[1]), port, quiet)
+      expect({ stdout, code }).toEqual({ stdout: "", code: 0 })
+      expect(performance.now() - started).toBeLessThan(2000)
+    } finally {
+      listener.close()
+    }
+    // Something holds the port: starting a hub there could only fail.
+    expect(existsSync(join(quiet, "claude-code.hub-start"))).toBe(false)
+  })
+
+  test.skipIf(!NODE)("bundled for Node and run by Node, as the npm package's hook is", async () => {
+    const out = mkdtempSync(join(tmpdir(), "guildhall-claude-code-node-"))
+    const built = await Bun.build({ entrypoints: [HOOK], outdir: out, target: "node" })
+    expect(built.success).toBe(true)
+    const event = { ...session.events[1], cwd: join(out, "nodeguild") }
+    const { stdout, code } = await hook(JSON.stringify(event), hub.port, home, [
+      NODE as string,
+      join(out, "hook.js"),
+    ])
+    expect({ stdout, code }).toEqual({ stdout: "", code: 0 })
+    expect((await hello()).some((e) => e.guild === "nodeguild")).toBe(true)
   })
 
   test("the dispatch carries the project, so the hub can tell two `app`s apart", async () => {

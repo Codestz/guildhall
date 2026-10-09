@@ -1,7 +1,7 @@
 {
   "name": "opencode-guildhall",
   "version": "0.2.0",
-  "description": "Nine guild agents for OpenCode, and a live 3D hall where you watch them work. Claude Code too.",
+  "description": "Events in. A living world out. Watch OpenCode and Claude Code sessions (and GitHub) become a living 3D island, plus nine guild agents for OpenCode.",
   "type": "module",
   "license": "MIT",
   "author": "Codestz",

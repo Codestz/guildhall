@@ -1,14 +1,19 @@
 # opencode-guildhall
 
-Nine guild agents for [OpenCode](https://opencode.ai), and a live 3D hall where you watch them work.
+The OpenCode and Claude Code source for [Guildhall](https://github.com/Codestz/guildhall): **events in,
+a living world out.** Your sessions become a living 3D island in your browser, with crowds, weather,
+ships, a director and a story. The package keeps its original name for now.
 
-One plugin gives you:
+For [OpenCode](https://opencode.ai), one plugin gives you:
 
 - **The guild.** A Guildmaster you talk to, and eight specialists it briefs, checks and reports on
   (architect, implementer, verifier, librarian, explorer, researcher, designer, product owner). Each
   has its own permissions, enforced by OpenCode rather than just described in a prompt.
-- **The hall.** A small 3D guildhall in your browser. Each OpenCode session shows up as an adventurer
+- **The hall.** The 3D world in your browser. Each OpenCode session shows up as an adventurer
   at the station for its role, and you can watch subagents set out, work, and come back.
+
+The same package carries a hook for Claude Code ([below](#claude-code)), and the hub turns a project's GitHub
+remote into a sea of ships.
 
 Everything runs on your machine. Nothing is written to your OpenCode config or your repo, and
 uninstalling the plugin removes it all.

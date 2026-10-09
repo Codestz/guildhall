@@ -1,16 +1,16 @@
 <h1 align="center">Guildhall</h1>
 
 <p align="center">
-  <strong>Your AI coding agents, working as a fantasy guild on a living island.</strong><br />
-  A 3D world you can watch, and a real nine-agent harness for <a href="https://opencode.ai">OpenCode</a>.<br />
-  Claude Code sessions can join the island too.
+  <strong>Events in. A living world out.</strong><br />
+  Plug in any event stream (coding agents, GitHub, a repo's whole history, or your own) and watch it
+  become a living 3D island: crowds, weather, ships, a director and a story. Live in your browser, at 60 fps.
 </p>
 
 <p align="center">
-  <a href="https://guildhall.codestz.dev"><strong>Visit the guild</strong></a> ·
-  <a href="#install">Install</a> ·
-  <a href="#claude-code">Claude Code</a> ·
-  <a href="packages/opencode-guildhall/README.md">Plugin docs</a>
+  <a href="https://guildhall.codestz.dev"><strong>See it live</strong></a> ·
+  <a href="#what-can-feed-it">What can feed it</a> ·
+  <a href="#try-it-live">Try it live</a> ·
+  <a href="https://guildhall.codestz.dev/how">How&nbsp;it's&nbsp;built</a>
 </p>
 
 <p align="center">
@@ -23,45 +23,53 @@
   <img src=".github/media/island-sunset.webp" alt="The guild's island at sunset from a low angle: a walled keep with a glowing hearth, a village, forest and mountains, ships on a pink sea, and a story caption reading 'The Architect and the Librarian bring their loot home.'" width="100%" />
 </p>
 
-Every session you run in OpenCode (or Claude Code) becomes an adventurer on the island. The Guildmaster posts a
-quest, specialists set out to the forest, the river or the proving grounds, and they come home with
-loot. Each tool call is a **deed**, with its own sigil above the hero's head. When they need you, a
-**plea** goes up. Everything you see comes from a real session, played out as it happens.
+Guildhall is a 3D world engine for event streams. Whatever you plug in, each worker becomes an
+adventurer on the island, each action a **deed** with its own sigil, and each call for help a
+**plea**. The weather follows how things are going, ships sail in from GitHub, and a bard tells it
+all as a story.
 
-The world reacts to your repo, too. The weather follows your test health: clear skies while things
-pass, rain and then storms as failures pile up. A session that fails rises as a skeleton in the
-graveyard. Ravens fly out when a quest begins and carry the loot home. And it all has a voice: a bard writes
-the story as captions and collects it into a book of Legends, and the guild makes music as it works.
+- **Any source.** OpenCode, Claude Code, GitHub, or your own through the open
+  [world protocol](packages/core/PROTOCOL.md). A repo's whole history is next.
+- **A world that tells the story.** A director picks the camera shots, captions narrate as it
+  happens, the Legends book and recaps keep it, and the guild makes music as it works.
+- **Built to scale.** 300 adventurers in 143 draw calls, an experimental WebGPU renderer, and
+  archipelagos of repos. The numbers are on [How it's built](https://guildhall.codestz.dev/how).
+- **Honest by design.** Only real events move the world, and nothing is faked. The public site
+  plays recorded and simulated stories, and says so.
 
-## Try it
+## What can feed it
 
-**In your browser.** [guildhall.codestz.dev](https://guildhall.codestz.dev) runs a simulated guild.
-Nothing to install. A few links straight into a scene:
+| Source | What you see | Quick start |
+|---|---|---|
+| [OpenCode](#opencode) | Every session an adventurer, plus nine guild agents to work with | Add the plugin to `opencode.json` |
+| [Claude&nbsp;Code](#claude-code) | Every session and subagent, in the same hall | Install once, merge the printed hooks |
+| [GitHub&nbsp;seas](#github-seas) | Commits, pull requests, CI and releases as ships | Automatic when a project's remote is on GitHub |
+| [Repo&nbsp;islands](#repo-islands-and-archipelagos) | A public repo's file tree grown into an island, or several as an archipelago | `?repo=owner/name` or `?archipelago` |
+| Git&nbsp;history | A repo's whole history played as a story (Repo Chronicle) | Coming |
+| [Your&nbsp;own](#your-own) | Anything that can POST JSON: deploys, services, jobs | The [world protocol](packages/core/PROTOCOL.md) |
 
-- [`?story=seas`](https://guildhall.codestz.dev/?story=seas): a party's run with its GitHub sea
-  beside it, from the first push to the release.
-- [`?repo=owner/name`](https://guildhall.codestz.dev/?repo=facebook/react): an island grown from
-  any public repo's file tree.
-- [`?story=rush&n=300`](https://guildhall.codestz.dev/?story=rush&n=300): a crowd of 300
-  adventurers (1 to 500).
+The OpenCode plugin and the Claude Code hook ship in one npm package, `opencode-guildhall`. The
+npm package keeps its original name for now.
 
-<a id="install"></a>**With your own agents.** Add the plugin to `opencode.json`, restart OpenCode,
-and open <http://127.0.0.1:4747>.
+<a id="install"></a>
+
+### OpenCode
+
+Add the plugin to `opencode.json`, restart OpenCode, and open <http://127.0.0.1:4747>.
 
 ```jsonc
 { "plugin": ["opencode-guildhall"] }
 ```
 
 That's OpenCode 1.18 or later. On OpenCode 2.0.18 or later, use `"plugins"`, or run
-`opencode plugin add opencode-guildhall`. Pick **guild-master** with
-Tab (shift+tab on v2), and the hall follows every OpenCode window you have open. Ports, options
-and upgrade notes are in the [plugin README](packages/opencode-guildhall/README.md).
+`opencode plugin add opencode-guildhall`. Pick **guild-master** with Tab (shift+tab on v2), and the
+hall follows every OpenCode window you have open. Ports, options and upgrade notes are in the
+[plugin README](packages/opencode-guildhall/README.md).
 
-## Claude Code
+### Claude Code
 
-The same package carries a hook for [Claude Code](https://claude.com/claude-code). Install it once, then
-print the hooks block and merge it into `~/.claude/settings.json` (every project) or a project's
-`.claude/settings.local.json`:
+Install the package once, then print the hooks block and merge it into `~/.claude/settings.json`
+(every project) or a project's `.claude/settings.local.json`:
 
 ```sh
 npm install -g opencode-guildhall
@@ -70,10 +78,47 @@ opencode-guildhall claude-code --print
 
 The command only prints; it never edits your settings. The hook runs on every Claude Code event,
 says nothing back to Claude, and always lets it carry on. It starts the hub the first time it's
-needed, so open <http://127.0.0.1:4747> once a session is going. Each project is its own guild, and
-a project open in both OpenCode and Claude Code shares one. The hub runs on [Bun](https://bun.sh),
-so have it on your PATH. A global install keeps the hook's path stable: `npx` and `bunx` run from
-a cache that gets cleared.
+needed (with Bun from your PATH, or Node without it), so open <http://127.0.0.1:4747> once a
+session is going. Each project is its own guild, and a project open in both OpenCode and Claude
+Code shares one. A global install keeps the hook's path stable: `npx` and `bunx` run from a cache
+that gets cleared.
+
+### GitHub seas
+
+When a project's remote is on GitHub, the hub watches it and the sea fills with ships: commits and
+pull requests sail in, the lighthouse burns steady while CI passes and pulses red when it fails, and
+a release arrives as a galleon. It uses `gh auth token` if the GitHub CLI is installed and logged in
+(public repos are watched without a token, less often). The token is read when needed and never
+stored. Set `GUILDHALL_GITHUB=0` to turn the watch off.
+
+### Repo islands and archipelagos
+
+Add `?repo=owner/name` to the hall's URL and your browser reads that public repo's file tree from
+GitHub and grows an island from it. `?archipelago` sets several side by side, or name your own with
+`?repos=a/b,c/d`. The **Your repo as an island** door in the hall does the same.
+
+### Your own
+
+Anything that can send JSON to `127.0.0.1:4747` can be a source. The
+[world protocol](packages/core/PROTOCOL.md) has the vocabulary, the wire format and an adapter in
+30 lines. From a clone, run the hub with `bun packages/hub/src/main.ts`, start the hall with
+`bun run dev`, and add `?live` to its URL.
+
+## Try it live
+
+[guildhall.codestz.dev](https://guildhall.codestz.dev) plays a simulated guild, with nothing to
+install. A few links straight into a scene:
+
+- [`?story=seas`](https://guildhall.codestz.dev/?story=seas): a party's run with its GitHub sea
+  beside it, from the first push to the release.
+- [`?repo=facebook/react`](https://guildhall.codestz.dev/?repo=facebook/react): an island grown
+  from a public repo's file tree. Any `owner/name` works.
+- [`?archipelago`](https://guildhall.codestz.dev/?archipelago): several repos as islands, side by
+  side.
+- [`?story=rush&n=300`](https://guildhall.codestz.dev/?story=rush&n=300): a crowd of 300
+  adventurers (1 to 500).
+- [`?renderer=webgpu`](https://guildhall.codestz.dev/?renderer=webgpu): the experimental WebGPU
+  renderer, where the browser has it. **Settings › Renderer** switches it in the hall.
 
 ## Watch it work
 
@@ -130,11 +175,8 @@ In replays it fast-forwards through the quiet stretches. Take the camera back an
 wind, rain, sea, fire and night insects. It is synthesized in the browser, apart from a few
 recorded effects. Sound is off until you turn it on.
 
-**GitHub seas.** When a project's remote is on GitHub, the hub watches it and the sea fills with
-ships: commits and pull requests sail in, the lighthouse burns steady while CI passes and pulses
-red when it fails, and a release arrives as a galleon. It uses `gh auth token` if the GitHub CLI is installed and logged in (public
-repos are watched without a token, less often). The token is read when needed and never stored.
-Set `GUILDHALL_GITHUB=0` to turn the watch off.
+**GitHub seas.** Ships for commits and pull requests, a lighthouse for CI and a galleon for each
+release. [More above](#github-seas).
 
 **Townsfolk.** Farmers, a fisher, merchants, gate guards, children and a graveyard keeper go about
 their day around the guild.
@@ -151,10 +193,38 @@ about.
   <img src=".github/media/events-pair.webp" alt="Left: lanterns and bunting strung across the square at night for a festival. Right: a glowing green ghost ship on a dark sea." width="100%" />
 </p>
 
+## How it works
+
+```mermaid
+flowchart LR
+  OC["OpenCode<br/>(v1 or v2)"] -- session events --> H["herald<br/>(the plugin)"]
+  H -- "POST changes" --> HUB["hub<br/>127.0.0.1:4747"]
+  CC["Claude Code"] -- "hook events" --> HUB
+  YOU["your adapter"] -- "POST changes" --> HUB
+  GH["GitHub"] -. "commits, PRs, CI" .-> HUB
+  HUB -- chronicles --> DISK[("~/.cache/guildhall")]
+  HUB -- WebSocket --> HALL["hall<br/>(your browser)"]
+```
+
+Every source is turned into one small vocabulary of **changes**: sessions, deeds, pleas and
+replies. The **herald** does it inside OpenCode, the Claude Code hook does it from Claude Code's
+hook events, and your own adapter can do it from anything. They all send to the **hub**, a tiny
+local server that the herald or the hook starts the first time it's needed. The hub records each
+session as a chronicle on disk, watches GitHub for the sea, and serves the **hall**, a React Three
+Fiber app that turns the stream into the island. The hall reads only changes, so it can't tell which source a
+guild came from. The [world protocol](packages/core/PROTOCOL.md) has the details.
+
+## How it's built
+
+[How it's built](https://guildhall.codestz.dev/how) is the long read: 300 adventurers in 143 draw
+calls (down from 1,226), WebGL against WebGPU measured honestly, the TSL gotchas, repos grown into
+islands and GitHub as a sea. Every number is measured, and every section ends in a live link.
+
 ## The guild
 
-The plugin gives OpenCode nine agents. You talk to the **Guildmaster**. It sizes your request,
-briefs the specialists, has their work checked by a verifier, and reports back.
+For OpenCode, the plugin also gives you nine agents to work with. You talk to the **Guildmaster**.
+It sizes your request, briefs the specialists, has their work checked by a verifier, and reports
+back.
 
 | Role | What it does | What it may do | Where it works |
 |---|---|---|---|
@@ -169,7 +239,8 @@ briefs the specialists, has their work checked by a verifier, and reports back.
 | **Product owner** | Turns a vague goal into a spec with testable criteria | Write Markdown under `docs/` only | Scroll desk in the keep |
 
 Agents from outside the guild, such as OpenCode's own `general`, show up as grey wanderers working
-the quarry.
+the quarry. These roles are the cast the world draws today, whatever the source; it is being
+generalised for sources that aren't coding agents.
 
 - **Permissions are enforced twice.** OpenCode's own rules: every agent starts from deny-all and
   gets back only what its job needs. "Checks" means an exact list of test, lint, typecheck and
@@ -185,44 +256,6 @@ the quarry.
   `npx opencode-guildhall eject` writes the prompts into `.opencode/agents/` for you to edit.
   `{ "agents": false }` turns the guild off and keeps only the hall.
 
-## How it works
-
-```mermaid
-flowchart LR
-  OC["OpenCode<br/>(v1 or v2)"] -- session events --> H["herald<br/>(the plugin)"]
-  H -- "POST changes" --> HUB["hub<br/>127.0.0.1:4747"]
-  HUB -- chronicles --> DISK[("~/.cache/guildhall")]
-  CC["Claude Code"] -- "hook events" --> HUB
-  HUB -- WebSocket --> HALL["hall<br/>(your browser)"]
-  GH["GitHub"] -. "commits, PRs, CI" .-> HUB
-```
-
-The **herald** runs inside OpenCode. It adds the guild's agents and translates OpenCode's events
-into a small model of sessions and deeds. It sends them to the **hub**, a tiny local server that
-the herald starts the first time it's needed. Every OpenCode window shares that one hub, and so
-does the Claude Code hook, which sends the same changes from Claude Code's hook events. The hub
-records each session as a chronicle on disk and serves the **hall**, a React Three Fiber app that
-turns the stream into the island.
-
-## Performance
-
-The target is 120 fps on a Retina MacBook, and the hall measures itself against it. On a
-production build at the default High tier, the party scene runs at about 121 to 131 fps. The
-busiest scene, thirteen adventurers in rain at night, runs at 117 to 120 fps, with its 95th-percentile
-frame at 12.5 to 13.7 ms. That is just short of the target, and the rest of the cost is fill rate at
-Retina resolution. A few things keep it fast:
-
-- Island tiles are instanced and placed props are batched per material. Each character's parts are
-  merged into two skinned meshes.
-- One shadow-casting sun, and its shadow map is redrawn only when something it covers changes: a
-  few times every four seconds instead of every frame. Moving characters get cheap blob shadows.
-- Outlines, mist, sun shafts and colour grading run in a single post-processing pass.
-- Occasional layers, like the graveyard's undead and the ghost ship, load the first time they're needed.
-- Quality adapts on its own across three tiers. An Ultra tier with a tilt-shift miniature look is
-  there if you choose it.
-- Where the browser has WebGPU, **Settings › Renderer** switches to an experimental WebGPU
-  renderer. WebGL stays the default.
-
 ## Privacy
 
 Everything runs on your machine. The hub listens on `127.0.0.1` only and refuses events from web
@@ -232,6 +265,23 @@ outside requests are few: the hall's fonts, which your browser loads from Google
 seas, where the hub asks api.github.com about your project's repo (`GUILDHALL_GITHUB=0` turns it
 off); and `?repo=`, where your browser reads a public repo's file tree from GitHub. No session data
 goes with any of them.
+
+## Performance
+
+60 fps is the bar, and the hall measures itself against it. On a Retina MacBook at the default High
+tier the party scene runs well above it; the numbers, and how they're measured, are on
+[How it's built](https://guildhall.codestz.dev/how). A few things keep it fast:
+
+- Island tiles are instanced and placed props are batched per material. Each character's parts are
+  merged into two skinned meshes, and big crowds draw from baked bone textures with mesh LOD.
+- One shadow-casting sun, and its shadow map is redrawn only when something it covers changes: a
+  few times every four seconds instead of every frame. Moving characters get cheap blob shadows.
+- Outlines, mist, sun shafts and colour grading run in a single post-processing pass.
+- Occasional layers, like the graveyard's undead and the ghost ship, load the first time they're needed.
+- Quality adapts on its own across three tiers. An Ultra tier with a tilt-shift miniature look is
+  there if you choose it.
+- Where the browser has WebGPU, **Settings › Renderer** switches to an experimental WebGPU
+  renderer. WebGL stays the default.
 
 ## Develop
 

@@ -7,8 +7,9 @@ import { repoDoor } from "./RepoDoor.tsx"
 /** The project's home, linked from the showcase caption. */
 export const PROJECT_URL = "https://github.com/Codestz/guildhall"
 
-const PITCH =
-  "Watch AI coding agents work as a living guild: every quest, deed and plea of a multi\u2011agent session, played out on an island."
+/** The headline, then what it means: on the card, the headline takes its own line. */
+const HEADLINE = "Events in. A living world out."
+const PITCH = "Coding agents, GitHub or a stream of your own, played out as a 3D island."
 
 /**
  * The showcase's directed opening (guild/opening.ts), drawn over the scene:
@@ -50,7 +51,9 @@ export function Opening({ state, store, phone }: { state: OpeningState; store: G
             </span>
             <h1 className="title-name">Guildhall</h1>
             <span className="title-rule" aria-hidden="true" />
-            <p className="title-pitch">{PITCH}</p>
+            <p className="title-pitch">
+              <span className="title-head">{HEADLINE}</span> {PITCH}
+            </p>
             <div
               className="title-load"
               role="progressbar"
@@ -79,8 +82,8 @@ export function Opening({ state, store, phone }: { state: OpeningState; store: G
       {caption && (
         <aside className="plaque opening-caption" aria-label="About this view">
           <p className="caption-text">
-            <b>A simulated guild at work on a feature.</b>{" "}
-            <span>{touch ? "Tap" : "Click"} anyone to follow.</span>
+            <b>{HEADLINE}</b>{" "}
+            <span>These events are simulated. {touch ? "Tap" : "Click"} anyone to follow.</span>
           </p>
           <span className="caption-links">
             <button type="button" className="caption-link" aria-haspopup="dialog" onClick={repoDoor.open}>

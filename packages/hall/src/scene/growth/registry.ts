@@ -20,17 +20,27 @@ export interface GrowthMarks {
   roles: Role[]
   /** x, z per instance. */
   spots: number[]
+  /** The piece each instance draws, where the layer said (growth film v2 tells stages apart by it). */
+  pieces: string[]
   /** Each instance's own matrix as built: what `restore` puts back. */
   base?: Float32Array
 }
 
 /** Marks a batch's instance `id` as a growable piece (in the layer's build, as it adds instances). */
-export function markGrowable(mesh: BatchedMesh, id: number, role: Role, x: number, z: number): void {
-  const marks: GrowthMarks = marksOf(mesh) ?? { ids: [], roles: [], spots: [] }
+export function markGrowable(
+  mesh: BatchedMesh,
+  id: number,
+  role: Role,
+  x: number,
+  z: number,
+  piece = "",
+): void {
+  const marks: GrowthMarks = marksOf(mesh) ?? { ids: [], roles: [], spots: [], pieces: [] }
   mesh.userData.growth = marks
   marks.ids.push(id)
   marks.roles.push(role)
   marks.spots.push(x, z)
+  marks.pieces.push(piece)
 }
 
 export const marksOf = (mesh: BatchedMesh): GrowthMarks | undefined =>

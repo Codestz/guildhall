@@ -148,3 +148,9 @@
     display: none;
   }
 }
+
+/* A thing the repo built (the castle raised, the first market): a stone-blue notch on the track. */
+.growth-track .beat.built {
+  background: #8fb4d6;
+  width: 3px;
+}

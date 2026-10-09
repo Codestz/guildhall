@@ -1,5 +1,5 @@
 import type { Chronicle, Milestone, MilestoneKind } from "./format.ts"
-import { type GrowthPlan, timeOfDay } from "./growth.ts"
+import { dayAt, type GrowthPlan, timeOfDay } from "./growth.ts"
 
 /**
  * The growth timelapse's story layer (ADR 0021), pure: which of the chronicle's milestones are told
@@ -16,7 +16,7 @@ export const FESTIVAL_GAP_S = 12
 export interface GrowthCaption {
   /** Film time it appears. */
   t: number
-  kind: MilestoneKind | "gone"
+  kind: MilestoneKind | "gone" | "built"
   /** "2017", "Oct 2026" for a short history. */
   when: string
   /** The milestone's own words. */
@@ -25,13 +25,29 @@ export interface GrowthCaption {
   tagline: string
 }
 
-export interface GrowthStory {
+/** Listed contributors' first days, sorted; the total they stand for. */
+export interface People {
+  firsts: number[]
+  contributors: number
+}
+
+/** A thing built the film marks on its tape (growthBuild.ts): "the castle is raised". Gen 2 films only. */
+export interface BuiltMoment {
+  t: number
+  text: string
+}
+
+export interface GrowthStory extends People {
   captions: GrowthCaption[]
   /** Film times a major release throws a festival. */
   festivals: number[]
-  /** Listed contributors' first days, sorted; the total they stand for. */
-  firsts: number[]
-  contributors: number
+  moments: BuiltMoment[]
+}
+
+export function peopleOf(c: Chronicle): People {
+  const firsts = c.contributors.filter((person) => !person.bot).map((person) => person.first)
+  firsts.sort((a, b) => a - b)
+  return { firsts, contributors: Math.max(c.repo.contributors, firsts.length) }
 }
 
 const TAGLINE: Record<GrowthCaption["kind"], string> = {
@@ -42,6 +58,7 @@ const TAGLINE: Record<GrowthCaption["kind"], string> = {
   refactor: "The island is reshaped",
   surge: "New hands arrive",
   gone: "Its land sinks back into the sea",
+  built: "Raised by the repo's own hands",
 }
 /** What wins a crowded moment: a birth, a major release, a rename… a minor release last. */
 const PRIORITY: Record<GrowthCaption["kind"], number> = {
@@ -52,6 +69,7 @@ const PRIORITY: Record<GrowthCaption["kind"], number> = {
   refactor: 2,
   surge: 1,
   release: 1,
+  built: 1,
 }
 
 /** A real major version (1.0.0 and up, not a prerelease): the ones worth a festival. */
@@ -76,7 +94,7 @@ function whenOf(day: number, span: number): string {
   return span < 730 ? dateLabel(day, span) : String(new Date(day * 86_400_000).getUTCFullYear())
 }
 
-export function storyOf(c: Chronicle, g: GrowthPlan): GrowthStory {
+export function storyOf(c: Chronicle, g: GrowthPlan, moments: BuiltMoment[] = []): GrowthStory {
   const span = c.end - c.start
   // Ghosts that were a big part of their island get a line when they go.
   const gone: Milestone[] = g.ghosts
@@ -124,9 +142,7 @@ export function storyOf(c: Chronicle, g: GrowthPlan): GrowthStory {
     if (festivals.every((f) => Math.abs(f - t) >= FESTIVAL_GAP_S)) festivals.push(t)
   }
 
-  const firsts = c.contributors.filter((person) => !person.bot).map((person) => person.first)
-  firsts.sort((a, b) => a - b)
-  return { captions, festivals, firsts, contributors: Math.max(c.repo.contributors, firsts.length) }
+  return { captions, festivals, moments, ...peopleOf(c) }
 }
 
 /** The caption up at film time `t`, if any. */
@@ -138,6 +154,20 @@ export function captionAt(story: GrowthStory, t: number): GrowthCaption | undefi
   return undefined
 }
 
+/** The moment built just now (growthBuild.ts), told like a caption when no milestone is being told. */
+export function momentAt(story: GrowthStory, g: GrowthPlan, t: number): GrowthCaption | undefined {
+  const moment = story.moments.find((m) => t >= m.t && t < m.t + CAPTION_HOLD_S)
+  if (!moment) return undefined
+  const span = g.end - g.start
+  return {
+    t: moment.t,
+    kind: "built",
+    when: whenOf(dayAt(g, moment.t), span),
+    text: moment.text,
+    tagline: TAGLINE.built,
+  }
+}
+
 /** The festival whose window holds `t` (index into `festivals`), or -1. */
 export function festivalAt(story: GrowthStory, t: number, window: number): number {
   return story.festivals.findIndex((f) => t >= f && t < f + window)
@@ -147,7 +177,7 @@ export function festivalAt(story: GrowthStory, t: number, window: number): numbe
  * Contributors by `day`: the listed ones who had started, scaled up to the repo's whole count (the
  * list holds the busiest few hundred), exactly the whole count by the last day.
  */
-export function contributorsAt(story: GrowthStory, day: number, end: number): number {
+export function contributorsAt(story: People, day: number, end: number): number {
   if (day >= end) return story.contributors
   const { firsts } = story
   let lo = 0

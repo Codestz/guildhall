@@ -92,7 +92,10 @@ export default function GrowthLayer() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: one driver per film (growth.film is not React state)
   useEffect(() => {
     if (!film) return
-    setDriver({ driver: new GrowthDriver(film.plan), writer: new RiseWriter(film.plan, riseMaskOf(world)) })
+    setDriver({
+      driver: new GrowthDriver(film.plan, film.build),
+      writer: new RiseWriter(film.plan, riseMaskOf(world)),
+    })
     // A release's festival is its own chunk: fetched now, not in the frame it is first wanted.
     if (film.story.festivals.length > 0) void prefetchFestival()
     return () => {

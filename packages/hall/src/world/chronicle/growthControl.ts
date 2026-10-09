@@ -1,5 +1,6 @@
 import type { Chronicle } from "./format.ts"
 import type { GrowthPlan } from "./growth.ts"
+import type { BuildPlan } from "./growthBuild.ts"
 import type { GrowthStory } from "./growthStory.ts"
 
 /**
@@ -23,6 +24,8 @@ export interface GrowthFilm {
   plan: GrowthPlan
   story: GrowthStory
   chronicle: Chronicle
+  /** Gen 2 films: when each building is begun and how it goes up (growthBuild.ts). Absent: the v1 film. */
+  build?: BuildPlan
   /** The chronicle's span, for labels. */
   start: number
   end: number

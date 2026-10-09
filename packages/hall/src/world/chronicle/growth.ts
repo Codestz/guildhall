@@ -39,6 +39,8 @@ export const SINK_S = 0.8
 export const HOLD_S = 1
 /** A road draws in this fast, hex by hex from the hub. */
 export const ROAD_STEP_S = 0.06
+/** A river rises early only within this many hexes of the harbour (gen 2). */
+const RIVER_REACH = 3
 
 /** 45 s for a young repo up to 75 s for twelve years or more. */
 export function filmLength(c: Pick<Chronicle, "start" | "end">): number {
@@ -52,6 +54,8 @@ export interface GrowthInput {
   shape: RepoShape
   /** islandFromTree(tree).plan: the same island the hall draws. */
   plan: IslandPlan
+  /** Gen 2: the keys of the hexes a lowland river runs through: they rise in the prologue, before any town. */
+  rivers?: ReadonlySet<string>
 }
 
 export interface GrowthDistrict {
@@ -107,7 +111,7 @@ export function timeOfDay(g: Pick<GrowthPlan, "start" | "end" | "duration">, day
   return PROLOGUE_S + span * Math.min(1, Math.max(0, p))
 }
 
-export function planGrowth({ chronicle: c, shape, plan }: GrowthInput): GrowthPlan {
+export function planGrowth({ chronicle: c, shape, plan, rivers }: GrowthInput): GrowthPlan {
   const duration = filmLength(c)
   const steps = Math.floor(duration / STEP_S) + 1
   const base = { start: c.start, end: c.end, duration }
@@ -214,6 +218,22 @@ export function planGrowth({ chronicle: c, shape, plan }: GrowthInput): GrowthPl
   })
   for (let i = 0; i < n; i++)
     if ((own[i]?.length ?? 0) === 0 && isRoad(i)) own[i] = [0, Number.POSITIVE_INFINITY]
+
+  // Rivers were there first: their hexes rise through the prologue, ring by ring from the hub.
+  if (rivers) {
+    // Only where the harbour is: a river ribbon far from any land would hang in the sea.
+    const harbour = [...(ranks[0] ?? []), ...cells.keys().filter(isKeep)]
+    const wet = [...rivers]
+      .flatMap((id) => index.get(id) ?? [])
+      .filter((h) => !isKeep(h))
+      .filter((h) =>
+        harbour.some((near) => hexDistance(cells[near] as Cell, cells[h] as Cell) <= RIVER_REACH),
+      )
+      .sort((a, b) => hexDistance(plan.hub, cells[a] as Cell) - hexDistance(plan.hub, cells[b] as Cell))
+    wet.forEach((h, k) => {
+      own[h] = [0.2 + PROLOGUE_S * 0.7 * (k / Math.max(1, wet.length)), Number.POSITIVE_INFINITY]
+    })
+  }
 
   // ---- ghosts: today's land, borrowed while they lived ----
   const ghostHeld: number[][] = Array.from({ length: n }, () => [])

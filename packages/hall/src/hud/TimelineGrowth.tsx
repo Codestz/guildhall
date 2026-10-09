@@ -8,6 +8,7 @@ import {
   dateLabel,
   filesAt,
   type GrowthCaption,
+  momentAt,
 } from "../world/chronicle/growthStory.ts"
 import { busiestWeek } from "../world/town/presence.ts"
 import { Icon } from "./icons.tsx"
@@ -85,8 +86,8 @@ function Tape({ film, playing, hidden }: { film: GrowthFilm; playing: boolean; h
         people.current.textContent = `${number(contributorsAt(story, day, end))} contributors · ${number(town.residents.length)} in town · ${number(filesAt(chronicle, day))} files${lit && busiest ? ` · busiest week, ${number(busiest.commits)} commits` : ""}`
       people.current?.classList.toggle("growth-busiest", lit)
       if (range.current && !dragging.current) range.current.value = String(t)
-      const now = captionAt(story, t)
-      if (now !== shown) {
+      const now = captionAt(story, t) ?? momentAt(story, plan, t)
+      if (now?.t !== shown?.t || now?.text !== shown?.text) {
         shown = now
         setCaption(now)
       }
@@ -166,6 +167,14 @@ function Tape({ film, playing, hidden }: { film: GrowthFilm; playing: boolean; h
                   className="beat"
                   data-kind="chapter"
                   style={{ left: `${(t / plan.duration) * 100}%` }}
+                />
+              ))}
+              {story.moments.map((moment) => (
+                <i
+                  key={moment.text}
+                  className="beat built"
+                  title={moment.text}
+                  style={{ left: `${(moment.t / plan.duration) * 100}%` }}
                 />
               ))}
               {busiest && (

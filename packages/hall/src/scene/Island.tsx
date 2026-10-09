@@ -240,7 +240,7 @@ function batch(
     const built = merge
       ? tieredMerge(group.material, group.instances, count)
       : tieredBatch(group.material, group.instances, count, (mesh, id, { placement }) =>
-          markGrowable(mesh, id, roleOf(placement.piece), placement.x, placement.z),
+          markGrowable(mesh, id, roleOf(placement.piece), placement.x, placement.z, placement.piece),
         )
     for (const mesh of built.meshes) {
       mesh.castShadow = group.cast

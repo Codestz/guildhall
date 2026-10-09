@@ -2,7 +2,9 @@ import { useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
 import { useMemo } from "react"
 import { InstancedMesh, Matrix4, type Mesh, type Object3D, Quaternion, Vector3 } from "three"
-import { DEPTH, type PieceState, pieceAt, roleOf, saltOf } from "../../world/chronicle/growthPieces.ts"
+import { ageOf, type Site as BuildSite, siteKey } from "../../world/chronicle/growthBuild.ts"
+import { DEPTH, pieceAt, roleOf, saltOf } from "../../world/chronicle/growthPieces.ts"
+import { emptyStage, type Stage, stageAt } from "../../world/chronicle/growthStages.ts"
 import LANDS from "../../world/lands.json"
 import { HEX_SCALE } from "../../world/lands.ts"
 import type { World } from "../../world/world.ts"
@@ -29,6 +31,8 @@ interface Site {
   w: number
   h: number
   d: number
+  /** Film v2: the building's own schedule and stages (growthBuild.ts). */
+  build?: BuildSite
 }
 
 /**
@@ -65,7 +69,7 @@ export function Builders({ driver, world }: { driver: GrowthDriver; world: World
     [nodes, buildings, tents],
     "materials",
   )
-  const state = useMemo<PieceState>(() => ({ visible: false, rise: 0, scale: 1, scaleY: 1, scaffold: 0 }), [])
+  const state = useMemo<Stage>(emptyStage, [])
 
   useFrame(() => {
     if (!built) return
@@ -74,14 +78,30 @@ export function Builders({ driver, world }: { driver: GrowthDriver; world: World
     for (const site of buildings) {
       const h = site.hex
       pieceAt("build", f.rise[h] as number, f.up[h] as number, f.built[h] as number, site.salt, state)
-      if (state.scaffold <= 0.01) continue
+      let s = state.scaffold
+      let p = s
+      let tall = 1
+      if (driver.build) {
+        // Film v2: the building's own stage; its scaffold climbs with the walls, its planks come first.
+        const rise = state.rise
+        stageAt(
+          site.build?.kind ?? "prop",
+          site.build ? ageOf(site.build, f.t, f.built[h] as number) : -1,
+          state,
+        )
+        state.rise = rise
+        const up = (f.up[h] as number) > 0
+        s = up ? state.scaffold : 0
+        p = up ? state.planks : 0
+        tall = Math.min(1, state.scaleY + 0.2)
+      }
+      if (s <= 0.01 && p <= 0.01) continue
       const y = state.rise * DEPTH
-      const s = state.scaffold
       place(
         site,
         y,
         (site.w / STRUCTURE) * 1.08 * s,
-        (site.h / STRUCTURE) * s,
+        ((site.h * tall) / STRUCTURE) * s,
         (site.d / STRUCTURE) * 1.08 * s,
       )
       built.scaffolds?.setMatrixAt(n, matrix)
@@ -89,9 +109,9 @@ export function Builders({ driver, world }: { driver: GrowthDriver; world: World
       place(
         { ...site, x: site.x + Math.cos(site.rot) * side, z: site.z - Math.sin(site.rot) * side },
         y,
-        PLANKS * s,
-        PLANKS * s,
-        PLANKS * s,
+        PLANKS * p,
+        PLANKS * p,
+        PLANKS * p,
       )
       built.planks?.setMatrixAt(n, matrix)
       n++
@@ -154,6 +174,9 @@ function sitesOf(world: World, driver: GrowthDriver): { buildings: Site[]; tents
       w: (size[0] ?? 1) * k,
       h: Math.min(6, (size[1] ?? 1) * k),
       d: (size[2] ?? 1) * k,
+      ...(driver.build?.sites.has(siteKey(piece.piece, piece.x, piece.z))
+        ? { build: driver.build.sites.get(siteKey(piece.piece, piece.x, piece.z)) }
+        : {}),
     })
   }
   const tents: Site[] = []

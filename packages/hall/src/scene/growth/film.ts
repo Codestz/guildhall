@@ -1,7 +1,9 @@
 import { dayOf } from "../../world/chronicle/format.ts"
 import { planGrowth, timeOfDay } from "../../world/chronicle/growth.ts"
+import { planBuild } from "../../world/chronicle/growthBuild.ts"
 import type { GrowthFilm, GrowthStart } from "../../world/chronicle/growthControl.ts"
-import { storyOf } from "../../world/chronicle/growthStory.ts"
+import { peopleOf, storyOf } from "../../world/chronicle/growthStory.ts"
+import { cellAt, key } from "../../world/gen/hex.ts"
 import { islandFromTree } from "../../world/gen/islandFromTree.ts"
 import { summarize } from "../../world/gen/repo.ts"
 import type { World } from "../../world/world.ts"
@@ -21,17 +23,30 @@ export async function filmFor(repo: string, world: World): Promise<GrowthFilm | 
   const chronicle = await chronicleFor(repo, tree)
   if (!chronicle) return `couldn't read ${tree.repo}'s history from GitHub`
   const made = islandFromTree(tree.entries, 0, world.repo?.gen)
-  // The film moves the hall's own island: it must be the same one, piece for piece.
-  if (
-    made.island.tiles.length !== world.island.tiles.length ||
-    made.island.decor.length !== world.island.decor.length
-  )
-    return `${tree.repo}'s island changed while its history loaded`
-  const plan = planGrowth({ chronicle, shape: summarize(tree.entries), plan: made.plan })
+  // The film moves the hall's own island: it must be the same one, piece for piece. (A gen 2 world
+  // drops, retiles and adds pieces under its massifs and rivers, so there it is the plan's land.)
+  const same =
+    world.repo?.gen === 2
+      ? world.terrain.cells().length === made.plan.land.size
+      : made.island.tiles.length === world.island.tiles.length &&
+        made.island.decor.length === world.island.decor.length
+  if (!same) return `${tree.repo}'s island changed while its history loaded`
+  // Gen 2: nature precedes the town, so the lowland rivers' hexes rise first (their tiles are the kit's rivers).
+  const gen2 = world.repo?.gen === 2
+  const rivers = gen2
+    ? new Set(
+        world.island.tiles
+          .filter((tile) => tile.piece.startsWith("hex_river"))
+          .map((tile) => key(cellAt([tile.x, tile.z]))),
+      )
+    : undefined
+  const plan = planGrowth({ chronicle, shape: summarize(tree.entries), plan: made.plan, rivers })
+  const build = gen2 ? planBuild(chronicle, plan, world.island.decor, peopleOf(chronicle)) : undefined
   return {
     repo: tree.repo,
     plan,
-    story: storyOf(chronicle, plan),
+    story: storyOf(chronicle, plan, build?.moments),
+    ...(build ? { build } : {}),
     chronicle,
     start: chronicle.start,
     end: chronicle.end,

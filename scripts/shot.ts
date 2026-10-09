@@ -16,6 +16,7 @@
  * Retina-like by default (DPR=2), like the Mac this is built on; `DPR=1 bun scripts/shot.ts …` to compare.
  */
 import { chromium } from "playwright-core"
+import { acquireGpu } from "./gpulock.ts"
 import { CHROME, CHROME_ARGS, runSteps, type Step, VIEWPORT } from "./steps.ts"
 
 const url = process.argv[2] ?? "http://localhost:5199/"
@@ -23,6 +24,7 @@ const steps: Step[] = process.argv[3]
   ? await Bun.file(process.argv[3]).json()
   : [{ wait: 6000 }, { shot: "hall" }]
 
+await acquireGpu("shot")
 const browser = await chromium.launch({ executablePath: CHROME, args: CHROME_ARGS })
 const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: Number(process.env.DPR ?? 2) })
 const errors: string[] = []

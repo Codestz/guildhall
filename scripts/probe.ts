@@ -13,6 +13,8 @@
  *   bun scripts/probe.ts steps file.json [--lab …]   (shot.ts's steps; plus { "state": "…" })
  *   bun scripts/probe.ts reload
  *
+ * Each command that drives the browser holds the machine-wide GPU lock (scripts/gpulock.ts) while it runs.
+ *
  * Shots land in .probe/<name>.jpg (`--png`: lossless .png, ~4× slower to encode). A `--state` loads
  * the page afresh at that link (~1 s more): the same picture as a cold load of it, whatever was
  * shot before. `--keep` applies it in place on top of the current state instead (faster, but
@@ -20,6 +22,7 @@
  * packages/hall/src/guild/deeplink.ts.
  */
 import { closeSync, openSync } from "node:fs"
+import { acquireGpu } from "./gpulock.ts"
 import { INFO_PATH, PROBE_DIR, ROOT } from "./steps.ts"
 
 interface Info {
@@ -86,8 +89,13 @@ function flag(args: string[], name: string): string | undefined {
   return i >= 0 ? args[i + 1] : undefined
 }
 
+/** The commands that put the browser to work (stop and health only talk to a server that is up). */
+const GPU_COMMANDS = new Set(["start", "shot", "state", "look", "eval", "steps", "reload"])
+
 async function main(argv: string[]): Promise<void> {
   const [command, ...args] = argv
+  // Per command, not per server: the server stays up between agents, so its turns are what take the lock.
+  if (command && GPU_COMMANDS.has(command)) await acquireGpu(`probe ${command}`)
   const settle = flag(args, "settle")
   const lab = flag(args, "lab")
   const fresh = !args.includes("--keep")

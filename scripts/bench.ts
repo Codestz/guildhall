@@ -26,6 +26,7 @@
 import { mkdir } from "node:fs/promises"
 import { dirname } from "node:path"
 import { type Browser, chromium } from "playwright-core"
+import { acquireGpu } from "./gpulock.ts"
 import { CHROME, CHROME_ARGS, PROBE_DIR, ROOT, VIEWPORT } from "./steps.ts"
 
 const arg = (name: string): string | undefined => {
@@ -230,6 +231,7 @@ const sha = git("rev-parse", "--short", "HEAD")
 const dirty = git("status", "--porcelain").length > 0
 const out = arg("out") ?? `${BENCH}/${sha}.json`
 
+await acquireGpu("bench")
 console.log(`building (VITE_GUILDHALL_PROBE=1) → ${BUILD}`)
 await build()
 const server = await serve()

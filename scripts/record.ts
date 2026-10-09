@@ -36,6 +36,7 @@
 import { createHash } from "node:crypto"
 import { mkdir, rm } from "node:fs/promises"
 import { type Browser, chromium, type Page } from "playwright-core"
+import { acquireGpu } from "./gpulock.ts"
 import { CHROME } from "./steps.ts"
 
 type Cut = "full" | "highlight" | "loop" | "social"
@@ -97,6 +98,7 @@ if (missing.length > 0) {
   console.error(`record: ${missing.join(" and ")} not found. Install with: brew install ffmpeg webp`)
   process.exit(1)
 }
+await acquireGpu(`record ${args.cut}`)
 await mkdir(FILM, { recursive: true })
 if (args.cut === "full") await full(args)
 else if (args.cut === "highlight") await highlight(args.quality)

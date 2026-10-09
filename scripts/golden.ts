@@ -24,6 +24,7 @@
  * pixels; what is left — clusters — must stay under the view's `threshold` (a share of all pixels).
  */
 import { mkdir } from "node:fs/promises"
+import { acquireGpu } from "./gpulock.ts"
 import { call, ensureServer } from "./probe.ts"
 import { loadSettle, PROBE_DIR } from "./steps.ts"
 
@@ -246,6 +247,7 @@ async function main(argv: string[]): Promise<number> {
     return 2
   }
   const views = chosen(names)
+  await acquireGpu(`golden ${command}`)
   const port = await ensureServer()
   const health = await call(port, "/health")
   const meta = Bun.file(`${GOLDEN}/meta.json`)

@@ -1,8 +1,11 @@
 import type { Cell } from "../../lands.ts"
 import { hash, key, step } from "../hex.ts"
+import { isFaceted } from "./facets.ts"
 import type { Relief } from "./index.ts"
 import { CORNERS, centreOf, pointOf, RES } from "./lattice.ts"
+import { strideOf } from "./style.ts"
 import { SWATCH, swatchV } from "./swatches.ts"
+import { paintStrata, paintZones, TILE_TOP } from "./zones.ts"
 
 /**
  * A relief as geometry (terrain v2 §6.1): the per-hex-set builder the island and the planned region
@@ -12,6 +15,10 @@ import { SWATCH, swatchV } from "./swatches.ts"
  *
  * Tiers nest: tier 0 is the lattice's finest (96 triangles a hex), tier 1 every other vertex (24),
  * tier 2 only the hex corners and centre (6).
+ *
+ * The chunky styles (style.ts) mesh a hex at every `strideOf`-th vertex (24 triangles for the facets), except a hex a
+ * river carved (it keeps its lattice) whose edge vertices facing a coarse hex are set on that hex's
+ * edge, so no crack opens between the two. Their rim faces and skirts take the tile top's grass.
  *
  * Where the set ends a skirt hangs below the edge: 5 units over a hex outside every massif (the same
  * drop as a tile's column, so no gap shows under a bevelled rim), 3 over a hex of the same massif that
@@ -41,8 +48,9 @@ const TREE_LINE = 0.7
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
 
 export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailTier = 0): MeshArrays {
-  const n = RES >> tier
-  const stride = RES / n
+  const tierN = RES >> tier
+  const chunky = relief.style !== "current"
+  const paintOf = relief.style === "b" ? paintStrata : paintZones
   const inSet = new Set(cells.map(key))
   const position: number[] = []
   const normal: number[] = []
@@ -85,11 +93,41 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
     const massif = relief.massifAt(cell)
     if (!massif) continue
     const { grid } = massif
+    // A hex's lattice: the style's coarse one, or the tier's when a river's bed was cut into it.
+    const coarse = RES / strideOf(relief.style)
+    const nOf = (c: Cell): number =>
+      chunky && isFaceted(grid, c, strideOf(relief.style)) ? Math.min(tierN, coarse) : tierN
+    const n = nOf(cell)
+    const stride = RES / n
     const [ci, cj] = centreOf(cell)
+    // Where a fine hex meets a coarse one the edge's in-between vertices lie on the coarse edge.
+    const snapped = new Map<string, number>()
+    if (chunky && n === RES)
+      for (let d = 0; d < 6; d++) {
+        const next = step(cell, d)
+        if (!inSet.has(key(next)) || !relief.massifAt(next) || nOf(next) >= n) continue
+        const [ai, aj] = CORNERS[d] as readonly [number, number]
+        const [bi, bj] = CORNERS[(d + 1) % 6] as readonly [number, number]
+        const at = (a: number): readonly [number, number] => [
+          ci + (n - a) * ai + a * bi,
+          cj + (n - a) * aj + a * bj,
+        ]
+        for (let a = 1; a < n; a += 2) {
+          const [i, j] = at(a)
+          const [i0, j0] = at(a - 1)
+          const [i1, j1] = at(a + 1)
+          snapped.set(`${i},${j}`, (grid.get(i0, j0) + grid.get(i1, j1)) / 2)
+        }
+      }
     // x, y, z, and the lattice vertex's own smoothed steepness (what paints a face).
     const vertex = (i: number, j: number, drop = 0): number[] => {
       const [x, z] = pointOf(i, j)
-      return [x, grid.get(i, j) - drop, z, massif.slope[grid.index(i, j)] as number]
+      return [
+        x,
+        (snapped.get(`${i},${j}`) ?? grid.get(i, j)) - drop,
+        z,
+        massif.slope[grid.index(i, j)] as number,
+      ]
     }
 
     for (let k = 0; k < 6; k++) {
@@ -97,11 +135,22 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
       const [bi, bj] = CORNERS[(k + 1) % 6] as readonly [number, number]
       const at = (a: number, b: number): number[] =>
         vertex(ci + stride * (a * ai + b * bi), cj + stride * (a * aj + b * bj))
+      const toTile = chunky && !relief.massifAt(step(cell, k))
       for (let a = 0; a < n; a++)
         for (let b = 0; a + b < n; b++) {
           const faces: [number[], number[], number[]][] = [[at(a, b), at(a + 1, b), at(a, b + 1)]]
           if (a + b < n - 1) faces.push([at(a + 1, b), at(a + 1, b + 1), at(a, b + 1)])
-          for (const [p, q, r] of faces) emit(p, q, r, paint(p, q, r, massif.height), true)
+          for (const [p, q, r] of faces) {
+            // A chunky massif's rim faces over land wear the tile top's grass: no seam to the hex ground.
+            const rim =
+              toTile && a + b === n - 1 && Math.min(p[1] as number, q[1] as number, r[1] as number) >= 0
+            const texel = !chunky
+              ? paint(p, q, r, massif.height)
+              : rim
+                ? TILE_TOP
+                : paintOf(p, q, r, massif.height)
+            emit(p, q, r, texel, true)
+          }
         }
     }
 
@@ -116,9 +165,12 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
         vertex(ci + stride * ((n - a) * ai + a * bi), cj + stride * ((n - a) * aj + a * bj), lower ? drop : 0)
       const angle = (Math.PI / 6) * (1 + 2 * d)
       const outward = [Math.cos(angle), Math.sin(angle)] as const
+      const sea = (edge(0)[1] as number) < 0
       const texel: readonly [number, number] = seam
         ? [SWATCH.dark.u, swatchV(SWATCH.dark, 0.7)]
-        : [SWATCH.grass.u, SWATCH.grass.dark]
+        : chunky && !sea
+          ? TILE_TOP
+          : [SWATCH.grass.u, SWATCH.grass.dark]
       for (let a = 0; a < n; a++) {
         emit(edge(a), edge(a + 1), edge(a, true), texel, false, outward)
         emit(edge(a + 1), edge(a + 1, true), edge(a, true), texel, false, outward)

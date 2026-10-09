@@ -3,7 +3,7 @@ import type { District, RepoIsland } from "./gen/dress.ts"
 import { cellAt, key } from "./gen/hex.ts"
 import type { Gen } from "./gen/islandFromTree.ts"
 import { forestOf } from "./gen/relief/forest.ts"
-import { type Relief, reliefOf } from "./gen/relief/index.ts"
+import { type Relief, type ReliefStyle, reliefOf } from "./gen/relief/index.ts"
 import type { Folder } from "./gen/repo.ts"
 import { dressRivers, riversOf } from "./gen/rivers/index.ts"
 import {
@@ -63,6 +63,8 @@ export interface RepoInfo {
   truncated?: boolean
   /** The generator that grew it (world/gen/islandFromTree.ts); absent is 1. */
   gen?: Gen
+  /** The relief's art direction (`?relief=`, world/gen/relief/style.ts); absent is the default. */
+  relief?: ReliefStyle
   districts: readonly District[]
   /**
    * The folder each district was grown from, aligned with `districts` (its workspace and pooling):
@@ -136,7 +138,10 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
     .filter((site) => !districts.some((place) => place.posts === site.posts))
     .map((site) => ({ at: site.at, posts: site.posts, wilds: SITE_DEFS[site.id].wilds }))
   const level = (cell: Cell): number => made.levels.get(key(cell)) ?? 0
-  const relief = info.gen === 2 ? reliefOf({ plan: made.plan, level }) : undefined
+  const relief =
+    info.gen === 2
+      ? reliefOf({ plan: made.plan, level, ...(info.relief ? { style: info.relief } : {}) })
+      : undefined
   const mountain = relief && relief.massifs.length > 0 ? relief : undefined
   // Rivers spring on the ranges: the relief is carved to their beds before anything reads its ground.
   const rivers = mountain ? riversOf(made.plan, mountain, level) : undefined

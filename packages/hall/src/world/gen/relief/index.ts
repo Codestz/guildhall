@@ -5,11 +5,13 @@ import { HUB } from "../plan/keep.ts"
 import type { IslandPlan } from "../plan.ts"
 import { type Massif, massifOf, SEA_RIM } from "./field.ts"
 import { CAP, footprintsOf, type Tier, tierOf } from "./massifs.ts"
+import { PEAK_BOOST, type ReliefStyle } from "./style.ts"
 
 export { type Massif, SEA_RIM } from "./field.ts"
 export { RES } from "./lattice.ts"
 export { CAP, SITE_REACH, type Tier, tierOf } from "./massifs.ts"
 export { type MeshArrays, reliefMesh } from "./mesh.ts"
+export { type ReliefStyle, reliefStyleOf } from "./style.ts"
 
 /**
  * The island's mountains (terrain v2, slice 2a): pure and deterministic. Massifs are grown from the
@@ -23,10 +25,13 @@ export interface ReliefInput {
   level(cell: Cell): number
   /** Years of history (the chronicle's), when known: older repos stand taller. */
   years?: number
+  /** The art direction (`?relief=`, style.ts); the default when absent. */
+  style?: ReliefStyle
 }
 
 export interface Relief {
   tier: Tier
+  style: ReliefStyle
   /** The main range first. */
   massifs: readonly Massif[]
   /** Every hex a massif holds, by key. */
@@ -41,7 +46,7 @@ export function peakHeight(tier: Tier, files: number, years = 0): number {
   return Math.min(CAP[tier], 10 + 6 * Math.log2(1 + files / 50) + 2 * Math.sqrt(Math.max(0, years)))
 }
 
-export function reliefOf({ plan, level, years = 0 }: ReliefInput): Relief {
+export function reliefOf({ plan, level, years = 0, style = "current" }: ReliefInput): Relief {
   const tier = tierOf(plan.districts.reduce((sum, d) => sum + d.folder.files, 0))
   const topOf = (cell: Cell): number => (plan.land.has(key(cell)) ? level(cell) * TERRACE : SEA_RIM)
   const footprints = footprintsOf(plan, tier)
@@ -66,7 +71,8 @@ export function reliefOf({ plan, level, years = 0 }: ReliefInput): Relief {
     return massifOf({
       id,
       cells: footprint.cells,
-      height: Math.max(TERRACE * 2, height),
+      height: Math.max(TERRACE * 2, height) * (style === "c" ? PEAK_BOOST : 1),
+      style,
       hub,
       seed: plan.seed ^ (0x9e3779b1 * (id + 1)),
       topOf,
@@ -75,6 +81,7 @@ export function reliefOf({ plan, level, years = 0 }: ReliefInput): Relief {
   const keys = new Set(massifs.flatMap((m) => [...m.keys]))
   return {
     tier,
+    style,
     massifs,
     keys,
     massifAt: (cell) => massifs.find((m) => m.keys.has(key(cell))),

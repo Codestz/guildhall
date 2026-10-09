@@ -2,6 +2,7 @@ import { createContext, use, useContext, useSyncExternalStore } from "react"
 import { setActiveWorld } from "./active.ts"
 import { type Gen, genOf, islandFromTree } from "./gen/islandFromTree.ts"
 import type { Tree } from "./gen/load.ts"
+import { type ReliefStyle, reliefStyleOf } from "./gen/relief/index.ts"
 import { handWorld, repoWorld, type World } from "./world.ts"
 
 /**
@@ -22,6 +23,10 @@ type Listener = () => void
 
 /** The generator this visit's link asks repo islands of (`?gen=2`), read once at load. */
 const LINKED_GEN: Gen = typeof location === "undefined" ? 1 : genOf(location.search)
+
+/** The relief's art direction this visit's link asks for (`?relief=a|b|c`), read once at load. */
+const LINKED_RELIEF: ReliefStyle =
+  typeof location === "undefined" ? "current" : reliefStyleOf(location.search)
 
 class WorldSource {
   world: World = handWorld()
@@ -60,6 +65,7 @@ class WorldSource {
           repo,
           source,
           ...(LINKED_GEN === 2 ? { gen: LINKED_GEN } : {}),
+          ...(LINKED_RELIEF !== "current" ? { relief: LINKED_RELIEF } : {}),
           ...(branch ? { branch } : {}),
           ...(truncated ? { truncated } : {}),
         })

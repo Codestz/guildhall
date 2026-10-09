@@ -41,6 +41,8 @@ export function settle(
   fixed: (i: number, j: number) => boolean,
   asked: readonly Peak[],
   saddles: readonly Saddle[],
+  /** Called after each round of cuts: a style's ground (facets.ts) follows the cut. */
+  refresh?: () => void,
 ): Summits {
   const span = Math.ceil(REACH / (CIRCUM / RES)) + 1
   const summit = (peak: Peak): Peak => {
@@ -71,6 +73,7 @@ export function settle(
   for (let round = 0; round <= peaks.length; round++) {
     for (const { saddle, a, b } of joined())
       cut(grid, fixed, saddle.at, Math.min(peaks[a]?.height ?? 0, peaks[b]?.height ?? 0) - DEPTH)
+    refresh?.()
     peaks = peaks.map((peak) => ({ ...peak, height: groundAt(peak.at, peak.height) }))
     let merged = false
     for (const { saddle, a, b } of joined()) {

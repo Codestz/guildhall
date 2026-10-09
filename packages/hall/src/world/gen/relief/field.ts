@@ -2,9 +2,11 @@ import type { Cell } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
 import { TERRACE } from "../../waterways.ts"
 import { key, step } from "../hex.ts"
+import { shapingOf, sharpen } from "./facets.ts"
 import { CIRCUM, CORNERS, centreOf, HeightGrid, pointOf, RES, ROW } from "./lattice.ts"
 import { type Peak, type Ridge, type Saddle, skeletonOf } from "./ridges.ts"
 import { type Source, spread } from "./spread.ts"
+import type { ReliefStyle } from "./style.ts"
 import { settle } from "./summits.ts"
 
 /**
@@ -77,7 +79,7 @@ function lattice(seed: number, i: number, j: number, salt: number): number {
 }
 
 /** Value noise in [0, 1) at a world point. */
-function valueNoise(seed: number, x: number, z: number, salt: number): number {
+export function valueNoise(seed: number, x: number, z: number, salt: number): number {
   const x0 = Math.floor(x)
   const z0 = Math.floor(z)
   const u = smooth(x - x0)
@@ -97,6 +99,8 @@ export interface MassifSpec {
   seed: number
   /** The ground a hex outside the massif stands at: its terrace top, or the sea cliff's. */
   topOf(cell: Cell): number
+  /** The art direction (style.ts); absent is the default. */
+  style?: ReliefStyle
 }
 
 /** The ridge's points as lattice sources, one about every lattice step, each carrying its crest height. */
@@ -223,6 +227,9 @@ export function massifOf(spec: MassifSpec): Massif {
       const high = smooth((raw[at] as number) / Math.max(1, height) / 0.7)
       raw[at] = (raw[at] as number) - GULLY * line ** 5 * high * smooth(((toRim[at] as number) - 4) / 10)
     }
+  if (spec.style === "c")
+    for (let at = 0; at < raw.length; at++)
+      if (owned[at] && !isRim(at)) raw[at] = sharpen(raw[at] as number, height)
   const needed = (height - (base[peakAt] as number)) / Math.max(1, toRim[peakAt] as number)
   limit(raw, grid, owned, isRim, Math.min(MOST, Math.max(GRADE, needed * 1.1)))
   // The limit leaves flat planes; lumps of two sizes (more where it is steep) make them rock.
@@ -267,7 +274,15 @@ export function massifOf(spec: MassifSpec): Massif {
       grid.data[at] = settled
     }
   // The peaks and saddles as the finished ground stands (the skeleton's heights were asks).
-  const summits = settle(grid, (i, j) => isRim(grid.index(i, j)), peaks, saddles)
+  const shaping = shapingOf(spec.style ?? "current", grid, owned, isRim)
+  shaping?.apply()
+  const summits = settle(
+    grid,
+    shaping?.fixed ?? ((i, j) => isRim(grid.index(i, j))),
+    peaks,
+    saddles,
+    shaping?.apply,
+  )
   const slope = new Float32Array(owned.length)
   const pitch = CIRCUM / RES
   for (let j = j0; j <= j1; j++)

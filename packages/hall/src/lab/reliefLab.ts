@@ -23,7 +23,7 @@ import { newSnowline, snowMaterial } from "../scene/terrain/snow.ts"
 import { LANDS_URL } from "../world/cast.ts"
 import { key, step } from "../world/gen/hex.ts"
 import { islandFromTree } from "../world/gen/islandFromTree.ts"
-import { RES, snowlineOf } from "../world/gen/relief/index.ts"
+import { RES, reliefStyleOf, snowlineOf } from "../world/gen/relief/index.ts"
 import { cellToWorld } from "../world/lands.ts"
 import { repoWorld, type World } from "../world/world.ts"
 import { draw, treeOf } from "./islandLab.ts"
@@ -38,7 +38,8 @@ import { load } from "./stage.ts"
  *   ?lab=relief&repo=facebook/react     a City (3k+ files): the main range and a second massif
  *   &repo=codestz/opencode-cockpit      a Town; &repo=sample (this repo) or codestz/mcpx: a Village
  *   &light=noon|dusk   &winter=0..1 (the snow line lowers)   &rise=0..1 (the growth film's rise hook)
- *   &massif=0          which massif to frame (default the main range)
+ *   &relief=a|b|c      the relief's art direction (world/gen/relief/style.ts); default the current one
+ *   &massif=0         which massif to frame (default the main range)
  *   &az=45 &el=33 &dist=…   the camera (45°, 33° is the hall's diorama); &x=&z=&y=  re-aims it
  *   &view=top          straight down
  *
@@ -55,7 +56,12 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
   const wanted = params.get("repo") ?? "facebook/react"
   const tree = await treeOf(wanted)
   const made = islandFromTree(tree.entries, 0, 2)
-  const world: World = repoWorld(made, { repo: wanted, source: "fixture", gen: 2 })
+  const world: World = repoWorld(made, {
+    repo: wanted,
+    source: "fixture",
+    gen: 2,
+    relief: reliefStyleOf(`?relief=${params.get("relief") ?? ""}`),
+  })
   const relief = world.relief
   if (!relief) {
     caption.textContent = `${tree.source}: no massifs (${made.plan.land.size} land hexes)`

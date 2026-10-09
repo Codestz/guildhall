@@ -174,12 +174,15 @@ export function startHub(options: HubOptions = {}): HubServer {
       ),
     )
     if (records.length === 0) return
-    broadcast({ type: "sea", events: records })
+    // Kept before they're announced, and all at once: a hall that says hello mid-write still gets them.
     for (const record of records) {
       const kept = sea.get(record.guild) ?? []
       kept.push(record)
       if (kept.length > SEA_KEEP) kept.splice(0, kept.length - SEA_KEEP)
       sea.set(record.guild, kept)
+    }
+    broadcast({ type: "sea", events: records })
+    for (const record of records) {
       try {
         const dir = chronicleDir(home, record.guild)
         await mkdir(dir, { recursive: true })

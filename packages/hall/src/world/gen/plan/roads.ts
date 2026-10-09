@@ -5,10 +5,15 @@ import type { PlanDistrict } from "../plan.ts"
 import { AVENUE, type Form, GATE, HUB, RESERVED, RING } from "./keep.ts"
 import type { Owners } from "./land.ts"
 
+/** What a road pays to cross a range's hex, over a plain hex's 1. */
+const CLIMB = 2.5
+const NONE: ReadonlySet<string> = new Set()
+
 /**
  * The roads: the avenue, then hub → every square, nearest first, reusing what's laid (Dijkstra over
  * the hexes); a workspace's packages after it, each from its biggest package's square. A road over
- * sea is a causeway and makes land, its district's.
+ * sea is a causeway and makes land, its district's. A range (v2) is crossed only where the detour
+ * round it costs more: the passes.
  */
 export function layRoads(
   districts: readonly PlanDistrict[],
@@ -16,6 +21,7 @@ export function layRoads(
   heads: ReadonlyMap<number, number>,
   radius: number,
   { bay }: Form = RING,
+  ranges: ReadonlySet<string> = NONE,
 ): { road: Set<string>; roads: Cell[][] } {
   const road = new Set<string>([key(HUB), key(AVENUE), key(GATE)])
   const roads: Cell[][] = [[HUB, AVENUE]]
@@ -32,7 +38,7 @@ export function layRoads(
       const id = key(cell)
       if (bay(cell) || (RESERVED.has(id) && !road.has(id)) || id === key(GATE)) return undefined
       if (road.has(id)) return 0.4
-      return owner.has(id) ? 1 : 8
+      return (owner.has(id) ? 1 : 8) + (ranges.has(id) ? CLIMB : 0)
     })
     for (const cell of path) {
       const id = key(cell)

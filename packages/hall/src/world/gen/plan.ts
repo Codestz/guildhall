@@ -6,6 +6,7 @@ import { groundOf, placeSites } from "./plan/ground.ts"
 import { type Form, GATE, HUB, QUAY, RESERVED, RING } from "./plan/keep.ts"
 import { layRoads } from "./plan/roads.ts"
 import { growSectors } from "./plan/sectors.ts"
+import { reserveRanges } from "./plan/zones.ts"
 import type { Folder, RepoShape } from "./repo.ts"
 
 export { HUB, KEEP } from "./plan/keep.ts"
@@ -19,6 +20,7 @@ export { HUB, KEEP } from "./plan/keep.ts"
  * The keep stands at the origin with the harbour (the root's own files) south of its gate, its
  * block and the ring round it reserved (plan/keep.ts). Then, in order:
  *   sectors   the folders round the hub, each grown from its square into one piece (plan/sectors.ts)
+ *   ranges    v2 only: the mountain ranges' ground, laid across the island before anything is built on it (plan/zones.ts)
  *   roads     hub → every square, reusing what's laid (plan/roads.ts)
  *   coast     smoothed until the coast tiles can draw every hex (plan/coast.ts)
  *   ground    a landmark site per district, elevation, and each biome's ground (plan/ground.ts)
@@ -62,6 +64,8 @@ export interface IslandPlan {
   gate: Cell
   /** Rings from the hub that hold all the land. */
   radius: number
+  /** Generator v2: the mountain ranges' reserved ground, main range first, as hex keys (none in v1). */
+  ranges: ReadonlySet<string>[]
 }
 
 /** Land ∝ code size, log-scaled: 1 KB ≈ 7 hexes, 100 KB ≈ 25, 10 MB ≈ 47. */
@@ -157,9 +161,12 @@ export function planIsland(
   })
   const form = formOf?.(districts.reduce((sum, district) => sum + district.quota, RESERVED.size)) ?? RING
   const { owner, heads, radius: searched } = growSectors(districts, seed, rng(seed), form)
-  const { road, roads } = layRoads(districts, owner, heads, searched, form)
+  const reserved = form.mass ? reserveRanges(districts, owner, seed) : []
+  const mountains = new Set(reserved.flatMap((range) => [...range]))
+  const { road, roads } = layRoads(districts, owner, heads, searched, form, mountains)
   const radius = smoothCoast(owner, road, form)
   const sites = placeSites(districts, owner, road, seed)
-  const land = groundOf(districts, owner, road, sites, seed)
-  return { hash: shape.hash, seed, land, districts, roads, hub: HUB, quay: QUAY, gate: GATE, radius }
+  const land = groundOf(districts, owner, road, sites, seed, mountains)
+  const ranges = reserved.map((range) => new Set([...range].filter((id) => land.has(id))))
+  return { hash: shape.hash, seed, land, districts, roads, hub: HUB, quay: QUAY, gate: GATE, radius, ranges }
 }

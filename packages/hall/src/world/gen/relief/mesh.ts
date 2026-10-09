@@ -29,12 +29,14 @@ export interface MeshArrays {
 /** Skirts: over the rim, and over a seam between two sets of one massif. */
 const RIM_DROP = 5
 const SEAM_DROP = 3
-/** Face slopes (degrees from flat): grass up to here, below the tree line. */
-const GRASS_SLOPE = 36
+/** Grass climbs slopes this steep (degrees from flat) at the foot of a massif... */
+const GRASS_FOOT = 56
+/** ...and only this steep up at the tree line, so the meadow thins into rock rather than ending at a line. */
+const GRASS_HIGH = 26
 /** Beyond this a face is a wall, in dark stone. */
-const WALL_SLOPE = 66
-/** Grass stops at this share of the main peak's height. */
-const TREE_LINE = 0.55
+const WALL_SLOPE = 68
+/** The tree line, a share of the massif's peak: grass thins up to it and is gone a little past. */
+const TREE_LINE = 0.6
 
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
 
@@ -130,7 +132,11 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
   }
 }
 
-/** A face's swatch: grass on gentle ground below the tree line, light rock above and on slopes, dark stone on walls. */
+/**
+ * A face's swatch, as ground ages up a mountain: meadow on the foothills, even on a fair slope,
+ * thinning to grass only on the gentler benches towards the tree line (the line itself ragged, face
+ * by face), then rock, and dark stone on walls. Grass darkens to olive as it climbs.
+ */
 function paint(
   p: readonly number[],
   q: readonly number[],
@@ -141,13 +147,15 @@ function paint(
   const slope = (Math.atan(grade) * 180) / Math.PI
   const height = ((p[1] as number) + (q[1] as number) + (r[1] as number)) / 3
   const rel = clamp01(height / Math.max(1, peak))
-  // A little per-face variation, stable: the kit's facets are never all one shade.
-  const jitter =
-    (hash(`${(p[0] as number).toFixed(1)},${(p[2] as number).toFixed(1)}`) / 4294967296 - 0.5) * 0.03
+  // Stable per-face chance: the kit's facets are never all one shade, and a tree line is never ruled.
+  const chance = hash(`${(p[0] as number).toFixed(1)},${(p[2] as number).toFixed(1)}`) / 4294967296
+  const jitter = (chance - 0.5) * 0.03
   if (slope >= WALL_SLOPE) return [SWATCH.dark.u, swatchV(SWATCH.dark, 1 - rel + jitter)]
-  if (slope < GRASS_SLOPE && rel < TREE_LINE) {
-    // A tile's own top is v 0.643: flat low ground matches the tiles beside it, steeper and higher turns olive and light.
-    const t = 0.38 + 0.5 * (slope / GRASS_SLOPE) - 0.4 * (rel / TREE_LINE)
+  const climb = clamp01(rel / TREE_LINE)
+  const limit = GRASS_FOOT + (GRASS_HIGH - GRASS_FOOT) * climb * climb + (chance - 0.5) * 10
+  if (slope < limit && rel < TREE_LINE + (chance - 0.5) * 0.12) {
+    // A tile's own top is v 0.643: flat low ground matches the tiles beside it, steeper and higher turns olive.
+    const t = 0.38 + 0.35 * (slope / GRASS_FOOT) + 0.3 * climb
     return [SWATCH.grass.u, swatchV(SWATCH.grass, t + jitter)]
   }
   return [SWATCH.rock.u, swatchV(SWATCH.rock, 1 - rel + jitter)]

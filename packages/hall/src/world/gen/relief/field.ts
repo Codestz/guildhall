@@ -5,6 +5,7 @@ import { key, step } from "../hex.ts"
 import { CIRCUM, CORNERS, centreOf, HeightGrid, pointOf, RES, ROW } from "./lattice.ts"
 import { type Peak, type Ridge, type Saddle, skeletonOf } from "./ridges.ts"
 import { type Source, spread } from "./spread.ts"
+import { settle } from "./summits.ts"
 
 /**
  * A massif's height field (terrain v2 §1.2–§2.2) on the lattice: the rim takes the neighbouring
@@ -238,6 +239,8 @@ export function massifOf(spec: MassifSpec): Massif {
       const weight = LEDGE * smooth((toRim[at] as number) / 8) * (1 - smooth((steep - 0.8) / 1.6))
       grid.data[at] = value + (ledge - value) * weight
     }
+  // The peaks and saddles as the finished ground stands (the skeleton's heights were asks).
+  const summits = settle(grid, (i, j) => isRim(grid.index(i, j)), peaks, saddles)
   const slope = new Float32Array(owned.length)
   const pitch = CIRCUM / RES
   for (let j = j0; j <= j1; j++)
@@ -253,35 +256,14 @@ export function massifOf(spec: MassifSpec): Massif {
       slope[at] = steep
     }
   relax(slope, grid, owned, 1)
-  let tallest = Number.NEGATIVE_INFINITY
-  for (const value of grid.data) if (value > tallest) tallest = value
-  // The peaks and saddles as they stand on the finished ground (the skeleton's heights were asks): a
-  // summit is the highest vertex within a hex and a half of where its crest met, a saddle's height is read.
-  const standing = (at: Spot, asked: number): number => grid.heightAt(at[0], at[1]) ?? asked
-  const summit = (peak: Peak): Peak => {
-    let best: Peak = { ...peak, height: Number.NEGATIVE_INFINITY }
-    const j = Math.round((peak.at[1] * RES) / ROW)
-    const i = Math.round((peak.at[0] * RES) / CIRCUM - j / 2)
-    const reach = Math.ceil(1.5 * RES)
-    for (let dj = -reach; dj <= reach; dj++)
-      for (let di = -reach; di <= reach; di++) {
-        const h = grid.get(i + di, j + dj)
-        const [x, z] = pointOf(i + di, j + dj)
-        if (h > best.height && Math.hypot(x - peak.at[0], z - peak.at[1]) <= 1.5 * CIRCUM)
-          best = { ...peak, at: [x, z], height: h }
-      }
-    return best.height === Number.NEGATIVE_INFINITY
-      ? { ...peak, height: standing(peak.at, peak.height) }
-      : best
-  }
   return {
     id: spec.id,
     cells,
     keys,
-    height: tallest,
-    peaks: peaks.map(summit),
+    height: summits.peaks[0]?.height ?? 0,
+    peaks: summits.peaks,
     ridges,
-    saddles: saddles.map((saddle) => ({ ...saddle, height: standing(saddle.at, saddle.height) })),
+    saddles: summits.saddles,
     grid,
     slope,
   }

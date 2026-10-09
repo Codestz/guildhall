@@ -46,13 +46,23 @@ export function reliefOf({ plan, level, years = 0 }: ReliefInput): Relief {
   const topOf = (cell: Cell): number => (plan.land.has(key(cell)) ? level(cell) * TERRACE : SEA_RIM)
   const footprints = footprintsOf(plan, tier)
   const hub = cellToWorld(HUB)
+  const mainAsk = peakHeight(
+    tier,
+    plan.districts.reduce((sum, d) => sum + d.folder.files, 0),
+    years,
+  )
   const massifs = footprints.map((footprint, id) => {
-    // Its districts' own files: the ones that hold a tenth or more of the massif.
+    // The main range is the island's backbone and counts the whole repo; the others count their
+    // districts' own files (the ones holding a tenth or more of the massif).
     let files = 0
-    for (const [district, held] of footprint.held)
-      if (held * 10 >= footprint.cells.length) files += plan.districts[district]?.folder.files ?? 0
-    // A second range stands a little lower than the main one.
-    const height = peakHeight(tier, files, years) * (id === 0 ? 1 : 0.85)
+    if (footprint.range === 0) files = plan.districts.reduce((sum, d) => sum + d.folder.files, 0)
+    else
+      for (const [district, held] of footprint.held)
+        if (held * 10 >= footprint.cells.length) files += plan.districts[district]?.folder.files ?? 0
+    // A second range stands a little lower, and a piece a pass cut off lower still.
+    const size = Math.min(1, 0.5 + footprint.cells.length / 120)
+    const asked = peakHeight(tier, files, years)
+    const height = (footprint.range === 0 ? asked : Math.min(asked, 0.85 * mainAsk)) * size
     return massifOf({
       id,
       cells: footprint.cells,

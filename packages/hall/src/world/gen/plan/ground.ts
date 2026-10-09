@@ -50,9 +50,15 @@ export function groundOf(
   road: ReadonlySet<string>,
   sites: ReadonlySet<string>,
   seed: number,
+  ranges: ReadonlySet<string> = new Set(),
 ): Map<string, PlanHex> {
   const land = new Map<string, PlanHex>()
   const nearRoad = (cell: Cell): boolean => neighbours(cell).some((next) => road.has(key(next)))
+  // Foothills ease a range down to the plain: the two rings outside it, where the ground is open.
+  const foot = new Set<string>()
+  for (const id of ranges)
+    for (const next of neighbours(unkey(id)))
+      for (const far of [next, ...neighbours(next)]) if (!ranges.has(key(far))) foot.add(key(far))
   districts.forEach((district, i) => {
     const own = [...owner].filter(([, d]) => d === i).map(([id]) => unkey(id))
     district.hexes = own.length
@@ -77,10 +83,13 @@ export function groundOf(
       else if (sites.has(id)) char = "s"
       // The ring round the keep: open lots, kept clear like the hand map's (lands.ts' V).
       else if (RESERVED.has(id)) char = "V"
+      else if (ranges.has(id))
+        char = neighbours(cell).every((next) => ranges.has(key(next)) || !owner.has(key(next))) ? "M" : "m"
       else if (raised.has(id))
         char =
           district.level === 1 ? "H" : neighbours(cell).every((next) => raised.has(key(next))) ? "M" : "m"
       else char = ground(district, noise(seed, cell, "ground"), noise(seed, cell, "crop"))
+      if (foot.has(id) && ".fh".includes(char) && noise(seed, cell, "foot") < 0.6) char = "H"
       land.set(id, { char, district: i })
     }
   })

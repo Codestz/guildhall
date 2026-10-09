@@ -45,8 +45,12 @@ import { loadTown2, useTown2 } from "./town2.ts"
 import { TSL } from "./tsl.ts"
 
 useGLTF.preload(LANDS_URL)
-// Generator 2's second town kit (scene/town2.ts) is fetched beside the land pack, for that link alone.
-if (typeof location !== "undefined" && genOf(location.search) === 2) void loadTown2()
+// Generator 2's second town kit (scene/town2.ts) is fetched beside the land pack, for a link that asks
+// a repo island (`?repo=`, `?archipelago`, `?repos=`) and not `?gen=1`; the hand island never needs it.
+if (typeof location !== "undefined" && genOf(location.search) === 2) {
+  const link = new URLSearchParams(location.search)
+  if (link.has("repo") || link.has("archipelago") || link.has("repos")) void loadTown2()
+}
 /** The far tier's simplifier, fetched beside the land pack (it is needed before the batches build). */
 const SIMPLIFIER = loadSimplifier()
 

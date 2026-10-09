@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { applyDeepLink, type Hall, lookOf, parseDeepLink, pick } from "../src/guild/deeplink.ts"
 import { GuildStore, RUSH } from "../src/guild/store.ts"
-import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
+import { genOf, islandFromTree } from "../src/world/gen/islandFromTree.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
 import { SITES } from "../src/world/lands.ts"
 import { sitesOf } from "../src/world/siteMap.ts"
@@ -102,6 +102,16 @@ describe("deep links: parsing", () => {
 
   test("other features' params are neither read nor reported", () => {
     expect(parse("live&showcase&lab=prop&piece=axe&grips")).toEqual({ link: {}, ignored: [] })
+  })
+})
+
+describe("deep links: gen", () => {
+  test("repo islands get generator 2 unless the link opts out with gen=1", () => {
+    expect(genOf("")).toBe(2)
+    expect(genOf("?repo=facebook/react&grow")).toBe(2)
+    expect(genOf("?repo=facebook/react&gen=2")).toBe(2)
+    expect(genOf("?repo=facebook/react&gen=1")).toBe(1)
+    expect(genOf("?gen=nonsense")).toBe(2)
   })
 })
 

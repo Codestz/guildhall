@@ -20,8 +20,8 @@ export type WorldStatus =
 
 type Listener = () => void
 
-/** The generator this visit's link asks repo islands of (`?gen=2`), read once at load. */
-const LINKED_GEN: Gen = typeof location === "undefined" ? 1 : genOf(location.search)
+/** The generator this visit's link asks repo islands of (2; `?gen=1` opts out), read once at load. */
+const LINKED_GEN: Gen = typeof location === "undefined" ? 2 : genOf(location.search)
 
 /** A repo's island as this visit's link asks it grown (`?gen=`): the home island's, and every far one's. */
 export function growWorld(tree: Tree): World {

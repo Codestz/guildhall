@@ -19,8 +19,11 @@ export function islandFromTree(tree: readonly RepoEntry[], seed = 0, gen: Gen = 
   return dress(gen === 2 ? scaledIsland(shape, mixed) : fitIsland(shape, mixed), fame)
 }
 
-/** The repo-island generators: 1 today's; 2 ADR 0020's, behind `?gen=2` until it is the default. */
+/** The repo-island generators: 1 the first (`?gen=1`, the opt-out); 2 ADR 0020's, what a link gets. */
 export type Gen = 1 | 2
 
-/** The generator a link asks for (`gen=2`), else 1. */
-export const genOf = (search: string): Gen => (new URLSearchParams(search).get("gen") === "2" ? 2 : 1)
+/**
+ * The generator a link asks repo islands of: 2, unless it says `gen=1`. (`islandFromTree`'s own
+ * default stays 1: this is the link-level default, so fixtures name their generator.)
+ */
+export const genOf = (search: string): Gen => (new URLSearchParams(search).get("gen") === "1" ? 1 : 2)

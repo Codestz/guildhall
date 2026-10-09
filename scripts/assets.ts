@@ -17,7 +17,7 @@
  *                           palette, ~500 triangles each. Lazy, with the folk of a gen 2 island.
  * - growth.glb            — a repo's growth timelapse (`?grow`, scene/growth): scaffolds, planks and
  *                           the ghost districts' tents (Kenney Survival Kit). Lazy; no bounds file.
- * - town2.glb / town2.json — the second town kit (gen 2, `?gen=2`): Kenney Fantasy Town, Castle and
+ * - town2.glb / town2.json — the second town kit (gen 2, the default for repo islands): Kenney Fantasy Town, Castle and
  *                           pieces for the buildings KayKit has none of (world/prefabs/town2.ts),
  *                           their colormaps baked onto KayKit's hexagon palette (scripts/palette.ts).
  *                           Lazy. Node names are `t2_` + the piece (`c_` for castle).

@@ -102,7 +102,7 @@ describe("island size, generator v2", () => {
     }
   })
 
-  test("deterministic, and the default generator is still v1", () => {
+  test("deterministic, and islandFromTree's own default stays v1 (the link-level default is genOf's)", () => {
     const tree = FIXTURES.guildhall ?? []
     expect(islandFromTree([...tree].reverse(), 0, 2)).toEqual(islandFromTree(tree, 0, 2))
     expect(islandFromTree(tree)).toEqual(islandFromTree(tree, 0, 1))

@@ -1,6 +1,6 @@
 /**
  * Rebuilds the social card, packages/hall/public/og.png (1200x630, under 300 KB):
- * a golden-hour frame of the React gen=2 island, shot cold with scripts/shot.ts, behind the
+ * a golden-hour frame of the React island, shot cold with scripts/shot.ts, behind the
  * overlay in scripts/og.html (crest, wordmark, tagline), rendered by Chrome for Testing at 2x,
  * then resampled to 1200x630 and palette-quantised with ffmpeg to fit the budget.
  *
@@ -32,7 +32,7 @@ if (!reuse) {
     "document.querySelectorAll('body *').forEach(e=>{if(e.tagName==='CANVAS'||e.querySelector('canvas')||e.closest('canvas'))return;const p=getComputedStyle(e).position;if(p==='fixed'||p==='absolute')e.style.display='none'})"
   const steps = [{ wait: 7000 }, { eval: hide }, { wait: 400 }, { shot: "og-frame", png: true }]
   await Bun.write(`${PROBE_DIR}/og-steps.json`, JSON.stringify(steps))
-  const url = `${base}/?repo=facebook/react&gen=2&look=island&hour=17.5&hud=off`
+  const url = `${base}/?repo=facebook/react&look=island&hour=17.5&hud=off`
   const shot = Bun.spawn(["bun", `${ROOT}scripts/shot.ts`, url, `${PROBE_DIR}/og-steps.json`], {
     stdout: "inherit",
     stderr: "inherit",

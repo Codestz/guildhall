@@ -1,3 +1,6 @@
+import { bundledChronicle } from "../chronicle/bundled.ts"
+import { type Chronicle, decodeChronicle, encodeChronicle } from "../chronicle/format.ts"
+import { quickChronicle } from "../chronicle/quick.ts"
 import { fetchPublicTree, GitHubError, parseRepo } from "./fetch.ts"
 import type { RepoEntry } from "./repo.ts"
 
@@ -32,6 +35,7 @@ const fixtures = (): Record<string, () => Promise<Fixture>> =>
 
 const SAMPLE = "guildhall"
 const CACHE = "guildhall.repo:"
+const CHRONICLE_CACHE = "guildhall.chronicle:"
 
 /** Why a tree couldn't be had, for a HUD that answers each differently (hud/RepoDoor.tsx). */
 export type RepoFailure = "invalid" | "missing" | "rate" | "network" | "github"
@@ -104,6 +108,48 @@ export function reasonOf(error: unknown, repo: string): string {
     return `GitHub couldn't list ${repo} (${error.status})`
   }
   return `couldn't reach GitHub for ${repo}`
+}
+
+/**
+ * The history of `wanted`'s island (world/chronicle/format.ts): its bundled deep chronicle when the
+ * hall ships one, else one quick-built live from GitHub (~20 of the hour's 60 unauthenticated calls,
+ * so it is asked for on demand, not with every tree), kept for the tab's session. Undefined when
+ * neither can be had: the island is then tree-only, as before. Never rejects.
+ */
+export async function chronicleFor(
+  wanted: string,
+  tree?: Tree,
+  fetcher: typeof fetch = fetch,
+): Promise<Chronicle | undefined> {
+  const bundled = await bundledChronicle(wanted, fetcher)
+  if (bundled) return bundled
+  let repo: string
+  try {
+    repo = parseRepo(tree?.repo ?? wanted)
+  } catch {
+    return undefined
+  }
+  const key = `${CHRONICLE_CACHE}${repo.toLowerCase()}`
+  try {
+    const kept = sessionStorage.getItem(key)
+    if (kept) return decodeChronicle(kept)
+  } catch {
+    // Blocked, or an old format: build it again.
+  }
+  try {
+    const built = await quickChronicle(repo, {
+      fetcher,
+      ...(tree && !tree.truncated ? { tree: { entries: tree.entries } } : {}),
+    })
+    try {
+      sessionStorage.setItem(key, encodeChronicle(built))
+    } catch {
+      // Full or blocked: the next ask builds it again.
+    }
+    return built
+  } catch {
+    return undefined
+  }
 }
 
 function remembered(repo: string): Tree | undefined {

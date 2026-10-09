@@ -19,6 +19,16 @@ export const CIVIC: readonly Prefab[] = [
       { piece: "flag_blue", x: -3.8, z: -0.5 },
     ],
     doors: [{ x: 0, z: 3.4, rot: 0 }],
+    variation: {
+      mirror: true,
+      swaps: { flag_blue: ["flag_red", "flag_yellow"] },
+      props: [
+        { piece: "wheelbarrow", x: 3.9, z: 0.2, rot: 1.9, chance: 0.4 },
+        { piece: "crate_A_big", x: -4.2, z: 1.4, rot: 0.3, chance: 0.45 },
+        { piece: "sack", x: 3.4, z: 3.9, rot: 0.8, chance: 0.4 },
+        { piece: "resource_lumber", x: 3.7, z: -1.6, rot: 1.6, scale: 0.8, chance: 0.4 },
+      ],
+    },
   },
   {
     id: "guildhouse",

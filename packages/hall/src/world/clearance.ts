@@ -4,7 +4,7 @@ import { FORGE_BUCKETS, pilesOf, workTreesOf } from "./behaviours.ts"
 import { FURNITURE } from "./furniture.ts"
 import KIT from "./kit.json"
 import LANDS from "./lands.json"
-import { cellToWorld, HEX_SCALE, MAP_FOR_TESTS as MAP, SITES } from "./lands.ts"
+import { cellToWorld, HEX_SCALE, MAP_FOR_TESTS as MAP, PIECES, SITES } from "./lands.ts"
 import {
   HAND_INS,
   HEARTH,
@@ -86,7 +86,7 @@ export function islandObstacles(world: World = activeWorld() ?? handWorld()): re
   const out: Obstacle[] = []
   for (const piece of world.island.decor) {
     if (FLAT.test(piece.piece)) continue
-    const bounds = (LANDS as Record<string, Bounds>)[piece.piece]
+    const bounds = PIECES[piece.piece]
     if (!bounds) continue
     const scale = HEX_SCALE * (piece.scale ?? 1) * (CANOPY.test(piece.piece) ? 0.6 : 1)
     out.push(box(piece.piece, bounds, piece.x, piece.z, piece.rot ?? 0, scale))

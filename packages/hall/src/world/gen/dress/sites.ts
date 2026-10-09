@@ -1,4 +1,3 @@
-import LANDS from "../../lands.json"
 import {
   type Cell,
   cellToWorld,
@@ -7,6 +6,7 @@ import {
   type LandmarkKind,
   type LandPiece,
   type LandPlacement,
+  PIECES,
 } from "../../lands.ts"
 import type { Post, Spot } from "../../layout.ts"
 import type { Biome, KitColour } from "../biomes.ts"
@@ -96,7 +96,7 @@ const NEAREST_POST = 3.4
  */
 export function postsAround(site: Spot, square: Spot, landmark: LandPiece, reach?: number): Post[] {
   const toSquare = Math.atan2(square[0] - site[0], square[1] - site[1])
-  const front = reach ?? Math.max(NEAREST_POST, (LANDS[landmark].max[2] ?? 0) * HEX_SCALE + FRONT_GAP)
+  const front = reach ?? Math.max(NEAREST_POST, (PIECES[landmark].max[2] ?? 0) * HEX_SCALE + FRONT_GAP)
   return [-0.35, 0, 0.35].map((spread) => {
     const angle = toSquare + spread
     const reach = front / Math.cos(spread)

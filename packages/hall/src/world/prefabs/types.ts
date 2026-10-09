@@ -1,5 +1,5 @@
 import type { KitColour } from "../gen/biomes.ts"
-import type { LandPiece, LandPlacement } from "../lands.ts"
+import type { LandPiece } from "../lands.ts"
 
 /**
  * A prefab: one composed structure from the land pack's pieces, laid out once in data and placed by
@@ -18,6 +18,8 @@ export interface Part {
   y?: number
   /** Relative to the pack's 5× drawing size. */
   scale?: number
+  /** For a variation's props: the chance it stands there at all (default ½). */
+  chance?: number
 }
 
 /** Where someone enters: a spot in front of a door, and the way the door faces. */
@@ -41,6 +43,22 @@ export interface Fixture {
   z: number
 }
 
+/**
+ * How a prefab may differ from one placement to the next, by a seed (variants.ts): the same seed
+ * always gives the same structure, and seed 0 is the plain one the catalogue draws. Each choice is
+ * drawn from the seed on its own, so a few declared ones make dozens of looks.
+ */
+export interface Variation {
+  /** Parts named `{kit}` take one of the four team colours (the district's most often), not always the district's. */
+  tint?: boolean
+  /** The layout may flip left for right, doors with it. Not for what has windows or chimneys the world lights. */
+  mirror?: boolean
+  /** Extra props, there or not by the seed. */
+  props?: readonly Part[]
+  /** Pieces that may be swapped for another: a market's blue awning for the red. */
+  swaps?: Readonly<Record<string, readonly string[]>>
+}
+
 export type PrefabKind = "house" | "market" | "plaza" | "civic" | "wall" | "venue"
 
 export interface Prefab {
@@ -59,65 +77,9 @@ export interface Prefab {
   windows?: readonly Fixture[]
   /** A venue's chimney tops: smoking while someone is inside. */
   chimneys?: readonly Fixture[]
+  /** What a seed may change (the homes', the inn's and the market's: so a town is not one house over and over). */
+  variation?: Variation
 }
-
-const round = (value: number): number => Math.round(value * 100) / 100
 
 /** The kit-coloured name a part resolves to. */
 export const pieceOf = (name: string, kit: KitColour): LandPiece => name.replace("{kit}", kit) as LandPiece
-
-/** A point of the prefab's frame in the world, the prefab stood at `at` and turned by `rot`. */
-function toWorld(at: readonly [number, number], rot: number, x: number, z: number): [number, number] {
-  const sin = Math.sin(rot)
-  const cos = Math.cos(rot)
-  return [round(at[0] + x * cos + z * sin), round(at[1] - x * sin + z * cos)]
-}
-
-/** The prefab stood at `at`, turned by `rot` (its front toward (sin rot, cos rot)), lifted by `y`. */
-export function instantiate(
-  prefab: Prefab,
-  at: readonly [number, number],
-  rot: number,
-  kit: KitColour,
-  y = 0,
-): LandPlacement[] {
-  return prefab.parts.map((part) => {
-    const [x, z] = toWorld(at, rot, part.x, part.z)
-    const lift = y + (part.y ?? 0)
-    return {
-      piece: pieceOf(part.piece, kit),
-      x,
-      z,
-      rot: round(rot + (part.rot ?? 0)),
-      ...(lift ? { y: lift } : {}),
-      ...(part.scale ? { scale: part.scale } : {}),
-    }
-  })
-}
-
-/** A prefab's door spots in the world, by the same transform. */
-export function doorsOf(prefab: Prefab, at: readonly [number, number], rot: number): Door[] {
-  return prefab.doors.map((door) => {
-    const [x, z] = toWorld(at, rot, door.x, door.z)
-    return {
-      x,
-      z,
-      rot: round(rot + door.rot),
-      ...(door.depth ? { depth: door.depth } : {}),
-      ...(door.y ? { y: door.y } : {}),
-    }
-  })
-}
-
-/** A prefab's fixtures (windows, chimneys) in the world, by the same transform; `y` lifts them. */
-export function fixturesOf(
-  list: readonly Fixture[] | undefined,
-  at: readonly [number, number],
-  rot: number,
-  y = 0,
-): Fixture[] {
-  return (list ?? []).map((fixture) => {
-    const [x, z] = toWorld(at, rot, fixture.x, fixture.z)
-    return { x, y: round(fixture.y + y), z }
-  })
-}

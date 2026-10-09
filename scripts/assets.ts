@@ -17,6 +17,10 @@
  *                           palette, ~500 triangles each. Lazy, with the folk of a gen 2 island.
  * - growth.glb            — a repo's growth timelapse (`?grow`, scene/growth): scaffolds, planks and
  *                           the ghost districts' tents (Kenney Survival Kit). Lazy; no bounds file.
+ * - town2.glb / town2.json — the second town kit (gen 2, `?gen=2`): Kenney Fantasy Town, Castle and
+ *                           pieces for the buildings KayKit has none of (world/prefabs/town2.ts),
+ *                           their colormaps baked onto KayKit's hexagon palette (scripts/palette.ts).
+ *                           Lazy. Node names are `t2_` + the piece (`c_` for castle).
  * - forest.glb / forest.json — character-scale trees, bushes, rocks and grass from the Forest
  *                           Nature Pack (one palette, one material), placed by world/wilds.ts.
  *
@@ -41,6 +45,7 @@ import {
   weld,
 } from "@gltf-transform/functions"
 import { MeshoptEncoder, MeshoptSimplifier } from "meshoptimizer"
+import { bakeToPalette, decodePng, encodePng, paletteOf } from "./palette.ts"
 
 const ROOT = join(import.meta.dir, "..")
 const SRC = join(ROOT, "assets/src")
@@ -491,6 +496,83 @@ const FOREST: Record<string, string[]> = {
   ],
 }
 
+/**
+ * The second town kit (world/prefabs/town2.ts, gen 2 only): the pieces of Kenney's Fantasy Town (the
+ * walls and roofs a house is built of, the windmill's sails, stalls, fences, lamps), Castle (hexagonal
+ * and square towers, the drawbridge) kits that the KayKit hex pack has no answer to. Three
+ * colormaps, one material each, all baked onto the KayKit palette (`toKayKit`). Pieces land in the
+ * bundle as `t2_<piece>`, `t2_c_<piece>` (dashes to underscores).
+ */
+const TOWN2: Record<string, string[]> = {
+  "kenney_fantasy-town-kit": [
+    "wall",
+    "wall-door",
+    "wall-window-glass",
+    "wall-wood",
+    "wall-wood-door",
+    "wall-wood-window-shutters",
+    "roof-gable",
+    "roof-high-gable",
+    "chimney",
+    "windmill",
+    "stall",
+    "stall-red",
+    "stall-green",
+    "cart",
+    "fence",
+    "fence-gate",
+    "lantern",
+    "fountain-round",
+    "planks",
+    "pillar-wood",
+    "hedge",
+    "hedge-gate",
+    "tree-high",
+  ],
+  "kenney_castle-kit": [
+    "bridge-draw",
+    "tower-hexagon-base",
+    "tower-hexagon-mid",
+    "tower-hexagon-top",
+    "tower-hexagon-roof",
+    "tower-square-base",
+    "tower-square-mid",
+    "tower-square-top-roof",
+    "tower-square-top-roof-high",
+    "wall-narrow-gate",
+  ],
+}
+
+/** Node name for a Kenney piece in town2.glb: `t2_` + `c_` for the castle kit + the piece. */
+function town2Name(pack: string, piece: string): string {
+  const letter = pack.includes("castle") ? "c_" : ""
+  return `t2_${letter}${piece.replace(/-/g, "_")}`
+}
+
+/**
+ * Kenney's colormaps are flat colours with a soft vertical gradient, lighter and cooler than the hex
+ * pack's. Each is baked onto KayKit's palette (scripts/palette.ts) and the materials set to its
+ * roughness (0.5), so a Fantasy Town wall stands beside a KayKit home. Run in the town2 step.
+ */
+const KAYKIT_PALETTE = join(
+  SRC,
+  "KayKit_Medieval_Hexagon_Pack_1.0_FREE/KayKit_Medieval_Hexagon_Pack_1.0_FREE/Textures/hexagons_medieval.png",
+)
+async function toKayKit(doc: Document): Promise<void> {
+  const palette = paletteOf(decodePng(await Bun.file(KAYKIT_PALETTE).bytes()))
+  await doc.transform(dedup())
+  for (const texture of doc.getRoot().listTextures()) {
+    const image = texture.getImage()
+    if (!image) continue
+    const baked = bakeToPalette(decodePng(image), palette)
+    texture.setImage(encodePng(baked.raster)).setMimeType("image/png")
+    console.log(
+      `  palette bake: mean distance to KayKit ${baked.before.toFixed(1)} -> ${baked.after.toFixed(1)} (Lab)`,
+    )
+  }
+  for (const material of doc.getRoot().listMaterials()) material.setRoughnessFactor(0.5).setMetallicFactor(0)
+}
+
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
   "meshopt.encoder": MeshoptEncoder,
 })
@@ -671,8 +753,21 @@ async function animations(name = "anims", clips: Record<string, string[]> = CLIP
   console.log(`${name}: ${target.getRoot().listAnimations().length} clips → ${kb(out)}`)
 }
 
-/** `bounds`: also write packages/hall/src/world/<name>.json, each piece's box for layout code. */
-async function kit(name: string, sources: Record<string, string[]>, bounds = true): Promise<void> {
+/**
+ * `bounds`: also write packages/hall/src/world/<name>.json, each piece's box for layout code.
+ * `options.name` renames a piece's node (by default its file name); `options.grade` edits the merged
+ * document before it is compressed (the palette bake).
+ */
+interface KitOptions {
+  name?: (pack: string, piece: string) => string
+  grade?: (doc: Document) => Promise<void>
+}
+async function kit(
+  name: string,
+  sources: Record<string, string[]>,
+  bounds = true,
+  options: KitOptions = {},
+): Promise<void> {
   const target = new Document()
   const scene = target.createScene("kit")
   const boxes: Record<string, { size: number[]; min: number[]; max: number[] }> = {}
@@ -692,7 +787,7 @@ async function kit(name: string, sources: Record<string, string[]>, bounds = tru
       if (!sourceScene) continue
       const map = mergeDocuments(target, doc)
       const merged = map.get(sourceScene) as ReturnType<typeof target.createScene>
-      const named = piece.replace(/_Color1$/, "")
+      const named = options.name?.(pack, piece) ?? piece.replace(/_Color1$/, "")
       const group = target.createNode(named)
       for (const child of merged.listChildren()) group.addChild(child as GNode)
       merged.dispose()
@@ -706,6 +801,7 @@ async function kit(name: string, sources: Record<string, string[]>, bounds = tru
     }
   }
   target.getRoot().setDefaultScene(scene)
+  await options.grade?.(target)
   await target.transform(
     unpartition(),
     dedup(),
@@ -767,6 +863,7 @@ const STEPS: Record<string, () => Promise<void>> = {
   seas: () => kit("seas", SEAS, false),
   growth: () => kit("growth", GROWTH, false),
   animals: () => kit("animals", ANIMALS, false),
+  town2: () => kit("town2", TOWN2, true, { name: town2Name, grade: toKayKit }),
 }
 const wanted = process.argv.slice(2)
 for (const name of wanted) if (!STEPS[name]) throw new Error(`unknown output ${name}: ${Object.keys(STEPS)}`)

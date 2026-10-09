@@ -1,7 +1,7 @@
 import { type Cell, cellToWorld, type Field, type LandPiece, type LandPlacement } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
-import { instantiate } from "../../prefabs/index.ts"
-import { key, neighbours, rings, step } from "../hex.ts"
+import { instantiate, prefab } from "../../prefabs/index.ts"
+import { key, neighbours, noise, rings, step } from "../hex.ts"
 import type { IslandPlan } from "../plan.ts"
 import { COAST_TILES, fit, PATH_TILES, turn } from "../tiles.ts"
 import { facing, round, siteDressing } from "./sites.ts"
@@ -40,6 +40,7 @@ export function dressHexes(
   const meadow: Spot[] = []
   const fields: Field[] = []
   const reach = plan.radius + 2
+  const mills = new Map<unknown, number>()
   const sites = new Map<string, number>()
   plan.districts.forEach((district, i) => {
     if (district.site) sites.set(key(district.site), i)
@@ -185,6 +186,17 @@ export function dressHexes(
           break
         case "w":
         case "d":
+          // Generator 2: now and then a windmill from the second town kit stands in the fields, at most two a district.
+          if (
+            lots &&
+            char === "w" &&
+            noise(plan.seed, cell, "mill") < 0.25 &&
+            (mills.get(district) ?? 0) < 2
+          ) {
+            mills.set(district, (mills.get(district) ?? 0) + 1)
+            decor.push(...instantiate(prefab("windmill-hex"), [x, z], facing([x, z], square), kit, lift))
+            break
+          }
           add("building_dirt", 0, 0, turn(0))
           fields.push({ kind: char === "w" ? "wheat" : "crops", x, z })
           for (let dir = 0; dir < 6; dir++) {
@@ -198,7 +210,7 @@ export function dressHexes(
           // Generator v2: a lot from the prefab catalogue (dress/town.ts), in the district's colour.
           const lot = lots?.get(key(cell))
           if (lot) {
-            decor.push(...instantiate(lot.prefab, [x, z], lot.rot, kit, lift))
+            decor.push(...instantiate(lot.prefab, [x, z], lot.rot, kit, lift, lot.seed))
             break
           }
           // A home in the district's colour, its door to the nearest road (or its square).

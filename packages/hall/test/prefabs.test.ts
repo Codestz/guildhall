@@ -2,8 +2,7 @@ import { describe, expect, test } from "bun:test"
 import type { KitColour } from "../src/world/gen/biomes.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
-import LANDS from "../src/world/lands.json"
-import { HEX_SCALE } from "../src/world/lands.ts"
+import { HEX_SCALE, PIECES } from "../src/world/lands.ts"
 import { doorsOf, instantiate, PREFABS, pieceOf, prefab } from "../src/world/prefabs/index.ts"
 import REACT from "./fixtures/repos/facebook__react.json"
 import SELF from "./fixtures/repos/guildhall.json"
@@ -11,7 +10,7 @@ import IS_ODD from "./fixtures/repos/jonschlinkert__is-odd.json"
 
 const KITS: KitColour[] = ["blue", "red", "yellow", "green"]
 type Box = { min: number[]; max: number[] }
-const boxes = LANDS as unknown as Record<string, Box>
+const boxes = PIECES as unknown as Record<string, Box>
 /** A hex's corner reach, world units, and the 10 units between neighbours. */
 const CORNER = 5.78
 const STEP = 10
@@ -43,6 +42,16 @@ describe("prefab catalogue", () => {
       "wall-tower",
       "wall-corner",
       "lookout",
+      "chapel",
+      "bakery",
+      "stable",
+      "warehouse",
+      "windmill-hex",
+      "harbour-light",
+      "bridge-plank",
+      "bridge-draw",
+      "plaza-fountain",
+      "garden",
     ])
   })
 

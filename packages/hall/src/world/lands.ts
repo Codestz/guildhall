@@ -1,6 +1,7 @@
 import type { Site as SiteName } from "@guildhall/roster"
 import LANDS from "./lands.json"
 import type { Post, Spot } from "./layout.ts"
+import TOWN2 from "./town2.json"
 
 /**
  * Guild Lands (ADR 0006, 0007): the island round the keep, as data. The island is hand-drawn as a
@@ -9,7 +10,12 @@ import type { Post, Spot } from "./layout.ts"
  * drift apart. Hex pieces are drawn at HEX_SCALE.
  */
 
-export type LandPiece = keyof typeof LANDS
+export type LandPiece = keyof typeof LANDS | keyof typeof TOWN2
+/** Every piece's bounding box (hex pack and the second town kit), in its own units: drawn at HEX_SCALE. */
+export const PIECES: Record<LandPiece, { min: number[]; max: number[]; size: number[] }> = {
+  ...LANDS,
+  ...TOWN2,
+}
 export const HEX_SCALE = 5
 /** Hex circumradius in world units: the pack's tiles are 2 across the flats (2/√3 to a corner). */
 const SIZE = (HEX_SCALE * 2) / Math.sqrt(3)
@@ -851,7 +857,7 @@ export function island(seed = 7): Island {
   // The graveyard claims its plot: the map's own scatter (rolled above, so the rest of the island
   // keeps its trees) stays off it, and so does the meadow grass.
   const claimed = (d: LandPlacement): boolean => {
-    const { size } = LANDS[d.piece]
+    const { size } = PIECES[d.piece]
     const reach = (Math.max(size[0] ?? 0, size[2] ?? 0) / 2) * HEX_SCALE * (d.scale ?? 1)
     return toPlot(d.x, d.z) < reach + 0.5
   }

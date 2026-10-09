@@ -1,6 +1,5 @@
 import FOREST from "./forest.json"
-import LANDS from "./lands.json"
-import { type Cell, cellToWorld, HEX_SCALE, MAP_FOR_TESTS, SITES, toPlot } from "./lands.ts"
+import { type Cell, cellToWorld, HEX_SCALE, MAP_FOR_TESTS, PIECES, SITES, toPlot } from "./lands.ts"
 import { ROOM, type Spot } from "./layout.ts"
 import { type Light, lightsOf, toSegment } from "./lights.ts"
 import { handWorld, type Terrain, type World } from "./world.ts"
@@ -193,7 +192,7 @@ function groundOf(world: World): Ground {
       return [best, post] as const
     }),
     decor: world.island.decor.map((d) => {
-      const { x0, z0, x1, z1 } = box(LANDS[d.piece])
+      const { x0, z0, x1, z1 } = box(PIECES[d.piece])
       const scale = HEX_SCALE * (d.scale ?? 1)
       const cx = ((x0 + x1) / 2) * scale
       const cz = ((z0 + z1) / 2) * scale

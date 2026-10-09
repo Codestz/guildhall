@@ -17,6 +17,8 @@ export interface Lot {
   prefab: Prefab
   /** The way its front faces: its nearest road hex, else its square. */
   rot: number
+  /** Which variant of the prefab it is (prefabs/variants.ts): its roof's colour, its flip, its props. */
+  seed: number
 }
 
 export interface Town {
@@ -51,6 +53,11 @@ export function townOf(plan: IslandPlan, links: Map<string, Set<number>>): Town 
       .filter(([, hex]) => hex.district === i && hex.char === "v")
       .map(([id]) => unkey(id))
       .sort((a, b) => dist(a, sx, sz) - dist(b, sx, sz) || a[0] - b[0] || a[1] - b[1])
+    // The harbour's one light stands on its lot nearest the open sea: the one with fewest land neighbours.
+    const landward = (cell: Cell): number =>
+      neighbours(cell).filter((next) => plan.land.has(key(next))).length
+    const shore =
+      district.biome === "harbour" ? [...cells].sort((a, b) => landward(a) - landward(b))[0] : undefined
     cells.forEach((cell, n) => {
       const id = key(cell)
       const d = dist(cell, sx, sz)
@@ -60,11 +67,14 @@ export function townOf(plan: IslandPlan, links: Map<string, Set<number>>): Town 
       const houses = farm && count === 1 ? [prefab("house-farmhouse")] : housesOf(capped(count, tier, d))
       const pick =
         houses[Math.floor(noise(plan.seed, cell, "lot") * houses.length)] ?? prefab("house-cottage")
+      const special = specialty(district.biome, tier, plan, cell, cell === shore)
       // Town and up: the lot nearest the plaza is the market's.
       const market = n === 0 && tier !== "hamlet" && tier !== "village" && i > 0
       const [cx, cz] = cellToWorld(cell)
       const look: Spot = road ? cellToWorld(road) : [sx, sz]
-      lots.set(id, { prefab: market ? prefab("market-stalls") : pick, rot: facing([cx, cz], look) })
+      const seed = 1 + Math.floor(noise(plan.seed, cell, "variant") * 65535)
+      const chosen = market ? prefab("market-stalls") : special ? prefab(special) : pick
+      lots.set(id, { prefab: chosen, rot: facing([cx, cz], look), seed })
     })
 
     if (i > 0) {
@@ -74,10 +84,32 @@ export function townOf(plan: IslandPlan, links: Map<string, Set<number>>): Town 
       const dir = free[Math.floor(noise(plan.seed, square, "plaza") * free.length)]
       const angle = dir === undefined ? 0 : Math.atan2(...(offset(square, dir) as [number, number]))
       const at: [number, number] = [sx + Math.sin(angle) * OFF_ROAD, sz + Math.cos(angle) * OFF_ROAD]
-      plazas.push(...instantiate(prefab("plaza-well"), at, 0, "blue"))
+      // A town or city's squares have a fountain as often as a well.
+      const fountain = tier !== "hamlet" && tier !== "village" && noise(plan.seed, square, "fountain") < 0.5
+      const seed = 1 + Math.floor(noise(plan.seed, square, "variant") * 65535)
+      plazas.push(...instantiate(prefab(fountain ? "plaza-fountain" : "plaza-well"), at, 0, "blue", 0, seed))
     }
   })
   return { lots, plazas }
+}
+
+/**
+ * What a lot may be besides a home, from the second town kit (prefabs/town2.ts): warehouses by the
+ * harbour, the harbour's light on the shore, and a bakery now and then in a town's or city's villages.
+ */
+function specialty(
+  biome: string,
+  tier: string,
+  plan: IslandPlan,
+  cell: Cell,
+  shore: boolean,
+): "warehouse" | "harbour-light" | "bakery" | undefined {
+  const roll = noise(plan.seed, cell, "specialty")
+  if (biome === "harbour") {
+    if (shore) return "harbour-light"
+    return roll < 0.35 ? "warehouse" : undefined
+  }
+  return tier === "town" || tier === "city" ? (roll < 0.05 ? "bakery" : undefined) : undefined
 }
 
 /** A hamlet's lots are cottages and a pair at most; a village's never three outside its core. */

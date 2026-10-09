@@ -19,6 +19,7 @@ import { FAR_ERROR } from "../render/tiers.ts"
 import { LANDS_URL } from "../world/cast.ts"
 import { roleOf } from "../world/chronicle/growthPieces.ts"
 import { type Chunks, chunksOf } from "../world/chunks.ts"
+import { genOf } from "../world/gen/islandFromTree.ts"
 import { HEX_SCALE, type LandPiece, type LandPlacement, SITES, yardBuilding } from "../world/lands.ts"
 import { useWorld, useWorldReady } from "../world/source.ts"
 import { markGrowable, useGrowable } from "./growth/registry.ts"
@@ -38,9 +39,12 @@ import {
   tieredMerge,
   useTiered,
 } from "./tiers.ts"
+import { loadTown2, useTown2 } from "./town2.ts"
 import { TSL } from "./tsl.ts"
 
 useGLTF.preload(LANDS_URL)
+// Generator 2's second town kit (scene/town2.ts) is fetched beside the land pack, for that link alone.
+if (typeof location !== "undefined" && genOf(location.search) === 2) void loadTown2()
 /** The far tier's simplifier, fetched beside the land pack (it is needed before the batches build). */
 const SIMPLIFIER = loadSimplifier()
 
@@ -59,10 +63,13 @@ const SIMPLIFIER = loadSimplifier()
  */
 export function Island() {
   useWorldReady()
-  const { nodes } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
+  const { nodes: lands } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
   const { progress } = useGuild()
   const world = useWorld()
   const land = world.island
+  // The land pack's pieces, and gen 2's second town kit's when the island's prefabs use it.
+  const town2 = useTown2(land.decor)
+  const nodes = useMemo(() => ({ ...lands, ...town2 }), [lands, town2])
   const gl = useThree((state) => state.gl)
   const webgpu = isWebGPU(gl)
   const simplifier = use(SIMPLIFIER)
@@ -77,12 +84,12 @@ export function Island() {
   const built = useOwnedMeshes(
     () => {
       const layer = batch(nodes, [...land.tiles, ...land.decor], webgpu, simplifier, chunksOf(world))
-      const base = landMaterial(nodes)
+      const base = landMaterial(lands)
       if (!world.relief || !base) return { ...layer, relief: undefined }
       const relief = reliefLayer(world.relief, makeSnow(base, snowline), webgpu, chunksOf(world))
       return { meshes: [...layer.meshes, ...relief.meshes], tiers: layer.tiers, relief: relief.tiers }
     },
-    [nodes, land, webgpu, simplifier, world, makeSnow, snowline],
+    [nodes, lands, land, webgpu, simplifier, world, makeSnow, snowline],
     "materials",
   )
   // The growth timelapse (`?grow`) rides these instances up out of the sea (scene/growth).

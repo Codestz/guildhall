@@ -427,7 +427,7 @@ function treesFor(posts: readonly Post[]): Spot[] {
 }
 
 /** Each trade's spots round a repo site's posts: the hand map's names, so the loops run unchanged. */
-function repoSpots(id: SiteId, at: Spot, posts: readonly Post[]): Behaviour["spots"] {
+export function repoSpots(id: SiteId, at: Spot, posts: readonly Post[]): Behaviour["spots"] {
   const heap = heapOf(posts)
   const trees = treesFor(posts)
   return (post, n): Spots => {

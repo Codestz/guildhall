@@ -9,6 +9,7 @@ import {
   onDryLand,
   onKeepFloor,
 } from "./clearance.ts"
+import { districtById } from "./districtWork.ts"
 import type { SiteId } from "./lands.ts"
 import { type Post, type Spot, STATIONS, type StationId } from "./layout.ts"
 import { sitesOf } from "./siteMap.ts"
@@ -69,11 +70,14 @@ function fieldOf(place: Place): Field | undefined {
   return field ?? undefined
 }
 
-/** The posts of a place, from its key (`site:forest`, `station:forge`), on the active world. */
+/** The posts of a place, from its key (`site:forest`, `station:forge`, `district:compiler`), on the active world. */
 function postsOf(key: string): readonly Post[] | undefined {
-  const [kind, id] = key.split(":")
+  const colon = key.indexOf(":")
+  const kind = key.slice(0, colon)
+  const id = key.slice(colon + 1)
   if (kind === "site") return sitesOf()[id as SiteId]?.posts
   if (kind === "station") return STATIONS[id as StationId]?.posts
+  if (kind === "district") return districtById(id)?.posts
   return undefined
 }
 
@@ -94,7 +98,7 @@ class Field {
 
   constructor(place: Place, posts: readonly Post[]) {
     const { behaviour } = place
-    this.island = place.key.startsWith("site:")
+    this.island = !place.key.startsWith("station:")
     this.marks = behaviour.marks
     this.walks = [behaviour.loop, ...(behaviour.steer ?? []).map((s) => s.steps)]
     this.berths = posts.map((post, berth) => ({

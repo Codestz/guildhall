@@ -1,10 +1,20 @@
 import { useGLTF } from "@react-three/drei"
 import { useFrame, useThree } from "@react-three/fiber"
-import { Suspense, use, useCallback, useEffect, useMemo, useReducer, useState } from "react"
+import {
+  Suspense,
+  use,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useState,
+  useSyncExternalStore,
+} from "react"
 import type { Object3D } from "three"
 import { SoundStage } from "../audio/SoundStage.tsx"
 import { MODE, PROBE } from "../guild/mode.ts"
 import type { AdventurerView } from "../guild/store.ts"
+import { town } from "../guild/town/town.ts"
 import { useGuild, useGuildStore } from "../guild/useGuild.ts"
 import { ANIMS_URL, AUTOMATON, MODELS, modelUrl } from "../world/cast.ts"
 import { useWorld } from "../world/source.ts"
@@ -43,6 +53,7 @@ import { Sigils } from "./Sigils.tsx"
 import { Stations } from "./Stations.tsx"
 import { Seas } from "./seas/Seas.tsx"
 import { stepFrame } from "./step.ts"
+import { Ferry } from "./town/Ferry.tsx"
 import { UndeadGate } from "./Undead.tsx"
 import { WeatherLayer } from "./weather/WeatherLayer.tsx"
 
@@ -82,8 +93,9 @@ export function Scene() {
         {today && <Life />}
         <Room />
         {today && <Stations />}
-        {today && <Cast />}
-        {today && <Blobs />}
+        {/* The guild today; through a growth film, only the town's townsfolk (guild/town). */}
+        <Cast today={today} />
+        <Blobs />
         {/* What everyone is doing, as an icon over their head: readable with the HUD hidden. */}
         {today && <Sigils />}
         <WorldReady />
@@ -93,6 +105,8 @@ export function Scene() {
       {/* Ships: their own Suspense, so the sea's traffic never holds up the island. */}
       <Suspense fallback={null}>
         <Ships />
+        {/* The town's ferry (guild/town): in only while contributors come ashore or leave. */}
+        <Ferry />
       </Suspense>
       {/* The guild's GitHub sea (scene/seas): lazy, nothing until the store has a sea event. */}
       <Seas />
@@ -119,22 +133,32 @@ export function Scene() {
  * Past ALL_HEROES adventurers the cast has a baked crowd (scene/crowd/): whoever the camera isn't
  * close to joins it, one draw per model part for all of them (scene/crowd/lod.ts). At or under it —
  * every story the hall ships — there is no crowd at all and everyone draws as they always did.
+ *
+ * On a repo's island with a chronicle the town's townsfolk (guild/town, ADR 0013) join the cast as
+ * figures like any other; through a growth film (`today` false) they are the whole cast.
  */
-function Cast() {
+function Cast({ today }: { today: boolean }) {
   const store = useGuild()
-  const [exits] = useState(() => new Exits<AdventurerView>())
+  const world = useWorld()
+  useSyncExternalStore(town.subscribe, town.snapshot)
+  const [exits] = useState(() => ({ guild: new Exits<AdventurerView>(), town: new Exits<AdventurerView>() }))
   const [, redraw] = useReducer((n: number) => n + 1, 0)
   const onGone = useCallback(
     (id: string) => {
-      if (exits.gone(id)) redraw()
+      if (exits.guild.gone(id) || exits.town.gone(id)) redraw()
     },
     [exits],
   )
-  const views = exits.stage(store.views, store.rebuilds, performance.now())
+  const now = performance.now()
+  const views = [
+    ...exits.guild.stage(today ? store.views : NO_ONE, store.rebuilds, now),
+    ...exits.town.stage(town.views, town.epoch, now),
+  ]
   const crowd = useCrowd(views.length > ALL_HEROES)
   // The camera's view, once a frame, before any adventurer reads it (mixer culling, who is a hero).
   // One frustum and one declutter run (throttled in chips.ts) for the whole cast, not one per adventurer.
   useFrame((state, delta) => {
+    town.tick(world, store.names, delta)
     castClock.now += delta
     if (crowd) crowd.time = castClock.now
     lookFrom(state.camera, state.size.height)
@@ -174,6 +198,8 @@ function Cast() {
     </Suspense>
   )
 }
+
+const NO_ONE: readonly AdventurerView[] = []
 
 /**
  * The cast's baked crowd while `wanted` (made on first want, kept after: crowd/cast.ts), else null.

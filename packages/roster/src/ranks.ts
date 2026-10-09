@@ -33,6 +33,28 @@ export const AGENT_RANK: RankRule = ({ deeds, tokens }) => {
   return "apprentice"
 }
 
+/** A repo's contributors rank by commits (ADR 0013): the bars are set by the repo's own spread. */
+export type CommitRule = (commits: number) => Rank
+
+/** Commits a journeyman and a master need at least, however small the repo. */
+export const COMMIT_FLOOR = { journeyman: 10, master: 50 } as const
+/** The share of a repo's contributors each rank starts above: the top 40% journeymen, the top 10% masters. */
+export const COMMIT_QUANTILE = { journeyman: 0.6, master: 0.9 } as const
+
+/**
+ * The commits rule for one repo, from every contributor's total (`commits`, any order). A rank's bar
+ * is its quantile of that spread, never under its floor: in react (1,800 commits at the top, three
+ * at the bottom of the list) a master has ~120, while in a two-person repo nobody is a master on
+ * 20 commits. Bots are best left out of `commits`: they would raise the bars for everyone.
+ */
+export function commitRank(commits: readonly number[]): CommitRule {
+  const sorted = [...commits].sort((a, b) => a - b)
+  const at = (q: number): number => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0
+  const journeyman = Math.max(COMMIT_FLOOR.journeyman, at(COMMIT_QUANTILE.journeyman))
+  const master = Math.max(COMMIT_FLOOR.master, at(COMMIT_QUANTILE.master))
+  return (n) => (n >= master ? "master" : n >= journeyman ? "journeyman" : "apprentice")
+}
+
 /** Pips on the chip's banner: none for an apprentice. */
 export function pipsOf(rank: Rank): number {
   return RANKS.indexOf(rank)

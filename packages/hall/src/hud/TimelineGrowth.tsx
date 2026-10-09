@@ -1,5 +1,6 @@
-import { type CSSProperties, useEffect, useRef, useState, useSyncExternalStore } from "react"
-import { dayAt } from "../world/chronicle/growth.ts"
+import { type CSSProperties, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import { town } from "../guild/town/town.ts"
+import { dayAt, timeOfDay } from "../world/chronicle/growth.ts"
 import { type GrowthFilm, growth, SPEEDS } from "../world/chronicle/growthControl.ts"
 import {
   captionAt,
@@ -8,8 +9,10 @@ import {
   filesAt,
   type GrowthCaption,
 } from "../world/chronicle/growthStory.ts"
+import { busiestWeek } from "../world/town/presence.ts"
 import { Icon } from "./icons.tsx"
 import "./TimelineGrowth.css"
+import "./town.css"
 
 /** The film's transport changed (phase, speed, a seek): re-render. The clock itself is read per frame. */
 export function useGrowthPhase(): typeof growth.phase {
@@ -53,8 +56,11 @@ function Tape({ film, playing, hidden }: { film: GrowthFilm; playing: boolean; h
   const range = useRef<HTMLInputElement>(null)
   const dragging = useRef<{ resume: boolean } | null>(null)
   const [caption, setCaption] = useState<GrowthCaption | undefined>()
+  const busy = useRef<HTMLElement>(null)
   const { plan, story, chronicle, start, end } = film
   const span = end - start
+  /** The week with the most commits: its mark on the track glows while the film passes it. */
+  const busiest = useMemo(() => busiestWeek(chronicle), [chronicle])
 
   // The clock, every frame, straight into the DOM; the caption only when it changes.
   useEffect(() => {
@@ -72,8 +78,12 @@ function Tape({ film, playing, hidden }: { film: GrowthFilm; playing: boolean; h
         if (date.current) date.current.textContent = next
         range.current?.setAttribute("aria-valuetext", next)
       }
+      // In town: the residents ashore now (guild/town), beside the history's running totals.
+      const lit = busiest !== undefined && Math.abs(day - (busiest.day + 3)) <= Math.max(7, town.window / 2)
+      busy.current?.classList.toggle("lit", lit)
       if (people.current)
-        people.current.textContent = `${number(contributorsAt(story, day, end))} contributors · ${number(filesAt(chronicle, day))} files`
+        people.current.textContent = `${number(contributorsAt(story, day, end))} contributors · ${number(town.residents.length)} in town · ${number(filesAt(chronicle, day))} files${lit && busiest ? ` · busiest week, ${number(busiest.commits)} commits` : ""}`
+      people.current?.classList.toggle("growth-busiest", lit)
       if (range.current && !dragging.current) range.current.value = String(t)
       const now = captionAt(story, t)
       if (now !== shown) {
@@ -83,7 +93,7 @@ function Tape({ film, playing, hidden }: { film: GrowthFilm; playing: boolean; h
     }
     draw()
     return () => cancelAnimationFrame(frame)
-  }, [plan, story, chronicle, span, end])
+  }, [plan, story, chronicle, span, end, busiest])
 
   // Space plays and pauses, anywhere but in a field or on a button (they have their own Space).
   useEffect(() => {
@@ -158,6 +168,14 @@ function Tape({ film, playing, hidden }: { film: GrowthFilm; playing: boolean; h
                   style={{ left: `${(t / plan.duration) * 100}%` }}
                 />
               ))}
+              {busiest && (
+                <i
+                  ref={busy}
+                  className="beat busiest"
+                  title={`Busiest week: ${number(busiest.commits)} commits`}
+                  style={{ left: `${(timeOfDay(plan, busiest.day + 3) / plan.duration) * 100}%` }}
+                />
+              )}
             </div>
             <input
               ref={range}

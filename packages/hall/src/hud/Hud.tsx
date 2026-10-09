@@ -25,6 +25,7 @@ import { SoundToggle, useSoundWaiting } from "./Sound.tsx"
 import { Stats } from "./Stats.tsx"
 import { Timeline } from "./Timeline.tsx"
 import { TimelineGrowth, useGrowthPhase } from "./TimelineGrowth.tsx"
+import { TownDossier, useResident } from "./TownDossier.tsx"
 
 const PHONE = "(max-width: 720px)"
 /** The showcase's opening caption speaks first: story captions start this long after the HUD lands. */
@@ -77,7 +78,9 @@ export function Hud() {
   const door = useRepoDoor()
 
   const view = store.selected ? store.views.find((v) => v.id === store.selected) : undefined
-  const dossier = mode !== "hidden" && Boolean(store.selected && store.sessionOf(store.selected))
+  const resident = useResident(store.selected)
+  const dossier =
+    mode !== "hidden" && Boolean(store.selected && (store.sessionOf(store.selected) || resident))
   const pleas = store.views.filter((v) => v.phase === "waiting").length
   const showcase = MODE === "showcase"
   const film = useGrowthPhase() !== "off"
@@ -322,7 +325,9 @@ export function Hud() {
           <Pleas store={store} />
 
           <div className="region region-right">
-            {dossier ? (
+            {dossier && resident ? (
+              <TownDossier store={store} resident={resident} className="is-sheet" />
+            ) : dossier ? (
               <Dossier store={store} view={view} className="is-sheet" />
             ) : (
               open.chronicle && (

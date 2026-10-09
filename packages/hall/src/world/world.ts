@@ -1,5 +1,6 @@
 import type { Biome } from "./gen/biomes.ts"
 import type { District, RepoIsland } from "./gen/dress.ts"
+import type { Folder } from "./gen/repo.ts"
 import {
   type Cell,
   type Island,
@@ -52,6 +53,11 @@ export interface RepoInfo {
   /** GitHub cut the listing short: the island is the part it sent. */
   truncated?: boolean
   districts: readonly District[]
+  /**
+   * The folder each district was grown from, aligned with `districts` (its workspace and pooling):
+   * what a chronicle's units are mapped onto districts by (chronicle/reconstruct.ts `districtOf`).
+   */
+  folders: readonly Folder[]
 }
 
 export interface World {
@@ -95,7 +101,7 @@ const BIOME_WILDS: Record<Biome, WorkPlace["wilds"]> = {
 }
 
 /** An island grown from a repo's tree (world/gen `islandFromTree`), as a world. */
-export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts">): World {
+export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "folders">): World {
   const { land } = made.plan
   const storySites = mapSites(made)
   const districts: WorkPlace[] = made.districts
@@ -117,7 +123,7 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts">): 
     },
     sites: [...districts, ...moved],
     storySites,
-    repo: { ...info, districts: made.districts },
+    repo: { ...info, districts: made.districts, folders: made.plan.districts.map((d) => d.folder) },
   }
 }
 

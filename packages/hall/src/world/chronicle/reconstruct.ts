@@ -1,4 +1,4 @@
-import type { RepoShape } from "../gen/repo.ts"
+import type { Folder, RepoShape } from "../gen/repo.ts"
 import type { Chronicle, Day, Unit } from "./format.ts"
 
 /**
@@ -105,7 +105,7 @@ export function districtsAt(c: Chronicle, shape: RepoShape, day: Day): Districts
  * its workspace's pool), a container's loose files to the pool or its biggest village, a folder to
  * its district, the rest to the "+N more" wilds. A unit with no district is left out (a ghost).
  */
-export function districtOf(c: Chronicle, shape: RepoShape): Map<string, string> {
+export function districtOf(c: Chronicle, shape: { folders: readonly Folder[] }): Map<string, string> {
   const map = new Map<string, string>()
   const named = new Set(shape.folders.map((folder) => folder.name))
   const wilds = shape.folders.find((folder) => folder.pooled && !folder.group)?.name

@@ -31,6 +31,7 @@ import { verbOf } from "../hud/format.ts"
 import { Icon } from "../hud/icons.tsx"
 import { placeOf, Routine, seedOf, shifted } from "../world/behaviours.ts"
 import { ANIMS_URL, AUTOMATON, figureOf, figureUrl, MODELS, modelUrl } from "../world/cast.ts"
+import { districtPlaceOf } from "../world/districtWork.ts"
 import type { Piece } from "../world/furniture.ts"
 import { SITE_DEFS } from "../world/sites.ts"
 import { attachHands, type Hands, probed, release, reserve } from "./activity.ts"
@@ -298,8 +299,11 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
   // Where they work, and the loop they run there (a new place: a new routine, berth reserved).
   const [tx, tz, tf] = view.target
   const place = useMemo(
-    () => placeOf(view.site, view.station, [tx, tz, tf]),
-    [view.site, view.station, tx, tz, tf],
+    () =>
+      view.district
+        ? districtPlaceOf(view.district, [tx, tz, tf])
+        : placeOf(view.site, view.station, [tx, tz, tf]),
+    [view.district, view.site, view.station, tx, tz, tf],
   )
   useEffect(() => {
     if (!place) return

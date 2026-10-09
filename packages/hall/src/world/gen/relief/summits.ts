@@ -41,7 +41,7 @@ export function settle(
   fixed: (i: number, j: number) => boolean,
   asked: readonly Peak[],
   saddles: readonly Saddle[],
-  /** Called after each round of cuts: a style's ground (facets.ts) follows the cut. */
+  /** Called after each round of cuts: the ground's shaping (facets.ts) follows the cut. */
   refresh?: () => void,
 ): Summits {
   const span = Math.ceil(REACH / (CIRCUM / RES)) + 1

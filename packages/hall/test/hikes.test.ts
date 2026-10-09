@@ -22,7 +22,6 @@ const world: World = repoWorld(islandFromTree(REACT.entries as RepoEntry[], 0, 2
   repo: REACT.repo,
   source: "fixture",
   gen: 2,
-  relief: "d",
 })
 
 describe("who hikes and where", () => {

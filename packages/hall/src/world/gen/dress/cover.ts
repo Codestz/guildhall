@@ -8,8 +8,7 @@ import { riversOf } from "../rivers/index.ts"
  * The hexes the mountains and rivers will cover, known while the island is still being dressed
  * (generator v2): world.ts grows the relief and the rivers after the dresser is done, taking
  * whatever stands on the hexes they cover, so a venue is placed knowing where they will be.
- * It is the same relief and the same rivers on a throwaway copy, in the default art direction
- * (`?relief=` sculpts the heights, and may move a river a hex; world.ts still drops a venue whose
+ * It is the same relief and the same rivers on a throwaway copy (world.ts still drops a venue whose
  * building ends up under one).
  */
 export interface Cover {

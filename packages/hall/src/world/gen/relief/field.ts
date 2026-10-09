@@ -4,9 +4,9 @@ import { TERRACE } from "../../waterways.ts"
 import { key, step } from "../hex.ts"
 import { ledgeTopOf, shapingOf, sharpen } from "./facets.ts"
 import { CIRCUM, CORNERS, centreOf, HeightGrid, pointOf, RES, ROW } from "./lattice.ts"
+import { smooth, valueNoise } from "./noise.ts"
 import { type Peak, type Ridge, type Saddle, skeletonOf } from "./ridges.ts"
 import { type Source, spread } from "./spread.ts"
-import { isSculpted, type ReliefStyle } from "./style.ts"
 import { settle } from "./summits.ts"
 
 /**
@@ -54,8 +54,10 @@ export interface Massif {
   grid: HeightGrid
   /** Steepness (rise over run) at each lattice vertex, smoothed: what the mesh paints grass, rock and walls by. */
   slope: Float32Array
-  /** Hybrid style: the top ledge's height (stairs below it, the faceted peak above); 0 in the others. */
+  /** The top ledge's height: stairs below it, the sculpted peak above. */
   ledgeTop: number
+  /** The grid as the field made it, before a river or a trail was carved: what tells a carved hex (mesh.ts). */
+  pristine: Float32Array
 }
 
 const SIX = [
@@ -67,31 +69,6 @@ const SIX = [
   [1, -1],
 ] as const
 
-const smooth = (x: number): number => {
-  const t = Math.min(1, Math.max(0, x))
-  return t * t * (3 - 2 * t)
-}
-
-/** An integer hash of a lattice point to [0, 1) (no strings, no closures: it runs per vertex). */
-function lattice(seed: number, i: number, j: number, salt: number): number {
-  let h = Math.imul(i, 0x27d4eb2d) ^ Math.imul(j, 0x165667b1) ^ Math.imul(seed ^ salt, 0x9e3779b1)
-  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b)
-  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35)
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296
-}
-
-/** Value noise in [0, 1) at a world point. */
-export function valueNoise(seed: number, x: number, z: number, salt: number): number {
-  const x0 = Math.floor(x)
-  const z0 = Math.floor(z)
-  const u = smooth(x - x0)
-  const v = smooth(z - z0)
-  return (
-    (lattice(seed, x0, z0, salt) * (1 - u) + lattice(seed, x0 + 1, z0, salt) * u) * (1 - v) +
-    (lattice(seed, x0, z0 + 1, salt) * (1 - u) + lattice(seed, x0 + 1, z0 + 1, salt) * u) * v
-  )
-}
-
 export interface MassifSpec {
   id: number
   cells: Cell[]
@@ -101,8 +78,6 @@ export interface MassifSpec {
   seed: number
   /** The ground a hex outside the massif stands at: its terrace top, or the sea cliff's. */
   topOf(cell: Cell): number
-  /** The art direction (style.ts); absent is the default. */
-  style?: ReliefStyle
 }
 
 /** The ridge's points as lattice sources, one about every lattice step, each carrying its crest height. */
@@ -229,10 +204,8 @@ export function massifOf(spec: MassifSpec): Massif {
       const high = smooth((raw[at] as number) / Math.max(1, height) / 0.7)
       raw[at] = (raw[at] as number) - GULLY * line ** 5 * high * smooth(((toRim[at] as number) - 4) / 10)
     }
-  if (isSculpted(spec.style ?? "current"))
-    for (let at = 0; at < raw.length; at++)
-      if (owned[at] && !isRim(at))
-        raw[at] = sharpen(raw[at] as number, height, spec.style === "d" ? 0.5 : undefined)
+  for (let at = 0; at < raw.length; at++)
+    if (owned[at] && !isRim(at)) raw[at] = sharpen(raw[at] as number, height, 0.5)
   const needed = (height - (base[peakAt] as number)) / Math.max(1, toRim[peakAt] as number)
   limit(raw, grid, owned, isRim, Math.min(MOST, Math.max(GRADE, needed * 1.1)))
   // The limit leaves flat planes; lumps of two sizes (more where it is steep) make them rock.
@@ -277,16 +250,10 @@ export function massifOf(spec: MassifSpec): Massif {
       grid.data[at] = settled
     }
   // The peaks and saddles as the finished ground stands (the skeleton's heights were asks).
-  const ledgeTop = ledgeTopOf(spec.style ?? "current", grid)
-  const shaping = shapingOf(spec.style ?? "current", grid, owned, isRim, ledgeTop)
-  shaping?.apply()
-  const summits = settle(
-    grid,
-    shaping?.fixed ?? ((i, j) => isRim(grid.index(i, j))),
-    peaks,
-    saddles,
-    shaping?.apply,
-  )
+  const ledgeTop = ledgeTopOf(grid)
+  const shaping = shapingOf(grid, owned, isRim, ledgeTop)
+  shaping.apply()
+  const summits = settle(grid, shaping.fixed, peaks, saddles, shaping.apply)
   const slope = new Float32Array(owned.length)
   const pitch = CIRCUM / RES
   for (let j = j0; j <= j1; j++)
@@ -313,6 +280,7 @@ export function massifOf(spec: MassifSpec): Massif {
     grid,
     slope,
     ledgeTop,
+    pristine: Float32Array.from(grid.data),
   }
 }
 

@@ -129,8 +129,9 @@ describe("the generated island", () => {
 
   test("the carved bed lies under the graded water along its whole run", () => {
     for (const reach of graded)
-      for (const [x, y, z] of reach.grade as Point3[]) {
-        // (Where the stream leaves the massif for a lowland tile, that tile's own banks take over.)
+      for (const [x, y, z] of (reach.grade as Point3[]).slice(1)) {
+        // (Where the stream leaves the massif for a lowland tile, that tile's own banks take over;
+        // and its spring, the first sample, may stand in the sculpted peak's steep flank above it.)
         const bed = world.relief?.heightAt(x, z)
         if (bed !== undefined && bed > 0) expect(bed).toBeLessThan(y + 0.2)
       }

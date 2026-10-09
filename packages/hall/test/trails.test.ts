@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { cellAt, key } from "../src/world/gen/hex.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
-import type { ReliefStyle } from "../src/world/gen/relief/index.ts"
 import { onShelf } from "../src/world/gen/relief/trailCarve.ts"
 import { SLOPE, STAIR } from "../src/world/gen/relief/trailSearch.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
@@ -19,20 +18,19 @@ import SELF from "./fixtures/repos/guildhall.json"
  * graph with costs by grade. They run on every gen 2 island that has a mountain worth climbing.
  */
 
-const grow = (fixture: { entries: unknown[]; repo: string }, gen: 1 | 2, relief?: ReliefStyle): World =>
+const grow = (fixture: { entries: unknown[]; repo: string }, gen: 1 | 2): World =>
   repoWorld(islandFromTree(fixture.entries as RepoEntry[], 0, gen), {
     repo: fixture.repo,
     source: "fixture",
-    ...(gen === 2 ? { gen, ...(relief ? { relief } : {}) } : {}),
+    ...(gen === 2 ? { gen } : {}),
   })
 
-const react = grow(REACT, 2, "d")
+const react = grow(REACT, 2)
 const FIXTURES: [string, World][] = [
   ["react", react],
-  ["cockpit", grow(COCKPIT, 2, "d")],
-  ["hindsight", grow(HINDSIGHT, 2, "d")],
-  ["this repo", grow(SELF, 2, "d")],
-  ["react, the earlier relief", grow(REACT, 2, "current")],
+  ["cockpit", grow(COCKPIT, 2)],
+  ["hindsight", grow(HINDSIGHT, 2)],
+  ["this repo", grow(SELF, 2)],
 ]
 const distance = (a: Spot, b: Spot): number => Math.hypot(a[0] - b[0], a[1] - b[1])
 
@@ -160,7 +158,7 @@ describe.each(FIXTURES)("a trail on %s", (_, world) => {
 
 describe("trails are deterministic", () => {
   test("the same island grows the same trails, nodes and ground", () => {
-    const again = grow(REACT, 2, "d")
+    const again = grow(REACT, 2)
     expect(again.trails).toEqual(react.trails)
     expect(Array.from(again.relief?.massifs[0]?.grid.data ?? [])).toEqual(
       Array.from(react.relief?.massifs[0]?.grid.data ?? []),

@@ -14,7 +14,7 @@ import { type TieredInstance, type TieredLayer, tiered, tieredBatch, tieredMerge
  * land material's snow-line copy (snow.ts). The relief is cut by the island's regions
  * (world/reliefChunks.ts) and tiered with them (scene/tiers.ts): a region draws its massif hexes in
  * full (the mesh's tier 0) or, far out, as the mesh's tier 2 (a lattice of hex corners and centres, the
- * hybrid's stairs kept), both built once up front and swapped in place. WebGL: one BatchedMesh, one
+ * stairs kept), both built once up front and swapped in place. WebGL: one BatchedMesh, one
  * instance per region, so the growth film (`?grow`, scene/growth) rides each region up like a land
  * tile; WebGPU, which has no multi-draw: one merged mesh per region and tier.
  */

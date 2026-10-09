@@ -2,7 +2,7 @@ import type { Spot } from "../../layout.ts"
 import type { Massif } from "./field.ts"
 import type { Relief } from "./index.ts"
 import { pointOf } from "./lattice.ts"
-import { strideOf } from "./style.ts"
+import { TRAIL_STRIDE } from "./shape.ts"
 import { carve, settle } from "./trailCarve.ts"
 import { distance, footOf, goalNear, headsOf, latticeOf } from "./trailGround.ts"
 import { type Found, type Head, ijOf, LAID, type Lattice, reach, SLOPE, STAIR } from "./trailSearch.ts"
@@ -136,11 +136,10 @@ function hairpinsOf(spots: readonly Spot[]): number[] {
 /** The island's trails; carves them into the relief. `river`: the keys of the hexes rivers run through. */
 export function trailsOf(relief: Relief, roads: Roads, river: ReadonlySet<string> = new Set()): TrailNet {
   const net: TrailNet = { trails: [], lookouts: [], nodes: {}, edges: [], costs: [] }
-  const stride = strideOf(relief.style)
   const feet = footOf(relief, roads.nodes)
   for (const massif of relief.massifs) {
     if (massif.cells.length < MIN_CELLS || massif.height < MIN_HEIGHT) continue
-    const lat = latticeOf(massif, stride, river)
+    const lat = latticeOf(massif, TRAIL_STRIDE, river)
     const { grid } = massif
     const { heads, roadOf } = headsOf(lat, feet)
     const used = new Uint8Array(grid.data.length)

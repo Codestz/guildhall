@@ -1,18 +1,16 @@
 import { type Cell, cellToWorld } from "../../lands.ts"
 import { TERRACE } from "../../waterways.ts"
-import { cellAt, key } from "../hex.ts"
+import { key } from "../hex.ts"
 import { HUB } from "../plan/keep.ts"
 import type { IslandPlan } from "../plan.ts"
 import { type Massif, massifOf, SEA_RIM } from "./field.ts"
-import { type HexRelief, hexReliefOf } from "./hexRelief.ts"
 import { CAP, footprintsOf, type Tier, tierOf } from "./massifs.ts"
-import { isSculpted, PEAK_BOOST, type ReliefStyle } from "./style.ts"
+import { PEAK_BOOST } from "./shape.ts"
 
 export { type Massif, SEA_RIM } from "./field.ts"
 export { RES } from "./lattice.ts"
 export { CAP, SITE_REACH, type Tier, tierOf } from "./massifs.ts"
 export { type MeshArrays, reliefMesh } from "./mesh.ts"
-export { type ReliefStyle, reliefStyleOf } from "./style.ts"
 
 /**
  * The island's mountains (terrain v2, slice 2a): pure and deterministic. Massifs are grown from the
@@ -26,20 +24,15 @@ export interface ReliefInput {
   level(cell: Cell): number
   /** Years of history (the chronicle's), when known: older repos stand taller. */
   years?: number
-  /** The art direction (`?relief=`, style.ts); the default when absent. */
-  style?: ReliefStyle
 }
 
 export interface Relief {
   tier: Tier
-  style: ReliefStyle
   /** The main range first. */
   massifs: readonly Massif[]
   /** Every hex a massif holds, by key. */
   keys: ReadonlySet<string>
   massifAt(cell: Cell): Massif | undefined
-  /** Hex-native (e): each massif hex's flat column top and its crowns; `heightAt` reads the tops. Absent in the other styles. */
-  hex?: HexRelief
   /** The ground's height at a world point, or undefined off every massif (the hex terrace holds it there). */
   heightAt(x: number, z: number): number | undefined
 }
@@ -49,7 +42,7 @@ export function peakHeight(tier: Tier, files: number, years = 0): number {
   return Math.min(CAP[tier], 10 + 6 * Math.log2(1 + files / 50) + 2 * Math.sqrt(Math.max(0, years)))
 }
 
-export function reliefOf({ plan, level, years = 0, style = "current" }: ReliefInput): Relief {
+export function reliefOf({ plan, level, years = 0 }: ReliefInput): Relief {
   const tier = tierOf(plan.districts.reduce((sum, d) => sum + d.folder.files, 0))
   const topOf = (cell: Cell): number => (plan.land.has(key(cell)) ? level(cell) * TERRACE : SEA_RIM)
   const footprints = footprintsOf(plan, tier)
@@ -74,25 +67,19 @@ export function reliefOf({ plan, level, years = 0, style = "current" }: ReliefIn
     return massifOf({
       id,
       cells: footprint.cells,
-      height: Math.max(TERRACE * 2, height) * (isSculpted(style) ? PEAK_BOOST : style === "e" ? 1.5 : 1),
-      // The hex-native style takes its heights from the plain field.
-      style: style === "e" ? "current" : style,
+      height: Math.max(TERRACE * 2, height) * PEAK_BOOST,
       hub,
       seed: plan.seed ^ (0x9e3779b1 * (id + 1)),
       topOf,
     })
   })
   const keys = new Set(massifs.flatMap((m) => [...m.keys]))
-  const hex = style === "e" ? hexReliefOf(massifs, plan.seed) : undefined
   return {
     tier,
-    style,
     massifs,
     keys,
     massifAt: (cell) => massifs.find((m) => m.keys.has(key(cell))),
-    ...(hex ? { hex } : {}),
     heightAt: (x, z) => {
-      if (hex) return hex.columns.get(key(cellAt([x, z])))
       for (const m of massifs) {
         const h = m.grid.heightAt(x, z)
         if (h !== undefined) return h

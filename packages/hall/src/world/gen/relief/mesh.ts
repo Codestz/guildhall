@@ -1,31 +1,33 @@
 import type { Cell } from "../../lands.ts"
-import { hash, key, step } from "../hex.ts"
-import { isFaceted } from "./facets.ts"
+import { key, step } from "../hex.ts"
+import { curvatureAt } from "./curvature.ts"
+import { planeAt } from "./facets.ts"
+import type { Massif } from "./field.ts"
 import type { Relief } from "./index.ts"
 import { CORNERS, centreOf, pointOf, RES } from "./lattice.ts"
-import { onLedge, stairsOf } from "./strata.ts"
-import { strideOf } from "./style.ts"
+import { valueNoise } from "./noise.ts"
+import { PATCH, riserZone, TILE_TOP, type Tone, vOf, type Zone, zoneOf } from "./paint.ts"
+import { LEDGE_STEP, TRAIL_STRIDE } from "./shape.ts"
+import { smoothNormals } from "./smooth.ts"
+import { chisel, onLedge, seamOf, stairsOf } from "./strata.ts"
 import { SWATCH, swatchV } from "./swatches.ts"
 import { flagsOf } from "./trailCarve.ts"
 import { trailTexel } from "./trailPaint.ts"
-import { paintRiser, paintStrata, paintZones, TILE_TOP } from "./zones.ts"
 
 /**
  * A relief as geometry (terrain v2 §6.1): the per-hex-set builder the island and the planned region
  * chunks (world/chunks.ts) call, once per hex set and detail tier. Pure typed arrays, no three.js.
- * The faces are flat-shaded (a non-indexed mesh with face normals: the kit's own faceted look), each
- * UV'd onto one palette swatch (swatches.ts) by its slope and height, so it joins the lands batch.
+ * The faces are smooth-shaded with creases (smooth.ts: slopes soft, ledge risers and ridges hard)
+ * and UV'd onto the land's palette swatches (swatches.ts), a vertex at its own place on the swatch's
+ * gradient strip (paint.ts), so it joins the lands batch.
  *
- * Tiers nest: tier 0 is the lattice's finest (96 triangles a hex), tier 1 every other vertex (24),
- * tier 2 only the hex corners and centre (6): the far tier, which keeps the hybrid's stairs (cut at
- * its corners) and loses the sculpted summit's facets. The chunky styles keep a river hex's lattice at
- * every tier.
- * A river hex's edge facing a coarse hex is set on that hex's edge whether or not the coarse hex is in
- * the set, so a chunk's mesh joins its neighbour's, at any tier of either, without a crack of its own.
- *
- * The chunky styles (style.ts) mesh a hex at every `strideOf`-th vertex (24 triangles for the facets), except a hex a
- * river carved (it keeps its lattice) whose edge vertices facing a coarse hex are set on that hex's
- * edge, so no crack opens between the two. Their rim faces and skirts take the tile top's grass.
+ * Tiers nest: a hex is meshed at every second vertex (24 triangles) at the finest tier and tier 1, and
+ * at tier 2 only the hex corners and centre (6): the far tier, which keeps the stairs (cut at its
+ * corners) and loses the sculpted summit's shape. A hex a river or a trail carved keeps its lattice
+ * at every tier (its bed is finer than a coarse face), its edge facing a coarser hex set on that
+ * hex's edge, so a chunk's mesh joins its neighbour's, at any tier of either, without a crack.
+ * The faces of the massif's hexes just outside the set are built too (and dropped), so the vertices
+ * on the set's edge are smoothed with the ground beyond it and no seam shows between two sets.
  *
  * Where the set ends a skirt hangs below the edge: 5 units over a hex outside every massif (the same
  * drop as a tile's column, so no gap shows under a bevelled rim), 3 over a hex of the same massif that
@@ -43,32 +45,77 @@ export interface MeshArrays {
 /** Skirts: over the rim, and over a seam between two sets of one massif. */
 const RIM_DROP = 5
 const SEAM_DROP = 3
-/** Grass climbs slopes this steep (degrees from flat) at the foot of a massif... */
-const GRASS_FOOT = 70
-/** ...and only this steep up at the tree line, so the meadow thins into rock rather than ending at a line. */
-const GRASS_HIGH = 48
-/** Beyond this a face is a wall, in dark stone. */
-const WALL_SLOPE = 74
-/** The tree line, a share of the massif's peak: grass thins up to it and is gone a little past. */
-const TREE_LINE = 0.7
+/** A vertex is carved when it differs from the field's own height and from its plane by more than this (units). */
+const CARVED = 0.05
+/** A rim face wears the tile's grass only if it is about level: a steep one is the mountain's own (rock) and the seam is its foot. */
+const FLAT_RIM = 1.2
+/** The concavity (units) a riser's foot and lip are shaded as: a full gully at the foot, a full lip at the top. */
+const WALL_CURVE = 3
 
-const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
+/**
+ * Whether a river carved into the hex: a vertex between the coarse ones that is neither the field's
+ * own height nor the coarse plane (a trail brings those back to the plane, which a coarse tier
+ * draws as it is; a river's bed is finer than a coarse face).
+ */
+function carvedHex(massif: Massif, cell: Cell): boolean {
+  const { grid, pristine } = massif
+  const [ci, cj] = centreOf(cell)
+  for (let k = 0; k < 6; k++) {
+    const [ai, aj] = CORNERS[k] as readonly [number, number]
+    const [bi, bj] = CORNERS[(k + 1) % 6] as readonly [number, number]
+    for (let a = 0; a <= RES; a++)
+      for (let b = 0; a + b <= RES; b++) {
+        const [i, j] = [ci + a * ai + b * bi, cj + a * aj + b * bj]
+        const at = grid.index(i, j)
+        if (at < 0 || (i % TRAIL_STRIDE === 0 && j % TRAIL_STRIDE === 0)) continue
+        const h = grid.data[at] as number
+        if (
+          Math.abs(h - (pristine[at] as number)) > CARVED &&
+          Math.abs(h - planeAt(grid, i, j, TRAIL_STRIDE)) > CARVED
+        )
+          return true
+      }
+  }
+  return false
+}
 
 export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailTier = 0): MeshArrays {
   const tierN = RES >> tier
-  const chunky = relief.style !== "current"
-  const paintOf = relief.style === "b" || relief.style === "d" ? paintStrata : paintZones
   const inSet = new Set(cells.map(key))
+  // The hexes of the same massifs just outside the set: built for the smoothing, never drawn.
+  const ghosts = new Map<string, Cell>()
+  for (const cell of cells)
+    for (let d = 0; d < 6; d++) {
+      const next = step(cell, d)
+      if (!inSet.has(key(next)) && relief.massifAt(next)) ghosts.set(key(next), next)
+    }
   const position: number[] = []
-  const normal: number[] = []
+  const face: number[] = []
   const uv: number[] = []
+  /** Per triangle: it keeps its face normal (a skirt), and it is part of the set (not a ghost's). */
+  const flat: number[] = []
+  const real: number[] = []
+  const carved = new Map<string, boolean>()
+  const nOf = (c: Cell): number => {
+    const massif = relief.massifAt(c)
+    if (!massif) return Math.min(tierN, RES / TRAIL_STRIDE)
+    const id = key(c)
+    let yes = carved.get(id)
+    if (yes === undefined) {
+      yes = carvedHex(massif, c)
+      carved.set(id, yes)
+    }
+    return yes ? RES : Math.min(tierN, RES / TRAIL_STRIDE)
+  }
 
+  /** One triangle; `paint` gives each vertex its [u, v] (a face's colour, or a texel for all three). */
   const emit = (
     a: readonly number[],
     b: readonly number[],
     c: readonly number[],
-    texel: readonly [number, number],
+    paint: (v: readonly number[]) => readonly [number, number],
     up: boolean,
+    isReal: boolean,
     outward?: readonly [number, number],
   ): void => {
     let [p, q, r] = [a, b, c]
@@ -88,47 +135,52 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
       ny = -ny
       nz = -nz
     }
-    const length = Math.hypot(nx, ny, nz) || 1
+    const length = Math.hypot(nx, ny, nz)
+    if (length < 1e-9) return
     for (const v of [p, q, r]) {
       position.push(v[0] as number, v[1] as number, v[2] as number)
-      normal.push(nx / length, ny / length, nz / length)
-      uv.push(texel[0], texel[1])
+      face.push(nx / length, ny / length, nz / length)
+      uv.push(...paint(v))
     }
+    flat.push(up ? 0 : 1)
+    real.push(isReal ? 1 : 0)
   }
 
-  for (const cell of cells) {
+  const build = (cell: Cell, isReal: boolean): void => {
     const massif = relief.massifAt(cell)
-    if (!massif) continue
+    if (!massif) return
     const { grid } = massif
     const trailFlags = flagsOf(grid)
-    // A hex's lattice: the style's coarse one (or the tier's, if coarser), but a river's bed cut into a
-    // hex keeps the finest at every tier, or the far ground would bury the stream.
-    const coarse = RES / strideOf(relief.style)
-    const nOf = (c: Cell): number =>
-      !chunky ? tierN : isFaceted(grid, c, strideOf(relief.style)) ? Math.min(tierN, coarse) : RES
+    // A hex's lattice: the tier's, but a river's bed or a trail's shelf keeps the finest at every
+    // tier, or the far ground would bury it.
     const n = nOf(cell)
     const stride = RES / n
     const [ci, cj] = centreOf(cell)
-    // Where a fine hex meets a coarse one the edge's in-between vertices lie on the coarse edge.
+    // Where a fine hex meets a coarser one the edge's in-between vertices lie on the coarse edge.
     const snapped = new Map<string, number>()
-    if (chunky && n === RES)
+    if (n > 1)
       for (let d = 0; d < 6; d++) {
         const next = step(cell, d)
-        if (!relief.massifAt(next) || nOf(next) >= n) continue
+        const coarse = relief.massifAt(next) ? nOf(next) : n
+        if (coarse >= n) continue
         const [ai, aj] = CORNERS[d] as readonly [number, number]
         const [bi, bj] = CORNERS[(d + 1) % 6] as readonly [number, number]
         const at = (a: number): readonly [number, number] => [
           ci + (n - a) * ai + a * bi,
           cj + (n - a) * aj + a * bj,
         ]
-        for (let a = 1; a < n; a += 2) {
+        const gap = n / coarse
+        for (let a = 1; a < n; a++) {
+          if (a % gap === 0) continue
+          const lo = Math.floor(a / gap) * gap
+          const [i0, j0] = at(lo)
+          const [i1, j1] = at(lo + gap)
           const [i, j] = at(a)
-          const [i0, j0] = at(a - 1)
-          const [i1, j1] = at(a + 1)
-          snapped.set(`${i},${j}`, (grid.get(i0, j0) + grid.get(i1, j1)) / 2)
+          const t = (a - lo) / gap
+          snapped.set(`${i},${j}`, grid.get(i0, j0) * (1 - t) + grid.get(i1, j1) * t)
         }
       }
-    // x, y, z, and the lattice vertex's own smoothed steepness (what paints a face).
+    // x, y, z, and the lattice vertex's own smoothed steepness and trail flag.
     const vertex = (i: number, j: number, drop = 0): number[] => {
       const [x, z] = pointOf(i, j)
       return [
@@ -139,49 +191,118 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
         trailFlags?.[grid.index(i, j)] ?? 0,
       ]
     }
+    /** A vertex that stands on a ledge of the stairs (not the peak above them, nor a rim at a half terrace). */
+    const onStairs = (v: readonly number[]): boolean =>
+      onLedge(v[1] as number) && (v[1] as number) <= massif.ledgeTop + 1e-3
+    const toneOf = (v: readonly number[]): Tone => ({
+      rel: (v[1] as number) / Math.max(1, massif.height),
+      curve: curvatureAt(grid, v[0] as number, v[2] as number),
+      weather: 2 * valueNoise(13, (v[0] as number) / PATCH, (v[2] as number) / PATCH, 51) - 1,
+    })
+    const wear =
+      (zone: Zone) =>
+      (v: readonly number[]): readonly [number, number] => [zone.swatch.u, vOf(zone, toneOf(v))]
+    const texel = (t: readonly [number, number]) => (): readonly [number, number] => t
 
     for (let k = 0; k < 6; k++) {
       const [ai, aj] = CORNERS[k] as readonly [number, number]
       const [bi, bj] = CORNERS[(k + 1) % 6] as readonly [number, number]
       const at = (a: number, b: number): number[] =>
         vertex(ci + stride * (a * ai + b * bi), cj + stride * (a * aj + b * bj))
-      const toTile = chunky && !relief.massifAt(step(cell, k))
+      const toTile = !relief.massifAt(step(cell, k))
       for (let a = 0; a < n; a++)
         for (let b = 0; a + b < n; b++) {
-          const faces: [number[], number[], number[]][] = [[at(a, b), at(a + 1, b), at(a, b + 1)]]
-          if (a + b < n - 1) faces.push([at(a + 1, b), at(a + 1, b + 1), at(a, b + 1)])
-          for (const [p, q, r] of faces) {
-            // A chunky massif's rim faces over land wear the tile top's grass: no seam to the hex ground.
+          const corners: [number, number][][] = [
+            [
+              [a, b],
+              [a + 1, b],
+              [a, b + 1],
+            ],
+          ]
+          if (a + b < n - 1)
+            corners.push([
+              [a + 1, b],
+              [a + 1, b + 1],
+              [a, b + 1],
+            ])
+          for (const ab of corners) {
+            const [p, q, r] = ab.map(([x, y]) => at(x, y)) as [number[], number[], number[]]
+            // The rim faces over land wear the tile top's grass: no seam to the hex ground.
+            const low = Math.min(p[1] as number, q[1] as number, r[1] as number)
             const rim =
-              toTile && a + b === n - 1 && Math.min(p[1] as number, q[1] as number, r[1] as number) >= 0
+              toTile &&
+              a + b === n - 1 &&
+              low >= 0 &&
+              Math.max(p[1] as number, q[1] as number, r[1] as number) - low < FLAT_RIM
             // A trail's shelf: the path's sand, or stone where its legs are steps (trailCarve.ts).
             const trail = trailTexel(p, q, r)
             if (trail) {
-              emit(p, q, r, trail, true)
+              emit(p, q, r, texel(trail), true, isReal)
               continue
             }
-            // The hybrid's ledges are stairs: tops and risers rather than a ramp between two ledges.
-            if (
-              relief.style === "d" &&
-              [p, q, r].every((v) => onLedge(v[1] as number) && (v[1] as number) <= massif.ledgeTop + 1e-3)
-            ) {
+            // The ledges are stairs: tops and risers rather than a ramp between two ledges.
+            if ([p, q, r].every(onStairs)) {
               const stairs = stairsOf(p, q, r)
               for (const t of stairs.tops)
-                emit(t[0], t[1], t[2], rim ? TILE_TOP : paintOf(t[0], t[1], t[2], massif.height), true)
-              for (const w of stairs.walls)
-                emit(w.tri[0], w.tri[1], w.tri[2], paintRiser(w.low), false, w.outward)
+                emit(
+                  t[0],
+                  t[1],
+                  t[2],
+                  rim ? texel(TILE_TOP) : wear(zoneOf(t[0], t[1], t[2], massif.height)),
+                  true,
+                  isReal,
+                )
+              for (const w of chisel(stairs.walls)) {
+                const zone = riserZone(w.low)
+                const foot = w.low * LEDGE_STEP
+                // A wall is dark at its foot (a crease) and catches the light along its lip.
+                const along = (v: readonly number[]): readonly [number, number] => [
+                  zone.swatch.u,
+                  vOf(zone, {
+                    rel: 0.5,
+                    curve: WALL_CURVE * (1 - (2 * ((v[1] as number) - foot)) / LEDGE_STEP),
+                    weather: 2 * valueNoise(13, (v[0] as number) / PATCH, (v[2] as number) / PATCH, 51) - 1,
+                  }),
+                ]
+                emit(w.tri[0], w.tri[1], w.tri[2], along, false, isReal, w.outward)
+              }
               continue
             }
-            const texel = !chunky
-              ? paint(p, q, r, massif.height)
-              : rim
-                ? TILE_TOP
-                : paintOf(p, q, r, massif.height)
-            emit(p, q, r, texel, true)
+            emit(p, q, r, rim ? texel(TILE_TOP) : wear(zoneOf(p, q, r, massif.height)), true, isReal)
+            // Where this ramp meets a stairs triangle across an edge between two ledges, the gap is closed.
+            const vs = [p, q, r]
+            for (let e = 0; e < 3; e++) {
+              const [i, j, w] = [e, (e + 1) % 3, (e + 2) % 3]
+              const [u, v] = [vs[i] as number[], vs[j] as number[]]
+              if (!onStairs(u) || !onStairs(v) || Math.abs((u[1] as number) - (v[1] as number)) < 1e-3)
+                continue
+              const [ui, uj, wi] = [
+                ab[i] as [number, number],
+                ab[j] as [number, number],
+                ab[w] as [number, number],
+              ]
+              const across = at(ui[0] + uj[0] - wi[0], ui[1] + uj[1] - wi[1])
+              if (!onStairs(across) || trailTexel(u, v, across)) continue
+              for (const seam of seamOf(u, v)) {
+                const zone = riserZone(seam.low)
+                const foot = seam.low * LEDGE_STEP
+                const along = (x: readonly number[]): readonly [number, number] => [
+                  zone.swatch.u,
+                  vOf(zone, {
+                    rel: 0.5,
+                    curve: WALL_CURVE * (1 - (2 * ((x[1] as number) - foot)) / LEDGE_STEP),
+                  }),
+                ]
+                // Seen from either side: the sliver is the gap's only face.
+                emit(seam.tri[0], seam.tri[1], seam.tri[2], along, false, isReal)
+                emit(seam.tri[0], seam.tri[2], seam.tri[1], along, false, isReal)
+              }
+            }
           }
         }
     }
-
+    // The skirts: they hang below the edge of the set, over the rim or over a seam with another set.
+    if (!isReal) return
     for (let d = 0; d < 6; d++) {
       const next = step(cell, d)
       if (inSet.has(key(next))) continue
@@ -194,68 +315,34 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
       const angle = (Math.PI / 6) * (1 + 2 * d)
       const outward = [Math.cos(angle), Math.sin(angle)] as const
       const sea = (edge(0)[1] as number) < 0
-      const texel: readonly [number, number] = seam
-        ? [SWATCH.dark.u, swatchV(SWATCH.dark, 0.7)]
-        : chunky && !sea
+      const colour: readonly [number, number] = seam
+        ? [SWATCH.slate.u, swatchV(SWATCH.slate, 0.6)]
+        : !sea
           ? TILE_TOP
           : [SWATCH.grass.u, SWATCH.grass.dark]
       for (let a = 0; a < n; a++) {
-        emit(edge(a), edge(a + 1), edge(a, true), texel, false, outward)
-        emit(edge(a + 1), edge(a + 1, true), edge(a, true), texel, false, outward)
+        emit(edge(a), edge(a + 1), edge(a, true), texel(colour), false, true, outward)
+        emit(edge(a + 1), edge(a + 1, true), edge(a, true), texel(colour), false, true, outward)
       }
     }
   }
-  return {
-    position: Float32Array.from(position),
-    normal: Float32Array.from(normal),
-    uv: Float32Array.from(uv),
-  }
-}
 
-/**
- * A face's swatch, as ground ages up a mountain: meadow and grass on the foothills (greens varying
- * face by face), a mottled belt where gentle faces keep grass and steep ones show rock (chosen by
- * the face's own slope, its height and a little noise, so never a ruled line), then rock in a few
- * greys and warm browns, and dark stone only on walls. Slope is read off the face itself.
- */
-function paint(
-  p: readonly number[],
-  q: readonly number[],
-  r: readonly number[],
-  peak: number,
-): [number, number] {
-  const ux = (q[0] as number) - (p[0] as number)
-  const uy = (q[1] as number) - (p[1] as number)
-  const uz = (q[2] as number) - (p[2] as number)
-  const vx = (r[0] as number) - (p[0] as number)
-  const vy = (r[1] as number) - (p[1] as number)
-  const vz = (r[2] as number) - (p[2] as number)
-  const nx = uy * vz - uz * vy
-  const ny = uz * vx - ux * vz
-  const nz = ux * vy - uy * vx
-  const slope = (Math.atan2(Math.hypot(nx, nz), Math.abs(ny)) * 180) / Math.PI
-  const height = ((p[1] as number) + (q[1] as number) + (r[1] as number)) / 3
-  const rel = clamp01(height / Math.max(1, peak))
-  // Stable per-face chance: the kit's facets are never all one shade, and a belt is never ruled.
-  const cx = ((p[0] as number) + (q[0] as number) + (r[0] as number)) / 3
-  const cz = ((p[2] as number) + (q[2] as number) + (r[2] as number)) / 3
-  const chance = hash(`${cx.toFixed(1)},${cz.toFixed(1)}`) / 4294967296
-  const other = hash(`${cz.toFixed(1)}:${cx.toFixed(1)}`) / 4294967296
-  const jitter = (chance - 0.5) * 0.2
-  if (slope >= WALL_SLOPE) return [SWATCH.warm.u, swatchV(SWATCH.warm, 0.55 + 0.4 * (1 - rel) + jitter)]
-  // Grass holds on slopes up to a limit that falls with height, ragged by chance.
-  const limit = GRASS_FOOT + (GRASS_HIGH - GRASS_FOOT) * clamp01(rel / TREE_LINE) ** 1.6 + (chance - 0.5) * 16
-  if (slope < limit && rel < TREE_LINE + 0.15 + (other - 0.5) * 0.2) {
-    const high = clamp01(rel / TREE_LINE)
-    // Foot: bright yellow-green like the tiles; then meadow, then deeper green and wooded teal.
-    if (high < 0.2 && slope < 24) return [SWATCH.grass.u, swatchV(SWATCH.grass, 0.38 + 0.3 * high + jitter)]
-    if (other < 0.3 + 0.4 * high)
-      return [SWATCH.conifer.u, swatchV(SWATCH.conifer, 0.15 + 0.5 * high + jitter)]
-    return [SWATCH.meadow.u, swatchV(SWATCH.meadow, 0.1 + 0.6 * high + slope / 150 + jitter)]
+  for (const cell of cells) build(cell, true)
+  for (const cell of ghosts.values()) build(cell, false)
+
+  const smooth = smoothNormals(position, face, Uint8Array.from(flat))
+  const keep = real.flatMap((r, t) => (r ? [t] : []))
+  const out: MeshArrays = {
+    position: new Float32Array(keep.length * 9),
+    normal: new Float32Array(keep.length * 9),
+    uv: new Float32Array(keep.length * 6),
   }
-  // Rock: light slate on the sunlit upper faces, warm grey-brown on the lower and the rubbly.
-  const shade = clamp01(0.15 + 0.5 * (1 - rel) + jitter)
-  if (other < 0.5 - 0.25 * rel) return [SWATCH.warm.u, swatchV(SWATCH.warm, shade)]
-  if (slope > 58 && chance < 0.2) return [SWATCH.rock.u, swatchV(SWATCH.rock, 0.3 + 0.5 * (1 - rel))]
-  return [SWATCH.slate.u, swatchV(SWATCH.slate, shade)]
+  keep.forEach((t, k) => {
+    for (let m = 0; m < 9; m++) {
+      out.position[k * 9 + m] = position[t * 9 + m] as number
+      out.normal[k * 9 + m] = smooth[t * 9 + m] as number
+    }
+    for (let m = 0; m < 6; m++) out.uv[k * 6 + m] = uv[t * 6 + m] as number
+  })
+  return out
 }

@@ -27,7 +27,7 @@ const react = decodeChronicle(
 const entries = REACT.entries as RepoEntry[]
 const made = islandFromTree(entries, 0, 2)
 const g = planGrowth({ chronicle: react, shape: summarize(entries), plan: made.plan })
-const world = repoWorld(made, { repo: "fixture/react", source: "fixture", gen: 2, relief: "d" } as never)
+const world = repoWorld(made, { repo: "fixture/react", source: "fixture", gen: 2 } as never)
 const relief = world.relief
 if (!relief) throw new Error("React at gen 2 has no relief")
 const chunks = chunksOf(world)

@@ -1,18 +1,16 @@
-import type { Cell } from "../../lands.ts"
-import { CORNERS, centreOf, type HeightGrid, RES } from "./lattice.ts"
-import { LEDGE_SHARE, LEDGE_STEP, type ReliefStyle, strideOf } from "./style.ts"
+import type { HeightGrid } from "./lattice.ts"
+import { LEDGE_SHARE, LEDGE_STEP, TRAIL_STRIDE } from "./shape.ts"
 
 /**
- * The chunky styles' ground (relief/style.ts): the lattice is meshed every `strideOf`-th vertex, and the
- * vertices between are set to the planes of the coarse triangles, so the mesh, `heightAt` (walkers,
- * trees, rocks) and the grid all agree and nothing floats or sinks. Strata also quantise the coarse
- * vertices to ledges. A hex a river carved is the exception: its bed is finer than a coarse face, so
- * the mesh keeps its full lattice (`isFaceted` tells).
+ * The relief's ground (relief/shape.ts): below the top ledge it stands on ledges (the mesh cuts the
+ * ramps between two ledges into stairs, strata.ts), above it the sculpted height is kept, the peak.
  */
 
-const onStride = (i: number, j: number, stride: number): boolean => i % stride === 0 && j % stride === 0
-
-/** The height of the coarse triangle's plane at lattice vertex (i, j), NaN where a corner is not owned. */
+/**
+ * The height of the coarse triangle's plane at lattice vertex (i, j), NaN where a corner is not
+ * owned. The trails (trailCarve.ts) are laid on every `stride`-th vertex and bring the ones
+ * between back to these planes.
+ */
 export function planeAt(grid: HeightGrid, i: number, j: number, stride: number): number {
   const fi = i / stride
   const fj = j / stride
@@ -26,47 +24,26 @@ export function planeAt(grid: HeightGrid, i: number, j: number, stride: number):
     : at(1, 1) * (u + v - 1) + at(1, 0) * (1 - v) + at(0, 1) * (1 - u)
 }
 
-/** Whether a hex's vertices all lie on its coarse planes (no river bed was cut into it). */
-export function isFaceted(grid: HeightGrid, cell: Cell, stride: number): boolean {
-  const [ci, cj] = centreOf(cell)
-  for (let k = 0; k < 6; k++) {
-    const [ai, aj] = CORNERS[k] as readonly [number, number]
-    const [bi, bj] = CORNERS[(k + 1) % 6] as readonly [number, number]
-    for (let a = 0; a <= RES; a++)
-      for (let b = 0; a + b <= RES; b++) {
-        const i = ci + a * ai + b * bi
-        const j = cj + a * aj + b * bj
-        // The hex's own edge is left out: a rim there is the neighbour's top, which the mesh meets as it is.
-        if (
-          a + b < RES &&
-          !onStride(i, j, stride) &&
-          Math.abs(grid.get(i, j) - planeAt(grid, i, j, stride)) > 0.05
-        )
-          return false
-      }
-  }
-  return true
-}
-
 export interface Shaping {
-  /** Vertices the saddle cuts must leave alone: the rim, and the ones between the coarse ones. */
+  /** Vertices the saddle cuts must leave alone: the rim. */
   fixed(i: number, j: number): boolean
-  /** Brings the grid to the style's ground: ledges for strata, then the planes between. Call after any cut. */
+  /** Brings the grid to the shaped ground: ledges up to the top ledge, the planes between. Call after any cut. */
   apply(): void
 }
 
-/** The style's ground rules over a massif's grid, or undefined for the default (nothing to do). */
+/**
+ * The ground rules over a massif's grid. The coarse vertices (every `TRAIL_STRIDE`-th) stand on
+ * ledges up to the top ledge and keep their sculpted height above it (the faceted peak); the
+ * vertices between them lie on the coarse triangles' planes, so the mesh, `heightAt` (walkers,
+ * trees, rocks) and the grid all agree, a ledge's contour is a clean line the trails and rivers can
+ * be laid on, and the peak's faces are big flat planes.
+ */
 export function shapingOf(
-  style: ReliefStyle,
   grid: HeightGrid,
   owned: Uint8Array,
   isRim: (at: number) => boolean,
-  /** Hybrid only: the top ledge's height; the ground above it is the faceted peak. */
-  ledgeTop = 0,
-): Shaping | undefined {
-  if (style === "current") return undefined
-  const stride = strideOf(style)
-  const hybrid = style === "d"
+  ledgeTop: number,
+): Shaping {
   const each = (visit: (i: number, j: number, at: number) => void): void => {
     for (let j = grid.j0; j < grid.j0 + grid.height; j++)
       for (let i = grid.i0; i < grid.i0 + grid.width; i++) {
@@ -74,25 +51,19 @@ export function shapingOf(
         if (owned[at] && !isRim(at)) visit(i, j, at)
       }
   }
+  const coarse = (i: number, j: number): boolean => i % TRAIL_STRIDE === 0 && j % TRAIL_STRIDE === 0
   return {
-    fixed: (i, j) => isRim(grid.index(i, j)) || !onStride(i, j, stride),
+    fixed: (i, j) => isRim(grid.index(i, j)) || !coarse(i, j),
     apply() {
-      // The hybrid: up to the top ledge the coarse vertices stand on ledges (idempotent: a ledge height
-      // stays); above it they keep their sculpted height, the faceted peak.
-      if (hybrid)
-        each((i, j, at) => {
-          const h = grid.data[at] as number
-          if (onStride(i, j, stride) && h <= ledgeTop + LEDGE_STEP / 2)
-            grid.data[at] = Math.min(ledgeTop, Math.round(h / LEDGE_STEP) * LEDGE_STEP)
-        })
-      if (style === "b")
-        each((i, j, at) => {
-          if (onStride(i, j, stride))
-            grid.data[at] = Math.round((grid.data[at] as number) / LEDGE_STEP) * LEDGE_STEP
-        })
+      // Idempotent: a ledge height stays. Above the top ledge the coarse vertices keep their sculpted height.
       each((i, j, at) => {
-        if (onStride(i, j, stride)) return
-        const plane = planeAt(grid, i, j, stride)
+        const h = grid.data[at] as number
+        if (coarse(i, j) && h <= ledgeTop + LEDGE_STEP / 2)
+          grid.data[at] = Math.min(ledgeTop, Math.round(h / LEDGE_STEP) * LEDGE_STEP)
+      })
+      each((i, j, at) => {
+        if (coarse(i, j)) return
+        const plane = planeAt(grid, i, j, TRAIL_STRIDE)
         if (!Number.isNaN(plane)) grid.data[at] = plane
       })
     },
@@ -110,11 +81,10 @@ export function sharpen(height: number, peak: number, kneeShare = 0.67): number 
 }
 
 /**
- * The hybrid's top ledge (0 in the other styles): a share of what the footprint reached, since the
- * slope limit clips the height asked. The stairs end there and the faceted peak rises above it.
+ * The top ledge: a share of what the footprint reached, since the slope limit clips the height
+ * asked. The stairs end there and the sculpted peak rises above it.
  */
-export function ledgeTopOf(style: ReliefStyle, grid: HeightGrid): number {
-  if (style !== "d") return 0
+export function ledgeTopOf(grid: HeightGrid): number {
   let reach = 0
   for (const h of grid.data) if (h > reach) reach = h
   return Math.max(LEDGE_STEP, Math.round((LEDGE_SHARE * reach) / LEDGE_STEP) * LEDGE_STEP)

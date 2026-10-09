@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { cellAt, key } from "../src/world/gen/hex.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
-import { forestOf, TREELINE } from "../src/world/gen/relief/forest.ts"
+import { dressingOf } from "../src/world/gen/relief/dressing.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
 import { cellToWorld } from "../src/world/lands.ts"
 import { repoWorld } from "../src/world/world.ts"
@@ -80,17 +80,17 @@ describe("hill country", () => {
   })
 })
 
-describe("forest", () => {
-  test("trees stand below the treeline and off steep ground, and never in a river hex", () => {
+describe("dressing", () => {
+  test("trees stand below the treeline and never in a river hex", () => {
     for (const { world } of [CITY, TOWN]) {
       const relief = world.relief
       if (!relief) throw new Error("no relief")
       const wet = new Set(world.water?.rivers.flatMap((reach) => reach.hexes.map((h) => key(h.cell))))
-      const trees = forestOf(relief, 1, wet)
+      const trees = dressingOf(relief, 1, wet).filter((p) => p.piece.startsWith("tree"))
       expect(trees.length).toBeGreaterThan(100)
       const top = Math.max(...relief.massifs.map((m) => m.height))
       for (const tree of trees) {
-        expect(tree.y ?? 0).toBeLessThan(top * TREELINE)
+        expect(tree.y ?? 0).toBeLessThan(top * 0.6)
         expect(wet.has(key(cellAt([tree.x, tree.z])))).toBe(false)
       }
     }
@@ -99,6 +99,6 @@ describe("forest", () => {
   test("the same relief grows the same forest", () => {
     const relief = CITY.world.relief
     if (!relief) throw new Error("no relief")
-    expect(forestOf(relief, 5)).toEqual(forestOf(relief, 5))
+    expect(dressingOf(relief, 5)).toEqual(dressingOf(relief, 5))
   })
 })

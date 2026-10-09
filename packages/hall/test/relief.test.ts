@@ -13,6 +13,7 @@ import {
 import { CIRCUM, CORNERS, centreOf, pointOf, RES } from "../src/world/gen/relief/lattice.ts"
 import { SITE_REACH } from "../src/world/gen/relief/massifs.ts"
 import { reliefMesh } from "../src/world/gen/relief/mesh.ts"
+import { LEDGE_STEP } from "../src/world/gen/relief/shape.ts"
 import { SWATCH } from "../src/world/gen/relief/swatches.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
 import { cellToWorld } from "../src/world/lands.ts"
@@ -249,21 +250,28 @@ describe("the mesh", () => {
     return edges
   }
 
-  test("each tier has its triangles: 6·n² a hex (96, 24, 6), plus two skirt faces along every edge on the set's boundary", () => {
-    for (const tier of [0, 1, 2] as const) {
-      const n = RES >> tier
+  test("each tier has its triangles: a hex at least 6·n² at its tier (24 at the finest, 24, 6) plus the skirts, and fewer the further", () => {
+    const counts = ([0, 1, 2] as const).map((tier) => {
+      const n = Math.min(RES >> tier, RES / 2)
       const mesh = reliefMesh(CITY_RELIEF, cells, tier)
-      expect(mesh.position.length / 9).toBe(cells.length * 6 * n * n + boundary(cells) * 2 * n)
+      // The stairs cut a ledge's ramps into tops and risers, which only adds faces (a carved hex keeps its lattice at every tier).
+      expect(mesh.position.length / 9).toBeGreaterThanOrEqual(
+        cells.length * 6 * n * n + boundary(cells) * 2 * n,
+      )
       expect(mesh.normal.length).toBe(mesh.position.length)
       expect(mesh.uv.length / 2).toBe(mesh.position.length / 3)
-    }
+      return mesh.position.length / 9
+    })
+    expect(counts[1]).toBeLessThanOrEqual((counts[0] as number) * 1.05)
+    expect(counts[1]).toBeGreaterThan(counts[2] as number)
   })
 
   test("the faces cover every hex's footprint once: projected top area is the hexes' area", () => {
     const mesh = reliefMesh(CITY_RELIEF, cells, 0)
     let area = 0
     for (let t = 0; t < mesh.position.length; t += 9) {
-      if ((mesh.normal[t + 1] as number) <= 0.01) continue
+      // (A riser's pillow, pushed out of its plane, tilts up a little: not ground.)
+      if ((mesh.normal[t + 1] as number) <= 0.2) continue
       const p = mesh.position
       area +=
         Math.abs(
@@ -276,15 +284,14 @@ describe("the mesh", () => {
     expect(area / (cells.length * hex)).toBeLessThan(1.001)
   })
 
-  test("the coarser tiers are subsamples of the finest: every vertex stands on the ground", () => {
+  test("the coarser tiers stand on the ground: their top faces are within two ledges of the finest tier's", () => {
     for (const tier of [1, 2] as const) {
       const mesh = reliefMesh(CITY_RELIEF, cells.slice(0, 40), tier)
       for (let v = 0; v < mesh.position.length; v += 3) {
+        if ((mesh.normal[v + 1] as number) <= 0.2) continue
         const [x, y] = [mesh.position[v] as number, mesh.position[v + 1] as number]
-        const z = mesh.position[v + 2] as number
-        const ground = CITY_RELIEF.heightAt(x, z)
-        // Skirt vertices hang below the ground (3 or 5 units); the rest are on it.
-        if (ground !== undefined && y > ground - 0.001) expect(y).toBeCloseTo(ground, 3)
+        const ground = CITY_RELIEF.heightAt(x, mesh.position[v + 2] as number)
+        if (ground !== undefined) expect(Math.abs(y - ground)).toBeLessThanOrEqual(2 * LEDGE_STEP + 1e-3)
       }
     }
   })
@@ -339,10 +346,12 @@ describe("the world with a relief", () => {
     const keys = world.relief?.keys ?? new Set<string>()
     for (const tile of world.island.tiles) expect(keys.has(key(cellAt([tile.x, tile.z])))).toBe(false)
     for (const piece of world.island.decor) {
-      expect(piece.piece.startsWith("mountain_")).toBe(false)
-      // Its forest, and the cairn and flag of a trail's lookout (test/trails.test.ts).
+      // A cone stands on its tile's top; a crag the dressing embeds in the face stands sunk into the ground.
+      if (piece.piece.startsWith("mountain_"))
+        expect(piece.y ?? 0).toBeLessThan((world.relief?.heightAt(piece.x, piece.z) ?? 0) - 0.5)
+      // Its trees, rocks and crags, and the cairn and flag of a trail's lookout (test/trails.test.ts).
       if (keys.has(key(cellAt([piece.x, piece.z]))))
-        expect(piece.piece).toMatch(/^(trees?_|rock_single_|flag_)/)
+        expect(piece.piece).toMatch(/^(trees?_|rock_single_|mountain_|flag_)/)
     }
     expect(CITY.island.decor.some((d) => d.piece.startsWith("mountain_"))).toBe(true)
   })

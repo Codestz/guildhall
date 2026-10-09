@@ -1,4 +1,6 @@
 import type { Craft } from "@guildhall/core"
+import { activeWorld } from "../world/active.ts"
+import { hikes, lookoutPost } from "../world/hikes.ts"
 import type { Post, Spot } from "../world/layout.ts"
 import { nearestVenue, type Venue, type VenueDoor, type VenueKind, venueOfCraft } from "../world/venues.ts"
 
@@ -48,6 +50,17 @@ export class Visits {
     if (!kind) return undefined
     const venue = nearestVenue(kind, KEEP, { venues: this.venues })
     return venue ? this.admit(venue) : undefined
+  }
+
+  /**
+   * Where a Scout's search takes them on an island with trails, now and then: up to a lookout
+   * (world/hikes.ts), to stand there while the deed runs. No venue and no door; undefined for anyone else.
+   */
+  lookoutFor(who: string, archetype: string, craft: Craft | undefined): Post | undefined {
+    const world = activeWorld()
+    return world && archetype === "scout" && craft === "search" && hikes(who)
+      ? lookoutPost(world, who)
+      : undefined
   }
 
   /** A visit to a given venue (a townsperson's own district's): theirs to cycle, never queued. */

@@ -4,6 +4,7 @@ import { cellAt, key } from "./gen/hex.ts"
 import type { Gen } from "./gen/islandFromTree.ts"
 import { forestOf } from "./gen/relief/forest.ts"
 import { type Relief, type ReliefStyle, reliefOf } from "./gen/relief/index.ts"
+import { joinRoads, type TrailNet, trailsOf } from "./gen/relief/trails.ts"
 import type { Folder } from "./gen/repo.ts"
 import { dressRivers, riversOf } from "./gen/rivers/index.ts"
 import type { Home } from "./homes.ts"
@@ -87,7 +88,12 @@ export interface World {
   kind: "hand" | "repo"
   island: Island
   /** The walking graph: road hexes by name, and the edges between neighbours. */
-  roads: { nodes: Readonly<Record<string, Spot>>; edges: readonly (readonly [string, string])[] }
+  roads: {
+    nodes: Readonly<Record<string, Spot>>
+    edges: readonly (readonly [string, string])[]
+    /** What walking each edge costs, aligned with `edges`; absent, its length. A gen 2 island's trails cost by grade. */
+    costs?: readonly number[]
+  }
   terrain: Terrain
   /** The ground's height for walkers: hex tops by level, and a massif's own height on a gen 2 island. */
   ground: Ground
@@ -95,6 +101,8 @@ export interface World {
   relief?: Relief
   /** The rivers and falls of a gen 2 island (world/gen/rivers), drawn by scene/nature/Rivers.tsx. */
   water?: Waterways
+  /** The trails up its mountains and the lookouts they end at (world/gen/relief/trails.ts); joined to `roads`. */
+  trails?: TrailNet
   /** Every place people work, for what grows and burns round them (wilds.ts, lights.ts). */
   sites: readonly WorkPlace[]
   /** The story's job sites on this island (`sitesOf`, world/siteMap.ts). */
@@ -178,6 +186,8 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
   const mountain = relief && relief.massifs.length > 0 ? relief : undefined
   // Rivers spring on the ranges: the relief is carved to their beds before anything reads its ground.
   const rivers = mountain ? riversOf(made.plan, mountain, level) : undefined
+  // Trails up the ranges, carved into the relief once the rivers have been (before the trees are set on it).
+  const trails = mountain ? trailsOf(mountain, made.roads, rivers?.hexes) : undefined
   const covered = (x: number, z: number): boolean => mountain?.keys.has(key(cellAt([x, z]))) ?? false
   // The hexes a massif covers are drawn by the massif (scene/Island.tsx), not by their tiles.
   const dry = mountain
@@ -192,7 +202,16 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
   const wet = rivers && mountain ? dressRivers(dry, rivers.waters, mountain.keys, rivers.bridges) : dry
   // Forest on the mountains' lower slopes, thinning to the treeline.
   const island = mountain
-    ? { ...wet, decor: [...wet.decor, ...forestOf(mountain, made.plan.seed, rivers?.hexes)] }
+    ? {
+        ...wet,
+        decor: [
+          ...wet.decor,
+          ...forestOf(mountain, made.plan.seed, rivers?.hexes),
+          ...(trails?.lookouts ?? []).flatMap((l) =>
+            instantiate(prefab("lookout"), l.at, l.rot, "blue", l.y),
+          ),
+        ],
+      }
     : wet
   const { open, decor } = standing(made.venues, island.decor)
   // A mountain or a river that took the ground under a house took the house.
@@ -200,7 +219,7 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
   return {
     kind: "repo",
     island: decor === island.decor ? island : { ...island, decor },
-    roads: made.roads,
+    roads: trails && trails.trails.length > 0 ? joinRoads(made.roads, trails) : made.roads,
     terrain: {
       at: ([q, line]) => (rivers?.hexes.has(`${q},${line}`) ? "r" : (land.get(`${q},${line}`)?.char ?? "~")),
       // A hex under a massif is raised (wilds and walkers keep off it), by its centre's height.
@@ -215,6 +234,7 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
     ground: { heightAt: (x, z) => mountain?.heightAt(x, z) ?? level(cellAt([x, z])) * TERRACE },
     ...(mountain ? { relief: mountain } : {}),
     ...(rivers ? { water: rivers.waters } : {}),
+    ...(trails && trails.trails.length > 0 ? { trails } : {}),
     sites: [...districts, ...moved],
     storySites,
     ...(open.length > 0 ? { venues: open } : {}),

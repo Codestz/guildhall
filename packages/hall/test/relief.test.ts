@@ -340,7 +340,9 @@ describe("the world with a relief", () => {
     for (const tile of world.island.tiles) expect(keys.has(key(cellAt([tile.x, tile.z])))).toBe(false)
     for (const piece of world.island.decor) {
       expect(piece.piece.startsWith("mountain_")).toBe(false)
-      if (keys.has(key(cellAt([piece.x, piece.z])))) expect(piece.piece).toMatch(/^trees?_/)
+      // Its forest, and the cairn and flag of a trail's lookout (test/trails.test.ts).
+      if (keys.has(key(cellAt([piece.x, piece.z]))))
+        expect(piece.piece).toMatch(/^(trees?_|rock_single_|flag_)/)
     }
     expect(CITY.island.decor.some((d) => d.piece.startsWith("mountain_"))).toBe(true)
   })

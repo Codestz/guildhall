@@ -40,8 +40,15 @@ const HALL = {
 /** A hall node, or a road node (named in lands.ts, or a road hex like "R-3_5"). */
 type Id = keyof typeof HALL | (string & {})
 
-/** The island's walking graph (world/world.ts `World.roads`). */
-type Roads = { nodes: Readonly<Record<string, Spot>>; edges: readonly (readonly [string, string])[] }
+/**
+ * The island's walking graph (world/world.ts `World.roads`). `costs`, aligned with `edges`, is what
+ * walking an edge costs when it is not its length: a trail up a mountain costs by its grade (gen/relief/trails.ts).
+ */
+type Roads = {
+  nodes: Readonly<Record<string, Spot>>
+  edges: readonly (readonly [string, string])[]
+  costs?: readonly number[]
+}
 
 const HALL_EDGES: readonly (readonly [Id, Id])[] = [
   ["A1", "A2"],
@@ -76,7 +83,8 @@ const HALL_EDGES: readonly (readonly [Id, Id])[] = [
 interface Graph {
   nodes: Readonly<Record<string, Spot>>
   edges: readonly (readonly [Id, Id])[]
-  adjacent: Map<Id, Id[]>
+  /** The nodes an edge joins each node to, with what walking it costs. */
+  adjacent: Map<Id, [Id, number][]>
   ids: Id[]
   /** The island's road nodes (no hall aisles), where spots outside the keep join the graph. */
   roadIds: Id[]
@@ -93,11 +101,14 @@ function graphOf(roads: Roads): Graph {
     ...(out ? [["GATE", out] as const] : []),
     ...roads.edges,
   ]
-  const adjacent = new Map<Id, Id[]>()
-  for (const [a, b] of edges) {
-    adjacent.set(a, [...(adjacent.get(a) ?? []), b])
-    adjacent.set(b, [...(adjacent.get(b) ?? []), a])
-  }
+  // The hall's aisles and the gate's edge cost their length; the island's roads their own cost, where given.
+  const lead = edges.length - roads.edges.length
+  const adjacent = new Map<Id, [Id, number][]>()
+  edges.forEach(([a, b], i) => {
+    const cost = roads.costs?.[i - lead] ?? distance(nodes[a] ?? [0, 0], nodes[b] ?? [0, 0])
+    adjacent.set(a, [...(adjacent.get(a) ?? []), [b, cost]])
+    adjacent.set(b, [...(adjacent.get(b) ?? []), [a, cost]])
+  })
   return { nodes, edges, adjacent, ids: Object.keys(nodes) as Id[], roadIds: Object.keys(roads.nodes) }
 }
 
@@ -124,6 +135,10 @@ function inKeep([x, z]: Spot): boolean {
 /** An open node: its cost so far, when it joined the open set, its id. */
 type Open = readonly [number, number, Id]
 
+/** A trail's node (gen/relief/trails.ts names them `T<massif>.<trail>.<i>`), and how near a spot must be to join at one. */
+const TRAIL = /^T\d+\./
+const ON_TRAIL = 3.2
+
 /** Short trips (same corner of the hall) go straight; longer ones take the aisles. */
 const STRAIGHT_BELOW = 3.5
 
@@ -140,7 +155,13 @@ export function route(from: Spot, to: Spot, roads: Roads = activeWorld()?.roads 
   const nearest = (spot: Spot): Id => {
     const pool = inKeep(spot) ? ids : roadIds
     let best: Id = pool[0] ?? "A4"
-    for (const id of pool) if (distance(node(id), spot) < distance(node(best), spot)) best = id
+    // A trail's nodes are joined only by a spot on the mountain, within a few paces of one; from the lowland, by the road.
+    for (const id of pool)
+      if (
+        distance(node(id), spot) < distance(node(best), spot) &&
+        (!TRAIL.test(id) || distance(node(id), spot) < ON_TRAIL)
+      )
+        best = id
     return best
   }
   const start = nearest(from)
@@ -155,8 +176,8 @@ export function route(from: Spot, to: Spot, roads: Roads = activeWorld()?.roads 
     const [spent, , current] = item
     if (spent > (cost.get(current) ?? Number.POSITIVE_INFINITY)) continue
     if (current === goal) break
-    for (const next of adjacent.get(current) ?? []) {
-      const through = spent + distance(node(current), node(next))
+    for (const [next, walk] of adjacent.get(current) ?? []) {
+      const through = spent + walk
       if (through < (cost.get(next) ?? Number.POSITIVE_INFINITY)) {
         cost.set(next, through)
         previous.set(next, current)
@@ -174,6 +195,23 @@ export function route(from: Spot, to: Spot, roads: Roads = activeWorld()?.roads 
   if (nodes.length > 1 && nodes[1] && distance(from, nodes[1]) < distance(node(start), nodes[1]))
     nodes.shift()
   return [...nodes, to]
+}
+
+/**
+ * How high the ground stands under a walker: a mountain's (the active world's relief), 0 anywhere
+ * else, which is where people have always walked. Walkers follow it up the trails (scene/brain.ts).
+ */
+export function groundAt(x: number, z: number): number {
+  return activeWorld()?.relief?.heightAt(x, z) ?? 0
+}
+
+/**
+ * How fast a walker goes on a slope, as a share of the pace on the flat: uphill it falls with the
+ * grade (a walking trail's 0.33 is 0.8, a stair's 0.5 is 0.7), downhill it is a touch slower than
+ * the flat for the care it takes. `grade` is rise over run, positive uphill.
+ */
+export function pace(grade: number): number {
+  return grade > 0 ? 1 - 0.6 * Math.min(grade, 0.6) : grade < -0.05 ? 0.95 : 1
 }
 
 /** Exported for tests and the Lab: the hand map's graph itself. */

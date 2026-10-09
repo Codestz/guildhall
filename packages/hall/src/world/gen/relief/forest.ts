@@ -3,6 +3,7 @@ import { cellAt, key, rng } from "../hex.ts"
 import { dressingOf } from "./dressing.ts"
 import type { Relief } from "./index.ts"
 import { isSculpted } from "./style.ts"
+import { onShelf } from "./trailCarve.ts"
 
 /**
  * The forest on the mountains (terrain 2c): trees stand thick on the lower slopes, thin out with
@@ -45,7 +46,7 @@ export function forestOf(
           const at = cellAt([x, z])
           if (key(at) !== key(cell)) continue
           const h = grid.heightAt(x, z)
-          if (h === undefined || h < 0.3) continue
+          if (h === undefined || h < 0.3 || onShelf(massif, x, z)) continue
           const grade =
             Math.max(
               Math.abs((grid.heightAt(x + 1.2, z) ?? h) - h),

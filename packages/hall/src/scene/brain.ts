@@ -2,7 +2,7 @@ import { MathUtils, type Object3D } from "three"
 import type { AdventurerView } from "../guild/store.ts"
 import { legOf, type Routine } from "../world/behaviours.ts"
 import type { Spot } from "../world/layout.ts"
-import { route } from "../world/paths.ts"
+import { groundAt, pace, route } from "../world/paths.ts"
 import { DESTINATIONS } from "../world/sites.ts"
 import { CARRY_WALK } from "./activity.ts"
 import { Visiting } from "./visit.ts"
@@ -89,9 +89,17 @@ export class Brain {
     const walking = !holding && remaining > 0.12
     const carrying = looping && work !== null && work.held !== null
     const leaving = view.phase === "leaving"
+    // On a mountain the ground has a grade (a gen 2 island's trails): a slower pace uphill, and a lean into it.
+    const here = groundAt(node.position.x, node.position.z)
+    const mountain = here > 0.3 || groundAt(nx, nz) > 0.3
+    const grade = walking && step > 0.01 ? (groundAt(nx, nz) - here) / step : 0
     let speed = 0
     if (walking) {
-      speed = carrying ? CARRY_SPEED : Math.max(WALK_SPEED, remaining / (leaving ? LEAVE_WALK_S : MAX_WALK_S))
+      // A hike keeps its own pace: the far-trip run (MAX_WALK_S) is for the flat.
+      const base = mountain
+        ? WALK_SPEED
+        : Math.max(WALK_SPEED, remaining / (leaving ? LEAVE_WALK_S : MAX_WALK_S))
+      speed = (carrying ? CARRY_SPEED : base) * pace(grade)
       const move = Math.min(1, (speed * delta) / Math.max(step, 1e-6))
       node.position.x += dx * move
       node.position.z += dz * move
@@ -109,7 +117,11 @@ export class Brain {
     // In bed: up onto the mattress. The post is at floor level beside it, so lying down there
     // put them on the floor under the bed (the user: "they sleep below the bed").
     const inBed = view.seat === "bed" && !walking
-    node.position.y = MathUtils.damp(node.position.y, inBed ? BED_TOP : 0, 6, delta)
+    // On a mountain they stand on its ground, the toes lifted a little on an uphill leg so they don't sink.
+    const lift = Math.max(0, Math.min(0.15, 0.3 * grade))
+    node.position.y = MathUtils.damp(node.position.y, inBed ? BED_TOP : here + lift, mountain ? 12 : 6, delta)
+    node.rotation.order = "YXZ"
+    node.rotation.x = MathUtils.damp(node.rotation.x, Math.min(0.2, 0.35 * Math.max(0, grade)), 8, delta)
     const out = this.stride
     out.walking = walking
     out.speed = speed

@@ -1,6 +1,7 @@
 import { cellToWorld, type LandPlacement } from "../../lands.ts"
 import { cellAt, key, rng } from "../hex.ts"
 import type { Relief } from "./index.ts"
+import { onShelf } from "./trailCarve.ts"
 
 /**
  * Sculpted peaks' dressing (styles c and d, relief/style.ts): the detail on the mountain comes from the
@@ -55,6 +56,7 @@ export function dressingOf(
         (k) => (grid.heightAt(x + 2 * Math.cos(k * 1.57), z + 2 * Math.sin(k * 1.57)) ?? h) - h >= RISER,
       )
     const put = (piece: LandPlacement["piece"], x: number, z: number, h: number, scale: number): void => {
+      if (onShelf(massif, x, z)) return
       out.push({
         piece,
         x: Math.round(x * 100) / 100,

@@ -6,6 +6,8 @@ import { CORNERS, centreOf, pointOf, RES } from "./lattice.ts"
 import { onLedge, stairsOf } from "./strata.ts"
 import { strideOf } from "./style.ts"
 import { SWATCH, swatchV } from "./swatches.ts"
+import { flagsOf } from "./trailCarve.ts"
+import { trailTexel } from "./trailPaint.ts"
 import { paintRiser, paintStrata, paintZones, TILE_TOP } from "./zones.ts"
 
 /**
@@ -98,6 +100,7 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
     const massif = relief.massifAt(cell)
     if (!massif) continue
     const { grid } = massif
+    const trailFlags = flagsOf(grid)
     // A hex's lattice: the style's coarse one (or the tier's, if coarser), but a river's bed cut into a
     // hex keeps the finest at every tier, or the far ground would bury the stream.
     const coarse = RES / strideOf(relief.style)
@@ -133,6 +136,7 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
         (snapped.get(`${i},${j}`) ?? grid.get(i, j)) - drop,
         z,
         massif.slope[grid.index(i, j)] as number,
+        trailFlags?.[grid.index(i, j)] ?? 0,
       ]
     }
 
@@ -150,6 +154,12 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
             // A chunky massif's rim faces over land wear the tile top's grass: no seam to the hex ground.
             const rim =
               toTile && a + b === n - 1 && Math.min(p[1] as number, q[1] as number, r[1] as number) >= 0
+            // A trail's shelf: the path's sand, or stone where its legs are steps (trailCarve.ts).
+            const trail = trailTexel(p, q, r)
+            if (trail) {
+              emit(p, q, r, trail, true)
+              continue
+            }
             // The hybrid's ledges are stairs: tops and risers rather than a ramp between two ledges.
             if (
               relief.style === "d" &&

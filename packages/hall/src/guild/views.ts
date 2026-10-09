@@ -172,9 +172,12 @@ export function viewsOf(
     const lastTool = s.entries.findLast((entry) => entry.kind === "tool")
     const stung = lastTool?.kind === "tool" && failedDeed(lastTool) && now - (lastTool.ended ?? 0) < 1400
 
+    // A Scout's search may take them up a trail to a lookout instead (world/hikes.ts): no door, no venue.
+    const hike =
+      !isMaster && s.status === "running" ? visits.lookoutFor(s.id, archetype.id, craft) : undefined
     // Hard at a deed, or just done with one: the venue its craft calls for (not a guildmaster, not a plea).
     const visiting =
-      !isMaster && s.status === "running"
+      !isMaster && s.status === "running" && !hike
         ? visits.forCraft(
             craft ??
               (lastTool?.kind === "tool" && lastTool.ended !== undefined && now - lastTool.ended < LINGER_MS
@@ -224,6 +227,8 @@ export function viewsOf(
       destination = to
       seat = berth?.seat
       target = berth?.target ?? (place?.crowd ? crowd.near(place.crowd) : MASTER_POST)
+    } else if (hike) {
+      target = hike
     } else if (visiting) {
       target = visiting.target
     } else if (home) {

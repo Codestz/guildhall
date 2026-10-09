@@ -1,6 +1,7 @@
 import { ARCHETYPES } from "@guildhall/roster"
 import { placeOf, seedOf } from "../../world/behaviours.ts"
 import { districtById, districtPlaceOf, siteOfDistrict, tradeOf } from "../../world/districtWork.ts"
+import { hikes, lookoutPost } from "../../world/hikes.ts"
 import type { Post, Spot } from "../../world/layout.ts"
 import { spread } from "../../world/sharers.ts"
 import { HARBOUR, type Resident } from "../../world/town/townsfolk.ts"
@@ -99,6 +100,9 @@ function viewOf(
     if (work)
       return { ...base, phase: "working", craft: "edit" as const, ...work, ...(visit ? { visit } : {}) }
   }
+  // Some of the Scouts, when not at work, climb to a lookout on the island's trails and take the view (world/hikes.ts).
+  const hike = r.archetype === "scout" && hikes(r.id) ? lookoutPost(world, r.id) : undefined
+  if (hike) return { ...base, phase: "idle", target: hike }
   const sit = (seedOf(r.id) % 1000) / 1000 < SITTING
   return {
     ...base,

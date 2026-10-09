@@ -42,6 +42,7 @@ describe("prefab catalogue", () => {
       "wall-gate",
       "wall-tower",
       "wall-corner",
+      "lookout",
     ])
   })
 

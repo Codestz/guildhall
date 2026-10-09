@@ -7,14 +7,15 @@
  *   b  strata: the massif stands in stacked ledges, rock bands between grassy and snowy tops
  *   c  sculpted peaks: taller, sharper summits, chunky facets, and the kit's rocks and conifer clumps
  *   d  hybrid, the default: b's ledges (as true stairs) up to the tree line, c's faceted peak above
+ *   e  hex-native: columns of the island's own tiles, kit rocks and scaled mountains as crowns (columns.ts)
  *   current  the relief as it was before the styles (`?relief=current`)
  */
-export type ReliefStyle = "current" | "a" | "b" | "c" | "d"
+export type ReliefStyle = "current" | "a" | "b" | "c" | "d" | "e"
 
 /** The style a link asks for (`relief=a`), else the default (the hybrid). */
 export function reliefStyleOf(search: string): ReliefStyle {
   const asked = new URLSearchParams(search).get("relief")
-  return asked === "a" || asked === "b" || asked === "c" || asked === "current" ? asked : "d"
+  return asked === "a" || asked === "b" || asked === "c" || asked === "e" || asked === "current" ? asked : "d"
 }
 
 /**

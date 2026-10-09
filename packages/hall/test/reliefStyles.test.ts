@@ -22,11 +22,11 @@ const trianglesOf = (relief: Relief): number =>
   relief.massifs.reduce((sum, m) => sum + reliefMesh(relief, m.cells, 0).position.length / 9, 0)
 
 describe("the style a link asks for", () => {
-  test("a, b, c, d and current are understood; anything else is the hybrid, the default", () => {
+  test("a, b, c, d, e and current are understood; anything else is the hybrid, the default", () => {
     expect(
-      ["?relief=a", "?relief=b", "?relief=c", "?relief=d", "?relief=current"].map(reliefStyleOf),
-    ).toEqual(["a", "b", "c", "d", "current"])
-    expect(["", "?relief=e", "?relief=A", "?relief="].map(reliefStyleOf)).toEqual(["d", "d", "d", "d"])
+      ["?relief=a", "?relief=b", "?relief=c", "?relief=d", "?relief=e", "?relief=current"].map(reliefStyleOf),
+    ).toEqual(["a", "b", "c", "d", "e", "current"])
+    expect(["", "?relief=f", "?relief=A", "?relief="].map(reliefStyleOf)).toEqual(["d", "d", "d", "d"])
   })
 
   test("the default relief is the current one", () => {

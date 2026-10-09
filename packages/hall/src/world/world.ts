@@ -3,6 +3,8 @@ import type { District, RepoIsland } from "./gen/dress.ts"
 import { cellAt, key } from "./gen/hex.ts"
 import type { Gen } from "./gen/islandFromTree.ts"
 import { forestOf } from "./gen/relief/forest.ts"
+import { hexMountains } from "./gen/relief/hexMountains.ts"
+import { lowlandRivers } from "./gen/relief/hexRivers.ts"
 import { type Relief, type ReliefStyle, reliefOf } from "./gen/relief/index.ts"
 import { joinRoads, type TrailNet, trailsOf } from "./gen/relief/trails.ts"
 import type { Folder } from "./gen/repo.ts"
@@ -99,6 +101,8 @@ export interface World {
   ground: Ground
   /** The mountains of a gen 2 island (world/gen/relief), drawn in place of the hexes they cover. */
   relief?: Relief
+  /** Hex-native mountains (relief style e): the island's tiles and crowns that are the range, drawn in the snow-line material. */
+  mountains?: ReadonlySet<LandPlacement>
   /** The rivers and falls of a gen 2 island (world/gen/rivers), drawn by scene/nature/Rivers.tsx. */
   water?: Waterways
   /** The trails up its mountains and the lookouts they end at (world/gen/relief/trails.ts); joined to `roads`. */
@@ -185,9 +189,14 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
       : undefined
   const mountain = relief && relief.massifs.length > 0 ? relief : undefined
   // Rivers spring on the ranges: the relief is carved to their beds before anything reads its ground.
-  const rivers = mountain ? riversOf(made.plan, mountain, level) : undefined
+  const carved = mountain ? riversOf(made.plan, mountain, level) : undefined
+  // The hex-native style (e) stands its mountains of the island's own tiles and pieces instead: no
+  // river runs over its columns, and no trail is carved into them (a lattice it does not have).
+  const hexed = mountain?.hex !== undefined
+  const rivers = carved && mountain && hexed ? lowlandRivers(carved, mountain.keys) : carved
+  const hexes = mountain ? hexMountains(mountain, made.plan.seed, rivers?.hexes) : undefined
   // Trails up the ranges, carved into the relief once the rivers have been (before the trees are set on it).
-  const trails = mountain ? trailsOf(mountain, made.roads, rivers?.hexes) : undefined
+  const trails = mountain && !hexed ? trailsOf(mountain, made.roads, rivers?.hexes) : undefined
   const covered = (x: number, z: number): boolean => mountain?.keys.has(key(cellAt([x, z]))) ?? false
   // The hexes a massif covers are drawn by the massif (scene/Island.tsx), not by their tiles.
   const dry = mountain
@@ -204,9 +213,10 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
   const island = mountain
     ? {
         ...wet,
+        tiles: hexes ? [...wet.tiles, ...hexes.tiles] : wet.tiles,
         decor: [
           ...wet.decor,
-          ...forestOf(mountain, made.plan.seed, rivers?.hexes),
+          ...(hexes ? hexes.decor : forestOf(mountain, made.plan.seed, rivers?.hexes)),
           ...(trails?.lookouts ?? []).flatMap((l) =>
             instantiate(prefab("lookout"), l.at, l.rot, "blue", l.y),
           ),
@@ -233,6 +243,7 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
     },
     ground: { heightAt: (x, z) => mountain?.heightAt(x, z) ?? level(cellAt([x, z])) * TERRACE },
     ...(mountain ? { relief: mountain } : {}),
+    ...(hexes ? { mountains: hexes.ground } : {}),
     ...(rivers ? { water: rivers.waters } : {}),
     ...(trails && trails.trails.length > 0 ? { trails } : {}),
     sites: [...districts, ...moved],

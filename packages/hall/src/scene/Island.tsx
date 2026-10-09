@@ -84,9 +84,12 @@ export function Island() {
   // materials are the land pack's.
   const built = useOwnedMeshes(
     () => {
-      const layer = batch(nodes, [...land.tiles, ...land.decor], webgpu, simplifier, chunksOf(world))
       const base = landMaterial(lands)
-      if (!world.relief || !base) return { ...layer, relief: undefined }
+      // Hex-native mountains (relief style e) are land tiles and pieces, drawn in the snow-line material.
+      const skin =
+        base && world.mountains ? { of: world.mountains, material: makeSnow(base, snowline) } : undefined
+      const layer = batch(nodes, [...land.tiles, ...land.decor], webgpu, simplifier, chunksOf(world), skin)
+      if (!world.relief || !base || skin) return { ...layer, relief: undefined }
       const relief = reliefLayer(world.relief, makeSnow(base, snowline), webgpu, chunksOf(world))
       return { meshes: [...layer.meshes, ...relief.meshes], tiers: layer.tiers, relief: relief.tiers }
     },
@@ -195,6 +198,7 @@ function batch(
   merge: boolean,
   simplifier: Simplifier,
   chunks: Chunks,
+  skin?: { of: ReadonlySet<LandPlacement>; material: Material },
 ): { meshes: Mesh[]; tiers: TieredLayer } {
   // A piece's coarse copy may move its surface FAR_ERROR world units wherever it stands, so its
   // error in its own units is set by its biggest copy.
@@ -233,10 +237,12 @@ function batch(
         byMaterial.set(material, { near, far: coarser(simplifier, near, error) })
       pieces.set(placement.piece, byMaterial)
     }
-    const cast = casts(placement.piece)
+    // A column above the ground throws a mountain's shadow, though a hex tile on the plain does not.
+    const cast = casts(placement.piece) || (!!skin?.of.has(placement) && (placement.y ?? 0) > 0)
     const at = place(placement)
     const chunk = chunks.at(placement.x, placement.z)
-    for (const [material, piece] of byMaterial) {
+    for (const [drawn, piece] of byMaterial) {
+      const material = skin?.of.has(placement) ? skin.material : drawn
       const id = `${material.uuid}:${cast}`
       const group: Group = groups.get(id) ?? { material, cast, instances: [] }
       group.instances.push({ piece, matrix: at, chunk, placement })

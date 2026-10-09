@@ -152,11 +152,11 @@ export const VIEWS: View[] = [
     name: "dossier",
     link: "story=saga&t=6:00&hour=12&weather=clear&hud=minimal&look=keep&select=Guildmaster",
     why: "an adventurer picked: dossier open, camera following",
-    // The follow camera tracks the Guildmaster, whose idle animation runs on real frame deltas, so
-    // the framing lands a few pixels apart per load (0.1-4.5% measured). The view guards the dossier
-    // panel (a third of the frame), so a looser limit still catches it breaking.
+    // The follow camera tracks the Guildmaster, who stops a stride short of the post wherever the
+    // frame timing put them (a shifted frame, 1-7%); a paused probe now walks in fixed steps
+    // (scene/Adventurer.tsx) and shows no toasts (hud/Chronicle.tsx), so the loads agree.
     settle: 4000,
-    threshold: 0.06,
+    threshold: 0.015,
   },
   {
     name: "legends",

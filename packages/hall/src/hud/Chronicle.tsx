@@ -1,4 +1,5 @@
 import { type CSSProperties, useRef } from "react"
+import { PROBE } from "../guild/mode.ts"
 import type { GuildStore, LogEntry } from "../guild/store.ts"
 import { clock, LOG_TONE } from "./format.ts"
 import { Icon } from "./icons.tsx"
@@ -95,7 +96,9 @@ const FADE = 1200
 
 /**
  * The chronicle folded away: the last few moments that matter, fading on their own. Lifetimes run
- * on the viewer's clock (not story time), so a paused story still clears its toasts.
+ * on the viewer's clock (not story time), so a paused story still clears its toasts. In a probe
+ * build with the story paused (a golden view) none show: which ones were still alive, and how
+ * faded, depended on the wall time the shot landed at, so the same view differed run to run.
  */
 export function Toasts({
   store,
@@ -123,7 +126,7 @@ export function Toasts({
       first = now
       seen.current.set(id, now)
     }
-    const left = life - (now - first)
+    const left = PROBE && store.speed === 0 ? 0 : life - (now - first)
     if (left > 0) shown.push({ entry, left })
   }
   // Forget the oldest once the map outgrows the log.

@@ -25,6 +25,7 @@ import {
   SphereGeometry,
   Vector3,
 } from "three"
+import { PROBE } from "../guild/mode.ts"
 import type { AdventurerView } from "../guild/store.ts"
 import { positions, useGuildStore } from "../guild/useGuild.ts"
 import { verbOf } from "../hud/format.ts"
@@ -405,7 +406,9 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
     // Off work (a plea, loot, a failure): the loop starts over, hands emptied, when they're back.
     if (work && !active && work.started) work.reset()
     const looping = active && work.started
-    const { walking, speed, remaining, carrying } = brain.walk(node, view, work, looping, holding, delta)
+    // A paused probe walks in fixed steps: a walk stops within a stride of its post, so frame timing moved the stop (and the follow camera).
+    const step = PROBE && store.speed === 0 ? 1 / 30 : delta
+    const { walking, speed, remaining, carrying } = brain.walk(node, view, work, looping, holding, step)
     const leaving = view.phase === "leaving"
 
     // In and out by dissolving (scene/dissolve.ts), never by scale: a leaver fades over the last

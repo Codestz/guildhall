@@ -9,9 +9,9 @@ import type { WaterUniforms } from "./Water.tsx"
 
 /**
  * The sky and weather as a water material reads them, written into its uniforms every frame: the
- * eased rain, gloom and cloud, the key and fill, the moon's path, Water v2's own clock. Water.tsx's
- * frame step for the uniforms every water shares (it keeps its own, for its torches and shore);
- * the inland water (Rivers.tsx) takes it from here. `onKey` hears of the scene's shadow-casting
+ * eased rain, gloom and cloud, the key and fill, the moon's path, Water v2's own clock. the frame
+ * step for the uniforms every water shares: the sea (Water.tsx, which adds its torches) and the
+ * inland water (Rivers.tsx) both take it from here. `onKey` hears of the scene's shadow-casting
  * key light once it has a map (the node materials take their shadow from it).
  */
 export function useWaterSky(

@@ -30,6 +30,8 @@ import { HEX_RADIUS } from "./scatter.ts"
 
 /** How far a lakeshore tile's sand runs on under the water past its edge, to about its waterline. */
 const COAST_REACH = 3
+/** How much further in, per bank beyond the first, a corner tile's waterline lies. */
+const CORNER_REACH = 2.5
 /** A hex's inradius (centre to edge midpoint). */
 const INRADIUS = HEX_RADIUS * Math.cos(Math.PI / 6)
 /** Rings per hex patch: 12 points round each (corners and edge midpoints), 1 + 12·RINGS vertices. */
@@ -150,6 +152,13 @@ function toSegment([px, pz]: Spot, [ax, az]: Spot, [bx, bz]: Spot): number {
   return Math.hypot(px - ax - dx * t, pz - az - dz * t)
 }
 
+/** Distance from p to the infinite line through a and b. */
+function toLine([px, pz]: Spot, [ax, az]: Spot, [bx, bz]: Spot): number {
+  const dx = bx - ax
+  const dz = bz - az
+  return Math.abs((px - ax) * dz - (pz - az) * dx) / Math.hypot(dx, dz)
+}
+
 /** Edge `dir` of a hex as its two corners (edge k faces 30° + 60°·k; its corners are at 60°·k and 60°·(k+1)). */
 function edgeOf([cx, cz]: Spot, dir: number): [Spot, Spot] {
   const corner = (k: number): Spot => [
@@ -228,9 +237,22 @@ function still(out: Builder, lake: Lake, falls: readonly Fall[]): void {
   const y = surfaceY("lake", lake.level)
   for (const cell of [...lake.cells, ...lake.shore]) {
     const wet = inside.has(key(cell))
-    patch(out, W(cell), y, (x, z) => {
+    const centre = W(cell)
+    // A lakeshore tile's sand is its hex inset from the banks it borders, corners square: the
+    // distance to each bank's whole line, not its segment (which rounds the corner off, and so
+    // misplaces the waterline where two banks meet).
+    const own = wet
+      ? []
+      : banks.filter(([a, b]) => {
+          const [mx, mz] = mid(a, b)
+          return Math.hypot(mx - centre[0], mz - centre[1]) < INRADIUS + 0.01
+        })
+    // ...and a tile with two banks (a corner of the land) cups the water further in (eased in from its banks, so the water doesn't step at them).
+    const extra = CORNER_REACH * Math.max(0, own.length - 1)
+    patch(out, centre, y, (x, z) => {
       let edge = 2 * HEX_RADIUS
-      for (const [a, b] of banks) edge = Math.min(edge, toSegment([x, z], a, b))
+      for (const [a, b] of own) edge = Math.min(edge, toLine([x, z], a, b))
+      if (own.length === 0) for (const [a, b] of banks) edge = Math.min(edge, toSegment([x, z], a, b))
       const toExit = Math.hypot(exit[0] - x, exit[1] - z)
       const drift = 0.3 * (1 - smoothstep(2, 10, toExit))
       const foot = nearestFoot(feet, x, z)
@@ -240,7 +262,11 @@ function still(out: Builder, lake: Lake, falls: readonly Fall[]): void {
         ((exit[0] - x) / Math.max(toExit, 1e-3)) * drift + ((x - foot[0]) / Math.max(fromFoot, 1e-3)) * push,
         ((exit[1] - z) / Math.max(toExit, 1e-3)) * drift + ((z - foot[1]) / Math.max(fromFoot, 1e-3)) * push,
       ]
-      return { flow, shore: (wet ? edge : -edge) + COAST_REACH, foot }
+      return {
+        flow,
+        shore: wet ? edge + COAST_REACH : COAST_REACH + extra * Math.min(1, edge / COAST_REACH) - edge,
+        foot,
+      }
     })
   }
 }

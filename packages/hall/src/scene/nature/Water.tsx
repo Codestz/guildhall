@@ -8,7 +8,6 @@ import {
   type DirectionalLight,
   Float32BufferAttribute,
   type Material,
-  MathUtils,
   type Object3D,
   RGBAFormat,
   ShaderMaterial,
@@ -19,7 +18,6 @@ import {
   Vector4,
   type WebGLRenderer,
 } from "three"
-import { reducedMotion } from "../../guild/opening.ts"
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { isWebGPU } from "../../render/backend.ts"
@@ -36,7 +34,7 @@ import { sky } from "../atmosphere/state.ts"
 import { wind } from "../atmosphere/wind.ts"
 import { riseWater, useRiseMask } from "../growth/mask.ts"
 import { installNodes, TSL } from "../tsl.ts"
-import { EASE, targetOf } from "../weather/shared.ts"
+import { targetOf } from "../weather/shared.ts"
 import { noiseTexture } from "./noise.ts"
 import { HEX_RADIUS } from "./scatter.ts"
 import { waterFragment, waterVertex } from "./shaders.ts"
@@ -44,6 +42,7 @@ import { Bakes, type Hole, patchSquares, SHORE, type ShoreLayout, seaSquares } f
 import { bakeShore, RING_MAX, riverOf, type Shore } from "./shoreBake.ts"
 import { outreachOf, shoreTilesOf } from "./shoreTiles.ts"
 import { RIVER_Y, SEA_Y } from "./waterline.ts"
+import { useWaterSky } from "./waterSky.ts"
 
 /**
  * The island's water (ADR 0007, Nature): one surface, one draw call, for the sea, the lake and the
@@ -113,7 +112,7 @@ function partsOf(world: World, archipelago: Archipelago | null, at?: Spot): Part
 }
 
 function Surface({ tier, at, part }: { tier: Tier; at?: Spot; part: Part }) {
-  const store = useGuildStore()
+  const _store = useGuildStore()
   const gl = useThree((state) => state.gl)
   const { nodes } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
   const world = useWorld()
@@ -141,8 +140,7 @@ function Surface({ tier, at, part }: { tier: Tier; at?: Spot; part: Part }) {
     return built
   }, [build, tier, v2, key, shore, layout, at, rise, node])
   const flames = useMemo(() => watersideOf(world, at), [world, at])
-  const eased = useMemo(() => ({ rain: 0, gloom: 0, cloud: 0, pick: 0, caustics: 0 }), [])
-  const still = useMemo(reducedMotion, [])
+  const eased = useMemo(() => ({ pick: 0 }), [])
 
   // The shore texture: baked once per world and square (after the first commit, so a suspended
   // render never pays for it), kept while a water draws it (Bakes). A shore tile waits its turn.
@@ -178,49 +176,9 @@ function Surface({ tier, at, part }: { tier: Tier; at?: Spot; part: Part }) {
   useEffect(() => () => material.dispose(), [material])
   useEffect(() => () => geometry.dispose(), [geometry])
 
+  useWaterSky(uniforms, node ? setKey : undefined)
   useFrame((state, delta) => {
-    if (node && !key?.parent) {
-      const found = keyLight(state.scene)
-      if (found !== key) setKey(found)
-    }
-    const env = store.environment
     const u = uniforms
-    eased.rain = MathUtils.damp(eased.rain, env.weather === "snow" ? 0 : env.precipitation, EASE, delta)
-    eased.gloom = MathUtils.damp(
-      eased.gloom,
-      env.weather === "storm" ? 1 : env.weather === "rain" ? 0.4 : 0,
-      EASE,
-      delta,
-    )
-    eased.cloud = MathUtils.damp(eased.cloud, env.cloudCover, EASE, delta)
-    u.uRain.value = eased.rain
-    u.uGloom.value = eased.gloom
-    u.uCloud.value = eased.cloud
-    u.uKeyIntensity.value = sky.keyIntensity
-    u.uHemiIntensity.value = sky.hemiIntensity
-    u.uFlash.value = sky.flash
-    // Water v2's own clock (caustics, rings, wake): it holds still under prefers-reduced-motion.
-    if (!still) eased.caustics = (eased.caustics + Math.min(delta, 0.1)) % 1000
-    u.uCaustics.value = eased.caustics
-    const [x, y, z] = sky.keyDirection
-    u.uKeyDir.value.set(x, y, z)
-    // A photogenic moon: its path swings round towards where the camera looks, so the diorama's
-    // high, fixed angle still sees it (a true mirror image is mostly behind or off screen).
-    const [mx, my, mz] = env.moon
-    state.camera.getWorldDirection(look)
-    look.y = 0
-    look.normalize()
-    const lift = Math.max(0.15, Math.min(0.75, (my + 0.6) * 0.5))
-    u.uMoonDir.value
-      .set(mx, 0, mz)
-      .normalize()
-      .lerp(look, 0.75)
-      .setY(0)
-      .normalize()
-      .multiplyScalar(Math.sqrt(1 - lift * lift))
-      .setY(lift)
-    u.uNight.value = sky.night
-    u.uMoon.value = sky.moonDisc * sky.night
     u.uLamps.value = sky.lamps * sky.night
     // The flames nearest what the camera looks at, re-picked twice a second (no per-frame garbage).
     eased.pick -= delta
@@ -274,22 +232,11 @@ function nodeWater(gl: object): Promise<Build> {
   return build
 }
 
-/** The scene's shadow-casting directional light (Atmosphere's key), once its shadow map exists. */
-function keyLight(scene: Object3D): DirectionalLight | null {
-  let found: DirectionalLight | null = null
-  scene.traverse((object) => {
-    const light = object as DirectionalLight
-    if (!found && light.isDirectionalLight && light.castShadow && light.shadow.map) found = light
-  })
-  return found
-}
-
 /** Deep and shallow water (sRGB, softened like the tiles); the sky lights them. */
 const DEEP = new Color("#1d6aa6")
 const SHALLOW = new Color("#3fb0b8")
 
 const noise = noiseTexture()
-const look = new Vector3()
 
 /** How many torch reflections the water draws at once. */
 const FLAMES = 8

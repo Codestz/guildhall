@@ -24,7 +24,7 @@
   "packages/hall/src/scene/events/eventNodes.ts": 493,
   "packages/hall/src/scene/life/Villagers.tsx": 511,
   "packages/hall/src/scene/life/rounds.ts": 990,
-  "packages/hall/src/scene/nature/Water.tsx": 474,
+  "packages/hall/src/scene/nature/Water.tsx": 421,
   "packages/hall/src/scene/sigilBoard.ts": 472,
   "packages/hall/src/world/behaviours.ts": 1100,
   "packages/hall/src/world/chronicle/deep.ts": 541,

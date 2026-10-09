@@ -6,15 +6,21 @@
  * a cliff's edge keep a hard line, being more than the angle from the face beside them.
  */
 
-/** The smoothing angle: two faces closer than this blend at their shared vertices. */
+/** The smoothing angle of risers: two walls closer than this blend at their shared vertices (a wall is never blended with ground). */
 export const CREASE_DEGREES = 20
+/** The ground's own (tops and ramps): wider, so a faceted flank reads as broad planes, not a face-by-face zigzag of light and dark. */
+export const GROUND_DEGREES = 25
 const COS = Math.cos((CREASE_DEGREES * Math.PI) / 180)
+const COS_GROUND = Math.cos((GROUND_DEGREES * Math.PI) / 180)
+/** A triangle's kind (the `flat` array): ground blends with ground, a wall only with walls, a skirt (flat) with nothing. */
+export const WALL = 2
 /** Positions closer than this (world units) are one vertex. */
 const GRID = 200
 
 /**
  * Vertex normals for triangles `position` (9 numbers each) with face normals `face` (9 each, one per
- * vertex, unit). `flat` marks triangles that keep their face normal and join nothing (skirts).
+ * vertex, unit). `flat` gives each triangle's kind: 0 ground, WALL (2) a riser, 1 a skirt that keeps its
+ * face normal and joins nothing.
  */
 export function smoothNormals(
   position: readonly number[],
@@ -50,6 +56,8 @@ export function smoothNormals(
     if (bucket.length < 2) continue
     for (const v of bucket) {
       const [fx, fy, fz] = [face[v * 3], face[v * 3 + 1], face[v * 3 + 2]] as [number, number, number]
+      const kind = flat[Math.floor(v / 3)]
+      const cos = kind === WALL ? COS : COS_GROUND
       let [sx, sy, sz] = [0, 0, 0]
       for (const w of bucket) {
         // Another position that hashed here is not this vertex.
@@ -60,7 +68,7 @@ export function smoothNormals(
         )
           continue
         const [gx, gy, gz] = [face[w * 3], face[w * 3 + 1], face[w * 3 + 2]] as [number, number, number]
-        if (fx * gx + fy * gy + fz * gz < COS) continue
+        if (flat[Math.floor(w / 3)] !== kind || fx * gx + fy * gy + fz * gz < cos) continue
         const weight = area[Math.floor(w / 3)] as number
         sx += gx * weight
         sy += gy * weight

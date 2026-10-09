@@ -1,5 +1,6 @@
 import { HEX_SCALE, type LandPiece, PIECES } from "../../lands.ts"
 import type { Ground } from "./ground.ts"
+import { fitRock } from "./rockSize.ts"
 
 /**
  * The kit's own rocks laid on the mountain, so the close-up is hand-made: boulders on the lip of a
@@ -46,15 +47,17 @@ export interface Context {
 
 const pick = <T>(list: readonly T[], random: () => number): T => list[Math.floor(random() * list.length)] as T
 
-/** A piece of `scale` set on the ground at a spot, sunk by a `sink` share of its height so its downhill edge meets the ground. */
+/** A piece of about `size` (held to a house and a half across) set on the ground at a spot, sunk by a `sink` share of its height so its downhill edge meets the ground. */
 function setRock(
   piece: LandPiece,
   spot: Spot,
-  scale: number,
+  size: number,
   sink: number,
   ground: Ground,
   slope = true,
 ): Outcrop {
+  // Bigger higher up, but never more than a house and a half across (rockSize.ts).
+  const scale = fitRock(piece, size)
   const [width, tall] = [PIECES[piece].size[0] as number, PIECES[piece].size[1] as number]
   // On a slope the base reaches down to the lowest ground under it; on a flat ledge top it is the top.
   const floor = slope ? ground.floorAt(spot.x, spot.z, spot.h, 0.5 * width * HEX_SCALE * scale) : spot.h

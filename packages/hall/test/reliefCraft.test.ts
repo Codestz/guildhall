@@ -7,7 +7,7 @@ import { reliefOf } from "../src/world/gen/relief/index.ts"
 import { reliefMesh } from "../src/world/gen/relief/mesh.ts"
 import { riserZone, vOf, zoneOf } from "../src/world/gen/relief/paint.ts"
 import { CREASE_DEGREES, smoothNormals } from "../src/world/gen/relief/smooth.ts"
-import { chisel, seamOf, stairsOf } from "../src/world/gen/relief/strata.ts"
+import { curtainOf, onLine, profile, rampOf, stairsOf, triangulate } from "../src/world/gen/relief/strata.ts"
 import { SWATCH } from "../src/world/gen/relief/swatches.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
 import REACT from "./fixtures/repos/facebook__react.json"
@@ -170,46 +170,109 @@ describe("gradients and ambient occlusion", () => {
   })
 })
 
-describe("chiselled risers", () => {
-  const walls = stairsOf([0, 0, 0, 0], [2, 5, 0, 0], [0, 5, 2, 0]).walls
+describe("a riser is a flat wall", () => {
+  // A triangle with one corner on a ledge, the other two a ledge up: one riser across it.
+  const { walls, tops } = stairsOf([0, 0, 0, 0], [2, 5, 0, 0], [0, 5, 2, 0])
+  const normalOf = ([a, b, c]: number[][]): number[] => {
+    const [ux, uy, uz] = [b![0]! - a![0]!, b![1]! - a![1]!, b![2]! - a![2]!]
+    const [vx, vy, vz] = [c![0]! - a![0]!, c![1]! - a![1]!, c![2]! - a![2]!]
+    const n = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx]
+    const l = Math.hypot(n[0]!, n[1]!, n[2]!)
+    return n.map((x) => x / l)
+  }
 
-  test("a wall's two triangles become four round a centre, and its corners stay where they were", () => {
-    const four = chisel(walls)
-    expect(four.length).toBe(walls.length * 2)
-    const corners = (list: typeof walls): Set<string> =>
-      new Set(
-        list.flatMap((w) =>
-          w.tri.slice(0, 2).map((v) =>
-            v
-              .slice(0, 3)
-              .map((n) => n.toFixed(4))
-              .join(),
-          ),
-        ),
-      )
-    for (const corner of corners(walls)) expect(corners(four).has(corner)).toBe(true)
+  test("every triangle of a riser lies in one vertical plane: one normal, no pillow, no teeth", () => {
+    expect(walls.length).toBeGreaterThan(0)
+    const first = normalOf(walls[0]!.tri)
+    for (const { tri } of walls) {
+      const n = normalOf(tri)
+      expect(Math.abs(n[1]!)).toBeLessThan(1e-9)
+      // The same plane, either way round.
+      expect(Math.abs(n[0]! * first[0]! + n[2]! * first[2]!)).toBeCloseTo(1, 9)
+    }
+  })
+
+  test("a riser stands one ledge high between the flat tops of the two ledges, which are flat", () => {
+    const ys = new Set(walls.flatMap(({ tri }) => tri.map((v) => v[1]!.toFixed(3))))
+    expect([...ys].sort()).toEqual(["0.000", "2.500", "5.000"])
+    for (const top of tops) expect(new Set(top.map((v) => v[1]!.toFixed(3))).size).toBe(1)
+  })
+
+  test("the profile of an edge is the same read from either end, so both triangles on it meet", () => {
+    const [u, v] = [
+      [0, 0, 0, 0],
+      [3, 10, 1, 0],
+    ]
+    const forward = profile(u, v).map((n) => n.at.slice(0, 3))
+    const back = profile(v, u).map((n) => n.at.slice(0, 3))
+    expect(forward.length).toBeGreaterThan(0)
+    expect(back).toEqual([...forward].reverse())
   })
 })
 
-describe("the seam beside a ramp", () => {
-  test("closes exactly the gap between the ramp's line and the stairs' profile, in the plane over the edge", () => {
-    const seams = seamOf([0, 0, 0, 0], [2, 5, 0, 0])
-    let area = 0
-    for (const { tri } of seams) {
-      for (const v of tri) expect(v[2]).toBeCloseTo(0, 9)
-      const [a, b, c] = tri
-      area +=
-        Math.abs(
-          ((b[0] as number) - (a[0] as number)) * ((c[1] as number) - (a[1] as number)) -
-            ((c[0] as number) - (a[0] as number)) * ((b[1] as number) - (a[1] as number)),
-        ) / 2
-    }
-    // A half-height cut midway: two right triangles of 1 by 2.5 each.
-    expect(area).toBeCloseTo(2.5, 6)
+describe("a ramp beside stairs", () => {
+  const [p, a, b] = [
+    [0, 8, 3, 0],
+    [0, 0, 0, 0],
+    [3, 5, 0, 0],
+  ]
+  const edge = onLine(profile(a, b))
+  const sub = (u: number[], v: number[]): number[] => [u[0]! - v[0]!, u[1]! - v[1]!, u[2]! - v[2]!]
+  const cross = (u: number[], v: number[]): number[] => [
+    u[1]! * v[2]! - u[2]! * v[1]!,
+    u[2]! * v[0]! - u[0]! * v[2]!,
+    u[0]! * v[1]! - u[1]! * v[0]!,
+  ]
+  const area = (t: number[][]): number =>
+    Math.hypot(...(cross(sub(t[1]!, t[0]!), sub(t[2]!, t[0]!)) as [number, number, number])) / 2
+
+  test("takes the riser's mid-point on its edge, and its faces are the very surface of the bare triangle", () => {
+    const bare = rampOf(p, a, b, [[], [], []])
+    const cut = rampOf(p, a, b, [[], edge, []])
+    expect(bare.length).toBe(1)
+    expect(cut.length).toBe(2)
+    expect(cut.reduce((sum, t) => sum + area(t), 0)).toBeCloseTo(area(bare[0]!), 9)
+    // Coplanar with it, so nothing moves and the ground walkers read is unchanged.
+    const normal = cross(sub(a, p), sub(b, p))
+    for (const t of cut)
+      for (const v of t)
+        expect(
+          normal[0]! * (v[0]! - p[0]!) + normal[1]! * (v[1]! - p[1]!) + normal[2]! * (v[2]! - p[2]!),
+        ).toBeCloseTo(0, 9)
   })
 
-  test("a ramp between the same ledge has no gap to close", () => {
-    expect(seamOf([0, 5, 0, 0], [2, 5, 0, 0])).toEqual([])
+  test("the curtain over the edge stands in the vertical plane over it and closes the gap to the profile", () => {
+    const curtain = curtainOf(a, b, profile(a, b), p)
+    // One triangle at the foot and one at the lip of the riser.
+    expect(curtain.length).toBe(2)
+    const along = sub(b, a)
+    for (const { tri } of curtain)
+      for (const v of tri) expect(along[0]! * (v[2]! - a[2]!) - along[2]! * (v[0]! - a[0]!)).toBeCloseTo(0, 9)
+    // The ramp is the taller side along the foot (the curtain faces away from it) and the shorter along the lip (it faces it).
+    const [foot, lip] = curtain.map((c) => c.outward)
+    expect(foot![0]! * lip![0]! + foot![1]! * lip![1]!).toBeCloseTo(-1, 9)
+  })
+})
+
+describe("the least stretched triangulation", () => {
+  test("a polygon of collinear edge points is cut into round triangles, never a sliver from one corner", () => {
+    // A tall thin wedge with a point in the middle of each long side.
+    const ring = [
+      [0, 0, 0],
+      [1, 5, 0],
+      [2, 10, 0],
+      [1, 10, 1],
+      [0, 10, 2],
+      [0, 5, 1],
+    ]
+    const tris = triangulate(ring)
+    expect(tris.length).toBe(4)
+    for (const t of tris) {
+      const [a, b, c] = t as [number[], number[], number[]]
+      const [ux, uy, uz] = [b[0]! - a[0]!, b[1]! - a[1]!, b[2]! - a[2]!]
+      const [vx, vy, vz] = [c[0]! - a[0]!, c[1]! - a[1]!, c[2]! - a[2]!]
+      expect(Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx)).toBeGreaterThan(1e-9)
+    }
   })
 })
 

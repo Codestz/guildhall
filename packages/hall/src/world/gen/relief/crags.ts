@@ -1,6 +1,7 @@
 import { HEX_SCALE, type LandPiece, PIECES } from "../../lands.ts"
 import { orient, type Tilt } from "../../tilt.ts"
 import type { Context, Spot } from "./outcrops.ts"
+import { fitRock } from "./rockSize.ts"
 
 /**
  * The kit's rocks and crags lying along the peak's cliffs: each piece is tipped onto the face's own
@@ -78,7 +79,8 @@ export function cragAt(spot: Spot, { ground, height, ledgeTop, random }: Context
   const tilt: Tilt = [(-gx / flat) * Math.sin(tip), (-gz / flat) * Math.sin(tip)]
   const crag = share < CRAG_BELOW && random() < 0.25
   const piece = (crag ? CRAGS : ROCKS)[Math.floor(random() * (crag ? CRAGS : ROCKS).length)] as LandPiece
-  const scale = crag ? 0.35 + 0.3 * random() : 1.6 + 1.6 * share + random()
+  // Bigger higher up, but never more than a house and a half across (rockSize.ts).
+  const scale = fitRock(piece, crag ? 0.5 + 0.2 * random() : 1.6 + 1.6 * share + random())
   const rot = random() * Math.PI * 2
   // Sunk until every point of the base is at or under the ground, then a share of the piece's radius more.
   const [width, , depth] = PIECES[piece].size as [number, number, number]

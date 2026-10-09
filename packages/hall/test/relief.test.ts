@@ -315,12 +315,12 @@ describe("the mesh", () => {
     expect(mesh.position.length).toBe(0)
   })
 
-  test("two sets of one massif share their seam: the one edge between them has a short skirt, not a rim's", () => {
+  test("two sets of one massif meet exactly along their seam: no skirt hangs there, as the same faces would be drawn, and none is needed", () => {
     const half = cells.slice(0, Math.floor(cells.length / 2))
     const rest = cells.slice(Math.floor(cells.length / 2))
     const both =
       reliefMesh(CITY_RELIEF, half, 0).position.length + reliefMesh(CITY_RELIEF, rest, 0).position.length
-    expect(both).toBeGreaterThan(reliefMesh(CITY_RELIEF, cells, 0).position.length)
+    expect(both).toBe(reliefMesh(CITY_RELIEF, cells, 0).position.length)
   })
 })
 

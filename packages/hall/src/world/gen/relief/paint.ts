@@ -39,6 +39,8 @@ const BARE = 48
 const CLIFF = 60
 /** A ledge's top: flatter than this (degrees); steeper is a band. */
 const TOP = 28
+/** Ground steeper than this (rise over run, 29°) at a corner is no grass's. */
+const GENTLE_RISE = 0.45
 /** How far the curvature moves a vertex along its strip: a gully's depth (units) that is fully dark, and the share of the strip it moves. */
 const FULL_CURVE = 2
 const AO = 0.2
@@ -91,11 +93,25 @@ function rock(slope: number, region: number): Zone {
     : { swatch: SWATCH.slate, t: 0.35, rise: -0.25 }
 }
 
+/**
+ * Whether grass may grow on a ramp face: gentle itself, and every corner stands on gentle ground, its
+ * smoothed steepness (the lattice's own, over the corner's neighbours, so one flat triangle among
+ * steep ones is not). What is steep at any corner is rock: no island of grass on a flank.
+ */
+export const grassy = (p: readonly number[], q: readonly number[], r: readonly number[]): boolean =>
+  [p, q, r].every((corner) => (corner[3] as number) < GENTLE_RISE) && faceOf(p, q, r).slope < TOP
+
 /** Grassy and wooded ledge tops, and rock between them: a ledge band's face is its own zone (`riserZone`). */
-export function zoneOf(p: readonly number[], q: readonly number[], r: readonly number[], peak: number): Zone {
+export function zoneOf(
+  p: readonly number[],
+  q: readonly number[],
+  r: readonly number[],
+  peak: number,
+  grass = true,
+): Zone {
   const { slope, height, x, z } = faceOf(p, q, r)
   const region = valueNoise(11, x / REGION, z / REGION, 21)
-  if (slope >= TOP) return rock(slope, region)
+  if (slope >= TOP || !grass) return rock(slope, region)
   const t = height / Math.max(1, peak) + WANDER * (2 * valueNoise(11, x / REGION, z / REGION, 22) - 1)
   if (t >= WOOD) return region > 0.62 ? rock(0, region) : { swatch: SWATCH.slate, t: 0.3, rise: -0.2 }
   if (t >= FOOT) return { swatch: SWATCH.meadow, t: 0.3, rise: 0.4 }

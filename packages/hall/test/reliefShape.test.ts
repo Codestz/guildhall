@@ -54,50 +54,62 @@ describe("the stairs and the peak", () => {
     expect(RELIEF.massifs.every((m) => m.height > m.ledgeTop)).toBe(true)
   })
 
-  test("the ledges are stairs: flat tops on ledge heights and vertical risers one ledge high", () => {
+  /** A face's own normal y (from its corners, whatever its smoothed vertex normals say). */
+  const faceUp = (mesh: { position: Float32Array }, v: number): number => {
+    const p = mesh.position
+    const [ux, uz] = [(p[v + 3] as number) - (p[v] as number), (p[v + 5] as number) - (p[v + 2] as number)]
+    const [vx, vz] = [(p[v + 6] as number) - (p[v] as number), (p[v + 8] as number) - (p[v + 2] as number)]
+    return Math.abs(uz * vx - ux * vz)
+  }
+
+  test("the ledges are stairs: flat tops on ledge heights and vertical risers between two ledges", () => {
     const mesh = reliefMesh(RELIEF, massif.cells, 0)
     let risers = 0
     let flat = 0
     for (let v = 0; v < mesh.normal.length; v += 9) {
-      const up = mesh.normal[v + 1] as number
       const ys = heightsOf(mesh, v)
       const rise = Math.max(...ys) - Math.min(...ys)
-      if (Math.abs(up) < 1e-6 && Math.abs(rise - LEDGE_STEP) < 1e-3) risers++
+      // A riser's face stands straight up (it has no footprint) on a ledge's height and half way to the next.
+      const half = (y: number): boolean =>
+        Math.abs(y / (LEDGE_STEP / 2) - Math.round(y / (LEDGE_STEP / 2))) < 1e-3
+      if (faceUp(mesh, v) < 1e-6 && rise > 1 && ys.every(half)) risers++
       const y = ys[0] as number
-      if (up > 0.999 && rise < 1e-3 && Math.abs(y / LEDGE_STEP - Math.round(y / LEDGE_STEP)) < 1e-3) flat++
+      if (
+        faceUp(mesh, v) > 1e-3 &&
+        rise < 1e-3 &&
+        Math.abs(y / LEDGE_STEP - Math.round(y / LEDGE_STEP)) < 1e-3
+      )
+        flat++
     }
     expect(risers).toBeGreaterThan(100)
     expect(flat).toBeGreaterThan(100)
   })
 
-  test("a riser is one swatch for its ledge band, dark at its foot and light along its lip", () => {
+  test("a riser is one flat colour for its ledge band: one swatch, one place on its strip, from foot to lip", () => {
     const mesh = reliefMesh(RELIEF, massif.cells, 0)
-    const swatches = new Map<number, Set<number>>()
-    const foot: number[] = []
-    const lip: number[] = []
+    const bands = new Map<number, Set<string>>()
     let n = 0
     for (let v = 0; v < mesh.normal.length; v += 9) {
-      if (Math.abs(mesh.normal[v + 1] as number) > 1e-6) continue
+      if (faceUp(mesh, v) > 1e-6) continue
+      // A riser's normal is horizontal; a curtain over a ramp's edge is shaded as the ramp is (its normal leans up).
+      if (Math.abs(mesh.normal[v + 1] as number) > 1e-3) continue
       const ys = heightsOf(mesh, v)
-      if (Math.abs(Math.max(...ys) - Math.min(...ys) - LEDGE_STEP) > 1e-3) continue
+      if (Math.max(...ys) - Math.min(...ys) < 1) continue
       // Rock and warm stone only: the skirts at the rim, as high as a riser, wear the tile's grass.
       const u = mesh.uv[(v / 3) * 2] as number
       if (u !== Math.fround(SWATCH.rock.u) && u !== Math.fround(SWATCH.warm.u)) continue
-      const band = Math.round(Math.min(...ys) / LEDGE_STEP)
-      swatches.set(band, (swatches.get(band) ?? new Set<number>()).add(u))
-      // The strip's v grows towards its dark end.
-      const low = Math.min(...ys)
-      for (let k = 0; k < 3; k++) {
-        const along = (ys[k] as number) - low
-        if (along < 1e-3) foot.push(mesh.uv[(v / 3 + k) * 2 + 1] as number)
-        if (along > LEDGE_STEP - 1e-3) lip.push(mesh.uv[(v / 3 + k) * 2 + 1] as number)
-      }
+      const band = Math.floor(Math.min(...ys) / LEDGE_STEP + 1e-3)
+      for (let k = 0; k < 3; k++)
+        bands.set(
+          band,
+          (bands.get(band) ?? new Set<string>()).add(
+            `${mesh.uv[(v / 3 + k) * 2]},${mesh.uv[(v / 3 + k) * 2 + 1]}`,
+          ),
+        )
       n++
     }
-    expect(swatches.size).toBeGreaterThan(2)
-    for (const us of swatches.values()) expect(us.size).toBe(1)
-    const mean = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length
-    expect(mean(foot)).toBeGreaterThan(mean(lip))
+    expect(bands.size).toBeGreaterThan(2)
+    for (const colours of bands.values()) expect(colours.size).toBe(1)
     expect(n).toBeGreaterThan(100)
   })
 

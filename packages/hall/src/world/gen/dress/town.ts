@@ -5,6 +5,8 @@ import { housesOf, instantiate, type Prefab, prefab } from "../../prefabs/index.
 import { key, neighbours, noise, step, unkey } from "../hex.ts"
 import { tierOf } from "../plan/tier.ts"
 import type { IslandPlan } from "../plan.ts"
+import { footprintsOf } from "./footprints.ts"
+import { plazaBeside } from "./plazas.ts"
 import { facing } from "./sites.ts"
 
 /**
@@ -32,8 +34,6 @@ export interface Town {
 /** Lots within this many units of the square are its core (three homes); within CORE + MID, two. */
 const CORE = 17
 const MID = 17
-/** How far a plaza's well stands off its hex's centre, off the road's own line. */
-const OFF_ROAD = 2.4
 
 /** Districts that are a town: the harbour's lots round the hub and every village-biome district's. */
 const isTown = (biome: string): boolean => biome === "village" || biome === "harbour"
@@ -83,12 +83,20 @@ export function townOf(plan: IslandPlan, links: Map<string, Set<number>>): Town 
         (dir) => !hasRoad(step(square, dir)) && plan.land.has(key(step(square, dir))),
       )
       const dir = free[Math.floor(noise(plan.seed, square, "plaza") * free.length)]
-      const angle = dir === undefined ? 0 : DMath.atan2(...(offset(square, dir) as [number, number]))
-      const at: [number, number] = [sx + DMath.sin(angle) * OFF_ROAD, sz + DMath.cos(angle) * OFF_ROAD]
-      // A town or city's squares have a fountain as often as a well.
+      const first = dir === undefined ? 0 : DMath.atan2(...(offset(square, dir) as [number, number]))
+      // A town or city's squares have a fountain as often as a well; either stands beside the roads,
+      // a well where a fountain will not fit, and a square with no room has neither.
       const fountain = tier !== "hamlet" && tier !== "village" && noise(plan.seed, square, "fountain") < 0.5
       const seed = 1 + Math.floor(noise(plan.seed, square, "variant") * 65535)
-      plazas.push(instantiate(prefab(fountain ? "plaza-fountain" : "plaza-well"), at, 0, "blue", 0, seed))
+      const houses = footprintsOf(
+        [...lots].flatMap(([id, lot]) =>
+          instantiate(lot.prefab, cellToWorld(unkey(id)), lot.rot, "blue", 0, lot.seed),
+        ),
+      )
+      const stood = (name: string): LandPlacement[] | undefined =>
+        plazaBeside(plan, links, square, prefab(name), "blue", seed, houses, first)
+      const plaza = (fountain ? stood("plaza-fountain") : undefined) ?? stood("plaza-well")
+      if (plaza) plazas.push(plaza)
     }
   })
   return { lots, plazas }

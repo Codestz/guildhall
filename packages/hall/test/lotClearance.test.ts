@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test"
+import { islandObstacles } from "../src/world/clearance.ts"
 import { clearLots, LOT_GAP } from "../src/world/gen/dress/clearLots.ts"
 import { crowds, type Footprint, footprintsOf } from "../src/world/gen/dress/footprints.ts"
 import type { Lot } from "../src/world/gen/dress/town.ts"
 import { key, unkey } from "../src/world/gen/hex.ts"
-import { cellToWorld, type LandPlacement } from "../src/world/lands.ts"
+import { cellToWorld, HEX_SCALE, type LandPlacement, PIECES } from "../src/world/lands.ts"
+import { toSegment } from "../src/world/lights.ts"
 import { instantiate, PREFABS, prefab } from "../src/world/prefabs/index.ts"
 import { gen2Worlds } from "./support/fixtures.ts"
 
@@ -131,6 +133,59 @@ describe("a gen 2 island's buildings", () => {
             crowded.push(`${a.piece}@${a.x},${a.z} / ${b.piece}@${b.x},${b.z}`)
         }
       expect(crowded).toEqual([])
+    })
+  }
+})
+
+/** The plazas' centrepieces: a fountain's basin and a well. */
+const CENTREPIECE = /^(t2_fountain_round|building_well_)/
+/** Drawn road's half-width: nothing of a plaza may stand on it. */
+const ROAD_HALF = 0.9
+
+describe("a fountain square", () => {
+  test("the fountain's basin is no wider than a cottage", () => {
+    const basin = prefab("plaza-fountain").parts.find((part) => part.piece === "t2_fountain_round")
+    const wide = (PIECES.t2_fountain_round.size[0] ?? 0) * HEX_SCALE * (basin?.scale ?? 1)
+    expect(wide).toBeLessThanOrEqual((PIECES.building_home_A_blue.size[0] ?? 0) * HEX_SCALE)
+  })
+
+  for (const [name, world] of gen2Worlds()) {
+    const decor = world.island.decor
+    const centres = decor.filter((item) => CENTREPIECE.test(item.piece))
+    const { nodes, edges } = world.roads
+    const onRoad = (item: LandPlacement, room = 0): boolean =>
+      edges.some(([a, b]) => {
+        const [from, to] = [nodes[a], nodes[b]]
+        return from && to && toSegment([item.x, item.z], from, to) < ROAD_HALF + room
+      })
+    /** Half a piece's width, world units. */
+    const half = (item: LandPlacement): number =>
+      ((PIECES[item.piece as keyof typeof PIECES].size[0] ?? 0) * HEX_SCALE * (item.scale ?? 1)) / 2
+
+    test(`${name}: no fountain or well stands on a road`, () => {
+      expect(
+        centres.filter((item) => onRoad(item, half(item))).map((item) => `${item.piece}@${item.x},${item.z}`),
+      ).toEqual([])
+    })
+
+    test(`${name}: no lamp, stall or prop of a plaza stands on a road or in its centrepiece`, () => {
+      const bad: string[] = []
+      for (const centre of centres)
+        for (const item of decor) {
+          if (item === centre || Math.hypot(item.x - centre.x, item.z - centre.z) > 4.5) continue
+          if (!/^(t2_(lantern|stall)|barrel|crate_)/.test(item.piece)) continue
+          const bounds = PIECES[centre.piece as keyof typeof PIECES]
+          const reach = ((bounds.size[0] ?? 0) * HEX_SCALE * (centre.scale ?? 1)) / 2
+          if (onRoad(item) || Math.hypot(item.x - centre.x, item.z - centre.z) < reach)
+            bad.push(`${item.piece}@${item.x},${item.z}`)
+        }
+      expect(bad).toEqual([])
+    })
+
+    test(`${name}: walkers treat every fountain and well as an obstacle`, () => {
+      const obstacles = islandObstacles(world)
+      const open = centres.filter((item) => !obstacles.some((o) => o.distance(item.x, item.z) === 0))
+      expect(open.map((item) => `${item.piece}@${item.x},${item.z}`)).toEqual([])
     })
   }
 })

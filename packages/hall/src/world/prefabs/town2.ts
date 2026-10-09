@@ -247,18 +247,19 @@ export const TOWN2: readonly Prefab[] = [
     kind: "plaza",
     rings: 0,
     parts: [
-      at("fountain_round", 0, -0.4, 0, 0, S),
-      at("lantern", -4.2, 2.8, 0, 0, S),
-      at("lantern", 4.2, 2.8, 0, 0, S),
-      at("stall_red", 0, 4.3, Math.PI, 0, S * 0.5),
+      // A basin about a cottage wide (3 units across), its lamps and stall close round it.
+      at("fountain_round", 0, 0, 0, 0, S * 0.5),
+      at("lantern", -2.6, 1, 0, 0, S),
+      at("lantern", 2.6, 1, 0, 0, S),
+      at("stall_red", 0, 3, Math.PI, 0, S * 0.5),
     ],
     doors: [],
     variation: {
       mirror: true,
       swaps: { t2_stall_red: ["t2_stall_green"] },
       props: [
-        { piece: "barrel", x: 4, z: -2.6, rot: 0.5, chance: 0.5 },
-        { piece: "crate_A_small", x: -4, z: -3, rot: 0.2, chance: 0.5 },
+        { piece: "barrel", x: 2.6, z: -2.2, rot: 0.5, chance: 0.5 },
+        { piece: "crate_A_small", x: -2.6, z: -2.4, rot: 0.2, chance: 0.5 },
       ],
     },
   },

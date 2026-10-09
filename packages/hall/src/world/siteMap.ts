@@ -29,6 +29,9 @@ const TRADE: Record<Exclude<SiteId, "river">, Biome> = {
 /** The order sites choose in (fixed: the mapping never depends on object key order). */
 const ORDER: readonly SiteId[] = ["yard", "forest", "quarry", "proving", "tower", "river"]
 
+/** A gen 2 island's story sites prefer a district this near the keep, world units: the walk from it stays short. */
+const STORY_REACH = 90
+
 /** How far a fishing post stands from its coast hex's centre, towards the sea. */
 const SHORE = 1.5
 /** Fishing posts keep this far off anything placed on the land (rocks, trees, the landmark's props). */
@@ -53,6 +56,11 @@ export function mapSites(made: RepoIsland): Record<SiteId, Site> {
     [...list].sort((a, b) => b.hexes - a.hexes || (a.id < b.id ? -1 : 1))[0]
   const biggest = (list: readonly District[]) =>
     [...list].sort((a, b) => b.bytes - a.bytes || (a.id < b.id ? -1 : 1))[0]
+  /** On a gen 2 island, the districts within the story's reach of the keep, if any are (else all). */
+  const reachable = (list: readonly District[]): readonly District[] => {
+    const close = list.filter((district) => Math.hypot(...district.at) <= STORY_REACH)
+    return plan.gen === 2 && close.length > 0 ? close : list
+  }
   const nearest = (list: readonly District[]) =>
     [...list].sort((a, b) => Math.hypot(...a.at) - Math.hypot(...b.at) || (a.id < b.id ? -1 : 1))[0]
 
@@ -65,7 +73,7 @@ export function mapSites(made: RepoIsland): Record<SiteId, Site> {
   }
   for (const id of ORDER) {
     if (id === "river") continue
-    const trade = free(towns).filter((district) => district.biome === TRADE[id])
+    const trade = reachable(free(towns).filter((district) => district.biome === TRADE[id]))
     const match = (id === "yard" ? biggest(trade.filter(isPackage)) : undefined) ?? largest(trade)
     if (match) chosen.set(id, match)
   }

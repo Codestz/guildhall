@@ -168,8 +168,8 @@ const facing = new Quaternion()
 const matrix = new Matrix4()
 const scale = new Vector3()
 
-/** A soft round falloff, drawn once (the same light-in-the-air look as the hall's lamps). */
-function halo(): CanvasTexture {
+/** A soft round falloff, drawn once (the same light-in-the-air look as the hall's lamps; the venues' glow too). */
+export function halo(): CanvasTexture {
   const size = 64
   const canvas = document.createElement("canvas")
   canvas.width = size

@@ -1,4 +1,4 @@
-import { activityOf, type Craft, failedDeed, type Model, type Session } from "@guildhall/core"
+import { activityOf, type Craft, deedCraft, failedDeed, type Model, type Session } from "@guildhall/core"
 import { type ArchetypeId, type DeedLook, deedLook, type Rank } from "@guildhall/roster"
 import type { SiteId } from "../world/lands.ts"
 import {
@@ -14,11 +14,13 @@ import {
 } from "../world/layout.ts"
 import { sitesOf } from "../world/siteMap.ts"
 import { destinationOf, FATES, type Fates, SITE_DEFS, siteOf } from "../world/sites.ts"
+import { venuesIn } from "../world/venues.ts"
 import { type Names, namedOf, rankOf } from "./casting.ts"
 import { Crowd } from "./crowd.ts"
 import { type Entrance, EXIT_MS, entranceOf, exitOf } from "./entrances.ts"
 import { numbered } from "./ordinals.ts"
 import { byJoin, type Party, stageOf } from "./parties.ts"
+import { LINGER_MS, type Visit, Visits } from "./visits.ts"
 
 /**
  * What each adventurer should be doing *now* (`AdventurerView`), derived from the model: pure, so
@@ -68,6 +70,11 @@ export interface AdventurerView {
    * posts, with `site` the trade they work there.
    */
   district?: string
+  /**
+   * The venue they are at (a gen 2 island's, world/venues.ts): walking to its door, going in while
+   * the deed runs, coming out. Their target is the door's step; no site or station then.
+   */
+  visit?: Visit
   /** Failed: where they were sent (a key of world/sites.ts `DESTINATIONS`). */
   destination?: string
   /** The deed in progress, if any. */
@@ -140,6 +147,8 @@ export function viewsOf(
   const atSite = new Map<SiteId, number>()
   /** Whoever rests or lies past a place's own seats takes free floor round it (guild/crowd.ts). */
   const crowd = new Crowd()
+  /** A gen 2 island's venues, visited by craft (guild/visits.ts); none on the hand lands. */
+  const visits = new Visits(venuesIn())
   const views: AdventurerView[] = []
 
   for (const s of sessions) {
@@ -162,6 +171,17 @@ export function viewsOf(
     const look = craft ? deedLook(craft) : undefined
     const lastTool = s.entries.findLast((entry) => entry.kind === "tool")
     const stung = lastTool?.kind === "tool" && failedDeed(lastTool) && now - (lastTool.ended ?? 0) < 1400
+
+    // Hard at a deed, or just done with one: the venue its craft calls for (not a guildmaster, not a plea).
+    const visiting =
+      !isMaster && s.status === "running"
+        ? visits.forCraft(
+            craft ??
+              (lastTool?.kind === "tool" && lastTool.ended !== undefined && now - lastTool.ended < LINGER_MS
+                ? deedCraft(lastTool)
+                : undefined),
+          )
+        : undefined
 
     let phase: Phase = "working"
     let target: Post
@@ -204,6 +224,8 @@ export function viewsOf(
       destination = to
       seat = berth?.seat
       target = berth?.target ?? (place?.crowd ? crowd.near(place.crowd) : MASTER_POST)
+    } else if (visiting) {
+      target = visiting.target
     } else if (home) {
       // Island workers stay at their site for the whole quest: no jogging back on every deed.
       site = home
@@ -247,6 +269,7 @@ export function viewsOf(
       target,
       ...(station ? { station } : {}),
       ...(site ? { site } : {}),
+      ...(visiting ? { visit: visiting.visit } : {}),
       ...(destination ? { destination } : {}),
       ...(seat ? { seat } : {}),
       ...(look ? { look } : {}),

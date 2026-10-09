@@ -11,6 +11,7 @@ import {
   cellToWorld,
   type Island,
   island,
+  type LandPlacement,
   MAP_FOR_TESTS,
   ROAD_EDGES,
   ROAD_NODES,
@@ -19,8 +20,10 @@ import {
   type SiteId,
 } from "./lands.ts"
 import type { Post, Spot } from "./layout.ts"
+import { instantiate, prefab } from "./prefabs/index.ts"
 import { mapSites } from "./siteMap.ts"
 import { SITE_DEFS } from "./sites.ts"
+import type { Venue } from "./venues.ts"
 import { TERRACE, type Waterways } from "./waterways.ts"
 import type { Mix } from "./wilds.ts"
 
@@ -95,6 +98,8 @@ export interface World {
   sites: readonly WorkPlace[]
   /** The story's job sites on this island (`sitesOf`, world/siteMap.ts). */
   storySites: Readonly<Record<SiteId, Site>>
+  /** The buildings people go into, a gen 2 island's (world/venues.ts); none on the hand lands. */
+  venues?: readonly Venue[]
   repo?: RepoInfo
 }
 
@@ -123,6 +128,31 @@ const BIOME_WILDS: Record<Biome, WorkPlace["wilds"]> = {
   forest: SITE_DEFS.forest.wilds,
   farms: SITE_DEFS.yard.wilds,
   wilds: { mix: { tree: 0.3, bush: 0.4, grass: 0.3 } },
+}
+
+/**
+ * The venues still standing in the island as drawn, and the decor without the yards of those that
+ * are not: a mountain or a river that took the ground under a venue's main building (it goes with
+ * the decor on the hexes they cover) leaves no door to go in by, and its props stand about for nothing.
+ */
+function standing(
+  venues: readonly Venue[],
+  decor: LandPlacement[],
+): { open: Venue[]; decor: LandPlacement[] } {
+  const here = (a: LandPlacement, b: LandPlacement): boolean =>
+    a.piece === b.piece && Math.hypot(a.x - b.x, a.z - b.z) < 0.05
+  const lost: LandPlacement[] = []
+  const open = venues.filter((venue) => {
+    const parts = instantiate(prefab(venue.prefab), venue.at, venue.rot, "blue")
+    const main = parts[0]
+    if (main && decor.some((d) => here(d, main))) return true
+    lost.push(...parts)
+    return false
+  })
+  return {
+    open,
+    decor: lost.length > 0 ? decor.filter((d) => !lost.some((part) => here(d, part))) : decor,
+  }
 }
 
 /** An island grown from a repo's tree (world/gen `islandFromTree`), as a world. */
@@ -161,9 +191,10 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
   const island = mountain
     ? { ...wet, decor: [...wet.decor, ...forestOf(mountain, made.plan.seed, rivers?.hexes)] }
     : wet
+  const { open, decor } = standing(made.venues, island.decor)
   return {
     kind: "repo",
-    island,
+    island: decor === island.decor ? island : { ...island, decor },
     roads: made.roads,
     terrain: {
       at: ([q, line]) => (rivers?.hexes.has(`${q},${line}`) ? "r" : (land.get(`${q},${line}`)?.char ?? "~")),
@@ -181,6 +212,7 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
     ...(rivers ? { water: rivers.waters } : {}),
     sites: [...districts, ...moved],
     storySites,
+    ...(open.length > 0 ? { venues: open } : {}),
     repo: { ...info, districts: made.districts, folders: made.plan.districts.map((d) => d.folder) },
   }
 }

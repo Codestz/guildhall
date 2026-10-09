@@ -5,6 +5,7 @@ import type { Spot } from "../world/layout.ts"
 import { route } from "../world/paths.ts"
 import { DESTINATIONS } from "../world/sites.ts"
 import { CARRY_WALK } from "./activity.ts"
+import { Visiting } from "./visit.ts"
 
 /**
  * An adventurer's brain (scene/Adventurer.tsx): where they walk, which way they face and which clip
@@ -36,10 +37,16 @@ export interface Stride {
 }
 
 export class Brain {
+  /** Going in at a venue's door and coming out (scene/visit.ts): its leg, while it has one, is the aim. */
+  readonly visit: Visiting
   /** Spots still to walk through; recomputed whenever the aim moves. */
   private path: Spot[] = []
   private readonly routed = { x: Number.NaN, z: Number.NaN }
   private readonly stride: Stride = { walking: false, speed: 0, remaining: 0, carrying: false }
+
+  constructor(who: string) {
+    this.visit = new Visiting(who)
+  }
 
   /**
    * One frame: walks `node` towards the work loop's aim (`looping`) or the view's target, turns it,
@@ -53,7 +60,8 @@ export class Brain {
     holding: boolean,
     delta: number,
   ): Stride {
-    const aim = looping && work ? work.aim : view.target
+    const leg = this.visit.leg()
+    const aim = leg?.to ?? (looping && work ? work.aim : view.target)
     const tx = aim[0]
     const tz = aim[1]
     if (this.routed.x !== tx || this.routed.z !== tz) {
@@ -61,7 +69,7 @@ export class Brain {
       this.routed.z = tz
       const from: Spot = [node.position.x, node.position.z]
       // The loop's own walks are short and tested clear; going to a post takes the roads.
-      this.path = looping ? legOf(from, [tx, tz]) : route(from, [tx, tz])
+      this.path = looping || leg?.direct ? legOf(from, [tx, tz]) : route(from, [tx, tz])
     }
     const path = this.path
     let next = path[0]
@@ -96,7 +104,7 @@ export class Brain {
       if (face) turn(node, Math.atan2(face[0] - node.position.x, face[1] - node.position.z), delta * 6)
       else if (work.atPost) turn(node, view.target[2], delta * 5)
     } else {
-      turn(node, view.target[2], delta * 5)
+      turn(node, leg?.face ?? view.target[2], delta * 5)
     }
     // In bed: up onto the mattress. The post is at floor level beside it, so lying down there
     // put them on the floor under the bed (the user: "they sleep below the bed").
@@ -107,6 +115,7 @@ export class Brain {
     out.speed = speed
     out.remaining = remaining
     out.carrying = carrying
+    this.visit.update(view.visit, !walking, delta, node)
     return out
   }
 }

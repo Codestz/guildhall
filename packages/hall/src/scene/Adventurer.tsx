@@ -228,7 +228,7 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
   /** What draws them (scene/body.ts). Made in a layout effect, below: a mount (StrictMode's second one too) gets its own. */
   const body = useRef<Body | null>(null)
   /** Where they walk and which way they face (scene/brain.ts). */
-  const [brain] = useState(() => new Brain())
+  const [brain] = useState(() => new Brain(id))
   /** The work loop at this adventurer's place, and what their hands show (scene/activity.ts). */
   const routine = useRef<Routine | null>(null)
   const hands = useRef<Hands | null>(null)
@@ -402,7 +402,7 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
     const holding = arrival.summoning > 0
     if (holding) arrival.summoning -= delta
     const work = routine.current
-    const active = work !== null && view.phase === "working"
+    const active = work !== null && view.phase === "working" && !brain.visit.engaged
     // Off work (a plea, loot, a failure): the loop starts over, hands emptied, when they're back.
     if (work && !active && work.started) work.reset()
     const looping = active && work.started
@@ -413,7 +413,7 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
 
     // In and out by dissolving (scene/dissolve.ts), never by scale: a leaver fades over the last
     // steps down the avenue; a newcomer fades in as they set off (or as they are summoned).
-    const goal = leaving && remaining < DISSOLVE_FROM ? 0 : 1
+    const goal = leaving && remaining < DISSOLVE_FROM ? 0 : brain.visit.goal
     const seconds = goal === 0 ? LEAVE_FADE_S : arrival.kind === "dais" ? SUMMON_FADE_S : ARRIVE_FADE_S
     const shown = arrival.fade.step(goal, delta, fadeSeconds(seconds))
     node.visible = shown > 0

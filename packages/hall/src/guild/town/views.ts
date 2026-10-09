@@ -4,16 +4,19 @@ import { districtById, districtPlaceOf, siteOfDistrict, tradeOf } from "../../wo
 import type { Post, Spot } from "../../world/layout.ts"
 import { spread } from "../../world/sharers.ts"
 import { HARBOUR, type Resident } from "../../world/town/townsfolk.ts"
+import { venuesIn } from "../../world/venues.ts"
 import type { World } from "../../world/world.ts"
 import { initials, type Names } from "../casting.ts"
 import type { AdventurerView } from "../views.ts"
+import { type Visit, Visits } from "../visits.ts"
 
 /**
  * The townsfolk as the cast draws them (ADR 0022): each resident (world/town/townsfolk.ts) as an
  * AdventurerView, so the hall's own figures, crowd, chips and routines carry them unchanged.
  *
  *   busy      at work at one of their district's posts (a hash of their login picks which), running
- *             its trade's loop; more of them than posts stand in the sharers' rows round it
+ *             its trade's loop; more of them than posts stand in the sharers' rows round it; and on
+ *             a gen 2 island they call in at their district's venue now and then (scene/visit.ts)
  *   quiet     resting round the harbour's square, on the open ground past its workers' rows
  *   leaving   walking down to the quay, where they dissolve aboard the ferry
  *   arriving  (just come) they step off the ferry at the quay and walk to wherever they belong
@@ -45,8 +48,11 @@ export function townViewsOf(
   const leaving: Post = [landing[0], landing[1] + 1.5, 0]
   /** Quiet ones round each harbour berth so far. */
   const resting = new Map<number, number>()
+  const venues = new Visits(venuesIn(world))
+  const venueOf = new Map(venuesIn(world).map((venue) => [venue.district, venue]))
   return residents.map((r) => {
-    const view = viewOf(r, world, names, enter, landing, leaving, resting)
+    const venue = venueOf.get(r.district)
+    const view = viewOf(r, world, names, enter, landing, leaving, resting, venue && venues.to(venue).visit)
     const before = previous.get(r.id)
     return before && same(before, view) ? before : view
   })
@@ -60,6 +66,7 @@ function viewOf(
   landing: Post,
   leaving: Post,
   resting: Map<number, number>,
+  visit?: Visit,
 ): AdventurerView {
   const archetype = ARCHETYPES[r.archetype]
   const named = names === "world"
@@ -89,7 +96,8 @@ function viewOf(
   if (r.presence === "leaving") return { ...base, phase: "leaving", target: leaving }
   if (r.presence === "busy") {
     const work = workPost(r, world)
-    if (work) return { ...base, phase: "working", craft: "edit" as const, ...work }
+    if (work)
+      return { ...base, phase: "working", craft: "edit" as const, ...work, ...(visit ? { visit } : {}) }
   }
   const sit = (seedOf(r.id) % 1000) / 1000 < SITTING
   return {

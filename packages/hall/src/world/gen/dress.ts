@@ -1,12 +1,14 @@
 import { cellToWorld, type Island, type LandPiece } from "../lands.ts"
 import type { Post, Spot } from "../layout.ts"
+import type { Venue } from "../venues.ts"
 import type { Biome, Language } from "./biomes.ts"
-import { type Civic, civicOf, type Fame } from "./dress/civic.ts"
+import { civicOf, type Fame } from "./dress/civic.ts"
 import { dressHexes } from "./dress/hexes.ts"
 import { dressRoads } from "./dress/roads.ts"
 import { LANDMARK, landmarksOf, postsAround, quayOf } from "./dress/sites.ts"
 import { terraceOf } from "./dress/terrace.ts"
 import { type Lot, townOf } from "./dress/town.ts"
+import { type Anchor, VENUE_CLEAR, venuesOf } from "./dress/venues.ts"
 import { key, rng, unkey } from "./hex.ts"
 import type { IslandPlan } from "./plan.ts"
 
@@ -48,18 +50,24 @@ export interface RepoIsland {
   island: Island
   roads: { nodes: Record<string, Spot>; edges: (readonly [string, string])[] }
   districts: District[]
+  /** Generator v2: the buildings people go into, one per district that has a venue (world/venues.ts). */
+  venues: Venue[]
 }
 
-/** Lots the civic centre or its wall stands on are dropped. */
-function clearLots(lots: Map<string, Lot>, civic: Civic): void {
+/** Lots the civic centre, a venue or the wall stand on are dropped. */
+function clearLots(lots: Map<string, Lot>, clear: readonly Anchor[], wall: readonly Spot[]): void {
   for (const id of [...lots.keys()]) {
     const [x, z] = cellToWorld(unkey(id))
     const crowded =
-      civic.clear.some(([cx, cz, r]) => Math.hypot(x - cx, z - cz) < r + 4) ||
-      civic.wall.some(([wx, wz]) => Math.hypot(x - wx, z - wz) < 7)
+      clear.some(([cx, cz, r]) => Math.hypot(x - cx, z - cz) < r + 4) ||
+      wall.some(([wx, wz]) => Math.hypot(wx - x, wz - z) < 7)
     if (crowded) lots.delete(id)
   }
 }
+
+/** Ground clutter a venue's yard leaves no room for. */
+const CLUTTER =
+  /^(trees?_|tree_single|rock_single|hill_single|hills_|fence_|building_(dirt|grain)|target$|tent$)/
 
 export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
   const random = rng(plan.seed ^ 0x9e3779b9)
@@ -68,21 +76,48 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
   // Generator v2: towns and a civic centre from the prefab catalogue (dress/town.ts, dress/civic.ts).
   const civic = plan.gen === 2 ? civicOf(plan, fame) : undefined
   const town = plan.gen === 2 ? townOf(plan, roads.links) : undefined
-  if (town && civic) clearLots(town.lots, civic)
-  const { tiles, decor, water, meadow, fields } = dressHexes(plan, roads.links, terrace, random, town?.lots)
+  // A venue keeps off the civic centre's halls and its wall (a wall piece is 10 long, a venue 10 across).
+  const civicAnchors: Anchor[] = [
+    ...(civic?.clear ?? []).map(([x, z, r]): Anchor => [x, z, r + 3]),
+    ...(civic?.wall ?? []).map(([x, z]): Anchor => [x, z, 8.5]),
+  ]
+  const venues = plan.gen === 2 ? venuesOf(plan, roads, civicAnchors) : []
+  const clear: Anchor[] = [
+    ...(civic?.clear ?? []),
+    ...venues.map(({ venue }): Anchor => [venue.at[0], venue.at[1], VENUE_CLEAR]),
+  ]
+  if (town) clearLots(town.lots, clear, civic?.wall ?? [])
+  const { tiles, decor, water, meadow, fields } = dressHexes(
+    plan,
+    roads.links,
+    terrace,
+    random,
+    town?.lots,
+    new Map(venues.map(({ cell, placements }) => [key(cell), placements])),
+  )
   if (town && civic) {
     decor.push(...town.plazas, ...civic.placements)
-    const open = (spot: Spot): boolean =>
-      civic.clear.every(([x, z, r]) => Math.hypot(spot[0] - x, spot[1] - z) > r)
+    const open = (spot: Spot): boolean => clear.every(([x, z, r]) => Math.hypot(spot[0] - x, spot[1] - z) > r)
     meadow.splice(0, meadow.length, ...meadow.filter(open))
+    // The trees and rocks on the hexes round a venue made way for its yard (the venue's own pieces stay).
+    const own = new Set(venues.flatMap(({ placements }) => placements))
+    const kept = decor.filter(
+      (item) =>
+        own.has(item) ||
+        !CLUTTER.test(item.piece) ||
+        venues.every(({ venue }) => Math.hypot(item.x - venue.at[0], item.z - venue.at[1]) > VENUE_CLEAR + 2),
+    )
+    decor.splice(0, decor.length, ...kept)
   }
   decor.push(...quayOf(plan.hub))
   const landmarks = landmarksOf(plan.hub, decor)
 
   const districts: District[] = plan.districts.map((district) => {
     const square = cellToWorld(district.square)
-    const siteAt = district.site ? cellToWorld(district.site) : undefined
     const folder = district.folder
+    const venue = venues.find((placed) => placed.venue.district === folder.name)
+    // Its landmark's hex: the venue's, which may have moved off the district's own site (dress/venues.ts).
+    const siteAt = venue ? venue.venue.at : district.site ? cellToWorld(district.site) : undefined
     return {
       id: folder.name,
       label:
@@ -100,9 +135,14 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
       at: siteAt ?? square,
       node: roads.nodeName(district.square),
       posts: siteAt
-        ? postsAround(siteAt, square, LANDMARK[district.biome](folder.language.kit))
+        ? postsAround(
+            siteAt,
+            square,
+            venue?.main ?? LANDMARK[district.biome](folder.language.kit),
+            venue?.front,
+          )
         : [[square[0], square[1], 0]],
-      ...(siteAt ? { landmark: LANDMARK[district.biome](folder.language.kit) } : {}),
+      ...(siteAt ? { landmark: venue?.main ?? LANDMARK[district.biome](folder.language.kit) } : {}),
     }
   })
 
@@ -112,5 +152,6 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
     island: { tiles, decor, water, meadow, landmarks, fields },
     roads: { nodes: roads.nodes, edges: roads.edges },
     districts,
+    venues: venues.map(({ venue }) => venue),
   }
 }

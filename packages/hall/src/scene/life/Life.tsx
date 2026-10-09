@@ -12,6 +12,7 @@ import { Ravens } from "./Ravens.tsx"
 import { Smoke } from "./Smoke.tsx"
 import { Sparks } from "./Sparks.tsx"
 import { life, readGuild } from "./state.ts"
+import { Venues } from "./Venues.tsx"
 import { Villagers } from "./Villagers.tsx"
 import { Windows } from "./Windows.tsx"
 import { WorkFx } from "./WorkFx.tsx"
@@ -27,10 +28,11 @@ import { WorkFx } from "./WorkFx.tsx"
  *   townsfolk  farmers, a fisher, merchants, gate guards, children, a graveyard keeper and villagers
  *              about their day (rounds.ts, Villagers.tsx): home at dusk and in the rain, guards and a
  *              night watchman out after dark with lanterns, on the square at a festival
+ *   venues     a gen 2 island's occupied venues light their windows and smoke their chimneys (Venues.tsx)
  *   ravens     carry quests out, news of loot home, and circle over a plea (Ravens.tsx)
  *   work       what working looks like between results: chips, sparks, steam, splashes, arrows in
  *              flight, the forest's shaking work trees, the forge's quench buckets (WorkFx.tsx)
- * Draw calls (High): machines 1, traces 1, smoke 1, sparks 1, birds 1, windows 2, ravens 2, work 5,
+ * Draw calls (High): machines 1, traces 1, smoke 1, sparks 1, birds 1, windows 2, venues 2, ravens 2, work 5,
  * plus one per townsperson out (14 at High, 8 Medium, 4 Low) and one per held thing or lantern
  * showing. Nothing here casts into the (static) sun shadow map; townsfolk get a blob shadow
  * (scene/Blobs.tsx).
@@ -42,7 +44,8 @@ import { WorkFx } from "./WorkFx.tsx"
 export function Life() {
   const store = useGuildStore()
   const tier = useTier()
-  const hand = useWorld().kind === "hand"
+  const world = useWorld()
+  const hand = world.kind === "hand"
   // After the guild's clock, before every Life piece reads it this frame.
   useFrame(() => readGuild(store), FRAME.SKY)
 
@@ -53,6 +56,7 @@ export function Life() {
       <WorkFx />
       <Birds tier={tier} />
       <Ravens />
+      {world.venues && <Venues venues={world.venues} tier={tier} />}
       {hand && (
         <>
           <Smoke tier={tier} />

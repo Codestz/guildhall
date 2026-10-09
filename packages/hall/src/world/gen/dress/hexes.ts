@@ -27,6 +27,7 @@ export function dressHexes(
   terrace: Terrace,
   random: () => number,
   lots?: ReadonlyMap<string, Lot>,
+  venues?: ReadonlyMap<string, readonly LandPlacement[]>,
 ): DressedHexes {
   const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)] as T
   const spin = (): number => turn(Math.floor(random() * 6))
@@ -138,11 +139,13 @@ export function dressHexes(
 
       const wet = [0, 1, 2, 3, 4, 5].filter((dir) => isSea(step(cell, dir)))
       const site = sites.get(key(cell))
+      // Generator v2: a district's venue stands on its landmark's hex, or on a free one beside the square.
+      const venue = venues?.get(key(cell))
       if (wet.length > 0) {
         const coast = fit(COAST_TILES, wet)
         if (!coast) throw new Error(`coast at ${key(cell)}: no tile opens onto ${wet}`)
         tile(`hex_coast_${coast.tile}` as LandPiece, coast.m)
-        if (site === undefined && char !== "V") {
+        if (site === undefined && venue === undefined && char !== "V") {
           if (coast.tile === "A" && (char === "F" || char === "f")) {
             const away = (((wet[0] ?? 0) + 3) * Math.PI) / 3 + Math.PI / 6
             add(pick(["trees_A_small", "trees_B_small"] as const), Math.cos(away) * 2, Math.sin(away) * 2)
@@ -152,6 +155,10 @@ export function dressHexes(
         }
       } else if (!terraced) tile("hex_grass")
 
+      if (venue) {
+        decor.push(...venue)
+        continue
+      }
       if (site !== undefined) {
         const owner = plan.districts[site]
         if (owner)

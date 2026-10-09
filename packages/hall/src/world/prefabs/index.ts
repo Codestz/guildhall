@@ -1,12 +1,24 @@
 import { CIVIC } from "./civic.ts"
 import { HOUSES, SQUARES } from "./houses.ts"
 import type { Prefab } from "./types.ts"
+import { VENUES } from "./venues.ts"
 import { WALLS } from "./walls.ts"
 
-export { doorsOf, instantiate, type Part, type Prefab, type PrefabKind, pieceOf } from "./types.ts"
+export {
+  DOOR_DEPTH,
+  type Door,
+  doorsOf,
+  type Fixture,
+  fixturesOf,
+  instantiate,
+  type Part,
+  type Prefab,
+  type PrefabKind,
+  pieceOf,
+} from "./types.ts"
 
 /** Every prefab, in the order the lab lays them out. Ids are stable. */
-export const PREFABS: readonly Prefab[] = [...HOUSES, ...SQUARES, ...CIVIC, ...WALLS]
+export const PREFABS: readonly Prefab[] = [...HOUSES, ...SQUARES, ...CIVIC, ...VENUES, ...WALLS]
 
 const BY_ID = new Map(PREFABS.map((prefab) => [prefab.id, prefab]))
 

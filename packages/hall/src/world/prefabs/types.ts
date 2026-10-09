@@ -25,9 +25,23 @@ export interface Door {
   x: number
   z: number
   rot: number
+  /** How far in from that spot the sill lies, along the way the door faces (default DOOR_DEPTH). */
+  depth?: number
+  /** How high the sill is above the step, when a flight of steps leads up to it. */
+  y?: number
 }
 
-export type PrefabKind = "house" | "market" | "plaza" | "civic" | "wall" | "site"
+/** The sill a pace in from the step when a door doesn't say. */
+export const DOOR_DEPTH = 1.1
+
+/** A point on a prefab: a lit window's glow, a chimney's top. `y` is its height above the ground. */
+export interface Fixture {
+  x: number
+  y: number
+  z: number
+}
+
+export type PrefabKind = "house" | "market" | "plaza" | "civic" | "wall" | "venue"
 
 export interface Prefab {
   /** Stable: lots, saves and shots refer to it. */
@@ -39,8 +53,12 @@ export interface Prefab {
   /** Houses it holds (a lot's density), for the houses. */
   houses?: number
   parts: readonly Part[]
-  /** For visitable buildings later; empty for what nobody enters. */
+  /** Where people go in (a venue's door is its first); empty for what nobody enters. */
   doors: readonly Door[]
+  /** A venue's glow spots (windows, the furnace's mouth): lit while someone is inside. */
+  windows?: readonly Fixture[]
+  /** A venue's chimney tops: smoking while someone is inside. */
+  chimneys?: readonly Fixture[]
 }
 
 const round = (value: number): number => Math.round(value * 100) / 100
@@ -81,6 +99,25 @@ export function instantiate(
 export function doorsOf(prefab: Prefab, at: readonly [number, number], rot: number): Door[] {
   return prefab.doors.map((door) => {
     const [x, z] = toWorld(at, rot, door.x, door.z)
-    return { x, z, rot: round(rot + door.rot) }
+    return {
+      x,
+      z,
+      rot: round(rot + door.rot),
+      ...(door.depth ? { depth: door.depth } : {}),
+      ...(door.y ? { y: door.y } : {}),
+    }
+  })
+}
+
+/** A prefab's fixtures (windows, chimneys) in the world, by the same transform; `y` lifts them. */
+export function fixturesOf(
+  list: readonly Fixture[] | undefined,
+  at: readonly [number, number],
+  rot: number,
+  y = 0,
+): Fixture[] {
+  return (list ?? []).map((fixture) => {
+    const [x, z] = toWorld(at, rot, fixture.x, fixture.z)
+    return { x, y: round(fixture.y + y), z }
   })
 }

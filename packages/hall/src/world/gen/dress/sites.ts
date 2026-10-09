@@ -91,11 +91,12 @@ const FRONT_GAP = 1
 const NEAREST_POST = 3.4
 /**
  * Three posts in front of a landmark (it faces the square), a step off its front face, facing it:
- * on the square's side, where its road ends.
+ * on the square's side, where its road ends. `reach` is how far out they stand when the landmark's
+ * own size doesn't say: a venue is bigger than its main piece, scaled, with its yard in front.
  */
-export function postsAround(site: Spot, square: Spot, landmark: LandPiece): Post[] {
+export function postsAround(site: Spot, square: Spot, landmark: LandPiece, reach?: number): Post[] {
   const toSquare = Math.atan2(square[0] - site[0], square[1] - site[1])
-  const front = Math.max(NEAREST_POST, (LANDS[landmark].max[2] ?? 0) * HEX_SCALE + FRONT_GAP)
+  const front = reach ?? Math.max(NEAREST_POST, (LANDS[landmark].max[2] ?? 0) * HEX_SCALE + FRONT_GAP)
   return [-0.35, 0, 0.35].map((spread) => {
     const angle = toSquare + spread
     const reach = front / Math.cos(spread)

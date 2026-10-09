@@ -3441,6 +3441,309 @@ button {
   }
 }
 
+/* ───────────── the Chronicle card (hud/Recap.tsx) ─────────────
+ * A shareable picture of the session, opened from the book. Ink, not parchment: it previews a dark
+ * card, and reads as a layer above the book rather than a page of it. Text on --ink-solid: paper
+ * 15.6:1, muted 10.6:1, faint 7.3:1, brass-hi 11.9:1; the primary button's ink on brass 9.4:1.
+ */
+.legends-card .glyph {
+  color: var(--umber);
+}
+.legends-card-end {
+  margin: 18px auto 4px;
+}
+.recap-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  padding: 24px var(--gut);
+  background: rgba(10, 7, 5, 0.6);
+  animation: scrim-in 0.2s ease-out both;
+}
+.recap {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(640px, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  padding: 22px 24px 20px;
+  border-radius: var(--r);
+  border: 1px solid var(--brass-line);
+  background: var(--ink-solid);
+  box-shadow:
+    var(--shadow),
+    0 30px 80px -20px rgba(0, 0, 0, 0.8);
+  color: var(--paper);
+  font-family: var(--body);
+  scrollbar-width: thin;
+  scrollbar-color: var(--hair-2) transparent;
+  animation: book-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.recap :focus-visible {
+  outline: 2px solid var(--brass-hi);
+  outline-offset: 2px;
+}
+.recap-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.recap-head > div {
+  flex: 1;
+  min-width: 0;
+}
+.recap-eyebrow {
+  margin: 0 0 2px;
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  color: var(--brass);
+}
+.recap-head h2 {
+  margin: 0;
+  font-family: "Alegreya", Georgia, serif;
+  font-weight: 600;
+  font-size: 25px;
+  line-height: 1.2;
+}
+.recap-head h2:focus {
+  outline: none;
+}
+.recap-sub {
+  margin: 4px 0 0;
+  font-size: 15px;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.recap-at {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--brass-hi);
+}
+.recap-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm);
+  color: var(--muted);
+}
+.recap-close:hover {
+  background: var(--raise-2);
+  color: var(--paper);
+}
+.recap-formats {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.recap-format {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px 0 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--hair-2);
+  font-size: 14.5px;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
+}
+.recap-format small {
+  margin-left: 2px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.recap-format input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.recap-format:hover {
+  color: var(--paper);
+  background: var(--raise);
+}
+.recap-format[data-checked="true"] {
+  color: var(--paper);
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+}
+.recap-format[data-checked="true"] .recap-shape {
+  color: var(--brass-hi);
+}
+.recap-format:has(input:focus-visible) {
+  outline: 2px solid var(--brass-hi);
+  outline-offset: 2px;
+}
+.recap-preview {
+  position: relative;
+  margin: 0;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--r-sm);
+  background: radial-gradient(ellipse at 70% 40%, rgba(220, 182, 98, 0.08), transparent 70%), #0f0c09;
+  box-shadow: 0 0 0 1px var(--hair-2);
+}
+.recap-preview[data-format="portrait"] {
+  /* a tall card previewed whole: as tall as the dialog allows, centred */
+  width: auto;
+  height: min(56dvh, 560px);
+  align-self: center;
+}
+.recap-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.recap-filming {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 15px;
+  color: var(--muted);
+}
+.recap-spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--brass-wash);
+  border-top-color: var(--brass);
+  animation: recap-spin 0.9s linear infinite;
+}
+@keyframes recap-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+.recap-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.recap-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px 0 13px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--hair-2);
+  background: var(--raise);
+  font-family: var(--body);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--paper);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.recap-btn:hover:not(:disabled) {
+  background: var(--raise-2);
+  border-color: var(--brass-line);
+}
+.recap-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.recap-btn-primary {
+  border-color: var(--brass);
+  background: var(--brass);
+  color: var(--ink-solid);
+}
+.recap-btn-primary:hover:not(:disabled) {
+  background: var(--brass-hi);
+  border-color: var(--brass-hi);
+}
+.recap-note {
+  margin: -4px 0 0;
+  font-size: 13.5px;
+  color: var(--faint);
+}
+.recap-note[data-tone="warn"] {
+  color: var(--plea);
+}
+.recap-text-btn {
+  padding: 0;
+  font: inherit;
+  color: var(--brass-hi);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+@media (max-width: 720px) {
+  .recap-scrim {
+    padding: 0;
+    align-items: end;
+  }
+  .recap {
+    width: 100%;
+    max-height: 94dvh;
+    padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+    border-radius: 12px 12px 0 0;
+    border-width: 1px 0 0;
+  }
+  .recap-head h2 {
+    font-size: 22px;
+  }
+  .recap-formats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .recap-format {
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 8px;
+  }
+  .recap-format small {
+    display: none;
+  }
+  .recap-preview[data-format="portrait"] {
+    height: min(46dvh, 460px);
+  }
+  .recap-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .recap-btn,
+  .recap-close {
+    min-height: 44px;
+  }
+  .recap-close {
+    width: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .recap-scrim,
+  .recap {
+    animation: none;
+  }
+  .recap-spinner {
+    animation-duration: 2.4s;
+  }
+}
+
 /* ───────────── parties: the switcher, the banner key, and the banner marks ─────────────
  * Several conversations on one island (guild/parties.ts). The banner colour is identity, like the
  * role colour, and always travels with the party's name. Pennants carry a dark outline, so the ivory
@@ -4402,3 +4705,144 @@ button {
     opacity: 0.6;
   }
 }
+
+/* ───────────────────────────── about card: sources (hud/Brand.tsx) ─────────────────────────────
+ * The reframe: the headline, what can feed the world, and the install lines folded behind
+ * "Set up a source" so the card stays as light as before. */
+
+.about .tagline {
+  font-family: var(--display);
+  font-size: 16px;
+  line-height: 1.25;
+  letter-spacing: 0.03em;
+  color: var(--brass-hi);
+}
+.about .tagline + .sim-note {
+  margin-top: -4px;
+  text-wrap: pretty;
+}
+.sources {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--paper);
+}
+.sources-label {
+  margin-right: 8px;
+  font-size: 12px;
+  color: var(--faint);
+}
+.sources-list {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* the dot trails its item, so a wrapped line never starts with one */
+.sources-list li {
+  display: inline-block;
+  white-space: nowrap;
+}
+.sources-list li:not(:last-child)::after {
+  content: "·";
+  margin: 0 6px;
+  color: var(--faint);
+}
+.sources-soon {
+  margin-left: 5px;
+  padding: 0 4px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-sm);
+  vertical-align: 1px;
+}
+.setup > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding-right: 6px;
+  font-size: 13.5px;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--r-sm);
+}
+.setup > summary::-webkit-details-marker {
+  display: none;
+}
+.setup > summary .glyph {
+  width: 14px;
+  height: 14px;
+  color: var(--brass-hi);
+  transform: rotate(-90deg);
+  transition: transform 0.15s;
+}
+.setup[open] > summary .glyph {
+  transform: none;
+}
+.setup > summary:hover {
+  color: var(--paper);
+}
+.setup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 0 2px;
+}
+/* one command a line; a command breaks at its spaces, never inside a flag or a package name */
+.setup .install-code {
+  overflow-wrap: break-word;
+}
+.code-line {
+  display: block;
+}
+.code-tok {
+  white-space: nowrap;
+}
+.setup-note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.setup-note b {
+  font-weight: 500;
+  color: var(--paper);
+}
+.setup-note a {
+  color: var(--brass-hi);
+  text-decoration: underline;
+  text-decoration-color: var(--brass-line);
+  text-underline-offset: 3px;
+}
+.setup-note a:hover {
+  color: var(--paper);
+  text-decoration-color: currentColor;
+}
+.about .setup + .about-how {
+  padding-top: 0;
+}
+@media (hover: none) and (pointer: coarse) {
+  /* a 44px target that overlaps the card's gaps rather than adding to them */
+  .setup > summary {
+    min-height: 44px;
+  }
+  .setup {
+    margin-block: -6px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .setup > summary .glyph {
+    transition: none;
+  }
+}
+/* the opening card's pitch: the headline on its own line (hud/Opening.tsx) */
+.title-head {
+  display: block;
+  color: var(--brass-hi);
+}
+/* ─────────────────────────── end about card: sources ─────────────────────────── */

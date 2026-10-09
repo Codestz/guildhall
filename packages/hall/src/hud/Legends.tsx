@@ -17,6 +17,7 @@ import { spell } from "../guild/story.ts"
 import { FOCUSABLE, tabStops, wrapOf } from "./focus.ts"
 import { Icon } from "./icons.tsx"
 import { Pennant } from "./Parties.tsx"
+import { Recap } from "./Recap.tsx"
 
 const NOTE_GLYPH: Record<NotableKind, keyof typeof Icon> = {
   plea: "plea",
@@ -47,6 +48,18 @@ export function Legends({ store, onClose }: { store: GuildStore; onClose: () => 
   const [chosen, setChosen] = useState<string | undefined>(() => store.focalParty?.id)
   const book = parties.find((p) => p.id === chosen) ?? store.focalParty
   const tabs = useRef<(HTMLButtonElement | null)[]>([])
+  // The Chronicle card (hud/Recap.tsx), and the button that opened it (focus goes back there).
+  // The book as it stood when the card was asked for: filming moves the story underneath it.
+  const [recap, setRecap] = useState<{ legend: Legend; party: string | undefined } | undefined>()
+  const recapFrom = useRef<HTMLButtonElement | null>(null)
+  function openRecap(event: { currentTarget: HTMLButtonElement }) {
+    recapFrom.current = event.currentTarget
+    if (legend) setRecap({ legend, party: book?.id })
+  }
+  function closeRecap() {
+    setRecap(undefined)
+    requestAnimationFrame(() => recapFrom.current?.focus())
+  }
 
   // Shows the probe hook forced (dev / probe builds only; empty otherwise).
   const forced = worldEventsOf(store).forced
@@ -136,6 +149,18 @@ export function Legends({ store, onClose }: { store: GuildStore; onClose: () => 
             {legend && <p className="legends-meta">{metaOf(legend)}</p>}
           </div>
           <div className="legends-tools">
+            <button
+              type="button"
+              className="legends-copy legends-card"
+              onClick={openRecap}
+              disabled={!legend}
+              aria-haspopup="dialog"
+              aria-expanded={recap !== undefined}
+              title="A picture of this session to share"
+            >
+              <CardGlyph />
+              <span>Chronicle card</span>
+            </button>
             <button
               type="button"
               className="legends-copy"
@@ -229,12 +254,47 @@ export function Legends({ store, onClose }: { store: GuildStore; onClose: () => 
                   </blockquote>
                 )}
                 <p className="legends-closing">{legend.closing}</p>
+                {legend.outcome === "complete" && (
+                  <button
+                    type="button"
+                    className="legends-copy legends-card legends-card-end"
+                    onClick={openRecap}
+                    aria-haspopup="dialog"
+                  >
+                    <CardGlyph />
+                    <span>Make the Chronicle card</span>
+                  </button>
+                )}
               </footer>
             </>
           )}
         </div>
       </article>
+      {recap && <Recap store={store} legend={recap.legend} party={recap.party} onClose={closeRecap} />}
     </div>
+  )
+}
+
+/** A card with a picture on it: the Chronicle card's mark. */
+function CardGlyph() {
+  return (
+    <svg
+      className="glyph"
+      width={16}
+      height={16}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <rect x="1.75" y="3" width="12.5" height="10" rx="1.5" />
+      <path d="m2.5 11.5 3.3-3.3 2.4 2.3 1.8-1.7 3.5 3.2" />
+      <circle cx="10.6" cy="6.1" r="1.1" />
+    </svg>
   )
 }
 

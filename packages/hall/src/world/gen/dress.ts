@@ -4,6 +4,7 @@ import type { Post, Spot } from "../layout.ts"
 import type { Venue } from "../venues.ts"
 import type { Biome, Language } from "./biomes.ts"
 import { civicOf, type Fame } from "./dress/civic.ts"
+import { coverOf } from "./dress/cover.ts"
 import { dressHexes } from "./dress/hexes.ts"
 import { homesOf } from "./dress/homes.ts"
 import { dressRoads } from "./dress/roads.ts"
@@ -85,7 +86,7 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
     ...(civic?.clear ?? []).map(([x, z, r]): Anchor => [x, z, r + 3]),
     ...(civic?.wall ?? []).map(([x, z]): Anchor => [x, z, 8.5]),
   ]
-  const venues = plan.gen === 2 ? venuesOf(plan, roads, civicAnchors) : []
+  const venues = plan.gen === 2 ? venuesOf(plan, roads, civicAnchors, coverOf(plan, terrace.levels)) : []
   const clear: Anchor[] = [
     ...(civic?.clear ?? []),
     ...venues.map(({ venue }): Anchor => [venue.at[0], venue.at[1], VENUE_CLEAR]),

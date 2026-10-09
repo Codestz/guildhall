@@ -2,8 +2,9 @@ import { type Cell, cellToWorld, type LandPlacement } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
 import { DOOR_DEPTH, doorsOf, fixturesOf, instantiate, type Prefab, prefab } from "../../prefabs/index.ts"
 import { VENUE_KINDS, type Venue, venueKindOf } from "../../venues.ts"
-import { key, neighbours } from "../hex.ts"
+import { cellAt, key, neighbours } from "../hex.ts"
 import type { IslandPlan, PlanDistrict } from "../plan.ts"
+import type { Cover } from "./cover.ts"
 import type { DressedRoads } from "./roads.ts"
 import { facing, round } from "./sites.ts"
 
@@ -36,10 +37,13 @@ export interface PlacedVenue {
 /** Ground a venue may stand on when it leaves its landmark hex: plain meadow, woods or a village lot. */
 const BUILDABLE = ".fv"
 
+const NO_COVER: Cover = { massifs: new Set(), rivers: new Set() }
+
 export function venuesOf(
   plan: IslandPlan,
   roads: DressedRoads,
   avoid: readonly Anchor[] = [],
+  cover: Cover = NO_COVER,
 ): PlacedVenue[] {
   const code = plan.districts
     .filter((district) => district.biome === "village")
@@ -54,55 +58,134 @@ export function venuesOf(
       district === code,
     )
     if (!kind) return
-    const free = (cell: Cell): boolean => {
+    // Open ground: nothing civic on it, and no mountain or river about to cover it.
+    const open = (cell: Cell): boolean => {
       const [x, z] = cellToWorld(cell)
-      return avoid.every(([ax, az, r]) => Math.hypot(x - ax, z - az) >= r)
+      return (
+        !cover.massifs.has(key(cell)) &&
+        !cover.rivers.has(key(cell)) &&
+        avoid.every(([ax, az, r]) => Math.hypot(x - ax, z - az) >= r)
+      )
     }
-    // Its landmark hex, unless something civic stands there: then the nearest free hex round its square.
-    const cell = free(district.site)
-      ? district.site
-      : around(district.square, plan.land).find((next) => {
-          const hex = plan.land.get(key(next))
-          return (
-            hex?.district === i &&
-            BUILDABLE.includes(hex.char) &&
-            hex.level === undefined &&
-            !taken.has(key(next)) &&
-            free(next)
-          )
-        })
-    if (!cell) return
-    taken.add(key(cell))
-    const placed = place(prefab(VENUE_KINDS[kind].prefab), kind, district, cell, roads)
-    if (placed) out.push(placed)
+    const spare = (cell: Cell): boolean => {
+      if (key(cell) === key(district.site as Cell)) return open(cell)
+      const hex = plan.land.get(key(cell))
+      return (
+        hex?.district === i &&
+        BUILDABLE.includes(hex.char) &&
+        hex.level === undefined &&
+        !taken.has(key(cell)) &&
+        open(cell)
+      )
+    }
+    // A mine into a mountain's flank when a range is near; else the landmark's hex, unless something
+    // civic or wild stands there: then the nearest spare hexes round the square, in turn. The first
+    // whose door's step is off the beach wins (a venue on a spit has nowhere to stand), else the first.
+    const square = cellToWorld(district.square)
+    const flank = kind === "mine" ? flankOf(district.site, spare, roads, cover) : undefined
+    const choices = [
+      ...(flank ? [flank] : []),
+      ...[district.site, ...around(district.square, plan.land)]
+        .filter(spare)
+        .map((cell) => ({ cell, towards: square })),
+    ]
+    let placed: PlacedVenue | undefined
+    for (const { cell, towards } of choices) {
+      const next = place(prefab(VENUE_KINDS[kind].prefab), kind, district, cell, towards, roads)
+      if (!next) continue
+      placed ??= next
+      if (!onBeach(next.venue.door.step, plan.land)) {
+        placed = next
+        break
+      }
+    }
+    if (!placed) return
+    taken.add(key(placed.cell))
+    out.push(placed)
   })
   return out
 }
 
-/** The hexes within two steps of a hex: inland ones first (a venue by the shore may stand in a river's mouth), then nearest. */
+/**
+ * Where a mine goes into a range: a spare hex within two steps of a massif's (the nearest first,
+ * then the nearest the district's landmark), its door to a road hex beside it and facing away from
+ * the slope. None where no massif is that close.
+ */
+function flankOf(
+  site: Cell,
+  spare: (cell: Cell) => boolean,
+  roads: DressedRoads,
+  cover: Cover,
+): { cell: Cell; towards: Spot } | undefined {
+  const [sx, sz] = cellToWorld(site)
+  let best: { cell: Cell; towards: Spot; rank: number } | undefined
+  const consider = (cell: Cell): void => {
+    const first = neighbours(cell)
+    const slope = first.some((n) => cover.massifs.has(key(n)))
+      ? 1
+      : first.flatMap(neighbours).some((n) => cover.massifs.has(key(n)))
+        ? 2
+        : 0
+    if (slope === 0 || !spare(cell)) return
+    const [cx, cz] = cellToWorld(cell)
+    // Away from the nearest massif hex's centre.
+    let ax = 0
+    let az = 0
+    let near = Number.POSITIVE_INFINITY
+    for (const m of [...first, ...first.flatMap(neighbours)].filter((n) => cover.massifs.has(key(n)))) {
+      const [mx, mz] = cellToWorld(m)
+      const d = Math.hypot(cx - mx, cz - mz)
+      if (d < near) [near, ax, az] = [d, (cx - mx) / d, (cz - mz) / d]
+    }
+    for (const road of first.filter((n) => roads.links.has(key(n)))) {
+      const [rx, rz] = cellToWorld(road)
+      if ((rx - cx) * ax + (rz - cz) * az < 0) continue
+      const rank = slope * 1000 + Math.hypot(cx - sx, cz - sz)
+      if (!best || rank < best.rank) best = { cell, towards: [rx, rz], rank }
+    }
+  }
+  for (const cell of [site, ...neighbours(site).flatMap((n) => [n, ...neighbours(n)])]) consider(cell)
+  return best && { cell: best.cell, towards: best.towards }
+}
+
+/** The hexes within three steps of a hex: inland ones first (a venue by the shore may stand in a river's mouth), then nearest. */
 function around(cell: Cell, land: ReadonlyMap<string, unknown>): Cell[] {
   const first = neighbours(cell)
   const seen = new Set([key(cell), ...first.map(key)])
   const second = first.flatMap(neighbours).filter((next) => !seen.has(key(next)) && seen.add(key(next)))
+  const third = second.flatMap(neighbours).filter((next) => !seen.has(key(next)) && seen.add(key(next)))
   const [cx, cz] = cellToWorld(cell)
   const far = (next: Cell): number => Math.hypot(cellToWorld(next)[0] - cx, cellToWorld(next)[1] - cz)
   const wet = (next: Cell): number => neighbours(next).filter((n) => !land.has(key(n))).length
-  return [...first, ...second].sort(
+  return [...first, ...second, ...third].sort(
     (a, b) => wet(a) - wet(b) || far(a) - far(b) || (key(a) < key(b) ? -1 : 1),
   )
 }
 
-/** A venue of `item` on `cell`, facing the district's square. */
+/** From a sea hex's centre a coast tile's sand slopes away for this far (world/wilds.ts WATER_CLEARANCE): no standing there. */
+const BEACH = 8
+
+/** Whether a spot lies on a beach: within a beach's reach of a hex that is not land. */
+function onBeach(spot: Spot, land: ReadonlyMap<string, unknown>): boolean {
+  const here = cellAt(spot)
+  return [here, ...neighbours(here)].some((next) => {
+    const [x, z] = cellToWorld(next)
+    return !land.has(key(next)) && Math.hypot(x - spot[0], z - spot[1]) < BEACH
+  })
+}
+
+/** A venue of `item` on `cell`, facing `towards` (the district's square, or the road hex a mine opens onto). */
 function place(
   item: Prefab,
   kind: Venue["kind"],
   district: PlanDistrict,
   cell: Cell,
+  towards: Spot,
   roads: DressedRoads,
 ): PlacedVenue | undefined {
   const { folder } = district
   const at = cellToWorld(cell)
-  const rot = facing(at, cellToWorld(district.square))
+  const rot = facing(at, towards)
   const door = doorsOf(item, at, rot)[0]
   const placements = instantiate(item, at, rot, folder.language.kit)
   const main = placements[0]

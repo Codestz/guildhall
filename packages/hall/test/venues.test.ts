@@ -11,11 +11,11 @@ import { clearOccupancy, occupants } from "../src/scene/life/occupancy.ts"
 import { Visiting } from "../src/scene/visit.ts"
 import { setActiveWorld } from "../src/world/active.ts"
 import { decodeChronicle } from "../src/world/chronicle/format.ts"
-import { cellAt } from "../src/world/gen/hex.ts"
+import { cellAt, unkey } from "../src/world/gen/hex.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
 import LANDS from "../src/world/lands.json"
-import { HEX_SCALE, MAP_FOR_TESTS } from "../src/world/lands.ts"
+import { cellToWorld, HEX_SCALE, MAP_FOR_TESTS } from "../src/world/lands.ts"
 import { GATE, type Spot, STATIONS } from "../src/world/layout.ts"
 import { route } from "../src/world/paths.ts"
 import { prefab } from "../src/world/prefabs/index.ts"
@@ -120,12 +120,30 @@ describe("venues on a gen 2 island", () => {
       const missing = districts
         .filter((d) => !["forest", "wilds"].includes(d.biome) && d.landmark && !withVenue.has(d.id))
         .map((d) => d.id)
-      // Only the harbour's tavern may be lost, and only to a civic wall that pushes it off its hex
-      // (a river's mouth or a mountain then takes the hex it moved to): never on an island without one.
-      const walled = world.island.decor.some((d) => d.piece === "wall_straight")
-      expect(missing.filter((id) => id !== "/" || !walled)).toEqual([])
+      // Every district whose kind has a venue keeps it: the harbour's tavern too, off the civic wall's
+      // hex and clear of the rivers' mouths, so folk and tavern-craft agents have somewhere to go.
+      expect(missing).toEqual([])
       // The district's landmark is the venue's own building: its posts stand in front of it.
       for (const v of venues) expect(districts.find((d) => d.id === v.district)?.landmark).toBeDefined()
+      // None stands in a river's bed.
+      for (const v of venues)
+        expect({ id: v.id, at: world.terrain.at(cellAt(v.at)) }).not.toEqual({ id: v.id, at: "r" })
+    })
+
+    test(`${name}: a mine stands at a mountain's foot when a range is near, its door facing away from the slope`, () => {
+      const massifs = [...(world.relief?.keys ?? [])].map(unkey)
+      for (const v of venues.filter((x) => x.kind === "mine")) {
+        const [x, z] = v.at
+        const slope = massifs
+          .map((cell) => cellToWorld(cell))
+          .map(([mx, mz]) => ({ mx, mz, d: Math.hypot(x - mx, z - mz) }))
+          .sort((a, b) => a.d - b.d)[0]
+        // Within two hexes of a massif (neighbouring hexes lie 10 apart), the mine opens away from it.
+        if (!slope || slope.d > 21) continue
+        const front = (v.door.step[0] - x) * (x - slope.mx) + (v.door.step[1] - z) * (z - slope.mz)
+        expect({ id: v.id, front: front >= 0 }).toEqual({ id: v.id, front: true })
+        expect({ id: v.id, beside: slope.d <= 10.1 }).toEqual({ id: v.id, beside: true })
+      }
     })
 
     test(`${name}: every door's step is on dry level ground beside the road graph, its sill inside the building`, () => {
@@ -185,6 +203,16 @@ describe("venues on a gen 2 island", () => {
           expect({ id, near: Math.hypot(...sites[id].at) <= 90 }).toEqual({ id, near: true })
     })
   }
+
+  test("React's compiler mine is dug into a mountain's flank, and its harbour has its tavern", () => {
+    const mine = react.venues?.find((v) => v.kind === "mine")
+    const range = [...(react.relief?.keys ?? [])].map((id) => cellToWorld(unkey(id)))
+    expect(mine).toBeDefined()
+    expect(range.some(([x, z]) => Math.hypot(x - (mine?.at[0] ?? 0), z - (mine?.at[1] ?? 0)) <= 10.1)).toBe(
+      true,
+    )
+    expect(react.venues?.some((v) => v.id === "/#tavern")).toBe(true)
+  })
 
   test("the nearest venue of a kind to the keep is the one agents go to", () => {
     const forge = nearestVenue("forge", [0, 0], react)

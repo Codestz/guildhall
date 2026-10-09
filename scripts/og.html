@@ -1,0 +1,81 @@
+<!doctype html>
+<!--
+  The overlay of the social card (scripts/og.ts renders it with Chrome for Testing and writes
+  packages/hall/public/og.png): a frame of the world behind the crest, the wordmark and the tagline,
+  in the hall's own tokens (hud/hall.css, demos.css). Not shipped: the site never links it.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Guildhall social card</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Marcellus+SC&family=Alegreya+Sans:wght@400;500&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --ink-solid: #15110d;
+        --paper: #f3e9d4;
+        --brass: #dcb662;
+        --brass-hi: #f1d590;
+        --brass-line: rgba(220, 182, 98, 0.34);
+        --display: "Marcellus SC", "Cormorant SC", Georgia, serif;
+        --body: "Alegreya Sans", "Gill Sans", "Trebuchet MS", sans-serif;
+      }
+      * { box-sizing: border-box; margin: 0; }
+      html, body { width: 1200px; height: 630px; overflow: hidden; background: var(--ink-solid); }
+      .card { position: relative; width: 1200px; height: 630px; overflow: hidden; }
+      /* The frame is 2880x1720; this window keeps the hall and the ranges on the right. */
+      .frame {
+        position: absolute; inset: 0;
+        background: url("../.probe/og-frame.png") no-repeat;
+        background-size: 1600px auto;
+        background-position: 0 -190px;
+      }
+      .veil {
+        position: absolute; inset: 0;
+        background:
+          linear-gradient(90deg, rgba(15, 12, 9, 0.9) 0%, rgba(15, 12, 9, 0.72) 34%, rgba(15, 12, 9, 0.12) 64%, transparent 80%),
+          linear-gradient(0deg, rgba(15, 12, 9, 0.5), transparent 28%);
+      }
+      .crest {
+        position: absolute; left: 80px; top: 118px;
+        width: 96px; height: 96px; border-radius: 50%;
+        display: grid; place-items: center; color: var(--brass-hi);
+        border: 1.5px solid var(--brass-line);
+        background: radial-gradient(circle at 50% 38%, rgba(220, 182, 98, 0.22), rgba(21, 17, 13, 0.78));
+        box-shadow: 0 0 0 6px rgba(21, 17, 13, 0.35);
+      }
+      .words { position: absolute; left: 80px; top: 260px; }
+      h1 {
+        font: 400 112px/1 var(--display); letter-spacing: 0.04em; color: var(--brass-hi);
+        text-shadow: 0 2px 24px rgba(15, 12, 9, 0.7);
+      }
+      .rule { display: block; width: 300px; height: 1.5px; margin: 26px 0 28px; background: linear-gradient(90deg, var(--brass), transparent); }
+      p { font: 500 40px/1.25 var(--body); color: var(--paper); text-shadow: 0 1px 14px rgba(15, 12, 9, 0.8); }
+      .corner { position: absolute; width: 26px; height: 26px; border: 0 solid var(--brass-line); }
+      .tl { left: 22px; top: 22px; border-width: 1.5px 0 0 1.5px; }
+      .tr { right: 22px; top: 22px; border-width: 1.5px 1.5px 0 0; }
+      .bl { left: 22px; bottom: 22px; border-width: 0 0 1.5px 1.5px; }
+      .br { right: 22px; bottom: 22px; border-width: 0 1.5px 1.5px 0; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="frame"></div>
+      <div class="veil"></div>
+      <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      <div class="crest">
+        <svg aria-hidden="true" width="52" height="52" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 1.5 13.5 4v4.2c0 3-2.3 5.3-5.5 6.3-3.2-1-5.5-3.3-5.5-6.3V4z" />
+          <path d="M5.2 9.5V7.2L8 5.4l2.8 1.8v2.3" />
+          <path d="M6.6 9.5V8.3h2.8v1.2" />
+        </svg>
+      </div>
+      <div class="words">
+        <h1>Guildhall</h1>
+        <span class="rule"></span>
+        <p>Events in.<br />A living world out.</p>
+      </div>
+    </div>
+  </body>
+</html>

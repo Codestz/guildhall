@@ -78,6 +78,7 @@
           <li><a href="#webgpu">WebGL against WebGPU, honestly</a></li>
           <li><a href="#tsl">TSL on WebGL: the gotchas</a></li>
           <li><a href="#islands">Repos as islands</a></li>
+          <li><a href="#world">A world from a repo</a></li>
           <li><a href="#seas">GitHub as a sea</a></li>
           <li><a href="#verify">How we know it still works</a></li>
         </ol>
@@ -440,9 +441,67 @@
         </div>
       </section>
 
-      <!-- ─────────────────────────── V. seas ─────────────────────────── -->
-      <section id="seas" aria-labelledby="seas-h">
+      <!-- ─────────────────────────── V. world ─────────────────────────── -->
+      <section id="world" aria-labelledby="world-h">
         <p class="eyebrow">V</p>
+        <h2 id="world-h">A world from a repo</h2>
+        <p>
+          A second generator is growing beside the first, still a preview. The first grows districts and
+          lets the coast fall where they end. This one draws the <strong>outline first</strong>: one
+          landmass, then everything inside it, in an order that stops things fighting over the same ground.
+        </p>
+
+        <figure class="plaque">
+          <figcaption>In the order it is laid</figcaption>
+          <dl class="map">
+            <dt>The land</dt>
+            <dd>one rounded landmass with a wavy coast and a harbour cove, sized by how many files the repo has</dd>
+            <dt>Mountain ranges</dt>
+            <dd>laid before any road or lot, as bands round winding inland spines, with the keep left in a plain; roads then pay extra to cross them and cut passes where they must</dd>
+            <dt>Rivers</dt>
+            <dd>found by a flood that starts at the sea and never climbs: each hex learns its way down, so water always runs downhill, falls over the ledges and reaches the coast, under a bridge where a road crosses</dd>
+            <dt>Forests and hill towns</dt>
+            <dd>trees cover the lower slopes and thin to a treeline; towns in the hills keep their lots on terraces</dd>
+            <dt>Detail</dt>
+            <dd>each region draws in full or as a simplified copy, chosen by how many screen pixels a world unit covers, with a margin so nothing flickers between the two</dd>
+            <dt>The view</dt>
+            <dd>when a mountain hides someone, a soft dithered hole opens in the relief itself, so the camera need not move</dd>
+          </dl>
+        </figure>
+
+        <figure class="plaque" aria-labelledby="world-n-h">
+          <div class="chart-head">
+            <figcaption id="world-n-h">What it cost, measured</figcaption>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th scope="col">Change</th><th scope="col">Before</th><th scope="col">After</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">React overview, triangles, with detail tiers</th><td>1.92M</td><td>1.31M</td></tr>
+                <tr><th scope="row">Draw calls for all inland water</th><td colspan="2">2, however many rivers and lakes</td></tr>
+                <tr><th scope="row">Six heroes on first paint, gzip, with meshopt</th><td>1.16 MB</td><td>0.75 MB</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="fig-note">
+            Detail tiers swap with no visible pop. The water is flat surfaces per level carrying flow and
+            bank distance, so every river, lake and fall shares two draws. The characters' saving
+            (410 KB gzip) is not the terrain's, but it keeps the first paint light while the world grows.
+          </p>
+        </figure>
+
+        <div class="plaque try">
+          <span class="try-label">Try it</span>
+          <a href="/?repo=facebook/react&amp;gen=2&amp;look=island&amp;hour=11"><code>?repo=facebook/react&amp;gen=2&amp;look=island</code></a>
+          <p>Add <code>gen=2</code> to any repo link. Without it you get the first generator, unchanged.</p>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── VI. seas ─────────────────────────── -->
+      <section id="seas" aria-labelledby="seas-h">
+        <p class="eyebrow">VI</p>
         <h2 id="seas-h">GitHub as a sea</h2>
         <p>
           When a project's remote is on GitHub, the water round its island fills with it. Commits and
@@ -489,9 +548,9 @@
         </div>
       </section>
 
-      <!-- ─────────────────────────── VI. verify ─────────────────────────── -->
+      <!-- ─────────────────────────── VII. verify ─────────────────────────── -->
       <section id="verify" aria-labelledby="verify-h">
-        <p class="eyebrow">VI</p>
+        <p class="eyebrow">VII</p>
         <h2 id="verify-h">How we know it still works</h2>
         <p>
           A 3D scene can break without a single test going red: a light turns off, a shader goes

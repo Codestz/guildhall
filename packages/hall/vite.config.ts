@@ -4,10 +4,10 @@ import { type Connect, defineConfig, type Plugin } from "vite"
 
 const page = (name: string) => fileURLToPath(new URL(name, import.meta.url))
 
-/** `/how` and `/harbour` serve their .html in dev and preview, as vercel.json's rewrites do on the site. */
+/** `/how`, `/harbour` and `/demos` serve their .html in dev and preview, as vercel.json's rewrites do on the site. */
 function cleanPages(): Plugin {
   const rewrite: Connect.NextHandleFunction = (req, _res, next) => {
-    const clean = /^\/(how|harbour)\/?(\?.*)?$/.exec(req.url ?? "")
+    const clean = /^\/(how|harbour|demos)\/?(\?.*)?$/.exec(req.url ?? "")
     if (clean) req.url = `/${clean[1]}.html${clean[2] ?? ""}`
     next()
   }
@@ -23,8 +23,14 @@ export default defineConfig({
   build: {
     rollupOptions: {
       // The hall; the "How it's built" page (/how), a static long read with no app code; and the
-      // Harbour (/harbour), the chronicled repos, a few kilobytes of plain DOM (hud/harbour.ts).
-      input: { main: page("index.html"), how: page("how.html"), harbour: page("harbour.html") },
+      // Harbour (/harbour), the chronicled repos, a few kilobytes of plain DOM (hud/harbour.ts); and
+      // Demos (/demos), a static gallery of deep links into the hall.
+      input: {
+        main: page("index.html"),
+        how: page("how.html"),
+        harbour: page("harbour.html"),
+        demos: page("demos.html"),
+      },
     },
   },
 })

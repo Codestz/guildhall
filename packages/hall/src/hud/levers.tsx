@@ -1,6 +1,34 @@
-import type { ReactNode } from "react"
+import { type ReactNode, useId } from "react"
 
-/** Settings' controls (hud/Settings.tsx): a labelled group of choices, and an on/off switch. */
+/**
+ * Settings' controls (hud/Settings.tsx, hud/DirectorControls.tsx): a titled section, a labelled
+ * group of choices, and an on/off switch.
+ */
+
+/** One titled section of Settings; `value` says what is in effect now. `sub`: inside a group (h4). */
+export function Section({
+  title,
+  value,
+  sub = false,
+  children,
+}: {
+  title: string
+  value?: string
+  sub?: boolean
+  children: ReactNode
+}) {
+  const id = useId()
+  const Heading = sub ? "h4" : "h3"
+  return (
+    <section className="set-section" aria-labelledby={id}>
+      <Heading id={id}>
+        {title}
+        <LeverValue value={value} />
+      </Heading>
+      {children}
+    </section>
+  )
+}
 
 /** A labelled group of choices; `value` says what is in effect now. */
 export function Lever({

@@ -95,55 +95,12 @@ strong {
 
 /* ───────────── frame ───────────── */
 
-.top,
 main,
 .foot {
   width: 100%;
   max-width: calc(var(--col) + 2 * var(--gut));
   margin: 0 auto;
   padding: 0 var(--gut);
-}
-.top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-top: 20px;
-}
-.home {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  color: var(--paper);
-  text-decoration: none;
-  font-family: var(--display);
-  font-size: 18px;
-  letter-spacing: 0.04em;
-}
-.home:hover {
-  color: var(--brass-hi);
-}
-.crest {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  flex: none;
-  color: var(--brass-hi);
-  border: 1px solid var(--brass-line);
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 35%, rgba(220, 182, 98, 0.18), transparent 70%);
-}
-.top-links {
-  display: flex;
-  gap: 18px;
-  font-size: 15px;
-}
-.top-links a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
 }
 
 /* ───────────── hero ───────────── */
@@ -739,9 +696,6 @@ td.gain {
 @media (max-width: 640px) {
   :root {
     font-size: 16px;
-  }
-  .top-links .wide {
-    display: none;
   }
   .hero {
     padding-top: 36px;

@@ -1,0 +1,125 @@
+/*
+ * The site's top navigation, shared by its static pages (demos.html, harbour.html, how.html):
+ * Showcase · Demos · Harbour · How it's built. Uses the page's own tokens (each page's sheet
+ * mirrors hall.css' :root). The hall itself links the pages from its about card (hud/Brand.tsx).
+ *
+ * Desktop: the crest left, the links right, one row. Phones: the crest, then the links on a row of
+ * their own, spread across the width, each a 44px target.
+ */
+
+.site-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+  width: 100%;
+  max-width: calc(1040px + 2 * var(--gut));
+  margin: 0 auto;
+  padding: 18px var(--gut) 0;
+}
+.site-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  color: var(--paper);
+  text-decoration: none;
+  font-family: var(--display);
+  font-size: 18px;
+  letter-spacing: 0.04em;
+}
+.site-home:hover {
+  color: var(--brass-hi);
+}
+.site-crest {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  color: var(--brass-hi);
+  border: 1px solid var(--brass-line);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, rgba(220, 182, 98, 0.18), transparent 70%);
+}
+.site-nav ul {
+  display: flex;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.site-nav a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  font-size: 15px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.site-nav a:hover {
+  color: var(--paper);
+  background: var(--raise);
+}
+/* where you are: brass, with a hairline under it (not colour alone: the line marks it too) */
+.site-nav a[aria-current="page"] {
+  color: var(--brass-hi);
+}
+.site-nav a[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 7px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--brass);
+}
+
+@media (max-width: 600px) {
+  .site-top {
+    flex-direction: column;
+    align-items: stretch;
+    padding-top: 12px;
+  }
+  .site-nav {
+    border-block: 1px solid var(--hair);
+  }
+  .site-nav ul {
+    justify-content: space-between;
+    gap: 0;
+  }
+  .site-nav a {
+    padding: 0 8px;
+  }
+  .site-nav li:first-child a {
+    padding-left: 0;
+  }
+  .site-nav li:last-child a {
+    padding-right: 0;
+  }
+  .site-nav a[aria-current="page"]::after {
+    left: 8px;
+    right: 8px;
+    bottom: 6px;
+  }
+  .site-nav li:first-child a[aria-current="page"]::after {
+    left: 0;
+  }
+  .site-nav li:last-child a[aria-current="page"]::after {
+    right: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .site-nav a,
+  .site-home {
+    transition:
+      color 0.15s ease,
+      background 0.15s ease;
+  }
+}

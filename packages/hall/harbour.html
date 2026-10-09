@@ -22,14 +22,15 @@
     <meta property="og:image:alt" content="A voxel island at golden hour, its guildhall lit by a fire, with the title Guildhall." />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="stylesheet" href="/src/hud/harbour.css" />
+    <link rel="stylesheet" href="/src/site/nav.css" />
     <script type="module" src="/src/hud/harbour.ts"></script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to the islands</a>
 
-    <header class="top">
-      <a class="home" href="/" aria-label="Guildhall: back to the island">
-        <span class="crest" aria-hidden="true">
+    <header class="site-top">
+      <a class="site-home" href="/" aria-label="Guildhall: the showcase">
+        <span class="site-crest" aria-hidden="true">
           <svg aria-hidden="true" width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
             <path d="M8 1.5 13.5 4v4.2c0 3-2.3 5.3-5.5 6.3-3.2-1-5.5-3.3-5.5-6.3V4z" />
             <path d="M5.2 9.5V7.2L8 5.4l2.8 1.8v2.3" />
@@ -38,9 +39,13 @@
         </span>
         Guildhall
       </a>
-      <nav class="top-links" aria-label="Site">
-        <a href="/">Visit the guild</a>
-        <a class="wide" href="/how">How it's built</a>
+      <nav class="site-nav" aria-label="Site">
+        <ul>
+          <li><a href="/">Showcase</a></li>
+          <li><a href="/demos">Demos</a></li>
+          <li><a href="/harbour" aria-current="page">Harbour</a></li>
+          <li><a href="/how">How it's built</a></li>
+        </ul>
       </nav>
     </header>
 

@@ -1,0 +1,410 @@
+/*
+ * Demos (demos.html): a gallery of deep links into the hall, in the site's ledger style. Tokens
+ * mirror hall.css' :root, as how/how.css and hud/harbour.css do; the top navigation is
+ * site/nav.css. Plain HTML and CSS: no script on this page.
+ */
+
+:root {
+  --ink-solid: #15110d;
+  --ink: #1d1712;
+  --ink-deep: #0f0c09;
+  --raise: rgba(255, 238, 205, 0.05);
+  --raise-2: rgba(255, 238, 205, 0.09);
+  --hair: rgba(243, 233, 212, 0.1);
+  --hair-2: rgba(243, 233, 212, 0.16);
+  --paper: #f3e9d4;
+  --muted: #cdbfa3;
+  --faint: #ab9e85;
+  --brass: #dcb662;
+  --brass-hi: #f1d590;
+  --brass-line: rgba(220, 182, 98, 0.34);
+  --brass-wash: rgba(220, 182, 98, 0.16);
+  --display: "Marcellus SC", "Cormorant SC", Georgia, serif;
+  --body: "Alegreya Sans", "Gill Sans", "Trebuchet MS", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --r: 7px;
+  --r-sm: 5px;
+  --gut: 16px;
+  --col: 1040px;
+
+  color-scheme: dark;
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--paper);
+  background: var(--ink-solid);
+  -webkit-font-smoothing: antialiased;
+  text-size-adjust: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 520px at 50% -180px, rgba(220, 182, 98, 0.09), transparent 70%), var(--ink-solid);
+}
+:focus-visible {
+  outline: 2px solid var(--brass-hi);
+  outline-offset: 3px;
+  border-radius: var(--r-sm);
+}
+a {
+  color: var(--brass-hi);
+  text-decoration: underline;
+  text-decoration-color: var(--brass-line);
+  text-underline-offset: 3px;
+}
+a:hover {
+  color: var(--paper);
+  text-decoration-color: currentColor;
+}
+strong {
+  font-weight: 500;
+  color: var(--paper);
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.skip {
+  position: absolute;
+  left: var(--gut);
+  top: -60px;
+  z-index: 5;
+  padding: 8px 14px;
+  background: var(--ink);
+  border: 1px solid var(--brass-line);
+  border-radius: var(--r-sm);
+}
+.skip:focus {
+  top: var(--gut);
+}
+
+/* ───────────── frame ───────────── */
+
+main,
+.foot {
+  width: 100%;
+  max-width: calc(var(--col) + 2 * var(--gut));
+  margin: 0 auto;
+  padding: 0 var(--gut);
+}
+
+/* ───────────── hero ───────────── */
+
+.hero {
+  max-width: 720px;
+  padding: 56px 0 8px;
+}
+.eyebrow {
+  margin: 0 0 10px;
+  font-family: var(--display);
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  color: var(--brass);
+}
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+h1 {
+  font-size: clamp(34px, 6vw, 52px);
+}
+.rule {
+  display: block;
+  width: 72px;
+  height: 1px;
+  margin: 22px 0;
+  background: linear-gradient(90deg, var(--brass), transparent);
+}
+.lede {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 19px;
+  color: var(--muted);
+}
+
+/* ───────────── shelves: Stories, Repos, The world ───────────── */
+
+.shelf {
+  margin-top: 56px;
+}
+.shelf-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--hair);
+}
+.shelf-head h2 {
+  font-size: 26px;
+}
+.shelf-head p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--faint);
+}
+
+.demos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.demo,
+.demo article {
+  display: flex;
+  min-width: 0;
+}
+.demo article {
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--r);
+  border: 1px solid var(--hair-2);
+  background: linear-gradient(180deg, var(--raise), transparent 70%), var(--ink);
+}
+.demo:hover article {
+  border-color: var(--brass-line);
+}
+.demo-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  background: var(--ink-deep);
+  border-bottom: 1px solid var(--hair);
+}
+.demo-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px 16px;
+}
+.demo-kicker {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--brass);
+}
+.demo h3 {
+  font-size: 23px;
+}
+.demo-desc {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.demo-shows {
+  display: grid;
+  gap: 4px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--paper);
+}
+.demo-shows li {
+  position: relative;
+  padding-left: 16px;
+}
+.demo-shows li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.55em;
+  width: 5px;
+  height: 5px;
+  transform: rotate(45deg);
+  background: var(--brass);
+}
+.demo-note {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--hair);
+  background: var(--ink-deep);
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.demo-note b {
+  font-weight: 500;
+  color: var(--paper);
+}
+
+/* the way in: one button, and the link it opens, for those who share them */
+.demo-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: auto;
+  padding-top: 10px;
+}
+.open {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--brass);
+  background: var(--brass-wash);
+  color: var(--brass-hi);
+  font-weight: 500;
+  text-decoration: none;
+}
+.open:hover {
+  background: rgba(220, 182, 98, 0.26);
+  color: var(--paper);
+}
+.demo-link {
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--faint);
+  overflow-wrap: anywhere;
+}
+
+/* the Saga's five acts, each a link of its own */
+.demo-chapters ul {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.demo-chapters a {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 52px;
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--hair-2);
+  background: var(--raise);
+  color: var(--brass-hi);
+  font-family: var(--display);
+  font-size: 15px;
+  line-height: 1.15;
+  text-decoration: none;
+}
+.demo-chapters a span {
+  font-family: var(--body);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.demo-chapters a:hover {
+  background: var(--raise-2);
+  border-color: var(--brass-line);
+}
+
+/* the feature: the Saga, across the shelf, picture beside the words */
+@media (min-width: 760px) {
+  .demo.feature {
+    grid-column: 1 / -1;
+  }
+  .demo.feature article {
+    flex-direction: row;
+  }
+  .demo.feature .demo-img {
+    width: 52%;
+    flex: none;
+    aspect-ratio: auto;
+    min-height: 100%;
+    border-bottom: 0;
+    border-right: 1px solid var(--hair);
+  }
+  .demo.feature .demo-body {
+    padding: 24px 26px 22px;
+  }
+  .demo.feature h3 {
+    font-size: 32px;
+  }
+}
+
+/* ───────────── foot ───────────── */
+
+.foot {
+  margin-top: 72px;
+  padding-bottom: 48px;
+}
+.foot-inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 24px;
+  border-top: 1px solid var(--hair);
+  font-size: 15px;
+  color: var(--faint);
+}
+.foot-inner p {
+  margin: 0;
+}
+.foot-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+@media (max-width: 560px) {
+  .hero {
+    padding-top: 32px;
+  }
+  .lede {
+    font-size: 17px;
+  }
+  .shelf {
+    margin-top: 44px;
+  }
+  .demos {
+    grid-template-columns: 1fr;
+  }
+  .demo-chapters ul {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .demo-chapters a {
+    align-items: center;
+    padding: 6px 2px;
+    text-align: center;
+  }
+  /* the act's name doesn't fit five abreast: its numeral stays, the name goes to the label */
+  .demo-chapters a span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .open,
+  .demo article,
+  .demo-chapters a {
+    transition:
+      background 0.15s ease,
+      border-color 0.15s ease;
+  }
+}

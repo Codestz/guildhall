@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Demos · Guildhall</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Marcellus+SC&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <meta name="theme-color" content="#15110d" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="canonical" href="https://guildhall.codestz.dev/demos" />
+    <meta name="description" content="Every Guildhall scene, one link away: the Saga, a party, Claude Code and OpenCode side by side, GitHub seas, a crowd of 300, real repos grown into islands, WebGPU, night and storms." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Guildhall" />
+    <meta property="og:url" content="https://guildhall.codestz.dev/demos" />
+    <meta property="og:title" content="Demos · Guildhall" />
+    <meta property="og:description" content="Every scene, one link away: stories, crowds, repos grown into islands, WebGPU, night and storms." />
+    <meta property="og:image" content="https://guildhall.codestz.dev/og.png" />
+    <meta property="og:image:alt" content="A voxel island at golden hour, its guildhall lit by a fire, with the title Guildhall." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="stylesheet" href="/src/demos/demos.css" />
+    <link rel="stylesheet" href="/src/site/nav.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to the demos</a>
+
+    <header class="site-top">
+      <a class="site-home" href="/" aria-label="Guildhall: the showcase">
+        <span class="site-crest" aria-hidden="true">
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+            <path d="M8 1.5 13.5 4v4.2c0 3-2.3 5.3-5.5 6.3-3.2-1-5.5-3.3-5.5-6.3V4z" />
+            <path d="M5.2 9.5V7.2L8 5.4l2.8 1.8v2.3" />
+            <path d="M6.6 9.5V8.3h2.8v1.2" />
+          </svg>
+        </span>
+        Guildhall
+      </a>
+      <nav class="site-nav" aria-label="Site">
+        <ul>
+          <li><a href="/">Showcase</a></li>
+          <li><a href="/demos" aria-current="page">Demos</a></li>
+          <li><a href="/harbour">Harbour</a></li>
+          <li><a href="/how">How it's built</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="main">
+      <div class="hero">
+        <p class="eyebrow">Demos</p>
+        <h1>Every scene, one link away</h1>
+        <span class="rule" aria-hidden="true"></span>
+        <p class="lede">
+          The showcase plays one film. These open the hall on a chosen scene: a story, a crowd, a repo, an
+          hour. Each one comes with the <strong>Director's controls</strong> in Settings, so you can change
+          the story, the hour, the weather and how the Bard films it.
+        </p>
+      </div>
+
+      <section class="shelf" aria-labelledby="g-stories">
+        <div class="shelf-head">
+          <h2 id="g-stories">Stories</h2>
+          <p>Simulated guilds, each a told story with its own cast.</p>
+        </div>
+        <ul class="demos">
+        <li class="demo feature">
+          <article aria-labelledby="d-saga">
+            <img class="demo-img" src="/demos/saga.webp" width="1024" height="640" alt="The whole island at golden hour, its hall lit by the fire." loading="eager" decoding="async" />
+            <div class="demo-body">
+              <p class="demo-kicker">OpenCode · five acts · about 17 minutes</p>
+              <h3 id="d-saga">The Saga</h3>
+              <p class="demo-desc">The showcase's own film, with every lever in reach. One feature, “make Quill work offline”, from the quest to the clean sweep, told by a guild of OpenCode agents.</p>
+              <h4 class="visually-hidden">What it shows</h4>
+              <ul class="demo-shows">
+              <li>A plan asked for and approved: pleas wait for you</li>
+              <li>Red tests bring a storm and a dragon; the fallen rise as skeletons</li>
+              <li>Every world event fires on its own: nothing is forced</li>
+              </ul>
+              <nav class="demo-chapters" aria-label="The Saga's acts">
+                <ul><li><a href="/?act=1" aria-label="Act I: Dawn">I<span>Dawn</span></a></li><li><a href="/?act=2" aria-label="Act II: The forge">II<span>The forge</span></a></li><li><a href="/?act=3" aria-label="Act III: The storm">III<span>The storm</span></a></li><li><a href="/?act=4" aria-label="Act IV: The mending">IV<span>The mending</span></a></li><li><a href="/?act=5" aria-label="Act V: Nightfall">V<span>Nightfall</span></a></li></ul>
+              </nav>
+              <div class="demo-acts">
+                <a class="open" href="/?story=saga">Open<span class="visually-hidden"> The Saga</span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 8h9.5M8.5 4l4 4-4 4" /></svg></a>
+                <code class="demo-link">?story=saga</code>
+              </div>
+            </div>
+          </article>
+        </li>
+        <li class="demo">
+          <article aria-labelledby="d-party">
+            <img class="demo-img" src="/demos/party.webp" width="640" height="400" alt="The keep's hall: a guildmaster by the fire, adventurers at their stations." loading="lazy" decoding="async" />
+            <div class="demo-body">
+              <p class="demo-kicker">One conversation</p>
+              <h3 id="d-party">A party</h3>
+              <p class="demo-desc">One guildmaster and the adventurers it sends out. Each quest is taken from the board, walked to its station and worked in front of you.</p>
+              <h4 class="visually-hidden">What it shows</h4>
+              <ul class="demo-shows">
+              <li>Every tool call is a deed you can see</li>
+              <li>Click anyone to follow them and read their dossier</li>
+              </ul>
+              <div class="demo-acts">
+                <a class="open" href="/?story=party">Open<span class="visually-hidden"> A party</span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 8h9.5M8.5 4l4 4-4 4" /></svg></a>
+                <code class="demo-link">?story=party</code>
+              </div>
+            </div>
+          </article>
+        </li>
+        <li class="demo">
+          <article aria-labelledby="d-factions">
+            <img class="demo-img" src="/demos/factions.webp" width="640" height="400" alt="Two parties at work in the keep at golden hour." loading="lazy" decoding="async" />
+            <div class="demo-body">
+              <p class="demo-kicker">Two harnesses at once</p>
+              <h3 id="d-factions">Claude Code and OpenCode</h3>
+              <p class="demo-desc">An OpenCode party and a Claude Code party share one island, each under its own banner, each with its own guildmaster.</p>
+              <h4 class="visually-hidden">What it shows</h4>
+              <ul class="demo-shows">
+              <li>Two sources in one world</li>
+              <li>Parties keep their colours and their own stations</li>
+              </ul>
+              <div class="demo-acts">
+                <a class="open" href="/?story=factions">Open<span class="visually-hidden"> Claude Code and OpenCode</span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 8h9.5M8.5 4l4 4-4 4" /></svg></a>
+                <code class="demo-link">?story=factions</code>
+              </div>
+            </div>
+          </article>
+        </li>
+        <li class="demo">
+          <article aria-labelledby="d-seas">
+            <img class="demo-img" src="/demos/seas.webp" width="640" height="400" alt="Ships at anchor off the island's quay." loading="lazy" decoding="async" />
+            <div class="demo-body">
+              <p class="demo-kicker">A repo's sea</p>
+              <h3 id="d-seas">GitHub seas</h3>
+              <p class="demo-desc">A party with its GitHub sea beside it, from the first push to the release: the repo's life as ships coming and going.</p>
+              <h4 class="visually-hidden">What it shows</h4>
+              <ul class="demo-shows">
+              <li>Pull requests anchor offshore; a release arrives as a galleon</li>
+              <li>The lighthouse pulses red when CI fails</li>
+              </ul>
+              <div class="demo-acts">
+                <a class="open" href="/?story=seas">Open<span class="visually-hidden"> GitHub seas</span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 8h9.5M8.5 4l4 4-4 4" /></svg></a>
+                <code class="demo-link">?story=seas</code>
+              </div>
+            </div>
+          </article>
+        </li>
+        </ul>
+      </section>
+
+      <section class="shelf" aria-labelledby="g-repos">
+        <div class="shelf-head">
+          <h2 id="g-repos">Repos</h2>
+          <p>Real repositories, read from their history and grown into islands.</p>
+        </div>
+        <ul class="demos">
+        <li class="demo">
+          <article aria-labelledby="d-archipelago">
+            <img class="demo-img" src="/demos/archipelago.webp" width="640" height="400" alt="Five islands on one sea, each labelled with its repo: mintroot, claude-hindsight, guildhall, opencode-cockpit and mcpx." loading="lazy" decoding="async" />
+            <div class="demo-body">
+              <p class="demo-kicker">The Harbour, at sea</p>
+              <h3 id="d-archipelago">An archipelago of real repos</h3>
+              <p class="demo-desc">The chronicled repos from the Harbour as islands around the guild's own. Sail from one to the next.</p>
+              <h4 class="visually-hidden">What it shows</h4>
+              <ul class="demo-shows">
+              <li>Each island grown from a repo's real history</li>
+              <li>M for the map, 1–6 to sail to an island, 0 for home</li>
+              </ul>
+              <div class="demo-acts">
+                <a class="open" href="/?archipelago&amp;demo">Open<span class="visually-hidden"> An archipelago of real repos</span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 8h9.5M8.5 4l4 4-4 4" /></svg></a>
+                <code class="demo-link">?archipelago</code>
+              </div>
+            </div>
+          </article>
+        </li>
+        <li class="demo">
+          <article aria-labelledby="d-react">
+            <img class="demo-img" src="/demos/react.webp" width="640" height="400" alt="A large voxel island crowded with districts: React's repository, grown whole." loading="lazy" decoding="async" />
+            <div class="demo-body">
+              <p class="demo-kicker">A growth timelapse</p>
+              <h3 id="d-react">React grows from its first commit</h3>
+              <p class="demo-desc">React's whole history as a timelapse: every folder a district, every release a milestone, every contributor a townsfolk.</p>
+              <h4 class="visually-hidden">What it shows</h4>
+              <ul class="demo-shows">
+              <li>Years of commits in a couple of minutes</li>
+              <li>Milestones and captions along the tape</li>
+              </ul>
+              <div class="demo-acts">
+                <a class="open" href="/?repo=facebook/react&amp;grow&amp;demo">Open<span class="visually-hidden"> React grows from its first commit</span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 8h9.5M8.5 4l4 4-4 4" /></svg></a>
+                <code class="demo-link">?repo=facebook/react&amp;grow</code>
+              </div>
+            </div>
+          </article>
+        </li>
+        <li class="demo">
+          <article aria-labelledby="d-island">
+            <img class="demo-img" src="/demos/island.webp" width="640" height="400" alt="A small voxel island whose districts are a repository's folders." loading="lazy" decoding="async" />
+            <div class="demo-body">
+              <p class="demo-kicker">Any public repo</p>
+              <h3 id="d-island">A repo as an island</h3>
+              <p class="demo-desc">A public GitHub repo grown into a voxel island: its folders become districts. The same tree always grows the same island. This one is mcpx.</p>
+              <h4 class="visually-hidden">What it shows</h4>
+              <ul class="demo-shows">
+              <li>Read from the public file tree, never the code</li>
+              <li>Grow your own from “Your repo as an island”</li>
+              </ul>
+              <div class="demo-acts">
+                <a class="open" href="/?repo=Codestz/mcpx&amp;demo">Open<span class="visually-hidden"> A repo as an island</span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 8h9.5M8.5 4l4 4-4 4" /></svg></a>
+                <code class="demo-link">?repo=Codestz/mcpx</code>
+              </div>
+            </div>
+          </article>
+        </li>
+        </ul>
+      </section>
+
+      <section class="shelf" aria-labelledby="g-hood">
+        <div class="shelf-head">
+          <h2 id="g-hood">The world</h2>
+          <p>How the island is drawn, how many it holds, and the sky over it.</p>
+        </div>
+        <ul class="demos">
+        <li class="demo">
+          <article aria-labelledby="d-crowd">
+            <img class="demo-img" src="/demos/crowd.webp" width="640" height="400" alt="Hundreds of adventurers packed into the keep's hall." loading="lazy" decoding="async" />
+            <div class="demo-body">
+              <p class="demo-kicker">Stress test</p>
+              <h3 id="d-crowd">A crowd of 300</h3>
+              <p class="demo-desc">Three hundred adventurers on one island, every one animated. Baked bone textures, mesh LOD and instancing keep it smooth.</p>
+              <h4 class="visually-hidden">What it shows</h4>
+              <ul class="demo-shows">
+              <li>300 skinned characters in a handful of draw calls</li>
+              <li>Turn on Stats for nerds to watch the frame rate</li>
+              </ul>
+              <div class="demo-acts">
+                <a class="open" href="/?story=rush&amp;n=300">Open<span class="visually-hidden"> A crowd of 300</span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 8h9.5M8.5 4l4 4-4 4" /></svg></a>
+                <code class="demo-link">?story=rush&amp;n=300</code>
+              </div>
+            </div>
+          </article>
+        </li>
+        <li class="demo">
+          <article aria-labelledby="d-webgpu">
+            <img class="demo-img" src="/demos/webgpu.webp" width="640" height="400" alt="The island at noon, as either renderer draws it." loading="lazy" decoding="async" />
+            <div class="demo-body">
+              <p class="demo-kicker">Two renderers, one island</p>
+              <h3 id="d-webgpu">WebGPU and WebGL</h3>
+              <p class="demo-desc">The same hall on three.js's WebGPU renderer, or on WebGL, the default. Same scene, same shaders, written once in TSL.</p>
+              <h4 class="visually-hidden">What it shows</h4>
+              <ul class="demo-shows">
+              <li>One codebase, two backends</li>
+              <li>How they compare is on How it's built</li>
+              </ul>
+              <p class="demo-note">
+                <b>Needs WebGPU</b> (recent Chrome, Edge or Safari). Elsewhere the hall falls back to WebGL. A
+                preview: ambient occlusion isn't drawn there yet. Open each in its own tab with Settings › Stats for
+                nerds on, and compare.
+              </p>
+              <div class="demo-acts">
+                <a class="open" href="/?renderer=webgpu&amp;demo">Open in WebGPU<span class="visually-hidden"> WebGPU and WebGL</span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 8h9.5M8.5 4l4 4-4 4" /></svg></a>
+                <code class="demo-link">?renderer=webgpu</code>
+              </div>
+            </div>
+          </article>
+        </li>
+        <li class="demo">
+          <article aria-labelledby="d-night">
+            <img class="demo-img" src="/demos/night.webp" width="640" height="400" alt="The island at night in a storm: dark sea, lamps lit along the paths, rain falling." loading="lazy" decoding="async" />
+            <div class="demo-body">
+              <p class="demo-kicker">Time and sky</p>
+              <h3 id="d-night">Night and weather</h3>
+              <p class="demo-desc">The island at ten at night, in a storm: lamps along the paths, rain, lightning over the sea. Change the hour and the weather from the Director's controls.</p>
+              <h4 class="visually-hidden">What it shows</h4>
+              <ul class="demo-shows">
+              <li>A full day and night cycle, and four weathers</li>
+              <li>In Auto, failures bring the clouds</li>
+              </ul>
+              <div class="demo-acts">
+                <a class="open" href="/?hour=22&amp;weather=storm">Open<span class="visually-hidden"> Night and weather</span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 8h9.5M8.5 4l4 4-4 4" /></svg></a>
+                <code class="demo-link">?hour=22&amp;weather=storm</code>
+              </div>
+            </div>
+          </article>
+        </li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="foot-inner">
+        <p>Guildhall · MIT · built with three.js and React Three Fiber.</p>
+        <nav class="foot-links" aria-label="More">
+          <a href="/">Visit the guild</a>
+          <a href="https://github.com/Codestz/guildhall">Source on GitHub</a>
+          <a href="https://www.npmjs.com/package/opencode-guildhall">npm</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

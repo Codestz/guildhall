@@ -1,8 +1,9 @@
 import { Fragment, useEffect, useState } from "react"
-import { MODE } from "../guild/mode.ts"
 import type { GuildStore } from "../guild/store.ts"
+import { sitePage } from "./directing.ts"
 import { Icon } from "./icons.tsx"
 import { repoDoor } from "./RepoDoor.tsx"
+import "./wayfinding.css"
 
 /** The project's home on GitHub; the protocol doc for "your own" sources lives there. */
 const PROTOCOL_URL = "https://github.com/Codestz/guildhall/blob/main/packages/core/PROTOCOL.md"
@@ -16,14 +17,12 @@ const SOURCES: { name: string; soon?: boolean }[] = [
   { name: "Your own" },
 ]
 
-/**
- * The "How it's built" page (how.html). The site and the dev server serve it at /how; a hall served
- * by the hub links the public copy, in a new tab so the live guild stays open.
- */
-const HOW =
-  MODE === "showcase" || import.meta.env.DEV
-    ? { href: "/how", away: false }
-    : { href: "https://guildhall.codestz.dev/how", away: true }
+/** The site's other pages (hud/directing.ts sitePage), at the foot of the about card. */
+const PAGES = [
+  { path: "/demos", label: "Demos", note: "Every scene" },
+  { path: "/harbour", label: "Harbour", note: "Chronicled repos" },
+  { path: "/how", label: "How it's built", note: "Crowds, WebGPU, measured" },
+] as const
 
 /**
  * Who we are, in one line: the crest, the name and a status line that says honestly what is on
@@ -130,15 +129,22 @@ export function Brand({ store, open, onToggle }: { store: GuildStore; open: bool
             </p>
           </div>
         </details>
-        <a
-          className="about-how"
-          href={HOW.href}
-          {...(HOW.away ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-        >
-          How it's built
-          <span className="about-how-note">crowds, WebGPU, measured</span>
-          {HOW.away && <span className="visually-hidden"> (opens in a new tab)</span>}
-        </a>
+        <nav className="about-nav" aria-label="Guildhall">
+          {PAGES.map(({ path, label, note }) => {
+            const page = sitePage(path)
+            return (
+              <a
+                key={path}
+                href={page.href}
+                {...(page.away ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+              >
+                <b>{label}</b>
+                <span>{note}</span>
+                {page.away && <span className="visually-hidden"> (opens in a new tab)</span>}
+              </a>
+            )
+          })}
+        </nav>
       </div>
     </header>
   )

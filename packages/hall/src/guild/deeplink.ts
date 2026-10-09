@@ -95,6 +95,7 @@ const OTHERS = new Set([
   "grow",
   "anyhub",
   "showcase",
+  "demo",
   "lab",
   "grips",
   "model",

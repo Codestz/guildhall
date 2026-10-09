@@ -439,32 +439,6 @@ button {
 .copy[data-done="true"] {
   color: var(--loot);
 }
-/* the "How it's built" page (/how), a quiet line under the install */
-.about-how {
-  display: inline-flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 2px 8px;
-  align-self: flex-start;
-  min-height: 32px;
-  padding: 6px 2px 0;
-  font-size: 13.5px;
-  color: var(--brass-hi);
-  text-decoration: underline;
-  text-decoration-color: var(--brass-line);
-  text-underline-offset: 3px;
-}
-.about-how:hover {
-  color: var(--paper);
-  text-decoration-color: currentColor;
-}
-.about-how-note {
-  font-size: 12px;
-  color: var(--faint);
-  text-decoration: none;
-  display: inline-block;
-}
-
 /* ───────────────────────────── roster badges ───────────────────────────── */
 
 .badges {
@@ -1804,9 +1778,10 @@ button {
   position: absolute;
   top: calc(var(--gut) + var(--bar) + 10px);
   right: var(--gut);
-  bottom: var(--gut);
   width: 372px;
-  max-height: max-content;
+  /* as tall as its content, never past the bottom gutter: the body scrolls (`max-content` with a
+     `bottom` made Chrome size it to the content, off the screen) */
+  max-height: calc(100% - var(--bar) - 10px - 2 * var(--gut));
   z-index: 4;
   display: flex;
   flex-direction: column;
@@ -4852,9 +4827,6 @@ a.door-act {
 .setup-note a:hover {
   color: var(--paper);
   text-decoration-color: currentColor;
-}
-.about .setup + .about-how {
-  padding-top: 0;
 }
 @media (hover: none) and (pointer: coarse) {
   /* a 44px target that overlaps the card's gaps rather than adding to them */

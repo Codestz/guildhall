@@ -6,7 +6,8 @@
   "framework": null,
   "rewrites": [
     { "source": "/how", "destination": "/how.html" },
-    { "source": "/harbour", "destination": "/harbour.html" }
+    { "source": "/harbour", "destination": "/harbour.html" },
+    { "source": "/demos", "destination": "/demos.html" }
   ],
   "headers": [
     {

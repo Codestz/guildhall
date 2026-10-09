@@ -1,42 +1,18 @@
-import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useSyncExternalStore } from "react"
+import { useEffect, useRef, useSyncExternalStore } from "react"
 import type { Names } from "../guild/casting.ts"
-import type { DirectorStyle } from "../guild/director.ts"
-import { MODE } from "../guild/mode.ts"
 import { type QualityChoice, quality, TIERS, type Tier } from "../guild/quality.ts"
-import { type GuildStore, SCENARIOS, type ScenarioId } from "../guild/store.ts"
+import type { GuildStore } from "../guild/store.ts"
 import { active, BACKEND_NAME, type Backend, backendUrl, webgpuAvailable } from "../render/backend.ts"
-import { MOODS, type Mood } from "../world/moods.ts"
 import { DoorLink } from "./Brand.tsx"
+import { DirectorControls, DirectorsElsewhere } from "./DirectorControls.tsx"
+import { DIRECTING } from "./directing.ts"
 import { Icon } from "./icons.tsx"
-import { Lever, LeverValue, Switch } from "./levers.tsx"
+import { Lever, Section, Switch } from "./levers.tsx"
 import { HUD_MODES, type HudMode, hudPrefs, useHudPrefs } from "./prefs.ts"
 import { SoundLevers } from "./Sound.tsx"
-import { WeatherLevers } from "./Weather.tsx"
-
-/** How the Bard films (guild/director.ts). */
-const DIRECTORS: Record<DirectorStyle, { label: string; hint: string }> = {
-  calm: {
-    label: "Calm",
-    hint: "Eases toward the action and drifts slowly. Never changes the replay's pace.",
-  },
-  cinematic: {
-    label: "Cinematic",
-    hint: "Cuts to the best action like a broadcast: close-ups, follows, reaction shots. Replays skip quiet stretches.",
-  },
-}
 
 const QUALITY: QualityChoice[] = ["auto", 0, 1, 2, 3]
 const BACKENDS: Backend[] = ["webgl", "webgpu"]
-const SPEEDS = [0.5, 1, 2, 4] as const
-const STORIES: Record<ScenarioId, string> = {
-  saga: "Saga",
-  party: "Party",
-  solo: "Solo",
-  rush: "Rush",
-  parties: "Parties",
-  factions: "Factions",
-  seas: "Seas",
-}
 const KEYS: [string, string][] = [
   ["Drag", "Pan"],
   ["Right-drag", "Turn"],
@@ -52,9 +28,12 @@ const KEYS: [string, string][] = [
 ]
 
 /**
- * Everything the viewer can tune, in one place: quality, the world, the camera, the story and the
- * HUD itself. A side drawer on desktop, a bottom sheet on phones. Non-modal: the hall stays live
- * behind it, Esc closes it and focus returns to the gear.
+ * Everything the viewer can tune, in one place: quality, the camera, sound and the HUD itself; and,
+ * for a demo or the local app, the Director's controls (hud/DirectorControls.tsx: story, hour,
+ * weather, mood, the Bard). A plain showcase visit gets a row to /demos in their place.
+ *
+ * A side drawer on desktop, a bottom sheet on phones. Non-modal: the hall stays live behind it, Esc
+ * closes it and focus returns to the gear.
  *
  * `onLegends` (phones): the toolbar there keeps only HUD mode and Settings, so the Legends book and
  * Sound lead the sheet instead of sitting in the bar.
@@ -76,19 +55,11 @@ export function Settings({
 }) {
   const tier = useSyncExternalStore(quality.subscribe, quality.snapshot)
   const prefs = useHudPrefs()
-  const showcase = MODE === "showcase"
   const head = useRef<HTMLHeadingElement>(null)
-  const paused = store.speed === 0
 
   useEffect(() => {
     head.current?.focus()
   }, [])
-
-  const camera = store.selected
-    ? `Following ${store.views.find((v) => v.id === store.selected)?.title ?? "someone"}`
-    : store.bard
-      ? "Directs the shots for you"
-      : "Yours until you turn it back on"
 
   return (
     <aside className="plaque settings" role="dialog" aria-labelledby="settings-h">
@@ -148,25 +119,7 @@ export function Settings({
           {webgpuAvailable() && <RendererLever />}
         </Section>
 
-        <Section title="World">
-          <WeatherLevers store={store} />
-          <Lever label="Mood" value={store.mood.name}>
-            <div className="moods">
-              {(Object.values(MOODS) as Mood[]).map((mood) => (
-                <button
-                  key={mood.id}
-                  type="button"
-                  className="mood"
-                  aria-pressed={store.mood.id === mood.id}
-                  aria-label={mood.name}
-                  title={mood.name}
-                  onClick={() => store.setMood(mood.id)}
-                  style={{ "--sky": mood.ground, "--fire": mood.fire } as CSSProperties}
-                />
-              ))}
-            </div>
-          </Lever>
-        </Section>
+        {DIRECTING ? <DirectorControls store={store} /> : <DirectorsElsewhere />}
 
         <Section title="Camera">
           <Lever label="View">
@@ -187,22 +140,6 @@ export function Settings({
               </button>
             </div>
           </Lever>
-          <Switch label="Bard" hint={camera} checked={store.bard} onChange={(on) => store.setBard(on)} />
-          <Lever label="Director" value={DIRECTORS[store.directorStyle].label}>
-            <div className="seg seg-fill">
-              {(Object.keys(DIRECTORS) as DirectorStyle[]).map((style) => (
-                <button
-                  key={style}
-                  type="button"
-                  aria-pressed={store.directorStyle === style}
-                  onClick={() => store.setDirector(style)}
-                >
-                  {DIRECTORS[style].label}
-                </button>
-              ))}
-            </div>
-          </Lever>
-          <p className="hint">{DIRECTORS[store.directorStyle].hint}</p>
           <details className="keys">
             <summary>Controls</summary>
             <dl>
@@ -217,47 +154,6 @@ export function Settings({
             </dl>
           </details>
         </Section>
-
-        {(store.mode === "sim" || !showcase) && (
-          <Section title="Story">
-            <Lever label="Story" quiet>
-              <div className="seg seg-fill">
-                {(Object.keys(SCENARIOS) as ScenarioId[]).map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    aria-pressed={store.mode === "sim" && store.scenario === id}
-                    onClick={() => store.load(id)}
-                  >
-                    {STORIES[id]}
-                  </button>
-                ))}
-                {!showcase && (
-                  <button type="button" aria-pressed={store.mode === "live"} onClick={() => store.live()}>
-                    Live
-                  </button>
-                )}
-              </div>
-            </Lever>
-            {store.mode === "sim" && (
-              <Lever label="Pace" value={paused ? "Paused" : undefined}>
-                <div className="seg seg-fill mono">
-                  {SPEEDS.map((speed) => (
-                    <button
-                      key={speed}
-                      type="button"
-                      aria-pressed={store.speed === speed}
-                      aria-label={`${speed} times speed`}
-                      onClick={() => store.setSpeed(speed)}
-                    >
-                      {speed === 0.5 ? "½" : speed}×
-                    </button>
-                  ))}
-                </div>
-              </Lever>
-            )}
-          </Section>
-        )}
 
         {!onLegends && (
           <Section title="Sound">
@@ -350,18 +246,5 @@ function RendererLever() {
         (dragon, festival, comet, ghost ship, rainbow) only partly.
       </p>
     </>
-  )
-}
-
-function Section({ title, value, children }: { title: string; value?: string; children: ReactNode }) {
-  const id = useId()
-  return (
-    <section className="set-section" aria-labelledby={id}>
-      <h3 id={id}>
-        {title}
-        <LeverValue value={value} />
-      </h3>
-      {children}
-    </section>
   )
 }

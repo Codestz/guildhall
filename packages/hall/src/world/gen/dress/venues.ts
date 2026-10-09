@@ -48,6 +48,9 @@ const BUILDABLE = ".fv"
 /** A door's step keeps this far (world units) from a river hex's centre when it can: a bridge's footprint. */
 const BRIDGE = 8
 
+/** A hex a venue may stand on and the spot it faces. */
+type Choice = { cell: Cell; towards: Spot }
+
 const NO_COVER: Cover = { massifs: new Set(), rivers: new Set() }
 
 export function venuesOf(
@@ -81,11 +84,12 @@ export function venuesOf(
         avoid.every(([ax, az, r]) => Math.hypot(x - ax, z - az) >= r)
       )
     }
-    const spare = (cell: Cell): boolean => {
+    const spare = (cell: Cell, anyDistrict = false): boolean => {
       if (key(cell) === key(district.site as Cell)) return open(cell)
       const hex = plan.land.get(key(cell))
       return (
-        hex?.district === i &&
+        (anyDistrict || hex?.district === i) &&
+        hex !== undefined &&
         BUILDABLE.includes(hex.char) &&
         hex.level === undefined &&
         !taken.has(key(cell)) &&
@@ -97,19 +101,25 @@ export function venuesOf(
     // whose door's step is off the beach wins (a venue on a spit has nowhere to stand), else the first.
     const square = cellToWorld(district.square)
     const flank = kind === "mine" ? flankOf(district.site, spare, roads, cover) : undefined
-    const choices = [
+    const hexes = [district.site, ...around(district.square, plan.land)]
+    const choices: Choice[] = [
       ...(flank ? [flank] : []),
-      ...[district.site, ...around(district.square, plan.land)]
-        .filter(spare)
-        .map((cell) => ({ cell, towards: square })),
+      ...hexes.filter((cell) => spare(cell)).map((cell) => ({ cell, towards: square })),
     ]
+    // A district too small to keep its venue off the beach borrows the free hexes beside its square from its neighbours.
+    const borrowed: Choice[] = hexes
+      .filter((cell) => spare(cell, true) && !choices.some((choice) => key(choice.cell) === key(cell)))
+      .map((cell) => ({ cell, towards: square }))
     // The first whose door's step is off the beach and clear of any river's bridge, else the first off the beach, else the first;
     // standing clear of the venues already placed if any hex allows, else wherever that rule picks.
-    const choose = (rejected: (next: PlacedVenue) => boolean): PlacedVenue | undefined => {
+    const choose = (
+      rejected: (next: PlacedVenue) => boolean,
+      from: readonly Choice[],
+    ): PlacedVenue | undefined => {
       let first: PlacedVenue | undefined
       let inland: PlacedVenue | undefined
       let clear: PlacedVenue | undefined
-      for (const { cell, towards } of choices) {
+      for (const { cell, towards } of from) {
         const next = place(prefab(VENUE_KINDS[kind].prefab), kind, district, cell, towards, roads)
         if (!next || rejected(next)) continue
         first ??= next
@@ -131,11 +141,16 @@ export function venuesOf(
       const [nx, nz] = roads.nodes[next.venue.node] ?? [0, 0]
       return Math.hypot(next.venue.door.step[0] - nx, next.venue.door.step[1] - nz)
     }
-    const placed =
-      choose((next) => touches(next) || reach(next) >= BY_ROAD) ??
-      choose((next) => touches(next) || reach(next) >= STRAY) ??
-      choose((next) => reach(next) >= BY_ROAD) ??
-      choose(() => false)
+    const attempt = (from: readonly Choice[]): PlacedVenue | undefined =>
+      choose((next) => touches(next) || reach(next) >= BY_ROAD, from) ??
+      choose((next) => touches(next) || reach(next) >= STRAY, from) ??
+      choose((next) => reach(next) >= BY_ROAD, from) ??
+      choose(() => false, from)
+    let placed = attempt(choices)
+    if (!placed || onBeach(placed.venue.door.step, plan.land)) {
+      const other = attempt(borrowed)
+      if (other && !onBeach(other.venue.door.step, plan.land)) placed = other
+    }
     if (!placed) return
     taken.add(key(placed.cell))
     out.push(placed)

@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test"
 import { blocker, islandObstacles, onDryLand } from "../src/world/clearance.ts"
-import { footprintsOf } from "../src/world/gen/dress/footprints.ts"
 import { KEEP } from "../src/world/gen/plan.ts"
 import { MAP_FOR_TESTS, SITES, type SiteId } from "../src/world/lands.ts"
 import { GATE, ROOM, type Spot, STATIONS } from "../src/world/layout.ts"
@@ -21,19 +20,6 @@ const SLACK = 0.75
 /** Trees on a terrace's ramp stand on their sloped hex by design (dress/hexes.ts). */
 const RAMPED = /^tree_single/
 
-/**
- * Islands so small that a district's work place and a venue's step can only stand on the beach: the
- * sand slopes away from the sea hex's centre for WATER_CLEARANCE (8), and these stand 6.8 or more
- * from it. There, land that is not water is dry enough.
- */
-const BEACHED = new Set(["Codestz/mcpx"])
-
-const dryOn = (name: string, world: World, spot: Spot): boolean => {
-  const cell = MAP_FOR_TESTS.cellOf(spot)
-  const land = world.terrain.level(cell) === 0 && world.terrain.at(cell) !== "~"
-  return onDryLand(spot, world) || (BEACHED.has(name) && land)
-}
-
 describe("a gen 2 island", () => {
   for (const [name, world] of gen2Worlds()) {
     test(`${name}: every site has posts of its own on dry land, clear of buildings`, () => {
@@ -44,19 +30,20 @@ describe("a gen 2 island", () => {
       const posts = IDS.flatMap((id) => sites[id].posts.map((post) => ({ id, post })))
       for (const { id, post } of posts) {
         const at = `${id} @ ${post[0]},${post[1]}`
-        expect({ at, dry: dryOn(name, world, [post[0], post[1]]) }).toEqual({ at, dry: true })
+        expect({ at, dry: onDryLand([post[0], post[1]], world) }).toEqual({ at, dry: true })
         expect({ at, hit: blocker([post[0], post[1]], buildings, 0)?.name }).toEqual({ at, hit: undefined })
       }
     })
 
-    test(`${name}: the keep stands at the origin on level ground, no building inside its walls`, () => {
+    test(`${name}: the keep stands at the origin on level ground, no building or prop inside its walls`, () => {
       for (const id of KEEP.keys()) {
         const [q, line] = id.split(",").map(Number) as [number, number]
         expect(world.terrain.level([q, line])).toBe(0)
       }
+      // Buildings, wall pieces and props alike (the quay's planks run through the gate, so they may).
       const inside = world.island.decor.filter(
         (d) =>
-          footprintsOf([d]).length > 0 &&
+          !d.piece.startsWith("floor_") &&
           Math.abs(d.x) < ROOM.width / 2 + 1 &&
           Math.abs(d.z) < ROOM.depth / 2 + 1,
       )
@@ -100,7 +87,7 @@ describe("a gen 2 island", () => {
     test(`${name}: every venue's door step is on dry land`, () => {
       for (const venue of world.venues ?? []) {
         const at = `${venue.id} @ ${venue.door.step}`
-        expect({ at, dry: dryOn(name, world, venue.door.step) }).toEqual({ at, dry: true })
+        expect({ at, dry: onDryLand(venue.door.step, world) }).toEqual({ at, dry: true })
       }
     })
   }

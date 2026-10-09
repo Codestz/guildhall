@@ -27,6 +27,17 @@ const MARGIN = 1.15
 /** The camera's near plane clears the nearest ground by this much more, world units. */
 const ROOM = 30
 
+/** A screen this narrow for its height (width / height) counts as a phone held upright. */
+const PORTRAIT_ASPECT = 0.46
+/** The island's reach fills this much of a portrait screen's width at the furthest zoom-out. */
+const FILL = 0.96
+
+/** How upright a screen is: 0 for a square or landscape one, 1 for a phone held upright (CameraRig's close-in, the fills below). */
+export function uprightOf(screen: Screen): number {
+  const aspect = screen.width / Math.max(screen.height, 1)
+  return Math.min(1, Math.max(0, (1 - aspect) / (1 - PORTRAIT_ASPECT)))
+}
+
 /** Orthographic zoom that fits the keep (CameraRig `base`, before a portrait screen closes in). */
 export const baseZoomOf = (width: number, height: number): number => Math.min(width / 44, height / 31)
 
@@ -48,13 +59,19 @@ export const landOf = (world: World): Land => ({
   peak: peakOf(world),
 })
 
-/** The furthest orthographic zoom-out of the controls (CameraRig `widest`). */
+/**
+ * The furthest orthographic zoom-out of the controls (CameraRig `widest`): the island's width, which
+ * on a portrait phone a small island's reach fills (the island overview opens here, so a hamlet is
+ * not a speck mid-screen).
+ */
 export function widestOf(screen: Screen, land: Land): number {
   const across = (baseZoomOf(screen.width, screen.height) * 0.42 * 0.5) / land.outreach
-  return widestZoom(across, screen.height, land.reach, land.peak)
+  const fill = (screen.width * FILL) / 2 / land.reach
+  const wide = across + Math.max(0, fill - across) * uprightOf(screen)
+  return widestZoom(wide, screen.height, land.reach, land.peak)
 }
 
-/** The film's zoom for a land `radius` wide (growth/orbit.ts): the whole of it, a little tighter on a portrait phone. */
+/** The film's zoom for a land `radius` wide (growth/orbit.ts): the whole of it. The radius is the land's half-diagonal, so no turn of the orbit crops it; any tighter crops react's corners on a phone. */
 export const filmZoom = (screen: Screen, radius: number): number =>
   Math.min(screen.width / 1.75, screen.height / 1.4) / radius
 

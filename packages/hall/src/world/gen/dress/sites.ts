@@ -67,7 +67,7 @@ export function quayOf(hub: Cell): LandPlacement[] {
     ...[6, 10, 14, 18].map((dz) => place("floor_wood_large", hx, hz + dz, 0, 0.2, -0.45)),
     place("floor_wood_large", hx - 4, hz + 18, 0, 0.2, -0.45),
     place("floor_wood_large", hx + 4, hz + 18, 0, 0.2, -0.45),
-    place("barrel", hx + 1.3, hz + 6.5, 0, 1, -0.4),
+    place("barrel", hx + 1.3, hz + 8.5, 0, 1, -0.4),
     place("crate_long_A", hx - 4.5, hz + 17.5, 1.6, 1, -0.4),
   ]
 }

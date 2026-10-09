@@ -62,4 +62,15 @@ describe("a portrait phone", () => {
     expect(viewReachOf(PHONE, BIG)).toBeGreaterThan(seaRadiusOf(BIG.reach))
     expect(orthoBackOf(PHONE, BIG)).toBeGreaterThan(ORTHO_BACK * BIG.outreach + 2 * BIG.peak)
   })
+
+  test("opens a small island across the screen's width, not a speck mid-screen", () => {
+    const across = 2 * SMALL.reach * widestOf(PHONE, SMALL)
+    expect(across).toBeGreaterThan(PHONE.width * 0.9)
+    expect(across).toBeLessThanOrEqual(PHONE.width)
+  })
+
+  test("leaves the controls' zoom-out alone where the island already fills the screen, and on a desktop", () => {
+    expect(widestOf(PHONE, BIG) * 2 * BIG.reach).toBeGreaterThan(PHONE.width)
+    expect(widestOf(DESKTOP, SMALL)).toBeCloseTo((DESKTOP.height / 31) * 0.21, 5)
+  })
 })

@@ -1,6 +1,6 @@
 import type { Home } from "../homes.ts"
-import { cellToWorld, type Island, type LandPiece } from "../lands.ts"
-import type { Post, Spot } from "../layout.ts"
+import { cellToWorld, type Island, type LandPiece, type LandPlacement } from "../lands.ts"
+import { type Post, ROOM, type Spot } from "../layout.ts"
 import type { Venue } from "../venues.ts"
 import type { Biome, Language } from "./biomes.ts"
 import { civicOf, type Fame } from "./dress/civic.ts"
@@ -60,6 +60,14 @@ export interface RepoIsland {
   /** Generator v2: the doors of the town's houses, where the townsfolk live (world/homes.ts). */
   homes: Home[]
 }
+
+/** Props (a barrel, a cart) of a lot or yard stand off the keep's room and its wall, a wall's width round it. */
+const KEEP_CLEAR = 1
+const strewn = (item: LandPlacement): boolean =>
+  Math.abs(item.x) < ROOM.width / 2 + KEEP_CLEAR &&
+  Math.abs(item.z) < ROOM.depth / 2 + KEEP_CLEAR &&
+  !item.piece.startsWith("floor_") &&
+  footprintsOf([item]).length === 0
 
 /** Ground clutter a venue's yard leaves no room for. */
 const CLUTTER =
@@ -130,7 +138,7 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
               ({ venue }) => Math.hypot(item.x - venue.at[0], item.z - venue.at[1]) > VENUE_CLEAR + 2,
             ))),
     )
-    decor.splice(0, decor.length, ...kept)
+    decor.splice(0, decor.length, ...kept.filter((item) => !strewn(item)))
   }
   decor.push(...quayOf(plan.hub))
   const landmarks = landmarksOf(plan.hub, decor)

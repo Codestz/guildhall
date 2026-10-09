@@ -25,7 +25,7 @@ import {
 } from "./archipelago/view.ts"
 import { bezier, closeIn, easeInOut } from "./cameraMath.ts"
 import { FRAME } from "./frame.ts"
-import { baseZoomOf, landOf, ORTHO_BACK, orthoBackOf, widestOf } from "./frameReach.ts"
+import { baseZoomOf, landOf, ORTHO_BACK, orthoBackOf, uprightOf, widestOf } from "./frameReach.ts"
 import { OpeningProgress } from "./OpeningCue.tsx"
 import { ClearAngle } from "./terrain/clearAngle.ts"
 import { aboveGround } from "./terrain/framing.ts"
@@ -52,7 +52,6 @@ const REVEAL_S = 3.2
 const SHOWCASE = MODE === "showcase"
 /** Portrait screens close in on the keep by up to this much (a 390×844 phone gets all of it). */
 const PORTRAIT_BOOST = 0.7
-const PORTRAIT_ASPECT = 0.46
 /** Direction from the target to the camera: the isometric angle. */
 const ISO_DIR = new Vector3(1, 0.93, 1).normalize()
 const TOP_DIR = new Vector3(0.001, 1, 0.01).normalize()
@@ -187,9 +186,7 @@ export function CameraRig() {
    * so it closes in (×1.7 on a phone held upright). Zooming out still reaches the whole island.
    */
   const base = baseZoomOf(size.width, size.height)
-  const upright = (1 - size.width / Math.max(size.height, 1)) / (1 - PORTRAIT_ASPECT)
-  const portrait = Math.min(1, Math.max(0, upright))
-  const fit = base * (1 + PORTRAIT_BOOST * portrait)
+  const fit = base * (1 + PORTRAIT_BOOST * uprightOf(size))
   const wide = fit * 0.42
   const widest = widestOf(size, land)
   /** The archipelago's map: the zoom (orthographic) and distance (perspective) that hold it all. */

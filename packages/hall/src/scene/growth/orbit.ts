@@ -1,8 +1,10 @@
 import { useFrame, useThree } from "@react-three/fiber"
-import { useEffect, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import type { OrthographicCamera, PerspectiveCamera, Vector3 } from "three"
 import { EPILOGUE_S } from "../../world/chronicle/growth.ts"
 import type { GrowthFrame } from "../../world/chronicle/growthFrame.ts"
+import { useWorld } from "../../world/source.ts"
+import { filmZoom, landOf, orthoBackOf } from "../frameReach.ts"
 
 /**
  * The timelapse's establishing shot (ADR 0021): a slow orbit round the land that is up, widening
@@ -18,8 +20,6 @@ const HOME_AZIMUTH = Math.PI / 4
 const ELEVATION = Math.atan2(0.93, Math.SQRT2)
 /** One turn in this many film seconds. */
 const TURN_S = 110
-/** The orthographic camera stands this far back (CameraRig ORTHO_BACK). */
-const ORTHO_BACK = 220
 const MOVE_KEYS = new Set([
   "w",
   "a",
@@ -52,6 +52,8 @@ type Controls = { target: Vector3; object: OrthographicCamera | PerspectiveCamer
 export function useOrbit(frame: () => GrowthFrame | undefined, duration: number, on: () => boolean) {
   const controls = useThree((state) => state.controls) as unknown as Controls | null
   const size = useThree((state) => state.size)
+  const world = useWorld()
+  const land = useMemo(() => landOf(world), [world])
   const dom = useThree((state) => state.gl.domElement)
   const taken = useRef(false)
   const eased = useRef({ x: 0, z: 0, radius: 0, ready: false })
@@ -90,10 +92,12 @@ export function useOrbit(frame: () => GrowthFrame | undefined, duration: number,
     controls.target.set(e.x, 1, e.z)
     if ((camera as OrthographicCamera).isOrthographicCamera) {
       const ortho = camera as OrthographicCamera
-      ortho.position.set(e.x + dx * ORTHO_BACK, 1 + dy * ORTHO_BACK, e.z + dz * ORTHO_BACK)
+      // As far back as CameraRig stands it: a pull-back over the whole land must not run it into the near plane.
+      const back = orthoBackOf(size, land)
+      ortho.position.set(e.x + dx * back, 1 + dy * back, e.z + dz * back)
       // The land's foreshortened height is ~0.6 of its width at this elevation; a portrait phone
       // fits it by width, a little tighter (the reach is a corner-to-corner radius).
-      ortho.zoom = Math.min(size.width / 1.75, size.height / 1.4) / e.radius
+      ortho.zoom = filmZoom(size, e.radius)
     } else {
       const distance = e.radius * 2.7
       camera.position.set(e.x + dx * distance, 1 + dy * distance, e.z + dz * distance)

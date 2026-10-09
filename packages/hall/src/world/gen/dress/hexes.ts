@@ -213,6 +213,11 @@ export function dressHexes(
             decor.push(...instantiate(lot.prefab, [x, z], lot.rot, kit, lift, lot.seed))
             break
           }
+          // A lot the civic centre, a venue or the wall took the room of stays open ground.
+          if (lots) {
+            if (!terraced) meadow.push([x, z])
+            break
+          }
           // A home in the district's colour, its door to the nearest road (or its square).
           const road = neighbours(cell).find((next) => at(next) === "=")
           const look = road ? cellToWorld(road) : square

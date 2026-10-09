@@ -24,8 +24,8 @@ export interface Lot {
 export interface Town {
   /** The prefab to stand on each `v` hex, by key. */
   lots: Map<string, Lot>
-  /** The plazas' dressing, level ground. */
-  plazas: LandPlacement[]
+  /** The plazas' dressing, level ground: each plaza's pieces together. */
+  plazas: LandPlacement[][]
 }
 
 /** Lots within this many units of the square are its core (three homes); within CORE + MID, two. */
@@ -40,7 +40,7 @@ const isTown = (biome: string): boolean => biome === "village" || biome === "har
 export function townOf(plan: IslandPlan, links: Map<string, Set<number>>): Town {
   const tier = tierOf(plan.districts.reduce((sum, d) => sum + d.folder.files, 0))
   const lots = new Map<string, Lot>()
-  const plazas: LandPlacement[] = []
+  const plazas: LandPlacement[][] = []
   const hasRoad = (cell: Cell): boolean => plan.land.get(key(cell))?.char === "="
 
   plan.districts.forEach((district, i) => {
@@ -87,7 +87,7 @@ export function townOf(plan: IslandPlan, links: Map<string, Set<number>>): Town 
       // A town or city's squares have a fountain as often as a well.
       const fountain = tier !== "hamlet" && tier !== "village" && noise(plan.seed, square, "fountain") < 0.5
       const seed = 1 + Math.floor(noise(plan.seed, square, "variant") * 65535)
-      plazas.push(...instantiate(prefab(fountain ? "plaza-fountain" : "plaza-well"), at, 0, "blue", 0, seed))
+      plazas.push(instantiate(prefab(fountain ? "plaza-fountain" : "plaza-well"), at, 0, "blue", 0, seed))
     }
   })
   return { lots, plazas }

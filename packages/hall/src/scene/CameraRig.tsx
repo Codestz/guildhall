@@ -13,9 +13,7 @@ import { MODE } from "../guild/mode.ts"
 import { opening, reducedMotion } from "../guild/opening.ts"
 import { positions, useGuild, useGuildStore } from "../guild/useGuild.ts"
 import { useArchipelago } from "../world/archipelagoSource.ts"
-import { peakOf } from "../world/peak.ts"
 import { useWorld } from "../world/source.ts"
-import { reachOf } from "../world/world.ts"
 import {
   flightSeconds,
   flightSize,
@@ -26,10 +24,10 @@ import {
 } from "./archipelago/view.ts"
 import { bezier, closeIn, easeInOut } from "./cameraMath.ts"
 import { FRAME } from "./frame.ts"
-import { outreachOf } from "./nature/shoreTiles.ts"
+import { baseZoomOf, landOf, ORTHO_BACK, orthoBackOf, widestOf } from "./frameReach.ts"
 import { OpeningProgress } from "./OpeningCue.tsx"
 import { ClearAngle } from "./terrain/clearAngle.ts"
-import { aboveGround, widestZoom } from "./terrain/framing.ts"
+import { aboveGround } from "./terrain/framing.ts"
 import { useCutaway } from "./terrain/useCutaway.ts"
 
 /**
@@ -120,7 +118,6 @@ const DECIDE_S = 0.125
  * zoom-out open up to hold the whole map. Without one, they follow the island's own reach past the
  * home bake's square (nature/shoreTiles.ts `outreachOf`: 1 for every island but a big generated one).
  */
-const ORTHO_BACK = 220
 const ARCHIPELAGO_BACK = 1200
 /** A long flight between islands pulls out this much halfway (a short one less). */
 const ISLAND_PULL = 0.45
@@ -148,11 +145,13 @@ export function CameraRig() {
   }, [])
   const archipelago = useArchipelago()
   const world = useWorld()
-  const outreach = useMemo(() => outreachOf(world), [world])
-  // Tall ground (a gen 2 island's massifs): the cameras stand and see further by what it rises.
-  const peak = useMemo(() => peakOf(world), [world])
-  const reach = useMemo(() => reachOf(world), [world])
-  const back = archipelago ? ARCHIPELAGO_BACK : ORTHO_BACK * outreach + 2 * peak
+  const land = useMemo(() => landOf(world), [world])
+  const { outreach, peak, reach } = land
+  const size = useThree((state) => state.size)
+  // The orthographic camera stands far enough back that the ground nearest it, at the widest zoom-out
+  // or the growth film's pull-back on this screen, is not clipped (frameReach.ts); the far plane keeps its room beyond.
+  const back = archipelago ? ARCHIPELAGO_BACK : orthoBackOf(size, land)
+  const orthoFar = archipelago ? 2600 : back + Math.max((900 - ORTHO_BACK) * outreach, back)
   /** A flight between islands (scene/archipelago/view.ts): the request flown, and where it is. */
   const trip = useRef({
     // From 0, not the current count: a link's `island=` may be asked before the rig mounts.
@@ -184,7 +183,6 @@ export function CameraRig() {
   })
   /** The cinematic camera's swing round a mountain that hides its subject (scene/terrain/clearAngle.ts). */
   const clear = useRef(new ClearAngle())
-  const size = useThree((state) => state.size)
   /** The default camera: switching views makes the other one default, and drei rebuilds the controls. */
   const defaultCamera = useThree((state) => state.camera)
   /**
@@ -192,12 +190,12 @@ export function CameraRig() {
    * screen fits by width, which leaves the island a band between two seas with 6px characters,
    * so it closes in (×1.7 on a phone held upright). Zooming out still reaches the whole island.
    */
-  const base = Math.min(size.width / 44, size.height / 31)
+  const base = baseZoomOf(size.width, size.height)
   const upright = (1 - size.width / Math.max(size.height, 1)) / (1 - PORTRAIT_ASPECT)
   const portrait = Math.min(1, Math.max(0, upright))
   const fit = base * (1 + PORTRAIT_BOOST * portrait)
   const wide = fit * 0.42
-  const widest = widestZoom((base * 0.42 * 0.5) / outreach, size.height, reach, peak)
+  const widest = widestOf(size, land)
   /** The archipelago's map: the zoom (orthographic) and distance (perspective) that hold it all. */
   const mapRadius = archipelago ? mapFrame(archipelago).radius : 0
   const mapZoom = archipelago ? Math.min(size.width, size.height * 1.4) / (mapRadius * 2) : widest
@@ -725,7 +723,7 @@ export function CameraRig() {
         position={[0.01, 240, 2]}
         zoom={wide * 0.5}
         near={0.1}
-        far={archipelago ? 2600 : 900 * outreach + 2 * peak}
+        far={orthoFar}
       />
       <PerspectiveCamera
         ref={persp}

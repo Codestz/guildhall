@@ -55,6 +55,12 @@ describe("deep links: parsing", () => {
     expect(parse("quality=0").link.quality).toBe(0)
     expect(parse("quality=3").link.quality).toBe(3)
     expect(parse("quality=1.5").link.quality).toBeUndefined()
+    expect(["low", "medium", "high", "ultra"].map((name) => parse(`quality=${name}`).link.quality)).toEqual([
+      0, 1, 2, 3,
+    ])
+    expect(parse("quality=auto").link.quality).toBeUndefined()
+    expect(parse("quality=auto").ignored).toEqual([])
+    expect(parse("quality=toString").ignored).toEqual(["quality=toString"])
   })
 
   test("hud=off is hidden", () => {

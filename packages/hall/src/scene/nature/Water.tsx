@@ -32,6 +32,7 @@ import { reachOf, type World } from "../../world/world.ts"
 import { useLooks } from "../atmosphere/looks.ts"
 import { sky } from "../atmosphere/state.ts"
 import { wind } from "../atmosphere/wind.ts"
+import { landOf, viewReachOf } from "../frameReach.ts"
 import { riseWater, useRiseMask } from "../growth/mask.ts"
 import { installNodes, TSL } from "../tsl.ts"
 import { targetOf } from "../weather/shared.ts"
@@ -64,6 +65,8 @@ import { useWaterSky } from "./waterSky.ts"
  */
 /** A far island's shore patch (world/archipelago.ts): its own bake, coarser than the home island's. */
 const PATCH: ShoreLayout = { half: PATCH_HALF, size: 512 }
+/** The disc of sea round a home island that fits the one bake (a bigger screen's reach widens it). */
+const DISC = 420
 
 /**
  * Under an archipelago (world/archipelagoSource.ts) the open sea reaches past every island and has
@@ -76,12 +79,15 @@ const PATCH: ShoreLayout = { half: PATCH_HALF, size: 512 }
 export function Water({ tier, at }: { tier: Tier; at?: Spot }) {
   const world = useWorld()
   const archipelago = useArchipelago()
-  const parts = useMemo(() => partsOf(world, archipelago, at), [world, archipelago, at])
+  // The sea reaches past whatever the cameras can show (scene/frameReach.ts), in steps so a resize rarely rebuilds it.
+  const size = useThree((state) => state.size)
+  const view = useMemo(() => Math.ceil(viewReachOf(size, landOf(world)) / 100) * 100, [size, world])
+  const parts = useMemo(() => partsOf(world, archipelago, view, at), [world, archipelago, view, at])
   return parts.map((part) => <Surface key={part.key} tier={tier} at={at} part={part} />)
 }
 
-/** Where a surface lies: the disc round the home island, a grid with holes, or a patch over one. */
-type Sea = "disc" | { radius: number; holes: readonly Hole[] } | { patch: number; at?: Spot }
+/** Where a surface lies: the disc round the home island (its radius), a grid with holes, or a patch over one. */
+type Sea = { disc: number } | { radius: number; holes: readonly Hole[] } | { patch: number; at?: Spot }
 
 /** One water surface: where it lies, the shore it reads (none: open sea), and whether its bake waits its turn. */
 interface Part {
@@ -91,15 +97,17 @@ interface Part {
   queued: boolean
 }
 
-function partsOf(world: World, archipelago: Archipelago | null, at?: Spot): Part[] {
+function partsOf(world: World, archipelago: Archipelago | null, view: number, at?: Spot): Part[] {
   if (at) return [{ key: "patch", sea: { patch: PATCH_HALF }, layout: PATCH, queued: false }]
   const far: Hole[] = archipelago?.islands.map((island) => ({ at: island.at, half: PATCH_HALF })) ?? []
   if (outreachOf(world) === 1) {
-    const sea: Sea = archipelago ? { radius: seaRadiusOf(archipelago.extent), holes: far } : "disc"
+    const sea: Sea = archipelago
+      ? { radius: seaRadiusOf(archipelago.extent), holes: far }
+      : { disc: Math.max(DISC, view) }
     return [{ key: "home", sea, layout: SHORE, queued: false }]
   }
   const tiles = shoreTilesOf(world)
-  const radius = seaRadiusOf(Math.max(archipelago?.extent ?? 0, reachOf(world)))
+  const radius = Math.max(seaRadiusOf(Math.max(archipelago?.extent ?? 0, reachOf(world))), view)
   return [
     { key: "sea", sea: { radius, holes: [...tiles, ...far] }, layout: null, queued: false },
     ...tiles.map((tile) => ({
@@ -194,7 +202,7 @@ function Surface({ tier, at, part }: { tier: Tier; at?: Spot; part: Part }) {
       geometry={geometry}
       material={material}
       receiveShadow
-      frustumCulled={sea !== "disc" && "patch" in sea}
+      frustumCulled={"patch" in sea}
       renderOrder={-1}
     />
   )
@@ -374,22 +382,21 @@ function surface(world: World, node: boolean, sea: Sea): BufferGeometry {
     river.push(r)
   }
   const SEGMENTS = 96
-  const RADIUS = 420
   const grid =
-    sea === "disc"
+    "disc" in sea
       ? null
       : "patch" in sea
         ? patchSquares(sea.patch, SEA_CELL, sea.at)
         : seaSquares(sea.radius, sea.holes, SEA_CELL)
   if (grid) for (const [x, z] of grid) push(x, SEA_Y, z, 0)
-  else
+  else if ("disc" in sea)
     for (let i = 0; i < SEGMENTS; i++) {
       const a0 = (i / SEGMENTS) * Math.PI * 2
       const a1 = ((i + 1) / SEGMENTS) * Math.PI * 2
       // Counter-clockwise seen from above (+y normal).
       push(0, SEA_Y, 0, 0)
-      push(Math.cos(a1) * RADIUS, SEA_Y, Math.sin(a1) * RADIUS, 0)
-      push(Math.cos(a0) * RADIUS, SEA_Y, Math.sin(a0) * RADIUS, 0)
+      push(Math.cos(a1) * sea.disc, SEA_Y, Math.sin(a1) * sea.disc, 0)
+      push(Math.cos(a0) * sea.disc, SEA_Y, Math.sin(a0) * sea.disc, 0)
     }
   for (const cell of riverOf(world)) {
     const char = world.terrain.at(cell)

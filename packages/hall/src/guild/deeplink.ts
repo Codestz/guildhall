@@ -23,7 +23,7 @@ import { RUSH, SCENARIOS, type ScenarioId } from "./store.ts"
  *   n        1–500, how many adventurers `rush` sends out (only with story=rush; 12 without it)
  *   hour     0–24 (decimals allowed), a fixed time of day
  *   weather  clear | cloudy | rain | storm | snow
- *   quality  0–3 (Low, Medium, High, Ultra), for this visit only (not remembered)
+ *   quality  0–3 or low|medium|high|ultra (auto: no pin), for this visit only (not remembered)
  *   hud      minimal | detailed | hidden (`off` is hidden), for this visit only
  *   bard     0 | 1, the director off or on
  *   view     diorama | explore
@@ -76,6 +76,7 @@ export interface Parsed {
 }
 
 const WEATHERS: readonly Weather[] = ["clear", "cloudy", "rain", "storm", "snow"]
+const QUALITY_NAMES: Record<string, Tier> = { low: 0, medium: 1, high: 2, ultra: 3 }
 const HUDS: Record<string, HudMode> = {
   minimal: "minimal",
   detailed: "detailed",
@@ -173,7 +174,8 @@ function take(link: DeepLink, key: string, value: string, probe: boolean): boole
       link.weather = value as Weather
       return true
     case "quality": {
-      const tier = intOf(value, 0, 3)
+      if (value === "auto") return true // no pin: the hall's own choice stands
+      const tier = Object.hasOwn(QUALITY_NAMES, value) ? QUALITY_NAMES[value] : intOf(value, 0, 3)
       if (tier === undefined) return false
       link.quality = tier as Tier
       return true

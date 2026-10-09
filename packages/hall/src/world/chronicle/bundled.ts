@@ -12,6 +12,17 @@ const ALIASES: Record<string, string> = {
   "facebook/react": "react/react",
 }
 
+/** The same repos' bundled trees (test/fixtures/repos) are filed under the spelling the fixture was made with. */
+const TREE_ALIASES: Record<string, string> = {
+  "react/react": "facebook/react",
+}
+
+/** The bundled tree's file stem ("owner__name") for `repo`, whichever spelling it was opened with. */
+export function treeStem(repo: string): string {
+  const name = repo.toLowerCase()
+  return (TREE_ALIASES[name] ?? name).replace("/", "__")
+}
+
 /** The asset's file name for `repo` ("owner/name", or "sample" for this repo). */
 export function chronicleFile(repo: string): string {
   const name = repo.toLowerCase()

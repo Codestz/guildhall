@@ -28,7 +28,7 @@ export const VENUES: readonly Prefab[] = [
       { piece: "wheelbarrow", x: 5, z: 4, rot: 2.6, scale: 1.2 },
       { piece: "resource_lumber", x: 4.6, z: -4.4, rot: 1.6, scale: 1.1 },
     ],
-    doors: [{ x: -2.6, z: 3.9, rot: 0, depth: 3.9 }],
+    doors: [{ x: -2.6, z: 4.4, rot: 0, depth: 4.4 }],
     windows: [
       { x: 1.7, y: 2.7, z: 2.9 },
       { x: -2.6, y: 2.4, z: 0.6 },
@@ -95,7 +95,7 @@ export const VENUES: readonly Prefab[] = [
       { piece: "rock_single_D", x: -5, z: 2, scale: 1.4 },
       { piece: "crate_A_big", x: -5.2, z: 4, rot: 0.8, scale: 1.2 },
     ],
-    doors: [{ x: 0, z: 5.2, rot: 0, depth: 2.2 }],
+    doors: [{ x: 0, z: 5.6, rot: 0, depth: 2.6 }],
     windows: [{ x: 0, y: 1.4, z: 4 }],
   },
   {
@@ -127,7 +127,7 @@ export const VENUES: readonly Prefab[] = [
     parts: [
       { piece: "building_home_B_blue", x: 0, z: -2.2, scale: 1.4 },
       { piece: "building_market_blue", x: -4.2, z: 2.6, rot: 0.3, scale: 0.62 },
-      { piece: "building_market_red", x: 4.4, z: 2.6, rot: -0.3, scale: 0.62 },
+      { piece: "building_market_red", x: 5.2, z: 2.6, rot: -0.3, scale: 0.62 },
       { piece: "crate_A_big", x: -5.6, z: -1, rot: 0.2, scale: 1.2 },
       { piece: "crate_B_big", x: -5.7, z: -2.4, rot: -0.3, scale: 1.2 },
       { piece: "barrel", x: 5.7, z: -0.8, scale: 1.3 },

@@ -1,4 +1,4 @@
-import { bundledChronicle } from "../chronicle/bundled.ts"
+import { bundledChronicle, treeStem } from "../chronicle/bundled.ts"
 import { CHRONICLES_CDN } from "../chronicle/catalog.ts"
 import { type Chronicle, decodeChronicle, encodeChronicle } from "../chronicle/format.ts"
 import { quickChronicle } from "../chronicle/quick.ts"
@@ -62,7 +62,7 @@ export async function treeFor(wanted: string): Promise<Tree> {
   } catch (error) {
     throw new RepoLoadError((error as Error).message, "invalid")
   }
-  const name = repo ? repo.replace("/", "__").toLowerCase() : SAMPLE
+  const name = repo ? treeStem(repo) : SAMPLE
   const bundled = Object.entries(fixtures()).find(([path]) => path.toLowerCase().endsWith(`/${name}.json`))
   if (bundled) {
     const fixture = await bundled[1]()

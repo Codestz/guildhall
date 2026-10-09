@@ -4,7 +4,9 @@ import type { Post, Spot } from "../layout.ts"
 import type { Venue } from "../venues.ts"
 import type { Biome, Language } from "./biomes.ts"
 import { civicOf, type Fame } from "./dress/civic.ts"
+import { clearLots, LOT_GAP } from "./dress/clearLots.ts"
 import { coverOf } from "./dress/cover.ts"
+import { crowds, footprintsOf } from "./dress/footprints.ts"
 import { dressHexes } from "./dress/hexes.ts"
 import { homesOf } from "./dress/homes.ts"
 import { dressRoads } from "./dress/roads.ts"
@@ -12,7 +14,7 @@ import { LANDMARK, landmarksOf, postsAround, quayOf } from "./dress/sites.ts"
 import { terraceOf } from "./dress/terrace.ts"
 import { type Lot, townOf } from "./dress/town.ts"
 import { type Anchor, VENUE_CLEAR, venuesOf } from "./dress/venues.ts"
-import { key, rng, unkey } from "./hex.ts"
+import { cellAt, key, rng, unkey } from "./hex.ts"
 import type { IslandPlan } from "./plan.ts"
 
 /**
@@ -59,17 +61,6 @@ export interface RepoIsland {
   homes: Home[]
 }
 
-/** Lots the civic centre, a venue or the wall stand on are dropped. */
-function clearLots(lots: Map<string, Lot>, clear: readonly Anchor[], wall: readonly Spot[]): void {
-  for (const id of [...lots.keys()]) {
-    const [x, z] = cellToWorld(unkey(id))
-    const crowded =
-      clear.some(([cx, cz, r]) => Math.hypot(x - cx, z - cz) < r + 4) ||
-      wall.some(([wx, wz]) => Math.hypot(wx - x, wz - z) < 7)
-    if (crowded) lots.delete(id)
-  }
-}
-
 /** Ground clutter a venue's yard leaves no room for. */
 const CLUTTER =
   /^(trees?_|tree_single|rock_single|hill_single|hills_|fence_|building_(dirt|grain)|target$|tent$)/
@@ -91,7 +82,12 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
     ...(civic?.clear ?? []),
     ...venues.map(({ venue }): Anchor => [venue.at[0], venue.at[1], VENUE_CLEAR]),
   ]
-  if (town) clearLots(town.lots, clear, civic?.wall ?? [])
+  // What the lots keep clear of: the civic centre's buildings and wall, and the venues'.
+  const fixed = footprintsOf([
+    ...(civic?.placements ?? []),
+    ...venues.flatMap(({ placements }) => placements),
+  ])
+  if (town) clearLots(town.lots, clear, civic?.wall ?? [], fixed)
   const homes = town ? homesOf(plan, town.lots) : []
   const { tiles, decor, water, meadow, fields } = dressHexes(
     plan,
@@ -102,16 +98,37 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
     new Map(venues.map(({ cell, placements }) => [key(cell), placements])),
   )
   if (town && civic) {
-    decor.push(...town.plazas, ...civic.placements)
+    // A plaza whose well or stalls would touch the civic centre's or a venue's buildings is left out.
+    const plazas = town.plazas.filter((plaza) =>
+      footprintsOf(plaza).every((shape) => fixed.every((other) => !crowds(shape, other, LOT_GAP))),
+    )
+    // A run of wall stops where a district's landmark stands in its way.
+    const built = footprintsOf(decor)
+    const wall = civic.placements.filter(
+      (item) =>
+        !item.piece.startsWith("wall_") ||
+        footprintsOf([item]).every((shape) => built.every((other) => !crowds(shape, other, 0))),
+    )
+    decor.push(...plazas.flat(), ...wall)
     const open = (spot: Spot): boolean => clear.every(([x, z, r]) => Math.hypot(spot[0] - x, spot[1] - z) > r)
     meadow.splice(0, meadow.length, ...meadow.filter(open))
     // The trees and rocks on the hexes round a venue made way for its yard (the venue's own pieces stay).
     const own = new Set(venues.flatMap(({ placements }) => placements))
+    // A district whose venue stands off its site leaves the site's own landmark out: that is the venue now.
+    const vacated = new Set(
+      venues.flatMap(({ venue }) => {
+        const site = plan.districts.find((district) => district.folder.name === venue.district)?.site
+        return site && key(cellAt(venue.at)) !== key(site) ? [key(site)] : []
+      }),
+    )
     const kept = decor.filter(
       (item) =>
         own.has(item) ||
-        !CLUTTER.test(item.piece) ||
-        venues.every(({ venue }) => Math.hypot(item.x - venue.at[0], item.z - venue.at[1]) > VENUE_CLEAR + 2),
+        (!vacated.has(key(cellAt([item.x, item.z]))) &&
+          (!CLUTTER.test(item.piece) ||
+            venues.every(
+              ({ venue }) => Math.hypot(item.x - venue.at[0], item.z - venue.at[1]) > VENUE_CLEAR + 2,
+            ))),
     )
     decor.splice(0, decor.length, ...kept)
   }

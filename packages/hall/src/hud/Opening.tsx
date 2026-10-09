@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
 import type { OpeningState } from "../guild/opening.ts"
 import type { GuildStore } from "../guild/store.ts"
+import { growing, growth } from "../world/chronicle/growthControl.ts"
 import { Icon } from "./icons.tsx"
 import { repoDoor } from "./RepoDoor.tsx"
 
@@ -25,6 +26,8 @@ export function Opening({ state, store, phone }: { state: OpeningState; store: G
   const { stage, loaded } = state
   const [dismissed, setDismissed] = useState(false)
   const touch = useTouch()
+  // A growth film (`?grow`) has its own captions and tape along the bottom: the welcome steps aside.
+  const film = useSyncExternalStore(growth.subscribe, growing)
 
   // Following someone is what the caption asks for: once they do, it has done its job.
   useEffect(() => {
@@ -33,7 +36,7 @@ export function Opening({ state, store, phone }: { state: OpeningState; store: G
 
   // The card stays mounted through "arrive" so a reduced-motion cut still fades.
   const titled = stage !== "landed"
-  const caption = (stage === "arrive" || stage === "landed") && !dismissed
+  const caption = (stage === "arrive" || stage === "landed") && !dismissed && !film
   const percent = Math.round(loaded * 100)
 
   return (

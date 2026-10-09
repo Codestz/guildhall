@@ -4,7 +4,8 @@
  *   bun scripts/assets.ts               (everything)
  *   bun scripts/assets.ts forest lands  (only those outputs)
  *
- * - characters/<name>.glb — one per character model, pruned.
+ * - characters/<name>.glb — one per character model, pruned, meshopt-compressed (not POSITION: see
+ *                           compressSkinned).
  * - anims.glb             — only the clips the hall plays, from Rig_Medium, meshes stripped. Every
  *                           character shares the rig, so one file animates everyone.
  * - kit.glb               — every environment piece and prop as a named top-level node, one shared
@@ -23,13 +24,15 @@
 import { readdirSync, statSync } from "node:fs"
 import { mkdir, writeFile } from "node:fs/promises"
 import { basename, join } from "node:path"
-import { Document, type Node as GNode, getBounds, NodeIO } from "@gltf-transform/core"
-import { ALL_EXTENSIONS } from "@gltf-transform/extensions"
+import { Document, type Node as GNode, getBounds, NodeIO, type Transform } from "@gltf-transform/core"
+import { ALL_EXTENSIONS, EXTMeshoptCompression } from "@gltf-transform/extensions"
 import {
   dedup,
   mergeDocuments,
   meshopt,
   prune,
+  quantize,
+  reorder,
   resample,
   simplify,
   unpartition,
@@ -490,7 +493,7 @@ async function characters(): Promise<void> {
     if (!path) throw new Error(`character ${name} not found`)
     const doc = await io.read(path)
     mergeSkinned(doc, (mesh) => (/Cape|Hat|Hood/i.test(mesh) ? `${name}_Tinted` : `${name}_Body`))
-    await doc.transform(dedup(), prune())
+    await doc.transform(dedup(), prune(), compressSkinned)
     const out = join(OUT, "characters", `${name.toLowerCase().replace("_", "-")}.glb`)
     await io.write(out, doc)
     console.log(`character ${name} → ${kb(out)}`)
@@ -504,7 +507,7 @@ async function skeletons(): Promise<void> {
     if (!path) throw new Error(`skeleton ${name} not found`)
     const doc = await io.read(path)
     mergeSkinned(doc, (mesh) => (/Eyes/i.test(mesh) ? `${name}_Eyes` : `${name}_Body`))
-    await doc.transform(dedup(), prune())
+    await doc.transform(dedup(), prune(), compressSkinned)
     const out = join(OUT, "characters", `${name.toLowerCase().replace("_", "-")}.glb`)
     await io.write(out, doc)
     console.log(`skeleton ${name} → ${kb(out)}`)
@@ -688,6 +691,23 @@ async function kit(name: string, sources: Record<string, string[]>, bounds = tru
   // In the repo's own format, so `biome check .` stays clean after a regeneration.
   const format = Bun.spawnSync([process.execPath, "x", "biome", "format", "--write", json], { cwd: ROOT })
   if (format.exitCode !== 0) throw new Error(`biome could not format ${json}: ${format.stderr.toString()}`)
+}
+
+/**
+ * meshopt (reorder, quantize, EXT_meshopt_compression) for the skinned characters, but with POSITION
+ * left in float. Quantizing it rescales each model's inverse bind matrices to its own bounding box,
+ * and the crowd bakes ONE rig for every model (crowd/bake.ts `boneMap` wants equal bind poses); it
+ * would also change the units the crowd's mesh simplifier works in (crowd/simplify.ts).
+ */
+const compressSkinned: Transform = async (doc) => {
+  await doc.transform(
+    reorder({ encoder: MeshoptEncoder, target: "size" }),
+    quantize({ pattern: /^(?!POSITION$)/ }),
+  )
+  doc
+    .createExtension(EXTMeshoptCompression)
+    .setRequired(true)
+    .setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE })
 }
 
 function round(value: number): number {

@@ -33,7 +33,9 @@ import {
 } from "three/tsl"
 import { type Node, NodeMaterial, type WebGPURenderer } from "three/webgpu"
 import { keyShadow } from "./grassNodes.ts"
-import { LAND_ABOVE, type ShoreSetup, STANDS_BELOW, type WaterUniforms } from "./Water.tsx"
+import type { ShoreSetup } from "./shoreBake.ts"
+import type { WaterUniforms } from "./Water.tsx"
+import { LAND_ABOVE, STANDS_BELOW } from "./waterline.ts"
 
 /**
  * The water as a TSL node material (WebGPU, always; WebGL with `?tsl=1`, scene/tsl.ts): nature/shaders.ts `waterFragment`,

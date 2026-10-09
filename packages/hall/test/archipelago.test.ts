@@ -134,7 +134,7 @@ describe("ferries", () => {
 describe("the archipelago's sea", () => {
   test("a patch fills its hole in the sea exactly", () => {
     const hole: [number, number] = [300, -40]
-    const sea = seaSquares(600, [hole], PATCH_HALF, SEA_CELL)
+    const sea = seaSquares(600, [{ at: hole, half: PATCH_HALF }], SEA_CELL)
     const inside = (x: number, z: number) =>
       Math.abs(x - hole[0]) < PATCH_HALF && Math.abs(z - hole[1]) < PATCH_HALF
     // Every sea triangle's centre is outside the hole…

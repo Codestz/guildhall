@@ -1,8 +1,14 @@
 import { type Cell, cellToWorld } from "../lands.ts"
 import type { Biome } from "./biomes.ts"
-import { cellAt, key, neighbours, noise, rings, rng, step, unkey } from "./hex.ts"
+import { rng, unkey } from "./hex.ts"
+import { smoothCoast } from "./plan/coast.ts"
+import { groundOf, placeSites } from "./plan/ground.ts"
+import { GATE, HUB, QUAY } from "./plan/keep.ts"
+import { layRoads } from "./plan/roads.ts"
+import { growSectors } from "./plan/sectors.ts"
 import type { Folder, RepoShape } from "./repo.ts"
-import { contiguous } from "./tiles.ts"
+
+export { HUB, KEEP } from "./plan/keep.ts"
 
 /**
  * An island planned from a repo's shape, before any tile is chosen: which hex is land, which
@@ -10,23 +16,18 @@ import { contiguous } from "./tiles.ts"
  * . meadow, f/F woods, h knoll, H foothill, m/M mountain, w/d fields, v village lot, s site ground)
  * so the adapter (dress.ts) can tile it exactly the way lands.ts tiles the hand-drawn map.
  *
- * The keep stands at the origin, as on the hand-drawn map (lands.ts' K block: Room, the stations
- * and the hall's aisles are placed there), its gate opening south down a short avenue onto the
- * harbour (the root's own files): the hub, two hexes south, its quay running on south into a bay
- * nothing may fill. The keep's block and the ring of land round it are reserved before anything
- * grows: level harbour ground no district, road or shore may take. The top-level folders sit round it in sectors sized by their land, each grown
- * hex by hex from a seed (its square, where its road ends), so every district is one piece. A split
- * workspace's packages (repo.ts) share one sector as a cluster: the biggest at its heart, the rest
- * fanned round it away from the hub, its road from the hub and theirs from its square: a town. Roads
- * run from the hub to every square (Dijkstra over the hexes, reusing roads already laid; a road over
- * sea is a causeway and makes land). Then the shore is smoothed until every land hex meets the sea
- * along one run of at most four sides (what the pack's coast tiles can draw).
+ * The keep stands at the origin with the harbour (the root's own files) south of its gate, its
+ * block and the ring round it reserved (plan/keep.ts). Then, in order:
+ *   sectors   the folders round the hub, each grown from its square into one piece (plan/sectors.ts)
+ *   roads     hub → every square, reusing what's laid (plan/roads.ts)
+ *   coast     smoothed until the coast tiles can draw every hex (plan/coast.ts)
+ *   ground    a landmark site per district, elevation, and each biome's ground (plan/ground.ts)
  */
 
 export interface PlanDistrict {
   folder: Folder
   biome: Biome
-  /** Hexes it was meant to grow to: ∝ log of its bytes. */
+  /** Hexes it was meant to grow to (quotaOf, or gen/scale.ts' share of the island's land). */
   quota: number
   /** Where its road ends. */
   square: Cell
@@ -63,37 +64,6 @@ export interface IslandPlan {
   radius: number
 }
 
-export const HUB: Cell = [0, 6]
-const QUAY: Cell = [0, 8]
-/** The gate's apron, and the avenue's one hex between it and the hub (lands.ts' [0, 2] and OUT). */
-const GATE: Cell = [0, 2]
-const AVENUE: Cell = [0, 4]
-/** The keep's block: lands.ts' K hexes, and the V lots either side of its gate. */
-export const KEEP: ReadonlyMap<string, "K" | "V"> = new Map([
-  ...(
-    [
-      [-2, -2],
-      [0, -2],
-      [2, -2],
-      [-1, -1],
-      [1, -1],
-      [-2, 0],
-      [0, 0],
-      [2, 0],
-      [-1, 1],
-      [1, 1],
-      [-2, 2],
-      [2, 2],
-    ] as const
-  ).map(([q, line]) => [`${q},${line}`, "K"] as const),
-  ["-1,3", "V"],
-  ["1,3", "V"],
-])
-/** Half-angle of the bay kept open south of the hub: the quay always faces open sea. */
-const BAY = (35 * Math.PI) / 180
-/** World radius of a round patch of n hexes (a hex is 86.6 square units). */
-const patch = (n: number): number => 5.25 * Math.sqrt(n)
-
 /** Land ∝ code size, log-scaled: 1 KB ≈ 7 hexes, 100 KB ≈ 25, 10 MB ≈ 47. */
 export function quotaOf(bytes: number): number {
   return Math.round(4 + 3.2 * Math.log2(1 + bytes / 1024))
@@ -106,21 +76,6 @@ function levelOf(folder: Folder): 0 | 1 | 2 {
   if (folder.biome === "library") return Math.max(1, base) as 1 | 2
   return base
 }
-
-const [HUB_X, HUB_Z] = cellToWorld(HUB)
-const inBay = (cell: Cell): boolean => {
-  if (cell[0] === HUB[0] && cell[1] === HUB[1]) return false
-  const [x, z] = cellToWorld(cell)
-  return z - HUB_Z > 0 && Math.abs(x - HUB_X) <= (z - HUB_Z) * Math.tan(BAY)
-}
-
-/** The keep's block, its gate and avenue, and the ring of land round them: the harbour's, kept level and clear. */
-const RESERVED: ReadonlySet<string> = (() => {
-  const out = new Set<string>([...KEEP.keys(), key(GATE), key(AVENUE)])
-  for (const id of KEEP.keys()) for (const next of neighbours(unkey(id))) if (!inBay(next)) out.add(key(next))
-  out.delete(key(HUB))
-  return out
-})()
 
 /**
  * How far the land may reach from the origin along x or z, world units: the shore's distance bake
@@ -144,18 +99,21 @@ export function extentOf(plan: IslandPlan): number {
 const HEX_RADIUS = 10 / Math.sqrt(3)
 const HEX_APOTHEM = 5
 
-/** The island for a repo's shape, its land shrunk until it fits inside ±LAND_HALF. */
+/** The island for a repo's shape (generator v1), its land shrunk until it fits inside ±LAND_HALF. */
 export function fitIsland(shape: RepoShape, seed: number): IslandPlan {
-  let plan = planIsland(shape, seed)
+  const quotas = quotasOf([shape.root, ...shape.folders])
+  let plan = planIsland(shape, seed, quotas)
   for (let scale = SHRINK; extentOf(plan) > LAND_HALF && scale >= SMALLEST; scale *= SHRINK)
-    plan = planIsland(shape, seed, scale)
+    plan = planIsland(
+      shape,
+      seed,
+      quotas.map((quota) => quota * scale),
+    )
   return plan
 }
 
 /** A workspace's land: its whole size's quota times this, shared among its packages ∝ their own. */
 const TOWN = 2
-/** The arc a workspace's packages fan over round its biggest, centred on the way out from the hub. */
-const FAN = (240 * Math.PI) / 180
 
 /** Each district's quota before scaling: its own, or its share of its workspace's. */
 function quotasOf(folders: readonly Folder[]): number[] {
@@ -174,12 +132,10 @@ function quotasOf(folders: readonly Folder[]): number[] {
   })
 }
 
-export function planIsland(shape: RepoShape, seed: number, scale = 1): IslandPlan {
-  const random = rng(seed)
-  const folders = [shape.root, ...shape.folders]
-  const quotas = quotasOf(folders)
-  const districts: PlanDistrict[] = folders.map((folder, i) => {
-    const own = Math.max(3, Math.round((quotas[i] ?? 0) * scale))
+/** The island for a repo's shape, each district (the root first, then its folders) grown to its quota. */
+export function planIsland(shape: RepoShape, seed: number, quotas: readonly number[]): IslandPlan {
+  const districts: PlanDistrict[] = [shape.root, ...shape.folders].map((folder, i) => {
+    const own = Math.max(3, Math.round(quotas[i] ?? 0))
     const quota = i === 0 ? Math.max(7, own) : own
     return {
       folder,
@@ -191,343 +147,10 @@ export function planIsland(shape: RepoShape, seed: number, scale = 1): IslandPla
       density: Math.min(0.85, Math.max(0.15, Math.log2(1 + folder.files / quota) / 4)),
     }
   })
-
-  // ---- Seeds: the folders round the hub in sectors ∝ their land, the bay left open ----
-  // A workspace's packages are one unit there: one sector, one cluster (heads[i] is its first, biggest).
-  const units: number[][] = []
-  const heads = new Map<number, number>()
-  districts.forEach((district, i) => {
-    if (i === 0) return
-    const group = district.folder.group
-    const unit =
-      group === undefined ? undefined : units.find((u) => districts[u[0] ?? 0]?.folder.group === group)
-    if (unit) {
-      heads.set(i, unit[0] ?? i)
-      unit.push(i)
-    } else units.push([i])
-  })
-  for (let i = units.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1))
-    ;[units[i], units[j]] = [units[j] ?? [], units[i] ?? []]
-  }
-  const quotaOfUnit = (unit: readonly number[]): number =>
-    unit.reduce((sum, i) => sum + (districts[i]?.quota ?? 0), 0)
-  const total = units.reduce((sum, unit) => sum + quotaOfUnit(unit), 0)
-  const rootRadius = patch(districts[0]?.quota ?? 7)
-  const seeded = new Set([key(HUB), ...RESERVED])
-  /** The first free hex out along a ray from [x, z]: no seed yet, not in the bay. */
-  const seedAt = (x: number, z: number, angle: number, distance: number): Cell => {
-    const at = (): Cell => cellAt([x + distance * Math.sin(angle), z + distance * Math.cos(angle)])
-    let cell = at()
-    while (seeded.has(key(cell)) || inBay(cell)) {
-      distance += 5
-      cell = at()
-    }
-    seeded.add(key(cell))
-    return cell
-  }
-  let swept = 0
-  for (const unit of units) {
-    const land = quotaOfUnit(unit)
-    const angle = BAY + (2 * Math.PI - 2 * BAY) * ((swept + land / 2) / total)
-    swept += land
-    const [first, ...ring] = unit
-    const head = districts[first ?? 0]
-    if (!head) continue
-    head.square = seedAt(HUB_X, HUB_Z, angle, rootRadius + patch(land) + 4)
-    // The rest of a workspace fan round its biggest package on the side away from the hub (a ray
-    // towards it would be pushed on through the harbour), each a patch's width off its square.
-    const [cx, cz] = cellToWorld(head.square)
-    ring.forEach((i, n) => {
-      const district = districts[i]
-      if (!district) return
-      const around = angle + FAN * ((n + 0.5) / ring.length - 0.5)
-      district.square = seedAt(cx, cz, around, patch(head.quota) + patch(district.quota))
-    })
-  }
-
-  // ---- Growth: each district claims the frontier hex nearest its seed, the emptiest first ----
-  const owner = new Map<string, number>()
-  const frontiers = districts.map(() => new Set<string>())
-  const claim = (cell: Cell, i: number): void => {
-    const id = key(cell)
-    owner.set(id, i)
-    for (const frontier of frontiers) frontier.delete(id)
-    for (const next of neighbours(cell)) {
-      const nextId = key(next)
-      if (!owner.has(nextId) && !inBay(next)) frontiers[i]?.add(nextId)
-    }
-  }
-  for (const id of RESERVED) owner.set(id, 0)
-  districts.forEach((district, i) => {
-    claim(district.square, i)
-  })
-  const claimed = districts.map(() => 1)
-  for (;;) {
-    let pick = -1
-    let emptiest = Number.POSITIVE_INFINITY
-    districts.forEach((district, i) => {
-      const fill = (claimed[i] ?? 0) / district.quota
-      if (fill < 1 && (frontiers[i]?.size ?? 0) > 0 && fill < emptiest) {
-        emptiest = fill
-        pick = i
-      }
-    })
-    const district = districts[pick]
-    if (!district) break
-    const [sx, sz] = cellToWorld(district.square)
-    const reach = patch(district.quota)
-    let best: string | undefined
-    let bestScore = Number.POSITIVE_INFINITY
-    for (const id of frontiers[pick] ?? []) {
-      const cell = unkey(id)
-      const [x, z] = cellToWorld(cell)
-      const score = Math.hypot(x - sx, z - sz) / reach + 0.3 * noise(seed, cell, `grow${pick}`)
-      if (score < bestScore) {
-        bestScore = score
-        best = id
-      }
-    }
-    if (best === undefined) break
-    claim(unkey(best), pick)
-    claimed[pick] = (claimed[pick] ?? 0) + 1
-  }
-
-  // Holes between districts fill in from their neighbours.
-  const majority = (cell: Cell): { count: number; district: number } => {
-    const counts = new Map<number, number>()
-    for (const next of neighbours(cell)) {
-      const i = owner.get(key(next))
-      if (i !== undefined) counts.set(i, (counts.get(i) ?? 0) + 1)
-    }
-    let district = -1
-    let most = 0
-    let count = 0
-    for (const [i, n] of [...counts].sort((a, b) => a[0] - b[0])) {
-      count += n
-      if (n > most) {
-        most = n
-        district = i
-      }
-    }
-    return { count, district }
-  }
-  let radius = 0
-  const span = (): Cell[] => {
-    radius = 0
-    for (const id of owner.keys()) radius = Math.max(radius, rings(unkey(id)))
-    const cells: Cell[] = []
-    for (let q = -radius - 1; q <= radius + 1; q++)
-      for (let line = -2 * radius - 2; line <= 2 * radius + 2; line++)
-        if ((q - line) % 2 === 0 && rings([q, line]) <= radius + 1) cells.push([q, line])
-    return cells
-  }
-  for (let pass = 0; pass < 3; pass++)
-    for (const cell of span()) {
-      if (owner.has(key(cell)) || inBay(cell)) continue
-      const { count, district } = majority(cell)
-      if (count >= 4) owner.set(key(cell), district)
-    }
-
-  // ---- Roads: the avenue, then hub → every square, nearest first, reusing what's laid; a
-  // workspace's packages after it, each from its biggest package's square ----
-  const road = new Set<string>([key(HUB), key(AVENUE), key(GATE)])
-  const roads: Cell[][] = [[HUB, AVENUE]]
-  const byDistance = districts
-    .map((district, i) => ({ i, d: rings(district.square) }))
-    .filter(({ i }) => i > 0)
-    .sort((a, b) => Number(heads.has(a.i)) - Number(heads.has(b.i)) || a.d - b.d || a.i - b.i)
-  for (const { i } of byDistance) {
-    const district = districts[i]
-    if (!district) continue
-    const head = heads.get(i)
-    const from = head === undefined ? HUB : (districts[head]?.square ?? HUB)
-    const path = cheapest(from, district.square, radius + 2, (cell) => {
-      const id = key(cell)
-      if (inBay(cell) || (RESERVED.has(id) && !road.has(id)) || id === key(GATE)) return undefined
-      if (road.has(id)) return 0.4
-      return owner.has(id) ? 1 : 8
-    })
-    for (const cell of path) {
-      const id = key(cell)
-      road.add(id)
-      if (!owner.has(id)) owner.set(id, i)
-    }
-    roads.push(path)
-  }
-
-  // ---- Shore: until every land hex meets the sea along one run of ≤ 4 sides ----
-  const wet = (cell: Cell): number[] => [0, 1, 2, 3, 4, 5].filter((dir) => !owner.has(key(step(cell, dir))))
-  const drawable = (dirs: number[]): boolean => dirs.length === 0 || (dirs.length <= 4 && !!contiguous(dirs))
-  const erode = (): boolean => {
-    let changed = false
-    for (const id of [...owner.keys()]) {
-      if (road.has(id) || RESERVED.has(id)) continue
-      if (!drawable(wet(unkey(id)))) {
-        owner.delete(id)
-        changed = true
-      }
-    }
-    return changed
-  }
-  for (let pass = 0; pass < 20; pass++) {
-    let changed = false
-    for (const cell of span()) {
-      const id = key(cell)
-      if (owner.has(id) || inBay(cell)) continue
-      const { count, district } = majority(cell)
-      if (count >= 4 && drawable(wet(cell))) {
-        owner.set(id, district)
-        changed = true
-      }
-    }
-    if (erode()) changed = true
-    if (!changed) break
-  }
-  while (erode());
-  span()
-
-  // ---- Sites: a level hex beside each square for its landmark, inland if it can be ----
-  const sites = new Set<string>()
-  const [hx, hz] = cellToWorld(HUB)
-  districts.forEach((district, i) => {
-    let best: Cell | undefined
-    let bestScore = Number.NEGATIVE_INFINITY
-    for (const cell of neighbours(district.square)) {
-      const id = key(cell)
-      if (road.has(id) || sites.has(id) || KEEP.has(id) || !owner.has(id)) continue
-      const [x, z] = cellToWorld(cell)
-      const score =
-        (owner.get(id) === i ? 100 : 0) +
-        (wet(cell).length === 0 ? 50 : 0) +
-        Math.hypot(x - hx, z - hz) / 10 +
-        noise(seed, cell, "site")
-      if (score > bestScore) {
-        bestScore = score
-        best = cell
-      }
-    }
-    if (!best) return
-    district.site = best
-    sites.add(key(best))
-  })
-
-  // ---- What grows where: elevation from depth, then each biome's ground ----
-  const land = new Map<string, PlanHex>()
-  const nearRoad = (cell: Cell): boolean => neighbours(cell).some((next) => road.has(key(next)))
-  districts.forEach((district, i) => {
-    const own = [...owner].filter(([, d]) => d === i).map(([id]) => unkey(id))
-    district.hexes = own.length
-    const raised = new Set<string>()
-    if (district.level > 0) {
-      const [sx, sz] = cellToWorld(district.square)
-      const inland = own
-        .filter((cell) => !road.has(key(cell)) && !sites.has(key(cell)) && !nearRoad(cell))
-        .map((cell) => {
-          const [x, z] = cellToWorld(cell)
-          return { cell, far: Math.hypot(x - sx, z - sz) + noise(seed, cell, "rise") * 5 }
-        })
-        .sort((a, b) => b.far - a.far)
-      const count = Math.round(inland.length * (district.level === 1 ? 0.35 : 0.5))
-      for (const { cell } of inland.slice(0, count)) raised.add(key(cell))
-    }
-    for (const cell of own) {
-      const id = key(cell)
-      let char: string
-      if (road.has(id)) char = "="
-      else if (KEEP.has(id)) char = KEEP.get(id) ?? "K"
-      else if (sites.has(id)) char = "s"
-      // The ring round the keep: open lots, kept clear like the hand map's (lands.ts' V).
-      else if (RESERVED.has(id)) char = "V"
-      else if (raised.has(id))
-        char =
-          district.level === 1 ? "H" : neighbours(cell).every((next) => raised.has(key(next))) ? "M" : "m"
-      else char = ground(district, noise(seed, cell, "ground"), noise(seed, cell, "crop"))
-      land.set(id, { char, district: i })
-    }
-  })
-
+  const { owner, heads, radius: searched } = growSectors(districts, seed, rng(seed))
+  const { road, roads } = layRoads(districts, owner, heads, searched)
+  const radius = smoothCoast(owner, road)
+  const sites = placeSites(districts, owner, road, seed)
+  const land = groundOf(districts, owner, road, sites, seed)
   return { hash: shape.hash, seed, land, districts, roads, hub: HUB, quay: QUAY, gate: GATE, radius }
-}
-
-/** A hex's ground in a district's biome; `roll` against its density decides how full it is. */
-function ground(district: PlanDistrict, roll: number, crop: number): string {
-  const d = district.density
-  switch (district.biome) {
-    case "village":
-      return roll < d ? "v" : roll < d + 0.15 ? "f" : "."
-    case "harbour":
-      return roll < d * 0.6 ? "v" : roll < d * 0.6 + 0.1 ? "f" : "."
-    case "proving":
-      return roll < d * 0.5 ? "s" : roll < 0.8 ? "." : "f"
-    case "library":
-      return roll < d ? "f" : roll > 0.8 ? "h" : "."
-    case "quarry":
-      return roll < d * 0.6 ? "h" : "."
-    case "forest":
-      return roll < d ? "F" : "f"
-    case "farms":
-      return roll < d ? (crop < 0.6 ? "w" : "d") : "."
-    case "wilds":
-      return roll < 0.3 ? "f" : roll < 0.45 ? "h" : "."
-  }
-}
-
-/** Dijkstra over the hexes within `radius` rings; `cost` undefined means impassable. */
-function cheapest(from: Cell, to: Cell, radius: number, cost: (cell: Cell) => number | undefined): Cell[] {
-  const goal = key(to)
-  const best = new Map<string, number>([[key(from), 0]])
-  const back = new Map<string, string>()
-  const heap: [number, string][] = [[0, key(from)]]
-  const push = (item: [number, string]): void => {
-    heap.push(item)
-    let i = heap.length - 1
-    while (i > 0) {
-      const parent = (i - 1) >> 1
-      if ((heap[parent]?.[0] ?? 0) <= item[0]) break
-      heap[i] = heap[parent] ?? item
-      i = parent
-    }
-    heap[i] = item
-  }
-  const pop = (): [number, string] | undefined => {
-    const top = heap[0]
-    const last = heap.pop()
-    if (!top || !last || heap.length === 0) return top
-    let i = 0
-    for (;;) {
-      const left = 2 * i + 1
-      const right = left + 1
-      let smallest = i
-      const at = (n: number): number => (n === i ? last[0] : (heap[n]?.[0] ?? Number.POSITIVE_INFINITY))
-      if (left < heap.length && at(left) < at(smallest)) smallest = left
-      if (right < heap.length && at(right) < at(smallest)) smallest = right
-      if (smallest === i) break
-      heap[i] = heap[smallest] ?? last
-      i = smallest
-    }
-    heap[i] = last
-    return top
-  }
-  for (let item = pop(); item; item = pop()) {
-    const [distance, id] = item
-    if (id === goal) break
-    if (distance > (best.get(id) ?? Number.POSITIVE_INFINITY)) continue
-    for (const next of neighbours(unkey(id))) {
-      if (rings(next) > radius) continue
-      const step = cost(next)
-      if (step === undefined) continue
-      const nextId = key(next)
-      const total = distance + step
-      if (total < (best.get(nextId) ?? Number.POSITIVE_INFINITY)) {
-        best.set(nextId, total)
-        back.set(nextId, id)
-        push([total, nextId])
-      }
-    }
-  }
-  const path: Cell[] = [to]
-  for (let id = back.get(goal); id !== undefined; id = back.get(id)) path.unshift(unkey(id))
-  if (key(path[0] ?? to) !== key(from)) throw new Error(`no road from ${key(from)} to ${goal}`)
-  return path
 }

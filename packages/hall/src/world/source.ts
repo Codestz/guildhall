@@ -1,6 +1,6 @@
 import { createContext, use, useContext, useSyncExternalStore } from "react"
 import { setActiveWorld } from "./active.ts"
-import { islandFromTree } from "./gen/islandFromTree.ts"
+import { type Gen, genOf, islandFromTree } from "./gen/islandFromTree.ts"
 import type { Tree } from "./gen/load.ts"
 import { handWorld, repoWorld, type World } from "./world.ts"
 
@@ -19,6 +19,9 @@ export type WorldStatus =
   | { state: "failed"; repo: string; reason: string }
 
 type Listener = () => void
+
+/** The generator this visit's link asks repo islands of (`?gen=2`), read once at load. */
+const LINKED_GEN: Gen = typeof location === "undefined" ? 1 : genOf(location.search)
 
 class WorldSource {
   world: World = handWorld()
@@ -51,11 +54,12 @@ class WorldSource {
     const done = (async () => {
       try {
         const tree = await fetchTree(wanted)
-        const made = islandFromTree(tree.entries)
+        const made = islandFromTree(tree.entries, 0, LINKED_GEN)
         const { repo, source, branch, truncated } = tree
         const world = repoWorld(made, {
           repo,
           source,
+          ...(LINKED_GEN === 2 ? { gen: LINKED_GEN } : {}),
           ...(branch ? { branch } : {}),
           ...(truncated ? { truncated } : {}),
         })

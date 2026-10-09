@@ -1,4 +1,5 @@
 import { activeWorld } from "./active.ts"
+import { Heap } from "./gen/heap.ts"
 import { ROAD_EDGES, ROAD_NODES } from "./lands.ts"
 import { ROOM, type Spot } from "./layout.ts"
 
@@ -120,13 +121,16 @@ function inKeep([x, z]: Spot): boolean {
   return Math.abs(x) <= ROOM.width / 2 && z >= -ROOM.depth / 2 && z <= ROOM.depth / 2 + 4
 }
 
+/** An open node: its cost so far, when it joined the open set, its id. */
+type Open = readonly [number, number, Id]
+
 /** Short trips (same corner of the hall) go straight; longer ones take the aisles. */
 const STRAIGHT_BELOW = 3.5
 
 /**
  * The spots to walk through from `from` to `to`, ending at `to`, on the active world's roads
- * (world/active.ts; the hand map's by default). Dijkstra over a graph of a few dozen to a few
- * hundred nodes: cheap enough to run whenever a target changes.
+ * (world/active.ts; the hand map's by default). Dijkstra over a graph of a few dozen to a couple of
+ * thousand nodes, its open set a heap: cheap enough to run whenever a target changes.
  */
 export function route(from: Spot, to: Spot, roads: Roads = activeWorld()?.roads ?? HAND_ROADS): Spot[] {
   if (distance(from, to) < STRAIGHT_BELOW) return [to]
@@ -143,19 +147,21 @@ export function route(from: Spot, to: Spot, roads: Roads = activeWorld()?.roads 
   const goal = nearest(to)
   const cost = new Map<Id, number>([[start, 0]])
   const previous = new Map<Id, Id>()
-  const open = new Set<Id>([start])
-  while (open.size > 0) {
-    let current: Id | undefined
-    for (const id of open)
-      if (current === undefined || (cost.get(id) ?? 0) < (cost.get(current) ?? 0)) current = id
-    if (current === undefined || current === goal) break
-    open.delete(current)
+  // The open set, cheapest first; between equals, the node that joined it first.
+  const joined = new Map<Id, number>([[start, 0]])
+  const open = new Heap<Open>((a, b) => a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]))
+  open.push([0, 0, start])
+  for (let item = open.pop(); item; item = open.pop()) {
+    const [spent, , current] = item
+    if (spent > (cost.get(current) ?? Number.POSITIVE_INFINITY)) continue
+    if (current === goal) break
     for (const next of adjacent.get(current) ?? []) {
-      const through = (cost.get(current) ?? 0) + distance(node(current), node(next))
+      const through = spent + distance(node(current), node(next))
       if (through < (cost.get(next) ?? Number.POSITIVE_INFINITY)) {
         cost.set(next, through)
         previous.set(next, current)
-        open.add(next)
+        if (!joined.has(next)) joined.set(next, joined.size)
+        open.push([through, joined.get(next) ?? 0, next])
       }
     }
   }

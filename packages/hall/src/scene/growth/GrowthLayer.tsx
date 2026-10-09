@@ -10,7 +10,7 @@ import { Builders } from "./Builders.tsx"
 import { GrowthDriver } from "./drive.ts"
 import { BURST_S, FestivalBurst, prefetchFestival } from "./FestivalBurst.tsx"
 import { filmFor, markAddress, startOf } from "./film.ts"
-import { clearRiseMask, RiseWriter } from "./mask.ts"
+import { clearRiseMask, RiseWriter, riseMaskOf } from "./mask.ts"
 import { useOrbit } from "./orbit.ts"
 import { restoreGrowables, veilGrowables } from "./registry.ts"
 
@@ -92,7 +92,7 @@ export default function GrowthLayer() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: one driver per film (growth.film is not React state)
   useEffect(() => {
     if (!film) return
-    setDriver({ driver: new GrowthDriver(film.plan), writer: new RiseWriter(film.plan) })
+    setDriver({ driver: new GrowthDriver(film.plan), writer: new RiseWriter(film.plan, riseMaskOf(world)) })
     // A release's festival is its own chunk: fetched now, not in the frame it is first wanted.
     if (film.story.festivals.length > 0) void prefetchFestival()
     return () => {

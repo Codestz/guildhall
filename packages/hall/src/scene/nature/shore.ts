@@ -130,8 +130,11 @@ export function flowAt(line: readonly Spot[], x: number, z: number, reach: numbe
 
 /** Shore texture layout: world [-HALF, HALF]² in x and z, `SIZE` texels a side. */
 export const SHORE = { half: 120, size: 1024, maxDistance: 10 } as const
-/** The extent and resolution of one shore bake: the home island's (SHORE), or a far island's patch. */
-export type ShoreLayout = { half: number; size: number }
+/**
+ * The extent and resolution of one shore bake: the home island's (SHORE), a far island's patch, or
+ * one of a big island's shore tiles (shoreTiles.ts), centred `at` (world xz; the origin if absent).
+ */
+export type ShoreLayout = { half: number; size: number; at?: Spot }
 
 /**
  * The shore texture's texels from a land mask (row 0 at z = +half, as a top-down render reads
@@ -143,6 +146,7 @@ export function shoreTexels(
   layout: ShoreLayout = SHORE,
 ): Uint8Array {
   const { half, size } = layout
+  const [ax, az] = layout.at ?? [0, 0]
   const { maxDistance } = SHORE
   const cell = (half * 2) / size
   const distance = distanceToLand(land, size, size)
@@ -159,10 +163,10 @@ export function shoreTexels(
   }
   const reach = 7
   for (let row = 0; row < size; row++) {
-    const z = half - (row + 0.5) * cell
+    const z = az + half - (row + 0.5) * cell
     for (let column = 0; column < size; column++) {
       const i = row * size + column
-      const x = -half + (column + 0.5) * cell
+      const x = ax - half + (column + 0.5) * cell
       out[i * 4] = Math.round(Math.min(1, ((distance[i] as number) * cell) / maxDistance) * 255)
       let fx = 0
       let fz = 0
@@ -178,13 +182,19 @@ export function shoreTexels(
   return out
 }
 
+/** A square the open sea leaves out: ±half round `at`. */
+export interface Hole {
+  at: Spot
+  half: number
+}
+
 /**
  * The open sea as a grid of `cell`-sized squares out to `radius` (xz pairs, two triangles a cell,
- * counter-clockwise from above), leaving out every square in a hole: a far island's shore patch,
- * ±half round its keep (world/archipelago.ts). Holes and offsets are multiples of `cell`, so a
- * patch drawn with the same grid (`patchSquares`) meets the sea vertex to vertex.
+ * counter-clockwise from above), leaving out every square in a hole: a far island's shore patch
+ * (world/archipelago.ts) or a shore tile (shoreTiles.ts). Holes and offsets are multiples of
+ * `cell`, so a patch drawn with the same grid (`patchSquares`) meets the sea vertex to vertex.
  */
-export function seaSquares(radius: number, holes: readonly Spot[], half: number, cell: number): Spot[] {
+export function seaSquares(radius: number, holes: readonly Hole[], cell: number): Spot[] {
   const out: Spot[] = []
   const n = Math.ceil(radius / cell)
   for (let i = -n; i < n; i++)
@@ -192,17 +202,18 @@ export function seaSquares(radius: number, holes: readonly Spot[], half: number,
       const cx = (i + 0.5) * cell
       const cz = (j + 0.5) * cell
       if (Math.hypot(cx, cz) > radius) continue
-      if (holes.some(([hx, hz]) => Math.abs(cx - hx) < half && Math.abs(cz - hz) < half)) continue
+      if (holes.some(({ at: [hx, hz], half }) => Math.abs(cx - hx) < half && Math.abs(cz - hz) < half))
+        continue
       out.push(...square(i * cell, j * cell, cell))
     }
   return out
 }
 
-/** A patch ±half round the origin as the same grid of `cell` squares. */
-export function patchSquares(half: number, cell: number): Spot[] {
+/** A patch ±half round `at` (the origin if absent) as the same grid of `cell` squares. */
+export function patchSquares(half: number, cell: number, [ax, az]: Spot = [0, 0]): Spot[] {
   const out: Spot[] = []
   for (let x = -half; x < half; x += cell)
-    for (let z = -half; z < half; z += cell) out.push(...square(x, z, cell))
+    for (let z = -half; z < half; z += cell) out.push(...square(ax + x, az + z, cell))
   return out
 }
 

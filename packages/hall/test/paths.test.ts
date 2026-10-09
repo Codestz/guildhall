@@ -76,3 +76,38 @@ describe("aisles", () => {
     expect(first?.[0]).toBe(0)
   })
 })
+
+describe("roads the size of a city island", () => {
+  /** A 40 × 40 grid of road nodes 10 apart, walled down the middle but for its far row. */
+  const SIDE = 40
+  const id = (i: number, j: number) => `G${i}_${j}`
+  const at = (i: number, j: number): Spot => [100 + 10 * i, 100 + 10 * j]
+  const nodes: Record<string, Spot> = {}
+  const edges: [string, string][] = []
+  for (let i = 0; i < SIDE; i++)
+    for (let j = 0; j < SIDE; j++) {
+      nodes[id(i, j)] = at(i, j)
+      if (j + 1 < SIDE) edges.push([id(i, j), id(i, j + 1)])
+      if (i + 1 < SIDE && (i !== SIDE / 2 - 1 || j === SIDE - 1)) edges.push([id(i, j), id(i + 1, j)])
+    }
+  const roads = { nodes, edges }
+  const length = (from: Spot, path: Spot[]) =>
+    path.reduce((sum, next, k) => {
+      const prev = k === 0 ? from : (path[k - 1] as Spot)
+      return sum + Math.hypot(next[0] - prev[0], next[1] - prev[1])
+    }, 0)
+
+  test("the shortest way round a wall, over 1,600 nodes", () => {
+    const from = at(0, 0)
+    const to = at(SIDE - 1, 0)
+    const path = route(from, to, roads)
+    expect(path.at(-1)).toEqual(to)
+    expect(length(from, path)).toBeCloseTo(3 * 10 * (SIDE - 1), 6)
+  })
+
+  test("straight along an open row", () => {
+    const from = at(0, SIDE - 1)
+    const to = at(SIDE - 1, SIDE - 1)
+    expect(length(from, route(from, to, roads))).toBeCloseTo(10 * (SIDE - 1), 6)
+  })
+})

@@ -94,6 +94,7 @@ ${FRAGMENT_HEAD}
 uniform sampler2D uShore;
 #ifdef WATER_RISE
 uniform sampler2D uRise;
+uniform float uRiseHalf;
 #endif
 uniform sampler2D uNoise;
 uniform float uShoreHalf;
@@ -150,7 +151,7 @@ void main() {
   float dist = shore.r * uShoreMax;
 #ifdef WATER_RISE
   // A growth timelapse: open sea wherever no land that is up now is near (scene/growth/mask.ts).
-  float risen = texture2D(uRise, vec2(sp.x, -sp.y) / (2.0 * uShoreHalf) + 0.5).g;
+  float risen = texture2D(uRise, vec2(p.x, -p.y) / (2.0 * uRiseHalf) + 0.5).g;
   dist = mix(uShoreMax, dist, risen);
   shore.a = mix(1.0, shore.a, risen);
 #endif

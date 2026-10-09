@@ -13,6 +13,7 @@ import { MODE } from "../guild/mode.ts"
 import { opening, reducedMotion } from "../guild/opening.ts"
 import { positions, useGuild, useGuildStore } from "../guild/useGuild.ts"
 import { useArchipelago } from "../world/archipelagoSource.ts"
+import { useWorld } from "../world/source.ts"
 import {
   flightSeconds,
   flightSize,
@@ -22,6 +23,7 @@ import {
   mapFrame,
 } from "./archipelago/view.ts"
 import { FRAME } from "./frame.ts"
+import { outreachOf } from "./nature/shoreTiles.ts"
 import { OpeningProgress } from "./OpeningCue.tsx"
 
 /**
@@ -109,7 +111,8 @@ const DECIDE_S = 0.125
 /**
  * An archipelago (scene/archipelago): the orthographic camera stands this far back (not 220), so a
  * far island on the camera's side of the sea is never behind it; the far planes and the farthest
- * zoom-out open up to hold the whole map. Without one, nothing changes.
+ * zoom-out open up to hold the whole map. Without one, they follow the island's own reach past the
+ * home bake's square (nature/shoreTiles.ts `outreachOf`: 1 for every island but a big generated one).
  */
 const ORTHO_BACK = 220
 const ARCHIPELAGO_BACK = 1200
@@ -138,7 +141,9 @@ export function CameraRig() {
     return () => list.removeEventListener("change", change)
   }, [])
   const archipelago = useArchipelago()
-  const back = archipelago ? ARCHIPELAGO_BACK : ORTHO_BACK
+  const world = useWorld()
+  const outreach = useMemo(() => outreachOf(world), [world])
+  const back = archipelago ? ARCHIPELAGO_BACK : ORTHO_BACK * outreach
   /** A flight between islands (scene/archipelago/view.ts): the request flown, and where it is. */
   const trip = useRef({
     // From 0, not the current count: a link's `island=` may be asked before the rig mounts.
@@ -181,7 +186,7 @@ export function CameraRig() {
   const portrait = Math.min(1, Math.max(0, upright))
   const fit = base * (1 + PORTRAIT_BOOST * portrait)
   const wide = fit * 0.42
-  const widest = base * 0.42 * 0.5
+  const widest = (base * 0.42 * 0.5) / outreach
   /** The archipelago's map: the zoom (orthographic) and distance (perspective) that hold it all. */
   const mapRadius = archipelago ? mapFrame(archipelago).radius : 0
   const mapZoom = archipelago ? Math.min(size.width, size.height * 1.4) / (mapRadius * 2) : widest
@@ -697,14 +702,14 @@ export function CameraRig() {
         position={[0.01, 240, 2]}
         zoom={wide * 0.5}
         near={0.1}
-        far={archipelago ? 2600 : 900}
+        far={archipelago ? 2600 : 900 * outreach}
       />
       <PerspectiveCamera
         ref={persp}
         makeDefault={view === "explore"}
         fov={38}
         near={0.5}
-        far={archipelago ? 3600 : 1200}
+        far={archipelago ? 3600 : 1200 * outreach}
         position={[60, 60, 60]}
       />
       <MapControls
@@ -719,7 +724,7 @@ export function CameraRig() {
         minZoom={archipelago ? Math.min(widest, mapZoom * 0.8) : widest}
         maxZoom={fit * 8}
         minDistance={4}
-        maxDistance={archipelago ? ARCHIPELAGO_BACK * 1.5 : 300}
+        maxDistance={archipelago ? ARCHIPELAGO_BACK * 1.5 : 300 * outreach}
         mouseButtons={{ LEFT: MOUSE.PAN, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.ROTATE }}
         touches={{ ONE: TOUCH.PAN, TWO: TOUCH.DOLLY_ROTATE }}
       />

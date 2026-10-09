@@ -1,5 +1,6 @@
 import type { Biome } from "./gen/biomes.ts"
 import type { District, RepoIsland } from "./gen/dress.ts"
+import type { Gen } from "./gen/islandFromTree.ts"
 import type { Folder } from "./gen/repo.ts"
 import {
   type Cell,
@@ -52,6 +53,8 @@ export interface RepoInfo {
   branch?: string
   /** GitHub cut the listing short: the island is the part it sent. */
   truncated?: boolean
+  /** The generator that grew it (world/gen/islandFromTree.ts); absent is 1. */
+  gen?: Gen
   districts: readonly District[]
   /**
    * The folder each district was grown from, aligned with `districts` (its workspace and pooling):

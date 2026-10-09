@@ -20,7 +20,7 @@ export async function filmFor(repo: string, world: World): Promise<GrowthFilm | 
     repo === "sample" || repo.toLowerCase() === sample.repo.toLowerCase() ? sample : await treeFor(repo)
   const chronicle = await chronicleFor(repo, tree)
   if (!chronicle) return `couldn't read ${tree.repo}'s history from GitHub`
-  const made = islandFromTree(tree.entries)
+  const made = islandFromTree(tree.entries, 0, world.repo?.gen)
   // The film moves the hall's own island: it must be the same one, piece for piece.
   if (
     made.island.tiles.length !== world.island.tiles.length ||

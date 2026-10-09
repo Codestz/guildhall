@@ -93,6 +93,7 @@ const OTHERS = new Set([
   "repos",
   "island",
   "grow",
+  "gen",
   "anyhub",
   "showcase",
   "demo",

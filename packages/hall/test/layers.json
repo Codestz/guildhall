@@ -32,7 +32,6 @@
   "cycles": [
     "scene/atmosphere/SkyDome.tsx | scene/atmosphere/skyNodes.ts",
     "scene/crowd/material.ts | scene/crowd/materialNodes.ts",
-    "scene/nature/Water.tsx | scene/nature/waterNodes.ts",
     "scene/weather/Precipitation.tsx | scene/weather/fallNodes.ts"
   ]
 }

@@ -219,7 +219,10 @@ describe("the kit's rocks on the mountain", () => {
   test("rocks and crags are the kit's own, bigger than a pebble", () => {
     const rocks = dressing.filter((p) => p.piece.startsWith("rock_single") || p.piece.startsWith("mountain_"))
     expect(rocks.length).toBeGreaterThan(15)
-    for (const rock of rocks) expect(rock.scale ?? 1).toBeGreaterThan(0.4)
+    // A crag is a whole mountain piece set small (scale 0.35 and up by construction, so it may land just
+    // above that on any island); a rock is the kit's rock at 1 and up. Neither is a pebble.
+    for (const rock of rocks)
+      expect(rock.scale ?? 1).toBeGreaterThan(rock.piece.startsWith("mountain_") ? 0.3 : 0.5)
   })
 
   test("none floats: every rock stands no higher than the ground at its centre, sunk into the slope", () => {

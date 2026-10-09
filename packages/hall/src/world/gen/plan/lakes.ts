@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { cellToWorld } from "../../lands.ts"
 import { key, neighbours, noise, rings, unkey } from "../hex.ts"
 import type { PlanDistrict } from "../plan.ts"
@@ -73,7 +74,7 @@ export function reserveLakes(
   const free = (id: string): boolean => {
     if (!owner.has(id) || RESERVED.has(id) || squares.has(id) || mountains.has(id)) return false
     const [x, z] = cellToWorld(unkey(id))
-    return Math.hypot(x, z) >= CLEAR * 0.8
+    return DMath.hypot(x, z) >= CLEAR * 0.8
   }
   const from = reachFrom(mountains, ranges.length > 1 ? (ranges[0] as ReadonlySet<string>) : new Set(), free)
   const lakes: PlanLake[] = []
@@ -184,12 +185,12 @@ function basinAt(entry: string, seed: number, ground: Ground): PlanLake | undefi
   const size = SIZE[0] + Math.floor(noise(seed, unkey(entry), "size") * (SIZE[1] - SIZE[0] + 1))
   const [fx, fz] = cellToWorld(unkey(foot))
   const [ex, ez] = cellToWorld(unkey(entry))
-  const heading = Math.hypot(ex - fx, ez - fz) || 1
+  const heading = DMath.hypot(ex - fx, ez - fz) || 1
   const radius = Math.max(0, 5.25 * Math.sqrt(size) - 5)
   const mid = [ex + ((ex - fx) / heading) * radius, ez + ((ez - fz) / heading) * radius] as const
   const reach = (id: string): number => {
     const [x, z] = cellToWorld(unkey(id))
-    return Math.hypot(x - mid[0], z - mid[1]) + noise(seed, unkey(id), "shape") * 2.5
+    return DMath.hypot(x - mid[0], z - mid[1]) + noise(seed, unkey(id), "shape") * 2.5
   }
   const cells = new Set([entry])
   const ring = (): string[] => [

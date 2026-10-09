@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import type { Spot } from "../../layout.ts"
 import {
   BANK,
@@ -43,7 +44,7 @@ function distanceTo(line: readonly Spot[], x: number, z: number): number {
     const [bx, bz] = line[k + 1] as Spot
     const len = (bx - ax) ** 2 + (bz - az) ** 2
     const t = len === 0 ? 0 : Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / len))
-    best = Math.min(best, Math.hypot(x - (ax + (bx - ax) * t), z - (az + (bz - az) * t)))
+    best = Math.min(best, DMath.hypot(x - (ax + (bx - ax) * t), z - (az + (bz - az) * t)))
   }
   return best
 }
@@ -75,7 +76,7 @@ function gradedCut(grade: readonly Point3[]): Cut {
         len === 0
           ? 0
           : Math.max(0, Math.min(1, ((x - a[0]) * (b[0] - a[0]) + (z - a[2]) * (b[2] - a[2])) / len))
-      const d = Math.hypot(x - (a[0] + (b[0] - a[0]) * t), z - (a[2] + (b[2] - a[2]) * t))
+      const d = DMath.hypot(x - (a[0] + (b[0] - a[0]) * t), z - (a[2] + (b[2] - a[2]) * t))
       if (d <= PITCH) lowest = Math.min(lowest, a[1] + (b[1] - a[1]) * t)
       if (d < best.d) {
         const slope = (slopes[k] as number) * (1 - t) + (slopes[k + 1] as number) * t

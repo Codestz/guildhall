@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { type Cell, cellToWorld, type LandPlacement } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
 import { DOOR_DEPTH, doorsOf, fixturesOf, instantiate, type Prefab, prefab } from "../../prefabs/index.ts"
@@ -6,7 +7,7 @@ import { cellAt, key, neighbours, unkey } from "../hex.ts"
 import { keepOf } from "../plan/lakes.ts"
 import type { IslandPlan, PlanDistrict } from "../plan.ts"
 import type { Cover } from "./cover.ts"
-import { crowds, footprintsOf } from "./footprints.ts"
+import { crowds, type Footprint, footprintsOf } from "./footprints.ts"
 import type { DressedRoads } from "./roads.ts"
 import { facing, round } from "./sites.ts"
 
@@ -58,6 +59,7 @@ export function venuesOf(
   roads: DressedRoads,
   avoid: readonly Anchor[] = [],
   cover: Cover = NO_COVER,
+  halls: readonly Footprint[] = [],
 ): PlacedVenue[] {
   const code = plan.districts
     .filter((district) => district.biome === "village")
@@ -81,7 +83,7 @@ export function venuesOf(
         !cover.massifs.has(key(cell)) &&
         !cover.rivers.has(key(cell)) &&
         !lakes.has(key(cell)) &&
-        avoid.every(([ax, az, r]) => Math.hypot(x - ax, z - az) >= r)
+        avoid.every(([ax, az, r]) => DMath.hypot(x - ax, z - az) >= r)
       )
     }
     const spare = (cell: Cell, anyDistrict = false): boolean => {
@@ -132,20 +134,19 @@ export function venuesOf(
       }
       return clear ?? inland ?? first
     }
-    const standing = out.flatMap((venue) => footprintsOf(venue.placements))
+    const standing = [...halls, ...out.flatMap((venue) => footprintsOf(venue.placements))]
     const touches = (next: PlacedVenue): boolean =>
       footprintsOf(next.placements).some((shape) => standing.some((other) => crowds(shape, other, VENUE_GAP)))
     // A door's step stays on the road graph's side, where a venue that clears the others allows; failing that,
-    // a looser reach for the step; failing that, a venue that crowds one beside it (as ever), and wherever.
+    // a looser reach for the step. A venue never stands through a hall or another venue, nor far from the
+    // roads: failing both, the district keeps its landmark.
     const reach = (next: PlacedVenue): number => {
       const [nx, nz] = roads.nodes[next.venue.node] ?? [0, 0]
-      return Math.hypot(next.venue.door.step[0] - nx, next.venue.door.step[1] - nz)
+      return DMath.hypot(next.venue.door.step[0] - nx, next.venue.door.step[1] - nz)
     }
     const attempt = (from: readonly Choice[]): PlacedVenue | undefined =>
       choose((next) => touches(next) || reach(next) >= BY_ROAD, from) ??
-      choose((next) => touches(next) || reach(next) >= STRAY, from) ??
-      choose((next) => reach(next) >= BY_ROAD, from) ??
-      choose(() => false, from)
+      choose((next) => touches(next) || reach(next) >= STRAY, from)
     let placed = attempt(choices)
     if (!placed || onBeach(placed.venue.door.step, plan.land)) {
       const other = attempt(borrowed)
@@ -186,13 +187,13 @@ function flankOf(
     let near = Number.POSITIVE_INFINITY
     for (const m of [...first, ...first.flatMap(neighbours)].filter((n) => cover.massifs.has(key(n)))) {
       const [mx, mz] = cellToWorld(m)
-      const d = Math.hypot(cx - mx, cz - mz)
+      const d = DMath.hypot(cx - mx, cz - mz)
       if (d < near) [near, ax, az] = [d, (cx - mx) / d, (cz - mz) / d]
     }
     for (const road of first.filter((n) => roads.links.has(key(n)))) {
       const [rx, rz] = cellToWorld(road)
       if ((rx - cx) * ax + (rz - cz) * az < 0) continue
-      const rank = slope * 1000 + Math.hypot(cx - sx, cz - sz)
+      const rank = slope * 1000 + DMath.hypot(cx - sx, cz - sz)
       if (!best || rank < best.rank) best = { cell, towards: [rx, rz], rank }
     }
   }
@@ -207,7 +208,7 @@ function around(cell: Cell, land: ReadonlyMap<string, unknown>): Cell[] {
   const second = first.flatMap(neighbours).filter((next) => !seen.has(key(next)) && seen.add(key(next)))
   const third = second.flatMap(neighbours).filter((next) => !seen.has(key(next)) && seen.add(key(next)))
   const [cx, cz] = cellToWorld(cell)
-  const far = (next: Cell): number => Math.hypot(cellToWorld(next)[0] - cx, cellToWorld(next)[1] - cz)
+  const far = (next: Cell): number => DMath.hypot(cellToWorld(next)[0] - cx, cellToWorld(next)[1] - cz)
   const wet = (next: Cell): number => neighbours(next).filter((n) => !land.has(key(n))).length
   return [...first, ...second, ...third].sort(
     (a, b) => wet(a) - wet(b) || far(a) - far(b) || (key(a) < key(b) ? -1 : 1),
@@ -222,7 +223,7 @@ function onBeach(spot: Spot, land: ReadonlyMap<string, unknown>): boolean {
   const here = cellAt(spot)
   return [here, ...neighbours(here)].some((next) => {
     const [x, z] = cellToWorld(next)
-    return !land.has(key(next)) && Math.hypot(x - spot[0], z - spot[1]) < BEACH
+    return !land.has(key(next)) && DMath.hypot(x - spot[0], z - spot[1]) < BEACH
   })
 }
 
@@ -230,7 +231,7 @@ function onBeach(spot: Spot, land: ReadonlyMap<string, unknown>): boolean {
 function byWater(spot: Spot, rivers: ReadonlySet<string>): boolean {
   return [...rivers].some((id) => {
     const [x, z] = cellToWorld(unkey(id))
-    return Math.hypot(x - spot[0], z - spot[1]) < BRIDGE
+    return DMath.hypot(x - spot[0], z - spot[1]) < BRIDGE
   })
 }
 
@@ -253,8 +254,8 @@ function place(
   const step: Spot = [door.x, door.z]
   const depth = door.depth ?? DOOR_DEPTH
   const sill: Spot = [
-    round(step[0] - Math.sin(door.rot) * depth),
-    round(step[1] - Math.cos(door.rot) * depth),
+    round(step[0] - DMath.sin(door.rot) * depth),
+    round(step[1] - DMath.cos(door.rot) * depth),
   ]
   const venue: Venue = {
     id: `${folder.name}#${kind}`,
@@ -284,7 +285,7 @@ function nearest(nodes: Readonly<Record<string, Spot>>, spot: Spot): string {
   let best = "HARBOUR"
   let bestDistance = Number.POSITIVE_INFINITY
   for (const [name, at] of Object.entries(nodes)) {
-    const distance = Math.hypot(at[0] - spot[0], at[1] - spot[1])
+    const distance = DMath.hypot(at[0] - spot[0], at[1] - spot[1])
     if (distance < bestDistance) {
       best = name
       bestDistance = distance

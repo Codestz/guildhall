@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { HEX_SCALE, type LandPlacement, PIECES } from "../../lands.ts"
 
 /**
@@ -22,7 +23,7 @@ export function footprintsOf(placements: readonly LandPlacement[]): Footprint[] 
     if (!bounds || !BUILT.test(piece.piece) || UNDERFOOT.test(piece.piece)) continue
     const scale = HEX_SCALE * (piece.scale ?? 1)
     const rot = piece.rot ?? 0
-    const [c, s] = [Math.cos(rot), Math.sin(rot)]
+    const [c, s] = [DMath.cos(rot), DMath.sin(rot)]
     const [x0 = 0, , z0 = 0] = bounds.min
     const [x1 = 0, , z1 = 0] = bounds.max
     out.push(
@@ -56,7 +57,7 @@ export function crowds(a: Footprint, b: Footprint, gap: number): boolean {
   for (const shape of [a, b])
     for (const n of [0, 1]) {
       const [p, q] = [shape[n] as [number, number], shape[n + 1] as [number, number]]
-      const length = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1
+      const length = DMath.hypot(q[0] - p[0], q[1] - p[1]) || 1
       const [ax, az] = [(q[1] - p[1]) / length, -(q[0] - p[0]) / length]
       const [a0, a1] = span(a, ax, az)
       const [b0, b1] = span(b, ax, az)

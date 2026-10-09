@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { type Cell, cellToWorld } from "../../lands.ts"
 import { key, neighbours, unkey } from "../hex.ts"
 
@@ -44,7 +45,7 @@ export const bayOf =
   (cell: Cell): boolean => {
     if (cell[0] === HUB[0] && cell[1] === HUB[1]) return false
     const [x, z] = cellToWorld(cell)
-    return z - HUB_Z > 0 && Math.abs(x - HUB_X) <= (z - HUB_Z) * Math.tan(half)
+    return z - HUB_Z > 0 && Math.abs(x - HUB_X) <= (z - HUB_Z) * DMath.tan(half)
   }
 export const inBay = bayOf(BAY)
 

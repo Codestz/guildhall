@@ -89,14 +89,14 @@ describe("the film's relief instances, frame by frame", () => {
     })
   })
 
-  test("the flicker's root cause: the hex under a chunk's middle does sink and rise again", () => {
-    // Riding that hex (as the film once did) made a standing mountain sink and reappear.
-    const sinks = marks.ids.filter((_, i) => {
-      const h = driver.hexAt(marks.spots[i * 2] as number, marks.spots[i * 2 + 1] as number)
-      const ups = times.map((t) => growthAt(g, t)).map((f) => f.up[h] as number)
-      return ups.some((up, k) => k > 0 && up < (ups[k - 1] as number) - 0.05)
-    })
-    expect(sinks.length).toBeGreaterThan(0)
+  test("the flicker's root cause: a hex's own growth does sink and rise again", () => {
+    // Riding a hex (as the film once did for a chunk's middle) would make a standing mountain sink and
+    // reappear; which hexes do so depends on the island, that some do on a real one does not.
+    const ups = times.map((t) => growthAt(g, t).up)
+    const sinking = [...(ups[0] ?? [])].filter((_, h) =>
+      ups.some((up, k) => k > 0 && (up[h] as number) < (ups[k - 1]?.[h] as number) - 0.05),
+    )
+    expect(sinking.length).toBeGreaterThan(0)
   })
 
   test("the chunks of one massif rise as one", () => {

@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { type Cell, cellToWorld, type LandPlacement } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
 import { housesOf, instantiate, type Prefab, prefab } from "../../prefabs/index.ts"
@@ -82,8 +83,8 @@ export function townOf(plan: IslandPlan, links: Map<string, Set<number>>): Town 
         (dir) => !hasRoad(step(square, dir)) && plan.land.has(key(step(square, dir))),
       )
       const dir = free[Math.floor(noise(plan.seed, square, "plaza") * free.length)]
-      const angle = dir === undefined ? 0 : Math.atan2(...(offset(square, dir) as [number, number]))
-      const at: [number, number] = [sx + Math.sin(angle) * OFF_ROAD, sz + Math.cos(angle) * OFF_ROAD]
+      const angle = dir === undefined ? 0 : DMath.atan2(...(offset(square, dir) as [number, number]))
+      const at: [number, number] = [sx + DMath.sin(angle) * OFF_ROAD, sz + DMath.cos(angle) * OFF_ROAD]
       // A town or city's squares have a fountain as often as a well.
       const fountain = tier !== "hamlet" && tier !== "village" && noise(plan.seed, square, "fountain") < 0.5
       const seed = 1 + Math.floor(noise(plan.seed, square, "variant") * 65535)
@@ -120,7 +121,7 @@ function capped(count: number, tier: string, distance: number): 1 | 2 | 3 {
 
 const dist = (cell: Cell, x: number, z: number): number => {
   const [cx, cz] = cellToWorld(cell)
-  return Math.hypot(cx - x, cz - z)
+  return DMath.hypot(cx - x, cz - z)
 }
 
 /** The offset (dx, dz) from a hex to its neighbour in a direction. */

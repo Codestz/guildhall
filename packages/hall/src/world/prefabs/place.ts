@@ -1,3 +1,4 @@
+import { DMath } from "../dmath.ts"
 import type { KitColour } from "../gen/biomes.ts"
 import type { LandPlacement } from "../lands.ts"
 import { type Door, type Fixture, type Prefab, pieceOf } from "./types.ts"
@@ -9,8 +10,8 @@ const round = (value: number): number => Math.round(value * 100) / 100
 
 /** A point of the prefab's frame in the world, the prefab stood at `at` and turned by `rot`. */
 function toWorld(at: readonly [number, number], rot: number, x: number, z: number): [number, number] {
-  const sin = Math.sin(rot)
-  const cos = Math.cos(rot)
+  const sin = DMath.sin(rot)
+  const cos = DMath.cos(rot)
   return [round(at[0] + x * cos + z * sin), round(at[1] - x * sin + z * cos)]
 }
 

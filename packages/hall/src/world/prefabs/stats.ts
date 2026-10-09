@@ -1,3 +1,4 @@
+import { DMath } from "../dmath.ts"
 import type { KitColour } from "../gen/biomes.ts"
 import { HEX_SCALE, PIECES } from "../lands.ts"
 import { type Prefab, pieceOf } from "./types.ts"
@@ -61,7 +62,7 @@ export function statsOf(
     const box = PIECES[name]
     if (!box) continue
     const k = HEX_SCALE * (part.scale ?? 1)
-    const [sin, cos] = [Math.sin(part.rot ?? 0), Math.cos(part.rot ?? 0)]
+    const [sin, cos] = [DMath.sin(part.rot ?? 0), DMath.cos(part.rot ?? 0)]
     for (const cx of [box.min[0] ?? 0, box.max[0] ?? 0])
       for (const cz of [box.min[2] ?? 0, box.max[2] ?? 0]) {
         const [lx, lz] = [cx * k, cz * k]
@@ -71,7 +72,7 @@ export function statsOf(
         hi[0] = Math.max(hi[0] ?? x, x)
         lo[2] = Math.min(lo[2] ?? z, z)
         hi[2] = Math.max(hi[2] ?? z, z)
-        reach = Math.max(reach, Math.hypot(x, z))
+        reach = Math.max(reach, DMath.hypot(x, z))
       }
     lo[1] = Math.min(lo[1] ?? 0, (part.y ?? 0) + (box.min[1] ?? 0) * k)
     hi[1] = Math.max(hi[1] ?? 0, (part.y ?? 0) + (box.max[1] ?? 0) * k)

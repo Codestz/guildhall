@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { type Cell, cellToWorld } from "../../lands.ts"
 import { cellAt, key, neighbours, noise, unkey } from "../hex.ts"
 import type { PlanDistrict } from "../plan.ts"
@@ -72,7 +73,7 @@ export function growSectors(
     for (const id of frontiers[pick] ?? []) {
       const cell = unkey(id)
       const [x, z] = cellToWorld(cell)
-      const score = Math.hypot(x - sx, z - sz) / reach + 0.3 * noise(seed, cell, `grow${pick}`)
+      const score = DMath.hypot(x - sx, z - sz) / reach + 0.3 * noise(seed, cell, `grow${pick}`)
       if (score < bestScore) {
         bestScore = score
         best = id
@@ -150,7 +151,7 @@ function seedSquares(districts: PlanDistrict[], random: () => number, form: Form
    * ray's reach so a big district starts well inside the coast rather than out on a cape.
    */
   const seedAt = (x: number, z: number, angle: number, distance: number): Cell => {
-    const at = (d: number): Cell => cellAt([x + d * Math.sin(angle), z + d * Math.cos(angle)])
+    const at = (d: number): Cell => cellAt([x + d * DMath.sin(angle), z + d * DMath.cos(angle)])
     let cell = at(distance)
     if (mass) cell = nearestFree(mass, at(Math.min(distance, INWARD * reachOf(mass, at))), free)
     else
@@ -199,7 +200,7 @@ function nearestFree(mass: ReadonlySet<string>, target: Cell, free: (cell: Cell)
     const cell = unkey(id)
     if (!free(cell)) continue
     const [x, z] = cellToWorld(cell)
-    const distance = Math.hypot(x - tx, z - tz)
+    const distance = DMath.hypot(x - tx, z - tz)
     if (distance < bestDistance || (distance === bestDistance && id < key(best))) {
       bestDistance = distance
       best = cell

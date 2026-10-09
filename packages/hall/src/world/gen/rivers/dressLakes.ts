@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { type Cell, cellToWorld, type LandPiece, type LandPlacement } from "../../lands.ts"
 import { TERRACE, type Waterways } from "../../waterways.ts"
 import { key, neighbours, noise } from "../hex.ts"
@@ -70,8 +71,8 @@ function plant(
   const angle = noise(0, cell, "angle") * Math.PI * 2
   return {
     piece: pieces[Math.floor(roll * pieces.length)] as LandPiece,
-    x: Math.round((x + Math.cos(angle) * reach) * 100) / 100,
-    z: Math.round((z + Math.sin(angle) * reach) * 100) / 100,
+    x: Math.round((x + DMath.cos(angle) * reach) * 100) / 100,
+    z: Math.round((z + DMath.sin(angle) * reach) * 100) / 100,
     rot: noise(0, cell, "turn") * Math.PI * 2,
     ...raised,
   }

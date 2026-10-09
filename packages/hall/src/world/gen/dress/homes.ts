@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import type { Home } from "../../homes.ts"
 import { cellToWorld } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
@@ -29,7 +30,7 @@ export function homesOf(plan: IslandPlan, lots: ReadonlyMap<string, Lot>): Home[
     const at: Spot = cellToWorld(unkey(id))
     for (const door of doorsOf(lot.prefab, at, lot.rot)) {
       const depth = door.depth ?? DOOR_DEPTH
-      const out = [Math.sin(door.rot), Math.cos(door.rot)] as const
+      const out = [DMath.sin(door.rot), DMath.cos(door.rot)] as const
       const step: Spot = [door.x, door.z]
       const sill: Spot = [round(step[0] - out[0] * depth), round(step[1] - out[1] * depth)]
       homes.push({

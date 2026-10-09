@@ -1,3 +1,4 @@
+import { DMath } from "../dmath.ts"
 import { type Cell, cellToWorld } from "../lands.ts"
 import type { Biome } from "./biomes.ts"
 import { rng, unkey } from "./hex.ts"
@@ -78,7 +79,7 @@ export interface IslandPlan {
 
 /** Land ∝ code size, log-scaled: 1 KB ≈ 7 hexes, 100 KB ≈ 25, 10 MB ≈ 47. */
 export function quotaOf(bytes: number): number {
-  return Math.round(4 + 3.2 * Math.log2(1 + bytes / 1024))
+  return Math.round(4 + 3.2 * DMath.log2(1 + bytes / 1024))
 }
 
 function levelOf(folder: Folder): 0 | 1 | 2 {
@@ -164,7 +165,7 @@ export function planIsland(
       square: HUB,
       hexes: 0,
       level: levelOf(folder),
-      density: Math.min(0.85, Math.max(0.15, Math.log2(1 + folder.files / quota) / 4)),
+      density: Math.min(0.85, Math.max(0.15, DMath.log2(1 + folder.files / quota) / 4)),
     }
   })
   const form = formOf?.(districts.reduce((sum, district) => sum + district.quota, RESERVED.size)) ?? RING

@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { type Cell, cellToWorld } from "../../lands.ts"
 import { TERRACE } from "../../waterways.ts"
 import { Heap } from "../heap.ts"
@@ -50,7 +51,7 @@ export function groundOf(plan: IslandPlan, relief: Relief, level: (cell: Cell) =
     let n = 0
     for (let k = -1; k < 6; k++) {
       const r = k < 0 ? 0 : 3.5
-      const h = relief.heightAt(x + Math.cos((k * Math.PI) / 3) * r, z + Math.sin((k * Math.PI) / 3) * r)
+      const h = relief.heightAt(x + DMath.cos((k * Math.PI) / 3) * r, z + DMath.sin((k * Math.PI) / 3) * r)
       if (h !== undefined) {
         sum += h
         n++

@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import type { Cell } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
 import {
@@ -76,7 +77,7 @@ export function gradeWaters(waters: Waterways, ground: GradeGround): Waterways {
   const joined = (cell: Cell, [x, z]: Spot): number => {
     const grade = graded.get(key(cell))
     if (!grade) return surfaceY(ground.lake?.(cell) ? "lake" : "river", ground.level(cell))
-    const near = (p: Point3) => Math.hypot(p[0] - x, p[2] - z)
+    const near = (p: Point3) => DMath.hypot(p[0] - x, p[2] - z)
     return grade.reduce((best, p) => (near(p) < near(best) ? p : best))[1]
   }
 
@@ -149,7 +150,7 @@ function gradeRun(hexes: RiverHex[], run: Run): { reaches: Reach[]; falls: Fall[
   const g = pts.map(height)
   // The ground a step past either end of the run, for a ledge at its ends.
   const past = (a: Spot, b: Spot): Spot => {
-    const d = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1
+    const d = DMath.hypot(a[0] - b[0], a[1] - b[1]) || 1
     return [a[0] + ((a[0] - b[0]) / d) * GRADE_STEP, a[1] + ((a[1] - b[1]) / d) * GRADE_STEP]
   }
   /** The ground a step above and below sample m: a fall's lip and its foot. */
@@ -249,7 +250,7 @@ function resample(line: readonly Spot[]): Spot[] {
   const lengths = [0]
   for (let i = 1; i < line.length; i++) {
     const [a, b] = [line[i - 1] as Spot, line[i] as Spot]
-    lengths.push((lengths[i - 1] as number) + Math.hypot(b[0] - a[0], b[1] - a[1]))
+    lengths.push((lengths[i - 1] as number) + DMath.hypot(b[0] - a[0], b[1] - a[1]))
   }
   const total = lengths.at(-1) as number
   const count = Math.max(1, Math.ceil(total / GRADE_STEP))

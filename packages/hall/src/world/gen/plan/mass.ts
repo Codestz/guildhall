@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { type Cell, cellToWorld } from "../../lands.ts"
 import { Heap } from "../heap.ts"
 import { key, neighbours, noise, rng, unkey } from "../hex.ts"
@@ -70,11 +71,11 @@ function outline(size: number, seed: number): (cell: Cell) => number {
     const [x, z] = cellToWorld(cell)
     const u = x / width
     const v = (z - centreZ) / depth
-    const angle = Math.atan2(v, u)
+    const angle = DMath.atan2(v, u)
     let radius = 1
     WAVES.forEach((amplitude, i) => {
-      radius += amplitude * Math.cos((i + 2) * angle - (phases[i] ?? 0))
+      radius += amplitude * DMath.cos((i + 2) * angle - (phases[i] ?? 0))
     })
-    return Math.hypot(u, v) / radius + JITTER * noise(seed, cell, "mass")
+    return DMath.hypot(u, v) / radius + JITTER * noise(seed, cell, "mass")
   }
 }

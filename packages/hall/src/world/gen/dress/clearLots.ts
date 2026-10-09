@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { cellToWorld } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
 import { instantiate, prefab } from "../../prefabs/index.ts"
@@ -23,8 +24,8 @@ export function clearLots(
   for (const id of [...lots.keys()]) {
     const [x, z] = cellToWorld(unkey(id))
     const crowded =
-      clear.some(([cx, cz, r]) => Math.hypot(x - cx, z - cz) < r + 4) ||
-      wall.some(([wx, wz]) => Math.hypot(wx - x, wz - z) < 7)
+      clear.some(([cx, cz, r]) => DMath.hypot(x - cx, z - cz) < r + 4) ||
+      wall.some(([wx, wz]) => DMath.hypot(wx - x, wz - z) < 7)
     if (crowded) lots.delete(id)
   }
   const market = (lot: Lot): number => (lot.prefab.kind === "market" ? 0 : 1)

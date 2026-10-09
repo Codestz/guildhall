@@ -1,3 +1,4 @@
+import { DMath } from "../dmath.ts"
 import { RESERVED } from "./plan/keep.ts"
 import { massForm } from "./plan/mass.ts"
 import { type IslandPlan, planIsland } from "./plan.ts"
@@ -21,7 +22,7 @@ export function landOf(files: number): number {
 
 /** A district's claim on the island's land: its files, and a little for its bytes. */
 const weightOf = (folder: Folder): number =>
-  Math.sqrt(folder.files) + 0.5 * Math.log2(1 + folder.bytes / 1024)
+  Math.sqrt(folder.files) + 0.5 * DMath.log2(1 + folder.bytes / 1024)
 
 /**
  * Each district's quota (the root first, then its folders): the island's land, less the keep's

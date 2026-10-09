@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { type Cell, cellToWorld, type Field, type LandPiece, type LandPlacement } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
 import { instantiate, prefab } from "../../prefabs/index.ts"
@@ -70,7 +71,7 @@ export function dressHexes(
         })
       const offset = (distance: number): [number, number] => {
         const angle = random() * Math.PI * 2
-        return [Math.cos(angle) * distance, Math.sin(angle) * distance]
+        return [DMath.cos(angle) * distance, DMath.sin(angle) * distance]
       }
 
       if (char === "~") {
@@ -149,7 +150,7 @@ export function dressHexes(
         if (site === undefined && venue === undefined && char !== "V") {
           if (coast.tile === "A" && (char === "F" || char === "f")) {
             const away = (((wet[0] ?? 0) + 3) * Math.PI) / 3 + Math.PI / 6
-            add(pick(["trees_A_small", "trees_B_small"] as const), Math.cos(away) * 2, Math.sin(away) * 2)
+            add(pick(["trees_A_small", "trees_B_small"] as const), DMath.cos(away) * 2, DMath.sin(away) * 2)
           } else if (coast.tile === "A" && random() < 0.5)
             add(pick(["rock_single_A", "rock_single_C"] as const), ...offset(2.5))
           continue

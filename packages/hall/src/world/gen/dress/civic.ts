@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { type Cell, cellToWorld, type LandPlacement } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
 import { instantiate, type Prefab, prefab } from "../../prefabs/index.ts"
@@ -47,12 +48,14 @@ export interface Civic {
   clear: [number, number, number][]
   /** Where wall pieces stand, so lots do not grow through them. */
   wall: Spot[]
+  /** The wall's own pieces (also among `placements`): the ones that give way to a building in their path. */
+  walls: LandPlacement[]
   tier: Tier
 }
 
 export function civicOf(plan: IslandPlan, fame: Fame = {}): Civic {
   const tier = tierOf(plan.districts.reduce((sum, d) => sum + d.folder.files, 0))
-  const out: Civic = { placements: [], clear: [], wall: [], tier }
+  const out: Civic = { placements: [], clear: [], wall: [], walls: [], tier }
   const land = (cell: Cell): boolean => plan.land.has(key(cell))
   const put = (item: Prefab, at: Spot, rot: number, radius = 6, seed = 0): void => {
     out.placements.push(...instantiate(item, at, rot, "blue", 0, seed))
@@ -113,12 +116,14 @@ function gatehouse(plan: IslandPlan, out: Civic, fame: Fame): void {
   const road = (x: number, z: number): boolean => plan.land.get(key(cellAt([x, z])))?.char === "="
   const stand = (id: string, x: number, z: number, rot: number): void => {
     if (!open(x, z)) return
-    out.placements.push(...instantiate(prefab(id), [x, z], rot, "blue"))
+    const pieces = instantiate(prefab(id), [x, z], rot, "blue")
+    out.placements.push(...pieces)
+    out.walls.push(...pieces)
     out.wall.push([x, z])
   }
   // A run of wall pieces between two points along an axis; where a road crosses, a gate.
   const run = (x0: number, z0: number, x1: number, z1: number, rot: number): void => {
-    const length = Math.hypot(x1 - x0, z1 - z0)
+    const length = DMath.hypot(x1 - x0, z1 - z0)
     const pieces = Math.round(length / 10)
     for (let n = 0; n < pieces; n++) {
       const t = (n + 0.5) / pieces

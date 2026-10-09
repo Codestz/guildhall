@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { type Cell, cellToWorld } from "../../lands.ts"
 import { key, neighbours, noise, unkey } from "../hex.ts"
 import type { PlanDistrict, PlanHex } from "../plan.ts"
@@ -26,7 +27,7 @@ export function placeSites(
       const score =
         (owner.get(id) === i ? 100 : 0) +
         (wet(owner, cell).length === 0 ? 50 : 0) +
-        Math.hypot(x - hx, z - hz) / 10 +
+        DMath.hypot(x - hx, z - hz) / 10 +
         noise(seed, cell, "site")
       if (score > bestScore) {
         bestScore = score
@@ -80,7 +81,7 @@ export function groundOf(
         )
         .map((cell) => {
           const [x, z] = cellToWorld(cell)
-          return { cell, far: Math.hypot(x - sx, z - sz) + noise(seed, cell, "rise") * 5 }
+          return { cell, far: DMath.hypot(x - sx, z - sz) + noise(seed, cell, "rise") * 5 }
         })
         .sort((a, b) => b.far - a.far)
       const count = Math.round(inland.length * (district.level === 1 ? 0.35 : 0.5))

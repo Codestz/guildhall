@@ -1,3 +1,4 @@
+import { DMath } from "../dmath.ts"
 import type { Home } from "../homes.ts"
 import { cellToWorld, type Island, type LandPiece, type LandPlacement } from "../lands.ts"
 import { type Post, ROOM, type Spot } from "../layout.ts"
@@ -10,6 +11,7 @@ import { crowds, footprintsOf } from "./dress/footprints.ts"
 import { dressHexes } from "./dress/hexes.ts"
 import { homesOf } from "./dress/homes.ts"
 import { dressRoads } from "./dress/roads.ts"
+import { RANK, settle } from "./dress/settle.ts"
 import { LANDMARK, landmarksOf, postsAround, quayOf } from "./dress/sites.ts"
 import { terraceOf } from "./dress/terrace.ts"
 import { type Lot, townOf } from "./dress/town.ts"
@@ -85,7 +87,16 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
     ...(civic?.clear ?? []).map(([x, z, r]): Anchor => [x, z, r + 3]),
     ...(civic?.wall ?? []).map(([x, z]): Anchor => [x, z, 8.5]),
   ]
-  const venues = plan.gen === 2 ? venuesOf(plan, roads, civicAnchors, coverOf(plan, terrace.levels)) : []
+  const venues =
+    plan.gen === 2
+      ? venuesOf(
+          plan,
+          roads,
+          civicAnchors,
+          coverOf(plan, terrace.levels),
+          footprintsOf(civic?.placements.filter((item) => !civic.walls.includes(item)) ?? []),
+        )
+      : []
   const clear: Anchor[] = [
     ...(civic?.clear ?? []),
     ...venues.map(({ venue }): Anchor => [venue.at[0], venue.at[1], VENUE_CLEAR]),
@@ -105,20 +116,16 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
     town?.lots,
     new Map(venues.map(({ cell, placements }) => [key(cell), placements])),
   )
+  /** The sites whose landmark gave way to a building of the civic centre or a venue. */
+  const lost = new Set<string>()
   if (town && civic) {
     // A plaza whose well or stalls would touch the civic centre's or a venue's buildings is left out.
     const plazas = town.plazas.filter((plaza) =>
       footprintsOf(plaza).every((shape) => fixed.every((other) => !crowds(shape, other, LOT_GAP))),
     )
-    // A run of wall stops where a district's landmark stands in its way.
-    const built = footprintsOf(decor)
-    const wall = civic.placements.filter(
-      (item) =>
-        !item.piece.startsWith("wall_") ||
-        footprintsOf([item]).every((shape) => built.every((other) => !crowds(shape, other, 0))),
-    )
-    decor.push(...plazas.flat(), ...wall)
-    const open = (spot: Spot): boolean => clear.every(([x, z, r]) => Math.hypot(spot[0] - x, spot[1] - z) > r)
+    decor.push(...plazas.flat(), ...civic.placements)
+    const open = (spot: Spot): boolean =>
+      clear.every(([x, z, r]) => DMath.hypot(spot[0] - x, spot[1] - z) > r)
     meadow.splice(0, meadow.length, ...meadow.filter(open))
     // The trees and rocks on the hexes round a venue made way for its yard (the venue's own pieces stay).
     const own = new Set(venues.flatMap(({ placements }) => placements))
@@ -135,10 +142,29 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
         (!vacated.has(key(cellAt([item.x, item.z]))) &&
           (!CLUTTER.test(item.piece) ||
             venues.every(
-              ({ venue }) => Math.hypot(item.x - venue.at[0], item.z - venue.at[1]) > VENUE_CLEAR + 2,
+              ({ venue }) => DMath.hypot(item.x - venue.at[0], item.z - venue.at[1]) > VENUE_CLEAR + 2,
             ))),
     )
-    decor.splice(0, decor.length, ...kept.filter((item) => !strewn(item)))
+    // Whatever still touches a building of a higher rank makes way (dress/settle.ts); a district whose
+    // landmark gave way has none, as one without a site.
+    const [halls, walls, laid] = [new Set(civic.placements), new Set(civic.walls), new Set(plazas.flat())]
+    const sites = new Set(plan.districts.flatMap((district) => (district.site ? [key(district.site)] : [])))
+    const rank = (item: LandPlacement): number =>
+      own.has(item) || (halls.has(item) && !walls.has(item))
+        ? RANK.FIXED
+        : walls.has(item)
+          ? RANK.WALL
+          : laid.has(item)
+            ? RANK.PLAZA
+            : sites.has(key(cellAt([item.x, item.z])))
+              ? RANK.LANDMARK
+              : RANK.TOWN
+    const standing = kept.filter((item) => !strewn(item))
+    const dropped = settle(standing, rank)
+    for (const item of dropped)
+      if (rank(item) === RANK.LANDMARK && footprintsOf([item]).length > 0)
+        lost.add(key(cellAt([item.x, item.z])))
+    decor.splice(0, decor.length, ...standing.filter((item) => !dropped.has(item)))
   }
   decor.push(...quayOf(plan.hub))
   const landmarks = landmarksOf(plan.hub, decor)
@@ -148,7 +174,11 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
     const folder = district.folder
     const venue = venues.find((placed) => placed.venue.district === folder.name)
     // Its landmark's hex: the venue's, which may have moved off the district's own site (dress/venues.ts).
-    const siteAt = venue ? venue.venue.at : district.site ? cellToWorld(district.site) : undefined
+    const siteAt = venue
+      ? venue.venue.at
+      : district.site && !lost.has(key(district.site))
+        ? cellToWorld(district.site)
+        : undefined
     return {
       id: folder.name,
       label:

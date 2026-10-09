@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { cellToWorld } from "../../lands.ts"
 import { Heap } from "../heap.ts"
 import { cellAt, key, neighbours, noise, rng, unkey } from "../hex.ts"
@@ -47,7 +48,7 @@ export function reserveRanges(
   for (const id of owner.keys()) {
     const cell = unkey(id)
     const [x, z] = cellToWorld(cell)
-    if (RESERVED.has(id) || apart.has(id) || Math.hypot(x, z) < CLEAR) continue
+    if (RESERVED.has(id) || apart.has(id) || DMath.hypot(x, z) < CLEAR) continue
     if (neighbours(cell).every((next) => owner.has(key(next)))) fits.add(id)
   }
   if (fits.size === 0) return []
@@ -71,7 +72,7 @@ export function reserveRanges(
     let farthest = -1
     for (const id of [...fits].sort()) {
       const [x, z] = cellToWorld(unkey(id))
-      const d = Math.min(...centres.map(([cx, cz]) => Math.hypot(x - cx, z - cz)), Math.hypot(x, z) * 1.2)
+      const d = Math.min(...centres.map(([cx, cz]) => DMath.hypot(x - cx, z - cz)), DMath.hypot(x, z) * 1.2)
       if (d > farthest) {
         farthest = d
         best = [x, z]
@@ -81,7 +82,7 @@ export function reserveRanges(
   }
   // The main range runs across the way out from the keep (a wall at the valley's far side).
   const spines = centres.map(([cx, cz], m) => {
-    const angle = m === 0 ? Math.atan2(cz, cx) + Math.PI / 2 + (random() - 0.5) * 0.9 : random() * Math.PI
+    const angle = m === 0 ? DMath.atan2(cz, cx) + Math.PI / 2 + (random() - 0.5) * 0.9 : random() * Math.PI
     return spineOf(cx, cz, angle, REACH * Math.sqrt((room[m] ?? 8) * HEX_AREA), random() * 6)
   })
 
@@ -115,10 +116,10 @@ export function reserveRanges(
 
 /** A spine through (cx, cz): a gently winding line of half-length `reach` along `angle`. */
 function spineOf(cx: number, cz: number, angle: number, reach: number, phase: number): Spine {
-  const [dx, dz] = [Math.cos(angle), Math.sin(angle)]
+  const [dx, dz] = [DMath.cos(angle), DMath.sin(angle)]
   return Array.from({ length: 9 }, (_, k): Point => {
     const s = (k - 4) / 4
-    const bend = 0.22 * reach * Math.sin(s * Math.PI * 0.9 + phase)
+    const bend = 0.22 * reach * DMath.sin(s * Math.PI * 0.9 + phase)
     return [cx + dx * s * reach - dz * bend, cz + dz * s * reach + dx * bend]
   })
 }
@@ -131,7 +132,7 @@ function distanceTo(spine: Spine, [x, z]: Point): number {
     const [bx, bz] = spine[k + 1] as Point
     const len = (bx - ax) ** 2 + (bz - az) ** 2
     const t = len === 0 ? 0 : Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / len))
-    best = Math.min(best, Math.hypot(x - (ax + (bx - ax) * t), z - (az + (bz - az) * t)))
+    best = Math.min(best, DMath.hypot(x - (ax + (bx - ax) * t), z - (az + (bz - az) * t)))
   }
   return best
 }
@@ -153,7 +154,7 @@ function nearest(ids: ReadonlySet<string>, [px, pz]: Point): Point {
   let bestDistance = Number.POSITIVE_INFINITY
   for (const id of [...ids].sort()) {
     const [x, z] = cellToWorld(unkey(id))
-    const d = Math.hypot(x - px, z - pz)
+    const d = DMath.hypot(x - px, z - pz)
     if (d < bestDistance) {
       bestDistance = d
       best = [x, z]

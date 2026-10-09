@@ -1,3 +1,4 @@
+import { DMath } from "../dmath.ts"
 import { type Cell, cellToWorld } from "../lands.ts"
 import type { Spot } from "../layout.ts"
 
@@ -47,7 +48,7 @@ export function cellAt([x, z]: Spot): Cell {
     for (let line = Math.floor(z / 5) - 2; line <= Math.ceil(z / 5) + 2; line++) {
       if ((q - line) % 2 !== 0) continue
       const [cx, cz] = cellToWorld([q, line])
-      const d = Math.hypot(cx - x, cz - z)
+      const d = DMath.hypot(cx - x, cz - z)
       if (d < distance) {
         distance = d
         best = [q, line]

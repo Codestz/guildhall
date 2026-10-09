@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import {
   type Cell,
   cellToWorld,
@@ -42,7 +43,7 @@ const FLAG: Record<KitColour, LandPiece> = {
 }
 
 export const round = (value: number): number => Math.round(value * 100) / 100
-export const facing = (from: Spot, to: Spot): number => Math.atan2(to[0] - from[0], to[1] - from[1])
+export const facing = (from: Spot, to: Spot): number => DMath.atan2(to[0] - from[0], to[1] - from[1])
 
 const place = (
   piece: LandPiece,
@@ -95,13 +96,13 @@ const NEAREST_POST = 3.4
  * own size doesn't say: a venue is bigger than its main piece, scaled, with its yard in front.
  */
 export function postsAround(site: Spot, square: Spot, landmark: LandPiece, reach?: number): Post[] {
-  const toSquare = Math.atan2(square[0] - site[0], square[1] - site[1])
+  const toSquare = DMath.atan2(square[0] - site[0], square[1] - site[1])
   const front = reach ?? Math.max(NEAREST_POST, (PIECES[landmark].max[2] ?? 0) * HEX_SCALE + FRONT_GAP)
   return [-0.35, 0, 0.35].map((spread) => {
     const angle = toSquare + spread
-    const reach = front / Math.cos(spread)
-    const x = round(site[0] + Math.sin(angle) * reach)
-    const z = round(site[1] + Math.cos(angle) * reach)
+    const reach = front / DMath.cos(spread)
+    const x = round(site[0] + DMath.sin(angle) * reach)
+    const z = round(site[1] + DMath.cos(angle) * reach)
     return [x, z, facing([x, z], site)] as Post
   })
 }
@@ -118,8 +119,8 @@ export function siteDressing(
   const look = cellToWorld(square)
   const toSquare = facing([x, z], look)
   const at = (angle: number, distance: number): [number, number] => [
-    round(x + Math.sin(toSquare + angle) * distance),
-    round(z + Math.cos(toSquare + angle) * distance),
+    round(x + DMath.sin(toSquare + angle) * distance),
+    round(z + DMath.cos(toSquare + angle) * distance),
   ]
   const out: LandPlacement[] = [{ piece: LANDMARK[biome](kit), x, z, rot: toSquare }]
   const [fx, fz] = at(Math.PI / 2, 3.8)

@@ -37,10 +37,22 @@ export interface RiverHex {
   out: number
 }
 
-/** A run of river hexes on one level, upstream first: one stretch of water at one height. */
+/** A point on a graded reach's surface: world x, y, z. */
+export type Point3 = readonly [x: number, y: number, z: number]
+
+/**
+ * A run of river hexes on one level, upstream first: one stretch of water at one height. A reach
+ * over a mountain's slope (`grade`) runs down it instead: its hexes keep their own levels.
+ */
 export interface Reach {
   level: number
   hexes: RiverHex[]
+  /**
+   * Where the water runs down a slope (rivers/grade.ts): its surface down the channel, from the
+   * first hex's entry edge to the last one's exit edge, a point every ≤ GRADE_STEP, never rising.
+   * Absent on a flat reach (every terrace hex, every lake), whose surface is `surfaceY` of its level.
+   */
+  grade?: Point3[]
   /** The hex upstream of the first (absent at a spring): a fall's lip, a lake, a higher reach. */
   prev?: Cell
   /** Where the water goes after the last hex: over a fall, into a lake, the sea, or another river. */
@@ -60,6 +72,17 @@ export interface Fall {
   bottom: number
   source: Exclude<WaterKind, "sea">
   into: WaterKind
+  /** The heights at the lip and the foot where a graded reach meets it (else `surfaceY` of the levels). */
+  topY?: number
+  bottomY?: number
+}
+
+/** A fall's surface heights: its lip's and its foot's. */
+export function fallHeights(fall: Fall): { top: number; bottom: number } {
+  return {
+    top: fall.topY ?? surfaceY(fall.source, fall.top),
+    bottom: fall.bottomY ?? surfaceY(fall.into === "river" ? "river" : "lake", fall.bottom),
+  }
 }
 
 export interface Lake {
@@ -278,6 +301,26 @@ export function surfaceY(kind: WaterKind, level: number): number {
 
 /** Half a river channel, course line to the foot of its banks (the pack's river tiles). */
 export const BANK = 2.6
+/** Points along a graded reach, at most this far apart (world units). */
+export const GRADE_STEP = 1.25
+/** A torrent's narrowest half-channel: a steep reach narrows from BANK to this. */
+const TORRENT = 1.7
+
+/** Half a graded reach's channel where its surface falls `slope` (rise over run): a torrent is narrower than a stream. */
+export function gradeHalfWidth(slope: number): number {
+  const t = Math.min(1, Math.max(0, (slope - 0.15) / 0.75))
+  return BANK + (TORRENT - BANK) * t * t * (3 - 2 * t)
+}
+
+/** How steeply a graded reach's surface falls at each of its points (rise over run, ≥ 0), over a few points either side. */
+export function gradeSlopes(grade: readonly Point3[]): number[] {
+  return grade.map((_, i) => {
+    const a = grade[Math.max(0, i - 2)] as Point3
+    const b = grade[Math.min(grade.length - 1, i + 2)] as Point3
+    const run = Math.hypot(b[0] - a[0], b[2] - a[2])
+    return run === 0 ? 0 : Math.max(0, (a[1] - b[1]) / run)
+  })
+}
 
 const CIRCUMRADIUS = (HEX_SCALE * 2) / Math.sqrt(3)
 const INRADIUS = HEX_SCALE
@@ -294,6 +337,20 @@ export function courseLine(reach: Reach): Spot[] {
   for (const hex of reach.hexes)
     line.push(...channel(cellToWorld(hex.cell), hex.ins[0] ?? (hex.out + 3) % 6, hex.out))
   line.push(cellToWorld(reach.next))
+  return line
+}
+
+/**
+ * The channel of a run of river hexes alone: from the first hex's entry edge (a spring's far edge)
+ * to the last one's exit edge, each point once. A graded reach's surface follows it (`grade`).
+ */
+export function channelLine(hexes: readonly RiverHex[]): Spot[] {
+  const line: Spot[] = []
+  for (const hex of hexes)
+    for (const point of channel(cellToWorld(hex.cell), hex.ins[0] ?? (hex.out + 3) % 6, hex.out)) {
+      const last = line.at(-1)
+      if (!last || Math.hypot(last[0] - point[0], last[1] - point[1]) > 1e-6) line.push(point)
+    }
   return line
 }
 

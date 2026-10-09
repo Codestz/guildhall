@@ -37,6 +37,7 @@ attribute vec2 aFlow;
 attribute float aShore;
 attribute vec3 aFoot;
 varying vec3 vWorld;
+varying vec3 vNormal;
 varying vec2 vFlow;
 varying float vShore;
 varying vec3 vFoot;
@@ -47,6 +48,7 @@ void main() {
   vec4 mvPosition = viewMatrix * worldPosition;
   gl_Position = projectionMatrix * mvPosition;
   vWorld = worldPosition.xyz;
+  vNormal = normalize(mat3(modelMatrix) * normal);
   vFlow = aFlow;
   vShore = aShore;
   vFoot = aFoot;
@@ -59,6 +61,7 @@ export const riverFragment = /* glsl */ `
 ${FRAGMENT_HEAD}
 ${SURFACE_UNIFORMS}
 varying vec3 vWorld;
+varying vec3 vNormal;
 varying vec2 vFlow;
 varying float vShore;
 varying vec3 vFoot;
@@ -107,7 +110,8 @@ void main() {
     crests = rings.z * uRain * (1.0 - 0.7 * runs);
   }
   #endif
-  vec3 n = normalize(vec3(-slope.x, 1.0, -slope.y));
+  // The surface's own tilt (a graded reach runs downhill; flat water's is straight up), and the ripples on it.
+  vec3 n = normalize(normalize(vNormal) + vec3(-slope.x, 0.0, -slope.y));
 
   vec3 v = normalize(cameraPosition - vWorld);
   float shadow = getShadowMask();
@@ -152,8 +156,12 @@ void main() {
   float foam = (1.0 - smoothstep(0.05, 0.55 + 0.35 * breakup, dist)) * smoothstep(-1.6, -0.5, vShore);
   float streak = texture2D(uNoise, p * vec2(0.4) - vFlow * t * 0.5).a;
   float race = smoothstep(1.05, 1.6, speed);
+  // White water: a graded reach racing down a steep flank (speed past 1.9) breaks up into churn.
+  float white = smoothstep(1.9, 3.0, speed);
+  float churn = texture2D(uNoise, p * 0.9 - vFlow * t * 0.9 + vec2(0.5, 0.2)).a;
   foam = max(foam * mix(1.0, 0.8, runs),
-    smoothstep(0.72 - 0.18 * race, 0.9, streak) * (0.35 + 0.4 * race) * (1.0 - smoothstep(0.4, 1.6, dist) * (1.0 - race)) * runs);
+    smoothstep(0.72 - 0.18 * race - 0.3 * white, 0.9, streak) * (0.35 + 0.4 * race + 0.3 * white) * (1.0 - smoothstep(0.4, 1.6, dist) * (1.0 - race)) * runs);
+  foam = max(foam, white * smoothstep(0.42, 0.78, churn) * 0.9 * (1.0 - smoothstep(0.6, 1.8, dist) * 0.5));
   // A fall's foot: solid white where it lands, churned foam boiling out round it.
   if (vFoot.z > 0.5) {
     vec2 d = p - vFoot.xy;

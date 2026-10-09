@@ -6,7 +6,10 @@ import {
   BANK,
   courseLine,
   type Fall,
+  gradeHalfWidth,
+  gradeSlopes,
   type Lake,
+  type Point3,
   type Reach,
   surfaceY,
   type Waterways,
@@ -189,7 +192,7 @@ function nearestFoot(feet: readonly Spot[], x: number, z: number): readonly [num
 /** Every reach and lake as one surface geometry (empty when there is no inland water). */
 export function surfaceGeometry(waters: Waterways): BufferGeometry {
   const out = new Builder({ aFlow: 2, aShore: 1, aFoot: 3 })
-  for (const reach of waters.rivers) river(out, reach, waters.falls)
+  for (const reach of waters.rivers) (reach.grade ? slope : river)(out, reach, waters.falls)
   for (const lake of waters.lakes) still(out, lake, waters.falls)
   return out.geometry()
 }
@@ -215,6 +218,57 @@ function river(out: Builder, reach: Reach, falls: readonly Fall[]): void {
       const speed = 1 + LIP_BOOST * (1 - smoothstep(0, LIP_REACH, toLip))
       return { flow: [along[0] * speed, along[1] * speed], shore: BANK - d, foot: nearestFoot(feet, x, z) }
     })
+}
+
+/** Columns across a graded reach's ribbon, and how far past its banks it tucks under them (they hide its edge). */
+const COLUMNS = 8
+const TUCK = 1
+/** How much faster a graded reach runs for each unit of slope, and its fastest (the shaders' white water begins near 1.9). */
+const SLOPE_SPEED = 1.1
+const SPEED_MAX = 3.4
+
+/**
+ * A graded reach (it runs down a mountain's flank): a ribbon along its surface, its width the
+ * channel's at each point (a torrent narrower than a stream). Where it is steep it runs faster and
+ * tilts its normal downhill, so the shaders churn it white; it is tilted only along its course.
+ */
+function slope(out: Builder, reach: Reach, falls: readonly Fall[]): void {
+  const grade = reach.grade as Point3[]
+  const slopes = gradeSlopes(grade)
+  const cells = reach.hexes.map((hex) => hex.cell)
+  const feet = falls.filter((fall) => cells.some((cell) => same(cell, fall.to))).map(footOf)
+  const [x0, , z0] = grade[0] as Point3
+  if (!reach.prev) feet.push([x0, z0])
+  const at = new Vector3()
+  let along: Spot = [0, 1]
+  const rows = grade.map(([x, y, z], i) => {
+    const a = grade[Math.max(0, i - 1)] as Point3
+    const b = grade[Math.min(grade.length - 1, i + 1)] as Point3
+    const length = Math.hypot(b[0] - a[0], b[2] - a[2])
+    if (length > 1e-6) along = [(b[0] - a[0]) / length, (b[2] - a[2]) / length]
+    const [tx, tz] = along
+    const steep = slopes[i] as number
+    const half = gradeHalfWidth(steep)
+    const speed = Math.min(SPEED_MAX, 1 + SLOPE_SPEED * steep)
+    const normal = new Vector3(steep * tx, 1, steep * tz).normalize()
+    return Array.from({ length: COLUMNS + 1 }, (_, c) => {
+      const side = (c / COLUMNS - 0.5) * 2 * (half + TUCK)
+      const px = x - tz * side
+      const pz = z + tx * side
+      return out.vertex(at.set(px, y, pz), normal, {
+        aFlow: [tx * speed, tz * speed],
+        aShore: [half - Math.abs(side)],
+        aFoot: nearestFoot(feet, px, pz),
+      })
+    })
+  })
+  for (let i = 1; i < rows.length; i++) {
+    const [a, b] = [rows[i - 1] as number[], rows[i] as number[]]
+    for (let c = 0; c < COLUMNS; c++) {
+      out.triangle(a[c] as number, a[c + 1] as number, b[c] as number, UP)
+      out.triangle(a[c + 1] as number, b[c + 1] as number, b[c] as number, UP)
+    }
+  }
 }
 
 /**

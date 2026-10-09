@@ -154,7 +154,8 @@ function surfaceColour(
         crests.assign(rings.z.mul(uRain).mul(calm))
       })
     }
-    const n = normalize(vec3(slope.x.negate(), 1, slope.y.negate())).toVar()
+    // The surface's own tilt (a graded reach runs downhill; flat water's is straight up), and the ripples on it.
+    const n = normalize(normalize(normalWorld).add(vec3(slope.x.negate(), 0, slope.y.negate()))).toVar()
 
     const v = normalize(cameraPosition.sub(positionWorld)).toVar()
     const shade = (key ? keyShadow(key) : float(1)).toVar()
@@ -214,10 +215,25 @@ function surfaceColour(
     const streak = noise.sample(p.mul(0.4).sub(flow.mul(t).mul(0.5))).a
     const race = smoothstep(1.05, 1.6, speed)
     const near = smoothstep(0.4, 1.6, dist).mul(race.oneMinus()).oneMinus()
+    // White water: a graded reach racing down a steep flank (speed past 1.9) breaks up into churn.
+    const white = smoothstep(1.9, 3.0, speed)
+    const churn = noise.sample(p.mul(0.9).sub(flow.mul(t).mul(0.9)).add(vec2(0.5, 0.2))).a
     const foam = max(
       rim.mul(mix(1, 0.8, runs)),
-      smoothstep(race.mul(-0.18).add(0.72), 0.9, streak).mul(race.mul(0.4).add(0.35)).mul(near).mul(runs),
+      smoothstep(race.mul(-0.18).sub(white.mul(0.3)).add(0.72), 0.9, streak)
+        .mul(race.mul(0.4).add(white.mul(0.3)).add(0.35))
+        .mul(near)
+        .mul(runs),
     ).toVar()
+    foam.assign(
+      max(
+        foam,
+        white
+          .mul(smoothstep(0.42, 0.78, churn))
+          .mul(0.9)
+          .mul(smoothstep(0.6, 1.8, dist).mul(-0.5).add(1)),
+      ),
+    )
     If(foot.z.greaterThan(0.5), () => {
       const d = p.sub(foot.xy)
       const off = length(d)

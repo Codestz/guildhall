@@ -1,18 +1,19 @@
 import type { Cell } from "../../lands.ts"
 import { TERRACE, type Waterways, waterwaysOf } from "../../waterways.ts"
-import { key } from "../hex.ts"
+import { cellAt, key } from "../hex.ts"
 import type { IslandPlan } from "../plan.ts"
 import type { Relief } from "../relief/index.ts"
 import { carveRelief } from "./carve.ts"
 import { type Course, coursesOf, groundOf } from "./course.ts"
+import { gradeWaters } from "./grade.ts"
 
 export { dressRivers } from "./dress.ts"
 
 /**
  * An island's rivers (terrain 2c): springs high on the ranges, drained down the valley floors to
  * the sea (course.ts), sorted into reaches and falls by the water layer (`waterwaysOf`, which draws
- * them: scene/nature/Rivers.tsx), the massifs carved to the water's contract (carve.ts) and the
- * lowland hexes tiled (dress.ts). Pure and deterministic; `riversOf` carves the relief in place.
+ * them: scene/nature/Rivers.tsx), the runs over massifs graded to follow the slope (grade.ts), the
+ * massifs carved to the water's contract (carve.ts) and the lowland hexes tiled (dress.ts). Pure and deterministic; `riversOf` carves the relief in place.
  */
 
 export interface IslandRivers {
@@ -57,7 +58,13 @@ export function riversOf(
     for (const [id, l] of trial) wet.set(id, l)
   }
   if (!waters || accepted.length === 0) return undefined
-  carveRelief(relief, waters)
-  const hexes = new Set(waters.rivers.flatMap((reach) => reach.hexes.map((hex) => key(hex.cell))))
-  return { waters, hexes, bridges: new Map([...bridges].filter(([id]) => hexes.has(id))) }
+  // Over the massifs the water runs the slope (grade.ts), from the relief as it is before the carving.
+  const graded = gradeWaters(waters, {
+    heightAt: (x, z) => relief.heightAt(x, z) ?? level(cellAt([x, z])) * TERRACE,
+    relief: (cell) => relief.keys.has(key(cell)),
+    level: (cell) => (plan.land.has(key(cell)) ? level(cell) : 0),
+  })
+  carveRelief(relief, graded)
+  const hexes = new Set(graded.rivers.flatMap((reach) => reach.hexes.map((hex) => key(hex.cell))))
+  return { waters: graded, hexes, bridges: new Map([...bridges].filter(([id]) => hexes.has(id))) }
 }

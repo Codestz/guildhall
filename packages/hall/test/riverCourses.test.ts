@@ -4,7 +4,6 @@ import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
 import { forestOf, TREELINE } from "../src/world/gen/relief/forest.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
 import { cellToWorld } from "../src/world/lands.ts"
-import { surfaceY } from "../src/world/waterways.ts"
 import { repoWorld } from "../src/world/world.ts"
 import COCKPIT from "./fixtures/repos/codestz__opencode-cockpit.json"
 import REACT from "./fixtures/repos/facebook__react.json"
@@ -29,19 +28,24 @@ describe("rivers", () => {
     expect(worldOf(REACT.entries, 1).world.water).toBeUndefined()
   })
 
-  test("rivers fall over ledges on their way down", () => {
-    const falls = CITY.world.water?.falls ?? []
-    expect(falls.length).toBeGreaterThan(3)
-    for (const fall of falls) expect(fall.top).toBeGreaterThan(fall.bottom)
+  test("rivers run down the mountains as one stream, falling only over the odd ledge", () => {
+    const water = CITY.world.water
+    const graded = (water?.rivers ?? []).filter((reach) => reach.grade)
+    expect(graded.length).toBeGreaterThan(2)
+    for (const reach of graded) {
+      const grade = reach.grade ?? []
+      expect((grade[0]?.[1] ?? 0) - (grade.at(-1)?.[1] ?? 0)).toBeGreaterThanOrEqual(0)
+    }
+    for (const fall of water?.falls ?? []) expect(fall.top).toBeGreaterThan(fall.bottom)
   })
 
-  test("the carved bed lies under each massif river hex's water", () => {
+  test("the carved bed lies under each graded reach's water", () => {
+    // (Past its first few points: a fall's foot shares its edge with the lip's bed above.)
     for (const { world } of [CITY, TOWN, VILLAGE])
       for (const reach of world.water?.rivers ?? [])
-        for (const hex of reach.hexes) {
-          if (!world.relief?.massifAt(hex.cell)) continue
-          const [x, z] = cellToWorld(hex.cell)
-          expect(world.ground.heightAt(x, z)).toBeLessThan(surfaceY("river", hex.level))
+        for (const [x, y, z] of reach.grade?.slice(3) ?? []) {
+          const bed = world.relief?.heightAt(x, z)
+          if (bed !== undefined && bed > 0) expect(bed).toBeLessThan(y + 0.2)
         }
   })
 

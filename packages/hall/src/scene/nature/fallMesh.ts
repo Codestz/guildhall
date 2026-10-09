@@ -1,7 +1,6 @@
 import { type BufferGeometry, Vector3 } from "three"
 import type { Spot } from "../../world/layout.ts"
-import type { Fall, Waterways } from "../../world/waterways.ts"
-import { surfaceY } from "../../world/waterways.ts"
+import { type Fall, fallHeights, type Waterways } from "../../world/waterways.ts"
 import { Builder, mid, THROW, THROW_AT_LIP, W } from "./riverMesh.ts"
 
 /**
@@ -33,13 +32,8 @@ export function fallsGeometry(waters: Waterways): BufferGeometry {
 
 const widthOf = (fall: Fall): number => (fall.source === "lake" ? LAKE_FALL_WIDTH : FALL_WIDTH)
 
-/** The upper and lower water's heights at a fall. */
-function heightsOf(fall: Fall): { top: number; bottom: number } {
-  return {
-    top: surfaceY(fall.source, fall.top),
-    bottom: surfaceY(fall.into === "river" ? "river" : "lake", fall.bottom),
-  }
-}
+/** The upper and lower water's heights at a fall (a graded reach's own where one meets it). */
+const heightsOf = fallHeights
 
 /** The fall's frame: the lip's midpoint, outward (down the fall) and across it, in xz. */
 function frameOf(fall: Fall): { lip: Spot; out: Spot; across: Spot } {

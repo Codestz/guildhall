@@ -26,20 +26,26 @@ import {
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { isWebGPU } from "../../render/backend.ts"
+import { NEAR } from "../../render/tiers.ts"
 import { LANDS_URL } from "../../world/cast.ts"
+import { type Chunks, chunksOf } from "../../world/chunks.ts"
 import { useWorld } from "../../world/source.ts"
 import { handWorld, type World } from "../../world/world.ts"
 import { sky } from "../atmosphere/state.ts"
 import { wind } from "../atmosphere/wind.ts"
 import { riseGrass, useRiseMask } from "../growth/mask.ts"
 import { useOwnedMeshes } from "../owned.ts"
+import { tiered, useTiered } from "../tiers.ts"
 import { installNodes, TSL } from "../tsl.ts"
 import { FLOWERS, scatter, type Tuft } from "./scatter.ts"
 import { grassFragment, grassVertex } from "./shaders.ts"
 
 /**
  * Grass and wild flowers on the meadows (ADR 0007, Nature): two InstancedMeshes (tufts, and the
- * few tufts' flowers), two draw calls, sharing one set of uniforms.
+ * few tufts' flowers), sharing one set of uniforms. The tufts are most of the island's triangles,
+ * so they are cut by region of the island (world/chunks.ts): a region off screen is culled whole,
+ * and a far one (scene/tiers.ts) draws three blades a tuft, not seven, from the same instances
+ * (a blade is under a pixel wide there). A call per region on screen, plus the flowers'.
  * Every tuft sways on the GPU with the wind; frost and snow settle on the blades below freezing;
  * rain darkens them and gives them a sheen. Low quality grows none.
  *
@@ -62,16 +68,36 @@ export function Grass({ tier }: { tier: Tier }) {
   const rise = useRiseMask()
   const built = useOwnedMeshes(
     () => {
-      if (DENSITY[tier] === 0) return { meshes: [], uniforms: null }
+      if (DENSITY[tier] === 0) return { meshes: [], uniforms: null, tiers: null }
       const uniforms = grassUniforms(paletteOf(nodes))
       const materials = build(uniforms, key)
       if (rise && !node) riseGrass([materials.tuft, materials.flower], rise)
-      const meshes = meadow({ tuft: tuft(), flower: flower() }, materials, DENSITY[tier], world)
-      return { meshes, uniforms }
+      const [grass, ...flowers] = meadow(
+        { tuft: tuft(BLADES), flower: flower() },
+        materials,
+        DENSITY[tier],
+        world,
+      )
+      if (!grass) return { meshes: [], uniforms, tiers: null }
+      const chunks = chunksOf(world)
+      const regions = byRegion(grass, tuft(FAR_BLADES, FAR_WIDTH), chunks)
+      const tiers = tiered(
+        chunks,
+        (chunk, tier) => {
+          const { near, far } = regions[chunk] ?? {}
+          if (!near || !far) return
+          near.visible = tier === NEAR
+          far.visible = tier !== NEAR
+        },
+        GRASS_FAR_AT,
+      )
+      const meshes = regions.flatMap(({ near, far }) => (near && far ? [near, far] : []))
+      return { meshes: [...meshes, ...flowers], uniforms, tiers }
     },
     [nodes, tier, world, build, key, rise, node],
     "textures",
   )
+  useTiered(built?.tiers)
   const eased = useMemo(() => ({ snow: 0, wet: 0 }), [])
 
   useFrame((state, delta) => {
@@ -238,6 +264,55 @@ export function meadow(
   return flowered.length > 0 ? [grass, flowers] : [grass]
 }
 
+/**
+ * The island's tufts (one mesh, as `meadow` scatters them) cut into a mesh per region, each with
+ * a far twin: the same instances (its matrix buffer shared) drawing `far`'s coarser blades,
+ * shown while the region is far. The whole mesh is let go (it was never drawn).
+ */
+function byRegion(
+  grass: InstancedMesh,
+  far: BufferGeometry,
+  chunks: Chunks,
+): { near: InstancedMesh | null; far: InstancedMesh | null }[] {
+  const matrix = new Matrix4()
+  const members = chunks.list.map((): number[] => [])
+  const all = grass.instanceMatrix.array
+  for (let i = 0; i < grass.count; i++)
+    members[chunks.at(all[i * 16 + 12] ?? 0, all[i * 16 + 14] ?? 0)]?.push(i)
+  const regions = members.map((own) => {
+    if (own.length === 0) return { near: null, far: null }
+    const near = new InstancedMesh(grass.geometry, grass.material, own.length)
+    own.forEach((from, i) => {
+      grass.getMatrixAt(from, matrix)
+      near.setMatrixAt(i, matrix)
+    })
+    // Shown until the tier pass settles its region (scene/tiers.ts: its first frame uploads it).
+    const twin = new InstancedMesh(far, grass.material, own.length)
+    twin.instanceMatrix = near.instanceMatrix
+    near.name = "nature-grass"
+    twin.name = "nature-grass-far"
+    for (const mesh of [near, twin]) {
+      mesh.castShadow = false
+      mesh.receiveShadow = true
+    }
+    near.computeBoundingSphere()
+    twin.boundingSphere = near.boundingSphere?.clone() ?? null
+    return { near, far: twin }
+  })
+  grass.dispose()
+  return regions
+}
+
+/** A near tuft's blades; a far one's, fewer and wider so the meadow keeps its cover. */
+const BLADES = 7
+const FAR_BLADES = 4
+const FAR_WIDTH = 1.75
+/**
+ * Dropping blades is not a surface moved by FAR_ERROR (render/tiers.ts): the grass goes far only
+ * once the pieces' threshold has shrunk to this share, where a tuft is about a pixel across.
+ */
+const GRASS_FAR_AT = 0.6
+
 type Push = (x: number, y: number, z: number, h: number, head: number) => void
 function builder(): { vertex: Push; done(): BufferGeometry } {
   const positions: number[] = []
@@ -260,20 +335,19 @@ function builder(): { vertex: Push; done(): BufferGeometry } {
   }
 }
 
-/** One tuft: seven blades leaning out from the centre. `uv.y` is height (0 root, 1 tip). */
-function tuft(): BufferGeometry {
+/** One tuft: `blades` blades leaning out from the centre, `width` times as wide. `uv.y` is height (0 root, 1 tip). */
+function tuft(blades: number, width = 1): BufferGeometry {
   const { vertex, done } = builder()
-  const BLADES = 7
-  for (let b = 0; b < BLADES; b++) {
-    const a = (b / BLADES) * Math.PI * 2 + (b % 2) * 0.4
+  for (let b = 0; b < blades; b++) {
+    const a = (b / blades) * Math.PI * 2 + (b % 2) * 0.4
     const r = 0.06 + (b % 3) * 0.06
     const height = 0.5 + ((b * 37) % 5) * 0.08
     const lean = 0.14 + (b % 2) * 0.12
     const cx = Math.cos(a)
     const sz = Math.sin(a)
     // The blade's face lies across the radial direction.
-    const wx = -sz * 0.07
-    const wz = cx * 0.07
+    const wx = -sz * 0.07 * width
+    const wz = cx * 0.07 * width
     const bx = cx * r
     const bz = sz * r
     vertex(bx - wx, 0, bz - wz, 0, 0)

@@ -39,6 +39,8 @@ export interface Terrain {
   level(cell: Cell): number
   /** Every hex on the map, by key ("q,line"). */
   cells(): readonly string[]
+  /** The district holding a land hex (a repo island's; the hand map has none). */
+  district?(cell: Cell): number | undefined
 }
 
 /** A place people work: its spot, where they stand, and what grows round it (world/wilds.ts). */
@@ -156,6 +158,7 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
         return Math.max(1, Math.round((mountain.heightAt(x, z) ?? 0) / TERRACE))
       },
       cells: () => [...land.keys()],
+      district: ([q, line]) => land.get(`${q},${line}`)?.district,
     },
     ground: { heightAt: (x, z) => mountain?.heightAt(x, z) ?? level(cellAt([x, z])) * TERRACE },
     ...(mountain ? { relief: mountain } : {}),

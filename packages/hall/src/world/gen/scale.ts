@@ -1,4 +1,5 @@
 import { RESERVED } from "./plan/keep.ts"
+import { massForm } from "./plan/mass.ts"
 import { type IslandPlan, planIsland } from "./plan.ts"
 import type { Folder, RepoShape } from "./repo.ts"
 
@@ -35,7 +36,7 @@ export function quotasByFiles(shape: RepoShape): number[] {
   return weights.map((weight) => (total > 0 ? (land * weight) / total : 0))
 }
 
-/** The island for a repo's shape, generator v2: sized by its files, never shrunk. */
+/** The island for a repo's shape, generator v2: sized by its files, never shrunk, one landmass. */
 export function scaledIsland(shape: RepoShape, seed: number): IslandPlan {
-  return planIsland(shape, seed, quotasByFiles(shape))
+  return planIsland(shape, seed, quotasByFiles(shape), (land) => massForm(land, seed))
 }

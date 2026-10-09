@@ -54,6 +54,7 @@ import { Stations } from "./Stations.tsx"
 import { Seas } from "./seas/Seas.tsx"
 import { usePetitioners } from "./seas/usePetitioners.ts"
 import { stepFrame } from "./step.ts"
+import { Tiers, tierProbe } from "./tiers.ts"
 import { Ferry } from "./town/Ferry.tsx"
 import { UndeadGate } from "./Undead.tsx"
 import { WeatherLayer } from "./weather/WeatherLayer.tsx"
@@ -74,6 +75,8 @@ export function Scene() {
       <ReleaseLater />
       <Crisp />
       <FrameStats />
+      {/* Far regions of the island to coarse copies, near ones back to full (scene/tiers.ts). */}
+      <Tiers />
       {/* Sound: moments and a 10 Hz sample of the world; never renders (audio/README.md). */}
       <SoundStage />
       {PROBE && <DevBridge />}
@@ -260,7 +263,9 @@ function DevBridge() {
     // setFrameloop("never") + advance(t) at one timestamp: the same instant re-drawn under two
     // settings, for pixel-identical A/B crops (docs/perf-budget.md).
     const step = (dt: number) => stepFrame(clock, advance, dt)
-    Object.assign(window, { r3f: { advance, gl, scene, setDpr, setFrameloop, shadows, step } })
+    Object.assign(window, {
+      r3f: { advance, gl, scene, setDpr, setFrameloop, shadows, step, tiers: tierProbe },
+    })
   }, [advance, clock, gl, scene, setDpr, setFrameloop])
   return null
 }

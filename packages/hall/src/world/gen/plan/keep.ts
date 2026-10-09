@@ -38,11 +38,27 @@ export const KEEP: ReadonlyMap<string, "K" | "V"> = new Map([
 export const BAY = (35 * Math.PI) / 180
 
 export const [HUB_X, HUB_Z] = cellToWorld(HUB)
-export const inBay = (cell: Cell): boolean => {
-  if (cell[0] === HUB[0] && cell[1] === HUB[1]) return false
-  const [x, z] = cellToWorld(cell)
-  return z - HUB_Z > 0 && Math.abs(x - HUB_X) <= (z - HUB_Z) * Math.tan(BAY)
+/** Whether a hex lies in a bay opening south of the hub at `half` radians either side. */
+export const bayOf =
+  (half: number) =>
+  (cell: Cell): boolean => {
+    if (cell[0] === HUB[0] && cell[1] === HUB[1]) return false
+    const [x, z] = cellToWorld(cell)
+    return z - HUB_Z > 0 && Math.abs(x - HUB_X) <= (z - HUB_Z) * Math.tan(half)
+  }
+export const inBay = bayOf(BAY)
+
+/**
+ * How an island's land is bounded while it is planned: the bay its quay looks out over (never
+ * land), and, for generator v2, the one landmass every district grows inside (plan/mass.ts).
+ * Without a mass the districts grow freely round the hub (v1's ring).
+ */
+export interface Form {
+  bay: (cell: Cell) => boolean
+  mass?: ReadonlySet<string>
 }
+/** v1's form: the wide bay, no mass. */
+export const RING: Form = { bay: inBay }
 
 /** The keep's block, its gate and avenue, and the ring of land round them: the harbour's, kept level and clear. */
 export const RESERVED: ReadonlySet<string> = (() => {

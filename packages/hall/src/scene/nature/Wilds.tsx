@@ -2,12 +2,11 @@ import { useGLTF } from "@react-three/drei"
 import { useThree } from "@react-three/fiber"
 import { use } from "react"
 import {
-  BatchedMesh,
   type BufferGeometry,
   Float32BufferAttribute,
   type Material,
   Matrix4,
-  Mesh,
+  type Mesh,
   type MeshStandardMaterial,
   type Object3D,
   Quaternion,
@@ -17,7 +16,10 @@ import {
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import type { Tier } from "../../guild/quality.ts"
 import { isWebGPU } from "../../render/backend.ts"
-import { bakeStatic, type Placed } from "../../render/bake.ts"
+import type { Placed } from "../../render/bake.ts"
+import { coarser, loadSimplifier, type Simplifier } from "../../render/simplify.ts"
+import { FAR_ERROR } from "../../render/tiers.ts"
+import { type Chunks, chunksOf } from "../../world/chunks.ts"
 import type { Spot } from "../../world/layout.ts"
 import { useWorld } from "../../world/source.ts"
 import { type Wild, type WildKind, type WildPiece, wilds, wildsOf } from "../../world/wilds.ts"
@@ -29,11 +31,22 @@ import { PILES } from "../life/places.ts"
 import { ROUNDS } from "../life/rounds.ts"
 import { useOwnedMeshes } from "../owned.ts"
 import { tameLime } from "../palette.ts"
+import {
+  type TieredBatch,
+  type TieredLayer,
+  type TieredPiece,
+  tiered,
+  tieredBatch,
+  tieredMerge,
+  useTiered,
+} from "../tiers.ts"
 import { installNodes, TSL } from "../tsl.ts"
 import { WIND_SWAY } from "./shaders.ts"
 
 export const FOREST_URL = `${import.meta.env.BASE_URL}assets/forest.glb`
 useGLTF.preload(FOREST_URL)
+/** The far tier's simplifier (render/simplify.ts), fetched beside the pack. */
+const SIMPLIFIER = loadSimplifier()
 
 /**
  * The wilds (ADR 0007, Nature): character-scale trees, bushes, rocks and grass from the Forest
@@ -74,7 +87,9 @@ const SWAY: Record<WildKind, number> = { tree: 0.5, bush: 0.8, rock: 0, grass: 4
 
 export function Wilds({ tier }: { tier: Tier }) {
   const { nodes } = useGLTF(FOREST_URL) as unknown as { nodes: Record<string, Object3D> }
-  const all = wildsFor(useWorld())
+  const world = useWorld()
+  const all = wildsFor(world)
+  const simplifier = use(SIMPLIFIER)
   const gl = useThree((state) => state.gl)
   const webgpu = isWebGPU(gl)
   const sway = webgpu || TSL ? use(nodeSway(gl)) : glslSway
@@ -82,13 +97,15 @@ export function Wilds({ tier }: { tier: Tier }) {
   const built = useOwnedMeshes(
     () => {
       const list = all.filter((w) => w.detail <= DETAIL[tier])
-      return { meshes: build(nodes, () => swayMaterial(nodes, sway), list, webgpu) }
+      return build(nodes, () => swayMaterial(nodes, sway), list, webgpu, simplifier, chunksOf(world))
     },
-    [nodes, tier, all, sway, webgpu],
+    [nodes, tier, all, sway, webgpu, simplifier, world],
     "textures",
   )
   // The growth timelapse (`?grow`) grows them once their land is up (scene/growth).
   useGrowable(built?.meshes)
+  // Far regions draw coarse copies (scene/tiers.ts).
+  useTiered(built?.tiers)
 
   return (
     <>
@@ -187,20 +204,30 @@ function geometryOf(source: Object3D, sway: number): BufferGeometry | null {
 /** Trees, and bushes and rocks big enough to throw a readable shadow. */
 const casts = (wild: Wild): boolean => wild.kind === "tree" || (wild.kind !== "grass" && wild.detail === 0)
 
-/** The wilds as two BatchedMeshes (or, to `merge`, two merged meshes): shadow casters, and the low fill. */
+/**
+ * The wilds as two BatchedMeshes (or, to `merge`, merged meshes per region): shadow casters, and
+ * the low fill; each piece's coarse copy beside it for far regions (scene/tiers.ts).
+ */
 function build(
   nodes: Record<string, Object3D>,
   material: () => Material | null,
   list: readonly Wild[],
   merge: boolean,
-): Mesh[] {
-  const geometries = new Map<WildPiece, BufferGeometry | null>()
-  const geometry = (wild: Wild) => {
-    if (!geometries.has(wild.piece)) {
+  simplifier: Simplifier,
+  chunks: Chunks,
+): { meshes: Mesh[]; tiers: TieredLayer } {
+  // A piece's coarse copy may move its surface FAR_ERROR world units at its biggest copy's scale.
+  const biggest = new Map<WildPiece, number>()
+  for (const wild of list) biggest.set(wild.piece, Math.max(biggest.get(wild.piece) ?? 0, wild.scale))
+  const pieces = new Map<WildPiece, TieredPiece | null>()
+  const pieceOf = (wild: Wild): TieredPiece | null => {
+    if (!pieces.has(wild.piece)) {
       const source = nodes[wild.piece]
-      geometries.set(wild.piece, source ? geometryOf(source, SWAY[wild.kind]) : null)
+      const near = source ? geometryOf(source, SWAY[wild.kind]) : null
+      const error = FAR_ERROR / (biggest.get(wild.piece) ?? 1)
+      pieces.set(wild.piece, near ? { near, far: coarser(simplifier, near, error) } : null)
     }
-    return geometries.get(wild.piece) ?? null
+    return pieces.get(wild.piece) ?? null
   }
 
   const matrix = new Matrix4()
@@ -212,56 +239,42 @@ function build(
     position.set(wild.x, wild.y, wild.z)
     rotation.setFromAxisAngle(up, wild.rot)
     scale.setScalar(wild.scale)
-    return matrix.compose(position, rotation, scale)
+    return matrix.compose(position, rotation, scale).clone()
   }
-  const out: Mesh[] = []
+  const count = chunks.list.length
+  const batches: TieredBatch[] = []
   for (const cast of [true, false]) {
-    const group = list.filter((wild) => casts(wild) === cast && geometry(wild))
+    const group = list.flatMap((wild) => {
+      const piece = casts(wild) === cast ? pieceOf(wild) : null
+      return piece ? [{ piece, matrix: place(wild), chunk: chunks.at(wild.x, wild.z), wild }] : []
+    })
     if (group.length === 0) continue
-    const used = new Map<BufferGeometry, number>()
-    for (const wild of group) used.set(geometry(wild) as BufferGeometry, -1)
-    let vertices = 0
-    let indices = 0
-    for (const g of used.keys()) {
-      vertices += g.getAttribute("position").count
-      indices += g.getIndex()?.count ?? 0
-    }
     // A material each: a node material is built for the first batch drawing it (its matrix texture),
     // and on WebGL's nodes handler a second batch would read the first's. GLSL shares the program.
     const own = material()
     if (!own) break
-    const name = cast ? "nature-wilds" : "nature-wilds-fill"
-    if (merge) {
-      const placed = group.map((wild) => ({
-        geometry: geometry(wild) as BufferGeometry,
-        matrix: place(wild).clone(),
-      }))
-      const merged = bakeStatic(placed, rooted)
-      if (!merged) continue
-      const mesh = new Mesh(merged, own)
-      mesh.name = name
+    const built = merge
+      ? tieredMerge(own, group, count, rooted)
+      : tieredBatch(own, group, count, (mesh, id, { wild }) =>
+          markGrowable(mesh, id, "nature", wild.x, wild.z),
+        )
+    for (const mesh of built.meshes) {
+      mesh.name = cast ? "nature-wilds" : "nature-wilds-fill"
       mesh.castShadow = cast
       mesh.receiveShadow = true
-      out.push(mesh)
-      continue
     }
-    const mesh = new BatchedMesh(group.length, vertices, indices, own)
-    for (const g of used.keys()) used.set(g, mesh.addGeometry(g))
-    for (const wild of group) {
-      const id = mesh.addInstance(used.get(geometry(wild) as BufferGeometry) ?? 0)
-      mesh.setMatrixAt(id, place(wild))
-      markGrowable(mesh, id, "nature", wild.x, wild.z)
-    }
-    mesh.name = name
-    // Opaque and depth-tested: sorting would only cost CPU every frame. Culling stays on.
-    mesh.sortObjects = false
-    mesh.castShadow = cast
-    mesh.receiveShadow = true
-    mesh.computeBoundingSphere()
-    out.push(mesh)
+    batches.push(built)
   }
-  for (const g of geometries.values()) g?.dispose()
-  return out
+  for (const piece of pieces.values()) {
+    piece?.near.dispose()
+    piece?.far?.dispose()
+  }
+  return {
+    meshes: batches.flatMap((built) => built.meshes),
+    tiers: tiered(chunks, (chunk, tier) => {
+      for (const built of batches) built.swap(chunk, tier)
+    }),
+  }
 }
 
 /**

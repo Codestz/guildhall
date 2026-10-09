@@ -2,11 +2,10 @@ import { useGLTF } from "@react-three/drei"
 import { useThree } from "@react-three/fiber"
 import { use, useMemo } from "react"
 import {
-  BatchedMesh,
   type BufferGeometry,
   type Material,
   Matrix4,
-  Mesh,
+  type Mesh,
   type MeshStandardMaterial,
   type Object3D,
   Quaternion,
@@ -15,9 +14,11 @@ import {
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import { useGuild } from "../guild/useGuild.ts"
 import { isWebGPU } from "../render/backend.ts"
-import { bakeStatic } from "../render/bake.ts"
+import { coarser, loadSimplifier, type Simplifier } from "../render/simplify.ts"
+import { FAR_ERROR } from "../render/tiers.ts"
 import { LANDS_URL } from "../world/cast.ts"
 import { roleOf } from "../world/chronicle/growthPieces.ts"
+import { type Chunks, chunksOf } from "../world/chunks.ts"
 import { HEX_SCALE, type LandPiece, type LandPlacement, SITES, yardBuilding } from "../world/lands.ts"
 import { useWorld, useWorldReady } from "../world/source.ts"
 import { markGrowable, useGrowable } from "./growth/registry.ts"
@@ -28,16 +29,30 @@ import { tameLime } from "./palette.ts"
 import { reliefMeshes } from "./terrain/reliefMeshes.ts"
 import { newSnowline, type SnowMaker, snowMaterial } from "./terrain/snow.ts"
 import { nodeSnow, useSnowline } from "./terrain/useSnowline.ts"
+import {
+  type TieredInstance,
+  type TieredLayer,
+  type TieredPiece,
+  tiered,
+  tieredBatch,
+  tieredMerge,
+  useTiered,
+} from "./tiers.ts"
 import { TSL } from "./tsl.ts"
 
 useGLTF.preload(LANDS_URL)
+/** The far tier's simplifier, fetched beside the land pack (it is needed before the batches build). */
+const SIMPLIFIER = loadSimplifier()
 
 /**
  * The island round the keep (ADR 0006, 0007). About 650 tiles and pieces of ~130 kinds, drawn as a
  * handful of BatchedMeshes: one per material × shadow role, each a single multi-draw call with
  * per-instance frustum culling (docs/perf-budget.md). Tiles and low clutter don't cast shadows;
  * only pieces tall enough to throw a readable one do. On WebGPU (no multi-draw: a BatchedMesh
- * there is a call per instance) each batch is one merged mesh instead (render/bake.ts).
+ * there is a call per instance) each batch is merged per region instead (render/bake.ts).
+ *
+ * Far regions draw coarse copies of their pieces (scene/tiers.ts, render/tiers.ts): a big repo's
+ * island seen whole costs a fraction of its full detail, and the swap is under a pixel.
  *
  * It draws the scene's world (world/source.ts): the hand-drawn lands, or a repo's island while one
  * loads it suspends, holding the whole world's Suspense with it.
@@ -50,6 +65,7 @@ export function Island() {
   const land = world.island
   const gl = useThree((state) => state.gl)
   const webgpu = isWebGPU(gl)
+  const simplifier = use(SIMPLIFIER)
   useMemo(() => soften(nodes), [nodes])
   // A gen 2 island's massifs (world/gen/relief) are drawn in the land's own palette, whitened above
   // the snow line (scene/terrain): GLSL on WebGL, its node twin on WebGPU (and `?tsl=1`).
@@ -60,16 +76,19 @@ export function Island() {
   // materials are the land pack's.
   const built = useOwnedMeshes(
     () => {
-      const meshes = batch(nodes, [...land.tiles, ...land.decor], webgpu)
+      const layer = batch(nodes, [...land.tiles, ...land.decor], webgpu, simplifier, chunksOf(world))
       const base = landMaterial(nodes)
-      if (world.relief && base) meshes.push(...reliefMeshes(world.relief, makeSnow(base, snowline), webgpu))
-      return { meshes }
+      if (world.relief && base)
+        layer.meshes.push(...reliefMeshes(world.relief, makeSnow(base, snowline), webgpu))
+      return layer
     },
-    [nodes, land, webgpu, world.relief, makeSnow, snowline],
+    [nodes, land, webgpu, simplifier, world, makeSnow, snowline],
     "materials",
   )
   // The growth timelapse (`?grow`) rides these instances up out of the sea (scene/growth).
   useGrowable(built?.meshes)
+  // Far regions draw coarse copies (scene/tiers.ts).
+  useTiered(built?.tiers)
   const building = yardBuilding(progress)
   const yard = SITES.yard.at
 
@@ -157,40 +176,31 @@ function parts(source: Object3D): Map<Material, BufferGeometry> {
 
 /**
  * Every placement, grouped by material and by whether it casts a shadow; each group is one
- * BatchedMesh holding each piece's geometry once and one instance per placement — or, for
- * WebGPU (`merge`), one mesh with every placement baked in.
+ * BatchedMesh holding each piece's geometry, and its coarse copy, once and one instance per
+ * placement — or, for WebGPU (`merge`), merged meshes per region. The batches swap a region
+ * between the two (scene/tiers.ts) as the camera moves.
  */
 function batch(
   nodes: Record<string, Object3D>,
   placements: readonly LandPlacement[],
   merge: boolean,
-): Mesh[] {
-  const pieces = new Map<LandPiece, Map<Material, BufferGeometry>>()
+  simplifier: Simplifier,
+  chunks: Chunks,
+): { meshes: Mesh[]; tiers: TieredLayer } {
+  // A piece's coarse copy may move its surface FAR_ERROR world units wherever it stands, so its
+  // error in its own units is set by its biggest copy.
+  const biggest = new Map<LandPiece, number>()
+  for (const { piece, scale = 1 } of placements) biggest.set(piece, Math.max(biggest.get(piece) ?? 0, scale))
+  const pieces = new Map<LandPiece, Map<Material, TieredPiece>>()
+  interface Placed extends TieredInstance {
+    placement: LandPlacement
+  }
   interface Group {
     material: Material
     cast: boolean
-    geometries: Map<BufferGeometry, number>
-    instances: { geometry: BufferGeometry; placement: LandPlacement }[]
+    instances: Placed[]
   }
   const groups = new Map<string, Group>()
-  for (const placement of placements) {
-    let byMaterial = pieces.get(placement.piece)
-    if (!byMaterial) {
-      const source = nodes[placement.piece]
-      if (!source) continue
-      byMaterial = parts(source)
-      pieces.set(placement.piece, byMaterial)
-    }
-    const cast = casts(placement.piece)
-    for (const [material, geometry] of byMaterial) {
-      const id = `${material.uuid}:${cast}`
-      const group: Group = groups.get(id) ?? { material, cast, geometries: new Map(), instances: [] }
-      group.geometries.set(geometry, 0)
-      group.instances.push({ geometry, placement })
-      groups.set(id, group)
-    }
-  }
-
   const matrix = new Matrix4()
   const position = new Vector3()
   const rotation = new Quaternion()
@@ -200,42 +210,47 @@ function batch(
     position.set(placement.x, placement.y ?? 0, placement.z)
     rotation.setFromAxisAngle(up, placement.rot ?? 0)
     scale.setScalar(HEX_SCALE * (placement.scale ?? 1))
-    return matrix.compose(position, rotation, scale)
+    return matrix.compose(position, rotation, scale).clone()
   }
-  const out: Mesh[] = []
-  for (const group of groups.values()) {
-    if (merge) {
-      const placed = group.instances.map(({ geometry, placement }) => ({
-        geometry,
-        matrix: place(placement).clone(),
-      }))
-      const merged = bakeStatic(placed)
-      if (!merged) continue
-      const mesh = new Mesh(merged, group.material)
+  for (const placement of placements) {
+    let byMaterial = pieces.get(placement.piece)
+    if (!byMaterial) {
+      const source = nodes[placement.piece]
+      if (!source) continue
+      const error = FAR_ERROR / (HEX_SCALE * (biggest.get(placement.piece) ?? 1))
+      byMaterial = new Map()
+      for (const [material, near] of parts(source))
+        byMaterial.set(material, { near, far: coarser(simplifier, near, error) })
+      pieces.set(placement.piece, byMaterial)
+    }
+    const cast = casts(placement.piece)
+    const at = place(placement)
+    const chunk = chunks.at(placement.x, placement.z)
+    for (const [material, piece] of byMaterial) {
+      const id = `${material.uuid}:${cast}`
+      const group: Group = groups.get(id) ?? { material, cast, instances: [] }
+      group.instances.push({ piece, matrix: at, chunk, placement })
+      groups.set(id, group)
+    }
+  }
+
+  const count = chunks.list.length
+  const batches = [...groups.values()].map((group) => {
+    const built = merge
+      ? tieredMerge(group.material, group.instances, count)
+      : tieredBatch(group.material, group.instances, count, (mesh, id, { placement }) =>
+          markGrowable(mesh, id, roleOf(placement.piece), placement.x, placement.z),
+        )
+    for (const mesh of built.meshes) {
       mesh.castShadow = group.cast
       mesh.receiveShadow = true
-      out.push(mesh)
-      continue
     }
-    let vertices = 0
-    let indices = 0
-    for (const geometry of group.geometries.keys()) {
-      vertices += geometry.getAttribute("position").count
-      indices += geometry.getIndex()?.count ?? 0
-    }
-    const mesh = new BatchedMesh(group.instances.length, vertices, indices, group.material)
-    for (const geometry of group.geometries.keys()) group.geometries.set(geometry, mesh.addGeometry(geometry))
-    for (const { geometry, placement } of group.instances) {
-      const id = mesh.addInstance(group.geometries.get(geometry) ?? 0)
-      mesh.setMatrixAt(id, place(placement))
-      markGrowable(mesh, id, roleOf(placement.piece), placement.x, placement.z)
-    }
-    // Opaque and depth-tested: sorting would only cost CPU every frame. Culling stays on.
-    mesh.sortObjects = false
-    mesh.castShadow = group.cast
-    mesh.receiveShadow = true
-    mesh.computeBoundingSphere()
-    out.push(mesh)
+    return built
+  })
+  return {
+    meshes: batches.flatMap((built) => built.meshes),
+    tiers: tiered(chunks, (chunk, tier) => {
+      for (const built of batches) built.swap(chunk, tier)
+    }),
   }
-  return out
 }

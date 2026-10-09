@@ -109,3 +109,69 @@ describe("island size, generator v2", () => {
     expect(islandFromTree(tree, 0, 2).plan.land.size).not.toBe(islandFromTree(tree).plan.land.size)
   })
 })
+
+/** The hexes of `set` joined to `start` through neighbours in it. */
+function reachable(set: ReadonlySet<string>, start: string): Set<string> {
+  const seen = new Set([start])
+  const todo = [start]
+  for (let id = todo.pop(); id !== undefined; id = todo.pop())
+    for (let dir = 0; dir < 6; dir++) {
+      const next = key(step(unkey(id), dir))
+      if (set.has(next) && !seen.has(next)) {
+        seen.add(next)
+        todo.push(next)
+      }
+    }
+  return seen
+}
+
+/** A plan's land along x and z, world units (hex centres). */
+function spanOf(land: ReadonlyMap<string, unknown>): { xs: number[]; zs: number[] } {
+  const cells = [...land.keys()].map(unkey)
+  return { xs: cells.map(([q]) => q * 8.66), zs: cells.map(([, line]) => line * 5) }
+}
+
+describe("island shape, generator v2: one landmass (plan/mass.ts)", () => {
+  test("the land is one piece, and so is every district", () => {
+    for (const [name, made] of Object.entries(v2)) {
+      const land = new Set(made.plan.land.keys())
+      expect({ name, whole: reachable(land, "0,0").size === land.size }).toEqual({ name, whole: true })
+      made.plan.districts.forEach((district, i) => {
+        const own = new Set([...made.plan.land].filter(([, hex]) => hex.district === i).map(([id]) => id))
+        const first = own.values().next().value
+        if (first === undefined) return
+        const piece = reachable(own, first).size === own.size
+        const folder = district.folder.name
+        expect({ name, folder, piece }).toEqual({ name, folder, piece: true })
+      })
+    }
+  })
+
+  test("round, not lobed: little coast for its land, about 1.4 times as wide as it is deep", () => {
+    for (const [name, made] of Object.entries(v2)) {
+      const land = made.plan.land
+      const coast = [...land.keys()].filter((id) =>
+        [0, 1, 2, 3, 4, 5].some((dir) => !land.has(key(step(unkey(id), dir)))),
+      ).length
+      // A disc has 2√π ≈ 3.5 coast hexes per √hex; React's lobes on necks ran to 6.5.
+      expect({ name, round: coast / Math.sqrt(land.size) < 4.8 }).toEqual({ name, round: true })
+      const { xs, zs } = spanOf(land)
+      const aspect = (Math.max(...xs) - Math.min(...xs) + 10) / (Math.max(...zs) - Math.min(...zs) + 10)
+      expect({ name, aspect: aspect > 1.15 && aspect < 1.75 }).toEqual({ name, aspect: true })
+    }
+  })
+
+  test("the keep stands in the middle half of the land, each way, not out on a shore", () => {
+    const share = (values: number[]) => -Math.min(...values) / (Math.max(...values) - Math.min(...values))
+    for (const [name, made] of Object.entries(v2)) {
+      const { xs, zs } = spanOf(made.plan.land)
+      expect({ name, x: Math.abs(share(xs) - 0.5) < 0.25 }).toEqual({ name, x: true })
+      expect({ name, z: Math.abs(share(zs) - 0.5) < 0.25 }).toEqual({ name, z: true })
+    }
+  })
+
+  test("React's island stays within ±250 across (its lobes reached 274)", () => {
+    const { xs } = spanOf(v2.react?.plan.land ?? new Map())
+    expect(Math.max(...xs.map(Math.abs))).toBeLessThan(250)
+  })
+})

@@ -2,7 +2,7 @@ import type { Cell } from "../../lands.ts"
 import { Heap } from "../heap.ts"
 import { key, neighbours, rings, unkey } from "../hex.ts"
 import type { PlanDistrict } from "../plan.ts"
-import { AVENUE, GATE, HUB, inBay, RESERVED } from "./keep.ts"
+import { AVENUE, type Form, GATE, HUB, RESERVED, RING } from "./keep.ts"
 import type { Owners } from "./land.ts"
 
 /**
@@ -15,6 +15,7 @@ export function layRoads(
   owner: Owners,
   heads: ReadonlyMap<number, number>,
   radius: number,
+  { bay }: Form = RING,
 ): { road: Set<string>; roads: Cell[][] } {
   const road = new Set<string>([key(HUB), key(AVENUE), key(GATE)])
   const roads: Cell[][] = [[HUB, AVENUE]]
@@ -29,7 +30,7 @@ export function layRoads(
     const from = head === undefined ? HUB : (districts[head]?.square ?? HUB)
     const path = cheapest(from, district.square, radius + 2, (cell) => {
       const id = key(cell)
-      if (inBay(cell) || (RESERVED.has(id) && !road.has(id)) || id === key(GATE)) return undefined
+      if (bay(cell) || (RESERVED.has(id) && !road.has(id)) || id === key(GATE)) return undefined
       if (road.has(id)) return 0.4
       return owner.has(id) ? 1 : 8
     })

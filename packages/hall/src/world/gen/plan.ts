@@ -3,7 +3,7 @@ import type { Biome } from "./biomes.ts"
 import { rng, unkey } from "./hex.ts"
 import { smoothCoast } from "./plan/coast.ts"
 import { groundOf, placeSites } from "./plan/ground.ts"
-import { GATE, HUB, QUAY } from "./plan/keep.ts"
+import { type Form, GATE, HUB, QUAY, RESERVED, RING } from "./plan/keep.ts"
 import { layRoads } from "./plan/roads.ts"
 import { growSectors } from "./plan/sectors.ts"
 import type { Folder, RepoShape } from "./repo.ts"
@@ -132,8 +132,16 @@ function quotasOf(folders: readonly Folder[]): number[] {
   })
 }
 
-/** The island for a repo's shape, each district (the root first, then its folders) grown to its quota. */
-export function planIsland(shape: RepoShape, seed: number, quotas: readonly number[]): IslandPlan {
+/**
+ * The island for a repo's shape, each district (the root first, then its folders) grown to its
+ * quota: freely round the hub (v1), or inside the outline `formOf` draws for the island's land.
+ */
+export function planIsland(
+  shape: RepoShape,
+  seed: number,
+  quotas: readonly number[],
+  formOf?: (land: number) => Form,
+): IslandPlan {
   const districts: PlanDistrict[] = [shape.root, ...shape.folders].map((folder, i) => {
     const own = Math.max(3, Math.round(quotas[i] ?? 0))
     const quota = i === 0 ? Math.max(7, own) : own
@@ -147,9 +155,10 @@ export function planIsland(shape: RepoShape, seed: number, quotas: readonly numb
       density: Math.min(0.85, Math.max(0.15, Math.log2(1 + folder.files / quota) / 4)),
     }
   })
-  const { owner, heads, radius: searched } = growSectors(districts, seed, rng(seed))
-  const { road, roads } = layRoads(districts, owner, heads, searched)
-  const radius = smoothCoast(owner, road)
+  const form = formOf?.(districts.reduce((sum, district) => sum + district.quota, RESERVED.size)) ?? RING
+  const { owner, heads, radius: searched } = growSectors(districts, seed, rng(seed), form)
+  const { road, roads } = layRoads(districts, owner, heads, searched, form)
+  const radius = smoothCoast(owner, road, form)
   const sites = placeSites(districts, owner, road, seed)
   const land = groundOf(districts, owner, road, sites, seed)
   return { hash: shape.hash, seed, land, districts, roads, hub: HUB, quay: QUAY, gate: GATE, radius }

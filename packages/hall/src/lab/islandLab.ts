@@ -255,7 +255,7 @@ const kb = (bytes: number): string =>
   bytes > 1 << 20 ? `${(bytes / (1 << 20)).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`
 
 /** A bundled fixture when there is one ("sample" is this repo), else the live API. */
-async function treeOf(wanted: string): Promise<{ entries: RepoEntry[]; source: string }> {
+export async function treeOf(wanted: string): Promise<{ entries: RepoEntry[]; source: string }> {
   const name = wanted === "sample" ? "guildhall" : parseRepo(wanted).replace("/", "__")
   const response = await fetch(`${import.meta.env.BASE_URL}test/fixtures/repos/${name}.json`)
   if (response.ok && response.headers.get("content-type")?.includes("json")) {
@@ -270,7 +270,7 @@ async function treeOf(wanted: string): Promise<{ entries: RepoEntry[]; source: s
 }
 
 /** Every placement as instances: one InstancedMesh per part of each piece. */
-function draw(pack: Object3D, placements: readonly LandPlacement[]): InstancedMesh[] {
+export function draw(pack: Object3D, placements: readonly LandPlacement[]): InstancedMesh[] {
   const pieces = new Map<string, Object3D>()
   pack.traverse((node) => {
     if (node.name && !pieces.has(node.name)) pieces.set(node.name, node)

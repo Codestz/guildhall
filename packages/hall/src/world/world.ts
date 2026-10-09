@@ -1,9 +1,12 @@
 import type { Biome } from "./gen/biomes.ts"
 import type { District, RepoIsland } from "./gen/dress.ts"
+import { cellAt, key } from "./gen/hex.ts"
 import type { Gen } from "./gen/islandFromTree.ts"
+import { type Relief, reliefOf } from "./gen/relief/index.ts"
 import type { Folder } from "./gen/repo.ts"
 import {
   type Cell,
+  cellToWorld,
   type Island,
   island,
   MAP_FOR_TESTS,
@@ -16,6 +19,7 @@ import {
 import type { Post, Spot } from "./layout.ts"
 import { mapSites } from "./siteMap.ts"
 import { SITE_DEFS } from "./sites.ts"
+import { TERRACE } from "./waterways.ts"
 import type { Mix } from "./wilds.ts"
 
 /**
@@ -63,6 +67,11 @@ export interface RepoInfo {
   folders: readonly Folder[]
 }
 
+/** What people stand on: the height of the ground at a world point (hex tops by level, a massif's lattice). */
+export interface Ground {
+  heightAt(x: number, z: number): number
+}
+
 export interface World {
   /** "hand": the guild's own lands, with the keep at the origin. "repo": a grown island. */
   kind: "hand" | "repo"
@@ -70,6 +79,10 @@ export interface World {
   /** The walking graph: road hexes by name, and the edges between neighbours. */
   roads: { nodes: Readonly<Record<string, Spot>>; edges: readonly (readonly [string, string])[] }
   terrain: Terrain
+  /** The ground's height for walkers: hex tops by level, and a massif's own height on a gen 2 island. */
+  ground: Ground
+  /** The mountains of a gen 2 island (world/gen/relief), drawn in place of the hexes they cover. */
+  relief?: Relief
   /** Every place people work, for what grows and burns round them (wilds.ts, lights.ts). */
   sites: readonly WorkPlace[]
   /** The story's job sites on this island (`sitesOf`, world/siteMap.ts). */
@@ -85,6 +98,7 @@ export function handWorld(): World {
     island: island(),
     roads: { nodes: ROAD_NODES, edges: ROAD_EDGES },
     terrain: { at: MAP_FOR_TESTS.at, level: MAP_FOR_TESTS.level, cells: MAP_FOR_TESTS.cells },
+    ground: { heightAt: (x, z) => MAP_FOR_TESTS.level(cellAt([x, z])) * TERRACE },
     sites: Object.values(SITE_DEFS).map(({ at, posts, wilds }) => ({ at, posts, wilds })),
     storySites: SITES,
   }
@@ -115,15 +129,36 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
   const moved: WorkPlace[] = Object.values(storySites)
     .filter((site) => !districts.some((place) => place.posts === site.posts))
     .map((site) => ({ at: site.at, posts: site.posts, wilds: SITE_DEFS[site.id].wilds }))
+  const level = (cell: Cell): number => made.levels.get(key(cell)) ?? 0
+  const relief = info.gen === 2 ? reliefOf({ plan: made.plan, level }) : undefined
+  const mountain = relief && relief.massifs.length > 0 ? relief : undefined
+  const covered = (x: number, z: number): boolean => mountain?.keys.has(key(cellAt([x, z]))) ?? false
+  // The hexes a massif covers are drawn by the massif (scene/Island.tsx), not by their tiles.
+  const island = mountain
+    ? {
+        ...made.island,
+        tiles: made.island.tiles.filter((t) => !covered(t.x, t.z)),
+        // The per-hex mountain cones the massifs replace ("mini mountains together") go too, wherever they stand.
+        decor: made.island.decor.filter((d) => !covered(d.x, d.z) && !d.piece.startsWith("mountain_")),
+        meadow: made.island.meadow.filter(([x, z]) => !covered(x, z)),
+      }
+    : made.island
   return {
     kind: "repo",
-    island: made.island,
+    island,
     roads: made.roads,
     terrain: {
       at: ([q, line]) => land.get(`${q},${line}`)?.char ?? "~",
-      level: ([q, line]) => made.levels.get(`${q},${line}`) ?? 0,
+      // A hex under a massif is raised (wilds and walkers keep off it), by its centre's height.
+      level: (cell) => {
+        if (!mountain?.massifAt(cell)) return level(cell)
+        const [x, z] = cellToWorld(cell)
+        return Math.max(1, Math.round((mountain.heightAt(x, z) ?? 0) / TERRACE))
+      },
       cells: () => [...land.keys()],
     },
+    ground: { heightAt: (x, z) => mountain?.heightAt(x, z) ?? level(cellAt([x, z])) * TERRACE },
+    ...(mountain ? { relief: mountain } : {}),
     sites: [...districts, ...moved],
     storySites,
     repo: { ...info, districts: made.districts, folders: made.plan.districts.map((d) => d.folder) },

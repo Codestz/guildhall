@@ -1,6 +1,6 @@
 import { useGLTF } from "@react-three/drei"
 import { useThree } from "@react-three/fiber"
-import { useMemo } from "react"
+import { use, useMemo } from "react"
 import {
   BatchedMesh,
   type BufferGeometry,
@@ -25,6 +25,10 @@ import { plain } from "./Kit.tsx"
 import { isMovingPart } from "./life/moving.ts"
 import { useOwnedMeshes } from "./owned.ts"
 import { tameLime } from "./palette.ts"
+import { reliefMeshes } from "./terrain/reliefMeshes.ts"
+import { newSnowline, type SnowMaker, snowMaterial } from "./terrain/snow.ts"
+import { nodeSnow, useSnowline } from "./terrain/useSnowline.ts"
+import { TSL } from "./tsl.ts"
 
 useGLTF.preload(LANDS_URL)
 
@@ -44,13 +48,24 @@ export function Island() {
   const { progress } = useGuild()
   const world = useWorld()
   const land = world.island
-  const webgpu = isWebGPU(useThree((state) => state.gl))
+  const gl = useThree((state) => state.gl)
+  const webgpu = isWebGPU(gl)
   useMemo(() => soften(nodes), [nodes])
+  // A gen 2 island's massifs (world/gen/relief) are drawn in the land's own palette, whitened above
+  // the snow line (scene/terrain): GLSL on WebGL, its node twin on WebGPU (and `?tsl=1`).
+  const makeSnow: SnowMaker = webgpu || TSL ? use(nodeSnow(gl)) : snowMaterial
+  const snowline = useMemo(newSnowline, [])
+  useSnowline(world.relief, snowline)
   // The batches are this mount's own (scene/owned.ts: freed on unmount, StrictMode-safe); their
   // materials are the land pack's.
   const built = useOwnedMeshes(
-    () => ({ meshes: batch(nodes, [...land.tiles, ...land.decor], webgpu) }),
-    [nodes, land, webgpu],
+    () => {
+      const meshes = batch(nodes, [...land.tiles, ...land.decor], webgpu)
+      const base = landMaterial(nodes)
+      if (world.relief && base) meshes.push(...reliefMeshes(world.relief, makeSnow(base, snowline), webgpu))
+      return { meshes }
+    },
+    [nodes, land, webgpu, world.relief, makeSnow, snowline],
     "materials",
   )
   // The growth timelapse (`?grow`) rides these instances up out of the sea (scene/growth).
@@ -66,6 +81,16 @@ export function Island() {
       {world.kind === "hand" && <YardBuilding nodes={nodes} piece={building} at={yard} />}
     </group>
   )
+}
+
+/** The land pack's one material (every hex tile shares it): what the relief copies. */
+function landMaterial(nodes: Record<string, Object3D>): Material | undefined {
+  let found: Material | undefined
+  nodes.hex_grass?.traverse((child) => {
+    const mesh = child as Mesh
+    if (!found && mesh.isMesh) found = mesh.material as Material
+  })
+  return found
 }
 
 /** The land palette: lime grass calmed in the texture itself (scene/palette.ts), nothing else. */

@@ -1,4 +1,4 @@
-import { key, neighbours, noise, rings, step } from "../world/gen/hex.ts"
+import { cellAt, key, neighbours, noise, rings, step } from "../world/gen/hex.ts"
 import { COAST_TILES, fit, PATH_TILES, turn } from "../world/gen/tiles.ts"
 import { type Cell, cellToWorld, type LandPiece, type LandPlacement, SITES } from "../world/lands.ts"
 import type { Spot } from "../world/layout.ts"
@@ -150,6 +150,7 @@ export function patchWorld(waters: Waterways): World {
       level: (cell) => levelOf(cell) ?? 0,
       cells: () => cells().map(key),
     },
+    ground: { heightAt: (x, z) => (levelOf(cellAt([x, z])) ?? 0) * TERRACE },
     sites: [],
     storySites: SITES,
   }

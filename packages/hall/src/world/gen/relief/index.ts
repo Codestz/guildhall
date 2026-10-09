@@ -5,7 +5,7 @@ import { HUB } from "../plan/keep.ts"
 import type { IslandPlan } from "../plan.ts"
 import { type Massif, massifOf, SEA_RIM } from "./field.ts"
 import { CAP, footprintsOf, type Tier, tierOf } from "./massifs.ts"
-import { PEAK_BOOST, type ReliefStyle } from "./style.ts"
+import { isSculpted, PEAK_BOOST, type ReliefStyle } from "./style.ts"
 
 export { type Massif, SEA_RIM } from "./field.ts"
 export { RES } from "./lattice.ts"
@@ -71,7 +71,7 @@ export function reliefOf({ plan, level, years = 0, style = "current" }: ReliefIn
     return massifOf({
       id,
       cells: footprint.cells,
-      height: Math.max(TERRACE * 2, height) * (style === "c" ? PEAK_BOOST : 1),
+      height: Math.max(TERRACE * 2, height) * (isSculpted(style) ? PEAK_BOOST : 1),
       style,
       hub,
       seed: plan.seed ^ (0x9e3779b1 * (id + 1)),

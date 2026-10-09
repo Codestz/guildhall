@@ -1,6 +1,6 @@
 import type { Cell } from "../../lands.ts"
 import { CORNERS, centreOf, type HeightGrid, RES } from "./lattice.ts"
-import { LEDGE_STEP, type ReliefStyle, strideOf } from "./style.ts"
+import { LEDGE_SHARE, LEDGE_STEP, type ReliefStyle, strideOf } from "./style.ts"
 
 /**
  * The chunky styles' ground (relief/style.ts): the lattice is meshed every `strideOf`-th vertex, and the
@@ -61,9 +61,12 @@ export function shapingOf(
   grid: HeightGrid,
   owned: Uint8Array,
   isRim: (at: number) => boolean,
+  /** Hybrid only: the top ledge's height; the ground above it is the faceted peak. */
+  ledgeTop = 0,
 ): Shaping | undefined {
   if (style === "current") return undefined
   const stride = strideOf(style)
+  const hybrid = style === "d"
   const each = (visit: (i: number, j: number, at: number) => void): void => {
     for (let j = grid.j0; j < grid.j0 + grid.height; j++)
       for (let i = grid.i0; i < grid.i0 + grid.width; i++) {
@@ -74,6 +77,14 @@ export function shapingOf(
   return {
     fixed: (i, j) => isRim(grid.index(i, j)) || !onStride(i, j, stride),
     apply() {
+      // The hybrid: up to the top ledge the coarse vertices stand on ledges (idempotent: a ledge height
+      // stays); above it they keep their sculpted height, the faceted peak.
+      if (hybrid)
+        each((i, j, at) => {
+          const h = grid.data[at] as number
+          if (onStride(i, j, stride) && h <= ledgeTop + LEDGE_STEP / 2)
+            grid.data[at] = Math.min(ledgeTop, Math.round(h / LEDGE_STEP) * LEDGE_STEP)
+        })
       if (style === "b")
         each((i, j, at) => {
           if (onStride(i, j, stride))
@@ -92,8 +103,19 @@ export function shapingOf(
  * Sculpted peaks: heights above two thirds of the peak fall away faster from it (the peak itself
  * kept), so a summit stands as a horn rather than a dome.
  */
-export function sharpen(height: number, peak: number): number {
-  const knee = 0.67 * peak
+export function sharpen(height: number, peak: number, kneeShare = 0.67): number {
+  const knee = kneeShare * peak
   if (height <= knee || peak <= knee) return height
   return knee + (peak - knee) * ((height - knee) / (peak - knee)) ** 1.9
+}
+
+/**
+ * The hybrid's top ledge (0 in the other styles): a share of what the footprint reached, since the
+ * slope limit clips the height asked. The stairs end there and the faceted peak rises above it.
+ */
+export function ledgeTopOf(style: ReliefStyle, grid: HeightGrid): number {
+  if (style !== "d") return 0
+  let reach = 0
+  for (const h of grid.data) if (h > reach) reach = h
+  return Math.max(LEDGE_STEP, Math.round((LEDGE_SHARE * reach) / LEDGE_STEP) * LEDGE_STEP)
 }

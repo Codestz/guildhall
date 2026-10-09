@@ -3,9 +3,10 @@ import { hash, key, step } from "../hex.ts"
 import { isFaceted } from "./facets.ts"
 import type { Relief } from "./index.ts"
 import { CORNERS, centreOf, pointOf, RES } from "./lattice.ts"
+import { onLedge, stairsOf } from "./strata.ts"
 import { strideOf } from "./style.ts"
 import { SWATCH, swatchV } from "./swatches.ts"
-import { paintStrata, paintZones, TILE_TOP } from "./zones.ts"
+import { paintRiser, paintStrata, paintZones, TILE_TOP } from "./zones.ts"
 
 /**
  * A relief as geometry (terrain v2 §6.1): the per-hex-set builder the island and the planned region
@@ -50,7 +51,7 @@ const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
 export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailTier = 0): MeshArrays {
   const tierN = RES >> tier
   const chunky = relief.style !== "current"
-  const paintOf = relief.style === "b" ? paintStrata : paintZones
+  const paintOf = relief.style === "b" || relief.style === "d" ? paintStrata : paintZones
   const inSet = new Set(cells.map(key))
   const position: number[] = []
   const normal: number[] = []
@@ -144,6 +145,18 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
             // A chunky massif's rim faces over land wear the tile top's grass: no seam to the hex ground.
             const rim =
               toTile && a + b === n - 1 && Math.min(p[1] as number, q[1] as number, r[1] as number) >= 0
+            // The hybrid's ledges are stairs: tops and risers rather than a ramp between two ledges.
+            if (
+              relief.style === "d" &&
+              [p, q, r].every((v) => onLedge(v[1] as number) && (v[1] as number) <= massif.ledgeTop + 1e-3)
+            ) {
+              const stairs = stairsOf(p, q, r)
+              for (const t of stairs.tops)
+                emit(t[0], t[1], t[2], rim ? TILE_TOP : paintOf(t[0], t[1], t[2], massif.height), true)
+              for (const w of stairs.walls)
+                emit(w.tri[0], w.tri[1], w.tri[2], paintRiser(w.low), false, w.outward)
+              continue
+            }
             const texel = !chunky
               ? paint(p, q, r, massif.height)
               : rim

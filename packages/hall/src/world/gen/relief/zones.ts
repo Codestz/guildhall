@@ -102,3 +102,10 @@ export function paintStrata(
 
 /** The tile top's grass: the rim faces of a massif take it, so the seam with the hex ground is one colour. */
 export const TILE_TOP: Texel = TILE_GRASS
+
+/** A riser's colour: one flat grey or warm rock for the whole ledge band, alternating band by band. */
+export function paintRiser(low: number): Texel {
+  return low % 2 === 0
+    ? [SWATCH.rock.u, swatchV(SWATCH.rock, 0.4)]
+    : [SWATCH.warm.u, swatchV(SWATCH.warm, 0.4)]
+}

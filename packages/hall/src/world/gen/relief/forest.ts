@@ -2,6 +2,7 @@ import { cellToWorld, type LandPlacement } from "../../lands.ts"
 import { cellAt, key, rng } from "../hex.ts"
 import { dressingOf } from "./dressing.ts"
 import type { Relief } from "./index.ts"
+import { isSculpted } from "./style.ts"
 
 /**
  * The forest on the mountains (terrain 2c): trees stand thick on the lower slopes, thin out with
@@ -25,7 +26,7 @@ export function forestOf(
   river: ReadonlySet<string> = new Set(),
 ): LandPlacement[] {
   // Sculpted peaks (style c) dress their flanks with the kit's clumps and rocks, not a carpet.
-  if (relief.style === "c") return dressingOf(relief, seed, river)
+  if (isSculpted(relief.style)) return dressingOf(relief, seed, river)
   const random = rng(seed ^ 0x7f0e57)
   const out: LandPlacement[] = []
   for (const massif of relief.massifs) {

@@ -1,3 +1,4 @@
+import { type Craft, craftOf, deedCraft } from "@guildhall/core"
 import { useThree } from "@react-three/fiber"
 import { useEffect } from "react"
 import { PROBE } from "../guild/mode.ts"
@@ -6,7 +7,7 @@ import type { GuildStore } from "../guild/store.ts"
 import { positions, useGuildStore } from "../guild/useGuild.ts"
 import { soundPrefs } from "../hud/prefs.ts"
 import { wind } from "../scene/atmosphere/wind.ts"
-import { kindOfTool } from "../scene/sigilBoard.ts"
+import { sigilOfCraft } from "../scene/sigilBoard.ts"
 import { GRAVEYARD_PLOT, island } from "../world/lands.ts"
 import { GATE, HEARTH, STATIONS } from "../world/layout.ts"
 import { ambienceOf, firePanOf } from "./ambience.ts"
@@ -93,14 +94,13 @@ function whereOf(id: string): Where | undefined {
 function infoOf(store: GuildStore, moment: Moment): MomentInfo {
   const view = store.views.find((v) => v.id === moment.id)
   const where = whereOf(moment.id) ?? (moment.kind === "join" ? { x: GATE[0], z: GATE[1] } : undefined)
-  const tool = moment.kind === "deed" || moment.kind === "deed-failed" ? moment.tool : undefined
-  let sigil: MomentInfo["sigil"]
-  if (moment.kind === "deed") {
+  let craft: Craft | undefined
+  if (moment.kind === "deed" || moment.kind === "deed-failed") {
     const entry = store.sessionOf(moment.id)?.entries.find((e) => e.kind === "tool" && e.call === moment.call)
-    const command = entry?.kind === "tool" ? entry.input.command : undefined
-    sigil = kindOfTool(moment.tool, typeof command === "string" ? command : "")
+    craft = entry?.kind === "tool" ? deedCraft(entry) : craftOf(moment.tool)
   }
-  const sample = sampleFor(moment.kind, tool, { station: view?.station, site: view?.site })
+  const sigil = moment.kind === "deed" && craft ? sigilOfCraft(craft) : undefined
+  const sample = sampleFor(moment.kind, craft, { station: view?.station, site: view?.site })
   const sampleAt = sample === "bell" || sample === "creak" ? GRAVEYARD : undefined
   return { where, sigil, sample, sampleAt }
 }

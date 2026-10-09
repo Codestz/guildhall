@@ -3,7 +3,7 @@ import type { Session } from "@guildhall/core"
 import { legendMarkdown, legendOf } from "../src/guild/legends.ts"
 import type { Moment } from "../src/guild/moments.ts"
 import { GuildStore } from "../src/guild/store.ts"
-import { type Caption, clip, craftOf, lineOf, listen, Narrator, quote } from "../src/guild/story.ts"
+import { type Caption, clip, lineOf, listen, Narrator, quote, toldOf } from "../src/guild/story.ts"
 
 /** A live moment, as the store would make it. */
 function moment(kind: Moment["kind"], id: string, extra: Record<string, unknown> = {}): Moment {
@@ -159,8 +159,10 @@ describe("story: the phrase grammar", () => {
       .map((p) => p.text)
       .join("")
     expect(text).toMatch(/two failing/)
-    expect(craftOf("bash", { command: "bun test users" })).toBe("test")
-    expect(craftOf("context7_query-docs")).toBe("consult")
+    expect(toldOf({ name: "bash", input: { command: "bun test users" } })).toBe("test")
+    expect(toldOf({ name: "bash", input: { command: "bun run typecheck" } })).toBe("run")
+    expect(toldOf({ name: "context7_query-docs" })).toBe("consult")
+    expect(toldOf({ name: "kubectl", craft: "edit" })).toBe("forge")
   })
 
   test("a replay tells the same story in the same words", () => {

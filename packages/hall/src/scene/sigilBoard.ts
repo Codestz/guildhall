@@ -1,7 +1,7 @@
+import { type Craft, craftOf } from "@guildhall/core"
 import { type Camera, Color, Vector3 } from "three"
 import type { Moment } from "../guild/moments.ts"
 import type { AdventurerView } from "../guild/store.ts"
-import { type VerbGlyph, verbOf } from "../hud/format.ts"
 import type { GlyphPath } from "../hud/glyphs.ts"
 import { chipOf } from "./chips.ts"
 import { SIGIL_BASE } from "./sigilSize.ts"
@@ -58,24 +58,27 @@ const SWAP_S = 0.12
 export const POP_S = 0.6
 
 /**
- * The chip's verb glyph (hud/format.ts verbOf) as a sigil: one mapping, so the name chip and the
- * medallion can never disagree. Glyphs that only mean a state (plea, rest, loot…) have no sigil.
+ * A deed's sigil, by its craft (@guildhall/core craft.ts). The same grouping as the name chip's verb
+ * glyph (hud/format.ts verbOf), so the chip and the medallion never disagree (test/sigils.test.ts).
  */
-const BY_GLYPH: Partial<Record<VerbGlyph, SigilKind>> = {
+const BY_CRAFT: Record<Craft, SigilKind> = {
   read: "read",
-  edit: "edit",
   search: "search",
-  test: "test",
+  edit: "edit",
+  write: "edit",
   run: "run",
-  summon: "dispatch",
-  thought: "think",
-  globe: "consult",
-  work: "work",
+  test: "test",
+  lint: "test",
+  fetch: "consult",
+  consult: "consult",
+  plan: "think",
+  delegate: "dispatch",
+  other: "work",
 }
 
-/** The sigil for a tool call. `doing` lets a shell command read as testing (`bun test`) or running. */
-export function kindOfTool(tool: string, doing = ""): SigilKind {
-  return BY_GLYPH[verbOf({ phase: "working", tool, thinking: false, doing }).glyph] ?? "work"
+/** The sigil for a deed of this craft. */
+export function sigilOfCraft(craft: Craft): SigilKind {
+  return BY_CRAFT[craft]
 }
 
 /**
@@ -83,11 +86,9 @@ export function kindOfTool(tool: string, doing = ""): SigilKind {
  * leaving, bringing loot, fallen, or walking with no deed; nothing while pleading either (the plea
  * has its own "!" over the head).
  */
-export function sigilOf(
-  view: Pick<AdventurerView, "phase" | "tool" | "thinking" | "doing">,
-): SigilKind | null {
+export function sigilOf(view: Pick<AdventurerView, "phase" | "craft" | "thinking">): SigilKind | null {
   if (view.phase !== "working") return null
-  if (view.tool) return kindOfTool(view.tool, view.doing)
+  if (view.craft) return BY_CRAFT[view.craft]
   return view.thinking ? "think" : null
 }
 
@@ -102,9 +103,9 @@ interface Entry {
   id: string
   /** What the views ask for now. */
   want: SigilKind | null
-  /** The view's tool call and line, at the last sync: the deed a finishing moment is about. */
+  /** The view's tool call and its craft, at the last sync: the deed a finishing moment is about. */
   tool: string
-  doing: string
+  craft: Craft | undefined
   /** What is drawn (fades out before it changes). */
   shown: SigilKind | null
   alpha: number
@@ -206,7 +207,7 @@ export class SigilBoard {
           id: view.id,
           want: null,
           tool: "",
-          doing: "",
+          craft: undefined,
           shown: null,
           alpha: 0,
           pop: -1,
@@ -228,7 +229,7 @@ export class SigilBoard {
       entry.present = true
       entry.want = sigilOf(view)
       entry.tool = view.tool ?? ""
-      entry.doing = view.doing
+      entry.craft = view.craft
       if (entry.colour !== view.color) {
         entry.colour = view.color
         entry.rim.set(view.color).lerp(BRASS, 0.35)
@@ -252,9 +253,10 @@ export class SigilBoard {
     if (!this.on || (moment.kind !== "deed" && moment.kind !== "deed-failed")) return
     const entry = this.byId.get(moment.id)
     if (!entry) return
-    // The deed that just ended: the views have not caught up yet, so its line is still the last one
+    // The deed that just ended: the views have not caught up yet, so its craft is still the last one
     // synced (a shell call reads as testing from its command).
-    entry.shown = kindOfTool(moment.tool, moment.tool === entry.tool ? entry.doing : "")
+    const craft = moment.tool === entry.tool ? entry.craft : undefined
+    entry.shown = BY_CRAFT[craft ?? craftOf(moment.tool)]
     entry.pop = 0
     entry.ok = moment.kind === "deed"
     if (this.still) return

@@ -10,6 +10,8 @@
  * `id` is always the session the change is about; a subagent *is* a session with a parent.
  */
 
+import type { Craft } from "../craft.ts"
+
 export type ToolState = "pending" | "running" | "completed" | "failed"
 
 export type Change =
@@ -61,6 +63,11 @@ export type Change =
       id: string
       call: string
       name?: string
+      /**
+       * What the deed means (`read`, `test`, `delegate`… craft.ts), when the source knows: it wins over
+       * the name. Optional; the hall reads it off the name otherwise (`craftOf`).
+       */
+      craft?: Craft
       state?: ToolState
       input?: Record<string, unknown>
       /** What it returned — or, while running, what it has printed so far. */

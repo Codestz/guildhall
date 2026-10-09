@@ -39,7 +39,7 @@ export interface Where {
 /** What the hall knows about a moment that the moment itself doesn't say. */
 export interface MomentInfo {
   where?: Where | undefined
-  /** The deed's sigil kind (scene/sigilBoard.ts kindOfTool). */
+  /** The deed's sigil kind (scene/sigilBoard.ts sigilOfCraft). */
   sigil?: SigilKind | undefined
   /** A spot sound to go with it (audio/samples.ts sampleFor). */
   sample?: SampleName | null | undefined

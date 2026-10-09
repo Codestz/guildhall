@@ -38,6 +38,7 @@ changes, so it can't tell which adapter (or which simulation) a guild came from.
 | **Archetype** | Who the world draws it as: Artisan, Warden, Scout, Automaton… (§1.1). Mapped from the role, or sent by the source. | `session.archetype` (optional) |
 | **Quest** | Work handed to a new adventurer: a deed named `task` or `subagent`. Its `input.description` is the quest's text. | `tool` change |
 | **Deed** | One action: a tool call, moving from `pending`/`running` to `completed` or `failed`. | `tool` change |
+| **Craft** | What a deed means: `read`, `edit`, `test`, `delegate`… (§1.2). Read from the tool's name, or sent by the source. | `tool.craft` (optional) |
 | **Outcome** | Whether a deed failed. One rule, `failedDeed`, decides it. See §1.3. | derived |
 | **Plea** | An adventurer held on a human decision (a permission, a question). | `status: "waiting"` |
 | **Loot** | A finished run: the session goes idle after working. | `status: "idle"` |
@@ -80,24 +81,37 @@ An adventurer's **rank** (apprentice, journeyman, master) comes from what it has
 the wire: for agents, a journeyman past 20 deeds or 1M tokens, a master past 60 deeds or 4M tokens
 (`packages/roster/src/ranks.ts`).
 
-### 1.2 Deeds: names and inputs the world reads
+### 1.2 Deeds: crafts, names and inputs the world reads
 
-Deed names follow OpenCode's spelling, which is lower case. The hall picks the animation for a deed
-from its name (`packages/roster/src/deeds.ts`):
+What a deed *means* is its **craft**, one of a small closed set (`packages/core/src/craft.ts`). The
+hall shows every deed by its craft (the caption's words, the chip's verb, the sigil, the work
+animation, the spot sound), never by the host's tool name.
 
-| Canonical name | Aliases read the same | Shown as |
+| Craft | Means | Read from the names |
 |---|---|---|
-| `task` | `subagent` | a quest (walk to the quest board) |
-| `webfetch` | `websearch` | a walk to the map table |
-| `read`, `grep`, `glob` | `list` → `glob` | reading |
-| `edit`, `write` | `patch`, `multiedit` → `edit` | smithing |
-| `bash` | `shell` | steam at the station |
-| `todowrite` | | a scroll |
-| anything containing `_` | | an MCP tool (spellcasting) |
-| anything else | | a plain interaction |
+| `read` | reads a file | `read` |
+| `search` | looks through the code | `grep`, `glob`, `list`, `ls`, `codesearch` |
+| `edit` | changes a file | `edit`, `patch`, `multiedit`, `apply_patch`, `notebookedit` |
+| `write` | writes a file whole | `write` |
+| `run` | runs a command | `bash`, `shell`, `powershell`, `bashoutput`, `killshell` |
+| `test` | runs the tests | a shell call whose `command` names a test runner, or `test`, `spec`, `check` |
+| `lint` | lints or typechecks | a shell call whose `command` says `lint`, `typecheck` or `tsc` (and no test) |
+| `fetch` | fetches or searches the web | `webfetch`, `websearch` |
+| `consult` | asks a tool outside the host's own | any other name containing `_` (an MCP tool: `context7_query-docs`, `mcp__memory__read_graph`) |
+| `plan` | keeps the plan | `todowrite`, `todoread`, `exitplanmode` |
+| `delegate` | hands work to another agent | `task`, `subagent`, `agent` |
+| `other` | anything else | any other name |
 
-Matching ignores case, except for quests: a quest is detected only when the name is exactly `task`
-or `subagent`.
+Names are matched in any case, so Claude Code's own names (`Bash`, `MultiEdit`, `Agent`) read the
+same. A source that knows what its tools mean may send `craft` on the `tool` change: it wins over the
+name (a deploy tool can say `run`, a custom editor `edit`). Send it once the call's input is known
+when the input decides it: a shell call without its `command` should send none yet. A craft the hall
+doesn't know is ignored and the name is read instead. It is optional and additive: without it, and in
+chronicles recorded before it, the name is read exactly as above.
+
+Deed names follow OpenCode's spelling, which is lower case. A few things still read the name itself:
+a quest is a deed named exactly `task` or `subagent`, and its `input.description` is the quest's
+text.
 
 Inputs are free-form objects. These keys are read when present:
 
@@ -187,7 +201,7 @@ safe to repeat: a second identical `session`, `status` or `tool` change leaves t
 | `prompt` | `key`, `text` | | Something said *to* it. The first prompt is its task. A repeated `key` is ignored. |
 | `thinking` | `key` | `text`, `delta`, `done` | Its thinking: `text` replaces, `delta` appends, `done` closes the block named `key`. |
 | `reply` | `key` | `text`, `delta`, `done` | What it writes back, the same way. |
-| `tool` | `call` | `name`, `state` (`pending` \| `running` \| `completed` \| `failed`), `input` (object), `output`, `error`, `started`, `ended`, `summary`, `exit` (integer) | A deed, keyed by `call`. Later changes for the same `call` fill it in. `ended` defaults to `at` when the state becomes `completed` or `failed`. |
+| `tool` | `call` | `name`, `craft` (§1.2), `state` (`pending` \| `running` \| `completed` \| `failed`), `input` (object), `output`, `error`, `started`, `ended`, `summary`, `exit` (integer) | A deed, keyed by `call`. Later changes for the same `call` fill it in. `ended` defaults to `at` when the state becomes `completed` or `failed`. |
 | `step` | | | It finished one model turn. |
 | `usage` | | `tokens`, `cost` | Running totals for the session (they replace, not add). |
 
@@ -195,7 +209,7 @@ Limits on fields (`packages/hub/src/validate.ts`):
 
 | What | Limit |
 |---|---|
-| ids, keys, names (`id`, `call`, `key`, `name`, `agent`, `archetype`, `parentID`, `model`) | 1–1024 characters |
+| ids, keys, names (`id`, `call`, `key`, `name`, `craft`, `agent`, `archetype`, `parentID`, `model`) | 1–1024 characters |
 | text (`text`, `delta`, `output`, `error`, `title`, `summary`) | ≤ 1,000,000 characters |
 | `input` as JSON | ≤ 1,000,000 characters |
 | numbers (`started`, `ended`, `tokens`, `cost`) | finite, ≥ 0 |
@@ -418,6 +432,7 @@ Where Claude Code's names become the world's:
 | tools `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, `WebFetch`, `WebSearch`, `TodoWrite`, … | the same name in lower case |
 | tool `PowerShell` | `shell` |
 | `mcp__<server>__<tool>` | unchanged |
+| any tool with its input | `craft` (§1.2) from Claude Code's own tool name: `NotebookEdit` → `edit`, `Bash` → `run`/`test`/`lint` by its command |
 | input `file_path`, `notebook_path` / `old_string` / `new_string` | `filePath` / `oldString` / `newString` (other keys kept) |
 | a tool result | `output`: a shell's stdout and stderr, a subagent's text, a file's content, otherwise its JSON. Capped at 16,000 characters. |
 

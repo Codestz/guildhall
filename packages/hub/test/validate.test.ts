@@ -46,6 +46,12 @@ describe("validChange", () => {
       expect(validChange({ ...session, archetype })).toBe(false)
   })
 
+  test("a deed's craft is a name: any string the hall may know, not a payload", () => {
+    expect(validChange({ ...tool, craft: "read" })).toBe(true)
+    expect(validChange({ ...tool, craft: "a-craft-from-a-newer-hall" })).toBe(true)
+    for (const craft of ["", 7, "x".repeat(MAX_NAME + 1)]) expect(validChange({ ...tool, craft })).toBe(false)
+  })
+
   test("a shell call's exit code passes, zero or not", () => {
     for (const exit of [0, 1, 2, 127, -1])
       expect(validChange({ ...tool, name: "bash", state: "completed", exit })).toBe(true)

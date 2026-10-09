@@ -3,6 +3,7 @@ import {
   apply,
   type Change,
   type CiState,
+  type Craft,
   emptyModel,
   failedDeed,
   type GuildEvent,
@@ -183,8 +184,10 @@ export interface AdventurerView {
   destination?: string
   /** The deed in progress, if any. */
   look?: DeedLook
-  /** Its tool name, as OpenCode spells it. */
+  /** Its tool name, as the host spells it. */
   tool?: string
+  /** What the deed in progress means (@guildhall/core `deedCraft`): what every surface shows it by. */
+  craft?: Craft
   thinking: boolean
   /** One line under the name: `edit · routes.ts`. */
   doing: string
@@ -1127,7 +1130,8 @@ export function viewsOf(
     if (!isMaster && s.status === "done" && since > GONE_MS + EXIT_MS) continue
 
     const running = activity.kind === "tool" ? activity.tool : undefined
-    const look = running ? deedLook(running) : undefined
+    const craft = activity.kind === "tool" ? activity.craft : undefined
+    const look = craft ? deedLook(craft) : undefined
     const lastTool = s.entries.findLast((entry) => entry.kind === "tool")
     const stung = lastTool?.kind === "tool" && failedDeed(lastTool) && now - (lastTool.ended ?? 0) < 1400
 
@@ -1219,6 +1223,7 @@ export function viewsOf(
       ...(seat ? { seat } : {}),
       ...(look ? { look } : {}),
       ...(running ? { tool: running } : {}),
+      ...(craft ? { craft } : {}),
       thinking: activity.kind === "thinking",
       doing: doingOf(s, activity.kind, activity.tool, activity.text),
       ...bubbleOf(s, activity.kind, now),

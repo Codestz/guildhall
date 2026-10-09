@@ -73,6 +73,8 @@ const SHAPES: Record<Change["type"], { required?: Record<string, Check>; optiona
       required: { call: name },
       optional: {
         name,
+        // A name, not checked against the crafts: a newer adapter may send one this hall reads off the name.
+        craft: name,
         state: oneOf("pending", "running", "completed", "failed"),
         input,
         output: text,

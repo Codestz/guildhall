@@ -5,6 +5,7 @@ import { createV1Translator, createV2Translator } from "@guildhall/core"
 import { projectOf, refOf } from "@guildhall/core/project"
 import { injectV1, injectV2, readOptions, type V2AgentDomain } from "./agents.ts"
 import { createCourier } from "./courier.ts"
+import { createCrafter } from "./craft.ts"
 import { type V2ToolCall, v1Guard, v2Guard } from "./guard.ts"
 import { createLocationFilter, type Located } from "./locate.ts"
 
@@ -66,6 +67,7 @@ export default {
     log(`v1 server start in ${input.directory}`)
     const options = readOptions(raw, log)
     const translator = createV1Translator(unknown(1))
+    const craft = createCrafter()
     const courier = createCourier({ guild: project.name, project: refOf(project), opencode: 1, log })
     return {
       ...(options.agents === false ? {} : v1Guard(log)),
@@ -79,7 +81,7 @@ export default {
       dispose: async () => courier.flush(),
       event: async ({ event }: { event: unknown }) => {
         try {
-          courier.send(translator.event(event, Date.now()), event)
+          courier.send(craft(translator.event(event, Date.now())), event)
         } catch (error) {
           log(`v1 translate failed: ${String(error)}`)
         }
@@ -112,6 +114,7 @@ export default {
     const project = projectOf(directory)
     log(`v2 setup in ${ctx.location.directory}`)
     const translator = createV2Translator(unknown(2))
+    const craft = createCrafter()
     const ours = createLocationFilter(directory)
     const courier = createCourier({ guild: project.name, project: refOf(project), opencode: 2, log })
     const stop = new AbortController()
@@ -125,7 +128,7 @@ export default {
             // including its sessions' status and usage, which carry no location (src/locate.ts).
             if (!ours(event as Located)) continue
             try {
-              courier.send(translator.event(event, Date.now()), event)
+              courier.send(craft(translator.event(event, Date.now())), event)
             } catch (error) {
               log(`v2 translate failed: ${String(error)}`)
             }

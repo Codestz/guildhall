@@ -8,6 +8,7 @@
  * on screen.
  */
 
+import { type Craft, deedCraft } from "../craft.ts"
 import type { Change, ToolState } from "./changes.ts"
 import { taskText } from "./changes.ts"
 
@@ -21,6 +22,8 @@ export type Entry =
       kind: "tool"
       call: string
       name: string
+      /** The craft its source declared (`Change` tool `craft`), unchecked: read it with `deedCraft`. */
+      craft?: string
       state: ToolState
       input: Record<string, unknown>
       output: string
@@ -255,6 +258,7 @@ export function apply(model: Model, change: Change): void {
       if (change.summary) entry.summary = change.summary
       if (change.exit !== undefined) entry.exit = change.exit
       if (change.name) entry.name = change.name
+      if (change.craft) entry.craft = change.craft
       if (change.state) entry.state = change.state
       if (change.input && Object.keys(change.input).length > 0) entry.input = change.input
       if (change.output !== undefined) entry.output = change.output
@@ -522,6 +526,8 @@ export interface Activity {
   kind: "starting" | "tool" | "thinking" | "writing" | "waiting" | "done" | "failed"
   /** The tool's name, for `tool`. */
   tool?: string
+  /** What the tool call means, for `tool` (craft.ts `deedCraft`). */
+  craft?: Craft
   text: string
   /** When the current thing started, for its elapsed time. */
   since: number
@@ -545,6 +551,7 @@ export function activityOf(s: Session): Activity {
     return {
       kind: "tool",
       tool: running.name,
+      craft: deedCraft(running),
       text: toolTarget(running.name, running.input),
       since: running.at,
     }

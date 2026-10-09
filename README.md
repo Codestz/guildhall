@@ -226,21 +226,26 @@ For OpenCode, the plugin also gives you nine agents to work with. You talk to th
 It sizes your request, briefs the specialists, has their work checked by a verifier, and reports
 back.
 
-| Role | What it does | What it may do | Where it works |
-|---|---|---|---|
-| **Guildmaster** | Talks to you, plans, briefs specialists, reports back | Read; shell asks first; may launch the eight specialists | Quest board in the keep |
-| **Architect** | Designs the structure first: boundaries, plans, task contracts | Write Markdown under `docs/` only | Drafting table in the keep |
-| **Implementer** | Builds one bounded task: the code and its tests | Edit files; run the project's checks; any other command asks | Forge, then the construction yard |
-| **Verifier** | Tries to prove the work wrong, returns a cited verdict | Read; run the checks; every other command is denied | Inspection bench, then the proving grounds |
-| **Librarian** | Library docs at your installed version, plus the project's decisions | Read and use the web | Library, then the wizard tower |
-| **Explorer** | Maps your codebase | Read only | Map table, then the forest edge |
-| **Researcher** | Answers open questions from the web, with sources | Read and use the web | Map table, then the river bend |
-| **Designer** | Designs and builds UI within your design system | Edit files; run the checks; any other command asks | Easel in the keep |
-| **Product owner** | Turns a vague goal into a spec with testable criteria | Write Markdown under `docs/` only | Scroll desk in the keep |
+The world draws every actor as an **archetype**. The nine guild agents each map onto one, and so
+does anyone from any other source:
 
-Agents from outside the guild, such as OpenCode's own `general`, show up as grey wanderers working
-the quarry. These roles are the cast the world draws today, whatever the source; it is being
-generalised for sources that aren't coding agents.
+| Archetype | Agent role | What it does | What it may do | Where it works |
+|---|---|---|---|---|
+| **Guildmaster** | Guildmaster (and the root of any party) | Talks to you, plans, briefs specialists, reports back | Read; shell asks first; may launch the eight specialists | Quest board in the keep |
+| **Architect** | Architect (and Claude Code's `Plan`) | Designs the structure first: boundaries, plans, task contracts | Write Markdown under `docs/` only | Drafting table in the keep |
+| **Artisan** | Implementer | Builds one bounded task: the code and its tests | Edit files; run the project's checks; any other command asks | Forge, then the construction yard |
+| **Warden** | Verifier | Tries to prove the work wrong, returns a cited verdict | Read; run the checks; every other command is denied | Inspection bench, then the proving grounds |
+| **Archivist** | Librarian | Library docs at your installed version, plus the project's decisions | Read and use the web | Library, then the wizard tower |
+| **Scout** | Explorer (and Claude Code's `Explore`) | Maps your codebase | Read only | Map table, then the forest edge |
+| **Scholar** | Researcher | Answers open questions from the web, with sources | Read and use the web | Map table, then the river bend |
+| **Illuminator** | Designer | Designs and builds UI within your design system | Edit files; run the checks; any other command asks | Easel in the keep |
+| **Herald** | Product owner | Turns a vague goal into a spec with testable criteria | Write Markdown under `docs/` only | Scroll desk in the keep |
+| **Wanderer** | Any agent from outside the guild (OpenCode's `general`, Claude Code's `general-purpose`) | Whatever its own agent does | What its own host allows | The quarry |
+| **Automaton** | A bot account (a GitHub app, `…[bot]`) | Automated work: CI, dependency updates | What its own host allows | The quarry |
+
+The chips and the roster show the archetype, with the source's own name beneath it
+(`Warden · verifier`); Settings → Names switches to the source's names alone. A source can also say
+which archetype an actor is outright.
 
 - **Permissions are enforced twice.** OpenCode's own rules: every agent starts from deny-all and
   gets back only what its job needs. "Checks" means an exact list of test, lint, typecheck and

@@ -1,23 +1,25 @@
 import { afterAll, afterEach, describe, expect, test } from "bun:test"
+import { CRAFTS, craftOf } from "@guildhall/core"
 import { Object3D, OrthographicCamera, Vector3 } from "three"
 import type { Moment } from "../src/guild/moments.ts"
 import { type AdventurerView, GuildStore } from "../src/guild/store.ts"
 import { verbOf } from "../src/hud/format.ts"
 import { addChip, chipSlot, layout, resetChips } from "../src/scene/chips.ts"
 import {
-  kindOfTool,
   MAX_BURSTS,
   MAX_PARTICLES,
   MAX_SIGILS,
   PER_BURST,
   SigilBoard,
   sigilOf,
+  sigilOfCraft,
 } from "../src/scene/sigilBoard.ts"
 import { SIGIL_MAX_PX, SIGIL_MIN_PX, sigilRoom, sizeFor } from "../src/scene/sigilSize.ts"
 
-/** A view with just what the sigils read; working on nothing unless told. */
+/** A view with just what the sigils read; working on nothing unless told (a tool's craft as the store reads it). */
 function view(id: string, patch: Partial<AdventurerView> = {}): AdventurerView {
   return {
+    ...(patch.tool ? { craft: craftOf(patch.tool) } : {}),
     id,
     agent: "guild-implementer",
     title: id,
@@ -76,20 +78,22 @@ function run(board: SigilBoard, seconds: number, from = board.now): void {
 afterEach(resetChips)
 
 describe("sigils: which kind a view shows", () => {
-  test("each tool maps to the sigil the brief names", () => {
-    expect(kindOfTool("read")).toBe("read")
-    expect(kindOfTool("edit")).toBe("edit")
-    expect(kindOfTool("write")).toBe("edit")
-    expect(kindOfTool("grep")).toBe("search")
-    expect(kindOfTool("glob")).toBe("search")
-    expect(kindOfTool("bash", "bun test src")).toBe("test")
-    expect(kindOfTool("bash", "git status")).toBe("run")
-    expect(kindOfTool("task")).toBe("dispatch")
-    expect(kindOfTool("webfetch")).toBe("consult")
-    expect(kindOfTool("websearch")).toBe("consult")
-    expect(kindOfTool("context7_query-docs")).toBe("consult")
-    expect(kindOfTool("todowrite")).toBe("think")
-    expect(kindOfTool("something-new")).toBe("work")
+  test("each craft maps to the sigil the brief names", () => {
+    const sigil = (tool: string, command?: string) => sigilOfCraft(craftOf(tool, command ? { command } : {}))
+    expect(sigil("read")).toBe("read")
+    expect(sigil("edit")).toBe("edit")
+    expect(sigil("write")).toBe("edit")
+    expect(sigil("grep")).toBe("search")
+    expect(sigil("glob")).toBe("search")
+    expect(sigil("bash", "bun test src")).toBe("test")
+    expect(sigil("bash", "bun run typecheck")).toBe("test")
+    expect(sigil("bash", "git status")).toBe("run")
+    expect(sigil("task")).toBe("dispatch")
+    expect(sigil("webfetch")).toBe("consult")
+    expect(sigil("websearch")).toBe("consult")
+    expect(sigil("context7_query-docs")).toBe("consult")
+    expect(sigil("todowrite")).toBe("think")
+    expect(sigil("something-new")).toBe("work")
   })
 
   test("thinking with no deed shows the thought cloud", () => {
@@ -97,7 +101,6 @@ describe("sigils: which kind a view shows", () => {
   })
 
   test("the sigil always agrees with the name chip's glyph (one language)", () => {
-    const tools = ["read", "edit", "grep", "bash", "task", "webfetch", "context7_x", "todowrite", "zzz"]
     const pairs: Record<string, string> = {
       read: "read",
       edit: "edit",
@@ -109,8 +112,8 @@ describe("sigils: which kind a view shows", () => {
       globe: "consult",
       work: "work",
     }
-    for (const tool of tools) {
-      const v = view("a", { tool, doing: "" })
+    for (const craft of CRAFTS) {
+      const v = view("a", { tool: "t", craft })
       expect(sigilOf(v)).toBe(pairs[verbOf(v).glyph] as never)
     }
   })
@@ -170,7 +173,7 @@ describe("sigils: when they show", () => {
   })
 
   test("a failure that ends the session still puffs, then the sigil fades", () => {
-    const { board } = boardWith([view("a", { tool: "bash", doing: "bun test" })])
+    const { board } = boardWith([view("a", { tool: "bash", craft: "test", doing: "bash · bun test" })])
     run(board, 0.5)
     board.take(deed("a", "bash", true))
     board.sync([view("a", { phase: "failed" })])

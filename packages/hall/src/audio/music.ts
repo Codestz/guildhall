@@ -112,7 +112,7 @@ export const TIMBRE_OF: Record<SigilKind, Timbre> = {
 /** What a moment needs from the hall to be scored: the deed's sigil kind, the key now. */
 export interface Score {
   key: Key
-  /** The deed's kind (scene/sigilBoard.ts kindOfTool), for `deed` moments. */
+  /** The deed's kind (scene/sigilBoard.ts sigilOfCraft), for `deed` moments. */
   sigil?: SigilKind
 }
 

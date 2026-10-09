@@ -1,3 +1,4 @@
+import type { Craft } from "@guildhall/core"
 import type { MomentKind } from "../guild/moments.ts"
 import type { Note } from "./music.ts"
 
@@ -100,8 +101,8 @@ export const SAMPLES: Record<SampleName, SampleDef> = {
   toll: { files: ["impactBell_heavy_004.ogg"], gain: 0.18, mode: "augment", rate: [0.95, 1.05] },
 }
 
-const CHOPPING = new Set(["grep", "glob", "list"])
-const BUILDING = new Set(["edit", "write", "patch", "multiedit"])
+/** Deeds that work the yard and the forest, by craft: building is changing files, chopping searching. */
+const BUILDING: ReadonlySet<Craft> = new Set(["edit", "write"])
 const READING = new Set(["library", "scroll-desk"])
 
 /**
@@ -113,16 +114,16 @@ const READING = new Set(["library", "scroll-desk"])
  */
 export function sampleFor(
   kind: MomentKind,
-  tool: string | undefined,
+  craft: Craft | undefined,
   at: { station?: string | undefined; site?: string | undefined },
 ): SampleName | null {
   switch (kind) {
     case "deed": {
       if (at.station === "forge") return "forge"
-      if (at.site === "yard") return tool && BUILDING.has(tool) ? "build" : null
+      if (at.site === "yard") return craft && BUILDING.has(craft) ? "build" : null
       if (at.site === "quarry") return "quarry"
-      if (at.site === "forest") return tool && CHOPPING.has(tool) ? "chop" : null
-      if (tool === "read" && ((at.station && READING.has(at.station)) || at.site === "tower")) return "book"
+      if (at.site === "forest") return craft === "search" ? "chop" : null
+      if (craft === "read" && ((at.station && READING.has(at.station)) || at.site === "tower")) return "book"
       return null
     }
     case "loot":

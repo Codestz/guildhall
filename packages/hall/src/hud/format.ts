@@ -1,4 +1,4 @@
-import type { Entry, Session } from "@guildhall/core"
+import type { Craft, Entry, Session } from "@guildhall/core"
 import type { AdventurerView, LogEntry, Marker, Phase } from "../guild/store.ts"
 
 /** Run time as `m:ss`. */
@@ -108,7 +108,7 @@ export type VerbGlyph =
  * `editing`, `searching`, `testing`, `thinking`, `waiting on you`, `resting`, … Always shown with its
  * glyph. The full deed (`edit · routes.ts`) stays in Detailed mode and the dossier.
  */
-export function verbOf(view: Pick<AdventurerView, "phase" | "tool" | "thinking" | "doing">): {
+export function verbOf(view: Pick<AdventurerView, "phase" | "craft" | "thinking" | "doing">): {
   verb: string
   glyph: VerbGlyph
 } {
@@ -126,36 +126,24 @@ export function verbOf(view: Pick<AdventurerView, "phase" | "tool" | "thinking" 
     default:
       break
   }
-  const tool = view.tool?.toLowerCase()
-  if (tool) {
-    const verb = TOOL_VERBS[tool]
-    if (verb) return verb
-    if (tool === "bash" || tool === "shell")
-      return TESTING.test(view.doing) ? { verb: "testing", glyph: "test" } : { verb: "running", glyph: "run" }
-    // MCP tools (`context7_query-docs`) are almost always lookups outside the repo.
-    if (tool.includes("_")) return { verb: "consulting", glyph: "globe" }
-    return { verb: "working", glyph: "work" }
-  }
+  if (view.craft) return VERBS[view.craft]
   if (view.doing === "writing its answer") return { verb: "answering", glyph: "edit" }
   if (view.doing === "starting") return { verb: "arriving", glyph: "join" }
   return { verb: "thinking", glyph: "thought" }
 }
 
-const TESTING = /\b(test|tests|spec|vitest|jest|pytest|check|lint|typecheck|tsc)\b/i
-
-const TOOL_VERBS: Record<string, { verb: string; glyph: VerbGlyph }> = {
+/** A deed in progress, by its craft. An MCP tool (`consult`) is almost always a lookup outside the repo. */
+const VERBS: Record<Craft, { verb: string; glyph: VerbGlyph }> = {
   read: { verb: "reading", glyph: "read" },
-  webfetch: { verb: "consulting", glyph: "globe" },
+  search: { verb: "searching", glyph: "search" },
   edit: { verb: "editing", glyph: "edit" },
   write: { verb: "editing", glyph: "edit" },
-  patch: { verb: "editing", glyph: "edit" },
-  multiedit: { verb: "editing", glyph: "edit" },
-  grep: { verb: "searching", glyph: "search" },
-  glob: { verb: "searching", glyph: "search" },
-  list: { verb: "searching", glyph: "search" },
-  websearch: { verb: "consulting", glyph: "globe" },
-  codesearch: { verb: "searching", glyph: "search" },
-  task: { verb: "dispatching", glyph: "summon" },
-  subagent: { verb: "dispatching", glyph: "summon" },
-  todowrite: { verb: "planning", glyph: "thought" },
+  run: { verb: "running", glyph: "run" },
+  test: { verb: "testing", glyph: "test" },
+  lint: { verb: "testing", glyph: "test" },
+  fetch: { verb: "consulting", glyph: "globe" },
+  consult: { verb: "consulting", glyph: "globe" },
+  plan: { verb: "planning", glyph: "thought" },
+  delegate: { verb: "dispatching", glyph: "summon" },
+  other: { verb: "working", glyph: "work" },
 }

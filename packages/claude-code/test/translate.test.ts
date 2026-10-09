@@ -63,6 +63,27 @@ describe("one conversation", () => {
     })
   })
 
+  test("each deed says its craft, read from Claude Code's own tool name", () => {
+    expect(tools(main).map((t) => t.craft)).toEqual(["read", "edit", "consult"])
+  })
+
+  test("a shell deed's craft comes from its command; without one it says none", () => {
+    const pre = (tool_input?: Record<string, unknown>) =>
+      translate(
+        {
+          hook_event_name: "PreToolUse",
+          session_id: MAIN,
+          tool_name: "Bash",
+          tool_use_id: "toolu_1",
+          ...(tool_input ? { tool_input } : {}),
+        },
+        1,
+      ).find((c) => c.type === "tool")
+    expect(pre({ command: "bun test cart" })).toMatchObject({ name: "bash", craft: "test" })
+    expect(pre({ command: "git status" })).toMatchObject({ craft: "run" })
+    expect(pre()).not.toHaveProperty("craft")
+  })
+
   test("a deed's output is the result's text", () => {
     expect(tools(main)[0]?.output).toContain("export function total(cart)")
     expect(tools(main)[2]?.output).toContain("Route handlers live in app/**/route.ts")

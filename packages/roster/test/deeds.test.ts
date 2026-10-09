@@ -1,25 +1,30 @@
 import { describe, expect, test } from "bun:test"
+import { CRAFTS } from "@guildhall/core"
 import { deedLook } from "../src/deeds.ts"
 
 describe("deedLook", () => {
-  test("v1 and v2 names for the same deed look the same", () => {
-    expect(deedLook("shell")).toEqual(deedLook("bash"))
-    expect(deedLook("subagent")).toEqual(deedLook("task"))
+  test("every craft has a look", () => {
+    for (const craft of CRAFTS) expect(deedLook(craft).clip).toBeString()
   })
 
   test("only quests and web trips walk", () => {
-    expect(deedLook("task").goTo).toBe("quest-board")
-    expect(deedLook("webfetch").goTo).toBe("map-table")
-    for (const tool of ["read", "grep", "glob", "edit", "write", "bash"]) {
-      expect(deedLook(tool).goTo).toBeUndefined()
-    }
+    expect(deedLook("delegate").goTo).toBe("quest-board")
+    expect(deedLook("fetch").goTo).toBe("map-table")
+    for (const craft of CRAFTS.filter((c) => c !== "delegate" && c !== "fetch"))
+      expect(deedLook(craft).goTo).toBeUndefined()
+  })
+
+  test("a run, a test and a lint all steam; an edit and a write both spark", () => {
+    expect(deedLook("test")).toEqual(deedLook("run"))
+    expect(deedLook("lint")).toEqual(deedLook("run"))
+    expect(deedLook("write")).toEqual(deedLook("edit"))
   })
 
   test("MCP tools cast a spell", () => {
-    expect(deedLook("context7_query-docs").clip).toBe("Spellcasting")
+    expect(deedLook("consult").clip).toBe("Spellcasting")
   })
 
-  test("unknown tools get the generic look", () => {
-    expect(deedLook("frobnicate")).toEqual({ clip: "Interact", effect: "none" })
+  test("other deeds get the generic look", () => {
+    expect(deedLook("other")).toEqual({ clip: "Interact", effect: "none" })
   })
 })

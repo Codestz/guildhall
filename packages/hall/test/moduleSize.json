@@ -6,7 +6,7 @@
   "packages/hall/src/guild/events.ts": 915,
   "packages/hall/src/guild/legends.ts": 650,
   "packages/hall/src/guild/store.ts": 1518,
-  "packages/hall/src/guild/story.ts": 1375,
+  "packages/hall/src/guild/story.ts": 1369,
   "packages/hall/src/hud/Legends.tsx": 485,
   "packages/hall/src/hud/Recap.tsx": 477,
   "packages/hall/src/hud/RecapDraw.ts": 490,

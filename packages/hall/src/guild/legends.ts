@@ -3,10 +3,8 @@ import { EVENT_KINDS, type EventKind, type Renown, renownOf } from "./events.ts"
 import { HARBOUR, type Moment } from "./moments.ts"
 import {
   CRAFT_ORDER,
-  type Craft,
   capital,
   clip,
-  craftOf,
   errorLine,
   failing,
   hash,
@@ -18,7 +16,9 @@ import {
   quote,
   sameQuest,
   spell,
+  type Told,
   targetOf,
+  toldOf,
   toolEntry,
 } from "./story.ts"
 
@@ -44,7 +44,7 @@ export interface Notable {
 }
 
 export interface DeedCount {
-  craft: Craft
+  craft: Told
   count: number
   /** `3 edits`. */
   label: string
@@ -174,10 +174,10 @@ function segmentsOf(session: Session): Entry[][] {
 }
 
 function countDeeds(entries: readonly Entry[], skipQuests: boolean): DeedCount[] {
-  const counts = new Map<Craft, number>()
+  const counts = new Map<Told, number>()
   for (const e of entries) {
     if (e.kind !== "tool" || (e.state !== "completed" && e.state !== "failed")) continue
-    const craft = craftOf(e.name, e.input)
+    const craft = toldOf(e)
     if (skipQuests && craft === "quest") continue
     counts.set(craft, (counts.get(craft) ?? 0) + 1)
   }
@@ -206,7 +206,7 @@ function notablesOf(moments: readonly Moment[], session: Session | undefined): N
     } else if (m.kind === "deed-failed") {
       const entry = toolEntry(session, m.call)
       const input = entry?.input ?? {}
-      const craft = craftOf(m.tool, input)
+      const craft = toldOf(entry ?? { name: m.tool })
       const what =
         typeof input.command === "string" ? `\`${clip(input.command, 40)}\`` : (targetOf(input) ?? m.tool)
       const n = failing(m.error) ?? failing(entry?.summary)

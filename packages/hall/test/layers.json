@@ -20,7 +20,6 @@
     "scene/Adventurer.tsx -> hud/icons.tsx",
     "scene/Sigils.tsx -> hud/glyphs.ts",
     "scene/Sigils.tsx -> hud/prefs.ts",
-    "scene/sigilBoard.ts -> hud/format.ts",
     "world/behaviours.ts -> scene/life/places.ts",
     "world/clearance.ts -> scene/life/rounds.ts"
   ],

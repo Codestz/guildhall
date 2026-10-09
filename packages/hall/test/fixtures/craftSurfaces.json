@@ -1,0 +1,2675 @@
+{
+  "party": {
+    "views": [
+      "idle|-|resting|false => resting idle | - | -",
+      "leaving|-|quest done|false => resting idle | - | -",
+      "loot|-|quest done|false => done loot | - | -",
+      "resting|-|quest done|false => resting idle | - | -",
+      "waiting|-|waiting for permission|false => waiting on you plea | - | -",
+      "working|-|thinking|true => thinking thought | think | -",
+      "working|-|writing its answer|false => answering edit | - | -",
+      "working|bash|bash · bun run migrate|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · bun run typecheck|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash · bun test users|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash · bun test|false => testing test | test | Use_Item/steam/-",
+      "working|context7_query-docs|context7_query-docs · keyset pagination where tup…|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|edit|edit · queries.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · routes.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · service.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|glob|glob · **|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · \"findUsers\" src|false => searching search | search | Interact/pages/-",
+      "working|read|read · pagination.md|false => reading read | read | Interact/pages/-",
+      "working|read|read · queries.ts|false => reading read | read | Interact/pages/-",
+      "working|read|read · routes.ts|false => reading read | read | Interact/pages/-",
+      "working|task|task · Check the ORM's keyset API|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Design the pagination contr…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Fix: fetch limit + 1 to det…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Map how GET /users flows fr…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Query: keyset pagination on…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Re-verify|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Verify against the contract|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|todowrite|todowrite|false => planning thought | think | Interact/scroll/-",
+      "working|webfetch|webfetch · cursor-vs-offset|false => consulting globe | consult | Interact/portal/map-table",
+      "working|write|write · 0042_users_created_at_idx.s…|false => editing edit | edit | Use_Item/sparks/-",
+      "working|write|write · pagination.md|false => editing edit | edit | Use_Item/sparks/-"
+    ],
+    "moments": [
+      "deed todowrite call_sim0004 => think | - | think",
+      "deed glob call_sim0008 => search | chop | search",
+      "deed grep call_sim0009 => search | chop | search",
+      "deed read call_sim0010 => read | - | read",
+      "deed read call_sim0011 => read | - | read",
+      "deed task call_sim0005 => dispatch | - | dispatch",
+      "deed webfetch call_sim0016 => consult | - | consult",
+      "deed write call_sim0018 => edit | - | edit",
+      "deed task call_sim0013 => dispatch | - | dispatch",
+      "deed read call_sim0031 => read | - | read",
+      "deed read call_sim0023 => read | - | read",
+      "deed context7_query-docs call_sim0039 => consult | - | consult",
+      "deed edit call_sim0024 => edit | build | edit",
+      "deed edit call_sim0032 => edit | build | edit",
+      "deed task call_sim0036 => dispatch | - | dispatch",
+      "deed write call_sim0033 => edit | build | edit",
+      "deed edit call_sim0025 => edit | build | edit",
+      "deed bash call_sim0026 => test | - | test",
+      "deed task call_sim0020 => dispatch | - | dispatch",
+      "deed bash call_sim0034 => run | - | run",
+      "deed task call_sim0028 => dispatch | - | dispatch",
+      "deed read call_sim0044 => read | - | read",
+      "deed-failed bash call_sim0045 => - | - | test",
+      "deed task call_sim0041 => dispatch | - | dispatch",
+      "deed edit call_sim0050 => edit | build | edit",
+      "deed bash call_sim0051 => test | - | test",
+      "deed task call_sim0048 => dispatch | - | dispatch",
+      "deed bash call_sim0056 => test | - | test",
+      "deed task call_sim0053 => dispatch | - | dispatch"
+    ],
+    "captions": [
+      "The Guildmaster asks the Scout to map how GET /users flows from route to query.",
+      "Across the guild: five deeds, mostly reading.",
+      "A quest leaves the board: the Architect is to design the pagination contract.",
+      "The Scout comes home: “routes.ts → service.ts → queries.ts; findUsers returns every…”",
+      "The Architect comes home: “Contract: ?cursor&limit → { items, nextCursor }. Two tasks…”",
+      "The Guildmaster sends the Artisan, the Artisan II and the Archivist out at once.",
+      "The Archivist comes home: “Use a row-value comparison: (created_at, id) > ($1, $2).”",
+      "The Artisan will go no further without your word.",
+      "The Artisan II's quest is done: “Route takes cursor & limit, encodes nextCursor.”",
+      "The Artisan returns with the loot: “findUsers(cursor, limit) with an index on (created_at, id).”",
+      "The Guildmaster sends the Warden to verify against the contract.",
+      "The Warden finds one failing.",
+      "The Warden returns with bad news: “FAIL: nextCursor skips the final row on exact page boundaries.”",
+      "The Guildmaster calls the Artisan back: “Fix: fetch limit + 1 to detect the next page”.",
+      "The Artisan's quest is done: “Lookahead row added; boundary test passes.”",
+      "A quest leaves the board: the Warden II is to re-verify.",
+      "The Warden II returns with good news: “PASS: contract holds, boundaries covered.”"
+    ],
+    "legends": [
+      {
+        "title": "Add cursor pagination to GET /users",
+        "party": 8,
+        "span": 67261,
+        "tokens": 135500,
+        "cost": 0.2168,
+        "outcome": "complete",
+        "opening": "The Guildmaster took up the quest “Add cursor pagination to GET /users”, and sent seven adventurers out to see it done.",
+        "chapters": [
+          {
+            "numeral": "I",
+            "id": "ses_sim0001",
+            "who": "Guildmaster",
+            "color": "#d4ad3a",
+            "quest": "Add cursor pagination to GET /users",
+            "resumed": false,
+            "begin": 0,
+            "end": 67261,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "plan",
+                "count": 1,
+                "label": "1 plan"
+              }
+            ],
+            "notables": [],
+            "tokens": 2000,
+            "cost": 0.0031999999999999997
+          },
+          {
+            "numeral": "II",
+            "id": "ses_sim0006",
+            "who": "Scout",
+            "color": "#2fa7a0",
+            "sentBy": "Guildmaster",
+            "quest": "Map how GET /users flows from route to query",
+            "resumed": false,
+            "begin": 4319,
+            "end": 11267,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "read",
+                "count": 2,
+                "label": "2 reads"
+              },
+              {
+                "craft": "search",
+                "count": 2,
+                "label": "2 searches"
+              }
+            ],
+            "notables": [],
+            "loot": "routes.ts → service.ts → queries.ts; findUsers returns every row.",
+            "tokens": 12250,
+            "cost": 0.0196
+          },
+          {
+            "numeral": "III",
+            "id": "ses_sim0014",
+            "who": "Architect",
+            "color": "#4f8fd6",
+            "sentBy": "Guildmaster",
+            "quest": "Design the pagination contract",
+            "resumed": false,
+            "begin": 11558,
+            "end": 22986,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 1,
+                "label": "1 edit"
+              },
+              {
+                "craft": "consult",
+                "count": 1,
+                "label": "1 consultation"
+              }
+            ],
+            "notables": [],
+            "loot": "Contract: ?cursor&limit → { items, nextCursor }. Two tasks: API, query.",
+            "tokens": 15000,
+            "cost": 0.024
+          },
+          {
+            "numeral": "IV",
+            "id": "ses_sim0021",
+            "who": "Artisan II",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "API: parse cursor + limit, return nextCursor",
+            "resumed": false,
+            "begin": 23256,
+            "end": 35671,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 2,
+                "label": "2 edits"
+              },
+              {
+                "craft": "run",
+                "count": 1,
+                "label": "1 command"
+              },
+              {
+                "craft": "read",
+                "count": 1,
+                "label": "1 read"
+              }
+            ],
+            "notables": [],
+            "loot": "Route takes cursor & limit, encodes nextCursor.",
+            "tokens": 28250,
+            "cost": 0.0452
+          },
+          {
+            "numeral": "V",
+            "id": "ses_sim0029",
+            "who": "Artisan",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Query: keyset pagination on (created_at, id)",
+            "resumed": false,
+            "begin": 23256,
+            "end": 40802,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 2,
+                "label": "2 edits"
+              },
+              {
+                "craft": "run",
+                "count": 1,
+                "label": "1 command"
+              },
+              {
+                "craft": "read",
+                "count": 1,
+                "label": "1 read"
+              }
+            ],
+            "notables": [
+              {
+                "kind": "plea",
+                "at": 30094,
+                "text": "Asked for your word; it was given after 7s."
+              }
+            ],
+            "loot": "findUsers(cursor, limit) with an index on (created_at, id)."
+          },
+          {
+            "numeral": "VI",
+            "id": "ses_sim0037",
+            "who": "Archivist",
+            "color": "#8b6cd9",
+            "sentBy": "Guildmaster",
+            "quest": "Check the ORM's keyset API",
+            "resumed": false,
+            "begin": 23256,
+            "end": 28687,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "consult",
+                "count": 1,
+                "label": "1 consultation"
+              }
+            ],
+            "notables": [],
+            "loot": "Use a row-value comparison: (created_at, id) > ($1, $2).",
+            "tokens": 10500,
+            "cost": 0.0168
+          },
+          {
+            "numeral": "VII",
+            "id": "ses_sim0042",
+            "who": "Warden",
+            "color": "#3fae6b",
+            "sentBy": "Guildmaster",
+            "quest": "Verify against the contract",
+            "resumed": false,
+            "begin": 41202,
+            "end": 51734,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "test",
+                "count": 1,
+                "label": "1 test run"
+              },
+              {
+                "craft": "read",
+                "count": 1,
+                "label": "1 read"
+              }
+            ],
+            "notables": [
+              {
+                "kind": "flaw",
+                "at": 47502,
+                "text": "Tests failed: `bun test users`, 1 failing."
+              }
+            ],
+            "loot": "FAIL: nextCursor skips the final row on exact page boundaries.",
+            "tokens": 15250,
+            "cost": 0.024399999999999998
+          },
+          {
+            "numeral": "VIII",
+            "id": "ses_sim0029",
+            "who": "Artisan",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Fix: fetch limit + 1 to detect the next page",
+            "resumed": true,
+            "begin": 52013,
+            "end": 59318,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 1,
+                "label": "1 edit"
+              },
+              {
+                "craft": "test",
+                "count": 1,
+                "label": "1 test run"
+              }
+            ],
+            "notables": [],
+            "loot": "Lookahead row added; boundary test passes.",
+            "tokens": 39500,
+            "cost": 0.06319999999999999,
+            "usageNote": "for both quests"
+          },
+          {
+            "numeral": "IX",
+            "id": "ses_sim0054",
+            "who": "Warden II",
+            "color": "#3fae6b",
+            "sentBy": "Guildmaster",
+            "quest": "Re-verify",
+            "resumed": false,
+            "begin": 59627,
+            "end": 65570,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "test",
+                "count": 1,
+                "label": "1 test run"
+              }
+            ],
+            "notables": [],
+            "loot": "PASS: contract holds, boundaries covered.",
+            "tokens": 12750,
+            "cost": 0.020399999999999998
+          }
+        ],
+        "lastWord": "GET /users now pages by cursor: ?cursor&limit → { items, nextCursor }. All 214 tests pass.",
+        "closing": "The quest was done in 1m 07s, though not without cost: one trial failed.",
+        "renown": [],
+        "unsung": [
+          {
+            "kind": "festival",
+            "hint": "When every deed of a long quest comes home clean…"
+          },
+          {
+            "kind": "ghost-ship",
+            "hint": "A sail with no crew, for those who fall…"
+          },
+          {
+            "kind": "rainbow",
+            "hint": "What follows the storm, if the work comes good…"
+          },
+          {
+            "kind": "raid",
+            "hint": "Spend long enough, and someone notices the treasury…"
+          },
+          {
+            "kind": "comet",
+            "hint": "Count the deeds, and look up…"
+          },
+          {
+            "kind": "dragon",
+            "hint": "Fail the same trial three times running…"
+          }
+        ]
+      }
+    ]
+  },
+  "rush": {
+    "views": [
+      "failed|-|Gave up: the module's tests keep failing|false => fallen fail | - | -",
+      "idle|-|resting|false => resting idle | - | -",
+      "loot|-|quest done|false => done loot | - | -",
+      "resting|-|quest done|false => resting idle | - | -",
+      "working|-|thinking|true => thinking thought | think | -",
+      "working|-|writing its answer|false => answering edit | - | -",
+      "working|bash|bash · bun test mod3|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash · bun test mod8|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash|false => running run | run | Use_Item/steam/-",
+      "working|context7_query-docs|context7_query-docs · mod10|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|context7_query-docs|context7_query-docs · mod11|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|context7_query-docs|context7_query-docs · mod12|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|context7_query-docs|context7_query-docs · mod1|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|context7_query-docs|context7_query-docs · mod2|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|context7_query-docs|context7_query-docs · mod3|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|context7_query-docs|context7_query-docs · mod4|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|context7_query-docs|context7_query-docs · mod5|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|context7_query-docs|context7_query-docs · mod6|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|context7_query-docs|context7_query-docs · mod7|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|context7_query-docs|context7_query-docs · mod8|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|context7_query-docs|context7_query-docs · mod9|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|edit|edit · index.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · mod10|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · mod11|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · mod1|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · mod2|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · mod4|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · mod5|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · mod7|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · mod8|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · mod9|false => editing edit | edit | Use_Item/sparks/-",
+      "working|glob|glob|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · mod11|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · mod12|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · mod1|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · mod2|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · mod5|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · mod8|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · mod9|false => searching search | search | Interact/pages/-",
+      "working|read|read · mod10|false => reading read | read | Interact/pages/-",
+      "working|read|read · mod11|false => reading read | read | Interact/pages/-",
+      "working|read|read · mod12|false => reading read | read | Interact/pages/-",
+      "working|read|read · mod1|false => reading read | read | Interact/pages/-",
+      "working|read|read · mod3|false => reading read | read | Interact/pages/-",
+      "working|read|read · mod4|false => reading read | read | Interact/pages/-",
+      "working|read|read · mod5|false => reading read | read | Interact/pages/-",
+      "working|read|read · mod6|false => reading read | read | Interact/pages/-",
+      "working|read|read · mod7|false => reading read | read | Interact/pages/-",
+      "working|task|task · Module 11|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Module 12|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Retry module 8: fix the fai…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|webfetch|webfetch|false => consulting globe | consult | Interact/portal/map-table"
+    ],
+    "moments": [
+      "deed edit call_sim0019 => edit | - | edit",
+      "deed webfetch call_sim0031 => consult | - | consult",
+      "deed read call_sim0063 => read | quarry | read",
+      "deed context7_query-docs call_sim0007 => consult | - | consult",
+      "deed grep call_sim0051 => search | - | search",
+      "deed edit call_sim0087 => edit | - | edit",
+      "deed grep call_sim0095 => search | - | search",
+      "deed glob call_sim0039 => search | - | search",
+      "deed webfetch call_sim0075 => consult | - | consult",
+      "deed read call_sim0119 => read | - | read",
+      "deed context7_query-docs call_sim0107 => consult | - | consult",
+      "deed read call_sim0131 => read | quarry | read",
+      "deed webfetch call_sim0020 => consult | - | consult",
+      "deed read call_sim0032 => read | - | read",
+      "deed read call_sim0064 => read | quarry | read",
+      "deed read call_sim0052 => read | - | read",
+      "deed grep call_sim0088 => search | chop | search",
+      "deed grep call_sim0008 => search | - | search",
+      "deed webfetch call_sim0096 => consult | - | consult",
+      "deed read call_sim0076 => read | - | read",
+      "deed context7_query-docs call_sim0040 => consult | - | consult",
+      "deed edit call_sim0108 => edit | - | edit",
+      "deed grep call_sim0120 => search | - | search",
+      "deed context7_query-docs call_sim0132 => consult | quarry | consult",
+      "deed grep call_sim0021 => search | chop | search",
+      "deed read call_sim0033 => read | - | read",
+      "deed glob call_sim0065 => search | quarry | search",
+      "deed webfetch call_sim0009 => consult | - | consult",
+      "deed edit call_sim0053 => edit | - | edit",
+      "deed context7_query-docs call_sim0097 => consult | - | consult",
+      "deed glob call_sim0109 => search | - | search",
+      "deed context7_query-docs call_sim0089 => consult | - | consult",
+      "deed bash call_sim0133 => run | quarry | run",
+      "deed context7_query-docs call_sim0077 => consult | - | consult",
+      "deed context7_query-docs call_sim0041 => consult | - | consult",
+      "deed read call_sim0121 => read | - | read",
+      "deed context7_query-docs call_sim0034 => consult | - | consult",
+      "deed read call_sim0066 => read | quarry | read",
+      "deed bash call_sim0022 => run | - | run",
+      "deed context7_query-docs call_sim0010 => consult | - | consult",
+      "deed bash call_sim0054 => run | - | run",
+      "deed context7_query-docs call_sim0110 => consult | - | consult",
+      "deed grep call_sim0090 => search | chop | search",
+      "deed edit call_sim0098 => edit | - | edit",
+      "deed context7_query-docs call_sim0042 => consult | - | consult",
+      "deed webfetch call_sim0078 => consult | - | consult",
+      "deed grep call_sim0134 => search | quarry | search",
+      "deed edit call_sim0122 => edit | - | edit",
+      "deed-failed bash call_sim0035 => - | - | test",
+      "deed bash call_sim0067 => run | quarry | run",
+      "deed bash call_sim0011 => run | - | run",
+      "deed-failed bash call_sim0091 => - | - | test",
+      "deed task call_sim0028 => dispatch | - | dispatch",
+      "deed task call_sim0084 => dispatch | - | dispatch",
+      "deed edit call_sim0099 => edit | - | edit",
+      "deed grep call_sim0023 => search | chop | search",
+      "deed read call_sim0079 => read | - | read",
+      "deed read call_sim0055 => read | - | read",
+      "deed grep call_sim0135 => search | quarry | search",
+      "deed bash call_sim0111 => run | - | run",
+      "deed read call_sim0043 => read | book | read",
+      "deed grep call_sim0123 => search | - | search",
+      "deed webfetch call_sim0068 => consult | quarry | consult",
+      "deed edit call_sim0012 => edit | build | edit",
+      "deed read call_sim0112 => read | book | read",
+      "deed webfetch call_sim0056 => consult | - | consult",
+      "deed edit call_sim0080 => edit | build | edit",
+      "deed bash call_sim0100 => run | - | run",
+      "deed bash call_sim0024 => run | - | run",
+      "deed glob call_sim0136 => search | quarry | search",
+      "deed edit call_sim0044 => edit | - | edit",
+      "deed context7_query-docs call_sim0124 => consult | - | consult",
+      "deed grep call_sim0013 => search | - | search",
+      "deed webfetch call_sim0113 => consult | - | consult",
+      "deed context7_query-docs call_sim0069 => consult | quarry | consult",
+      "deed webfetch call_sim0101 => consult | - | consult",
+      "deed grep call_sim0057 => search | - | search",
+      "deed context7_query-docs call_sim0025 => consult | - | consult",
+      "deed read call_sim0137 => read | quarry | read",
+      "deed edit call_sim0081 => edit | build | edit",
+      "deed read call_sim0014 => read | - | read",
+      "deed bash call_sim0045 => run | - | run",
+      "deed context7_query-docs call_sim0070 => consult | quarry | consult",
+      "deed read call_sim0125 => read | - | read",
+      "deed glob call_sim0114 => search | - | search",
+      "deed webfetch call_sim0026 => consult | - | consult",
+      "deed context7_query-docs call_sim0058 => consult | - | consult",
+      "deed grep call_sim0102 => search | - | search",
+      "deed read call_sim0138 => read | quarry | read",
+      "deed task call_sim0060 => dispatch | - | dispatch",
+      "deed task call_sim0004 => dispatch | - | dispatch",
+      "deed task call_sim0104 => dispatch | - | dispatch",
+      "deed edit call_sim0082 => edit | build | edit",
+      "deed task call_sim0048 => dispatch | - | dispatch",
+      "deed task call_sim0016 => dispatch | - | dispatch",
+      "deed glob call_sim0046 => search | - | search",
+      "deed task call_sim0092 => dispatch | - | dispatch",
+      "deed task call_sim0128 => dispatch | - | dispatch",
+      "deed read call_sim0126 => read | - | read",
+      "deed task call_sim0072 => dispatch | - | dispatch",
+      "deed task call_sim0036 => dispatch | - | dispatch",
+      "deed task call_sim0116 => dispatch | - | dispatch",
+      "deed edit call_sim0142 => edit | - | edit",
+      "deed bash call_sim0143 => test | - | test",
+      "deed task call_sim0140 => dispatch | - | dispatch"
+    ],
+    "captions": [
+      "Twelve quests leave the board at once.",
+      "All over the island: 15 deeds, mostly reading.",
+      "All over the island: 22 deeds, mostly consulting the archives.",
+      "Two fall at once; the graveyard stirs.",
+      "25 deeds, mostly consulting the archives, all at once.",
+      "The Wanderer II, the Artisan and five others bring their loot home.",
+      "The Guildmaster calls the Scout II back from the fall: “Retry module 8: fix the failing tests”.",
+      "The Artisan II, the Archivist II and the Scholar II bring their loot home.",
+      "The Scout II's quest is done: “Fixed and passing.”"
+    ],
+    "legends": [
+      {
+        "title": "Sweep the repo: 12 parallel quests",
+        "party": 13,
+        "span": 34895,
+        "tokens": 595000,
+        "cost": 0.952,
+        "outcome": "complete",
+        "opening": "It began at the quest board: “Sweep the repo: 12 parallel quests”. The Guildmaster called twelve adventurers to the work.",
+        "chapters": [
+          {
+            "numeral": "I",
+            "id": "ses_sim0005",
+            "who": "Artisan",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Module 1",
+            "resumed": false,
+            "begin": 1261,
+            "end": 23430,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 1,
+                "label": "1 edit"
+              },
+              {
+                "craft": "run",
+                "count": 1,
+                "label": "1 command"
+              },
+              {
+                "craft": "read",
+                "count": 1,
+                "label": "1 read"
+              },
+              {
+                "craft": "search",
+                "count": 2,
+                "label": "2 searches"
+              },
+              {
+                "craft": "consult",
+                "count": 3,
+                "label": "3 consultations"
+              }
+            ],
+            "notables": [],
+            "loot": "Module 1 done.",
+            "tokens": 52000,
+            "cost": 0.0832
+          },
+          {
+            "numeral": "II",
+            "id": "ses_sim0017",
+            "who": "Scout",
+            "color": "#2fa7a0",
+            "sentBy": "Guildmaster",
+            "quest": "Module 2",
+            "resumed": false,
+            "begin": 1261,
+            "end": 23843,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 1,
+                "label": "1 edit"
+              },
+              {
+                "craft": "run",
+                "count": 2,
+                "label": "2 commands"
+              },
+              {
+                "craft": "search",
+                "count": 2,
+                "label": "2 searches"
+              },
+              {
+                "craft": "consult",
+                "count": 3,
+                "label": "3 consultations"
+              }
+            ],
+            "notables": [],
+            "loot": "Module 2 done.",
+            "tokens": 52000,
+            "cost": 0.0832
+          },
+          {
+            "numeral": "III",
+            "id": "ses_sim0029",
+            "who": "Warden",
+            "color": "#3fae6b",
+            "sentBy": "Guildmaster",
+            "quest": "Module 3",
+            "resumed": false,
+            "begin": 1261,
+            "end": 14599,
+            "outcome": "fallen",
+            "deeds": [
+              {
+                "craft": "test",
+                "count": 1,
+                "label": "1 test run"
+              },
+              {
+                "craft": "read",
+                "count": 2,
+                "label": "2 reads"
+              },
+              {
+                "craft": "consult",
+                "count": 2,
+                "label": "2 consultations"
+              }
+            ],
+            "notables": [
+              {
+                "kind": "flaw",
+                "at": 14599,
+                "text": "Tests failed: `bun test mod3`, 3 failing."
+              },
+              {
+                "kind": "fall",
+                "at": 14599,
+                "text": "Fell: “Gave up: the module's tests keep failing”, and rose in the graveyard."
+              }
+            ],
+            "tokens": 31500,
+            "cost": 0.0504
+          },
+          {
+            "numeral": "IV",
+            "id": "ses_sim0037",
+            "who": "Archivist II",
+            "color": "#8b6cd9",
+            "sentBy": "Guildmaster",
+            "quest": "Module 4",
+            "resumed": false,
+            "begin": 1261,
+            "end": 25647,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 1,
+                "label": "1 edit"
+              },
+              {
+                "craft": "run",
+                "count": 1,
+                "label": "1 command"
+              },
+              {
+                "craft": "read",
+                "count": 1,
+                "label": "1 read"
+              },
+              {
+                "craft": "search",
+                "count": 2,
+                "label": "2 searches"
+              },
+              {
+                "craft": "consult",
+                "count": 3,
+                "label": "3 consultations"
+              }
+            ],
+            "notables": [],
+            "loot": "Module 4 done.",
+            "tokens": 52000,
+            "cost": 0.0832
+          },
+          {
+            "numeral": "V",
+            "id": "ses_sim0049",
+            "who": "Scholar",
+            "color": "#6fb3e0",
+            "sentBy": "Guildmaster",
+            "quest": "Module 5",
+            "resumed": false,
+            "begin": 1261,
+            "end": 23785,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 1,
+                "label": "1 edit"
+              },
+              {
+                "craft": "run",
+                "count": 1,
+                "label": "1 command"
+              },
+              {
+                "craft": "read",
+                "count": 2,
+                "label": "2 reads"
+              },
+              {
+                "craft": "search",
+                "count": 2,
+                "label": "2 searches"
+              },
+              {
+                "craft": "consult",
+                "count": 2,
+                "label": "2 consultations"
+              }
+            ],
+            "notables": [],
+            "loot": "Module 5 done.",
+            "tokens": 52000,
+            "cost": 0.0832
+          },
+          {
+            "numeral": "VI",
+            "id": "ses_sim0061",
+            "who": "Wanderer II",
+            "color": "#9a8f80",
+            "sentBy": "Guildmaster",
+            "quest": "Module 6",
+            "resumed": false,
+            "begin": 1261,
+            "end": 23198,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "run",
+                "count": 1,
+                "label": "1 command"
+              },
+              {
+                "craft": "read",
+                "count": 3,
+                "label": "3 reads"
+              },
+              {
+                "craft": "search",
+                "count": 1,
+                "label": "1 search"
+              },
+              {
+                "craft": "consult",
+                "count": 3,
+                "label": "3 consultations"
+              }
+            ],
+            "notables": [],
+            "loot": "Module 6 done.",
+            "tokens": 52000,
+            "cost": 0.0832
+          },
+          {
+            "numeral": "VII",
+            "id": "ses_sim0073",
+            "who": "Artisan II",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Module 7",
+            "resumed": false,
+            "begin": 1261,
+            "end": 25393,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 3,
+                "label": "3 edits"
+              },
+              {
+                "craft": "read",
+                "count": 2,
+                "label": "2 reads"
+              },
+              {
+                "craft": "consult",
+                "count": 3,
+                "label": "3 consultations"
+              }
+            ],
+            "notables": [],
+            "loot": "Module 7 done.",
+            "tokens": 52000,
+            "cost": 0.0832
+          },
+          {
+            "numeral": "VIII",
+            "id": "ses_sim0085",
+            "who": "Scout II",
+            "color": "#2fa7a0",
+            "sentBy": "Guildmaster",
+            "quest": "Module 8",
+            "resumed": false,
+            "begin": 1261,
+            "end": 14718,
+            "outcome": "fallen",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 1,
+                "label": "1 edit"
+              },
+              {
+                "craft": "test",
+                "count": 1,
+                "label": "1 test run"
+              },
+              {
+                "craft": "search",
+                "count": 2,
+                "label": "2 searches"
+              },
+              {
+                "craft": "consult",
+                "count": 1,
+                "label": "1 consultation"
+              }
+            ],
+            "notables": [
+              {
+                "kind": "flaw",
+                "at": 14718,
+                "text": "Tests failed: `bun test mod8`, 3 failing."
+              },
+              {
+                "kind": "fall",
+                "at": 14718,
+                "text": "Fell: “Gave up: the module's tests keep failing”, and rose in the graveyard."
+              },
+              {
+                "kind": "renown",
+                "at": 14718,
+                "text": "A ghost ship passed in the mist for the fallen."
+              }
+            ]
+          },
+          {
+            "numeral": "IX",
+            "id": "ses_sim0093",
+            "who": "Warden II",
+            "color": "#3fae6b",
+            "sentBy": "Guildmaster",
+            "quest": "Module 9",
+            "resumed": false,
+            "begin": 1261,
+            "end": 24255,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 2,
+                "label": "2 edits"
+              },
+              {
+                "craft": "run",
+                "count": 1,
+                "label": "1 command"
+              },
+              {
+                "craft": "search",
+                "count": 2,
+                "label": "2 searches"
+              },
+              {
+                "craft": "consult",
+                "count": 3,
+                "label": "3 consultations"
+              }
+            ],
+            "notables": [],
+            "loot": "Module 9 done.",
+            "tokens": 52000,
+            "cost": 0.0832
+          },
+          {
+            "numeral": "X",
+            "id": "ses_sim0105",
+            "who": "Archivist",
+            "color": "#8b6cd9",
+            "sentBy": "Guildmaster",
+            "quest": "Module 10",
+            "resumed": false,
+            "begin": 1261,
+            "end": 23648,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 1,
+                "label": "1 edit"
+              },
+              {
+                "craft": "run",
+                "count": 1,
+                "label": "1 command"
+              },
+              {
+                "craft": "read",
+                "count": 1,
+                "label": "1 read"
+              },
+              {
+                "craft": "search",
+                "count": 2,
+                "label": "2 searches"
+              },
+              {
+                "craft": "consult",
+                "count": 3,
+                "label": "3 consultations"
+              }
+            ],
+            "notables": [],
+            "loot": "Module 10 done.",
+            "tokens": 52000,
+            "cost": 0.0832
+          },
+          {
+            "numeral": "XI",
+            "id": "ses_sim0117",
+            "who": "Scholar II",
+            "color": "#6fb3e0",
+            "sentBy": "Guildmaster",
+            "quest": "Module 11",
+            "resumed": false,
+            "begin": 1261,
+            "end": 25902,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 1,
+                "label": "1 edit"
+              },
+              {
+                "craft": "read",
+                "count": 4,
+                "label": "4 reads"
+              },
+              {
+                "craft": "search",
+                "count": 2,
+                "label": "2 searches"
+              },
+              {
+                "craft": "consult",
+                "count": 1,
+                "label": "1 consultation"
+              }
+            ],
+            "notables": [],
+            "loot": "Module 11 done.",
+            "tokens": 52000,
+            "cost": 0.0832
+          },
+          {
+            "numeral": "XII",
+            "id": "ses_sim0129",
+            "who": "Wanderer",
+            "color": "#9a8f80",
+            "sentBy": "Guildmaster",
+            "quest": "Module 12",
+            "resumed": false,
+            "begin": 1261,
+            "end": 24277,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "run",
+                "count": 1,
+                "label": "1 command"
+              },
+              {
+                "craft": "read",
+                "count": 3,
+                "label": "3 reads"
+              },
+              {
+                "craft": "search",
+                "count": 3,
+                "label": "3 searches"
+              },
+              {
+                "craft": "consult",
+                "count": 1,
+                "label": "1 consultation"
+              }
+            ],
+            "notables": [],
+            "loot": "Module 12 done.",
+            "tokens": 52000,
+            "cost": 0.0832
+          },
+          {
+            "numeral": "XIII",
+            "id": "ses_sim0085",
+            "who": "Scout II",
+            "color": "#2fa7a0",
+            "sentBy": "Guildmaster",
+            "quest": "Retry module 8: fix the failing tests",
+            "resumed": true,
+            "begin": 26302,
+            "end": 33276,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 1,
+                "label": "1 edit"
+              },
+              {
+                "craft": "test",
+                "count": 1,
+                "label": "1 test run"
+              }
+            ],
+            "notables": [
+              {
+                "kind": "rise",
+                "at": 26750,
+                "text": "Rose again and took up the work."
+              }
+            ],
+            "loot": "Fixed and passing.",
+            "tokens": 43500,
+            "cost": 0.0696,
+            "usageNote": "for both quests"
+          }
+        ],
+        "lastWord": "All 12 modules swept.",
+        "closing": "It took 35s, and two fell, two trials failed and one rose again — but the quest was done.",
+        "renown": [
+          {
+            "kind": "ghost-ship",
+            "id": "ghost-ship",
+            "title": "The Ghost Ship",
+            "text": "Two fell in one quest, and a ghost ship passed in the mist.",
+            "count": 1,
+            "forced": false
+          }
+        ],
+        "unsung": [
+          {
+            "kind": "festival",
+            "hint": "When every deed of a long quest comes home clean…"
+          },
+          {
+            "kind": "rainbow",
+            "hint": "What follows the storm, if the work comes good…"
+          },
+          {
+            "kind": "raid",
+            "hint": "Spend long enough, and someone notices the treasury…"
+          },
+          {
+            "kind": "comet",
+            "hint": "Count the deeds, and look up…"
+          },
+          {
+            "kind": "dragon",
+            "hint": "Fail the same trial three times running…"
+          }
+        ]
+      }
+    ]
+  },
+  "saga": {
+    "views": [
+      "idle|-|resting|false => resting idle | - | -",
+      "leaving|-|quest done|false => resting idle | - | -",
+      "loot|-|quest done|false => done loot | - | -",
+      "resting|-|quest done|false => resting idle | - | -",
+      "waiting|-|waiting for permission|false => waiting on you plea | - | -",
+      "working|-|thinking|true => thinking thought | think | -",
+      "working|-|writing its answer|false => answering edit | - | -",
+      "working|bash|bash · bun add -d vite-plugin-pwa|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · bun add idb|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · bun add node-diff3|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · bun run build|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · bun run typecheck|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash · bun test src/search/tokeniz…|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash · bun test src/search|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash · bun test src/sync --rerun-e…|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash · bun test src/sync/conflict.…|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash · bun test src/sync/engine.te…|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash · bun test src/sync/outbox.te…|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash · bun test src/sync|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash · gh pr checks 418 --watch|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · gh pr checks 418|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · gh pr create --base release…|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · gh run view --log-failed|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · git bisect run bun test src…|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash · git bisect skip && git bise…|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · git bisect start HEAD main …|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · git commit -am \"fix(search)…|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · git push -u origin fix/emoj…|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · git switch -c fix/emoji-sea…|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · rm -rf .quill-data && bun r…|false => running run | run | Use_Item/steam/-",
+      "working|context7_query-docs|context7_query-docs · idb openDB upgrade transact…|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|context7_query-docs|context7_query-docs · node-diff3 merge conflict h…|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|edit|edit · Header.tsx|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · api.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · conflict.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · engine.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · indexer.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · notes.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · outbox.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · store.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · theme.css|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · tokenize.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · vite.config.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|glob|glob · *.{ts,tsx}|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · \"POST /sync\" test-results|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · \"Segmenter\" src|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · \"addEventListener\\(\"(online…|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · \"fetch\\(|/api/notes\" src|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · \"fromCodePoint\" src|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · \"tokenize\\(\" src/search|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · \"updatedAt\" src|false => searching search | search | Interact/pages/-",
+      "working|read|read · 0007-offline-sync.md|false => reading read | read | Interact/pages/-",
+      "working|read|read · App.tsx|false => reading read | read | Interact/pages/-",
+      "working|read|read · Header.tsx|false => reading read | read | Interact/pages/-",
+      "working|read|read · api.ts|false => reading read | read | Interact/pages/-",
+      "working|read|read · conflict.ts|false => reading read | read | Interact/pages/-",
+      "working|read|read · engine.test.ts|false => reading read | read | Interact/pages/-",
+      "working|read|read · index.html|false => reading read | read | Interact/pages/-",
+      "working|read|read · indexer.ts|false => reading read | read | Interact/pages/-",
+      "working|read|read · network.har|false => reading read | read | Interact/pages/-",
+      "working|read|read · notes.ts|false => reading read | read | Interact/pages/-",
+      "working|read|read · offline-sync.md|false => reading read | read | Interact/pages/-",
+      "working|read|read · package.json|false => reading read | read | Interact/pages/-",
+      "working|read|read · store.ts|false => reading read | read | Interact/pages/-",
+      "working|read|read · theme.css|false => reading read | read | Interact/pages/-",
+      "working|read|read · types.ts|false => reading read | read | Interact/pages/-",
+      "working|read|read · vite.config.ts|false => reading read | read | Interact/pages/-",
+      "working|task|task · Bisect: which commit starte…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Conflicts: three-way merge …|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Design offline sync: storag…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Drop Intl.Segmenter from in…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Find where search tokenizes…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Find why #418 fails on the …|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Fix: merge() drops the remo…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Map how notes are loaded an…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Reproduce with a failing te…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Research offline storage an…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Service worker: cache the a…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Sync engine: flush the outb…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Verify offline sync end to …|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|todowrite|todowrite|false => planning thought | think | Interact/scroll/-",
+      "working|webfetch|webfetch · IndexedDB_API|false => consulting globe | consult | Interact/portal/map-table",
+      "working|webfetch|webfetch · background-sync|false => consulting globe | consult | Interact/portal/map-table",
+      "working|webfetch|webfetch · idb#transaction-lifetime|false => consulting globe | consult | Interact/portal/map-table",
+      "working|webfetch|webfetch · node-diff3|false => consulting globe | consult | Interact/portal/map-table",
+      "working|webfetch|webfetch · offline-cookbook|false => consulting globe | consult | Interact/portal/map-table",
+      "working|webfetch|webfetch · onLine|false => consulting globe | consult | Interact/portal/map-table",
+      "working|write|write · 0007-offline-sync.md|false => editing edit | edit | Use_Item/sparks/-",
+      "working|write|write · OfflineBadge.tsx|false => editing edit | edit | Use_Item/sparks/-",
+      "working|write|write · conflict.test.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|write|write · conflict.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|write|write · db.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|write|write · engine.test.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|write|write · engine.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|write|write · offline-sync.md|false => editing edit | edit | Use_Item/sparks/-",
+      "working|write|write · outbox.test.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|write|write · outbox.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|write|write · service-worker.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|write|write · tokenize.test.ts|false => editing edit | edit | Use_Item/sparks/-"
+    ],
+    "moments": [
+      "deed todowrite call_sim0004 => think | - | think",
+      "deed glob call_sim0009 => search | chop | search",
+      "deed webfetch call_sim0024 => consult | - | consult",
+      "deed grep call_sim0010 => search | chop | search",
+      "deed webfetch call_sim0025 => consult | - | consult",
+      "deed read call_sim0011 => read | - | read",
+      "deed read call_sim0012 => read | - | read",
+      "deed read call_sim0013 => read | - | read",
+      "deed grep call_sim0015 => search | chop | search",
+      "deed webfetch call_sim0027 => consult | - | consult",
+      "deed read call_sim0016 => read | - | read",
+      "deed read call_sim0017 => read | - | read",
+      "deed webfetch call_sim0028 => consult | - | consult",
+      "deed grep call_sim0018 => search | chop | search",
+      "deed read call_sim0019 => read | - | read",
+      "deed task call_sim0021 => dispatch | - | dispatch",
+      "deed task call_sim0005 => dispatch | - | dispatch",
+      "deed read call_sim0035 => read | - | read",
+      "deed read call_sim0036 => read | - | read",
+      "deed webfetch call_sim0038 => consult | - | consult",
+      "deed write call_sim0039 => edit | - | edit",
+      "deed write call_sim0040 => edit | - | edit",
+      "deed task call_sim0032 => dispatch | - | dispatch",
+      "deed todowrite call_sim0044 => think | - | think",
+      "deed read call_sim0048 => read | - | read",
+      "deed read call_sim0049 => read | - | read",
+      "deed read call_sim0062 => read | - | read",
+      "deed read call_sim0063 => read | - | read",
+      "deed read call_sim0064 => read | - | read",
+      "deed read call_sim0107 => read | - | read",
+      "deed read call_sim0108 => read | - | read",
+      "deed read call_sim0076 => read | - | read",
+      "deed read call_sim0077 => read | - | read",
+      "deed read call_sim0096 => read | - | read",
+      "deed read call_sim0097 => read | - | read",
+      "deed context7_query-docs call_sim0088 => consult | - | consult",
+      "deed write call_sim0066 => edit | build | edit",
+      "deed bash call_sim0051 => run | - | run",
+      "deed bash call_sim0110 => run | - | run",
+      "deed context7_query-docs call_sim0089 => consult | - | consult",
+      "deed write call_sim0099 => edit | - | edit",
+      "deed bash call_sim0079 => run | - | run",
+      "deed write call_sim0052 => edit | build | edit",
+      "deed write call_sim0111 => edit | build | edit",
+      "deed webfetch call_sim0091 => consult | - | consult",
+      "deed write call_sim0080 => edit | build | edit",
+      "deed task call_sim0085 => dispatch | - | dispatch",
+      "deed edit call_sim0067 => edit | build | edit",
+      "deed edit call_sim0112 => edit | build | edit",
+      "deed edit call_sim0068 => edit | build | edit",
+      "deed edit call_sim0100 => edit | - | edit",
+      "deed write call_sim0053 => edit | build | edit",
+      "deed edit call_sim0054 => edit | build | edit",
+      "deed edit call_sim0101 => edit | - | edit",
+      "deed write call_sim0081 => edit | build | edit",
+      "deed bash call_sim0082 => test | - | test",
+      "deed write call_sim0069 => edit | build | edit",
+      "deed write call_sim0055 => edit | build | edit",
+      "deed bash call_sim0113 => run | - | run",
+      "deed bash call_sim0070 => test | - | test",
+      "deed bash call_sim0056 => test | - | test",
+      "deed grep call_sim0122 => search | chop | search",
+      "deed read call_sim0123 => read | - | read",
+      "deed read call_sim0124 => read | - | read",
+      "deed task call_sim0093 => dispatch | - | dispatch",
+      "deed grep call_sim0126 => search | chop | search",
+      "deed task call_sim0119 => dispatch | - | dispatch",
+      "deed write call_sim0131 => edit | build | edit",
+      "deed-failed bash call_sim0132 => - | - | test",
+      "deed bash call_sim0057 => test | - | test",
+      "deed task call_sim0045 => dispatch | - | dispatch",
+      "deed bash call_sim0114 => test | - | test",
+      "deed task call_sim0104 => dispatch | - | dispatch",
+      "deed edit call_sim0083 => edit | build | edit",
+      "deed edit call_sim0134 => edit | build | edit",
+      "deed task call_sim0073 => dispatch | - | dispatch",
+      "deed bash call_sim0135 => test | - | test",
+      "deed task call_sim0128 => dispatch | - | dispatch",
+      "deed task call_sim0059 => dispatch | - | dispatch",
+      "deed read call_sim0175 => read | - | read",
+      "deed read call_sim0176 => read | - | read",
+      "deed-failed bash call_sim0177 => - | - | test",
+      "deed read call_sim0179 => read | - | read",
+      "deed bash call_sim0140 => run | - | run",
+      "deed task call_sim0172 => dispatch | - | dispatch",
+      "deed bash call_sim0141 => run | - | run",
+      "deed read call_sim0184 => read | - | read",
+      "deed bash call_sim0142 => run | - | run",
+      "deed edit call_sim0185 => edit | build | edit",
+      "deed bash call_sim0143 => run | - | run",
+      "deed-failed bash call_sim0186 => - | - | test",
+      "deed edit call_sim0188 => edit | build | edit",
+      "deed-failed bash call_sim0189 => - | - | test",
+      "deed edit call_sim0190 => edit | build | edit",
+      "deed bash call_sim0146 => run | - | run",
+      "deed-failed bash call_sim0191 => - | - | test",
+      "deed bash call_sim0150 => run | - | run",
+      "deed read call_sim0151 => read | - | read",
+      "deed grep call_sim0152 => search | - | search",
+      "deed task call_sim0147 => dispatch | - | dispatch",
+      "deed-failed bash call_sim0193 => - | - | test",
+      "deed edit call_sim0156 => edit | build | edit",
+      "deed bash call_sim0157 => test | - | test",
+      "deed read call_sim0198 => read | - | read",
+      "deed task call_sim0154 => dispatch | - | dispatch",
+      "deed bash call_sim0214 => run | - | run",
+      "deed edit call_sim0199 => edit | build | edit",
+      "deed grep call_sim0194 => search | - | search",
+      "deed bash call_sim0159 => run | - | run",
+      "deed-failed bash call_sim0200 => - | - | test",
+      "deed read call_sim0202 => read | - | read",
+      "deed read call_sim0195 => read | - | read",
+      "deed-failed bash call_sim0215 => - | - | test",
+      "deed bash call_sim0203 => run | - | run",
+      "deed bash call_sim0204 => test | - | test",
+      "deed-failed bash call_sim0217 => - | - | run"
+    ],
+    "captions": [
+      "The Guildmaster splits the work: the Scholar and the Scout set out together.",
+      "The Guildmaster pins the plan to the board.",
+      "Busy hands — two searches made and one scroll consulted, by the Scout and the Scholar.",
+      "Busy hands — six deeds, mostly reading, by the Scholar and the Scout.",
+      "Busy hands — four deeds, mostly reading, by the Scout and the Scholar.",
+      "The Scout studies App.tsx.",
+      "The Scholar's quest is done: “IndexedDB via idb for notes and an outbox. Background Sync is…”",
+      "The Scout comes home: “Saves are a PUT /api/notes/:id from store.ts with no local…”",
+      "The Guildmaster asks the Architect to design offline sync: storage, outbox, conflicts.",
+      "The Architect pores over store.ts and types.ts.",
+      "The Architect consults distant scrolls on node-diff3.",
+      "The Architect forges offline-sync.md.",
+      "The Architect forges 0007-offline-sync.md.",
+      "The Architect will go no further without your word.",
+      "Word given, the Architect carries on.",
+      "The Architect comes home: “Plan approved: (1) idb store + outbox, (2) sync engine with…”",
+      "Six quests leave the board at once.",
+      "The Guildmaster draws up the plan.",
+      "Busy hands — seven files read, by the Artisan IV, the Artisan II and the Artisan III.",
+      "Across the guild: four files read and one scroll consulted.",
+      "All over the island: ten deeds, mostly forging.",
+      "The Archivist's quest is done: “idb: never await a fetch inside a transaction (it…”",
+      "The Artisan II sets hammer to api.ts, 1 line.",
+      "Six files forged, all at once.",
+      "Across the guild: two files forged and one trial run.",
+      "Four deeds, mostly testing, all at once.",
+      "The Guildmaster sends the Scout to find where search tokenizes note titles.",
+      "The Scout hunts through the code for tokenize\\( — 5 matches.",
+      "The Scout pores over tokenize.ts and indexer.ts.",
+      "The Illuminator returns with the loot: “The header shows a quiet cloud badge with the pending count…”",
+      "The Scout searches the code for fromCodePoint — 1 match.",
+      "The Guildmaster sends the Artisan out: “Reproduce with a failing test, then make tokenize()…”",
+      "The Scout returns with the loot: “tokenize() slices titles by UTF-16 index; an emoji is a…”",
+      "The Artisan runs the tests — one failing.",
+      "The Artisan IV's quest is done: “Notes and the outbox live in IndexedDB; store.ts writes…”",
+      "The Artisan III runs bun run typecheck — ok.",
+      "The Artisan III returns with the loot: “The app shell is precached: Quill opens with no network; /api…”",
+      "The Artisan comes home: “merge(base, local, remote): line-level diff3 for bodies; the…”",
+      "The Artisan runs the tests — 23 pass.",
+      "The Artisan returns with the loot: “tokenize() walks code points; “🍜 ramen” indexes as two…”",
+      "And so it is done: “Fixed: search no longer throws on emoji titles. tokenize() walks code…”",
+      "The Artisan II's quest is done: “Engine flushes the outbox in order and pulls since the cursor…”",
+      "A quest leaves the board: the Warden is to verify offline sync end to end.",
+      "The Warden reads offline-sync.md and engine.ts.",
+      "The tests turn on the Warden: three failing.",
+      "The Warden reads conflict.ts.",
+      "The Warden returns with bad news: “FAIL: 3 of 41. (1) After a reconnect the outbox replays ops…”",
+      "The Guildmaster fans the work out: two quests, all at once.",
+      "The Guildmaster runs git commit -am \"fix(search)… — 2 files changed.",
+      "The Artisan II pores over engine.test.ts and forges engine.ts, 1 line.",
+      "The quest is complete: “Opened #418 against release/2.4.”",
+      "The Artisan II finds one failing.",
+      "The Artisan II forges engine.ts, 1 line.",
+      "The Artisan II runs the tests — two failing.",
+      "The Artisan II reworks outbox.ts, 1 line.",
+      "The Guildmaster asks the Warden to find why #418 fails on the Node 18 runner.",
+      "The tests turn on the Artisan II: two failing.",
+      "The Warden runs gh run view --log-failed — 1 failing job.",
+      "The Warden studies ci.yml and searches the code for Segmenter — 1 match.",
+      "The Guildmaster calls the Artisan back: “Drop Intl.Segmenter from indexer.ts: split words on…”",
+      "The tests turn on the Artisan II: ten failing.",
+      "The Warden's quest is done: “indexer.ts still calls Intl.Segmenter for word breaks; Node 18…”",
+      "The Guildmaster calls the Warden back: “Bisect: which commit started the duplicate replays?”",
+      "The Artisan's quest is done: “indexer.ts splits on Unicode whitespace; no Intl.Segmenter.”",
+      "Across the guild: one command run and one file read.",
+      "Busy hands — one file forged and one search made, by the Artisan and the Artisan II.",
+      "The tests turn on the Artisan: one failing.",
+      "The Artisan will go no further without your word.",
+      "The Artisan reads package.json.",
+      "The Artisan II pores over network.har.",
+      "The Warden finds failures.",
+      "The Artisan has your answer and carries on.",
+      "The Artisan runs rm -rf .quill-data && bun run… — dropped quill_dev · migrated 14 · seeded 120 notes.",
+      "The tests turn on the Warden: two failing."
+    ],
+    "legends": [
+      {
+        "title": "Make Quill work offline: keep notes in IndexedDB, queue edits while offline…",
+        "party": 11,
+        "span": 856999,
+        "tokens": 4313500,
+        "cost": 2.8906949999999996,
+        "outcome": "underway",
+        "opening": "The Guildmaster took up the quest “Make Quill work offline: keep notes in IndexedDB, queue edits while offline and sync…”, and sent ten adventurers out to see it done.",
+        "chapters": [
+          {
+            "numeral": "I",
+            "id": "ses_sim0001",
+            "who": "Guildmaster",
+            "color": "#d4ad3a",
+            "quest": "Make Quill work offline: keep notes in IndexedDB, queue edits while offline and sync them when the connection returns. Conflicts must never lose text.",
+            "resumed": false,
+            "begin": 0,
+            "outcome": "underway",
+            "deeds": [
+              {
+                "craft": "plan",
+                "count": 2,
+                "label": "2 plans"
+              }
+            ],
+            "notables": [],
+            "tokens": 74500,
+            "cost": 0.054465
+          },
+          {
+            "numeral": "II",
+            "id": "ses_sim0006",
+            "who": "Scout",
+            "color": "#2fa7a0",
+            "sentBy": "Guildmaster",
+            "quest": "Map how notes are loaded and saved today",
+            "resumed": false,
+            "begin": 18614,
+            "end": 109173,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "read",
+                "count": 6,
+                "label": "6 reads"
+              },
+              {
+                "craft": "search",
+                "count": 4,
+                "label": "4 searches"
+              }
+            ],
+            "notables": [],
+            "loot": "Saves are a PUT /api/notes/:id from store.ts with no local copy; updatedAt is set by the server; useNotes refetches on window focus. Nothing queues a failed save, and nothing retries one.",
+            "tokens": 374500,
+            "cost": 0.255465
+          },
+          {
+            "numeral": "III",
+            "id": "ses_sim0022",
+            "who": "Scholar",
+            "color": "#6fb3e0",
+            "sentBy": "Guildmaster",
+            "quest": "Research offline storage and sync in the browser",
+            "resumed": false,
+            "begin": 18614,
+            "end": 92424,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "consult",
+                "count": 4,
+                "label": "4 consultations"
+              }
+            ],
+            "notables": [],
+            "loot": "IndexedDB via idb for notes and an outbox. Background Sync is Chromium-only: flush the outbox on `online`, on focus and on a timer. navigator.onLine lies; treat a failed fetch as offline.",
+            "tokens": 175000,
+            "cost": 0.12375
+          },
+          {
+            "numeral": "IV",
+            "id": "ses_sim0033",
+            "who": "Architect",
+            "color": "#4f8fd6",
+            "sentBy": "Guildmaster",
+            "quest": "Design offline sync: storage, outbox, conflicts",
+            "resumed": false,
+            "begin": 114910,
+            "end": 226052,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 2,
+                "label": "2 edits"
+              },
+              {
+                "craft": "read",
+                "count": 2,
+                "label": "2 reads"
+              },
+              {
+                "craft": "consult",
+                "count": 1,
+                "label": "1 consultation"
+              }
+            ],
+            "notables": [
+              {
+                "kind": "plea",
+                "at": 192418,
+                "text": "Asked for your word; it was given after 30s."
+              }
+            ],
+            "loot": "Plan approved: (1) idb store + outbox, (2) sync engine with base versions and an op id per edit, (3) three-way merge for bodies, newest title wins, (4) an offline badge. Three can run at once.",
+            "tokens": 175000,
+            "cost": 0.12375
+          },
+          {
+            "numeral": "V",
+            "id": "ses_sim0046",
+            "who": "Artisan IV",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Storage: notes and the outbox in IndexedDB (src/sync/db.ts, src/sync/outbox.ts)",
+            "resumed": false,
+            "begin": 314882,
+            "end": 508475,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 4,
+                "label": "4 edits"
+              },
+              {
+                "craft": "test",
+                "count": 1,
+                "label": "1 test run"
+              },
+              {
+                "craft": "run",
+                "count": 2,
+                "label": "2 commands"
+              },
+              {
+                "craft": "read",
+                "count": 2,
+                "label": "2 reads"
+              }
+            ],
+            "notables": [],
+            "loot": "Notes and the outbox live in IndexedDB; store.ts writes locally first and queues the edit.",
+            "tokens": 454000,
+            "cost": 0.30678
+          },
+          {
+            "numeral": "VI",
+            "id": "ses_sim0060",
+            "who": "Artisan II",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Sync engine: flush the outbox, pull changes since the last cursor (src/sync/engine.ts)",
+            "resumed": false,
+            "begin": 314882,
+            "end": 546300,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 4,
+                "label": "4 edits"
+              },
+              {
+                "craft": "test",
+                "count": 1,
+                "label": "1 test run"
+              },
+              {
+                "craft": "read",
+                "count": 3,
+                "label": "3 reads"
+              }
+            ],
+            "notables": [],
+            "loot": "Engine flushes the outbox in order and pulls since the cursor, with backoff on failure."
+          },
+          {
+            "numeral": "VII",
+            "id": "ses_sim0074",
+            "who": "Artisan",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Conflicts: three-way merge of note bodies (src/sync/conflict.ts)",
+            "resumed": false,
+            "begin": 314882,
+            "end": 520577,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 3,
+                "label": "3 edits"
+              },
+              {
+                "craft": "test",
+                "count": 1,
+                "label": "1 test run"
+              },
+              {
+                "craft": "run",
+                "count": 1,
+                "label": "1 command"
+              },
+              {
+                "craft": "read",
+                "count": 2,
+                "label": "2 reads"
+              }
+            ],
+            "notables": [],
+            "loot": "merge(base, local, remote): line-level diff3 for bodies; the newest title wins."
+          },
+          {
+            "numeral": "VIII",
+            "id": "ses_sim0086",
+            "who": "Archivist",
+            "color": "#8b6cd9",
+            "sentBy": "Guildmaster",
+            "quest": "Check idb's transaction API and how diff3 reports conflicts",
+            "resumed": false,
+            "begin": 314882,
+            "end": 368102,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "consult",
+                "count": 3,
+                "label": "3 consultations"
+              }
+            ],
+            "notables": [],
+            "loot": "idb: never await a fetch inside a transaction (it auto-commits). diff3: merge() returns conflict hunks with both sides; keep them, don't pick one.",
+            "tokens": 121500,
+            "cost": 0.087255
+          },
+          {
+            "numeral": "IX",
+            "id": "ses_sim0094",
+            "who": "Illuminator",
+            "color": "#e070a8",
+            "sentBy": "Guildmaster",
+            "quest": "Offline badge and pending-changes count in the header",
+            "resumed": false,
+            "begin": 314882,
+            "end": 475668,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 3,
+                "label": "3 edits"
+              },
+              {
+                "craft": "read",
+                "count": 2,
+                "label": "2 reads"
+              }
+            ],
+            "notables": [],
+            "loot": "The header shows a quiet cloud badge with the pending count while offline.",
+            "tokens": 175000,
+            "cost": 0.12375
+          },
+          {
+            "numeral": "X",
+            "id": "ses_sim0105",
+            "who": "Artisan III",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Service worker: cache the app shell so Quill opens with no network (src/sw/service-worker.ts)",
+            "resumed": false,
+            "begin": 314882,
+            "end": 516981,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 2,
+                "label": "2 edits"
+              },
+              {
+                "craft": "run",
+                "count": 3,
+                "label": "3 commands"
+              },
+              {
+                "craft": "read",
+                "count": 2,
+                "label": "2 reads"
+              }
+            ],
+            "notables": [],
+            "loot": "The app shell is precached: Quill opens with no network; /api stays network-first and /sync is never cached.",
+            "tokens": 301500,
+            "cost": 0.20785499999999998
+          },
+          {
+            "numeral": "XI",
+            "id": "ses_sim0173",
+            "who": "Warden",
+            "color": "#3fae6b",
+            "sentBy": "Guildmaster",
+            "quest": "Verify offline sync end to end",
+            "resumed": false,
+            "begin": 570000,
+            "end": 609277,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "test",
+                "count": 1,
+                "label": "1 test run"
+              },
+              {
+                "craft": "read",
+                "count": 3,
+                "label": "3 reads"
+              }
+            ],
+            "notables": [
+              {
+                "kind": "flaw",
+                "at": 592678,
+                "text": "Tests failed: `bun test src/sync`, 3 failing."
+              }
+            ],
+            "loot": "FAIL: 3 of 41. (1) After a reconnect the outbox replays ops the server already applied: duplicates. (2) merge() drops the remote title when only the body conflicts."
+          },
+          {
+            "numeral": "XII",
+            "id": "ses_sim0060",
+            "who": "Artisan II",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Fix: after a reconnect the outbox replays ops the server already applied (engine.test, offline.spec:41)",
+            "resumed": true,
+            "begin": 614174,
+            "outcome": "underway",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 3,
+                "label": "3 edits"
+              },
+              {
+                "craft": "test",
+                "count": 4,
+                "label": "4 test runs"
+              },
+              {
+                "craft": "read",
+                "count": 2,
+                "label": "2 reads"
+              },
+              {
+                "craft": "search",
+                "count": 1,
+                "label": "1 search"
+              }
+            ],
+            "notables": [
+              {
+                "kind": "flaw",
+                "at": 641664,
+                "text": "Tests failed: `bun test src/sync/engine.test.ts`, 1 failing."
+              },
+              {
+                "kind": "flaw",
+                "at": 665502,
+                "text": "Tests failed: `bun test src/sync/engine.test.ts`, 2 failing."
+              },
+              {
+                "kind": "flaw",
+                "at": 713018,
+                "text": "Tests failed: `bun test src/sync/engine.test.ts`, 2 failing."
+              },
+              {
+                "kind": "renown",
+                "at": 713018,
+                "text": "A dragon woke over the peaks."
+              },
+              {
+                "kind": "flaw",
+                "at": 740095,
+                "text": "Tests failed: `bun test src/sync --rerun-each 5`, 10 failing."
+              }
+            ],
+            "tokens": 1324000,
+            "cost": 0.8506800000000001,
+            "usageNote": "for both quests"
+          },
+          {
+            "numeral": "XIII",
+            "id": "ses_sim0074",
+            "who": "Artisan",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Fix: merge() drops the remote title when only the body conflicts (conflict.test, offline.spec:77)",
+            "resumed": true,
+            "begin": 614174,
+            "outcome": "underway",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 1,
+                "label": "1 edit"
+              },
+              {
+                "craft": "test",
+                "count": 2,
+                "label": "2 test runs"
+              },
+              {
+                "craft": "run",
+                "count": 1,
+                "label": "1 command"
+              },
+              {
+                "craft": "read",
+                "count": 2,
+                "label": "2 reads"
+              }
+            ],
+            "notables": [
+              {
+                "kind": "flaw",
+                "at": 783929,
+                "text": "Tests failed: `bun test src/sync/conflict.test.ts`, 1 failing."
+              },
+              {
+                "kind": "plea",
+                "at": 797168,
+                "text": "Asked for your word; it was given after 34s."
+              }
+            ],
+            "tokens": 837000,
+            "cost": 0.5490900000000001,
+            "usageNote": "for both quests"
+          },
+          {
+            "numeral": "XIV",
+            "id": "ses_sim0173",
+            "who": "Warden",
+            "color": "#3fae6b",
+            "sentBy": "Guildmaster",
+            "quest": "Bisect: which commit started the duplicate replays?",
+            "resumed": true,
+            "begin": 758613,
+            "outcome": "underway",
+            "deeds": [
+              {
+                "craft": "test",
+                "count": 2,
+                "label": "2 test runs"
+              },
+              {
+                "craft": "run",
+                "count": 1,
+                "label": "1 command"
+              }
+            ],
+            "notables": [
+              {
+                "kind": "flaw",
+                "at": 814560,
+                "text": "Tests failed: `git bisect run bun test src/sync/engine…`, bisect run failed: exit code 2 from 'bun test' is neither 0, 1 nor 125."
+              },
+              {
+                "kind": "flaw",
+                "at": 856999,
+                "text": "Tests failed: `git bisect skip && git bisect run bun…`, 2 failing."
+              }
+            ],
+            "tokens": 301500,
+            "cost": 0.20785499999999998,
+            "usageNote": "for both quests"
+          }
+        ],
+        "closing": "The tale is still being written: four at work.",
+        "renown": [
+          {
+            "kind": "raid",
+            "id": "raid",
+            "title": "The Treasury Raided",
+            "text": "The guild spent past two million tokens, and pirates anchored offshore under the black flag.",
+            "count": 1,
+            "forced": false
+          },
+          {
+            "kind": "dragon",
+            "id": "dragon",
+            "title": "The Dragon of the Peaks",
+            "text": "The Artisan II's bash failed three times running, and a dragon circled the peaks.",
+            "count": 1,
+            "forced": false
+          }
+        ],
+        "unsung": [
+          {
+            "kind": "festival",
+            "hint": "When every deed of a long quest comes home clean…"
+          },
+          {
+            "kind": "ghost-ship",
+            "hint": "A sail with no crew, for those who fall…"
+          },
+          {
+            "kind": "rainbow",
+            "hint": "What follows the storm, if the work comes good…"
+          },
+          {
+            "kind": "comet",
+            "hint": "Count the deeds, and look up…"
+          }
+        ]
+      },
+      {
+        "title": "Fix the emoji search bug: searching for “🍜 ramen” throws RangeError: Invalid…",
+        "party": 4,
+        "span": 774557,
+        "tokens": 846000,
+        "cost": 0.59022,
+        "outcome": "underway",
+        "opening": "It began at the quest board: “Fix the emoji search bug: searching for “🍜 ramen” throws RangeError: Invalid code point…”. The Guildmaster called three adventurers to the work.",
+        "chapters": [
+          {
+            "numeral": "I",
+            "id": "ses_sim0116",
+            "who": "Guildmaster",
+            "color": "#d4ad3a",
+            "quest": "Fix the emoji search bug: searching for “🍜 ramen” throws RangeError: Invalid code point in tokenize()",
+            "resumed": false,
+            "begin": 0,
+            "end": 533203,
+            "outcome": "underway",
+            "deeds": [
+              {
+                "craft": "run",
+                "count": 6,
+                "label": "6 commands"
+              }
+            ],
+            "notables": [],
+            "tokens": 301500,
+            "cost": 0.20785499999999998
+          },
+          {
+            "numeral": "II",
+            "id": "ses_sim0120",
+            "who": "Scout",
+            "color": "#2fa7a0",
+            "sentBy": "Guildmaster",
+            "quest": "Find where search tokenizes note titles",
+            "resumed": false,
+            "begin": 449854,
+            "end": 483507,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "read",
+                "count": 2,
+                "label": "2 reads"
+              },
+              {
+                "craft": "search",
+                "count": 2,
+                "label": "2 searches"
+              }
+            ],
+            "notables": [],
+            "loot": "tokenize() slices titles by UTF-16 index; an emoji is a surrogate pair, the slice splits it and String.fromCodePoint throws.",
+            "tokens": 121500,
+            "cost": 0.087255
+          },
+          {
+            "numeral": "III",
+            "id": "ses_sim0129",
+            "who": "Artisan",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Reproduce with a failing test, then make tokenize() walk code points",
+            "resumed": false,
+            "begin": 483829,
+            "end": 530204,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 2,
+                "label": "2 edits"
+              },
+              {
+                "craft": "test",
+                "count": 2,
+                "label": "2 test runs"
+              }
+            ],
+            "notables": [
+              {
+                "kind": "flaw",
+                "at": 504649,
+                "text": "Tests failed: `bun test src/search/tokenize.test.ts`, 1 failing."
+              }
+            ],
+            "loot": "tokenize() walks code points; “🍜 ramen” indexes as two tokens. Regression test added."
+          },
+          {
+            "numeral": "IV",
+            "id": "ses_sim0148",
+            "who": "Warden",
+            "color": "#3fae6b",
+            "sentBy": "Guildmaster",
+            "quest": "Find why #418 fails on the Node 18 runner",
+            "resumed": false,
+            "begin": 710135,
+            "end": 738087,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "run",
+                "count": 1,
+                "label": "1 command"
+              },
+              {
+                "craft": "read",
+                "count": 1,
+                "label": "1 read"
+              },
+              {
+                "craft": "search",
+                "count": 1,
+                "label": "1 search"
+              }
+            ],
+            "notables": [],
+            "loot": "indexer.ts still calls Intl.Segmenter for word breaks; Node 18 on the release branch lacks it.",
+            "tokens": 121500,
+            "cost": 0.087255
+          },
+          {
+            "numeral": "V",
+            "id": "ses_sim0129",
+            "who": "Artisan",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Drop Intl.Segmenter from indexer.ts: split words on Unicode whitespace instead",
+            "resumed": true,
+            "begin": 738404,
+            "end": 762393,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 1,
+                "label": "1 edit"
+              },
+              {
+                "craft": "test",
+                "count": 1,
+                "label": "1 test run"
+              }
+            ],
+            "notables": [],
+            "loot": "indexer.ts splits on Unicode whitespace; no Intl.Segmenter.",
+            "tokens": 301500,
+            "cost": 0.20785499999999998,
+            "usageNote": "for both quests"
+          }
+        ],
+        "closing": "The tale is still being written: one at work.",
+        "renown": [],
+        "unsung": [
+          {
+            "kind": "festival",
+            "hint": "When every deed of a long quest comes home clean…"
+          },
+          {
+            "kind": "ghost-ship",
+            "hint": "A sail with no crew, for those who fall…"
+          },
+          {
+            "kind": "rainbow",
+            "hint": "What follows the storm, if the work comes good…"
+          },
+          {
+            "kind": "raid",
+            "hint": "Spend long enough, and someone notices the treasury…"
+          },
+          {
+            "kind": "comet",
+            "hint": "Count the deeds, and look up…"
+          },
+          {
+            "kind": "dragon",
+            "hint": "Fail the same trial three times running…"
+          }
+        ]
+      }
+    ]
+  },
+  "seas": {
+    "views": [
+      "idle|-|resting|false => resting idle | - | -",
+      "leaving|-|quest done|false => resting idle | - | -",
+      "loot|-|quest done|false => done loot | - | -",
+      "resting|-|quest done|false => resting idle | - | -",
+      "working|-|thinking|true => thinking thought | think | -",
+      "working|-|writing its answer|false => answering edit | - | -",
+      "working|bash|bash · bun test settings|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash · gh pr create --fill|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · gh pr merge 128 --squash|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · gh release create v1.4.0 --…|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · gh release view v1.4.0|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · gh run view --log-failed|false => running run | run | Use_Item/steam/-",
+      "working|bash|bash · git push -u origin dark-mode|false => running run | run | Use_Item/steam/-",
+      "working|edit|edit · CHANGELOG.md|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · SettingsPage.tsx|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · theming.md|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · tokens.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|read|read · CHANGELOG.md|false => reading read | read | Interact/pages/-",
+      "working|read|read · tokens.ts|false => reading read | read | Interact/pages/-",
+      "working|task|task · Add dark theme tokens and w…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Fix: raise muted-text contr…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Write the v1.4.0 changelog …|false => dispatching summon | dispatch | Use_Item/scroll/quest-board"
+    ],
+    "moments": [
+      "deed read call_sim0007 => read | - | read",
+      "deed edit call_sim0008 => edit | build | edit",
+      "deed edit call_sim0009 => edit | build | edit",
+      "deed bash call_sim0010 => test | - | test",
+      "deed task call_sim0004 => dispatch | - | dispatch",
+      "deed bash call_sim0012 => run | - | run",
+      "deed bash call_sim0013 => run | - | run",
+      "deed bash call_sim0015 => run | - | run",
+      "deed edit call_sim0019 => edit | build | edit",
+      "deed bash call_sim0020 => test | - | test",
+      "deed task call_sim0017 => dispatch | - | dispatch",
+      "deed bash call_sim0022 => run | - | run",
+      "deed bash call_sim0024 => run | - | run",
+      "deed bash call_sim0025 => run | - | run",
+      "deed read call_sim0030 => read | book | read",
+      "deed read call_sim0031 => read | book | read",
+      "deed edit call_sim0033 => edit | - | edit",
+      "deed edit call_sim0034 => edit | - | edit",
+      "deed task call_sim0027 => dispatch | - | dispatch",
+      "deed bash call_sim0036 => run | - | run"
+    ],
+    "captions": [
+      "The Guildmaster sends the Artisan to add dark theme tokens and wire the settings page.",
+      "The Artisan pores over tokens.ts and sets hammer to tokens.ts.",
+      "The Artisan comes home: “Dark tokens added; the settings page follows…”",
+      "The Guildmaster runs git push -u origin dark-mode and gh pr create --fill — #128.",
+      "The lighthouse burns red: CI failed on dark-mode.",
+      "The Artisan is called back from the tavern: “Fix: raise muted-text contrast to 4.5 in dark mode”.",
+      "The Artisan reshapes tokens.ts.",
+      "The Artisan comes home: “Muted text lifted to #a3a3a3: 4.6 contrast; snapshot updated.”",
+      "The lighthouse burns warm again: CI passes on dark-mode.",
+      "#128 “Dark mode for the settings page” is merged, and its ship comes home to the quay.",
+      "Release v1.4.0 “Dark mode” is out — a galleon drops anchor, flags flying.",
+      "The Guildmaster asks the Archivist to write the v1.4.0 changelog entry for dark mode.",
+      "The Archivist reads CHANGELOG.md and tokens.ts and sets hammer to CHANGELOG.md.",
+      "The Archivist's quest is done: “v1.4.0 in the changelog and the theming docs: dark settings…”"
+    ],
+    "legends": [
+      {
+        "title": "Ship dark mode for the settings page, behind a PR",
+        "party": 3,
+        "span": 116466,
+        "tokens": 96750,
+        "cost": 0.1548,
+        "outcome": "complete",
+        "opening": "It began at the quest board: “Ship dark mode for the settings page, behind a PR”. The Guildmaster called two adventurers to the work.",
+        "chapters": [
+          {
+            "numeral": "I",
+            "id": "ses_sim0001",
+            "who": "Guildmaster",
+            "color": "#d4ad3a",
+            "quest": "Ship dark mode for the settings page, behind a PR",
+            "resumed": false,
+            "begin": 0,
+            "end": 116466,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "run",
+                "count": 7,
+                "label": "7 commands"
+              }
+            ],
+            "notables": [
+              {
+                "kind": "flaw",
+                "at": 39023,
+                "sea": true,
+                "text": "CI failed on dark-mode, and the lighthouse burned red."
+              },
+              {
+                "kind": "rise",
+                "at": 70471,
+                "sea": true,
+                "text": "CI passed again on dark-mode; the lighthouse burned warm."
+              },
+              {
+                "kind": "renown",
+                "at": 72772,
+                "sea": true,
+                "text": "Pull request #128 “Dark mode for the settings page” was merged; its ship sailed into the harbour."
+              },
+              {
+                "kind": "renown",
+                "at": 94185,
+                "sea": true,
+                "text": "Released v1.4.0 “Dark mode”: a galleon came into the harbour."
+              },
+              {
+                "kind": "renown",
+                "at": 116466,
+                "text": "Came home clean; the village held a festival in their honour."
+              }
+            ],
+            "tokens": 27500,
+            "cost": 0.044
+          },
+          {
+            "numeral": "II",
+            "id": "ses_sim0005",
+            "who": "Artisan",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Add dark theme tokens and wire the settings page",
+            "resumed": false,
+            "begin": 2732,
+            "end": 16610,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 2,
+                "label": "2 edits"
+              },
+              {
+                "craft": "test",
+                "count": 1,
+                "label": "1 test run"
+              },
+              {
+                "craft": "read",
+                "count": 1,
+                "label": "1 read"
+              }
+            ],
+            "notables": [],
+            "loot": "Dark tokens added; the settings page follows prefers-color-scheme."
+          },
+          {
+            "numeral": "III",
+            "id": "ses_sim0005",
+            "who": "Artisan",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Fix: raise muted-text contrast to 4.5 in dark mode",
+            "resumed": true,
+            "begin": 42822,
+            "end": 49899,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 1,
+                "label": "1 edit"
+              },
+              {
+                "craft": "test",
+                "count": 1,
+                "label": "1 test run"
+              }
+            ],
+            "notables": [],
+            "loot": "Muted text lifted to #a3a3a3: 4.6 contrast; snapshot updated.",
+            "tokens": 41750,
+            "cost": 0.0668,
+            "usageNote": "for both quests"
+          },
+          {
+            "numeral": "IV",
+            "id": "ses_sim0028",
+            "who": "Archivist",
+            "color": "#8b6cd9",
+            "sentBy": "Guildmaster",
+            "quest": "Write the v1.4.0 changelog entry for dark mode",
+            "resumed": false,
+            "begin": 96623,
+            "end": 110969,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 2,
+                "label": "2 edits"
+              },
+              {
+                "craft": "read",
+                "count": 2,
+                "label": "2 reads"
+              }
+            ],
+            "notables": [],
+            "loot": "v1.4.0 in the changelog and the theming docs: dark settings page, muted text at 4.6 contrast.",
+            "tokens": 27500,
+            "cost": 0.044
+          }
+        ],
+        "lastWord": "Dark mode shipped: PR #128 merged after a contrast fix, CI green, v1.4.0 released and logged.",
+        "closing": "The quest was done in 1m 56s; the loot is home and the hearth is warm.",
+        "renown": [
+          {
+            "kind": "festival",
+            "id": "festival",
+            "title": "A Clean Sweep",
+            "text": "The whole quest came home clean — 17 deeds, not one failed — and the village held a festival.",
+            "count": 1,
+            "forced": false
+          }
+        ],
+        "unsung": [
+          {
+            "kind": "ghost-ship",
+            "hint": "A sail with no crew, for those who fall…"
+          },
+          {
+            "kind": "rainbow",
+            "hint": "What follows the storm, if the work comes good…"
+          },
+          {
+            "kind": "raid",
+            "hint": "Spend long enough, and someone notices the treasury…"
+          },
+          {
+            "kind": "comet",
+            "hint": "Count the deeds, and look up…"
+          },
+          {
+            "kind": "dragon",
+            "hint": "Fail the same trial three times running…"
+          }
+        ]
+      }
+    ]
+  },
+  "factions": {
+    "views": [
+      "idle|-|resting|false => resting idle | - | -",
+      "leaving|-|quest done|false => resting idle | - | -",
+      "loot|-|quest done|false => done loot | - | -",
+      "resting|-|quest done|false => resting idle | - | -",
+      "waiting|-|waiting for permission|false => waiting on you plea | - | -",
+      "working|-|thinking|true => thinking thought | think | -",
+      "working|-|writing its answer|false => answering edit | - | -",
+      "working|bash|bash · bun test export|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash · bun test limit|false => testing test | test | Use_Item/steam/-",
+      "working|bash|bash · git push origin fix/export-…|false => running run | run | Use_Item/steam/-",
+      "working|edit|edit · export.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|edit|edit · index.ts|false => editing edit | edit | Use_Item/sparks/-",
+      "working|glob|glob · **|false => searching search | search | Interact/pages/-",
+      "working|grep|grep · \"exportNightly\" src|false => searching search | search | Interact/pages/-",
+      "working|mcp__context7__query-docs|mcp__context7__query-docs · postgres cursor streaming n…|false => consulting globe | consult | Spellcasting/portal/-",
+      "working|read|read · export.ts|false => reading read | read | Interact/pages/-",
+      "working|read|read · index.ts|false => reading read | read | Interact/pages/-",
+      "working|task|task · Add a token-bucket limiter …|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Find every public route|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Stream the export instead o…|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|task|task · Trace the nightly export job|false => dispatching summon | dispatch | Use_Item/scroll/quest-board",
+      "working|write|write · limit.ts|false => editing edit | edit | Use_Item/sparks/-"
+    ],
+    "moments": [
+      "deed glob call_sim0007 => search | chop | search",
+      "deed grep call_sim0024 => search | quarry | search",
+      "deed read call_sim0008 => read | - | read",
+      "deed read call_sim0025 => read | quarry | read",
+      "deed task call_sim0004 => dispatch | - | dispatch",
+      "deed task call_sim0021 => dispatch | - | dispatch",
+      "deed mcp__context7__query-docs call_sim0027 => consult | - | consult",
+      "deed write call_sim0013 => edit | build | edit",
+      "deed edit call_sim0014 => edit | build | edit",
+      "deed edit call_sim0031 => edit | build | edit",
+      "deed bash call_sim0015 => test | - | test",
+      "deed-failed bash call_sim0032 => - | - | test",
+      "deed task call_sim0010 => dispatch | - | dispatch",
+      "deed edit call_sim0033 => edit | build | edit",
+      "deed bash call_sim0034 => test | - | test",
+      "deed task call_sim0028 => dispatch | - | dispatch",
+      "deed bash call_sim0036 => run | - | run"
+    ],
+    "captions": [
+      "The Guildmaster asks the Scout to find every public route.",
+      "A quest leaves the board: the Wanderer is to trace the nightly export job.",
+      "A quest leaves the board: the Artisan is to add a token-bucket limiter middleware.",
+      "The Guildmaster hands the Artisan a quest: “Stream the export instead of loading it whole”.",
+      "The Scout returns with the loot: “Nine routes, all mounted in src/routes/index.ts.”",
+      "The tests turn on the Artisan: failures.",
+      "And so it is done: “Rate limiting is on: 60/min per API key, 429 with Retry-After.”",
+      "The Guildmaster will go no further without your word.",
+      "The Wanderer and the Artisan bring their loot home."
+    ],
+    "legends": [
+      {
+        "title": "Add rate limiting to the public API",
+        "party": 3,
+        "span": 20666,
+        "tokens": 30250,
+        "cost": 0.0484,
+        "outcome": "complete",
+        "opening": "The Guildmaster took up the quest “Add rate limiting to the public API”, and sent two adventurers out to see it done.",
+        "chapters": [
+          {
+            "numeral": "I",
+            "id": "ses_sim0005",
+            "who": "Scout",
+            "color": "#2fa7a0",
+            "sentBy": "Guildmaster",
+            "quest": "Find every public route",
+            "resumed": false,
+            "begin": 2312,
+            "end": 6838,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "read",
+                "count": 1,
+                "label": "1 read"
+              },
+              {
+                "craft": "search",
+                "count": 1,
+                "label": "1 search"
+              }
+            ],
+            "notables": [],
+            "loot": "Nine routes, all mounted in src/routes/index.ts.",
+            "tokens": 6250,
+            "cost": 0.009999999999999998
+          },
+          {
+            "numeral": "II",
+            "id": "ses_sim0011",
+            "who": "Artisan",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Add a token-bucket limiter middleware",
+            "resumed": false,
+            "begin": 7112,
+            "end": 19340,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 2,
+                "label": "2 edits"
+              },
+              {
+                "craft": "test",
+                "count": 1,
+                "label": "1 test run"
+              }
+            ],
+            "notables": [],
+            "loot": "Limiter mounted on every public route: 60 requests a minute per key.",
+            "tokens": 24000,
+            "cost": 0.038400000000000004
+          }
+        ],
+        "lastWord": "Rate limiting is on: 60/min per API key, 429 with Retry-After.",
+        "closing": "And so the quest was done in 21s, and the guild rested.",
+        "renown": [],
+        "unsung": [
+          {
+            "kind": "festival",
+            "hint": "When every deed of a long quest comes home clean…"
+          },
+          {
+            "kind": "ghost-ship",
+            "hint": "A sail with no crew, for those who fall…"
+          },
+          {
+            "kind": "rainbow",
+            "hint": "What follows the storm, if the work comes good…"
+          },
+          {
+            "kind": "raid",
+            "hint": "Spend long enough, and someone notices the treasury…"
+          },
+          {
+            "kind": "comet",
+            "hint": "Count the deeds, and look up…"
+          },
+          {
+            "kind": "dragon",
+            "hint": "Fail the same trial three times running…"
+          }
+        ]
+      },
+      {
+        "title": "Why does the nightly export time out?",
+        "party": 3,
+        "span": 30692,
+        "tokens": 51750,
+        "cost": 0.08279999999999998,
+        "outcome": "underway",
+        "opening": "The Guildmaster took up the quest “Why does the nightly export time out?”, and sent two adventurers out to see it done.",
+        "chapters": [
+          {
+            "numeral": "I",
+            "id": "ses_sim0018",
+            "who": "Guildmaster",
+            "color": "#d4ad3a",
+            "quest": "Why does the nightly export time out?",
+            "resumed": false,
+            "begin": 0,
+            "outcome": "underway",
+            "deeds": [
+              {
+                "craft": "run",
+                "count": 1,
+                "label": "1 command"
+              },
+              {
+                "craft": "consult",
+                "count": 1,
+                "label": "1 consultation"
+              }
+            ],
+            "notables": [
+              {
+                "kind": "plea",
+                "at": 26009,
+                "text": "Asked for your word; it was given after 3s."
+              }
+            ],
+            "tokens": 10250,
+            "cost": 0.016399999999999998
+          },
+          {
+            "numeral": "II",
+            "id": "ses_sim0022",
+            "who": "Wanderer",
+            "color": "#9a8f80",
+            "sentBy": "Guildmaster",
+            "quest": "Trace the nightly export job",
+            "resumed": false,
+            "begin": 4231,
+            "end": 7952,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "read",
+                "count": 1,
+                "label": "1 read"
+              },
+              {
+                "craft": "search",
+                "count": 1,
+                "label": "1 search"
+              }
+            ],
+            "notables": [],
+            "loot": "export.ts loads every order into memory before writing the CSV.",
+            "tokens": 6250,
+            "cost": 0.009999999999999998
+          },
+          {
+            "numeral": "III",
+            "id": "ses_sim0029",
+            "who": "Artisan",
+            "color": "#e0702f",
+            "sentBy": "Guildmaster",
+            "quest": "Stream the export instead of loading it whole",
+            "resumed": false,
+            "begin": 11117,
+            "end": 25734,
+            "outcome": "done",
+            "deeds": [
+              {
+                "craft": "forge",
+                "count": 2,
+                "label": "2 edits"
+              },
+              {
+                "craft": "test",
+                "count": 2,
+                "label": "2 test runs"
+              }
+            ],
+            "notables": [
+              {
+                "kind": "flaw",
+                "at": 18408,
+                "text": "Tests failed: `bun test export`, Exit code 1."
+              }
+            ],
+            "loot": "Export streams rows through a cursor; memory flat at 40 MB.",
+            "tokens": 35250,
+            "cost": 0.05639999999999999
+          }
+        ],
+        "closing": "The tale is still being written: one at work.",
+        "renown": [],
+        "unsung": [
+          {
+            "kind": "festival",
+            "hint": "When every deed of a long quest comes home clean…"
+          },
+          {
+            "kind": "ghost-ship",
+            "hint": "A sail with no crew, for those who fall…"
+          },
+          {
+            "kind": "rainbow",
+            "hint": "What follows the storm, if the work comes good…"
+          },
+          {
+            "kind": "raid",
+            "hint": "Spend long enough, and someone notices the treasury…"
+          },
+          {
+            "kind": "comet",
+            "hint": "Count the deeds, and look up…"
+          },
+          {
+            "kind": "dragon",
+            "hint": "Fail the same trial three times running…"
+          }
+        ]
+      }
+    ]
+  }
+}

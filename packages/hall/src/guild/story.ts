@@ -1,4 +1,4 @@
-import type { Entry, Session } from "@guildhall/core"
+import { type Craft, deedCraft, type Entry, type Session } from "@guildhall/core"
 import type { Renown } from "./events.ts"
 import type { Moment } from "./moments.ts"
 
@@ -104,38 +104,31 @@ export function pick<T>(items: readonly T[], seed: number): T {
 
 // ─────────────────────────────── crafts ───────────────────────────────
 
-/** What kind of work a tool is, in the story's words. */
-export type Craft = "read" | "search" | "forge" | "test" | "run" | "consult" | "plan" | "quest" | "other"
+/**
+ * How the story tells a deed: its craft (@guildhall/core craft.ts) in the story's own word-classes.
+ * An edit and a write are both forging, a web fetch and an MCP tool both consulting, and a lint a
+ * command run (only a test run is a trial).
+ */
+export type Told = "read" | "search" | "forge" | "test" | "run" | "consult" | "plan" | "quest" | "other"
 
-const CRAFT_OF: Record<string, Craft> = {
+const TOLD: Record<Craft, Told> = {
   read: "read",
-  grep: "search",
-  glob: "search",
-  list: "search",
-  ls: "search",
-  codesearch: "search",
+  search: "search",
   edit: "forge",
   write: "forge",
-  patch: "forge",
-  multiedit: "forge",
-  apply_patch: "forge",
-  bash: "run",
-  shell: "run",
-  webfetch: "consult",
-  websearch: "consult",
-  todowrite: "plan",
-  todoread: "plan",
-  task: "quest",
-  subagent: "quest",
+  run: "run",
+  test: "test",
+  lint: "run",
+  fetch: "consult",
+  consult: "consult",
+  plan: "plan",
+  delegate: "quest",
+  other: "other",
 }
 
-const TESTS = /\b(test|tests|vitest|jest|pytest|spec|check)\b/i
-
-/** A tool's craft; a shell command that runs tests is a trial, an MCP tool (`a_b`) a consultation. */
-export function craftOf(tool: string, input: Record<string, unknown> = {}): Craft {
-  const craft = CRAFT_OF[tool] ?? (tool.includes("_") ? "consult" : "other")
-  if (craft === "run" && typeof input.command === "string" && TESTS.test(input.command)) return "test"
-  return craft
+/** How the story tells a tool call: the craft its source declared, else read off its name and input. */
+export function toldOf(deed: { name: string; input?: Record<string, unknown>; craft?: string }): Told {
+  return TOLD[deedCraft(deed)]
 }
 
 /** Longest a deed's target or summary runs in a caption (review-2 #19: they had no cap). */
@@ -164,7 +157,7 @@ function basename(path: string): string {
 }
 
 /** Legend nouns: `2 reads`, `3 edits`, `1 test run`. */
-export const NOUNS: Record<Craft, [string, string]> = {
+export const NOUNS: Record<Told, [string, string]> = {
   read: ["read", "reads"],
   search: ["search", "searches"],
   forge: ["edit", "edits"],
@@ -177,7 +170,7 @@ export const NOUNS: Record<Craft, [string, string]> = {
 }
 
 /** Caption nouns for a burst across the guild: `three files forged`. */
-const BURST: Record<Craft, [string, string]> = {
+const BURST: Record<Told, [string, string]> = {
   read: ["file read", "files read"],
   search: ["search made", "searches made"],
   forge: ["file forged", "files forged"],
@@ -190,7 +183,7 @@ const BURST: Record<Craft, [string, string]> = {
 }
 
 /** What a crowd was mostly doing: `22 deeds, mostly consulting the archives`. */
-const MOSTLY: Record<Craft, string> = {
+const MOSTLY: Record<Told, string> = {
   read: "reading",
   search: "searching the code",
   forge: "forging",
@@ -202,7 +195,7 @@ const MOSTLY: Record<Craft, string> = {
   other: "odd jobs",
 }
 
-export const CRAFT_ORDER: Craft[] = [
+export const CRAFT_ORDER: Told[] = [
   "forge",
   "test",
   "run",
@@ -215,7 +208,7 @@ export const CRAFT_ORDER: Craft[] = [
 ]
 
 /** Doing it, for a plea: `running bun run migrate`. */
-function doing(craft: Craft, target: string | undefined): string {
+function doing(craft: Told, target: string | undefined): string {
   const on = target ? ` ${target}` : ""
   switch (craft) {
     case "read":
@@ -412,7 +405,7 @@ function actorsOf(moments: readonly Moment[]): Moment[] {
 
 /** What one deed was, looked up in its session. */
 interface Deed {
-  craft: Craft
+  craft: Told
   target?: string
   summary?: string
   error?: string
@@ -429,7 +422,7 @@ function deedOf(m: Moment, lookup: Lookup): Deed {
   const summary = entry?.summary ? clip(entry.summary, 60) : undefined
   const size = m.kind === "deed" ? m.size : undefined
   return {
-    craft: craftOf(tool, input),
+    craft: toldOf(entry ?? { name: tool }),
     ...(target ? { target } : {}),
     ...(summary ? { summary } : {}),
     ...(error ? { error } : {}),
@@ -438,7 +431,7 @@ function deedOf(m: Moment, lookup: Lookup): Deed {
 }
 
 /** A verb phrase for one adventurer's deeds of one craft: `reads routes.ts and queries.ts`. */
-function deedPhrase(craft: Craft, deeds: readonly Deed[], seed: number): string {
+function deedPhrase(craft: Told, deeds: readonly Deed[], seed: number): string {
   const targets = [...new Set(deeds.flatMap((d) => (d.target ? [d.target] : [])))]
   const named = targets.length > 0 && targets.length <= 2 ? listOf(targets) : undefined
   const n = deeds.length
@@ -477,7 +470,7 @@ function deedPhrase(craft: Craft, deeds: readonly Deed[], seed: number): string 
 
 /** Deeds across the guild, counted: `three files forged, two read`. */
 function burst(deeds: readonly Deed[]): string {
-  const counts = new Map<Craft, number>()
+  const counts = new Map<Told, number>()
   for (const d of deeds) counts.set(d.craft, (counts.get(d.craft) ?? 0) + 1)
   if (counts.size > 2) {
     // A crowd: the count and the craft most of them were, not an inventory.
@@ -610,7 +603,7 @@ export function lineOf(
         (e) => e.kind === "tool" && (e.state === "running" || e.state === "pending"),
       )
       if (asking?.kind === "tool" && asking.name !== "task" && asking.name !== "subagent") {
-        const act = doing(craftOf(asking.name, asking.input), targetOf(asking.input))
+        const act = doing(toldOf(asking), targetOf(asking.input))
         return line.parts(
           pick(
             [

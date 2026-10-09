@@ -1,4 +1,4 @@
-import type { Change } from "@guildhall/core"
+import { type Change, type Craft, declaredCraft } from "@guildhall/core"
 import { type ArchetypeId, ROLES } from "@guildhall/roster"
 
 /**
@@ -227,10 +227,16 @@ export function deedInput(input: Record<string, unknown>): Record<string, unknow
   return out
 }
 
-function deedOf(input: HookInput): { name?: string; input?: Record<string, unknown> } {
+/** A deed's name, input and craft (PROTOCOL.md §1.2): Claude Code's own tool names say what it is. */
+function deedOf(input: HookInput): { name?: string; craft?: Craft; input?: Record<string, unknown> } {
   const name = str(input.tool_name)
   const args = record(input.tool_input)
-  return { ...(name ? { name: deedName(name) } : {}), ...(args ? { input: deedInput(args) } : {}) }
+  const craft = name ? declaredCraft(name, args) : undefined
+  return {
+    ...(name ? { name: deedName(name) } : {}),
+    ...(craft ? { craft } : {}),
+    ...(args ? { input: deedInput(args) } : {}),
+  }
 }
 
 /** A shell tool's failure that is really an answer: the command ran and exited non-zero. */

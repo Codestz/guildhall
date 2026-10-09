@@ -374,11 +374,11 @@ describe("audio: the sample manifest", () => {
     expect(sampleFor("deed", "edit", { station: "forge" })).toBe("forge")
     expect(sampleFor("deed", "write", { site: "yard" })).toBe("build")
     expect(sampleFor("deed", "read", { site: "yard" })).toBeNull()
-    expect(sampleFor("deed", "grep", { site: "forest" })).toBe("chop")
+    expect(sampleFor("deed", "search", { site: "forest" })).toBe("chop")
     expect(sampleFor("deed", "read", { station: "library" })).toBe("book")
     expect(sampleFor("deed", "read", {})).toBeNull()
     expect(sampleFor("loot", undefined, {})).toBe("coins")
-    expect(sampleFor("quest", "task", {})).toBeNull()
+    expect(sampleFor("quest", "delegate", {})).toBeNull()
   })
 })
 

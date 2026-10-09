@@ -1,4 +1,5 @@
 import type { Craft, Entry, Session } from "@guildhall/core"
+import { PETITION_PARTY } from "../guild/petitions.ts"
 import type { AdventurerView, LogEntry, Marker, Phase } from "../guild/store.ts"
 
 /** Run time as `m:ss`. */
@@ -108,7 +109,7 @@ export type VerbGlyph =
  * `editing`, `searching`, `testing`, `thinking`, `waiting on you`, `resting`, … Always shown with its
  * glyph. The full deed (`edit · routes.ts`) stays in Detailed mode and the dossier.
  */
-export function verbOf(view: Pick<AdventurerView, "phase" | "craft" | "thinking" | "doing">): {
+export function verbOf(view: Pick<AdventurerView, "phase" | "craft" | "thinking" | "doing" | "party">): {
   verb: string
   glyph: VerbGlyph
 } {
@@ -118,7 +119,10 @@ export function verbOf(view: Pick<AdventurerView, "phase" | "craft" | "thinking"
     case "resting":
     case "leaving":
     case "idle":
-      return { verb: "resting", glyph: "idle" }
+      // A petitioner on the quay is an open issue: waiting to be heard, not resting.
+      return view.party === PETITION_PARTY
+        ? { verb: "awaiting", glyph: "idle" }
+        : { verb: "resting", glyph: "idle" }
     case "loot":
       return { verb: "done", glyph: "loot" }
     case "failed":

@@ -36,6 +36,7 @@
 import { createHash } from "node:crypto"
 import { mkdir, rm } from "node:fs/promises"
 import { type Browser, chromium, type Page } from "playwright-core"
+import { CHROME } from "./steps.ts"
 
 type Cut = "full" | "highlight" | "loop" | "social"
 
@@ -43,7 +44,6 @@ const ROOT = new URL("..", import.meta.url).pathname
 const FILM = `${ROOT}.probe/film`
 const BUILD = `${FILM}/build`
 const MEDIA = `${ROOT}.github/media`
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 const FPS = 30
 const WIDTH = 1920
 const HEIGHT = 1080

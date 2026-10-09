@@ -10,7 +10,10 @@
  * Screenshots land in .probe/ (git-ignored): .png from shot.ts, .jpg from the probe server unless
  * the step says `"png": true`.
  */
-import type { Page } from "playwright-core"
+import { existsSync, readdirSync } from "node:fs"
+import { homedir } from "node:os"
+import { join } from "node:path"
+import { chromium, type Page } from "playwright-core"
 
 export type Step =
   | { wait: number }
@@ -27,7 +30,29 @@ export const ROOT = new URL("..", import.meta.url).pathname
 export const PROBE_DIR = `${ROOT}.probe`
 /** Where a running probe server says where it listens (scripts/probe-server.ts). */
 export const INFO_PATH = `${PROBE_DIR}/probe-server.json`
-export const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+/**
+ * The browser the probe, goldens, bench and recorder drive. Not the user's own Google Chrome: on macOS a
+ * headless instance of the installed Chrome blocks opening it (LaunchServices activates the hidden one).
+ * Playwright's "Chrome for Testing" is a separate app. Order: $GUILDHALL_CHROME, playwright-core's own
+ * build, the newest one installed in ms-playwright, then the system Chrome as a last resort.
+ */
+export const CHROME = resolveChrome()
+
+function resolveChrome(): string {
+  const wanted = process.env.GUILDHALL_CHROME
+  if (wanted) return wanted
+  const own = chromium.executablePath()
+  if (existsSync(own)) return own
+  const cache = join(homedir(), "Library/Caches/ms-playwright")
+  const app = "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+  const builds = existsSync(cache)
+    ? readdirSync(cache)
+        .filter((name) => /^chromium-\d+$/.test(name))
+        .sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)))
+    : []
+  for (const build of builds) if (existsSync(join(cache, build, app))) return join(cache, build, app)
+  return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+}
 /**
  * Uncapped frame rate (no vsync, no 60 Hz limit), so fps/frame-time readings show real headroom
  * against the 120 fps budget instead of the headless 60 cap; Metal through ANGLE, like the Mac.

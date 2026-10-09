@@ -22,6 +22,8 @@ export interface GrowthMarks {
   spots: number[]
   /** The piece each instance draws, where the layer said (growth film v2 tells stages apart by it). */
   pieces: string[]
+  /** A mountain's massifs (their hex keys), so it rises with its land (growthRelief.ts); undefined for the rest. */
+  massifs: (readonly ReadonlySet<string>[] | undefined)[]
   /** Each instance's own matrix as built: what `restore` puts back. */
   base?: Float32Array
 }
@@ -34,13 +36,15 @@ export function markGrowable(
   x: number,
   z: number,
   piece = "",
+  massifs?: readonly ReadonlySet<string>[],
 ): void {
-  const marks: GrowthMarks = marksOf(mesh) ?? { ids: [], roles: [], spots: [], pieces: [] }
+  const marks: GrowthMarks = marksOf(mesh) ?? { ids: [], roles: [], spots: [], pieces: [], massifs: [] }
   mesh.userData.growth = marks
   marks.ids.push(id)
   marks.roles.push(role)
   marks.spots.push(x, z)
   marks.pieces.push(piece)
+  marks.massifs.push(massifs)
 }
 
 export const marksOf = (mesh: BatchedMesh): GrowthMarks | undefined =>

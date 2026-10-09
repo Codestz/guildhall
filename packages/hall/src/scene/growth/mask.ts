@@ -15,7 +15,9 @@ import { outreachOf } from "../nature/shoreTiles.ts"
  * those squares across, at the same density. Red: how green each hex is (the grass grows there:
  * Grass.tsx). Green: whether the water there is a shore of land that is up now — a risen hex
  * itself, or sea within two hexes of one (Water.tsx): elsewhere the water reads as open sea,
- * whatever today's shore bake says. While a film is asked but has no plan yet it is all zero: open
+ * whatever today's shore bake says. Blue: how far up the land under a hex is (its own cell only, none
+ * on the sea), which the inland water (Rivers.tsx) is cut by: a river, lake or fall shows only where
+ * its ground stands, mountains' included. While a film is asked but has no plan yet it is all zero: open
  * sea, no grass.
  */
 
@@ -72,6 +74,17 @@ export function riseWater(material: Material, rise: Rise): void {
   shader.uniforms.uRiseHalf = { value: rise.half }
 }
 
+/** Inland water: shown only where the mask's blue says the land under it is up (riverShaders.ts RIVER_RISE). */
+export function riseRivers(materials: readonly Material[], rise: Rise): void {
+  for (const material of materials) {
+    const shader = material as ShaderMaterial
+    if (!shader.isShaderMaterial) continue
+    shader.defines.RIVER_RISE = ""
+    shader.uniforms.uRise = { value: rise.mask }
+    shader.uniforms.uRiseHalf = { value: rise.half }
+  }
+}
+
 /** Grass: tufts grow with their hex's green (shaders.ts GRASS_RISE). The materials share uniforms. */
 export function riseGrass(materials: readonly Material[], rise: Rise): void {
   for (const material of materials) {
@@ -94,6 +107,7 @@ export class RiseWriter {
   /** Per cell, quantised to a byte: what the texture holds now (only a change uploads it). */
   private gate: Uint8Array
   private green: Uint8Array
+  private land: Uint8Array
 
   constructor(
     g: GrowthPlan,
@@ -127,24 +141,29 @@ export class RiseWriter {
     this.cellNear = near
     this.gate = new Uint8Array(cells.size)
     this.green = new Uint8Array(cells.size)
+    this.land = new Uint8Array(cells.size)
   }
 
-  /** `up` and `green` per hex (growthFrame / drive.ts). Uploads only when a cell changed. */
-  write(up: Float32Array, green: Float32Array): void {
+  /** `up`, `green` and `land` per hex (growthFrame / drive.ts). Uploads only when a cell changed. */
+  write(up: Float32Array, green: Float32Array, land: Float32Array): void {
     let changed = false
     for (let c = 0; c < this.cellLand.length; c++) {
       const own = this.cellLand[c] as number
       let gate = 0
       let grown = 0
+      let ground = 0
       if (own >= 0) {
         gate = up[own] as number
         grown = green[own] as number
+        ground = land[own] as number
       } else for (const h of this.cellNear[c] as Int32Array) gate = Math.max(gate, up[h] as number)
       const g = Math.round(gate * 255)
       const r = Math.round(grown * 255)
-      if (g === this.gate[c] && r === this.green[c]) continue
+      const b = Math.round(ground * 255)
+      if (g === this.gate[c] && r === this.green[c] && b === this.land[c]) continue
       this.gate[c] = g
       this.green[c] = r
+      this.land[c] = b
       changed = true
     }
     if (!changed) return
@@ -154,6 +173,7 @@ export class RiseWriter {
       const c = this.texelCell[i] as number
       data[i * 4] = this.green[c] as number
       data[i * 4 + 1] = this.gate[c] as number
+      data[i * 4 + 2] = this.land[c] as number
     }
     t.needsUpdate = true
   }

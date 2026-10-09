@@ -110,7 +110,7 @@ export default function GrowthLayer() {
     const live = growth.film
     if (!driver || !live || driver.driver.g !== live.plan) return
     const moved = driver.driver.apply(growth.t)
-    driver.writer.write(driver.driver.frame.up, driver.driver.green)
+    driver.writer.write(driver.driver.frame.up, driver.driver.green, driver.driver.land)
     const now = state.clock.elapsedTime
     if (moved && Math.abs(now - shadowAt.current) > SHADOW_EVERY_S) {
       shadowAt.current = now

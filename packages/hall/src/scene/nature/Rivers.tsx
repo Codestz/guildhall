@@ -12,6 +12,7 @@ import type { Tier } from "../../guild/quality.ts"
 import { isWebGPU } from "../../render/backend.ts"
 import type { Waterways } from "../../world/waterways.ts"
 import { useLooks } from "../atmosphere/looks.ts"
+import { riseRivers, useRiseMask } from "../growth/mask.ts"
 import { installNodes, TSL } from "../tsl.ts"
 import { fallsGeometry } from "./fallMesh.ts"
 import { surfaceGeometry } from "./riverMesh.ts"
@@ -39,7 +40,13 @@ export function Rivers({ waters, tier }: { waters: Waterways; tier: Tier }) {
   const [key, setKey] = useState<DirectionalLight | null>(null)
   const surface = useMemo(() => surfaceGeometry(waters), [waters])
   const falls = useMemo(() => fallsGeometry(waters), [waters])
-  const { materials, uniforms } = useMemo(() => build(tier === 0, v2, key), [build, tier, v2, key])
+  // A growth film shows the water only where its land is up (the node path draws it as always).
+  const rise = useRiseMask()
+  const { materials, uniforms } = useMemo(() => {
+    const made = build(tier === 0, v2, key)
+    if (rise && !node) riseRivers(made.materials, rise)
+    return made
+  }, [build, tier, v2, key, rise, node])
   useWaterSky(uniforms, node ? setKey : undefined)
   useEffect(
     () => () => {

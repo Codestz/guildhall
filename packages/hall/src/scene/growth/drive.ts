@@ -3,6 +3,7 @@ import type { GrowthPlan } from "../../world/chronicle/growth.ts"
 import { ageOf, type BuildPlan, type Site, siteKey } from "../../world/chronicle/growthBuild.ts"
 import { emptyFrame, type GrowthFrame, growthAt, hexOf } from "../../world/chronicle/growthFrame.ts"
 import { DEPTH, pieceAt, saltOf } from "../../world/chronicle/growthPieces.ts"
+import { massifBirth, mountainUp } from "../../world/chronicle/growthRelief.ts"
 import { emptyStage, type Stage, stageAt } from "../../world/chronicle/growthStages.ts"
 import { cellAt, key } from "../../world/gen/hex.ts"
 import { growables, marksOf } from "./registry.ts"
@@ -24,6 +25,8 @@ const SCAR = new Color(0.36, 0.28, 0.22)
 interface Batch {
   hex: Int32Array
   salt: Float32Array
+  /** A mountain instance's film time of birth (growthRelief.ts); NaN for every other piece. */
+  birth: Float64Array
   /** Film v2: each instance's build site (growthBuild.ts), if it has one. */
   site: (Site | undefined)[]
   /** Last written per instance: rise, scale, scaleY, visible, colour key. */
@@ -36,6 +39,14 @@ export class GrowthDriver {
   readonly frame: GrowthFrame
   /** Per hex, how green its land is (the grass mask's red). */
   readonly green: Float32Array
+  /**
+   * Per hex, how far its land is up for what lies on it (the water mask's blue): the hex's own rise,
+   * or for a mountain's hexes the mountain's, which rises later and never sinks back.
+   */
+  readonly land: Float32Array
+  /** Per hex, the birth of the massif it is in (NaN: none), learnt as the relief's batch registers. */
+  private mountain: Float64Array
+  private massifs = new Map<ReadonlySet<string>, number>()
   private batches = new WeakMap<BatchedMesh, Batch>()
   private groupHexes = new WeakMap<Object3D, Int32Array>()
   private state: Stage = emptyStage()
@@ -49,6 +60,8 @@ export class GrowthDriver {
   ) {
     this.frame = emptyFrame(g)
     this.green = new Float32Array(g.cells.length)
+    this.land = new Float32Array(g.cells.length)
+    this.mountain = new Float64Array(g.cells.length).fill(Number.NaN)
   }
 
   /** The hex a spot belongs to. */
@@ -71,6 +84,10 @@ export class GrowthDriver {
         ).scale * ((f.up[h] as number) >= 1 ? 1 : 0)
     let moved = false
     for (const mesh of growables.batches) moved = this.drawBatch(mesh) || moved
+    for (let h = 0; h < this.land.length; h++) {
+      const born = this.mountain[h] as number
+      this.land[h] = Number.isNaN(born) ? (f.up[h] as number) : mountainUp(f.t, born)
+    }
     for (const [group, spots] of growables.groups) {
       let hexes = this.groupHexes.get(group)
       if (!hexes) {
@@ -93,6 +110,7 @@ export class GrowthDriver {
     known = {
       hex: new Int32Array(n),
       salt: new Float32Array(n),
+      birth: new Float64Array(n).fill(Number.NaN),
       site: new Array(n),
       last: new Float32Array(n * 5).fill(Number.NaN),
     }
@@ -101,10 +119,30 @@ export class GrowthDriver {
       const z = marks.spots[i * 2 + 1] as number
       known.hex[i] = this.hexAt(x, z)
       known.salt[i] = saltOf(x, z)
+      known.birth[i] = this.birthOf(marks.massifs[i])
       known.site[i] = this.build?.sites.get(siteKey(marks.pieces[i] ?? "", x, z))
     }
     this.batches.set(mesh, known)
     return known
+  }
+
+  /** A mountain instance's birth: its earliest massif's (one massif rises as one, over all its chunks). */
+  private birthOf(massifs: readonly ReadonlySet<string>[] | undefined): number {
+    if (!massifs || massifs.length === 0) return Number.NaN
+    let first = Number.POSITIVE_INFINITY
+    for (const massif of massifs) {
+      let born = this.massifs.get(massif)
+      if (born === undefined) {
+        born = massifBirth(this.g, massif)
+        this.massifs.set(massif, born)
+        for (const id of massif) {
+          const h = this.g.index.get(id)
+          if (h !== undefined) this.mountain[h] = born
+        }
+      }
+      first = Math.min(first, born)
+    }
+    return first
   }
 
   /** Film v2: the build site's own stage (growthStages.ts) in place of the role's v1 arc, written over `state`. */
@@ -139,13 +177,26 @@ export class GrowthDriver {
       const h = batch.hex[i] as number
       // What is built goes up on its own district's land, never on a ghost's borrowed hex.
       const since = role === "build" || role === "prop" ? f.built[h] : f.since[h]
-      pieceAt(role, f.rise[h] as number, f.up[h] as number, since as number, batch.salt[i] as number, s)
-      s.scar = 0
-      if (this.build) this.stage(role, batch, i, h)
+      const born = batch.birth[i] as number
+      const mountain = !Number.isNaN(born)
+      if (mountain) {
+        // A mountain rises with its land, behind it and never back down (growthRelief.ts).
+        s.rise = mountainUp(f.t, born) - 1
+        s.visible = s.rise > -1
+        s.scale = 1
+        s.scaleY = 1
+        s.scaffold = 0
+        s.scar = 0
+      } else {
+        pieceAt(role, f.rise[h] as number, f.up[h] as number, since as number, batch.salt[i] as number, s)
+        s.scar = 0
+        if (this.build) this.stage(role, batch, i, h)
+      }
       const id = marks.ids[i] as number
       const o = i * 5
-      const tint =
-        role === "land"
+      const tint = mountain
+        ? 0
+        : role === "land"
           ? colourKey(f.ghost[h] as number, f.heat[this.g.district[h] as number] as number)
           : s.scar > 0.02
             ? 2 + Math.round(s.scar * 16) / 16

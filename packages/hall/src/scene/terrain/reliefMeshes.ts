@@ -45,13 +45,17 @@ export function reliefLayer(relief: Relief, material: Material, merge: boolean, 
   // Each region is built `lift` below its place and set up by its instance matrix: the growth film
   // sinks an instance by (DEPTH + its base height) × rise, so a region whose base matrix holds its own
   // height sinks right out of sight, and rises out of the sea as the land under its middle does.
-  const instances: (TieredInstance & { spot: readonly [number, number] })[] = []
+  const instances: (TieredInstance & {
+    spot: readonly [number, number]
+    massifs: readonly ReadonlySet<string>[]
+  })[] = []
   reliefCells(relief, chunks).forEach((cells, chunk) => {
     if (cells.length === 0) return
     const lift = Math.ceil(Math.max(...cells.map((cell) => relief.massifAt(cell)?.height ?? 0))) + 1
     const place = (tier: 0 | 2): BufferGeometry =>
       reliefGeometry(reliefMesh(relief, cells, tier)).translate(0, -lift, 0)
-    // The film raises it with the land under its middle.
+    // The film raises it with its massifs' land, as one (growthRelief.ts); the spot is only where it stands.
+    const massifs = [...new Set(cells.flatMap((cell) => relief.massifAt(cell) ?? []))].map((m) => m.keys)
     const points = cells.map((cell) => cellToWorld(cell))
     const spot: readonly [number, number] = [
       points.reduce((sum, [x]) => sum + x, 0) / points.length,
@@ -62,14 +66,15 @@ export function reliefLayer(relief: Relief, material: Material, merge: boolean, 
       matrix: new Matrix4().makeTranslation(0, lift, 0),
       chunk,
       spot,
+      massifs,
     })
   })
   if (instances.length === 0) return { meshes: [], tiers: tiered(chunks, () => {}) }
   const count = chunks.list.length
   const built = merge
     ? tieredMerge(material, instances, count)
-    : tieredBatch(material, instances, count, (mesh, id, { spot }) =>
-        markGrowable(mesh, id, "land", spot[0], spot[1]),
+    : tieredBatch(material, instances, count, (mesh, id, { spot, massifs }) =>
+        markGrowable(mesh, id, "land", spot[0], spot[1], "", massifs),
       )
   for (const { piece } of instances) {
     piece.near.dispose()

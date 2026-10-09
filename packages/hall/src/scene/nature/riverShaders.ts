@@ -29,6 +29,22 @@ uniform float uNight;
 uniform float uCaustics;
 `
 
+/**
+ * A growth film (`?grow`, scene/growth/mask.ts): the water shows only where the land under it is up,
+ * read from the rise mask's blue, so no ribbon, lake or fall hangs over a sea its land has not left yet.
+ */
+const RISE_UNIFORMS = /* glsl */ `
+#ifdef RIVER_RISE
+uniform sampler2D uRise;
+uniform float uRiseHalf;
+#endif
+`
+const RISE_CUT = /* glsl */ `
+#ifdef RIVER_RISE
+  if (texture2D(uRise, vec2(vWorld.x, -vWorld.z) / (2.0 * uRiseHalf) + 0.5).b < 0.5) discard;
+#endif
+`
+
 export const riverVertex = /* glsl */ `
 #include <common>
 #include <fog_pars_vertex>
@@ -60,6 +76,7 @@ void main() {
 export const riverFragment = /* glsl */ `
 ${FRAGMENT_HEAD}
 ${SURFACE_UNIFORMS}
+${RISE_UNIFORMS}
 varying vec3 vWorld;
 varying vec3 vNormal;
 varying vec2 vFlow;
@@ -81,6 +98,7 @@ vec3 ripples(vec2 p, float t) {
 }
 
 void main() {
+  ${RISE_CUT}
   vec2 p = vWorld.xz;
   float t = uTime;
   float dist = max(vShore, 0.0);
@@ -217,6 +235,7 @@ void main() {
 export const fallFragment = /* glsl */ `
 ${FRAGMENT_HEAD}
 ${SURFACE_UNIFORMS}
+${RISE_UNIFORMS}
 varying vec3 vWorld;
 varying vec3 vNormal;
 varying vec2 vUv;
@@ -224,6 +243,7 @@ varying vec2 vSheet;
 varying float vPart;
 
 void main() {
+  ${RISE_CUT}
   vec3 n = normalize(vNormal);
   vec3 v = normalize(cameraPosition - vWorld);
   float t = uCaustics;

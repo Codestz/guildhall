@@ -15,15 +15,15 @@ const PITCH = "Coding agents, GitHub or a stream of your own, played out as a 3D
 /**
  * The showcase's directed opening (guild/opening.ts), drawn over the scene:
  *
- *   card    crest, name, the one-line pitch and the real loading state
- *   reveal  the card dissolves into the establishing shot between letterbox bars
+ *   card    the loader is up (hud/Loader.tsx); the camera holds its top-down start
+ *   reveal  the loader dissolves into the establishing shot between letterbox bars
  *   arrive  the bars retract as the HUD fades in
  *   landed  a short caption says what this is and how to start, with a link to the project
  *
- * Only mounted in showcase mode. Reduced motion: no bars, the card simply fades.
+ * Only mounted in showcase mode. Reduced motion: no bars, the loader simply fades.
  */
 export function Opening({ state, store, phone }: { state: OpeningState; store: GuildStore; phone: boolean }) {
-  const { stage, loaded } = state
+  const { stage } = state
   const [dismissed, setDismissed] = useState(false)
   const touch = useTouch()
   // A growth film (`?grow`) has its own captions and tape along the bottom: the welcome steps aside.
@@ -34,10 +34,7 @@ export function Opening({ state, store, phone }: { state: OpeningState; store: G
     if (store.selected) setDismissed(true)
   }, [store.selected])
 
-  // The card stays mounted through "arrive" so a reduced-motion cut still fades.
-  const titled = stage !== "landed"
   const caption = (stage === "arrive" || stage === "landed") && !dismissed && !film
-  const percent = Math.round(loaded * 100)
 
   return (
     <div className="opening" data-stage={stage} data-phone={phone}>
@@ -45,42 +42,6 @@ export function Opening({ state, store, phone }: { state: OpeningState; store: G
         <i />
         <i />
       </div>
-
-      {titled && (
-        <section className="title-card" aria-label="Guildhall" aria-busy={stage === "card"}>
-          <div className="title-inner">
-            <span className="crest title-crest">
-              <Icon.crest />
-            </span>
-            <h1 className="title-name">Guildhall</h1>
-            <span className="title-rule" aria-hidden="true" />
-            <p className="title-pitch">
-              <span className="title-head">{HEADLINE}</span> {PITCH}
-            </p>
-            <div
-              className="title-load"
-              role="progressbar"
-              aria-label="Loading the guildhall"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={percent}
-            >
-              <span className="title-bar">
-                <i style={{ transform: `scaleX(${Math.max(0.04, loaded)})` }} />
-              </span>
-              <span className="title-load-text">
-                {stage === "card" ? (
-                  <>
-                    Raising the hall <span className="mono">{percent}%</span>
-                  </>
-                ) : (
-                  "Enter the guild"
-                )}
-              </span>
-            </div>
-          </div>
-        </section>
-      )}
 
       {caption && (
         <aside className="plaque opening-caption" aria-label="About this view">

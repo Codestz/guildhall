@@ -31,10 +31,27 @@
     <meta name="twitter:image:alt" content="A low-poly island grown from the React repo at golden hour: mountain ranges, rivers and forests round a lit guildhall, with the title Guildhall and the line Events in. A living world out." />
     <style>
       html, body, #root { margin: 0; height: 100%; background: #cfdcee; overflow: hidden; }
+      /* The first paint, before any script: the loader's ink, crest and name at the loader's own
+         place (hud/loader.css), so React takes over without a jump and the world is never seen bare. */
+      #boot-shell { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center;
+        gap: 18px; padding: clamp(72px, 26vh, 260px) 20px 24px; box-sizing: border-box; color: #f1d590;
+        background: radial-gradient(ellipse 70% 60% at 50% 40%, rgba(220, 182, 98, 0.1), transparent 70%),
+          radial-gradient(ellipse at 50% 45%, #241b13 0%, #15110d 55%, #0c0907 100%); }
+      #boot-shell .crest { display: grid; place-items: center; width: 68px; height: 68px; border: 1px solid rgba(220, 182, 98, 0.34);
+        border-radius: 50%; box-shadow: 0 0 40px -8px rgba(220, 182, 98, 0.35); }
+      #boot-shell .crest svg { width: 40px; height: 40px; }
+      #boot-shell .name { font: 400 clamp(40px, 8vw, 76px) / 1 "Marcellus SC", "Cormorant SC", Georgia, serif; letter-spacing: 0.08em; }
+      @media (max-width: 640px) { #boot-shell { padding-top: clamp(64px, 22vh, 180px); }
+        #boot-shell .crest { width: 56px; height: 56px; } #boot-shell .crest svg { width: 32px; height: 32px; } }
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot-shell" aria-hidden="true">
+        <span class="crest"><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5 13.5 4v4.2c0 3-2.3 5.3-5.5 6.3-3.2-1-5.5-3.3-5.5-6.3V4z"/><path d="M5.2 9.5V7.2L8 5.4l2.8 1.8v2.3"/><path d="M6.6 9.5V8.3h2.8v1.2"/></svg></span>
+        <span class="name">Guildhall</span>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

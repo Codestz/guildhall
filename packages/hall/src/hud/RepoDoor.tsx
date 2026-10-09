@@ -7,6 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react"
+import { boot } from "../guild/boot.ts"
 import { parseDeepLink } from "../guild/deeplink.ts"
 import type { GuildStore } from "../guild/store.ts"
 import { useGuildStore } from "../guild/useGuild.ts"
@@ -80,22 +81,21 @@ export function useRepoDoor(): boolean {
 
 // ── going to an island in place ──
 
-/** How long the veil takes to fall, and to lift, ms (quicker with reduced motion). */
+/** How long the loader takes to fall over the world, ms (quicker with reduced motion). */
 const VEIL_MS = 260
 const VEIL_QUICK_MS = 120
-/** Frames drawn on the new island under the veil before it lifts: its layers build in effects. */
-const SETTLE_FRAMES = 3
 
-let veil: HTMLDivElement | null = null
 let visits = 0
 let following = false
 
 /**
- * Swaps the hall to `repo`'s island (HOME_ISLAND: the guild's own) without leaving the page: a veil
- * falls over the world (not the HUD), the world swaps under it (world/source.ts showIsland), and it
- * lifts once the new island has drawn. A pick or framing belonged to the island left, so both go,
- * as a reload's `islandLink` drops them. `url`: the address to push for it (the door); Back and
- * Forward pass none, the address being already theirs.
+ * Swaps the hall to `repo`'s island (HOME_ISLAND: the guild's own) without leaving the page: the
+ * loader falls over the world (not the HUD; hud/Loader.tsx), the world swaps under it
+ * (world/source.ts showIsland), and it lifts once the new island is drawn, by the same measure as the
+ * page's first load (guild/boot.ts: grown, models in, shaders compiled, a run of smooth frames). A
+ * pick or framing belonged to the island left, so both go, as a reload's `islandLink` drops them.
+ * `url`: the address to push for it (the door); Back and Forward pass none, the address being
+ * already theirs.
  */
 export async function visitIsland(store: GuildStore, repo: string, url?: string): Promise<void> {
   if (url !== undefined) {
@@ -103,18 +103,18 @@ export async function visitIsland(store: GuildStore, repo: string, url?: string)
     followHistory(store)
   }
   const n = ++visits
-  const ms = matchMedia("(prefers-reduced-motion: reduce)").matches ? VEIL_QUICK_MS : VEIL_MS
-  const shade = veilOf(ms)
-  shade.style.opacity = "1"
-  await wait(ms)
+  boot.begin(repo === HOME_ISLAND ? "the guild's island" : repo)
+  await wait(matchMedia("(prefers-reduced-motion: reduce)").matches ? VEIL_QUICK_MS : VEIL_MS)
   if (n !== visits) return
   store.select(null)
   store.frame(null)
   await showIsland(repo)
   await worldSource.ready
-  for (let i = 0; i < SETTLE_FRAMES; i++) await new Promise(requestAnimationFrame)
+  // One frame for React to take the new world up (and suspend on it), so the measuring starts on it.
+  await new Promise(requestAnimationFrame)
   if (n !== visits) return
-  shade.style.opacity = "0"
+  boot.arm()
+  await boot.ready()
 }
 
 /** Back and Forward between islands the door went to: each entry's `?repo=` (none: home), in place. */
@@ -125,27 +125,6 @@ function followHistory(store: GuildStore): void {
     const repo = parseDeepLink(location.search, false).link.repo ?? HOME_ISLAND
     void visitIsland(store, repo)
   })
-}
-
-/** The veil over the world: below the HUD (z 40), above the canvas and its name chips (z 0–20). */
-function veilOf(ms: number): HTMLDivElement {
-  if (!veil) {
-    veil = document.createElement("div")
-    veil.setAttribute("aria-hidden", "true")
-    Object.assign(veil.style, {
-      position: "fixed",
-      inset: "0",
-      zIndex: "30",
-      background: "var(--ink-solid)",
-      opacity: "0",
-      pointerEvents: "none",
-    })
-    document.body.append(veil)
-    // Laid out at 0 first, so the first fall eases instead of popping.
-    veil.getBoundingClientRect()
-  }
-  veil.style.transition = `opacity ${ms}ms ease`
-  return veil
 }
 
 function wait(ms: number): Promise<void> {

@@ -2,6 +2,7 @@ import { Canvas } from "@react-three/fiber"
 import type { GuildStore } from "./guild/store.ts"
 import { GuildContext } from "./guild/useGuild.ts"
 import { Hud } from "./hud/Hud.tsx"
+import { Loader } from "./hud/Loader.tsx"
 import { requestedBackend } from "./render/backend.ts"
 import { glFor } from "./render/renderer.ts"
 import { Scene } from "./scene/Scene.tsx"
@@ -28,6 +29,8 @@ export function Hall({ store }: { store: GuildStore }) {
         <Scene />
       </Canvas>
       <Hud />
+      {/* Over everything until the world is drawn (guild/boot.ts); back under the HUD for each island visit. */}
+      <Loader />
     </GuildContext.Provider>
   )
 }

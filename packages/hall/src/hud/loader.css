@@ -1,0 +1,202 @@
+/*
+ * The loader (hud/Loader.tsx, guild/boot.ts): the first thing the page shows and the last thing it
+ * lifts. Opaque ink from the first paint (index.html draws the same crest and name before any
+ * script runs, at the same place), so the world is never seen half-made. Reduced motion: no glow,
+ * a short fade. A visit (going to another island) is the same card under the HUD.
+ */
+
+.loader {
+  --fade: 650ms;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  padding: clamp(72px, 26vh, 260px) 20px 24px;
+  overflow: hidden;
+  color: var(--paper);
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 40%, rgba(220, 182, 98, 0.1), transparent 70%),
+    radial-gradient(ellipse at 50% 45%, #241b13 0%, var(--ink-solid) 55%, #0c0907 100%);
+  opacity: 1;
+  transition:
+    opacity var(--fade) ease-in-out,
+    visibility 0s linear var(--fade);
+}
+.loader[data-state="pre"],
+.loader[data-state="out"] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.loader[data-kind="visit"] {
+  z-index: 30; /* the world's veil: below the HUD (z 40), above the canvas */
+  pointer-events: none;
+  align-content: center;
+  padding-top: 24px;
+}
+.loader[data-kind="visit"][data-state="in"] {
+  transition-duration: 260ms, 0s;
+}
+
+.loader-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 620px;
+  text-align: center;
+}
+.crest.loader-crest {
+  width: 68px;
+  height: 68px;
+  margin-bottom: 4px;
+  box-shadow: 0 0 40px -8px rgba(220, 182, 98, 0.35);
+  animation: loader-breathe 2.4s ease-in-out infinite;
+}
+.loader-crest .glyph {
+  width: 40px;
+  height: 40px;
+}
+.loader-name {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(40px, 8vw, 76px);
+  line-height: 1;
+  letter-spacing: 0.08em;
+  color: var(--brass-hi);
+  text-shadow: 0 2px 24px rgba(220, 182, 98, 0.18);
+}
+.loader-rule {
+  width: 140px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--brass), transparent);
+  opacity: 0.6;
+}
+.loader-pitch {
+  margin: 0;
+  max-width: 34ch;
+  font-size: clamp(16px, 1.9vw, 19px);
+  line-height: 1.5;
+  text-wrap: balance;
+  color: var(--brass-hi);
+}
+.loader-bar {
+  display: block;
+  width: 168px;
+  height: 2px;
+  margin-top: 14px;
+  border-radius: 2px;
+  background: var(--hair-2);
+  overflow: hidden;
+}
+.loader-bar i {
+  display: block;
+  height: 100%;
+  background: var(--brass);
+  transform-origin: left center;
+  transition: transform 0.3s ease-out;
+}
+.loader-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 18px;
+  font-family: var(--display);
+  font-size: 12.5px;
+  letter-spacing: 0.14em;
+  color: var(--faint);
+}
+.loader-steps li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.loader-steps li::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+}
+.loader-steps li[data-step="done"] {
+  color: var(--muted);
+}
+.loader-steps li[data-step="done"]::before {
+  background: currentColor;
+}
+.loader-steps li[data-step="now"] {
+  color: var(--brass-hi);
+}
+.loader-steps li[data-step="now"]::before {
+  background: var(--brass);
+  border-color: var(--brass);
+}
+.loader[data-kind="visit"] .loader-steps {
+  display: none;
+}
+.loader[data-kind="visit"] .loader-crest,
+.loader[data-kind="visit"] .loader-rule,
+.loader[data-kind="visit"] .loader-pitch {
+  display: none;
+}
+.loader[data-kind="visit"] .loader-name {
+  font-size: clamp(22px, 4vw, 30px);
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+}
+
+@keyframes loader-breathe {
+  50% {
+    box-shadow: 0 0 56px -4px rgba(220, 182, 98, 0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader {
+    --fade: 150ms;
+  }
+  .crest.loader-crest {
+    animation: none;
+  }
+  .loader-bar i {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .loader {
+    padding-top: clamp(64px, 22vh, 180px);
+  }
+  .crest.loader-crest {
+    width: 56px;
+    height: 56px;
+  }
+  .loader-crest .glyph {
+    width: 32px;
+    height: 32px;
+  }
+  .loader-steps {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+}
+
+/* a visit has no list of steps: the one it is on, in words */
+.loader-say {
+  display: none;
+  margin: 0;
+  font-family: var(--display);
+  font-size: 12.5px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.loader[data-kind="visit"] .loader-say {
+  display: block;
+}

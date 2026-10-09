@@ -176,6 +176,7 @@ async function measure(browser: Browser, url: string): Promise<Sample> {
             guild?: { held: boolean }
           }
           if (!w.r3f?.scene || w.guild?.held !== false) return false
+          if ((document.documentElement.dataset.boot ?? "revealed") !== "revealed") return false
           let meshes = 0
           w.r3f.scene.traverse((o) => {
             if (o.isMesh) meshes++

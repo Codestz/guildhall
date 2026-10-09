@@ -8,6 +8,7 @@ import {
   TOUCH,
   Vector3,
 } from "three"
+import { boot } from "../guild/boot.ts"
 import { clearFrame, hudInsets, type Point, type Shot, type ShotKind, type Stage } from "../guild/director.ts"
 import { MODE } from "../guild/mode.ts"
 import { opening, reducedMotion } from "../guild/opening.ts"
@@ -26,7 +27,6 @@ import {
 import { bezier, closeIn, easeInOut } from "./cameraMath.ts"
 import { FRAME } from "./frame.ts"
 import { baseZoomOf, landOf, ORTHO_BACK, orthoBackOf, orthoMaxOf, uprightOf, widestOf } from "./frameReach.ts"
-import { OpeningProgress } from "./OpeningCue.tsx"
 import { ClearAngle } from "./terrain/clearAngle.ts"
 import { aboveGround } from "./terrain/framing.ts"
 import { useCutaway } from "./terrain/useCutaway.ts"
@@ -50,6 +50,11 @@ type Controls = ComponentRef<typeof MapControls>
 const REVEAL_S = 3.2
 /** The showcase's directed opening (guild/opening.ts): hold, then reveal, then land. */
 const SHOWCASE = MODE === "showcase"
+/** The sweep has landed: the showcase's opening moves on, and automation may shoot (guild/boot.ts). */
+function landed(): void {
+  if (SHOWCASE) opening.land()
+  boot.land()
+}
 /** Portrait screens close in on the keep by up to this much (a 390×844 phone gets all of it). */
 const PORTRAIT_BOOST = 0.7
 /** Direction from the target to the camera: the isometric angle. */
@@ -299,20 +304,20 @@ export function CameraRig() {
     const camera = control.object as Ortho | Persp
     const isOrtho = (camera as Ortho).isOrthographicCamera === true
 
-    // A deep link's `look` skips the sweep below (once the showcase's title card is down): it cuts
-    // straight to its framing (1b).
-    if (revealed.current < 1 && store.framing && (!SHOWCASE || opening.get().stage !== "card")) {
+    // A deep link's `look` skips the sweep below (once the showcase's opening is under way): it cuts
+    // straight to its framing (1b), loader or not, so the world is drawn from where it will be seen.
+    const waiting = SHOWCASE ? opening.get().stage === "card" : boot.get().stage !== "ready"
+    if (revealed.current < 1 && store.framing && (!SHOWCASE || !waiting)) {
       revealed.current = 1
-      if (SHOWCASE) opening.land()
+      landed()
     }
-    // 1. The dollhouse reveal, once. The showcase holds it until the world has loaded (the title
-    //    card is up), cuts straight to the end for reduced motion, and lands the opening.
+    // 1. The dollhouse reveal, once. Held until the world is ready (guild/boot.ts: the loader is up),
+    //    cut straight to the end for reduced motion, and lands the opening.
     if (revealed.current < 1) {
-      const stage = SHOWCASE ? opening.get().stage : "landed"
       // A long first frame (shader compiles) must not skip half the showcase's sweep.
       const step = SHOWCASE ? Math.min(delta, 1 / 30) : delta
-      if (stage === "card") revealed.current = 0
-      else if (SHOWCASE && reducedMotion()) revealed.current = 1
+      if (waiting) revealed.current = 0
+      else if (reducedMotion()) revealed.current = 1
       else revealed.current = Math.min(1, revealed.current + step / REVEAL_S)
       const p = easeInOut(revealed.current)
       const dir = scratch.dir.copy(TOP_DIR).lerp(ISO_DIR, p).normalize()
@@ -325,7 +330,7 @@ export function CameraRig() {
       }
       camera.updateProjectionMatrix()
       control.update()
-      if (SHOWCASE && revealed.current >= 1) opening.land()
+      if (revealed.current >= 1) landed()
       return
     }
 
@@ -709,7 +714,6 @@ export function CameraRig() {
 
   return (
     <>
-      {SHOWCASE && <OpeningProgress />}
       <OrthographicCamera
         ref={ortho}
         makeDefault={view === "diorama"}

@@ -171,11 +171,15 @@ async function waitMounted(page: Page, timeout: number): Promise<boolean> {
     const n = await meshes(page)
     if (n === -2) return false
     if (n >= MIN_MESHES) {
-      // The probe bridge (main.tsx) is there, and the world released the store's hold.
+      // The probe bridge (main.tsx) is there, the world released the store's hold, and the boot is
+      // over (guild/boot.ts): the loader gone and the camera landed, so no shot catches either. A
+      // build without the signal counts as revealed.
       const released = await page
         .evaluate(
           () =>
-            "deeplink" in window && (window as unknown as { guild: { held: boolean } }).guild.held === false,
+            "deeplink" in window &&
+            (window as unknown as { guild: { held: boolean } }).guild.held === false &&
+            (document.documentElement.dataset.boot ?? "revealed") === "revealed",
         )
         .catch(() => false)
       if (released) return true
@@ -208,8 +212,8 @@ async function ensureHall(): Promise<void> {
 }
 
 async function finishMount(): Promise<void> {
-  // Let the first frames compile shaders and the opening reveal (3.2 s) land before anyone shoots.
-  await hall.waitForTimeout(3500)
+  // The boot is revealed (waitMounted): shaders compiled, the sweep landed. A beat for the first frames after it.
+  await hall.waitForTimeout(500)
   ready = true
 }
 

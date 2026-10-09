@@ -12,7 +12,7 @@ import {
 } from "react"
 import type { Object3D } from "three"
 import { SoundStage } from "../audio/SoundStage.tsx"
-import { MODE, PROBE } from "../guild/mode.ts"
+import { PROBE } from "../guild/mode.ts"
 import type { AdventurerView } from "../guild/store.ts"
 import { town } from "../guild/town/town.ts"
 import { useGuild, useGuildStore } from "../guild/useGuild.ts"
@@ -25,6 +25,7 @@ import { Atmosphere } from "./atmosphere/Atmosphere.tsx"
 import { Post } from "./atmosphere/Post.tsx"
 import { shadows } from "./atmosphere/shadows.ts"
 import { Blobs } from "./Blobs.tsx"
+import { BootWatch, WorldMounted } from "./BootWatch.tsx"
 import { CameraRig } from "./CameraRig.tsx"
 import { Crisp } from "./Crisp.tsx"
 import { declutter } from "./chips.ts"
@@ -45,7 +46,6 @@ import { NearLights } from "./lights/NearLights.tsx"
 import { NightLife } from "./lights/NightLife.tsx"
 import { StreetLights } from "./lights/StreetLights.tsx"
 import { Nature } from "./nature/Nature.tsx"
-import { OpeningCue } from "./OpeningCue.tsx"
 import { Quality } from "./Quality.tsx"
 import { Rings } from "./Rings.tsx"
 import { Room } from "./Room.tsx"
@@ -104,9 +104,11 @@ export function Scene() {
         {/* What everyone is doing, as an icon over their head: readable with the HUD hidden. */}
         {today && <Sigils />}
         <WorldReady />
-        {/* Showcase: mounts with the world, then lifts the title card (guild/opening.ts). */}
-        {MODE === "showcase" && <OpeningCue />}
+        {/* Counts the world as built while it is (scene/BootWatch.tsx). */}
+        <WorldMounted />
       </Suspense>
+      {/* Measures that the world is drawn, then lifts the loader (guild/boot.ts, hud/Loader.tsx). */}
+      <BootWatch />
       {/* Ships: their own Suspense, so the sea's traffic never holds up the island. */}
       <Suspense fallback={null}>
         <Ships />

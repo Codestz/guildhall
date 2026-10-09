@@ -21,7 +21,7 @@ vec3 key(vec3 n, float shadow) {
 }
 `
 
-const FRAGMENT_HEAD = /* glsl */ `
+export const FRAGMENT_HEAD = /* glsl */ `
 #include <common>
 #include <fog_pars_fragment>
 #include <bsdfs>
@@ -32,7 +32,7 @@ ${LIGHT}
 uniform float uTime;
 `
 
-const FRAGMENT_TAIL = /* glsl */ `
+export const FRAGMENT_TAIL = /* glsl */ `
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
   #include <fog_fragment>

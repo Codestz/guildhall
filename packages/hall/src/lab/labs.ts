@@ -8,6 +8,7 @@
  *   ?lab=prop&piece=lantern                     a kit piece or drawn prop from four sides
  *   ?lab=event&kind=dragon&night=1              a world event alone over a flat sea, on repeat
  *   ?lab=crowd&n=300 (&compare=1)               the baked-bone crowd: a field of n, or one beside a real rig
+ *   ?lab=water&hour=18.5 (&look=falls)          rivers, a lake and waterfalls on a terraced patch
  *
  * Each lab hangs its levers on `window.lab`. A new lab: a module with `start(root, params)`, and a
  * line here.
@@ -19,6 +20,7 @@ export const LABS = {
   event: () => import("./eventLab.tsx"),
   crowd: () => import("./crowdLab.ts"),
   island: () => import("./islandLab.ts"),
+  water: () => import("./waterLab.tsx"),
 } satisfies Record<string, () => Promise<{ start(root: HTMLElement, params: URLSearchParams): unknown }>>
 
 export type LabName = keyof typeof LABS

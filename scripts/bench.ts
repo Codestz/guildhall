@@ -7,6 +7,7 @@
  *   party            the party story at 13:00, clear                     ?story=party&t=0:30&hour=13
  *   rush-night-rain  the rush (12) at 22:00 in the rain                  ?story=rush&t=0:20&hour=22&weather=rain
  *   crowd-50/100/300 the rush with 50, 100, 300 adventurers at 13:00     ?story=rush&n=…&t=0:20&hour=13
+ *   water-lab        (only when named) the water lab at 13:00             ?lab=water&hour=13
  *
  * Every scene is paused at its moment (the crowd stays put; idle clips, water, weather still run),
  * the Bard off, the tier pinned to High (guild/quality.ts). Per sample: a fresh page on the
@@ -43,10 +44,18 @@ const SCENES: Record<string, string> = {
   "crowd-100": "story=rush&n=100&t=0:20&hour=13&weather=clear",
   "crowd-300": "story=rush&n=300&t=0:20&hour=13&weather=clear",
 }
+/**
+ * Labs (lab/labs.ts), benched only when named in --scenes: a lab is ready when it says so
+ * (`window.lab.ready`), not when the hall's island has mounted.
+ */
+const LABS: Record<string, string> = {
+  "water-lab": "lab=water&hour=13&weather=clear",
+}
+const KNOWN = { ...SCENES, ...LABS }
 
 const names = (arg("scenes") ?? Object.keys(SCENES).join(",")).split(",").filter(Boolean)
-const unknown = names.filter((name) => !(name in SCENES))
-if (unknown.length) fail(`unknown scene ${unknown.join(", ")}; known: ${Object.keys(SCENES).join(", ")}`)
+const unknown = names.filter((name) => !(name in KNOWN))
+if (unknown.length) fail(`unknown scene ${unknown.join(", ")}; known: ${Object.keys(KNOWN).join(", ")}`)
 const SECONDS = Number(arg("seconds") ?? 5)
 const ROUNDS = Number(arg("rounds") ?? 3)
 const DPR = Number(arg("dpr") ?? 2)
@@ -149,23 +158,33 @@ async function measure(browser: Browser, url: string): Promise<Sample> {
   })
   try {
     await page.goto(url)
+    if (/[?&]lab=/.test(url))
+      await page.waitForFunction(
+        () => (window as { lab?: { ready?: boolean } }).lab?.ready === true,
+        undefined,
+        {
+          timeout: MOUNT_TIMEOUT_MS,
+          polling: 250,
+        },
+      )
     // Mounted: the island's meshes are there and the world released the store's hold (probe-server.ts).
-    await page.waitForFunction(
-      (min: number) => {
-        const w = window as unknown as {
-          r3f?: { scene: { traverse(f: (o: { isMesh?: boolean }) => void): void } }
-          guild?: { held: boolean }
-        }
-        if (!w.r3f?.scene || w.guild?.held !== false) return false
-        let meshes = 0
-        w.r3f.scene.traverse((o) => {
-          if (o.isMesh) meshes++
-        })
-        return meshes >= min
-      },
-      MIN_MESHES,
-      { timeout: MOUNT_TIMEOUT_MS, polling: 250 },
-    )
+    else
+      await page.waitForFunction(
+        (min: number) => {
+          const w = window as unknown as {
+            r3f?: { scene: { traverse(f: (o: { isMesh?: boolean }) => void): void } }
+            guild?: { held: boolean }
+          }
+          if (!w.r3f?.scene || w.guild?.held !== false) return false
+          let meshes = 0
+          w.r3f.scene.traverse((o) => {
+            if (o.isMesh) meshes++
+          })
+          return meshes >= min
+        },
+        MIN_MESHES,
+        { timeout: MOUNT_TIMEOUT_MS, polling: 250 },
+      )
     await page.waitForTimeout(WARMUP_S * 1000)
     const cdp = await context.newCDPSession(page)
     const heap = async () => ((await cdp.send("Runtime.getHeapUsage")) as { usedSize: number }).usedSize
@@ -243,10 +262,7 @@ const samples: Record<string, Sample[]> = Object.fromEntries(names.map((name) =>
 try {
   for (let round = 0; round < ROUNDS; round++)
     for (const name of names) {
-      const sample = await measure(
-        browser,
-        `${server.url}?${BASE}&${SCENES[name]}${EXTRA ? `&${EXTRA}` : ""}`,
-      )
+      const sample = await measure(browser, `${server.url}?${BASE}&${KNOWN[name]}${EXTRA ? `&${EXTRA}` : ""}`)
       samples[name]?.push(sample)
       console.log(
         `  round ${round + 1}/${ROUNDS} ${name.padEnd(16)} ${sample.fps.toFixed(0)} fps  p95 ${sample.p95.toFixed(2)} ms` +
@@ -265,7 +281,7 @@ const scenes = Object.fromEntries(
     return [
       name,
       {
-        link: `?${BASE}&${SCENES[name]}`,
+        link: `?${BASE}&${KNOWN[name]}`,
         fps: round2(median(rs.map((r) => r.fps))),
         p50: round2(median(rs.map((r) => r.p50))),
         p95: round2(median(rs.map((r) => r.p95))),

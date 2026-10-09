@@ -28,7 +28,7 @@ import { mkdir } from "node:fs/promises"
 import { dirname } from "node:path"
 import { type Browser, chromium } from "playwright-core"
 import { acquireGpu } from "./gpulock.ts"
-import { CHROME, CHROME_ARGS, PROBE_DIR, ROOT, VIEWPORT } from "./steps.ts"
+import { CAPPED, CHROME, CHROME_ARGS, PROBE_DIR, ROOT, VIEWPORT } from "./steps.ts"
 
 const arg = (name: string): string | undefined => {
   const i = process.argv.indexOf(`--${name}`)
@@ -252,6 +252,10 @@ const out = arg("out") ?? `${BENCH}/${sha}.json`
 
 await acquireGpu("bench")
 console.log(`building (VITE_GUILDHALL_PROBE=1) → ${BUILD}`)
+if (CAPPED)
+  console.log(
+    "on battery: capped at 60 fps — readings show whether a scene holds 60, not headroom (GUILDHALL_UNCAPPED=1 to override)",
+  )
 await build()
 const server = await serve()
 const browser = await chromium.launch({

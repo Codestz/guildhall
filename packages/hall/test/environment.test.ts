@@ -254,5 +254,7 @@ describe("cost in a long live session", () => {
       // Heat folded over time and heat summed at once differ in rounding only.
       expect(temperature).toBeCloseTo(freshTemperature, 9)
     }
-  })
+    // Building four 60k-deed models is the slow part, not the refreshes the test times: room for
+    // a loaded machine, or one on battery.
+  }, 20_000)
 })

@@ -56,13 +56,18 @@ function resolveChrome(): string {
 /**
  * Uncapped frame rate (no vsync, no 60 Hz limit), so fps/frame-time readings show real headroom
  * against the 120 fps budget instead of the headless 60 cap; Metal through ANGLE, like the Mac.
+ * On battery the tools hold to 60 instead (GUILDHALL_UNCAPPED=1 overrides): a capped run still
+ * says whether a scene keeps 60 fps, at a fraction of the power.
  */
-export const CHROME_ARGS = [
-  "--use-angle=metal",
-  "--enable-gpu",
-  "--disable-gpu-vsync",
-  "--disable-frame-rate-limit",
-]
+const UNCAPPED_ARGS = ["--disable-gpu-vsync", "--disable-frame-rate-limit"]
+export const CAPPED = process.env.GUILDHALL_UNCAPPED !== "1" && onBattery()
+export const CHROME_ARGS = ["--use-angle=metal", "--enable-gpu", ...(CAPPED ? [] : UNCAPPED_ARGS)]
+
+function onBattery(): boolean {
+  if (process.platform !== "darwin") return false
+  const batt = Bun.spawnSync(["pmset", "-g", "batt"]).stdout.toString()
+  return batt.includes("'Battery Power'")
+}
 export const VIEWPORT = { width: 1440, height: 860 }
 
 /**

@@ -4,6 +4,7 @@ import { BatchedMesh, type BufferGeometry, type Material, type Matrix4, Mesh } f
 import { bakeStatic, type Placed } from "../render/bake.ts"
 import { type DetailTier, FAR, NEAR, pixelsPerUnit, tierAt } from "../render/tiers.ts"
 import type { Chunks } from "../world/chunks.ts"
+import type { Spot } from "../world/layout.ts"
 import { shadows } from "./atmosphere/shadows.ts"
 import { FRAME } from "./frame.ts"
 
@@ -68,6 +69,23 @@ export function useTiered(layer: TieredLayer | null | undefined): void {
   }, [layer])
 }
 
+/** Where an island's regions lie when it stands off the origin (a far island's group is moved there). */
+const offsets = new WeakMap<Chunks, Spot>()
+const ORIGIN: Spot = [0, 0]
+
+/**
+ * Tells the tier pass where `chunks` (a world's regions, in its own coordinates) really are, while
+ * mounted: a perspective camera measures each region's distance from there, not from the origin.
+ */
+export function useChunksAt(chunks: Chunks, at: Spot): void {
+  useLayoutEffect(() => {
+    offsets.set(chunks, at)
+    return () => {
+      offsets.delete(chunks)
+    }
+  }, [chunks, at])
+}
+
 /** A layer's regions, unsettled until the pass's first two frames, swapped by `swap`. */
 export function tiered(chunks: Chunks, swap: TieredLayer["swap"], farAt = 1): TieredLayer {
   return { chunks, tiers: new Uint8Array(chunks.list.length).fill(UNSETTLED), farAt, swap }
@@ -83,6 +101,7 @@ export function Tiers() {
       const layer = layers[l]
       if (!layer) continue
       const { list } = layer.chunks
+      const [ox, oz] = offsets.get(layer.chunks) ?? ORIGIN
       for (let i = 0; i < list.length; i++) {
         const chunk = list[i]
         if (!chunk) continue
@@ -92,7 +111,14 @@ export function Tiers() {
           layer.tiers[i] = SETTLING
           continue
         }
-        const pixels = pixelsPerUnit(camera, size.height, chunk.centre[0], 0, chunk.centre[1], chunk.radius)
+        const pixels = pixelsPerUnit(
+          camera,
+          size.height,
+          chunk.centre[0] + ox,
+          0,
+          chunk.centre[1] + oz,
+          chunk.radius,
+        )
         fewest = Math.min(fewest, pixels)
         if (current === SETTLING) settled = true
         const from = current === SETTLING ? NEAR : (current as DetailTier)

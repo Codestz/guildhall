@@ -16,6 +16,7 @@ import { reducedMotion } from "../../guild/opening.ts"
 import { TIERS } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { isWebGPU } from "../../render/backend.ts"
+import { useArchipelago } from "../../world/archipelagoSource.ts"
 import { useWorld } from "../../world/source.ts"
 import { reachOf } from "../../world/world.ts"
 import { FRAME } from "../frame.ts"
@@ -66,7 +67,9 @@ function PostGL() {
   // Aerial perspective is a gen 2 island's (the hand island's pictures stay as they were).
   const world = useWorld()
   const haze = world.repo?.gen === 2 && WIDE_VIEW.haze
-  const reach = useMemo(() => reachOf(world), [world])
+  // Under an archipelago the haze spans all of it, not the home island alone: its far islands are not misted out.
+  const extent = useArchipelago()?.extent ?? 0
+  const reach = useMemo(() => Math.max(reachOf(world), extent), [world, extent])
   const grade = useMemo(() => new GradeEffect(), [])
   const lut = useMemo(() => new MoodLutEffect(), [])
   const bloom = useRef<BloomEffect>(null)

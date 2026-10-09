@@ -64,14 +64,16 @@ if (live === null && !lab) applyDeepLink(parseDeepLink(location.search, PROBE).l
 // grow beside the home one, and a link's island is where the camera starts.
 const archipelago = live === null && !lab ? parseArchipelagoLink(location.search) : null
 if (archipelago)
-  void loadArchipelago(archipelago.repos).then((grown) => {
-    if (!grown || !archipelago.island) return
-    const stop = islandIndexOf(
-      archipelago.island,
-      grown.islands.map((island) => island.repo),
-    )
-    if (stop !== undefined && stop !== HOME) islandView.go(stop, { cut: true })
-  })
+  void import("./scene/archipelago/footprint.ts")
+    .then(({ patchesOf }) => loadArchipelago(archipelago.repos, patchesOf))
+    .then((grown) => {
+      if (!grown || !archipelago.island) return
+      const stop = islandIndexOf(
+        archipelago.island,
+        grown.islands.map((island) => island.repo),
+      )
+      if (stop !== undefined && stop !== HOME) islandView.go(stop, { cut: true })
+    })
 
 if (PROBE)
   Object.assign(window, {

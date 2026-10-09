@@ -21,14 +21,14 @@ import {
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { isWebGPU } from "../../render/backend.ts"
-import { PATCH_HALF, SEA_CELL, seaRadiusOf } from "../../world/archipelago.ts"
-import { type Archipelago, useArchipelago } from "../../world/archipelagoSource.ts"
+import { SEA_CELL } from "../../world/archipelago.ts"
+import { useArchipelago } from "../../world/archipelagoSource.ts"
 import { LANDS_URL } from "../../world/cast.ts"
 import { cellToWorld } from "../../world/lands.ts"
 import type { Spot } from "../../world/layout.ts"
 import { lightsOf } from "../../world/lights.ts"
 import { useWorld } from "../../world/source.ts"
-import { reachOf, type World } from "../../world/world.ts"
+import type { World } from "../../world/world.ts"
 import { useLooks } from "../atmosphere/looks.ts"
 import { sky } from "../atmosphere/state.ts"
 import { wind } from "../atmosphere/wind.ts"
@@ -39,10 +39,10 @@ import { targetOf } from "../weather/shared.ts"
 import { noiseTexture } from "./noise.ts"
 import { HEX_RADIUS } from "./scatter.ts"
 import { waterFragment, waterVertex } from "./shaders.ts"
-import { Bakes, type Hole, patchSquares, SHORE, type ShoreLayout, seaSquares } from "./shore.ts"
+import { Bakes, patchSquares, SHORE, type ShoreLayout, seaSquares } from "./shore.ts"
 import { bakeShore, RING_MAX, riverOf, type Shore } from "./shoreBake.ts"
-import { outreachOf, shoreTilesOf } from "./shoreTiles.ts"
 import { RIVER_Y, SEA_Y } from "./waterline.ts"
+import { type Part, partsOf, type Sea } from "./waterParts.ts"
 import { useWaterSky } from "./waterSky.ts"
 
 /**
@@ -63,10 +63,6 @@ import { useWaterSky } from "./waterSky.ts"
  * loads. The shore bake is GLSL with a synchronous readback on WebGL; on WebGPU the same masks are
  * node materials, read back once asynchronously (the sea reads open water until then).
  */
-/** A far island's shore patch (world/archipelago.ts): its own bake, coarser than the home island's. */
-const PATCH: ShoreLayout = { half: PATCH_HALF, size: 512 }
-/** The disc of sea round a home island that fits the one bake (a bigger screen's reach widens it). */
-const DISC = 420
 
 /**
  * Under an archipelago (world/archipelagoSource.ts) the open sea reaches past every island and has
@@ -84,39 +80,6 @@ export function Water({ tier, at }: { tier: Tier; at?: Spot }) {
   const view = useMemo(() => Math.ceil(viewReachOf(size, landOf(world)) / 100) * 100, [size, world])
   const parts = useMemo(() => partsOf(world, archipelago, view, at), [world, archipelago, view, at])
   return parts.map((part) => <Surface key={part.key} tier={tier} at={at} part={part} />)
-}
-
-/** Where a surface lies: the disc round the home island (its radius), a grid with holes, or a patch over one. */
-type Sea = { disc: number } | { radius: number; holes: readonly Hole[] } | { patch: number; at?: Spot }
-
-/** One water surface: where it lies, the shore it reads (none: open sea), and whether its bake waits its turn. */
-interface Part {
-  key: string
-  sea: Sea
-  layout: ShoreLayout | null
-  queued: boolean
-}
-
-function partsOf(world: World, archipelago: Archipelago | null, view: number, at?: Spot): Part[] {
-  if (at) return [{ key: "patch", sea: { patch: PATCH_HALF }, layout: PATCH, queued: false }]
-  const far: Hole[] = archipelago?.islands.map((island) => ({ at: island.at, half: PATCH_HALF })) ?? []
-  if (outreachOf(world) === 1) {
-    const sea: Sea = archipelago
-      ? { radius: seaRadiusOf(archipelago.extent), holes: far }
-      : { disc: Math.max(DISC, view) }
-    return [{ key: "home", sea, layout: SHORE, queued: false }]
-  }
-  const tiles = shoreTilesOf(world)
-  const radius = Math.max(seaRadiusOf(Math.max(archipelago?.extent ?? 0, reachOf(world))), view)
-  return [
-    { key: "sea", sea: { radius, holes: [...tiles, ...far] }, layout: null, queued: false },
-    ...tiles.map((tile) => ({
-      key: `tile ${tile.at.join(",")}`,
-      sea: { patch: tile.half, at: tile.at },
-      layout: tile,
-      queued: true,
-    })),
-  ]
 }
 
 function Surface({ tier, at, part }: { tier: Tier; at?: Spot; part: Part }) {

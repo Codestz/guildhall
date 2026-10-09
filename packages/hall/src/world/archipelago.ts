@@ -34,10 +34,27 @@ export const PATCH_HALF = 140
 export const SEA_CELL = 20
 /** The home island's own shore bake reaches ±this (nature/shore.ts SHORE.half): no patch over it. */
 export const HOME_HALF = 120
-/** Where the ring starts: one island's width out past the home island. */
+/**
+ * Where the ring starts: one island's width out past a small home island, so the default archipelago
+ * keeps its layout. A bigger island (generator v2) is pushed out past this by its own reach.
+ */
 const RING_START = 300
+/** Open sea kept between two islands' land: a ship's offing (OFFING) off each coast, and a little more. */
+export const SEA_GAP = 60
 
-export interface IslandSeed {
+/** A square of an island's water, ±half round `at` from its keep: a shore patch or a shore tile (nature/shoreTiles.ts). */
+export interface Patch {
+  at: Spot
+  half: number
+}
+
+/** What placing an island needs of it: how far its land reaches, and the squares its water is drawn in. */
+export interface Footprint {
+  reach: number
+  patches: readonly Patch[]
+}
+
+export interface IslandSeed extends Footprint {
   /** "owner/name": what places it (its hash turns the ring a little). */
   repo: string
 }
@@ -46,12 +63,24 @@ export interface IslandSeed {
 const apart = (a: Spot, b: Spot): number => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]))
 const snap = (v: number): number => Math.round(v / SEA_CELL) * SEA_CELL
 
+/** Whether island `a` (keep at `from`) and `b` (at `to`) keep their gap of sea and share no square of water. */
+function clear(a: Footprint, from: Spot, b: Footprint, to: Spot): boolean {
+  if (Math.hypot(from[0] - to[0], from[1] - to[1]) < a.reach + b.reach + SEA_GAP) return false
+  return a.patches.every((p) =>
+    b.patches.every(
+      (q) =>
+        apart([from[0] + p.at[0], from[1] + p.at[1]], [to[0] + q.at[0], to[1] + q.at[1]]) >= p.half + q.half,
+    ),
+  )
+}
+
 /**
  * Each island's offset from the home island's keep, in order: a ring round the origin, one slot per
- * island, each pushed out until its patch clears the home island's shore and every patch before it.
- * Deterministic (the same repos give the same ring); every offset is a multiple of SEA_CELL.
+ * island, each pushed out until it is clear (SEA_GAP between the lands' reaches, no shared square of
+ * water) of the home island and every island before it: a big island stands further out than a small
+ * one. Deterministic (the same repos give the same ring); every offset is a multiple of SEA_CELL.
  */
-export function placeIslands(seeds: readonly IslandSeed[]): Spot[] {
+export function placeIslands(seeds: readonly IslandSeed[], home: Footprint): Spot[] {
   const placed: Spot[] = []
   const n = seeds.length
   for (let i = 0; i < n; i++) {
@@ -61,8 +90,8 @@ export function placeIslands(seeds: readonly IslandSeed[]): Spot[] {
     const angle = -Math.PI / 2 + (i * 2 * Math.PI) / n + nudge
     for (let r = RING_START; ; r += SEA_CELL) {
       const at: Spot = [snap(Math.cos(angle) * r), snap(Math.sin(angle) * r)]
-      if (apart(at, [0, 0]) < PATCH_HALF + HOME_HALF) continue
-      if (placed.some((other) => apart(at, other) < 2 * PATCH_HALF)) continue
+      if (!clear(home, [0, 0], seed, at)) continue
+      if (!placed.every((other, j) => clear(seeds[j] as IslandSeed, other, seed, at))) continue
       placed.push(at)
       break
     }

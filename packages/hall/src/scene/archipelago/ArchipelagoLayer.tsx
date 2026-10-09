@@ -1,46 +1,26 @@
 import { useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
 import { type CSSProperties, Suspense, useEffect, useMemo, useRef, useState } from "react"
-import {
-  AdditiveBlending,
-  CircleGeometry,
-  Color,
-  ConeGeometry,
-  Float32BufferAttribute,
-  type Group,
-  Matrix4,
-  Mesh,
-  MeshBasicMaterial,
-  MeshStandardMaterial,
-  type Object3D,
-  Quaternion,
-  SphereGeometry,
-  Vector3,
-} from "three"
+import { CircleGeometry, type Group, type Mesh, type Object3D, type Vector3 } from "three"
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import type { Archipelago, FarIsland, IslandInfo } from "../../world/archipelagoSource.ts"
-import { LANDS_URL, SHIPS_URL } from "../../world/cast.ts"
-import { HEX_SCALE } from "../../world/lands.ts"
-import { glowsOf, lightsOf } from "../../world/lights.ts"
-import { useWorld, WorldScope } from "../../world/source.ts"
-import { halos } from "../atmosphere/Lamps.tsx"
-import { sky } from "../atmosphere/state.ts"
-import { bakeNode } from "../events/common.ts"
+import { SHIPS_URL } from "../../world/cast.ts"
+import { chunksOf } from "../../world/chunks.ts"
+import { WorldScope } from "../../world/source.ts"
 import { FRAME } from "../frame.ts"
 import { Island } from "../Island.tsx"
-import { mergePlacements, useKit } from "../Kit.tsx"
 import { Label } from "../Label.tsx"
-import { Pools } from "../lights/StreetLights.tsx"
 import { Fields } from "../nature/Fields.tsx"
 import { Grass } from "../nature/Grass.tsx"
+import { Rivers } from "../nature/Rivers.tsx"
 import { Water } from "../nature/Water.tsx"
 import { Wilds } from "../nature/Wilds.tsx"
-import { useOwnedMeshes } from "../owned.ts"
 import { useTier } from "../Quality.tsx"
-import { SEA_Y, Ships, watersOf } from "../Ships.tsx"
-import { harbourOf, lighthouseSpot } from "../seas/fleet.ts"
+import { SEA_Y, Ships } from "../Ships.tsx"
+import { useChunksAt } from "../tiers.ts"
 import { FERRIES, type FerryAt, ferryAt } from "./ferries.ts"
+import { IdleLights, Lighthouse } from "./IdleIsland.tsx"
 import { HOME, islandView, type Stop, useIslandView } from "./view.ts"
 
 /**
@@ -85,8 +65,17 @@ const NEAR_ZOOM = 0.55
 /** Perspective: closer than this. */
 const NEAR_DISTANCE = 240
 
+/**
+ * How finely a far island's coarse copies are held (Island's `detail`): a quarter, so they move a surface
+ * up to 4 × FAR_ERROR, which is still under a pixel at the ~1 px a unit the whole map is drawn at. Measured on a
+ * default archipelago round React (gen 2): its far islands' triangles fall by half.
+ */
+const FAR_DETAIL = 0.25
+
 function FarIslandLayer({ island, tier }: { island: FarIsland; tier: Tier }) {
   const near = useNear(island)
+  // Its regions' tiers go by where it lies, not by its own coordinates (scene/tiers.ts).
+  useChunksAt(chunksOf(island.world), island.at)
   const [grown, setGrown] = useState(false)
   useEffect(() => {
     if (near) setGrown(true)
@@ -95,18 +84,19 @@ function FarIslandLayer({ island, tier }: { island: FarIsland; tier: Tier }) {
     <group name={`island-${island.name}`} position={[island.at[0], 0, island.at[1]]}>
       <WorldScope value={island.world}>
         <Suspense fallback={null}>
-          <Island />
+          <Island detail={FAR_DETAIL} />
           <Water tier={tier} at={island.at} />
+          {island.world.water && <Rivers waters={island.world.water} tier={tier} />}
           <Wilds tier={near ? tier : 0} />
           <Fields />
-          <IdleLights />
+          <IdleLights near={near} />
           <Lighthouse />
-          <Ships />
         </Suspense>
         {grown && (
           <group visible={near}>
             <Suspense fallback={null}>
               <Grass tier={tier} />
+              <Ships />
             </Suspense>
           </group>
         )}
@@ -135,131 +125,6 @@ function useNear(island: IslandInfo): boolean {
     }
   })
   return near
-}
-
-/**
- * A far island's night lights: its lanterns and torch posts (merged), a pool under each and a
- * halo on each flame, waking with `sky.lamps` — the home island's look (lights/StreetLights.tsx,
- * atmosphere/Lamps.tsx), without the carried lanterns or the point lights (nobody walks there).
- */
-function IdleLights() {
-  const kit = useKit()
-  const world = useWorld()
-  const lights = lightsOf(world)
-  const glows = glowsOf(world)
-  const models = useOwnedMeshes(
-    () => {
-      const meshes = mergePlacements(
-        kit,
-        lights.map((light) => light.placement),
-      )
-      for (const mesh of meshes) mesh.castShadow = false
-      return { meshes }
-    },
-    [kit, lights],
-    "materials",
-  )
-  const flames = useOwnedMeshes(() => ({ meshes: [halos(glows.length)] }), [glows])
-  const store = useGuildStore()
-  useFrame(({ camera, clock }) => {
-    const mesh = flames?.meshes[0] as ReturnType<typeof halos> | undefined
-    if (!mesh) return
-    camera.getWorldQuaternion(facing)
-    tint.set(store.mood.fire)
-    const t = clock.elapsedTime
-    for (let i = 0; i < glows.length; i++) {
-      const glow = glows[i]
-      if (!glow) continue
-      const flicker = 0.88 + Math.sin(t * 9.1 + i * 1.7) * 0.06 + Math.sin(t * 15.7 + i * 3.4) * 0.05
-      const size = glow.halo * (0.8 + sky.lamps * 0.35) * flicker
-      matrix.compose(
-        place.set(glow.flame[0], glow.flame[1], glow.flame[2]),
-        facing,
-        scale.set(size, size, size),
-      )
-      mesh.setMatrixAt(i, matrix)
-      mesh.setColorAt(i, colour.copy(tint).multiplyScalar(flicker * (0.1 + sky.lamps * 1.6)))
-    }
-    mesh.instanceMatrix.needsUpdate = true
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
-  })
-  return (
-    <group name="idle-lights">
-      {models?.meshes.map((mesh) => (
-        <primitive key={mesh.uuid} object={mesh} />
-      ))}
-      {flames?.meshes[0] && <primitive object={flames.meshes[0]} />}
-      <Pools glows={glows} />
-    </group>
-  )
-}
-
-/** The lighthouse's lamp, over the tower's roof (scene/seas/SeasLayer.tsx's). */
-const LAMP_Y = 11.8
-const BEAM_LENGTH = 70
-
-/**
- * A lighthouse on the coast by the island's harbour (scene/seas/fleet.ts `lighthouseSpot`), when
- * it has a coast to stand on: the tower, a lamp that wakes at dusk, and at night a beam sweeping
- * the sea. Three draws.
- */
-function Lighthouse() {
-  const world = useWorld()
-  const lands = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
-  const spot = useMemo(() => lighthouseSpot(world.island, harbourOf(watersOf(world).quay)), [world])
-  const built = useOwnedMeshes(() => {
-    const source = lands.nodes.building_tower_A_blue
-    const baked = source ? bakeNode(source) : null
-    if (!spot || !baked) return { meshes: [] as Mesh[], lamp: null, beam: null }
-    const tower = new Mesh(
-      baked.geometry,
-      new MeshStandardMaterial({ map: baked.material.map, roughness: 0.9 }),
-    )
-    tower.position.set(spot.x, 0, spot.z)
-    tower.scale.setScalar(HEX_SCALE)
-    tower.rotation.y = Math.atan2(-spot.x, -spot.z)
-    tower.castShadow = true
-    tower.receiveShadow = true
-    const lamp = new Mesh(new SphereGeometry(0.9, 12, 8), new MeshBasicMaterial({ toneMapped: false }))
-    lamp.position.set(spot.x, LAMP_Y, spot.z)
-    const cone = new ConeGeometry(7, BEAM_LENGTH, 20, 6, true)
-    cone.translate(0, -BEAM_LENGTH / 2, 0)
-    // Bright at the lamp, gone at the far end: additive, so a black vertex adds nothing.
-    const along = cone.getAttribute("position")
-    const fade = new Float32Array(along.count * 3)
-    for (let i = 0; i < along.count; i++) fade.fill((1 + along.getY(i) / BEAM_LENGTH) ** 2, i * 3, i * 3 + 3)
-    cone.setAttribute("color", new Float32BufferAttribute(fade, 3))
-    cone.rotateX(-Math.PI / 2 + 0.06)
-    const beam = new Mesh(
-      cone,
-      new MeshBasicMaterial({
-        color: 0xffd9a0,
-        transparent: true,
-        blending: AdditiveBlending,
-        vertexColors: true,
-        depthWrite: false,
-        toneMapped: false,
-      }),
-    )
-    beam.position.copy(lamp.position)
-    beam.renderOrder = 2
-    beam.frustumCulled = false
-    return { meshes: [tower, lamp, beam], lamp, beam }
-  }, [lands.nodes, spot])
-
-  useFrame(({ clock }) => {
-    if (!built?.lamp || !built.beam) return
-    const lamps = sky.lamps
-    ;(built.lamp.material as MeshBasicMaterial).color
-      .setRGB(0.25, 0.24, 0.27)
-      .lerp(WARM, Math.min(1, lamps * 1.2))
-    const beam = built.beam.material as MeshBasicMaterial
-    built.beam.visible = sky.night > 0.15
-    beam.opacity = 0.32 * sky.night
-    built.beam.rotation.y = clock.elapsedTime * 0.5
-  })
-
-  return built?.meshes.map((mesh) => <primitive key={mesh.uuid} object={mesh} />) ?? null
 }
 
 /** The ships that cross between the islands: a hull each, rising at one quay and sinking at the next. */
@@ -375,12 +240,3 @@ const HOME_PLATE_OUT = -0.6
  * view is for, so a chip passing under it never covers it.
  */
 const PLATE_Z: readonly [number, number] = [24, 21]
-
-const facing = new Quaternion()
-const place = new Vector3()
-const scale = new Vector3()
-const matrix = new Matrix4()
-const tint = new Color()
-const colour = new Color()
-/** The lighthouse lamp lit. */
-const WARM = new Color("#ffcf7a").multiplyScalar(1.6)

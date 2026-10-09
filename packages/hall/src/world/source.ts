@@ -28,6 +28,19 @@ const LINKED_GEN: Gen = typeof location === "undefined" ? 1 : genOf(location.sea
 const LINKED_RELIEF: ReliefStyle =
   typeof location === "undefined" ? "current" : reliefStyleOf(location.search)
 
+/** A repo's island as this visit's link asks it grown (`?gen=`, `?relief=`): the home island's, and every far one's. */
+export function growWorld(tree: Tree): World {
+  const { repo, source, branch, truncated } = tree
+  return repoWorld(islandFromTree(tree.entries, 0, LINKED_GEN), {
+    repo,
+    source,
+    ...(LINKED_GEN === 2 ? { gen: LINKED_GEN } : {}),
+    ...(LINKED_RELIEF !== "current" ? { relief: LINKED_RELIEF } : {}),
+    ...(branch ? { branch } : {}),
+    ...(truncated ? { truncated } : {}),
+  })
+}
+
 class WorldSource {
   world: World = handWorld()
   status: WorldStatus = { state: "hand" }
@@ -58,17 +71,7 @@ class WorldSource {
     this.set(this.world, { state: "loading", repo: wanted })
     const done = (async () => {
       try {
-        const tree = await fetchTree(wanted)
-        const made = islandFromTree(tree.entries, 0, LINKED_GEN)
-        const { repo, source, branch, truncated } = tree
-        const world = repoWorld(made, {
-          repo,
-          source,
-          ...(LINKED_GEN === 2 ? { gen: LINKED_GEN } : {}),
-          ...(LINKED_RELIEF !== "current" ? { relief: LINKED_RELIEF } : {}),
-          ...(branch ? { branch } : {}),
-          ...(truncated ? { truncated } : {}),
-        })
+        const world = growWorld(await fetchTree(wanted))
         if (n === this.asked) this.set(world, { state: "repo" })
       } catch (error) {
         if (n === this.asked)

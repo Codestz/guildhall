@@ -75,6 +75,19 @@ export function frameOf(stop: Stop, archipelago: Archipelago): Frame {
   return { x: island.at[0], z: island.at[1], radius: island.reach }
 }
 
+/** The extent (world units from the origin) the camera's depths below were set for: a default archipelago. */
+const FITTED_EXTENT = 450
+
+/**
+ * How deep the cameras must see over an archipelago: how far back the orthographic one stands (not 220:
+ * a far island on its side of the sea is never behind it), its far plane and the perspective one's, and
+ * the farthest dolly. They grow with the archipelago's extent, so a ring of big islands is not cut off.
+ */
+export function depthsOf(archipelago: Archipelago): { back: number; orthoFar: number; far: number } {
+  const scale = Math.max(1, archipelago.extent / FITTED_EXTENT)
+  return { back: 1200 * scale, orthoFar: 2600 * scale, far: 3600 * scale }
+}
+
 /** How long a flight between two points takes, s: longer for longer trips, never a crawl. */
 export function flightSeconds(distance: number): number {
   return Math.min(3.4, Math.max(1.4, 1.2 + distance / 220))

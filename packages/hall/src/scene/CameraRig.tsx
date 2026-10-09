@@ -15,6 +15,7 @@ import { positions, useGuild, useGuildStore } from "../guild/useGuild.ts"
 import { useArchipelago } from "../world/archipelagoSource.ts"
 import { useWorld } from "../world/source.ts"
 import {
+  depthsOf,
   flightSeconds,
   flightSize,
   frameOf,
@@ -112,13 +113,6 @@ const TURN_WIDE = 0.045
 const TURN_HELD = 0.012
 /** Decisions per second: the director scores a few times a second, the camera moves every frame. */
 const DECIDE_S = 0.125
-/**
- * An archipelago (scene/archipelago): the orthographic camera stands this far back (not 220), so a
- * far island on the camera's side of the sea is never behind it; the far planes and the farthest
- * zoom-out open up to hold the whole map. Without one, they follow the island's own reach past the
- * home bake's square (nature/shoreTiles.ts `outreachOf`: 1 for every island but a big generated one).
- */
-const ARCHIPELAGO_BACK = 1200
 /** A long flight between islands pulls out this much halfway (a short one less). */
 const ISLAND_PULL = 0.45
 
@@ -150,8 +144,10 @@ export function CameraRig() {
   const size = useThree((state) => state.size)
   // The orthographic camera stands far enough back that the ground nearest it, at the widest zoom-out
   // or the growth film's pull-back on this screen, is not clipped (frameReach.ts); the far plane keeps its room beyond.
-  const back = archipelago ? ARCHIPELAGO_BACK : orthoBackOf(size, land)
-  const orthoFar = archipelago ? 2600 : back + Math.max((900 - ORTHO_BACK) * outreach, back)
+  // An archipelago's camera stands further back and sees further (view.ts `depthsOf`): no far island is behind it.
+  const depths = archipelago && depthsOf(archipelago)
+  const back = depths ? depths.back : orthoBackOf(size, land)
+  const orthoFar = depths ? depths.orthoFar : back + Math.max((900 - ORTHO_BACK) * outreach, back)
   /** A flight between islands (scene/archipelago/view.ts): the request flown, and where it is. */
   const trip = useRef({
     // From 0, not the current count: a link's `island=` may be asked before the rig mounts.
@@ -730,7 +726,7 @@ export function CameraRig() {
         makeDefault={view === "explore"}
         fov={38}
         near={0.5}
-        far={archipelago ? 3600 : 1200 * outreach + 2 * peak}
+        far={depths ? depths.far : 1200 * outreach + 2 * peak}
         position={[60, 60, 60]}
       />
       <MapControls
@@ -745,7 +741,7 @@ export function CameraRig() {
         minZoom={archipelago ? Math.min(widest, mapZoom * 0.8) : widest}
         maxZoom={fit * 8}
         minDistance={4}
-        maxDistance={archipelago ? ARCHIPELAGO_BACK * 1.5 : 300 * outreach}
+        maxDistance={depths ? depths.back * 1.5 : 300 * outreach}
         mouseButtons={{ LEFT: MOUSE.PAN, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.ROTATE }}
         touches={{ ONE: TOUCH.PAN, TWO: TOUCH.DOLLY_ROTATE }}
       />

@@ -1,11 +1,19 @@
 import { useSyncExternalStore } from "react"
-import { crossingsOf, extentOf, HOME_REPO, mainLanguage, placeIslands, type Shore } from "./archipelago.ts"
+import {
+  crossingsOf,
+  extentOf,
+  type Footprint,
+  HOME_REPO,
+  mainLanguage,
+  type Patch,
+  placeIslands,
+  type Shore,
+} from "./archipelago.ts"
 import { type Language, languageOf } from "./gen/biomes.ts"
-import { islandFromTree } from "./gen/islandFromTree.ts"
 import type { Tree } from "./gen/load.ts"
 import type { Spot } from "./layout.ts"
-import { worldSource } from "./source.ts"
-import { reachOf, repoWorld, type World } from "./world.ts"
+import { growWorld, worldSource } from "./source.ts"
+import { reachOf, type World } from "./world.ts"
 
 /**
  * The archipelago being drawn (world/archipelago.ts): grown once from its repos' trees, then fixed.
@@ -46,6 +54,12 @@ export type ArchipelagoStatus =
 
 type Listener = () => void
 
+/**
+ * The squares of water an island is drawn in, from its keep (scene/archipelago/footprint.ts): the
+ * scene knows its shore tiles, the world does not. `far` is a far island's, else the home one's.
+ */
+export type PatchesOf = (world: World, far: boolean) => readonly Patch[]
+
 class ArchipelagoSource {
   archipelago: Archipelago | null = null
   status: ArchipelagoStatus = { state: "off" }
@@ -60,8 +74,14 @@ class ArchipelagoSource {
   /**
    * Grows every repo's island (in parallel) and places them round the home island, once: asked
    * again, it answers with the first load. `fetchTree` is the source of trees (world/gen/load.ts).
+   * Every island is grown as the link asks the home one (`?gen=`, `?relief=`: world/source.ts) and
+   * placed by how far it reaches (`patchesOf`).
    */
-  load(repos: readonly string[], fetchTree: (repo: string) => Promise<Tree>): Promise<Archipelago | null> {
+  load(
+    repos: readonly string[],
+    fetchTree: (repo: string) => Promise<Tree>,
+    patchesOf: PatchesOf,
+  ): Promise<Archipelago | null> {
     if (this.loading) return this.loading
     this.set(null, { state: "loading", repos })
     this.loading = (async () => {
@@ -70,13 +90,9 @@ class ArchipelagoSource {
         repos.map(async (repo): Promise<Grown> => {
           try {
             const tree = await fetchTree(repo)
-            const world = repoWorld(islandFromTree(tree.entries), {
-              repo: tree.repo,
-              source: tree.source,
-              ...(tree.branch ? { branch: tree.branch } : {}),
-              ...(tree.truncated ? { truncated: tree.truncated } : {}),
-            })
-            return { repo: tree.repo, world, language: mainLanguage(tree.entries) }
+            // A big island takes a while to grow: a frame between each, so the page stays alive.
+            await new Promise((resume) => setTimeout(resume))
+            return { repo: tree.repo, world: growWorld(tree), language: mainLanguage(tree.entries) }
           } catch (error) {
             return { repo, reason: (error as Error).message }
           }
@@ -86,7 +102,15 @@ class ArchipelagoSource {
       await worldSource.ready
       const kept = grown.filter((one): one is Extract<Grown, { world: World }> => "world" in one)
       const failed = grown.filter((one): one is Extract<Grown, { reason: string }> => "reason" in one)
-      const offsets = placeIslands(kept)
+      const homeWorld = worldSource.world
+      const footprint = (world: World, far: boolean): Footprint => ({
+        reach: reachOf(world),
+        patches: patchesOf(world, far),
+      })
+      const offsets = placeIslands(
+        kept.map((one) => ({ repo: one.repo, ...footprint(one.world, true) })),
+        footprint(homeWorld, false),
+      )
       const islands: FarIsland[] = kept.map((one, i) => ({
         repo: one.repo,
         name: nameOf(one.repo),
@@ -95,7 +119,7 @@ class ArchipelagoSource {
         reach: reachOf(one.world),
         world: one.world,
       }))
-      const home = homeOf(worldSource.world)
+      const home = homeOf(homeWorld)
       const shores: Shore[] = [home, ...islands]
       const archipelago: Archipelago | null =
         islands.length > 0
@@ -129,8 +153,12 @@ function homeOf(world: World): IslandInfo {
 export const archipelagoSource = new ArchipelagoSource()
 
 /** Grows the archipelago from these repos: bundled fixtures or GitHub, as `?repo=` does. */
-export function loadArchipelago(repos: readonly string[]): Promise<Archipelago | null> {
-  return archipelagoSource.load(repos, async (repo) => (await import("./gen/load.ts")).treeFor(repo))
+export function loadArchipelago(repos: readonly string[], patchesOf: PatchesOf): Promise<Archipelago | null> {
+  return archipelagoSource.load(
+    repos,
+    async (repo) => (await import("./gen/load.ts")).treeFor(repo),
+    patchesOf,
+  )
 }
 
 /** The archipelago drawn now (null: just the home island); re-renders when it changes. */

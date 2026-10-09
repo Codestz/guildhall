@@ -57,12 +57,14 @@ const SIMPLIFIER = loadSimplifier()
  * there is a call per instance) each batch is merged per region instead (render/bake.ts).
  *
  * Far regions draw coarse copies of their pieces (scene/tiers.ts, render/tiers.ts): a big repo's
- * island seen whole costs a fraction of its full detail, and the swap is under a pixel.
+ * island seen whole costs a fraction of its full detail, and the swap is under a pixel. `detail`
+ * (1: as above) is how fine those copies are held: below 1 they are coarser by that factor, and a
+ * region goes far only that much further out (a far island of the archipelago's, scene/archipelago).
  *
  * It draws the scene's world (world/source.ts): the hand-drawn lands, or a repo's island while one
  * loads it suspends, holding the whole world's Suspense with it.
  */
-export function Island() {
+export function Island({ detail = 1 }: { detail?: number }) {
   useWorldReady()
   const { nodes: lands } = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
   const { progress } = useGuild()
@@ -88,12 +90,20 @@ export function Island() {
       // Hex-native mountains (relief style e) are land tiles and pieces, drawn in the snow-line material.
       const skin =
         base && world.mountains ? { of: world.mountains, material: makeSnow(base, snowline) } : undefined
-      const layer = batch(nodes, [...land.tiles, ...land.decor], webgpu, simplifier, chunksOf(world), skin)
+      const layer = batch(
+        nodes,
+        [...land.tiles, ...land.decor],
+        webgpu,
+        simplifier,
+        chunksOf(world),
+        skin,
+        detail,
+      )
       if (!world.relief || !base || skin) return { ...layer, relief: undefined }
       const relief = reliefLayer(world.relief, makeSnow(base, snowline), webgpu, chunksOf(world))
       return { meshes: [...layer.meshes, ...relief.meshes], tiers: layer.tiers, relief: relief.tiers }
     },
-    [nodes, lands, land, webgpu, simplifier, world, makeSnow, snowline],
+    [nodes, lands, land, webgpu, simplifier, world, makeSnow, snowline, detail],
     "materials",
   )
   // The growth timelapse (`?grow`) rides these instances up out of the sea (scene/growth).
@@ -199,6 +209,7 @@ function batch(
   simplifier: Simplifier,
   chunks: Chunks,
   skin?: { of: ReadonlySet<LandPlacement>; material: Material },
+  detail = 1,
 ): { meshes: Mesh[]; tiers: TieredLayer } {
   // A piece's coarse copy may move its surface FAR_ERROR world units wherever it stands, so its
   // error in its own units is set by its biggest copy.
@@ -231,7 +242,7 @@ function batch(
     if (!byMaterial) {
       const source = nodes[placement.piece]
       if (!source) continue
-      const error = FAR_ERROR / (HEX_SCALE * (biggest.get(placement.piece) ?? 1))
+      const error = FAR_ERROR / detail / (HEX_SCALE * (biggest.get(placement.piece) ?? 1))
       byMaterial = new Map()
       for (const [material, near] of parts(source))
         byMaterial.set(material, { near, far: coarser(simplifier, near, error) })
@@ -265,8 +276,12 @@ function batch(
   })
   return {
     meshes: batches.flatMap((built) => built.meshes),
-    tiers: tiered(chunks, (chunk, tier) => {
-      for (const built of batches) built.swap(chunk, tier)
-    }),
+    tiers: tiered(
+      chunks,
+      (chunk, tier) => {
+        for (const built of batches) built.swap(chunk, tier)
+      },
+      detail,
+    ),
   }
 }

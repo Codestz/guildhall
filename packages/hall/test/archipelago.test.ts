@@ -6,6 +6,7 @@ import {
   crossingsOf,
   DEFAULT_ARCHIPELAGO,
   extentOf,
+  type Footprint,
   HOME_HALF,
   mainLanguage,
   OFFING,
@@ -27,13 +28,15 @@ import COCKPIT from "./fixtures/repos/codestz__opencode-cockpit.json"
 
 const cheb = (a: readonly number[], b: readonly number[]) =>
   Math.max(Math.abs((a[0] ?? 0) - (b[0] ?? 0)), Math.abs((a[1] ?? 0) - (b[1] ?? 0)))
-const seeds = (n: number) => Array.from({ length: n }, (_, i) => ({ repo: `owner/repo-${i}` }))
+const SMALL: Footprint = { reach: 118, patches: [{ at: [0, 0], half: PATCH_HALF }] }
+const HAND_HOME: Footprint = { reach: 82, patches: [{ at: [0, 0], half: HOME_HALF }] }
+const seeds = (n: number) => Array.from({ length: n }, (_, i) => ({ repo: `owner/repo-${i}`, ...SMALL }))
 const FIXTURES = [HINDSIGHT, MCPX, COCKPIT, MINTROOT] as { repo: string; entries: RepoEntry[] }[]
 
 describe("placeIslands", () => {
   for (const n of [1, 4, 6])
     test(`${n} islands: patches clear the home shore and each other, on the sea grid`, () => {
-      const placed = placeIslands(seeds(n))
+      const placed = placeIslands(seeds(n), HAND_HOME)
       expect(placed).toHaveLength(n)
       for (const [i, at] of placed.entries()) {
         expect(cheb(at, [0, 0])).toBeGreaterThanOrEqual(PATCH_HALF + HOME_HALF)
@@ -45,8 +48,8 @@ describe("placeIslands", () => {
     })
 
   test("the same repos land in the same places", () => {
-    const repos = DEFAULT_ARCHIPELAGO.map((repo) => ({ repo }))
-    expect(placeIslands(repos)).toEqual(placeIslands(repos))
+    const repos = DEFAULT_ARCHIPELAGO.map((repo) => ({ repo, ...SMALL }))
+    expect(placeIslands(repos, HAND_HOME)).toEqual(placeIslands(repos, HAND_HOME))
   })
 })
 
@@ -69,7 +72,7 @@ describe("the default archipelago's fixtures", () => {
 })
 
 describe("crossings", () => {
-  const ring = placeIslands(seeds(4))
+  const ring = placeIslands(seeds(4), HAND_HOME)
   const islands: Shore[] = [{ at: [0, 0], reach: 82 }, ...ring.map((at) => ({ at, reach: 118 }))]
 
   test("no crossing passes over a third island", () => {
@@ -94,7 +97,7 @@ describe("crossings", () => {
 })
 
 describe("ferries", () => {
-  const ring = placeIslands(seeds(4))
+  const ring = placeIslands(seeds(4), HAND_HOME)
   const islands: Shore[] = [{ at: [0, 0], reach: 82 }, ...ring.map((at) => ({ at, reach: 110 }))]
   const crossings = crossingsOf(islands)
   const at = (): FerryAt => ({ x: 0, z: 0, heading: 0, shown: 0 })

@@ -1,7 +1,9 @@
 import { DMath } from "./dmath.ts"
 import type { Biome } from "./gen/biomes.ts"
+import type { MainBuilding } from "./gen/dress/main.ts"
 import type { District, RepoIsland } from "./gen/dress.ts"
 import { cellAt, key } from "./gen/hex.ts"
+import type { Archetype, Palette, Role } from "./gen/identity/types.ts"
 import type { Gen } from "./gen/islandFromTree.ts"
 import { dressingOf } from "./gen/relief/dressing.ts"
 import { type Relief, reliefOf, reliefOver } from "./gen/relief/index.ts"
@@ -49,6 +51,13 @@ export interface Terrain {
   cells(): readonly string[]
   /** The district holding a land hex (a repo island's; the hand map has none). */
   district?(cell: Cell): number | undefined
+}
+
+/** Who a generator 2 island is (world/gen/identity): what it is for, the shape its land took, its colours. */
+export interface IslandIdentity {
+  role: Role
+  shape: Archetype
+  palette: Palette
 }
 
 /** A place people work: its spot, where they stand, and what grows round it (world/wilds.ts). */
@@ -114,6 +123,9 @@ export interface World {
   venues?: readonly Venue[]
   /** The houses people live in, a gen 2 island's (world/homes.ts); none on the hand lands. */
   homes?: readonly Home[]
+  /** A gen 2 island's main building, its heart (world/gen/dress/main.ts): where it stands, its focal point and its doors. */
+  main?: MainBuilding
+  identity?: IslandIdentity
   repo?: RepoInfo
 }
 
@@ -244,6 +256,16 @@ export function repoParts(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
     storySites,
     ...(open.length > 0 ? { venues: open } : {}),
     ...(homes.length > 0 ? { homes } : {}),
+    ...(made.main ? { main: made.main } : {}),
+    ...(made.plan.identity && made.plan.shape
+      ? {
+          identity: {
+            role: made.plan.identity.role,
+            shape: made.plan.shape,
+            palette: made.plan.identity.palette,
+          },
+        }
+      : {}),
     repo: { ...info, districts: made.districts, folders: made.plan.districts.map((d) => d.folder) },
   }
 }

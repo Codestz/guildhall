@@ -148,6 +148,31 @@ export function paletteOf(sheet: Raster): Uint8Array[] {
   return out
 }
 
+/**
+ * Kenney's castle kit draws its stone in peach and cream, where KayKit's castles (the hex pack's keeps
+ * and towers) are grey-blue: beside them a bell tower or a nave reads as another game's. The light warm
+ * texels (peach plaster and stone: bright, and no more than mildly warm, so neither the gold and
+ * orange of the roofs nor the browns of the beams) are made cool grey of their own brightness before
+ * the bake, and the bake takes them to KayKit's stone and whites.
+ */
+const STONE_LIGHT = 175
+const STONE_WARM = [25, 120] as const
+
+export function coolStone(source: Raster): Raster {
+  const data = new Uint8Array(source.data)
+  for (let i = 0; i < source.width * source.height; i++) {
+    const [r = 0, g = 0, b = 0] = source.data.subarray(i * 4, i * 4 + 3)
+    const light = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    const warm = r - b
+    if (light < STONE_LIGHT || r < g || g < b || warm < STONE_WARM[0] || warm > STONE_WARM[1]) continue
+    data.set(
+      [light - 4, light - 1, light + 3].map((v) => Math.round(Math.min(255, Math.max(0, v)))),
+      i * 4,
+    )
+  }
+  return { width: source.width, height: source.height, data }
+}
+
 /** How far a texel is pulled onto its palette colour: the whole way (1) or not at all (0). */
 const PULL = 0.85
 /** Lightness counts for less than hue in the match: it is the gradient's, and the lit scene's, to keep. */

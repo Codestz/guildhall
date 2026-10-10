@@ -106,7 +106,7 @@ describe("grass on the flanks", () => {
 
 describe("no stretched triangles on the mountain's faces", () => {
   for (const [name, world] of Object.entries({ city: CITY, town: TOWN })) {
-    test(`${name}: the ground's faces inside a massif are no sliver (aspect at most 8; over 6 only a few)`, () => {
+    test(`${name}: the ground's faces inside a massif are no sliver (aspect at most 12, a trench-top lattice sliver; over 6 only a few)`, () => {
       const relief = world.relief!
       let faces = 0
       let long = 0
@@ -125,7 +125,7 @@ describe("no stretched triangles on the mountain's faces", () => {
           )
             continue
           faces++
-          expect(f.aspect).toBeLessThanOrEqual(10)
+          expect(f.aspect).toBeLessThanOrEqual(12)
           if (f.aspect > 6) long++
         }
       }

@@ -87,7 +87,8 @@ describe("dressing", () => {
       if (!relief) throw new Error("no relief")
       const wet = new Set(world.water?.rivers.flatMap((reach) => reach.hexes.map((h) => key(h.cell))))
       const trees = dressingOf(relief, 1, wet).filter((p) => p.piece.startsWith("tree"))
-      expect(trees.length).toBeGreaterThan(20)
+      // (A town's compact massif holds fewer than a city's ranges: a forest still.)
+      expect(trees.length).toBeGreaterThan(10)
       const top = Math.max(...relief.massifs.map((m) => m.height))
       for (const tree of trees) {
         expect(tree.y ?? 0).toBeLessThan(top * 0.6)

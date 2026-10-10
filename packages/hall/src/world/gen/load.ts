@@ -3,6 +3,7 @@ import { CHRONICLES_CDN } from "../chronicle/catalog.ts"
 import { type Chronicle, decodeChronicle, encodeChronicle } from "../chronicle/format.ts"
 import { quickChronicle } from "../chronicle/quick.ts"
 import { fetchPublicTree, GitHubError, parseRepo } from "./fetch.ts"
+import type { IslandHint } from "./identity/types.ts"
 import type { RepoEntry } from "./repo.ts"
 
 /**
@@ -17,6 +18,8 @@ export interface Tree {
   source: "fixture" | "github"
   branch?: string
   truncated?: boolean
+  /** What its archipelago knows of the island this tree makes (a split package's name, its place, how bound it is). */
+  island?: IslandHint
   entries: RepoEntry[]
 }
 

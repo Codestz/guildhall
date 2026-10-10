@@ -35,7 +35,7 @@ export function growSectors(
   random: () => number,
   form: Form = RING,
 ): Sectors {
-  const { bay, mass } = form
+  const { bay, mass, reserved = RESERVED } = form
   const heads = seedSquares(districts, random, form)
   const owner: Owners = new Map()
   const frontiers = districts.map(() => new Set<string>())
@@ -48,7 +48,7 @@ export function growSectors(
       if (!owner.has(nextId) && !bay(next) && (!mass || mass.has(nextId))) frontiers[i]?.add(nextId)
     }
   }
-  for (const id of RESERVED) owner.set(id, 0)
+  for (const id of reserved) owner.set(id, 0)
   districts.forEach((district, i) => {
     claim(district.square, i)
   })
@@ -142,8 +142,8 @@ function seedSquares(districts: PlanDistrict[], random: () => number, form: Form
     unit.reduce((sum, i) => sum + (districts[i]?.quota ?? 0), 0)
   const total = units.reduce((sum, unit) => sum + quotaOfUnit(unit), 0)
   const rootRadius = patch(districts[0]?.quota ?? 7)
-  const seeded = new Set([key(HUB), ...RESERVED])
-  const { bay, mass } = form
+  const { bay, mass, reserved = RESERVED } = form
+  const seeded = new Set([key(HUB), ...reserved])
   const free = (cell: Cell): boolean => !seeded.has(key(cell)) && !bay(cell) && (!mass || mass.has(key(cell)))
   /**
    * Out along a ray from [x, z]: the first free hex (no seed yet, not in the bay) at `distance` or
@@ -191,18 +191,22 @@ function reachOf(mass: ReadonlySet<string>, at: (distance: number) => Cell): num
   return reach
 }
 
-/** The mass's free hex nearest `target` (the lowest key on a tie). */
+/**
+ * The mass's free hex nearest `target` (the lowest key on a tie), an inland one (all six sides land)
+ * where there is one: a square on a shore leaves its landmark none.
+ */
 function nearestFree(mass: ReadonlySet<string>, target: Cell, free: (cell: Cell) => boolean): Cell {
   const [tx, tz] = cellToWorld(target)
   let best: Cell = target
-  let bestDistance = Number.POSITIVE_INFINITY
+  let bestRank = Number.POSITIVE_INFINITY
   for (const id of mass) {
     const cell = unkey(id)
     if (!free(cell)) continue
     const [x, z] = cellToWorld(cell)
-    const distance = DMath.hypot(x - tx, z - tz)
-    if (distance < bestDistance || (distance === bestDistance && id < key(best))) {
-      bestDistance = distance
+    const inland = neighbours(cell).every((next) => mass.has(key(next)))
+    const rank = DMath.hypot(x - tx, z - tz) + (inland ? 0 : 1000)
+    if (rank < bestRank || (rank === bestRank && id < key(best))) {
+      bestRank = rank
       best = cell
     }
   }

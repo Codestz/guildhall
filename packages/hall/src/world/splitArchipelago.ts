@@ -1,7 +1,10 @@
 import { crossingsOf, extentOf, type Footprint, mainLanguage, type Shore } from "./archipelago.ts"
 import type { Archipelago, FarIsland, IslandInfo, PatchesOf } from "./archipelagoSource.ts"
+import { bindOf, weightOf } from "./gen/coupling.ts"
+import { slotsOf } from "./gen/identity/palette.ts"
+import type { IslandHint } from "./gen/identity/types.ts"
 import type { Tree } from "./gen/load.ts"
-import { type Slice, splitRepo } from "./gen/split.ts"
+import { type RepoSplit, type Slice, splitRepo } from "./gen/split.ts"
 import { APRON, withQuays } from "./quays.ts"
 import { growIslandAsync, layoutAsync } from "./source.ts"
 import { reachOf, type World, type WorldParts } from "./world.ts"
@@ -15,14 +18,31 @@ import { reachOf, type World, type WorldParts } from "./world.ts"
 /** An island's id: the repo and its folder in it ("facebook/react#packages/react-dom"). */
 export const splitIdOf = (repo: string, slice: Slice): string => `${repo}#${slice.id}`
 
-/** The tree one island is grown from. */
-export function sliceTree(tree: Tree, slice: Slice): Tree {
+/**
+ * What the split knows of each of its islands that its tree does not (gen/identity): the name, how
+ * bound it is to the rest, and the palette it wears, which differs from those of the islands it is
+ * bound to. The core, first, is the home island.
+ */
+export function hintsOf(split: RepoSplit): IslandHint[] {
+  const ids = split.slices.map((slice) => slice.id)
+  const palettes = slotsOf(ids, (a, b) => weightOf(split.coupling, a, b))
+  return split.slices.map((slice, i) => ({
+    name: slice.label,
+    core: i === 0,
+    palette: palettes[i] as number,
+    weight: bindOf(split.coupling, slice.id, ids),
+  }))
+}
+
+/** The tree one island is grown from, with its hint (`hintsOf`) when it has one. */
+export function sliceTree(tree: Tree, slice: Slice, hint?: IslandHint): Tree {
   const { repo, source, branch, truncated } = tree
   return {
     repo,
     source,
     ...(branch ? { branch } : {}),
     ...(truncated ? { truncated } : {}),
+    ...(hint ? { island: hint } : {}),
     entries: slice.entries,
   }
 }
@@ -39,8 +59,9 @@ export interface Grown {
 export async function growSplit(tree: Tree, patchesOf: PatchesOf): Promise<Grown | undefined> {
   const split = splitRepo(tree.entries, tree.repo)
   if (!split) return undefined
+  const hints = hintsOf(split)
   const settled = await Promise.allSettled(
-    split.slices.map((slice) => growIslandAsync(sliceTree(tree, slice))),
+    split.slices.map((slice, i) => growIslandAsync(sliceTree(tree, slice, hints[i]))),
   )
   const core = settled[0]
   if (core?.status !== "fulfilled") throw (core as PromiseRejectedResult).reason

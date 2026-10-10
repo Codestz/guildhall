@@ -8,11 +8,15 @@ import { drawable, majority, type Owners, spanOf, wet } from "./land.ts"
  * can't draw are given back to the sea. Roads and the keep's reserve stay. Returns the rings from
  * the hub that hold the land after.
  */
-export function smoothCoast(owner: Owners, road: ReadonlySet<string>, { bay }: Form = RING): number {
+export function smoothCoast(
+  owner: Owners,
+  road: ReadonlySet<string>,
+  { bay, reserved = RESERVED }: Form = RING,
+): number {
   const erode = (): boolean => {
     let changed = false
     for (const id of [...owner.keys()]) {
-      if (road.has(id) || RESERVED.has(id)) continue
+      if (road.has(id) || reserved.has(id)) continue
       if (!drawable(wet(owner, unkey(id)))) {
         owner.delete(id)
         changed = true

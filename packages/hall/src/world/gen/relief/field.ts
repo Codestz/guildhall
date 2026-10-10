@@ -53,6 +53,8 @@ const GRADE = 1.5
 const MOST = 2.2
 /** Gauss–Seidel passes that blur the rim's heights into the base (the creases between nearest rims). */
 const BLUR = 12
+/** A mesa's table stands at this share of the height its crest would rise to. */
+const MESA = 0.7
 
 export interface Massif {
   id: number
@@ -94,6 +96,8 @@ export interface MassifSpec {
   seed: number
   /** The ground a hex outside the massif stands at: its terrace top, or the sea cliff's. */
   topOf(cell: Cell): number
+  /** Cut the summit flat: a table (a plateau island's main range). */
+  mesa?: true
 }
 
 /** The ridge's points as lattice sources, one about every lattice step, each carrying its crest height. */
@@ -199,6 +203,12 @@ export function massifOf(spec: MassifSpec): Massif {
       lift[at] = flank + ROUGH * height * ridged * smooth(rimDistance / 12) * (flank / Math.max(1, height))
     }
   relax(lift, grid, owned, SOFTEN, isRim)
+  // A mesa (a plateau island's main range): the top cut flat, a table where a peak would stand.
+  if (spec.mesa) {
+    let high = 0
+    for (let at = 0; at < lift.length; at++) high = Math.max(high, lift[at] as number)
+    for (let at = 0; at < lift.length; at++) lift[at] = Math.min(lift[at] as number, high * MESA)
+  }
   for (let at = 0; at < lift.length; at++)
     if ((lift[at] as number) > top) {
       top = lift[at] as number

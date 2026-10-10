@@ -47,7 +47,7 @@ import {
   weld,
 } from "@gltf-transform/functions"
 import { MeshoptEncoder, MeshoptSimplifier } from "meshoptimizer"
-import { bakeToPalette, decodePng, encodePng, paletteOf } from "./palette.ts"
+import { bakeToPalette, coolStone, decodePng, encodePng, paletteOf } from "./palette.ts"
 
 const ROOT = join(import.meta.dir, "..")
 const SRC = join(ROOT, "assets/src")
@@ -586,7 +586,7 @@ async function toKayKit(doc: Document): Promise<void> {
   for (const texture of doc.getRoot().listTextures()) {
     const image = texture.getImage()
     if (!image) continue
-    const baked = bakeToPalette(decodePng(image), palette)
+    const baked = bakeToPalette(coolStone(decodePng(image)), palette)
     texture.setImage(encodePng(baked.raster)).setMimeType("image/png")
     console.log(
       `  palette bake: mean distance to KayKit ${baked.before.toFixed(1)} -> ${baked.after.toFixed(1)} (Lab)`,

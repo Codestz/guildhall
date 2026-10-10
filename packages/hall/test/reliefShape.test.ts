@@ -71,8 +71,9 @@ describe("the stairs to the summit", () => {
 
   test("a ledge all the way up: every peak, every pass and every vertex of the ground between stands on a ledge", () => {
     for (const m of RELIEF.massifs) {
-      for (const peak of m.peaks) expect(peak.height % LEDGE_STEP).toBe(0)
-      for (const { h } of interior(m)) expect(h % LEDGE_STEP).toBe(0)
+      // (|…|: a ledge at height 0 can come out as -0.)
+      for (const peak of m.peaks) expect(Math.abs(peak.height % LEDGE_STEP)).toBe(0)
+      for (const { h } of interior(m)) expect(Math.abs(h % LEDGE_STEP)).toBe(0)
     }
   })
 

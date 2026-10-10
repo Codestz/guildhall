@@ -106,13 +106,16 @@ describe("the rivers over the mountain", () => {
       const drops = grade.flatMap((p, k) =>
         k > 0 && grade[k - 1]![1] - p[1] >= LEDGE_STEP - 0.05 ? [k] : [],
       )
+      const single = (j: number): boolean => grade[j - 1]![1] - grade[j]![1] < LEDGE_STEP + 0.05
       for (const at of drops) {
         const near = drops.filter(
           (j) => Math.hypot(grade[j]![0] - grade[at]![0], grade[j]![2] - grade[at]![2]) <= 10,
         )
-        // A drop within a short run of two others is a long fall's own (its drop is more than a ledge).
-        if (near.length >= 3) expect(grade[at - 1]![1] - grade[at]![1]).toBeGreaterThan(LEDGE_STEP + 0.05)
-        else if (grade[at - 1]![1] - grade[at]![1] < LEDGE_STEP + 0.05) singles++
+        // A drop within a short run of two others is a long fall's own (its drop is more than a ledge); a
+        // long fall with a single step by it is no run of three ledge steps.
+        if (near.length >= 3 && near.filter(single).length >= 3)
+          expect(grade[at - 1]![1] - grade[at]![1]).toBeGreaterThan(LEDGE_STEP + 0.05)
+        else if (near.length < 3 && single(at)) singles++
       }
     }
     expect(singles).toBeGreaterThan(0)

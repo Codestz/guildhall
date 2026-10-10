@@ -21,7 +21,7 @@ export interface Grown {
 /** The island's world data: `islandFromTree` then `repoWorld`'s relief, rivers, trails and venues, as the link asks. */
 export function growParts(tree: Tree, gen: Gen): WorldParts {
   const { repo, source, branch, truncated } = tree
-  return repoParts(islandFromTree(tree.entries, 0, gen), {
+  return repoParts(islandFromTree(tree.entries, 0, gen, undefined, tree.island), {
     repo,
     source,
     ...(gen === 2 ? { gen } : {}),

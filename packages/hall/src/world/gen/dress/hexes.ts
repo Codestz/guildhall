@@ -5,6 +5,7 @@ import { instantiate, prefab } from "../../prefabs/index.ts"
 import { key, neighbours, noise, rings, step } from "../hex.ts"
 import type { IslandPlan } from "../plan.ts"
 import { COAST_TILES, fit, PATH_TILES, turn } from "../tiles.ts"
+import { propOnRoad } from "./plazas.ts"
 import { facing, round, siteDressing } from "./sites.ts"
 import type { Terrace } from "./terrace.ts"
 import type { Lot } from "./town.ts"
@@ -163,8 +164,11 @@ export function dressHexes(
       }
       if (site !== undefined) {
         const owner = plan.districts[site]
-        if (owner)
-          decor.push(...siteDressing(owner.biome, owner.folder.language.kit, cell, owner.square, random))
+        if (owner) {
+          // The landmark stands; its props (a crate, a barrel) never on a road.
+          const dressing = siteDressing(owner.biome, owner.folder.language.kit, cell, owner.square, random)
+          decor.push(...dressing.filter((item, n) => n === 0 || !propOnRoad(links, item)))
+        }
         continue
       }
       const square = district ? cellToWorld(district.square) : ([0, 0] as Spot)

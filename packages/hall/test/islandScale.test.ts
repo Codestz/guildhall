@@ -131,24 +131,38 @@ function spanOf(land: ReadonlyMap<string, unknown>): { xs: number[]; zs: number[
   return { xs: cells.map(([q]) => q * 8.66), zs: cells.map(([, line]) => line * 5) }
 }
 
-describe("island shape, generator v2: one landmass (plan/mass.ts)", () => {
-  test("the land is one piece, and so is every district", () => {
+describe("island shape, generator v2: one landmass (plan/mass.ts), in the shape its identity gives", () => {
+  /** The plan's land without a reef's islets. */
+  const body = (plan: (typeof v2)[string]["plan"]): Set<string> =>
+    new Set([...plan.land.keys()].filter((id) => !plan.reef?.has(id)))
+
+  test("the land is one piece, and so is every district; a reef's islets lie apart, off the body", () => {
     for (const [name, made] of Object.entries(v2)) {
-      const land = new Set(made.plan.land.keys())
+      const land = body(made.plan)
       expect({ name, whole: reachable(land, "0,0").size === land.size }).toEqual({ name, whole: true })
       made.plan.districts.forEach((district, i) => {
-        const own = new Set([...made.plan.land].filter(([, hex]) => hex.district === i).map(([id]) => id))
+        const own = new Set(
+          [...made.plan.land]
+            .filter(([id, hex]) => hex.district === i && !made.plan.reef?.has(id))
+            .map(([id]) => id),
+        )
         const first = own.values().next().value
         if (first === undefined) return
         const piece = reachable(own, first).size === own.size
         const folder = district.folder.name
         expect({ name, folder, piece }).toEqual({ name, folder, piece: true })
       })
+      for (const id of made.plan.reef ?? []) {
+        const near = [0, 1, 2, 3, 4, 5].some((dir) => land.has(key(step(unkey(id), dir))))
+        expect({ name, id, touchesBody: near }).toEqual({ name, id, touchesBody: false })
+      }
     }
   })
 
-  test("round, not lobed: little coast for its land, about 1.4 times as wide as it is deep", () => {
+  test("a cone and a plateau are round (little coast for their land), about 1.4 and 1.25 times as wide as deep", () => {
     for (const [name, made] of Object.entries(v2)) {
+      const { shape } = made.plan
+      if (shape !== "cone" && shape !== "plateau") continue
       const land = made.plan.land
       const coast = [...land.keys()].filter((id) =>
         [0, 1, 2, 3, 4, 5].some((dir) => !land.has(key(step(unkey(id), dir)))),
@@ -157,13 +171,38 @@ describe("island shape, generator v2: one landmass (plan/mass.ts)", () => {
       expect({ name, round: coast / Math.sqrt(land.size) < 4.8 }).toEqual({ name, round: true })
       const { xs, zs } = spanOf(land)
       const aspect = (Math.max(...xs) - Math.min(...xs) + 10) / (Math.max(...zs) - Math.min(...zs) + 10)
-      expect({ name, aspect: aspect > 1.15 && aspect < 1.75 }).toEqual({ name, aspect: true })
+      expect({ name, aspect: aspect > 1.1 && aspect < 1.75 }).toEqual({ name, aspect: true })
     }
   })
 
-  test("the keep stands in the middle half of the land, each way, not out on a shore", () => {
+  test("a ridge is longer than it is wide, running north from the keep; an atoll holds a lagoon of sea inside its land", () => {
+    for (const [name, made] of Object.entries(v2)) {
+      const { shape, land } = made.plan
+      if (shape === "ridge") {
+        const { xs, zs } = spanOf(land)
+        const aspect = (Math.max(...xs) - Math.min(...xs) + 10) / (Math.max(...zs) - Math.min(...zs) + 10)
+        expect({ name, long: aspect < 0.9 }).toEqual({ name, long: true })
+      }
+      if (shape === "atoll") {
+        const lagoon = made.plan.lagoon ?? new Set<string>()
+        expect({ name, lagoon: lagoon.size >= 7 }).toEqual({ name, lagoon: true })
+        for (const id of lagoon) {
+          expect({ name, id, dry: land.has(id) }).toEqual({ name, id, dry: false })
+          // Every lagoon hex is enclosed by land or more lagoon: it is no bay open to the sea.
+          const ringed = [0, 1, 2, 3, 4, 5].every((dir) => {
+            const next = key(step(unkey(id), dir))
+            return land.has(next) || lagoon.has(next)
+          })
+          expect({ name, id, ringed }).toEqual({ name, id, ringed: true })
+        }
+      }
+    }
+  })
+
+  test("the keep stands in the middle half of a cone's or a plateau's land, each way, not out on a shore", () => {
     const share = (values: number[]) => -Math.min(...values) / (Math.max(...values) - Math.min(...values))
     for (const [name, made] of Object.entries(v2)) {
+      if (made.plan.shape !== "cone" && made.plan.shape !== "plateau") continue
       const { xs, zs } = spanOf(made.plan.land)
       expect({ name, x: Math.abs(share(xs) - 0.5) < 0.25 }).toEqual({ name, x: true })
       expect({ name, z: Math.abs(share(zs) - 0.5) < 0.25 }).toEqual({ name, z: true })

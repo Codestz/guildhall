@@ -83,8 +83,12 @@ function read(world: World): Anchors {
 
 /** The curtain wall's straight pieces gathered into runs: same turn, each within a piece of the next. */
 function wallRuns(world: World): WallRun[] {
-  // The gates are roofed higher than the walk: the watch keeps to the plain runs.
-  const pieces = world.island.decor.filter((d) => d.piece === "wall_straight")
+  // The gates are roofed higher than the walk: the watch keeps to the plain runs. The main building's own
+  // curtain (a castle's) is its own: the town's watch does not patrol it.
+  const { main } = world
+  const own = (d: { x: number; z: number }): boolean =>
+    main !== undefined && Math.hypot(d.x - main.at[0], d.z - main.at[1]) <= main.reach + 1
+  const pieces = world.island.decor.filter((d) => d.piece === "wall_straight" && !own(d))
   const used = new Set<number>()
   const runs: WallRun[] = []
   pieces.forEach((first, i) => {

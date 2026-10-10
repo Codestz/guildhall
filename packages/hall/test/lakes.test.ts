@@ -176,7 +176,8 @@ describe("a lake's surface", () => {
       const [x, z] = cellToWorld(lake.cells[0] as never)
       let found = false
       for (let v = 0; v < position.count; v++)
-        if (Math.hypot(position.getX(v) - x, position.getZ(v) - z) < 1e-6) {
+        // (The surface's positions are float32: a hex centre far from the origin is a few millionths off.)
+        if (Math.hypot(position.getX(v) - x, position.getZ(v) - z) < 1e-3) {
           expect(position.getY(v)).toBeGreaterThan(SEA_Y + 0.02)
           found = true
         }

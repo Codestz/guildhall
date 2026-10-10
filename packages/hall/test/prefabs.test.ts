@@ -104,9 +104,12 @@ describe("a civic centre on every gen 2 island", () => {
     expect(pieces).toContain("wall_straight")
   })
 
-  test("a village (this repo) has a guildhouse; a hamlet an inn", () => {
-    expect(piecesOf(SELF.entries as RepoEntry[], 2)).toContain("building_church_blue")
-    expect(piecesOf(IS_ODD.entries as RepoEntry[], 2)).toContain("building_tavern_blue")
+  test("a village (this repo) has an inn and a market at its gate, a hamlet an inn; each a main building of its own", () => {
+    const village = islandFromTree(SELF.entries as RepoEntry[], 0, 2)
+    expect(village.island.decor.map((p) => p.piece)).toContain("building_tavern_blue")
+    const hamlet = islandFromTree(IS_ODD.entries as RepoEntry[], 0, 2)
+    expect(hamlet.island.decor.map((p) => p.piece)).toContain("building_tavern_blue")
+    for (const made of [village, hamlet]) expect(made.main?.id).toBeDefined()
   })
 
   test("the first generator draws none of it", () => {
@@ -115,11 +118,13 @@ describe("a civic centre on every gen 2 island", () => {
     expect(pieces).not.toContain("wall_straight")
   })
 
-  test("a famous repo gets the castle at 5k stars and a smaller one is a tier's", () => {
+  test("a famous repo gets a castle's gatehouse and wall at 5k stars, whatever its main building is", () => {
     const tree = IS_ODD.entries as RepoEntry[]
-    expect(islandFromTree(tree, 0, 2, { stars: 6000 }).island.decor.map((p) => p.piece)).toContain(
-      "building_castle_blue",
-    )
+    const walls = (stars?: number): number =>
+      islandFromTree(tree, 0, 2, stars === undefined ? undefined : { stars }).island.decor.filter((p) =>
+        p.piece.startsWith("wall_"),
+      ).length
+    expect(walls(6000)).toBeGreaterThan(walls())
   })
 
   test("a district's lots hold one to three homes, denser near its square", () => {

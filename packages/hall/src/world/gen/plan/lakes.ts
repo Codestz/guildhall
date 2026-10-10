@@ -60,6 +60,7 @@ export function reserveLakes(
   owner: Owners,
   ranges: readonly ReadonlySet<string>[],
   seed: number,
+  reserved: ReadonlySet<string> = RESERVED,
 ): PlanLake[] {
   const want = COUNT[tierOf(districts.reduce((sum, d) => sum + d.folder.files, 0))]
   const mountains = new Set(ranges.flatMap((range) => [...range]))
@@ -72,7 +73,7 @@ export function reserveLakes(
   }
   // Open ground a lake or its stream may take: unbuilt, off the keep, a range and the squares.
   const free = (id: string): boolean => {
-    if (!owner.has(id) || RESERVED.has(id) || squares.has(id) || mountains.has(id)) return false
+    if (!owner.has(id) || reserved.has(id) || squares.has(id) || mountains.has(id)) return false
     const [x, z] = cellToWorld(unkey(id))
     return DMath.hypot(x, z) >= CLEAR * 0.8
   }

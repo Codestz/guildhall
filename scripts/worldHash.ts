@@ -1,7 +1,7 @@
 /**
  * Prints a short hash of what the generators make, per bundled repo fixture and seed: the plan, tiles,
- * decor, roads, venues, homes, relief (massifs, heights, dressing, the whole mesh), rivers, trails,
- * wilds and lights. A world must come out the same on every machine, so run this where CI runs
+ * decor, roads, venues, homes, the island's identity (the shape of its land, its palette) and main
+ * building, relief (massifs, heights, dressing, the whole mesh), rivers, trails, wilds and lights. A world must come out the same on every machine, so run this where CI runs
  * (macOS arm64 and Linux x64) and diff the output:
  *
  *   bun scripts/worldHash.ts [seeds=3] > host.txt
@@ -54,6 +54,8 @@ for (const fixture of FIXTURES)
       venues: hash(world.venues),
       homes: hash(world.homes),
       districts: hash(made.districts),
+      identity: hash(world.identity),
+      main: hash(world.main),
       sites: hash(world.storySites),
       water: hash(world.water),
       trails: hash(world.trails),
@@ -71,6 +73,8 @@ for (const fixture of FIXTURES)
     }
     console.log(
       `${fixture.repo}#${seed}`,
+      `shape:${world.identity?.shape}`,
+      `landmark:${world.main?.id}`,
       Object.entries(parts)
         .map(([name, value]) => `${name}:${value}`)
         .join(" "),
@@ -99,5 +103,7 @@ for (const fixture of FIXTURES) {
     `quays:${hash(islands.map((island) => island.quays))}`,
     `lanes:${hash(net.routes.map((route) => route.lane?.pts))}`,
     `bridges:${hash(net.routes.map((route) => route.bridge?.path))}`,
+    `identities:${hash(islands.map((one) => [one.id, "world" in one ? one.world.identity : undefined]))}`,
+    `landmarks:${(archipelago.islands.map((one) => one.world.main?.id)).join(",")}`,
   )
 }

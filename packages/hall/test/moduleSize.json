@@ -1,6 +1,5 @@
 {
   "packages/core/src/model/model.ts": 575,
-  "packages/hall/src/guild/deeplink.ts": 410,
   "packages/hall/src/guild/director.ts": 708,
   "packages/hall/src/guild/environment.ts": 448,
   "packages/hall/src/guild/events.ts": 915,

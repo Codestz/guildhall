@@ -36,13 +36,16 @@ export type GrowthStart = { year: number } | { t: number } | undefined
 
 export const SPEEDS = [1, 2, 4] as const
 
-/** Reads `?grow` from a page's search: undefined when not asked. */
-export function growParam(search: string): { start: GrowthStart } | undefined {
+/**
+ * Reads `?grow` from a page's search: undefined when not asked. `grow=YYYY` is public; `grow=t:N`
+ * (a film-time seek, for probes) only when `probe` (a dev or probe build, guild/mode.ts PROBE).
+ */
+export function growParam(search: string, probe = false): { start: GrowthStart } | undefined {
   const params = new URLSearchParams(search)
   if (!params.has("grow")) return undefined
   const value = params.get("grow") ?? ""
   const t = /^t:(\d+(?:\.\d+)?)$/.exec(value)
-  if (t) return { start: { t: Number(t[1]) } }
+  if (t && probe) return { start: { t: Number(t[1]) } }
   const year = /^(\d{4})$/.exec(value)
   return { start: year ? { year: Number(year[1]) } : undefined }
 }

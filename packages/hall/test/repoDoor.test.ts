@@ -12,9 +12,8 @@ describe("the repo door's links", () => {
     )
   })
 
-  test("a share link is just the island (and the showcase, if this page is it)", () => {
-    expect(shareLink("facebook/react", "?story=rush&hour=23")).toBe("?repo=facebook/react")
-    expect(shareLink("facebook/react", "?showcase&hour=23")).toBe("?showcase&repo=facebook/react")
+  test("a share link is just the island", () => {
+    expect(shareLink("facebook/react")).toBe("?repo=facebook/react")
   })
 
   test("adding to the archipelago appends to ?repos= and starts on the new island", () => {

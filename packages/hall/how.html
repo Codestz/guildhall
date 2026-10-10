@@ -80,6 +80,7 @@
           <li><a href="#islands">Repos as islands</a></li>
           <li><a href="#world">A world from a repo</a></li>
           <li><a href="#seas">GitHub as a sea</a></li>
+          <li><a href="#links">Every link param</a></li>
           <li><a href="#verify">How we know it still works</a></li>
         </ol>
       </nav>
@@ -550,8 +551,52 @@
       </section>
 
       <!-- ─────────────────────────── VII. verify ─────────────────────────── -->
-      <section id="verify" aria-labelledby="verify-h">
+      <!-- ─────────────────────────── VII. link params ─────────────────────────── -->
+      <section id="links" aria-labelledby="links-h">
         <p class="eyebrow">VII</p>
+        <h2 id="links-h">Every link param</h2>
+        <p>
+          A link can carry a whole scene. These are the params the hall reads in every build; anything
+          else is ignored. Debug switches exist only in development builds, so a shared link cannot turn
+          them on.
+        </p>
+        <figure class="plaque">
+          <div class="table-wrap">
+            <table>
+              <caption>The public params</caption>
+              <thead>
+                <tr><th scope="col">Param</th><th scope="col">Does</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row"><code>story</code></th><td>A scenario: <code>party</code>, <code>solo</code>, <code>rush</code>, <code>parties</code>, <code>factions</code>, <code>saga</code>, <code>seas</code>.</td></tr>
+                <tr><th scope="row"><code>act</code></th><td>A Saga chapter, 1 to 5 (implies <code>story=saga</code>).</td></tr>
+                <tr><th scope="row"><code>t</code></th><td>A seek into the story, <code>mm:ss</code>.</td></tr>
+                <tr><th scope="row"><code>n</code></th><td>How many adventurers <code>story=rush</code> sends out, 1 to 500.</td></tr>
+                <tr><th scope="row"><code>hour</code></th><td>A fixed time of day, 0 to 24.</td></tr>
+                <tr><th scope="row"><code>weather</code></th><td><code>clear</code>, <code>cloudy</code>, <code>rain</code>, <code>storm</code> or <code>snow</code>.</td></tr>
+                <tr><th scope="row"><code>look</code></th><td>Frame a site, landmark, district or <code>x,z</code>.</td></tr>
+                <tr><th scope="row"><code>repo</code></th><td>Grow an island from <code>owner/name</code>.</td></tr>
+                <tr><th scope="row"><code>select</code></th><td>Follow an adventurer (the Share button writes it).</td></tr>
+                <tr><th scope="row"><code>view</code></th><td><code>diorama</code> or <code>explore</code> (written by Share).</td></tr>
+                <tr><th scope="row"><code>paused</code></th><td><code>1</code> stops the story's clock (written by Share).</td></tr>
+                <tr><th scope="row"><code>bard</code></th><td><code>0</code> or <code>1</code>, the director off or on (written by Share).</td></tr>
+                <tr><th scope="row"><code>hud</code></th><td><code>minimal</code>, <code>detailed</code> or <code>hidden</code>.</td></tr>
+                <tr><th scope="row"><code>live</code></th><td>Follow a hub on this machine, <code>?live=ws://localhost:4747/ws</code>.</td></tr>
+                <tr><th scope="row"><code>renderer</code></th><td><code>webgl</code> or <code>webgpu</code> (experimental).</td></tr>
+                <tr><th scope="row"><code>demo</code></th><td>Open the Director's controls in Settings.</td></tr>
+                <tr><th scope="row"><code>archipelago</code></th><td>Several islands at once, the default set.</td></tr>
+                <tr><th scope="row"><code>repos</code></th><td>A comma-separated list of repos as an archipelago.</td></tr>
+                <tr><th scope="row"><code>island</code></th><td>The island an archipelago starts on.</td></tr>
+                <tr><th scope="row"><code>split</code></th><td>A repo's districts as islands of their own.</td></tr>
+                <tr><th scope="row"><code>grow</code></th><td>Replay the repo's history; <code>grow=2017</code> starts at a year.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </figure>
+      </section>
+
+      <section id="verify" aria-labelledby="verify-h">
+        <p class="eyebrow">VIII</p>
         <h2 id="verify-h">How we know it still works</h2>
         <p>
           A 3D scene can break without a single test going red: a light turns off, a shader goes

@@ -13,14 +13,14 @@ import {
 } from "three"
 import type { WebGLNodesHandler } from "three/examples/jsm/tsl/WebGLNodesHandler.js"
 import type { Node } from "three/webgpu"
+import { DEV } from "../guild/devFlags.ts"
 
 /**
  * TSL on today's WebGLRenderer (chapter 2, phase 2): shaders ported to node materials one at a
- * time, drawn through three's `WebGLNodesHandler`, behind `?tsl=1` until each is proven against the
+ * time, drawn through three's `WebGLNodesHandler`, behind `?tsl=1` (dev and probe builds only) until each is proven against the
  * golden views. Read once, at load. Off, nothing below is loaded (three/webgpu is ~0.8 MB).
  */
-export const TSL: boolean =
-  typeof location !== "undefined" && new URLSearchParams(location.search).get("tsl") === "1"
+export const TSL: boolean = DEV.tsl
 
 const installed = new WeakMap<WebGLRenderer, Promise<void>>()
 

@@ -20,7 +20,7 @@ function query(params: URLSearchParams): string {
   return text ? `?${text}` : ""
 }
 
-/** This hall at `repo`'s island: the page's other params kept (the story, the hour, `showcase`). */
+/** This hall at `repo`'s island: the page's other params kept (the story, the hour). */
 export function islandLink(repo: string, search: string): string {
   const params = new URLSearchParams(search)
   for (const name of PLACE_PARAMS) params.delete(name)
@@ -28,10 +28,9 @@ export function islandLink(repo: string, search: string): string {
   return query(params)
 }
 
-/** The link to share for `repo`'s island: just the island (and the showcase, if this page is it). */
-export function shareLink(repo: string, search: string): string {
+/** The link to share for `repo`'s island: just the island. */
+export function shareLink(repo: string): string {
   const params = new URLSearchParams()
-  if (new URLSearchParams(search).has("showcase")) params.set("showcase", "")
   params.set("repo", repo)
   return query(params)
 }

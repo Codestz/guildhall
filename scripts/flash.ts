@@ -318,7 +318,7 @@ try {
     server = await serve()
   }
   const base = given ?? server!.url
-  const url = `${base}?showcase${REPO ? `&repo=${REPO}` : ""}`
+  const url = `${base}${REPO ? `?repo=${REPO}` : ""}`
   browser = await chromium.launch({
     executablePath: CHROME,
     args: CHROME_ARGS.filter((a) => !a.includes("frame-rate")),

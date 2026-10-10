@@ -266,7 +266,7 @@ export function RepoDoor() {
 
   async function share() {
     if (!subject) return
-    const link = `${location.origin}${location.pathname}${shareLink(subject, location.search)}`
+    const link = `${location.origin}${location.pathname}${shareLink(subject)}`
     setCopied((await copyText(link)) ? "done" : "failed")
   }
 

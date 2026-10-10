@@ -5,7 +5,7 @@
  *   bun scripts/probe.ts start [--dpr 1] [--url http://localhost:5199/]
  *   bun scripts/probe.ts stop
  *   bun scripts/probe.ts health
- *   bun scripts/probe.ts shot <name> [--state 'story=saga&t=11:53&hour=23&look=quarry&hud=off']
+ *   bun scripts/probe.ts shot <name> [--state 'story=saga&t=11:53&hour=23&look=quarry&hud=hidden']
  *                                    [--lab 'character&model=mage&clip=Walking_A'] [--settle ms] [--keep] [--png]
  *   bun scripts/probe.ts state 'story=rush&t=0:40&select=Implementer'   [--keep] [--settle ms]
  *   bun scripts/probe.ts look quarry | graveyard | 12,-40

@@ -1,7 +1,8 @@
 import { type Change, type GuildEvent, isSeaRecord, type SeaRecord } from "@guildhall/core"
+import { devFlagsOf } from "../devFlags.ts"
 import type { StoryHour } from "../environment.ts"
 import { markerOf } from "../log.ts"
-import { SERVED } from "../mode.ts"
+import { PROBE, SERVED } from "../mode.ts"
 import { type Sighted, sight } from "../sea.ts"
 import type { Feed, FeedSink } from "./feed.ts"
 
@@ -19,18 +20,24 @@ export const SERVING_HUB: string | null =
 
 /**
  * The hub a page's query asks for: null without `?live`; `?live=<url>` only for a hub on this
- * machine (ws://localhost or ws://127.0.0.1, any port) unless `&anyhub=1` says otherwise — a link
- * must not be able to point the hall at someone else's stream. Anything else is the default hub.
- * A hall served by a hub (`serving`) follows it without being asked, and it is the default; the
- * stories stay a click away in Settings.
+ * machine (ws://localhost or ws://127.0.0.1, any port) — a link must not be able to point the hall
+ * at someone else's stream. Anything else is the default hub. `&anyhub=1` lifts that for a hub
+ * elsewhere, but only in a dev or probe build (`probe`, guild/devFlags.ts): a link is untrusted
+ * input, so it must not carry its own permission to defeat the check. A hall served by a hub
+ * (`serving`) follows it without being asked, and it is the default; the stories stay a click away
+ * in Settings.
  */
-export function liveUrlOf(search: string, serving: string | null = SERVING_HUB): string | null {
+export function liveUrlOf(
+  search: string,
+  serving: string | null = SERVING_HUB,
+  probe: boolean = PROBE,
+): string | null {
   const fallback = serving ?? DEFAULT_HUB
   const params = new URLSearchParams(search)
   const asked = params.get("live")
   if (asked === null) return serving
   if (!asked) return fallback
-  if (params.get("anyhub") === "1") return asked
+  if (devFlagsOf(search, probe).anyhub) return asked
   try {
     const url = new URL(asked)
     const local = url.hostname === "localhost" || url.hostname === "127.0.0.1"

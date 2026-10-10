@@ -52,12 +52,19 @@ export async function growSplit(tree: Tree, patchesOf: PatchesOf): Promise<Grown
     if (outcome.status === "fulfilled") kept.push({ slice, world: outcome.value })
     else failed.push({ repo: splitIdOf(tree.repo, slice), reason: (outcome.reason as Error).message })
   }
+  // Laid out by the slices' own ids (the coupling is keyed by them); named by full id once placed.
   const laid = kept.map(({ slice, world }, i) => ({
-    id: splitIdOf(tree.repo, slice),
+    id: slice.id,
     world,
     footprint: { reach: reachOf(world), patches: patchesOf(world, i > 0, true) } satisfies Footprint,
   }))
-  const layout = layoutSplit(laid, split.coupling)
+  const placed = layoutSplit(laid, split.coupling)
+  const named = (id: string): string => `${tree.repo}#${id}`
+  const layout = {
+    ...placed,
+    links: placed.links.map((link) => ({ ...link, a: named(link.a), b: named(link.b) })),
+    quays: placed.quays.map((quays) => quays.map((quay) => ({ ...quay, partner: named(quay.partner) }))),
+  }
   const infos = kept.map(({ slice, world }, i): IslandInfo => {
     const id = splitIdOf(tree.repo, slice)
     const center = layout.centers[i] as IslandInfo["center"]

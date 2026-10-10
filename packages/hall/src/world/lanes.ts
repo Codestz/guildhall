@@ -1,4 +1,6 @@
+import { BRIDGE_CLEAR, clearOf, type Wall } from "./bridgeWalls.ts"
 import { DMath } from "./dmath.ts"
+import { searchPath } from "./laneSearch.ts"
 import type { Spot } from "./layout.ts"
 import type { Quay } from "./linkStub.ts"
 
@@ -95,9 +97,10 @@ function nearest(pts: readonly Spot[], o: Obstacle): { i: number; gap: number } 
 
 /**
  * The lane from `a`'s berth to `b`'s, round every obstacle that would otherwise be within
- * LANE_MARGIN of it. Deterministic.
+ * LANE_MARGIN of it. Deterministic. A lane never crosses a bridge (`walls`, world/bridgeWalls.ts): one
+ * that would is found a way round, over the sea between the islands; see `laneClear`.
  */
-export function laneOf(a: Quay, b: Quay, obstacles: readonly Obstacle[]): Lane {
+export function laneOf(a: Quay, b: Quay, obstacles: readonly Obstacle[], walls: readonly Wall[] = []): Lane {
   const berthA = berthOf(a)
   const berthB = berthOf(b)
   const out = (q: Quay, berth: Spot): Spot => [
@@ -130,6 +133,8 @@ export function laneOf(a: Quay, b: Quay, obstacles: readonly Obstacle[]): Lane {
     middle.splice(slot < 0 ? middle.length : slot, 0, waypoint)
     pts = sample(control())
   }
+  if (walls.length > 0 && !pointsClear(pts, walls))
+    pts = aroundWalls(a, b, berthA, berthB, out, obstacles, walls) ?? pts
   const at = [0]
   for (let i = 1; i < pts.length; i++) {
     const p = pts[i - 1] as Spot
@@ -137,6 +142,50 @@ export function laneOf(a: Quay, b: Quay, obstacles: readonly Obstacle[]): Lane {
     at.push((at[i - 1] as number) + DMath.hypot(q[0] - p[0], q[1] - p[1]))
   }
   return { pts, at, length: at[at.length - 1] as number }
+}
+
+const pointsClear = (pts: readonly Spot[], walls: readonly Wall[]): boolean =>
+  pts.every((p) => clearOf(walls, p[0], p[1]))
+
+/** Whether a lane keeps BRIDGE_CLEAR off every bridge, end to end. */
+export const laneClear = (lane: Lane, walls: readonly Wall[]): boolean => pointsClear(lane.pts, walls)
+
+/**
+ * The way from berth to berth over the sea that keeps off every bridge and (as the bows do) the other
+ * islands: found over a grid (world/laneSearch.ts), then drawn smooth if the smooth curve still clears
+ * the walls, else as the straight legs it was found as. Undefined when there is no way.
+ */
+function aroundWalls(
+  a: Quay,
+  b: Quay,
+  berthA: Spot,
+  berthB: Spot,
+  out: (q: Quay, berth: Spot) => Spot,
+  obstacles: readonly Obstacle[],
+  walls: readonly Wall[],
+): Spot[] | undefined {
+  const offA = out(a, berthA)
+  const offB = out(b, berthB)
+  const way = searchPath(
+    offA,
+    offB,
+    (x, z) =>
+      !clearOf(walls, x, z, BRIDGE_CLEAR + 3) ||
+      obstacles.some((o) => DMath.hypot(x - o.center[0], z - o.center[1]) < o.reach + LANE_MARGIN - 4),
+  )
+  if (!way) return undefined
+  const smooth = sample([berthA, ...way, berthB])
+  if (pointsClear(smooth, walls)) return smooth
+  const legs: Spot[] = [berthA, ...way, berthB]
+  const dense: Spot[] = [berthA]
+  for (let i = 1; i < legs.length; i++) {
+    const p = legs[i - 1] as Spot
+    const q = legs[i] as Spot
+    const steps = Math.max(1, Math.ceil(DMath.hypot(q[0] - p[0], q[1] - p[1]) / STEP))
+    for (let k = 1; k <= steps; k++)
+      dense.push([p[0] + ((q[0] - p[0]) * k) / steps, p[1] + ((q[1] - p[1]) * k) / steps])
+  }
+  return dense
 }
 
 /** How far along the route's control polyline a point's nearest approach lies (to order bows). */

@@ -3,11 +3,14 @@ import { useFrame } from "@react-three/fiber"
 import { useMemo, useRef } from "react"
 import type { Group, Mesh, Object3D } from "three"
 import { useGuildStore } from "../guild/useGuild.ts"
+import { pushedClear } from "../world/bridgeWalls.ts"
 import { SHIPS_URL } from "../world/cast.ts"
 import { HEX_SCALE } from "../world/lands.ts"
+import { trackAt, trackOf } from "../world/laps.ts"
 import { useWorld } from "../world/source.ts"
 import { reachOf, type World } from "../world/world.ts"
 import { FRAME } from "./frame.ts"
+import { useBridgeWalls } from "./links/useLinkNet.ts"
 
 /**
  * Ships on the sea (Kenney Pirate Kit, CC0): merchant ships sailing slow laps around the island,
@@ -56,6 +59,11 @@ export function Ships() {
   const store = useGuildStore()
   const world = useWorld()
   const { lap, quay } = useMemo(() => watersOf(world), [world])
+  // A bridge is as high as a mast: no ship sails through one. Where one crosses the lap the ships sail
+  // back and forth along the clear part of it (world/laps.ts); the rowboat is moored clear of it.
+  const walls = useBridgeWalls()
+  const track = useMemo(() => trackOf(lap.rx, lap.rz, walls), [lap, walls])
+  const mooring = useMemo(() => pushedClear(walls, quay[0], quay[1]), [walls, quay])
   const refs = useRef<(Group | null)[]>([])
   const boatRef = useRef<Group>(null)
 
@@ -65,11 +73,11 @@ export function Ships() {
     ships.forEach(({ sailor }, i) => {
       const group = refs.current[i]
       if (!group) return
-      const a = (sailor.phase + t * sailor.speed) * Math.PI * 2
+      const { angle: a, dir: back } = trackAt(track, (sailor.phase + t * sailor.speed) * Math.PI * 2)
       const x = Math.cos(a) * lap.rx
       const z = Math.sin(a) * lap.rz
       // Heading along the lap (the tangent), bow forward (+z in the model).
-      const dir = Math.sign(sailor.speed)
+      const dir = track.span >= Math.PI * 2 ? Math.sign(sailor.speed) : back
       const heading = Math.atan2(-Math.sin(a) * lap.rx * dir, Math.cos(a) * lap.rz * dir)
       const sway = 0.5 + wind
       group.position.set(x, SEA_Y - sailor.draft * sailor.scale + Math.sin(t * 0.9 + i) * 0.12, z)
@@ -102,7 +110,7 @@ export function Ships() {
         ) : null,
       )}
       {boat && (
-        <group ref={boatRef} position={[quay[0], SEA_Y, quay[1]]} scale={1.1}>
+        <group ref={boatRef} position={[mooring[0], SEA_Y, mooring[1]]} scale={1.1}>
           <primitive object={boat} />
         </group>
       )}

@@ -1,5 +1,6 @@
 import type { CiState, SeaEvent } from "@guildhall/core"
 import { CAPS, type Caps, docketAt, MAX_BERTHS } from "../../guild/docket.ts"
+import { pushedClear, type Wall } from "../../world/bridgeWalls.ts"
 import {
   along,
   BERTH,
@@ -244,6 +245,23 @@ export function toWorld(
     z: h.z + h.sideZ * side + h.outZ * out,
     heading: Math.atan2(h.sideX * dx + h.outX * dz, h.sideZ * dx + h.outZ * dz),
   }
+}
+
+/**
+ * `toWorld`, kept off the bridges' walls (world/bridgeWalls.ts): a ship never sails through one, so a
+ * place or a leg that would is moved clear of it, to the side the ship is on.
+ */
+export function toWorldClear(
+  h: Harbour,
+  walls: readonly Wall[],
+  side: number,
+  out: number,
+  heading = 0,
+): { x: number; z: number; heading: number } {
+  const at = toWorld(h, side, out, heading)
+  if (walls.length === 0) return at
+  const [x, z] = pushedClear(walls, at.x, at.z)
+  return { x, z, heading: at.heading }
 }
 
 /** Where the lighthouse should stand, in the harbour's frame: on the shore east of the quay. */

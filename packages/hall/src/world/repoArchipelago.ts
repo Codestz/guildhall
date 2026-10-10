@@ -130,6 +130,10 @@ export function chooseLinks(
   return out
 }
 
+const unit = (x: number, z: number): Spot => {
+  const length = DMath.hypot(x, z) || 1
+  return [x / length, z / length]
+}
 const hypot = (a: Spot, b: Spot): number => DMath.hypot(a[0] - b[0], a[1] - b[1])
 const snap = (v: number): number => Math.round(v / SEA_CELL) * SEA_CELL
 
@@ -221,6 +225,8 @@ export function layoutSplit(islands: readonly Laid[], coupling: Coupling): Split
   const links: IslandLink[] = []
   const quays: Quay[][] = islands.map(() => [])
   const local: Spot[][] = islands.map(() => [])
+  // The bridges' heads on each island: other quays keep their distance from them.
+  const heads: Spot[][] = islands.map(() => [])
   const upon = (k: number, q: Spot): Spot => [(centers[k] as Spot)[0] + q[0], (centers[k] as Spot)[1] + q[1]]
   for (const wanted of chooseLinks(
     islands.map((one) => one.id),
@@ -235,17 +241,44 @@ export function layoutSplit(islands: readonly Laid[], coupling: Coupling): Split
       centers[j] as Spot,
     )
     if (!strait) continue
-    const qi = quayFacing((islands[i] as Laid).world, strait.a, local[i])
-    const qj = quayFacing((islands[j] as Laid).world, strait.b, local[j])
+    const gap = Math.round(strait.gap * 10) / 10
+    const kind = linkKind(wanted.weight, gap)
+    // Out from one coast towards the other, as the crossing will run: first as the straits' nearest
+    // points say, then as the quays chosen say (so a bridge's aprons are judged on its real axis).
+    const bridge = kind === "bridge"
+    let across = unit(
+      (centers[j] as Spot)[0] + strait.b[0] - (centers[i] as Spot)[0] - strait.a[0],
+      (centers[j] as Spot)[1] + strait.b[1] - (centers[i] as Spot)[1] - strait.a[1],
+    )
+    let qi: Spot | undefined
+    let qj: Spot | undefined
+    for (let round = 0; round < (bridge ? 2 : 1); round++) {
+      qi = quayFacing((islands[i] as Laid).world, strait.a, local[i], {
+        facing: across,
+        bridge,
+        heads: heads[i] as Spot[],
+      })
+      qj = quayFacing((islands[j] as Laid).world, strait.b, local[j], {
+        facing: [-across[0], -across[1]],
+        bridge,
+        heads: heads[j] as Spot[],
+      })
+      if (!qi || !qj) break
+      const [a, b] = [upon(i, qi), upon(j, qj)]
+      across = unit(b[0] - a[0], b[1] - a[1])
+    }
     if (!qi || !qj) continue
     const [wi, wj] = [upon(i, qi), upon(j, qj)]
     const span = hypot(wi, wj) || 1
     const facing = (from: Spot, to: Spot): Spot => [(to[0] - from[0]) / span, (to[1] - from[1]) / span]
     const link = links.length
-    const gap = Math.round(strait.gap * 10) / 10
-    links.push({ ...wanted, gap, kind: linkKind(wanted.weight, gap) })
+    links.push({ ...wanted, gap, kind })
     local[i]?.push(qi)
     local[j]?.push(qj)
+    if (bridge) {
+      heads[i]?.push(qi)
+      heads[j]?.push(qj)
+    }
     quays[i]?.push({ link, partner: wanted.b, at: wi, local: qi, facing: facing(wi, wj) })
     quays[j]?.push({ link, partner: wanted.a, at: wj, local: qj, facing: facing(wj, wi) })
   }

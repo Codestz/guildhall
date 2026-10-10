@@ -16,14 +16,11 @@ import {
   Quaternion,
   Vector3,
 } from "three"
-import { PROBE } from "../../guild/mode.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import type { Archipelago } from "../../world/archipelagoSource.ts"
 import { SHIPS_URL } from "../../world/cast.ts"
 import { type FerryState, ferryAt } from "../../world/ferrySchedule.ts"
-import { type LinkNet, type LinkRoute, netOf } from "../../world/linkNet.ts"
-import { BRIDGE_MAX, linkSetOf } from "../../world/linkStub.ts"
-import { useWorld } from "../../world/source.ts"
+import type { LinkNet, LinkRoute } from "../../world/linkNet.ts"
 import { halos } from "../atmosphere/Lamps.tsx"
 import { sky } from "../atmosphere/state.ts"
 import { bakeNode } from "../events/common.ts"
@@ -33,6 +30,7 @@ import { SEA_Y } from "../Ships.tsx"
 import { bridgeGeometry } from "./bridgeMesh.ts"
 import { dockGeometry, dockLampOf } from "./dockMesh.ts"
 import type { V3 } from "./shapes.ts"
+import { useLinkNet } from "./useLinkNet.ts"
 
 /**
  * What joins the islands (world/linkNet.ts), drawn: a stone bridge for each bridge link, a timber
@@ -99,18 +97,10 @@ function wakeGeometry(): BufferGeometry {
 /** The ferries: those routes with a timetable. */
 const ferriesOf = (net: LinkNet): LinkRoute[] => net.routes.filter((route) => route.table)
 
-/** Probe builds only: `?bridgemax=150` bridges islands whose quays are that close (the stub's BRIDGE_MAX, world/linkStub.ts). */
-function bridgeMaxOf(): number {
-  if (!PROBE || typeof location === "undefined") return BRIDGE_MAX
-  const asked = Number(new URLSearchParams(location.search).get("bridgemax"))
-  return asked > 0 ? asked : BRIDGE_MAX
-}
-
 export default function LinksLayer({ archipelago }: { archipelago: Archipelago }) {
   const store = useGuildStore()
-  const home = useWorld()
   const ships = useGLTF(SHIPS_URL) as unknown as { nodes: Record<string, Object3D> }
-  const net = useMemo(() => netOf(linkSetOf(archipelago, home, bridgeMaxOf())), [archipelago, home])
+  const net = useLinkNet(archipelago)
   const ferries = useMemo(() => ferriesOf(net), [net])
 
   /** Stone and timber: bridges, docks, and the lanterns' flames. Static but for the flames. */

@@ -98,7 +98,7 @@ export function quayFacing(world: World, center: Spot, reach: number, toward: Sp
 }
 
 /** The side of a pier ending at `end` (the island's own coordinates) where a boat's berth has the least land. */
-function berthSideOf(world: World, end: Spot, facing: number): 1 | -1 {
+export function berthSideOf(world: World, end: Spot, facing: number): 1 | -1 {
   const ux = DMath.sin(facing)
   const uz = DMath.cos(facing)
   const landOn = (side: number): number => {

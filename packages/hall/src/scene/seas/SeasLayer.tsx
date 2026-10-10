@@ -20,10 +20,12 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { CAPS } from "../../guild/docket.ts"
 import { quality } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
+import type { Wall } from "../../world/bridgeWalls.ts"
 import { LANDS_URL, SHIPS_URL } from "../../world/cast.ts"
 import { useWorld } from "../../world/source.ts"
 import { bakeNode, hash01 } from "../events/common.ts"
 import { FRAME } from "../frame.ts"
+import { useBridgeWalls } from "../links/useLinkNet.ts"
 import { useOwnedMeshes } from "../owned.ts"
 import { SEA_Y, watersOf } from "../Ships.tsx"
 import {
@@ -39,6 +41,7 @@ import {
   MAX_SHIPS,
   seaAt,
   toWorld,
+  toWorldClear,
   type Voyage,
 } from "./fleet.ts"
 import { lighthouse } from "./lighthouse.ts"
@@ -105,6 +108,8 @@ export default function SeasLayer() {
   const ships = useGLTF(SHIPS_URL) as unknown as { nodes: Record<string, Object3D> }
   const lands = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
   const harbour = useMemo(() => harbourOf(watersOf(world).quay), [world])
+  // The bridges are walls to a ship (world/bridgeWalls.ts): voyages that would cross one are kept clear.
+  const walls = useBridgeWalls()
   const lighthouse = useMemo(() => lighthouseSpot(world.island, harbour), [world, harbour])
   const layer = useOwnedMeshes(
     () => build(ships.nodes, seas.nodes, lands.nodes, lighthouse, harbour),
@@ -138,7 +143,7 @@ export default function SeasLayer() {
     layer.gold.visible = false
     for (const voyage of view.voyages) {
       if (voyage.shown <= 0.01) continue
-      shipMatrix(voyage, harbour, t)
+      shipMatrix(voyage, harbour, walls, t)
       const mesh = layer.hulls[voyage.hull]
       if (voyage.hull === "galleon") {
         mesh.matrix.copy(dummy.matrix)
@@ -200,7 +205,7 @@ export default function SeasLayer() {
     // The release's flourish: bursts of sparks over the galleon as it drops anchor.
     const sparks = layer.sparks
     if (view.flourish !== undefined && view.galleon) {
-      const g = toWorld(harbour, view.galleon.side, view.galleon.out)
+      const g = toWorldClear(harbour, walls, view.galleon.side, view.galleon.out)
       flourish(sparks, g.x, g.z, view.flourish)
     } else sparks.count = 0
   }, FRAME.WORLD)
@@ -216,9 +221,9 @@ export default function SeasLayer() {
 }
 
 /** A voyage's ship matrix (into `dummy.matrix`): placed, bobbing, leaning, shrinking as it goes. */
-function shipMatrix(voyage: Voyage, harbour: Harbour, t: number): void {
+function shipMatrix(voyage: Voyage, harbour: Harbour, walls: readonly Wall[], t: number): void {
   const hull = HULLS[voyage.hull]
-  const at = toWorld(harbour, voyage.side, voyage.out, voyage.heading)
+  const at = toWorldClear(harbour, walls, voyage.side, voyage.out, voyage.heading)
   const phase = voyage.key.length * 1.7 + voyage.side * 0.1
   const sway = voyage.sailing ? 1.4 : 0.7
   const sink = (1 - voyage.shown) * 3

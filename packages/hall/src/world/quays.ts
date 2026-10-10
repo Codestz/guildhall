@@ -20,6 +20,19 @@ export const COAST_BAND = WATER_CLEARANCE + 3.5
 export const ROAD_REACH = 80
 /** Two quays on one island keep this far apart. */
 export const QUAY_SPACING = 9
+/** …and this far from a bridge's head, which is wide, and which a ferry's berth must keep off. */
+export const BRIDGE_SPACING = 24
+/**
+ * A bridge's head wants an apron, in the quay's frame (out to sea, and across it): this far back
+ * inland, this far ahead where the ramp climbs, this far to either side. Clear of every building,
+ * wall and tree, so the bridge never lands against one.
+ */
+export const APRON = { back: 9, ahead: 12, half: 7.5 } as const
+/** On a cramped island, at least the head itself: the ramp's length and the deck's width (world/bridges.ts). */
+export const HEAD = { back: 3, ahead: 9, half: 6.5 } as const
+const APRON_STEP = 2
+/** A building, as `islandObstacles` names it: what a bridge must never land against. */
+export const BUILDING = /^building_/
 
 const seas = new WeakMap<World, Spot[]>()
 /** The open sea's hex centres (a lake is not a harbour). */
@@ -95,12 +108,49 @@ export function quayProblem(world: World, spot: Spot, planning = false): string 
   return undefined
 }
 
+/** Why the bridge head at `spot`, facing `facing` (a unit vector out to sea), has no clear apron; undefined when it has. */
+export function apronProblem(
+  world: World,
+  spot: Spot,
+  facing: Spot,
+  apron: { back: number; ahead: number; half: number } = APRON,
+  only?: RegExp,
+): string | undefined {
+  // The quay's own lantern stands there by design (world/lights.ts); everything else stays off.
+  const obstacles = obstaclesOf(world, true).filter(
+    (o) => !o.name.startsWith("light ") && (!only || only.test(o.name)),
+  )
+  const [ux, uz] = facing
+  for (let f = -apron.back; f <= apron.ahead; f += APRON_STEP)
+    for (let s = -apron.half; s <= apron.half; s += APRON_STEP) {
+      const at: Spot = [spot[0] + ux * f + uz * s, spot[1] + uz * f - ux * s]
+      const hit = blocker(at, obstacles, 0.4)
+      if (hit) return `the apron meets ${hit.name}`
+    }
+  return undefined
+}
+
+/** What a quay is wanted for (island-local `facing`, out to sea): where it must keep its apron, and whom it keeps off. */
+export interface QuayWish {
+  /** The unit vector from the quay out towards its partner. Given, the quay's apron is kept clear if any spot has one. */
+  facing?: Spot
+  /** It is a bridge's head: it keeps BRIDGE_SPACING off the others. */
+  bridge?: boolean
+  /** The bridge heads already on the island. */
+  heads?: readonly Spot[]
+}
+
 /**
  * A quay on `world`'s coast as near `target` (a point of the island, the coast the partner's lands
  * nearest) as one can be, at least QUAY_SPACING from each of `taken`. Undefined when the island has
  * no valid spot (it is then left without that link).
  */
-export function quayFacing(world: World, target: Spot, taken: readonly Spot[] = []): Spot | undefined {
+export function quayFacing(
+  world: World,
+  target: Spot,
+  taken: readonly Spot[] = [],
+  wish: QuayWish = {},
+): Spot | undefined {
   const candidates: { at: Spot; score: number }[] = []
   for (const tile of world.island.tiles) {
     if (!tile.piece.startsWith("hex_coast")) continue
@@ -115,10 +165,20 @@ export function quayFacing(world: World, target: Spot, taken: readonly Spot[] = 
     }
   }
   candidates.sort((a, b) => b.score - a.score || a.at[0] - b.at[0] || a.at[1] - b.at[1])
-  for (const { at } of candidates) {
-    if (taken.some((other) => distance(other, at) < QUAY_SPACING)) continue
-    if (!quayProblem(world, at, true)) return at
-  }
+  const apart = (other: Spot): number =>
+    wish.bridge || wish.heads?.includes(other) ? BRIDGE_SPACING : QUAY_SPACING
+  // The best: a full apron and room for the bridge heads; then the head alone; failing both any valid
+  // spot (a link is worth a tight landing).
+  const tiers: { apron: typeof APRON | typeof HEAD; only?: RegExp }[] =
+    wish.bridge && wish.facing ? [{ apron: APRON }, { apron: HEAD }, { apron: HEAD, only: BUILDING }] : []
+  for (const [tier, { apron, only }] of [...tiers, {} as (typeof tiers)[number]].entries())
+    for (const { at } of candidates) {
+      if (taken.some((other) => distance(other, at) < (tier < tiers.length ? apart(other) : QUAY_SPACING)))
+        continue
+      if (quayProblem(world, at, true)) continue
+      if (apron && wish.facing && apronProblem(world, at, wish.facing, apron, only)) continue
+      return at
+    }
   return undefined
 }
 

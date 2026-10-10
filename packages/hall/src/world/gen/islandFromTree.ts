@@ -1,5 +1,7 @@
 import type { Fame } from "./dress/civic.ts"
 import { dress, type RepoIsland } from "./dress.ts"
+import { identityOf } from "./identity/index.ts"
+import type { IslandHint } from "./identity/types.ts"
 import { fitIsland } from "./plan.ts"
 import { type RepoEntry, summarize } from "./repo.ts"
 import { scaledIsland } from "./scale.ts"
@@ -12,11 +14,22 @@ import { scaledIsland } from "./scale.ts"
  *            v1  fitIsland (plan.ts): its land shrunk until it fits the one shore bake
  *            v2  scaledIsland (scale.ts): sized by its files, the shore baked in tiles
  *        → dress (dress.ts: lands.ts' Island + road graph + a Site-shaped entry per district)
+ *
+ * Generator 2 islands have an identity (gen/identity): the shape of their land, a main building
+ * for a heart and their own colours, from their tree and, in an archipelago, their `hint`.
  */
-export function islandFromTree(tree: readonly RepoEntry[], seed = 0, gen: Gen = 1, fame?: Fame): RepoIsland {
+export function islandFromTree(
+  tree: readonly RepoEntry[],
+  seed = 0,
+  gen: Gen = 1,
+  fame?: Fame,
+  hint?: IslandHint,
+): RepoIsland {
   const shape = summarize(tree)
   const mixed = (shape.hash ^ Math.imul(seed, 0x9e3779b1)) >>> 0
-  return dress(gen === 2 ? scaledIsland(shape, mixed) : fitIsland(shape, mixed), fame)
+  const plan =
+    gen === 2 ? scaledIsland(shape, mixed, identityOf(shape, mixed, hint)) : fitIsland(shape, mixed)
+  return dress(plan, fame)
 }
 
 /** The repo-island generators: 1 the first (`?gen=1`, the opt-out); 2 ADR 0020's, what a link gets. */

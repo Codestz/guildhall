@@ -93,3 +93,9 @@ export function couplingOf(packages: readonly Coupled[], manifests: Manifests = 
     }
   return out
 }
+
+/** How bound `id` is to the others, 0..2: the sum of its bonds to `ids` halved, capped (a hub everything leans on is 2). */
+export function bindOf(coupling: Coupling, id: string, ids: readonly string[]): number {
+  const total = ids.reduce((sum, other) => sum + (other === id ? 0 : weightOf(coupling, id, other)), 0)
+  return Math.round(Math.min(2, total / 2) * 100) / 100
+}

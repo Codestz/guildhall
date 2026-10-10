@@ -1,8 +1,8 @@
 import { DMath } from "../../dmath.ts"
-import { cellToWorld } from "../../lands.ts"
+import { type Cell, cellToWorld } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
 import { instantiate, prefab } from "../../prefabs/index.ts"
-import { unkey } from "../hex.ts"
+import { cellAt, unkey } from "../hex.ts"
 import { crowds, type Footprint, footprintsOf } from "./footprints.ts"
 import type { Lot } from "./town.ts"
 import type { Anchor } from "./venues.ts"
@@ -12,14 +12,16 @@ export const LOT_GAP = 1
 
 /**
  * Lots the civic centre, a venue or the wall stand on are dropped; so is one whose buildings would
- * touch the `fixed` footprints or a lot kept before it (markets first), unless a cottage in its
- * place fits.
+ * touch the `fixed` footprints or a lot kept before it (markets first), or stand over ground of a
+ * different terrace than its hex's (`level`: a house is drawn at one height), unless a cottage in
+ * its place fits.
  */
 export function clearLots(
   lots: Map<string, Lot>,
   clear: readonly Anchor[],
   wall: readonly Spot[],
   fixed: readonly Footprint[],
+  level: (cell: Cell) => number = () => 0,
 ): void {
   for (const id of [...lots.keys()]) {
     const [x, z] = cellToWorld(unkey(id))
@@ -32,7 +34,10 @@ export function clearLots(
   const order = [...lots].sort(([a, one], [b, two]) => market(one) - market(two) || (a < b ? -1 : 1))
   const standing: Footprint[] = [...fixed]
   const room = (id: string, lot: Lot): Footprint[] | undefined => {
-    const own = footprintsOf(instantiate(lot.prefab, cellToWorld(unkey(id)), lot.rot, "blue"))
+    const placed = instantiate(lot.prefab, cellToWorld(unkey(id)), lot.rot, "blue")
+    const base = level(unkey(id))
+    if (placed.some((piece) => level(cellAt([piece.x, piece.z])) !== base)) return undefined
+    const own = footprintsOf(placed)
     return own.some((shape) => standing.some((other) => crowds(shape, other, LOT_GAP))) ? undefined : own
   }
   for (const [id, lot] of order) {

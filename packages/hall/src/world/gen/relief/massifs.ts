@@ -34,9 +34,10 @@ export interface Footprint {
 export function footprintsOf(plan: IslandPlan, tier: Tier): Footprint[] {
   if (tier === "hamlet") return []
   const { land } = plan
+  const reserved = plan.reserved ?? RESERVED
   const free = (id: string): boolean => {
     const hex = land.get(id)
-    return !!hex && !BLOCKED.has(hex.char) && !RESERVED.has(id)
+    return !!hex && !BLOCKED.has(hex.char) && !reserved.has(id)
   }
   const out: Footprint[] = []
   plan.ranges.forEach((range, r) => {

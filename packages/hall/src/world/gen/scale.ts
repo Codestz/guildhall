@@ -1,4 +1,5 @@
 import { DMath } from "../dmath.ts"
+import type { Identity } from "./identity/types.ts"
 import { RESERVED } from "./plan/keep.ts"
 import { massForm } from "./plan/mass.ts"
 import { type IslandPlan, planIsland } from "./plan.ts"
@@ -37,7 +38,11 @@ export function quotasByFiles(shape: RepoShape): number[] {
   return weights.map((weight) => (total > 0 ? (land * weight) / total : 0))
 }
 
-/** The island for a repo's shape, generator v2: sized by its files, never shrunk, one landmass. */
-export function scaledIsland(shape: RepoShape, seed: number): IslandPlan {
-  return planIsland(shape, seed, quotasByFiles(shape), (land) => massForm(land, seed))
+/**
+ * The island for a repo's shape, generator v2: sized by its files, never shrunk, one landmass in the
+ * shape its identity gives (and, but for a reef's islets, one piece), its heart's ground reserved.
+ */
+export function scaledIsland(shape: RepoShape, seed: number, identity?: Identity): IslandPlan {
+  const plan = planIsland(shape, seed, quotasByFiles(shape), (land) => massForm(land, seed, identity))
+  return identity ? { ...plan, identity } : plan
 }

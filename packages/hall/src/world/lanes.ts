@@ -78,8 +78,27 @@ function catmull(p0: Spot, p1: Spot, p2: Spot, p3: Spot, t: number): Spot {
   return [at(0), at(1)]
 }
 
+/** The longest stretch between control points: past it a Catmull-Rom curve overshoots (swings back at a short leg's start). */
+const MAX_GAP = 60
+
+/** The control points with a point added along every stretch longer than MAX_GAP. */
+function densified(control: readonly Spot[]): Spot[] {
+  const out: Spot[] = []
+  control.forEach((p, i) => {
+    const prev = control[i - 1]
+    if (prev) {
+      const n = Math.ceil(DMath.hypot(p[0] - prev[0], p[1] - prev[1]) / MAX_GAP)
+      for (let j = 1; j < n; j++)
+        out.push([prev[0] + ((p[0] - prev[0]) * j) / n, prev[1] + ((p[1] - prev[1]) * j) / n])
+    }
+    out.push(p)
+  })
+  return out
+}
+
 /** The control points through a smooth polyline, ends continued straight on. */
-function sample(control: readonly Spot[]): Spot[] {
+function sample(points: readonly Spot[]): Spot[] {
+  const control = densified(points)
   const first = control[0] as Spot
   const second = control[1] as Spot
   const last = control[control.length - 1] as Spot

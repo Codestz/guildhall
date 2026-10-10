@@ -1,6 +1,8 @@
 import { DMath } from "../../dmath.ts"
 import { type Cell, cellToWorld } from "../../lands.ts"
 import { key, neighbours, unkey } from "../hex.ts"
+import type { Archetype } from "../identity/types.ts"
+import type { Heart } from "./heart.ts"
 
 /**
  * The keep's block at the origin, as on the hand-drawn map (lands.ts' K block: Room, the stations
@@ -57,6 +59,16 @@ export const inBay = bayOf(BAY)
 export interface Form {
   bay: (cell: Cell) => boolean
   mass?: ReadonlySet<string>
+  /** Generator v2: the ground kept clear of roads, lots, ranges and lakes: the keep's reserve and the heart's. */
+  reserved?: ReadonlySet<string>
+  /** A reef's islets: land in the mass that no road reaches, left to meadow and woods. */
+  reef?: ReadonlySet<string>
+  /** An atoll's lagoon: sea inside the mass, left out of it. */
+  lagoon?: ReadonlySet<string>
+  /** The shape the land took (identity/archetype.ts). */
+  shape?: Archetype
+  /** Where the island's main building stands (plan/heart.ts). */
+  heart?: Heart
 }
 /** v1's form: the wide bay, no mass. */
 export const RING: Form = { bay: inBay }

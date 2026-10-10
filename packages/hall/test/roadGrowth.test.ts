@@ -64,7 +64,7 @@ describe("road growth", () => {
       const lonely = [...land.keys()].filter(
         (id) =>
           !solid.has(id) &&
-          !RESERVED.has(id) &&
+          !(made.plan.reserved ?? RESERVED).has(id) &&
           neighbours(unkey(id)).every((n) => land.has(key(n))) &&
           (reach.get(id) ?? 99) > 4,
       )

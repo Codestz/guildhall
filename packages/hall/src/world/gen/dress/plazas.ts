@@ -64,6 +64,11 @@ const squareAt = (x: number, z: number, r: number): Footprint => [
 const onRoad = (item: LandPlacement, roads: readonly Segment[]): boolean =>
   roads.some(([a, b]) => toSegment([item.x, item.z], a, b) < ROAD_HALF + VERGE + radiusOf(item))
 
+/** Whether a prop (a crate, a barrel) stands on one of the dressed roads. */
+export function propOnRoad(links: ReadonlyMap<string, ReadonlySet<number>>, item: LandPlacement): boolean {
+  return onRoad(item, roadsNear(links, [item.x, item.z], 12))
+}
+
 /**
  * The prefab stood beside the square's roads, as near its hex's middle as it fits (starting from the
  * way `first` points), or undefined where no spot clears them.
@@ -80,7 +85,7 @@ export function plazaBeside(
 ): LandPlacement[] | undefined {
   const centre = cellToWorld(square)
   const roads = roadsNear(links, centre, 16)
-  // Level land under its whole footing: no sea, no foothill or mountain (a slope would lift the ground off it).
+  // Level land under its whole footing: no sea, no foothill, terrace or mountain (a slope would lift the ground off it).
   const standsOn = (item: LandPlacement): boolean => {
     const r = radiusOf(item)
     return [
@@ -90,8 +95,9 @@ export function plazaBeside(
       [0, r],
       [0, -r],
     ].every(([dx = 0, dz = 0]) => {
-      const char = plan.land.get(key(cellAt([item.x + dx, item.z + dz])))?.char
-      return char !== undefined && !RAISED.includes(char)
+      const hex = plan.land.get(key(cellAt([item.x + dx, item.z + dz])))
+      // A terrace in hill country is raised ground too, whatever grows on it.
+      return hex !== undefined && !RAISED.includes(hex.char) && hex.level === undefined
     })
   }
   const houseCrowds = (item: LandPlacement): boolean => {

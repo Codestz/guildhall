@@ -16,11 +16,13 @@ export interface Cover {
   massifs: ReadonlySet<string>
   /** Every hex a river runs through, by key. */
   rivers: ReadonlySet<string>
+  /** Terrace level of every raised hex (absent is level ground): what a building's parts must not straddle. */
+  levels: ReadonlyMap<string, number>
 }
 
 export function coverOf(plan: IslandPlan, levels: ReadonlyMap<string, number>): Cover {
   const level = (cell: Cell): number => levels.get(key(cell)) ?? 0
   const relief = reliefOf({ plan, level })
-  if (relief.massifs.length === 0) return { massifs: new Set(), rivers: new Set() }
-  return { massifs: relief.keys, rivers: riversOf(plan, relief, level)?.hexes ?? new Set() }
+  if (relief.massifs.length === 0) return { massifs: new Set(), rivers: new Set(), levels }
+  return { massifs: relief.keys, rivers: riversOf(plan, relief, level)?.hexes ?? new Set(), levels }
 }

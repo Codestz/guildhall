@@ -40,11 +40,21 @@ export function mapFrame(archipelago: Archipelago): Frame {
   return { x, z, radius }
 }
 
-/** A stop's frame: the map's, or one island's (its keep, its reach). */
+/**
+ * A stop's frame: the map's, or one island's: its keep and its reach; a far island that has a main
+ * building (world/gen/dress/main.ts) is framed on that, its focal point, with the reach still held.
+ */
 export function frameOf(stop: Stop, archipelago: Archipelago): Frame {
   if (stop === "map") return mapFrame(archipelago)
-  const island = stop === HOME ? archipelago.home : (archipelago.islands[stop] ?? archipelago.home)
-  return { x: island.at[0], z: island.at[1], radius: island.reach }
+  const far = stop === HOME ? undefined : archipelago.islands[stop]
+  const island = far ?? archipelago.home
+  const focal = far?.world?.main?.focal
+  if (!focal) return { x: island.at[0], z: island.at[1], radius: island.reach }
+  return {
+    x: island.at[0] + focal.x,
+    z: island.at[1] + focal.z,
+    radius: island.reach + Math.hypot(focal.x, focal.z),
+  }
 }
 
 /** The extent (world units from the origin) the camera's depths below were set for: a default archipelago. */

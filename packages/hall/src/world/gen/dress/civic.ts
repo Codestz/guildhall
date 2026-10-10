@@ -6,6 +6,7 @@ import { cellAt, key, noise } from "../hex.ts"
 import { AVENUE } from "../plan/keep.ts"
 import { type Tier, tierOf } from "../plan/tier.ts"
 import type { IslandPlan } from "../plan.ts"
+import { type MainBuilding, mainOf } from "./main.ts"
 import { facing } from "./sites.ts"
 
 /**
@@ -20,6 +21,11 @@ import { facing } from "./sites.ts"
  *
  * A castle is also what a repo of 5k stars or 150 contributors gets, and the ring wall 50k stars,
  * when the hall knows them (RepoInfo does not reach the plan yet: `fame` is empty and tiers decide).
+ *
+ * Where the plan has a heart (plan/heart.ts), the island's main building is its composite landmark
+ * (dress/main.ts) and takes the place of the castle, the town hall and the guildhouse: the lots keep
+ * the chapel, the stalls, the stable and the inn, and the wall, with the main building to close its
+ * north, no longer runs round the keep.
  */
 
 export interface Fame {
@@ -51,6 +57,8 @@ export interface Civic {
   /** The wall's own pieces (also among `placements`): the ones that give way to a building in their path. */
   walls: LandPlacement[]
   tier: Tier
+  /** The island's main building, where its plan has a heart. */
+  main?: MainBuilding
 }
 
 export function civicOf(plan: IslandPlan, fame: Fame = {}): Civic {
@@ -80,20 +88,26 @@ export function civicOf(plan: IslandPlan, fame: Fame = {}): Civic {
     if (home && plan.land.get(key(home))?.level === undefined) onLot(prefab("stable"), home)
   }
 
+  const heart = mainOf(plan)
+  if (heart) {
+    out.placements.push(...heart.placements)
+    out.clear.push([heart.main.at[0], heart.main.at[1], heart.main.reach + 3])
+    out.main = heart.main
+  }
   const castle = tier === "city" || (fame.stars ?? 0) >= 5000 || (fame.contributors ?? 0) >= 150
   if (castle) {
-    put(prefab("castle"), cellToWorld(BEHIND), 0, 16)
+    if (!heart) put(prefab("castle"), cellToWorld(BEHIND), 0, 16)
     onLot(prefab("chapel"), EAST)
     stables()
     onLot(prefab("market-stalls"), WEST)
-    gatehouse(plan, out, fame)
+    gatehouse(plan, out, fame, !heart)
   } else if (tier === "town") {
-    put(prefab("town-hall"), cellToWorld(BEHIND), 0, 14)
+    if (!heart) put(prefab("town-hall"), cellToWorld(BEHIND), 0, 14)
     onLot(prefab("chapel"), EAST)
     stables()
     onLot(prefab("market-stalls"), WEST)
   } else if (tier === "village") {
-    onLot(prefab("guildhouse"), WEST)
+    onLot(prefab(heart ? "inn" : "guildhouse"), WEST)
     onLot(prefab("market-stalls"), EAST)
   } else {
     onLot(prefab("inn"), WEST)
@@ -106,8 +120,8 @@ export function civicOf(plan: IslandPlan, fame: Fame = {}): Civic {
  * The curtain wall across the avenue: a gate in the middle with a tower either side, runs of wall
  * out to the corners, and (a famous repo, or tier alone when fame is unknown) the other three sides.
  */
-function gatehouse(plan: IslandPlan, out: Civic, fame: Fame): void {
-  const ring = fame.stars === undefined ? true : fame.stars >= 50_000
+function gatehouse(plan: IslandPlan, out: Civic, fame: Fame, closed: boolean): void {
+  const ring = closed && (fame.stars === undefined ? true : fame.stars >= 50_000)
   const open = (x: number, z: number): boolean => {
     const cell = cellAt([x, z])
     const hex = plan.land.get(key(cell))

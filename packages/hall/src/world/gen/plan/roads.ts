@@ -24,7 +24,7 @@ export function layRoads(
   owner: Owners,
   heads: ReadonlyMap<number, number>,
   radius: number,
-  { bay, mass }: Form = RING,
+  { bay, mass, reserved = RESERVED }: Form = RING,
   ranges: ReadonlySet<string> = NONE,
   lakes: readonly PlanLake[] = [],
 ): { road: Set<string>; roads: Cell[][] } {
@@ -35,7 +35,7 @@ export function layRoads(
   const roads: Cell[][] = [[HUB, AVENUE]]
   const price = (cell: Cell): number | undefined => {
     const id = key(cell)
-    if (bay(cell) || (RESERVED.has(id) && !road.has(id)) || id === key(GATE) || wet.has(id)) return undefined
+    if (bay(cell) || (reserved.has(id) && !road.has(id)) || id === key(GATE) || wet.has(id)) return undefined
     if (road.has(id)) return 0.4
     return (owner.has(id) ? 1 : 8) + (ranges.has(id) ? CLIMB : 0) + (streams.has(id) ? STREAM : 0)
   }
@@ -58,6 +58,16 @@ export function layRoads(
   }
   // Generator v2: the streets grow with the island (plan/streets.ts).
   if (mass)
-    growStreets({ districts, owner, road, roads, radius, price, ranges, wet: new Set([...wet, ...streams]) })
+    growStreets({
+      districts,
+      owner,
+      road,
+      roads,
+      radius,
+      price,
+      ranges,
+      wet: new Set([...wet, ...streams]),
+      reserved,
+    })
   return { road, roads }
 }

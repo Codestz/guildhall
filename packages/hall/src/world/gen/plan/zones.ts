@@ -2,6 +2,7 @@ import { DMath } from "../../dmath.ts"
 import { cellToWorld } from "../../lands.ts"
 import { Heap } from "../heap.ts"
 import { cellAt, key, neighbours, noise, rng, unkey } from "../hex.ts"
+import type { Archetype } from "../identity/types.ts"
 import type { PlanDistrict } from "../plan.ts"
 import { RESERVED } from "./keep.ts"
 import type { Owners } from "./land.ts"
@@ -29,14 +30,32 @@ const HEX_AREA = 86.6
 type Point = readonly [number, number]
 type Spine = readonly Point[]
 
+/**
+ * What an island's shape makes of its main range (identity/archetype.ts), the tier's other ranges
+ * standing as they would: how long its spine is (a cone's is a point, one massif at the island's
+ * middle; a plateau's a short one, a broad table; a ridge's runs the island's length; an atoll's is
+ * a short arc on its ring) and whether it keeps near the island's middle.
+ */
+const STYLE: Readonly<Record<Archetype, { reach: number; along?: boolean; middle?: true; only?: true }>> = {
+  atoll: { reach: 0.5 },
+  cone: { reach: 0.25, middle: true },
+  // The ridge is the island's one range, the tier's whole share of land in a single long spine.
+  ridge: { reach: 1.7, along: true, only: true },
+  plateau: { reach: 0.4, middle: true },
+  reef: { reach: 1 },
+}
+
 /** The ranges' hexes, main range first: the ground the roads, lots and fields are kept off. */
 export function reserveRanges(
   districts: readonly PlanDistrict[],
   owner: Owners,
   seed: number,
+  reserved: ReadonlySet<string> = RESERVED,
+  shape?: Archetype,
 ): Set<string>[] {
   const tier = tierOf(districts.reduce((sum, d) => sum + d.folder.files, 0))
-  const count = COUNT[tier]
+  const style: (typeof STYLE)[Archetype] = shape ? STYLE[shape] : { reach: 1 }
+  const count = style.only ? Math.min(1, COUNT[tier]) : COUNT[tier]
   if (count === 0) return []
   const apart = new Set<string>()
   for (const { square } of districts) {
@@ -48,8 +67,8 @@ export function reserveRanges(
   for (const id of owner.keys()) {
     const cell = unkey(id)
     const [x, z] = cellToWorld(cell)
-    if (RESERVED.has(id) || apart.has(id) || DMath.hypot(x, z) < CLEAR) continue
-    if (neighbours(cell).every((next) => owner.has(key(next)))) fits.add(id)
+    if (reserved.has(id) || apart.has(id) || DMath.hypot(x, z) < CLEAR) continue
+    if (neighbours(cell).every((next) => owner.has(key(next)) && !reserved.has(key(next)))) fits.add(id)
   }
   if (fits.size === 0) return []
 
@@ -62,9 +81,10 @@ export function reserveRanges(
 
   // Centres: the main range inland of the island's middle, the rest each as far from the others as can be.
   const middle = centroid(fits)
+  const wander = style.middle ? 0.1 : 0.5
   const aim: Point = [
-    middle[0] + (random() - 0.5) * extent * 0.5,
-    middle[1] + (random() - 0.5) * extent * 0.5,
+    middle[0] + (random() - 0.5) * extent * wander,
+    middle[1] + (random() - 0.5) * extent * wander,
   ]
   const centres: Point[] = [nearest(fits, aim)]
   while (centres.length < room.length) {
@@ -82,8 +102,11 @@ export function reserveRanges(
   }
   // The main range runs across the way out from the keep (a wall at the valley's far side).
   const spines = centres.map(([cx, cz], m) => {
-    const angle = m === 0 ? DMath.atan2(cz, cx) + Math.PI / 2 + (random() - 0.5) * 0.9 : random() * Math.PI
-    return spineOf(cx, cz, angle, REACH * Math.sqrt((room[m] ?? 8) * HEX_AREA), random() * 6)
+    const across = m === 0 ? DMath.atan2(cz, cx) + Math.PI / 2 + (random() - 0.5) * 0.9 : random() * Math.PI
+    const main = m === 0
+    const angle = main && style.along ? Math.PI / 2 + (random() - 0.5) * 0.2 : across
+    const reach = REACH * (main ? style.reach : 1) * Math.sqrt((room[m] ?? 8) * HEX_AREA)
+    return spineOf(cx, cz, angle, reach, random() * 6)
   })
 
   const hexes = new Map<number, number>()

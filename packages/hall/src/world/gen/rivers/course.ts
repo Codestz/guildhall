@@ -86,9 +86,10 @@ function crossable(plan: IslandPlan): Map<string, number> {
   for (const id of [key(plan.hub), key(plan.gate), ...plan.districts.map((d) => key(d.square))])
     edges.delete(id)
   const out = new Map<string, number>()
+  const reserved = plan.reserved ?? RESERVED
   for (const [id, set] of edges) {
     const [a, b] = [...set]
-    if (set.size === 2 && a !== undefined && b !== undefined && (a + 3) % 6 === b && !RESERVED.has(id))
+    if (set.size === 2 && a !== undefined && b !== undefined && (a + 3) % 6 === b && !reserved.has(id))
       out.set(id, Math.min(a, b))
   }
   return out
@@ -99,7 +100,8 @@ export function dryOf(plan: IslandPlan, bridges: ReadonlyMap<string, number>): S
   const roads = new Set(plan.roads.flat().map(key))
   const dry = new Set<string>()
   for (const [id, hex] of plan.land)
-    if (DRY.has(hex.char) || RESERVED.has(id) || (roads.has(id) && !bridges.has(id))) dry.add(id)
+    if (DRY.has(hex.char) || (plan.reserved ?? RESERVED).has(id) || (roads.has(id) && !bridges.has(id)))
+      dry.add(id)
   for (const { square, site } of plan.districts) {
     dry.add(key(square))
     if (site) dry.add(key(site))

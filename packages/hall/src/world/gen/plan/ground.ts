@@ -14,6 +14,7 @@ export function placeSites(
   owner: Owners,
   road: ReadonlySet<string>,
   seed: number,
+  reserved: ReadonlySet<string> = new Set(),
 ): Set<string> {
   const sites = new Set<string>()
   const [hx, hz] = cellToWorld(HUB)
@@ -22,7 +23,7 @@ export function placeSites(
     let bestScore = Number.NEGATIVE_INFINITY
     for (const cell of neighbours(district.square)) {
       const id = key(cell)
-      if (road.has(id) || sites.has(id) || KEEP.has(id) || !owner.has(id)) continue
+      if (road.has(id) || sites.has(id) || KEEP.has(id) || reserved.has(id) || !owner.has(id)) continue
       const [x, z] = cellToWorld(cell)
       const score =
         (owner.get(id) === i ? 100 : 0) +
@@ -56,6 +57,8 @@ export function groundOf(
   ranges: ReadonlySet<string> = new Set(),
   hills = false,
   kept: ReadonlySet<string> = new Set(),
+  reserved: ReadonlySet<string> = RESERVED,
+  reef: ReadonlySet<string> = new Set(),
 ): Map<string, PlanHex> {
   const land = new Map<string, PlanHex>()
   const nearRoad = (cell: Cell): boolean => neighbours(cell).some((next) => road.has(key(next)))
@@ -77,7 +80,7 @@ export function groundOf(
             !sites.has(key(cell)) &&
             !nearRoad(cell) &&
             !kept.has(key(cell)) &&
-            !(hills && (RESERVED.has(key(cell)) || ranges.has(key(cell)) || wet(owner, cell).length > 0)),
+            !(hills && (reserved.has(key(cell)) || ranges.has(key(cell)) || wet(owner, cell).length > 0)),
         )
         .map((cell) => {
           const [x, z] = cellToWorld(cell)
@@ -95,8 +98,10 @@ export function groundOf(
       if (road.has(id)) char = "="
       else if (KEEP.has(id)) char = KEEP.get(id) ?? "K"
       else if (sites.has(id)) char = "s"
+      // An islet's ground: meadow, woods and knolls, nothing built (no road reaches it).
+      else if (reef.has(id)) char = islet(noise(seed, cell, "ground"))
       // The ring round the keep: open lots, kept clear like the hand map's (lands.ts' V).
-      else if (RESERVED.has(id)) char = "V"
+      else if (reserved.has(id)) char = "V"
       // A lake's ground stays open meadow, level, for the water and its shore.
       else if (kept.has(id)) char = "."
       else if (ranges.has(id))
@@ -114,6 +119,9 @@ export function groundOf(
   })
   return land
 }
+
+/** The ground of an islet's hex: mostly woods, then open meadow, then a knoll. */
+const islet = (roll: number): string => (roll < 0.5 ? "f" : roll < 0.85 ? "." : "h")
 
 /** A hex's ground in a district's biome; `roll` against its density decides how full it is. */
 function ground(district: PlanDistrict, roll: number, crop: number): string {

@@ -126,8 +126,14 @@ export function planBuild(
   const sites = new Map<string, Site>()
   const moments: Moment[] = []
   const put = (p: LandPlacement, kind: Kind, born: number, delay: number): Site => {
-    // Whatever the schedule says, it is built by the last frame (today's island, exactly).
-    const room = g.duration - 0.1 - SPAN[kind] - (born + RISE_S)
+    // Whatever the schedule says, it is built by the last frame (today's island, exactly): by the end of
+    // the film, and within the time its own hex has stood.
+    const standing =
+      g.duration - Math.max(0, (g.own[hexIndex(g, p.x, p.z)] as number[] | undefined)?.[0] ?? 0)
+    const room = Math.min(
+      g.duration - 0.1 - SPAN[kind] - (born + RISE_S),
+      standing - RISE_S - 0.1 - SPAN[kind],
+    )
     const site = { kind, born, delay: Math.max(0, Math.min(delay, room)) }
     sites.set(siteKey(p.piece, p.x, p.z), site)
     return site

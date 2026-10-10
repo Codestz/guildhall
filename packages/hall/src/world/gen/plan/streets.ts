@@ -1,7 +1,6 @@
 import type { Cell } from "../../lands.ts"
 import { key, neighbours, rings, unkey } from "../hex.ts"
 import type { PlanDistrict } from "../plan.ts"
-import { RESERVED } from "./keep.ts"
 import type { Owners } from "./land.ts"
 import { cheapest } from "./route.ts"
 
@@ -37,10 +36,12 @@ export interface Streets {
   price(cell: Cell): number | undefined
   ranges: ReadonlySet<string>
   wet: ReadonlySet<string>
+  /** The ground no street may take: the keep's and the heart's. */
+  reserved: ReadonlySet<string>
 }
 
 export function growStreets(plan: Streets): void {
-  const { owner, road, roads, radius, ranges, wet } = plan
+  const { owner, road, roads, radius, ranges, wet, reserved } = plan
   const inland = (cell: Cell): boolean => neighbours(cell).every((next) => owner.has(key(next)))
   /** What a street pays for a hex: only land that is neither a range, a lake's nor kept. */
   const price = (cell: Cell): number | undefined => {
@@ -114,7 +115,7 @@ export function growStreets(plan: Streets): void {
     let target: string | undefined
     let most = dead + 1
     for (const [id, d] of reach) {
-      if (d < most || tried.has(id) || RESERVED.has(id) || ranges.has(id) || wet.has(id)) continue
+      if (d < most || tried.has(id) || reserved.has(id) || ranges.has(id) || wet.has(id)) continue
       if (!inland(unkey(id)) || (d === most && target !== undefined && id > target)) continue
       if (d > most || target === undefined || id < target) {
         most = d

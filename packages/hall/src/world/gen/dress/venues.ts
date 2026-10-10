@@ -52,7 +52,7 @@ const BRIDGE = 8
 /** A hex a venue may stand on and the spot it faces. */
 type Choice = { cell: Cell; towards: Spot }
 
-const NO_COVER: Cover = { massifs: new Set(), rivers: new Set() }
+const NO_COVER: Cover = { massifs: new Set(), rivers: new Set(), levels: new Map() }
 
 export function venuesOf(
   plan: IslandPlan,
@@ -137,6 +137,15 @@ export function venuesOf(
     const standing = [...halls, ...out.flatMap((venue) => footprintsOf(venue.placements))]
     const touches = (next: PlacedVenue): boolean =>
       footprintsOf(next.placements).some((shape) => standing.some((other) => crowds(shape, other, VENUE_GAP)))
+    // A building is drawn at one height: none of its parts may stand over the next terrace's ground.
+    const straddles = (next: PlacedVenue): boolean => {
+      const base = cover.levels.get(key(next.cell)) ?? 0
+      return next.placements.some(
+        (part) =>
+          part.piece.startsWith("building_") &&
+          (cover.levels.get(key(cellAt([part.x, part.z]))) ?? 0) !== base,
+      )
+    }
     // A door's step stays on the road graph's side, where a venue that clears the others allows; failing that,
     // a looser reach for the step. A venue never stands through a hall or another venue, nor far from the
     // roads: failing both, the district keeps its landmark.
@@ -145,8 +154,8 @@ export function venuesOf(
       return DMath.hypot(next.venue.door.step[0] - nx, next.venue.door.step[1] - nz)
     }
     const attempt = (from: readonly Choice[]): PlacedVenue | undefined =>
-      choose((next) => touches(next) || reach(next) >= BY_ROAD, from) ??
-      choose((next) => touches(next) || reach(next) >= STRAY, from)
+      choose((next) => touches(next) || straddles(next) || reach(next) >= BY_ROAD, from) ??
+      choose((next) => touches(next) || straddles(next) || reach(next) >= STRAY, from)
     let placed = attempt(choices)
     if (!placed || onBeach(placed.venue.door.step, plan.land)) {
       const other = attempt(borrowed)

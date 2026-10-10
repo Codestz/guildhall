@@ -122,13 +122,18 @@ describe("a gen 2 island's buildings", () => {
       expect(crowded).toEqual([])
     })
 
-    test(`${name}: no two buildings overlap, venues included (the wall's own run apart)`, () => {
+    test(`${name}: no two buildings overlap, venues included (the wall's own run apart, the main building's own parts)`, () => {
       const built = decor.filter((item) => footprintsOf([item]).length > 0)
+      // The main building's parts meet by design (composites.test.ts checks them): only what stands against it counts.
+      const { main } = world
+      const parts = (item: LandPlacement): boolean =>
+        main !== undefined && Math.hypot(item.x - main.at[0], item.z - main.at[1]) <= main.reach
       const crowded: string[] = []
       for (let i = 0; i < built.length; i++)
         for (let j = i + 1; j < built.length; j++) {
           const [a, b] = [built[i] as LandPlacement, built[j] as LandPlacement]
           if (RUN.test(a.piece) && RUN.test(b.piece)) continue
+          if (parts(a) && parts(b)) continue
           if (Math.hypot(a.x - b.x, a.z - b.z) < 16 && crowds(one(a), one(b), 0))
             crowded.push(`${a.piece}@${a.x},${a.z} / ${b.piece}@${b.x},${b.z}`)
         }

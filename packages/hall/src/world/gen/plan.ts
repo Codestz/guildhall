@@ -2,8 +2,10 @@ import { DMath } from "../dmath.ts"
 import { type Cell, cellToWorld } from "../lands.ts"
 import type { Biome } from "./biomes.ts"
 import { rng, unkey } from "./hex.ts"
+import type { Archetype, Identity } from "./identity/types.ts"
 import { smoothCoast } from "./plan/coast.ts"
 import { groundOf, placeSites } from "./plan/ground.ts"
+import { enclosedSea, type Heart } from "./plan/heart.ts"
 import { type Form, GATE, HUB, QUAY, RESERVED, RING } from "./plan/keep.ts"
 import { keepOf, type PlanLake, reserveLakes } from "./plan/lakes.ts"
 import { layRoads } from "./plan/roads.ts"
@@ -75,6 +77,16 @@ export interface IslandPlan {
   lakes: readonly PlanLake[]
   /** Generator v2 only: its towns and civic centre are dressed from the prefab catalogue. */
   gen?: 2
+  /** Generator v2: who the island is, and where its main building stands (plan/heart.ts) on the shape its land took. */
+  identity?: Identity
+  heart?: Heart
+  shape?: Archetype
+  /** A reef's islets: land no road reaches. */
+  reef?: ReadonlySet<string>
+  /** An atoll's lagoon: the sea inside its ring. */
+  lagoon?: ReadonlySet<string>
+  /** The ground kept clear of lots and roads: the keep's and the heart's (the keep's alone, when there is no heart). */
+  reserved?: ReadonlySet<string>
 }
 
 /** Land ∝ code size, log-scaled: 1 KB ≈ 7 hexes, 100 KB ≈ 25, 10 MB ≈ 47. */
@@ -95,6 +107,8 @@ function levelOf(folder: Folder): 0 | 1 | 2 {
  * covers ±120 (scene/nature/shore.ts SHORE.half), and a coast tile's sand runs to its hex's edge.
  */
 export const LAND_HALF = 118
+/** The least sea an atoll's ring may enclose and still be one. */
+const MIN_LAGOON = 7
 /** Each try shrinks every district's land by this much until the island fits. */
 const SHRINK = 0.85
 /** The smallest share of its land a district is shrunk to (a giant monorepo still gets an island). */
@@ -169,16 +183,33 @@ export function planIsland(
     }
   })
   const form = formOf?.(districts.reduce((sum, district) => sum + district.quota, RESERVED.size)) ?? RING
+  const held = form.reserved ?? RESERVED
   const { owner, heads, radius: searched } = growSectors(districts, seed, rng(seed), form)
-  const reserved = form.mass ? reserveRanges(districts, owner, seed) : []
+  // An islet no road reaches belongs to the harbour's district, whatever grew round it.
+  for (const id of form.reef ?? []) owner.set(id, 0)
+  const reserved = form.mass ? reserveRanges(districts, owner, seed, held, form.shape) : []
   const mountains = new Set(reserved.flatMap((range) => [...range]))
-  const lakes = form.mass ? reserveLakes(districts, owner, reserved, seed) : []
+  const lakes = form.mass ? reserveLakes(districts, owner, reserved, seed, held) : []
   const kept = keepOf(lakes)
   const { road, roads } = layRoads(districts, owner, heads, searched, form, mountains, lakes)
   const radius = smoothCoast(owner, road, form)
-  const sites = placeSites(districts, owner, road, seed)
-  const land = groundOf(districts, owner, road, sites, seed, mountains, Boolean(form.mass), kept)
+  const sites = placeSites(districts, owner, road, seed, form.heart?.cells)
+  const land = groundOf(
+    districts,
+    owner,
+    road,
+    sites,
+    seed,
+    mountains,
+    Boolean(form.mass),
+    kept,
+    held,
+    form.reef,
+  )
   const ranges = reserved.map((range) => new Set([...range].filter((id) => land.has(id))))
+  // An atoll's lagoon as the shore left it: the sea its ring still encloses (a ring the smoothing wore through is no atoll).
+  const lagoon = form.lagoon && form.lagoon.size > 0 ? enclosedSea(new Set(land.keys())) : undefined
+  const shaped = form.shape === "atoll" && (lagoon?.size ?? 0) < MIN_LAGOON ? "cone" : form.shape
   return {
     hash: shape.hash,
     seed,
@@ -192,5 +223,9 @@ export function planIsland(
     ranges,
     lakes,
     ...(form.mass ? { gen: 2 as const } : {}),
+    ...(form.heart ? { heart: form.heart, reserved: held } : {}),
+    ...(shaped ? { shape: shaped } : {}),
+    ...(form.reef && form.reef.size > 0 ? { reef: form.reef } : {}),
+    ...(lagoon && lagoon.size >= MIN_LAGOON ? { lagoon } : {}),
   }
 }

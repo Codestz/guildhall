@@ -63,11 +63,11 @@ export function plazaStops(kit: Kit, district: string): readonly Stop[] {
 const GATHER_APART = 1.7
 
 /** Rings of standing room round a venue's step for those at its work, two sides of it. */
-const WORK_RINGS_A = [1.8, 2.8, 3.8, 4.8, 5.8, 6.8, 8.4, 10]
-const WORK_RINGS_B = [2.2, 3.2, 4.2, 5.2, 6.2, 7.2, 8.8, 10.4]
+const WORK_RINGS_A = [1.8, 2.8, 3.8, 4.8, 5.8, 6.8, 8.4, 10, 11.8, 13.6, 15.6, 17.4]
+const WORK_RINGS_B = [2.2, 3.2, 4.2, 5.2, 6.2, 7.2, 8.8, 10.4, 12.2, 14, 16, 18]
 
 /** Rings of standing room round a square, nearest first. */
-const SQUARE_RINGS = [3.8, 5.2, 6.6, 8.2, 10, 12]
+const SQUARE_RINGS = [3.8, 5.2, 6.6, 8.2, 10, 12, 14.2, 16.4]
 
 /** The evening inn: in at its door for a good while, then the step outside; the square where there is none. */
 export function innStops(kit: Kit, district: string): readonly Stop[] {

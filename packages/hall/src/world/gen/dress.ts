@@ -10,6 +10,7 @@ import { coverOf } from "./dress/cover.ts"
 import { crowds, footprintsOf } from "./dress/footprints.ts"
 import { dressHexes } from "./dress/hexes.ts"
 import { homesOf } from "./dress/homes.ts"
+import type { MainBuilding } from "./dress/main.ts"
 import { dressRoads } from "./dress/roads.ts"
 import { RANK, settle } from "./dress/settle.ts"
 import { LANDMARK, landmarksOf, postsAround, quayOf } from "./dress/sites.ts"
@@ -17,6 +18,7 @@ import { terraceOf } from "./dress/terrace.ts"
 import { type Lot, townOf } from "./dress/town.ts"
 import { type Anchor, VENUE_CLEAR, venuesOf } from "./dress/venues.ts"
 import { cellAt, key, rng, unkey } from "./hex.ts"
+import { painted } from "./identity/palette.ts"
 import type { IslandPlan } from "./plan.ts"
 
 /**
@@ -61,6 +63,8 @@ export interface RepoIsland {
   venues: Venue[]
   /** Generator v2: the doors of the town's houses, where the townsfolk live (world/homes.ts). */
   homes: Home[]
+  /** Generator v2: the island's main building, its heart (dress/main.ts). */
+  main?: MainBuilding
 }
 
 /** Props (a barrel, a cart) of a lot or yard stand off the keep's room and its wall, a wall's width round it. */
@@ -70,6 +74,11 @@ const strewn = (item: LandPlacement): boolean =>
   Math.abs(item.z) < ROOM.depth / 2 + KEEP_CLEAR &&
   !item.piece.startsWith("floor_") &&
   footprintsOf([item]).length === 0
+
+/** A plaza's centrepiece, the small props a district's landmark scatters, and the room the one keeps clear of the other. */
+const CENTREPIECE = /^(t2_fountain_round|building_well_)/
+const LOOSE = /^(barrel|crate_|sack|bucket_)/
+const CENTRE_ROOM = 2.6
 
 /** Ground clutter a venue's yard leaves no room for. */
 const CLUTTER =
@@ -106,7 +115,7 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
     ...(civic?.placements ?? []),
     ...venues.flatMap(({ placements }) => placements),
   ])
-  if (town) clearLots(town.lots, clear, civic?.wall ?? [], fixed)
+  if (town) clearLots(town.lots, clear, civic?.wall ?? [], fixed, terrace.level)
   const homes = town ? homesOf(plan, town.lots) : []
   const { tiles, decor, water, meadow, fields } = dressHexes(
     plan,
@@ -123,6 +132,13 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
     const plazas = town.plazas.filter((plaza) =>
       footprintsOf(plaza).every((shape) => fixed.every((other) => !crowds(shape, other, LOT_GAP))),
     )
+    // A crate or barrel a district's landmark left stands off a plaza's well or fountain.
+    const centres = plazas.flat().filter((item) => CENTREPIECE.test(item.piece))
+    const loose = decor.filter(
+      (item) =>
+        LOOSE.test(item.piece) && centres.some((c) => DMath.hypot(item.x - c.x, item.z - c.z) < CENTRE_ROOM),
+    )
+    decor.splice(0, decor.length, ...decor.filter((item) => !loose.includes(item)))
     decor.push(...plazas.flat(), ...civic.placements)
     const open = (spot: Spot): boolean =>
       clear.every(([x, z, r]) => DMath.hypot(spot[0] - x, spot[1] - z) > r)
@@ -168,6 +184,9 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
   }
   decor.push(...quayOf(plan.hub))
   const landmarks = landmarksOf(plan.hub, decor)
+  // The island's colours: the homes' roofs and the banners (a venue's main building is found by its piece, so it stays).
+  const venuePieces = new Set(venues.flatMap(({ placements }) => placements))
+  const coloured = plan.identity ? painted(decor, plan.identity.palette, venuePieces) : decor
 
   const districts: District[] = plan.districts.map((district) => {
     const square = cellToWorld(district.square)
@@ -210,10 +229,11 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
   return {
     plan,
     levels: terrace.levels,
-    island: { tiles, decor, water, meadow, landmarks, fields },
+    island: { tiles, decor: coloured, water, meadow, landmarks, fields },
     roads: { nodes: roads.nodes, edges: roads.edges },
     districts,
     venues: venues.map(({ venue }) => venue),
     homes,
+    ...(civic?.main ? { main: civic.main } : {}),
   }
 }

@@ -74,6 +74,7 @@ export function reliefOf({ plan, level, years = 0 }: ReliefInput): Relief {
       hub,
       seed: plan.seed ^ (0x9e3779b1 * (id + 1)),
       topOf,
+      ...(plan.shape === "plateau" && footprint.range === 0 ? { mesa: true as const } : {}),
     })
   })
   return reliefOver(tier, massifs)

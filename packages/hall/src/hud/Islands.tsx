@@ -1,30 +1,52 @@
-import { type CSSProperties, useEffect, useRef } from "react"
-import { HOME, islandView, type Stop, useIslandView } from "../scene/archipelago/view.ts"
-import { archipelagoSource, useArchipelago, useArchipelagoStatus } from "../world/archipelagoSource.ts"
+import { type CSSProperties, useEffect, useRef, useState } from "react"
+import { islandView, useIslandView } from "../guild/islandView.ts"
+import { useArchipelago, useArchipelagoStatus } from "../world/archipelagoSource.ts"
+import { HOME, type Stop } from "../world/islandRing.ts"
 import { Icon } from "./icons.tsx"
+import { useSwipe } from "./islandTravel.tsx"
 import { repoDoor } from "./RepoDoor.tsx"
 
 /**
- * The archipelago's switcher (`?archipelago`, world/archipelagoSource.ts): the map, then every
- * island — the home one first, where the guild lives — each in its main language's colour, the one
- * the camera is on pressed. Choosing one flies there (scene/CameraRig.tsx); M opens the map (and,
- * on the map, goes back), 0 is home, 1–6 the far islands in order. Nothing without an archipelago.
+ * The archipelago's switcher (`?archipelago`, world/archipelagoSource.ts): a chip beside the repo's,
+ * the island the camera is on and a chevron, opening the list — the map, then every island, the home
+ * one first (where the guild lives), each in its main language's colour. Choosing one flies there
+ * (scene/CameraRig.tsx). The keys (hud/islandTravel.tsx): M the map, 0 home, 1–6 the far islands, ← →
+ * or [ ] the neighbours round the ring; on a phone, a swipe along the chip. Nothing without an
+ * archipelago.
  */
 export function IslandSwitcher({ compact = false }: { compact?: boolean }) {
   const archipelago = useArchipelago()
   const status = useArchipelagoStatus()
   const view = useIslandView()
+  const [open, setOpen] = useState(false)
+  const root = useRef<HTMLDivElement>(null)
+  const swipe = useSwipe()
+
+  // Closed by a click elsewhere or Esc; the chip keeps the focus ring.
+  useEffect(() => {
+    if (!open) return
+    const away = (event: Event) => {
+      if (event.target instanceof Node && !root.current?.contains(event.target)) setOpen(false)
+    }
+    const key = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false)
+    document.addEventListener("pointerdown", away)
+    window.addEventListener("keydown", key)
+    return () => {
+      document.removeEventListener("pointerdown", away)
+      window.removeEventListener("keydown", key)
+    }
+  }, [open])
 
   if (status.state === "loading")
     return (
-      <section className="plaque repo-legend" aria-live="polite">
+      <section className="plaque repo-legend repo-panel" aria-live="polite">
         <p className="repo-note">Charting the archipelago…</p>
       </section>
     )
   if (!archipelago) {
     if (status.state !== "ready" || status.failed.length === 0) return null
     return (
-      <section className="plaque repo-legend" role="status">
+      <section className="plaque repo-legend repo-panel" role="status">
         <p className="repo-note">Couldn't chart the archipelago: {status.failed[0]?.reason}.</p>
       </section>
     )
@@ -35,31 +57,61 @@ export function IslandSwitcher({ compact = false }: { compact?: boolean }) {
     { stop: HOME as Stop, island: archipelago.home, key: "0" },
     ...archipelago.islands.map((island, i) => ({ stop: i as Stop, island, key: `${i + 1}` })),
   ]
+  const here = view.stop === "map" ? undefined : rows.find((row) => row.stop === view.stop)?.island
+  const fly = (stop: Stop) => {
+    islandView.go(stop)
+    setOpen(false)
+  }
   return (
-    <nav className="plaque islands" aria-label="Archipelago" data-compact={compact}>
-      <ul className="party-list">
-        <li>
-          <button
-            type="button"
-            className="party-row island-row island-map"
-            aria-pressed={view.stop === "map"}
-            onClick={() => islandView.go(view.stop === "map" ? HOME : "map")}
-            title="The map of every island · M"
-          >
-            <MapGlyph />
-            <span className="party-name">Map</span>
-            {!compact && <kbd>M</kbd>}
-          </button>
-        </li>
-        {rows.map(({ stop, island, key }) => {
-          const on = view.stop === stop
-          return (
+    <div className="island-switcher" ref={root}>
+      <button
+        type="button"
+        className="plaque island-chip"
+        aria-expanded={open}
+        aria-controls="island-list"
+        aria-label={`Island: ${here?.name ?? "the map"}. Switch island`}
+        title="Switch island · ← → · M map"
+        onClick={() => !swipe.swiped() && setOpen(!open)}
+        {...swipe.handlers}
+      >
+        {here ? (
+          <i className="repo-swatch" aria-hidden="true" style={{ background: here.language.colour }} />
+        ) : (
+          <MapGlyph />
+        )}
+        <span className="island-chip-name">{here?.name ?? "The map"}</span>
+        <span className="fold" aria-hidden="true">
+          <Icon.chevron />
+        </span>
+      </button>
+      <nav
+        className="plaque islands island-list"
+        id="island-list"
+        aria-label="Archipelago"
+        data-compact={compact}
+        hidden={!open}
+      >
+        <ul className="party-list">
+          <li>
+            <button
+              type="button"
+              className="party-row island-row island-map"
+              aria-pressed={view.stop === "map"}
+              onClick={() => fly(view.stop === "map" ? HOME : "map")}
+              title="The map of every island · M"
+            >
+              <MapGlyph />
+              <span className="party-name">Map</span>
+              {!compact && <kbd>M</kbd>}
+            </button>
+          </li>
+          {rows.map(({ stop, island, key }) => (
             <li key={island.repo}>
               <button
                 type="button"
                 className="party-row island-row"
-                aria-pressed={on}
-                onClick={() => islandView.go(stop)}
+                aria-pressed={view.stop === stop}
+                onClick={() => fly(stop)}
                 aria-label={`${island.repo}, ${island.language.name}${stop === HOME ? ", the guild's island" : ""}. Fly there (${key}).`}
                 title={`${island.repo} · ${key}`}
                 style={{ "--banner": island.language.colour } as CSSProperties}
@@ -73,65 +125,37 @@ export function IslandSwitcher({ compact = false }: { compact?: boolean }) {
                 {!compact && (
                   <span className="party-state">{stop === HOME ? "the guild" : island.language.name}</span>
                 )}
+                {!compact && <kbd>{key}</kbd>}
               </button>
             </li>
-          )
-        })}
-        <li>
-          <button
-            type="button"
-            className="party-row island-row island-add"
-            aria-haspopup="dialog"
-            onClick={repoDoor.open}
-            aria-label="Add an island: grow your repo"
-            title="Add an island"
-          >
-            <Icon.plus />
-            {!compact && <span className="party-name">Add an island</span>}
-          </button>
-        </li>
-      </ul>
-      {failed.length > 0 && !compact && (
-        <p className="repo-note island-failed">
-          Left out: {failed.map((one) => one.repo).join(", ")} ({failed[0]?.reason})
-        </p>
-      )}
-    </nav>
+          ))}
+          <li>
+            <button
+              type="button"
+              className="party-row island-row island-add"
+              aria-haspopup="dialog"
+              onClick={repoDoor.open}
+              aria-label="Add an island: grow your repo"
+              title="Add an island"
+            >
+              <Icon.plus />
+              <span className="party-name">Add an island</span>
+            </button>
+          </li>
+        </ul>
+        {!compact && (
+          <p className="repo-note island-hint">
+            <kbd>←</kbd> <kbd>→</kbd> hop to the next island
+          </p>
+        )}
+        {failed.length > 0 && !compact && (
+          <p className="repo-note island-failed">
+            Left out: {failed.map((one) => one.repo).join(", ")} ({failed[0]?.reason})
+          </p>
+        )}
+      </nav>
+    </div>
   )
-}
-
-/**
- * The switcher's keys, listened to whatever the HUD shows (the hidden HUD too): M the map (back
- * from it to where you were), 0 home, 1–6 the far islands.
- */
-export function IslandKeys() {
-  const before = useRef<Stop>(HOME)
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      const archipelago = archipelagoSource.archipelago
-      if (!archipelago || event.metaKey || event.ctrlKey || event.altKey) return
-      const target = event.target
-      if (target instanceof HTMLElement && /input|textarea|select/i.test(target.tagName)) return
-      // A modal (the Legends, the repo door) keeps its keys to itself.
-      if (target instanceof HTMLElement && target.closest('[aria-modal="true"]')) return
-      const now = islandView.get().stop
-      if (event.key === "m" || event.key === "M") {
-        if (now === "map") islandView.go(before.current)
-        else {
-          before.current = now
-          islandView.go("map")
-        }
-        return
-      }
-      if (!/^[0-9]$/.test(event.key)) return
-      const n = Number(event.key)
-      if (n === 0) islandView.go(HOME)
-      else if (n <= archipelago.islands.length) islandView.go(n - 1)
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [])
-  return null
 }
 
 function MapGlyph() {

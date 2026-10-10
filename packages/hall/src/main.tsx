@@ -3,13 +3,14 @@ import { createRoot } from "react-dom/client"
 import { boot } from "./guild/boot.ts"
 import { applyDeepLink, type Hall as LinkedHall, parseDeepLink } from "./guild/deeplink.ts"
 import { worldEventsOf } from "./guild/events.ts"
+import { islandView } from "./guild/islandView.ts"
 import { MODE, PROBE } from "./guild/mode.ts"
 import { quality } from "./guild/quality.ts"
 import { GuildStore, liveUrlOf } from "./guild/store.ts"
 import { Hall } from "./Hall.tsx"
 import "./hall.css"
 import { hudPrefs } from "./hud/prefs.ts"
-import { HOME, islandView } from "./scene/archipelago/view.ts"
+import { HOME } from "./world/islandRing.ts"
 import { islandIndexOf, parseArchipelagoLink, parseSplitLink } from "./world/archipelagoLink.ts"
 import { loadArchipelago, loadSplitRepo } from "./world/archipelagoSource.ts"
 
@@ -89,7 +90,7 @@ if (archipelago) {
         archipelago.island,
         grown.islands.map((island) => island.repo),
       )
-      if (stop !== undefined && stop !== HOME) islandView.go(stop, { cut: true })
+      if (stop !== undefined) islandView.start(stop)
     })
   // The loader waits for the far islands to be grown too (guild/boot.ts), not only the home one.
   boot.hold(growing)

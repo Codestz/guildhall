@@ -193,3 +193,93 @@
     top: calc(var(--gut) + var(--bar) + 12px + env(safe-area-inset-top));
   }
 }
+
+/* the island chip (hud/Islands.tsx, `?archipelago`): the island the camera is on, set like the repo's; its list drops beneath */
+.island-switcher {
+  display: contents;
+}
+.hud-head .island-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--bar);
+  min-width: 0;
+  max-width: 190px;
+  padding: 0 8px 0 11px;
+  color: var(--muted);
+  touch-action: pan-y;
+  transition: color 0.15s;
+}
+.island-chip:hover,
+.island-chip[aria-expanded="true"] {
+  color: var(--brass-hi);
+}
+.island-chip[aria-expanded="true"] {
+  background: rgba(38, 29, 19, 0.92);
+  border-color: var(--brass-line);
+}
+.island-chip .repo-swatch {
+  flex: none;
+}
+.hud-head .island-chip .glyph {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.island-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--display);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--brass-hi);
+}
+.island-chip[aria-expanded="true"] .fold {
+  transform: rotate(180deg);
+}
+.island-chip .fold .glyph {
+  width: 14px;
+  height: 14px;
+}
+.hud-head .island-list {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 6;
+  box-sizing: border-box;
+  box-shadow: var(--shadow);
+}
+.island-list[hidden] {
+  display: none;
+}
+.island-hint {
+  padding: 6px 9px 2px;
+  font-size: 12px;
+}
+.island-hint kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  /* one row: crest, repo chip, island chip, roster stack; the repo's name gives way first */
+  .hud-head .island-chip {
+    flex: 0 1 auto;
+    max-width: 150px;
+  }
+  .hud-head:has(.island-chip) .repo-chip {
+    flex: 0 1 auto;
+    max-width: 128px;
+  }
+  .hud-head .island-list {
+    width: calc(100vw - 2 * var(--gut));
+    max-height: 62vh;
+    overflow-y: auto;
+  }
+  .island-list .party-row {
+    min-height: 44px;
+  }
+}

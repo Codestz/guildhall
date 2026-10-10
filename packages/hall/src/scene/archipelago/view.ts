@@ -1,46 +1,5 @@
-import { useSyncExternalStore } from "react"
 import type { Archipelago } from "../../world/archipelagoSource.ts"
-
-/**
- * Where the viewer asked the camera to be in an archipelago (world/archipelagoSource.ts): the home
- * island (-1, where the guild and the Bard are), a far island (its index), or the map of them all.
- * The HUD's switcher and the map's labels ask; scene/CameraRig.tsx flies there. Module state, like
- * guild/opening.ts: one camera, one request at a time, each numbered so a repeat is a new trip.
- */
-export type Stop = "map" | number
-export const HOME = -1
-
-export interface IslandView {
-  stop: Stop
-  /** Counts requests: the rig flies once per new `n`. */
-  n: number
-  /** Go there at once (a deep link's `island=`, reduced motion). */
-  cut: boolean
-  /** Only note where the camera already is (the Bard took it home): no trip at all. */
-  quiet: boolean
-}
-
-type Listener = () => void
-const listeners = new Set<Listener>()
-let view: IslandView = { stop: HOME, n: 0, cut: false, quiet: false }
-
-export const islandView = {
-  get(): IslandView {
-    return view
-  },
-  go(stop: Stop, options: { cut?: boolean; quiet?: boolean } = {}): void {
-    view = { stop, n: view.n + 1, cut: options.cut ?? false, quiet: options.quiet ?? false }
-    for (const listener of listeners) listener()
-  },
-  subscribe(listener: Listener): () => void {
-    listeners.add(listener)
-    return () => listeners.delete(listener)
-  },
-}
-
-export function useIslandView(): IslandView {
-  return useSyncExternalStore(islandView.subscribe, islandView.get)
-}
+import { HOME, type Stop } from "../../world/islandRing.ts"
 
 /** What a stop's shot holds: its centre on the sea (x, z) and the radius round it to fit. */
 export interface Frame {
@@ -88,9 +47,9 @@ export function depthsOf(archipelago: Archipelago): { back: number; orthoFar: nu
   return { back: 1200 * scale, orthoFar: 2600 * scale, far: 3600 * scale }
 }
 
-/** How long a flight between two points takes, s: longer for longer trips, never a crawl. */
+/** How long a flight between two points takes, s: 1.4 for a hop, 1.8 across the whole sea. */
 export function flightSeconds(distance: number): number {
-  return Math.min(3.4, Math.max(1.4, 1.2 + distance / 220))
+  return Math.min(1.8, 1.4 + distance / 1500)
 }
 
 /**

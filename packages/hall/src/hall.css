@@ -4072,23 +4072,6 @@ button {
   padding: 4px 9px 2px;
   font-size: 12px;
 }
-.islands[data-compact="true"] {
-  width: auto;
-  max-width: 100%;
-  padding: 3px;
-}
-.islands[data-compact="true"] .party-list {
-  flex-direction: row;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.islands[data-compact="true"] .party-row {
-  flex: none;
-  width: auto;
-  min-height: 40px;
-  gap: 6px;
-  padding: 4px 8px;
-}
 /* An island's name on the map: a plate in its language's colour that flies there. */
 .island-mark {
   display: flex;
@@ -4108,8 +4091,13 @@ button {
   transition: transform 0.15s;
 }
 .island-mark:hover,
-.island-mark:focus-visible {
+.island-mark:focus-visible,
+.island-mark[data-hover="true"] {
   transform: translateY(-2px);
+  background: rgba(38, 29, 19, 0.96);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 6px 18px rgba(0, 0, 0, 0.45);
 }
 .island-swatch {
   width: 9px;
@@ -4126,6 +4114,64 @@ button {
 .island-mark-lang {
   font-size: 12px;
   color: var(--muted);
+}
+.island-mark-files {
+  font-size: 12px;
+  color: var(--muted);
+}
+/* a phone's map is narrow: name, count and dot only */
+@media (max-width: 720px) {
+  .island-mark {
+    gap: 5px;
+    padding: 3px 7px 2px 6px;
+  }
+  .island-mark-name {
+    font-size: 12px;
+  }
+  .island-mark-lang {
+    display: none;
+  }
+  .island-mark-files {
+    font-size: 10px;
+  }
+}
+/* at work (the guild's adventurers) or quiet */
+.island-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(220, 182, 98, 0.3);
+}
+.island-dot[data-state="busy"] {
+  background: #8fcf7a;
+  box-shadow: 0 0 6px 1px rgba(143, 207, 122, 0.7);
+  animation: island-pulse 1.6s ease-in-out infinite;
+}
+@keyframes island-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .island-dot[data-state="busy"] {
+    animation: none;
+  }
+}
+/* a trip with reduced motion: a cut under a quick dark veil, behind the HUD, above the world */
+.hud > .travel-fade {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: #0d0a07;
+  opacity: 0;
+  pointer-events: none;
+  animation: travel-fade 0.36s ease-in-out both;
+}
+@keyframes travel-fade {
+  50% {
+    opacity: 0.94;
+  }
 }
 
 /* ---- The repo door: "your repo as an island" (hud/RepoDoor.tsx) ---- */

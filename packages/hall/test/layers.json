@@ -4,7 +4,6 @@
     "audio/SoundStage.tsx -> scene/atmosphere/wind.ts",
     "audio/SoundStage.tsx -> scene/sigilBoard.ts",
     "hud/Hud.tsx -> scene/chips.ts",
-    "hud/Islands.tsx -> scene/archipelago/view.ts",
     "hud/RecapCapture.ts -> scene/Ships.tsx",
     "hud/RecapCapture.ts -> scene/seas/fleet.ts",
     "hud/Settings.tsx -> render/backend.ts",

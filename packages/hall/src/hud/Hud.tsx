@@ -12,8 +12,9 @@ import { ChapterChip } from "./Chapter.tsx"
 import { Chronicle, Toasts } from "./Chronicle.tsx"
 import { Dossier } from "./Dossier.tsx"
 import { FastForward } from "./FastForward.tsx"
-import { IslandKeys, IslandSwitcher } from "./Islands.tsx"
+import { IslandSwitcher } from "./Islands.tsx"
 import { Icon } from "./icons.tsx"
+import { IslandKeys, IslandUrl, TravelFade } from "./islandTravel.tsx"
 import { Legends } from "./Legends.tsx"
 import { Opening } from "./Opening.tsx"
 import { PartySwitcher } from "./Parties.tsx"
@@ -243,15 +244,17 @@ export function Hud() {
     >
       {opening}
       <IslandKeys />
+      <IslandUrl />
+      <TravelFade />
       {!hidden && (
         <div className="region region-left">
           {/* The top-left bar: the crest, the repo's chip (its panel wraps below) and, on a phone, the roster's stack. */}
           <div className="hud-head">
             <Brand store={store} open={open.about} onToggle={() => toggle("about")} />
             <RepoLegend />
+            <IslandSwitcher compact={phone} />
             {phone && !open.roster && <RosterStack store={store} onExpand={() => toggle("roster")} />}
           </div>
-          <IslandSwitcher compact={phone} />
           <PartySwitcher store={store} compact={phone} />
           {open.roster ? (
             <Roster store={store} open onToggle={() => toggle("roster")} compact className="is-sheet" />

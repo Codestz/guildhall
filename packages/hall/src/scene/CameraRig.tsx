@@ -10,20 +10,15 @@ import {
 } from "three"
 import { boot } from "../guild/boot.ts"
 import { clearFrame, hudInsets, type Point, type Shot, type ShotKind, type Stage } from "../guild/director.ts"
+import { islandView } from "../guild/islandView.ts"
 import { MODE } from "../guild/mode.ts"
 import { opening, reducedMotion } from "../guild/opening.ts"
 import { positions, useGuild, useGuildStore } from "../guild/useGuild.ts"
 import { useArchipelago } from "../world/archipelagoSource.ts"
+import { HOME as HOME_ISLAND, islandAt, placesOf } from "../world/islandRing.ts"
 import { useWorld } from "../world/source.ts"
-import {
-  depthsOf,
-  flightSeconds,
-  flightSize,
-  frameOf,
-  HOME as HOME_ISLAND,
-  islandView,
-  mapFrame,
-} from "./archipelago/view.ts"
+import { Flight, planTrip } from "./archipelago/flight.ts"
+import { depthsOf, mapFrame } from "./archipelago/view.ts"
 import { bezier, closeIn, easeInOut } from "./cameraMath.ts"
 import { FRAME } from "./frame.ts"
 import { baseZoomOf, landOf, ORTHO_BACK, orthoBackOf, orthoMaxOf, uprightOf, widestOf } from "./frameReach.ts"
@@ -117,8 +112,8 @@ const TURN_WIDE = 0.045
 const TURN_HELD = 0.012
 /** Decisions per second: the director scores a few times a second, the camera moves every frame. */
 const DECIDE_S = 0.125
-/** A long flight between islands pulls out this much halfway (a short one less). */
-const ISLAND_PULL = 0.45
+/** A followed adventurer this far from the camera's target has crossed to another island: fly, don't glide. */
+const FOLLOW_HOP = 80
 
 export function CameraRig() {
   const store = useGuildStore()
@@ -143,6 +138,7 @@ export function CameraRig() {
   }, [])
   const archipelago = useArchipelago()
   const world = useWorld()
+  const places = useMemo(() => (archipelago ? placesOf(archipelago) : []), [archipelago])
   const land = useMemo(() => landOf(world), [world])
   const { outreach, peak, reach } = land
   const size = useThree((state) => state.size)
@@ -152,20 +148,8 @@ export function CameraRig() {
   const depths = archipelago && depthsOf(archipelago)
   const back = depths ? depths.back : orthoBackOf(size, land)
   const orthoFar = depths ? depths.orthoFar : back + Math.max((900 - ORTHO_BACK) * outreach, back)
-  /** A flight between islands (scene/archipelago/view.ts): the request flown, and where it is. */
-  const trip = useRef({
-    // From 0, not the current count: a link's `island=` may be asked before the rig mounts.
-    n: 0,
-    flying: false,
-    t: 0,
-    duration: 1,
-    from: new Vector3(),
-    to: new Vector3(),
-    sizeFrom: 1,
-    sizeTo: 1,
-    pull: 0,
-    home: false,
-  })
+  /** A flight between islands (scene/archipelago/flight.ts). */
+  const flight = useMemo(() => new Flight(), [])
   /** The Cinematic director's transition state (one object, mutated). */
   const film = useRef({
     active: false,
@@ -246,6 +230,7 @@ export function CameraRig() {
   }, [dom, store])
 
   // Keyboard: held keys move the camera smoothly (read in useFrame); B and V are toggles.
+  const hops = archipelago !== null
   useEffect(() => {
     const typing = (event: KeyboardEvent) =>
       event.target instanceof HTMLElement && /input|textarea|select/i.test(event.target.tagName)
@@ -254,6 +239,8 @@ export function CameraRig() {
       const key = event.key.toLowerCase()
       if (key === "b") return store.setBard(!store.bard)
       if (key === "v") return store.setView(store.view === "diorama" ? "explore" : "diorama")
+      // ←/→ hop between islands in an archipelago (hud/Islands.tsx); A/D still pan.
+      if (hops && (key === "arrowleft" || key === "arrowright")) return
       if (MOVE_KEYS.has(key)) {
         keys.current.add(key)
         if (store.bard && revealed.current >= 1) store.setBard(false)
@@ -270,7 +257,7 @@ export function CameraRig() {
       window.removeEventListener("keyup", up)
       window.removeEventListener("blur", blur)
     }
-  }, [store])
+  }, [store, hops])
 
   /** Where the camera looked and stood last frame: restored after drei recreates the controls. */
   const last = useRef({ target: HOME.clone(), position: HOME.clone().addScaledVector(ISO_DIR, FAR), zoom: 0 })
@@ -412,6 +399,8 @@ export function CameraRig() {
     const selected = store.selected ? positions.get(store.selected) : undefined
     if (selected) {
       const goal = scratch.goal.set(selected.x, 1.2 + rise(selected.x, selected.z), selected.z)
+      // On another island than the camera's (a ferry brought them over): a flight to them, not a jump.
+      if (archipelago && crossed(selected, goal, control)) return
       clearShift(camera, control, isOrtho, goal)
       const fresh = following.current !== store.selected
       // A new pick: glide there quickly; then track tightly so walking never leaves the frame.
@@ -445,60 +434,55 @@ export function CameraRig() {
   useCutaway(world)
 
   /**
-   * The archipelago's flights (scene/archipelago/view.ts): a new request starts one — a straight
-   * glide over the sea that pulls out halfway, keeping the angle you look from — or, with reduced
-   * motion or a deep link, a cut. Leaving the home island hands the camera to you (the Bard off);
-   * arriving home hands it back. The Bard switched back on away from home flies there itself (its
-   * own flight), so the request just notes that. True while a flight is moving the camera.
+   * The archipelago's flights (scene/archipelago/flight.ts): a new request starts one — an arc over
+   * the sea that pulls out halfway, keeping the angle you look from — or, with a deep link, a cut
+   * (reduced motion: a cut under a cross-fade). Leaving the home island hands the camera to you (the
+   * Bard off); arriving home hands it back. The Bard switched back on away from home flies there
+   * itself (its own flight), so the request just notes that. A request `at` a spot is a followed
+   * adventurer's crossing: the pick stays. True while a flight is moving the camera.
    */
   function fly(delta: number, camera: Ortho | Persp, control: Controls, isOrtho: boolean): boolean {
     if (!archipelago) return false
-    const f = trip.current
     // Away from home with the Bard switched back on (B, Esc): it is taking the camera home.
     const asked = islandView.get()
-    if (asked.n === f.n && asked.stop !== HOME_ISLAND && store.bard && !f.flying)
+    if (asked.n === flight.n && asked.stop !== HOME_ISLAND && store.bard && !flight.flying)
       islandView.go(HOME_ISLAND, { quiet: true })
     const request = islandView.get()
-    if (request.n !== f.n) {
-      f.n = request.n
+    if (request.n !== flight.n) {
+      flight.n = request.n
       if (request.quiet) return false
-      const frame = frameOf(request.stop, archipelago)
-      const map = request.stop === "map"
-      f.home = request.stop === HOME_ISLAND
-      if (!f.home && store.bard) store.setBard(false)
-      if (store.selected) store.select(null)
-      f.from.copy(control.target)
-      f.to.set(frame.x, 1, frame.z)
-      const o = camera as Ortho
-      const distance = camera.position.distanceTo(control.target)
-      f.sizeFrom = isOrtho ? o.zoom : distance
-      f.sizeTo = isOrtho ? (map ? mapZoom : wide) : map ? mapDistance : Math.max(FAR, frame.radius * 1.3)
-      const length = f.from.distanceTo(f.to)
-      f.pull = map ? 0 : Math.min(ISLAND_PULL, length / 600)
-      f.duration = flightSeconds(length + (map ? 200 : 0))
-      f.t = request.cut || still.current ? 1 : 0
-      f.flying = true
+      if (request.stop !== HOME_ISLAND && store.bard) store.setBard(false)
+      if (store.selected && !request.at) store.select(null)
+      // A followed adventurer's crossing lands already close in on them: no second close-in after it.
+      if (request.at) following.current = store.selected
+      const size = isOrtho ? (camera as Ortho).zoom : camera.position.distanceTo(control.target)
+      const trip = planTrip(request, archipelago, control.target, size, isOrtho, {
+        wide,
+        mapZoom,
+        mapDistance,
+        far: FAR,
+        follow: isOrtho ? fit * 2.2 : CLOSE,
+      })
+      flight.begin(control.target, trip, request.stop, { cut: request.cut, fade: still.current })
     }
-    if (!f.flying) return false
-    f.t = Math.min(1, f.t + delta / f.duration)
-    const p = easeInOut(f.t)
-    control.target.lerpVectors(f.from, f.to, p)
-    const dir = scratch.dir.copy(camera.position).sub(control.target)
-    if (dir.lengthSq() < 1e-6) dir.copy(ISO_DIR)
-    dir.normalize()
-    const size = flightSize(f.sizeFrom, f.sizeTo, p, f.pull, isOrtho)
-    if (isOrtho) {
-      ;(camera as Ortho).zoom = size
-      camera.position.copy(control.target).addScaledVector(dir, back)
-    } else {
-      camera.position.copy(control.target).addScaledVector(dir, size)
+    const flying = flight.step(delta, camera, control, isOrtho, back, ISO_DIR)
+    // Home again: the Bard has the camera back.
+    if (!flight.flying && flying && flight.home && !store.bard) store.setBard(true)
+    return flying
+  }
+
+  /**
+   * Notes which island a followed adventurer is on (the switcher's chip says it) and, when they are
+   * far from the camera's target, asks for a flight to them (view.ts `at`). True if it did.
+   */
+  function crossed(at: Vector3, goal: Vector3, control: Controls): boolean {
+    const here = islandAt(places, at.x, at.z)
+    if (here === undefined || here === islandView.get().stop) return false
+    if (control.target.distanceTo(goal) <= FOLLOW_HOP) {
+      islandView.go(here, { quiet: true })
+      return false
     }
-    camera.updateProjectionMatrix()
-    if (f.t >= 1) {
-      f.flying = false
-      // Home again: the Bard has the camera back.
-      if (f.home && !store.bard) store.setBard(true)
-    }
+    islandView.go(here, { at: [at.x, at.z] })
     return true
   }
 

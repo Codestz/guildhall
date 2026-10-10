@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { FERRIES, type FerryAt, ferryAt, PERIOD_S } from "../src/scene/archipelago/ferries.ts"
-import { flightSize, frameOf, HOME, mapFrame } from "../src/scene/archipelago/view.ts"
+import { flightSize, frameOf, mapFrame } from "../src/scene/archipelago/view.ts"
 import { patchSquares, seaSquares } from "../src/scene/nature/shore.ts"
 import {
   crossingsOf,
@@ -20,6 +19,7 @@ import { islandIndexOf, parseArchipelagoLink } from "../src/world/archipelagoLin
 import type { Archipelago } from "../src/world/archipelagoSource.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
+import { HOME } from "../src/world/islandRing.ts"
 import { reachOf, repoWorld } from "../src/world/world.ts"
 import HINDSIGHT from "./fixtures/repos/codestz__claude-hindsight.json"
 import MCPX from "./fixtures/repos/codestz__mcpx.json"
@@ -93,44 +93,6 @@ describe("crossings", () => {
   test("the extent reaches the furthest land", () => {
     const furthest = Math.max(...ring.map((at) => Math.hypot(at[0], at[1])))
     expect(extentOf(islands)).toBeCloseTo(furthest + 118, 5)
-  })
-})
-
-describe("ferries", () => {
-  const ring = placeIslands(seeds(4), HAND_HOME)
-  const islands: Shore[] = [{ at: [0, 0], reach: 82 }, ...ring.map((at) => ({ at, reach: 110 }))]
-  const crossings = crossingsOf(islands)
-  const at = (): FerryAt => ({ x: 0, z: 0, heading: 0, shown: 0 })
-
-  test("the same story time puts every ferry in the same place", () => {
-    for (let ferry = 0; ferry < FERRIES; ferry++) {
-      const a = at()
-      const b = at()
-      expect(ferryAt(islands, crossings, ferry, 1234.5, a)).toBe(
-        ferryAt(islands, crossings, ferry, 1234.5, b),
-      )
-      expect(a).toEqual(b)
-    }
-  })
-
-  test("now and then at sea, and never over land", () => {
-    let sailing = 0
-    let samples = 0
-    for (let t = 0; t < PERIOD_S * 40; t += 3)
-      for (let ferry = 0; ferry < FERRIES; ferry++) {
-        samples++
-        const where = at()
-        if (!ferryAt(islands, crossings, ferry, t, where)) continue
-        sailing++
-        for (const island of islands)
-          expect(Math.hypot(where.x - island.at[0], where.z - island.at[1])).toBeGreaterThan(island.reach + 8)
-      }
-    expect(sailing / samples).toBeGreaterThan(0.05)
-    expect(sailing / samples).toBeLessThan(0.9)
-  })
-
-  test("no crossings, no ferries", () => {
-    expect(ferryAt(islands, [], 0, 100, at())).toBe(false)
   })
 })
 

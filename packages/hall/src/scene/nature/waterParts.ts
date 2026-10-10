@@ -37,14 +37,19 @@ const tileParts = (tiles: readonly ShoreTile[]): Part[] =>
     queued: true,
   }))
 
-export function partsOf(world: World, archipelago: Archipelago | null, view: number, at?: Spot): Part[] {
+export function partsOf(
+  world: World,
+  archipelago: Archipelago | null,
+  view: number,
+  drawn: ReadonlySet<string>,
+  at?: Spot,
+  tight = false,
+): Part[] {
   // A far island: its one patch, or (a big generator-v2 one) its shore tiles at a far island's coarser bake.
   if (at) {
     if (outreachOf(world) === 1) {
       // A split repo's island has a tight patch (scene/archipelago/footprint.ts), so its straits can be narrow.
-      const half = archipelago?.islands.find((island) => island.world === world)?.tight
-        ? patchHalfOf(world)
-        : PATCH_HALF
+      const half = tight ? patchHalfOf(world) : PATCH_HALF
       return [
         {
           key: "patch",
@@ -56,7 +61,8 @@ export function partsOf(world: World, archipelago: Archipelago | null, view: num
     }
     return tileParts(farTilesOf(world))
   }
-  const far: Hole[] = archipelago?.islands.flatMap(holesOf) ?? []
+  // The sea is cut only for the far islands that are drawn (archipelagoSource.markDrawn): never a hole with no island in it.
+  const far: Hole[] = archipelago?.islands.filter((island) => drawn.has(island.id)).flatMap(holesOf) ?? []
   if (outreachOf(world) === 1) {
     const sea: Sea = archipelago
       ? { radius: seaRadiusOf(archipelago.extent), holes: far }

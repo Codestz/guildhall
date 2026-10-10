@@ -4,6 +4,7 @@ import { useArchipelago, useArchipelagoStatus } from "../world/archipelagoSource
 import { HOME, type Stop } from "../world/islandRing.ts"
 import { Icon } from "./icons.tsx"
 import { useSwipe } from "./islandTravel.tsx"
+import { LostIslands } from "./LostIslands.tsx"
 import { repoDoor } from "./RepoDoor.tsx"
 
 /**
@@ -37,22 +38,24 @@ export function IslandSwitcher({ compact = false }: { compact?: boolean }) {
     }
   }, [open])
 
-  if (status.state === "loading")
+  // Islands come as they are grown: the chip is there from the first, this only while none has.
+  if (status.state === "loading" && !archipelago)
     return (
       <section className="plaque repo-legend repo-panel" aria-live="polite">
         <p className="repo-note">Charting the archipelago…</p>
       </section>
     )
+  const failed = status.state === "off" ? [] : (status.failed ?? [])
   if (!archipelago) {
-    if (status.state !== "ready" || status.failed.length === 0) return null
+    if (status.state !== "ready" || failed.length === 0) return null
     return (
       <section className="plaque repo-legend repo-panel" role="status">
-        <p className="repo-note">Couldn't chart the archipelago: {status.failed[0]?.reason}.</p>
+        <p className="repo-note">Couldn't chart the archipelago: {failed[0]?.reason}.</p>
+        <LostIslands failed={failed} />
       </section>
     )
   }
 
-  const failed = status.state === "ready" ? status.failed : []
   const rows = [
     { stop: HOME as Stop, island: archipelago.home, key: "0" },
     ...archipelago.islands.map((island, i) => ({ stop: i as Stop, island, key: `${i + 1}` })),
@@ -148,12 +151,8 @@ export function IslandSwitcher({ compact = false }: { compact?: boolean }) {
             <kbd>←</kbd> <kbd>→</kbd> hop to the next island
           </p>
         )}
-        {failed.length > 0 && !compact && (
-          <p className="repo-note island-failed">
-            Left out: {failed.map((one) => one.repo).join(", ")} ({failed[0]?.reason})
-          </p>
-        )}
       </nav>
+      <LostIslands failed={failed} hidden={open} />
     </div>
   )
 }

@@ -88,21 +88,33 @@ export function waterClear(a: Footprint, from: Spot, b: Footprint, to: Spot): bo
  */
 export function placeIslands(seeds: readonly IslandSeed[], home: Footprint): Spot[] {
   const placed: Spot[] = []
-  const n = seeds.length
-  for (let i = 0; i < n; i++) {
-    const seed = seeds[i] as IslandSeed
-    // A slot each round the ring, nudged up to ±8° by the repo's name, so it doesn't read as a grid.
-    const nudge = ((hash(seed.repo) % 1000) / 1000 - 0.5) * ((16 * Math.PI) / 180)
-    const angle = -Math.PI / 2 + (i * 2 * Math.PI) / n + nudge
-    for (let r = RING_START; ; r += SEA_CELL) {
-      const at: Spot = [snap(DMath.cos(angle) * r), snap(DMath.sin(angle) * r)]
-      if (!clear(home, [0, 0], seed, at)) continue
-      if (!placed.every((other, j) => clear(seeds[j] as IslandSeed, other, seed, at))) continue
-      placed.push(at)
-      break
-    }
-  }
+  for (const [i, seed] of seeds.entries())
+    placed.push(placeIsland(seed, i, seeds.length, seeds.slice(0, i), placed, home))
   return placed
+}
+
+/**
+ * One island's offset: ring slot `slot` of `slots`, pushed out until it is clear of the home island
+ * and of `before` (the islands already placed, at `at`). The same rule as placeIslands, one island at
+ * a time, so islands that arrive as they are grown take their slots without moving the others.
+ */
+export function placeIsland(
+  seed: IslandSeed,
+  slot: number,
+  slots: number,
+  before: readonly Footprint[],
+  at: readonly Spot[],
+  home: Footprint,
+): Spot {
+  // A slot each round the ring, nudged up to ±8° by the repo's name, so it doesn't read as a grid.
+  const nudge = ((hash(seed.repo) % 1000) / 1000 - 0.5) * ((16 * Math.PI) / 180)
+  const angle = -Math.PI / 2 + (slot * 2 * Math.PI) / slots + nudge
+  for (let r = RING_START; ; r += SEA_CELL) {
+    const spot: Spot = [snap(DMath.cos(angle) * r), snap(DMath.sin(angle) * r)]
+    if (!clear(home, [0, 0], seed, spot)) continue
+    if (!at.every((other, j) => clear(before[j] as Footprint, other, seed, spot))) continue
+    return spot
+  }
 }
 
 /** An island as the crossings see it: where its keep is, and how far its land reaches from it. */

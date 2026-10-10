@@ -22,7 +22,7 @@ import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import { isWebGPU } from "../../render/backend.ts"
 import { SEA_CELL } from "../../world/archipelago.ts"
-import { useArchipelago } from "../../world/archipelagoSource.ts"
+import { useArchipelago, useDrawnIslands } from "../../world/archipelagoSource.ts"
 import { LANDS_URL } from "../../world/cast.ts"
 import { cellToWorld } from "../../world/lands.ts"
 import type { Spot } from "../../world/layout.ts"
@@ -71,14 +71,22 @@ import { useWaterSky } from "./waterSky.ts"
  * water and its bake are the same as without an archipelago. A home island too big for the one bake
  * (generator v2, shoreTiles.ts) is drawn as patches too: the open sea with a hole for each of its
  * shore tiles, and a surface over each reading its own bake, baked one a frame, nearest the keep first.
+ * Holes are cut only for far islands that are drawn (archipelagoSource.markDrawn), never ahead of one.
  */
 export function Water({ tier, at }: { tier: Tier; at?: Spot }) {
   const world = useWorld()
   const archipelago = useArchipelago()
+  // Only the home sea reads who is drawn: a far island's patch isn't rebuilt each time another arrives.
+  const home = at ? null : archipelago
+  const holes = useDrawnIslands(!at)
+  const tight = at ? archipelago?.islands.find((island) => island.world === world)?.tight : undefined
   // The sea reaches past whatever the cameras can show (scene/frameReach.ts), in steps so a resize rarely rebuilds it.
   const size = useThree((state) => state.size)
   const view = useMemo(() => Math.ceil(viewReachOf(size, landOf(world)) / 100) * 100, [size, world])
-  const parts = useMemo(() => partsOf(world, archipelago, view, at), [world, archipelago, view, at])
+  const parts = useMemo(
+    () => partsOf(world, home, view, holes, at, tight),
+    [world, home, view, holes, at, tight],
+  )
   return parts.map((part) => <Surface key={part.key} tier={tier} at={at} part={part} />)
 }
 

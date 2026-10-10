@@ -4068,10 +4068,6 @@ button {
 .island-map[aria-pressed="true"] .glyph {
   color: var(--brass-hi);
 }
-.island-failed {
-  padding: 4px 9px 2px;
-  font-size: 12px;
-}
 /* An island's name on the map: a plate in its language's colour that flies there, set where the
    layout put it (scene/archipelago/labels.ts: --dx, --dy), or a pip when there is no room. */
 .island-mark {

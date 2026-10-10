@@ -3,7 +3,12 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import type { Vector3 } from "three"
 import { useIslandView } from "../../guild/islandView.ts"
 import type { Tier } from "../../guild/quality.ts"
-import type { Archipelago, FarIsland, IslandInfo } from "../../world/archipelagoSource.ts"
+import {
+  type Archipelago,
+  archipelagoSource,
+  type FarIsland,
+  type IslandInfo,
+} from "../../world/archipelagoSource.ts"
 import { chunksOf } from "../../world/chunks.ts"
 import { HOME, type Stop } from "../../world/islandRing.ts"
 import { WorldScope } from "../../world/source.ts"
@@ -99,6 +104,7 @@ function FarIslandLayer({ island, stop, tier }: { island: FarIsland; stop: Stop;
           <Fields />
           <IdleLights near={near} />
           <Lighthouse />
+          <Drawn id={island.id} />
         </Suspense>
         {grown && (
           <group visible={near}>
@@ -111,6 +117,15 @@ function FarIslandLayer({ island, stop, tier }: { island: FarIsland; stop: Stop;
       </WorldScope>
     </group>
   )
+}
+
+/**
+ * The last child of an island's own Suspense: it mounts only once everything before it has, so the
+ * island is on screen (land, water, wilds) by the time the open sea is cut for it.
+ */
+function Drawn({ id }: { id: string }) {
+  useEffect(() => archipelagoSource.markDrawn(id), [id])
+  return null
 }
 
 /**

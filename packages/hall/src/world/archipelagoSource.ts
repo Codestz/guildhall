@@ -4,9 +4,10 @@ import {
   extentOf,
   type Footprint,
   HOME_REPO,
+  type IslandSeed,
   mainLanguage,
   type Patch,
-  placeIslands,
+  placeIsland,
   type Shore,
 } from "./archipelago.ts"
 import { type Language, languageOf } from "./gen/biomes.ts"
@@ -68,10 +69,18 @@ export interface Archipelago {
   links: readonly IslandLink[]
 }
 
+/** An island that couldn't be had, and why; `retry` when asking again may help (a far island of `?repos=`). */
+export interface FailedIsland {
+  repo: string
+  reason: string
+  retry?: true
+}
+
+/** `loading`: the repos still being grown (`repos`), with what failed so far; each island that is ready is drawn as it comes. */
 export type ArchipelagoStatus =
   | { state: "off" }
-  | { state: "loading"; repos: readonly string[] }
-  | { state: "ready"; failed: readonly { repo: string; reason: string }[] }
+  | { state: "loading"; repos: readonly string[]; failed?: readonly FailedIsland[] }
+  | { state: "ready"; failed: readonly FailedIsland[] }
 
 type Listener = () => void
 
@@ -81,11 +90,25 @@ type Listener = () => void
  */
 export type PatchesOf = (world: World, far: boolean, tight?: boolean) => readonly Patch[]
 
+/** A `load` in progress: what it was asked, and the islands placed so far (with the footprints they were placed by). */
+interface Run {
+  repos: readonly string[]
+  fetchTree: (repo: string) => Promise<Tree>
+  patchesOf: PatchesOf
+  islands: FarIsland[]
+  seeds: IslandSeed[]
+  failed: FailedIsland[]
+  pending: Set<string>
+}
+
 class ArchipelagoSource {
   archipelago: Archipelago | null = null
   status: ArchipelagoStatus = { state: "off" }
+  /** The far islands whose land is on screen (`markDrawn`): the only ones the open sea is cut for. */
+  drawn: ReadonlySet<string> = new Set()
   private listeners = new Set<Listener>()
   private loading: Promise<Archipelago | null> | undefined
+  private run: Run | undefined
 
   subscribe = (listener: Listener): (() => void) => {
     this.listeners.add(listener)
@@ -93,10 +116,13 @@ class ArchipelagoSource {
   }
 
   /**
-   * Grows every repo's island (in parallel) and places them round the home island, once: asked
-   * again, it answers with the first load. `fetchTree` is the source of trees (world/gen/load.ts).
-   * Every island is grown as the link asks the home one (`?gen=`, `?relief=`: world/source.ts) and
-   * placed by how far it reaches (`patchesOf`).
+   * Grows every repo's island (in parallel) and adds each to the archipelago as it is ready, round
+   * the home island: asked again, it answers with the first load, which settles when every repo has
+   * grown or failed. An island takes its ring slot by its place in `repos` and clears the islands
+   * already there, so none moves when another arrives. `fetchTree` is the source of trees
+   * (world/gen/load.ts). Every island is grown as the link asks the home one (`?gen=`, `?relief=`:
+   * world/source.ts) and placed by how far it reaches (`patchesOf`). One that can't be had is named
+   * in the status (`retry` asks again) and costs the sea nothing.
    */
   load(
     repos: readonly string[],
@@ -104,51 +130,96 @@ class ArchipelagoSource {
     patchesOf: PatchesOf,
   ): Promise<Archipelago | null> {
     if (this.loading) return this.loading
-    this.set(null, { state: "loading", repos })
-    this.loading = (async () => {
-      type Grown = { repo: string; world: World; language: Language } | { repo: string; reason: string }
-      const grown = await Promise.all(
-        repos.map(async (repo): Promise<Grown> => {
-          try {
-            const tree = await fetchTree(repo)
-            // A big island takes a while to grow: a worker grows it (world/grow), so the page stays alive.
-            return {
-              repo: tree.repo,
-              world: await growWorldAsync(tree),
-              language: mainLanguage(tree.entries),
-            }
-          } catch (error) {
-            return { repo, reason: (error as Error).message }
-          }
-        }),
-      )
-      // The home island first: a `?repo=` island is the home one, once it has grown.
-      await worldSource.ready
-      const kept = grown.filter((one): one is Extract<Grown, { world: World }> => "world" in one)
-      const failed = grown.filter((one): one is Extract<Grown, { reason: string }> => "reason" in one)
-      const homeWorld = worldSource.world
-      const footprint = (world: World, far: boolean): Footprint => ({
-        reach: reachOf(world),
-        patches: patchesOf(world, far),
-      })
-      const offsets = placeIslands(
-        kept.map((one) => ({ repo: one.repo, ...footprint(one.world, true) })),
+    this.run = { repos, fetchTree, patchesOf, islands: [], seeds: [], failed: [], pending: new Set(repos) }
+    this.progress()
+    this.loading = Promise.all(repos.map((repo) => this.grow(repo))).then(() => this.archipelago)
+    return this.loading
+  }
+
+  /** Asks again for a far island that failed (`?repos=`): it is grown and added when it comes. */
+  retry(repo: string): void {
+    const run = this.run
+    if (!run?.failed.some((one) => one.repo === repo)) return
+    run.failed = run.failed.filter((one) => one.repo !== repo)
+    run.pending.add(repo)
+    this.progress()
+    void this.grow(repo)
+  }
+
+  /** One repo's island, grown and, once the home island is known, added; or failed. Never rejects. */
+  private async grow(repo: string): Promise<void> {
+    const run = this.run as Run
+    let grown: { repo: string; world: World; language: Language }
+    try {
+      const tree = await run.fetchTree(repo)
+      // A big island takes a while to grow: a worker grows it (world/grow), so the page stays alive.
+      grown = { repo: tree.repo, world: await growWorldAsync(tree), language: mainLanguage(tree.entries) }
+    } catch (error) {
+      run.failed.push({ repo, reason: (error as Error).message, retry: true })
+      run.pending.delete(repo)
+      this.progress()
+      return
+    }
+    // The home island first: a `?repo=` island is the home one, once it has grown.
+    await worldSource.ready
+    const homeWorld = worldSource.world
+    const footprint = (world: World, far: boolean): Footprint => ({
+      reach: reachOf(world),
+      patches: run.patchesOf(world, far),
+    })
+    run.pending.delete(repo)
+    // The same repo under two spellings is one island.
+    if (!run.islands.some((one) => one.repo === grown.repo)) {
+      const seed = { repo: grown.repo, ...footprint(grown.world, true) }
+      const at = placeIsland(
+        seed,
+        run.repos.indexOf(repo),
+        run.repos.length,
+        run.seeds,
+        run.islands.map((one) => one.at),
         footprint(homeWorld, false),
       )
-      const islands: FarIsland[] = kept.map((one, i) => ({
-        ...infoOf(one.repo, offsets[i] as Spot, reachOf(one.world), one.language),
-        world: one.world,
-      }))
-      const home = homeOf(homeWorld)
-      const shores: Shore[] = [home, ...islands]
-      const archipelago: Archipelago | null =
-        islands.length > 0
-          ? { home, islands, crossings: crossingsOf(shores), extent: extentOf(shores), links: [] }
-          : null
-      this.set(archipelago, { state: "ready", failed })
-      return archipelago
-    })()
-    return this.loading
+      run.seeds.push(seed)
+      run.islands.push({
+        ...infoOf(grown.repo, at, reachOf(grown.world), grown.language),
+        world: grown.world,
+      })
+    }
+    this.progress()
+  }
+
+  /** The archipelago and status as the run stands: the islands grown so far, and what is still coming. */
+  private progress(): void {
+    const run = this.run as Run
+    const failed = [...run.failed]
+    const status: ArchipelagoStatus =
+      run.pending.size > 0
+        ? { state: "loading", repos: [...run.pending], failed }
+        : { state: "ready", failed }
+    if (run.islands.length === 0) {
+      this.set(null, status)
+      return
+    }
+    const home = homeOf(worldSource.world)
+    const shores: Shore[] = [home, ...run.islands]
+    const islands = [...run.islands]
+    this.set({ home, islands, crossings: crossingsOf(shores), extent: extentOf(shores), links: [] }, status)
+  }
+
+  /**
+   * An island's land is on screen (scene/archipelago/ArchipelagoLayer.tsx): the open sea is cut for
+   * it from then on, never before, so a sea is never cut for an island that isn't drawn. Returns the
+   * undoing, for when it goes.
+   */
+  markDrawn = (id: string): (() => void) => {
+    this.drawn = new Set(this.drawn).add(id)
+    this.emit()
+    return () => {
+      const rest = new Set(this.drawn)
+      rest.delete(id)
+      this.drawn = rest
+      this.emit()
+    }
   }
 
   /**
@@ -188,6 +259,10 @@ class ArchipelagoSource {
   private set(archipelago: Archipelago | null, status: ArchipelagoStatus): void {
     this.archipelago = archipelago
     this.status = status
+    this.emit()
+  }
+
+  private emit(): void {
     for (const listener of this.listeners) listener()
   }
 }
@@ -237,4 +312,13 @@ export function useArchipelago(): Archipelago | null {
 
 export function useArchipelagoStatus(): ArchipelagoStatus {
   return useSyncExternalStore(archipelagoSource.subscribe, () => archipelagoSource.status)
+}
+
+const NO_ISLANDS: ReadonlySet<string> = new Set()
+
+/** The far islands drawn now (their land is on screen): what the open sea is cut for. `live` false: none, and no re-render. */
+export function useDrawnIslands(live = true): ReadonlySet<string> {
+  return useSyncExternalStore(archipelagoSource.subscribe, () =>
+    live ? archipelagoSource.drawn : NO_ISLANDS,
+  )
 }

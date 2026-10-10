@@ -1,5 +1,6 @@
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
+import { startOnIsland } from "./guild/archipelagoStart.ts"
 import { boot } from "./guild/boot.ts"
 import { applyDeepLink, type Hall as LinkedHall, parseDeepLink } from "./guild/deeplink.ts"
 import { worldEventsOf } from "./guild/events.ts"
@@ -81,18 +82,12 @@ if (live === null && !lab) applyDeepLink(parseDeepLink(location.search, PROBE).l
 // grow beside the home one, and a link's island is where the camera starts.
 const archipelago = live === null && !lab ? parseArchipelagoLink(location.search) : null
 if (archipelago) {
-  const growing = import("./scene/archipelago/footprint.ts")
-    .then(({ patchesOf }) => loadArchipelago(archipelago.repos, patchesOf))
-    .then((grown) => {
-      if (!grown || !archipelago.island) return
-      const stop = islandIndexOf(
-        archipelago.island,
-        grown.islands.map((island) => island.repo),
-      )
-      if (stop !== undefined) islandView.start(stop)
-    })
-  // The loader waits for the far islands to be grown too (guild/boot.ts), not only the home one.
-  boot.hold(growing)
+  // The far islands come as they are grown, each drawn when it is ready (a big one takes a while):
+  // the loader waits for the home island only, and a link's island= starts when its island is in.
+  if (archipelago.island) startOnIsland(archipelago.island)
+  void import("./scene/archipelago/footprint.ts").then(({ patchesOf }) =>
+    loadArchipelago(archipelago.repos, patchesOf),
+  )
 }
 
 if (PROBE)

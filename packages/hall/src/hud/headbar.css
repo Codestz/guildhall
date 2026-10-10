@@ -258,6 +258,51 @@
   padding: 6px 9px 2px;
   font-size: 12px;
 }
+/* islands that didn't load (hud/LostIslands.tsx): a plate each under the chip, with a way to ask again */
+.hud-head .island-lost {
+  position: fixed;
+  top: var(--gut, 16px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 4px 4px;
+  list-style: none;
+  box-shadow: var(--shadow);
+}
+.island-lost[hidden] {
+  display: none;
+}
+.island-lost-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.island-lost-name {
+  font-family: var(--display);
+  letter-spacing: 0.03em;
+  color: var(--brass-hi);
+}
+.island-lost-note {
+  color: var(--muted);
+}
+.island-lost-retry {
+  padding: 2px 9px;
+  border: 1px solid var(--brass-line);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--brass-hi);
+  font: inherit;
+  cursor: pointer;
+}
+.island-lost-retry:hover,
+.island-lost-retry:focus-visible {
+  background: rgba(38, 29, 19, 0.92);
+}
 .island-hint kbd {
   font-family: var(--mono);
   font-size: 11px;

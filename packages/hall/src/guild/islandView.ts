@@ -21,6 +21,8 @@ export interface IslandView {
    * following whoever is followed: the one case where a trip leaves the pick be.
    */
   at?: Spot
+  /** Stop "map" only: frame the core and this many of its nearest islands, not them all (an establishing shot). */
+  around?: number
 }
 
 type Listener = () => void
@@ -31,13 +33,14 @@ export const islandView = {
   get(): IslandView {
     return view
   },
-  go(stop: Stop, options: { cut?: boolean; quiet?: boolean; at?: Spot } = {}): void {
+  go(stop: Stop, options: { cut?: boolean; quiet?: boolean; at?: Spot; around?: number } = {}): void {
     view = {
       stop,
       n: view.n + 1,
       cut: options.cut ?? false,
       quiet: options.quiet ?? false,
       ...(options.at ? { at: options.at } : {}),
+      ...(options.around ? { around: options.around } : {}),
     }
     for (const listener of listeners) listener()
   },

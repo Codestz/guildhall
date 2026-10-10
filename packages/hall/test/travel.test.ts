@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { OrthographicCamera, PerspectiveCamera, Vector3 } from "three"
 import { islandView } from "../src/guild/islandView.ts"
 import { FADE_CUT_S, Flight, planTrip, type Sizes, travel } from "../src/scene/archipelago/flight.ts"
-import { flightSeconds } from "../src/scene/archipelago/view.ts"
+import { establishFrame, flightSeconds, mapFrame } from "../src/scene/archipelago/view.ts"
 import { islandIndexOf } from "../src/world/archipelagoLink.ts"
 import type { Archipelago } from "../src/world/archipelagoSource.ts"
 import { HOME, islandAt, islandParam, neighbour, placesOf, ringOf } from "../src/world/islandRing.ts"
@@ -147,6 +147,25 @@ describe("a flight", () => {
     expect(flight.step(1 / 60, camera, control, false, 0, new Vector3(1, 1, 1))).toBe(true)
     expect(flight.flying).toBe(false)
     expect(camera.position.distanceTo(control.target)).toBeCloseTo(sizes.mapDistance, 3)
+  })
+
+  test("an establishing shot is the map's, tightened to the core and its nearest islands", () => {
+    const control = { target: new Vector3(0, 1, 0) }
+    islandView.go("map", { around: 2 })
+    const trip = planTrip(islandView.get(), archipelago, control.target, 3, true, sizes)
+    const tight = mapFrame(archipelago).radius / establishFrame(archipelago, 2).radius
+    expect(tight).toBeGreaterThan(1)
+    expect(trip.sizeTo).toBeCloseTo(sizes.mapZoom * tight, 6)
+    expect(trip.pull).toBe(0)
+  })
+
+  test("the establishing frame holds the core and only its nearest islands", () => {
+    const frame = establishFrame(archipelago, 1)
+    expect(frame.radius).toBeLessThan(mapFrame(archipelago).radius)
+    expect(establishFrame(archipelago, 99).radius).toBeCloseTo(
+      mapFrame({ ...archipelago, links: [] } as Archipelago).radius,
+      6,
+    )
   })
 
   test("with reduced motion it holds for the fade's dark, then cuts", () => {

@@ -10,6 +10,7 @@ import {
 } from "three"
 import { boot } from "../guild/boot.ts"
 import { clearFrame, hudInsets, type Point, type Shot, type ShotKind, type Stage } from "../guild/director.ts"
+import { home } from "../guild/home.ts"
 import { islandView } from "../guild/islandView.ts"
 import { MODE } from "../guild/mode.ts"
 import { opening, reducedMotion } from "../guild/opening.ts"
@@ -43,6 +44,8 @@ import { useCutaway } from "./terrain/useCutaway.ts"
 type Controls = ComponentRef<typeof MapControls>
 
 const REVEAL_S = 3.2
+/** The home's reveal (guild/homeShow.ts): short, the film is waiting to play under it. */
+const HOME_REVEAL_S = 1.2
 /** The showcase's directed opening (guild/opening.ts): hold, then reveal, then land. */
 const SHOWCASE = MODE === "showcase"
 /** The sweep has landed: the showcase's opening moves on, and automation may shoot (guild/boot.ts). */
@@ -305,7 +308,7 @@ export function CameraRig() {
       const step = SHOWCASE ? Math.min(delta, 1 / 30) : delta
       if (waiting) revealed.current = 0
       else if (reducedMotion()) revealed.current = 1
-      else revealed.current = Math.min(1, revealed.current + step / REVEAL_S)
+      else revealed.current = Math.min(1, revealed.current + step / (home.active ? HOME_REVEAL_S : REVEAL_S))
       const p = easeInOut(revealed.current)
       const dir = scratch.dir.copy(TOP_DIR).lerp(ISO_DIR, p).normalize()
       control.target.copy(HOME)

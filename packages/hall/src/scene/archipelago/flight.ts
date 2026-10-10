@@ -4,7 +4,7 @@ import type { IslandView } from "../../guild/islandView.ts"
 import type { Archipelago } from "../../world/archipelagoSource.ts"
 import { HOME, type Stop } from "../../world/islandRing.ts"
 import { easeInOut } from "../cameraMath.ts"
-import { flightSeconds, flightSize, frameOf } from "./view.ts"
+import { establishFrame, flightSeconds, flightSize, frameOf, mapFrame } from "./view.ts"
 
 /**
  * A flight between islands (the camera rig's, scene/CameraRig.tsx): a crane over the sea. The shot
@@ -66,11 +66,14 @@ export function planTrip(
   sizes: Sizes,
 ): Trip {
   const map = request.stop === "map"
-  const frame = frameOf(request.stop, archipelago)
+  const around = map ? request.around : undefined
+  const frame = around ? establishFrame(archipelago, around) : frameOf(request.stop, archipelago)
   const to = new Vector3(request.at?.[0] ?? frame.x, 1, request.at?.[1] ?? frame.z)
   const length = from.distanceTo(to)
   const overview = isOrtho ? sizes.wide : Math.max(sizes.far, frame.radius * 1.3)
-  const fitted = map ? (isOrtho ? sizes.mapZoom : sizes.mapDistance) : overview
+  // An establishing shot is the map's, tightened by how much smaller its frame is.
+  const tight = around ? mapFrame(archipelago).radius / frame.radius : 1
+  const fitted = map ? (isOrtho ? sizes.mapZoom * tight : sizes.mapDistance / tight) : overview
   return {
     to,
     sizeFrom: size,

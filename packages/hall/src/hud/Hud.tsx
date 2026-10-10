@@ -375,7 +375,7 @@ export function Hud() {
       {prefs.captions && (
         <Captions
           store={store}
-          visible={mode !== "detailed"}
+          visible={mode !== "detailed" && homePhase !== "invite"}
           announcePleas={hidden}
           quietMs={showcase ? OPENING_QUIET_MS : 1200}
         />

@@ -40,6 +40,31 @@ export function mapFrame(archipelago: Archipelago): Frame {
   return { x, z, radius }
 }
 
+/**
+ * An establishing shot: the core with its `count` nearest islands (by the distance between their
+ * centres), with the sea between them. Wider than any one island, tighter than the map; the core is
+ * pulled towards the middle like the map's.
+ */
+export function establishFrame(archipelago: Archipelago, count: number): Frame {
+  const [cx, cz] = archipelago.home.at
+  const near = [...archipelago.islands]
+    .sort((a, b) => Math.hypot(a.at[0] - cx, a.at[1] - cz) - Math.hypot(b.at[0] - cx, b.at[1] - cz))
+    .slice(0, count)
+  let minX = cx - archipelago.home.reach
+  let maxX = cx + archipelago.home.reach
+  let minZ = cz - archipelago.home.reach
+  let maxZ = cz + archipelago.home.reach
+  for (const { at, reach } of near) {
+    minX = Math.min(minX, at[0] - reach)
+    maxX = Math.max(maxX, at[0] + reach)
+    minZ = Math.min(minZ, at[1] - reach)
+    maxZ = Math.max(maxZ, at[1] + reach)
+  }
+  const x = (minX + maxX) / 2 + (cx - (minX + maxX) / 2) * CORE_PULL
+  const z = (minZ + maxZ) / 2 + (cz - (minZ + maxZ) / 2) * CORE_PULL
+  return { x, z, radius: Math.max(maxX - x, x - minX, maxZ - z, z - minZ) * 1.08 }
+}
+
 /** A stop's frame: the map's, or one island's (its keep, its reach). */
 export function frameOf(stop: Stop, archipelago: Archipelago): Frame {
   if (stop === "map") return mapFrame(archipelago)

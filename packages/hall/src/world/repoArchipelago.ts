@@ -4,7 +4,7 @@ import { DMath } from "./dmath.ts"
 import { type Coupling, weightOf } from "./gen/coupling.ts"
 import { hash } from "./gen/hex.ts"
 import type { Spot } from "./layout.ts"
-import { quayFacing } from "./quays.ts"
+import { headProblem, quayChoices, quayFacing } from "./quays.ts"
 import type { World } from "./world.ts"
 
 /**
@@ -130,6 +130,26 @@ export function chooseLinks(
   return out
 }
 
+/** The two ends of a link: island-local quays on the `a` and `b` coasts. */
+interface Quays {
+  qi: Spot
+  qj: Spot
+}
+/** A bridge is no longer than the strait it spans plus this: heads far from the narrowest part make a ferry. */
+const BRIDGE_SLACK = 40
+/** A bridge's head is looked for among this many of a coast's best quays. */
+const PAIR_OPTIONS = 60
+
+/** The first `n` of an iterator. */
+function* take<T>(items: Iterable<T>, n: number): Generator<T> {
+  if (n <= 0) return
+  let left = n
+  for (const item of items) {
+    yield item
+    if (--left === 0) return
+  }
+}
+
 const unit = (x: number, z: number): Spot => {
   const length = DMath.hypot(x, z) || 1
   return [x / length, z / length]
@@ -242,32 +262,78 @@ export function layoutSplit(islands: readonly Laid[], coupling: Coupling): Split
     )
     if (!strait) continue
     const gap = Math.round(strait.gap * 10) / 10
-    const kind = linkKind(wanted.weight, gap)
+    const wi0 = islands[i] as Laid
+    const wj0 = islands[j] as Laid
+    const away = (v: Spot): Spot => [-v[0], -v[1]]
     // Out from one coast towards the other, as the crossing will run: first as the straits' nearest
     // points say, then as the quays chosen say (so a bridge's aprons are judged on its real axis).
-    const bridge = kind === "bridge"
-    let across = unit(
-      (centers[j] as Spot)[0] + strait.b[0] - (centers[i] as Spot)[0] - strait.a[0],
-      (centers[j] as Spot)[1] + strait.b[1] - (centers[i] as Spot)[1] - strait.a[1],
-    )
-    let qi: Spot | undefined
-    let qj: Spot | undefined
-    for (let round = 0; round < (bridge ? 2 : 1); round++) {
-      qi = quayFacing((islands[i] as Laid).world, strait.a, local[i], {
-        facing: across,
-        bridge,
-        heads: heads[i] as Spot[],
-      })
-      qj = quayFacing((islands[j] as Laid).world, strait.b, local[j], {
-        facing: [-across[0], -across[1]],
-        bridge,
+    const axisOf = (qi: Spot, qj: Spot): Spot => {
+      const [a, b] = [upon(i, qi), upon(j, qj)]
+      return unit(b[0] - a[0], b[1] - a[1])
+    }
+    /** A ferry's two quays: the best of each coast. */
+    const ferryQuays = (): Quays | undefined => {
+      const across = unit(
+        (centers[j] as Spot)[0] + strait.b[0] - (centers[i] as Spot)[0] - strait.a[0],
+        (centers[j] as Spot)[1] + strait.b[1] - (centers[i] as Spot)[1] - strait.a[1],
+      )
+      const qi = quayFacing(wi0.world, strait.a, local[i], { facing: across, heads: heads[i] as Spot[] })
+      const qj = quayFacing(wj0.world, strait.b, local[j], {
+        facing: away(across),
         heads: heads[j] as Spot[],
       })
-      if (!qi || !qj) break
-      const [a, b] = [upon(i, qi), upon(j, qj)]
-      across = unit(b[0] - a[0], b[1] - a[1])
+      return qi && qj ? { qi, qj } : undefined
     }
-    if (!qi || !qj) continue
+    /**
+     * A bridge's two heads: the best pair (nearest the strait's narrowest, with room for the apron) of
+     * which each stands at the shore on the pair's real axis (`headProblem`): the bridge's way over
+     * either island's land is no more than a ramp. Judged on the axis the last round gave.
+     */
+    const bridgeQuays = (): Quays | undefined => {
+      let across = unit(
+        (centers[j] as Spot)[0] + strait.b[0] - (centers[i] as Spot)[0] - strait.a[0],
+        (centers[j] as Spot)[1] + strait.b[1] - (centers[i] as Spot)[1] - strait.a[1],
+      )
+      let found: Quays | undefined
+      for (let round = 0; round < 2; round++) {
+        const options = (one: Laid, k: number, target: Spot, facing: Spot): Spot[] => {
+          const wish = { facing, bridge: true, heads: heads[k] as Spot[] }
+          return [...take(quayChoices(one.world, target, local[k], wish), PAIR_OPTIONS)]
+        }
+        const oi = options(wi0, i, strait.a, across)
+        const oj = options(wj0, j, strait.b, away(across))
+        const shore = (qi: Spot, qj: Spot): boolean => {
+          const axis = axisOf(qi, qj)
+          const span = hypot(upon(i, qi), upon(j, qj))
+          return (
+            span <= gap + BRIDGE_SLACK &&
+            !headProblem(wi0.world, qi, axis, span) &&
+            !headProblem(wj0.world, qj, away(axis), span)
+          )
+        }
+        // Pairs by the sum of their ranks: the nearest to the strait first.
+        let next: Quays | undefined
+        for (let sum = 0; sum < oi.length + oj.length - 1 && !next; sum++)
+          for (let x = Math.max(0, sum - oj.length + 1); x <= Math.min(sum, oi.length - 1) && !next; x++) {
+            const [qi, qj] = [oi[x] as Spot, oj[sum - x] as Spot]
+            if (shore(qi, qj)) next = { qi, qj }
+          }
+        if (!next) break
+        found = next
+        across = axisOf(next.qi, next.qj)
+      }
+      return found
+    }
+    // Where the coasts allow no such pair of heads, the two islands are joined by a ferry instead.
+    let kind = linkKind(wanted.weight, gap)
+    let picked = kind === "bridge" ? bridgeQuays() : ferryQuays()
+    if (kind === "bridge" && !picked) {
+      kind = "ferry"
+      picked = ferryQuays()
+    }
+    if (!picked) continue
+    const bridge = kind === "bridge"
+    const { qi, qj } = picked
     const [wi, wj] = [upon(i, qi), upon(j, qj)]
     const span = hypot(wi, wj) || 1
     const facing = (from: Spot, to: Spot): Spot => [(to[0] - from[0]) / span, (to[1] - from[1]) / span]

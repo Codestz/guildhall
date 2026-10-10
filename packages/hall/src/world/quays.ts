@@ -2,6 +2,8 @@ import { blocker, islandObstacles, type Obstacle, onDryLand } from "./clearance.
 import { DMath } from "./dmath.ts"
 import { cellAt } from "./gen/hex.ts"
 import type { Post, Spot } from "./layout.ts"
+import { isLand } from "./linkStub.ts"
+import { roadFrom, roadWithin } from "./quayRoads.ts"
 import { WATER_CLEARANCE } from "./wilds.ts"
 import type { World } from "./world.ts"
 
@@ -16,8 +18,6 @@ import type { World } from "./world.ts"
 export const QUAY_CLEARANCE = 1.4
 /** The sea's nearest hex centre lies within this of a quay: it stands at the water's edge, not inland. */
 export const COAST_BAND = WATER_CLEARANCE + 3.5
-/** The road network is at most this far from a quay, in a straight, dry walk. */
-export const ROAD_REACH = 80
 /** Two quays on one island keep this far apart. */
 export const QUAY_SPACING = 9
 /** …and this far from a bridge's head, which is wide, and which a ferry's berth must keep off. */
@@ -30,7 +30,17 @@ export const BRIDGE_SPACING = 24
 export const APRON = { back: 9, ahead: 12, half: 7.5 } as const
 /** On a cramped island, at least the head itself: the ramp's length and the deck's width (world/bridges.ts). */
 export const HEAD = { back: 3, ahead: 9, half: 6.5 } as const
+/**
+ * A ferry's dock wants room for its timber, in the quay's frame (as APRON): the deck starts a little
+ * inland, the pier runs out to PIER, and its landing stage is wider; clear of every building.
+ */
+export const DOCK = { back: 3.5, ahead: 12, half: 4.5 } as const
 const APRON_STEP = 2
+/**
+ * A bridge leaves its island at the shore: its way over its own land is at most this long (about a
+ * hex), and the rest of it is over the strait. Beyond that the head is not on the coast facing the partner.
+ */
+export const HEAD_LAND = 10
 /** A building, as `islandObstacles` names it: what a bridge must never land against. */
 export const BUILDING = /^building_/
 
@@ -49,10 +59,8 @@ function seaOf(world: World): Spot[] {
 const TRAIL = /^T\d+\./
 
 interface Roads {
-  /** Every node a walker joins from the lowland (trails aside). */
-  all: [string, Spot][]
-  /** The ids the keep's own network reaches. */
-  main: Set<string>
+  /** The nodes the keep's own network reaches (trails aside). */
+  network: [string, Spot][]
 }
 const roads = new WeakMap<World, Roads>()
 function roadsOf(world: World): Roads {
@@ -69,7 +77,7 @@ function roadsOf(world: World): Roads {
     const start = [...all].sort((a, b) => from(a) - from(b) || (a[0] < b[0] ? -1 : 1))[0]?.[0]
     const main = new Set<string>(start ? [start] : [])
     for (const id of main) for (const next of adjacent.get(id) ?? []) main.add(next)
-    known = { all, main }
+    known = { network: all.filter(([id]) => main.has(id)) }
     roads.set(world, known)
   }
   return known
@@ -77,9 +85,17 @@ function roadsOf(world: World): Roads {
 
 const distance = (a: Spot, b: Spot): number => DMath.hypot(a[0] - b[0], a[1] - b[1])
 
+const planned = new WeakMap<World, readonly Obstacle[]>()
 /** What a quay keeps off: everything, or (planning) all but the wilds, which a quay's own site clears. */
-const obstaclesOf = (world: World, planning: boolean): readonly Obstacle[] =>
-  islandObstacles(world).filter((o) => !planning || !o.name.startsWith("wild "))
+function obstaclesOf(world: World, planning: boolean): readonly Obstacle[] {
+  if (!planning) return islandObstacles(world)
+  let known = planned.get(world)
+  if (!known) {
+    known = islandObstacles(world).filter((o) => !o.name.startsWith("wild "))
+    planned.set(world, known)
+  }
+  return known
+}
 
 /**
  * Why `spot` is no quay of `world`'s, or undefined when it is one. `planning`: the wilds don't count
@@ -90,22 +106,8 @@ export function quayProblem(world: World, spot: Spot, planning = false): string 
   const obstacles = obstaclesOf(world, planning)
   if (blocker(spot, obstacles, QUAY_CLEARANCE)) return "blocked by a building or tree"
   if (!seaOf(world).some((w) => distance(w, spot) <= COAST_BAND)) return "not at the coast"
-  // The road a walker joins from here: the nearest node, as the router takes it (world/paths.ts).
-  const { all, main } = roadsOf(world)
-  const road = all.reduce<[string, Spot] | undefined>(
-    (best, node) => (!best || distance(node[1], spot) < distance(best[1], spot) ? node : best),
-    undefined,
-  )
-  if (!road || distance(road[1], spot) > ROAD_REACH) return "no road within reach"
-  if (!main.has(road[0])) return "its road is cut off from the keep"
-  // The last stretch to the road is walked in a straight line: dry and clear all the way.
-  const n = Math.ceil(distance(road[1], spot) / 2)
-  for (let k = 1; k < n; k++) {
-    const at: Spot = [spot[0] + ((road[1][0] - spot[0]) * k) / n, spot[1] + ((road[1][1] - spot[1]) * k) / n]
-    if (!onDryLand(at, world)) return "no dry walk to the road"
-    if (blocker(at, obstacles, 0.5)) return "a building in the way to the road"
-  }
-  return undefined
+  // The road to the keep's network, over dry clear ground (world/quayRoads.ts).
+  return roadWithin(world, spot, obstacles, roadsOf(world).network) ? undefined : "no road within reach"
 }
 
 /** Why the bridge head at `spot`, facing `facing` (a unit vector out to sea), has no clear apron; undefined when it has. */
@@ -130,6 +132,16 @@ export function apronProblem(
   return undefined
 }
 
+/**
+ * Why a bridge head at `spot` facing `facing` (a unit vector out to sea) is not at the shore: its way
+ * runs on over its own island's land past HEAD_LAND, within `span`; undefined when it leaves the land at once.
+ */
+export function headProblem(world: World, spot: Spot, facing: Spot, span: number): string | undefined {
+  for (let t = HEAD_LAND; t <= span; t += APRON_STEP)
+    if (isLand(world, [spot[0] + facing[0] * t, spot[1] + facing[1] * t])) return "its way runs on over land"
+  return undefined
+}
+
 /** What a quay is wanted for (island-local `facing`, out to sea): where it must keep its apron, and whom it keeps off. */
 export interface QuayWish {
   /** The unit vector from the quay out towards its partner. Given, the quay's apron is kept clear if any spot has one. */
@@ -141,16 +153,17 @@ export interface QuayWish {
 }
 
 /**
- * A quay on `world`'s coast as near `target` (a point of the island, the coast the partner's lands
- * nearest) as one can be, at least QUAY_SPACING from each of `taken`. Undefined when the island has
- * no valid spot (it is then left without that link).
+ * The valid quays on `world`'s coast, nearest `target` (a point of the island, the coast the partner's
+ * lands nearest) first, each at least QUAY_SPACING from each of `taken`: lazily, best tier first (a
+ * bridge's head: full apron, then the head alone, then any), none twice. None at all and the island is
+ * left without that link.
  */
-export function quayFacing(
+export function* quayChoices(
   world: World,
   target: Spot,
   taken: readonly Spot[] = [],
   wish: QuayWish = {},
-): Spot | undefined {
+): Generator<Spot> {
   const candidates: { at: Spot; score: number }[] = []
   for (const tile of world.island.tiles) {
     if (!tile.piece.startsWith("hex_coast")) continue
@@ -165,31 +178,41 @@ export function quayFacing(
     }
   }
   candidates.sort((a, b) => b.score - a.score || a.at[0] - b.at[0] || a.at[1] - b.at[1])
+  // A bridge's head and every other quay keep BRIDGE_SPACING apart, in every tier: a ferry's dock too.
   const apart = (other: Spot): number =>
     wish.bridge || wish.heads?.includes(other) ? BRIDGE_SPACING : QUAY_SPACING
-  // The best: a full apron and room for the bridge heads; then the head alone; failing both any valid
-  // spot (a link is worth a tight landing).
-  const tiers: { apron: typeof APRON | typeof HEAD; only?: RegExp }[] =
-    wish.bridge && wish.facing ? [{ apron: APRON }, { apron: HEAD }, { apron: HEAD, only: BUILDING }] : []
-  for (const [tier, { apron, only }] of [...tiers, {} as (typeof tiers)[number]].entries())
-    for (const { at } of candidates) {
-      if (taken.some((other) => distance(other, at) < (tier < tiers.length ? apart(other) : QUAY_SPACING)))
-        continue
-      if (quayProblem(world, at, true)) continue
-      if (apron && wish.facing && apronProblem(world, at, wish.facing, apron, only)) continue
-      return at
+  const tiers: { apron: typeof APRON | typeof HEAD | typeof DOCK; only?: RegExp }[] = !wish.facing
+    ? []
+    : wish.bridge
+      ? [{ apron: APRON }, { apron: HEAD }, { apron: HEAD, only: BUILDING }]
+      : [{ apron: DOCK, only: BUILDING }]
+  const given = new Set<Spot>()
+  // Whether a spot is a quay at all, found once however many tiers look at it.
+  const valid = new Map<Spot, boolean>()
+  const quay = (at: Spot): boolean => {
+    let ok = valid.get(at)
+    if (ok === undefined) {
+      ok = !taken.some((other) => distance(other, at) < apart(other)) && !quayProblem(world, at, true)
+      valid.set(at, ok)
     }
-  return undefined
+    return ok
+  }
+  for (const { apron, only } of [...tiers, {} as (typeof tiers)[number]])
+    for (const { at } of candidates) {
+      if (given.has(at) || !quay(at)) continue
+      if (apron && wish.facing && apronProblem(world, at, wish.facing, apron, only)) continue
+      given.add(at)
+      yield at
+    }
 }
 
-/** The road node a quay's walk joins: the nearest one the keep's network reaches. */
-function roadFor(world: World, spot: Spot): string | undefined {
-  const { all, main } = roadsOf(world)
-  let best: [string, Spot] | undefined
-  for (const node of all)
-    if (main.has(node[0]) && (!best || distance(node[1], spot) < distance(best[1], spot))) best = node
-  return best?.[0]
-}
+/** The best quay of `quayChoices`; undefined when the island has no valid spot. */
+export const quayFacing = (
+  world: World,
+  target: Spot,
+  taken: readonly Spot[] = [],
+  wish: QuayWish = {},
+): Spot | undefined => quayChoices(world, target, taken, wish).next().value
 
 /**
  * The world with each quay made a work place with a road of its own (`facing`: a unit vector, out to
@@ -207,10 +230,16 @@ export function withQuays(
   const sites = quays.map(({ local, facing, span }, n) => {
     const id = `Q${n}`
     nodes[id] = local
-    const to = roadFor(world, local)
-    if (to) {
-      edges.push([id, to])
-      costs?.push(distance(local, world.roads.nodes[to] as Spot))
+    // The quay's road: the stops from the quay to the network, new waypoints named `Q<n>.<k>`.
+    let from = id
+    for (const [k, stop] of (
+      roadFrom(world, local, obstaclesOf(world, true), roadsOf(world).network) ?? []
+    ).entries()) {
+      const to = stop.id ?? `${id}.${k}`
+      nodes[to] = stop.at
+      edges.push([from, to])
+      costs?.push(distance(nodes[from] as Spot, stop.at))
+      from = to
     }
     const post: Post = [local[0], local[1], DMath.atan2(facing[0], facing[1])]
     // A bridge (`span`: its length) keeps its apron and its whole way over land clear of what grows.

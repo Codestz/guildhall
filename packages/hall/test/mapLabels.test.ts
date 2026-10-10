@@ -101,6 +101,24 @@ describe("the plates' layout", () => {
     expect(8 + (corner?.dy ?? 0) - 13).toBeGreaterThanOrEqual(8)
   })
 
+  test("a plate keeps off the rectangles it is told to avoid", () => {
+    const hud = { x: 340, y: 270, w: 120, h: 60 }
+    const [at] = layoutLabels([plate(400, 300)], view, [hud])
+    const box = { x: 400 + (at?.dx ?? 0) - 60, y: 300 + (at?.dy ?? 0) - 13, w: 120, h: 26 }
+    expect(at?.shown).toBe(true)
+    expect(clash(box, hud)).toBe(false)
+  })
+
+  test("no more plates than the limit are shown, the core always; the rest are pips", () => {
+    const items = [
+      plate(100, 100, 1e9, { pinned: true }),
+      ...Array.from({ length: 8 }, (_, i) => plate(100 + i * 90, 400, 10 - i)),
+    ]
+    const placed = layoutLabels(items, { ...view, max: 4 })
+    expect(placed[0]?.shown).toBe(true)
+    expect(placed.filter((at) => at.shown).length).toBe(4)
+  })
+
   test("the same islands lay out the same way", () => {
     const items = [plate(100, 100, 5), plate(120, 110, 4), plate(500, 300, 3)]
     expect(layoutLabels(items, view)).toEqual(layoutLabels(items, view))

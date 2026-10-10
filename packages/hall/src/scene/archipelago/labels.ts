@@ -49,7 +49,7 @@ const EDGE = 8
 /** Rings of candidate spots round an island, as multiples of the plate's own size. */
 const RINGS = [0, 1.2, 2.2, 3.4]
 
-interface Rect {
+export interface Rect {
   x: number
   y: number
   w: number
@@ -81,13 +81,20 @@ function candidates(item: LabelIn, ring: number): readonly (readonly [number, nu
  * important first take their spot, the rest the first that is free; the pinned ones are always shown
  * (at their best spot even if it overlaps).
  */
-export function layoutLabels(items: readonly LabelIn[], view: { w: number; h: number }): LabelOut[] {
+export function layoutLabels(
+  items: readonly LabelIn[],
+  view: { w: number; h: number /** At most this many plates (the rest pips). */; max?: number },
+  /** Screen rectangles no plate may cover (the HUD, the adventurers' chips). */
+  avoid: readonly Rect[] = [],
+): LabelOut[] {
   const out: LabelOut[] = items.map(() => ({ dx: 0, dy: 0, shown: false, leader: false }))
   const order = items
     .map((_, i) => i)
     .sort((a, b) => (items[b] as LabelIn).priority - (items[a] as LabelIn).priority || a - b)
-  const taken: Rect[] = []
+  const taken: Rect[] = [...avoid]
+  let shownCount = 0
   for (const i of order) {
+    if (view.max !== undefined && shownCount >= view.max && !(items[i] as LabelIn).pinned) continue
     const item = items[i] as LabelIn
     const rect = (dx: number, dy: number): Rect => ({
       x: item.x + dx - item.w / 2,
@@ -108,6 +115,7 @@ export function layoutLabels(items: readonly LabelIn[], view: { w: number; h: nu
     // The pinned plate is always shown: at its first choice, over whatever is there.
     const spot = best ?? (item.pinned ? candidates(item, 0)[0] : undefined)
     if (!spot) continue
+    shownCount++
     taken.push(rect(spot[0], spot[1]))
     out[i] = {
       dx: spot[0],

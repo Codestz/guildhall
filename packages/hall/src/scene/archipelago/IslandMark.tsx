@@ -8,7 +8,12 @@ import { HOME, type Stop } from "../../world/islandRing.ts"
 import { useWorld } from "../../world/source.ts"
 import { Label } from "../Label.tsx"
 import { SEA_Y } from "../Ships.tsx"
-import { type LabelIn, layoutLabels, shortName } from "./labels.ts"
+import { type LabelIn, layoutLabels, type Rect, shortName } from "./labels.ts"
+
+/** What a plate keeps off: the HUD's bars and buttons, and the adventurers' chips. */
+const AVOID = ".hud .toolbar, .hud .hud-head, .hud .plaque, .hud .timeline, .hud .tape, .chip, .chip > *"
+/** On a phone the map shows this many plates; the others are pips, which a tap brings back. */
+const PHONE_PLATES = 7
 
 /**
  * The map view's island plates (`M`, or a flight to "map"): each island's short name over its coast,
@@ -53,6 +58,8 @@ export function MapMarks({
   const working = store.views.filter((view) => view.phase === "working" || view.phase === "waiting").length
   const base = marks.find((mark) => mark.stop === HOME)?.island.name ?? ""
   const plates = useRef(new Map<Stop, Plate>())
+  const frame = useRef(0)
+  const avoid = useRef<Rect[]>([])
   const plateOf = (stop: Stop): Plate => {
     const known = plates.current.get(stop)
     if (known) return known
@@ -92,7 +99,19 @@ export function MapMarks({
       })
       stops.push(mark.stop)
     }
-    const placed = layoutLabels(items, { w: size.width, h: size.height })
+    // The HUD and the adventurers' chips stay uncovered; measured now and then (chips move).
+    frame.current++
+    if (frame.current % 8 === 1) {
+      avoid.current = []
+      for (const element of document.querySelectorAll(AVOID))
+        for (const r of [element.getBoundingClientRect()])
+          if (r.width > 0 && r.height > 0) avoid.current.push({ x: r.x, y: r.y, w: r.width, h: r.height })
+    }
+    const placed = layoutLabels(
+      items,
+      { w: size.width, h: size.height, ...(phone ? { max: PHONE_PLATES } : {}) },
+      avoid.current,
+    )
     for (const [k, stop] of stops.entries()) {
       const plate = plateOf(stop)
       const at = placed[k]
@@ -222,7 +241,14 @@ function IslandMark({
           ref={(element) => {
             plate.button = element
           }}
-          onClick={() => islandView.go(stop)}
+          onClick={(event) => {
+            // A pip first opens into its plate (a tap on a phone); the plate flies there.
+            if (event.currentTarget.dataset.shown === "false" && !hovered) {
+              onHover(stop)
+              return
+            }
+            islandView.go(stop)
+          }}
           onMouseEnter={() => onHover(stop)}
           onMouseLeave={() => onHover(null)}
           title={`Fly to ${island.repo}`}

@@ -21,8 +21,15 @@ export interface Obstacle {
 
 /** Sea kept between a lane and any other island's furthest land (the ships' offing, world/archipelago.ts, and a little more). */
 export const LANE_MARGIN = 30
-/** Where the boat lies: this far to the side of the pier's axis, alongside it. */
-export const BERTH_SIDE = 5.3
+/** A ferry's hull (the Kenney `ship-small`, scene/links/LinksLayer.tsx): half its beam, half its length. */
+export const HULL_BEAM = 2.4
+export const HULL_LENGTH = 4.6
+/** A dock's landing stage and its fender reach this far from the pier's axis (scene/links/dockMesh.ts). */
+export const STAGE_EDGE = 2.9
+/** The boat lies this clear of the stage. */
+const BERTH_GAP = 0.5
+/** Where the boat lies: this far to the side of the pier's axis, alongside it: its hull clear of the stage. */
+export const BERTH_SIDE = STAGE_EDGE + BERTH_GAP + HULL_BEAM
 /** …and this far back from the pier's end, towards land. */
 export const BERTH_BACK = 4
 /** The lane runs straight out from a berth this far before it may turn. */
@@ -39,7 +46,16 @@ export interface Lane {
   /** Distance along the lane to each point. */
   at: readonly number[]
   length: number
+  /** At each end, the unit vector from the pier out across the water to the berth: the way a boat turning there stands off. */
+  away: readonly [Spot, Spot]
 }
+
+/**
+ * How far from the pier's axis a hull turned `turn` radians off the pier's line must lie to clear the
+ * stage: its beam when parallel (BERTH_SIDE), more as it swings, its length when it stands across.
+ */
+export const standOff = (turn: number): number =>
+  STAGE_EDGE + BERTH_GAP + HULL_BEAM * Math.abs(DMath.cos(turn)) + HULL_LENGTH * Math.abs(DMath.sin(turn))
 
 /** Where a boat lies at a quay: alongside the pier's end, on the quay's berth side. */
 export function berthOf(quay: Quay): Spot {
@@ -141,7 +157,8 @@ export function laneOf(a: Quay, b: Quay, obstacles: readonly Obstacle[], walls: 
     const q = pts[i] as Spot
     at.push((at[i - 1] as number) + DMath.hypot(q[0] - p[0], q[1] - p[1]))
   }
-  return { pts, at, length: at[at.length - 1] as number }
+  const away = (q: Quay): Spot => [DMath.cos(q.facing) * q.berthSide, -DMath.sin(q.facing) * q.berthSide]
+  return { pts, at, length: at[at.length - 1] as number, away: [away(a), away(b)] }
 }
 
 const pointsClear = (pts: readonly Spot[], walls: readonly Wall[]): boolean =>

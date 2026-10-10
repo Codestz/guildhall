@@ -2,7 +2,7 @@ import type { BufferGeometry } from "three"
 import { type Bridge, DECK_EDGES, deckAt, PARAPET, RAIL_WIDTH } from "../../world/bridges.ts"
 import type { Quay } from "../../world/linkStub.ts"
 import { SEA_Y } from "../Ships.tsx"
-import { BED, COBBLE, COOL, courses, PALE, SHADE, STONE, tone } from "./bridgeStone.ts"
+import { COOL, courses, FLAG, PALE, SHADE, STONE, tone } from "./bridgeStone.ts"
 import { jitter, Shapes, type V3 } from "./shapes.ts"
 
 /**
@@ -168,7 +168,11 @@ export function addBridge(shapes: Shapes, bridge: Bridge, a: Quay): void {
   for (const s of bridge.piers) pier(shapes, f, s)
 }
 
-/** The paved deck between the parapets: cobbles, and the rail lane's bed of ballast along the right behind a pale kerb. */
+/**
+ * The paved deck between the parapets: one surface of light grey flagstones, each block a touch
+ * lighter or darker, with only a fine kerb line along it where the rail lane (RAIL_WIDTH, on the
+ * right) will run one day: no colour of its own.
+ */
 function paveDeck(
   shapes: Shapes,
   f: Frame,
@@ -176,29 +180,28 @@ function paveDeck(
   [y0, y1]: readonly [number, number],
   block: number,
 ): void {
-  const bed = RIGHT - RAIL_WIDTH + 0.3
+  const kerb = RIGHT - RAIL_WIDTH + 0.3
   const up: V3 = [0, 1, 0]
+  // Two flags across, the one beside the kerb and the one beyond it, each its own tone.
+  for (const [from, to, salt] of [
+    [LEFT, kerb, 3],
+    [kerb, RIGHT, 11],
+  ] as const)
+    shapes.quad(
+      f.at(s0, from, y0),
+      f.at(s1, from, y1),
+      f.at(s1, to, y1),
+      f.at(s0, to, y0),
+      up,
+      tone(FLAG, (jitter(block, salt) - 0.5) * 0.16),
+    )
   shapes.quad(
-    f.at(s0, LEFT, y0),
-    f.at(s1, LEFT, y1),
-    f.at(s1, bed, y1),
-    f.at(s0, bed, y0),
+    f.at(s0, kerb - 0.05, y0 + 0.02),
+    f.at(s1, kerb - 0.05, y1 + 0.02),
+    f.at(s1, kerb + 0.05, y1 + 0.02),
+    f.at(s0, kerb + 0.05, y0 + 0.02),
     up,
-    tone(COBBLE, (jitter(block, 3) - 0.5) * 0.18),
-  )
-  shapes.quad(
-    f.at(s0, bed, y0 + 0.04),
-    f.at(s1, bed, y1 + 0.04),
-    f.at(s1, RIGHT, y1 + 0.04),
-    f.at(s0, RIGHT, y0 + 0.04),
-    up,
-    tone(BED, (jitter(block, 11) - 0.5) * 0.2),
-  )
-  shapes.box(
-    f.at((s0 + s1) / 2, bed - 0.12, (y0 + y1) / 2 + 0.1),
-    [0.12, 0.1, (s1 - s0) / 2],
-    f.heading,
-    PALE,
+    tone(FLAG, 0.22),
   )
 }
 
@@ -298,7 +301,8 @@ function addTowers(shapes: Shapes, bridge: Bridge, a: Quay): void {
     for (const side of [LEFT - PARAPET - 0.2, RIGHT + PARAPET + 0.2]) {
       shapes.box(f.at(s, side, (top - 1) / 2), [1.2, (top + 1) / 2, 1.4], f.heading, STONE, 1.05)
       shapes.box(f.at(s, side, top + 0.2), [1.5, 0.2, 1.7], f.heading, PALE)
-      const peak = f.at(s, side, top + 1.9)
+      // A low cap in the coping's own pale stone, each face a little lighter or darker than the next.
+      const peak = f.at(s, side, top + 1.5)
       const corners = [
         f.at(s - 1.5, side - 1.3, top + 0.4),
         f.at(s - 1.5, side + 1.3, top + 0.4),
@@ -307,7 +311,7 @@ function addTowers(shapes: Shapes, bridge: Bridge, a: Quay): void {
       ]
       const outs = [f.dir(0, -1, 0.6), f.dir(1, 0, 0.6), f.dir(0, 1, 0.6), f.dir(-1, 0, 0.6)]
       for (const [i, out] of outs.entries())
-        shapes.tri(corners[i] as V3, corners[(i + 1) % 4] as V3, peak, out, SHADE, 0.75 + 0.1 * i)
+        shapes.tri(corners[i] as V3, corners[(i + 1) % 4] as V3, peak, out, PALE, 0.94 + 0.04 * i)
     }
   }
 }

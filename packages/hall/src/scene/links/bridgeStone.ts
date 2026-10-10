@@ -11,8 +11,8 @@ export const STONE: Swatch = { col: 6, row: 1, t: 0.4 }
 export const COOL: Swatch = { col: 2, row: 0, t: 0.55 }
 export const PALE: Swatch = { col: 2, row: 0, t: 0.2 }
 export const SHADE: Swatch = { col: 3, row: 0, t: 0.8 }
-export const COBBLE: Swatch = { col: 6, row: 1, t: 0.2 }
-export const BED: Swatch = { col: 7, row: 1, t: 0.5 }
+/** The deck's flagstones: light grey, between the caps' pale and the cool course. */
+export const FLAG: Swatch = { col: 2, row: 0, t: 0.32 }
 
 /** A swatch moved down (or, negative, up) its gradient. */
 export const tone = (swatch: Swatch, by: number): Swatch => ({ ...swatch, t: swatch.t + by })

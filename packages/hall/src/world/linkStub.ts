@@ -2,7 +2,7 @@ import { crossingsOf, type Shore } from "./archipelago.ts"
 import type { Archipelago } from "./archipelagoSource.ts"
 import { DMath } from "./dmath.ts"
 import { cellAt, key } from "./gen/hex.ts"
-import { BERTH_SIDE } from "./lanes.ts"
+import { BERTH_SIDE, HULL_BEAM, standOff } from "./lanes.ts"
 import type { Spot } from "./layout.ts"
 import type { World } from "./world.ts"
 
@@ -103,9 +103,9 @@ export function berthSideOf(world: World, end: Spot, facing: number): 1 | -1 {
   const uz = DMath.cos(facing)
   const landOn = (side: number): number => {
     let count = 0
-    // The hull's footprint beside the pier: stern to bow, and out to its beam.
+    // The hull's footprint beside the pier: stern to bow, and out to its beam and as far as it stands off turning.
     for (const along of [-9, -6, -3, 0, 3])
-      for (const out of [BERTH_SIDE - 2.4, BERTH_SIDE, BERTH_SIDE + 2.4])
+      for (const out of [BERTH_SIDE - HULL_BEAM, BERTH_SIDE, BERTH_SIDE + HULL_BEAM, standOff(Math.PI / 2)])
         if (isLand(world, [end[0] + ux * along + uz * out * side, end[1] + uz * along - ux * out * side]))
           count++
     return count

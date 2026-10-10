@@ -1,5 +1,5 @@
 import { hash } from "./gen/hex.ts"
-import { type Lane, type LanePoint, laneAt } from "./lanes.ts"
+import { BERTH_SIDE, type Lane, type LanePoint, laneAt, standOff } from "./lanes.ts"
 
 /**
  * A ferry's timetable: one boat on one lane, a pure function of story time (like scene/seas/fleet.ts:
@@ -69,6 +69,11 @@ export function ferryAt(table: Timetable, t: number, out: FerryState): FerryStat
     const arrived = forward ? out.heading + Math.PI : out.heading
     const swing = ease(Math.max(0, Math.min(1, (u / DWELL_S - SWING_FROM) / (SWING_TO - SWING_FROM))))
     out.heading = arrived + Math.PI * swing
+    // Turning, the boat stands off the pier by as much as its hull needs, and comes back alongside.
+    const [ax, az] = lane.away[forward ? 0 : 1]
+    const off = standOff(Math.PI * swing) - BERTH_SIDE
+    out.x += ax * off
+    out.z += az * off
     out.moored = forward ? "a" : "b"
     out.s = dock
     out.speed = 0

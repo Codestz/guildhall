@@ -1,10 +1,11 @@
 import type { Cell } from "../../lands.ts"
-import { Heap } from "../heap.ts"
-import { key, neighbours, rings, unkey } from "../hex.ts"
+import { key, rings } from "../hex.ts"
 import type { PlanDistrict } from "../plan.ts"
 import { AVENUE, type Form, GATE, HUB, RESERVED, RING } from "./keep.ts"
 import type { PlanLake } from "./lakes.ts"
 import type { Owners } from "./land.ts"
+import { cheapest } from "./route.ts"
+import { growStreets } from "./streets.ts"
 
 /** What a road pays to cross a range's hex, over a plain hex's 1. */
 const CLIMB = 2.5
@@ -23,7 +24,7 @@ export function layRoads(
   owner: Owners,
   heads: ReadonlyMap<number, number>,
   radius: number,
-  { bay }: Form = RING,
+  { bay, mass }: Form = RING,
   ranges: ReadonlySet<string> = NONE,
   lakes: readonly PlanLake[] = [],
 ): { road: Set<string>; roads: Cell[][] } {
@@ -32,6 +33,12 @@ export function layRoads(
   const streams = new Set(lakes.flatMap((lake) => lake.inlet))
   const road = new Set<string>([key(HUB), key(AVENUE), key(GATE)])
   const roads: Cell[][] = [[HUB, AVENUE]]
+  const price = (cell: Cell): number | undefined => {
+    const id = key(cell)
+    if (bay(cell) || (RESERVED.has(id) && !road.has(id)) || id === key(GATE) || wet.has(id)) return undefined
+    if (road.has(id)) return 0.4
+    return (owner.has(id) ? 1 : 8) + (ranges.has(id) ? CLIMB : 0) + (streams.has(id) ? STREAM : 0)
+  }
   const byDistance = districts
     .map((district, i) => ({ i, d: rings(district.square) }))
     .filter(({ i }) => i > 0)
@@ -41,13 +48,7 @@ export function layRoads(
     if (!district) continue
     const head = heads.get(i)
     const from = head === undefined ? HUB : (districts[head]?.square ?? HUB)
-    const path = cheapest(from, district.square, radius + 2, (cell) => {
-      const id = key(cell)
-      if (bay(cell) || (RESERVED.has(id) && !road.has(id)) || id === key(GATE) || wet.has(id))
-        return undefined
-      if (road.has(id)) return 0.4
-      return (owner.has(id) ? 1 : 8) + (ranges.has(id) ? CLIMB : 0) + (streams.has(id) ? STREAM : 0)
-    })
+    const path = cheapest(from, district.square, radius + 2, price)
     for (const cell of path) {
       const id = key(cell)
       road.add(id)
@@ -55,35 +56,8 @@ export function layRoads(
     }
     roads.push(path)
   }
+  // Generator v2: the streets grow with the island (plan/streets.ts).
+  if (mass)
+    growStreets({ districts, owner, road, roads, radius, price, ranges, wet: new Set([...wet, ...streams]) })
   return { road, roads }
-}
-
-/** Dijkstra over the hexes within `radius` rings; `cost` undefined means impassable. */
-function cheapest(from: Cell, to: Cell, radius: number, cost: (cell: Cell) => number | undefined): Cell[] {
-  const goal = key(to)
-  const best = new Map<string, number>([[key(from), 0]])
-  const back = new Map<string, string>()
-  const heap = new Heap<[number, string]>((a, b) => a[0] < b[0])
-  heap.push([0, key(from)])
-  for (let item = heap.pop(); item; item = heap.pop()) {
-    const [distance, id] = item
-    if (id === goal) break
-    if (distance > (best.get(id) ?? Number.POSITIVE_INFINITY)) continue
-    for (const next of neighbours(unkey(id))) {
-      if (rings(next) > radius) continue
-      const step = cost(next)
-      if (step === undefined) continue
-      const nextId = key(next)
-      const total = distance + step
-      if (total < (best.get(nextId) ?? Number.POSITIVE_INFINITY)) {
-        best.set(nextId, total)
-        back.set(nextId, id)
-        heap.push([total, nextId])
-      }
-    }
-  }
-  const path: Cell[] = [to]
-  for (let id = back.get(goal); id !== undefined; id = back.get(id)) path.unshift(unkey(id))
-  if (key(path[0] ?? to) !== key(from)) throw new Error(`no road from ${key(from)} to ${goal}`)
-  return path
 }

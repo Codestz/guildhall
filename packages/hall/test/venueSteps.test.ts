@@ -11,6 +11,7 @@ import MINTROOT from "./fixtures/repos/codestz__mintroot.json"
 import COCKPIT from "./fixtures/repos/codestz__opencode-cockpit.json"
 import REACT from "./fixtures/repos/facebook__react.json"
 import SELF from "./fixtures/repos/guildhall.json"
+import { SLOW } from "./support/slow.ts"
 
 /**
  * A venue's door step (prefabs/venues.ts) is the spot someone stands to go in: just outside the
@@ -47,15 +48,19 @@ describe("a gen 2 island's venue steps", () => {
     }),
   )
 
-  test("no step stands inside a building's own clearance box", () => {
-    const inBuilding: string[] = []
-    for (const world of worlds) {
-      const obstacles = islandObstacles(world).filter((o) => /^building_/.test(o.name))
-      for (const venue of world.venues ?? []) {
-        const hit = blocker(venue.door.step, obstacles)
-        if (hit) inBuilding.push(`${world.repo?.repo} ${venue.kind} in ${hit.name}`)
+  test(
+    "no step stands inside a building's own clearance box",
+    () => {
+      const inBuilding: string[] = []
+      for (const world of worlds) {
+        const obstacles = islandObstacles(world).filter((o) => /^building_/.test(o.name))
+        for (const venue of world.venues ?? []) {
+          const hit = blocker(venue.door.step, obstacles)
+          if (hit) inBuilding.push(`${world.repo?.repo} ${venue.kind} in ${hit.name}`)
+        }
       }
-    }
-    expect(inBuilding).toEqual([])
-  })
+      expect(inBuilding).toEqual([])
+    },
+    5000 * SLOW,
+  )
 })

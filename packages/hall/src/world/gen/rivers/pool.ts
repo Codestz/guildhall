@@ -52,6 +52,9 @@ export function* coursesFor(lake: PlanLake, t: Terrain): Generator<Course> {
   const slope = climb(unkey(lake.foot), t, taken)
   const stream = [...slope, ...inlet]
   if (stream.some((c) => taken.has(key(c)))) return
+  // The stream's own hexes cross a road only where a bridge stands.
+  const roads = new Set(t.plan.roads.flat().map(key))
+  if (stream.some((c) => roads.has(key(c)) && !t.bridges.has(key(c)))) return
   const far = (c: Cell): number => rings([c[0] - entry[0], c[1] - entry[1]])
   const order = lake.cells.map(unkey).sort((a, b) => far(b) - far(a) || (key(a) < key(b) ? -1 : 1))
   for (const exit of order) {

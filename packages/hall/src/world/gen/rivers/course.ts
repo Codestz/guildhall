@@ -2,11 +2,12 @@ import { DMath } from "../../dmath.ts"
 import { type Cell, cellToWorld } from "../../lands.ts"
 import { TERRACE } from "../../waterways.ts"
 import { Heap } from "../heap.ts"
-import { direction, key, neighbours, rings, unkey } from "../hex.ts"
+import { cellAt, direction, key, neighbours, rings, unkey } from "../hex.ts"
 import { RESERVED } from "../plan/keep.ts"
 import { keepOf } from "../plan/lakes.ts"
 import type { IslandPlan } from "../plan.ts"
 import { type Relief, tierOf } from "../relief/index.ts"
+import { crossingFault } from "./crossing.ts"
 
 /**
  * Where rivers run (terrain 2c): springs high on the ranges, and the way each one drains to the sea.
@@ -114,6 +115,11 @@ export function coursesOf(
 ): { courses: Course[]; bridges: Map<string, number> } {
   const tier = tierOf(plan.districts.reduce((sum, d) => sum + d.folder.files, 0))
   const bridges = crossable(plan)
+  // A bridge stands in the lowland only, where its deck meets level banks on both sides (crossing.ts).
+  const heightAt = (x: number, z: number): number =>
+    relief.heightAt(x, z) ?? ground.level(cellAt([x, z])) * TERRACE
+  for (const [id, axis] of bridges)
+    if (ground.massif.has(id) || crossingFault(unkey(id), axis, heightAt)) bridges.delete(id)
   const dry = dryOf(plan, bridges)
   // A lake's basin, shore and stream corridor are the lake's own: no river runs through them.
   for (const id of keepOf(plan.lakes)) dry.add(id)

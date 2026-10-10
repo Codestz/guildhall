@@ -3,7 +3,6 @@ import { stairAt } from "./facets.ts"
 import type { Massif } from "./field.ts"
 import { CORNERS, centreOf, RES } from "./lattice.ts"
 import { TRAIL_STRIDE } from "./shape.ts"
-import { ramped } from "./trailCarve.ts"
 
 /** A vertex is carved when it differs from the field's own height and from its stairs by more than this (units). */
 const CARVED = 0.05
@@ -27,7 +26,7 @@ export function carvedHex(massif: Massif, cell: Cell): boolean {
         const h = grid.data[at] as number
         if (
           Math.abs(h - (pristine[at] as number)) > CARVED &&
-          Math.abs(h - stairAt(grid, i, j, TRAIL_STRIDE, ramped(grid))) > CARVED
+          Math.abs(h - stairAt(grid, i, j, TRAIL_STRIDE)) > CARVED
         )
           return true
       }

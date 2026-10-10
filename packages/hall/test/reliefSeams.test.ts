@@ -10,7 +10,6 @@ import {
 
 /** Where a hex of the finest lattice meets a coarse one (world/gen/relief/seams.ts): both sides must read the same six vertices. */
 
-const NONE = () => false
 /** A grid of ledges (0) with one vertex off its ledge. */
 const gridOff = (at: Lat | undefined): HeightGrid => {
   const grid = new HeightGrid(-6, -6, 14, 14)
@@ -58,9 +57,9 @@ describe("a seam between a fine hex and a coarse one", () => {
     for (const off of [undefined, ...seamPoints(a, d, 1)]) {
       const grid = gridOff(off)
       const verdicts = [
-        coarseSeamStairs(grid, a, b, c as Lat, NONE),
-        fineSeamStairs(grid, a, [1, 0], xa as Lat, NONE),
-        fineSeamStairs(grid, [1, 0], b, xb as Lat, NONE),
+        coarseSeamStairs(grid, a, b, c as Lat),
+        fineSeamStairs(grid, a, [1, 0], xa as Lat),
+        fineSeamStairs(grid, [1, 0], b, xb as Lat),
       ]
       expect(verdicts).toEqual(Array(3).fill(off === undefined))
     }
@@ -69,17 +68,10 @@ describe("a seam between a fine hex and a coarse one", () => {
   test("the same seam with the coarse hex on the other side reads the same six", () => {
     const grid = gridOff(undefined)
     // The coarse apex below, the fine apexes above.
-    expect(coarseSeamStairs(grid, a, b, [2, -2], NONE)).toBe(true)
-    expect(fineSeamStairs(grid, a, [1, 0], [0, 1], NONE)).toBe(true)
+    expect(coarseSeamStairs(grid, a, b, [2, -2])).toBe(true)
+    expect(fineSeamStairs(grid, a, [1, 0], [0, 1])).toBe(true)
     const off = gridOff([2, -2])
-    expect(coarseSeamStairs(off, a, b, [2, -2], NONE)).toBe(false)
-    expect(fineSeamStairs(off, [1, 0], b, [1, 1], NONE)).toBe(false)
-  })
-
-  test("a vertex on a trail's shelf (drawn as a ramp) makes it a ramp seam on both sides", () => {
-    const grid = gridOff(undefined)
-    const shelf = (at: number): boolean => at === grid.index(1, 0)
-    expect(coarseSeamStairs(grid, a, b, [0, 2], shelf)).toBe(false)
-    expect(fineSeamStairs(grid, a, [1, 0], [1, -1], shelf)).toBe(false)
+    expect(coarseSeamStairs(off, a, b, [2, -2])).toBe(false)
+    expect(fineSeamStairs(off, [1, 0], b, [1, 1])).toBe(false)
   })
 })

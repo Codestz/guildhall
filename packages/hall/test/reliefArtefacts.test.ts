@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { SNOW_EDGE, snowAmount } from "../src/scene/terrain/snow.ts"
 import { cellAt, key, neighbours } from "../src/world/gen/hex.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
+import { treadAt } from "../src/world/gen/relief/flights.ts"
 import { snowlineOf } from "../src/world/gen/relief/index.ts"
 import { type MeshArrays, reliefMesh } from "../src/world/gen/relief/mesh.ts"
 import { LEDGE_STEP } from "../src/world/gen/relief/shape.ts"
@@ -55,12 +56,9 @@ describe("grass on the flanks", () => {
   const mesh = reliefMesh(CITY.relief!, CITY.relief!.massifs[0]!.cells, 0)
   const faces = facesOf(mesh)
 
-  test("none grows on a steep face: a flank steeper than a gentle slope is rock", () => {
-    // 0.05: a face with a footprint (not a riser or a curtain); 0.88: steeper than about 28 degrees.
-    const steep = faces.filter((f) => f.ny > 0.05 && f.ny < 0.88)
-    expect(steep.length).toBeGreaterThan(500)
-    // (A rim face over land wears the hex tile's own grass to join it, whatever its slope.)
-    expect(steep.filter((f) => GRASSES.includes(f.u) && f.v !== Math.fround(0.643))).toEqual([])
+  test("the mountain is flat tops and vertical walls: no face is a slope, so none grows grass on one", () => {
+    expect(faces.length).toBeGreaterThan(5000)
+    expect(faces.filter((f) => f.ny > 0.001 && f.ny < 0.999)).toEqual([])
   })
 
   test("grass on a slope is a patch, never a speckle: each run of grass ramps is joined to a ledge's top or is a good many faces", () => {
@@ -127,12 +125,13 @@ describe("no stretched triangles on the mountain's faces", () => {
           )
             continue
           faces++
-          expect(f.aspect).toBeLessThanOrEqual(8)
+          expect(f.aspect).toBeLessThanOrEqual(10)
           if (f.aspect > 6) long++
         }
       }
       expect(faces).toBeGreaterThan(1000)
-      expect(long / faces).toBeLessThan(0.002)
+      // (The tops of a river's trench, cut into the stairs, are the long ones.)
+      expect(long / faces).toBeLessThan(0.04)
     })
   }
 })
@@ -180,6 +179,9 @@ describe("the snow line", () => {
       // A face that takes full snow lies level, on a ledge: the cap is flat white tops, not faceted slopes.
       if (f.ny > 0.999) {
         expect(Math.max(...y) - Math.min(...y)).toBeLessThan(1e-3)
+        // (The treads of a trail's steps are flat tops too, a step's height apart.)
+        const [x, z] = [0, 2].map((k) => f.corners.reduce((sum, c) => sum + c[k]!, 0) / 3) as [number, number]
+        if (relief.massifs[0]!.flights.some((flight) => treadAt(flight, x, z) !== undefined)) continue
         expect(y[0]! % LEDGE_STEP).toBeCloseTo(0, 3)
         white++
       }

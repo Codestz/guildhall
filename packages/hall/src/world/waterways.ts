@@ -76,6 +76,13 @@ export interface Fall {
   /** The heights at the lip and the foot where a graded reach meets it (else `surfaceY` of the levels). */
   topY?: number
   bottomY?: number
+  /**
+   * A fall of a graded reach that stands off a hex edge (a long fall down a mountain's tallest wall,
+   * rivers/plunge.ts): where its lip is (world x, z), the unit direction it falls out in, and how wide it pours.
+   */
+  at?: readonly [number, number]
+  out?: readonly [number, number]
+  width?: number
 }
 
 /** A fall's surface heights: its lip's and its foot's. */

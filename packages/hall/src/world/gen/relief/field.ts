@@ -4,15 +4,17 @@ import type { Spot } from "../../layout.ts"
 import { TERRACE } from "../../waterways.ts"
 import { key, step } from "../hex.ts"
 import { shapingOf } from "./facets.ts"
+import type { Flight } from "./flights.ts"
 import { CIRCUM, CORNERS, centreOf, HeightGrid, pointOf, RES, ROW } from "./lattice.ts"
 import { smooth, valueNoise } from "./noise.ts"
 import { type Peak, type Ridge, type Saddle, skeletonOf } from "./ridges.ts"
+import { LEDGE_STEP } from "./shape.ts"
 import { type Source, spread } from "./spread.ts"
 import { settle } from "./summits.ts"
 
 /**
- * A massif's height field (terrain v2 §1.2–§2.2) on the lattice: the rim takes the neighbouring
- * hexes' tops exactly (or the sea cliff's −1.5 facing the sea), the skeleton's crests rise from it,
+ * A massif's height field (terrain v2 §1.2–§2.2) on the lattice: the rim stands on the ledge at or over
+ * the neighbouring hexes' tops (`rimLedge`; a wall of at most a ledge to the lowland), the skeleton's crests rise from it,
  * the flanks fall off each crest with the distance to the rim, ridged noise breaks them up, and the
  * result is set on LEDGE_STEP ledges (facets.ts) from the foot to the summit, so the whole mountain
  * speaks the hex kit's terrace language: a stepped peak, never a sculpted one.
@@ -20,6 +22,14 @@ import { settle } from "./summits.ts"
 
 /** Where a massif meets the sea: below the waterline, so the shore bake sees a cliff. */
 export const SEA_RIM = -1.5
+/**
+ * Where a massif's rim stands over a hex outside it whose top is `top`: that top taken up to the next
+ * ledge (the sea cliff down to the one below the waterline), so the foot is a ledge like any other and
+ * meets the lowland in a vertical wall, never a ramp (mesh.ts).
+ */
+export const rimLedge = (top: number): number =>
+  top < 0 ? -LEDGE_STEP : Math.ceil(top / LEDGE_STEP - 1e-6) * LEDGE_STEP
+
 /** How far the strata pull a height towards its nearest ledge (0 smooth, 1 terraced). */
 const LEDGE = 0.65
 /** How sharply a flank falls from its crest: 1 a cone, higher a sharper ridge. */
@@ -58,6 +68,12 @@ export interface Massif {
   slope: Float32Array
   /** The grid as the field made it, before a river or a trail was carved: what tells a carved hex (mesh.ts). */
   pristine: Float32Array
+  /** At each rim vertex, the top of the hex outside it (NaN elsewhere): how far the foot's wall stands over the lowland. */
+  foot: Float32Array
+  /** Per vertex, what a trail made of it (trailCarve.ts `ON_TRAIL`): the mesh paints its shelf as the path. */
+  trail: Uint8Array
+  /** The flights of steps the trails climb the risers by (flights.ts). */
+  flights: Flight[]
 }
 
 const SIX = [
@@ -135,6 +151,7 @@ export function massifOf(spec: MassifSpec): Massif {
 
   // The rim: the lattice points along every edge that faces a hex outside, at that hex's top.
   const rim = new Float32Array(owned.length).fill(Number.POSITIVE_INFINITY)
+  const foot = new Float32Array(owned.length).fill(Number.NaN)
   for (const cell of cells) {
     const [ci, cj] = centreOf(cell)
     for (let d = 0; d < 6; d++) {
@@ -145,7 +162,8 @@ export function massifOf(spec: MassifSpec): Massif {
       const [bi, bj] = CORNERS[(d + 1) % 6] as readonly [number, number]
       for (let a = 0; a <= RES; a++) {
         const at = grid.index(ci + (RES - a) * ai + a * bi, cj + (RES - a) * aj + a * bj)
-        rim[at] = Math.min(rim[at] as number, top)
+        rim[at] = Math.min(rim[at] as number, rimLedge(top))
+        foot[at] = Math.min(Number.isNaN(foot[at] as number) ? top : (foot[at] as number), top)
       }
     }
   }
@@ -155,7 +173,7 @@ export function massifOf(spec: MassifSpec): Massif {
   for (let j = j0; j <= j1; j++)
     for (let i = i0; i <= i1; i++) {
       const at = grid.index(i, j)
-      if (isRim(at)) rimSources.push({ i, j, value: rim[at] as number })
+      if (isRim(at)) rimSources.push({ i, j, value: foot[at] as number })
     }
   const { dist: toRim, carry: base } = spread(grid, owned, rimSources)
   relax(base, grid, owned, BLUR, isRim)
@@ -278,6 +296,9 @@ export function massifOf(spec: MassifSpec): Massif {
     grid,
     slope,
     pristine: Float32Array.from(grid.data),
+    foot,
+    trail: new Uint8Array(owned.length),
+    flights: [],
   }
 }
 

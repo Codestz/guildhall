@@ -30,13 +30,15 @@ export function fallsGeometry(waters: Waterways): BufferGeometry {
   return out.geometry()
 }
 
-const widthOf = (fall: Fall): number => (fall.source === "lake" ? LAKE_FALL_WIDTH : FALL_WIDTH)
+const widthOf = (fall: Fall): number => fall.width ?? (fall.source === "lake" ? LAKE_FALL_WIDTH : FALL_WIDTH)
 
 /** The upper and lower water's heights at a fall (a graded reach's own where one meets it). */
 const heightsOf = fallHeights
 
 /** The fall's frame: the lip's midpoint, outward (down the fall) and across it, in xz. */
 function frameOf(fall: Fall): { lip: Spot; out: Spot; across: Spot } {
+  if (fall.at && fall.out)
+    return { lip: [...fall.at], out: [...fall.out], across: [-fall.out[1], fall.out[0]] }
   const from = W(fall.from)
   const to = W(fall.to)
   const length = Math.hypot(to[0] - from[0], to[1] - from[1])

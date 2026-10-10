@@ -179,6 +179,10 @@ function edgeOf([cx, cz]: Spot, dir: number): [Spot, Spot] {
 
 /** Where a fall lands: past the lip by its throw, on the lower water. */
 function footOf(fall: Fall): Spot {
+  if (fall.at && fall.out) {
+    const reach = THROW_AT_LIP + THROW + 0.4
+    return [fall.at[0] + fall.out[0] * reach, fall.at[1] + fall.out[1] * reach]
+  }
   const [fx, fz] = W(fall.from)
   const [tx, tz] = W(fall.to)
   const [mx, mz] = mid([fx, fz], [tx, tz])
@@ -232,6 +236,8 @@ const TUCK = 1
 /** How much faster a graded reach runs for each unit of slope, and its fastest (the shaders' white water begins near 1.9). */
 const SLOPE_SPEED = 1.1
 const SPEED_MAX = 3.4
+/** A drop this far between two samples of a graded reach is a long fall (rivers/plunge.ts): its sheet is drawn, no ribbon. */
+const SHEER = 10
 
 /**
  * A graded reach (it runs down a mountain's flank): a ribbon along its surface, its width the
@@ -270,6 +276,7 @@ function slope(out: Builder, reach: Reach, falls: readonly Fall[]): void {
   })
   for (let i = 1; i < rows.length; i++) {
     const [a, b] = [rows[i - 1] as number[], rows[i] as number[]]
+    if ((grade[i - 1] as Point3)[1] - (grade[i] as Point3)[1] >= SHEER) continue
     for (let c = 0; c < COLUMNS; c++) {
       out.triangle(a[c] as number, a[c + 1] as number, b[c] as number, UP)
       out.triangle(a[c + 1] as number, b[c + 1] as number, b[c] as number, UP)

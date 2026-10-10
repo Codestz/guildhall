@@ -7,7 +7,7 @@ import { onLedge } from "./strata.ts"
  * edge the coarse side has two segments on and the fine side four. Over a segment of the coarse edge
  * `a`..`b` the fine side has a vertex `m` at its middle, and three triangles meet there: the coarse
  * one (`a`, `b`, its apex), and the fine side's two (`a`, `m` and `m`, `b`, each with its own apex).
- * When all six vertices stand on ledges (and none on a trail's shelf) the seam is stairs too: the
+ * When all six vertices stand on ledges the seam is stairs too: the
  * coarse triangle is split at `m` (its two halves share the fine triangles' edges, so both sides cut
  * the same riser in the same place) and no ramp is needed. Otherwise the seam stays a ramp (mesh.ts).
  *
@@ -15,8 +15,6 @@ import { onLedge } from "./strata.ts"
  */
 
 export type Lat = readonly [number, number]
-/** Whether a vertex (by its array index) stands on a trail's shelf, which is drawn as a ramp. */
-type Ramped = (at: number) => boolean
 
 /** A lattice step turned a sixth of a turn one way (+1) or the other (-1). */
 export const turn = ([i, j]: Lat, side: 1 | -1): Lat => (side > 0 ? [-j, i + j] : [i + j, -i])
@@ -36,36 +34,30 @@ export function seamPoints(a: Lat, d: Lat, side: 1 | -1): Lat[] {
   return [a, m, plus(m, d), plus(a, twice(turn(d, side))), plus(a, away), plus(m, away)]
 }
 
-const plain = (grid: HeightGrid, points: readonly Lat[], ramped: Ramped): boolean =>
-  points.every(([i, j]) => onLedge(grid.get(i, j)) && !ramped(grid.index(i, j)))
+const plain = (grid: HeightGrid, points: readonly Lat[]): boolean =>
+  points.every(([i, j]) => onLedge(grid.get(i, j)))
 
 /** Whether the seam over the coarse segment `a`–`b`, its coarse triangle's apex `c`, is stairs. */
-export function coarseSeamStairs(grid: HeightGrid, a: Lat, b: Lat, c: Lat, ramped: Ramped): boolean {
+export function coarseSeamStairs(grid: HeightGrid, a: Lat, b: Lat, c: Lat): boolean {
   const d: Lat = [(b[0] - a[0]) / 2, (b[1] - a[1]) / 2]
   const side = same(minus(c, a), twice(turn(d, 1))) ? 1 : -1
-  return plain(grid, seamPoints(a, d, side), ramped)
+  return plain(grid, seamPoints(a, d, side))
 }
 
 /** Whether the seam is stairs, from a fine triangle's edge `u`–`v` on it and that triangle's apex `x`, inside the fine hex. */
-export function fineSeamStairs(grid: HeightGrid, u: Lat, v: Lat, x: Lat, ramped: Ramped): boolean {
+export function fineSeamStairs(grid: HeightGrid, u: Lat, v: Lat, x: Lat): boolean {
   const [a, m] = isCoarse(u) ? [u, v] : [v, u]
   const d = minus(m, a)
   // The fine apex lies on the side opposite the coarse one: x = a + turn(d, -side).
   const side = same(minus(x, a), turn(d, -1)) ? 1 : -1
-  return plain(grid, seamPoints(a, d, side), ramped)
+  return plain(grid, seamPoints(a, d, side))
 }
 
 /**
  * Whether the seam edge `u`–`v` (a fine step or a coarse segment on a hex edge between the two
  * lattices) is stairs. `sizeAt` gives the lattice (4 or 2) of the hex holding a lattice point.
  */
-export function steppedSeam(
-  grid: HeightGrid,
-  u: Lat,
-  v: Lat,
-  sizeAt: (at: Lat) => number,
-  ramped: Ramped,
-): boolean {
+export function steppedSeam(grid: HeightGrid, u: Lat, v: Lat, sizeAt: (at: Lat) => number): boolean {
   const d = minus(v, u)
   const coarse = isCoarse(u) && isCoarse(v)
   const half: Lat = coarse ? [d[0] / 2, d[1] / 2] : d
@@ -74,7 +66,7 @@ export function steppedSeam(
   const fine = sides.find((at) => sizeAt(at) === RES)
   const near = sides.find((at) => sizeAt(at) === RES / 2)
   if (!fine || !near) return false
-  return coarse ? coarseSeamStairs(grid, u, v, near, ramped) : fineSeamStairs(grid, u, v, fine, ramped)
+  return coarse ? coarseSeamStairs(grid, u, v, near) : fineSeamStairs(grid, u, v, fine)
 }
 
 /**
@@ -87,7 +79,6 @@ export function snapsOf(
   [ci, cj]: Lat,
   n: number,
   coarseOf: (d: number) => number,
-  ramped: Ramped,
 ): Map<string, number> {
   const snapped = new Map<string, number>()
   if (n < 2) return snapped
@@ -103,8 +94,7 @@ export function snapsOf(
     for (let a = 1; a < n; a++) {
       if (a % gap === 0) continue
       const lo = Math.floor(a / gap) * gap
-      if (n === RES && gap === 2 && fineSeamStairs(grid, edgeAt(lo), edgeAt(lo + 1), innerAt(lo), ramped))
-        continue
+      if (n === RES && gap === 2 && fineSeamStairs(grid, edgeAt(lo), edgeAt(lo + 1), innerAt(lo))) continue
       const t = (a - lo) / gap
       const [i, j] = edgeAt(a)
       snapped.set(`${i},${j}`, grid.get(...edgeAt(lo)) * (1 - t) + grid.get(...edgeAt(lo + gap)) * t)

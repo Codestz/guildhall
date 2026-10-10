@@ -14,6 +14,7 @@ import {
   type Waterways,
 } from "../../waterways.ts"
 import { key } from "../hex.ts"
+import { plunge } from "./plunge.ts"
 
 /**
  * Rivers that run down a mountain (terrain 2c, after the water layer sorted them): over a massif
@@ -23,8 +24,8 @@ import { key } from "../hex.ts"
  * across a ledge's top and down its riser, so the water runs the terraces as a stair of pools and
  * falls at the ledge walls (carve.ts cuts the bed to it; scene/nature/ribbonMesh.ts draws it). A fall stays only
  * at a real ledge: a hex edge the water layer had a fall on where the ground itself drops over
- * LEDGE in a short run. Where a run meets the lowland's flat water (or the sea) its surface comes
- * down to that water's level, so the stream arrives rather than steps. Pure; reads the relief's
+ * LEDGE in a short run. Where a run meets the lowland's flat water (or the sea) its last step
+ * drops to that water's level: the trench ends in a fall at the foot. Pure; reads the relief's
  * heights before they are carved.
  */
 
@@ -32,8 +33,6 @@ import { key } from "../hex.ts"
 const LEDGE = 2 * TERRACE
 /** ...and its water to drop at least this far (else it is one stream after all). */
 const MIN_DROP = TERRACE
-/** Where a run comes down to the water ahead, over this many samples. */
-const RAMP = 4
 
 /** The ground as grading sees it, before the relief is carved. */
 export interface GradeGround {
@@ -195,6 +194,10 @@ function gradeRun(hexes: RiverHex[], run: Run): { reaches: Reach[]; falls: Fall[
       if (lipY - bottom >= MIN_DROP) falls.push({ ...fall, topY: lipY, bottomY: bottom })
       else surface = descend(slope, surface[0], below, below)
     }
+    // Over the tallest wall runs the water takes one long fall, not a step a ledge.
+    const plunged = plunge(surface, pts.slice(lo, hi + 1))
+    surface = plunged.surface
+    falls.push(...plunged.falls)
     above = surface.at(-1)
 
     const prev = k0 > 0 ? hexes[k0 - 1]?.cell : run.prev
@@ -211,7 +214,7 @@ function gradeRun(hexes: RiverHex[], run: Run): { reaches: Reach[]; falls: Fall[
 
 /**
  * The surface down a stretch of ground: never rising, starting at `start` (else the
- * ground's own height), kept above `floor`, and brought down to land on `arrive` if there is one.
+ * ground's own height), kept above `floor`, and dropping to land on `arrive` at its end if there is one.
  */
 function descend(
   ground: readonly number[],
@@ -224,12 +227,7 @@ function descend(
     if (m > 0) y = Math.min(y, s)
     return Math.max(y, floor ?? Number.NEGATIVE_INFINITY)
   })
-  if (arrive === undefined) return flat
-  const lead = flat.length - 1 - RAMP
-  return flat.map((v, m) => {
-    const t = Math.min(1, Math.max(0, (m - lead) / RAMP))
-    return v + (arrive - v) * t * t * (3 - 2 * t)
-  })
+  return arrive === undefined ? flat : flat.map((v, m) => (m === flat.length - 1 ? arrive : v))
 }
 
 /** A polyline as points ≤ GRADE_STEP apart, its ends included. */

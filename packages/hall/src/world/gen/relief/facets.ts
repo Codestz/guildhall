@@ -31,22 +31,15 @@ function triangleAt(
  * coarse triangle's corners all stand on ledges, the plane's height rounded to its ledge (the riser is
  * the plane's half-ledge contour, a straight line, which is where the mesh cuts it), else the plane
  * (a rim's half terrace, a trail's shelf). A finer lattice (a river's hex) laid on it is stairs too.
- * A triangle all of whose corners `ramped` (a trail's shelf, drawn as a ramp) is its plane.
  */
-export function stairAt(
-  grid: HeightGrid,
-  i: number,
-  j: number,
-  stride: number,
-  ramped: (at: number) => boolean = () => false,
-): number {
+export function stairAt(grid: HeightGrid, i: number, j: number, stride: number): number {
   const { at, weights } = triangleAt(grid, i, j, stride)
   const corners = at.map((v) => (v < 0 ? Number.NaN : (grid.data[v] as number)))
   const plane =
     (corners[0] as number) * weights[0] +
     (corners[1] as number) * weights[1] +
     (corners[2] as number) * weights[2]
-  return corners.every(onLedge) && !at.every(ramped) ? Math.round(plane / LEDGE_STEP) * LEDGE_STEP : plane
+  return corners.every(onLedge) ? Math.round(plane / LEDGE_STEP) * LEDGE_STEP : plane
 }
 
 /** The stairs' height at a world point, or undefined where the massif owns no triangle there: what the mesh draws. */

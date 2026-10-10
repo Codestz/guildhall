@@ -82,16 +82,10 @@ function faceOf(p: readonly number[], q: readonly number[], r: readonly number[]
   }
 }
 
-/** Rock by steepness and region: grey stone (the slate strip) as the base, darker on walls, with warm stone only in a few patches; lighter higher up. */
-function rock(slope: number, region: number): Zone {
+/** Rock by steepness: grey stone (the slate strip) throughout, darker on a wall, lighter higher up. */
+function rock(slope: number): Zone {
   if (slope >= CLIFF) return { swatch: SWATCH.slate, t: 0.8, rise: -0.25 }
-  if (slope >= BARE)
-    return region > 0.8
-      ? { swatch: SWATCH.warm, t: 0.5, rise: -0.25 }
-      : { swatch: SWATCH.slate, t: 0.55, rise: -0.25 }
-  return region > 0.82
-    ? { swatch: SWATCH.warm, t: 0.4, rise: -0.25 }
-    : { swatch: SWATCH.slate, t: 0.35, rise: -0.25 }
+  return { swatch: SWATCH.slate, t: slope >= BARE ? 0.55 : 0.35, rise: -0.25 }
 }
 
 /**
@@ -111,17 +105,23 @@ export function zoneOf(
   grass = true,
 ): Zone {
   const { slope, height, x, z } = faceOf(p, q, r)
-  const region = valueNoise(11, x / REGION, z / REGION, 21)
-  if (slope >= TOP || !grass) return rock(slope, region)
+  if (slope >= TOP || !grass) return rock(slope)
   const t = height / Math.max(1, peak) + WANDER * (2 * valueNoise(11, x / REGION, z / REGION, 22) - 1)
-  if (t >= WOOD) return region > 0.62 ? rock(0, region) : { swatch: SWATCH.slate, t: 0.3, rise: -0.2 }
+  if (t >= WOOD) return { swatch: SWATCH.slate, t: 0.3, rise: -0.2 }
   if (t >= FOOT) return { swatch: SWATCH.meadow, t: 0.3, rise: 0.4 }
   return { swatch: SWATCH.grass, t: GRASS_T, rise: 0.25 }
 }
 
-/** A riser's zone: grey stone for the whole ledge band, with a warm band every third one. */
-export const riserZone = (low: number): Zone =>
-  low % 3 === 2 ? { swatch: SWATCH.warm, t: 0.45, rise: 0 } : { swatch: SWATCH.slate, t: 0.55, rise: 0 }
+/**
+ * A riser's zone: one grey stone family from the foot to the summit, the strip's blue-grey slate,
+ * lighter with each ledge and alternating a shade band by band; the lowest two bands wear the
+ * kit's slightly warmer rock grey.
+ */
+export const riserZone = (low: number): Zone => ({
+  swatch: low <= 1 ? SWATCH.rock : SWATCH.slate,
+  t: low <= 1 ? 0.5 : Math.max(0.3, 0.6 - 0.03 * low) + (low % 2 === 0 ? 0.05 : 0),
+  rise: 0,
+})
 
 /** A vertex's v on its zone's strip. */
 export function vOf(zone: Zone, { rel, curve, weather = 0 }: Tone): number {

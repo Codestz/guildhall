@@ -5,6 +5,7 @@ import { key } from "../hex.ts"
 import { HUB } from "../plan/keep.ts"
 import type { IslandPlan } from "../plan.ts"
 import { type Massif, massifOf, SEA_RIM } from "./field.ts"
+import { treadAt } from "./flights.ts"
 import { HeightGrid } from "./lattice.ts"
 import { CAP, footprintsOf, type Tier, tierOf } from "./massifs.ts"
 import { PEAK_BOOST } from "./shape.ts"
@@ -94,7 +95,8 @@ export function reliefOver(tier: Tier, massifs: readonly Massif[]): Relief {
     heightAt: (x, z) => {
       for (const m of massifs) {
         const h = m.grid.heightAt(x, z)
-        if (h !== undefined) return h
+        // A flight of steps stands higher than the ledge's plane under it.
+        if (h !== undefined) return m.flights.reduce((top, f) => Math.max(top, treadAt(f, x, z) ?? top), h)
       }
       return undefined
     },

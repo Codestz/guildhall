@@ -1,7 +1,9 @@
+import { DMath } from "../../dmath.ts"
 import type { Cell } from "../../lands.ts"
 import { key } from "../hex.ts"
 import { limitLevels, stairAt } from "./facets.ts"
-import { CIRCUM, CORNERS, centreOf, type HeightGrid, RES, ROW } from "./lattice.ts"
+import type { Flight } from "./flights.ts"
+import { CIRCUM, CORNERS, centreOf, type HeightGrid, pointOf, RES, ROW } from "./lattice.ts"
 import { at, ijOf, type Lattice, SLOPE } from "./trailSearch.ts"
 
 /**
@@ -10,7 +12,8 @@ import { at, ijOf, type Lattice, SLOPE } from "./trailSearch.ts"
  * cut to the leg's height, so a flat shelf (two triangles' width) runs across the slope with the hill
  * standing above it and the ground falling away below. Hairpins get a landing, the end a pad for the
  * lookout. The vertices between the coarse ones are brought back to the coarse planes afterwards,
- * so the mesh, `heightAt` and the walkers agree. Vertices carry flags (`flagsOf`) for the mesh to paint.
+ * so the mesh, `heightAt` and the walkers agree. Vertices carry flags (the massif's `trail`) for the mesh to paint,
+ * and where a leg climbs a riser a flight of steps (flights.ts) leans on the wall.
  */
 
 /** A vertex on a trail's shelf, and on a stair leg (steeper than a walking trail: painted as stone). */
@@ -21,17 +24,9 @@ export const ON_STAIRS = 2
 export interface Ground {
   grid: HeightGrid
   slope: Float32Array
+  trail: Uint8Array
+  flights: Flight[]
 }
-
-const flags = new WeakMap<HeightGrid, Uint8Array>()
-/** Whether a vertex stands on a trail's shelf: a triangle of three of them is drawn as a ramp (trailPaint.ts), so the ground between follows the plane. */
-export const ramped =
-  (grid: HeightGrid) =>
-  (v: number): boolean =>
-    ((flags.get(grid)?.[v] ?? 0) & ON_TRAIL) !== 0
-
-/** A massif's trail flags by lattice vertex (`ON_TRAIL`, `ON_STAIRS`); undefined where no trail runs. */
-export const flagsOf = (grid: HeightGrid): Uint8Array | undefined => flags.get(grid)
 
 /** A planned trail to carve: the lattice vertices from the head, and the height of each. */
 export interface Plan {
@@ -65,8 +60,7 @@ function beside(lattice: Lattice, a: number, b: number): number[] {
  */
 export function carve(ground: Ground, lattice: Lattice, plan: Plan, pad: boolean): Set<number> {
   const { grid } = ground
-  const paths = flags.get(grid) ?? new Uint8Array(grid.data.length)
-  flags.set(grid, paths)
+  const paths = ground.trail
   const { chain, heights } = plan
   const changed = new Set<number>()
   const pitch = (CIRCUM / RES) * lattice.stride
@@ -92,6 +86,24 @@ export function carve(ground: Ground, lattice: Lattice, plan: Plan, pad: boolean
     paths[v] = (paths[v] as number) | ON_TRAIL | (steep ? ON_STAIRS : 0)
     changed.add(v)
   })
+  // A leg that climbs a riser: its flight of steps leans on the wall, which stands half-way along the leg.
+  for (let k = 0; k + 1 < chain.length; k++) {
+    const [ha, hb] = [heights[k] as number, heights[k + 1] as number]
+    if (Math.abs(ha - hb) < 0.5) continue
+    const [from, to] = ha < hb ? [chain[k], chain[k + 1]] : [chain[k + 1], chain[k]]
+    const [a, b] = [pointOf(...ijOf(grid, from as number)), pointOf(...ijOf(grid, to as number))]
+    const length = DMath.hypot(b[0] - a[0], b[1] - a[1])
+    ground.flights.push({
+      x: Math.round(((a[0] + b[0]) / 2) * 1000) / 1000,
+      z: Math.round(((a[1] + b[1]) / 2) * 1000) / 1000,
+      dx: (b[0] - a[0]) / length,
+      dz: (b[1] - a[1]) / length,
+      lo: Math.min(ha, hb),
+      hi: Math.max(ha, hb),
+      // The foot of a flight down to the trail's end stops short of the lookout's pad.
+      ...(from === chain[chain.length - 1] ? { run: Math.round(length * 0.425 * 1000) / 1000 } : {}),
+    })
+  }
   for (let k = 0; k + 1 < chain.length; k++) {
     const a = chain[k] as number
     const b = chain[k + 1] as number
@@ -140,11 +152,11 @@ export function settle(
   changed: Set<number>,
   river: ReadonlySet<string>,
 ): void {
-  const { grid, slope } = ground
+  const { grid, slope, trail } = ground
   const { stride } = lattice
   // The ledges the cuts left standing too tall or too thin come down; the shelf and the rim stay.
-  const shelf = ramped(grid)
-  for (const v of limitLevels(grid, (v) => lattice.rim.has(v) || shelf(v))) changed.add(v)
+  for (const v of limitLevels(grid, (v) => lattice.rim.has(v) || ((trail[v] as number) & ON_TRAIL) !== 0))
+    changed.add(v)
   const near = (ci: number, cj: number, visit: (i: number, j: number) => void): void => {
     for (let dj = -RES; dj <= RES; dj++)
       for (let di = -RES; di <= RES; di++) if (Math.abs(di + dj) <= RES) visit(ci + di, cj + dj)
@@ -161,7 +173,7 @@ export function settle(
       const v = grid.index(i, j)
       if (v < 0 || Number.isNaN(grid.data[v] as number) || lattice.rim.has(v)) return
       if (i % stride === 0 && j % stride === 0) return
-      const stairs = stairAt(grid, i, j, stride, shelf)
+      const stairs = stairAt(grid, i, j, stride)
       if (!Number.isNaN(stairs)) grid.data[v] = stairs
     })
   }
@@ -184,10 +196,9 @@ export function settle(
 }
 
 /** Whether a point stands on or beside a trail's shelf (within about a vertex of it): nothing grows or lies there. */
-export function onShelf(massif: Pick<Ground, "grid">, x: number, z: number): boolean {
+export function onShelf(massif: Pick<Ground, "grid" | "trail">, x: number, z: number): boolean {
   const { grid } = massif
-  const paths = flags.get(grid)
-  if (!paths) return false
+  const paths = massif.trail
   const fj = (z * RES) / ROW
   const fi = (x * RES) / CIRCUM - fj / 2
   const [i, j] = [Math.round(fi), Math.round(fj)]

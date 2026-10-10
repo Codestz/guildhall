@@ -3,6 +3,7 @@ import type { Cell } from "../../lands.ts"
 import { cellAt, key, step } from "../hex.ts"
 import { carvedHex } from "./carved.ts"
 import { curvatureAt } from "./curvature.ts"
+import { flightsIn } from "./flights.ts"
 import type { Relief } from "./index.ts"
 import { CIRCUM, CORNERS, centreOf, pointOf, RES, ROW, sectorTriangles } from "./lattice.ts"
 import { valueNoise } from "./noise.ts"
@@ -12,7 +13,6 @@ import { TRAIL_STRIDE } from "./shape.ts"
 import { smoothNormals, WALL } from "./smooth.ts"
 import { curtainOf, cutEdge, levelOf, onLedge, onLine, profile, rampOf, stairsOf, upOf } from "./strata.ts"
 import { SWATCH, swatchV } from "./swatches.ts"
-import { flagsOf, ramped } from "./trailCarve.ts"
 import { trailTexel } from "./trailPaint.ts"
 
 /**
@@ -131,24 +131,17 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
     const massif = relief.massifAt(cell)
     if (!massif) return
     const { grid } = massif
-    const trailFlags = flagsOf(grid)
+    const trailFlags = massif.trail
     // A hex's lattice: the tier's, but a river's bed or a trail's shelf keeps the finest at every
     // tier, or the far ground would bury it.
     const n = nOf(cell)
     const stride = RES / n
     const [ci, cj] = centreOf(cell)
     // Where a fine hex meets a coarser one the edge's in-between vertices lie on the coarse edge (seams.ts).
-    const shelf = ramped(grid)
-    const snapped = snapsOf(
-      grid,
-      [ci, cj],
-      n,
-      (d) => {
-        const next = step(cell, d)
-        return relief.massifAt(next) ? nOf(next) : n
-      },
-      shelf,
-    )
+    const snapped = snapsOf(grid, [ci, cj], n, (d) => {
+      const next = step(cell, d)
+      return relief.massifAt(next) ? nOf(next) : n
+    })
     // x, y, z, and the lattice vertex's own smoothed steepness and trail flag.
     const vertex = (i: number, j: number, drop = 0): number[] => {
       const [x, z] = pointOf(i, j)
@@ -157,7 +150,7 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
         (snapped.get(`${i},${j}`) ?? grid.get(i, j)) - drop,
         z,
         massif.slope[grid.index(i, j)] as number,
-        trailFlags?.[grid.index(i, j)] ?? 0,
+        trailFlags[grid.index(i, j)] as number,
       ]
     }
     /** A vertex that stands on a ledge of the stairs (not a rim at a half terrace, nor a trail's or river's ramp). */
@@ -208,11 +201,10 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
           latticeOf(u[0] as number, u[2] as number),
           latticeOf(v[0] as number, v[2] as number),
           sizeAt,
-          shelf,
         )
       )
     }
-    /** Whether the triangle across the edge u–v from `w` is stairs (its third corner stands on a ledge, and it is no trail or lattice change). */
+    /** Whether the triangle across the edge u–v from `w` is stairs (its third corner stands on a ledge, and it is no lattice change). */
     const stairsAcross = (u: number[], v: number[], w: number[]): boolean => {
       const across = vertex(
         ...latticeOf(
@@ -220,9 +212,7 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
           (u[2] as number) + (v[2] as number) - (w[2] as number),
         ),
       )
-      return (
-        onStairs(across) && !trailTexel(u, v, across) && !straightEdge(u, across) && !straightEdge(v, across)
-      )
+      return onStairs(across) && !straightEdge(u, across) && !straightEdge(v, across)
     }
 
     for (let k = 0; k < 6; k++) {
@@ -240,8 +230,6 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
       const gap = across > n ? across / n : 1
       // A skirt hangs where the set ends over a hex that does not meet it exactly: a tile's, another massif's, or a lattice of another size (a tier's seam).
       const skirted = isReal && !inSet.has(key(next)) && (relief.massifAt(next) !== massif || across !== n)
-      // The hex edge's own corner decides whether the skirt hangs over the sea.
-      const sea = (vertex(ci + stride * n * ai, cj + stride * n * aj)[1] as number) < 0
       for (let a = 0; a < n; a++)
         for (let b = 0; a + b < n; b++) {
           for (const [index, ab] of sectorTriangles(n, a, b).entries()) {
@@ -253,8 +241,8 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
             const [lp, lq, lr] = ab.map(latOf) as unknown as [Lat, Lat, Lat]
             const stairsSeam =
               onEdge &&
-              ((n === 2 && across === RES && coarseSeamStairs(grid, lq, lr, lp, shelf)) ||
-                (n === RES && across === 2 && fineSeamStairs(grid, lq, lr, lp, shelf)))
+              ((n === 2 && across === RES && coarseSeamStairs(grid, lq, lr, lp)) ||
+                (n === RES && across === 2 && fineSeamStairs(grid, lq, lr, lp)))
             const straight = onEdge && across !== n && !stairsSeam ? 1 : -1
             // The rim faces over land wear the tile top's grass: no seam to the hex ground.
             const low = Math.min(p[1] as number, q[1] as number, r[1] as number)
@@ -263,10 +251,14 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
               onEdge &&
               low >= 0 &&
               Math.max(p[1] as number, q[1] as number, r[1] as number) - low < FLAT_RIM
+            // A trail's shelf: the path's sand on the flat tops (trailPaint.ts).
+            const trail = trailTexel(p, q, r)
             const paintOf = (t: readonly number[][]) =>
-              rim
-                ? texel(TILE_TOP)
-                : wear(zoneOf(t[0] as number[], t[1] as number[], t[2] as number[], massif.height))
+              trail
+                ? texel(trail)
+                : rim
+                  ? texel(TILE_TOP)
+                  : wear(zoneOf(t[0] as number[], t[1] as number[], t[2] as number[], massif.height))
             // The ramp's own up-facing normal, which the curtains over its edges are shaded with.
             const up = upOf(p, q, r)
             // A ramp's one zone, from its corners, whatever it is cut into.
@@ -293,11 +285,9 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
               const paint = shade ? rampPaint : texel([zone.swatch.u, vOf(zone, { rel: 0.5, curve: 0 })])
               emit(w.tri[0], w.tri[1], w.tri[2], paint, isReal, w.outward, false, shade)
             }
-            // A trail's shelf: the path's sand, or stone where its legs are steps (trailCarve.ts).
-            const trail = trailTexel(p, q, r)
             // What the surface does along each edge, in order from corner 1: a stairs triangle's profile, a ramp's extra vertices.
             let chain: number[][] = []
-            if (!trail && straight < 0 && vs.every(onStairs)) {
+            if (straight < 0 && vs.every(onStairs)) {
               // The ledges are stairs: tops and risers rather than a ramp between two ledges.
               const mid = stairsSeam && n === 2 ? vertex((lq[0] + lr[0]) / 2, (lq[1] + lr[1]) / 2) : undefined
               for (const part of mid
@@ -344,8 +334,7 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
                   ? []
                   : cutEdge(u, v, n === 1 ? Number.POSITIVE_INFINITY : LONG)
               })
-              for (const t of rampOf(p, q, r, between))
-                emit(t[0], t[1], t[2], trail ? texel(trail) : rampPaint, isReal, "kept")
+              for (const t of rampOf(p, q, r, between)) emit(t[0], t[1], t[2], rampPaint, isReal, "kept")
               if (skirted && onEdge) chain = between[1] as number[][]
             }
             if (!skirted || !onEdge) continue
@@ -354,24 +343,43 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
             const drop = seam ? SEAM_DROP : RIM_DROP
             const angle = (Math.PI / 6) * (1 + 2 * k)
             const outward = [DMath.cos(angle), DMath.sin(angle)] as const
-            const colour: readonly [number, number] = seam
+            const stone: readonly [number, number] = seam
               ? [SWATCH.slate.u, swatchV(SWATCH.slate, 0.6)]
-              : sea
-                ? [SWATCH.grass.u, SWATCH.grass.dark]
-                : TILE_TOP
+              : [SWATCH.rock.u, swatchV(SWATCH.rock, 0.5)]
+            // Over a hex outside, the wall stands from the rim down to that hex's top: stone; under it, the tile's own grass.
+            const tile = seam
+              ? Number.NEGATIVE_INFINITY
+              : Math.max(massif.foot[grid.index(...lq)] as number, massif.foot[grid.index(...lr)] as number)
             const edge = [q, ...chain, r]
-            const lower = (v: number[]): number[] => [v[0] as number, (v[1] as number) - drop, v[2] as number]
+            const at3 = (v: number[], y: number): number[] => [v[0] as number, y, v[2] as number]
+            const bottom = (v: number[]): number => (v[1] as number) - drop
+            const meet = (v: number[]): number =>
+              Number.isNaN(tile) ? (v[1] as number) : Math.max(bottom(v), Math.min(v[1] as number, tile))
+            const grass = texel(seam ? stone : TILE_TOP)
+            const above = texel(stone)
             for (let m = 0; m + 1 < edge.length; m++) {
               const [s, t] = [edge[m] as number[], edge[m + 1] as number[]]
-              emit(s, t, lower(s), texel(colour), isReal, outward, true)
-              emit(t, lower(t), lower(s), texel(colour), isReal, outward, true)
+              const [sm, tm] = [at3(s, meet(s)), at3(t, meet(t))]
+              emit(s, t, sm, above, isReal, outward, true)
+              emit(t, tm, sm, above, isReal, outward, true)
+              emit(sm, tm, at3(s, bottom(s)), grass, isReal, outward, true)
+              emit(tm, at3(t, bottom(t)), at3(s, bottom(s)), grass, isReal, outward, true)
             }
           }
         }
     }
   }
 
-  for (const cell of cells) build(cell, true)
+  for (const cell of cells) {
+    build(cell, true)
+    // The trails' steps stand where their top meets the wall; the far tier leaves them out.
+    if (tier < 2)
+      for (const { tri, texel } of flightsIn(
+        relief.massifAt(cell)?.flights ?? [],
+        (x, z) => key(cellAt([x, z])) === key(cell),
+      ))
+        emit(tri[0], tri[1], tri[2], () => texel, true, "kept", true)
+  }
   for (const cell of ghosts.values()) build(cell, false)
 
   const smooth = smoothNormals(position, face, Uint8Array.from(flat))

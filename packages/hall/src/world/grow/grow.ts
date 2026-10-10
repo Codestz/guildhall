@@ -56,7 +56,7 @@ export function growSyncParts(tree: Tree, gen: Gen): { world: World; parts: Worl
 export function transferablesOf({ parts }: Grown): ArrayBuffer[] {
   const buffers = new Set<ArrayBuffer>()
   for (const massif of parts.relief?.massifs ?? [])
-    for (const array of [massif.grid.data, massif.slope, massif.pristine])
+    for (const array of [massif.grid.data, massif.slope, massif.pristine, massif.trail, massif.foot])
       buffers.add(array.buffer as ArrayBuffer)
   return [...buffers]
 }

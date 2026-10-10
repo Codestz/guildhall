@@ -20,20 +20,21 @@ import { LEDGE_STEP } from "../relief/shape.ts"
  * under a massif that grading left alone) has its bed carved to `level·TERRACE − 0.6` within BANK
  * of the course line and the rest of its hex raised to at least `level·TERRACE − 0.1`, so its flat
  * patch of water is clipped at the banks; where two hexes meet over a fall the shared edge keeps
- * the upper bed: the lip. A graded reach (grade.ts) has its bed cut down its slope, `DEPTH` under
- * its surface within the channel's half-width, and its banks held `FREEBOARD` over it beside the
- * channel — a levee where the slope falls away — easing back into the natural ground beyond.
+ * the upper bed: the lip. A graded reach (grade.ts) is cut as a trench of stairs: its bed a ledge
+ * under the ledge its water stands on (or under the one below it, where it falls), and its banks
+ * raised to the water's ledge where the ground beside the channel lies lower: every height a ledge,
+ * so the trench is flat treads and vertical walls like the rest of the mountain.
  */
 
 /** The bed under the water, below the river's level; the banks are at least this far below the level's top. */
 const BED = 0.6
 const BANK_TOP = 0.1
-/** A graded reach's bed under its surface, and its banks over it. */
+/** Ground this much under a graded reach's surface is under water. */
 const DEPTH = 0.16
-const FREEBOARD = 0.34
-/** Past the channel the banks hold for SHOULDER, then ease out to the natural ground over EASE. */
-const SHOULDER = 1.6
-const EASE = 2.4
+/** Beside the channel, the ground is raised to the water's ledge out to this far (units) past its half-width. */
+const BANKS = 1.6
+/** A surface falling no faster than this (rise over run) is still water: its banks hold it; a steeper one is a fall. */
+const STILL = 0.15
 /** The lattice's step: the ground between vertices is a blend of those within this of a point. */
 const PITCH = CIRCUM / RES
 
@@ -49,6 +50,9 @@ function distanceTo(line: readonly Spot[], x: number, z: number): number {
   }
   return best
 }
+
+const ceilLedge = (y: number): number => Math.ceil(y / LEDGE_STEP - 1e-6) * LEDGE_STEP
+const floorLedge = (y: number): number => Math.floor(y / LEDGE_STEP + 1e-6) * LEDGE_STEP
 
 /** The ledge the water stands on, where it stands on one (a stream on a stair's top or running down its riser), else undefined. */
 function ledgeOf(water: number): number | undefined {
@@ -74,7 +78,7 @@ function flatCut(reach: Reach, top: number): Cut {
 function gradedCut(grade: readonly Point3[]): Cut {
   const slopes = gradeSlopes(grade)
   return (x, z, ground) => {
-    let best = { d: Number.POSITIVE_INFINITY, y: 0, half: BANK }
+    let best = { d: Number.POSITIVE_INFINITY, y: 0, half: BANK, slope: 0 }
     let lowest = Number.POSITIVE_INFINITY
     for (let k = 0; k + 1 < grade.length; k++) {
       const [a, b] = [grade[k] as Point3, grade[k + 1] as Point3]
@@ -87,20 +91,15 @@ function gradedCut(grade: readonly Point3[]): Cut {
       if (d <= PITCH) lowest = Math.min(lowest, a[1] + (b[1] - a[1]) * t)
       if (d < best.d) {
         const slope = (slopes[k] as number) * (1 - t) + (slopes[k + 1] as number) * t
-        best = { d, y: a[1] + (b[1] - a[1]) * t, half: gradeHalfWidth(slope) }
+        best = { d, y: a[1] + (b[1] - a[1]) * t, half: gradeHalfWidth(slope), slope }
       }
     }
-    // A stream on a ledge runs in a trench of stairs, a ledge deep: flat along the top, a step at the riser.
+    // A stream runs in a trench of stairs, a ledge deep: flat along the top, a step at the riser.
     const water = Math.min(best.y, lowest)
-    if (best.d <= best.half) {
-      const ledge = ledgeOf(water)
-      return { bed: ledge === undefined ? water - DEPTH : ledge - LEDGE_STEP }
-    }
-    const ease = 1 - Math.min(1, Math.max(0, (best.d - best.half - SHOULDER) / EASE))
-    const held = best.y + FREEBOARD
-    // Water on a ledge is the ground's own level: only ground under it needs a bank.
-    const needed = ledgeOf(best.y) === undefined ? held > ground : ground < best.y - DEPTH
-    return ease > 0 && needed ? { bank: ground + (held - ground) * ease } : {}
+    if (best.d <= best.half) return { bed: (ledgeOf(water) ?? floorLedge(water)) - LEDGE_STEP }
+    // Water holds on a ledge's top, or still, on the ledge over it; a fall has no banks (the riser is its wall).
+    const held = ledgeOf(best.y) ?? (best.slope < STILL ? ceilLedge(best.y) : undefined)
+    return best.d - best.half <= BANKS && held !== undefined && ground < held - DEPTH ? { bank: held } : {}
   }
 }
 

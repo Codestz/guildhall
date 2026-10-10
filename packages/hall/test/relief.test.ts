@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { cellAt, key, neighbours, step, unkey } from "../src/world/gen/hex.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
+import { rimLedge } from "../src/world/gen/relief/field.ts"
 import {
   CAP,
   peakHeight,
@@ -173,9 +174,10 @@ describe("the ground", () => {
             const [bi, bj] = CORNERS[(d + 1) % 6] as readonly [number, number]
             for (let a = 0; a <= RES; a++) {
               const h = massif.grid.get(ci + (RES - a) * ai + a * bi, cj + (RES - a) * aj + a * bj)
-              // Along the edge it is the neighbour's top; a corner shared with a lower hex takes that one.
-              if (a > 0 && a < RES) expect(h).toBeCloseTo(top, 4)
-              else expect(h).toBeLessThanOrEqual(top + 1e-4)
+              // Along the edge it is the ledge at or over the neighbour's top (a vertical wall to the lowland, never a
+              // ramp); a corner shared with a lower hex takes that one.
+              if (a > 0 && a < RES) expect(h).toBeCloseTo(rimLedge(top), 4)
+              else expect(h).toBeLessThanOrEqual(rimLedge(top) + 1e-4)
             }
           }
     }

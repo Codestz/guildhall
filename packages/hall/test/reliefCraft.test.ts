@@ -69,25 +69,13 @@ describe("smooth shading with creases", () => {
     )
   })
 
-  test("the mesh's normals are unit vectors and the ramps (a river's banks, a trail's steps) are smoother than their faces", () => {
+  test("the mesh's normals are unit vectors, and a river's trench and a trail's steps shade as flat tops and walls (no slope to round)", () => {
     const mesh = reliefMesh(CARVED, CARVED.massifs[0]?.cells ?? [], 0)
-    let soft = 0
-    let ground = 0
     for (let v = 0; v < mesh.normal.length; v += 3) {
       const [x, y, z] = [mesh.normal[v] as number, mesh.normal[v + 1] as number, mesh.normal[v + 2] as number]
       expect(Math.hypot(x, y, z)).toBeCloseTo(1, 4)
-      if (y > 0.2 && y < 0.95) {
-        ground++
-        // Vertices of one face with normals that differ: the face is shaded round, not flat.
-        const tri = Math.floor(v / 9) * 9
-        if (
-          Math.abs(y - (mesh.normal[tri + 1] as number)) > 1e-4 ||
-          Math.abs(x - (mesh.normal[tri] as number)) > 1e-4
-        )
-          soft++
-      }
+      expect(Math.abs(y) < 0.2 || Math.abs(y) > 0.95).toBe(true)
     }
-    expect(soft / ground).toBeGreaterThan(0.1)
   })
 
   test("two sets of one massif agree on the normals along their shared edge (no seam)", () => {
@@ -283,24 +271,50 @@ describe("the least stretched triangulation", () => {
 describe("the dressing on the mountain", () => {
   const dressing = dressingOf(RELIEF, 3)
 
-  test("is conifers and nothing else: no kit rock, scree or crag stands on a massif", () => {
-    expect(dressing.length).toBeGreaterThan(50)
-    for (const piece of dressing) expect(piece.piece).toMatch(/^tree/)
+  const trees = dressing.filter((piece) => piece.piece.startsWith("tree"))
+  const flags = dressing.filter((piece) => piece.piece === "flag_yellow")
+
+  test("is conifers and a flag on each tall peak and nothing else: no kit rock, scree or crag stands on a massif", () => {
+    expect(trees.length).toBeGreaterThan(50)
+    expect(trees.length + flags.length).toBe(dressing.length)
   })
 
   test("the conifers stand on the grass ledges below the bare rock, each set on its ledge's flat top", () => {
-    for (const piece of dressing) {
+    for (const piece of trees) {
       const own = RELIEF.massifAt(cellAt([piece.x, piece.z]))
       const ground = RELIEF.heightAt(piece.x, piece.z)
       expect(own).toBeDefined()
-      expect(ground as number).toBeLessThan(0.5 * (own?.height ?? 0))
+      expect(ground as number).toBeLessThan(0.4 * (own?.height ?? 0))
       expect(Math.abs((piece.y ?? 0) - (ground as number) + 0.15)).toBeLessThan(0.02)
     }
   })
 
-  test("it is seeded and keeps off the rivers' hexes", () => {
+  test("the woods thin out with height: fewer conifers on each floor up", () => {
+    const peak = RELIEF.massifs[0]?.height ?? 1
+    const share = (from: number, to: number): number =>
+      trees.filter((t) => {
+        const rel = (RELIEF.heightAt(t.x, t.z) ?? 0) / peak
+        return rel >= from && rel < to
+      }).length
+    expect(share(0.04, 0.15)).toBeGreaterThan(share(0.25, 0.38))
+  })
+
+  test("every peak tall enough stands a flag on its top, level ground, and none stands by a lookout's", () => {
+    expect(flags.length).toBeGreaterThan(0)
+    for (const flag of flags) {
+      const own = RELIEF.massifAt(cellAt([flag.x, flag.z]))
+      expect(
+        own?.peaks.some((p) => Math.hypot(p.at[0] - flag.x, p.at[1] - flag.z) < 4 && p.height >= 20),
+      ).toBe(true)
+      expect(Math.abs((flag.y ?? 0) - (RELIEF.heightAt(flag.x, flag.z) as number))).toBeLessThan(0.02)
+    }
+    const lookouts = flags.map((flag) => ({ at: [flag.x, flag.z] as [number, number] }))
+    expect(dressingOf(RELIEF, 3, new Set(), lookouts).filter((p) => p.piece === "flag_yellow")).toEqual([])
+  })
+
+  test("it is seeded and keeps its trees off the rivers' hexes", () => {
     expect(dressingOf(RELIEF, 5)).toEqual(dressingOf(RELIEF, 5))
     expect(dressingOf(RELIEF, 5)).not.toEqual(dressingOf(RELIEF, 6))
-    expect(dressingOf(RELIEF, 5, RELIEF.keys)).toEqual([])
+    expect(dressingOf(RELIEF, 5, RELIEF.keys).filter((p) => p.piece.startsWith("tree"))).toEqual([])
   })
 })

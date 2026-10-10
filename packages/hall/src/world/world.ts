@@ -218,7 +218,7 @@ export function repoParts(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
         ...wet,
         decor: [
           ...wet.decor,
-          ...dressingOf(mountain, made.plan.seed, rivers?.hexes),
+          ...dressingOf(mountain, made.plan.seed, rivers?.hexes, trails?.lookouts),
           ...(trails?.lookouts ?? []).flatMap((l) =>
             instantiate(prefab("lookout"), l.at, l.rot, "blue", l.y),
           ),

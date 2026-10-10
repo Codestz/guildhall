@@ -194,6 +194,7 @@ describe("the stairs to the summit", () => {
   test("trees stand on flat ledge tops, so they sit exactly on the stairs", () => {
     let trees = 0
     for (const piece of dressingOf(RELIEF, 3)) {
+      if (!piece.piece.startsWith("tree")) continue
       const ground = RELIEF.heightAt(piece.x, piece.z) as number
       for (const [dx, dz] of [
         [1, 0],

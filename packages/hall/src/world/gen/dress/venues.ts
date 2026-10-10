@@ -2,7 +2,7 @@ import { DMath } from "../../dmath.ts"
 import { type Cell, cellToWorld, type LandPlacement } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
 import { DOOR_DEPTH, doorsOf, fixturesOf, instantiate, type Prefab, prefab } from "../../prefabs/index.ts"
-import { VENUE_KINDS, type Venue, venueKindOf } from "../../venues.ts"
+import { type TradeKind, VENUE_KINDS, type Venue, venueKindOf } from "../../venues.ts"
 import { cellAt, key, neighbours, unkey } from "../hex.ts"
 import { keepOf } from "../plan/lakes.ts"
 import type { IslandPlan, PlanDistrict } from "../plan.ts"
@@ -247,7 +247,7 @@ function byWater(spot: Spot, rivers: ReadonlySet<string>): boolean {
 /** A venue of `item` on `cell`, facing `towards` (the district's square, or the road hex a mine opens onto). */
 function place(
   item: Prefab,
-  kind: Venue["kind"],
+  kind: TradeKind,
   district: PlanDistrict,
   cell: Cell,
   towards: Spot,

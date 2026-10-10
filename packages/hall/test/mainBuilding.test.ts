@@ -6,6 +6,7 @@ import { PALETTES } from "../src/world/gen/identity/palette.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
 import { openSea } from "../src/world/gen/plan/heart.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
+import { covers, LOOSE } from "../src/world/hall/site.ts"
 import { cellToWorld, type LandPlacement } from "../src/world/lands.ts"
 import { COMPOSITES, composed } from "../src/world/prefabs/composite/index.ts"
 import { instantiate } from "../src/world/prefabs/index.ts"
@@ -25,10 +26,13 @@ const ids = new Set(COMPOSITES.map((item) => item.id))
 
 /** The main building's own pieces as it stands in the world. */
 function piecesOf(world: World): LandPlacement[] {
-  const { main, identity } = world
+  const { main, identity, hall } = world
   if (!main) return []
   const kit = identity?.palette.roof ?? "blue"
-  return instantiate(composed(main.id, main.seed, kit), main.at, main.rot, kit)
+  // The loose things a landmark scatters before its door make way for its hall (world/hall/site.ts).
+  return instantiate(composed(main.id, main.seed, kit), main.at, main.rot, kit).filter(
+    (part) => !(hall && LOOSE.test(part.piece) && covers(hall, part.x, part.z, 1)),
+  )
 }
 
 function expectMainBuilding(world: World, label: string): void {
@@ -37,7 +41,7 @@ function expectMainBuilding(world: World, label: string): void {
   if (!main) return
   expect(ids.has(main.id), `${label}: ${main.id} is in the catalogue`).toBe(true)
   const pieces = piecesOf(world)
-  expect(pieces.length).toBeGreaterThan(8)
+  expect(composed(main.id, main.seed).parts.length).toBeGreaterThan(8)
   // Exactly one: its parts stand in the world once each (each at its place, whatever colour the palette made it).
   const near = world.island.decor.filter(
     (d) => Math.hypot(d.x - main.at[0], d.z - main.at[1]) <= main.reach + 0.5,

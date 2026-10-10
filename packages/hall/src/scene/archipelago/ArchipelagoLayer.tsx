@@ -12,6 +12,7 @@ import {
 import { chunksOf } from "../../world/chunks.ts"
 import { HOME, type Stop } from "../../world/islandRing.ts"
 import { WorldScope } from "../../world/source.ts"
+import { HallRoom } from "../HallRoom.tsx"
 import { Island } from "../Island.tsx"
 import LinksLayer from "../links/LinksLayer.tsx"
 import { Fields } from "../nature/Fields.tsx"
@@ -102,6 +103,7 @@ function FarIslandLayer({ island, stop, tier }: { island: FarIsland; stop: Stop;
           {island.world.water && <Rivers waters={island.world.water} tier={tier} />}
           <Wilds tier={near ? tier : 0} />
           <Fields />
+          {island.world.hall && <HallRoom hall={island.world.hall} at={island.at} />}
           <IdleLights near={near} />
           <Lighthouse />
           <Drawn id={island.id} />

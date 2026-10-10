@@ -1,3 +1,4 @@
+export { crossing } from "./crossing.ts"
 export { factions } from "./factions.ts"
 export { Player, toEvents } from "./player.ts"
 export { CONTEXT_ECONOMY, saga, sagaTale, type Tale } from "./saga.ts"

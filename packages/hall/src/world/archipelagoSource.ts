@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react"
+import { setSea } from "./abroad.ts"
 import {
   crossingsOf,
   extentOf,
@@ -267,6 +268,7 @@ class ArchipelagoSource {
 
   private set(archipelago: Archipelago | null, status: ArchipelagoStatus): void {
     this.archipelago = archipelago
+    setSea(archipelago)
     this.status = status
     this.emit()
   }

@@ -15,9 +15,13 @@ import type { Fixture } from "./prefabs/index.ts"
  *   forge       a code district: edits and writes        library   docs, examples, the site: reads, searches
  *   market      a workspace package's district           tavern    the harbour: plans, consults, delegates
  *   mine        data, assets, public: shell commands     watchtower  tests, CI: test runs and checks
+ *   hall        a far island's main landmark's open-roofed floor (world/hall): whoever works on the island
+ *               comes to its seats and stations (guild/hall.ts); not a building one goes into, so no craft calls for it
  */
 
-export type VenueKind = "forge" | "library" | "tavern" | "mine" | "watchtower" | "market"
+export type VenueKind = "forge" | "library" | "tavern" | "mine" | "watchtower" | "market" | "hall"
+/** The kinds of building a district raises (not the far islands' halls). */
+export type TradeKind = Exclude<VenueKind, "hall">
 
 /** Where someone goes in: stand at `step` facing `inward`, walk to `sill` (up `y` over steps). */
 export interface VenueDoor {
@@ -49,7 +53,7 @@ export interface Venue {
 }
 
 /** The prefab each kind stands as, and how many fit inside. */
-export const VENUE_KINDS: Readonly<Record<VenueKind, { prefab: string; capacity: number }>> = {
+export const VENUE_KINDS: Readonly<Record<TradeKind, { prefab: string; capacity: number }>> = {
   forge: { prefab: "forge", capacity: 3 },
   library: { prefab: "library", capacity: 4 },
   tavern: { prefab: "tavern", capacity: 6 },
@@ -69,7 +73,7 @@ const WATCH = /^(\.?github|\.circleci|ci|infra|deploy|ops|config|configs)$/
 export function venueKindOf(
   district: { biome: Biome; name: string; package: boolean },
   leading: boolean,
-): VenueKind | undefined {
+): TradeKind | undefined {
   switch (district.biome) {
     case "harbour":
       return "tavern"
@@ -92,7 +96,7 @@ export function venueKindOf(
  * Where a deed's craft takes an adventurer, when it takes them anywhere: the shell digs at the mine,
  * the rest as ADR 0011's table reads (core/craft.ts). A craft not here is done where they stand.
  */
-const OF_CRAFT: Readonly<Partial<Record<Craft, VenueKind>>> = {
+const OF_CRAFT: Readonly<Partial<Record<Craft, TradeKind>>> = {
   edit: "forge",
   write: "forge",
   read: "library",
@@ -106,7 +110,7 @@ const OF_CRAFT: Readonly<Partial<Record<Craft, VenueKind>>> = {
   delegate: "tavern",
 }
 
-export const venueOfCraft = (craft: Craft | undefined): VenueKind | undefined =>
+export const venueOfCraft = (craft: Craft | undefined): TradeKind | undefined =>
   craft ? OF_CRAFT[craft] : undefined
 
 /** A world's venues (a gen 2 island's; the hand lands and the first generator's have none). */
@@ -116,7 +120,7 @@ export const venuesIn = (
 
 /** The venue of `kind` nearest `from` (the keep's gate, usually): ties go to the first in id order. */
 export function nearestVenue(
-  kind: VenueKind,
+  kind: TradeKind,
   from: Spot,
   world: { venues?: readonly Venue[] } | undefined = activeWorld(),
 ): Venue | undefined {
@@ -135,7 +139,7 @@ export function nearestVenue(
 
 /** The venues of `kind`, nearest `from` first (ties in id order). */
 export function venuesNear(
-  kind: VenueKind,
+  kind: TradeKind,
   from: Spot,
   world: { venues?: readonly Venue[] } | undefined = activeWorld(),
 ): Venue[] {

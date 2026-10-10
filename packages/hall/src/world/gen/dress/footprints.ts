@@ -15,12 +15,19 @@ type Bounds = { min: readonly number[]; max: readonly number[] }
 const UNDERFOOT = /^building_(dirt|grain|scaffolding|bridge)/
 const BUILT = /^(building_|wall_)/
 
-/** The footprints of the buildings and wall pieces among `placements`. */
-export function footprintsOf(placements: readonly LandPlacement[]): Footprint[] {
+/** Every piece that takes room from the ground, not only buildings and walls (what a landmark's forecourt keeps: a well, a fountain, a drawbridge). */
+export const anything = (piece: string): boolean =>
+  !/^(hex_|floor_|t2_floor|waterlily|waterplant)/.test(piece)
+
+/** The footprints of the buildings and wall pieces (or of the pieces `built` names) among `placements`. */
+export function footprintsOf(
+  placements: readonly LandPlacement[],
+  built: (piece: string) => boolean = (piece) => BUILT.test(piece),
+): Footprint[] {
   const out: Footprint[] = []
   for (const piece of placements) {
     const bounds = (PIECES as Record<string, Bounds>)[piece.piece]
-    if (!bounds || !BUILT.test(piece.piece) || UNDERFOOT.test(piece.piece)) continue
+    if (!bounds || !built(piece.piece) || UNDERFOOT.test(piece.piece)) continue
     const scale = HEX_SCALE * (piece.scale ?? 1)
     const rot = piece.rot ?? 0
     const [c, s] = [DMath.cos(rot), DMath.sin(rot)]

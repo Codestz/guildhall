@@ -11,6 +11,7 @@ import { MODE, PROBE } from "./guild/mode.ts"
 import { reducedMotion } from "./guild/opening.ts"
 import { quality } from "./guild/quality.ts"
 import { GuildStore, liveUrlOf } from "./guild/store.ts"
+import { positions } from "./guild/useGuild.ts"
 import { Hall } from "./Hall.tsx"
 import "./hall.css"
 import { hudPrefs } from "./hud/prefs.ts"
@@ -107,6 +108,8 @@ if (archipelago) {
 if (PROBE)
   Object.assign(window, {
     guild: store,
+    /** Where each adventurer stands now, by id (guild/useGuild.ts): a probe reads who is aboard a ferry. */
+    positions,
     archipelago: archipelagoSource,
     quality,
     /**

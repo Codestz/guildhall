@@ -91,15 +91,15 @@ interface Graph {
   roadIds: Id[]
 }
 
-function graphOf(roads: Roads): Graph {
-  const nodes: Readonly<Record<string, Spot>> = { ...HALL, ...roads.nodes }
+function graphOf(roads: Roads, aisles: boolean): Graph {
+  const nodes: Readonly<Record<string, Spot>> = aisles ? { ...HALL, ...roads.nodes } : roads.nodes
   // The gate opens onto the road hex nearest it (the hand map's OUT; a repo island's avenue).
   let out: string | undefined
   for (const [id, at] of Object.entries(roads.nodes))
     if (out === undefined || distance(at, HALL.GATE) < distance(roads.nodes[out] ?? at, HALL.GATE)) out = id
   const edges: (readonly [Id, Id])[] = [
-    ...HALL_EDGES,
-    ...(out ? [["GATE", out] as const] : []),
+    ...(aisles ? HALL_EDGES : []),
+    ...(aisles && out ? [["GATE", out] as const] : []),
     ...roads.edges,
   ]
   // The hall's aisles and the gate's edge cost their length; the island's roads their own cost, where given.
@@ -115,11 +115,13 @@ function graphOf(roads: Roads): Graph {
 
 const HAND_ROADS: Roads = { nodes: ROAD_NODES, edges: ROAD_EDGES }
 const graphs = new WeakMap<Roads, Graph>()
-function graphFor(roads: Roads): Graph {
-  let graph = graphs.get(roads)
+const bare = new WeakMap<Roads, Graph>()
+function graphFor(roads: Roads, aisles = true): Graph {
+  const known = aisles ? graphs : bare
+  let graph = known.get(roads)
   if (!graph) {
-    graph = graphOf(roads)
-    graphs.set(roads, graph)
+    graph = graphOf(roads, aisles)
+    known.set(roads, graph)
   }
   return graph
 }
@@ -146,15 +148,21 @@ const STRAIGHT_BELOW = 3.5
 /**
  * The spots to walk through from `from` to `to`, ending at `to`, on the active world's roads
  * (world/active.ts; the hand map's by default). Dijkstra over a graph of a few dozen to a couple of
- * thousand nodes, its open set a heap: cheap enough to run whenever a target changes.
+ * thousand nodes, its open set a heap: cheap enough to run whenever a target changes. `aisles` false:
+ * the roads alone, for an island with no great hall at its keep (a far island's: scene/voyage.ts).
  */
-export function route(from: Spot, to: Spot, roads: Roads = activeWorld()?.roads ?? HAND_ROADS): Spot[] {
+export function route(
+  from: Spot,
+  to: Spot,
+  roads: Roads = activeWorld()?.roads ?? HAND_ROADS,
+  aisles = true,
+): Spot[] {
   if (distance(from, to) < STRAIGHT_BELOW) return [to]
-  const { nodes: points, adjacent, ids, roadIds } = graphFor(roads)
+  const { nodes: points, adjacent, ids, roadIds } = graphFor(roads, aisles)
   const node = (id: Id): Spot => points[id] ?? [0, 0]
   // A spot out on the island joins the graph at a road, never at an aisle behind the keep's wall.
   const nearest = (spot: Spot): Id => {
-    const pool = inKeep(spot) ? ids : roadIds
+    const pool = aisles && inKeep(spot) ? ids : roadIds
     let best: Id = pool[0] ?? "A4"
     // A trail's nodes are joined only by a spot on the mountain, within a few paces of one; from the lowland, by the road.
     for (const id of pool)

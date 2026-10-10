@@ -59,6 +59,8 @@ export interface Civic {
   tier: Tier
   /** The island's main building, where its plan has a heart. */
   main?: MainBuilding
+  /** The main building's own pieces (also among `placements`). */
+  parts?: LandPlacement[]
 }
 
 export function civicOf(plan: IslandPlan, fame: Fame = {}): Civic {
@@ -93,6 +95,7 @@ export function civicOf(plan: IslandPlan, fame: Fame = {}): Civic {
     out.placements.push(...heart.placements)
     out.clear.push([heart.main.at[0], heart.main.at[1], heart.main.reach + 3])
     out.main = heart.main
+    out.parts = heart.placements
   }
   const castle = tier === "city" || (fame.stars ?? 0) >= 5000 || (fame.contributors ?? 0) >= 150
   if (castle) {

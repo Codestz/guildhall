@@ -1,5 +1,6 @@
 import { activityOf, type Craft, deedCraft, failedDeed, type Model, type Session } from "@guildhall/core"
 import { type ArchetypeId, type DeedLook, deedLook, type Rank } from "@guildhall/roster"
+import { seaNow } from "../world/abroad.ts"
 import type { SiteId } from "../world/lands.ts"
 import {
   HAND_INS,
@@ -18,6 +19,7 @@ import { venuesIn } from "../world/venues.ts"
 import { type Names, namedOf, rankOf } from "./casting.ts"
 import { Crowd } from "./crowd.ts"
 import { type Entrance, EXIT_MS, entranceOf, exitOf } from "./entrances.ts"
+import { boundFor, type HallVisit, HallVisits } from "./hall.ts"
 import { numbered } from "./ordinals.ts"
 import { byJoin, type Party, stageOf } from "./parties.ts"
 import { LINGER_MS, type Visit, Visits } from "./visits.ts"
@@ -75,6 +77,11 @@ export interface AdventurerView {
    * the deed runs, coming out. Their target is the door's step; no site or station then.
    */
   visit?: Visit
+  /**
+   * Working on another island's package: the far island they cross to and the seat or station they
+   * take in its hall (guild/hall.ts). Their target is that spot, in the archipelago's coordinates.
+   */
+  hall?: HallVisit
   /** Failed: where they were sent (a key of world/sites.ts `DESTINATIONS`). */
   destination?: string
   /** The deed in progress, if any. */
@@ -149,6 +156,10 @@ export function viewsOf(
   const crowd = new Crowd()
   /** A gen 2 island's venues, visited by craft (guild/visits.ts); none on the hand lands. */
   const visits = new Visits(venuesIn())
+  // A split repo's agents at work on another package go to its island's hall (guild/hall.ts).
+  const sea = seaNow()
+  const bound = boundFor(sessions, now, sea, (s) => s === partyOfId.get(s.id)?.root)
+  const halls = new HallVisits(sea, bound, previous)
   const views: AdventurerView[] = []
 
   for (const s of sessions) {
@@ -172,19 +183,23 @@ export function viewsOf(
     const lastTool = s.entries.findLast((entry) => entry.kind === "tool")
     const stung = lastTool?.kind === "tool" && failedDeed(lastTool) && now - (lastTool.ended ?? 0) < 1400
 
+    // Hard at a deed, or just done with one: what craft it was.
+    const deed =
+      craft ??
+      (lastTool?.kind === "tool" && lastTool.ended !== undefined && now - lastTool.ended < LINGER_MS
+        ? deedCraft(lastTool)
+        : undefined)
+    // Work on another island's package is done in its hall, after crossing to it (guild/hall.ts).
+    const island = bound.get(s.id)
+    const abroad = island ? halls.visit(s.id, island, deed) : undefined
     // A Scout's search may take them up a trail to a lookout instead (world/hikes.ts): no door, no venue.
     const hike =
-      !isMaster && s.status === "running" ? visits.lookoutFor(s.id, archetype.id, craft) : undefined
-    // Hard at a deed, or just done with one: the venue its craft calls for (not a guildmaster, not a plea).
-    const visiting =
-      !isMaster && s.status === "running" && !hike
-        ? visits.forCraft(
-            craft ??
-              (lastTool?.kind === "tool" && lastTool.ended !== undefined && now - lastTool.ended < LINGER_MS
-                ? deedCraft(lastTool)
-                : undefined),
-          )
+      !isMaster && s.status === "running" && !abroad
+        ? visits.lookoutFor(s.id, archetype.id, craft)
         : undefined
+    // At a deed: the venue its craft calls for (not a guildmaster, not a plea).
+    const visiting =
+      !isMaster && s.status === "running" && !hike && !abroad ? visits.forCraft(deed) : undefined
 
     let phase: Phase = "working"
     let target: Post
@@ -227,6 +242,8 @@ export function viewsOf(
       destination = to
       seat = berth?.seat
       target = berth?.target ?? (place?.crowd ? crowd.near(place.crowd) : MASTER_POST)
+    } else if (abroad) {
+      target = abroad.target
     } else if (hike) {
       target = hike
     } else if (visiting) {
@@ -275,6 +292,7 @@ export function viewsOf(
       ...(station ? { station } : {}),
       ...(site ? { site } : {}),
       ...(visiting ? { visit: visiting.visit } : {}),
+      ...(abroad ? { hall: abroad.visit } : {}),
       ...(destination ? { destination } : {}),
       ...(seat ? { seat } : {}),
       ...(look ? { look } : {}),

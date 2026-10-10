@@ -279,8 +279,15 @@ interface Flash {
   index: number
 }
 
-/** Frames that spike to near white against the median of those just before, or are one flat bright colour. */
-function judge(stats: Stat[], from: number): Flash[] {
+/** A frame darker than this is the loader's own dark (the body's colour is 0.07), not a lit blank. */
+const DARK = 0.2
+
+/**
+ * Frames that spike to near white against the median of those just before, or are one flat colour.
+ * `veiled(t)`: the loader is up (a visit's veil: `boot -> loading` to the next `boot -> ready`): its flat
+ * dark card is what it is meant to show, so only a lit flat frame (the world's bare sky under it) counts there.
+ */
+function judge(stats: Stat[], from: number, veiled: (t: number) => boolean = () => false): Flash[] {
   const found: Flash[] = []
   for (let i = 6; i < stats.length; i++) {
     const s = stats[i]!
@@ -291,7 +298,7 @@ function judge(stats: Stat[], from: number): Flash[] {
       .sort((a, b) => a - b)
     const before = prior[3]!
     const spike = s.luma - before > SPIKE && s.luma > WHITE
-    const blank = s.flat > FLAT_SHARE
+    const blank = s.flat > FLAT_SHARE && !(s.luma < DARK && veiled(s.t))
     if (spike || blank) found.push({ at: s.t, luma: s.luma, before, flat: s.flat, index: i })
   }
   return found
@@ -345,8 +352,19 @@ try {
     () => (window as never as { __flash?: Mark[] }).__flash ?? [],
   )) as Mark[]
   const stats = await measure(scratch, frames)
-  const flashes = judge(stats, from)
   const timeline = [...marks, ...events].sort((a, b) => a.t - b.t)
+  // The spans the loader is up, from `boot -> loading` to the next `boot -> ready`.
+  const veils: Array<[number, number]> = []
+  let since: number | undefined
+  for (const m of timeline) {
+    if (m.what === "boot -> loading") since ??= m.t
+    else if (m.what === "boot -> ready" && since !== undefined) {
+      veils.push([since, m.t])
+      since = undefined
+    }
+  }
+  if (since !== undefined) veils.push([since, Infinity])
+  const flashes = judge(stats, from, (t) => veils.some(([a, b]) => t >= a && t <= b))
   console.log(
     `${REPO || "hand island"}: ${frames.length} frames filmed over ${(stats.at(-1)!.t - stats[0]!.t).toFixed(1)} s`,
   )

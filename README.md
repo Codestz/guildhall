@@ -136,9 +136,12 @@ Anything that can send JSON to `127.0.0.1:4747` can be a source. The
 
 ## Try it live
 
-[guildhall.codestz.dev](https://guildhall.codestz.dev) plays a simulated guild, with nothing to
-install. A few links straight into a scene:
+[guildhall.codestz.dev](https://guildhall.codestz.dev) opens on React: a 20-second cut of its
+growth from the first commit, then its packages as an archipelago with a simulated guild at work
+(a click or Esc skips the film). Nothing to install. A few links straight into a scene:
 
+- [`?story=saga`](https://guildhall.codestz.dev/?story=saga): the hand-drawn island and its
+  five-act Saga, the site's old home (more in [Demos](https://guildhall.codestz.dev/demos)).
 - [`?story=seas`](https://guildhall.codestz.dev/?story=seas): a party's run with its GitHub sea
   beside it, from the first push to the release.
 - [`?repo=facebook/react`](https://guildhall.codestz.dev/?repo=facebook/react): a world grown

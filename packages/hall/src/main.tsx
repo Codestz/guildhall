@@ -4,15 +4,18 @@ import { startOnIsland } from "./guild/archipelagoStart.ts"
 import { boot } from "./guild/boot.ts"
 import { applyDeepLink, type Hall as LinkedHall, parseDeepLink } from "./guild/deeplink.ts"
 import { worldEventsOf } from "./guild/events.ts"
+import { HOME_REPO, homeOf } from "./guild/home.ts"
+import { startHome } from "./guild/homeShow.ts"
 import { islandView } from "./guild/islandView.ts"
 import { MODE, PROBE } from "./guild/mode.ts"
+import { reducedMotion } from "./guild/opening.ts"
 import { quality } from "./guild/quality.ts"
 import { GuildStore, liveUrlOf } from "./guild/store.ts"
 import { Hall } from "./Hall.tsx"
 import "./hall.css"
 import { hudPrefs } from "./hud/prefs.ts"
 import { islandIndexOf, parseArchipelagoLink, parseSplitLink } from "./world/archipelagoLink.ts"
-import { loadArchipelago, loadSplitRepo } from "./world/archipelagoSource.ts"
+import { archipelagoSource, loadArchipelago, loadSplitRepo } from "./world/archipelagoSource.ts"
 
 const root = document.getElementById("root")
 if (!root) throw new Error("#root missing from index.html")
@@ -39,6 +42,13 @@ setTimeout(() => store.release(), 20_000)
 const live = liveUrlOf(location.search)
 if (live !== null) store.live(live)
 
+// The showcase's home (guild/home.ts): a bare `/` is React, grown as an archipelago of its packages
+// after a short cut of its growth film (guild/homeShow.ts). The link read from here on is that
+// spelled out; any other link opens as it always did. Reduced motion has no film: straight to the packages.
+const showHome = live === null && !lab ? homeOf(location.search, reducedMotion()) : null
+const filmed = showHome?.film === true
+const search = showHome ? `repo=${HOME_REPO}&${location.search.slice(1)}` : location.search
+
 // Deep links (guild/deeplink.ts): `?story=saga&t=11:53&hour=23&look=quarry`… Quality and HUD from
 // a link last for the visit: the viewer's own remembered choices are left as they were.
 const linked: LinkedHall = {
@@ -62,7 +72,7 @@ const linked: LinkedHall = {
 }
 // `?repo=owner/name&split` (world/archipelagoLink.ts): the repo as an archipelago of its packages. It
 // adopts the core as the home world first, so the link's own `repo=` (applyDeepLink) finds it loading.
-const split = live === null && !lab ? parseSplitLink(location.search) : null
+const split = live === null && !lab && !filmed ? parseSplitLink(search) : null
 if (split) {
   const patches = import("./scene/archipelago/footprint.ts").then(({ patchesOf }) => patchesOf)
   const splitting = loadSplitRepo(split.repo, patches).then((grown) => {
@@ -76,7 +86,11 @@ if (split) {
   boot.hold(splitting)
 }
 
-if (live === null && !lab) applyDeepLink(parseDeepLink(location.search, PROBE).link, linked)
+if (live === null && !lab) applyDeepLink(parseDeepLink(search, PROBE).link, linked)
+if (showHome)
+  startHome(store, showHome, () =>
+    import("./scene/archipelago/footprint.ts").then(({ patchesOf }) => patchesOf),
+  )
 
 // The archipelago (`?archipelago`, `?repos=`, `&island=`; world/archipelagoLink.ts): the far islands
 // grow beside the home one, and a link's island is where the camera starts.
@@ -93,6 +107,7 @@ if (archipelago) {
 if (PROBE)
   Object.assign(window, {
     guild: store,
+    archipelago: archipelagoSource,
     quality,
     /**
      * scripts/probe-server.ts: `deeplink.apply("story=saga&hour=23")` sets a state on the warm page

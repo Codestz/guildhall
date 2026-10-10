@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { hudInsets } from "../guild/director.ts"
+import { useHome } from "../guild/home.ts"
 import { MODE } from "../guild/mode.ts"
 import { useOpening } from "../guild/opening.ts"
 import { useGuild } from "../guild/useGuild.ts"
@@ -12,6 +13,7 @@ import { ChapterChip } from "./Chapter.tsx"
 import { Chronicle, Toasts } from "./Chronicle.tsx"
 import { Dossier } from "./Dossier.tsx"
 import { FastForward } from "./FastForward.tsx"
+import { HomeHud } from "./HomeHud.tsx"
 import { IslandSwitcher } from "./Islands.tsx"
 import { Icon } from "./icons.tsx"
 import { IslandKeys, IslandUrl, TravelFade } from "./islandTravel.tsx"
@@ -80,6 +82,7 @@ export function Hud() {
   const root = useRef<HTMLDivElement>(null)
   const soundWaiting = useSoundWaiting()
   const door = useRepoDoor()
+  const homePhase = useHome()
 
   const view = store.selected ? store.views.find((v) => v.id === store.selected) : undefined
   const resident = useResident(store.selected)
@@ -241,6 +244,7 @@ export function Hud() {
       data-sheet={dossier || settings || open.roster || open.chronicle}
       data-opening={showcase ? intro.stage : undefined}
       data-captions={prefs.captions && mode !== "detailed"}
+      data-home={homePhase}
     >
       {opening}
       <IslandKeys />
@@ -362,11 +366,11 @@ export function Hud() {
           {showcase && <ChapterChip store={store} />}
         </>
       )}
-
       <FastForward store={store} />
       {door && <RepoDoor />}
-      {/* A repo's growth timelapse (`?grow`): its tape and milestones own the bottom while it plays. */}
-      <TimelineGrowth hidden={hidden} />
+      {/* A repo's growth timelapse (`?grow`): its tape and milestones own the bottom while it plays; the home's film has its own. */}
+      <TimelineGrowth hidden={hidden || homePhase === "film"} />
+      <HomeHud phase={homePhase} phone={phone} quiet={hidden || door} />
 
       {prefs.captions && (
         <Captions

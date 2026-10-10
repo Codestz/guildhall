@@ -35,9 +35,19 @@
   pointer-events: none;
   align-content: center;
   padding-top: 24px;
+  will-change: opacity;
 }
 .loader[data-kind="visit"][data-state="in"] {
   transition-duration: 260ms, 0s;
+}
+/*
+ * Once a visit's veil has fallen the canvas is hidden under it (still drawing), so a frame composited
+ * while the new world's first mount stalls the page shows the page's dark, never the world's bare sky.
+ * Shown again at once as the veil lifts.
+ */
+html:has(.loader[data-kind="visit"][data-state="in"]) canvas {
+  visibility: hidden;
+  transition: visibility 0s linear 0.3s;
 }
 
 .loader-inner {

@@ -1,3 +1,4 @@
+import { home } from "../../guild/home.ts"
 import { dayOf } from "../../world/chronicle/format.ts"
 import { planGrowth, timeOfDay } from "../../world/chronicle/growth.ts"
 import { planBuild } from "../../world/chronicle/growthBuild.ts"
@@ -62,6 +63,8 @@ export function startOf(film: GrowthFilm, start: GrowthStart): { t: number; paus
 
 /** Keeps `grow` in the address while a film plays (so the link shares it), out of it after. */
 export function markAddress(on: boolean): void {
+  // The home's cut (guild/homeShow.ts) is not a link to share: its address stays a bare `/`.
+  if (home.active) return
   const params = new URLSearchParams(location.search)
   if (params.has("grow") === on) return
   if (on) params.set("grow", "")

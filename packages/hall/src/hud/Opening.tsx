@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react"
+import { useHome } from "../guild/home.ts"
 import type { OpeningState } from "../guild/opening.ts"
 import type { GuildStore } from "../guild/store.ts"
 import { growing, growth } from "../world/chronicle/growthControl.ts"
@@ -34,7 +35,10 @@ export function Opening({ state, store, phone }: { state: OpeningState; store: G
     if (store.selected) setDismissed(true)
   }, [store.selected])
 
-  const caption = (stage === "arrive" || stage === "landed") && !dismissed && !film
+  // The home (guild/homeShow.ts) has its own film and its own invitation: the welcome keeps off.
+  const homed = useHome() !== "off"
+
+  const caption = (stage === "arrive" || stage === "landed") && !dismissed && !film && !homed
 
   return (
     <div className="opening" data-stage={stage} data-phone={phone}>

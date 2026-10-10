@@ -232,19 +232,28 @@ class ArchipelagoSource {
     repo: string,
     fetchTree: (repo: string) => Promise<Tree>,
     patchesOf: Promise<PatchesOf>,
+    /**
+     * Held back until this settles: the island is grown now, but neither the home world nor the
+     * archipelago is taken until then (the home page's film plays on the whole repo's island first).
+     * The core is then adopted under its own name, `repo#split`, the repo's whole island being the
+     * world's last, and the archipelago is set in the same turn as the world.
+     */
+    gate?: Promise<unknown>,
   ): Promise<Archipelago | null> {
     if (this.loading) return this.loading
-    this.set(null, { state: "loading", repos: [repo] })
+    if (!gate) this.set(null, { state: "loading", repos: [repo] })
     const making = fetchTree(repo).then(async (tree) => ({
       tree,
       grown: await growSplit(tree, await patchesOf),
     }))
-    void worldSource.adopt(
-      repo,
-      making.then(async ({ tree, grown }) => grown?.home ?? (await growWorldAsync(tree))),
-    )
-    this.loading = making.then(
-      ({ grown }) => {
+    if (!gate)
+      void worldSource.adopt(
+        repo,
+        making.then(async ({ tree, grown }) => grown?.home ?? (await growWorldAsync(tree))),
+      )
+    this.loading = (gate ? making.then(async (made) => (await gate, made)) : making).then(
+      async ({ grown }) => {
+        if (gate && grown) await worldSource.adopt(`${repo}#split`, Promise.resolve(grown.home))
         this.set(grown?.archipelago ?? null, { state: "ready", failed: grown?.failed ?? [] })
         return grown?.archipelago ?? null
       },
@@ -297,11 +306,16 @@ export function loadArchipelago(repos: readonly string[], patchesOf: PatchesOf):
 }
 
 /** Grows `repo` as an archipelago of its packages (`?repo=…&split`): bundled fixture or GitHub. */
-export function loadSplitRepo(repo: string, patchesOf: Promise<PatchesOf>): Promise<Archipelago | null> {
+export function loadSplitRepo(
+  repo: string,
+  patchesOf: Promise<PatchesOf>,
+  gate?: Promise<unknown>,
+): Promise<Archipelago | null> {
   return archipelagoSource.loadSplit(
     repo,
     async (wanted) => (await import("./gen/load.ts")).treeFor(wanted),
     patchesOf,
+    gate,
   )
 }
 

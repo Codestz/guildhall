@@ -56,6 +56,16 @@ class GrowthControl {
   speed: (typeof SPEEDS)[number] = 1
   start: GrowthStart
   failure: string | undefined
+  /**
+   * Film seconds per second of play at film time `t`, when something shapes the film's pace (the
+   * home page's cut, guild/homeShow.ts); undefined: 1. Cleared with the film.
+   */
+  pace: ((t: number) => number) | undefined
+  /**
+   * Asked to end the film itself: when the clock reaches the end the film is paused on its last frame
+   * and this is called, once, instead of `stop()`; the asker stops it when it is ready.
+   */
+  onEnd: (() => void) | undefined
   /** Bumps on every notified change (useSyncExternalStore's snapshot). */
   version = 0
   private listeners = new Set<() => void>()
@@ -71,6 +81,8 @@ class GrowthControl {
     this.repo = repo
     this.start = start
     this.film = undefined
+    this.pace = undefined
+    this.onEnd = undefined
     this.failure = undefined
     this.t = 0
     this.set("waiting")
@@ -114,16 +126,24 @@ class GrowthControl {
   stop(): void {
     this.film = undefined
     this.repo = undefined
+    this.pace = undefined
+    this.onEnd = undefined
     this.set("off")
   }
 
   /** Advances the clock (the scene, once a frame). Returns true when the film just ended. */
   tick(delta: number): boolean {
     if (this.phase !== "playing" || !this.film) return false
-    this.t += Math.min(delta, 0.1) * this.speed
+    this.t += Math.min(delta, 0.1) * this.speed * (this.pace?.(this.t) ?? 1)
     if (this.t < this.film.plan.duration) return false
     this.t = this.film.plan.duration
-    this.stop()
+    // Held on its last frame for whoever asked to end it (the home's veil falls first), else over.
+    if (this.onEnd) {
+      const end = this.onEnd
+      this.onEnd = undefined
+      this.set("paused")
+      end()
+    } else this.stop()
     return true
   }
 

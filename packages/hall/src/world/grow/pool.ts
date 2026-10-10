@@ -1,27 +1,40 @@
 import type { Gen } from "../gen/islandFromTree.ts"
 import type { Tree } from "../gen/load.ts"
-import type { World } from "../world.ts"
-import { growSync, worldFrom } from "./grow.ts"
-import type { GrowReply, GrowRequest } from "./job.ts"
+import type { SplitLayout } from "../repoArchipelago.ts"
+import type { World, WorldParts } from "../world.ts"
+import { growSyncParts, worldFrom } from "./grow.ts"
+import type { GrowReply, GrowRequest, LayoutReply, LayoutRequest } from "./job.ts"
+import { type LayoutInput, layoutOf } from "./layout.ts"
 
 /**
  * Islands grown off the main thread: up to `size` workers (the home island and the archipelago's
- * far ones, in the order asked), each running one job at a time. Without workers (tests, node, a
- * browser that has none) or after one fails, the same job runs on this thread (`growSync`), so a
- * caller never knows the difference but in the stall.
+ * far ones, in the order asked), each running one job at a time. A job is an island to grow, or a
+ * split repo's islands to lay out (grow/layout.ts). Without workers (tests, node, a browser that has
+ * none) or after one fails, the same job runs on this thread, so a caller never knows the difference
+ * but in the stall.
  */
 
 /** The part of a Worker the pool uses, so tests can stand a fake in. */
 export interface WorkerLike {
-  postMessage(request: GrowRequest): void
-  onmessage: ((event: { data: GrowReply }) => void) | null
+  postMessage(request: GrowRequest | LayoutRequest): void
+  onmessage: ((event: { data: GrowReply | LayoutReply }) => void) | null
   onerror: ((event: unknown) => void) | null
   terminate(): void
 }
 
-interface Job extends GrowRequest {
-  resolve(world: World): void
+/** An island with the data it was grown from (what a layout job is sent). */
+export interface GrownIsland {
+  world: World
+  parts: WorldParts
+}
+
+interface Job {
+  request: GrowRequest | LayoutRequest
+  /** The reply, taken as the caller wants it (throws for a reply that is not its kind). */
+  settle(reply: GrowReply | LayoutReply): void
   reject(error: Error): void
+  /** The same job on this thread, if no worker can run it. */
+  local(): void
 }
 
 export class GrowPool {
@@ -36,10 +49,50 @@ export class GrowPool {
   ) {}
 
   /** The island of `tree` as generator `gen` grows it. */
-  grow(tree: Tree, gen: Gen): Promise<World> {
-    if (!this.spawn) return new Promise((resolve) => resolve(growSync(tree, gen)))
-    return new Promise((resolve, reject) => {
-      this.queue.push({ tree, gen, resolve, reject })
+  async grow(tree: Tree, gen: Gen): Promise<World> {
+    return (await this.growParts(tree, gen)).world
+  }
+
+  /** The island, and the data it was made of: a split repo's layout needs the latter. */
+  growParts(tree: Tree, gen: Gen): Promise<GrownIsland> {
+    return this.run(
+      { tree, gen },
+      (reply) => {
+        if (!("grown" in reply)) throw new Error("error" in reply ? reply.error : "no island came back")
+        return { world: worldFrom(reply.grown), parts: reply.grown.parts }
+      },
+      () => growSyncParts(tree, gen),
+    )
+  }
+
+  /** A split repo's islands laid out (grow/layout.ts), in a worker: the sea the loader waits for, off the main thread. */
+  layout(input: LayoutInput): Promise<SplitLayout> {
+    return this.run(
+      { layout: input },
+      (reply) => {
+        if (!("layout" in reply)) throw new Error("error" in reply ? reply.error : "no layout came back")
+        return reply.layout
+      },
+      () => layoutOf(input),
+    )
+  }
+
+  private run<T>(
+    request: Job["request"],
+    read: (reply: GrowReply | LayoutReply) => T,
+    local: () => T,
+  ): Promise<T> {
+    if (!this.spawn) return new Promise((resolve) => resolve(local()))
+    return new Promise<T>((resolve, reject) => {
+      this.queue.push({
+        request,
+        settle: (reply) => {
+          if ("error" in reply) reject(new Error(reply.error))
+          else resolve(read(reply))
+        },
+        reject,
+        local: () => resolve(local()),
+      })
       this.pump()
     })
   }
@@ -50,7 +103,7 @@ export class GrowPool {
       if (!worker) return
       const job = this.queue.shift() as Job
       this.busy.set(worker, job)
-      worker.postMessage({ tree: job.tree, gen: job.gen })
+      worker.postMessage(job.request)
     }
   }
 
@@ -63,8 +116,7 @@ export class GrowPool {
       this.busy.delete(worker)
       this.idle.push(worker)
       try {
-        if ("error" in data) job.reject(new Error(data.error))
-        else job.resolve(worldFrom(data.grown))
+        job.settle(data)
       } catch (error) {
         job.reject(error as Error)
       }
@@ -77,7 +129,12 @@ export class GrowPool {
       const stranded = [...(this.busy.get(worker) ? [this.busy.get(worker) as Job] : []), ...this.queue]
       this.busy.delete(worker)
       this.queue = []
-      for (const job of stranded) this.grow(job.tree, job.gen).then(job.resolve, job.reject)
+      for (const job of stranded)
+        try {
+          job.local()
+        } catch (error) {
+          job.reject(error as Error)
+        }
     }
     return worker
   }

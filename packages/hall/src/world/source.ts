@@ -3,7 +3,9 @@ import { setActiveWorld } from "./active.ts"
 import { type Gen, genOf } from "./gen/islandFromTree.ts"
 import type { Tree } from "./gen/load.ts"
 import { growSync } from "./grow/grow.ts"
-import { growPool } from "./grow/pool.ts"
+import type { LayoutInput } from "./grow/layout.ts"
+import { type GrownIsland, growPool } from "./grow/pool.ts"
+import type { SplitLayout } from "./repoArchipelago.ts"
 import { handWorld, type World } from "./world.ts"
 
 /**
@@ -30,6 +32,10 @@ export const growWorld = (tree: Tree): World => growSync(tree, LINKED_GEN)
 
 /** The same island grown in a Web Worker, off the main thread (world/grow/pool.ts; here, when there is none). */
 export const growWorldAsync = (tree: Tree): Promise<World> => growPool.grow(tree, LINKED_GEN)
+/** The same, with the data the island was made of (a split repo's layout is sent it: world/splitArchipelago.ts). */
+export const growIslandAsync = (tree: Tree): Promise<GrownIsland> => growPool.growParts(tree, LINKED_GEN)
+/** A split repo's islands laid out, off the main thread (world/grow/layout.ts). */
+export const layoutAsync = (input: LayoutInput): Promise<SplitLayout> => growPool.layout(input)
 
 class WorldSource {
   world: World = handWorld()

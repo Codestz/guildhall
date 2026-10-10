@@ -3,9 +3,8 @@ import type { Archipelago, FarIsland, IslandInfo, PatchesOf } from "./archipelag
 import type { Tree } from "./gen/load.ts"
 import { type Slice, splitRepo } from "./gen/split.ts"
 import { APRON, withQuays } from "./quays.ts"
-import { layoutSplit } from "./repoArchipelago.ts"
-import { growWorldAsync } from "./source.ts"
-import { reachOf, type World } from "./world.ts"
+import { growIslandAsync, layoutAsync } from "./source.ts"
+import { reachOf, type World, type WorldParts } from "./world.ts"
 
 /**
  * A repo grown as an archipelago (`?repo=…&split`): its tree cut into islands (world/gen/split.ts),
@@ -41,24 +40,27 @@ export async function growSplit(tree: Tree, patchesOf: PatchesOf): Promise<Grown
   const split = splitRepo(tree.entries, tree.repo)
   if (!split) return undefined
   const settled = await Promise.allSettled(
-    split.slices.map((slice) => growWorldAsync(sliceTree(tree, slice))),
+    split.slices.map((slice) => growIslandAsync(sliceTree(tree, slice))),
   )
   const core = settled[0]
   if (core?.status !== "fulfilled") throw (core as PromiseRejectedResult).reason
   const failed: Grown["failed"] = []
-  const kept: { slice: Slice; world: World }[] = []
+  const kept: { slice: Slice; world: World; parts: WorldParts }[] = []
   for (const [i, outcome] of settled.entries()) {
     const slice = split.slices[i] as Slice
-    if (outcome.status === "fulfilled") kept.push({ slice, world: outcome.value })
+    if (outcome.status === "fulfilled") kept.push({ slice, ...outcome.value })
     else failed.push({ repo: splitIdOf(tree.repo, slice), reason: (outcome.reason as Error).message })
   }
-  // Laid out by the slices' own ids (the coupling is keyed by them); named by full id once placed.
-  const laid = kept.map(({ slice, world }, i) => ({
-    id: slice.id,
-    world,
-    footprint: { reach: reachOf(world), patches: patchesOf(world, i > 0, true) } satisfies Footprint,
-  }))
-  const placed = layoutSplit(laid, split.coupling)
+  // Laid out by the slices' own ids (the coupling is keyed by them), in a worker (world/grow/layout.ts):
+  // the quays alone take seconds on a big repo. Named by full id once placed.
+  const placed = await layoutAsync({
+    islands: kept.map(({ slice, world, parts }, i) => ({
+      id: slice.id,
+      parts,
+      patches: patchesOf(world, i > 0, true),
+    })),
+    coupling: [...split.coupling],
+  })
   const named = (id: string): string => `${tree.repo}#${id}`
   const layout = {
     ...placed,

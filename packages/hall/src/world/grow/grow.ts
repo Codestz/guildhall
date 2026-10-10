@@ -46,6 +46,12 @@ export function worldFrom({ parts, population }: Grown): World {
 /** The whole job on this thread; the folk are planned when first wanted (folk/plan.ts). */
 export const growSync = (tree: Tree, gen: Gen): World => worldOf(growParts(tree, gen))
 
+/** The same, with the data the world was closed from (a split repo's layout is sent it). */
+export function growSyncParts(tree: Tree, gen: Gen): { world: World; parts: WorldParts } {
+  const parts = growParts(tree, gen)
+  return { world: worldOf(parts), parts }
+}
+
 /** The buffers of a Grown's big typed arrays (the massifs' grids), to be transferred instead of copied. */
 export function transferablesOf({ parts }: Grown): ArrayBuffer[] {
   const buffers = new Set<ArrayBuffer>()

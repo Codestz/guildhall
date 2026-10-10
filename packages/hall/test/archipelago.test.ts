@@ -150,6 +150,7 @@ describe("the map and flights", () => {
       { repo: "a/a", name: "a", at: [300, 0], reach: 100 },
       { repo: "b/b", name: "b", at: [-300, 40], reach: 110 },
     ],
+    links: [],
   } as unknown as Archipelago
 
   test("the map holds every island's land", () => {

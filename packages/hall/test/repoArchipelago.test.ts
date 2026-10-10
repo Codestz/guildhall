@@ -359,16 +359,22 @@ describe("the archipelago's layout", () => {
 })
 
 describe("the link", () => {
-  test("`?repo=…&split` names the repo; without `split` or a repo it is no split", () => {
+  test("`?repo=…` splits by default; `split=0`, `grow`, a repos list or no repo is no split", () => {
+    expect(parseSplitLink("?repo=facebook/react")).toEqual({ repo: "facebook/react" })
     expect(parseSplitLink("?repo=facebook/react&split")).toEqual({ repo: "facebook/react" })
     expect(parseSplitLink("?repo=facebook/react&split&island=map")).toEqual({
       repo: "facebook/react",
       island: "map",
     })
-    expect(parseSplitLink("?repo=facebook/react")).toBeNull()
     expect(parseSplitLink("?split")).toBeNull()
     expect(parseSplitLink("?repo=facebook/react&split=0")).toBeNull()
-    expect(parseSplitLink("?repo=home&split")).toBeNull()
+    expect(parseSplitLink("?repo=facebook/react&split=false")).toBeNull()
+    expect(parseSplitLink("?repo=facebook/react&grow")).toBeNull()
+    expect(parseSplitLink("?repo=facebook/react&split&grow")).toBeNull()
+    expect(parseSplitLink("?repo=facebook/react&repos=a/b")).toBeNull()
+    expect(parseSplitLink("?repo=facebook/react&archipelago")).toBeNull()
+    expect(parseSplitLink("?repo=home")).toBeNull()
+    expect(parseSplitLink("?repo=sample")).toBeNull()
   })
 
   test("`island=` finds a split repo's package by its name or its id", () => {

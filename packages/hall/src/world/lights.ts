@@ -169,7 +169,8 @@ function build(world: World): Light[] {
   }
   for (const l of world.island.landmarks)
     if (l.kind === "well" || l.kind === "market" || l.kind === "dock") lanternsAround(l.x, l.z, 2)
-  for (const site of world.sites) lanternsAround(site.at[0], site.at[1], 2)
+  // A quay's dock and bridge carry lamps of their own (scene/links); a lantern of the island's would stand on its timber or ramp.
+  for (const site of world.sites) if (!site.quay) lanternsAround(site.at[0], site.at[1], 2)
   return out
 }
 

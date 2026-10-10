@@ -37,6 +37,7 @@ import { RUSH, SCENARIOS, type ScenarioId } from "./store.ts"
  *            (world/gen) instead of the guild's own. The Bard directs there as anywhere (with
  *            `bard=0`, the island is framed whole). Bundled fixtures first, else the public GitHub
  *            API; on failure the guild's island stays. A `look` name waits for the island to grow.
+ *            A repo of several packages opens as an archipelago (world/archipelagoLink.ts); `split=0` or `grow`: one island.
  *            `home`: back to the guild's own island. Applied in place, the world swaps live.
  *
  * Every value is validated strictly; anything unknown or invalid is ignored (and listed in

@@ -243,8 +243,14 @@ export function RepoDoor() {
       location.assign(`${location.pathname}${added.search}`)
       return
     }
+    const link = `${location.pathname}${islandLink(repo, location.search)}${location.hash}`
+    // A repo's island opens afresh, as its link would (a repo of packages is an archipelago); only home swaps in place.
+    if (repo !== HOME_ISLAND) {
+      location.assign(link)
+      return
+    }
     repoDoor.close()
-    void visitIsland(store, repo, `${location.pathname}${islandLink(repo, location.search)}${location.hash}`)
+    void visitIsland(store, repo, link)
   }
 
   function submit(event: FormEvent) {

@@ -200,8 +200,8 @@ describe("docks", () => {
         }
       }
       expect(docks).toBeGreaterThan(10)
-      // A cramped coast may leave a dock no better place (a link is worth a tight landing).
-      expect(crowded).toBeLessThanOrEqual(Math.floor(docks / 10))
+      // A dock moves along the coast to a clear stretch rather than ever stand against a house.
+      expect(crowded).toBe(0)
     },
     60_000 * SLOW,
   )

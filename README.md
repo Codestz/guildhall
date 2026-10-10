@@ -96,7 +96,8 @@ stored. Set `GUILDHALL_GITHUB=0` to turn the watch off.
 ### Repo islands and archipelagos
 
 Add `?repo=owner/name` to the hall's URL and your browser reads that public repo's file tree from
-GitHub and grows a world from it. `?archipelago` sets several side by side, or name your own with
+GitHub and grows a world from it; a repo of several packages opens as an archipelago of them, the
+core its home island (`&split=0` keeps it one island). `?archipelago` sets several side by side, or name your own with
 `?repos=a/b,c/d`. The **Your repo as an island** door in the hall does the same.
 
 <p align="center">
@@ -141,7 +142,8 @@ install. A few links straight into a scene:
 - [`?story=seas`](https://guildhall.codestz.dev/?story=seas): a party's run with its GitHub sea
   beside it, from the first push to the release.
 - [`?repo=facebook/react`](https://guildhall.codestz.dev/?repo=facebook/react): a world grown
-  from a public repo's file tree. Any `owner/name` works. Add `&grow` to watch it build.
+  from a public repo's file tree. Any `owner/name` works. A repo of several packages opens as an
+  archipelago of them (`&split=0` for one island). Add `&grow` to watch the one island build.
 - [`?archipelago`](https://guildhall.codestz.dev/?archipelago): several repos as islands, side by
   side.
 - [`?story=rush&n=300`](https://guildhall.codestz.dev/?story=rush&n=300): a crowd of 300

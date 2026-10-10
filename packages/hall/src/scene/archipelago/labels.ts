@@ -76,16 +76,42 @@ function candidates(item: LabelIn, ring: number): readonly (readonly [number, nu
   ]
 }
 
+/** The pip an island with no plate shows, over its centre (px, with a little to spare). */
+const PIP = 16
+
 /**
  * Lays the plates out in `view` (px). Returns each item's place, aligned with `items`: the most
  * important first take their spot, the rest the first that is free; the pinned ones are always shown
- * (at their best spot even if it overlaps).
+ * (at their best spot even if it overlaps). A plate keeps off the pips of the islands that have none
+ * (laid out again, with those pips known, until the plates that show are the ones that fit).
  */
 export function layoutLabels(
   items: readonly LabelIn[],
   view: { w: number; h: number /** At most this many plates (the rest pips). */; max?: number },
   /** Screen rectangles no plate may cover (the HUD, the adventurers' chips). */
   avoid: readonly Rect[] = [],
+): LabelOut[] {
+  let pips = new Map<number, Rect>()
+  let out = layoutOnce(items, view, avoid, pips)
+  for (let round = 0; round < items.length; round++) {
+    const next = new Map<number, Rect>()
+    for (const [i, at] of out.entries()) {
+      const item = items[i] as LabelIn
+      if (!at.shown) next.set(i, { x: item.x - PIP / 2, y: item.y - PIP / 2, w: PIP, h: PIP })
+    }
+    if (next.size === pips.size) break
+    pips = next
+    out = layoutOnce(items, view, avoid, pips)
+  }
+  return out
+}
+
+/** One pass: `pips` (by item) are rects every plate but the island's own keeps off. */
+function layoutOnce(
+  items: readonly LabelIn[],
+  view: { w: number; h: number; max?: number },
+  avoid: readonly Rect[],
+  pips: ReadonlyMap<number, Rect>,
 ): LabelOut[] {
   const out: LabelOut[] = items.map(() => ({ dx: 0, dy: 0, shown: false, leader: false }))
   const order = items
@@ -108,7 +134,11 @@ export function layoutLabels(
     for (const ring of RINGS) {
       best = candidates(item, ring).find(([dx, dy]) => {
         const r = rect(dx, dy)
-        return inside(r) && !taken.some((other) => overlaps(r, other))
+        return (
+          inside(r) &&
+          !taken.some((other) => overlaps(r, other)) &&
+          ![...pips].some(([j, pip]) => j !== i && overlaps(r, pip))
+        )
       })
       if (best) break
     }

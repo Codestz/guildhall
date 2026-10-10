@@ -2,7 +2,9 @@ import type { BufferGeometry } from "three"
 import { type Bridge, DECK_EDGES, deckAt, PARAPET, RAIL_WIDTH } from "../../world/bridges.ts"
 import type { Quay } from "../../world/linkStub.ts"
 import { SEA_Y } from "../Ships.tsx"
+import { ABUT, abutment } from "./bridgeAbutment.ts"
 import { COOL, courses, FLAG, PALE, SHADE, STONE, tone } from "./bridgeStone.ts"
+import { TORCH_FOOT } from "./bridgeTorches.ts"
 import { jitter, Shapes, type V3 } from "./shapes.ts"
 
 /**
@@ -67,20 +69,25 @@ function piecesOf(bridge: Bridge): Piece[] {
   const { piers, length } = bridge
   const first = piers[0] as number
   const last = piers[piers.length - 1] as number
-  const pieces: Piece[] = [{ from: 0, to: first + PIER_HALF, arch: false }]
+  const pieces: Piece[] = [{ from: -ABUT, to: first + PIER_HALF, arch: false }]
   for (let i = 0; i + 1 < piers.length; i++) {
     const a = piers[i] as number
     const b = piers[i + 1] as number
     pieces.push({ from: a + PIER_HALF, to: b - PIER_HALF, arch: true })
     if (i + 2 < piers.length) pieces.push({ from: b - PIER_HALF, to: b + PIER_HALF, arch: false })
   }
-  pieces.push({ from: last - PIER_HALF, to: length, arch: false })
+  pieces.push({ from: last - PIER_HALF, to: length + ABUT, arch: false })
   return pieces
 }
 
 const [LEFT, RIGHT] = DECK_EDGES
 const BODY_L = LEFT - PARAPET
 const BODY_R = RIGHT + PARAPET
+/** The parapets' faces across the axis, each [inner, outer]. */
+const PARAPETS = [
+  [LEFT, BODY_L],
+  [RIGHT, BODY_R],
+] as const
 
 /** Adds `bridge`, which starts at quay `a`'s landing, to `shapes`. */
 export function addBridge(shapes: Shapes, bridge: Bridge, a: Quay): void {
@@ -149,12 +156,17 @@ export function addBridge(shapes: Shapes, bridge: Bridge, a: Quay): void {
           tone(SHADE, (jitter(block, 7) - 0.5) * 0.14),
         )
     }
-    // The faces across the axis: a pier's or ramp's ends.
+    // The faces across the axis: a pier's or ramp's ends, and at each head an abutment of dressed stone.
     if (!piece.arch)
       for (const [s, along] of [
         [piece.from, -1],
         [piece.to, 1],
-      ] as const)
+      ] as const) {
+        if (s === -ABUT || s === bridge.length + ABUT) {
+          const top = deckAt(bridge, s)
+          abutment(shapes, f, s, along, [BODY_L, BODY_R], PARAPETS, BOTTOM, top, top + PARAPET_H - COPING)
+          continue
+        }
         shapes.quad(
           f.at(s, BODY_L, BOTTOM),
           f.at(s, BODY_R, BOTTOM),
@@ -164,6 +176,7 @@ export function addBridge(shapes: Shapes, bridge: Bridge, a: Quay): void {
           SHADE,
           0.95,
         )
+      }
   }
   for (const s of bridge.piers) pier(shapes, f, s)
 }
@@ -317,7 +330,8 @@ function addTowers(shapes: Shapes, bridge: Bridge, a: Quay): void {
 }
 
 /** Where a bridge's torches stand: the base of each, on a parapet's coping. */
-const lampPosts = (bridge: Bridge): V3[] => bridge.lamps.map(([x, z, y]): V3 => [x, y + PARAPET_H, z])
+const lampPosts = (bridge: Bridge): V3[] =>
+  bridge.lamps.map(([x, z, y]): V3 => [x, y + PARAPET_H + TORCH_FOOT, z])
 
 /** Every bridge of an archipelago in one geometry, and where its torches stand; null when there are no bridges. */
 export function bridgeGeometry(

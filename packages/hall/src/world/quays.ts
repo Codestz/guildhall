@@ -34,7 +34,7 @@ export const HEAD = { back: 3, ahead: 9, half: 6.5 } as const
  * A ferry's dock wants room for its timber, in the quay's frame (as APRON): the deck starts a little
  * inland, the pier runs out to PIER, and its landing stage is wider; clear of every building.
  */
-export const DOCK = { back: 3.5, ahead: 12, half: 4.5 } as const
+export const DOCK = { back: 3.5, ahead: 12, half: 4.5, step: 1 } as const
 const APRON_STEP = 2
 /**
  * A bridge leaves its island at the shore: its way over its own land is at most this long (about a
@@ -115,7 +115,7 @@ export function apronProblem(
   world: World,
   spot: Spot,
   facing: Spot,
-  apron: { back: number; ahead: number; half: number } = APRON,
+  apron: { back: number; ahead: number; half: number; step?: number } = APRON,
   only?: RegExp,
 ): string | undefined {
   // The quay's own lantern stands there by design (world/lights.ts); everything else stays off.
@@ -123,8 +123,10 @@ export function apronProblem(
     (o) => !o.name.startsWith("light ") && (!only || only.test(o.name)),
   )
   const [ux, uz] = facing
-  for (let f = -apron.back; f <= apron.ahead; f += APRON_STEP)
-    for (let s = -apron.half; s <= apron.half; s += APRON_STEP) {
+  // A dock is narrow timber beside small buildings: it is looked at more finely than a bridge's broad apron.
+  const step = apron.step ?? APRON_STEP
+  for (let f = -apron.back; f <= apron.ahead; f += step)
+    for (let s = -apron.half; s <= apron.half; s += step) {
       const at: Spot = [spot[0] + ux * f + uz * s, spot[1] + uz * f - ux * s]
       const hit = blocker(at, obstacles, 0.4)
       if (hit) return `the apron meets ${hit.name}`
@@ -256,6 +258,7 @@ export function withQuays(
       at: local,
       posts: [post],
       wilds: { mix: { grass: 0.6, rock: 0.4 } },
+      quay: true as const,
       ...(reserved.length > 0 ? { reserved } : {}),
     }
   })

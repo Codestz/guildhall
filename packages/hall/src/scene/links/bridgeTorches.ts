@@ -10,6 +10,9 @@ import type { V3 } from "./shapes.ts"
 
 /** A little under the street torch's post (world/lights.ts TORCH_SCALE, 2.6): a parapet is not a verge. */
 const SCALE = 2.3
+/** The torch model's foot hangs this far under its origin (kit.json): its post is lifted so the foot stands on the coping, not in it. */
+export const TORCH_FOOT = 0.225 * SCALE
+
 /** Where a torch's flame burns, over its foot: the street torch's (0.92 of its height). */
 export const FLAME_UP = 0.92 * SCALE
 

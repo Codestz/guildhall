@@ -54,8 +54,10 @@ export function parseArchipelagoLink(search: string): ArchipelagoLink | null {
 }
 
 /**
- * `?repo=owner/name&split`: the repo as an archipelago of its packages (world/gen/split.ts), the
- * core its home island. A repo that has nothing to split stays the one island it was.
+ * `?repo=owner/name`: a repo whose tree splits into packages opens as an archipelago of them
+ * (world/gen/split.ts), the core its home island. A repo that has nothing to split stays the one
+ * island it was. `&split=0` opts out to a single island; `&grow` (the history film, which does not
+ * grow a split repo yet) and the other archipelago links (`?repos=`, `?archipelago`) imply it.
  */
 export interface SplitLink {
   repo: string
@@ -66,7 +68,8 @@ export interface SplitLink {
 export function parseSplitLink(search: string): SplitLink | null {
   const params = new URLSearchParams(search)
   const value = params.get("repo")?.trim()
-  if (!params.has("split") || !value || value === "home" || value === "sample") return null
+  if (!value || value === "home" || value === "sample") return null
+  if (params.has("grow") || params.has("repos") || params.has("archipelago")) return null
   const split = (params.get("split") ?? "").toLowerCase()
   if (split === "0" || split === "false") return null
   let repo: string

@@ -58,6 +58,8 @@ export interface WorkPlace {
   wilds: { mix: Mix; barren?: boolean }
   /** Lanes the wilds keep off, as segments from here (a bridge's head: world/quays.ts `withQuays`). */
   reserved?: readonly (readonly [Spot, Spot])[]
+  /** A quay (world/quays.ts `withQuays`): a dock or bridge head, which carries its own lamps and keeps the island's off. */
+  quay?: true
 }
 
 /** What a repo island was grown from, for the HUD. */

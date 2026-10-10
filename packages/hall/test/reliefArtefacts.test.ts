@@ -1,18 +1,17 @@
 import { describe, expect, test } from "bun:test"
-import { SNOW_EDGE, SNOW_WARP, snowAmount, snowWarp } from "../src/scene/terrain/snow.ts"
+import { SNOW_EDGE, snowAmount } from "../src/scene/terrain/snow.ts"
 import { cellAt, key, neighbours } from "../src/world/gen/hex.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
-import { dressingOf } from "../src/world/gen/relief/dressing.ts"
+import { snowlineOf } from "../src/world/gen/relief/index.ts"
 import { type MeshArrays, reliefMesh } from "../src/world/gen/relief/mesh.ts"
-import { MOST_ROCK } from "../src/world/gen/relief/rockSize.ts"
+import { LEDGE_STEP } from "../src/world/gen/relief/shape.ts"
 import { SWATCH } from "../src/world/gen/relief/swatches.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
-import { HEX_SCALE, type LandPiece, PIECES } from "../src/world/lands.ts"
 import { repoWorld } from "../src/world/world.ts"
 import COCKPIT from "./fixtures/repos/codestz__opencode-cockpit.json"
 import REACT from "./fixtures/repos/facebook__react.json"
 
-/** The close-up artefacts of the relief (style d): grass islands on flanks, slivers, the snow line's edge, oversized rocks. */
+/** The close-up artefacts of the relief: grass islands on flanks, slivers, the snow caps on the top ledges. */
 
 const worldOf = (entries: unknown) =>
   repoWorld(islandFromTree(entries as RepoEntry[], 0, 2), {
@@ -75,14 +74,14 @@ describe("grass on the flanks", () => {
       for (let k = 0; k < 3; k++) edges.set(edgeId(f, k), [...(edges.get(edgeId(f, k)) ?? []), i])
     })
     // A ramp of grass: a face of grass that is neither a ledge's top (flat) nor a riser.
-    // (The rim faces over land wear the hex tile's own grass: they join the tile, not the slope.)
+    // (The rim faces over land wear the hex tile's own grass: they join the tile, not the slope; nor does a river's bed at the foot, below a unit, which is the valley's.)
     const ramp = (i: number): boolean =>
       GRASSES.includes(faces[i]!.u) &&
+      Math.max(...faces[i]!.corners.map((c) => c[1]!)) > 1 &&
       faces[i]!.v !== Math.fround(0.643) &&
       faces[i]!.ny < 0.999 &&
       faces[i]!.ny > 0.05
     const seen = new Set<number>()
-    let patches = 0
     let speckles = 0
     faces.forEach((_, start) => {
       if (!ramp(start) || seen.has(start)) return
@@ -101,10 +100,8 @@ describe("grass on the flanks", () => {
             } else if (GRASSES.includes(faces[j]!.u) && faces[j]!.ny >= 0.999) anchored = true
           }
       }
-      patches++
       if (!anchored && run.length < 6) speckles++
     })
-    expect(patches).toBeGreaterThan(5)
     expect(speckles).toBe(0)
   })
 })
@@ -117,14 +114,14 @@ describe("no stretched triangles on the mountain's faces", () => {
       let long = 0
       for (const massif of relief.massifs) {
         for (const f of facesOf(reliefMesh(relief, massif.cells, 0))) {
-          // The ground (a footprint), in a hex whose six neighbours are all the massif's: not its rim or a riser.
+          // The ground (a footprint), in a hex whose six neighbours are all the massif's: not its rim, a riser or a trail's steps (steeper than 70°).
           const [x, z] = [0, 2].map((k) => f.corners.reduce((sum, c) => sum + c[k]!, 0) / 3) as [
             number,
             number,
           ]
           const cell = cellAt([x, z])
           if (
-            f.ny < 0.02 ||
+            f.ny < 0.3 ||
             !massif.keys.has(key(cell)) ||
             !neighbours(cell).every((c) => massif.keys.has(key(c)))
           )
@@ -146,49 +143,47 @@ describe("the snow line", () => {
 
   test("is one smooth rise with height: no step between a point and one a hair above it", () => {
     let before = 0
-    for (let y = line - 6; y <= line + 6; y += 0.05) {
-      const here = snowAmount(line, 10, y, 20, flat)
+    for (let y = line - 6; y <= line + 6; y += 0.02) {
+      const here = snowAmount(line, y, flat)
       expect(here).toBeGreaterThanOrEqual(before - 1e-9)
       expect(here - before).toBeLessThan(0.05)
       before = here
     }
   })
 
-  test("is bare below its soft edge and white above the line, a band of its edge's width in between", () => {
-    expect(snowAmount(line, 3, line - SNOW_EDGE - SNOW_WARP - 0.01, 8, flat)).toBe(0)
-    expect(snowAmount(line, 3, line + SNOW_WARP + 0.01, 8, flat)).toBe(1)
+  test("is bare below its soft edge and white at the line", () => {
+    expect(snowAmount(line, line - SNOW_EDGE - 0.01, flat)).toBe(0)
+    expect(snowAmount(line, line, flat)).toBe(1)
   })
 
-  test("is warped by a slow wave, within the warp, so the line is a natural edge rather than a level cut", () => {
-    const pushes = Array.from({ length: 200 }, (_, k) => snowWarp(k * 1.7, k * 0.9))
-    expect(Math.max(...pushes)).toBeLessThanOrEqual(SNOW_WARP)
-    expect(Math.min(...pushes)).toBeGreaterThanOrEqual(-SNOW_WARP)
-    expect(Math.max(...pushes) - Math.min(...pushes)).toBeGreaterThan(SNOW_WARP)
-    // Slow: two points a unit apart are pushed alike.
-    expect(Math.abs(snowWarp(5, 5) - snowWarp(6, 5))).toBeLessThan(0.7)
+  test("is narrower than a ledge, so a ledge top is bare or white, never a gradient across its stairs", () => {
+    expect(SNOW_EDGE).toBeLessThan(LEDGE_STEP)
+    expect(snowAmount(line, line - LEDGE_STEP, flat)).toBe(0)
+    expect(snowAmount(line, line + LEDGE_STEP, flat)).toBe(1)
   })
 
   test("settles on a surface facing up and not on a wall, at any height", () => {
-    expect(snowAmount(line, 0, line + 20, 0, 0)).toBe(0)
-    expect(snowAmount(line, 0, line + 20, 0, 1)).toBe(1)
-    expect(snowAmount(line, 0, line + 20, 0, 0.5)).toBeGreaterThan(0)
-    expect(snowAmount(line, 0, line + 20, 0, 0.5)).toBeLessThan(1)
+    expect(snowAmount(line, line + 20, 0)).toBe(0)
+    expect(snowAmount(line, line + 20, 1)).toBe(1)
+    expect(snowAmount(line, line + 20, 0.5)).toBeGreaterThan(0)
+    expect(snowAmount(line, line + 20, 0.5)).toBeLessThan(1)
   })
-})
 
-describe("the rocks on the mountain stand no bigger than a house and a half", () => {
-  for (const [name, world] of Object.entries({ city: CITY, town: TOWN })) {
-    test(`${name}: every rock and crag is at most ${MOST_ROCK} units across, and none is a pebble`, () => {
-      const relief = world.relief!
-      const rocks = dressingOf(relief, 3).filter(
-        (p) => p.piece.startsWith("rock_single") || p.piece.startsWith("mountain_"),
-      )
-      expect(rocks.length).toBeGreaterThan(10)
-      for (const rock of rocks) {
-        const [width, , depth] = PIECES[rock.piece as LandPiece].size as [number, number, number]
-        expect(Math.max(width, depth) * HEX_SCALE * (rock.scale ?? 1)).toBeLessThanOrEqual(MOST_ROCK + 1e-6)
-        expect(rock.scale ?? 1).toBeGreaterThan(0.4)
+  test("caps the top ledges of the main peak: every white face is a flat ledge top, and there are some", () => {
+    const relief = CITY.relief!
+    const snowline = snowlineOf(relief, 0)
+    const mesh = reliefMesh(relief, relief.massifs[0]!.cells, 0)
+    let white = 0
+    for (const f of facesOf(mesh)) {
+      const y = f.corners.map((c) => c[1]!)
+      if (snowAmount(snowline, Math.min(...y), f.ny) < 1) continue
+      // A face that takes full snow lies level, on a ledge: the cap is flat white tops, not faceted slopes.
+      if (f.ny > 0.999) {
+        expect(Math.max(...y) - Math.min(...y)).toBeLessThan(1e-3)
+        expect(y[0]! % LEDGE_STEP).toBeCloseTo(0, 3)
+        white++
       }
-    })
-  }
+    }
+    expect(white).toBeGreaterThan(5)
+  })
 })

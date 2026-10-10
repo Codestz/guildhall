@@ -7,15 +7,16 @@ import { LEDGE_STEP } from "./shape.ts"
  * orientations shade as a sawtooth. Here the step lives on the lattice's *edges*: an edge between
  * two ledges is cut at one place per riser (`profile`): a flat run at the lower ledge, a vertical
  * riser, a flat run at the upper. Both triangles on an edge read the same profile, so stairs meet
- * stairs exactly. A ramp triangle (a peak's face, a rim, a river's hex) beside stairs keeps its
+ * stairs exactly. A ramp triangle (a rim, a river's bank, a trail's steps) beside stairs keeps its
  * straight edge (`rampOf`, with the riser's mid-point on it) and a curtain (`curtainOf`) closes the
  * gap in the vertical plane over the edge between the ramp's line and the profile: a wall of the
  * taller side, so the mesh is a closed solid with no crack and no T-junction. Inside a stairs
  * triangle the riser joins the two crossings: a flat wall facing downhill.
  *
- * The trade-off: the grid (`heightAt`, so walkers and trees) still reads the ramp between two ledges,
- * so over that one-lattice-step band it is up to half a ledge off the mesh. On a flat ledge top the
- * two agree exactly, and dressing keeps its trees and rocks to flat ground (dressing.ts).
+ * The trade-off: the grid (`heightAt`, so walkers and trees) reads a riser as a ramp one fine lattice
+ * step wide (facets.ts `stairAt` puts the vertices between the stairs' own vertices on the ledges), so
+ * on the riser's line it can stand on the other ledge. On a flat ledge top the two agree exactly, and
+ * dressing keeps its trees to flat ground (dressing.ts).
  */
 
 type Vertex = readonly number[]
@@ -138,6 +139,24 @@ export function stairsOf(p: Vertex, q: Vertex, r: Vertex): Stairs {
   return stairs
 }
 
+/** A triangle's unit normal, turned to face up. */
+export function upOf(p: Vertex, q: Vertex, r: Vertex): number[] {
+  const [ux, uy, uz] = [
+    (q[0] as number) - (p[0] as number),
+    (q[1] as number) - (p[1] as number),
+    (q[2] as number) - (p[2] as number),
+  ]
+  const [vx, vy, vz] = [
+    (r[0] as number) - (p[0] as number),
+    (r[1] as number) - (p[1] as number),
+    (r[2] as number) - (p[2] as number),
+  ]
+  const n = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx]
+  const length = DMath.hypot(...(n as [number, number, number])) || 1
+  const sign = (n[1] as number) < 0 ? -1 : 1
+  return n.map((x) => (sign * x) / length)
+}
+
 /** A triangle's aspect: its longest edge squared over twice its area (1.15 equilateral), infinite when it has no area. */
 function aspect(a: readonly number[], b: readonly number[], c: readonly number[]): number {
   const [ux, uy, uz] = [
@@ -196,7 +215,7 @@ export function triangulate(ring: readonly number[][]): Tri[] {
 }
 
 /**
- * The points that cut an edge of a ramp (a peak's flank, a rim's cliff) longer than `long` into 2, 4,
+ * The points that cut an edge of a ramp (a rim's cliff, a trail's steps) longer than `long` into 2, 4,
  * 8... equal pieces: a power of two, so the two legs of a wedge are cut at the same fractions and its
  * faces stay round. The neighbour across the edge cuts it the same (the points come from the end that
  * is first in x, z). In order from `u`; none on a short edge.

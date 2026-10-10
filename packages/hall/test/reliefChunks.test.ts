@@ -62,7 +62,8 @@ describe("a region's tiers", () => {
       near += t0
       far += t2
     }
-    expect(far).toBeLessThan(near / 2)
+    // The stairs run to the summit, so the far tier keeps their risers: cheaper, not a fraction.
+    expect(far).toBeLessThan(near * 0.6)
   })
 
   test("the far tier keeps the summit: its highest point is the near tier's", () => {

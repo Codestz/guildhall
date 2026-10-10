@@ -73,7 +73,7 @@ describe("massifs", () => {
   test("every size has its range, and a City's main range is a real mountain", () => {
     for (const relief of Object.values(RELIEFS)) expect(relief.massifs.length).toBeGreaterThan(0)
     const main = CITY_RELIEF.massifs[0]
-    expect(main?.height).toBeGreaterThan(40)
+    expect(main?.height).toBeGreaterThanOrEqual(7 * LEDGE_STEP)
     expect(main?.height).toBeLessThanOrEqual(CAP.city)
     expect(main?.cells.length).toBeGreaterThan(100)
   })
@@ -209,7 +209,7 @@ describe("the ground", () => {
     expect(CITY_RELIEF.heightAt(1e5, 1e5)).toBeUndefined()
   })
 
-  test("no flank is steeper than a climbable crag (65°), so stairs and switchbacks can follow it", () => {
+  test("no flank is steeper than a climbable crag (65°), so a trail can follow it", () => {
     const pitch = CIRCUM / RES
     for (const relief of Object.values(RELIEFS))
       for (const { grid } of relief.massifs)
@@ -346,12 +346,8 @@ describe("the world with a relief", () => {
     const keys = world.relief?.keys ?? new Set<string>()
     for (const tile of world.island.tiles) expect(keys.has(key(cellAt([tile.x, tile.z])))).toBe(false)
     for (const piece of world.island.decor) {
-      // A cone stands on its tile's top; a crag the dressing embeds in the face stands sunk into the ground.
-      if (piece.piece.startsWith("mountain_"))
-        expect(piece.y ?? 0).toBeLessThan((world.relief?.heightAt(piece.x, piece.z) ?? 0) - 0.5)
-      // Its trees, rocks and crags, and the cairn and flag of a trail's lookout (test/trails.test.ts).
-      if (keys.has(key(cellAt([piece.x, piece.z]))))
-        expect(piece.piece).toMatch(/^(trees?_|rock_single_|mountain_|flag_)/)
+      // Its conifers, and the cairn and flag of a trail's lookout (test/trails.test.ts): no rock, no cone, no crag.
+      if (keys.has(key(cellAt([piece.x, piece.z])))) expect(piece.piece).toMatch(/^(trees?_|flag_)/)
     }
     expect(CITY.island.decor.some((d) => d.piece.startsWith("mountain_"))).toBe(true)
   })

@@ -1,8 +1,8 @@
 import { DMath } from "../../dmath.ts"
-import { TERRACE } from "../../waterways.ts"
 import { cellAt } from "../hex.ts"
 import { CIRCUM, type HeightGrid, pointOf, RES, ROW } from "./lattice.ts"
 import type { Peak, Saddle } from "./ridges.ts"
+import { LEDGE_STEP } from "./shape.ts"
 
 /**
  * Makes a massif's skeleton agree with its finished ground. The skeleton's heights were asks: the
@@ -16,8 +16,8 @@ import type { Peak, Saddle } from "./ridges.ts"
 
 /** A peak is the highest vertex within this far of where its crest met, world units. */
 const REACH = 1.5 * CIRCUM
-/** A saddle lies at least this far below the lower of its peaks. */
-const DEPTH = TERRACE
+/** A saddle lies at least this far below the lower of its peaks: a ledge. */
+const DEPTH = LEDGE_STEP
 /** A pass lies at most this share of its lower peak's height: the summits stand clear of it. */
 const PROMINENCE = 0.62
 /** A saddle that cannot be cut this far below its lower peak merges that peak away. */
@@ -121,8 +121,9 @@ export function settle(
   }
 }
 
-/** The height a pass between peaks the lower of which stands `low` is cut to. */
-const pass = (low: number): number => Math.min(low - DEPTH, PROMINENCE * low)
+/** The height a pass between peaks the lower of which stands `low` is cut to: a ledge. */
+const pass = (low: number): number =>
+  Math.floor((Math.min(low - DEPTH, PROMINENCE * low) + 1e-6) / LEDGE_STEP) * LEDGE_STEP
 
 /** Lowers the grid round `at` to at most `ceiling`, climbing out of the cut at CUT; the fixed vertices stay. */
 function cut(grid: HeightGrid, fixed: (i: number, j: number) => boolean, at: Spot2, ceiling: number): void {

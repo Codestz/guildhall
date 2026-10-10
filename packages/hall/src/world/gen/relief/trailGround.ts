@@ -74,14 +74,7 @@ export function latticeOf(massif: Massif, stride: number, river: ReadonlySet<str
     }
     ground.set(next)
   }
-  let apex = -1
-  for (let v = 0; v < grid.data.length; v++)
-    if (
-      !Number.isNaN(grid.data[v] as number) &&
-      (apex < 0 || (grid.data[v] as number) > (grid.data[apex] as number))
-    )
-      apex = v
-  return { grid, stride, ground, apex, rim, blocked: wetOf(massif, river) }
+  return { grid, stride, ground, rim, blocked: wetOf(massif, river) }
 }
 
 /** Road nodes outside every massif: where a trail may start from. */
@@ -117,21 +110,13 @@ export function headsOf(
   return { heads, roadOf }
 }
 
-/**
- * Whether a lookout's pad fits round a vertex: its neighbours are the massif's own, no other trail
- * has been cut over them, and the pad does not take the summit's tip off (the lookout stands beside it).
- */
+/** Whether a lookout's pad fits round a vertex: its neighbours are the massif's own, and no other trail has been cut over them. */
 function padFits(lat: Lattice, used: Uint8Array, v: number): boolean {
   const { grid, stride, ground } = lat
-  return (
-    v !== lat.apex &&
-    CORNERS.every(([di, dj]) => {
-      const n = at(grid, v, di * stride, dj * stride)
-      return (
-        n >= 0 && n !== lat.apex && !Number.isNaN(ground[n] as number) && !lat.rim.has(n) && used[n] !== LAID
-      )
-    })
-  )
+  return CORNERS.every(([di, dj]) => {
+    const n = at(grid, v, di * stride, dj * stride)
+    return n >= 0 && !Number.isNaN(ground[n] as number) && !lat.rim.has(n) && used[n] !== LAID
+  })
 }
 
 /**

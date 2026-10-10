@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { key } from "../src/world/gen/hex.ts"
+import { cellAt, key } from "../src/world/gen/hex.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
 import { curvatureAt } from "../src/world/gen/relief/curvature.ts"
 import { dressingOf } from "../src/world/gen/relief/dressing.ts"
@@ -10,14 +10,18 @@ import { CREASE_DEGREES, smoothNormals } from "../src/world/gen/relief/smooth.ts
 import { curtainOf, onLine, profile, rampOf, stairsOf, triangulate } from "../src/world/gen/relief/strata.ts"
 import { SWATCH } from "../src/world/gen/relief/swatches.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
+import { repoWorld } from "../src/world/world.ts"
 import REACT from "./fixtures/repos/facebook__react.json"
 
-/** The craft pass on the relief: smooth shading with creases, strip gradients, the kit's rocks. */
+/** The craft pass on the relief: smooth shading with creases, strip gradients, flat risers, conifers and nothing else. */
 
 const CITY = islandFromTree(REACT.entries as RepoEntry[], 0, 2)
 const RELIEF = reliefOf({ plan: CITY.plan, level: (cell) => CITY.levels.get(key(cell)) ?? 0 })
 const massif = RELIEF.massifs[0]
 if (!massif) throw new Error("no massif")
+/** The same island with its rivers and trails carved: the only ground that is not stairs. */
+const CARVED = repoWorld(CITY, { repo: "fixture/x", source: "fixture", gen: 2 } as never).relief
+if (!CARVED?.massifs[0]) throw new Error("no carved massif")
 
 /** A triangle's three vertices, flat-shaded: positions and per-vertex face normals. */
 const tri = (a: number[], b: number[], c: number[]) => {
@@ -65,8 +69,8 @@ describe("smooth shading with creases", () => {
     )
   })
 
-  test("the mesh's normals are unit vectors and open slopes are smoother than their faces", () => {
-    const mesh = reliefMesh(RELIEF, massif.cells, 0)
+  test("the mesh's normals are unit vectors and the ramps (a river's banks, a trail's steps) are smoother than their faces", () => {
+    const mesh = reliefMesh(CARVED, CARVED.massifs[0]?.cells ?? [], 0)
     let soft = 0
     let ground = 0
     for (let v = 0; v < mesh.normal.length; v += 3) {
@@ -276,31 +280,22 @@ describe("the least stretched triangulation", () => {
   })
 })
 
-describe("the kit's rocks on the mountain", () => {
+describe("the dressing on the mountain", () => {
   const dressing = dressingOf(RELIEF, 3)
 
-  test("rocks and crags are the kit's own, bigger than a pebble", () => {
-    const rocks = dressing.filter((p) => p.piece.startsWith("rock_single") || p.piece.startsWith("mountain_"))
-    expect(rocks.length).toBeGreaterThan(15)
-    // A crag is a whole mountain piece set small (scale 0.35 and up by construction, so it may land just
-    // above that on any island); a rock is the kit's rock at 1 and up. Neither is a pebble.
-    for (const rock of rocks)
-      expect(rock.scale ?? 1).toBeGreaterThan(rock.piece.startsWith("mountain_") ? 0.3 : 0.5)
+  test("is conifers and nothing else: no kit rock, scree or crag stands on a massif", () => {
+    expect(dressing.length).toBeGreaterThan(50)
+    for (const piece of dressing) expect(piece.piece).toMatch(/^tree/)
   })
 
-  test("none floats: every rock stands no higher than the ground at its centre, sunk into the slope", () => {
-    for (const rock of dressing) {
-      if (!rock.piece.startsWith("rock_single") && !rock.piece.startsWith("mountain_")) continue
-      const ground = RELIEF.heightAt(rock.x, rock.z)
-      if (ground !== undefined) expect(rock.y ?? 0).toBeLessThanOrEqual(ground + 1e-6)
+  test("the conifers stand on the grass ledges below the bare rock, each set on its ledge's flat top", () => {
+    for (const piece of dressing) {
+      const own = RELIEF.massifAt(cellAt([piece.x, piece.z]))
+      const ground = RELIEF.heightAt(piece.x, piece.z)
+      expect(own).toBeDefined()
+      expect(ground as number).toBeLessThan(0.5 * (own?.height ?? 0))
+      expect(Math.abs((piece.y ?? 0) - (ground as number) + 0.15)).toBeLessThan(0.02)
     }
-  })
-
-  test("the steep ground above the top ledge carries rocks", () => {
-    const high = dressing.filter(
-      (p) => (RELIEF.heightAt(p.x, p.z) ?? 0) > massif.ledgeTop && p.piece.startsWith("rock_single"),
-    )
-    expect(high.length).toBeGreaterThan(5)
   })
 
   test("it is seeded and keeps off the rivers' hexes", () => {

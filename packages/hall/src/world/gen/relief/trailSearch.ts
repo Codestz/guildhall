@@ -35,8 +35,6 @@ export interface Lattice {
   stride: number
   /** The ground (a little smoothed), indexed like the grid; NaN where the massif owns nothing. */
   ground: Float32Array
-  /** The massif's highest vertex: the tip of its summit, which no trail's pad takes off. */
-  apex: number
   /** Vertices that may start a trail but not be walked through (the rim), and those no trail may touch (rivers). */
   rim: ReadonlySet<number>
   blocked: ReadonlySet<number>

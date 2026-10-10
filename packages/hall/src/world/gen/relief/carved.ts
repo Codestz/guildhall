@@ -1,16 +1,17 @@
 import type { Cell } from "../../lands.ts"
-import { planeAt } from "./facets.ts"
+import { stairAt } from "./facets.ts"
 import type { Massif } from "./field.ts"
 import { CORNERS, centreOf, RES } from "./lattice.ts"
 import { TRAIL_STRIDE } from "./shape.ts"
+import { ramped } from "./trailCarve.ts"
 
-/** A vertex is carved when it differs from the field's own height and from its plane by more than this (units). */
+/** A vertex is carved when it differs from the field's own height and from its stairs by more than this (units). */
 const CARVED = 0.05
 
 /**
  * Whether a river carved into the hex: a vertex between the coarse ones that is neither the field's
- * own height nor the coarse plane (a trail brings those back to the plane, which a coarse tier
- * draws as it is; a river's bed is finer than a coarse face).
+ * own height nor the coarse stairs' (a trail brings those back to the stairs, which a coarse tier
+ * draws as they are; a river's bed is finer than a coarse face).
  */
 export function carvedHex(massif: Massif, cell: Cell): boolean {
   const { grid, pristine } = massif
@@ -26,7 +27,7 @@ export function carvedHex(massif: Massif, cell: Cell): boolean {
         const h = grid.data[at] as number
         if (
           Math.abs(h - (pristine[at] as number)) > CARVED &&
-          Math.abs(h - planeAt(grid, i, j, TRAIL_STRIDE)) > CARVED
+          Math.abs(h - stairAt(grid, i, j, TRAIL_STRIDE, ramped(grid))) > CARVED
         )
           return true
       }

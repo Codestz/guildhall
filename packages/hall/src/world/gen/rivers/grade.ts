@@ -19,8 +19,9 @@ import { key } from "../hex.ts"
  * Rivers that run down a mountain (terrain 2c, after the water layer sorted them): over a massif
  * the water layer's reaches are flat patches a terrace apart, a stair of pools and small falls.
  * Here every run of river hexes over a massif becomes a graded reach instead — a surface that
- * follows the ground down the channel, smoothed and never rising, so the water runs the slope as
- * one stream (carve.ts cuts the bed to it; scene/nature/ribbonMesh.ts draws it). A fall stays only
+ * follows the ground down the channel, never rising: on a massif's stairs (relief/facets.ts), flat
+ * across a ledge's top and down its riser, so the water runs the terraces as a stair of pools and
+ * falls at the ledge walls (carve.ts cuts the bed to it; scene/nature/ribbonMesh.ts draws it). A fall stays only
  * at a real ledge: a hex edge the water layer had a fall on where the ground itself drops over
  * LEDGE in a short run. Where a run meets the lowland's flat water (or the sea) its surface comes
  * down to that water's level, so the stream arrives rather than steps. Pure; reads the relief's
@@ -31,8 +32,6 @@ import { key } from "../hex.ts"
 const LEDGE = 2 * TERRACE
 /** ...and its water to drop at least this far (else it is one stream after all). */
 const MIN_DROP = TERRACE
-/** The ground's samples are averaged over this many either side, so the surface doesn't follow every lump. */
-const SMOOTH = 2
 /** Where a run comes down to the water ahead, over this many samples. */
 const RAMP = 4
 
@@ -211,7 +210,7 @@ function gradeRun(hexes: RiverHex[], run: Run): { reaches: Reach[]; falls: Fall[
 }
 
 /**
- * The surface down a stretch of ground: smoothed, never rising, starting at `start` (else the
+ * The surface down a stretch of ground: never rising, starting at `start` (else the
  * ground's own height), kept above `floor`, and brought down to land on `arrive` if there is one.
  */
 function descend(
@@ -220,20 +219,8 @@ function descend(
   floor: number | undefined,
   arrive: number | undefined,
 ): number[] {
-  const smooth = ground.map((_, m) => {
-    let sum = 0
-    let count = 0
-    for (let d = -SMOOTH; d <= SMOOTH; d++) {
-      const v = ground[m + d]
-      if (v !== undefined) {
-        sum += v
-        count++
-      }
-    }
-    return sum / count
-  })
-  let y = start ?? (smooth[0] as number)
-  const flat = smooth.map((s, m) => {
+  let y = start ?? (ground[0] as number)
+  const flat = ground.map((s, m) => {
     if (m > 0) y = Math.min(y, s)
     return Math.max(y, floor ?? Number.NEGATIVE_INFINITY)
   })

@@ -31,6 +31,27 @@ export const CORNERS: readonly (readonly [number, number])[] = [
 /** A vertex's world position at resolution n. */
 export const pointOf = (i: number, j: number, n = RES): Spot => [(CIRCUM / n) * (i + j / 2), (ROW / n) * j]
 
+/**
+ * The one or two triangles of a hex's sector at (a, b) (a, b ≥ 0, a + b < n), each as three (a, b)
+ * pairs: the one pointing out (a, b), (a + 1, b), (a, b + 1), and, inside the sector, the one back to it.
+ */
+export function sectorTriangles(n: number, a: number, b: number): [number, number][][] {
+  const out: [number, number][][] = [
+    [
+      [a, b],
+      [a + 1, b],
+      [a, b + 1],
+    ],
+  ]
+  if (a + b < n - 1)
+    out.push([
+      [a + 1, b],
+      [a + 1, b + 1],
+      [a, b + 1],
+    ])
+  return out
+}
+
 /** A cell's centre as a lattice vertex at resolution n. */
 export const centreOf = ([q, line]: Cell, n = RES): readonly [number, number] => [
   ((3 * q - line) / 2) * n,

@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { cellAt, key } from "../src/world/gen/hex.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
+import { LEDGE_STEP } from "../src/world/gen/relief/shape.ts"
 import { onShelf } from "../src/world/gen/relief/trailCarve.ts"
-import { SLOPE, STAIR } from "../src/world/gen/relief/trailSearch.ts"
+import { SLOPE } from "../src/world/gen/relief/trailSearch.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
 import type { Spot } from "../src/world/layout.ts"
 import { route } from "../src/world/paths.ts"
@@ -88,7 +89,7 @@ describe.each(FIXTURES)("a trail on %s", (_, world) => {
     }
   })
 
-  test("keeps within the steepest grade on every leg, mostly the walking grade", () => {
+  test("is flat across a ledge's top and a ramp up the one riser between two: no leg climbs more than a ledge", () => {
     let legs = 0
     let steps = 0
     for (const trail of net.trails)
@@ -96,13 +97,12 @@ describe.each(FIXTURES)("a trail on %s", (_, world) => {
         const a = world.roads.nodes[trail.nodes[k] as string] as Spot
         const b = world.roads.nodes[trail.nodes[k + 1] as string] as Spot
         const rise = Math.abs(world.ground.heightAt(b[0], b[1]) - world.ground.heightAt(a[0], a[1]))
-        const grade = rise / distance(a, b)
-        expect(grade).toBeLessThanOrEqual(STAIR + 0.02)
+        expect(rise).toBeLessThanOrEqual(LEDGE_STEP + 0.02)
         legs++
-        if (grade > SLOPE + 0.02) steps++
+        if (rise / distance(a, b) > SLOPE + 0.02) steps++
       }
     expect(legs).toBeGreaterThan(8)
-    expect(steps / legs).toBeLessThan(0.2)
+    expect(steps / legs).toBeLessThan(0.4)
   })
 
   test("ends at its lookout, on the summit or a pass, on flat ground", () => {

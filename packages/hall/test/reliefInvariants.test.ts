@@ -3,6 +3,7 @@ import { key, neighbours, unkey } from "../src/world/gen/hex.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
 import { CLEAR } from "../src/world/gen/plan/zones.ts"
 import { CAP, reliefOf } from "../src/world/gen/relief/index.ts"
+import { LEDGE_STEP } from "../src/world/gen/relief/shape.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
 import { cellToWorld } from "../src/world/lands.ts"
 import COCKPIT from "./fixtures/repos/codestz__opencode-cockpit.json"
@@ -104,7 +105,7 @@ describe("the field agrees with itself", () => {
   test("a City's main range is a real mountain, a second range stands lower, none passes its cap", () => {
     for (const { name, relief } of cases) {
       expect(relief.massifs[0]?.height).toBeLessThanOrEqual(CAP[relief.tier] + 1.3)
-      if (name === "city") expect(relief.massifs[0]?.height).toBeGreaterThan(40)
+      if (name === "city") expect(relief.massifs[0]?.height).toBeGreaterThanOrEqual(7 * LEDGE_STEP)
     }
   })
 })

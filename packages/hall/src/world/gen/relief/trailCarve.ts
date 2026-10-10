@@ -1,6 +1,6 @@
 import type { Cell } from "../../lands.ts"
 import { key } from "../hex.ts"
-import { planeAt } from "./facets.ts"
+import { limitLevels, stairAt } from "./facets.ts"
 import { CIRCUM, CORNERS, centreOf, type HeightGrid, RES, ROW } from "./lattice.ts"
 import { at, ijOf, type Lattice, SLOPE } from "./trailSearch.ts"
 
@@ -24,6 +24,12 @@ export interface Ground {
 }
 
 const flags = new WeakMap<HeightGrid, Uint8Array>()
+/** Whether a vertex stands on a trail's shelf: a triangle of three of them is drawn as a ramp (trailPaint.ts), so the ground between follows the plane. */
+export const ramped =
+  (grid: HeightGrid) =>
+  (v: number): boolean =>
+    ((flags.get(grid)?.[v] ?? 0) & ON_TRAIL) !== 0
+
 /** A massif's trail flags by lattice vertex (`ON_TRAIL`, `ON_STAIRS`); undefined where no trail runs. */
 export const flagsOf = (grid: HeightGrid): Uint8Array | undefined => flags.get(grid)
 
@@ -89,11 +95,15 @@ export function carve(ground: Ground, lattice: Lattice, plan: Plan, pad: boolean
   for (let k = 0; k + 1 < chain.length; k++) {
     const a = chain[k] as number
     const b = chain[k + 1] as number
-    const level = ((heights[k] as number) + (heights[k + 1] as number)) / 2
-    // The uphill side is cut into the hill; where neither is free the leg runs on its own.
+    const level = Math.max(heights[k] as number, heights[k + 1] as number)
+    // The side nearest the leg's ledge is brought to it (a flat shelf on the ledge's top, a nibble out
+    // of the riser beside it); where neither is free the leg runs on its own.
     const sides = beside(lattice, a, b)
       .filter(ordinary)
-      .sort((p, q) => (grid.data[q] as number) - (grid.data[p] as number) || p - q)
+      .sort(
+        (p, q) =>
+          Math.abs((grid.data[p] as number) - level) - Math.abs((grid.data[q] as number) - level) || p - q,
+      )
     if (sides[0] !== undefined) cut(sides[0], level, 1)
   }
   for (const k of plan.hairpins) {
@@ -120,18 +130,21 @@ export function carve(ground: Ground, lattice: Lattice, plan: Plan, pad: boolean
 
 /**
  * After carving: the vertices between the coarse ones of every hex a carve touched go back to the
- * coarse planes (a hex a river carved is left as its bed made it), and the steepness the mesh
+ * coarse stairs (a hex a river carved is left as its bed made it), and the steepness the mesh
  * paints by is read again round the changes.
  */
 export function settle(
   ground: Ground,
   lattice: Lattice,
   cells: readonly Cell[],
-  changed: ReadonlySet<number>,
+  changed: Set<number>,
   river: ReadonlySet<string>,
 ): void {
   const { grid, slope } = ground
   const { stride } = lattice
+  // The ledges the cuts left standing too tall or too thin come down; the shelf and the rim stay.
+  const shelf = ramped(grid)
+  for (const v of limitLevels(grid, (v) => lattice.rim.has(v) || shelf(v))) changed.add(v)
   const near = (ci: number, cj: number, visit: (i: number, j: number) => void): void => {
     for (let dj = -RES; dj <= RES; dj++)
       for (let di = -RES; di <= RES; di++) if (Math.abs(di + dj) <= RES) visit(ci + di, cj + dj)
@@ -148,8 +161,8 @@ export function settle(
       const v = grid.index(i, j)
       if (v < 0 || Number.isNaN(grid.data[v] as number) || lattice.rim.has(v)) return
       if (i % stride === 0 && j % stride === 0) return
-      const plane = planeAt(grid, i, j, stride)
-      if (!Number.isNaN(plane)) grid.data[v] = plane
+      const stairs = stairAt(grid, i, j, stride, shelf)
+      if (!Number.isNaN(stairs)) grid.data[v] = stairs
     })
   }
   const pitch = CIRCUM / RES

@@ -3,7 +3,7 @@ import type { Cell } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
 import { TERRACE } from "../../waterways.ts"
 import { key, step } from "../hex.ts"
-import { ledgeTopOf, shapingOf, sharpen } from "./facets.ts"
+import { shapingOf } from "./facets.ts"
 import { CIRCUM, CORNERS, centreOf, HeightGrid, pointOf, RES, ROW } from "./lattice.ts"
 import { smooth, valueNoise } from "./noise.ts"
 import { type Peak, type Ridge, type Saddle, skeletonOf } from "./ridges.ts"
@@ -14,7 +14,8 @@ import { settle } from "./summits.ts"
  * A massif's height field (terrain v2 §1.2–§2.2) on the lattice: the rim takes the neighbouring
  * hexes' tops exactly (or the sea cliff's −1.5 facing the sea), the skeleton's crests rise from it,
  * the flanks fall off each crest with the distance to the rim, ridged noise breaks them up, and the
- * result is pulled towards TERRACE ledges so the mountain speaks the hex kit's terrace language.
+ * result is set on LEDGE_STEP ledges (facets.ts) from the foot to the summit, so the whole mountain
+ * speaks the hex kit's terrace language: a stepped peak, never a sculpted one.
  */
 
 /** Where a massif meets the sea: below the waterline, so the shore bake sees a cliff. */
@@ -55,8 +56,6 @@ export interface Massif {
   grid: HeightGrid
   /** Steepness (rise over run) at each lattice vertex, smoothed: what the mesh paints grass, rock and walls by. */
   slope: Float32Array
-  /** The top ledge's height: stairs below it, the sculpted peak above. */
-  ledgeTop: number
   /** The grid as the field made it, before a river or a trail was carved: what tells a carved hex (mesh.ts). */
   pristine: Float32Array
 }
@@ -206,8 +205,6 @@ export function massifOf(spec: MassifSpec): Massif {
       raw[at] =
         (raw[at] as number) - GULLY * DMath.pow(line, 5) * high * smooth(((toRim[at] as number) - 4) / 10)
     }
-  for (let at = 0; at < raw.length; at++)
-    if (owned[at] && !isRim(at)) raw[at] = sharpen(raw[at] as number, height, 0.5)
   const needed = (height - (base[peakAt] as number)) / Math.max(1, toRim[peakAt] as number)
   limit(raw, grid, owned, isRim, Math.min(MOST, Math.max(GRADE, needed * 1.1)))
   // The limit leaves flat planes; lumps of two sizes (more where it is steep) make them rock.
@@ -252,8 +249,7 @@ export function massifOf(spec: MassifSpec): Massif {
       grid.data[at] = settled
     }
   // The peaks and saddles as the finished ground stands (the skeleton's heights were asks).
-  const ledgeTop = ledgeTopOf(grid)
-  const shaping = shapingOf(grid, owned, isRim, ledgeTop)
+  const shaping = shapingOf(grid, owned, isRim)
   shaping.apply()
   const summits = settle(grid, shaping.fixed, peaks, saddles, shaping.apply)
   const slope = new Float32Array(owned.length)
@@ -281,7 +277,6 @@ export function massifOf(spec: MassifSpec): Massif {
     saddles: summits.saddles,
     grid,
     slope,
-    ledgeTop,
     pristine: Float32Array.from(grid.data),
   }
 }

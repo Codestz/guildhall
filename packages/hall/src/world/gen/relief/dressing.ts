@@ -1,30 +1,24 @@
 import { DMath } from "../../dmath.ts"
 import { cellToWorld, type LandPlacement } from "../../lands.ts"
 import { cellAt, key, rng } from "../hex.ts"
-import { cragAt } from "./crags.ts"
 import { groundOf } from "./ground.ts"
 import type { Relief } from "./index.ts"
-import { outcropsAt } from "./outcrops.ts"
 import { onShelf } from "./trailCarve.ts"
 
 /**
- * The massifs' dressing (relief/shape.ts): the detail on the mountain comes from the hex pack's own
- * pieces, not from noisy colour. Conifers stand in clumps with open meadow between, in a band on
- * the lower flanks; the kit's rocks, scree and crags lie on the ledges and the steeper ground above
- * (outcrops.ts), bigger and more of them the higher it is. Pure and seeded, set on the ground by
- * `heightAt`.
+ * The massifs' dressing (relief/shape.ts): the mountain is its terraces and nothing else, so the only
+ * pieces on it are the hex pack's conifers, standing in clumps with open meadow between on the flat
+ * grass ledges of the lower floors; the bare rock and snow above carry none. Pure and seeded, set on
+ * the ground by `heightAt`.
  */
 
 /** The conifer band, as shares of a massif's height: clumps start above the foot and end here. */
 const BAND = [0.04, 0.46] as const
 /** Steeper than this (rise over run) takes no trees. */
 const WOODED = 0.75
-/** Clump centres a hex draws at most, a clump's reach (world units), and the spots a hex tries for rocks. */
+/** Clump centres a hex draws at most, and a clump's reach (world units). */
 const CLUMPS = 5
 const REACH = 3.2
-const ROCK_SPOTS = 6
-/** The spots a hex tries for rocks lying along a cliff (crags.ts). */
-const CLIFF_SPOTS = 8
 
 export function dressingOf(
   relief: Relief,
@@ -34,10 +28,9 @@ export function dressingOf(
   const random = rng(seed ^ 0x51ce7)
   const out: LandPlacement[] = []
   for (const massif of relief.massifs) {
-    const { height, ledgeTop } = massif
+    const { height } = massif
     const ground = groundOf(massif)
-    // Trees stand on ledge tops below the top ledge, and on the flanks up to the band's end.
-    const band = Math.max(BAND[1], ledgeTop / height + 0.01)
+    const band = BAND[1]
     const put = (piece: LandPlacement["piece"], x: number, z: number, y: number, scale: number): void => {
       if (onShelf(massif, x, z)) return
       out.push({
@@ -75,31 +68,6 @@ export function dressingOf(
             continue
           put(random() < 0.35 ? "trees_A_small" : "tree_single_A", x, z, h - 0.15, 0.85 + 0.35 * random())
         }
-      }
-      // Rocks, scree and crags: on ledge lips and risers' feet, and embedded in the steep ground above.
-      for (let r = 0; r < ROCK_SPOTS; r++) {
-        const [x, z] = [cx + (random() - 0.5) * 8, cz + (random() - 0.5) * 8]
-        const h = on(x, z)
-        if (h === undefined) continue
-        for (const rock of outcropsAt({ x, z, h }, { ground, height, ledgeTop, random }))
-          put(rock.piece, rock.x, rock.z, rock.y, rock.scale)
-      }
-      // Rocks and crags tipped onto the peak's cliffs.
-      for (let r = 0; r < CLIFF_SPOTS; r++) {
-        const [x, z] = [cx + (random() - 0.5) * 8, cz + (random() - 0.5) * 8]
-        const h = on(x, z)
-        const crag = h === undefined ? undefined : cragAt({ x, z, h }, { ground, height, ledgeTop, random })
-        if (!crag || onShelf(massif, x, z)) continue
-        const [tx, tz] = crag.tilt
-        out.push({
-          piece: crag.piece,
-          x: Math.round(crag.x * 100) / 100,
-          z: Math.round(crag.z * 100) / 100,
-          y: Math.round(crag.y * 100) / 100,
-          rot: Math.round(crag.rot * 100) / 100,
-          scale: Math.round(crag.scale * 100) / 100,
-          tilt: [Math.round(tx * 1000) / 1000, Math.round(tz * 1000) / 1000],
-        })
       }
     }
   }

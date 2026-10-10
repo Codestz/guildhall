@@ -4,14 +4,15 @@ import { cellAt, key, step } from "../hex.ts"
 import { carvedHex } from "./carved.ts"
 import { curvatureAt } from "./curvature.ts"
 import type { Relief } from "./index.ts"
-import { CIRCUM, CORNERS, centreOf, pointOf, RES, ROW } from "./lattice.ts"
+import { CIRCUM, CORNERS, centreOf, pointOf, RES, ROW, sectorTriangles } from "./lattice.ts"
 import { valueNoise } from "./noise.ts"
 import { grassy, PATCH, riserZone, TILE_TOP, type Tone, vOf, type Zone, zoneOf } from "./paint.ts"
+import { coarseSeamStairs, fineSeamStairs, type Lat, snapsOf, steppedSeam } from "./seams.ts"
 import { TRAIL_STRIDE } from "./shape.ts"
 import { smoothNormals, WALL } from "./smooth.ts"
-import { curtainOf, cutEdge, levelOf, onLedge, onLine, profile, rampOf, stairsOf } from "./strata.ts"
+import { curtainOf, cutEdge, levelOf, onLedge, onLine, profile, rampOf, stairsOf, upOf } from "./strata.ts"
 import { SWATCH, swatchV } from "./swatches.ts"
-import { flagsOf } from "./trailCarve.ts"
+import { flagsOf, ramped } from "./trailCarve.ts"
 import { trailTexel } from "./trailPaint.ts"
 
 /**
@@ -23,15 +24,16 @@ import { trailTexel } from "./trailPaint.ts"
  *
  * Tiers nest: a hex is meshed at every second vertex (24 triangles) at the finest tier and tier 1, and
  * at tier 2 only the hex corners and centre (6): the far tier, which keeps the stairs (cut at its
- * corners) and loses the sculpted summit's shape. A hex a river or a trail carved keeps its lattice
- * at every tier (its bed is finer than a coarse face), its edge facing a coarser hex set on that
- * hex's edge, so a chunk's mesh joins its neighbour's, at any tier of either, without a crack.
+ * corners): the same stepped summit, its ledges cut a hex wide. A hex a river carved keeps its
+ * lattice at every tier (its bed is finer than a coarse face), its edge facing a coarser hex set on
+ * that hex's edge (or, where both sides stand on ledges, cut as stairs on both sides: seams.ts), so a
+ * chunk's mesh joins its neighbour's, at any tier of either, without a crack.
  * The faces of the massif's hexes just outside the set are built too (and dropped), so the vertices
  * on the set's edge are smoothed with the ground beyond it and no seam shows between two sets.
  *
  * The mesh is watertight inside a massif (test/reliefWatertight.test.ts): the stairs take their cuts
  * on the lattice's edges (strata.ts), so two triangles on an edge share its vertices; a ramp beside
- * stairs, a peak's long edges and a coarser hex's edge carry the same extra vertices their neighbour
+ * stairs, a rim's long edges and a coarser hex's edge carry the same extra vertices their neighbour
  * has, and a curtain closes the gap between a ramp's line and the stairs' profile. Two sets of one
  * lattice therefore meet exactly, with nothing hung between them.
  *
@@ -135,30 +137,18 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
     const n = nOf(cell)
     const stride = RES / n
     const [ci, cj] = centreOf(cell)
-    // Where a fine hex meets a coarser one the edge's in-between vertices lie on the coarse edge.
-    const snapped = new Map<string, number>()
-    if (n > 1)
-      for (let d = 0; d < 6; d++) {
+    // Where a fine hex meets a coarser one the edge's in-between vertices lie on the coarse edge (seams.ts).
+    const shelf = ramped(grid)
+    const snapped = snapsOf(
+      grid,
+      [ci, cj],
+      n,
+      (d) => {
         const next = step(cell, d)
-        const coarse = relief.massifAt(next) ? nOf(next) : n
-        if (coarse >= n) continue
-        const [ai, aj] = CORNERS[d] as readonly [number, number]
-        const [bi, bj] = CORNERS[(d + 1) % 6] as readonly [number, number]
-        const at = (a: number): readonly [number, number] => [
-          ci + (n - a) * ai + a * bi,
-          cj + (n - a) * aj + a * bj,
-        ]
-        const gap = n / coarse
-        for (let a = 1; a < n; a++) {
-          if (a % gap === 0) continue
-          const lo = Math.floor(a / gap) * gap
-          const [i0, j0] = at(lo)
-          const [i1, j1] = at(lo + gap)
-          const [i, j] = at(a)
-          const t = (a - lo) / gap
-          snapped.set(`${i},${j}`, grid.get(i0, j0) * (1 - t) + grid.get(i1, j1) * t)
-        }
-      }
+        return relief.massifAt(next) ? nOf(next) : n
+      },
+      shelf,
+    )
     // x, y, z, and the lattice vertex's own smoothed steepness and trail flag.
     const vertex = (i: number, j: number, drop = 0): number[] => {
       const [x, z] = pointOf(i, j)
@@ -170,9 +160,8 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
         trailFlags?.[grid.index(i, j)] ?? 0,
       ]
     }
-    /** A vertex that stands on a ledge of the stairs (not the peak above them, nor a rim at a half terrace). */
-    const onStairs = (v: readonly number[]): boolean =>
-      onLedge(v[1] as number) && (v[1] as number) <= massif.ledgeTop + 1e-3
+    /** A vertex that stands on a ledge of the stairs (not a rim at a half terrace, nor a trail's or river's ramp). */
+    const onStairs = (v: readonly number[]): boolean => onLedge(v[1] as number)
     const toneOf = (v: readonly number[]): Tone => ({
       rel: (v[1] as number) / Math.max(1, massif.height),
       curve: curvatureAt(grid, v[0] as number, v[2] as number),
@@ -198,7 +187,9 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
       )
       return onStairs(across) || grassy(u, v, across)
     }
-    /** An edge on a hex edge where the lattice changes (a finer hex on one side): kept straight, never stepped. */
+    /** The lattice of the hex that holds a lattice point (4 for a river's bed, else the tier's). */
+    const sizeAt = ([i, j]: Lat): number => nOf(cellAt(pointOf(i, j)))
+    /** An edge on a hex edge where the lattice changes (a finer hex on one side): kept straight, never stepped, unless the seam is stairs (seams.ts). */
     const straightEdge = (u: readonly number[], v: readonly number[]): boolean => {
       const [dx, dz] = [(v[0] as number) - (u[0] as number), (v[2] as number) - (u[2] as number)]
       const length = DMath.hypot(dx, dz) || 1
@@ -207,7 +198,19 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
         cellAt([mx - (dz / length) * 0.02, mz + (dx / length) * 0.02]),
         cellAt([mx + (dz / length) * 0.02, mz - (dx / length) * 0.02]),
       ]
-      return key(c1) !== key(c2) && !!relief.massifAt(c1) && !!relief.massifAt(c2) && nOf(c1) !== nOf(c2)
+      return (
+        key(c1) !== key(c2) &&
+        !!relief.massifAt(c1) &&
+        !!relief.massifAt(c2) &&
+        nOf(c1) !== nOf(c2) &&
+        !steppedSeam(
+          grid,
+          latticeOf(u[0] as number, u[2] as number),
+          latticeOf(v[0] as number, v[2] as number),
+          sizeAt,
+          shelf,
+        )
+      )
     }
     /** Whether the triangle across the edge u–v from `w` is stairs (its third corner stands on a ledge, and it is no trail or lattice change). */
     const stairsAcross = (u: number[], v: number[], w: number[]): boolean => {
@@ -225,8 +228,11 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
     for (let k = 0; k < 6; k++) {
       const [ai, aj] = CORNERS[k] as readonly [number, number]
       const [bi, bj] = CORNERS[(k + 1) % 6] as readonly [number, number]
-      const at = (a: number, b: number): number[] =>
-        vertex(ci + stride * (a * ai + b * bi), cj + stride * (a * aj + b * bj))
+      const latOf = ([a, b]: readonly [number, number]): Lat => [
+        ci + stride * (a * ai + b * bi),
+        cj + stride * (a * aj + b * bj),
+      ]
+      const at = (a: number, b: number): number[] => vertex(...latOf([a, b]))
       const next = step(cell, k)
       const toTile = !relief.massifAt(next)
       // Across this hex edge a hex of another lattice: the edge stays straight, and the coarser side takes the finer's vertices.
@@ -238,25 +244,18 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
       const sea = (vertex(ci + stride * n * ai, cj + stride * n * aj)[1] as number) < 0
       for (let a = 0; a < n; a++)
         for (let b = 0; a + b < n; b++) {
-          const corners: [number, number][][] = [
-            [
-              [a, b],
-              [a + 1, b],
-              [a, b + 1],
-            ],
-          ]
-          if (a + b < n - 1)
-            corners.push([
-              [a + 1, b],
-              [a + 1, b + 1],
-              [a, b + 1],
-            ])
-          for (const [index, ab] of corners.entries()) {
+          for (const [index, ab] of sectorTriangles(n, a, b).entries()) {
             const [p, q, r] = ab.map(([x, y]) => at(x, y)) as [number[], number[], number[]]
             const vs = [p, q, r]
-            // Its edge on the hex edge (from corner 1 to corner 2); where the lattice changes it is kept straight.
+            // Its edge on the hex edge (from corner 1 to corner 2); where the lattice changes it is kept straight,
+            // unless the seam is stairs: then both sides cut the same risers, the coarse triangle split at the fine vertex between.
             const onEdge = index === 0 && a + b === n - 1
-            const straight = onEdge && across !== n ? 1 : -1
+            const [lp, lq, lr] = ab.map(latOf) as unknown as [Lat, Lat, Lat]
+            const stairsSeam =
+              onEdge &&
+              ((n === 2 && across === RES && coarseSeamStairs(grid, lq, lr, lp, shelf)) ||
+                (n === RES && across === 2 && fineSeamStairs(grid, lq, lr, lp, shelf)))
+            const straight = onEdge && across !== n && !stairsSeam ? 1 : -1
             // The rim faces over land wear the tile top's grass: no seam to the hex ground.
             const low = Math.min(p[1] as number, q[1] as number, r[1] as number)
             const rim =
@@ -269,22 +268,7 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
                 ? texel(TILE_TOP)
                 : wear(zoneOf(t[0] as number[], t[1] as number[], t[2] as number[], massif.height))
             // The ramp's own up-facing normal, which the curtains over its edges are shaded with.
-            const up = (() => {
-              const [ux, uy, uz] = [
-                (q[0] as number) - (p[0] as number),
-                (q[1] as number) - (p[1] as number),
-                (q[2] as number) - (p[2] as number),
-              ]
-              const [vx, vy, vz] = [
-                (r[0] as number) - (p[0] as number),
-                (r[1] as number) - (p[1] as number),
-                (r[2] as number) - (p[2] as number),
-              ]
-              const n = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx]
-              const length = DMath.hypot(...(n as [number, number, number])) || 1
-              const sign = (n[1] as number) < 0 ? -1 : 1
-              return n.map((x) => (sign * x) / length)
-            })()
+            const up = upOf(p, q, r)
             // A ramp's one zone, from its corners, whatever it is cut into.
             const rampPaint = rim
               ? texel(TILE_TOP)
@@ -315,10 +299,21 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
             let chain: number[][] = []
             if (!trail && straight < 0 && vs.every(onStairs)) {
               // The ledges are stairs: tops and risers rather than a ramp between two ledges.
-              const stairs = stairsOf(p, q, r)
-              for (const t of stairs.tops) emit(t[0], t[1], t[2], paintOf(t), isReal, "up")
-              for (const w of stairs.walls) wall(w)
-              if (skirted && onEdge) chain = profile(q, r).map((s) => s.at)
+              const mid = stairsSeam && n === 2 ? vertex((lq[0] + lr[0]) / 2, (lq[1] + lr[1]) / 2) : undefined
+              for (const part of mid
+                ? [
+                    [p, q, mid],
+                    [p, mid, r],
+                  ]
+                : [vs]) {
+                const stairs = stairsOf(part[0] as number[], part[1] as number[], part[2] as number[])
+                for (const t of stairs.tops) emit(t[0], t[1], t[2], paintOf(t), isReal, "up")
+                for (const w of stairs.walls) wall(w)
+              }
+              if (skirted && onEdge)
+                chain = mid
+                  ? [...profile(q, mid).map((s) => s.at), mid, ...profile(mid, r).map((s) => s.at)]
+                  : profile(q, r).map((s) => s.at)
             } else {
               // A ramp: its edge keeps the finer lattice's vertices when straight, and where a stairs triangle
               // lies across, the riser's mid-points, closed by a curtain to the stairs' profile.

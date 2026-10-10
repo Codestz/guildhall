@@ -13,6 +13,7 @@ import {
 import { key } from "../hex.ts"
 import type { Relief } from "../relief/index.ts"
 import { CIRCUM, CORNERS, centreOf, pointOf, RES } from "../relief/lattice.ts"
+import { LEDGE_STEP } from "../relief/shape.ts"
 
 /**
  * The relief cut to the water's contract (terrain v2 §4.1), in place. A flat reach (a river hex
@@ -49,6 +50,12 @@ function distanceTo(line: readonly Spot[], x: number, z: number): number {
   return best
 }
 
+/** The ledge the water stands on, where it stands on one (a stream on a stair's top or running down its riser), else undefined. */
+function ledgeOf(water: number): number | undefined {
+  const ledge = Math.round(water / LEDGE_STEP) * LEDGE_STEP
+  return Math.abs(water - ledge) < 0.05 ? ledge : undefined
+}
+
 /** What a reach asks of the ground at a point: the bed if it lies in the channel, else the height its banks hold. */
 type Cut = (x: number, z: number, ground: number) => { bed?: number; bank?: number }
 
@@ -83,10 +90,17 @@ function gradedCut(grade: readonly Point3[]): Cut {
         best = { d, y: a[1] + (b[1] - a[1]) * t, half: gradeHalfWidth(slope) }
       }
     }
-    if (best.d <= best.half) return { bed: Math.min(best.y, lowest) - DEPTH }
+    // A stream on a ledge runs in a trench of stairs, a ledge deep: flat along the top, a step at the riser.
+    const water = Math.min(best.y, lowest)
+    if (best.d <= best.half) {
+      const ledge = ledgeOf(water)
+      return { bed: ledge === undefined ? water - DEPTH : ledge - LEDGE_STEP }
+    }
     const ease = 1 - Math.min(1, Math.max(0, (best.d - best.half - SHOULDER) / EASE))
     const held = best.y + FREEBOARD
-    return ease > 0 && held > ground ? { bank: ground + (held - ground) * ease } : {}
+    // Water on a ledge is the ground's own level: only ground under it needs a bank.
+    const needed = ledgeOf(best.y) === undefined ? held > ground : ground < best.y - DEPTH
+    return ease > 0 && needed ? { bank: ground + (held - ground) * ease } : {}
   }
 }
 

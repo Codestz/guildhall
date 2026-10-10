@@ -3,6 +3,7 @@ import { patchWaters } from "../src/lab/waterPatch.ts"
 import { surfaceGeometry } from "../src/scene/nature/riverMesh.ts"
 import { key } from "../src/world/gen/hex.ts"
 import { islandFromTree } from "../src/world/gen/islandFromTree.ts"
+import { LEDGE_STEP } from "../src/world/gen/relief/shape.ts"
 import type { RepoEntry } from "../src/world/gen/repo.ts"
 import { type GradeGround, gradeWaters } from "../src/world/gen/rivers/grade.ts"
 import type { Cell } from "../src/world/lands.ts"
@@ -127,11 +128,35 @@ describe("the generated island", () => {
     }
   })
 
+  test("the water runs the stairs: most of it stands on a ledge, flat across its top, and falls down its riser", () => {
+    const heights = graded.flatMap((reach) => (reach.grade as Point3[]).map((point) => point[1]))
+    const level = heights.filter((y) => Math.abs(y / LEDGE_STEP - Math.round(y / LEDGE_STEP)) < 0.01)
+    expect(level.length / heights.length).toBeGreaterThan(0.6)
+    // A riser's drop is a ledge, and it falls in one step of the run.
+    const drops = graded.flatMap((reach) =>
+      (reach.grade as Point3[])
+        .slice(1)
+        .map((point, i) => ((reach.grade as Point3[])[i] as Point3)[1] - point[1]),
+    )
+    expect(drops.some((drop) => Math.abs(drop - LEDGE_STEP) < 0.01)).toBe(true)
+  })
+
+  test("the stream's bed is a trench of stairs: on a ledge's water it lies a ledge down, level with the stairs", () => {
+    let trench = 0
+    for (const reach of graded)
+      for (const [x, y, z] of (reach.grade as Point3[]).slice(1)) {
+        if (Math.abs(y / LEDGE_STEP - Math.round(y / LEDGE_STEP)) > 0.01) continue
+        const bed = world.relief?.heightAt(x, z)
+        if (bed !== undefined && Math.abs(bed - (y - LEDGE_STEP)) < 0.01) trench++
+      }
+    expect(trench).toBeGreaterThan(20)
+  })
+
   test("the carved bed lies under the graded water along its whole run", () => {
     for (const reach of graded)
       for (const [x, y, z] of (reach.grade as Point3[]).slice(1)) {
         // (Where the stream leaves the massif for a lowland tile, that tile's own banks take over;
-        // and its spring, the first sample, may stand in the sculpted peak's steep flank above it.)
+        // and its spring, the first sample, may stand on a riser of the stepped peak above it.)
         const bed = world.relief?.heightAt(x, z)
         if (bed !== undefined && bed > 0) expect(bed).toBeLessThan(y + 0.2)
       }

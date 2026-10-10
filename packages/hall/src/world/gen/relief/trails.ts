@@ -6,12 +6,13 @@ import { pointOf } from "./lattice.ts"
 import { TRAIL_STRIDE } from "./shape.ts"
 import { carve, settle } from "./trailCarve.ts"
 import { distance, footOf, goalNear, headsOf, latticeOf } from "./trailGround.ts"
-import { type Found, type Head, ijOf, LAID, type Lattice, reach, SLOPE, STAIR } from "./trailSearch.ts"
+import { type Found, type Head, ijOf, LAID, type Lattice, reach, SLOPE } from "./trailSearch.ts"
 
 /**
  * The trails (terrain v2 §3.2, slice 2c): each big massif gets one to three, from a road at its foot
  * up to a lookout on a summit or a pass between its peaks. A trail is found on the massif's lattice
- * (trailSearch.ts), carved into its relief as a shelf (trailCarve.ts) and joined to the island's
+ * (trailSearch.ts) by its walking grade, then laid on the massif's own ledges (flat across a ledge's
+ * top, steps up a riser) and carved as a shelf (trailCarve.ts), and joined to the island's
  * walking graph: its nodes `T<massif>.<trail>.<i>` lie on the lattice vertices, the first joined to
  * the road node at the foot, and an edge costs its length in 3D over the grade (walkers ask
  * `heightAt` for the rest). Trails never share a vertex. Pure and deterministic; `trailsOf` carves
@@ -104,22 +105,13 @@ function route(lat: Lattice, open: readonly Head[], used: Uint8Array, want: Want
   return undefined
 }
 
-/** The heights a found chain is carved at: the rim as it is, no leg past the steepest grade. */
-function profile(
-  massif: Massif,
-  chain: readonly number[],
-  spots: readonly Spot[],
-  found: number[],
-): number[] {
-  const heights = [...found]
-  heights[0] = massif.grid.data[chain[0] as number] as number
-  for (let k = 1; k < heights.length; k++) {
-    const room = STAIR * distance(spots[k - 1] as Spot, spots[k] as Spot)
-    const before = heights[k - 1] as number
-    heights[k] = Math.min(before + room, Math.max(before - room, heights[k] as number))
-  }
-  return heights
-}
+/**
+ * The heights a found chain is carved at: the ground's own, the rim as it is. A trail lies on the
+ * ledges, flat across a ledge's top and a steep ramp (steps) up the one riser between two; the
+ * ledges' rule (facets.ts) keeps a riser to one ledge, so no leg climbs more.
+ */
+const heightsOf = (massif: Massif, chain: readonly number[]): number[] =>
+  chain.map((v) => massif.grid.data[v] as number)
 
 /** The chain's positions that turn back on themselves (120° or more): they get a landing. */
 function hairpinsOf(spots: readonly Spot[]): number[] {
@@ -157,7 +149,7 @@ export function trailsOf(relief: Relief, roads: Roads, river: ReadonlySet<string
       if (!found || found.chain.length < 4) continue
       const { chain } = found
       const spots = chain.map((v) => pointOf(...ijOf(grid, v)))
-      const heights = profile(massif, chain, spots, found.heights)
+      const heights = heightsOf(massif, chain)
       taken.push(spots[0] as Spot)
       for (const v of carve(massif, lat, { chain, heights, hairpins: hairpinsOf(spots) }, true)) {
         lat.ground[v] = grid.data[v] as number

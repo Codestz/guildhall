@@ -2,6 +2,7 @@ import type { Cell } from "../../lands.ts"
 import { TERRACE, type Waterways, waterwaysOf } from "../../waterways.ts"
 import { cellAt, key } from "../hex.ts"
 import type { IslandPlan } from "../plan.ts"
+import { stairsAt } from "../relief/facets.ts"
 import type { Relief } from "../relief/index.ts"
 import { carveRelief } from "./carve.ts"
 import { type Course, coursesOf, groundOf } from "./course.ts"
@@ -66,9 +67,15 @@ export function riversOf(
   waters = addLakes(waters, { plan, relief, accepted, level: levelWith(wet), bridges, ground })
   if (waters.rivers.length === 0) return undefined
   const pooled = new Set(waters.lakes.flatMap((lake) => lake.cells.map(key)))
-  // Over the massifs the water runs the slope (grade.ts), from the relief as it is before the carving.
+  // Over the massifs the water runs the stairs (grade.ts): flat across a ledge's top and down its
+  // riser, from the relief as it is before the carving.
   const graded = gradeWaters(waters, {
-    heightAt: (x, z) => relief.heightAt(x, z) ?? level(cellAt([x, z])) * TERRACE,
+    heightAt: (x, z) => {
+      const massif = relief.massifAt(cellAt([x, z]))
+      return (
+        (massif && stairsAt(massif.grid, x, z)) ?? relief.heightAt(x, z) ?? level(cellAt([x, z])) * TERRACE
+      )
+    },
     relief: (cell) => relief.keys.has(key(cell)),
     level: (cell) => (plan.land.has(key(cell)) ? level(cell) : 0),
     lake: (cell) => pooled.has(key(cell)),

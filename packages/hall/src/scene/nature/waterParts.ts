@@ -2,7 +2,7 @@ import { PATCH_HALF, seaRadiusOf } from "../../world/archipelago.ts"
 import type { Archipelago } from "../../world/archipelagoSource.ts"
 import type { Spot } from "../../world/layout.ts"
 import { reachOf, type World } from "../../world/world.ts"
-import { farTilesOf, holesOf } from "../archipelago/footprint.ts"
+import { farTilesOf, holesOf, patchHalfOf } from "../archipelago/footprint.ts"
 import { type Hole, SHORE, type ShoreLayout } from "./shore.ts"
 import { outreachOf, type ShoreTile, shoreTilesOf } from "./shoreTiles.ts"
 
@@ -40,8 +40,20 @@ const tileParts = (tiles: readonly ShoreTile[]): Part[] =>
 export function partsOf(world: World, archipelago: Archipelago | null, view: number, at?: Spot): Part[] {
   // A far island: its one patch, or (a big generator-v2 one) its shore tiles at a far island's coarser bake.
   if (at) {
-    if (outreachOf(world) === 1)
-      return [{ key: "patch", sea: { patch: PATCH_HALF }, layout: PATCH, queued: false }]
+    if (outreachOf(world) === 1) {
+      // A split repo's island has a tight patch (scene/archipelago/footprint.ts), so its straits can be narrow.
+      const half = archipelago?.islands.find((island) => island.world === world)?.tight
+        ? patchHalfOf(world)
+        : PATCH_HALF
+      return [
+        {
+          key: "patch",
+          sea: { patch: half },
+          layout: half === PATCH_HALF ? PATCH : { ...PATCH, half },
+          queued: false,
+        },
+      ]
+    }
     return tileParts(farTilesOf(world))
   }
   const far: Hole[] = archipelago?.islands.flatMap(holesOf) ?? []

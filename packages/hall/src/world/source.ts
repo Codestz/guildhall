@@ -57,11 +57,20 @@ class WorldSource {
     // Asked again for the island it has (or is growing), as a re-applied deep link does: the same
     // world, kept, so nothing built per world is built again.
     if (this.last && this.last.wanted === wanted) return this.last.done
+    return this.adopt(wanted, (async () => growWorldAsync(await fetchTree(wanted)))())
+  }
+
+  /**
+   * Makes `making` (a world still being made, as `load` makes one) the world for `wanted`. For a world
+   * made some other way: a repo split into islands (world/archipelagoSource.ts) makes its core's.
+   */
+  adopt(wanted: string, making: Promise<World>): Promise<World> {
+    if (this.last && this.last.wanted === wanted) return this.last.done
     const n = ++this.asked
     this.set(this.world, { state: "loading", repo: wanted })
     const done = (async () => {
       try {
-        const world = await growWorldAsync(await fetchTree(wanted))
+        const world = await making
         if (n === this.asked) this.set(world, { state: "repo" })
       } catch (error) {
         if (n === this.asked)

@@ -93,6 +93,7 @@ const OTHERS = new Set([
   "tsl",
   "archipelago",
   "repos",
+  "split",
   "island",
   "grow",
   "gen",

@@ -54,8 +54,35 @@ export function parseArchipelagoLink(search: string): ArchipelagoLink | null {
 }
 
 /**
+ * `?repo=owner/name&split`: the repo as an archipelago of its packages (world/gen/split.ts), the
+ * core its home island. A repo that has nothing to split stays the one island it was.
+ */
+export interface SplitLink {
+  repo: string
+  /** The island to start on, as written (`island=`: "map", a package's name or its id). */
+  island?: string
+}
+
+export function parseSplitLink(search: string): SplitLink | null {
+  const params = new URLSearchParams(search)
+  const value = params.get("repo")?.trim()
+  if (!params.has("split") || !value || value === "home" || value === "sample") return null
+  const split = (params.get("split") ?? "").toLowerCase()
+  if (split === "0" || split === "false") return null
+  let repo: string
+  try {
+    repo = parseRepo(value)
+  } catch {
+    return null
+  }
+  const island = params.get("island")?.trim()
+  return { repo, ...(island ? { island } : {}) }
+}
+
+/**
  * Which island a link's `island=` means: -1 the home island, an index into `repos`, "map" for the
- * map of them all, or undefined.
+ * map of them all, or undefined. A split repo's islands are "owner/name#folder": a package's name
+ * (its folder's last part) or its whole id will do.
  */
 export function islandIndexOf(wanted: string, repos: readonly string[]): number | "map" | undefined {
   const key = wanted.trim().toLowerCase()
@@ -64,7 +91,8 @@ export function islandIndexOf(wanted: string, repos: readonly string[]): number 
     return -1
   const found = repos.findIndex((repo) => {
     const lower = repo.toLowerCase()
-    return lower === key || lower.split("/")[1] === key
+    const folder = lower.split("#")[1]
+    return lower === key || lower.split("/")[1] === key || folder === key || folder?.split("/").pop() === key
   })
   return found >= 0 ? found : undefined
 }

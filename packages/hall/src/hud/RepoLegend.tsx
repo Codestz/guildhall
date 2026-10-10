@@ -10,6 +10,7 @@ import { deepenLink } from "./chronicleLinks.ts"
 import { Icon } from "./icons.tsx"
 import { repoDoor } from "./RepoDoor.tsx"
 import { repoPanel, useRepoPanel } from "./repoPanel.ts"
+import { SplitIslands } from "./SplitIslands.tsx"
 import { useGrowthPhase } from "./TimelineGrowth.tsx"
 import { useDeepChronicle } from "./useCatalog.ts"
 
@@ -156,6 +157,7 @@ export function RepoLegend() {
             </li>
           ))}
         </ul>
+        <SplitIslands />
       </section>
     </>
   )

@@ -65,8 +65,13 @@ const apart = (a: Spot, b: Spot): number => Math.max(Math.abs(a[0] - b[0]), Math
 const snap = (v: number): number => Math.round(v / SEA_CELL) * SEA_CELL
 
 /** Whether island `a` (keep at `from`) and `b` (at `to`) keep their gap of sea and share no square of water. */
-function clear(a: Footprint, from: Spot, b: Footprint, to: Spot): boolean {
+export function clear(a: Footprint, from: Spot, b: Footprint, to: Spot): boolean {
   if (DMath.hypot(from[0] - to[0], from[1] - to[1]) < a.reach + b.reach + SEA_GAP) return false
+  return waterClear(a, from, b, to)
+}
+
+/** Whether `a` (keep at `from`) and `b` (at `to`) share no square of water. */
+export function waterClear(a: Footprint, from: Spot, b: Footprint, to: Spot): boolean {
   return a.patches.every((p) =>
     b.patches.every(
       (q) =>

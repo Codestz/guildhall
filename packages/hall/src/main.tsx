@@ -10,8 +10,8 @@ import { Hall } from "./Hall.tsx"
 import "./hall.css"
 import { hudPrefs } from "./hud/prefs.ts"
 import { HOME, islandView } from "./scene/archipelago/view.ts"
-import { islandIndexOf, parseArchipelagoLink } from "./world/archipelagoLink.ts"
-import { loadArchipelago } from "./world/archipelagoSource.ts"
+import { islandIndexOf, parseArchipelagoLink, parseSplitLink } from "./world/archipelagoLink.ts"
+import { loadArchipelago, loadSplitRepo } from "./world/archipelagoSource.ts"
 
 const root = document.getElementById("root")
 if (!root) throw new Error("#root missing from index.html")
@@ -59,6 +59,22 @@ const linked: LinkedHall = {
   },
   ...(PROBE ? { force: (kind) => void worldEventsOf(store).force(kind) } : {}),
 }
+// `?repo=owner/name&split` (world/archipelagoLink.ts): the repo as an archipelago of its packages. It
+// adopts the core as the home world first, so the link's own `repo=` (applyDeepLink) finds it loading.
+const split = live === null && !lab ? parseSplitLink(location.search) : null
+if (split) {
+  const patches = import("./scene/archipelago/footprint.ts").then(({ patchesOf }) => patchesOf)
+  const splitting = loadSplitRepo(split.repo, patches).then((grown) => {
+    if (!grown || !split.island) return
+    const stop = islandIndexOf(
+      split.island,
+      grown.islands.map((island) => island.repo),
+    )
+    if (stop !== undefined && stop !== HOME) islandView.go(stop, { cut: true })
+  })
+  boot.hold(splitting)
+}
+
 if (live === null && !lab) applyDeepLink(parseDeepLink(location.search, PROBE).link, linked)
 
 // The archipelago (`?archipelago`, `?repos=`, `&island=`; world/archipelagoLink.ts): the far islands

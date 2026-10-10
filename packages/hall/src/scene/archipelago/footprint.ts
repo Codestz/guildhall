@@ -1,8 +1,19 @@
-import { PATCH_HALF, type Patch } from "../../world/archipelago.ts"
+import { PATCH_HALF, type Patch, SEA_CELL } from "../../world/archipelago.ts"
 import type { FarIsland } from "../../world/archipelagoSource.ts"
 import type { World } from "../../world/world.ts"
+import { HEX_RADIUS } from "../nature/scatter.ts"
 import type { Hole } from "../nature/shore.ts"
-import { outreachOf, type ShoreTile, shoreTilesOf } from "../nature/shoreTiles.ts"
+import { SHORE } from "../nature/shore.ts"
+import { outreachOf, type ShoreTile, shoreTilesOf, spanOf } from "../nature/shoreTiles.ts"
+
+/**
+ * A small far island's tight patch (a split repo's, whose islands lie in narrow straits): just its
+ * land and the foam past it, on the sea grid, never more than the usual PATCH_HALF.
+ */
+export function patchHalfOf(world: World): number {
+  const need = spanOf(world) + SHORE.maxDistance + HEX_RADIUS
+  return Math.min(PATCH_HALF, Math.ceil(need / SEA_CELL) * SEA_CELL)
+}
 
 /**
  * Where an island's water is drawn (nature/Water.tsx), which is what keeps islands from sharing sea:
@@ -27,14 +38,14 @@ export function farTilesOf(world: World): readonly ShoreTile[] {
 }
 
 /** The squares of water an island is drawn in, from its keep (`far`: as a far island, else as the home one). */
-export function patchesOf(world: World, far: boolean): readonly Patch[] {
-  if (far && outreachOf(world) === 1) return [{ at: [0, 0], half: PATCH_HALF }]
+export function patchesOf(world: World, far: boolean, tight = false): readonly Patch[] {
+  if (far && outreachOf(world) === 1) return [{ at: [0, 0], half: tight ? patchHalfOf(world) : PATCH_HALF }]
   return (far ? farTilesOf(world) : shoreTilesOf(world)).map(({ at, half }) => ({ at, half }))
 }
 
 /** The holes a far island leaves in the open sea: its squares of water, moved to where it lies. */
 export function holesOf(island: FarIsland): Hole[] {
-  return patchesOf(island.world, true).map(({ at, half }) => ({
+  return patchesOf(island.world, true, island.tight).map(({ at, half }) => ({
     at: [island.at[0] + at[0], island.at[1] + at[1]],
     half,
   }))

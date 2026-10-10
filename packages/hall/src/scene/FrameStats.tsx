@@ -4,7 +4,7 @@ import { TIERS } from "../guild/quality.ts"
 import { frameStats } from "../guild/stats.ts"
 import { active, frameCounts } from "../render/backend.ts"
 import { syncShadows } from "../render/shims.ts"
-import { FRAME } from "./frame.ts"
+import { composer, FRAME } from "./frame.ts"
 import { useTier } from "./Quality.tsx"
 
 /**
@@ -27,8 +27,9 @@ export function FrameStats() {
 
   useFrame(({ scene, camera }, delta) => {
     // A positive-priority frame callback turns off R3F's own render. With post-processing on, the
-    // composer (FRAME.RENDER) draws the frame; without it, this is the one place that does.
-    if (!post) {
+    // composer (FRAME.RENDER) draws the frame; without it, this is the one place that does: on Low,
+    // and in the frames after a switch to a post tier until its composer is built (scene/frame.ts).
+    if (!post || (!composer.live && active.backend !== "webgpu")) {
       gl.info.reset()
       // WebGPU: the on-demand shadow cache's request, handed to the lights (render/shims.ts).
       if (active.backend === "webgpu") syncShadows(gl, scene)

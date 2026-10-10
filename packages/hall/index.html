@@ -30,7 +30,9 @@
     <meta name="twitter:image" content="https://guildhall.codestz.dev/og.png" />
     <meta name="twitter:image:alt" content="A low-poly island grown from the React repo at golden hour: mountain ranges, rivers and forests round a lit guildhall, with the title Guildhall and the line Events in. A living world out." />
     <style>
-      html, body, #root { margin: 0; height: 100%; background: #cfdcee; overflow: hidden; }
+      /* The loader's ink, not a sky colour: a canvas that is ever shown cleared (a resize clears it) then
+         reads as a dark beat, never a white flash. */
+      html, body, #root { margin: 0; height: 100%; background: #15110d; overflow: hidden; }
       /* The first paint, before any script: the loader's ink, crest and name at the loader's own
          place (hud/loader.css), so React takes over without a jump and the world is never seen bare. */
       #boot-shell { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center;

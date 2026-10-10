@@ -13,6 +13,9 @@
  *             Low (no post)               FrameStats, at STATS, calls gl.render itself
  *           Any positive priority turns R3F's own render off, so with the composer gone something
  *           else must draw: that is FrameStats on Low.
+ *           A tier with post whose composer is not built yet (`composer.live`, the frames after a
+ *           Low -> Medium switch) is drawn by FrameStats too: the switch resizes the canvas, which
+ *           clears it, and a frame nobody draws is the page's colour, shown as a flash.
  *   STATS   FrameStats reads `renderer.info` after the whole frame is drawn (and renders on Low).
  *
  * The shadow map is drawn on demand (atmosphere/shadows.ts): anything that adds, removes or moves a
@@ -25,3 +28,6 @@ export const FRAME = {
   RENDER: 1,
   STATS: 2,
 } as const
+
+/** Whether the post-processing composer (atmosphere/Post.tsx) is built, and so draws the frame. */
+export const composer = { live: false }

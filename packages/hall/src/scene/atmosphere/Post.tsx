@@ -19,7 +19,7 @@ import { isWebGPU } from "../../render/backend.ts"
 import { useArchipelago } from "../../world/archipelagoSource.ts"
 import { useWorld } from "../../world/source.ts"
 import { reachOf } from "../../world/world.ts"
-import { FRAME } from "../frame.ts"
+import { composer, FRAME } from "../frame.ts"
 import { useTier } from "../Quality.tsx"
 import { HAZE } from "./aerial.ts"
 import { GradeEffect } from "./GradeEffect.ts"
@@ -36,6 +36,10 @@ import { WIDE_VIEW } from "./wideView.ts"
  */
 const BLOOM_INPUT = 0.5
 const ORIGIN = new Vector3()
+/** The composer's ref: set once it is built, null when it goes (scene/frame.ts, who draws the frame). */
+const live = (built: unknown) => {
+  composer.live = Boolean(built)
+}
 
 /**
  * Post-processing per quality tier (ADR 0007, task "Sky"): bloom so flames and the sun glow, the
@@ -108,7 +112,7 @@ function PostGL() {
   const half = level.ao === "half"
   return (
     // Draws the frame on every tier with post (scene/frame.ts: on Low, FrameStats does).
-    <EffectComposer multisampling={0} renderPriority={FRAME.RENDER}>
+    <EffectComposer ref={live} multisampling={0} renderPriority={FRAME.RENDER}>
       {level.ao !== "off" ? (
         <N8AO
           aoRadius={2.4}

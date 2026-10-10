@@ -15,11 +15,19 @@ export function useTier(): Tier {
  */
 export function Quality({ children }: { children: ReactNode }) {
   const tier = useTier()
+  const gl = useThree((state) => state.gl)
   const setDpr = useThree((state) => state.setDpr)
+  const advance = useThree((state) => state.advance)
 
   useEffect(() => {
-    setDpr(Math.min(window.devicePixelRatio, TIERS[tier].dpr))
-  }, [tier, setDpr])
+    const dpr = Math.min(window.devicePixelRatio, TIERS[tier].dpr)
+    if (gl.getPixelRatio() === dpr) return
+    setDpr(dpr)
+    // A new pixel ratio resizes the canvas, which clears it, and this runs after the frame's own
+    // draw (a state change in a frame callback is committed right after it): left to the next
+    // frame the page would show the cleared canvas, a flash. Draw now, before anything is shown.
+    advance(performance.now(), false)
+  }, [tier, gl, setDpr, advance])
 
   return (
     <PerformanceMonitor

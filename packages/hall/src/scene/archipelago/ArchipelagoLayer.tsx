@@ -1,25 +1,21 @@
-import { useGLTF } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
 import { type CSSProperties, Suspense, useEffect, useMemo, useRef, useState } from "react"
-import { CircleGeometry, type Group, type Mesh, type Object3D, type Vector3 } from "three"
+import { CircleGeometry, type Vector3 } from "three"
 import type { Tier } from "../../guild/quality.ts"
-import { useGuildStore } from "../../guild/useGuild.ts"
 import type { Archipelago, FarIsland, IslandInfo } from "../../world/archipelagoSource.ts"
-import { SHIPS_URL } from "../../world/cast.ts"
 import { chunksOf } from "../../world/chunks.ts"
 import { WorldScope } from "../../world/source.ts"
-import { FRAME } from "../frame.ts"
 import { Island } from "../Island.tsx"
 import { Label } from "../Label.tsx"
+import LinksLayer from "../links/LinksLayer.tsx"
 import { Fields } from "../nature/Fields.tsx"
 import { Grass } from "../nature/Grass.tsx"
 import { Rivers } from "../nature/Rivers.tsx"
 import { Water } from "../nature/Water.tsx"
 import { Wilds } from "../nature/Wilds.tsx"
 import { useTier } from "../Quality.tsx"
-import { SEA_Y, Ships } from "../Ships.tsx"
+import { Ships } from "../Ships.tsx"
 import { useChunksAt } from "../tiers.ts"
-import { FERRIES, type FerryAt, ferryAt } from "./ferries.ts"
 import { IdleLights, Lighthouse } from "./IdleIsland.tsx"
 import { HOME, islandView, type Stop, useIslandView } from "./view.ts"
 
@@ -35,7 +31,7 @@ import { HOME, islandView, type Stop, useIslandView } from "./view.ts"
  * grown, is hidden rather than dropped, so flying back costs nothing.
  *
  * Over them: a name on each island (its main language's colour) in the map view, and the ships
- * that cross between them now and then (scene/archipelago/ferries.ts).
+ * that join them: ferries on their lanes, bridges (scene/links).
  */
 export default function ArchipelagoLayer({ archipelago }: { archipelago: Archipelago }) {
   const tier = useTier()
@@ -47,7 +43,7 @@ export default function ArchipelagoLayer({ archipelago }: { archipelago: Archipe
         <FarIslandLayer key={island.repo} island={island} tier={tier} />
       ))}
       <Suspense fallback={null}>
-        <Ferries archipelago={archipelago} />
+        <LinksLayer archipelago={archipelago} />
       </Suspense>
       {[archipelago.home, ...archipelago.islands].map((island, i) => (
         <IslandMark key={island.repo} island={island} stop={i === 0 ? HOME : i - 1} map={map} />
@@ -126,69 +122,6 @@ function useNear(island: IslandInfo): boolean {
   })
   return near
 }
-
-/** The ships that cross between the islands: a hull each, rising at one quay and sinking at the next. */
-function Ferries({ archipelago }: { archipelago: Archipelago }) {
-  const store = useGuildStore()
-  const { nodes } = useGLTF(SHIPS_URL) as unknown as { nodes: Record<string, Object3D> }
-  const shores = useMemo(() => [archipelago.home, ...archipelago.islands], [archipelago])
-  const hulls = useMemo(
-    () =>
-      Array.from({ length: FERRIES }, (_, i) => {
-        const source = nodes[FERRY_HULLS[i % FERRY_HULLS.length] as string]
-        if (!source) return null
-        const copy = source.clone(true)
-        copy.traverse((child) => {
-          const mesh = child as Mesh
-          if (!mesh.isMesh) return
-          mesh.castShadow = false
-          mesh.receiveShadow = true
-        })
-        return copy
-      }),
-    [nodes],
-  )
-  const refs = useRef<(Group | null)[]>([])
-  const at = useMemo<FerryAt>(() => ({ x: 0, z: 0, heading: 0, shown: 0 }), [])
-
-  useFrame((state) => {
-    const t = store.time / 1000
-    const bob = state.clock.elapsedTime
-    for (let i = 0; i < FERRIES; i++) {
-      const group = refs.current[i]
-      if (!group) continue
-      const sailing = ferryAt(shores, archipelago.crossings, i, t, at)
-      group.visible = sailing
-      if (!sailing) continue
-      const sink = (1 - at.shown) * 3
-      group.position.set(at.x, SEA_Y - FERRY_DRAFT + Math.sin(bob * 0.9 + i) * 0.12 - sink, at.z)
-      group.rotation.set(Math.sin(bob * 0.6 + i * 2) * 0.03, at.heading, Math.sin(bob * 0.8 + i) * 0.05)
-      group.scale.setScalar(FERRY_SCALE * (0.4 + 0.6 * at.shown))
-    }
-  }, FRAME.WORLD)
-
-  return (
-    <group name="ferries">
-      {hulls.map((hull, i) =>
-        hull ? (
-          <group
-            // biome-ignore lint/suspicious/noArrayIndexKey: one slot per ferry, fixed
-            key={i}
-            ref={(group) => {
-              refs.current[i] = group
-            }}
-            visible={false}
-          >
-            <primitive object={hull} />
-          </group>
-        ) : null,
-      )}
-    </group>
-  )
-}
-const FERRY_HULLS = ["ship-medium", "ship-small", "ship-large"]
-const FERRY_SCALE = 1
-const FERRY_DRAFT = 1
 
 /**
  * An island's name on its far coast in the map view, in its main language's colour: a button that

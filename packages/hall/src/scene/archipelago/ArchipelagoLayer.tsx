@@ -151,4 +151,3 @@ function useNear(island: IslandInfo, stop: Stop): { near: boolean; warm: boolean
   })
   return { near, warm }
 }
-

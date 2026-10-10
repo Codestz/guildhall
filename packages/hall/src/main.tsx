@@ -10,7 +10,6 @@ import { GuildStore, liveUrlOf } from "./guild/store.ts"
 import { Hall } from "./Hall.tsx"
 import "./hall.css"
 import { hudPrefs } from "./hud/prefs.ts"
-import { HOME } from "./world/islandRing.ts"
 import { islandIndexOf, parseArchipelagoLink, parseSplitLink } from "./world/archipelagoLink.ts"
 import { loadArchipelago, loadSplitRepo } from "./world/archipelagoSource.ts"
 
@@ -71,7 +70,7 @@ if (split) {
       split.island,
       grown.islands.map((island) => island.repo),
     )
-    if (stop !== undefined && stop !== HOME) islandView.go(stop, { cut: true })
+    if (stop !== undefined) islandView.start(stop)
   })
   boot.hold(splitting)
 }

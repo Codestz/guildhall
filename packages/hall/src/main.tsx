@@ -17,9 +17,9 @@ const root = document.getElementById("root")
 if (!root) throw new Error("#root missing from index.html")
 
 // The labs (lab/labs.ts): dev and probe builds only, `?lab=grips|character|prop|event`, instead of
-// the hall. `?grips` is the grip lab's old address.
+// the hall.
 const params = new URLSearchParams(location.search)
-const lab = PROBE ? (params.get("lab") ?? (params.has("grips") ? "grips" : null)) : null
+const lab = PROBE ? params.get("lab") : null
 // The build-time test spelled out here (not just PROBE): the bundler drops the import, and with it
 // every lab chunk, before it plans the chunks of a showcase build.
 if ((import.meta.env.DEV || import.meta.env.VITE_GUILDHALL_PROBE === "1") && lab)
@@ -34,7 +34,7 @@ store.hold()
 // mounts, and the HUD must not stay frozen by the hold (review-2 #23). Idempotent.
 setTimeout(() => store.release(), 20_000)
 // `?live` follows the hub (real OpenCode sessions); `?live=ws://localhost:port/ws` picks another
-// hub on this machine (`&anyhub=1` for one elsewhere).
+// hub on this machine (`&anyhub=1` for one elsewhere, in a dev or probe build only).
 const live = liveUrlOf(location.search)
 if (live !== null) store.live(live)
 

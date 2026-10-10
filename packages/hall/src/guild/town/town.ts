@@ -7,6 +7,7 @@ import { WINDOW_DAYS } from "../../world/town/presence.ts"
 import { comingsAndGoings, filmWindow, type Resident, townsfolkAt } from "../../world/town/townsfolk.ts"
 import type { World } from "../../world/world.ts"
 import type { Names } from "../casting.ts"
+import { DEV } from "../devFlags.ts"
 import { PROBE } from "../mode.ts"
 import { quality, type Tier } from "../quality.ts"
 import type { AdventurerView } from "../views.ts"
@@ -30,13 +31,6 @@ const UPDATE_S = 0.25
 
 const NO_VIEWS: readonly AdventurerView[] = []
 
-/** `?townsfolk=N` caps the town for a measurement (0: nobody); unset, the tier's cap. */
-function asked(): number | undefined {
-  if (typeof location === "undefined") return undefined
-  const value = new URLSearchParams(location.search).get("townsfolk")
-  return value === null || value === "" || Number.isNaN(Number(value)) ? undefined : Number(value)
-}
-
 export class Town {
   /** Who is in town, in the chronicle's order. */
   residents: readonly Resident[] = []
@@ -52,7 +46,7 @@ export class Town {
   epoch = 0
   /** Bumps on every notified change (useSyncExternalStore's snapshot). */
   version = 0
-  cap: number | undefined = asked()
+  cap: number | undefined = DEV.townsfolk
 
   private world: World | undefined
   private names: Names = "world"

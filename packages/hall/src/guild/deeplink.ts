@@ -9,6 +9,7 @@ import { handWorld, reachOf, type World } from "../world/world.ts"
 import type { Place } from "./director.ts"
 import type { Weather } from "./environment.ts"
 import { EVENT_KINDS, type EventKind } from "./events.ts"
+import { READ_ELSEWHERE } from "./params.ts"
 import type { Tier } from "./quality.ts"
 import { RUSH, SCENARIOS, type ScenarioId } from "./store.ts"
 
@@ -23,8 +24,8 @@ import { RUSH, SCENARIOS, type ScenarioId } from "./store.ts"
  *   n        1–500, how many adventurers `rush` sends out (only with story=rush; 12 without it)
  *   hour     0–24 (decimals allowed), a fixed time of day
  *   weather  clear | cloudy | rain | storm | snow
- *   quality  0–3 or low|medium|high|ultra (auto: no pin), for this visit only (not remembered)
- *   hud      minimal | detailed | hidden (`off` is hidden), for this visit only
+ *   quality  0–3 or low|medium|high|ultra, for this visit only (not remembered) — dev and probe builds only
+ *   hud      minimal | detailed | hidden, for this visit only
  *   bard     0 | 1, the director off or on
  *   view     diorama | explore
  *   select   an adventurer's title (`Implementer II`, any case) or session id: followed, dossier open
@@ -40,7 +41,9 @@ import { RUSH, SCENARIOS, type ScenarioId } from "./store.ts"
  *            `home`: back to the guild's own island. Applied in place, the world swaps live.
  *
  * Every value is validated strictly; anything unknown or invalid is ignored (and listed in
- * `ignored`, for the probe tools to report). Production honours all of it except `event`.
+ * `ignored`, for the probe tools to report). Production honours all of it except the dev-only
+ * `quality` and `event`. Every param the hall reads, here or elsewhere, is listed in guild/params.ts
+ * (test/params.test.ts keeps that true); the ones read elsewhere are never reported as ignored.
  */
 export interface DeepLink {
   story?: ScenarioId
@@ -81,33 +84,11 @@ const HUDS: Record<string, HudMode> = {
   minimal: "minimal",
   detailed: "detailed",
   hidden: "hidden",
-  off: "hidden",
 }
 /** Furthest a numeric `look` may be from the island's centre, world units (the sea around it). */
 const LOOK_MAX = 200
 /** Most adventurers `n` may ask `rush` for: a stress scene, not a denial of service. */
 const RUSH_MAX = 500
-/** Params owned by other features (`?live`, `?showcase`, the labs): never reported as ignored. */
-const OTHERS = new Set([
-  "live",
-  "tsl",
-  "archipelago",
-  "repos",
-  "split",
-  "island",
-  "grow",
-  "gen",
-  "anyhub",
-  "showcase",
-  "demo",
-  "lab",
-  "grips",
-  "model",
-  "clip",
-  "piece",
-  "kind",
-  "night",
-])
 
 /** Parses a location search string. `probe`: a dev or probe build (dev-only params allowed). */
 export function parseDeepLink(search: string, probe: boolean): Parsed {
@@ -115,7 +96,7 @@ export function parseDeepLink(search: string, probe: boolean): Parsed {
   const ignored: string[] = []
   for (const [key, raw] of new URLSearchParams(search)) {
     const value = raw.trim()
-    if (!take(link, key, value, probe) && !OTHERS.has(key)) ignored.push(`${key}=${raw}`)
+    if (!take(link, key, value, probe) && !READ_ELSEWHERE.has(key)) ignored.push(`${key}=${raw}`)
   }
   if (link.act !== undefined && link.story === undefined) link.story = "saga"
   if (link.act !== undefined && link.story !== "saga") {
@@ -174,7 +155,7 @@ function take(link: DeepLink, key: string, value: string, probe: boolean): boole
       link.weather = value as Weather
       return true
     case "quality": {
-      if (value === "auto") return true // no pin: the hall's own choice stands
+      if (!probe) return false
       const tier = Object.hasOwn(QUALITY_NAMES, value) ? QUALITY_NAMES[value] : intOf(value, 0, 3)
       if (tier === undefined) return false
       link.quality = tier as Tier

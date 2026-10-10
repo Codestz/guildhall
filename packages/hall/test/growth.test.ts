@@ -258,7 +258,8 @@ describe("the transport", () => {
     expect(growParam("?repo=a/b")).toBeUndefined()
     expect(growParam("?repo=a/b&grow")).toEqual({ start: undefined })
     expect(growParam("?grow=2017")).toEqual({ start: { year: 2017 } })
-    expect(growParam("?grow=t:30")).toEqual({ start: { t: 30 } })
+    expect(growParam("?grow=t:30", true)).toEqual({ start: { t: 30 } })
+    expect(growParam("?grow=t:30")).toEqual({ start: undefined })
   })
 
   test("it plays, pauses, seeks, and ends on its own", () => {

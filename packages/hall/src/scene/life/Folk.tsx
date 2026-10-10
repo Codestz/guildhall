@@ -1,5 +1,6 @@
 import { useFrame } from "@react-three/fiber"
 import { Suspense, useEffect, useMemo, useRef, useState } from "react"
+import { DEV } from "../../guild/devFlags.ts"
 import { PROBE } from "../../guild/mode.ts"
 import type { Tier } from "../../guild/quality.ts"
 import { useGuildStore } from "../../guild/useGuild.ts"
@@ -32,11 +33,9 @@ import { Troupe } from "./troupe.ts"
  * Draw calls: the crowd's own (shared with the cast), barrows 2, animals 1 per kind showing.
  */
 export function Folk({ tier }: { tier: Tier }) {
-  // `?folk=0`: nobody (a measurement's A/B, docs/perf-budget.md).
-  return OFF ? null : <Townspeople tier={tier} />
+  // `?folk=off` (dev and probe builds): nobody (a measurement's A/B, docs/perf-budget.md).
+  return DEV.folk ? <Townspeople tier={tier} /> : null
 }
-
-const OFF = typeof location !== "undefined" && new URLSearchParams(location.search).get("folk") === "0"
 
 function Townspeople({ tier }: { tier: Tier }) {
   const world = useWorld()

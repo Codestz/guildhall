@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { PROBE } from "../../guild/mode.ts"
+import { DEV } from "../../guild/devFlags.ts"
 import { type Archipelago, useArchipelago } from "../../world/archipelagoSource.ts"
 import { type Wall, wallFrom } from "../../world/bridgeWalls.ts"
 import type { Spot } from "../../world/layout.ts"
@@ -10,9 +10,7 @@ import { netFor } from "../../world/splitLinks.ts"
 
 /** Probe builds only: `?bridgemax=150` bridges islands whose quays are that close (the stub's BRIDGE_MAX, world/linkStub.ts). */
 export function bridgeMaxOf(): number {
-  if (!PROBE || typeof location === "undefined") return BRIDGE_MAX
-  const asked = Number(new URLSearchParams(location.search).get("bridgemax"))
-  return asked > 0 ? asked : BRIDGE_MAX
+  return DEV.bridgemax ?? BRIDGE_MAX
 }
 
 /** The archipelago's links, made concrete once (world/splitLinks.ts `netFor`). */

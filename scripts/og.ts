@@ -32,7 +32,7 @@ if (!reuse) {
     "document.querySelectorAll('body *').forEach(e=>{if(e.tagName==='CANVAS'||e.querySelector('canvas')||e.closest('canvas'))return;const p=getComputedStyle(e).position;if(p==='fixed'||p==='absolute')e.style.display='none'})"
   const steps = [{ wait: 7000 }, { eval: hide }, { wait: 400 }, { shot: "og-frame", png: true }]
   await Bun.write(`${PROBE_DIR}/og-steps.json`, JSON.stringify(steps))
-  const url = `${base}/?repo=facebook/react&look=island&hour=17.5&hud=off`
+  const url = `${base}/?repo=facebook/react&look=island&hour=17.5&hud=hidden`
   const shot = Bun.spawn(["bun", `${ROOT}scripts/shot.ts`, url, `${PROBE_DIR}/og-steps.json`], {
     stdout: "inherit",
     stderr: "inherit",

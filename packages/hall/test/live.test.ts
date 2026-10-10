@@ -269,11 +269,39 @@ describe("?live", () => {
     expect(liveUrlOf("?live=ws://127.0.0.1:4800/ws")).toBe("ws://127.0.0.1:4800/ws")
   })
 
-  test("anywhere else falls back to the default hub, unless &anyhub=1", () => {
+  test("anywhere else falls back to the default hub", () => {
     for (const url of ["ws://evil.example/ws", "wss://127.0.0.1/ws", "http://localhost:4747/ws", "nonsense"])
       expect(liveUrlOf(`?live=${encodeURIComponent(url)}`)).toBe(DEFAULT)
     expect(liveUrlOf(`?live=${encodeURIComponent("ws://localhost.evil.example/ws")}`)).toBe(DEFAULT)
-    expect(liveUrlOf("?live=ws://box.lan:4747/ws&anyhub=1")).toBe("ws://box.lan:4747/ws")
+  })
+
+  describe("&anyhub=1 (a link must not carry its own permission to leave this machine)", () => {
+    const evil = "?live=ws://evil.example/ws&anyhub=1"
+    const lan = "?live=ws://box.lan:4747/ws&anyhub=1"
+
+    test("a production build ignores it: the default hub, or the serving hub", () => {
+      for (const search of [
+        evil,
+        lan,
+        "?anyhub=1&live=ws://evil.example/ws",
+        "?live=ws://evil.example/ws&anyhub=true",
+      ]) {
+        expect(liveUrlOf(search, null, false)).toBe(DEFAULT)
+        expect(liveUrlOf(search, "ws://127.0.0.1:4848/ws", false)).toBe("ws://127.0.0.1:4848/ws")
+      }
+    })
+
+    test("a production build still follows a hub on this machine", () => {
+      expect(liveUrlOf("?live=ws://localhost:5000/ws&anyhub=1", null, false)).toBe("ws://localhost:5000/ws")
+    })
+
+    test("a dev or probe build lets a hub elsewhere through", () => {
+      expect(liveUrlOf(lan, null, true)).toBe("ws://box.lan:4747/ws")
+    })
+
+    test("the page's own build decides by default (tests are not a probe build)", () => {
+      expect(liveUrlOf(evil)).toBe(DEFAULT)
+    })
   })
 
   describe("a hall served by a hub (the npm package)", () => {

@@ -14,6 +14,7 @@ describe("deep links: parsing", () => {
   test("a full link reads every param", () => {
     const { link, ignored } = parse(
       "?story=saga&t=11:53&hour=23&weather=storm&quality=2&hud=hidden&bard=0&view=explore&select=Implementer II&look=quarry&paused=1",
+      true,
     )
     expect(ignored).toEqual([])
     expect(link).toMatchObject({
@@ -52,19 +53,29 @@ describe("deep links: parsing", () => {
     expect(parse("t=0:00").link.t).toBe(0)
     expect(parse("t=999:59").link.t).toBe((999 * 60 + 59) * 1000)
     expect(parse("t=12").link.t).toBeUndefined()
-    expect(parse("quality=0").link.quality).toBe(0)
-    expect(parse("quality=3").link.quality).toBe(3)
-    expect(parse("quality=1.5").link.quality).toBeUndefined()
-    expect(["low", "medium", "high", "ultra"].map((name) => parse(`quality=${name}`).link.quality)).toEqual([
-      0, 1, 2, 3,
-    ])
-    expect(parse("quality=auto").link.quality).toBeUndefined()
-    expect(parse("quality=auto").ignored).toEqual([])
-    expect(parse("quality=toString").ignored).toEqual(["quality=toString"])
+    expect(parse("quality=0", true).link.quality).toBe(0)
+    expect(parse("quality=3", true).link.quality).toBe(3)
+    expect(parse("quality=1.5", true).link.quality).toBeUndefined()
+    expect(
+      ["low", "medium", "high", "ultra"].map((name) => parse(`quality=${name}`, true).link.quality),
+    ).toEqual([0, 1, 2, 3])
+    expect(parse("quality=toString", true).ignored).toEqual(["quality=toString"])
   })
 
-  test("hud=off is hidden", () => {
-    expect(parse("hud=off").link.hud).toBe("hidden")
+  test("quality is honoured only in dev and probe builds; auto is no longer a spelling", () => {
+    const shipped = parse("quality=2", false)
+    expect(shipped.link.quality).toBeUndefined()
+    expect(shipped.ignored).toEqual(["quality=2"])
+    expect(parse("quality=auto", true)).toEqual({ link: {}, ignored: ["quality=auto"] })
+  })
+
+  test("hud takes minimal, detailed and hidden only (off is gone)", () => {
+    expect(["minimal", "detailed", "hidden"].map((mode) => parse(`hud=${mode}`).link.hud)).toEqual([
+      "minimal",
+      "detailed",
+      "hidden",
+    ])
+    expect(parse("hud=off")).toEqual({ link: {}, ignored: ["hud=off"] })
   })
 
   test("act implies the Saga; with another story it is dropped", () => {
@@ -101,7 +112,14 @@ describe("deep links: parsing", () => {
   })
 
   test("other features' params are neither read nor reported", () => {
-    expect(parse("live&showcase&lab=prop&piece=axe&grips")).toEqual({ link: {}, ignored: [] })
+    expect(parse("live&showcase&lab=prop&anyhub=1&tsl=1&cascades=off&gen=1")).toEqual({
+      link: {},
+      ignored: [],
+    })
+  })
+
+  test("a retired alias or a lab's own param is reported, not silently read", () => {
+    expect(parse("grips&piece=axe").ignored).toEqual(["grips=", "piece=axe"])
   })
 })
 

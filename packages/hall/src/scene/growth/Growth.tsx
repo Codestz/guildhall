@@ -7,7 +7,7 @@ const GrowthLayer = lazy(() => import("./GrowthLayer.tsx"))
 
 // A link's `?grow` (with `?repo=`) asks for the film as the hall loads (ADR 0021).
 if (typeof location !== "undefined") {
-  const asked = growParam(location.search)
+  const asked = growParam(location.search, PROBE)
   const repo = new URLSearchParams(location.search).get("repo")
   if (asked && repo) growth.request(repo, asked.start)
   // Probes: `growth.seek(30)`, `growth.pause()`, `growth.t` (scripts/probe.ts eval).

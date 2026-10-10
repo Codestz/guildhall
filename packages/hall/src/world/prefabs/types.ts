@@ -59,7 +59,7 @@ export interface Variation {
   swaps?: Readonly<Record<string, readonly string[]>>
 }
 
-export type PrefabKind = "house" | "market" | "plaza" | "civic" | "wall" | "venue"
+export type PrefabKind = "landmark" | "house" | "market" | "plaza" | "civic" | "wall" | "venue"
 
 export interface Prefab {
   /** Stable: lots, saves and shots refer to it. */

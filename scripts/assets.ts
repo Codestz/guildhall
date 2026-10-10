@@ -512,7 +512,8 @@ const FOREST: Record<string, string[]> = {
 /**
  * The second town kit (world/prefabs/town2.ts, gen 2 only): the pieces of Kenney's Fantasy Town (the
  * walls and roofs a house is built of, the windmill's sails, stalls, fences, lamps), Castle (hexagonal
- * and square towers, the drawbridge) kits that the KayKit hex pack has no answer to. Three
+ * and square towers, the drawbridge) kits that the KayKit hex pack has no answer to. The composite landmarks
+ * (world/prefabs/composite) add a dome, a spire, stone pillars, a square fountain, a bench, stairs and a long banner. Three
  * colormaps, one material each, all baked onto the KayKit palette (`toKayKit`). Pieces land in the
  * bundle as `t2_<piece>`, `t2_c_<piece>` (dashes to underscores).
  */
@@ -541,6 +542,9 @@ const TOWN2: Record<string, string[]> = {
     "hedge",
     "hedge-gate",
     "tree-high",
+    "pillar-stone",
+    "fountain-square",
+    "stall-bench",
   ],
   "kenney_castle-kit": [
     "bridge-draw",
@@ -553,6 +557,11 @@ const TOWN2: Record<string, string[]> = {
     "tower-square-top-roof",
     "tower-square-top-roof-high",
     "wall-narrow-gate",
+    "tower-square-top-roof-rounded",
+    "tower-slant-roof",
+    "tower-square-mid-windows",
+    "stairs-stone",
+    "flag-banner-long",
   ],
 }
 

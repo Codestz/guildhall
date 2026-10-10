@@ -1,3 +1,4 @@
+import type { Composed, Tree } from "../world/prefabs/composite/index.ts"
 import type { Resolved, Stats } from "../world/prefabs/index.ts"
 
 /**
@@ -14,7 +15,9 @@ export interface InspectorView {
   of: number
   /** The seed shown; `variant` is undefined for a prefab that does not vary. */
   seed: number
-  variant?: Resolved
+  variant?: Pick<Resolved, "kit" | "mirrored" | "swapped">
+  /** A composite landmark as this seed made it: its parts tree, focal point and smoke points are listed. */
+  landmark?: Composed
   /** How many props the seed let in on top of the prefab's own parts. */
   props: number
   isolated: boolean
@@ -57,6 +60,8 @@ const STYLE = `
 .pfi li b{font-weight:400;color:var(--brass-hi,#f1d590)}
 .pfi-step{display:flex;align-items:center;gap:6px;margin-top:2px}
 .pfi-step span{flex:1;text-align:center;font:13px var(--mono,monospace)}
+.pfi-tree li{border:0;justify-content:flex-start;gap:6px;padding:1px 0;font-size:12px}
+.pfi-tree b{margin-left:auto}
 .pfi-note{margin:4px 0 0;color:var(--muted,#cdbfa3);font-size:13px}
 .pfi-keys{padding:8px 16px;border-top:1px solid var(--hair,#fff1);color:var(--faint,#ab9e85);font-size:12px}
 .pfi-hint{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:50;padding:5px 12px;
@@ -71,12 +76,18 @@ const kb = (bytes: number): string => `${(bytes / 1024).toFixed(bytes < 10240 ? 
 const count = (n: number): string => n.toLocaleString("en-US")
 
 /** One variant in words: "red roof · mirrored · 2 props". */
-function describe(variant: Resolved, props: number): string {
+function describe(variant: Pick<Resolved, "kit" | "mirrored" | "swapped">, props: number): string {
   const parts = [`${variant.kit} roof`]
   if (variant.mirrored) parts.push("mirrored")
   parts.push(...variant.swapped)
   if (props > 0) parts.push(`${props} extra prop${props > 1 ? "s" : ""}`)
   return parts.join(" · ")
+}
+
+/** A parts tree as nested lines: each group, its pieces beneath it and the groups within. */
+function treeList(tree: Tree, depth = 0): string {
+  const line = `<li style="padding-left:${depth * 12}px"><span>${tree.name}</span><b>${tree.pieces}</b></li>`
+  return line + tree.kids.map((kid) => treeList(kid, depth + 1)).join("")
 }
 
 export interface Inspector {
@@ -123,7 +134,7 @@ export function createInspector(root: HTMLElement, actions: InspectorActions): I
       panel.hidden = true
       hint.hidden = false
     },
-    show({ stats, at, of, seed, variant, props, isolated }) {
+    show({ stats, at, of, seed, variant, landmark, props, isolated }) {
       hint.hidden = true
       panel.hidden = false
       const head = document.createElement("div")
@@ -150,6 +161,9 @@ export function createInspector(root: HTMLElement, actions: InspectorActions): I
         ${stats.houses ? row("Homes", String(stats.houses)) : ""}
         ${row("Size", `${stats.size.join(" × ")}`)}
         ${row("Reach", `${stats.reach} from anchor`)}
+        ${landmark ? row("Class", `${landmark.composite.size} · ${landmark.composite.coastal ? "coastal" : "inland"}`) : ""}
+        ${landmark ? row("Focal", `${landmark.focal.x}, ${landmark.focal.y}, ${landmark.focal.z}`) : ""}
+        ${landmark ? row("Smoke points", String(landmark.smoke.length)) : ""}
         ${row("Doors", String(stats.doors))}${row("Windows", String(stats.windows))}${row("Chimneys", String(stats.chimneys))}
         ${row("Triangles", count(stats.tris))}
         ${row("Draw calls", `${stats.draws.loose} loose · ${stats.draws.batched} batched`)}
@@ -157,6 +171,7 @@ export function createInspector(root: HTMLElement, actions: InspectorActions): I
       </dl>
       <h3>VARIANTS</h3>
       <div class="pfi-variants"></div>
+      ${landmark ? `<h3>TREE</h3><ul class="pfi-tree">${treeList(landmark.tree)}</ul>` : ""}
       <h3>PARTS · ${stats.parts.reduce((sum, p) => sum + p.count, 0)}</h3>${list(stats.parts)}
       ${stats.unknown ? `<p class="pfi-note">${stats.unknown} piece(s) not in the pack</p>` : ""}`
       const variants = body.querySelector(".pfi-variants")

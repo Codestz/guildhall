@@ -9,13 +9,13 @@ import type { Part, Prefab } from "./types.ts"
  */
 
 /** The drawing size, relative to the pack's 5×, and the cell it makes in world units. */
-const S = 0.6
-const M = 5 * S
+export const S = 0.6
+export const M = 5 * S
 
 const round = (value: number): number => Math.round(value * 100) / 100
 
 /** A piece of the kit (`t2_` is its name in the bundle) at a spot, `y` world units up, drawn at `scale` × 5. */
-function at(piece: string, x: number, z: number, rot = 0, y = 0, scale = S): Part {
+export function at(piece: string, x: number, z: number, rot = 0, y = 0, scale = S): Part {
   return {
     piece: `t2_${piece}`,
     x: round(x),
@@ -26,15 +26,15 @@ function at(piece: string, x: number, z: number, rot = 0, y = 0, scale = S): Par
   }
 }
 
-type Side = "front" | "back" | "left" | "right"
+export type Side = "front" | "back" | "left" | "right"
 /** The turn that faces a +x panel (as the kit draws one) toward each side of the box. */
 const TURN: Record<Side, number> = { right: 0, front: -Math.PI / 2, left: Math.PI, back: Math.PI / 2 }
 
 /** The wall panel (by name) for the `i`th of `n` cells along a side, or nothing: a gap. */
-type Pick = (side: Side, i: number, n: number) => string | undefined
+export type Pick = (side: Side, i: number, n: number) => string | undefined
 
 /** A box `w` × `d` cells (x by z) centred on the anchor, ringed by wall panels, `floor` cells up. */
-function shell(w: number, d: number, pick: Pick, floor = 0): Part[] {
+export function shell(w: number, d: number, pick: Pick, floor = 0): Part[] {
   const out: Part[] = []
   const x = (i: number): number => (i - (w - 1) / 2) * M
   const z = (j: number): number => (j - (d - 1) / 2) * M
@@ -54,7 +54,7 @@ function shell(w: number, d: number, pick: Pick, floor = 0): Part[] {
 }
 
 /** One roof piece over every cell of a `w` × `d` box, `floor` cells up. */
-function roofs(w: number, d: number, piece: string, floor = 1, turned = 0): Part[] {
+export function roofs(w: number, d: number, piece: string, floor = 1, turned = 0): Part[] {
   const out: Part[] = []
   for (let i = 0; i < w; i++)
     for (let j = 0; j < d; j++)
@@ -72,7 +72,12 @@ const lodging =
   }
 
 /** A tower of kit pieces, each (name, height in the kit's units) on the last, drawn at `scale` × 5. */
-function stack(x: number, z: number, scale: number, pieces: readonly (readonly [string, number])[]): Part[] {
+export function stack(
+  x: number,
+  z: number,
+  scale: number,
+  pieces: readonly (readonly [string, number])[],
+): Part[] {
   let y = 0
   return pieces.map(([piece, height]) => {
     const part = at(piece, x, z, 0, y, scale)

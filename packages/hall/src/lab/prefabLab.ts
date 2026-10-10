@@ -20,10 +20,10 @@ import {
 } from "three"
 import { CIVIC_URL } from "../scene/civic.ts"
 import { LANDS_URL } from "../world/cast.ts"
-import { turn } from "../world/gen/tiles.ts"
-import { cellToWorld, HEX_SCALE } from "../world/lands.ts"
-import { instantiate, PREFABS, type Prefab, resolve, statsOf } from "../world/prefabs/index.ts"
+import { HEX_SCALE } from "../world/lands.ts"
+import { instantiate, resolve, statsOf } from "../world/prefabs/index.ts"
 import { draw } from "./islandLab.ts"
+import { drawing, ENTRIES, type Entry, layout, made, patch, varies } from "./prefabEntries.ts"
 import { createInspector } from "./prefabInspector.ts"
 import { markers, pieceInfo } from "./prefabMarks.ts"
 import { load } from "./stage.ts"
@@ -35,6 +35,7 @@ import { load } from "./stage.ts"
  *   ?lab=prefabs                      the whole catalogue, a row of five hexes a line
  *   &only=castle                      one prefab alone, close (and its inspector open)
  *   &show=house-row,bakery,inn        just those, side by side (to judge one kit against another)
+ *   &section=composites               just the composite landmarks (world/prefabs/composite), in their own section
  *   &seed=3                           the seeded variant (prefabs/variants.ts) of every prefab that has one
  *   &hour=11                          the sun (0–24); 18.5 is dusk, past 20 is night
  *   &kit=red                          the colour of the homes (blue, red, yellow, green)
@@ -48,9 +49,6 @@ import { load } from "./stage.ts"
  * `window.lab`: `view({az, el, dist, x, z})`, `only(id|"")`, `select(id|"")`, `seed(n)`, `ids()`.
  */
 
-/** World units between one prefab's anchor and the next (ring-1 prefabs need the room). */
-const SPACING = 46
-const PER_ROW = 5
 /** The inspector's width, so the view is shifted clear of it. */
 const PANEL = 328
 /** A hex's corner reach: its outline. */
@@ -95,15 +93,16 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
   const aim = new Vector3()
   const rig = { az: Number(params.get("az") ?? 20), el: Number(params.get("el") ?? 38), dist: 100 }
   let spin = params.get("spin") !== "0"
-  let shown: readonly Prefab[] = []
+  let shown: readonly Entry[] = []
   let anchors = new Map<string, [number, number]>()
   /** The prefab the inspector holds, whether it alone is drawn, and each one's chosen seed. */
-  let selected = PREFABS.find((item) => item.id === params.get("only"))
+  let selected = ENTRIES.find((item) => item.id === params.get("only"))
   let isolated = selected !== undefined
   const seeds = new Map<string, number>()
-  const listed = PREFABS.filter((item) => (params.get("show") ?? "").split(",").includes(item.id))
+  const listed = ENTRIES.filter((item) => (params.get("show") ?? "").split(",").includes(item.id))
+  const section = params.get("section")
   const defaultSeed = Math.max(0, Math.floor(Number(params.get("seed") ?? 0)) || 0)
-  const seedOf = (item: Prefab): number => (item.variation ? (seeds.get(item.id) ?? defaultSeed) : 0)
+  const seedOf = (item: Entry): number => (varies(item) ? (seeds.get(item.id) ?? defaultSeed) : 0)
   const labels = new Map<string, HTMLDivElement>()
   const outline = new Mesh(
     new RingGeometry(HEX - 0.35, HEX, 6),
@@ -118,7 +117,7 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
     prev: () => browse(-1),
     next: () => browse(1),
     vary: (delta: number) => {
-      if (selected?.variation) seeds.set(selected.id, Math.max(0, seedOf(selected) + delta))
+      if (selected && varies(selected)) seeds.set(selected.id, Math.max(0, seedOf(selected) + delta))
       refresh(true)
     },
     isolate: () => {
@@ -139,24 +138,26 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
     for (const mesh of drawn) scene.remove(mesh)
     for (const element of labels.values()) element.remove()
     labels.clear()
-    shown = isolated && selected ? [selected] : listed.length > 0 ? listed : PREFABS
-    anchors = new Map(
-      shown.map((item, n) => [item.id, [(n % PER_ROW) * SPACING, Math.floor(n / PER_ROW) * SPACING]]),
-    )
+    shown =
+      isolated && selected
+        ? [selected]
+        : listed.length > 0
+          ? listed
+          : ENTRIES.filter((item) => !section || item.section === section)
+    const grid = layout(shown)
+    anchors = grid.anchors
+    for (const heading of grid.headings) {
+      const element = inspector.label(heading.text)
+      labels.set(`#${heading.text}`, element)
+      element.dataset.at = `${heading.x},${heading.z}`
+    }
     const tiles = []
     const placements = []
     for (const item of shown) {
       const [x, z] = anchors.get(item.id) ?? [0, 0]
-      // A hex patch under it wide enough for its rings, and a cell or two round.
-      const radius = item.rings + 1
-      for (let dq = -radius; dq <= radius; dq++)
-        for (let dl = -2 * radius; dl <= 2 * radius; dl++) {
-          if ((dq - dl) % 2 !== 0) continue
-          const [tx, tz] = cellToWorld([dq, dl])
-          if (Math.hypot(tx, tz) > radius * 10 + 6) continue
-          tiles.push({ piece: "hex_grass" as const, x: x + tx, z: z + tz, rot: turn(0) })
-        }
-      placements.push(...instantiate(item, [x, z], 0, kit, 0, seedOf(item)))
+      tiles.push(...patch(item, x, z))
+      const [shape, seed] = drawing(item, seedOf(item), kit)
+      placements.push(...instantiate(shape, [x, z], 0, kit, 0, seed))
       const element = inspector.label(item.id)
       labels.set(item.id, element)
       element.dataset.at = `${x},${z + (item.rings + 0.6) * 10}`
@@ -167,18 +168,26 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
       mesh.receiveShadow = true
     }
     if (marked)
-      for (const item of shown) drawn.push(...markers(item, anchors.get(item.id) ?? [0, 0], seedOf(item)))
+      for (const item of shown) {
+        const [shape, seed] = drawing(item, seedOf(item), kit)
+        drawn.push(...markers(shape, anchors.get(item.id) ?? [0, 0], seed))
+      }
     scene.add(...drawn)
     const xs = [...anchors.values()].map(([x]) => x)
     const zs = [...anchors.values()].map(([, z]) => z)
     aim.set(
       (Math.min(...xs) + Math.max(...xs)) / 2,
-      isolated ? 3 : 0,
+      isolated ? (selected?.composite ? 8 : 3) : 0,
       (Math.min(...zs) + Math.max(...zs)) / 2,
     )
     const width = Math.max(...xs) - Math.min(...xs) + 40
     const depth = Math.max(...zs) - Math.min(...zs) + 40
-    rig.dist = Number(params.get("dist") ?? (isolated ? 62 : Math.max(width, depth * 1.4) * 1.5))
+    rig.dist = Number(
+      params.get("dist") ??
+        (isolated
+          ? 62 + Math.max(0, ...shown.map((item) => item.rings - 1)) * 40 + (selected?.composite ? 14 : 0)
+          : Math.max(width, depth * 1.4) * 1.5),
+    )
     light()
   }
 
@@ -197,21 +206,24 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
     }
     outline.position.set(at[0], 0.12, at[1])
     const seed = seedOf(selected)
-    const variant = selected.variation ? resolve(selected, seed, kit) : undefined
+    const shape = made(selected, seed, kit)
+    const landmark = "composite" in shape ? shape : undefined
+    const variant = landmark ?? (selected.prefab.variation ? resolve(selected.prefab, seed, kit) : undefined)
     inspector.show({
-      stats: statsOf(selected, seed, kit, info),
-      at: PREFABS.indexOf(selected) + 1,
-      of: PREFABS.length,
+      stats: statsOf(shape, landmark ? 0 : seed, kit, info),
+      at: ENTRIES.indexOf(selected) + 1,
+      of: ENTRIES.length,
       seed,
       ...(variant ? { variant } : {}),
-      props: variant ? variant.parts.length - selected.parts.length : 0,
+      ...(landmark ? { landmark } : {}),
+      props: !landmark && variant ? variant.parts.length - selected.prefab.parts.length : 0,
       isolated,
     })
   }
 
   const browse = (delta: number): void => {
-    const here = selected ? PREFABS.indexOf(selected) : delta > 0 ? -1 : 0
-    selected = PREFABS[(here + delta + PREFABS.length) % PREFABS.length]
+    const here = selected ? ENTRIES.indexOf(selected) : delta > 0 ? -1 : 0
+    selected = ENTRIES[(here + delta + ENTRIES.length) % ENTRIES.length]
     refresh(isolated)
   }
 
@@ -268,12 +280,12 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
       const item = anchors.get(id)
       element.style.left = `${((p.x + 1) / 2) * window.innerWidth}px`
       element.style.top = `${((1 - p.y) / 2) * window.innerHeight}px`
-      element.style.display = item && p.z < 1 ? "block" : "none"
+      element.style.display = (item || id.startsWith("#")) && p.z < 1 ? "block" : "none"
     }
   }
 
   /** The prefab under a click: the ground point it lands on, the nearest anchor within its hexes. */
-  const pick = (event: PointerEvent): Prefab | undefined => {
+  const pick = (event: PointerEvent): Entry | undefined => {
     const at = new Vector2(
       (event.clientX / window.innerWidth) * 2 - 1,
       -(event.clientY / window.innerHeight) * 2 + 1,
@@ -282,7 +294,7 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
     ray.setFromCamera(at, camera)
     const ground = ray.ray.intersectPlane(new Plane(new Vector3(0, 1, 0), 0), new Vector3())
     if (!ground) return undefined
-    let best: Prefab | undefined
+    let best: Entry | undefined
     let bestD = Number.POSITIVE_INFINITY
     for (const item of shown) {
       const [x = 0, z = 0] = anchors.get(item.id) ?? []
@@ -360,20 +372,20 @@ export async function start(root: HTMLElement, params: URLSearchParams): Promise
         aim.z = to.z ?? aim.z
       },
       only: (id: string) => {
-        selected = PREFABS.find((item) => item.id === id)
+        selected = ENTRIES.find((item) => item.id === id)
         isolated = selected !== undefined
         refresh(true)
       },
       select: (id: string) => {
-        selected = PREFABS.find((item) => item.id === id)
+        selected = ENTRIES.find((item) => item.id === id)
         refresh(isolated)
       },
       seed: (n: number) => {
-        if (selected?.variation) seeds.set(selected.id, n)
-        else for (const item of PREFABS) if (item.variation) seeds.set(item.id, n)
+        if (selected && varies(selected)) seeds.set(selected.id, n)
+        else for (const item of ENTRIES) if (varies(item)) seeds.set(item.id, n)
         refresh(true)
       },
-      ids: () => PREFABS.map((item) => item.id),
+      ids: () => ENTRIES.map((item) => item.id),
     },
   })
 }

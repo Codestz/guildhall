@@ -4072,7 +4072,8 @@ button {
   padding: 4px 9px 2px;
   font-size: 12px;
 }
-/* An island's name on the map: a plate in its language's colour that flies there. */
+/* An island's name on the map: a plate in its language's colour that flies there, set where the
+   layout put it (scene/archipelago/labels.ts: --dx, --dy), or a pip when there is no room. */
 .island-mark {
   display: flex;
   align-items: center;
@@ -4088,7 +4089,10 @@ button {
   white-space: nowrap;
   pointer-events: auto;
   cursor: pointer;
-  transition: transform 0.15s;
+  translate: var(--dx, 0px) var(--dy, 0px);
+  transition:
+    transform 0.15s,
+    translate 0.12s;
 }
 .island-mark:hover,
 .island-mark:focus-visible,
@@ -4111,15 +4115,76 @@ button {
   font-size: 15px;
   letter-spacing: 0.04em;
 }
-.island-mark-lang {
-  font-size: 12px;
-  color: var(--muted);
-}
+/* the language and the file count show on a hover; the plate is the name */
+.island-mark-lang,
 .island-mark-files {
+  display: none;
   font-size: 12px;
   color: var(--muted);
 }
-/* a phone's map is narrow: name, count and dot only */
+.island-mark:hover .island-mark-lang,
+.island-mark:hover .island-mark-files,
+.island-mark:focus-visible .island-mark-lang,
+.island-mark:focus-visible .island-mark-files,
+.island-mark[data-hover="true"] .island-mark-lang,
+.island-mark[data-hover="true"] .island-mark-files {
+  display: inline;
+}
+/* the core: the repo's own island, larger, in brass */
+.island-mark[data-core="true"] {
+  padding: 6px 14px 5px 11px;
+  gap: 9px;
+  background: rgba(46, 33, 17, 0.94);
+  border-bottom: 3px solid var(--brass-hi, #e6c36a);
+  box-shadow:
+    0 0 0 1px rgba(230, 195, 106, 0.6),
+    0 0 22px rgba(230, 195, 106, 0.28),
+    0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.island-mark[data-core="true"] .island-mark-name {
+  font-size: 19px;
+  letter-spacing: 0.06em;
+}
+.island-mark[data-core="true"] .island-swatch {
+  width: 12px;
+  height: 12px;
+}
+.island-mark-core {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brass-hi, #e6c36a);
+}
+/* no room for the plate: a pip in the island's colour; a hover brings the plate back */
+.island-mark[data-shown="false"]:not(:hover):not([data-hover="true"]):not(:focus-visible) {
+  padding: 0;
+  gap: 0;
+  width: 13px;
+  height: 13px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow:
+    0 0 0 2px rgba(20, 15, 11, 0.85),
+    0 1px 6px rgba(0, 0, 0, 0.5);
+  translate: 0 0;
+}
+.island-mark[data-shown="false"]:not(:hover):not([data-hover="true"]):not(:focus-visible) > * {
+  display: none;
+}
+/* the line back to an island whose plate sits off to one side: under the plates */
+.island-leader {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 1px;
+  transform-origin: 0 50%;
+  background: var(--accent);
+  opacity: 0.75;
+  pointer-events: none;
+}
+/* a phone's map is narrow: names and dots only */
 @media (max-width: 720px) {
   .island-mark {
     gap: 5px;
@@ -4128,11 +4193,11 @@ button {
   .island-mark-name {
     font-size: 12px;
   }
-  .island-mark-lang {
-    display: none;
+  .island-mark[data-core="true"] .island-mark-name {
+    font-size: 14px;
   }
-  .island-mark-files {
-    font-size: 10px;
+  .island-mark-core {
+    display: none;
   }
 }
 /* at work (the guild's adventurers) or quiet */

@@ -16,6 +16,7 @@ const archipelago = {
     { repo: "o/c", name: "c", at: [-300, 0], reach: 100 },
     { repo: "o/d", name: "d", at: [0, -300], reach: 90 },
   ],
+  links: [],
 } as unknown as Archipelago
 
 describe("the ring round the home island", () => {

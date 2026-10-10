@@ -8,7 +8,16 @@ export interface Frame {
   radius: number
 }
 
-/** The map: every island's land, centred on their bounding box, with a little sea round it. */
+/**
+ * How far a repo split into packages (`?repo=…&split`) centres its map on the core rather than on the
+ * middle of the sea: the core is what the map is about, so it sits near the middle of the view.
+ */
+const CORE_PULL = 0.6
+
+/**
+ * The map: every island's land with a little sea round it, centred on their bounding box, or (a split
+ * repo's) drawn towards the core, still holding every island.
+ */
 export function mapFrame(archipelago: Archipelago): Frame {
   let minX = Number.POSITIVE_INFINITY
   let maxX = Number.NEGATIVE_INFINITY
@@ -20,11 +29,15 @@ export function mapFrame(archipelago: Archipelago): Frame {
     minZ = Math.min(minZ, at[1] - reach)
     maxZ = Math.max(maxZ, at[1] + reach)
   }
-  return {
-    x: (minX + maxX) / 2,
-    z: (minZ + maxZ) / 2,
-    radius: (Math.max(maxX - minX, maxZ - minZ) / 2) * 1.08,
+  const middle = { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2 }
+  if (archipelago.links.length === 0) {
+    return { ...middle, radius: (Math.max(maxX - minX, maxZ - minZ) / 2) * 1.08 }
   }
+  const [cx, cz] = archipelago.home.at
+  const x = middle.x + (cx - middle.x) * CORE_PULL
+  const z = middle.z + (cz - middle.z) * CORE_PULL
+  const radius = Math.max(maxX - x, x - minX, maxZ - z, z - minZ) * 1.08
+  return { x, z, radius }
 }
 
 /** A stop's frame: the map's, or one island's (its keep, its reach). */

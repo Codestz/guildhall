@@ -15,13 +15,19 @@ export type HomePhase = "film" | "swap" | "invite" | "off"
 
 export const HOME_REPO = "facebook/react"
 
+/** Whether the home opens on React's growth film: off, the home is the archipelago itself. */
+const HOME_FILM = false
+
 /** Link params that leave the home as it is: the viewer's own (`gen=1`, `split=0`), or pure noise. */
 const KEPT = new Set(["showcase", "gen", "split", "quality", "hud", "fbclid"])
 
 export interface HomeLink {
   /** The repo's packages follow the film as an archipelago; false (`split=0`): it stays the one island. */
   split: boolean
-  /** The film plays: not with reduced motion (`reduced`), which opens straight on the packages. */
+  /**
+   * The film plays first. Off: the archipelago is the base, so the home opens straight on React's
+   * packages (the growth film stays at `?grow`). Kept as a switch for a redesigned film.
+   */
   film: boolean
 }
 
@@ -34,7 +40,7 @@ export function homeOf(search: string, reduced: boolean, mode = MODE): HomeLink 
   const params = new URLSearchParams(search)
   for (const key of params.keys()) if (!KEPT.has(key) && !key.startsWith("utm_")) return null
   const split = (params.get("split") ?? "").toLowerCase()
-  return { split: split !== "0" && split !== "false", film: !reduced }
+  return { split: split !== "0" && split !== "false", film: HOME_FILM && !reduced }
 }
 
 type Listener = () => void

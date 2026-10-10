@@ -5,9 +5,9 @@ import type { GrowthFilm } from "../src/world/chronicle/growthControl.ts"
 import type { GrowthCaption } from "../src/world/chronicle/growthStory.ts"
 
 describe("the showcase home's link", () => {
-  test("a bare / is the home: film, then split", () => {
-    expect(homeOf("", false, "showcase")).toEqual({ split: true, film: true })
-    expect(homeOf("?showcase", false, "showcase")).toEqual({ split: true, film: true })
+  test("a bare / is the home: straight to the archipelago, no film", () => {
+    expect(homeOf("", false, "showcase")).toEqual({ split: true, film: false })
+    expect(homeOf("?showcase", false, "showcase")).toEqual({ split: true, film: false })
   })
 
   test("reduced motion plays no film", () => {
@@ -15,8 +15,8 @@ describe("the showcase home's link", () => {
   })
 
   test("split=0 keeps the one island; gen=1 and utm noise leave it the home", () => {
-    expect(homeOf("?split=0", false, "showcase")).toEqual({ split: false, film: true })
-    expect(homeOf("?gen=1&utm_source=x", false, "showcase")).toEqual({ split: true, film: true })
+    expect(homeOf("?split=0", false, "showcase")).toEqual({ split: false, film: false })
+    expect(homeOf("?gen=1&utm_source=x", false, "showcase")).toEqual({ split: true, film: false })
   })
 
   test("a link that asks for something else is not the home", () => {

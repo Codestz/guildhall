@@ -10,6 +10,8 @@
  */
 import { createHash } from "node:crypto"
 import { patchesOf } from "../packages/hall/src/scene/archipelago/footprint.ts"
+import { pathOn } from "../packages/hall/src/scene/voyage.ts"
+import { type Sea, toSea } from "../packages/hall/src/world/abroad.ts"
 import { unkey } from "../packages/hall/src/world/gen/hex.ts"
 import { islandFromTree } from "../packages/hall/src/world/gen/islandFromTree.ts"
 import type { Tree } from "../packages/hall/src/world/gen/load.ts"
@@ -56,6 +58,7 @@ for (const fixture of FIXTURES)
       districts: hash(made.districts),
       identity: hash(world.identity),
       main: hash(world.main),
+      hall: hash(world.hall),
       sites: hash(world.storySites),
       water: hash(world.water),
       trails: hash(world.trails),
@@ -94,6 +97,17 @@ for (const fixture of FIXTURES) {
   const { archipelago, home } = grown
   const net = netFor(archipelago, home)
   const islands = [archipelago.home, ...archipelago.islands]
+  // The ways on foot from each far hall's first spot to its first quay (scene/voyage.ts): the roads and the hall's own lanes.
+  const sea: Sea = {
+    home: { id: archipelago.home.id, at: archipelago.home.at, world: home },
+    far: archipelago.islands.map((one) => ({ id: one.id, at: one.at, world: one.world })),
+    net,
+  }
+  const ways = sea.far.map((isle, i) => {
+    const spot = isle.world.hall?.spots[0]
+    const quay = archipelago.islands[i]?.quays[0]
+    return spot && quay ? pathOn(sea, isle, toSea(isle, [spot.post[0], spot.post[1]]), quay.at) : []
+  })
   console.log(
     `${fixture.repo}#split`,
     `slices:${hash(split.slices.map((s) => [s.id, s.kind, s.files]))}`,
@@ -104,6 +118,8 @@ for (const fixture of FIXTURES) {
     `lanes:${hash(net.routes.map((route) => route.lane?.pts))}`,
     `bridges:${hash(net.routes.map((route) => route.bridge?.path))}`,
     `identities:${hash(islands.map((one) => [one.id, "world" in one ? one.world.identity : undefined]))}`,
-    `landmarks:${(archipelago.islands.map((one) => one.world.main?.id)).join(",")}`,
+    `landmarks:${archipelago.islands.map((one) => one.world.main?.id).join(",")}`,
+    `halls:${hash(archipelago.islands.map((one) => one.world.hall))}`,
+    `ways:${hash(ways)}`,
   )
 }

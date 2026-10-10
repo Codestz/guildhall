@@ -10,6 +10,8 @@ import { type Relief, reliefOf, reliefOver } from "./gen/relief/index.ts"
 import { joinRoads, type TrailNet, trailsOf } from "./gen/relief/trails.ts"
 import type { Folder } from "./gen/repo.ts"
 import { dressRivers, riversOf } from "./gen/rivers/index.ts"
+import { venueOfHall, withHall } from "./hall/roads.ts"
+import type { Hall } from "./hall/types.ts"
 import type { Home } from "./homes.ts"
 import {
   type Cell,
@@ -125,6 +127,8 @@ export interface World {
   homes?: readonly Home[]
   /** A gen 2 island's main building, its heart (world/gen/dress/main.ts): where it stands, its focal point and its doors. */
   main?: MainBuilding
+  /** A far island's hall, before its main building's door (world/hall): a venue (kind "hall") too. */
+  hall?: Hall
   identity?: IslandIdentity
   repo?: RepoInfo
 }
@@ -242,10 +246,11 @@ export function repoParts(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
   const { open, decor } = standing(made.venues, island.decor)
   // A mountain or a river that took the ground under a house took the house.
   const homes = made.homes.filter((home) => !covered(home.door.step[0], home.door.step[1]))
+  const walked = trails && trails.trails.length > 0 ? joinRoads(made.roads, trails) : made.roads
   return {
     kind: "repo",
     island: decor === island.decor ? island : { ...island, decor },
-    roads: trails && trails.trails.length > 0 ? joinRoads(made.roads, trails) : made.roads,
+    roads: made.hall ? withHall(walked, made.hall) : walked,
     land: new Map([...land].map(([id, hex]) => [id, { char: hex.char, district: hex.district }])),
     levels: made.levels,
     ...(rivers ? { riverHexes: rivers.hexes } : {}),
@@ -254,7 +259,10 @@ export function repoParts(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
     ...(trails && trails.trails.length > 0 ? { trails } : {}),
     sites: [...districts, ...moved],
     storySites,
-    ...(open.length > 0 ? { venues: open } : {}),
+    ...(open.length > 0 || made.hall
+      ? { venues: [...open, ...(made.hall ? [venueOfHall(made.hall)] : [])] }
+      : {}),
+    ...(made.hall ? { hall: made.hall } : {}),
     ...(homes.length > 0 ? { homes } : {}),
     ...(made.main ? { main: made.main } : {}),
     ...(made.plan.identity && made.plan.shape

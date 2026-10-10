@@ -1,5 +1,16 @@
 import type { Change, SeaEvent } from "@guildhall/core"
-import { type Chapter, factions, parties, party, rush, sagaTale, seas, solo, type Tale } from "@guildhall/sim"
+import {
+  type Chapter,
+  crossing,
+  factions,
+  parties,
+  party,
+  rush,
+  sagaTale,
+  seas,
+  solo,
+  type Tale,
+} from "@guildhall/sim"
 
 /** The told stories the sim feed (guild/feeds/sim.ts) plays: Settings → Story, a deep link's `story`. */
 
@@ -10,12 +21,14 @@ export const RUSH: { count?: number } = {}
 export type Told = Change[] | (Tale & { sea?: readonly SeaEvent[] })
 
 export const SCENARIOS: Record<
-  "saga" | "party" | "solo" | "rush" | "parties" | "factions" | "seas",
+  "saga" | "party" | "solo" | "rush" | "parties" | "factions" | "seas" | "crossing",
   () => Told
 > = {
   /** The showcase's story: five acts, ~17 min watched, every world event (sim/saga.ts). */
   saga: () => sagaTale(),
   party: () => party(),
+  /** A party working across a monorepo's packages: on its archipelago they cross to the packages' islands (sim/crossing.ts). */
+  crossing: () => crossing(),
   solo: () => solo(),
   rush: () => rush(RUSH.count),
   /** Three conversations at once: several parties on one island (guild/parties.ts). */

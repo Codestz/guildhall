@@ -27,6 +27,7 @@ export type Stops = Record<Slot, readonly Stop[]>
 
 /** What a venue's work looks like. */
 const WORK_CLIP: Readonly<Record<VenueKind, string>> = {
+  hall: "Interact",
   forge: "Hammering",
   library: "Working_B",
   market: "Interact",

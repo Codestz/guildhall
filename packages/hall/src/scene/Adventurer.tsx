@@ -228,7 +228,7 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
   /** What draws them (scene/body.ts). Made in a layout effect, below: a mount (StrictMode's second one too) gets its own. */
   const body = useRef<Body | null>(null)
   /** Where they walk and which way they face (scene/brain.ts). */
-  const [brain] = useState(() => new Brain(id))
+  const [brain] = useState(() => new Brain(id, () => store.time / 1000))
   /** The work loop at this adventurer's place, and what their hands show (scene/activity.ts). */
   const routine = useRef<Routine | null>(null)
   const hands = useRef<Hands | null>(null)
@@ -442,7 +442,7 @@ function Figure({ view, onGone, selected, following, banners, dark, crowd = null
         beat(work, node)
       }
     }
-    const clip = holding ? "Spawn_Ground" : clipFor(view, walking, speed, looping ? work : null)
+    const clip = holding ? "Spawn_Ground" : clipFor(view, walking, speed, looping ? work : null, brain.riding)
     hands.current?.show(looping ? work.held : null, active, clip)
     // Carrying takes both hands: the trade's own gear is put away meanwhile.
     if (rightHeld.current) rightHeld.current.visible = !carrying

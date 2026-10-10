@@ -1,5 +1,6 @@
 import { useMemo } from "react"
 import { DEV } from "../../guild/devFlags.ts"
+import { setSeaNet } from "../../world/abroad.ts"
 import { type Archipelago, useArchipelago } from "../../world/archipelagoSource.ts"
 import { type Wall, wallFrom } from "../../world/bridgeWalls.ts"
 import type { Spot } from "../../world/layout.ts"
@@ -15,7 +16,11 @@ export function bridgeMaxOf(): number {
 
 /** The archipelago's links, made concrete once (world/splitLinks.ts `netFor`). */
 export function useLinkNet(archipelago: Archipelago): LinkNet {
-  return useMemo(() => netFor(archipelago, worldSource.world, bridgeMaxOf()), [archipelago])
+  return useMemo(() => {
+    const net = netFor(archipelago, worldSource.world, bridgeMaxOf())
+    setSeaNet(net)
+    return net
+  }, [archipelago])
 }
 
 const NONE: readonly Wall[] = []

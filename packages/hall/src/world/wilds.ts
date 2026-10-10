@@ -1,8 +1,10 @@
 import { DMath } from "./dmath.ts"
 import FOREST from "./forest.json"
-import { type Cell, cellToWorld, HEX_SCALE, MAP_FOR_TESTS, PIECES, SITES, toPlot } from "./lands.ts"
+import { covers } from "./hall/site.ts"
+import { type Cell, cellToWorld, MAP_FOR_TESTS, SITES, toPlot } from "./lands.ts"
 import { ROOM, type Spot } from "./layout.ts"
-import { type Light, lightsOf, toSegment } from "./lights.ts"
+import { toSegment } from "./lights.ts"
+import { box, type Ground, groundOf } from "./wildGround.ts"
 import { handWorld, type Terrain, type World } from "./world.ts"
 
 /**
@@ -55,9 +57,8 @@ const PATH_CLEARANCE = 1.2
 const POST_CLEARANCE = 2
 /** Off a torch or lantern: no canopy over a flame, no bush hiding a lamp's foot. */
 const LIGHT_CLEARANCE = 2.4
-/** Off any other decor's footprint (fences, crates, hex trees), and more off a building's walls. */
+/** Off any other decor's footprint (fences, crates, hex trees), and more off a building's walls (wildGround.ts). */
 const DECOR_CLEARANCE = 0.6
-const BUILDING_CLEARANCE = 1.6
 /**
  * From a water hex's centre: its edge is 5 away, and a coast tile's sand slopes down for ~3 more
  * (measured from hex_coast_A: level 3 units in, −0.5 at 2), so anything closer would float.
@@ -112,13 +113,6 @@ function footprint(piece: WildPiece): number {
   return Math.max(-x0, x1, -z0, z1)
 }
 
-/** A manifest bounding box's ground extent. */
-function box({ min, max }: { min: number[]; max: number[] }) {
-  const [x0 = 0, , z0 = 0] = min
-  const [x1 = 0, , z1 = 0] = max
-  return { x0, z0, x1, z1 }
-}
-
 /** Small enough to drop at lower quality. */
 function detailOf(kind: WildKind, piece: WildPiece, radius: number): Wild["detail"] {
   if (kind === "tree" || piece === BARE) return 0
@@ -139,82 +133,6 @@ export function hash(x: number, z: number, salt: number): number {
 const pick = <T>(list: readonly T[], roll: number): T =>
   list[Math.floor(roll * list.length) % list.length] as T
 
-// ---- The map, as obstacles ---------------------------------------------------------------------
-
-/** A world's ground, as what the wilds must keep clear of. */
-interface Ground {
-  hand: boolean
-  terrain: Terrain
-  roads: (readonly [Spot, Spot])[]
-  sea: Spot[]
-  river: Spot[]
-  posts: Spot[]
-  /** How adventurers reach their posts: straight from the nearest road node. */
-  approaches: (readonly [Spot, Spot])[]
-  reserved: (readonly [Spot, Spot])[] // lanes sites reserve (a bridge's way), 7.5 off each side
-  /** Every placed land piece (buildings, fences, crates, hex trees…) as a circle on the ground. */
-  decor: { x: number; z: number; r: number }[]
-  lights: readonly Light[]
-}
-
-function groundOf(world: World): Ground {
-  const hand = world.kind === "hand"
-  const { terrain } = world
-  const { nodes: graph, edges } = world.roads
-  const roads: (readonly [Spot, Spot])[] = edges.flatMap(([a, b]) => {
-    const from = graph[a]
-    const to = graph[b]
-    return from && to ? [[from, to] as const] : []
-  })
-  // The keep's gate apron: the avenue's drawn stub from the gate up to the road hex nearest it
-  // (the hand map's OUT; a repo island's avenue).
-  const gate: Spot = [0, ROOM.depth / 2]
-  let out: Spot | undefined
-  for (const at of Object.values(graph))
-    if (
-      !out ||
-      DMath.hypot(at[0] - gate[0], at[1] - gate[1]) < DMath.hypot(out[0] - gate[0], out[1] - gate[1])
-    )
-      out = at
-  if (out) roads.push([gate, out])
-  const nodes = Object.values(graph)
-  const isSea = (w: Spot) => ["~", "o"].includes(terrain.at(MAP_FOR_TESTS.cellOf(w)))
-  const posts: Spot[] = world.sites.flatMap((site) => site.posts.map((p) => [p[0], p[1]] as Spot))
-  return {
-    hand,
-    terrain,
-    roads,
-    sea: world.island.water.filter(isSea),
-    river: world.island.water.filter((w) => !isSea(w)),
-    posts,
-    reserved: world.sites.flatMap((site) => site.reserved ?? []),
-    approaches: posts.map((post) => {
-      let best = nodes[0] as Spot
-      for (const node of nodes)
-        if (
-          DMath.hypot(node[0] - post[0], node[1] - post[1]) <
-          DMath.hypot(best[0] - post[0], best[1] - post[1])
-        )
-          best = node
-      return [best, post] as const
-    }),
-    decor: world.island.decor.map((d) => {
-      const { x0, z0, x1, z1 } = box(PIECES[d.piece])
-      const scale = HEX_SCALE * (d.scale ?? 1)
-      const cx = ((x0 + x1) / 2) * scale
-      const cz = ((z0 + z1) / 2) * scale
-      const rot = d.rot ?? 0
-      return {
-        x: d.x + cx * DMath.cos(rot) + cz * DMath.sin(rot),
-        z: d.z - cx * DMath.sin(rot) + cz * DMath.cos(rot),
-        r:
-          (Math.max(x1 - x0, z1 - z0) / 2) * scale +
-          (d.piece.startsWith("building_") ? BUILDING_CLEARANCE : 0),
-      }
-    }),
-    lights: lightsOf(world),
-  }
-}
 /** The yard's growing building isn't in decor (scene/Island.tsx swaps it): a home at 1.5×. */
 const YARD_RADIUS = 4.5
 
@@ -259,6 +177,7 @@ function clear(
   if (ground.roads.some(([a, b]) => toSegment([x, z], a, b) < ROAD_HALF + r)) return false
   if (ground.approaches.some(([a, b]) => toSegment([x, z], a, b) < PATH_CLEARANCE + r)) return false
   if (ground.reserved.some(([a, b]) => toSegment([x, z], a, b) < 7.5 + r)) return false
+  if (ground.hall && covers(ground.hall, x, z, r + 1)) return false
   if (ground.posts.some((p) => DMath.hypot(p[0] - x, p[1] - z) < POST_CLEARANCE + r)) return false
   if (ground.hand) {
     const yard = SITES.yard.at

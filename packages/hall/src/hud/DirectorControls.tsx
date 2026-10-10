@@ -30,6 +30,7 @@ const STORIES: Record<ScenarioId, string> = {
   parties: "Parties",
   factions: "Factions",
   seas: "Seas",
+  crossing: "Crossing",
 }
 
 /**

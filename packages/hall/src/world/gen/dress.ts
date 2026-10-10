@@ -1,4 +1,6 @@
 import { DMath } from "../dmath.ts"
+import { anchorsOf, covers, dropLoose, footprintOf, hallFor } from "../hall/site.ts"
+import type { Hall } from "../hall/types.ts"
 import type { Home } from "../homes.ts"
 import { cellToWorld, type Island, type LandPiece, type LandPlacement } from "../lands.ts"
 import { type Post, ROOM, type Spot } from "../layout.ts"
@@ -65,6 +67,8 @@ export interface RepoIsland {
   homes: Home[]
   /** Generator v2: the island's main building, its heart (dress/main.ts). */
   main?: MainBuilding
+  /** A far island's hall, standing before its main building's door (world/hall). */
+  hall?: Hall
 }
 
 /** Props (a barrel, a cart) of a lot or yard stand off the keep's room and its wall, a wall's width round it. */
@@ -96,18 +100,20 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
     ...(civic?.clear ?? []).map(([x, z, r]): Anchor => [x, z, r + 3]),
     ...(civic?.wall ?? []).map(([x, z]): Anchor => [x, z, 8.5]),
   ]
+  // A far island's hall, before the town: its lots and its meadow keep clear of it (world/hall/site.ts).
+  const hall = hallFor(plan, civic)
+  if (hall && civic) dropLoose(civic, hall)
+  if (hall) civicAnchors.push(...anchorsOf(hall))
   const venues =
     plan.gen === 2
-      ? venuesOf(
-          plan,
-          roads,
-          civicAnchors,
-          coverOf(plan, terrace.levels),
-          footprintsOf(civic?.placements.filter((item) => !civic.walls.includes(item)) ?? []),
-        )
+      ? venuesOf(plan, roads, civicAnchors, coverOf(plan, terrace.levels), [
+          ...footprintsOf(civic?.placements.filter((item) => !civic.walls.includes(item)) ?? []),
+          ...(hall ? [footprintOf(hall)] : []),
+        ])
       : []
   const clear: Anchor[] = [
     ...(civic?.clear ?? []),
+    ...(hall ? anchorsOf(hall) : []),
     ...venues.map(({ venue }): Anchor => [venue.at[0], venue.at[1], VENUE_CLEAR]),
   ]
   // What the lots keep clear of: the civic centre's buildings and wall, and the venues'.
@@ -156,6 +162,7 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
       (item) =>
         own.has(item) ||
         (!vacated.has(key(cellAt([item.x, item.z]))) &&
+          !(hall && CLUTTER.test(item.piece) && covers(hall, item.x, item.z, 2)) &&
           (!CLUTTER.test(item.piece) ||
             venues.every(
               ({ venue }) => DMath.hypot(item.x - venue.at[0], item.z - venue.at[1]) > VENUE_CLEAR + 2,
@@ -233,6 +240,7 @@ export function dress(plan: IslandPlan, fame?: Fame): RepoIsland {
     roads: { nodes: roads.nodes, edges: roads.edges },
     districts,
     venues: venues.map(({ venue }) => venue),
+    ...(hall ? { hall } : {}),
     homes,
     ...(civic?.main ? { main: civic.main } : {}),
   }

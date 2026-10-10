@@ -6,6 +6,7 @@ import { groundAt, pace, route } from "../world/paths.ts"
 import { DESTINATIONS } from "../world/sites.ts"
 import { CARRY_WALK } from "./activity.ts"
 import { Visiting } from "./visit.ts"
+import { Voyage } from "./voyage.ts"
 
 /**
  * An adventurer's brain (scene/Adventurer.tsx): where they walk, which way they face and which clip
@@ -44,8 +45,19 @@ export class Brain {
   private readonly routed = { x: Number.NaN, z: Number.NaN }
   private readonly stride: Stride = { walking: false, speed: 0, remaining: 0, carrying: false }
 
-  constructor(who: string) {
+  /** Crossing to another island, and walking its roads and its hall (scene/voyage.ts). */
+  readonly voyage: Voyage
+  private tripKey = ""
+  /** Aboard a ferry this frame, or stepping across to or from it: they stand, whatever the deed. */
+  riding = false
+
+  constructor(
+    who: string,
+    /** The story's clock, seconds: the ferries sail by it. */
+    private readonly now: () => number = () => 0,
+  ) {
     this.visit = new Visiting(who)
+    this.voyage = new Voyage(who)
   }
 
   /**
@@ -60,11 +72,25 @@ export class Brain {
     holding: boolean,
     delta: number,
   ): Stride {
-    const leg = this.visit.leg()
-    const aim = leg?.to ?? (looping && work ? work.aim : view.target)
+    // Bound for another island, or on one: the voyage says how (roads, a hall's lane, a ferry, a bridge).
+    const trip = holding ? undefined : this.voyage.aim(view, [node.position.x, node.position.z], this.now())
+    this.riding = trip?.ride !== undefined
+    if (trip?.ride) return this.ride(node, trip.ride, delta)
+    const ground = trip?.ground ?? groundAt
+    const leg = trip ? undefined : this.visit.leg()
+    const aim = trip
+      ? (trip.path[trip.path.length - 1] as Spot)
+      : (leg?.to ?? (looping && work ? work.aim : view.target))
     const tx = aim[0]
     const tz = aim[1]
-    if (this.routed.x !== tx || this.routed.z !== tz) {
+    if (trip) {
+      if (this.tripKey !== trip.key) {
+        this.tripKey = trip.key
+        this.path = [...trip.path]
+        this.routed.x = Number.NaN
+      }
+    } else if (this.tripKey || this.routed.x !== tx || this.routed.z !== tz) {
+      this.tripKey = ""
       this.routed.x = tx
       this.routed.z = tz
       const from: Spot = [node.position.x, node.position.z]
@@ -90,9 +116,9 @@ export class Brain {
     const carrying = looping && work !== null && work.held !== null
     const leaving = view.phase === "leaving"
     // On a mountain the ground has a grade (a gen 2 island's trails): a slower pace uphill, and a lean into it.
-    const here = groundAt(node.position.x, node.position.z)
-    const mountain = here > 0.3 || groundAt(nx, nz) > 0.3
-    const grade = walking && step > 0.01 ? (groundAt(nx, nz) - here) / step : 0
+    const here = ground(node.position.x, node.position.z)
+    const mountain = here > 0.3 || ground(nx, nz) > 0.3
+    const grade = walking && step > 0.01 ? (ground(nx, nz) - here) / step : 0
     let speed = 0
     if (walking) {
       // A hike keeps its own pace: the far-trip run (MAX_WALK_S) is for the flat.
@@ -112,7 +138,7 @@ export class Brain {
       if (face) turn(node, Math.atan2(face[0] - node.position.x, face[1] - node.position.z), delta * 6)
       else if (work.atPost) turn(node, view.target[2], delta * 5)
     } else {
-      turn(node, leg?.face ?? view.target[2], delta * 5)
+      turn(node, trip?.face ?? leg?.face ?? view.target[2], delta * 5)
     }
     // In bed: up onto the mattress. The post is at floor level beside it, so lying down there
     // put them on the floor under the bed (the user: "they sleep below the bed").
@@ -130,16 +156,43 @@ export class Brain {
     this.visit.update(view.visit, !walking, delta, node)
     return out
   }
+
+  /** Aboard a ferry (or stepping across to it): put where the voyage says, turned with the boat, standing. */
+  private ride(
+    node: Object3D,
+    at: { x: number; y: number; z: number; heading: number },
+    delta: number,
+  ): Stride {
+    node.position.set(at.x, at.y, at.z)
+    node.rotation.x = 0
+    turn(node, at.heading, delta * 6)
+    const out = this.stride
+    out.walking = false
+    out.speed = 0
+    out.remaining = 0
+    out.carrying = false
+    return out
+  }
 }
 
 /**
  * Which clip the moment calls for. Clip names are KayKit Rig_Medium (scripts/assets.ts CLIPS);
  * `work` is the routine when its loop is running.
  */
-export function clipFor(view: AdventurerView, walking: boolean, speed: number, work: Routine | null): string {
+export function clipFor(
+  view: AdventurerView,
+  walking: boolean,
+  speed: number,
+  work: Routine | null,
+  riding = false,
+): string {
   const moving = work?.held ? CARRY_WALK : speed > RUN_ABOVE ? "Running_A" : "Walking_A"
   if (walking) return moving
+  if (riding) return "Idle_A"
   if (view.stung) return "Hit_A"
+  // At a seat or station of a far island's hall (world/hall): sat at a desk, or at the bench's work.
+  if (view.hall?.spot && view.phase === "working")
+    return view.hall.seat ? view.hall.clip : view.look || view.thinking ? view.hall.clip : "Idle_A"
   switch (view.phase) {
     case "resting":
       return view.seat === "floor" ? "Sit_Floor_Idle" : "Sit_Chair_Idle"

@@ -2,35 +2,59 @@ import type { BufferGeometry } from "three"
 import { type Bridge, DECK_EDGES, deckAt, PARAPET, RAIL_WIDTH } from "../../world/bridges.ts"
 import type { Quay } from "../../world/linkStub.ts"
 import { SEA_Y } from "../Ships.tsx"
+import { BED, COBBLE, COOL, courses, PALE, SHADE, STONE, tone } from "./bridgeStone.ts"
 import { jitter, Shapes, type V3 } from "./shapes.ts"
 
 /**
- * Bridges as one mesh: a stone body (fascia, an arched underside between piers, solid piers and
- * ramps), a paved deck and parapets on both sides, in the island kit's muted stone. Every bridge of
- * an archipelago is merged into one geometry, so they all cost one draw call.
+ * Bridges as one mesh, in the island's own stone: dressed in courses (scene/links/bridgeStone.ts),
+ * painted from the land pack's palette so the island's light and shadow fall on them as on its own
+ * walls. Arched spans on chunky piers with cutwaters, a dark intrados under each arch ringed by its
+ * voussoirs, a bevelled coping on the parapets, a paved deck with a kerb beside the rail bed, and
+ * on a long bridge two towers at its middle pier. Every bridge of an archipelago is merged into one
+ * geometry: one draw call, however many.
  */
 
-const STONE = 0x9a9488
-const FASCIA = 0x8a857a
-const PAVING = 0xb9b09d
-const CAP = 0xc9c1ae
-const DARK = 0x5d5a54
-const BALLAST = 0x77705f
-/** A parapet's height, and a lantern post's above it. */
+/** A parapet's height; the coping is the top of it. */
 export const PARAPET_H = 1.05
-export const POST_H = 2.5
+const COPING = 0.2
 /** A tower rises this far over the parapet. */
 const TOWER_H = 3.4
 /** The slab under the deck. */
 const SLAB = 0.8
 /** How far down the piers and ramps go: into the seabed. */
 const BOTTOM = -3.2
-/** A pier is this thick along the axis. */
-const PIER_HALF = 1.5
+/** A pier is this thick along the axis, and its buttress stands out this far to either side of the body. */
+const PIER_HALF = 1.9
+const FLARE = 0.5
+/** A cutwater's point stands out this far past the buttress. */
+const PROW = 1.4
 /** Mesh sampling along the axis. */
 const STEP = 1.6
 /** The arches spring from just over the water. */
 const SPRING = SEA_Y + 0.5
+/** The voussoirs' ring round an arch, and the coping's overhang and bevel. */
+const RING = 0.6
+const OVERHANG = 0.16
+const BEVEL = 0.14
+
+/** A bridge's frame: points and directions on the axis that starts at its first landing. */
+interface Frame {
+  /** The point at distance `s` along the axis, `side` to its right, `y` up. */
+  at(s: number, side: number, y: number): V3
+  /** A direction: `across` (to the axis's right), `along` it, and `up`. */
+  dir(across: number, along: number, up: number): V3
+  heading: number
+}
+
+function frameOf(bridge: Bridge, a: Quay): Frame {
+  const ux = Math.sin(bridge.heading)
+  const uz = Math.cos(bridge.heading)
+  return {
+    at: (s, side, y) => [a.land[0] + ux * s + uz * side, y, a.land[1] + uz * s - ux * side],
+    dir: (across, along, up) => [uz * across + ux * along, up, -ux * across + uz * along],
+    heading: bridge.heading,
+  }
+}
 
 /** A piece of the axis: an arched span between piers, or solid (a pier, a ramp). */
 interface Piece {
@@ -54,24 +78,13 @@ function piecesOf(bridge: Bridge): Piece[] {
   return pieces
 }
 
+const [LEFT, RIGHT] = DECK_EDGES
+const BODY_L = LEFT - PARAPET
+const BODY_R = RIGHT + PARAPET
+
 /** Adds `bridge`, which starts at quay `a`'s landing, to `shapes`. */
 export function addBridge(shapes: Shapes, bridge: Bridge, a: Quay): void {
-  const ux = Math.sin(bridge.heading)
-  const uz = Math.cos(bridge.heading)
-  /** The point `side` to the right of the axis at distance `s`, at height `y`. */
-  const at = (s: number, side: number, y: number): V3 => [
-    a.land[0] + ux * s + uz * side,
-    y,
-    a.land[1] + uz * s - ux * side,
-  ]
-  const [leftEdge, rightEdge] = DECK_EDGES
-  const bodyL = leftEdge - PARAPET
-  const bodyR = rightEdge + PARAPET
-  const outRight: V3 = [uz, 0, -ux]
-  const outLeft: V3 = [-uz, 0, ux]
-  const forward: V3 = [ux, 0, uz]
-  const back: V3 = [-ux, 0, -uz]
-
+  const f = frameOf(bridge, a)
   for (const piece of piecesOf(bridge)) {
     const n = Math.max(1, Math.round((piece.to - piece.from) / STEP))
     const centre = (piece.from + piece.to) / 2
@@ -84,153 +97,235 @@ export function addBridge(shapes: Shapes, bridge: Bridge, a: Quay): void {
       const u = Math.min(1, Math.abs(s - centre) / reach)
       return SPRING + rise * Math.sqrt(1 - u * u)
     }
+    /** Where the plain courses stop: an arch's voussoir ring starts there. */
+    const stoneTo = (s: number): number =>
+      piece.arch ? Math.min(under(s) + RING, deckAt(bridge, s) - 0.3) : BOTTOM
+    const wallTop = (s: number): number => deckAt(bridge, s) + PARAPET_H - COPING
+    const deck = (s: number): number => deckAt(bridge, s)
     for (let k = 0; k < n; k++) {
       const s0 = piece.from + ((piece.to - piece.from) * k) / n
       const s1 = piece.from + ((piece.to - piece.from) * (k + 1)) / n
-      const y0 = deckAt(bridge, s0)
-      const y1 = deckAt(bridge, s1)
       const block = Math.floor(s0 / STEP)
-      const stone = 0.9 + 0.2 * jitter(block, piece.from)
-      // Paved deck between the parapets.
-      shapes.quad(
-        at(s0, leftEdge, y0),
-        at(s1, leftEdge, y1),
-        at(s1, rightEdge, y1),
-        at(s0, rightEdge, y0),
-        [0, 1, 0],
-        PAVING,
-        0.95 + 0.1 * jitter(block, 3),
-      )
-      // The rail lane's bed: ballast laid along the right, a kerb between it and the walkway.
-      const bed = rightEdge - RAIL_WIDTH + 0.3
-      shapes.quad(
-        at(s0, bed, y0 + 0.04),
-        at(s1, bed, y1 + 0.04),
-        at(s1, rightEdge, y1 + 0.04),
-        at(s0, rightEdge, y0 + 0.04),
-        [0, 1, 0],
-        BALLAST,
-        0.9 + 0.2 * jitter(block, 11),
-      )
-      shapes.box(
-        at((s0 + s1) / 2, bed - 0.12, (y0 + y1) / 2 + 0.1),
-        [0.12, 0.1, (s1 - s0) / 2],
-        bridge.heading,
-        CAP,
-      )
+      paveDeck(shapes, f, [s0, s1], [deck(s0), deck(s1)], block)
       for (const side of [-1, 1] as const) {
-        const out = side > 0 ? outRight : outLeft
-        // Parapet: top, outer and inner faces; the fascia below runs from the underside up to the deck.
-        const inner = side < 0 ? leftEdge : rightEdge
-        const outer = side < 0 ? bodyL : bodyR
-        shapes.quad(
-          at(s0, inner, y0 + PARAPET_H),
-          at(s1, inner, y1 + PARAPET_H),
-          at(s1, outer, y1 + PARAPET_H),
-          at(s0, outer, y0 + PARAPET_H),
-          [0, 1, 0],
-          CAP,
-          0.95 + 0.1 * jitter(block, 5),
-        )
-        shapes.quad(
-          at(s0, outer, y0 + PARAPET_H),
-          at(s1, outer, y1 + PARAPET_H),
-          at(s1, outer, y1),
-          at(s0, outer, y0),
-          out,
-          STONE,
-          stone,
-        )
-        shapes.quad(
-          at(s0, inner, y0 + PARAPET_H),
-          at(s1, inner, y1 + PARAPET_H),
-          at(s1, inner, y1),
-          at(s0, inner, y0),
-          [-out[0], 0, -out[2]],
-          STONE,
-          stone * 0.95,
-        )
-        shapes.quad(
-          at(s0, outer, y0),
-          at(s1, outer, y1),
-          at(s1, outer, under(s1)),
-          at(s0, outer, under(s0)),
-          out,
-          FASCIA,
-          stone,
-        )
+        const inner = side < 0 ? LEFT : RIGHT
+        const outer = side < 0 ? BODY_L : BODY_R
+        const plane = (c: number) => (s: number, y: number) => f.at(s, c, y)
+        // The outer face in courses from the coping down to the arch's ring (or the seabed), the inner down to the deck.
+        courses(shapes, plane(outer), [s0, s1], wallTop, stoneTo, f.dir(side, 0, 0), block)
+        courses(shapes, plane(inner), [s0, s1], wallTop, deck, f.dir(-side, 0, 0), block, 0.95)
+        const y0 = deck(s0)
+        const y1 = deck(s1)
+        coping(shapes, f, [s0, s1], [y0, y1], [inner, outer], side, block)
+        // A projecting band where the parapet meets the fascia: a shadow line the length of the bridge.
+        const lip = outer + side * 0.14
+        const along = (c: number, h: number): readonly [V3, V3] => [f.at(s0, c, y0 + h), f.at(s1, c, y1 + h)]
+        const [o0, o1] = along(outer, 0.22)
+        const [l0, l1] = along(lip, 0.22)
+        const [d0, d1] = along(lip, 0)
+        shapes.quad(o0, o1, l1, l0, [0, 1, 0], PALE, 1.05)
+        shapes.quad(l0, l1, d1, d0, f.dir(side, 0, 0), PALE, 0.95)
+        if (piece.arch) {
+          // The voussoirs: alternate blocks of the ring round the arch, pale and cool.
+          const ring = tone(block % 2 === 0 ? PALE : COOL, 0.1 + (jitter(block, 9) - 0.5) * 0.12)
+          shapes.quad(
+            f.at(s0, outer, stoneTo(s0)),
+            f.at(s1, outer, stoneTo(s1)),
+            f.at(s1, outer, under(s1)),
+            f.at(s0, outer, under(s0)),
+            f.dir(side, 0, 0),
+            ring,
+          )
+        }
       }
-      if (piece.arch) {
+      if (piece.arch)
         // The arch's underside, dark in its shade.
-        const lo0 = under(s0)
-        const lo1 = under(s1)
         shapes.quad(
-          at(s0, bodyL, lo0),
-          at(s1, bodyL, lo1),
-          at(s1, bodyR, lo1),
-          at(s0, bodyR, lo0),
+          f.at(s0, BODY_L, under(s0)),
+          f.at(s1, BODY_L, under(s1)),
+          f.at(s1, BODY_R, under(s1)),
+          f.at(s0, BODY_R, under(s0)),
           [0, -1, 0],
-          DARK,
-          0.9 + 0.2 * jitter(block, 7),
+          tone(SHADE, (jitter(block, 7) - 0.5) * 0.14),
         )
-      }
     }
-    // The faces across the axis: a pier's or ramp's ends, and an arch's spandrel ends.
-    for (const [s, out] of [
-      [piece.from, back],
-      [piece.to, forward],
-    ] as const) {
-      if (piece.arch) continue
-      const y = deckAt(bridge, s)
-      shapes.quad(
-        at(s, bodyL, BOTTOM),
-        at(s, bodyR, BOTTOM),
-        at(s, bodyR, y),
-        at(s, bodyL, y),
-        out,
-        DARK,
-        0.85,
-      )
-    }
+    // The faces across the axis: a pier's or ramp's ends.
+    if (!piece.arch)
+      for (const [s, along] of [
+        [piece.from, -1],
+        [piece.to, 1],
+      ] as const)
+        shapes.quad(
+          f.at(s, BODY_L, BOTTOM),
+          f.at(s, BODY_R, BOTTOM),
+          f.at(s, BODY_R, deckAt(bridge, s)),
+          f.at(s, BODY_L, deckAt(bridge, s)),
+          f.dir(0, along, 0),
+          SHADE,
+          0.95,
+        )
+  }
+  for (const s of bridge.piers) pier(shapes, f, s)
+}
+
+/** The paved deck between the parapets: cobbles, and the rail lane's bed of ballast along the right behind a pale kerb. */
+function paveDeck(
+  shapes: Shapes,
+  f: Frame,
+  [s0, s1]: readonly [number, number],
+  [y0, y1]: readonly [number, number],
+  block: number,
+): void {
+  const bed = RIGHT - RAIL_WIDTH + 0.3
+  const up: V3 = [0, 1, 0]
+  shapes.quad(
+    f.at(s0, LEFT, y0),
+    f.at(s1, LEFT, y1),
+    f.at(s1, bed, y1),
+    f.at(s0, bed, y0),
+    up,
+    tone(COBBLE, (jitter(block, 3) - 0.5) * 0.18),
+  )
+  shapes.quad(
+    f.at(s0, bed, y0 + 0.04),
+    f.at(s1, bed, y1 + 0.04),
+    f.at(s1, RIGHT, y1 + 0.04),
+    f.at(s0, RIGHT, y0 + 0.04),
+    up,
+    tone(BED, (jitter(block, 11) - 0.5) * 0.2),
+  )
+  shapes.box(
+    f.at((s0 + s1) / 2, bed - 0.12, (y0 + y1) / 2 + 0.1),
+    [0.12, 0.1, (s1 - s0) / 2],
+    f.heading,
+    PALE,
+  )
+}
+
+/**
+ * A parapet's coping on `side`: a pale stone that overhangs the wall a little, with a bevel each side
+ * of its flat top (`inner` and `outer`: the parapet's faces across the axis).
+ */
+function coping(
+  shapes: Shapes,
+  f: Frame,
+  [s0, s1]: readonly [number, number],
+  [y0, y1]: readonly [number, number],
+  [inner, outer]: readonly [number, number],
+  side: -1 | 1,
+  block: number,
+): void {
+  const a = inner - side * OVERHANG
+  const b = outer + side * OVERHANG
+  const tint = tone(PALE, (jitter(block, 5) - 0.5) * 0.12)
+  // [across, height above the deck] of the coping's profile, from its inner foot up and over to the outer foot.
+  const profile: readonly (readonly [number, number])[] = [
+    [a, PARAPET_H - COPING],
+    [a, PARAPET_H - 0.08],
+    [a + side * BEVEL, PARAPET_H],
+    [b - side * BEVEL, PARAPET_H],
+    [b, PARAPET_H - 0.08],
+    [b, PARAPET_H - COPING],
+  ]
+  for (let i = 0; i + 1 < profile.length; i++) {
+    const [c0, h0] = profile[i] as readonly [number, number]
+    const [c1, h1] = profile[i + 1] as readonly [number, number]
+    // Outward from the stone: to the left of the way the profile runs.
+    const out = f.dir(-(h1 - h0) * side, 0, (c1 - c0) * side)
+    shapes.quad(
+      f.at(s0, c0, y0 + h0),
+      f.at(s1, c0, y1 + h0),
+      f.at(s1, c1, y1 + h1),
+      f.at(s0, c1, y0 + h1),
+      out,
+      tint,
+      1.06,
+    )
   }
 }
 
-/** Towers flanking the deck at a long bridge's middle pier: two stone turrets with a cap. */
+/**
+ * A pier at distance `s`: a buttress a little wider than the body, down to the seabed and up to the
+ * arches' springing, capped with a pale impost, and on each side a cutwater, a prow of stone that
+ * parts the tide.
+ */
+function pier(shapes: Shapes, f: Frame, s: number): void {
+  const top = SPRING + 1
+  const mid = (BODY_L + BODY_R) / 2
+  const half = (BODY_R - BODY_L) / 2 + FLARE
+  const l = PIER_HALF + 0.25
+  shapes.box(f.at(s, mid, (BOTTOM + top) / 2), [half, (top - BOTTOM) / 2, l], f.heading, STONE, 1.02)
+  shapes.box(f.at(s, mid, top + 0.1), [half + 0.18, 0.1, l + 0.18], f.heading, PALE)
+  for (const side of [-1, 1] as const) {
+    const edge = mid + side * half
+    const tip = mid + side * (half + PROW)
+    const peak = SPRING + 0.2
+    // Two sloping faces meeting at the prow, and its sloping top.
+    shapes.quad(
+      f.at(s - l, edge, BOTTOM),
+      f.at(s, tip, BOTTOM),
+      f.at(s, tip, peak),
+      f.at(s - l, edge, top),
+      f.dir(side, -0.7, 0),
+      STONE,
+      0.95,
+    )
+    shapes.quad(
+      f.at(s + l, edge, BOTTOM),
+      f.at(s, tip, BOTTOM),
+      f.at(s, tip, peak),
+      f.at(s + l, edge, top),
+      f.dir(side, 0.7, 0),
+      STONE,
+      0.9,
+    )
+    shapes.tri(
+      f.at(s - l, edge, top),
+      f.at(s + l, edge, top),
+      f.at(s, tip, peak),
+      f.dir(side * 0.3, 0, 1),
+      PALE,
+      1.02,
+    )
+  }
+}
+
+/** Towers flanking the deck at a long bridge's middle pier: two stone turrets with a cap and a low roof. */
 function addTowers(shapes: Shapes, bridge: Bridge, a: Quay): void {
-  const ux = Math.sin(bridge.heading)
-  const uz = Math.cos(bridge.heading)
-  const [left, right] = DECK_EDGES
+  const f = frameOf(bridge, a)
   for (const s of bridge.towers) {
     const top = bridge.deck + PARAPET_H + TOWER_H
-    for (const side of [left - PARAPET - 0.2, right + PARAPET + 0.2]) {
-      const at = (y: number): V3 => [a.land[0] + ux * s + uz * side, y, a.land[1] + uz * s - ux * side]
-      shapes.box(at((top - 1) / 2), [1.2, (top + 1) / 2, 1.4], bridge.heading, STONE, 1.05)
-      shapes.box(at(top + 0.2), [1.5, 0.2, 1.7], bridge.heading, CAP)
+    for (const side of [LEFT - PARAPET - 0.2, RIGHT + PARAPET + 0.2]) {
+      shapes.box(f.at(s, side, (top - 1) / 2), [1.2, (top + 1) / 2, 1.4], f.heading, STONE, 1.05)
+      shapes.box(f.at(s, side, top + 0.2), [1.5, 0.2, 1.7], f.heading, PALE)
+      const peak = f.at(s, side, top + 1.9)
+      const corners = [
+        f.at(s - 1.5, side - 1.3, top + 0.4),
+        f.at(s - 1.5, side + 1.3, top + 0.4),
+        f.at(s + 1.5, side + 1.3, top + 0.4),
+        f.at(s + 1.5, side - 1.3, top + 0.4),
+      ]
+      const outs = [f.dir(0, -1, 0.6), f.dir(1, 0, 0.6), f.dir(0, 1, 0.6), f.dir(-1, 0, 0.6)]
+      for (const [i, out] of outs.entries())
+        shapes.tri(corners[i] as V3, corners[(i + 1) % 4] as V3, peak, out, SHADE, 0.75 + 0.1 * i)
     }
   }
 }
 
-/** The lantern posts on a bridge's parapets (iron pole, a small house) and where their flames burn. */
-function addLamps(shapes: Shapes, bridge: Bridge): V3[] {
-  return bridge.lamps.map(([x, z, y]) => {
-    const base = y + PARAPET_H
-    shapes.box([x, base + POST_H / 2, z], [0.13, POST_H / 2, 0.13], bridge.heading, 0x3c3a3e)
-    shapes.box([x, base + POST_H + 0.22, z], [0.22, 0.22, 0.22], bridge.heading, 0xffd9a0, 1.4)
-    return [x, base + POST_H + 0.25, z]
-  })
-}
+/** Where a bridge's torches stand: the base of each, on a parapet's coping. */
+const lampPosts = (bridge: Bridge): V3[] => bridge.lamps.map(([x, z, y]): V3 => [x, y + PARAPET_H, z])
 
-/** Every bridge of an archipelago in one geometry, and its lanterns' flames (null when there are no bridges). */
+/** Every bridge of an archipelago in one geometry, and where its torches stand; null when there are no bridges. */
 export function bridgeGeometry(
   bridges: readonly { bridge: Bridge; from: Quay }[],
-): { geometry: BufferGeometry; flames: V3[] } | null {
+): { geometry: BufferGeometry; posts: V3[] } | null {
   if (bridges.length === 0) return null
   const shapes = new Shapes()
-  const flames: V3[] = []
+  const posts: V3[] = []
   for (const { bridge, from } of bridges) {
     addBridge(shapes, bridge, from)
     addTowers(shapes, bridge, from)
-    flames.push(...addLamps(shapes, bridge))
+    posts.push(...lampPosts(bridge))
   }
-  return { geometry: shapes.geometry(), flames }
+  return { geometry: shapes.geometry(), posts }
 }

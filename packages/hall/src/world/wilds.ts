@@ -53,6 +53,8 @@ export const ROAD_HALF = 2.6
 const PATH_CLEARANCE = 1.2
 /** Room round a work post to swing an axe. */
 const POST_CLEARANCE = 2
+/** Half the width of a lane a site reserves: a bridge's deck and its parapets, and a little more. */
+const RESERVED_HALF = 7.5
 /** Off a torch or lantern: no canopy over a flame, no bush hiding a lamp's foot. */
 const LIGHT_CLEARANCE = 2.4
 /** Off any other decor's footprint (fences, crates, hex trees), and more off a building's walls. */
@@ -151,6 +153,8 @@ interface Ground {
   posts: Spot[]
   /** How adventurers reach their posts: straight from the nearest road node. */
   approaches: (readonly [Spot, Spot])[]
+  /** Lanes the sites reserved (a bridge's head and ramp), kept clear of anything that grows. */
+  reserved: (readonly [Spot, Spot])[]
   /** Every placed land piece (buildings, fences, crates, hex trees…) as a circle on the ground. */
   decor: { x: number; z: number; r: number }[]
   lights: readonly Light[]
@@ -186,6 +190,7 @@ function groundOf(world: World): Ground {
     sea: world.island.water.filter(isSea),
     river: world.island.water.filter((w) => !isSea(w)),
     posts,
+    reserved: world.sites.flatMap((site) => site.reserved ?? []),
     approaches: posts.map((post) => {
       let best = nodes[0] as Spot
       for (const node of nodes)
@@ -256,6 +261,7 @@ function clear(
   if (ground.river.some((w) => DMath.hypot(w[0] - x, w[1] - z) < RIVER_CLEARANCE + r)) return false
   if (ground.roads.some(([a, b]) => toSegment([x, z], a, b) < ROAD_HALF + r)) return false
   if (ground.approaches.some(([a, b]) => toSegment([x, z], a, b) < PATH_CLEARANCE + r)) return false
+  if (ground.reserved.some(([a, b]) => toSegment([x, z], a, b) < RESERVED_HALF + r)) return false
   if (ground.posts.some((p) => DMath.hypot(p[0] - x, p[1] - z) < POST_CLEARANCE + r)) return false
   if (ground.hand) {
     const yard = SITES.yard.at

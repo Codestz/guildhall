@@ -1,6 +1,7 @@
 import type { CiState, SeaEvent } from "@guildhall/core"
 import { CAPS, type Caps, docketAt, MAX_BERTHS } from "../../guild/docket.ts"
-import { pushedClear, type Wall } from "../../world/bridgeWalls.ts"
+import { clearOf, pushedClear, type Wall } from "../../world/bridgeWalls.ts"
+import type { Spot } from "../../world/layout.ts"
 import {
   along,
   BERTH,
@@ -267,10 +268,14 @@ export function toWorldClear(
 /** Where the lighthouse should stand, in the harbour's frame: on the shore east of the quay. */
 const LIGHTHOUSE_NEAR = { side: 70, out: -24 }
 
+/** The lighthouse keeps this far off a bridge's axis (its deck, its head and ramp) and from a quay. */
+const LIGHTHOUSE_OFF = { wall: 22, quay: 14 }
+
 /**
  * The lighthouse's spot: the beach hex (a coast tile) nearest the shore east of the quay with
- * nothing placed on it, so it stands where the land meets the sea. Undefined on an island without
- * a free coast.
+ * nothing placed on it, so it stands where the land meets the sea. Never where a bridge lands
+ * (`walls`, island-local) or at a quay (`quays`): the tower is no part of the bridge's head. Undefined
+ * on an island without a free coast.
  */
 export function lighthouseSpot(
   island: {
@@ -278,6 +283,7 @@ export function lighthouseSpot(
     decor: readonly { x: number; z: number }[]
   },
   h: Harbour,
+  keepOff: { walls?: readonly Wall[]; quays?: readonly Spot[] } = {},
 ): { x: number; z: number } | undefined {
   const near = toWorld(h, LIGHTHOUSE_NEAR.side, LIGHTHOUSE_NEAR.out)
   let best: { x: number; z: number } | undefined
@@ -286,6 +292,8 @@ export function lighthouseSpot(
     if (!tile.piece.startsWith("hex_coast")) continue
     if (island.decor.some((d) => Math.hypot(d.x - tile.x, d.z - tile.z) < 5)) continue
     if (Math.hypot(tile.x - h.x, tile.z - h.z) < 18) continue
+    if (keepOff.walls && !clearOf(keepOff.walls, tile.x, tile.z, LIGHTHOUSE_OFF.wall)) continue
+    if (keepOff.quays?.some((q) => Math.hypot(q[0] - tile.x, q[1] - tile.z) < LIGHTHOUSE_OFF.quay)) continue
     const d = Math.hypot(tile.x - near.x, tile.z - near.z)
     if (d < bestD) {
       bestD = d

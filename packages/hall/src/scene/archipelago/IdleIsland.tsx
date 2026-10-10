@@ -25,6 +25,7 @@ import { sky } from "../atmosphere/state.ts"
 import { bakeNode } from "../events/common.ts"
 import { mergePlacements, useKit } from "../Kit.tsx"
 import { Pools } from "../lights/StreetLights.tsx"
+import { useBridgeWalls, useIslandQuays } from "../links/useLinkNet.ts"
 import { useOwnedMeshes } from "../owned.ts"
 import { watersOf } from "../Ships.tsx"
 import { harbourOf, lighthouseSpot } from "../seas/fleet.ts"
@@ -101,7 +102,12 @@ const BEAM_LENGTH = 70
 export function Lighthouse() {
   const world = useWorld()
   const lands = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
-  const spot = useMemo(() => lighthouseSpot(world.island, harbourOf(watersOf(world).quay)), [world])
+  const walls = useBridgeWalls()
+  const quays = useIslandQuays()
+  const spot = useMemo(
+    () => lighthouseSpot(world.island, harbourOf(watersOf(world).quay), { walls, quays }),
+    [world, walls, quays],
+  )
   const built = useOwnedMeshes(() => {
     const source = lands.nodes.building_tower_A_blue
     const baked = source ? bakeNode(source) : null

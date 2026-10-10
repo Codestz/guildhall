@@ -56,6 +56,8 @@ export interface WorkPlace {
   at: Spot
   posts: readonly Post[]
   wilds: { mix: Mix; barren?: boolean }
+  /** Lanes the wilds keep off, as segments from here (a bridge's head: world/quays.ts `withQuays`). */
+  reserved?: readonly (readonly [Spot, Spot])[]
 }
 
 /** What a repo island was grown from, for the HUD. */

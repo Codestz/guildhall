@@ -18,7 +18,7 @@ import {
 } from "three"
 import { useGuildStore } from "../../guild/useGuild.ts"
 import type { Archipelago } from "../../world/archipelagoSource.ts"
-import { SHIPS_URL } from "../../world/cast.ts"
+import { KIT_URL, LANDS_URL, SHIPS_URL } from "../../world/cast.ts"
 import { type FerryState, ferryAt } from "../../world/ferrySchedule.ts"
 import type { LinkNet, LinkRoute } from "../../world/linkNet.ts"
 import { halos } from "../atmosphere/Lamps.tsx"
@@ -28,6 +28,7 @@ import { FRAME } from "../frame.ts"
 import { useOwnedMeshes } from "../owned.ts"
 import { SEA_Y } from "../Ships.tsx"
 import { bridgeGeometry } from "./bridgeMesh.ts"
+import { flamesOf, torchMesh } from "./bridgeTorches.ts"
 import { dockGeometry, dockLampOf } from "./dockMesh.ts"
 import type { V3 } from "./shapes.ts"
 import { useLinkNet } from "./useLinkNet.ts"
@@ -39,7 +40,8 @@ import { useLinkNet } from "./useLinkNet.ts"
  *
  * Batched: every bridge is one mesh, every dock one, every ferry one instanced hull, their wakes
  * one, and every lantern's flame (docks, bridges, the ferries' bow and stern) one more of halos:
- * five draw calls however many links. Nothing here casts into the static shadow map.
+ * six draw calls however many links (the bridges' torches are one more instanced mesh). Nothing here
+ * casts into the static shadow map.
  */
 
 /** The ferry's hull: a Kenney ship (scene/Ships.tsx), sitting this deep in the water (model units). */
@@ -94,40 +96,63 @@ function wakeGeometry(): BufferGeometry {
   return geometry
 }
 
+/** A copy of the land pack's material (every hex tile shares it): the island's own stone, light and shadow. */
+function landMaterialOf(nodes: Record<string, Object3D>): MeshStandardMaterial | undefined {
+  let found: MeshStandardMaterial | undefined
+  nodes.hex_grass?.traverse((child) => {
+    const mesh = child as Mesh
+    if (!found && mesh.isMesh) found = (mesh.material as MeshStandardMaterial).clone()
+  })
+  return found
+}
+
 /** The ferries: those routes with a timetable. */
 const ferriesOf = (net: LinkNet): LinkRoute[] => net.routes.filter((route) => route.table)
 
 export default function LinksLayer({ archipelago }: { archipelago: Archipelago }) {
   const store = useGuildStore()
   const ships = useGLTF(SHIPS_URL) as unknown as { nodes: Record<string, Object3D> }
+  const lands = useGLTF(LANDS_URL) as unknown as { nodes: Record<string, Object3D> }
+  const kit = useGLTF(KIT_URL) as unknown as { nodes: Record<string, Object3D> }
   const net = useLinkNet(archipelago)
   const ferries = useMemo(() => ferriesOf(net), [net])
 
-  /** Stone and timber: bridges, docks, and the lanterns' flames. Static but for the flames. */
-  const fixed = useOwnedMeshes(() => {
-    const meshes: Mesh[] = []
-    const material = new MeshStandardMaterial({ vertexColors: true, roughness: 0.92, flatShading: true })
-    const flames: V3[] = []
-    const bridges = bridgeGeometry(
-      net.routes.flatMap((route) => (route.bridge ? [{ bridge: route.bridge, from: route.quays[0] }] : [])),
-    )
-    if (bridges) {
-      meshes.push(
-        Object.assign(new Mesh(bridges.geometry, material), { name: "bridges", receiveShadow: true }),
+  /**
+   * Stone and timber: bridges, docks, and the lanterns' flames. Static but for the flames. The bridges
+   * are painted in the land pack's palette, in a copy of the island's own material (its texture is
+   * shared, never freed here); the docks' timber is vertex-coloured.
+   */
+  const fixed = useOwnedMeshes(
+    () => {
+      const meshes: Mesh[] = []
+      const timber = new MeshStandardMaterial({ vertexColors: true, roughness: 0.92, flatShading: true })
+      const flames: V3[] = []
+      const bridges = bridgeGeometry(
+        net.routes.flatMap((route) => (route.bridge ? [{ bridge: route.bridge, from: route.quays[0] }] : [])),
       )
-      flames.push(...bridges.flames)
-    }
-    const quays = ferries.flatMap((route) => route.quays)
-    const docks = dockGeometry(quays)
-    if (docks) {
-      meshes.push(Object.assign(new Mesh(docks, material), { name: "docks", receiveShadow: true }))
-      flames.push(...quays.map(dockLampOf))
-    }
-    // Flames: the fixed ones first, then two a ferry.
-    const lamps = halos(flames.length + ferries.length * LANTERNS.length)
-    lamps.name = "link-lamps"
-    return { meshes: [...meshes, lamps], flames, lamps }
-  }, [net, ferries])
+      const stone = landMaterialOf(lands.nodes)
+      if (bridges && stone) {
+        meshes.push(
+          Object.assign(new Mesh(bridges.geometry, stone), { name: "bridges", receiveShadow: true }),
+        )
+        const torch = kit.nodes.torch ? bakeNode(kit.nodes.torch) : null
+        if (torch) meshes.push(torchMesh(torch, bridges.posts))
+        flames.push(...flamesOf(bridges.posts))
+      }
+      const quays = ferries.flatMap((route) => route.quays)
+      const docks = dockGeometry(quays)
+      if (docks) {
+        meshes.push(Object.assign(new Mesh(docks, timber), { name: "docks", receiveShadow: true }))
+        flames.push(...quays.map(dockLampOf))
+      }
+      // Flames: the fixed ones first, then two a ferry.
+      const lamps = halos(flames.length + ferries.length * LANTERNS.length)
+      lamps.name = "link-lamps"
+      return { meshes: [...meshes, lamps], flames, lamps }
+    },
+    [net, ferries, lands.nodes, kit.nodes],
+    "textures",
+  )
 
   /** The ferries and their wakes, one instanced mesh each; the hull's palette belongs to the ship pack. */
   const boats = useOwnedMeshes(

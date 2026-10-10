@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test"
 import type { SeaEvent } from "@guildhall/core"
 import { watersOf } from "../src/scene/Ships.tsx"
-import { harbourOf, type SeaSighting, seaAt, toWorld, toWorldClear } from "../src/scene/seas/fleet.ts"
+import {
+  harbourOf,
+  lighthouseSpot,
+  type SeaSighting,
+  seaAt,
+  toWorld,
+  toWorldClear,
+} from "../src/scene/seas/fleet.ts"
 import {
   BRIDGE_CLEAR,
   clearOf,
@@ -14,8 +21,10 @@ import { type FerryState, ferryAt } from "../src/world/ferrySchedule.ts"
 import { laneClear, laneOf } from "../src/world/lanes.ts"
 import { trackAt, trackOf } from "../src/world/laps.ts"
 import type { Spot } from "../src/world/layout.ts"
+import { toSegment } from "../src/world/lights.ts"
 import type { Quay } from "../src/world/linkStub.ts"
 import { APRON, apronProblem, BUILDING, HEAD } from "../src/world/quays.ts"
+import { wildsOf } from "../src/world/wilds.ts"
 import { reachOf } from "../src/world/world.ts"
 import { SLOW } from "./support/slow.ts"
 import { reactSplit } from "./support/splitFixture.ts"
@@ -205,6 +214,51 @@ describe("React, an archipelago of its packages", () => {
       expect(heads).toBeGreaterThan(0)
       expect(reachOf(home)).toBeGreaterThan(0)
       expect(bare).toBe(heads)
+    },
+    60_000 * SLOW,
+  )
+
+  test(
+    "no lighthouse stands on a bridge's head or its ramp",
+    async () => {
+      const { archipelago, net, home } = await sea
+      for (const info of [archipelago.home, ...archipelago.islands]) {
+        const world =
+          info.id === archipelago.home.id ? home : archipelago.islands.find((i) => i.id === info.id)?.world
+        if (!world) continue
+        const walls = net.walls.map((wall) => wallFrom(wall, info.at))
+        const quays = info.quays.map((quay) => quay.local)
+        const spot = lighthouseSpot(world.island, harbourOf(watersOf(world).quay), { walls, quays })
+        if (spot) expect(clearOf(walls, spot.x, spot.z, 22)).toBe(true)
+      }
+    },
+    60_000 * SLOW,
+  )
+
+  test(
+    "nothing grows on a bridge's way over land: no tree or rock within its deck's width",
+    async () => {
+      const { archipelago, home } = await sea
+      let lanes = 0
+      for (const info of [archipelago.home, ...archipelago.islands]) {
+        const world =
+          info.id === archipelago.home.id ? home : archipelago.islands.find((i) => i.id === info.id)?.world
+        if (!world) continue
+        for (const q of info.quays) {
+          if (archipelago.links[q.link]?.kind !== "bridge") continue
+          const far = [archipelago.home, ...archipelago.islands]
+            .flatMap((i) => i.quays)
+            .find((o) => o.link === q.link && o !== q)
+          const span = far ? Math.hypot(far.at[0] - q.at[0], far.at[1] - q.at[1]) : 12
+          const from: Spot = [q.local[0] - q.facing[0] * 9, q.local[1] - q.facing[1] * 9]
+          const to: Spot = [q.local[0] + q.facing[0] * span, q.local[1] + q.facing[1] * span]
+          lanes++
+          for (const wild of wildsOf(world)) {
+            expect(toSegment([wild.x, wild.z], from, to)).toBeGreaterThanOrEqual(7.5 + wild.radius - 1e-6)
+          }
+        }
+      }
+      expect(lanes).toBe(8)
     },
     60_000 * SLOW,
   )

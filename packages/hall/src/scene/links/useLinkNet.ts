@@ -2,6 +2,7 @@ import { useMemo } from "react"
 import { PROBE } from "../../guild/mode.ts"
 import { type Archipelago, useArchipelago } from "../../world/archipelagoSource.ts"
 import { type Wall, wallFrom } from "../../world/bridgeWalls.ts"
+import type { Spot } from "../../world/layout.ts"
 import type { LinkNet } from "../../world/linkNet.ts"
 import { BRIDGE_MAX } from "../../world/linkStub.ts"
 import { useWorld, worldSource } from "../../world/source.ts"
@@ -33,5 +34,18 @@ export function useBridgeWalls(): readonly Wall[] {
     const net = netFor(archipelago, worldSource.world, bridgeMaxOf())
     const centre = archipelago.islands.find((island) => island.world === world)?.at ?? archipelago.home.at
     return net.walls.map((wall) => wallFrom(wall, centre))
+  }, [archipelago, world])
+}
+
+const NO_SPOTS: readonly Spot[] = []
+
+/** The quays of the island being drawn, island-local: where its bridges and ferries land. */
+export function useIslandQuays(): readonly Spot[] {
+  const archipelago = useArchipelago()
+  const world = useWorld()
+  return useMemo(() => {
+    if (!archipelago) return NO_SPOTS
+    const island = archipelago.islands.find((one) => one.world === world) ?? archipelago.home
+    return island.quays.map((quay) => quay.local)
   }, [archipelago, world])
 }

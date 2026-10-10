@@ -25,7 +25,7 @@ import { LANDS_URL, SHIPS_URL } from "../../world/cast.ts"
 import { useWorld } from "../../world/source.ts"
 import { bakeNode, hash01 } from "../events/common.ts"
 import { FRAME } from "../frame.ts"
-import { useBridgeWalls } from "../links/useLinkNet.ts"
+import { useBridgeWalls, useIslandQuays } from "../links/useLinkNet.ts"
 import { useOwnedMeshes } from "../owned.ts"
 import { SEA_Y, watersOf } from "../Ships.tsx"
 import {
@@ -110,7 +110,11 @@ export default function SeasLayer() {
   const harbour = useMemo(() => harbourOf(watersOf(world).quay), [world])
   // The bridges are walls to a ship (world/bridgeWalls.ts): voyages that would cross one are kept clear.
   const walls = useBridgeWalls()
-  const lighthouse = useMemo(() => lighthouseSpot(world.island, harbour), [world, harbour])
+  const quays = useIslandQuays()
+  const lighthouse = useMemo(
+    () => lighthouseSpot(world.island, harbour, { walls, quays }),
+    [world, harbour, walls, quays],
+  )
   const layer = useOwnedMeshes(
     () => build(ships.nodes, seas.nodes, lands.nodes, lighthouse, harbour),
     [ships.nodes, seas.nodes, lands.nodes, lighthouse, harbour],

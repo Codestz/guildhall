@@ -2,7 +2,7 @@ import { crossingsOf, extentOf, type Footprint, mainLanguage, type Shore } from 
 import type { Archipelago, FarIsland, IslandInfo, PatchesOf } from "./archipelagoSource.ts"
 import type { Tree } from "./gen/load.ts"
 import { type Slice, splitRepo } from "./gen/split.ts"
-import { withQuays } from "./quays.ts"
+import { APRON, withQuays } from "./quays.ts"
 import { layoutSplit } from "./repoArchipelago.ts"
 import { growWorldAsync } from "./source.ts"
 import { reachOf, type World } from "./world.ts"
@@ -84,7 +84,18 @@ export async function growSplit(tree: Tree, patchesOf: PatchesOf): Promise<Grown
     }
   })
   const [home, ...far] = infos as [IslandInfo, ...IslandInfo[]]
-  const worlds = kept.map(({ world }, i) => withQuays(world, layout.quays[i] ?? []))
+  const worlds = kept.map(({ world }, i) =>
+    withQuays(
+      world,
+      (layout.quays[i] ?? []).map((quay) => {
+        if (layout.links[quay.link]?.kind !== "bridge") return quay
+        // The bridge runs to the partner's quay: the whole way is kept clear.
+        const other = layout.quays.flat().find((q) => q.link === quay.link && q !== quay)
+        const span = other ? Math.hypot(other.at[0] - quay.at[0], other.at[1] - quay.at[1]) : APRON.ahead
+        return { ...quay, span }
+      }),
+    ),
+  )
   const islands: FarIsland[] = far.map((info, i) => ({ ...info, world: worlds[i + 1] as World }))
   const shores: Shore[] = infos
   return {

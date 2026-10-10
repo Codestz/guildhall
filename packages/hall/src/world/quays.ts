@@ -196,12 +196,15 @@ function roadFor(world: World, spot: Spot): string | undefined {
  * sea): a post, so the wilds keep off it and lanterns stand by it (world/wilds.ts, world/lights.ts), and a
  * road node `Q<n>` joined to the network, so the router walks to it. A new world; the one given is not changed.
  */
-export function withQuays(world: World, quays: readonly { local: Spot; facing: Spot }[]): World {
+export function withQuays(
+  world: World,
+  quays: readonly { local: Spot; facing: Spot; span?: number }[],
+): World {
   if (quays.length === 0) return world
   const nodes: Record<string, Spot> = { ...world.roads.nodes }
   const edges: (readonly [string, string])[] = [...world.roads.edges]
   const costs = world.roads.costs ? [...world.roads.costs] : undefined
-  const sites = quays.map(({ local, facing }, n) => {
+  const sites = quays.map(({ local, facing, span }, n) => {
     const id = `Q${n}`
     nodes[id] = local
     const to = roadFor(world, local)
@@ -210,7 +213,22 @@ export function withQuays(world: World, quays: readonly { local: Spot; facing: S
       costs?.push(distance(local, world.roads.nodes[to] as Spot))
     }
     const post: Post = [local[0], local[1], DMath.atan2(facing[0], facing[1])]
-    return { at: local, posts: [post], wilds: { mix: { grass: 0.6, rock: 0.4 } } }
+    // A bridge (`span`: its length) keeps its apron and its whole way over land clear of what grows.
+    const reserved: [Spot, Spot][] =
+      span === undefined
+        ? []
+        : [
+            [
+              [local[0] - facing[0] * APRON.back, local[1] - facing[1] * APRON.back],
+              [local[0] + facing[0] * span, local[1] + facing[1] * span],
+            ],
+          ]
+    return {
+      at: local,
+      posts: [post],
+      wilds: { mix: { grass: 0.6, rock: 0.4 } },
+      ...(reserved.length > 0 ? { reserved } : {}),
+    }
   })
   return {
     ...world,

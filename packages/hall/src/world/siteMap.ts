@@ -1,4 +1,5 @@
 import { activeWorld } from "./active.ts"
+import { DMath } from "./dmath.ts"
 import type { Biome } from "./gen/biomes.ts"
 import type { District, RepoIsland } from "./gen/dress.ts"
 import { cellAt, key, neighbours, unkey } from "./gen/hex.ts"
@@ -58,11 +59,11 @@ export function mapSites(made: RepoIsland): Record<SiteId, Site> {
     [...list].sort((a, b) => b.bytes - a.bytes || (a.id < b.id ? -1 : 1))[0]
   /** On a gen 2 island, the districts within the story's reach of the keep, if any are (else all). */
   const reachable = (list: readonly District[]): readonly District[] => {
-    const close = list.filter((district) => Math.hypot(...district.at) <= STORY_REACH)
+    const close = list.filter((district) => DMath.hypot(...district.at) <= STORY_REACH)
     return plan.gen === 2 && close.length > 0 ? close : list
   }
   const nearest = (list: readonly District[]) =>
-    [...list].sort((a, b) => Math.hypot(...a.at) - Math.hypot(...b.at) || (a.id < b.id ? -1 : 1))[0]
+    [...list].sort((a, b) => DMath.hypot(...a.at) - DMath.hypot(...b.at) || (a.id < b.id ? -1 : 1))[0]
 
   const chosen = new Map<SiteId, District>()
   const free = (list: readonly District[]) =>
@@ -141,19 +142,19 @@ function shared(made: RepoIsland, posts: readonly Post[], taken: readonly Post[]
   const middle = posts[Math.floor(posts.length / 2)]
   if (!middle) return posts
   const facing = middle[2]
-  const right: Spot = [-Math.cos(facing), Math.sin(facing)]
-  const back: Spot = [-Math.sin(facing), -Math.cos(facing)]
+  const right: Spot = [-DMath.cos(facing), DMath.sin(facing)]
+  const back: Spot = [-DMath.sin(facing), -DMath.cos(facing)]
   const dry = (x: number, z: number): boolean => {
     const char = made.plan.land.get(key(cellAt([x, z])))?.char
     if (!char || !LEVEL_GROUND.has(char) || made.levels.has(key(cellAt([x, z])))) return false
-    return !made.island.water.some((w) => Math.hypot(w[0] - x, w[1] - z) < BEACH)
+    return !made.island.water.some((w) => DMath.hypot(w[0] - x, w[1] - z) < BEACH)
   }
   for (const [side, away] of SHIFTS) {
     const dx = right[0] * side + back[0] * away
     const dz = right[1] * side + back[1] * away
     const moved = posts.map(([x, z, f]): Post => [round(x + dx), round(z + dz), f])
     const fits = moved.every(
-      ([x, z]) => dry(x, z) && taken.every((t) => Math.hypot(t[0] - x, t[1] - z) >= APART),
+      ([x, z]) => dry(x, z) && taken.every((t) => DMath.hypot(t[0] - x, t[1] - z) >= APART),
     )
     if (fits) return moved
   }
@@ -179,8 +180,8 @@ function shoreOf(made: RepoIsland, district: number): { cell: Cell; sea: Spot }[
       sx += wx - x
       sz += wz - z
     }
-    const length = Math.hypot(sx, sz) || 1
-    out.push({ cell, sea: [sx / length, sz / length], far: Math.hypot(x - at[0], z - at[1]) })
+    const length = DMath.hypot(sx, sz) || 1
+    out.push({ cell, sea: [sx / length, sz / length], far: DMath.hypot(x - at[0], z - at[1]) })
   }
   return out.sort((a, b) => a.far - b.far || key(a.cell).localeCompare(key(b.cell)))
 }
@@ -193,8 +194,8 @@ function fishingPosts(made: RepoIsland, district: number): Post[] {
   const posts: Post[] = []
   for (const { cell, sea } of shoreOf(made, district)) {
     const [x, z] = cellToWorld(cell)
-    const post: Post = [round(x + sea[0] * SHORE), round(z + sea[1] * SHORE), Math.atan2(sea[0], sea[1])]
-    if (decor.some((d) => Math.hypot(d.x - post[0], d.z - post[1]) < CLEAR)) continue
+    const post: Post = [round(x + sea[0] * SHORE), round(z + sea[1] * SHORE), DMath.atan2(sea[0], sea[1])]
+    if (decor.some((d) => DMath.hypot(d.x - post[0], d.z - post[1]) < CLEAR)) continue
     posts.push(post)
     if (posts.length === 3) break
   }

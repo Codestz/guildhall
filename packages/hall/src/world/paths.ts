@@ -1,4 +1,5 @@
 import { activeWorld } from "./active.ts"
+import { DMath } from "./dmath.ts"
 import { Heap } from "./gen/heap.ts"
 import { ROAD_EDGES, ROAD_NODES } from "./lands.ts"
 import { ROOM, type Spot } from "./layout.ts"
@@ -124,7 +125,7 @@ function graphFor(roads: Roads): Graph {
 }
 
 function distance(a: Spot, b: Spot): number {
-  return Math.hypot(a[0] - b[0], a[1] - b[1])
+  return DMath.hypot(a[0] - b[0], a[1] - b[1])
 }
 
 /** Inside the keep's walls, or on the apron at its gate (the aisles' GATE node is just inside). */

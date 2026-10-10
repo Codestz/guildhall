@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { cellToWorld, type LandPlacement } from "../../lands.ts"
 import { cellAt, key, rng } from "../hex.ts"
 import { cragAt } from "./crags.ts"
@@ -63,7 +64,7 @@ export function dressingOf(
         for (let t = 0; t < trees; t++) {
           const a = random() * Math.PI * 2
           const d = REACH * Math.sqrt(random())
-          const [x, z] = [mx + Math.cos(a) * d, mz + Math.sin(a) * d]
+          const [x, z] = [mx + DMath.cos(a) * d, mz + DMath.sin(a) * d]
           const h = on(x, z)
           if (
             h === undefined ||

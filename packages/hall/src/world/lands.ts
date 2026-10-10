@@ -1,5 +1,6 @@
 import type { Site as SiteName } from "@guildhall/roster"
 import CIVIC from "./civic.json"
+import { DMath } from "./dmath.ts"
 import LANDS from "./lands.json"
 import type { Post, Spot } from "./layout.ts"
 import TOWN2 from "./town2.json"
@@ -289,11 +290,11 @@ export interface Site {
 
 /** Facing from a post towards a point. */
 function toward(x: number, z: number, tx: number, tz: number): Post {
-  return [x, z, Math.atan2(tx - x, tz - z)]
+  return [x, z, DMath.atan2(tx - x, tz - z)]
 }
 /** A post `distance` from `work`, on the side of `from` (usually the road), facing the work. */
 function stand(work: Spot, from: Spot, distance: number): Post {
-  const length = Math.hypot(from[0] - work[0], from[1] - work[1]) || 1
+  const length = DMath.hypot(from[0] - work[0], from[1] - work[1]) || 1
   const x = work[0] + ((from[0] - work[0]) / length) * distance
   const z = work[1] + ((from[1] - work[1]) / length) * distance
   return toward(round(x), round(z), work[0], work[1])
@@ -396,7 +397,7 @@ export function toPlot(x: number, z: number): number {
   const { x0, x1, z0, z1 } = GRAVEYARD_PLOT
   const dx = Math.max(x0 - x, 0, x - x1)
   const dz = Math.max(z0 - z, 0, z - z1)
-  return Math.hypot(dx, dz)
+  return DMath.hypot(dx, dz)
 }
 
 // ---- Landmarks -------------------------------------------------------------------------------
@@ -468,7 +469,7 @@ const SITE_OF: Partial<Record<LandPiece, SiteId>> = Object.fromEntries(
 // ---- Hand-placed buildings and dressing --------------------------------------------------------
 
 /** Rotation that turns a building's front (+z) towards a point. */
-const facing = (from: Spot, to: Spot): number => Math.atan2(to[0] - from[0], to[1] - from[1])
+const facing = (from: Spot, to: Spot): number => DMath.atan2(to[0] - from[0], to[1] - from[1])
 /** A piece at a hex, nudged by (dx, dz), its front turned towards `look` (a hex or a point). */
 function put(piece: LandPiece, cell: Cell, dx = 0, dz = 0, look?: Cell, scale?: number): LandPlacement {
   return putFacing(piece, cell, dx, dz, look && W(look), scale)
@@ -721,7 +722,7 @@ export function island(seed = 7): Island {
     /** A spot inside the hex, `reach` from its centre. */
     const offset = (reach: number): [number, number] => {
       const angle = random() * Math.PI * 2
-      return [Math.cos(angle) * reach, Math.sin(angle) * reach]
+      return [DMath.cos(angle) * reach, DMath.sin(angle) * reach]
     }
 
     if (OPEN.has(char)) {
@@ -808,7 +809,7 @@ export function island(seed = 7): Island {
       // A shore with one wet side keeps its trees, set back from the water.
       if (coast.tile === "A" && (char === "F" || char === "f")) {
         const away = (((wet[0] ?? 0) + 3) * Math.PI) / 3 + Math.PI / 6
-        add(pick(["trees_A_small", "trees_B_small"] as const), Math.cos(away) * 2, Math.sin(away) * 2)
+        add(pick(["trees_A_small", "trees_B_small"] as const), DMath.cos(away) * 2, DMath.sin(away) * 2)
       } else if (coast.tile === "A" && random() < 0.5)
         add(pick(["rock_single_A", "rock_single_C"] as const), ...offset(2.5))
       continue
@@ -894,8 +895,8 @@ export function island(seed = 7): Island {
       const [cx, cy, cz] = chimney
       landmarks.push({
         kind: "chimney",
-        x: round(placement.x + (cx * Math.cos(rot) + cz * Math.sin(rot)) * scale),
-        z: round(placement.z + (-cx * Math.sin(rot) + cz * Math.cos(rot)) * scale),
+        x: round(placement.x + (cx * DMath.cos(rot) + cz * DMath.sin(rot)) * scale),
+        z: round(placement.z + (-cx * DMath.sin(rot) + cz * DMath.cos(rot)) * scale),
         y: round(cy * scale),
       })
     }
@@ -964,7 +965,7 @@ export const MAP_FOR_TESTS = {
         const cell: Cell = [q + dq, line]
         if ((cell[0] - line) % 2 !== 0) continue
         const [x, z] = W(cell)
-        const d = Math.hypot(x - spot[0], z - spot[1])
+        const d = DMath.hypot(x - spot[0], z - spot[1])
         if (d < distance) {
           distance = d
           best = cell

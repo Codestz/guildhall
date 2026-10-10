@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test"
 import { apply, type Change, emptyModel, type Model } from "@guildhall/core"
 import { Ordinals } from "../src/guild/ordinals.ts"
 import { GuildStore, ordinalOf, RUSH, viewsOf } from "../src/guild/store.ts"
+import { SLOW } from "./support/slow.ts"
 
 /**
  * The store at crowd size (Chapter 2, docs/perf-budget.md): a refresh and a rebuild stay cheap at
@@ -35,7 +36,7 @@ describe("cost at 300 adventurers", () => {
       store.tick(101) // paused: no events, but past the 100 ms refresh
       times.push(performance.now() - started)
     }
-    expect(median(times)).toBeLessThan(3)
+    expect(median(times)).toBeLessThan(3 * SLOW)
   })
 
   test("a rebuild (a seek) no longer counts every role's ranks per log line", () => {
@@ -51,7 +52,7 @@ describe("cost at 300 adventurers", () => {
       // The quickest of several: the least disturbed by whatever else the machine is doing.
       return Math.min(...times)
     }
-    expect(seek(rushAt(300, 60_000))).toBeLessThan(60)
+    expect(seek(rushAt(300, 60_000))).toBeLessThan(60 * SLOW)
   })
 })
 

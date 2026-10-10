@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { HEX_SCALE, type LandPiece, PIECES } from "../../lands.ts"
 import { orient, type Tilt } from "../../tilt.ts"
 import type { Context, Spot } from "./outcrops.ts"
@@ -51,9 +52,9 @@ export function baseOf(
   const spots: [number, number, number][] = [[0, 0, 0]]
   for (let a = 0; a < 8; a++)
     spots.push([
-      Math.cos(a * 0.785) * BASE_REACH * width * k,
+      DMath.cos(a * 0.785) * BASE_REACH * width * k,
       0,
-      Math.sin(a * 0.785) * BASE_REACH * depth * k,
+      DMath.sin(a * 0.785) * BASE_REACH * depth * k,
     ])
   return spots.map((spot) => {
     const [dx, dy, dz] = orient(spot, rot, tilt)
@@ -73,10 +74,10 @@ export function cragAt(spot: Spot, { ground, height, ledgeTop, random }: Context
   const [gx, gz] = [slope(SPAN, 0), slope(0, SPAN)]
   if (gx === undefined || gz === undefined) return undefined
   // The normal (-gx, 1, -gz) normalised; its horizontal part, held to the most a piece may tip.
-  const flat = Math.hypot(gx, gz)
+  const flat = DMath.hypot(gx, gz)
   if (flat < 0.2) return undefined
-  const tip = Math.min(MOST_TIP, Math.atan(flat))
-  const tilt: Tilt = [(-gx / flat) * Math.sin(tip), (-gz / flat) * Math.sin(tip)]
+  const tip = Math.min(MOST_TIP, DMath.atan(flat))
+  const tilt: Tilt = [(-gx / flat) * DMath.sin(tip), (-gz / flat) * DMath.sin(tip)]
   const crag = share < CRAG_BELOW && random() < 0.25
   const piece = (crag ? CRAGS : ROCKS)[Math.floor(random() * (crag ? CRAGS : ROCKS).length)] as LandPiece
   // Bigger higher up, but never more than a house and a half across (rockSize.ts).

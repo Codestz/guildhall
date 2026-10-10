@@ -1,3 +1,4 @@
+import { DMath } from "./dmath.ts"
 import type BOUNDS from "./graveyard.json"
 import { GRAVEYARD_PLOT } from "./lands.ts"
 
@@ -58,7 +59,7 @@ const put = (piece: GravePiece, x: number, z: number, rot = 0, scale?: number): 
 
 /** A fence from a to b (along x or z): whole pieces stretched to fit, a pillar at every joint. */
 function fence(a: readonly [number, number], b: readonly [number, number], broken: readonly number[] = []) {
-  const length = Math.hypot(b[0] - a[0], b[1] - a[1])
+  const length = DMath.hypot(b[0] - a[0], b[1] - a[1])
   const n = Math.max(1, Math.round(length / 4))
   const rot = Math.abs(b[0] - a[0]) > Math.abs(b[1] - a[1]) ? 0 : EAST
   for (let i = 0; i < n; i++) {

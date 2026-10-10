@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import type { Spot } from "../../layout.ts"
 import { cellAt, key, step } from "../hex.ts"
 import type { Massif } from "./field.ts"
@@ -17,7 +18,7 @@ const GOAL_RADII = [8, 16, 24] as const
 /** Smoothing passes over the ground the search reads, so a ledge's riser is a ramp and a crag's lump is gone. */
 const SMOOTH = 3
 
-export const distance = (a: Spot, b: Spot): number => Math.hypot(a[0] - b[0], a[1] - b[1])
+export const distance = (a: Spot, b: Spot): number => DMath.hypot(a[0] - b[0], a[1] - b[1])
 
 /** The rim: every vertex along an edge of the massif that faces a hex outside it. */
 function rimOf(massif: Massif): Set<number> {

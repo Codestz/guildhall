@@ -1,3 +1,4 @@
+import { DMath } from "./dmath.ts"
 import FOREST from "./forest.json"
 import { type Cell, cellToWorld, HEX_SCALE, MAP_FOR_TESTS, PIECES, SITES, toPlot } from "./lands.ts"
 import { ROOM, type Spot } from "./layout.ts"
@@ -169,7 +170,10 @@ function groundOf(world: World): Ground {
   const gate: Spot = [0, ROOM.depth / 2]
   let out: Spot | undefined
   for (const at of Object.values(graph))
-    if (!out || Math.hypot(at[0] - gate[0], at[1] - gate[1]) < Math.hypot(out[0] - gate[0], out[1] - gate[1]))
+    if (
+      !out ||
+      DMath.hypot(at[0] - gate[0], at[1] - gate[1]) < DMath.hypot(out[0] - gate[0], out[1] - gate[1])
+    )
       out = at
   if (out) roads.push([gate, out])
   const nodes = Object.values(graph)
@@ -186,7 +190,8 @@ function groundOf(world: World): Ground {
       let best = nodes[0] as Spot
       for (const node of nodes)
         if (
-          Math.hypot(node[0] - post[0], node[1] - post[1]) < Math.hypot(best[0] - post[0], best[1] - post[1])
+          DMath.hypot(node[0] - post[0], node[1] - post[1]) <
+          DMath.hypot(best[0] - post[0], best[1] - post[1])
         )
           best = node
       return [best, post] as const
@@ -198,8 +203,8 @@ function groundOf(world: World): Ground {
       const cz = ((z0 + z1) / 2) * scale
       const rot = d.rot ?? 0
       return {
-        x: d.x + cx * Math.cos(rot) + cz * Math.sin(rot),
-        z: d.z - cx * Math.sin(rot) + cz * Math.cos(rot),
+        x: d.x + cx * DMath.cos(rot) + cz * DMath.sin(rot),
+        z: d.z - cx * DMath.sin(rot) + cz * DMath.cos(rot),
         r:
           (Math.max(x1 - x0, z1 - z0) / 2) * scale +
           (d.piece.startsWith("building_") ? BUILDING_CLEARANCE : 0),
@@ -247,23 +252,23 @@ function clear(
   )
     return false
   if (ground.hand && toPlot(x, z) < GRAVEYARD_CLEARANCE + r) return false
-  if (ground.sea.some((w) => Math.hypot(w[0] - x, w[1] - z) < WATER_CLEARANCE + r)) return false
-  if (ground.river.some((w) => Math.hypot(w[0] - x, w[1] - z) < RIVER_CLEARANCE + r)) return false
+  if (ground.sea.some((w) => DMath.hypot(w[0] - x, w[1] - z) < WATER_CLEARANCE + r)) return false
+  if (ground.river.some((w) => DMath.hypot(w[0] - x, w[1] - z) < RIVER_CLEARANCE + r)) return false
   if (ground.roads.some(([a, b]) => toSegment([x, z], a, b) < ROAD_HALF + r)) return false
   if (ground.approaches.some(([a, b]) => toSegment([x, z], a, b) < PATH_CLEARANCE + r)) return false
-  if (ground.posts.some((p) => Math.hypot(p[0] - x, p[1] - z) < POST_CLEARANCE + r)) return false
+  if (ground.posts.some((p) => DMath.hypot(p[0] - x, p[1] - z) < POST_CLEARANCE + r)) return false
   if (ground.hand) {
     const yard = SITES.yard.at
-    if (Math.hypot(yard[0] - x, yard[1] - z) < YARD_RADIUS + r) return false
+    if (DMath.hypot(yard[0] - x, yard[1] - z) < YARD_RADIUS + r) return false
   }
-  if (ground.decor.some((d) => Math.hypot(d.x - x, d.z - z) < d.r + DECOR_CLEARANCE + r)) return false
+  if (ground.decor.some((d) => DMath.hypot(d.x - x, d.z - z) < d.r + DECOR_CLEARANCE + r)) return false
   for (const light of ground.lights)
-    if (Math.hypot(light.placement.x - x, light.placement.z - z) < LIGHT_CLEARANCE + r) return false
+    if (DMath.hypot(light.placement.x - x, light.placement.z - z) < LIGHT_CLEARANCE + r) return false
   for (const path of extra.paths)
     for (let i = 1; i < path.length; i++)
       if (toSegment([x, z], path[i - 1] as Spot, path[i] as Spot) < PATH_CLEARANCE + r) return false
-  if (extra.spots.some((s) => Math.hypot(s[0] - x, s[1] - z) < POST_CLEARANCE + r)) return false
-  return !placed.some((w) => Math.hypot(w.x - x, w.z - z) < (w.radius + r) * SPACING)
+  if (extra.spots.some((s) => DMath.hypot(s[0] - x, s[1] - z) < POST_CLEARANCE + r)) return false
+  return !placed.some((w) => DMath.hypot(w.x - x, w.z - z) < (w.radius + r) * SPACING)
 }
 
 // ---- Placement -------------------------------------------------------------------------------
@@ -325,7 +330,7 @@ export function wildsOf(world: World, keep: KeepClear = {}): Wild[] {
     for (let k = 0; k < 2; k++) {
       const angle = hash(jx, jz, 70 + k) * Math.PI * 2
       const reach = radius + 0.5 + hash(jx, jz, 80 + k) * 1.2
-      tryAt(jx + Math.cos(angle) * reach, jz + Math.sin(angle) * reach, CLUMP, false, false)
+      tryAt(jx + DMath.cos(angle) * reach, jz + DMath.sin(angle) * reach, CLUMP, false, false)
     }
   }
 
@@ -335,7 +340,7 @@ export function wildsOf(world: World, keep: KeepClear = {}): Wild[] {
     for (const [a, b] of roads) {
       const dx = b[0] - a[0]
       const dz = b[1] - a[1]
-      const length = Math.hypot(dx, dz) || 1
+      const length = DMath.hypot(dx, dz) || 1
       const [nx, nz] = [-dz / length, dx / length]
       for (let s = step / 2; s < length; s += step)
         for (const side of [1, -1]) {
@@ -356,7 +361,7 @@ export function wildsOf(world: World, keep: KeepClear = {}): Wild[] {
     for (let ring = 6; ring <= 16; ring += 2.5)
       for (let k = 0; k < 14; k++) {
         const angle = (k / 14) * Math.PI * 2 + ring * 0.37
-        tryAt(site.at[0] + Math.cos(angle) * ring, site.at[1] + Math.sin(angle) * ring, mix, barren)
+        tryAt(site.at[0] + DMath.cos(angle) * ring, site.at[1] + DMath.sin(angle) * ring, mix, barren)
       }
   }
 
@@ -369,7 +374,7 @@ export function wildsOf(world: World, keep: KeepClear = {}): Wild[] {
     for (let k = 0; k < 9; k++) {
       const angle = hash(cx, cz, 10 + k) * Math.PI * 2
       const reach = 1.5 + hash(cx, cz, 20 + k) * 3.5
-      tryAt(cx + Math.cos(angle) * reach, cz + Math.sin(angle) * reach, VILLAGE)
+      tryAt(cx + DMath.cos(angle) * reach, cz + DMath.sin(angle) * reach, VILLAGE)
     }
   }
 
@@ -384,7 +389,7 @@ export function wildsOf(world: World, keep: KeepClear = {}): Wild[] {
     for (let k = 0; k < 6; k++) {
       const angle = hash(cx, cz, 50 + k) * Math.PI * 2
       const reach = hash(cx, cz, 60 + k) * 3
-      tryAt(cx + Math.cos(angle) * reach, cz + Math.sin(angle) * reach, SHORE)
+      tryAt(cx + DMath.cos(angle) * reach, cz + DMath.sin(angle) * reach, SHORE)
     }
   }
   return placed

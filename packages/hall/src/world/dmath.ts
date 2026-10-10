@@ -111,9 +111,12 @@ export function atan2(y: number, x: number): number {
   return atan(y / x) + (y < 0 || Object.is(y, -0) ? -Math.PI : Math.PI)
 }
 
-/** √(x² + y²) with the sum taken in one fixed order. */
-export function hypot(x: number, y: number): number {
-  return Math.sqrt(x * x + y * y)
+/** √(x² + y² + …) with the sum taken in one fixed order, as `Math.hypot`. */
+export function hypot(x: number, y?: number, ...rest: number[]): number {
+  if (y === undefined) return Math.abs(x)
+  let sum = x * x + y * y
+  for (const v of rest) sum += v * v
+  return Math.sqrt(sum)
 }
 
 /** Base-2 logarithm of a positive number. */
@@ -145,5 +148,58 @@ export function log2(x: number): number {
   return e + (2 * sum) / LN2
 }
 
+/** The natural logarithm of a positive number. */
+export function ln(x: number): number {
+  return log2(x) * LN2
+}
+
+/** 2^k for a whole k, by repeated squaring: every product is exact, so the bits are the same everywhere. */
+function twoTo(k: number): number {
+  let base = k < 0 ? 0.5 : 2
+  let out = 1
+  for (let n = Math.abs(k); n > 0; n = Math.floor(n / 2)) {
+    if (n % 2 === 1) out *= base
+    base *= base
+  }
+  return out
+}
+
+/** e^x: 2^k · e^r with |r| ≤ ln2/2, the second by its Taylor series. */
+export function exp(x: number): number {
+  if (Number.isNaN(x)) return x
+  if (x > 709.78) return Number.POSITIVE_INFINITY
+  if (x < -745) return 0
+  const k = Math.round(x / LN2)
+  const r = x - k * LN2
+  let term = 1
+  let sum = 1
+  for (let n = 1; n <= 20; n++) {
+    term = (term * r) / n
+    sum += term
+  }
+  return sum * twoTo(k)
+}
+
+/**
+ * `x ** y`. A whole exponent is repeated multiplication, exact in IEEE order; a fractional one is
+ * e^(y·ln x), for a positive `x` (a negative base to a fractional power is NaN, as in `Math.pow`).
+ */
+export function pow(x: number, y: number): number {
+  if (y === 0) return 1
+  if (Number.isNaN(x) || Number.isNaN(y)) return Number.NaN
+  if (Number.isInteger(y) && Math.abs(y) <= 1024) {
+    let base = x
+    let out = 1
+    for (let n = Math.abs(y); n > 0; n = Math.floor(n / 2)) {
+      if (n % 2 === 1) out *= base
+      base *= base
+    }
+    return y < 0 ? 1 / out : out
+  }
+  if (x === 0) return y > 0 ? 0 : Number.POSITIVE_INFINITY
+  if (x < 0) return Number.NaN
+  return exp(y * ln(x))
+}
+
 /** The maths the generators use, by name (`DMath.sin(x)`, as one would `Math.sin(x)`). */
-export const DMath = { sin, cos, tan, atan, atan2, hypot, log2 } as const
+export const DMath = { sin, cos, tan, atan, atan2, hypot, log2, ln, exp, pow } as const

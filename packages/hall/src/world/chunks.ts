@@ -1,3 +1,4 @@
+import { DMath } from "./dmath.ts"
 import { cellAt, key, unkey } from "./gen/hex.ts"
 import { type Cell, cellToWorld } from "./lands.ts"
 import type { Spot } from "./layout.ts"
@@ -71,7 +72,7 @@ function chunk(world: World): Chunks {
     let best = 0
     let distance = Number.POSITIVE_INFINITY
     list.forEach((chunk, i) => {
-      const d = Math.hypot(chunk.centre[0] - x, chunk.centre[1] - z)
+      const d = DMath.hypot(chunk.centre[0] - x, chunk.centre[1] - z)
       if (d < distance) {
         distance = d
         best = i
@@ -93,7 +94,7 @@ export function split(cells: readonly Cell[]): Cell[][] {
     let far = 0
     let farthest = -1
     points.forEach(([x, z], i) => {
-      const d = Math.min(...centres.map(([cx, cz]) => Math.hypot(cx - x, cz - z)))
+      const d = Math.min(...centres.map(([cx, cz]) => DMath.hypot(cx - x, cz - z)))
       if (d > farthest) {
         farthest = d
         far = i
@@ -124,7 +125,7 @@ function assign(points: readonly Spot[], centres: readonly Spot[]): number[] {
     let best = 0
     let distance = Number.POSITIVE_INFINITY
     centres.forEach(([cx, cz], c) => {
-      const d = Math.hypot(cx - x, cz - z)
+      const d = DMath.hypot(cx - x, cz - z)
       if (d < distance) {
         distance = d
         best = c
@@ -138,6 +139,6 @@ function boundsOf(cells: readonly Cell[]): Chunk {
   const points = cells.map((cell) => cellToWorld(cell))
   const cx = points.reduce((sum, [x]) => sum + x, 0) / points.length
   const cz = points.reduce((sum, [, z]) => sum + z, 0) / points.length
-  const radius = Math.max(...points.map(([x, z]) => Math.hypot(x - cx, z - cz))) + HEX_RADIUS
+  const radius = Math.max(...points.map(([x, z]) => DMath.hypot(x - cx, z - cz))) + HEX_RADIUS
   return { cells, centre: [cx, cz], radius, hexes: cells.length }
 }

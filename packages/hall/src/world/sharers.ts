@@ -10,6 +10,7 @@ import {
   onKeepFloor,
 } from "./clearance.ts"
 import { districtById } from "./districtWork.ts"
+import { DMath } from "./dmath.ts"
 import type { SiteId } from "./lands.ts"
 import { type Post, type Spot, STATIONS, type StationId } from "./layout.ts"
 import { sitesOf } from "./siteMap.ts"
@@ -134,8 +135,8 @@ class Field {
   private open(spots: Spots, [dx, dz]: Spot): boolean {
     const post = spots.post as Spot
     const at: Spot = [post[0] + dx, post[1] + dz]
-    if (this.posts.some((p) => Math.hypot(p[0] - at[0], p[1] - at[1]) < APART)) return false
-    if (this.stands.some((s) => Math.hypot(s[0] - at[0], s[1] - at[1]) < APART)) return false
+    if (this.posts.some((p) => DMath.hypot(p[0] - at[0], p[1] - at[1]) < APART)) return false
+    if (this.stands.some((s) => DMath.hypot(s[0] - at[0], s[1] - at[1]) < APART)) return false
     for (const [name, spot] of Object.entries(spots))
       if (!this.marks.has(name) && !this.ground([spot[0] + dx, spot[1] + dz], BODY)) return false
     // Every short walk of the loop and the steers (the long ones take the roads: behaviours `legOf`).
@@ -146,7 +147,7 @@ class Field {
         const base = spots[step.walk]
         if (!base) continue
         const to: Spot = [base[0] + dx, base[1] + dz]
-        if (Math.hypot(to[0] - from[0], to[1] - from[1]) < LOCAL_WALK && !this.clearWalk(from, to))
+        if (DMath.hypot(to[0] - from[0], to[1] - from[1]) < LOCAL_WALK && !this.clearWalk(from, to))
           return false
         from = to
       }
@@ -155,7 +156,7 @@ class Field {
   }
 
   private clearWalk(from: Spot, to: Spot): boolean {
-    const n = Math.max(1, Math.ceil(Math.hypot(to[0] - from[0], to[1] - from[1]) / ALONG))
+    const n = Math.max(1, Math.ceil(DMath.hypot(to[0] - from[0], to[1] - from[1]) / ALONG))
     for (let k = 1; k < n; k++) {
       const t = k / n
       if (!this.ground([from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t], BODY * 0.6))
@@ -179,15 +180,15 @@ function candidates(post: Post): Spot[] {
   const fake = { post } as Place
   const line = Array.from({ length: LINE }, (_, k) => beside(fake, k + 1))
   const facing = post[2]
-  const right: Spot = [-Math.cos(facing), Math.sin(facing)]
-  const back: Spot = [-Math.sin(facing), -Math.cos(facing)]
+  const right: Spot = [-DMath.cos(facing), DMath.sin(facing)]
+  const back: Spot = [-DMath.sin(facing), -DMath.cos(facing)]
   const rows: { offset: Spot; away: number }[] = []
   const deep = Math.ceil(REACH / (STEP * 0.87))
   for (let row = -1; row <= deep; row++)
     for (let col = -REACH; col <= REACH; col++) {
       const side = (col + (row % 2 === 0 ? 0 : 0.5)) * STEP
       const behind = row * STEP * 0.87
-      const away = Math.hypot(side, behind)
+      const away = DMath.hypot(side, behind)
       if (away < STEP * 0.5 || away > REACH) continue
       // A step ahead only out to the side: never between a worker and their work.
       if (behind < 0 && Math.abs(side) < 1.5) continue

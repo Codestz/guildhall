@@ -1,3 +1,4 @@
+import { DMath } from "./dmath.ts"
 import { dominant, type Language, languageOf } from "./gen/biomes.ts"
 import { hash } from "./gen/hex.ts"
 import type { RepoEntry } from "./gen/repo.ts"
@@ -65,7 +66,7 @@ const snap = (v: number): number => Math.round(v / SEA_CELL) * SEA_CELL
 
 /** Whether island `a` (keep at `from`) and `b` (at `to`) keep their gap of sea and share no square of water. */
 function clear(a: Footprint, from: Spot, b: Footprint, to: Spot): boolean {
-  if (Math.hypot(from[0] - to[0], from[1] - to[1]) < a.reach + b.reach + SEA_GAP) return false
+  if (DMath.hypot(from[0] - to[0], from[1] - to[1]) < a.reach + b.reach + SEA_GAP) return false
   return a.patches.every((p) =>
     b.patches.every(
       (q) =>
@@ -89,7 +90,7 @@ export function placeIslands(seeds: readonly IslandSeed[], home: Footprint): Spo
     const nudge = ((hash(seed.repo) % 1000) / 1000 - 0.5) * ((16 * Math.PI) / 180)
     const angle = -Math.PI / 2 + (i * 2 * Math.PI) / n + nudge
     for (let r = RING_START; ; r += SEA_CELL) {
-      const at: Spot = [snap(Math.cos(angle) * r), snap(Math.sin(angle) * r)]
+      const at: Spot = [snap(DMath.cos(angle) * r), snap(DMath.sin(angle) * r)]
       if (!clear(home, [0, 0], seed, at)) continue
       if (!placed.every((other, j) => clear(seeds[j] as IslandSeed, other, seed, at))) continue
       placed.push(at)
@@ -112,7 +113,7 @@ export const OFFING = 22
 export function portOf(from: Shore, to: Shore): Spot {
   const dx = to.at[0] - from.at[0]
   const dz = to.at[1] - from.at[1]
-  const length = Math.hypot(dx, dz) || 1
+  const length = DMath.hypot(dx, dz) || 1
   const out = from.reach + OFFING
   return [from.at[0] + (dx / length) * out, from.at[1] + (dz / length) * out]
 }
@@ -123,7 +124,7 @@ function toSegment(p: Spot, a: Spot, b: Spot): number {
   const ez = b[1] - a[1]
   const length2 = ex * ex + ez * ez
   const t = length2 === 0 ? 0 : Math.max(0, Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ez) / length2))
-  return Math.hypot(a[0] + ex * t - p[0], a[1] + ez * t - p[1])
+  return DMath.hypot(a[0] + ex * t - p[0], a[1] + ez * t - p[1])
 }
 
 /**
@@ -153,7 +154,7 @@ export const seaRadiusOf = (extent: number): number => Math.max(420, extent * 2)
 
 /** How far the archipelago reaches from the origin: the furthest land of any island. */
 export function extentOf(islands: readonly Shore[]): number {
-  return Math.max(0, ...islands.map((island) => Math.hypot(island.at[0], island.at[1]) + island.reach))
+  return Math.max(0, ...islands.map((island) => DMath.hypot(island.at[0], island.at[1]) + island.reach))
 }
 
 /** A repo's main language: the most bytes across the whole tree, code before data and prose. */

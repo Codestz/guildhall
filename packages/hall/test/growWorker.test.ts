@@ -7,6 +7,7 @@ import { GrowPool, type WorkerLike } from "../src/world/grow/pool.ts"
 import type { World } from "../src/world/world.ts"
 import MCPX from "./fixtures/repos/codestz__mcpx.json"
 import REACT from "./fixtures/repos/facebook__react.json"
+import { SLOW } from "./support/slow.ts"
 
 /**
  * An island grown in a Web Worker is the island grown on this thread (world/grow): the worker's
@@ -77,14 +78,18 @@ describe("a worker-grown island", () => {
     ["mcpx at gen 2", MCPX, 2],
     ["mcpx at gen 1", MCPX, 1],
   ] as const) {
-    test(`is the island grown here: ${name}`, () => {
-      const reply = viaWorker({ tree: tree(fixture), gen })
-      if (!("grown" in reply)) throw new Error(reply.error)
-      const world = worldFrom(reply.grown)
-      const here = growSync(tree(fixture), gen)
-      expect(differences(plain(world), plain(here))).toEqual([])
-      expect(differences(populationOf(world), populationOf(here))).toEqual([])
-    })
+    test(
+      `is the island grown here: ${name}`,
+      () => {
+        const reply = viaWorker({ tree: tree(fixture), gen })
+        if (!("grown" in reply)) throw new Error(reply.error)
+        const world = worldFrom(reply.grown)
+        const here = growSync(tree(fixture), gen)
+        expect(differences(plain(world), plain(here))).toEqual([])
+        expect(differences(populationOf(world), populationOf(here))).toEqual([])
+      },
+      5000 * SLOW,
+    )
   }
 
   test("brings its mountains' heights as typed arrays that were moved, not copied", () => {

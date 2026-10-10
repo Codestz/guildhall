@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import type { HeightGrid } from "./lattice.ts"
 import { LEDGE_SHARE, LEDGE_STEP, TRAIL_STRIDE } from "./shape.ts"
 
@@ -77,7 +78,7 @@ export function shapingOf(
 export function sharpen(height: number, peak: number, kneeShare = 0.67): number {
   const knee = kneeShare * peak
   if (height <= knee || peak <= knee) return height
-  return knee + (peak - knee) * ((height - knee) / (peak - knee)) ** 1.9
+  return knee + (peak - knee) * DMath.pow((height - knee) / (peak - knee), 1.9)
 }
 
 /**

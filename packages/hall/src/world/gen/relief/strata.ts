@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { LEDGE_STEP } from "./shape.ts"
 
 /**
@@ -118,7 +119,7 @@ export function stairsOf(p: Vertex, q: Vertex, r: Vertex): Stairs {
       number[],
     ]
     const [dx, dz] = [(f1[0] as number) - (f0[0] as number), (f1[2] as number) - (f0[2] as number)]
-    const length = Math.hypot(dx, dz)
+    const length = DMath.hypot(dx, dz)
     if (length < 1e-4) continue
     // Faces the lower corners.
     const low = corners.filter((_, i) => (levels[i] as number) <= level)
@@ -149,12 +150,12 @@ function aspect(a: readonly number[], b: readonly number[], c: readonly number[]
     (c[1] as number) - (a[1] as number),
     (c[2] as number) - (a[2] as number),
   ]
-  const area = Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2
+  const area = DMath.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2
   if (area < 1e-9) return Number.POSITIVE_INFINITY
   const longest = Math.max(
-    Math.hypot(ux, uy, uz),
-    Math.hypot(vx, vy, vz),
-    Math.hypot(vx - ux, vy - uy, vz - uz),
+    DMath.hypot(ux, uy, uz),
+    DMath.hypot(vx, vy, vz),
+    DMath.hypot(vx - ux, vy - uy, vz - uz),
   )
   return (longest * longest) / (2 * area)
 }
@@ -209,9 +210,9 @@ export function cutEdge(u: Vertex, v: Vertex, long: number): number[][] {
     (b[1] as number) - (a[1] as number),
     (b[2] as number) - (a[2] as number),
   ]
-  const length = Math.hypot(d0, d1, d2)
+  const length = DMath.hypot(d0, d1, d2)
   if (length <= long) return []
-  const parts = 2 ** Math.ceil(Math.log2(length / long))
+  const parts = DMath.pow(2, Math.ceil(DMath.log2(length / long)))
   const out: number[][] = []
   for (let m = 1; m < parts; m++) {
     const t = m / parts
@@ -250,7 +251,7 @@ export function curtainOf(
   inside: Vertex,
 ): { tri: Tri; low: number; outward: Facing }[] {
   const [dx, dz] = [(v[0] as number) - (u[0] as number), (v[2] as number) - (u[2] as number)]
-  const length = Math.hypot(dx, dz)
+  const length = DMath.hypot(dx, dz)
   if (length < 1e-9) return []
   // The edge's normal, towards the ramp.
   const side =

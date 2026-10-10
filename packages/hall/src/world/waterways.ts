@@ -1,3 +1,4 @@
+import { DMath } from "./dmath.ts"
 import { direction, key, neighbours } from "./gen/hex.ts"
 import { type Cell, cellToWorld, HEX_SCALE } from "./lands.ts"
 import type { Spot } from "./layout.ts"
@@ -317,7 +318,7 @@ export function gradeSlopes(grade: readonly Point3[]): number[] {
   return grade.map((_, i) => {
     const a = grade[Math.max(0, i - 2)] as Point3
     const b = grade[Math.min(grade.length - 1, i + 2)] as Point3
-    const run = Math.hypot(b[0] - a[0], b[2] - a[2])
+    const run = DMath.hypot(b[0] - a[0], b[2] - a[2])
     return run === 0 ? 0 : Math.max(0, (a[1] - b[1]) / run)
   })
 }
@@ -349,7 +350,7 @@ export function channelLine(hexes: readonly RiverHex[]): Spot[] {
   for (const hex of hexes)
     for (const point of channel(cellToWorld(hex.cell), hex.ins[0] ?? (hex.out + 3) % 6, hex.out)) {
       const last = line.at(-1)
-      if (!last || Math.hypot(last[0] - point[0], last[1] - point[1]) > 1e-6) line.push(point)
+      if (!last || DMath.hypot(last[0] - point[0], last[1] - point[1]) > 1e-6) line.push(point)
     }
   return line
 }
@@ -361,7 +362,7 @@ export function channelLine(hexes: readonly RiverHex[]): Spot[] {
  */
 function channel(centre: Spot, from: number, to: number): Spot[] {
   const [cx, cz] = centre
-  const at = (angle: number, r: number): Spot => [cx + Math.cos(angle) * r, cz + Math.sin(angle) * r]
+  const at = (angle: number, r: number): Spot => [cx + DMath.cos(angle) * r, cz + DMath.sin(angle) * r]
   const midOf = (edge: number) => at(Math.PI / 6 + (edge * Math.PI) / 3, INRADIUS)
   const turn = (((to - from) % 6) + 6) % 6
   if (turn === 3) return [midOf(from), midOf(to)]
@@ -369,16 +370,16 @@ function channel(centre: Spot, from: number, to: number): Spot[] {
   const pivot = wide
     ? at(Math.PI / 6 + ((from + (turn === 2 ? 1 : -1)) * Math.PI) / 3, 2 * INRADIUS)
     : at(((from + (turn === 1 ? 1 : 0)) * Math.PI) / 3, CIRCUMRADIUS)
-  const angle = (p: Spot) => Math.atan2(p[1] - pivot[1], p[0] - pivot[0])
+  const angle = (p: Spot) => DMath.atan2(p[1] - pivot[1], p[0] - pivot[0])
   const a0 = angle(midOf(from))
   let sweep = angle(midOf(to)) - a0
   if (sweep > Math.PI) sweep -= 2 * Math.PI
   if (sweep < -Math.PI) sweep += 2 * Math.PI
-  const r = Math.hypot(midOf(from)[0] - pivot[0], midOf(from)[1] - pivot[1])
+  const r = DMath.hypot(midOf(from)[0] - pivot[0], midOf(from)[1] - pivot[1])
   const points: Spot[] = []
   for (let i = 0; i <= ARC_STEPS; i++) {
     const a = a0 + (sweep * i) / ARC_STEPS
-    points.push([pivot[0] + Math.cos(a) * r, pivot[1] + Math.sin(a) * r])
+    points.push([pivot[0] + DMath.cos(a) * r, pivot[1] + DMath.sin(a) * r])
   }
   return points
 }

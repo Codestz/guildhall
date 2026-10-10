@@ -1,3 +1,4 @@
+import { DMath } from "./dmath.ts"
 import type { Biome } from "./gen/biomes.ts"
 import type { District, RepoIsland } from "./gen/dress.ts"
 import { cellAt, key } from "./gen/hex.ts"
@@ -149,7 +150,7 @@ function standing(
   decor: LandPlacement[],
 ): { open: Venue[]; decor: LandPlacement[] } {
   const here = (a: LandPlacement, b: LandPlacement): boolean =>
-    a.piece === b.piece && Math.hypot(a.x - b.x, a.z - b.z) < 0.05
+    a.piece === b.piece && DMath.hypot(a.x - b.x, a.z - b.z) < 0.05
   const lost: LandPlacement[] = []
   const open = venues.filter((venue) => {
     const parts = instantiate(prefab(venue.prefab), venue.at, venue.rot, "blue")
@@ -275,6 +276,6 @@ export function repoWorld(made: RepoIsland, info: Omit<RepoInfo, "districts" | "
 export function reachOf(world: World): number {
   let reach = 0
   for (const tile of world.island.tiles)
-    if (tile.piece !== "hex_water") reach = Math.max(reach, Math.hypot(tile.x, tile.z))
+    if (tile.piece !== "hex_water") reach = Math.max(reach, DMath.hypot(tile.x, tile.z))
   return reach
 }

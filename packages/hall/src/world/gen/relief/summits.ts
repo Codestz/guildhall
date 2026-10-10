@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { TERRACE } from "../../waterways.ts"
 import { cellAt } from "../hex.ts"
 import { CIRCUM, type HeightGrid, pointOf, RES, ROW } from "./lattice.ts"
@@ -54,7 +55,7 @@ export function settle(
       for (let di = -span; di <= span; di++) {
         const h = grid.get(i + di, j + dj)
         const at = pointOf(i + di, j + dj)
-        if (h > best.height && Math.hypot(at[0] - peak.at[0], at[1] - peak.at[1]) <= REACH)
+        if (h > best.height && DMath.hypot(at[0] - peak.at[0], at[1] - peak.at[1]) <= REACH)
           best = { ...peak, at, height: h }
       }
     return best
@@ -101,7 +102,9 @@ export function settle(
       }
     }
   const crown: Peak = { cell: cellAt([topAt[0], topAt[1]]), at: [topAt[0], topAt[1]], height: top }
-  const under = kept.find(({ peak }) => Math.hypot(peak.at[0] - topAt[0], peak.at[1] - topAt[1]) <= 2 * REACH)
+  const under = kept.find(
+    ({ peak }) => DMath.hypot(peak.at[0] - topAt[0], peak.at[1] - topAt[1]) <= 2 * REACH,
+  )
   if (!under) kept.push({ peak: crown, from: -1 })
   else if (under.peak.height < top) under.peak = { ...under.peak, at: crown.at, height: top }
   kept.sort((p, q) => q.peak.height - p.peak.height || p.from - q.from)
@@ -130,6 +133,6 @@ function cut(grid: HeightGrid, fixed: (i: number, j: number) => boolean, at: Spo
       const h = grid.get(i + di, j + dj)
       if (Number.isNaN(h) || fixed(i + di, j + dj)) continue
       const [x, z] = pointOf(i + di, j + dj)
-      grid.set(i + di, j + dj, Math.min(h, ceiling + CUT * Math.hypot(x - at[0], z - at[1])))
+      grid.set(i + di, j + dj, Math.min(h, ceiling + CUT * DMath.hypot(x - at[0], z - at[1])))
     }
 }

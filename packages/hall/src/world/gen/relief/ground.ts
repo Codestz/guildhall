@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import type { Massif } from "./field.ts"
 
 /**
@@ -31,11 +32,11 @@ export function groundOf(massif: Massif): Ground {
   /** The rise of the ground in the four directions, `d` units off (`edge`, where the massif's ground ends there). */
   const around = (x: number, z: number, h: number, d: number, edge = 0): number[] =>
     [0, 1, 2, 3].map(
-      (k) => (grid.heightAt(x + d * Math.cos(k * 1.57), z + d * Math.sin(k * 1.57)) ?? h + edge) - h,
+      (k) => (grid.heightAt(x + d * DMath.cos(k * 1.57), z + d * DMath.sin(k * 1.57)) ?? h + edge) - h,
     )
   const diagonals = (x: number, z: number, h: number, d: number): number[] =>
     [0.785, 2.356, 3.927, 5.498].map(
-      (a) => (grid.heightAt(x + d * Math.cos(a), z + d * Math.sin(a)) ?? h) - h,
+      (a) => (grid.heightAt(x + d * DMath.cos(a), z + d * DMath.sin(a)) ?? h) - h,
     )
   return {
     heightAt: (x, z) => grid.heightAt(x, z),

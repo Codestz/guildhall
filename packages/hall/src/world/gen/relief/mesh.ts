@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import type { Cell } from "../../lands.ts"
 import { cellAt, key, step } from "../hex.ts"
 import { carvedHex } from "./carved.ts"
@@ -113,7 +114,7 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
       ny = -ny
       nz = -nz
     }
-    const length = Math.hypot(nx, ny, nz)
+    const length = DMath.hypot(nx, ny, nz)
     if (length < 1e-9) return
     for (const v of [p, q, r]) {
       position.push(v[0] as number, v[1] as number, v[2] as number)
@@ -200,7 +201,7 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
     /** An edge on a hex edge where the lattice changes (a finer hex on one side): kept straight, never stepped. */
     const straightEdge = (u: readonly number[], v: readonly number[]): boolean => {
       const [dx, dz] = [(v[0] as number) - (u[0] as number), (v[2] as number) - (u[2] as number)]
-      const length = Math.hypot(dx, dz) || 1
+      const length = DMath.hypot(dx, dz) || 1
       const [mx, mz] = [((u[0] as number) + (v[0] as number)) / 2, ((u[2] as number) + (v[2] as number)) / 2]
       const [c1, c2] = [
         cellAt([mx - (dz / length) * 0.02, mz + (dx / length) * 0.02]),
@@ -280,7 +281,7 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
                 (r[2] as number) - (p[2] as number),
               ]
               const n = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx]
-              const length = Math.hypot(...(n as [number, number, number])) || 1
+              const length = DMath.hypot(...(n as [number, number, number])) || 1
               const sign = (n[1] as number) < 0 ? -1 : 1
               return n.map((x) => (sign * x) / length)
             })()
@@ -357,7 +358,7 @@ export function reliefMesh(relief: Relief, cells: readonly Cell[], tier: DetailT
             const seam = relief.massifAt(next) === massif
             const drop = seam ? SEAM_DROP : RIM_DROP
             const angle = (Math.PI / 6) * (1 + 2 * k)
-            const outward = [Math.cos(angle), Math.sin(angle)] as const
+            const outward = [DMath.cos(angle), DMath.sin(angle)] as const
             const colour: readonly [number, number] = seam
               ? [SWATCH.slate.u, swatchV(SWATCH.slate, 0.6)]
               : sea

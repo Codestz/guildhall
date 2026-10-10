@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import type { Cell } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
 import { TERRACE } from "../../waterways.ts"
@@ -88,7 +89,7 @@ function crestSources(ridges: readonly Ridge[]): Source[] {
     for (let k = 0; k + 1 < ridge.points.length; k++) {
       const [ax, az] = ridge.points[k] as Spot
       const [bx, bz] = ridge.points[k + 1] as Spot
-      const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / pitch))
+      const steps = Math.max(1, Math.ceil(DMath.hypot(bx - ax, bz - az) / pitch))
       for (let s = 0; s <= steps; s++) {
         const t = s / steps
         const x = ax + (bx - ax) * t
@@ -97,7 +98,7 @@ function crestSources(ridges: readonly Ridge[]): Source[] {
         const i = Math.round((x * RES) / CIRCUM - j / 2)
         const [vx, vz] = pointOf(i, j)
         const crest = (ridge.crest[k] as number) * (1 - t) + (ridge.crest[k + 1] as number) * t
-        sources.push({ i, j, d: Math.hypot(x - vx, z - vz), value: crest })
+        sources.push({ i, j, d: DMath.hypot(x - vx, z - vz), value: crest })
       }
     }
   return sources.sort((a, b) => b.value - a.value)
@@ -173,7 +174,7 @@ export function massifOf(spec: MassifSpec): Massif {
       const [x, z] = pointOf(i, j)
       const d = Math.max(0, (toCrest[at] as number) - CROWN)
       const rimDistance = toRim[at] as number
-      const flank = (crest[at] as number) * (1 - d / (d + rimDistance)) ** FLANK
+      const flank = (crest[at] as number) * DMath.pow(1 - d / (d + rimDistance), FLANK)
       const ridged =
         1 -
         Math.abs(2 * valueNoise(seed, x / 14, z / 14, 1) - 1) +
@@ -202,7 +203,8 @@ export function massifOf(spec: MassifSpec): Massif {
       const warp = valueNoise(seed, x / 17, z / 17, 5) * 6
       const line = 1 - Math.abs(2 * valueNoise(seed, x / GULLY_SCALE + warp, z / GULLY_SCALE - warp, 6) - 1)
       const high = smooth((raw[at] as number) / Math.max(1, height) / 0.7)
-      raw[at] = (raw[at] as number) - GULLY * line ** 5 * high * smooth(((toRim[at] as number) - 4) / 10)
+      raw[at] =
+        (raw[at] as number) - GULLY * DMath.pow(line, 5) * high * smooth(((toRim[at] as number) - 4) / 10)
     }
   for (let at = 0; at < raw.length; at++)
     if (owned[at] && !isRim(at)) raw[at] = sharpen(raw[at] as number, height, 0.5)

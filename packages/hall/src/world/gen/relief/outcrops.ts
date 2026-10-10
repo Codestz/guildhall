@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { HEX_SCALE, type LandPiece, PIECES } from "../../lands.ts"
 import type { Ground } from "./ground.ts"
 import { fitRock } from "./rockSize.ts"
@@ -92,7 +93,7 @@ export function outcropsAt(spot: Spot, { ground, height, ledgeTop, random }: Con
   for (let k = 0; k < 2; k++) {
     if (random() < 0.5) continue
     const angle = random() * Math.PI * 2
-    const [nx, nz] = [x + Math.cos(angle) * 1.8 * scale, z + Math.sin(angle) * 1.8 * scale]
+    const [nx, nz] = [x + DMath.cos(angle) * 1.8 * scale, z + DMath.sin(angle) * 1.8 * scale]
     const nh = ground.heightAt(nx, nz)
     if (nh !== undefined && ground.grade(nx, nz, nh) <= STEEPEST)
       out.push(

@@ -130,7 +130,7 @@ function distanceTo(spine: Spine, [x, z]: Point): number {
   for (let k = 0; k + 1 < spine.length; k++) {
     const [ax, az] = spine[k] as Point
     const [bx, bz] = spine[k + 1] as Point
-    const len = (bx - ax) ** 2 + (bz - az) ** 2
+    const len = DMath.pow(bx - ax, 2) + DMath.pow(bz - az, 2)
     const t = len === 0 ? 0 : Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / len))
     best = Math.min(best, DMath.hypot(x - (ax + (bx - ax) * t), z - (az + (bz - az) * t)))
   }

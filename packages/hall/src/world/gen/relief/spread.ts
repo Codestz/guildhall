@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { Heap } from "../heap.ts"
 import type { HeightGrid } from "./lattice.ts"
 import { pointOf } from "./lattice.ts"
@@ -24,7 +25,7 @@ const MOVES: readonly (readonly [number, number])[] = [
   [1, -2],
   [2, -1],
 ]
-const LENGTH = MOVES.map(([i, j]) => Math.hypot(...(pointOf(i, j) as [number, number])))
+const LENGTH = MOVES.map(([i, j]) => DMath.hypot(...(pointOf(i, j) as [number, number])))
 
 export interface Source {
   /** Lattice vertex. */

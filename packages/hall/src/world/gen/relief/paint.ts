@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { valueNoise } from "./noise.ts"
 import { SWATCH, type Swatch, swatchV } from "./swatches.ts"
 
@@ -74,7 +75,7 @@ function faceOf(p: readonly number[], q: readonly number[], r: readonly number[]
   const ny = uz * vx - ux * vz
   const nz = ux * vy - uy * vx
   return {
-    slope: (Math.atan2(Math.hypot(nx, nz), Math.abs(ny)) * 180) / Math.PI,
+    slope: (DMath.atan2(DMath.hypot(nx, nz), Math.abs(ny)) * 180) / Math.PI,
     height: ((p[1] as number) + (q[1] as number) + (r[1] as number)) / 3,
     x: ((p[0] as number) + (q[0] as number) + (r[0] as number)) / 3,
     z: ((p[2] as number) + (q[2] as number) + (r[2] as number)) / 3,

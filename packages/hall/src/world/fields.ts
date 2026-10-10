@@ -1,3 +1,4 @@
+import { DMath } from "./dmath.ts"
 import type { Piece, Placement } from "./furniture.ts"
 import KIT from "./kit.json"
 import { type Field, HEX_SCALE, island } from "./lands.ts"
@@ -56,8 +57,8 @@ function halfChord(u: number, margin: number): number {
 
 /** Local (u across rows, v along rows) → world, for rows turned by `angle`. */
 function toWorld(field: Field, angle: number, u: number, v: number): [number, number] {
-  const c = Math.cos(angle)
-  const s = Math.sin(angle)
+  const c = DMath.cos(angle)
+  const s = DMath.sin(angle)
   return [field.x + u * c + v * s, field.z - u * s + v * c]
 }
 

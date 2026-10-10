@@ -1,6 +1,7 @@
 import { ROUNDS } from "../scene/life/rounds.ts"
 import { activeWorld } from "./active.ts"
 import { FORGE_BUCKETS, pilesOf, workTreesOf } from "./behaviours.ts"
+import { DMath } from "./dmath.ts"
 import { FURNITURE } from "./furniture.ts"
 import KIT from "./kit.json"
 import LANDS from "./lands.json"
@@ -45,8 +46,8 @@ type Bounds = { min: readonly number[]; max: readonly number[] }
 export function box(name: string, bounds: Bounds, x: number, z: number, rot = 0, scale = 1): Obstacle {
   const [x0 = 0, , z0 = 0] = bounds.min
   const [x1 = 0, , z1 = 0] = bounds.max
-  const c = Math.cos(rot)
-  const s = Math.sin(rot)
+  const c = DMath.cos(rot)
+  const s = DMath.sin(rot)
   return {
     name,
     distance(px, pz) {
@@ -57,13 +58,13 @@ export function box(name: string, bounds: Bounds, x: number, z: number, rot = 0,
       const lz = (dx * s + dz * c) / scale
       const ox = Math.max(x0 - lx, 0, lx - x1)
       const oz = Math.max(z0 - lz, 0, lz - z1)
-      return Math.hypot(ox, oz) * scale
+      return DMath.hypot(ox, oz) * scale
     },
   }
 }
 
 export function circle(name: string, x: number, z: number, radius: number): Obstacle {
-  return { name, distance: (px, pz) => Math.max(0, Math.hypot(px - x, pz - z) - radius) }
+  return { name, distance: (px, pz) => Math.max(0, DMath.hypot(px - x, pz - z) - radius) }
 }
 
 /** The first obstacle `spot` stands too close to, if any. */
@@ -155,7 +156,7 @@ export function onDryLand(spot: Spot, world: World = activeWorld() ?? handWorld(
     const centre = cellToWorld(cell)
     for (const dir of MAP.riverLinks.get(cell.join(",")) ?? []) {
       const angle = Math.PI / 6 + (dir * Math.PI) / 3
-      const edge: Spot = [centre[0] + Math.cos(angle) * 5, centre[1] + Math.sin(angle) * 5]
+      const edge: Spot = [centre[0] + DMath.cos(angle) * 5, centre[1] + DMath.sin(angle) * 5]
       if (toSegment(spot, centre, edge) < CHANNEL + BODY) return false
     }
   }
@@ -170,7 +171,7 @@ function seaNear(spot: Spot, world: World): boolean {
     sea = world.island.water.filter((w) => ["~", "o"].includes(world.terrain.at(MAP.cellOf(w))))
     SEA.set(world, sea)
   }
-  return sea.some((w) => Math.hypot(w[0] - spot[0], w[1] - spot[1]) < WATER_CLEARANCE)
+  return sea.some((w) => DMath.hypot(w[0] - spot[0], w[1] - spot[1]) < WATER_CLEARANCE)
 }
 
 // ---- The keep's floor -------------------------------------------------------------------------
@@ -200,7 +201,7 @@ export function keepPosts(): readonly Spot[] {
 export function onKeepFloor(spot: Spot): boolean {
   const [x, z] = spot
   if (Math.abs(x) > ROOM.width / 2 - STEP || Math.abs(z) > ROOM.depth / 2 - STEP) return false
-  if (keepPosts().some((s) => Math.hypot(s[0] - x, s[1] - z) < OFF_POSTS)) return false
+  if (keepPosts().some((s) => DMath.hypot(s[0] - x, s[1] - z) < OFF_POSTS)) return false
   return !keepObstacles().some((o) => o.distance(x, z) < ROOM_FOR_A_BODY)
 }
 

@@ -1,3 +1,4 @@
+import { DMath } from "./dmath.ts"
 import { hash } from "./gen/hex.ts"
 import type { Post } from "./layout.ts"
 import type { World } from "./world.ts"
@@ -28,8 +29,8 @@ export function lookoutPost(world: Pick<World, "trails">, who: string): Post | u
   const lookouts = world.trails?.lookouts ?? []
   const lookout = lookouts[hash(`lookout:${who}`) % Math.max(1, lookouts.length)]
   if (!lookout) return undefined
-  const x = lookout.at[0] + Math.sin(lookout.rot) * STAND
-  const z = lookout.at[1] + Math.cos(lookout.rot) * STAND
+  const x = lookout.at[0] + DMath.sin(lookout.rot) * STAND
+  const z = lookout.at[1] + DMath.cos(lookout.rot) * STAND
   return [
     Math.round(x * 100) / 100,
     Math.round(z * 100) / 100,

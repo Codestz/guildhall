@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 /**
  * Smooth shading with creases, the way a bevelled hand-modelled piece reads: each vertex of a
  * non-indexed mesh takes the area-weighted mean of the face normals of every face that meets it
@@ -10,8 +11,8 @@
 export const CREASE_DEGREES = 20
 /** The ground's own (tops and ramps): wider, so a faceted flank reads as broad planes, not a face-by-face zigzag of light and dark. */
 export const GROUND_DEGREES = 25
-const COS = Math.cos((CREASE_DEGREES * Math.PI) / 180)
-const COS_GROUND = Math.cos((GROUND_DEGREES * Math.PI) / 180)
+const COS = DMath.cos((CREASE_DEGREES * Math.PI) / 180)
+const COS_GROUND = DMath.cos((GROUND_DEGREES * Math.PI) / 180)
 /** A triangle's kind (the `flat` array): ground blends with ground, a wall only with walls, a skirt (flat) with nothing. */
 export const WALL = 2
 /** Positions closer than this (world units) are one vertex. */
@@ -49,7 +50,7 @@ export function smoothNormals(
     const bx = (position[o + 6] as number) - (position[o] as number)
     const by = (position[o + 7] as number) - (position[o + 1] as number)
     const bz = (position[o + 8] as number) - (position[o + 2] as number)
-    area[t] = Math.hypot(ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx)
+    area[t] = DMath.hypot(ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx)
   }
   const normal = Float32Array.from(face)
   for (const bucket of buckets.values()) {
@@ -74,7 +75,7 @@ export function smoothNormals(
         sy += gy * weight
         sz += gz * weight
       }
-      const length = Math.hypot(sx, sy, sz)
+      const length = DMath.hypot(sx, sy, sz)
       if (length > 1e-9) {
         normal[v * 3] = sx / length
         normal[v * 3 + 1] = sy / length

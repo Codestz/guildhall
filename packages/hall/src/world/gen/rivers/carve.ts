@@ -42,7 +42,7 @@ function distanceTo(line: readonly Spot[], x: number, z: number): number {
   for (let k = 0; k + 1 < line.length; k++) {
     const [ax, az] = line[k] as Spot
     const [bx, bz] = line[k + 1] as Spot
-    const len = (bx - ax) ** 2 + (bz - az) ** 2
+    const len = DMath.pow(bx - ax, 2) + DMath.pow(bz - az, 2)
     const t = len === 0 ? 0 : Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / len))
     best = Math.min(best, DMath.hypot(x - (ax + (bx - ax) * t), z - (az + (bz - az) * t)))
   }
@@ -71,7 +71,7 @@ function gradedCut(grade: readonly Point3[]): Cut {
     let lowest = Number.POSITIVE_INFINITY
     for (let k = 0; k + 1 < grade.length; k++) {
       const [a, b] = [grade[k] as Point3, grade[k + 1] as Point3]
-      const len = (b[0] - a[0]) ** 2 + (b[2] - a[2]) ** 2
+      const len = DMath.pow(b[0] - a[0], 2) + DMath.pow(b[2] - a[2], 2)
       const t =
         len === 0
           ? 0

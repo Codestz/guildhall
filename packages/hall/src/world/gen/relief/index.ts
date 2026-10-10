@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { type Cell, cellToWorld } from "../../lands.ts"
 import { TERRACE } from "../../waterways.ts"
 import { key } from "../hex.ts"
@@ -40,7 +41,7 @@ export interface Relief {
 
 /** A massif's main peak: grows with its files and its years, capped by the island's tier. */
 export function peakHeight(tier: Tier, files: number, years = 0): number {
-  return Math.min(CAP[tier], 10 + 6 * Math.log2(1 + files / 50) + 2 * Math.sqrt(Math.max(0, years)))
+  return Math.min(CAP[tier], 10 + 6 * DMath.log2(1 + files / 50) + 2 * Math.sqrt(Math.max(0, years)))
 }
 
 export function reliefOf({ plan, level, years = 0 }: ReliefInput): Relief {

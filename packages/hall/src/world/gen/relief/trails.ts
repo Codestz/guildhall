@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import type { Spot } from "../../layout.ts"
 import type { Massif } from "./field.ts"
 import type { Relief } from "./index.ts"
@@ -180,7 +181,7 @@ export function trailsOf(relief: Relief, roads: Roads, river: ReadonlySet<string
         if (grade > SLOPE) stairs++
         net.nodes[name] = nodes[k] as Spot
         net.edges.push([from, name])
-        net.costs.push(Math.hypot(run, rise) * (1 + 2 * grade) * (grade > SLOPE ? 1.4 : 1))
+        net.costs.push(DMath.hypot(run, rise) * (1 + 2 * grade) * (grade > SLOPE ? 1.4 : 1))
       })
       const last = chain.length - 1
       const back = spots[last - 1] as Spot
@@ -191,7 +192,7 @@ export function trailsOf(relief: Relief, roads: Roads, river: ReadonlySet<string
         kind: want.kind,
         at: top,
         y: Math.round((heights[last] as number) * 100) / 100,
-        rot: Math.round(Math.atan2(back[0] - top[0], back[1] - top[1]) * 100) / 100,
+        rot: Math.round(DMath.atan2(back[0] - top[0], back[1] - top[1]) * 100) / 100,
         node: names[last] as string,
       })
     }

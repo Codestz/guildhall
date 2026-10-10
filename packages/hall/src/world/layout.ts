@@ -1,4 +1,5 @@
 import type { Station as RosterStation } from "@guildhall/roster"
+import { DMath } from "./dmath.ts"
 
 /**
  * The great hall, in KayKit's native units (a floor tile is 4×4, a wall 4 high, a character ~2.5 tall).
@@ -135,9 +136,9 @@ export const HEARTH_SEATS = 9
 /** When the tavern is full: sit on the floor around the hearth. */
 export function hearthSeat(n: number): Post {
   const angle = Math.PI * 0.2 + n * ((Math.PI * 2) / HEARTH_SEATS)
-  const x = HEARTH[0] + Math.cos(angle) * 3.4
-  const z = HEARTH[1] + Math.sin(angle) * 3.4
-  return [x, z, Math.atan2(HEARTH[0] - x, HEARTH[1] - z)]
+  const x = HEARTH[0] + DMath.cos(angle) * 3.4
+  const z = HEARTH[1] + DMath.sin(angle) * 3.4
+  return [x, z, DMath.atan2(HEARTH[0] - x, HEARTH[1] - z)]
 }
 
 /** Where the guildmaster takes loot: just in front of the dais. */
@@ -146,6 +147,6 @@ export const HAND_IN: Post = [1.8, -5.6, -Math.PI * 0.75]
 /** Where loot is handed to each seat's guildmaster (STATIONS["quest-board"].posts), facing them. */
 export const HAND_INS: readonly Post[] = [
   HAND_IN,
-  [6, -5.6, Math.atan2(-1.6, -2)],
-  [10.6, -5, Math.atan2(-1.4, -1.8)],
+  [6, -5.6, DMath.atan2(-1.6, -2)],
+  [10.6, -5, DMath.atan2(-1.4, -1.8)],
 ]

@@ -1,5 +1,6 @@
 import type { Craft } from "@guildhall/core"
 import { activeWorld } from "./active.ts"
+import { DMath } from "./dmath.ts"
 import type { Biome } from "./gen/biomes.ts"
 import type { Spot } from "./layout.ts"
 import type { Fixture } from "./prefabs/index.ts"
@@ -123,7 +124,7 @@ export function nearestVenue(
   let bestDistance = Number.POSITIVE_INFINITY
   for (const venue of venuesIn(world)) {
     if (venue.kind !== kind) continue
-    const distance = Math.hypot(venue.at[0] - from[0], venue.at[1] - from[1])
+    const distance = DMath.hypot(venue.at[0] - from[0], venue.at[1] - from[1])
     if (distance < bestDistance || (distance === bestDistance && best && venue.id < best.id)) {
       best = venue
       bestDistance = distance
@@ -138,7 +139,7 @@ export function venuesNear(
   from: Spot,
   world: { venues?: readonly Venue[] } | undefined = activeWorld(),
 ): Venue[] {
-  const away = (venue: Venue): number => Math.hypot(venue.at[0] - from[0], venue.at[1] - from[1])
+  const away = (venue: Venue): number => DMath.hypot(venue.at[0] - from[0], venue.at[1] - from[1])
   return venuesIn(world)
     .filter((venue) => venue.kind === kind)
     .sort((a, b) => away(a) - away(b) || (a.id < b.id ? -1 : 1))

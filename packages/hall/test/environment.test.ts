@@ -8,6 +8,7 @@ import {
   environmentOf,
   type Weather,
 } from "../src/guild/environment.ts"
+import { SLOW } from "./support/slow.ts"
 
 const MINUTE = 60_000
 
@@ -245,7 +246,7 @@ describe("cost in a long live session", () => {
       times.push(performance.now() - started)
     }
     times.sort((a, b) => a - b)
-    expect(times[15]).toBeLessThan(0.5)
+    expect(times[15]).toBeLessThan(0.5 * SLOW)
     // Later, with the same model: exactly what a model read for the first time says.
     for (const later of [t + 1000, t + 3 * MINUTE, t + 30 * MINUTE]) {
       const { temperature, ...rest } = read(later)

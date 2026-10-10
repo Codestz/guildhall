@@ -1,3 +1,4 @@
+import { DMath } from "../../dmath.ts"
 import { type Cell, cellToWorld } from "../../lands.ts"
 import type { Spot } from "../../layout.ts"
 import { Heap } from "../heap.ts"
@@ -67,7 +68,7 @@ export function depthsOf(keys: ReadonlySet<string>): Map<string, number> {
   return depth
 }
 
-const dist = (a: Spot, b: Spot): number => Math.hypot(a[0] - b[0], a[1] - b[1])
+const dist = (a: Spot, b: Spot): number => DMath.hypot(a[0] - b[0], a[1] - b[1])
 
 /** The cheapest hex path between two footprint hexes, hugging the middle (deep hexes cost less). */
 function route(from: Cell, to: Cell, keys: ReadonlySet<string>, depth: ReadonlyMap<string, number>): Cell[] {
@@ -189,7 +190,7 @@ export function skeletonOf(
     const dip = low * (SADDLE[0] + (SADDLE[1] - SADDLE[0]) * jitter(to.cell, "saddle"))
     const crest = s.map((t) => {
       const end = t < 0.5 ? from.height : to.height
-      return dip + (end - dip) * Math.abs(2 * t - 1) ** SPIKE
+      return dip + (end - dip) * DMath.pow(Math.abs(2 * t - 1), SPIKE)
     })
     const mid = s.findIndex((t) => t >= 0.5)
     saddles.push({ at: points[mid] as Spot, height: dip, between: [a, b] })
@@ -215,7 +216,7 @@ export function skeletonOf(
       if (!pick) continue
       const points = chaikin(route(peak.cell, pick, keys, depth).map(worldOf))
       const s = along(points)
-      ridges.push({ points, crest: s.map((t) => peak.height * (0.85 - 0.7 * t ** 0.8)) })
+      ridges.push({ points, crest: s.map((t) => peak.height * (0.85 - 0.7 * DMath.pow(t, 0.8))) })
       marks.push(...points)
     }
   })

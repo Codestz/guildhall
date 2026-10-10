@@ -1,3 +1,4 @@
+import { DMath } from "./dmath.ts"
 import type { Placement } from "./furniture.ts"
 import { GRAVEYARD } from "./graveyard.ts"
 import { toPlot } from "./lands.ts"
@@ -52,7 +53,7 @@ export function toSegment(p: Spot, a: Spot, b: Spot): number {
   const dx = b[0] - a[0]
   const dz = b[1] - a[1]
   const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / (dx * dx + dz * dz || 1)))
-  return Math.hypot(p[0] - (a[0] + dx * t), p[1] - (a[1] + dz * t))
+  return DMath.hypot(p[0] - (a[0] + dx * t), p[1] - (a[1] + dz * t))
 }
 
 /** Lanterns are small: they may stand closer to roads and buildings than a torch post. */
@@ -90,12 +91,12 @@ function groundOf(world: World): Ground {
 function clear(ground: Ground, [x, z]: Spot, spacing: Spot[], rules: Rules = TORCH_RULES): boolean {
   // Every world has the keep at the origin; only the hand map has the graveyard.
   if (Math.abs(x) < ROOM.width / 2 + KEEP_MARGIN && Math.abs(z) < ROOM.depth / 2 + KEEP_MARGIN) return false
-  if (ground.water.some((w) => Math.hypot(w[0] - x, w[1] - z) < WATER_CLEARANCE)) return false
-  if (ground.buildings.some((b) => Math.hypot(b[0] - x, b[1] - z) < rules.building)) return false
+  if (ground.water.some((w) => DMath.hypot(w[0] - x, w[1] - z) < WATER_CLEARANCE)) return false
+  if (ground.buildings.some((b) => DMath.hypot(b[0] - x, b[1] - z) < rules.building)) return false
   if (ground.roads.some(([a, b]) => toSegment([x, z], a, b) < rules.road)) return false
-  if (ground.posts.some((p) => Math.hypot(p[0] - x, p[1] - z) < POST_CLEARANCE)) return false
+  if (ground.posts.some((p) => DMath.hypot(p[0] - x, p[1] - z) < POST_CLEARANCE)) return false
   if (ground.hand && toPlot(x, z) < GRAVEYARD_CLEARANCE) return false
-  return !spacing.some((s) => Math.hypot(s[0] - x, s[1] - z) < MIN_SPACING)
+  return !spacing.some((s) => DMath.hypot(s[0] - x, s[1] - z) < MIN_SPACING)
 }
 
 function torch(x: number, z: number, scale = 1): Light {
@@ -142,7 +143,7 @@ function build(world: World): Light[] {
     const to = next ? nodes[next] : undefined
     const dx = to ? to[0] - at[0] : 1
     const dz = to ? to[1] - at[1] : 0
-    const length = Math.hypot(dx, dz) || 1
+    const length = DMath.hypot(dx, dz) || 1
     side = -side
     const candidates: Spot[] = [
       [at[0] + (-dz / length) * SIDE_OFFSET * side, at[1] + (dx / length) * SIDE_OFFSET * side],
@@ -158,7 +159,7 @@ function build(world: World): Light[] {
     for (let ring = 3; ring <= 5.5 && placed < count; ring += 1.25) {
       for (let k = 0; k < 10 && placed < count; k++) {
         const angle = 0.4 + (k / 10) * Math.PI * 2
-        const spot: Spot = [cx + Math.cos(angle) * ring, cz + Math.sin(angle) * ring]
+        const spot: Spot = [cx + DMath.cos(angle) * ring, cz + DMath.sin(angle) * ring]
         if (clear(ground, spot, taken, LANTERN_RULES)) {
           add(lantern(spot[0], spot[1]))
           placed++

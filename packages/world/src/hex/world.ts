@@ -64,6 +64,8 @@ export interface HexWorldTile {
   paths?: number[]
   /** The side (0–5) a building's door faces. */
   door?: number
+  /** The prefab's turn about +y, radians (placeTile's `rot`): its spots and blockers turn with it. */
+  rot: number
 }
 
 export interface HexWorld {
@@ -417,6 +419,7 @@ export function hexWorld(h: HexIsland, z: HexZones, opts: { step?: number } = {}
       top: k === "shallows" ? -0.4 : t,
       ground,
       prefab,
+      rot,
       ...(pathSides ? { paths: pathSides } : {}),
       ...(door !== undefined ? { door } : {}),
     })

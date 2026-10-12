@@ -320,7 +320,21 @@
         0
       ],
       "hands": 1,
-      "slot": "hand.r"
+      "slot": "hand.r",
+      "clips": {
+        "Sit_Chair_Idle": {
+          "hide": true
+        },
+        "Walking_A": {
+          "hide": true
+        },
+        "Walking_B": {
+          "hide": true
+        },
+        "Walking_C": {
+          "hide": true
+        }
+      }
     },
     "kaykit-adventurers/wand": {
       "axis": [
@@ -585,12 +599,17 @@
         0
       ],
       "clips": {
+        "Sit_Chair_Idle": {
+          "hide": true
+        },
         "Walking_A": {
-          "offset": [
-            0,
-            -0.35,
-            0
-          ]
+          "hide": true
+        },
+        "Walking_B": {
+          "hide": true
+        },
+        "Walking_C": {
+          "hide": true
         },
         "Waving": {
           "hide": true
@@ -616,12 +635,17 @@
         0
       ],
       "clips": {
+        "Sit_Chair_Idle": {
+          "hide": true
+        },
         "Walking_A": {
-          "offset": [
-            0,
-            -0.5,
-            0
-          ]
+          "hide": true
+        },
+        "Walking_B": {
+          "hide": true
+        },
+        "Walking_C": {
+          "hide": true
         },
         "Waving": {
           "hide": true
@@ -731,7 +755,21 @@
         0
       ],
       "hands": 1,
-      "slot": "hand.r"
+      "slot": "hand.r",
+      "clips": {
+        "Sit_Chair_Idle": {
+          "hide": true
+        },
+        "Walking_A": {
+          "hide": true
+        },
+        "Walking_B": {
+          "hide": true
+        },
+        "Walking_C": {
+          "hide": true
+        }
+      }
     },
     "kenney-survival/tool-hoe": {
       "axis": [
@@ -747,12 +785,17 @@
             0
           ]
         },
+        "Sit_Chair_Idle": {
+          "hide": true
+        },
         "Walking_A": {
-          "offset": [
-            0,
-            -0.4,
-            0
-          ]
+          "hide": true
+        },
+        "Walking_B": {
+          "hide": true
+        },
+        "Walking_C": {
+          "hide": true
         },
         "Waving": {
           "hide": true

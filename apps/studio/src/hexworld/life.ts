@@ -36,8 +36,10 @@ import {
   hexWalk,
   type LifePose,
   type LifeStep,
+  lifePlaces,
   lifePose,
   planFolk,
+  type TileFurniture,
   workTiles,
 } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
@@ -108,6 +110,24 @@ function usable(r: NpcRecipe, catalog: Catalog): NpcRecipe {
   }
 }
 
+/**
+ * A look that holds `prop` (its work spot's) in the hand the prop's mount names, in place of what the
+ * recipe put there; unchanged when the prop has no mount in this library.
+ */
+function holding(look: NpcLook, prop: string | undefined, catalog: Catalog): NpcLook {
+  const mount = prop ? catalog.get(prop)?.compose.mount : undefined
+  if (!prop || !mount) return look
+  const mounts = [...look.mounts.filter((m) => m.slot !== mount.slot), { piece: prop, slot: mount.slot }]
+  return { ...look, mounts }
+}
+
+/** The clips spots ask for (sitting, sawing…), for the crowd to bake besides the looks' own. */
+function spotClips(loops: readonly (readonly LifeStep[])[]): string[] {
+  const out = new Set<string>()
+  for (const steps of loops) for (const s of steps) if (s.kind === "stay" && s.clip) out.add(s.clip)
+  return [...out].sort()
+}
+
 /** A look at the hex world's scale. */
 const scaled = (look: NpcLook): NpcLook => ({ ...look, scale: look.scale * CHARACTER_SCALE })
 
@@ -156,21 +176,87 @@ function banner(name: string, colour: string): HTMLElement {
   return el
 }
 
+/**
+ * A debug overlay (`?spots=1`): spots as dots with a tick the way they face (green work, blue sit,
+ * yellow stand / talk), blockers as red rings, within 30 m of the camera's target.
+ */
+function spotsOverlay(
+  stage: Stage,
+  host: HTMLElement,
+  furniture: TileFurniture,
+  groundAt: (x: number, z: number) => number,
+): { draw(): void; dispose(): void } {
+  const canvas = document.createElement("canvas")
+  canvas.style.cssText = "position:absolute;inset:0;z-index:1;pointer-events:none;width:100%;height:100%"
+  host.append(canvas)
+  const colour = { work: "#3fd16b", sit: "#4aa3ff", sleep: "#b07cff", stand: "#ffd34a", talk: "#ffd34a" }
+  return {
+    draw() {
+      const w = host.clientWidth
+      const h = host.clientHeight
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w
+        canvas.height = h
+      }
+      const g = canvas.getContext("2d")
+      if (!g) return
+      g.clearRect(0, 0, w, h)
+      const target = stage.getCamera().target
+      const close = (x: number, z: number) => Math.hypot(x - target[0], z - target[2]) < 30
+      g.lineWidth = 2
+      for (const b of furniture.blockers) {
+        if (!close(b.x, b.z)) continue
+        const y = groundAt(b.x, b.z) + 0.05
+        g.strokeStyle = "rgba(255,60,60,0.9)"
+        g.beginPath()
+        for (let k = 0; k <= 16; k++) {
+          const a = (k / 16) * Math.PI * 2
+          const p = toScreen(stage, [b.x + Math.cos(a) * b.r, y, b.z + Math.sin(a) * b.r])
+          if (!p) continue
+          if (k === 0) g.moveTo(p[0], p[1])
+          else g.lineTo(p[0], p[1])
+        }
+        g.stroke()
+      }
+      for (const s of furniture.spots) {
+        if (!close(s.x, s.z)) continue
+        const y = groundAt(s.x, s.z) + 0.05
+        const p = toScreen(stage, [s.x, y, s.z])
+        const q = toScreen(stage, [s.x + Math.sin(s.facing) * 0.6, y, s.z + Math.cos(s.facing) * 0.6])
+        if (!p || !q) continue
+        g.strokeStyle = colour[s.kind]
+        g.fillStyle = colour[s.kind]
+        g.beginPath()
+        g.arc(p[0], p[1], 5, 0, Math.PI * 2)
+        g.fill()
+        g.beginPath()
+        g.moveTo(p[0], p[1])
+        g.lineTo(q[0], q[1])
+        g.stroke()
+      }
+    },
+    dispose: () => canvas.remove(),
+  }
+}
+
 export function createLife(stage: Stage, opts: LifeOpts): Life {
   const { island: h, zones: z, world: w, groundAt } = opts
   let disposed = false
   let crowd: Crowd | null = null
   let unFrame = () => {}
   const banners: HTMLElement[] = []
+  const cleanup: (() => void)[] = []
 
   const ready = (async () => {
     const t0 = performance.now()
     const walk = hexWalk(h, z, w, { reach: workTiles(h, z) })
-    const folk = planFolk(h, z, w, walk, { seed: opts.seed, pace: (LIFE_MPS * 3600) / SPEEDUP })
+    // one reservation book: the agents take their spots and slots first, then the townsfolk
+    const places = lifePlaces(h, z, w, walk)
     const agents = DEMO_AGENTS.map((a, slot) => ({
       spec: a,
-      ...agentLoop(walk, z, a.errands, { slot: slot * 2, mps: LIFE_MPS * 1.15 }),
+      ...agentLoop(walk, z, a.errands, { slot: slot * 2, mps: LIFE_MPS * 1.15, role: a.recipe, places }),
     }))
+    const folk = planFolk(h, z, w, walk, { seed: opts.seed, pace: (LIFE_MPS * 3600) / SPEEDUP, places })
     const planned = performance.now() - t0
     const [catalog, recipes] = await Promise.all([mountedCatalog(), npcRecipes()])
     if (disposed || !catalog || recipes.size === 0) {
@@ -190,7 +276,8 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     for (const f of folk) {
       const recipe = usableOf(f.role)
       if (!recipe) continue
-      looks.push(scaled(resolveNpc(recipe, hash(`hexfolk:${opts.seed}:${f.id}`), catalog)))
+      const look = resolveNpc(recipe, hash(`hexfolk:${opts.seed}:${f.id}`), catalog)
+      looks.push(scaled(holding(look, f.prop, catalog)))
       loops.push({ steps: f.day, period: 24, real: false })
     }
     const agentIds: number[] = []
@@ -208,7 +295,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       stage,
       looks.map((look, id) => ({ id, look })),
       { catalog, url: libraryUrl },
-      { heroes: 12 },
+      { heroes: 12, clips: spotClips([...folk.map((f) => f.day), ...agents.map((a) => a.steps)]) },
     )
     if (disposed) {
       made.dispose()
@@ -244,6 +331,14 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     const baseZ = new Float32Array(n)
     const poses: LifePose[] = []
     const SPACE = 0.8
+    /** A walker's half-width against blockers, metres. */
+    const BODY = 0.22
+    /** How much of a pair's push `a` takes from `b`: a stayer leaves it to a walker. */
+    const yields = (a: number, b: number) => {
+      const wa = poses[a]!.act === "walk"
+      const wb = poses[b]!.act === "walk"
+      return wa === wb ? 1 : wa ? 1.8 : 0.2
+    }
     const separate = () => {
       const grid = new Map<number, number[]>()
       for (let id = 0; id < n; id++) {
@@ -290,21 +385,39 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
                 ez = Math.sin(a)
                 d = 1e-3
               }
+              // walkers step round whoever stands at a spot (it is theirs): a stayer barely gives
               const k = (SPACE - d) / 2 / d
-              pushX[id] = pushX[id]! + ex * k
-              pushZ[id] = pushZ[id]! + ez * k
-              pushX[o] = pushX[o]! - ex * k
-              pushZ[o] = pushZ[o]! - ez * k
+              const ki = k * yields(id, o)
+              const ko = k * yields(o, id)
+              pushX[id] = pushX[id]! + ex * ki
+              pushZ[id] = pushZ[id]! + ez * ki
+              pushX[o] = pushX[o]! - ex * ko
+              pushZ[o] = pushZ[o]! - ez * ko
             }
       }
       for (let id = 0; id < n; id++) {
         // ease toward the push, let it relax back when alone, never more than a stride off the way
+        // (a stayer only a little: it stays at its spot)
         offX[id] = offX[id]! * 0.9 + pushX[id]! * 0.6
         offZ[id] = offZ[id]! * 0.9 + pushZ[id]! * 0.6
+        const cap = poses[id]!.act === "walk" ? 1.6 : 0.3
         const m = Math.hypot(offX[id]!, offZ[id]!)
-        if (m > 1.6) {
-          offX[id] = (offX[id]! / m) * 1.6
-          offZ[id] = (offZ[id]! / m) * 1.6
+        if (m > cap) {
+          offX[id] = (offX[id]! / m) * cap
+          offZ[id] = (offZ[id]! / m) * cap
+        }
+        // and never into a cart, a stall or a house: a walker pushed in is set back on the disc's edge
+        if (poses[id]!.act !== "walk" || poses[id]!.indoors) continue
+        const x = baseX[id]! + offX[id]!
+        const zz = baseZ[id]! + offZ[id]!
+        for (const b of places.furniture.near(x, zz, BODY)) {
+          const ex = x - b.x
+          const ez = zz - b.z
+          const d = Math.hypot(ex, ez) || 1e-3
+          const out = b.r + BODY - d
+          if (out <= 0) continue
+          offX[id] = offX[id]! + (ex / d) * out
+          offZ[id] = offZ[id]! + (ez / d) * out
         }
       }
     }
@@ -313,12 +426,13 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       const look = looks[id]!
       const x = (poses[id] ? baseX[id]! : p.at[0]) + offX[id]!
       const zz = (poses[id] ? baseZ[id]! : p.at[2]) + offZ[id]!
-      const y = p.ground ? groundAt(x, zz) : p.at[1]
+      const y = (p.ground ? groundAt(x, zz) : p.at[1]) + (p.lift ?? 0)
       const prev = last[id]!
       const moved = Number.isNaN(prev[0]) ? 0 : Math.hypot(x - prev[0], zz - prev[1])
       prev[0] = x
       prev[1] = zz
-      const clip = look.clips[p.act]
+      // at a spot, its clip; walking, always the walk
+      const clip = (p.act !== "walk" && p.clip) || look.clips[p.act]
       // walking: the feet keep pace with the ground covered; standing: the clip's own time
       phase[id] =
         phase[id]! + (p.act === "walk" ? moved / (STRIDE * look.scale) : dt / (durations.get(clip) ?? 1.5))
@@ -363,7 +477,12 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         el.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`
       }
       cpuMs += (performance.now() - t1 - cpuMs) * 0.05
+      overlay?.draw()
     }
+    // `?spots=1`: every spot and blocker drawn over the scene, to check them against what stands there
+    const showSpots = new URLSearchParams(location.search).get("spots") === "1"
+    const overlay = showSpots ? spotsOverlay(stage, opts.host, places.furniture, groundAt) : null
+    if (overlay) cleanup.push(overlay.dispose)
     unFrame = stage.onFrame(tick)
     tick(0)
     // heroes load as the crowd first updates: let them settle before `ready` resolves
@@ -393,6 +512,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       unFrame()
       crowd?.dispose()
       for (const el of banners) el.remove()
+      for (const done of cleanup) done()
       const ext = window.guildhall?.ext
       if (ext) delete ext.life
     },

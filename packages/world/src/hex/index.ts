@@ -24,12 +24,15 @@ export {
   type AgentSpec,
   agentLoop,
   type Folk,
+  guildhallZone,
   type LifeAct,
+  type LifePlaces,
   type LifePose,
   type LifeSpot,
   type LifeStay,
   type LifeStep,
   type LifeWalk,
+  lifePlaces,
   lifePose,
   PLACE_ROLES,
   peopleFor,
@@ -38,6 +41,7 @@ export {
   workTiles,
 } from "./life.ts"
 export { hexStructures } from "./structures.ts"
+export { type Disc, type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
 export {
   CHARACTER_SCALE,
   castleWalls,
@@ -59,6 +63,7 @@ export {
   tileVariant,
 } from "./tiles.ts"
 export {
+  clearWay,
   DOOR_OUT,
   HEX_WALK_KINDS,
   type HexWalk,
@@ -66,6 +71,7 @@ export {
   type HexWalkKind,
   type HexWalkNode,
   hexWalk,
+  WALK_CLEAR,
 } from "./walk.ts"
 export {
   type HexBridge,

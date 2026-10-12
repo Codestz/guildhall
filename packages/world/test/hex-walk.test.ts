@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import {
   agentLoop,
+  guildhallZone,
   hexIsland,
   hexWalk,
   hexWorld,
@@ -138,10 +139,10 @@ describe("hex life", () => {
       }
   })
 
-  test("an agent's loop leaves the Guildhall square, works at the place and comes back", () => {
+  test("an agent's loop leaves the Guildhall, works at the place and comes back", () => {
     const camp = z.zones.findIndex((zz) => zz.kind === "camp")
     const { steps, period } = agentLoop(walk, z, [{ place: "camp", work: 30, idle: 5 }], { slot: 0 })
-    const hall = walk.nodes[walk.hearts[0]!]!
+    const hall = walk.nodes[walk.hearts[guildhallZone(walk, z)]!]!
     const site = walk.nodes[walk.hearts[camp]!]!
     const start = lifePose(steps, 0, period)
     expect(Math.hypot(start.at[0] - hall.x, start.at[2] - hall.z)).toBeLessThan(2)

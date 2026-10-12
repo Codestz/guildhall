@@ -59,12 +59,98 @@ export interface HexWalk {
 export const DOOR_OUT = 1.75
 /**
  * A bridge deck stands this far over its banks (as world.ts lays it); a dock's deck this high (the
- * dock prefab's platform, 0.75 of a 2.13 m piece set at 0.1, its posts standing above the deck).
+ * dock prefab's pier platforms, 0.75 m tall, stand on the shallows' bed at −0.4, as its crates do).
  */
 export const DECK_LIFT = 0.08
-export const DOCK_Y = 1.3
+export const DOCK_Y = 0.35
 /** Most steps a spur takes to reach the graph. */
 const SPUR_STEPS = 6
+
+/** Clearance kept from a blocker's edge by a walker's middle, metres (a shoulder and a little). */
+export const WALK_CLEAR = 0.3
+
+type Pt = [number, number, number]
+
+/**
+ * A polyline that keeps clear of the blocker discs `near` finds (decisions.md "Activity spots": paths
+ * go round carts, stalls and houses): where a segment would cut a disc (grown by WALK_CLEAR), two
+ * waypoints are put in beside it, on the side the segment already passed, and the new segments are
+ * checked again (a few rounds). A disc either end stands in is left alone (a spot on a bench, a door
+ * in a doorway): that is where the walk starts or ends. `ground[k]` is segment k's flag; the segments
+ * a detour adds take the flag of the one they replace.
+ */
+export function clearWay(
+  pts: readonly Pt[],
+  ground: readonly boolean[],
+  near: (x: number, z: number, r: number) => readonly { x: number; z: number; r: number }[],
+): { pts: Pt[]; ground: boolean[] } {
+  const P = [...pts]
+  const G = [...ground]
+  // a way point inside a blocker (a square's middle under its well) is set out on the disc's edge,
+  // on the side the way passes; only the ends may stand in one
+  for (let k = 1; k < P.length - 1; k++) {
+    const p = P[k]!
+    for (const d of near(p[0], p[2], WALK_CLEAR)) {
+      const r = (d.r + WALK_CLEAR) * 1.05
+      let ex = p[0] - d.x
+      let ez = p[2] - d.z
+      let m = Math.hypot(ex, ez)
+      if (m >= r) continue
+      if (m < 1e-3) {
+        // dead centre: out to the right of the way through it
+        const a = P[k - 1]!
+        const b = P[k + 1]!
+        const l = Math.hypot(b[0] - a[0], b[2] - a[2]) || 1
+        ex = -(b[2] - a[2]) / l
+        ez = (b[0] - a[0]) / l
+        m = 1
+      }
+      P[k] = [d.x + (ex / m) * r, p[1], d.z + (ez / m) * r]
+    }
+  }
+  for (let k = 0, added = 0; k < P.length - 1 && added < 24; k++) {
+    const a = P[k]!
+    const b = P[k + 1]!
+    const dx = b[0] - a[0]
+    const dz = b[2] - a[2]
+    const len = Math.hypot(dx, dz)
+    if (len < 1e-6) continue
+    const ux = dx / len
+    const uz = dz / len
+    // the first disc the segment cuts, along it
+    let hit: { x: number; z: number; r: number } | null = null
+    let along = Infinity
+    let side = 0
+    for (const d of near((a[0] + b[0]) / 2, (a[2] + b[2]) / 2, len / 2 + 0.5)) {
+      const r = d.r + WALK_CLEAR
+      if (Math.hypot(a[0] - d.x, a[2] - d.z) < r || Math.hypot(b[0] - d.x, b[2] - d.z) < r) continue
+      const t = (d.x - a[0]) * ux + (d.z - a[2]) * uz
+      if (t <= 0 || t >= len) continue
+      const off = (d.x - a[0]) * -uz + (d.z - a[2]) * ux
+      if (Math.abs(off) >= r || t >= along) continue
+      hit = d
+      along = t
+      side = off
+    }
+    if (!hit) continue
+    // round the side the segment's line already passes (left when the disc is to the right)
+    const sgn = side >= 0 ? -1 : 1
+    const r = (hit.r + WALK_CLEAR) * 1.08
+    const nx = -uz * sgn
+    const nz = ux * sgn
+    const y = (f: number) => a[1] + (b[1] - a[1]) * f
+    const t0 = Math.max(0.05, along - r * 0.75) / len
+    const t1 = Math.min(len - 0.05, along + r * 0.75) / len
+    const w0: Pt = [hit.x + nx * r - ux * r * 0.75, y(t0), hit.z + nz * r - uz * r * 0.75]
+    const w1: Pt = [hit.x + nx * r + ux * r * 0.75, y(t1), hit.z + nz * r + uz * r * 0.75]
+    P.splice(k + 1, 0, w0, w1)
+    G.splice(k, 0, G[k]!, G[k]!)
+    added++
+    // look at the new first segment again
+    k--
+  }
+  return { pts: P, ground: G }
+}
 
 /** Unit vector out through side d (60°·d counter-clockwise from +x, toward −z), as tilePath. */
 const side = (d: number): [number, number] => {

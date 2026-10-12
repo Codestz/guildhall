@@ -40,8 +40,33 @@ const BUILDS: Record<string, string[]> = {
   farm: ["farmstead", "cottage"],
   fishing: ["cottage", "cottage", "house"],
   mine: ["cottage", "smithy"],
-  lumber: ["cottage", "lumber"],
+  lumber: ["cottage", "lumber", "hunter"],
+  monastery: ["monastery", "cottage", "graveyard"],
+  camp: ["barracks", "fort-tower", "archery", "cottage"],
+  hamlet: ["cottage", "homestead", "house", "farmstead"],
+  market: ["market", "tavern", "townhouse", "house", "smithy", "cottage"],
 }
+
+/** The town builds by district: tall houses, shops and inns at its heart; workshops by the water; cottages at its edge. */
+const TOWN_HEART = ["townhouse", "market", "tavern", "townhouse", "house", "chapel"]
+const TOWN_WATER = ["warehouse", "smithy", "house", "construction"]
+const TOWN_EDGE = ["cottage", "house", "homestead", "cottage", "smithy", "construction"]
+
+/** What a place's heart tile is. */
+const HEART: Record<string, string | null> = {
+  town: "well-square",
+  market: "market",
+  monastery: "chapel",
+  camp: "archery",
+  harbour: "well-square",
+  hamlet: "well-square",
+  farm: "well-square",
+  fishing: "well-square",
+  mine: "mine",
+  lumber: "lumber",
+}
+
+const COLOURS = ["red", "red", "blue", "blue", "green", "yellow"]
 
 /** The prefab for a tile's use (besides buildings and roads). */
 const BY_USE: Record<string, string> = {
@@ -52,6 +77,9 @@ const BY_USE: Record<string, string> = {
   grove: "meadow",
   meadow: "meadow",
   hillside: "hillside",
+  hunter: "hunter",
+  shepherd: "shepherd",
+  homestead: "homestead",
   crag: "rocky",
   quarry: "rocky",
   beach: "beach",
@@ -105,6 +133,17 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
     const a = (Math.PI / 180) * (60 * d)
     return Math.atan2(Math.cos(a), -Math.sin(a))
   }
+  const steps = (a: number, b: number) => {
+    const dq = g.q[a]! - g.q[b]!
+    const dr = g.r[a]! - g.r[b]!
+    return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2
+  }
+  /** A KayKit hex building in another of its four colours, by the tile. */
+  const recolour = (piece: string, i: number): string => {
+    const m = /^(kaykit-hexagon\/building-.+)-(red|blue|green|yellow)$/.exec(piece)
+    if (!m) return piece
+    return `${m[1]}-${COLOURS[Math.floor(hash2(seed + 41, g.q[i]!, g.r[i]!) * COLOURS.length) % COLOURS.length]}`
+  }
   const byTile = new Map<number, number>()
   for (let i = 0; i < g.size; i++) {
     const k = kindOf(h, i)
@@ -124,11 +163,17 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
     const pick = (list: string[]) =>
       list[Math.floor(hash2(seed + 5, g.q[i]!, g.r[i]!) * list.length) % list.length]!
     if (u === "building") {
-      prefab = pick(BUILDS[zone?.kind ?? "town"] ?? BUILDS.town!)
+      if (zone?.kind === "town") {
+        const d = steps(i, zone.tile)
+        const byWater = [...g.neighbours(i)].some(
+          (j) => j >= 0 && (kindOf(h, j) === "river" || kindOf(h, j) === "lake"),
+        )
+        prefab = pick(d <= 3 ? TOWN_HEART : byWater ? TOWN_WATER : TOWN_EDGE)
+      } else prefab = pick(BUILDS[zone?.kind ?? "town"] ?? BUILDS.town!)
       rot = rotOf(facing(i))
     } else if (u === "landmark") prefab = "castle"
     else if (u === "square") {
-      prefab = zone?.kind === "town" ? "well-square" : null
+      prefab = HEART[zone?.kind ?? "town"] ?? "well-square"
       ground = "paved"
     } else if (u === "road" || u === "bridge") {
       const nb = g.neighbours(i)
@@ -159,7 +204,8 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
     if (p) {
       if (p.ground === "dirt" || p.ground === "paved") ground = p.ground
       // a prefab's own pieces, minus those that would float on water tiles it was not made for
-      for (const q of placeTile(p, [x, zz], prefab === "dock" ? 0.1 : t, rot, i)) pieces.push(q)
+      for (const q of placeTile(p, [x, zz], prefab === "dock" ? 0.1 : t, rot, i))
+        pieces.push({ ...q, piece: recolour(q.piece, i) })
       prefabs[prefab!] = (prefabs[prefab!] ?? 0) + 1
     }
     byTile.set(i, tiles.length)

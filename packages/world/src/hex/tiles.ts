@@ -440,6 +440,83 @@ TILE_PREFABS.push(
     ),
   },
 
+  // ---- more places ----
+  {
+    id: "monastery",
+    name: "Monastery",
+    group: "town",
+    ground: "paved",
+    pieces: [
+      p(H("church", "yellow"), 0, -0.3, 0, 0.5),
+      p("kaykit-forest/tree-3-a-color1", 1.9, 1.2, 0, T * 0.6),
+      p("kenney-graveyard/gravestone-cross", -1.8, 1.3, 0, 0.5),
+    ],
+  },
+  {
+    id: "archery",
+    name: "Archery range",
+    group: "town",
+    ground: "dirt",
+    pieces: [p(H("archeryrange", "red"), 0, 0, 0, 0.4)],
+  },
+  {
+    id: "fort-tower",
+    name: "Fort tower",
+    group: "town",
+    ground: "dirt",
+    pieces: [
+      p(H("tower-catapult", "red"), 0, 0, 0, 0.5),
+      p("kaykit-dungeon/barrel-small", 1.8, 1.2, 0, 0.45),
+    ],
+  },
+  {
+    id: "construction",
+    name: "Building site",
+    group: "town",
+    ground: "dirt",
+    pieces: [
+      p("kaykit-hexagon/building-stage-b", 0, 0, 0, 0.45),
+      p("kaykit-resources/wood-planks-stack-large", 1.8, 1.2, 0.3, 0.5),
+      p("kaykit-resources/stone-bricks-stack-medium", -1.8, 1.1, 0, 0.5),
+    ],
+  },
+  {
+    id: "hunter",
+    name: "Hunter's lodge",
+    group: "country",
+    ground: "grass",
+    pieces: [
+      p(H("home-a", "green"), -0.3, -0.4, 0, B * 0.85),
+      p("kaykit-resources/wood-log-stack", 1.7, 0.9, 0.5, 0.55),
+      p("kaykit-forest/tree-1-a-color1", 1.6, -1.4, 0, T * 0.7),
+      p("kaykit-forest/bush-2-c-color1", -1.8, 1.2, 0, 0.8),
+    ],
+  },
+  {
+    id: "shepherd",
+    name: "Shepherd's hut",
+    group: "country",
+    ground: "grass",
+    pieces: [
+      p(H("home-a", "yellow"), 0.6, -0.8, 0, B * 0.75),
+      ...fenceRing(2).slice(0, 3),
+      p("kaykit-forest/grass-2-d-color1", -1, 0.8, 0, 1),
+    ],
+  },
+  {
+    id: "homestead",
+    name: "Homestead",
+    group: "country",
+    ground: "grass",
+    pieces: [
+      p(H("home-b", "yellow"), 0, -0.6, 0, B * 0.9),
+      p("kenney-nature/fence-simple", 0, 1.8, 0, 0.7),
+      p("kenney-nature/crop-pumpkin", -1.3, 1.2, 0, 0.55),
+      p("kenney-nature/crops-leafs-stage-b", 1.3, 1.1, 0, 0.55),
+      p("kaykit-dungeon/barrel-small", 1.9, 0, 0, 0.45),
+    ],
+  },
+
   // ---- landmarks ----
   {
     id: "castle",

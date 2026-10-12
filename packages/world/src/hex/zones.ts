@@ -22,7 +22,19 @@ import { hash2 } from "../geom/noise.ts"
 import type { HexIsland } from "./island.ts"
 import { kindOf } from "./island.ts"
 
-export const ZONE_KINDS = ["town", "harbour", "castle", "farm", "fishing", "mine", "lumber"] as const
+export const ZONE_KINDS = [
+  "town",
+  "harbour",
+  "castle",
+  "farm",
+  "fishing",
+  "mine",
+  "lumber",
+  "monastery",
+  "camp",
+  "hamlet",
+  "market",
+] as const
 export type ZoneKind = (typeof ZONE_KINDS)[number]
 
 /** What a tile is for. */
@@ -60,6 +72,9 @@ export const TILE_USES = [
   "shrine",
   "campsite",
   "sawmill",
+  "hunter",
+  "shepherd",
+  "homestead",
 ] as const
 export type TileUse = (typeof TILE_USES)[number]
 
@@ -99,6 +114,10 @@ const PLAN: Record<ZoneKind, { per1k: number; min: number; density: number; apar
   fishing: { per1k: 7, min: 5, density: 0.4, apart: 10 },
   mine: { per1k: 5, min: 4, density: 0.4, apart: 9 },
   lumber: { per1k: 5, min: 4, density: 0.4, apart: 9 },
+  monastery: { per1k: 4, min: 4, density: 0.45, apart: 10 },
+  camp: { per1k: 4, min: 4, density: 0.5, apart: 9 },
+  hamlet: { per1k: 4, min: 4, density: 0.55, apart: 8 },
+  market: { per1k: 7, min: 6, density: 0.6, apart: 12 },
 }
 
 const U = Object.fromEntries(TILE_USES.map((k, i) => [k, i])) as Record<TileUse, number>
@@ -259,9 +278,37 @@ export function hexZones(h: HexIsland): HexZones {
         return kind(i) !== "forest" && toForest[i]! === 1 && f >= 0.6
           ? f + (town === undefined ? 0 : dist(i, town) / 40)
           : -1
+      // a quiet hill, far from the town
+      case "monastery":
+        return L >= 2 && f >= 0.6 && town !== undefined ? L * 0.5 + dist(i, town) / 15 + h1z(1, i) : -1
+      // a fort on open ground between the town and the far coast
+      case "camp":
+        return f >= 0.8 && L <= 3 && town !== undefined && dist(i, town) >= 10 ? f + h1z(2, i) * 1.5 : -1
+      // small clusters scattered in the open country, away from everything
+      case "hamlet":
+        return f >= 0.7 && L <= 3 && kind(i) !== "sand"
+          ? Math.min(...zones.map((zz) => dist(i, zz.tile))) / 10 + h1z(3, i)
+          : -1
+      // a crossroads market village, halfway out
+      case "market":
+        return f >= 0.85 && L <= 2 && town !== undefined ? -Math.abs(dist(i, town) - 16) / 6 + h1z(4, i) : -1
     }
   }
-  const order: ZoneKind[] = ["town", "harbour", "castle", "farm", "fishing", "mine", "lumber"]
+  const h1z = (k: number, i: number) => hash2(seed + 600 + k, g.q[i]!, g.r[i]!)
+  const order: ZoneKind[] = [
+    "town",
+    "harbour",
+    "castle",
+    "market",
+    "farm",
+    "fishing",
+    "mine",
+    "lumber",
+    "monastery",
+    "camp",
+  ]
+  // hamlets fill the open country: more of them the bigger the island
+  for (let k = 0; k < Math.round(land / 450); k++) order.push("hamlet")
   // a bigger island gets a second farm and fishing village
   if (land > 1400) order.push("farm", "fishing")
   if (land > 2200) order.push("farm", "lumber")
@@ -476,7 +523,7 @@ export function hexZones(h: HexIsland): HexZones {
     if (!free(i) || toRoad[i] !== 1 || toZone[i]! < 3) continue
     const k = kind(i)
     if (k !== "grass" && k !== "meadow") continue
-    if (farms.some((f) => dist(f, i) < 4) || h1(10, i) > 0.55) continue
+    if (farms.some((f) => dist(f, i) < 3) || h1(10, i) > 0.8) continue
     use[i] = U.farmstead
     farms.push(i)
   }
@@ -493,14 +540,30 @@ export function hexZones(h: HexIsland): HexZones {
     }
     const k = kind(i)
     const near = toZone[i]! <= 3 || toRoad[i]! <= 1
-    let u: TileUse
-    if (k === "forest") u = h1(20, i) < 0.82 ? "woods" : "grove"
+    let u: TileUse = "meadow"
+    // lone dwellings scattered over the country: a hunter at the wood's edge, a shepherd on the hills
+    const edge = toForest[i] === 1 && k !== "forest"
+    if (edge && toRoad[i]! <= 3 && h1(30, i) < 0.08) u = "hunter"
+    else if (k === "hill" && h1(31, i) < 0.06) u = "shepherd"
+    else if (!near && toRoad[i]! <= 3 && (k === "grass" || k === "meadow") && h1(32, i) < 0.06)
+      u = "homestead"
+    else if (k === "forest") u = h1(20, i) < 0.82 ? "woods" : "grove"
     else if (k === "sand") u = "beach"
     else if (k === "cliff") u = "bluff"
     else if (k === "hill") u = h1(21, i) < 0.55 ? "hillside" : h1(22, i) < 0.6 ? "pasture" : "grove"
     else if (toWater[i] === 1 && h1(23, i) < 0.45) u = "reeds"
     else if (near) u = h1(24, i) < 0.4 ? "field" : h1(25, i) < 0.55 ? "pasture" : "orchard"
-    else u = h1(26, i) < 0.4 ? "meadow" : h1(27, i) < 0.55 ? "grove" : h1(28, i) < 0.6 ? "pasture" : "meadow"
+    else
+      u =
+        h1(26, i) < 0.3
+          ? "meadow"
+          : h1(27, i) < 0.4
+            ? "grove"
+            : h1(28, i) < 0.55
+              ? "pasture"
+              : h1(29, i) < 0.5
+                ? "field"
+                : "orchard"
     use[i] = U[u]
   }
 

@@ -24,7 +24,7 @@ export interface Screen {
 /** Every screen the studio can open with `?screen=<id>`. New screens register here, one line each. */
 export const SCREENS: readonly Screen[] = [m0, lineup, pieces, scale]
 
-export const DEFAULT_SCREEN = "m0"
+export const DEFAULT_SCREEN = "pieces"
 
 /** The screen a query names, the default when it names none. Undefined for an unknown id. */
 export function screenFor(query: URLSearchParams): Screen | undefined {

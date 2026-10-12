@@ -81,7 +81,7 @@ export const TILE_PREFABS: TilePrefab[] = [
     pieces: [
       p("kaykit-hexagon/building-home-b-red", 0, -0.3, 0, B),
       p("kenney-pirate/barrel", 1.7, 1.2, 0.4, 0.45),
-      p("kenney-nature/plant-bush", -1.8, 1.1, 0, 0.7),
+      p("kaykit-forest/bush-1-c-color1", -1.8, 1.1, 0, 0.84),
       p("kenney-nature/flower-red-a", -1.1, 1.7, 0, 1),
       p("kenney-nature/flower-yellow-a", -0.6, 1.9, 0, 1),
       p("kaykit-halloween/post-lantern", 1.2, 1.9, 0, 0.55),
@@ -105,8 +105,8 @@ export const TILE_PREFABS: TilePrefab[] = [
     ground: "paved",
     pieces: [
       p("kaykit-hexagon/building-well-yellow", 0, 0, 0, B),
-      p("kenney-nature/plant-bush-large", -1.9, -0.9, 0, 0.6),
-      p("kenney-nature/plant-bush-large", 1.9, -0.9, 1, 0.6),
+      p("kaykit-forest/bush-2-c-color1", -1.9, -0.9, 0, 0.69),
+      p("kaykit-forest/bush-2-c-color1", 1.9, -0.9, 1, 0.69),
       p("kaykit-halloween/post-lantern", 1.6, 1.3, 0, 0.55),
       p("kaykit-halloween/post-lantern", -1.6, 1.3, 0, 0.55),
     ],
@@ -145,8 +145,8 @@ export const TILE_PREFABS: TilePrefab[] = [
         [1.3, 1.2],
         [0, 0],
       ].map(([x, z], k) => p("kaykit-forest/tree-3-a-color1", x!, z!, k, T * 0.62)),
-      p("kenney-nature/grass", -2, 0, 0, 0.8),
-      p("kenney-nature/grass", 2, 0.2, 1, 0.8),
+      p("kaykit-forest/grass-2-c-color1", -2, 0, 0, 0.8),
+      p("kaykit-forest/grass-2-c-color1", 2, 0.2, 1, 0.8),
     ],
   },
   {
@@ -155,10 +155,10 @@ export const TILE_PREFABS: TilePrefab[] = [
     ground: "grass",
     pieces: [
       ...fenceRing(1),
-      p("kenney-nature/log-stack", -0.6, -0.4, 0.4, 0.45),
+      p("kaykit-resources/wood-log-stack", -0.6, -0.4, 0.4, 0.54),
       p("kaykit-dungeon/barrel-small", 0.7, 0.5, 0, 0.5),
       ...ringAt(0.45, 0.4).map(([x, z], k) =>
-        p(k % 2 ? "kenney-nature/grass-large" : "kenney-nature/grass", x, z, k, 0.8),
+        p(k % 2 ? "kaykit-forest/grass-2-d-color1" : "kaykit-forest/grass-2-c-color1", x, z, k, 0.8),
       ),
       p("kenney-nature/flower-yellow-a", 1.2, -1, 0, 1),
     ],
@@ -173,10 +173,10 @@ export const TILE_PREFABS: TilePrefab[] = [
       p("kaykit-forest/tree-1-a-color1", 0.2, 0.9, 2.1, T * 1.1),
       p("kaykit-forest/tree-4-b-color1", -1.6, 1, 0.7, T * 0.85),
       p("kaykit-forest/tree-3-b-color1", 1.7, 1.1, 1.9, T * 0.8),
-      p("kenney-nature/plant-bush-large", -0.1, -2, 0, 0.6),
-      p("kenney-nature/mushroom-red", 0.8, 0.2, 0, 1),
-      p("kenney-nature/stump-round", -0.3, -0.1, 0.5, 0.5),
-      p("kenney-nature/rock-small-c", 2.1, -0.1, 0.3, 0.5),
+      p("kaykit-forest/bush-2-c-color1", -0.1, -2, 0, 0.69),
+      p("kaykit-forest/bush-1-c-color1", 0.8, 0.2, 0, 0.6),
+      p("kaykit-resources/wood-log-a", -0.3, -0.1, 0.5, 0.55),
+      p("kaykit-forest/rock-3-e-color1", 2.1, -0.1, 0.3, 0.625),
     ],
   },
   {
@@ -187,15 +187,17 @@ export const TILE_PREFABS: TilePrefab[] = [
       p("kaykit-forest/tree-2-b-color1", 1.1, -0.8, 0.5, T * 0.9),
       ...ringAt(0.55, 0.3).map(([x, z], k) =>
         p(
-          ["kenney-nature/flower-red-a", "kenney-nature/flower-yellow-a", "kenney-nature/grass"][k % 3]!,
+          ["kenney-nature/flower-red-a", "kenney-nature/flower-yellow-a", "kaykit-forest/grass-2-c-color1"][
+            k % 3
+          ]!,
           x,
           z,
           k,
           1,
         ),
       ),
-      p("kenney-nature/rock-small-c", -1.2, 0.6, 0, 0.45),
-      p("kenney-nature/plant-bush", -0.6, -1.4, 0, 0.6),
+      p("kaykit-forest/rock-3-e-color1", -1.2, 0.6, 0, 0.562),
+      p("kaykit-forest/bush-1-c-color1", -0.6, -1.4, 0, 0.72),
     ],
   },
   {
@@ -205,9 +207,9 @@ export const TILE_PREFABS: TilePrefab[] = [
     path: true,
     pieces: [
       p("kaykit-halloween/post-lantern", 1.3, -0.9, 0, 0.55),
-      p("kenney-nature/grass", -1.4, 1.3, 0, 0.8),
-      p("kenney-nature/grass", 1.6, 1.4, 1, 0.8),
-      p("kenney-nature/rock-small-c", -1.8, -1.2, 0.3, 0.4),
+      p("kaykit-forest/grass-2-c-color1", -1.4, 1.3, 0, 0.8),
+      p("kaykit-forest/grass-2-c-color1", 1.6, 1.4, 1, 0.8),
+      p("kaykit-forest/rock-3-e-color1", -1.8, -1.2, 0.3, 0.5),
       p("kenney-nature/flower-yellow-a", -2, 0.2, 0, 1),
     ],
   },

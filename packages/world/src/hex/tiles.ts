@@ -111,11 +111,11 @@ export const TILE_PREFABS: TilePrefab[] = [
     ground: "grass",
     pieces: [
       p("kaykit-hexagon/building-home-a-yellow", -0.4, -1.1, 0, B * 0.9),
-      p("kenney-graveyard/hay-bale", 1.6, -1.2, 0.5, 0.8),
-      p("kenney-graveyard/hay-bale", 1.9, -0.5, 1.2, 0.8),
-      ...[-1.4, -0.6, 0.2, 1].flatMap((x) => [
-        p("kenney-nature/crops-wheat-stage-b", x, 1.1, 0, 0.6),
-        p("kenney-nature/crops-wheat-stage-b", x, 1.8, 0, 0.6),
+      p("kenney-town/cart", 1.7, -0.9, 0.6, 0.45),
+      p("kaykit-dungeon/barrel-small", 2.1, 0.2, 0, 0.5),
+      ...[-1.4, -0.6, 0.2, 1].flatMap((x, k) => [
+        p(k % 2 ? "kenney-nature/crops-leafs-stage-b" : "kenney-nature/crop-pumpkin", x, 1.1, k, 0.55),
+        p(k % 2 ? "kenney-nature/crop-pumpkin" : "kenney-nature/crops-leafs-stage-b", x, 1.8, k + 1, 0.55),
       ]),
       p("kenney-nature/fence-simple", -0.2, 2.45, 0, 0.75),
     ],
@@ -124,11 +124,8 @@ export const TILE_PREFABS: TilePrefab[] = [
     id: "field",
     name: "Field",
     ground: "soil",
-    pieces: [-2, -1, 0, 1, 2].flatMap((row) =>
-      [-2, -1.2, -0.4, 0.4, 1.2, 2]
-        .filter((x) => Math.hypot(x, row * 0.85) < R * 0.78)
-        .map((x) => p("kenney-nature/crops-wheat-stage-b", x, row * 0.85, (row % 2) * 0.2, 0.62)),
-    ),
+    // KayKit's own hex field (V1's), scaled from its native hex to ours
+    pieces: [p("kaykit-hexagon/building-grain", 0, 0, 0, 0.37)],
   },
   {
     id: "orchard",
@@ -152,8 +149,8 @@ export const TILE_PREFABS: TilePrefab[] = [
     ground: "grass",
     pieces: [
       ...fenceRing(1),
-      p("kenney-graveyard/hay-bale", -0.6, -0.4, 0.4, 0.8),
-      p("kenney-graveyard/hay-bale", 0.5, 0.3, 1.6, 0.8),
+      p("kenney-nature/log-stack", -0.6, -0.4, 0.4, 0.45),
+      p("kaykit-dungeon/barrel-small", 0.7, 0.5, 0, 0.5),
       ...ringAt(0.45, 0.4).map(([x, z], k) =>
         p(k % 2 ? "kenney-nature/grass-large" : "kenney-nature/grass", x, z, k, 0.8),
       ),

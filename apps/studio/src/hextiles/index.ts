@@ -32,6 +32,8 @@ const GROUND: Record<TileGround, [number, number, number]> = {
   dirt: [196, 160, 108],
   paved: [196, 186, 166],
   sand: [232, 210, 150],
+  rock: [150, 140, 128],
+  water: [79, 154, 214],
 }
 const SIDE: [number, number, number] = [122, 90, 60]
 const CHARACTER = "kaykit-adventurers/knight"
@@ -48,29 +50,79 @@ export const hexTiles: Screen = {
     const meshes: TerrainMesh[] = []
     const cleanup: (() => void)[] = []
     const one = ctx.query.get("tile")
-    const shown = one ? TILE_PREFABS.filter((t) => t.id === one) : TILE_PREFABS
+    const group = ctx.query.get("group")
+    const shown = one
+      ? TILE_PREFABS.filter((t) => t.id === one)
+      : group
+        ? TILE_PREFABS.filter((t) => t.group === group)
+        : TILE_PREFABS
 
     const build = async () => {
       const catalog = await loadCatalog()
       if (!catalog || disposed) return
       const R = HEX_TILE_SIZE
       const gap = R * 2.9
-      const cols = Math.min(5, shown.length)
+      const cols = Math.min(7, shown.length)
       const at = (k: number): [number, number] => [(k % cols) * gap, Math.floor(k / cols) * gap * 1.25]
       const tiles: HexPrism[] = []
       const pieces: BatchInstance[] = []
       const paths: number[] = []
       shown.forEach((t, k) => {
         const [x, z] = at(k)
-        tiles.push({ x, z, top: 0.5, color: GROUND[t.ground], side: SIDE })
+        tiles.push({ x, z, top: t.ground === "water" ? 0.15 : 0.5, color: GROUND[t.ground], side: SIDE })
         pieces.push(...placeTile(t, [x, z], 0.5, 0, k + 1).filter((q) => catalog.get(q.piece)))
+        // a dirt path from the centre out through each side the tile names (side d's middle sits at
+        // 30° + 60°·d on a pointy-top hex), a round patch where they meet
         if (t.path) {
-          // a dirt path across the tile, edge middle to edge middle (pointy-top: along x)
-          const h = R * (Math.sqrt(3) / 2)
-          const w = 0.9
           const y = 0.53
-          paths.push(x - h, y, z - w, x - h, y, z + w, x + h, y, z - w)
-          paths.push(x + h, y, z - w, x - h, y, z + w, x + h, y, z + w)
+          const w = 0.85
+          const reach = R * (Math.sqrt(3) / 2) + 0.05
+          for (const d of t.path) {
+            const a = (Math.PI / 180) * (60 * d)
+            const ex = Math.cos(a) * reach
+            const ez = -Math.sin(a) * reach
+            const nx = -ez / reach
+            const nz = ex / reach
+            const q = [
+              [x + nx * w, z + nz * w],
+              [x - nx * w, z - nz * w],
+              [x + ex - nx * w, z + ez - nz * w],
+              [x + ex + nx * w, z + ez + nz * w],
+            ] as const
+            for (const [a0, b0, c0] of [
+              [0, 2, 1],
+              [0, 3, 2],
+              [0, 1, 2],
+              [0, 2, 3],
+            ] as const)
+              paths.push(q[a0][0], y, q[a0][1], q[b0][0], y, q[b0][1], q[c0][0], y, q[c0][1])
+          }
+          for (let k = 0; k < 8; k++) {
+            const a0 = (k / 8) * Math.PI * 2
+            const a1 = ((k + 1) / 8) * Math.PI * 2
+            paths.push(
+              x,
+              y,
+              z,
+              x + Math.cos(a1) * w,
+              y,
+              z + Math.sin(a1) * w,
+              x + Math.cos(a0) * w,
+              y,
+              z + Math.sin(a0) * w,
+            )
+            paths.push(
+              x,
+              y,
+              z,
+              x + Math.cos(a0) * w,
+              y,
+              z + Math.sin(a0) * w,
+              x + Math.cos(a1) * w,
+              y,
+              z + Math.sin(a1) * w,
+            )
+          }
         }
       })
       meshes.push(createHexGround(stage, { size: R, base: -0.5, tiles }))

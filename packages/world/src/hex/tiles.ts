@@ -19,7 +19,7 @@ export const SCALE_B = { building: 0.5, tree: 0.6 } as const
  */
 export const CHARACTER_SCALE = 0.47
 
-export type TileGround = "grass" | "soil" | "dirt" | "paved" | "sand"
+export type TileGround = "grass" | "soil" | "dirt" | "paved" | "sand" | "rock" | "water"
 
 export interface TilePiece {
   piece: string
@@ -33,8 +33,10 @@ export interface TilePrefab {
   id: string
   name: string
   ground: TileGround
-  /** A dirt path across the tile, from edge to edge through the centre (road tiles). */
-  path?: boolean
+  /** Paths from the centre out through these sides (0–5, counter-clockwise from east): road tiles. */
+  path?: number[]
+  /** What the tile is for, for the gallery's grouping. */
+  group?: "town" | "country" | "ground" | "landmark" | "road"
   pieces: TilePiece[]
 }
 
@@ -76,6 +78,7 @@ function fenceRing(gap = -1): TilePiece[] {
 export const TILE_PREFABS: TilePrefab[] = [
   {
     id: "house",
+    group: "town",
     name: "House",
     ground: "grass",
     pieces: [
@@ -89,6 +92,7 @@ export const TILE_PREFABS: TilePrefab[] = [
   },
   {
     id: "tavern",
+    group: "town",
     name: "Tavern",
     ground: "grass",
     pieces: [
@@ -101,6 +105,7 @@ export const TILE_PREFABS: TilePrefab[] = [
   },
   {
     id: "well-square",
+    group: "town",
     name: "Well square",
     ground: "paved",
     pieces: [
@@ -113,6 +118,7 @@ export const TILE_PREFABS: TilePrefab[] = [
   },
   {
     id: "farmstead",
+    group: "country",
     name: "Farmstead",
     ground: "grass",
     pieces: [
@@ -128,6 +134,7 @@ export const TILE_PREFABS: TilePrefab[] = [
   },
   {
     id: "field",
+    group: "country",
     name: "Field",
     ground: "soil",
     // KayKit's own hex field (V1's), scaled from its native hex to ours
@@ -135,6 +142,7 @@ export const TILE_PREFABS: TilePrefab[] = [
   },
   {
     id: "orchard",
+    group: "country",
     name: "Orchard",
     ground: "grass",
     pieces: [
@@ -151,6 +159,7 @@ export const TILE_PREFABS: TilePrefab[] = [
   },
   {
     id: "pasture",
+    group: "country",
     name: "Pasture",
     ground: "grass",
     pieces: [
@@ -165,6 +174,7 @@ export const TILE_PREFABS: TilePrefab[] = [
   },
   {
     id: "woods",
+    group: "country",
     name: "Woods",
     ground: "grass",
     pieces: [
@@ -181,6 +191,7 @@ export const TILE_PREFABS: TilePrefab[] = [
   },
   {
     id: "meadow",
+    group: "country",
     name: "Meadow",
     ground: "grass",
     pieces: [
@@ -202,9 +213,10 @@ export const TILE_PREFABS: TilePrefab[] = [
   },
   {
     id: "road",
+    group: "road",
     name: "Road",
     ground: "grass",
-    path: true,
+    path: [0, 3],
     pieces: [
       p("kaykit-halloween/post-lantern", 1.3, -0.9, 0, 0.55),
       p("kaykit-forest/grass-2-c-color1", -1.4, 1.3, 0, 0.8),
@@ -214,6 +226,301 @@ export const TILE_PREFABS: TilePrefab[] = [
     ],
   },
 ]
+
+const H = (id: string, colour = "blue") => `kaykit-hexagon/building-${id}-${colour}`
+const rocks = (n: number, k = 0.6, seed = 0): TilePiece[] =>
+  Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * Math.PI * 2 + seed
+    const r = R * (0.25 + (0.4 * ((i * 37 + seed * 11) % 7)) / 7)
+    return p(`kaykit-forest/rock-3-${"efghijk"[i % 7]}-color1`, Math.cos(a) * r, Math.sin(a) * r, i, k)
+  })
+
+TILE_PREFABS.push(
+  // ---- road pieces: a straight, a bend, a fork, a crossing, an end ----
+  {
+    id: "road-bend",
+    name: "Road bend",
+    group: "road",
+    ground: "grass",
+    path: [0, 2],
+    pieces: [
+      p("kaykit-forest/bush-1-c-color1", -1.6, 1, 0, 1),
+      p("kaykit-forest/grass-2-c-color1", 1.2, 1.5, 0, 1),
+    ],
+  },
+  {
+    id: "road-fork",
+    name: "Road fork",
+    group: "road",
+    ground: "grass",
+    path: [0, 2, 4],
+    pieces: [p("kaykit-halloween/post-lantern", 0.9, 0.9, 0, 0.55)],
+  },
+  {
+    id: "road-cross",
+    name: "Crossroads",
+    group: "road",
+    ground: "grass",
+    path: [0, 1, 3, 4],
+    pieces: [p("kaykit-halloween/post-lantern", -0.6, 1.4, 0, 0.55)],
+  },
+  {
+    id: "road-end",
+    name: "Road end",
+    group: "road",
+    ground: "grass",
+    path: [3],
+    pieces: [p("kenney-town/cart", 0.9, 0, 0.4, 0.4), p("kaykit-dungeon/barrel-small", 1.6, -1, 0, 0.5)],
+  },
+
+  // ---- town ----
+  {
+    id: "townhouse",
+    name: "Town house",
+    group: "town",
+    ground: "grass",
+    pieces: [
+      p(H("home-b", "green"), 0, -0.3, 0, B),
+      p("kaykit-dungeon/barrel-small", 1.8, 1.2, 0, 0.45),
+      p("kaykit-forest/bush-1-c-color1", -1.8, 1.1, 0, 0.8),
+    ],
+  },
+  {
+    id: "cottage",
+    name: "Cottage",
+    group: "town",
+    ground: "grass",
+    pieces: [
+      p(H("home-a", "red"), 0, -0.4, 0, B),
+      p("kenney-nature/fence-simple", 0, 1.9, 0, 0.7),
+      p("kenney-nature/flower-red-a", -1.4, 1.2, 0, 1),
+      p("kenney-nature/flower-yellow-a", 1.3, 1.1, 0, 1),
+    ],
+  },
+  {
+    id: "market",
+    name: "Market",
+    group: "town",
+    ground: "paved",
+    pieces: [
+      p(H("market", "red"), 0, 0, 0, 0.4),
+      p("kaykit-dungeon/barrel-small", 2, 1.3, 0, 0.45),
+      p("kaykit-halloween/post-lantern", -2, 1.3, 0, 0.55),
+    ],
+  },
+  {
+    id: "smithy",
+    name: "Smithy",
+    group: "town",
+    ground: "dirt",
+    pieces: [
+      p(H("blacksmith", "yellow"), 0, -0.2, 0, 0.5),
+      p("kaykit-resources/wood-log-stack", 1.9, 1.3, 0.4, 0.6),
+    ],
+  },
+  {
+    id: "chapel",
+    name: "Chapel",
+    group: "town",
+    ground: "grass",
+    pieces: [
+      p(H("church", "blue"), 0, -0.6, 0, 0.5),
+      p("kenney-graveyard/gravestone-round", 1.6, 1.3, 0, 0.5),
+      p("kenney-graveyard/gravestone-cross", 2.2, 0.4, 0.2, 0.5),
+      p("kenney-graveyard/gravestone-bevel", 1, 1.9, -0.2, 0.5),
+    ],
+  },
+  {
+    id: "barracks",
+    name: "Barracks",
+    group: "town",
+    ground: "dirt",
+    pieces: [p(H("barracks", "red"), 0, 0, 0, 0.44)],
+  },
+  {
+    id: "graveyard",
+    name: "Graveyard",
+    group: "town",
+    ground: "grass",
+    pieces: [
+      ...[-1.4, 0, 1.4].flatMap((x, k) => [
+        p(k % 2 ? "kenney-graveyard/gravestone-cross" : "kenney-graveyard/gravestone-round", x, -0.6, 0, 0.5),
+        p("kenney-graveyard/gravestone-bevel", x, 0.8, 0, 0.5),
+      ]),
+      p("kaykit-forest/tree-bare-1-c-color1", -1.8, 1.5, 0, 0.4),
+      ...fenceRing(1),
+    ],
+  },
+
+  // ---- harbour ----
+  {
+    id: "dock",
+    name: "Dock",
+    group: "town",
+    ground: "water",
+    pieces: [
+      p("kenney-pirate/structure-platform-dock", 0, 0, 0, 0.75),
+      p("kenney-pirate/boat-row-small", 1.9, 1.4, 0.6, 0.45),
+      p("kaykit-dungeon/barrel-small", -0.8, -0.6, 0, 0.45),
+    ],
+  },
+  {
+    id: "warehouse",
+    name: "Warehouse",
+    group: "town",
+    ground: "dirt",
+    pieces: [
+      p(H("lumbermill", "blue"), 0, -0.3, 0, 0.45),
+      p("kenney-pirate/crate", 1.8, 1.4, 0.3, 0.5),
+      p("kenney-pirate/crate", 2.1, 0.6, 1, 0.5),
+    ],
+  },
+
+  // ---- ground ----
+  {
+    id: "beach",
+    name: "Beach",
+    group: "ground",
+    ground: "sand",
+    pieces: [
+      p("kaykit-forest/rock-3-e-color1", 1.2, -0.8, 0, 0.6),
+      p("kaykit-forest/grass-2-c-color1", -1.6, -1.2, 0, 1),
+    ],
+  },
+  { id: "rocky", name: "Rocky ground", group: "ground", ground: "rock", pieces: rocks(6, 0.7, 1) },
+  {
+    id: "hillside",
+    name: "Hillside",
+    group: "ground",
+    ground: "grass",
+    pieces: [
+      ...rocks(3, 0.6, 2),
+      p("kaykit-forest/tree-4-b-color1", 0.6, -0.6, 0, T * 0.8),
+      p("kaykit-forest/tree-4-a-color1", -1, 1, 0, T * 0.8),
+    ],
+  },
+  {
+    id: "pines",
+    name: "Pine woods",
+    group: "ground",
+    ground: "grass",
+    pieces: [
+      ...[
+        [-1, -1],
+        [1.1, -0.8],
+        [0, 0.4],
+        [-1.5, 1.1],
+        [1.5, 1.2],
+        [0.1, -1.9],
+      ].map(([x, z], k) =>
+        p(`kaykit-forest/tree-4-${"abc"[k % 3]}-color1`, x!, z!, k, T * (0.7 + 0.1 * (k % 3))),
+      ),
+    ],
+  },
+  {
+    id: "lake",
+    name: "Lake",
+    group: "ground",
+    ground: "water",
+    pieces: [p("kaykit-forest/rock-3-e-color1", 1.9, -1, 0, 0.5)],
+  },
+  {
+    id: "reeds",
+    name: "Reeds",
+    group: "ground",
+    ground: "grass",
+    pieces: Array.from({ length: 9 }, (_, i) =>
+      p(
+        "kaykit-forest/grass-2-a-color1",
+        Math.cos(i * 0.7) * (0.6 + (i % 3) * 0.6),
+        Math.sin(i * 0.7) * (0.6 + (i % 3) * 0.6),
+        i,
+        1.3,
+      ),
+    ),
+  },
+
+  // ---- landmarks ----
+  {
+    id: "castle",
+    name: "Castle",
+    group: "landmark",
+    ground: "rock",
+    pieces: [p(H("castle", "blue"), 0, 0, 0, 0.36), p("kenney-castle/flag-pennant", 2.3, 1.4, 0, 0.5)],
+  },
+  {
+    id: "windmill",
+    name: "Windmill",
+    group: "landmark",
+    ground: "grass",
+    pieces: [
+      p(H("windmill", "yellow"), 0, 0, 0, 0.5),
+      p("kenney-nature/crops-leafs-stage-b", 1.8, 1.4, 0, 0.55),
+      p("kenney-nature/crop-pumpkin", 1.2, 1.9, 0, 0.55),
+    ],
+  },
+  {
+    id: "watermill",
+    name: "Watermill",
+    group: "landmark",
+    ground: "grass",
+    pieces: [p(H("watermill", "red"), 0, 0, 0, 0.5)],
+  },
+  {
+    id: "mine",
+    name: "Mine",
+    group: "landmark",
+    ground: "rock",
+    pieces: [p(H("mine", "blue"), 0, 0, 0, 0.42), p("kaykit-resources/stone-chunks-large", 2, 1.2, 0, 0.6)],
+  },
+  {
+    id: "lumber",
+    name: "Lumber camp",
+    group: "landmark",
+    ground: "dirt",
+    pieces: [
+      p(H("lumbermill", "yellow"), 0, -0.4, 0, 0.45),
+      p("kaykit-resources/wood-log-stack", -1.9, 1.2, 0.5, 0.6),
+      p("kaykit-resources/wood-planks-stack-large", 1.9, 1.3, 0, 0.5),
+    ],
+  },
+  {
+    id: "watchtower",
+    name: "Watchtower",
+    group: "landmark",
+    ground: "grass",
+    pieces: [p(H("tower-a", "green"), 0, 0, 0, 0.5), ...rocks(2, 0.5, 4)],
+  },
+  {
+    id: "lighthouse",
+    name: "Lighthouse",
+    group: "landmark",
+    ground: "rock",
+    pieces: [p(H("tower-b", "red"), 0, 0, 0, 0.45), ...rocks(3, 0.55, 5)],
+  },
+  {
+    id: "campsite",
+    name: "Campsite",
+    group: "landmark",
+    ground: "grass",
+    pieces: [
+      p("kenney-survival/tent-canvas", -0.8, -0.6, 0.5, 0.7),
+      p("kenney-survival/campfire-pit", 0.8, 0.6, 0, 1),
+      p("kaykit-resources/wood-log-a", 1.6, 0, 1, 0.8),
+      p("kaykit-forest/tree-1-a-color1", 1.6, -1.6, 0, T * 0.7),
+    ],
+  },
+  {
+    id: "ruins",
+    name: "Ruins",
+    group: "landmark",
+    ground: "grass",
+    pieces: [
+      p("kaykit-hexagon/building-destroyed", 0, 0, 0, 0.42),
+      p("kaykit-forest/bush-2-c-color1", 1.8, 1.2, 0, 0.8),
+    ],
+  },
+)
 
 /** A tile's pieces in the world: its prefab turned by `rot` (a sixth of a turn per step) and moved to `at`. */
 export function placeTile(

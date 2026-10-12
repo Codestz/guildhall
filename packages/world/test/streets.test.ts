@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { roll } from "@guildhall/core"
 import { centroid, contains, dist, distTo, intersect, type Vec2 } from "../src/index.ts"
 import { site } from "../src/town/site.ts"
-import { TIER_DEFAULTS } from "../src/town/spec.ts"
+import { normalizeSpec, TIER_DEFAULTS } from "../src/town/spec.ts"
 import { STREET_WIDTH, streets, townLand } from "../src/town/streets.ts"
 import type { StreetGraph, Tier, TownSpecInput } from "../src/town/types.ts"
 
@@ -132,7 +132,8 @@ describe("streets", () => {
   test("a harbour gets one quay at the water's edge; no harbour, no quay", () => {
     for (const { spec, site: s, graph } of built) {
       const quays = graph.nodes.filter((n) => n.kind === "quay")
-      if (s.water.length === 0) {
+      // The sea is all round every island: only a harbour town comes down to it.
+      if (!normalizeSpec(spec).harbour) {
         expect(quays).toEqual([])
         continue
       }
@@ -145,14 +146,11 @@ describe("streets", () => {
     }
   })
 
-  test("each gate's road runs on out to the bounds (or the water), never back into the town", () => {
+  test("each gate's road runs on out to the coast, never back into the town", () => {
     for (const { spec, site: s, graph } of built) {
-      const h = 1.3 * s.radius
-      const atEdge = (p: Vec2) =>
-        Math.abs(Math.max(Math.abs(p[0]), Math.abs(p[1])) - h) < 0.1 ||
-        s.water.some((w) => distTo(p, w, true) < 0.1)
+      const atEdge = (p: Vec2) => s.water.some((w) => distTo(p, w, true) < 0.1)
       for (const gate of graph.nodes.filter((n) => n.kind === "gate")) {
-        // Walk the roads out of the gate: some end of them is on the bounds or the shore.
+        // Walk the roads out of the gate: some end of them is on the shore.
         const seen = new Set([gate.id])
         const stack = [gate.id]
         let out = false
@@ -173,10 +171,9 @@ describe("streets", () => {
     }
   })
 
-  test("a fork is where a footpath leaves a road; a road end is a footpath's dead end inside the bounds", () => {
+  test("a fork is where a footpath leaves a road; a road end is a footpath's dead end inland", () => {
     let forks = 0
     for (const { spec, site: s, graph } of built) {
-      const h = 1.3 * s.radius
       for (const n of graph.nodes.filter((x) => x.tag)) {
         const classes = graph.edges.filter((e) => e.a === n.id || e.b === n.id).map((e) => e.cls)
         expect(
@@ -188,11 +185,15 @@ describe("streets", () => {
           expect(classes.length, label(spec)).toBe(3)
         } else {
           expect(n.kind, label(spec)).toBe("end")
-          expect(Math.max(Math.abs(n.at[0]), Math.abs(n.at[1])), label(spec)).toBeLessThan(h - 1)
+          expect(Math.min(...s.water.map((w) => distTo(n.at, w, true))), label(spec)).toBeGreaterThan(0.1)
+          expect(
+            s.water.some((w) => contains(w, n.at, 0)),
+            label(spec),
+          ).toBe(false)
         }
       }
     }
-    // Most roads out of a village or bigger have room for one (the bounds are close: see W1).
+    // Most roads out of a village or bigger have room for one.
     const roads = built
       .filter((b) => b.spec.tier !== "hamlet")
       .reduce((sum, b) => sum + b.graph.nodes.filter((n) => n.kind === "gate").length, 0)

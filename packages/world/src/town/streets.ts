@@ -8,7 +8,7 @@
  * circle, each at its own radius) join some neighbouring main streets; side streets fork off and
  * wander outward until they meet another street, a few of them forking round a small triangular
  * square (a well's, an inn's, a chapel's). A harbour street drops from the square to the shore (the
- * quay) and a street rings the castle ground. Outside, each gate's road wanders on to the bounds and
+ * quay) and a street rings the castle ground. Outside, each gate's road wanders on to the coast and
  * forks once into a footpath that stops in the country (a `road-end`, for W8's points of interest).
  * A hamlet has no wall street: one bent street, or a crossroads, through a small green.
  *
@@ -101,8 +101,11 @@ export function townLand(site: Site): Polygon {
   return site.land.find((poly) => contains(poly, c)) ?? (site.land[0] as Polygon)
 }
 
-export function streets(site: Site, spec: TownSpecInput, roll: Roll): StreetGraph {
+export function streets(island: Site, spec: TownSpecInput, roll: Roll): StreetGraph {
   const s = normalizeSpec(spec)
+  // The sea is all round the island: a town without a harbour keeps its back to it (no harbour
+  // street, no waterfront); its roads still stop at the coast, where the land does.
+  const site = s.harbour ? island : { ...island, water: [] }
   const r = site.radius
   const land = townLand(site)
   const plazaC = centroid(site.plaza)
@@ -278,7 +281,7 @@ function hamletStreets(site: Site, gates: Vec2[], shore: Vec2 | null, roll: Roll
   const dry = (l: ReturnType<typeof layout>) =>
     l.lane.every((p) => contains(quayLand, p, 0) && distTo(p, quayLand) > STREET_WIDTH.lane)
   let shift = 0
-  while (water && shift < 12 && !dry(layout(shift))) shift += 2
+  while (water && shift < 24 && !dry(layout(shift))) shift += 2
   const { pa, pb, lane } = layout(shift)
   const green: Ring = [...lane.slice(0, -1), pb]
   const inGreen = (p: Vec2) => contains(green, p)
@@ -297,10 +300,17 @@ function hamletStreets(site: Site, gates: Vec2[], shore: Vec2 | null, roll: Roll
     const taken = marks.find((m) => m.kind === "plaza")?.at
     const near = dist(g, pa) <= dist(g, pb) ? [pa, pb] : [pb, pa]
     const ends = taken ? near.sort((p, q) => Number(p === taken) - Number(q === taken)) : near
-    for (const start of ends) {
-      const pieces = clipLine(bent(start, g, 0.2, `${k}:main`, roll), free, [green, quayLand])
+    // Its bends are drawn again (less deep) when they would run it along the lane, which leaves the
+    // same end of the street.
+    const tries = ends.flatMap((start) => [0, 1, 2].map((t) => ({ start, t })))
+    for (const { start, t } of tries) {
+      const salt = t === 0 ? `${k}:main` : `${k}:${t}:main`
+      const pieces = clipLine(bent(start, g, 0.2 / (1 + t), salt, roll), free, [green, quayLand])
       const first = pieces.find(
-        (p) => dist(at(p, p.length - 1), g) <= MERGE && dist(at(p, 0), start) <= MERGE,
+        (p) =>
+          dist(at(p, p.length - 1), g) <= MERGE &&
+          dist(at(p, 0), start) <= MERGE &&
+          !tooClose(p, [lane], 6, 0, STREET_WIDTH.lane / 2 + MERGE),
       )
       if (!first) continue
       lines.push({ points: first, cls: "main" })
@@ -365,7 +375,7 @@ function hamletAxis(site: Site): Vec2 {
 }
 
 /**
- * The road out of a gate: it wanders on to the bounds (or the water), and once past the suburb it
+ * The road out of a gate: it wanders on across the island to the coast, and once past the suburb it
  * forks into a footpath that runs off into the country and stops there, a `road-end`.
  */
 function countryRoad(
@@ -382,7 +392,9 @@ function countryRoad(
 ): void {
   const plazaC = centroid(site.plaza)
   const out = DMath.atan2(g[1] - plazaC[1], g[0] - plazaC[0])
-  const steps = Math.ceil((1.6 * r) / 30)
+  // Enough strides to reach the far shore; the coast cuts it where it gets there.
+  const far = Math.max(...rings.flatMap((ring) => ring.map((p) => dist(p, g))))
+  const steps = Math.ceil(far / 30)
   const walk = wander(g, out, steps, 30, 0.3, out, `${k}:road`, roll)
   walk[0] = g
   const road = clipLine(walk, keep, rings).find((p) => dist(at(p, 0), g) <= MERGE)
@@ -411,10 +423,10 @@ function countryRoad(
   if (!run) return
   const kept = clipLine(run.points, keep, rings)[0]
   if (!kept || dist(at(kept, 0), fork.at) > MERGE || length(kept) < SHORT) return
-  // A footpath that runs into another road joins it; one that stops short is a road end.
+  // A footpath that runs into another road joins it, one cut by the coast ends there; one that
+  // stops short in the country is a road end.
   const end = at(kept, kept.length - 1)
-  const inBounds = Math.max(Math.abs(end[0]), Math.abs(end[1])) < 1.3 * r - 5
-  const stops = !run.to && inBounds && dist(end, at(run.points, run.points.length - 1)) <= MERGE
+  const stops = !run.to && dist(end, at(run.points, run.points.length - 1)) <= 0.01
   lines.push({ points: kept, cls: "road" })
   marks.push({ at: fork.at, tag: "fork" })
   if (stops) marks.push({ at: at(kept, kept.length - 1), tag: "road-end" })

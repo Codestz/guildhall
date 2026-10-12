@@ -2,21 +2,25 @@ import { describe, expect, test } from "bun:test"
 import { DMath } from "@guildhall/core"
 import {
   area,
+  bbox,
   centroid,
   clip,
   contains,
+  distTo,
   dot,
+  lerp,
   type Ring,
   rectCorners,
   scale,
   shapeArea,
+  sub,
   type Vec2,
 } from "../src/index.ts"
 import { site } from "../src/town/site.ts"
 import { normalizeSpec, TIER_DEFAULTS, validateTownSpec } from "../src/town/spec.ts"
 import { TIERS, type TownSpecInput } from "../src/town/types.ts"
 
-/** world town: tier defaults, preset validation, and the site (flat land, water, plaza, castle ground). */
+/** world town: tier defaults, preset validation, and the site (an island in the sea, its bay, the plaza, the castle ground). */
 
 const SEEDS = Array.from({ length: 20 }, (_, i) => i + 1)
 const dirOf = (bearing: number): Vec2 => [DMath.cos(bearing), DMath.sin(bearing)]
@@ -171,57 +175,92 @@ describe("validateTownSpec", () => {
 describe("site", () => {
   const harboured = (seed: number, tier = TIERS[seed % TIERS.length]!) =>
     ({ seed, tier, harbour: { bearing: (seed * 0.7) % (2 * Math.PI) }, landmark: "castle" }) as const
+  const inland = (seed: number, tier = TIERS[seed % TIERS.length]!) =>
+    ({ seed, tier, harbour: null, landmark: "castle" }) as const
+  const both = SEEDS.flatMap((seed) => [harboured(seed), inland(seed)])
+  /** The island: the land polygon holding the town's centre. */
+  const islandOf = (s: ReturnType<typeof site>) => s.land.find((poly) => contains(poly, [0, 0]))!
 
   test("is deterministic: the same spec gives the same site, bit for bit", () => {
-    for (const seed of SEEDS)
-      expect(JSON.stringify(site(harboured(seed)))).toBe(JSON.stringify(site(harboured(seed))))
+    for (const spec of both) expect(JSON.stringify(site(spec))).toBe(JSON.stringify(site(spec)))
   })
 
-  test("different seeds give different sites", () => {
-    const outlines = new Set(SEEDS.map((seed) => JSON.stringify(site(harboured(seed, "town")).plaza)))
+  test("different seeds give different islands", () => {
+    const outlines = new Set(SEEDS.map((seed) => JSON.stringify(site(harboured(seed, "town")).land)))
     expect(outlines.size).toBe(SEEDS.length)
   })
 
-  test("the bounds are a 2.6r square round the origin", () => {
-    for (const tier of TIERS) {
-      const s = site({ seed: 1, tier, harbour: null })
-      const r = TIER_DEFAULTS[tier].radius
-      expect(s.radius).toBe(r)
-      expect(area(s.bounds)).toBeCloseTo((2.6 * r) ** 2, 0)
+  test("the map is mostly sea: a square about twice the island's size, water on every side", () => {
+    for (const spec of both) {
+      const s = site(spec)
+      const r = s.radius
+      expect(s.radius).toBe(TIER_DEFAULTS[spec.tier].radius)
+      const [lo, hi] = bbox(islandOf(s)[0]!)
+      const across = Math.max(hi[0] - lo[0], hi[1] - lo[1])
+      // The island is 4–5 town radii across ...
+      expect(across / r).toBeGreaterThan(3.8)
+      expect(across / r).toBeLessThan(5.6)
+      // ... in the middle half of a square map: the sea is the rest.
+      const [blo, bhi] = bbox(s.bounds)
+      expect(bhi[0] - blo[0]).toBeCloseTo(bhi[1] - blo[1], 2)
+      expect((bhi[0] - blo[0]) / across).toBeGreaterThan(1.9)
+      const land = shapeArea(s.land) / area(s.bounds)
+      expect(land).toBeGreaterThan(0.1)
+      expect(land).toBeLessThan(0.3)
+      // The map's edge is water all round.
+      for (let i = 0; i < 4; i++)
+        for (const t of [0.1, 0.5, 0.9]) {
+          const edge = lerp(s.bounds[i]!, s.bounds[(i + 1) % 4]!, t)
+          const p = lerp(edge, centroid(s.bounds), 0.01)
+          expect(inWater(s.water, p), `${spec.tier}#${spec.seed} ${p}`).toBe(true)
+        }
     }
   })
 
-  test("without a harbour the land is the whole bounds and there is no water", () => {
-    const s = site({ seed: 4, tier: "town", harbour: null })
-    expect(s.water).toEqual([])
-    expect(shapeArea(s.land)).toBeCloseTo(area(s.bounds), 3)
-  })
-
-  test("land and water split the bounds exactly; water is a real bite, not the whole map", () => {
-    for (const seed of SEEDS) {
-      const s = site(harboured(seed))
-      const bounds = area(s.bounds)
-      const water = waterArea(s.water)
-      expect(shapeArea(s.land) + water).toBeCloseTo(bounds, -1)
-      expect(water / bounds).toBeGreaterThan(0.1)
-      expect(water / bounds).toBeLessThan(0.4)
+  test("land and water split the bounds exactly; the sea comes as plain rings, the town's side first", () => {
+    for (const spec of both) {
+      const s = site(spec)
+      expect(shapeArea(s.land) + waterArea(s.water)).toBeCloseTo(area(s.bounds), -2)
       expect(clip(s.land, s.water, "intersection").length).toBe(0)
+      for (const ring of s.water) expect(area(ring)).toBeGreaterThan(0)
+      if (spec.harbour) {
+        const dir = dirOf(spec.harbour.bearing)
+        expect(dot(sub(centroid(s.water[0]!), centroid(s.plaza)), dir)).toBeGreaterThan(0)
+      }
     }
   })
 
-  test("the near shore lies 0.55r out along the bearing and the water runs past the bounds", () => {
+  test("with a harbour the town sits on its bay: the near shore 0.55r out, the island behind it", () => {
     for (const seed of SEEDS) {
       const spec = harboured(seed)
       const s = site(spec)
+      const r = s.radius
       const dir = dirOf(spec.harbour.bearing)
-      expect(inWater(s.water, scale(dir, 0.53 * s.radius))).toBe(false)
-      expect(inWater(s.water, scale(dir, 0.57 * s.radius))).toBe(true)
-      const h = 1.3 * s.radius
-      const onBounds = s.water
-        .flat()
-        .filter((p) => Math.abs(Math.abs(p[0]) - h) < 1e-2 || Math.abs(Math.abs(p[1]) - h) < 1e-2)
-      expect(onBounds.length).toBeGreaterThanOrEqual(2)
+      expect(inWater(s.water, scale(dir, 0.53 * r))).toBe(false)
+      expect(inWater(s.water, scale(dir, 0.57 * r))).toBe(true)
+      // The island's bulk lies inland of the town: countryside for fields, woods and points of interest.
+      expect(dot(centroid(islandOf(s)[0]!), dir)).toBeLessThan(-0.8 * r)
+      expect(contains(islandOf(s), scale(dir, -2.5 * r))).toBe(true)
     }
+  })
+
+  test("without a harbour the town keeps well back from every shore", () => {
+    for (const seed of SEEDS) {
+      const s = site(inland(seed))
+      for (const ring of s.water) expect(distTo([0, 0], ring, true)).toBeGreaterThan(1.4 * s.radius)
+    }
+  })
+
+  test("now and then a tiny islet lies offshore, on the island's far side from the town", () => {
+    let islets = 0
+    for (const spec of both) {
+      const s = site(spec)
+      for (const poly of s.land.filter((p) => !contains(p, [0, 0]) && area(p[0]!) < 0.1 * s.radius ** 2)) {
+        islets++
+        expect(distTo([0, 0], poly[0]!, true)).toBeGreaterThan(1.5 * s.radius)
+      }
+    }
+    expect(islets).toBeGreaterThan(0)
   })
 
   test("the plaza sits on land, pulled 0.15r toward the water", () => {
@@ -234,6 +273,19 @@ describe("site", () => {
     }
   })
 
+  test("the castle stands on the town's edge, reaching past the gate circle, its front to the town", () => {
+    for (const spec of both) {
+      const s = site(spec)
+      const castle = s.castleSite!
+      const out = Math.hypot(...castle.c)
+      expect(out).toBeLessThan(s.radius)
+      expect(out + castle.d / 2).toBeGreaterThan(s.radius)
+      // Local −z (its front) points back at the town's centre.
+      const z: Vec2 = [DMath.sin(castle.rot), DMath.cos(castle.rot)]
+      expect(dot(z, scale(castle.c, 1 / out))).toBeCloseTo(1, 3)
+    }
+  })
+
   test("the castle ground exists only for a castle, on land, clear of the plaza, away from the water", () => {
     expect(site({ seed: 1, tier: "town", harbour: null, landmark: "guildhall" }).castleSite).toBeNull()
     for (const seed of SEEDS) {
@@ -241,9 +293,7 @@ describe("site", () => {
       const s = site(spec)
       const castle = s.castleSite!
       const ring = rectCorners(castle)
-      // The lake may cut a far corner off; the castle stands on the town's own land.
-      const home = s.land.find((poly) => contains(poly, [0, 0]))!
-      for (const p of ring) expect(contains(home, p)).toBe(true)
+      for (const p of ring) expect(contains(islandOf(s), p)).toBe(true)
       expect(clip(ring, s.plaza, "intersection").length).toBe(0)
       expect(dot(castle.c, dirOf(spec.harbour.bearing))).toBeLessThan(
         dot(centroid(s.plaza), dirOf(spec.harbour.bearing)),

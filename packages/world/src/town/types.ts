@@ -49,7 +49,7 @@ export type NormalSpec = Required<TownSpec>
 
 /** What a tier gives a spec that leaves a field out, and the knobs later stages read from it. */
 export interface TierDefaults {
-  /** Metres from the centre to the gates; the bounds are a 2.6r square. */
+  /** Metres from the centre to the gates; the bounds are a 4.5r square. */
   radius: number
   districts: DistrictKind[]
   /** Street density: the largest lots block (m²) before a lane cuts it. */
@@ -70,7 +70,10 @@ export const LEVELS = { land: 0, water: -0.6 } as const
 /** The ground a town is laid out on (site.ts): flat land, the water cut out of it, and the reserves. */
 export interface Site {
   radius: number
-  /** The 2.6r square, counter-clockwise, centred on the origin. */
+  /**
+   * A 4.5r square, counter-clockwise, holding the town (centred on the origin) off-centre: its centre
+   * lies 0.9r from the origin away from the water, so the countryside opens on the land side.
+   */
   bounds: Ring
   /** The bounds minus the water: outer rings CCW, holes CW. */
   land: Ring[][]

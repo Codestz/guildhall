@@ -251,6 +251,7 @@ function painter(seed: number, tint?: Tint) {
     cobbleDark: swatch("cobble"),
     sand: swatch("sand"),
     sandDark: swatch("sand-dark"),
+    sandLight: swatch("sand-light"),
     dirt: swatch("dirt"),
     dirtLight: swatch("dirt-light"),
     dirtDark: swatch("dirt-dark"),
@@ -269,10 +270,11 @@ function painter(seed: number, tint?: Tint) {
         mix(out, c.grassDark, TINT.shade * t.shade)
         return mix(out, c.dirt, TINT.worn * t.worn)
       }
+      // Warm, light sandy cobbles (V1's paths), a hint of grey stone; the plaza paving lighter still.
       case "cobble":
-        return mix(mix(set(out, c.cobble), c.sandDark, 0.45), c.cobbleDark, 0.4 * fine(x, z))
+        return mix(mix(mix(set(out, c.sand), c.sandDark, 0.3), c.cobble, 0.15), c.sandDark, 0.4 * fine(x, z))
       case "plaza":
-        return mix(mix(set(out, c.cobble), c.sand, 0.45), c.cobbleDark, 0.3 * fine(x, z))
+        return mix(mix(mix(set(out, c.sandLight), c.sand, 0.5), c.cobble, 0.1), c.sandDark, 0.3 * fine(x, z))
       case "dirt":
         return mix(set(out, c.dirt), c.dirtLight, 0.6 * fine(x, z))
       case "sand":

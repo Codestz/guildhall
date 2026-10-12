@@ -79,14 +79,16 @@
       ],
       "rampSwaps": {
         "accent": [
-          "accent",
+          "terracotta",
           "thatch",
-          "roof-blue"
+          "roof-blue",
+          "timber"
         ],
         "teal": [
           "terracotta",
           "thatch",
-          "roof-blue"
+          "roof-blue",
+          "timber"
         ]
       }
     }

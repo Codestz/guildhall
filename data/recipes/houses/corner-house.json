@@ -97,14 +97,16 @@
     "vary": {
       "rampSwaps": {
         "accent": [
-          "accent",
+          "terracotta",
           "roof-blue",
-          "cobble"
+          "cobble",
+          "timber"
         ],
         "teal": [
           "terracotta",
           "roof-blue",
-          "slate"
+          "slate",
+          "timber"
         ]
       }
     }

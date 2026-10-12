@@ -22,6 +22,9 @@ import { measure } from "./stages/measure.ts"
 import { normalize } from "./stages/normalize.ts"
 import { optimize } from "./stages/optimize.ts"
 import type { PieceReport, PieceSource, Stage, StageCtx } from "./stages/types.ts"
+import { withAnswer } from "./tags/apply.ts"
+import { loadTagCache, thumbHash } from "./tags/emit.ts"
+import { loadVocab, type TagCache, type Vocab } from "./tags/vocab.ts"
 import { removeOrphans, writePiece } from "./write.ts"
 
 /** Static pieces, in order. Characters run `characters` alone. */
@@ -142,6 +145,25 @@ function buildRigs(packs: readonly PackConfig[], paths: Paths, logger: Logger): 
     : importRigs(declaring, paths.raw, paths.library, logger.child("rigs"))
 }
 
+let vocab: Vocab | undefined
+
+/**
+ * A fresh entry with what `tag apply` added to its previous one: the answer cached for its thumbnail
+ * (as `tag apply` writes it), else the previous entry's autoTags and vision front. Rule and manual
+ * compose meta always come fresh from the config.
+ */
+function withVision(library: string, cache: TagCache, e: CatalogEntry, old?: CatalogEntry): CatalogEntry {
+  const hash = thumbHash(library, e.files.thumb)
+  if (hash && cache[hash]) {
+    vocab ??= loadVocab()
+    return withAnswer(e, hash, cache, vocab)
+  }
+  const out: CatalogEntry = old?.autoTags ? { ...e, autoTags: old.autoTags } : e
+  if (old?.compose.source === "vision" && e.compose.source === "placeholder")
+    out.compose = { ...e.compose, front: old.compose.front, source: "vision" }
+  return out
+}
+
 async function runPack(
   pack: PackConfig,
   paths: Paths,
@@ -192,18 +214,19 @@ async function runPack(
     } else todo.push(f)
   }
   const pool = run.pool
+  const tags = loadTagCache(paths.library)
   await Promise.all(
     todo.map(async (f) => {
       try {
         const made = await pool.run(pack, f)
         const before = new Map(fromFile(f).map((e) => [e.id, e]))
-        // A re-import keeps what later steps added: the thumbnail path and the vision tags.
+        // A re-import keeps what later steps added: the thumbnail path, then the vision answer cached
+        // for that thumbnail (autoTags, and front over placeholder meta), as `tag apply` writes it.
         for (const e of made) {
           const old = before.get(e.id)
           if (old?.files.thumb) e.files.thumb = old.files.thumb
-          if (old?.autoTags) e.autoTags = old.autoTags
+          entries.push(withVision(paths.library, tags, e, old))
         }
-        entries.push(...made)
         nextCache[f.slug] = keys.get(f.slug) as string
         summary.imported++
       } catch (err) {

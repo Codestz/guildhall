@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { cacheFile, loadCache, pieceKey, saveCache, stableStringify } from "../src/cache.ts"
+import { cacheFile, contentHash, loadCache, pieceKey, saveCache, stableStringify } from "../src/cache.ts"
 import { runImport } from "../src/pipeline.ts"
 import { fixturePacks, fixturePaths, tempDir } from "./fixtures/env.ts"
 
@@ -94,5 +94,46 @@ describe("incremental import", () => {
     await runImport({ paths: p, packs, force: true })
     const [after] = JSON.parse(readFileSync(shard, "utf8"))
     expect([after.files.thumb, after.autoTags?.tags]).toEqual(["thumbs/fixture-atlas/crate.webp", ["wooden"]])
+  })
+
+  test("a re-import writes the cached vision answer back: autoTags, and front over placeholder only", async () => {
+    const p = fixturePaths()
+    const packs = (await fixturePacks()).filter(
+      (x) => x.id === "fixture-atlas" || x.id === "fixture-colormap",
+    )
+    await runImport({ paths: p, packs })
+    const answers: Record<string, unknown> = {}
+    for (const [pack, slug] of [
+      ["fixture-atlas", "crate"],
+      ["fixture-colormap", "wall-door"],
+    ] as const) {
+      const thumb = `thumbs/${pack}/${slug}.webp`
+      mkdirSync(join(p.library, `thumbs/${pack}`), { recursive: true })
+      writeFileSync(join(p.library, thumb), `thumb of ${slug}`)
+      answers[contentHash(readFileSync(join(p.library, thumb)))] = {
+        tags: ["wooden"],
+        front: "+x",
+        door: true,
+        by: "model",
+      }
+      const shard = join(p.library, `catalog/${pack}.json`)
+      const [entry] = JSON.parse(readFileSync(shard, "utf8"))
+      entry.files.thumb = thumb
+      writeFileSync(shard, JSON.stringify([entry]))
+    }
+    mkdirSync(join(p.library, "tags"), { recursive: true })
+    writeFileSync(join(p.library, "tags/cache.json"), JSON.stringify(answers))
+
+    await runImport({ paths: p, packs, force: true })
+    const read = (pack: string) =>
+      JSON.parse(readFileSync(join(p.library, `catalog/${pack}.json`), "utf8"))[0]
+    const crate = read("fixture-atlas")
+    expect(crate.autoTags).toMatchObject({ tags: ["has-door", "wooden"], by: "model" })
+    expect([crate.compose.front, crate.compose.source]).toEqual(["+x", "vision"])
+    // The wall's compose meta comes from its rule: the vision front never overwrites it.
+    const wall = read("fixture-colormap")
+    expect(wall.autoTags?.tags).toEqual(["has-door", "wooden"])
+    expect(wall.compose.source).toBe("rule")
+    expect(wall.compose.front).not.toBe("+x")
   })
 })

@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { BufferAttribute, BufferGeometry, Group, Mesh, MeshBasicMaterial } from "three"
 import { batchGeometry } from "../src/batchGeometry.ts"
-import { keyLight, lightAt } from "../src/light.ts"
+import { FIRE_FLOOR, keyLight, lightAt } from "../src/light.ts"
+import { poolLevel } from "../src/night/index.ts"
 import { windowsDark } from "../src/night/windows.ts"
 
 /** Night: the moon, the light sources' glow, the lit windows. */
@@ -39,6 +40,21 @@ describe("batchGeometry _glow", () => {
 })
 
 describe("lightAt by night", () => {
+  test("fires burn all day; the lamps' pools on the ground wait for the sun to go", () => {
+    expect(lightAt(12).fire).toBe(FIRE_FLOOR)
+    expect(lightAt(17.5).fire).toBe(lightAt(17.5).lamps)
+    expect(lightAt(0).fire).toBe(1)
+    expect(poolLevel(lightAt(17.5))).toBeLessThan(0.1)
+    expect(poolLevel(lightAt(19.5))).toBeGreaterThan(0.8)
+  })
+
+  test("a shadow lifts the shade rather than blacking it: the key's shadow keeps some of its light", () => {
+    for (const hour of [0, 10, 13, 17.5]) {
+      expect(lightAt(hour).shadow).toBeGreaterThan(0.5)
+      expect(lightAt(hour).shadow).toBeLessThan(1)
+    }
+  })
+
   test("noon is day: no lamps, no moon, the sun is the key", () => {
     const l = lightAt(12)
     expect(l.lamps).toBe(0)
@@ -58,7 +74,13 @@ describe("lightAt by night", () => {
 
   test("lamps come on before the sun sets and go off after it rises", () => {
     expect(lightAt(19).lamps).toBeGreaterThan(0.3)
-    expect(lightAt(17.5).lamps).toBe(0)
+    // A first soft glow from late afternoon (~16:30), about half by golden hour, full by dusk.
+    expect(lightAt(16.5).lamps).toBeGreaterThan(0)
+    expect(lightAt(16.5).lamps).toBeLessThan(0.15)
+    expect(lightAt(17.5).lamps).toBeGreaterThan(0.3)
+    expect(lightAt(17.5).lamps).toBeLessThan(0.6)
+    expect(lightAt(19.5).lamps).toBeGreaterThan(0.95)
+    expect(lightAt(15).lamps).toBe(0)
     expect(lightAt(7).lamps).toBe(0)
   })
 

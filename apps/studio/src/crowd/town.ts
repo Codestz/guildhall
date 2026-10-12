@@ -107,6 +107,8 @@ export async function buildTown(
   const last = kept.map(() => [Number.NaN, 0, 0] as [number, number, number])
   const phase = looks.map((l) => l.phase)
   let hour = q.hour
+  /** The hour the town is lit at: it follows the sim clock, so sky and HUD agree (every 15 s of sim time: smooth at 20×). */
+  let lit = q.hour
   let step = 0
 
   // Close and wide look at the busiest corner (the town camera, `cam=town`, sees the whole town).
@@ -162,6 +164,10 @@ export async function buildTown(
     advance(dt) {
       step = dt
       hour = (hour + (dt * SPEEDUP) / 3600) % 24
+      if (Math.abs(hour - lit) >= 1 / 240) {
+        lit = hour
+        town.set({ hour })
+      }
     },
     status: () => {
       const h = Math.floor(hour)

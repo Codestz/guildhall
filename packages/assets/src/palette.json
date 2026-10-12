@@ -222,7 +222,7 @@
     {
       "id": 27,
       "name": "terracotta-dark",
-      "hex": "#883e2c",
+      "hex": "#844230",
       "group": "roof",
       "ramp": "terracotta",
       "tone": "dark"
@@ -230,7 +230,7 @@
     {
       "id": 28,
       "name": "terracotta",
-      "hex": "#b3593b",
+      "hex": "#ad5f40",
       "group": "roof",
       "ramp": "terracotta",
       "tone": "base"
@@ -238,7 +238,7 @@
     {
       "id": 29,
       "name": "terracotta-light",
-      "hex": "#cf7d56",
+      "hex": "#c98060",
       "group": "roof",
       "ramp": "terracotta",
       "tone": "light"
@@ -246,7 +246,7 @@
     {
       "id": 30,
       "name": "slate-dark",
-      "hex": "#5f6177",
+      "hex": "#5f6272",
       "group": "roof",
       "ramp": "slate",
       "tone": "dark"
@@ -254,7 +254,7 @@
     {
       "id": 31,
       "name": "slate",
-      "hex": "#7d819c",
+      "hex": "#7e8396",
       "group": "roof",
       "ramp": "slate",
       "tone": "base"
@@ -262,7 +262,7 @@
     {
       "id": 32,
       "name": "slate-light",
-      "hex": "#a7afd2",
+      "hex": "#a9b0c6",
       "group": "roof",
       "ramp": "slate",
       "tone": "light"
@@ -462,7 +462,7 @@
     {
       "id": 57,
       "name": "roof-blue-dark",
-      "hex": "#246099",
+      "hex": "#2f5f8c",
       "group": "roof",
       "ramp": "roof-blue",
       "tone": "dark"
@@ -470,7 +470,7 @@
     {
       "id": 58,
       "name": "roof-blue",
-      "hex": "#2581bf",
+      "hex": "#3f7cb0",
       "group": "roof",
       "ramp": "roof-blue",
       "tone": "base"
@@ -478,7 +478,7 @@
     {
       "id": 59,
       "name": "roof-blue-light",
-      "hex": "#658ed7",
+      "hex": "#7193c6",
       "group": "roof",
       "ramp": "roof-blue",
       "tone": "light"

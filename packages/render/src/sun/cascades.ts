@@ -94,6 +94,8 @@ export function createSun(stage: Stage, opts: SunOpts): Sun {
   const keys: string[] = []
   const refit = () => {
     const target = stage.getCamera().target
+    // The sky sets how dark the key's shadow is (light.ts); every cascade casts it the same.
+    for (const light of lights) light.shadow.intensity = sun.shadow.intensity
     fitCascades(target, dir, radii, mapSize, span).forEach((fit, i) => {
       if (keys[i] === fit.key) return
       keys[i] = fit.key

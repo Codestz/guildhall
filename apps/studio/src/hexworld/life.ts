@@ -235,11 +235,81 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       const l = loops[id]!
       return lifePose(l.steps, l.real ? secs : day, l.period)
     }
+    // personal space: walkers keep to the right of their way, and everyone near someone else is nudged
+    // apart (a smoothed offset per person, so nobody jumps), so two people never stand inside each other
+    const n = looks.length
+    const offX = new Float32Array(n)
+    const offZ = new Float32Array(n)
+    const baseX = new Float32Array(n)
+    const baseZ = new Float32Array(n)
+    const poses: LifePose[] = []
+    const SPACE = 0.8
+    const separate = () => {
+      const grid = new Map<number, number[]>()
+      for (let id = 0; id < n; id++) {
+        const p = pose(id)
+        poses[id] = p
+        let x = p.at[0]
+        let zz = p.at[2]
+        if (p.act === "walk") {
+          // keep right: a lane half a shoulder off the way's middle
+          x += Math.cos(p.facing) * 0.32
+          zz -= Math.sin(p.facing) * 0.32
+        }
+        baseX[id] = x
+        baseZ[id] = zz
+        if (p.indoors) continue
+        const key = (Math.floor(x) * 73856093) ^ (Math.floor(zz) * 19349663)
+        let cell = grid.get(key)
+        if (!cell) grid.set(key, (cell = []))
+        cell.push(id)
+      }
+      const pushX = new Float32Array(n)
+      const pushZ = new Float32Array(n)
+      for (let id = 0; id < n; id++) {
+        if (poses[id]!.indoors) continue
+        const x = baseX[id]! + offX[id]!
+        const zz = baseZ[id]! + offZ[id]!
+        const cx = Math.floor(baseX[id]!)
+        const cz = Math.floor(baseZ[id]!)
+        for (let dx = -1; dx <= 1; dx++)
+          for (let dz = -1; dz <= 1; dz++)
+            for (const o of grid.get(((cx + dx) * 73856093) ^ ((cz + dz) * 19349663)) ?? []) {
+              if (o <= id) continue
+              let ex = x - (baseX[o]! + offX[o]!)
+              let ez = zz - (baseZ[o]! + offZ[o]!)
+              let d = Math.hypot(ex, ez)
+              if (d >= SPACE) continue
+              if (d < 1e-3) {
+                // exactly together: part them along a fixed per-pair direction
+                const a = ((id * 92821 + o * 68917) % 628) / 100
+                ex = Math.cos(a)
+                ez = Math.sin(a)
+                d = 1e-3
+              }
+              const k = (SPACE - d) / 2 / d
+              pushX[id] = pushX[id]! + ex * k
+              pushZ[id] = pushZ[id]! + ez * k
+              pushX[o] = pushX[o]! - ex * k
+              pushZ[o] = pushZ[o]! - ez * k
+            }
+      }
+      for (let id = 0; id < n; id++) {
+        // ease toward the push, let it relax back when alone, never more than a stride off the way
+        offX[id] = offX[id]! * 0.9 + pushX[id]! * 0.6
+        offZ[id] = offZ[id]! * 0.9 + pushZ[id]! * 0.6
+        const m = Math.hypot(offX[id]!, offZ[id]!)
+        if (m > 1.6) {
+          offX[id] = (offX[id]! / m) * 1.6
+          offZ[id] = (offZ[id]! / m) * 1.6
+        }
+      }
+    }
     const sample = (id: number): ActorSample => {
-      const p = pose(id)
+      const p = poses[id] ?? pose(id)
       const look = looks[id]!
-      const x = p.at[0]
-      const zz = p.at[2]
+      const x = (poses[id] ? baseX[id]! : p.at[0]) + offX[id]!
+      const zz = (poses[id] ? baseZ[id]! : p.at[2]) + offZ[id]!
       const y = p.ground ? groundAt(x, zz) : p.at[1]
       const prev = last[id]!
       const moved = Number.isNaN(prev[0]) ? 0 : Math.hypot(x - prev[0], zz - prev[1])
@@ -268,6 +338,8 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         day = clock
       } else day = (day + (step * SPEEDUP) / 3600) % 24
       secs += step
+      separate()
+      separate()
       crowd?.update(step, sample)
       // banners over their agents, nudged up off each other where they would overlap
       const placed: [number, number][] = []

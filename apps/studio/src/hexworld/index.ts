@@ -107,6 +107,7 @@ export const hexWorldScreen: Screen = {
         groundAt = m.heightAt
       }
       if (w.paths.length) meshes.push(createSurface(stage, new Float32Array(w.paths), "#d9c08c"))
+      if (w.decks.length) meshes.push(createSurface(stage, new Float32Array(w.decks), "#9a6a3c"))
       let span = 0
       for (const t of w.tiles) span = Math.max(span, Math.abs(t.x), Math.abs(t.z))
       span += R * 4

@@ -27,6 +27,8 @@ export interface HexWorld {
   pieces: { piece: string; x: number; y: number; z: number; rot: number; scale: number }[]
   /** Path strips (triangle positions) over road tiles. */
   paths: number[]
+  /** Bridge decks (triangle positions), drawn in plank colour. */
+  decks: number[]
   /** The island's ground height at a point (the top of the tile under it; 0 off the island). */
   heightAt(x: number, z: number): number
   stats: { tiles: number; pieces: number; prefabs: Record<string, number> }
@@ -106,6 +108,7 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
   const tiles: HexWorldTile[] = []
   const pieces: HexWorld["pieces"] = []
   const paths: number[] = []
+  const decks: number[] = []
   const prefabs: Record<string, number> = {}
   const seed = h.spec.seed
   const at = (i: number): [number, number] => {
@@ -222,38 +225,35 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
       const sides = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! >= 0 && (links.get(i)?.has(nb[d]!) ?? false))
       if (u === "road") paths.push(...tilePath([x, zz], t + 0.03, sides.length ? sides : [0, 3]))
       else {
-        // a bridge runs from the edge where its road comes in to the edge where it leaves (whatever the bend),
-        // so its ends meet the road on both banks; deck at the higher bank
-        const mid = (d: number): [number, number] => {
-          const a = (Math.PI / 180) * (60 * d)
-          const e = (HEX_TILE_SIZE * Math.sqrt(3)) / 2
-          return [x + Math.cos(a) * e, zz - Math.sin(a) * e]
-        }
-        const ends =
-          sides.length >= 2
-            ? [sides[0]!, sides[sides.length - 1]!]
-            : [sides[0] ?? 0, ((sides[0] ?? 0) + 3) % 6]
-        const A = mid(ends[0]!)
-        const Bp = mid(ends[1]!)
+        // a wooden bridge: a plank deck from the centre out through each side its road crosses, at the banks'
+        // height, so it meets the road strips on both banks exactly; rails along both sides of each leg
         let bank = 0
         let n = 0
-        for (const d of ends) {
+        for (const d of sides) {
           const j = nb[d]!
           if (j >= 0) {
             bank += top(j)
             n++
           }
         }
-        bank = n ? bank / n : t
-        const len = Math.hypot(Bp[0] - A[0], Bp[1] - A[1]) + 1.4
-        pieces.push({
-          piece: "kaykit-hexagon/building-bridge-a",
-          x: (A[0] + Bp[0]) / 2,
-          y: bank - 0.55,
-          z: (A[1] + Bp[1]) / 2,
-          rot: Math.atan2(Bp[0] - A[0], Bp[1] - A[1]),
-          scale: len / 15.4,
-        })
+        bank = n ? bank / n : t + 0.4
+        const legs = sides.length ? sides : [0, 3]
+        decks.push(...tilePath([x, zz], bank + 0.08, legs, 0.95))
+        for (const d of legs) {
+          const a = (Math.PI / 180) * (60 * d)
+          const ux = Math.cos(a)
+          const uz = -Math.sin(a)
+          for (const side of [-1, 1])
+            for (const f of [0.35, 0.75])
+              pieces.push({
+                piece: "kenney-nature/fence-simple",
+                x: x + ux * HEX_TILE_SIZE * f * 0.87 - uz * side * 1.05,
+                y: bank + 0.08,
+                z: zz + uz * HEX_TILE_SIZE * f * 0.87 + ux * side * 1.05,
+                rot: Math.atan2(ux, uz) + Math.PI / 2,
+                scale: 0.32,
+              })
+        }
       }
     } else if (u === "dock") prefab = "dock"
     else if (BY_USE[u]) {
@@ -292,5 +292,12 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
     const k = i >= 0 ? byTile.get(i) : undefined
     return k === undefined ? 0 : Math.max(0, tiles[k]!.top)
   }
-  return { tiles, pieces, paths, heightAt, stats: { tiles: tiles.length, pieces: pieces.length, prefabs } }
+  return {
+    tiles,
+    pieces,
+    paths,
+    decks,
+    heightAt,
+    stats: { tiles: tiles.length, pieces: pieces.length, prefabs },
+  }
 }

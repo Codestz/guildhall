@@ -261,7 +261,10 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         if (p.indoors) continue
         const key = (Math.floor(x) * 73856093) ^ (Math.floor(zz) * 19349663)
         let cell = grid.get(key)
-        if (!cell) grid.set(key, (cell = []))
+        if (!cell) {
+          cell = []
+          grid.set(key, cell)
+        }
         cell.push(id)
       }
       const pushX = new Float32Array(n)

@@ -394,7 +394,10 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
       kind[i] = K.lake
       made++
       for (const j of g.neighbours(i))
-        if (j >= 0 && !seen.has(j) && hash2(seed + 61, j, made) < 0.8) seen.add(j), queue.push(j)
+        if (j >= 0 && !seen.has(j) && hash2(seed + 61, j, made) < 0.8) {
+          seen.add(j)
+          queue.push(j)
+        }
     }
     if (made) lakes++
   }

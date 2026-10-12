@@ -16,6 +16,8 @@ export type DataKind =
   | "recipes/stalls"
   | "recipes/docks"
   | "recipes/farm"
+  | "recipes/vignettes"
+  | "islands"
   | "npcs"
   | "towns"
 

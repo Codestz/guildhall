@@ -31,7 +31,7 @@ export interface RecipeRef {
 /** `?recipe=houses/demo` → the houses folder; anything unreadable falls back to it. */
 export const DEFAULT_REF: RecipeRef = { kind: "recipes/houses", id: "demo" }
 
-const FOLDERS = ["houses", "landmarks", "stalls", "docks", "farm"] as const
+const FOLDERS = ["houses", "landmarks", "stalls", "docks", "farm", "vignettes"] as const
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
 /** `kind/id` (e.g. `houses/demo`) as a data file, or null when it names no recipe folder. */

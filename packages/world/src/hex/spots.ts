@@ -279,26 +279,32 @@ export function tileFurniture(g: HexGrid, w: Pick<HexWorld, "tiles" | "pieces">)
   }
   // blockers in 4 m cells, for `near`
   const CELL = 4
-  const cells = new Map<string, Disc[]>()
+  // (a number key: `near` runs for every walker every frame)
+  const cellKey = (cx: number, cz: number) => (cx + 4096) * 8192 + cz + 4096
+  const cells = new Map<number, Disc[]>()
   for (const b of blockers)
     for (let cx = Math.floor((b.x - b.r) / CELL); cx <= Math.floor((b.x + b.r) / CELL); cx++)
       for (let cz = Math.floor((b.z - b.r) / CELL); cz <= Math.floor((b.z + b.r) / CELL); cz++) {
-        const key = `${cx},${cz}`
+        const key = cellKey(cx, cz)
         const list = cells.get(key)
         if (list) list.push(b)
         else cells.set(key, [b])
       }
+  const none: Disc[] = []
   return {
     spots,
     blockers,
     on: (tile) => onTile.get(tile) ?? [],
     near(x, z, r) {
-      const out = new Set<Disc>()
+      let out = none
       for (let cx = Math.floor((x - r) / CELL); cx <= Math.floor((x + r) / CELL); cx++)
         for (let cz = Math.floor((z - r) / CELL); cz <= Math.floor((z + r) / CELL); cz++)
-          for (const b of cells.get(`${cx},${cz}`) ?? [])
-            if (Math.hypot(b.x - x, b.z - z) < b.r + r) out.add(b)
-      return [...out]
+          for (const b of cells.get(cellKey(cx, cz)) ?? none) {
+            if (Math.hypot(b.x - x, b.z - z) >= b.r + r || out.includes(b)) continue
+            if (out === none) out = []
+            out.push(b)
+          }
+      return out
     },
   }
 }

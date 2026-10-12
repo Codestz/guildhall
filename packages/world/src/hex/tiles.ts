@@ -548,3 +548,45 @@ export function placeTile(
     }
   })
 }
+
+/**
+ * A road tile's path as triangle positions: a strip from the centre out through each side in `sides`
+ * (side d faces 60°·d counter-clockwise from +x, toward -z), and a round patch where they meet.
+ */
+export function tilePath(at: [number, number], y: number, sides: readonly number[], w = 0.85): number[] {
+  const [x, z] = at
+  const out: number[] = []
+  const reach = R * (Math.sqrt(3) / 2) + 0.05
+  const tri = (a: number[], b: number[], c: number[]) =>
+    out.push(a[0]!, y, a[1]!, b[0]!, y, b[1]!, c[0]!, y, c[1]!)
+  for (const d of sides) {
+    const a = (Math.PI / 180) * (60 * d)
+    const ex = Math.cos(a) * reach
+    const ez = -Math.sin(a) * reach
+    const nx = -ez / reach
+    const nz = ex / reach
+    const q = [
+      [x + nx * w, z + nz * w],
+      [x - nx * w, z - nz * w],
+      [x + ex - nx * w, z + ez - nz * w],
+      [x + ex + nx * w, z + ez + nz * w],
+    ]
+    // both windings: the strip shows from above whichever way it runs
+    tri(q[0]!, q[2]!, q[1]!)
+    tri(q[0]!, q[3]!, q[2]!)
+    tri(q[0]!, q[1]!, q[2]!)
+    tri(q[0]!, q[2]!, q[3]!)
+  }
+  for (let k = 0; k < 8; k++) {
+    const a0 = (k / 8) * Math.PI * 2
+    const a1 = ((k + 1) / 8) * Math.PI * 2
+    const p0 = [x + Math.cos(a0) * w, z + Math.sin(a0) * w]
+    const p1 = [x + Math.cos(a1) * w, z + Math.sin(a1) * w]
+    tri([x, z], p1, p0)
+    tri([x, z], p0, p1)
+  }
+  return out
+}
+
+/** The prefab with this id. */
+export const tilePrefab = (id: string): TilePrefab | undefined => TILE_PREFABS.find((t) => t.id === id)

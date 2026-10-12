@@ -21,7 +21,10 @@ export {
   type TileGround,
   type TilePiece,
   type TilePrefab,
+  tilePath,
+  tilePrefab,
 } from "./tiles.ts"
+export { type HexWorld, type HexWorldTile, hexWorld, LEVEL_STEP } from "./world.ts"
 export {
   type HexRoad,
   type HexZone,

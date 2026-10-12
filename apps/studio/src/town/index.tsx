@@ -13,6 +13,7 @@ import { createRoot } from "react-dom/client"
 import { holdStudioStyle } from "../browser/style.ts"
 import { loadCatalog } from "../catalog.ts"
 import { type DataKind, list, load } from "../data.ts"
+import { hexWorldScreen } from "../hexworld/index.ts"
 import { island } from "../island/index.ts"
 import { buildLibrary } from "../planner/library.ts"
 import { holdPlannerStyle } from "../planner/style.ts"
@@ -85,7 +86,8 @@ export const town: Screen = {
       const q = new URLSearchParams(ctx.query)
       if (id && /^\d+$/.test(id)) q.set("seed", id)
       q.delete(TOWN_KEY)
-      return island.mount(host, { ...ctx, query: q })
+      // the hex island (decisions.md "Clean restart on hex"); `?skin=terra` keeps the smooth one
+      return (q.get("skin") === "terra" ? island : hexWorldScreen).mount(host, { ...ctx, query: q })
     }
     const studio = holdStudioStyle()
     const planner = holdPlannerStyle()

@@ -173,6 +173,12 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         dev: true,
       },
       {
+        id: "hexworld",
+        name: "Hex island",
+        purpose: "The hex island in 3D, built tile by tile from the tile prefabs.",
+        dev: true,
+      },
+      {
         id: "hextiles",
         name: "Tile prefabs",
         purpose:

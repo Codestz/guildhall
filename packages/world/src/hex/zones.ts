@@ -323,6 +323,46 @@ export function hexZones(h: HexIsland): HexZones {
     }
     if (best >= 0) zones.push({ kind: k, tile: best, tiles: [], buildings: 0 })
   }
+  // coverage: no stretch of land is left far from every place. The tile furthest from all of them gets
+  // a new one, of the kind its ground suits, until every dry tile is within POCKET steps of a place.
+  const POCKET = 7
+  for (let n = 0; n < Math.round(land / 90); n++) {
+    let best = -1
+    let bd = 0
+    for (let i = 0; i < N; i++) {
+      if (!dry(i) || kind(i) === "cliff" || flatness(i) < 0.5) continue
+      let d = 1e9
+      for (const zz of zones) d = Math.min(d, dist(i, zz.tile))
+      // a little seeded preference so pockets don't fill in a grid
+      const sc = d + hash2(seed + 700, g.q[i]!, g.r[i]!) * 1.5
+      if (d >= POCKET && sc > bd) {
+        bd = sc
+        best = i
+      }
+    }
+    if (best < 0) break
+    const k = kind(best)
+    const u = hash2(seed + 701, g.q[best]!, g.r[best]!)
+    const pick: ZoneKind =
+      k === "forest"
+        ? u < 0.6
+          ? "lumber"
+          : "hamlet"
+        : k === "sand"
+          ? "fishing"
+          : toRock[best]! <= 2
+            ? "mine"
+            : k === "hill" || h.level[best]! >= 3
+              ? u < 0.35
+                ? "monastery"
+                : "hamlet"
+              : u < 0.5
+                ? "farm"
+                : u < 0.8
+                  ? "hamlet"
+                  : "camp"
+    zones.push({ kind: pick, tile: best, tiles: [], buildings: 0 })
+  }
 
   // ---- each place grows over easy tiles round its heart ----
   const zoneOf = new Int16Array(N)

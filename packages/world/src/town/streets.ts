@@ -10,6 +10,8 @@
  * square (a well's, an inn's, a chapel's). A harbour street drops from the square to the shore (the
  * quay) and a street rings the castle ground. Outside, each gate's road wanders on to the coast and
  * forks once into a footpath that stops in the country (a `road-end`, for W8's points of interest).
+ * In a frame (ADR 011) each gate's road stops instead where it leaves the frame's reach, an `exit`
+ * for the island's roads to join, with no footpath; the quay is on the frame's harbour water.
  * A hamlet has no wall street: one bent street, or a crossroads, through a small green.
  *
  * Everything is planarized into nodes at junctions and edges carrying their polylines, vertices on
@@ -38,7 +40,16 @@ import {
   type Vec2,
 } from "../geom/vec.ts"
 import { normalizeSpec, TIER_DEFAULTS } from "./spec.ts"
-import type { Site, Square, StreetEdge, StreetGraph, StreetNode, Tier, TownSpecInput } from "./types.ts"
+import type {
+  Site,
+  Square,
+  StreetEdge,
+  StreetGraph,
+  StreetNode,
+  Tier,
+  TownFrame,
+  TownSpecInput,
+} from "./types.ts"
 
 export type StreetClass = StreetEdge["cls"]
 
@@ -76,6 +87,10 @@ const SQUARES: Readonly<Record<Tier, number>> = { hamlet: 0, village: 1, town: 2
 const SQUARE_KINDS: readonly Square["kind"][] = ["well", "inn", "chapel"]
 /** A street piece shorter than this is not worth a street, metres. */
 const SHORT = 12
+/** Headings a framed town's road tries when the coast cuts it short of the reach (radians off its own). */
+const EXIT_TURNS = [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4] as const
+/** Points round the reach circle a framed town's roads are cut at. */
+const REACH_POINTS = 128
 
 interface StreetLine {
   points: Vec2[]
@@ -101,7 +116,7 @@ export function townLand(site: Site): Polygon {
   return site.land.find((poly) => contains(poly, c)) ?? (site.land[0] as Polygon)
 }
 
-export function streets(island: Site, spec: TownSpecInput, roll: Roll): StreetGraph {
+export function streets(island: Site, spec: TownSpecInput, roll: Roll, frame?: TownFrame): StreetGraph {
   const s = normalizeSpec(spec)
   // The sea is all round the island: a town without a harbour keeps its back to it (no harbour
   // street, no waterfront); its roads still stop at the coast, where the land does.
@@ -109,16 +124,30 @@ export function streets(island: Site, spec: TownSpecInput, roll: Roll): StreetGr
   const r = site.radius
   const land = townLand(site)
   const plazaC = centroid(site.plaza)
-  const dry = piece(offset(land, -(QUAY + GATE_SHORE)), plazaC)
+  // A frame's edge is not a shore: framed, the gates keep back from its water only (a harbour's or not).
+  const dry = piece(
+    frame
+      ? clip(
+          land,
+          offset(
+            frame.water.map((w) => [w]),
+            QUAY + GATE_SHORE,
+          ),
+          "difference",
+        )
+      : offset(land, -(QUAY + GATE_SHORE)),
+    plazaC,
+  )
   const hamlet = s.tier === "hamlet"
   // A hamlet's two ways in lie roughly along its axis, so its street runs past the green.
   const axis = hamlet ? hamletAxis(site) : null
   const along = axis ? DMath.atan2(axis[1], axis[0]) + 0.4 * (2 * roll("along:gates") - 1) : undefined
   const gates = placeGates(r, hamlet ? 2 : TIER_DEFAULTS[s.tier].gates, dry, plazaC, site, roll, along)
-  const shore = nearestShore(site.water, plazaC)
+  // Framed, the quay is on the harbour's own water (the frame's first), not any shore that is nearer.
+  const shore = nearestShore(frame ? site.water.slice(0, 1) : site.water, plazaC)
   return hamlet
-    ? hamletStreets(site, gates, shore, roll)
-    : townStreets(site, s.tier, s.walls, gates, shore, roll)
+    ? hamletStreets(site, gates, shore, roll, frame)
+    : townStreets(site, s.tier, s.walls, gates, shore, roll, frame)
 }
 
 function townStreets(
@@ -128,6 +157,7 @@ function townStreets(
   gates: Vec2[],
   shore: Vec2 | null,
   roll: Roll,
+  host: TownFrame | undefined,
 ): StreetGraph {
   const r = site.radius
   const land = townLand(site)
@@ -225,6 +255,7 @@ function townStreets(
       lines,
       marks,
       roll,
+      host,
     )
   })
   const graph = buildGraph(lines, marks)
@@ -236,7 +267,13 @@ function townStreets(
  * lane bowing round the green's far side back to the street, and (one time in two) a crossroads:
  * an arm or two running out into the fields from the street or the lane. No ring encloses it.
  */
-function hamletStreets(site: Site, gates: Vec2[], shore: Vec2 | null, roll: Roll): StreetGraph {
+function hamletStreets(
+  site: Site,
+  gates: Vec2[],
+  shore: Vec2 | null,
+  roll: Roll,
+  host: TownFrame | undefined,
+): StreetGraph {
   const r = site.radius
   const land = townLand(site)
   const plazaC = centroid(site.plaza)
@@ -362,6 +399,7 @@ function hamletStreets(site: Site, gates: Vec2[], shore: Vec2 | null, roll: Roll
       lines,
       marks,
       roll,
+      host,
     )
   })
   return buildGraph(lines, marks)
@@ -376,7 +414,8 @@ function hamletAxis(site: Site): Vec2 {
 
 /**
  * The road out of a gate: it wanders on across the island to the coast, and once past the suburb it
- * forks into a footpath that runs off into the country and stops there, a `road-end`.
+ * forks into a footpath that runs off into the country and stops there, a `road-end`. In a frame it
+ * stops at the frame's edge instead (frameRoad).
  */
 function countryRoad(
   g: Vec2,
@@ -389,7 +428,12 @@ function countryRoad(
   lines: StreetLine[],
   marks: NodeMark[],
   roll: Roll,
+  frame?: TownFrame,
 ): void {
+  if (frame) {
+    frameRoad(g, k, site, keep, rings, frame.reach, lines, marks, roll)
+    return
+  }
   const plazaC = centroid(site.plaza)
   const out = DMath.atan2(g[1] - plazaC[1], g[0] - plazaC[0])
   // Enough strides to reach the far shore; the coast cuts it where it gets there.
@@ -430,6 +474,46 @@ function countryRoad(
   lines.push({ points: kept, cls: "road" })
   marks.push({ at: fork.at, tag: "fork" })
   if (stops) marks.push({ at: at(kept, kept.length - 1), tag: "road-end" })
+}
+
+/**
+ * A framed town's road out of a gate: it wanders outward and stops where it crosses the reach circle
+ * round the town's centre, an `exit` (the island's road network joins there). No footpath forks off:
+ * the country beyond is the island's. Where the coast cuts it short of the reach, it sets off again on
+ * a heading turned a little further each time; a gate whose every heading meets the coast has no road.
+ */
+function frameRoad(
+  g: Vec2,
+  k: number,
+  site: Site,
+  keep: (p: Vec2) => boolean,
+  rings: readonly Ring[],
+  reach: number,
+  lines: StreetLine[],
+  marks: NodeMark[],
+  roll: Roll,
+): void {
+  const plazaC = centroid(site.plaza)
+  const out = DMath.atan2(g[1] - plazaC[1], g[0] - plazaC[0])
+  const edge: Ring = Array.from({ length: REACH_POINTS }, (_, i) => {
+    const t = (2 * Math.PI * i) / REACH_POINTS
+    return [reach * DMath.cos(t), reach * DMath.sin(t)]
+  })
+  const inReach = (q: Vec2) => keep(q) && Math.hypot(q[0], q[1]) < reach
+  // Half again the straight way out, in strides: wandering is longer than the crow flies.
+  const steps = Math.ceil((1.5 * Math.max(0, reach - Math.hypot(g[0], g[1]))) / 30) + 1
+  for (const [t, turn] of EXIT_TURNS.entries()) {
+    const heading = out + turn
+    const walk = wander(g, heading, steps, 30, 0.3, heading, t === 0 ? `${k}:road` : `${k}:${t}:road`, roll)
+    walk[0] = g
+    const road = clipLine(walk, inReach, [...rings, edge]).find((p) => dist(at(p, 0), g) <= MERGE)
+    const end = road && at(road, road.length - 1)
+    if (!road || !end || Math.hypot(end[0], end[1]) < reach - MERGE) continue
+    road[0] = g
+    lines.push({ points: road, cls: "road" })
+    marks.push({ at: end, tag: "exit" })
+    return
+  }
 }
 
 /**

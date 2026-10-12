@@ -5,6 +5,10 @@
  * the square (interiors.ts) → stations → the walk graph. Farms lay out from the farmland beyond the
  * wall and keep clear of anything already built out there, so nothing is placed twice. Edge ids are
  * renumbered in order at the end, and the plan's hash fingerprints everything it holds.
+ *
+ * Given a `TownFrame` (ADR 011: an island hosts the town), the town lays out on the frame's land in its
+ * own local frame: its gate roads stop at the frame's reach as `exit` nodes, its farms keep to the
+ * frame, and the island-wide nature is left to the island. Without one, the town owns its island.
  */
 import type { PrefabMeta } from "@guildhall/assets"
 import { fnv1a, roll } from "@guildhall/core"
@@ -29,7 +33,7 @@ import { site } from "./site.ts"
 import { normalizeSpec } from "./spec.ts"
 import { stations } from "./stations.ts"
 import { streets, sturdyClip } from "./streets.ts"
-import type { Block, Edge, PieceInstance, Placement, TownPlan, TownSpecInput } from "./types.ts"
+import type { Block, Edge, PieceInstance, Placement, TownFrame, TownPlan, TownSpecInput } from "./types.ts"
 import { type WalkGraph, walkGraph } from "./walk.ts"
 
 export { type DressInput, type DressKits, dressTown, PLANT_ROLES, recipeKey } from "./dress.ts"
@@ -64,12 +68,14 @@ export interface TownLayout extends TownPlan {
 
 /**
  * Generates the town. `times`, when given, receives each stage's milliseconds (the plan itself never
- * holds timings, so its hash is the same on every machine).
+ * holds timings, so its hash is the same on every machine). `frame`, when given, is the ground an
+ * island hosts it on (ADR 011); absent, the output is today's, hash for hash.
  */
 export function generateTown(
   spec: TownSpecInput,
   lib: PlanLibrary,
   times?: Record<string, number>,
+  frame?: TownFrame,
 ): TownLayout {
   const s = normalizeSpec(spec)
   const stage =
@@ -83,8 +89,8 @@ export function generateTown(
     mark = now
   }
 
-  const ground = site(s)
-  const graph = streets(ground, s, stage("streets"))
+  const ground = site(s, frame)
+  const graph = streets(ground, s, stage("streets"), frame)
   lap("streets")
   const cut = blockStage(graph, ground, s, stage("blocks"))
   lap("blocks")
@@ -165,10 +171,13 @@ export function generateTown(
   lap("harbour")
 
   // Nature grows on the green only: of what is built, it need only see what stands out there (the
-  // farms, and every edge so far), not the thousands of pieces inside the town.
-  const outside = { ...plan, placements: farmed.placements }
-  plan.nature.push(...nature(outside, lib, stage("nature")))
-  lap("nature")
+  // farms, and every edge so far), not the thousands of pieces inside the town. A framed town's
+  // green is the island's to grow (one nature over the whole island).
+  if (!frame) {
+    const outside = { ...plan, placements: farmed.placements }
+    plan.nature.push(...nature(outside, lib, stage("nature")))
+    lap("nature")
+  }
   const dressed = furnish(plan, lib, stage("furnish"))
   plan.placements.push(...dressed.placements)
   plan.edges.push(...dressed.edges)

@@ -9,15 +9,17 @@
  * (fields, woods, W8's points of interest). Without one it still sits off-centre, well back from
  * every shore. The plaza is pulled toward the water; the castle stands on the town's edge away from
  * it, so the wall street goes round its far side. Every draw is `roll(seed, "<what>:site")`. The
- * coast itself is the landform's (land/coast.ts), shared with the island level.
+ * coast itself is the landform's (land/coast.ts), shared with the island level. Framed (ADR 011), the
+ * island has already drawn the coast: the town takes its land and water from the frame, and its
+ * bounds are the frame's box.
  */
 import { DMath, roll } from "@guildhall/core"
 import { axes, type Rect } from "../geom/obb.ts"
-import type { Ring } from "../geom/poly.ts"
+import { bbox, type Polygon, type Ring } from "../geom/poly.ts"
 import { add, round3, scale, snap, type Vec2 } from "../geom/vec.ts"
 import { islandCoast } from "../land/coast.ts"
 import { normalizeSpec, TIER_DEFAULTS } from "./spec.ts"
-import type { Site, TownSpecInput } from "./types.ts"
+import type { Site, TownFrame, TownSpecInput } from "./types.ts"
 
 /** The island's mean radius round its own centre, in town radii. */
 export const ISLAND = 2.2
@@ -26,7 +28,7 @@ const PULL = 0.15
 /** How far the castle ground reaches past the gate circle, metres: the wall street goes round it. */
 const CASTLE_OUT = 5
 
-export function site(spec: TownSpecInput): Site {
+export function site(spec: TownSpecInput, frame?: TownFrame): Site {
   const s = normalizeSpec(spec)
   const r = s.radius
   const draw = (salt: string) => roll(s.seed, `${salt}:site`)
@@ -34,7 +36,13 @@ export function site(spec: TownSpecInput): Site {
   // The side of the town the island's coast is nearest on: the water's, else a rolled one.
   const lean = 2 * Math.PI * draw("lean")
   const side: Vec2 = toWater ?? [DMath.cos(lean), DMath.sin(lean)]
-  const { land, bounds, sea: water } = islandCoast(s.seed, { r, side, harbour: toWater !== null }, ISLAND)
+  const {
+    land,
+    bounds,
+    sea: water,
+  } = frame
+    ? { land: frame.land, bounds: boxOf(frame.land), sea: frame.water }
+    : islandCoast(s.seed, { r, side, harbour: toWater !== null }, ISLAND)
 
   const long = TIER_DEFAULTS[s.tier].plaza
   const plazaRect: Rect = {
@@ -47,6 +55,12 @@ export function site(spec: TownSpecInput): Site {
 
   const castleSite = s.landmark === "castle" ? castleRect(toWater, r, draw) : null
   return { radius: r, bounds, land, water, plaza, castleSite }
+}
+
+/** The box round the land's outer rings, counter-clockwise. */
+function boxOf(land: readonly Polygon[]): Ring {
+  const [lo, hi] = bbox(land.flatMap((poly) => poly[0] ?? []))
+  return [lo, [hi[0], lo[1]], hi, [lo[0], hi[1]]]
 }
 
 /** A rect's outline with its corners rounded by `k` metres, counter-clockwise. */

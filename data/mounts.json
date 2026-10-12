@@ -1,11 +1,523 @@
 {
   "mounts": {
+    "kaykit-adventurers/axe-1handed": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "clips": {
+        "Holding_A": {
+          "offset": [
+            0,
+            -0.5,
+            0
+          ]
+        },
+        "Walking_A": {
+          "offset": [
+            0,
+            -0.45,
+            0
+          ]
+        },
+        "Waving": {
+          "hide": true
+        }
+      },
+      "edge": [
+        -1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.12,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.r"
+    },
+    "kaykit-adventurers/bow": {
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        -0.3,
+        0,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.l"
+    },
+    "kaykit-adventurers/bow-with-string": {
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        -0.3,
+        0,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.l"
+    },
+    "kaykit-adventurers/dagger": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.1,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.r"
+    },
+    "kaykit-adventurers/mug-empty": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "edge": [
+        -1,
+        0,
+        0
+      ],
+      "handle": [
+        0.27,
+        0,
+        0
+      ],
+      "hands": 1,
+      "scale": 0.75,
+      "slot": "hand.r",
+      "upright": {
+        "up": [
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    "kaykit-adventurers/mug-full": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "edge": [
+        -1,
+        0,
+        0
+      ],
+      "handle": [
+        0.27,
+        0,
+        0
+      ],
+      "hands": 1,
+      "scale": 0.75,
+      "slot": "hand.r",
+      "upright": {
+        "up": [
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    "kaykit-adventurers/shield-round": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        0,
+        -0.1
+      ],
+      "hands": 1,
+      "slot": "hand.l"
+    },
+    "kaykit-adventurers/shield-round-barbarian": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        0,
+        -0.1
+      ],
+      "hands": 1,
+      "slot": "hand.l"
+    },
+    "kaykit-adventurers/shield-round-color": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        0,
+        -0.1
+      ],
+      "hands": 1,
+      "slot": "hand.l"
+    },
+    "kaykit-adventurers/spellbook-closed": {
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "edge": [
+        0,
+        1,
+        0
+      ],
+      "handle": [
+        0,
+        0,
+        -0.18
+      ],
+      "hands": 1,
+      "slot": "hand.l",
+      "upright": {
+        "up": [
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    "kaykit-adventurers/spellbook-open": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.25,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.l",
+      "upright": {
+        "up": [
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    "kaykit-adventurers/staff": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "clips": {
+        "Chopping": {
+          "hide": true
+        },
+        "Hammering": {
+          "hide": true
+        },
+        "Holding_A": {
+          "offset": [
+            0,
+            -0.5,
+            0
+          ]
+        },
+        "Pickaxing": {
+          "hide": true
+        }
+      },
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.05,
+        0
+      ],
+      "hands": 1,
+      "scale": 0.85,
+      "slot": "hand.r",
+      "upright": {
+        "up": [
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    "kaykit-adventurers/sword-1handed": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.15,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.r"
+    },
+    "kaykit-adventurers/wand": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.1,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.r"
+    },
+    "kaykit-tools/axe": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "clips": {
+        "Holding_A": {
+          "offset": [
+            0,
+            -0.5,
+            0
+          ]
+        },
+        "Walking_A": {
+          "offset": [
+            0,
+            -0.45,
+            0
+          ]
+        },
+        "Waving": {
+          "hide": true
+        }
+      },
+      "edge": [
+        -1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.12,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.r"
+    },
+    "kaykit-tools/bucket-metal": {
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "clips": {
+        "Waving": {
+          "hide": true
+        }
+      },
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        1.1,
+        0
+      ],
+      "hands": 1,
+      "scale": 0.6,
+      "slot": "hand.r",
+      "upright": {
+        "up": [
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    "kaykit-tools/chisel": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.05,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.r"
+    },
+    "kaykit-tools/file": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.05,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.r"
+    },
+    "kaykit-tools/hammer": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "clips": {
+        "Holding_A": {
+          "offset": [
+            0,
+            -0.45,
+            0
+          ]
+        },
+        "Walking_A": {
+          "offset": [
+            0,
+            -0.4,
+            0
+          ]
+        },
+        "Waving": {
+          "hide": true
+        }
+      },
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.1,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.r"
+    },
+    "kaykit-tools/knife": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "edge": [
+        -1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.1,
+        0
+      ],
+      "hands": 1,
+      "scale": 0.6,
+      "slot": "hand.r"
+    },
     "kaykit-tools/lantern": {
       "axis": [
         0,
         -1,
         0
       ],
+      "clips": {
+        "Waving": {
+          "hide": true
+        }
+      },
       "edge": [
         1,
         0,
@@ -17,7 +529,182 @@
         0
       ],
       "hands": 1,
-      "scale": 0.5,
+      "scale": 0.6,
+      "slot": "hand.r",
+      "upright": {
+        "up": [
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    "kaykit-tools/mallet": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "clips": {
+        "Holding_A": {
+          "offset": [
+            0,
+            -0.45,
+            0
+          ]
+        },
+        "Walking_A": {
+          "offset": [
+            0,
+            -0.4,
+            0
+          ]
+        },
+        "Waving": {
+          "hide": true
+        }
+      },
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.1,
+        0
+      ],
+      "hands": 1,
+      "scale": 0.8,
+      "slot": "hand.r"
+    },
+    "kaykit-tools/pickaxe": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "clips": {
+        "Walking_A": {
+          "offset": [
+            0,
+            -0.35,
+            0
+          ]
+        },
+        "Waving": {
+          "hide": true
+        }
+      },
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.1,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.r"
+    },
+    "kaykit-tools/shovel": {
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "clips": {
+        "Walking_A": {
+          "offset": [
+            0,
+            -0.5,
+            0
+          ]
+        },
+        "Waving": {
+          "hide": true
+        }
+      },
+      "edge": [
+        0,
+        0,
+        1
+      ],
+      "handle": [
+        0,
+        0.55,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.r"
+    },
+    "kaykit-tools/torch": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "clips": {
+        "Chopping": {
+          "hide": true
+        },
+        "Hammering": {
+          "hide": true
+        },
+        "Pickaxing": {
+          "hide": true
+        }
+      },
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        0,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.r",
+      "upright": {
+        "up": [
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    "kaykit-tools/torch-burnt": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "clips": {
+        "Chopping": {
+          "hide": true
+        },
+        "Hammering": {
+          "hide": true
+        },
+        "Pickaxing": {
+          "hide": true
+        }
+      },
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        0,
+        0
+      ],
+      "hands": 1,
       "slot": "hand.r",
       "upright": {
         "up": [
@@ -45,6 +732,77 @@
       ],
       "hands": 1,
       "slot": "hand.r"
+    },
+    "kenney-survival/tool-hoe": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "clips": {
+        "Holding_A": {
+          "offset": [
+            0,
+            -0.5,
+            0
+          ]
+        },
+        "Walking_A": {
+          "offset": [
+            0,
+            -0.4,
+            0
+          ]
+        },
+        "Waving": {
+          "hide": true
+        }
+      },
+      "edge": [
+        0,
+        0,
+        1
+      ],
+      "handle": [
+        0,
+        0.05,
+        0
+      ],
+      "hands": 1,
+      "scale": 2,
+      "slot": "hand.r"
+    },
+    "quaternius-props/bag": {
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "clips": {
+        "Waving": {
+          "hide": true
+        }
+      },
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        0.88,
+        0
+      ],
+      "hands": 1,
+      "scale": 0.65,
+      "slot": "hand.r",
+      "upright": {
+        "up": [
+          0,
+          1,
+          0
+        ]
+      }
     }
   },
   "version": 1

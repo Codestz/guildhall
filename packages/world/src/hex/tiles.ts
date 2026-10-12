@@ -17,7 +17,7 @@ export const SCALE_B = { building: 0.5, tree: 0.6 } as const
  * Characters in the hex world (user: "the door = the same height as the character"): the KayKit heroes
  * scaled so their head reaches a door's top beside a scale-B building.
  */
-export const CHARACTER_SCALE = 0.55
+export const CHARACTER_SCALE = 0.47
 
 export type TileGround = "grass" | "soil" | "dirt" | "paved" | "sand"
 

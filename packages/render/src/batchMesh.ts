@@ -21,7 +21,17 @@ import {
   Vector3,
   type WebGLRenderer,
 } from "three"
-import { type LodCounts, PIECE_PX, pickTier, SHADOW_TIER, SHELL_PX, screenRadius } from "./lod.ts"
+import {
+  CULLED,
+  DETAIL_RADIUS,
+  type LodCounts,
+  PIECE_PX,
+  pickTier,
+  pieceThresholds,
+  SHADOW_TIER,
+  SHELL_PX,
+  screenRadius,
+} from "./lod.ts"
 
 /** The BatchedMesh internals the walk fills (three keeps them private). */
 interface Internals {
@@ -171,6 +181,7 @@ export class LodBatchedMesh extends BatchedMesh {
     const sized = !shadow && perspective
     renderer.getDrawingBufferSize(buffer)
     const projectionY = camera.projectionMatrix.elements[5] as number
+    const detailPx = pieceThresholds(0, renderer.getPixelRatio())
     const px = (id: number, geometryId: number) => {
       const s = this.sphereOf(id, geometryId)
       return screenRadius(s.radius, s.center.distanceTo(viewer), projectionY, buffer.y)
@@ -208,19 +219,23 @@ export class LodBatchedMesh extends BatchedMesh {
         if (isShell !== far) continue
       }
       const geometryId = instance.geometryIndex
-      if (!frustum.intersectsSphere(this.sphereOf(i, geometryId))) continue
+      const bounds = this.sphereOf(i, geometryId)
+      if (!frustum.intersectsSphere(bounds)) continue
 
       const ids = this.tierIds[geometryId]
+      const detail = !isShell && bounds.radius < DETAIL_RADIUS
       let tier = 0
+      if (sized && (detail || (ids && ids.length > 1))) {
+        tier = pickTier(px(i, geometryId), this.tierOf[i] as number, detail ? detailPx : PIECE_PX)
+        this.tierOf[i] = tier
+        // detail too small to see is not drawn at all
+        if (tier >= CULLED) continue
+      } else if (!sized && ids && ids.length > 1) tier = shadow ? SHADOW_TIER : ids.length - 1
       if (ids && ids.length > 1) {
-        if (sized) {
-          tier = pickTier(px(i, geometryId), this.tierOf[i] as number, PIECE_PX)
-          this.tierOf[i] = tier
-        } else tier = shadow ? SHADOW_TIER : ids.length - 1
         tier = Math.min(tier, ids.length - 1)
         // A tier that reuses the finer one's geometry counts as that one.
         while (tier > 0 && ids[tier] === ids[tier - 1]) tier--
-      }
+      } else tier = 0
       if (isShell) shells++
       else tiers[tier] = (tiers[tier] as number) + 1
       const range = geometries[ids ? (ids[tier] as number) : geometryId] as { start: number; count: number }

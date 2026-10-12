@@ -12,12 +12,21 @@ import {
   PlaneGeometry,
   Scene,
   SphereGeometry,
+  Vector3,
 } from "three"
 import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import { createStaticBatch } from "../src/batch.ts"
 import { batchGeometry } from "../src/batchGeometry.ts"
 import { LodBatchedMesh } from "../src/batchMesh.ts"
-import { PIECE_PX, pickTier, SHELL, screenRadius } from "../src/lod.ts"
+import {
+  DETAIL_PX,
+  DETAIL_RADIUS,
+  PIECE_PX,
+  pickTier,
+  pieceThresholds,
+  SHELL,
+  screenRadius,
+} from "../src/lod.ts"
 import {
   shellGeometry,
   simplifierReady,
@@ -176,7 +185,10 @@ describe("shellGeometry", () => {
 
 /** A batch with tiers: one far-reaching camera pass, counting what it drew. */
 describe("LodBatchedMesh", () => {
-  const renderer = { getDrawingBufferSize: (v: { set(x: number, y: number): void }) => v.set(1600, 1000) }
+  const renderer = {
+    getDrawingBufferSize: (v: { set(x: number, y: number): void }) => v.set(1600, 1000),
+    getPixelRatio: () => 1,
+  }
   const camera = (z: number) => {
     const c = new PerspectiveCamera(40, 1.6, 0.1, 5000)
     c.position.set(0, 0, z)
@@ -229,6 +241,40 @@ describe("LodBatchedMesh", () => {
     expect(pass(m, sun, true)).toEqual([coarse, coarse])
     // The main view's counts are not touched by it.
     expect(m.lod.near).toBe(1)
+  })
+
+  /** Two pieces side by side: a detail one (0.3 m) and one at the detail radius. */
+  function detail() {
+    const m = new LodBatchedMesh(2, 2000, 6000, new MeshBasicMaterial())
+    const base = m.addGeometry(twoToneSphere())
+    const small = m.addInstance(base)
+    m.setMatrixAt(small, new Matrix4().makeScale(0.3, 0.3, 0.3))
+    const big = m.addInstance(base)
+    m.setMatrixAt(big, new Matrix4().makeTranslation(1, 0, 0).scale(new Vector3().setScalar(DETAIL_RADIUS)))
+    return m
+  }
+  // where a 0.3 m piece is DETAIL_PX / 2 on screen (1000 px high, DPR 1)
+  const pastDetail = (0.3 * 2.747 * 1000) / 2 / (DETAIL_PX / 2)
+
+  test("detail is drawn near, and not at all once it is under DETAIL_PX; bigger pieces stay", () => {
+    const m = detail()
+    expect(pass(m, camera(4)).length).toBe(2)
+    expect(pass(m, camera(pastDetail)).length).toBe(1)
+  })
+
+  test("a shadow pass still draws the detail the main view dropped", () => {
+    const m = detail()
+    pass(m, camera(pastDetail))
+    const sun = new OrthographicCamera(-10, 10, 10, -10, 0.1, 100)
+    sun.position.set(0, 0, 20)
+    sun.updateMatrixWorld()
+    expect(pass(m, sun, true).length).toBe(2)
+  })
+
+  test("the detail cut is in CSS pixels: the same at any DPR", () => {
+    expect(pieceThresholds(0.3, 1).at(-1)).toBe(DETAIL_PX)
+    expect(pieceThresholds(0.3, 2).at(-1)).toBe(DETAIL_PX * 2)
+    expect(pieceThresholds(DETAIL_RADIUS, 2)).toEqual(PIECE_PX)
   })
 
   test("instances out of view are not drawn", () => {

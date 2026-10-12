@@ -264,6 +264,21 @@ export interface HexFineGround extends HexGroundMesh {
   heightAt(x: number, z: number): number
   /** Small hexes drawn. */
   count: number
+  /** What `heightAt` reads, as plain data (a worker hands it over). */
+  heights: HexHeights
+}
+
+/**
+ * Heights on a hex grid of radius `size` (pointy top, axial q, r): hex (q, r) holds
+ * `y[(r - r0) · cols + q - q0]`; 0 off the grid and where no ground stands.
+ */
+export interface HexHeights {
+  size: number
+  q0: number
+  r0: number
+  cols: number
+  rows: number
+  y: Float32Array
 }
 
 /**
@@ -340,7 +355,7 @@ export function hexGroundFine(
     const y = wt ? sum / wt : p.top
     return Math.max(0.35, Math.round(y / step) * step)
   }
-  const cells = new Map<string, { x: number; z: number; y: number; t: (typeof w.tiles)[number] }>()
+  const cells = new Map<string, Cell>()
   let minQ = 1e9
   let maxQ = -1e9
   let minR = 1e9
@@ -380,13 +395,47 @@ export function hexGroundFine(
       if (n && !soft(n.t) && n.t.ground !== "water" && n.y < c.y) c.y = n.y
     }
   }
-  const pos: number[] = []
-  const col: number[] = []
-  const tone = (x: number, z: number) => 0.93 + 0.12 * (fbm(seed + 77, x / 22, z / 22, 2) * 0.5 + 0.5)
-  const put = (x: number, y: number, z: number, c: RGB, k: number) => {
-    pos.push(x, y, z)
-    col.push((c[0] * k) / 255, (c[1] * k) / 255, (c[2] * k) / 255)
+  // The cells also on a dense (q, r) grid over the island's box, for the lookups below and `heightAt`.
+  const cols = Math.max(0, maxQ - minQ + 1)
+  const rows = Math.max(0, maxR - minR + 1)
+  const slot = (q: number, rr: number) =>
+    q < minQ || q > maxQ || rr < minR || rr > maxR ? -1 : (rr - minR) * cols + (q - minQ)
+  const heights = new Float32Array(cols * rows)
+  const dense: (Cell | undefined)[] = new Array(cols * rows)
+  for (const [key, c] of cells) {
+    const [q, rr] = key.split(",").map(Number) as [number, number]
+    const k = slot(q, rr)
+    dense[k] = c
+    heights[k] = c.y
   }
+  const cellAt = (q: number, rr: number) => {
+    const k = slot(q, rr)
+    return k < 0 ? undefined : dense[k]
+  }
+  // Every top is 18 vertices, and walls come 6 at a time: the buffers start at twice the tops and grow.
+  let pos = new Float32Array(cells.size * 18 * 3 * 2)
+  let col = new Float32Array(pos.length)
+  let n = 0
+  const grow = (a: Float32Array) => {
+    const b = new Float32Array(a.length * 2)
+    b.set(a)
+    return b
+  }
+  const put = (x: number, y: number, z: number, c: RGB, k: number) => {
+    if (n + 3 > pos.length) {
+      pos = grow(pos)
+      col = grow(col)
+    }
+    pos[n] = x
+    pos[n + 1] = y
+    pos[n + 2] = z
+    col[n] = (c[0] * k) / 255
+    col[n + 1] = (c[1] * k) / 255
+    col[n + 2] = (c[2] * k) / 255
+    n += 3
+  }
+  const tone = (x: number, z: number) => 0.93 + 0.12 * (fbm(seed + 77, x / 22, z / 22, 2) * 0.5 + 0.5)
+  const tones = new Float64Array(6)
   const corners: [number, number][] = []
   for (let k = 0; k < 6; k++) {
     const a = (Math.PI / 180) * (60 * k - 30)
@@ -408,19 +457,22 @@ export function hexGroundFine(
     // grass on a soft tile tints a little lighter as it climbs
     const lift = soft(c.t) ? 1 + Math.min(0.08, (c.y - c.t.top) * 0.03) : 1
     const P = corners.map(([dx, dz]) => [c.x + dx, c.z + dz] as const)
+    // each corner's tone once (a corner is shared by two of the fan's triangles)
+    const centre = tone(c.x, c.z) * lift
+    for (let k = 0; k < 6; k++) tones[k] = tone(P[k]![0], P[k]![1]) * lift
     for (let k = 0; k < 6; k++) {
       const a = P[k]!
       const b = P[(k + 1) % 6]!
-      put(c.x, c.y, c.z, top, tone(c.x, c.z) * lift)
-      put(b[0], c.y, b[1], top, tone(b[0], b[1]) * lift)
-      put(a[0], c.y, a[1], top, tone(a[0], a[1]) * lift)
+      put(c.x, c.y, c.z, top, centre)
+      put(b[0], c.y, b[1], top, tones[(k + 1) % 6]!)
+      put(a[0], c.y, a[1], top, tones[k]!)
     }
     const side =
       c.t.ground === "rock" || c.t.ground === "cliff" ? (pal.side[c.t.ground] ?? pal.sideLand) : pal.sideLand
     for (let k = 0; k < 6; k++) {
       const [sq, sr] = STEP[k]!
-      const n = cells.get(`${q + sq},${rr + sr}`)
-      const floor = n ? n.y : base
+      const nb = cellAt(q + sq, rr + sr)
+      const floor = nb ? nb.y : base
       if (floor >= c.y - 0.01) continue
       const a = P[k]!
       const b = P[(k + 1) % 6]!
@@ -434,7 +486,14 @@ export function hexGroundFine(
   }
   const heightAt = (x: number, z: number): number => {
     const [q, rr] = axial(x, z, r)
-    return cells.get(`${q},${rr}`)?.y ?? 0
+    const k = slot(q, rr)
+    return k < 0 ? 0 : (heights[k] as number)
   }
-  return { position: new Float32Array(pos), color: new Float32Array(col), heightAt, count: cells.size }
+  return {
+    position: pos.slice(0, n),
+    color: col.slice(0, n),
+    heightAt,
+    count: cells.size,
+    heights: { size: r, q0: minQ, r0: minR, cols, rows, y: heights },
+  }
 }

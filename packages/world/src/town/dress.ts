@@ -6,12 +6,13 @@
  * (segments, towers, gates). Pieces come out sorted by piece id, so each piece's instances are one
  * run for the batch. The ground is the land with the lakes as holes, painted with the street
  * ribbons, the square, the castle ward, the quay, fields and plots; footprints of buildings and walls
- * are kept for contact darkening; the water carries its shore lines.
+ * are kept for contact darkening; the water carries its shore lines (the land's outline). townGround and
+ * townWater are the ground and water alone, for the worker that builds their meshes (ground.ts, water.ts).
  */
 import { PALETTE, type Recipe, type RecipeInstance, rampMapToSwatchMap } from "@guildhall/assets"
 import { ribbon } from "../geom/line.ts"
 import { axes, rectCorners } from "../geom/obb.ts"
-import { area, bbox, clip, type Ring } from "../geom/poly.ts"
+import { area, bbox, clip, type MultiPolygon, type Ring } from "../geom/poly.ts"
 import { add, at, EPS, round3, scale, snap, type Vec2 } from "../geom/vec.ts"
 import { type EdgeKitProfile, edgeKits, edgePieces } from "./edges.ts"
 import type { Plot } from "./interiors.ts"
@@ -71,24 +72,37 @@ export function dressTown(
   const order = pieces.map((p, i) => ({ p, i }))
   order.sort((a, b) => (a.p.piece < b.p.piece ? -1 : a.p.piece > b.p.piece ? 1 : a.i - b.i))
 
+  const ground = townGround(plan, (p) => recipeOf(p) !== undefined, kits.wall.thickness)
+  return { pieces: order.map((o) => o.p), ground, water: townWater(plan, ground) }
+}
+
+/**
+ * The town's ground alone (what the worker builds the ground mesh from): the land, the painted
+ * overlays and the footprints of the placements `compiled` says are prefabs (or have a building's
+ * role) and of the walls.
+ */
+export function townGround(
+  plan: DressInput,
+  compiled: (p: Placement) => boolean,
+  wallThickness = edgeKits(normalizeSpec(plan.spec).tier).wall.thickness,
+): TownDraw["ground"] {
   const footprints: Vec2[][] = []
   for (const p of plan.placements) {
     const size = plan.sizes?.[p.prefab]
-    const building = recipeOf(p) !== undefined || BUILDING_ROLES.has(p.role ?? "")
-    if (size && building)
+    if (size && (compiled(p) || BUILDING_ROLES.has(p.role ?? "")))
       footprints.push(rectCorners({ c: p.at, rot: p.rot, w: size[0], d: size[1] }).map(snap))
   }
-  for (const e of plan.edges) if (e.kind === "wall") footprints.push(...wallFootprint(e, kits.wall.thickness))
+  for (const e of plan.edges) if (e.kind === "wall") footprints.push(...wallFootprint(e, wallThickness))
+  return { ...landOf(plan), overlays: overlays(plan), footprints }
+}
 
-  const { land, holes } = landOf(plan)
+/** The town's water: its polygons, and the shore along the land's outline (never a seam between them). */
+export function townWater(plan: TownPlan, ground: TownDraw["ground"]): TownDraw["water"] {
+  const coast = [ground.land, ...ground.holes, ...(ground.islets ?? [])]
   return {
-    pieces: order.map((o) => o.p),
-    ground: { land, holes, overlays: overlays(plan), footprints },
-    water: {
-      polys: plan.water,
-      level: LEVELS.water,
-      shore: plan.water.flatMap((r) => shoreOf(r, plan.bounds)),
-    },
+    polys: plan.water,
+    level: LEVELS.water,
+    shore: plan.water.length === 0 ? [] : coast.flatMap((r) => shoreOf(r, plan.bounds)),
   }
 }
 
@@ -124,12 +138,19 @@ function swatchMap(
   return Object.keys(merged).length > 0 ? merged : undefined
 }
 
-/** The land: the bounds minus the water, its largest piece (a lake rarely cuts the bounds in two). */
-function landOf(plan: TownPlan): { land: Vec2[]; holes: Vec2[][] } {
-  if (plan.water.length === 0) return { land: plan.bounds, holes: [] }
-  const parts = clip(plan.bounds, plan.water, "difference")
-  const best = parts.reduce<Ring[] | null>((m, p) => (!m || area(at(p, 0)) > area(at(m, 0)) ? p : m), null)
-  return best ? { land: at(best, 0), holes: best.slice(1) } : { land: plan.bounds, holes: [] }
+/**
+ * The land: the bounds minus each water piece in turn (the pieces meet along seams, so taken all at
+ * once the booleans can leave sea in the land). The largest piece is the land with its holes (the
+ * island); the others are islets.
+ */
+function landOf(plan: TownPlan): { land: Vec2[]; holes: Vec2[][]; islets: Vec2[][] } {
+  let parts: MultiPolygon = [[plan.bounds]]
+  for (const ring of plan.water)
+    if (ring.length >= 3 && parts.length > 0) parts = clip(parts, ring, "difference")
+  const sorted = [...parts].sort((p, q) => area(at(q, 0)) - area(at(p, 0)))
+  const best = sorted[0]
+  if (!best) return { land: plan.bounds, holes: [], islets: [] }
+  return { land: at(best, 0), holes: best.slice(1), islets: sorted.slice(1).map((p) => at(p, 0)) }
 }
 
 /** The painted ground, back to front: streets, the square and ward, the quay, fields, plots. */

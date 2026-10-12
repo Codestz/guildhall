@@ -1,13 +1,14 @@
 /**
  * The town's generation worker (the planner's pattern): towns grow here so the 3D view keeps drawing
- * while a new seed is laid out. Jobs run in arrival order; the screen drops replies it no longer wants.
+ * while a new seed is laid out, and its ground and water meshes are built (their arrays are handed
+ * over, not copied). Jobs run in arrival order; the screen drops replies it no longer wants.
  */
 import type { JobLib } from "../planner/job.ts"
-import { type FromWorker, runTownJob, type ToWorker } from "./job.ts"
+import { type FromWorker, runTownJob, type ToWorker, transferables } from "./job.ts"
 
 interface Scope {
   onmessage: ((e: MessageEvent<ToWorker>) => void) | null
-  postMessage(message: FromWorker): void
+  postMessage(message: FromWorker, transfer?: Transferable[]): void
 }
 const scope = self as unknown as Scope
 
@@ -24,7 +25,8 @@ scope.onmessage = (e) => {
     return
   }
   try {
-    scope.postMessage({ type: "done", id: msg.id, job: runTownJob(msg.spec, lib) })
+    const job = runTownJob(msg.spec, lib)
+    scope.postMessage({ type: "done", id: msg.id, job }, transferables(job))
   } catch (error) {
     scope.postMessage({
       type: "fail",

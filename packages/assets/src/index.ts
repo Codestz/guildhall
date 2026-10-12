@@ -51,6 +51,7 @@ import { loadPalette as load, type PaletteJson as PJ } from "./palette.ts"
 export const PALETTE = load(paletteJson as PJ)
 export type { HouseBlueprint, PrefabKind, PrefabMeta, PrefabRecipe, Storey } from "./compose/blueprint.ts"
 export { PREFAB_KINDS, validatePrefab } from "./compose/blueprint.ts"
+export * from "./compose/index.ts"
 export type { Mount, MountClip, MountSlot, MountsFile, Vec3 } from "./mount.ts"
 export { MOUNT_SLOTS, mountBasis, SLOT_FRAMES, validateMount, validateMounts } from "./mount.ts"
 export type { NpcLook, NpcRecipe } from "./npc/recipe.ts"

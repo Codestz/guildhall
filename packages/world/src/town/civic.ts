@@ -68,7 +68,7 @@ const COUNTS: Readonly<Record<CivicKind, Readonly<Record<Tier, number>>>> = {
   tower: { hamlet: 0, village: 0, town: 1, city: 2, capital: 2 },
   windmill: { hamlet: 0, village: 1, town: 1, city: 1, capital: 1 },
   watermill: { hamlet: 0, village: 1, town: 1, city: 0, capital: 0 },
-  open: { hamlet: 1, village: 1, town: 2, city: 3, capital: 3 },
+  open: { hamlet: 1, village: 2, town: 4, city: 6, capital: 7 },
 }
 /** Claimed in this order: the most particular sites first. */
 const ORDER: readonly CivicKind[] = [
@@ -106,7 +106,7 @@ const INSETS = [0, 0.75, 1.5] as const
 /** Two civic buildings of one kind stand at least this far apart, metres. */
 const APART = 30
 /** Open squares stand this far from each other, the market and the street squares, at the least. */
-const OPEN_APART = 45
+const OPEN_APART = 40
 /** Warehouses and the watermill stand no further from the quay than this, metres. */
 const WATERSIDE = 35
 /** A block side whose middle is this near the market square runs along it, metres (its street and kerb). */
@@ -251,8 +251,9 @@ export function claimCivic(
     const metas = kinds.get(kind) ?? []
     for (let n = 0; n < want[kind]; n++) {
       const draw: Roll = (salt) => roll(`${kind}:${n}:${salt}`)
-      // The kind's recipes from a drawn one round: the first with a site wins.
-      const start = Math.floor(draw("prefab") * metas.length)
+      // The kind's recipes round from a drawn one, the next one for each further building (so a
+      // town's squares or warehouses differ): the first with a site wins.
+      const start = Math.floor(roll(`${kind}:prefab`) * metas.length) + n
       let found: { meta: PrefabMeta; site: Site } | null = null
       for (let k = 0; k < metas.length && !found; k++) {
         const meta = at(metas, (start + k) % metas.length)

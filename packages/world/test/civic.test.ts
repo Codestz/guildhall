@@ -123,7 +123,6 @@ describe("claimCivic, through generateTown", () => {
   test("site rules: the guildhall on the market, the inn by a gate, warehouses on the water, squares apart", () => {
     for (const s of [TOWN, CITY]) {
       const plan = town(s)
-      const c = centroid(plan.plazas[0] as Vec2[])
       const r = plan.spec.radius ?? 100
       const civic = civicOf(plan)
       const at = (k: string) => civic.filter((x) => x.kind === k).map((x) => x.p.at)
@@ -140,7 +139,7 @@ describe("claimCivic, through generateTown", () => {
       expect(Math.min(...gates.map((g) => dist(g, inn))), label(s)).toBeLessThan(0.45 * r)
       const open = at("open")
       for (const [i, a] of open.entries())
-        for (const b of open.slice(i + 1)) expect(dist(a, b), label(s)).toBeGreaterThanOrEqual(45)
+        for (const b of open.slice(i + 1)) expect(dist(a, b), label(s)).toBeGreaterThanOrEqual(40)
     }
     const city = town(CITY)
     const shore = city.blocks.filter((b) => b.use === "harbour")

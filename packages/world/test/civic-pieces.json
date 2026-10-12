@@ -96,6 +96,11 @@
   },
   {
     "category": "tower",
+    "id": "kenney-castle/tower-square-mid",
+    "size": [4, 4.34, 4]
+  },
+  {
+    "category": "tower",
     "id": "kenney-castle/tower-square-mid-windows",
     "size": [4, 4.34, 4]
   },

@@ -60,7 +60,7 @@
       "z": -3
     },
     {
-      "piece": "kenney-castle/tower-square-top",
+      "piece": "kenney-castle/tower-square-mid",
       "rampMap": {
         "sand": "stone",
         "sandstone": "grey",
@@ -73,6 +73,19 @@
       "z": -3
     },
     {
+      "piece": "kenney-castle/tower-square-top",
+      "rampMap": {
+        "sand": "stone",
+        "sandstone": "grey",
+        "terracotta": "stone"
+      },
+      "rot": 0,
+      "scale": 1,
+      "x": 3.5,
+      "y": 17.36,
+      "z": -3
+    },
+    {
       "piece": "kenney-castle/tower-square-roof",
       "rampMap": {
         "sand": "stone",
@@ -82,7 +95,7 @@
       "rot": 0,
       "scale": 1,
       "x": 3.5,
-      "y": 14.31,
+      "y": 18.65,
       "z": -3
     },
     {

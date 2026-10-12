@@ -1,8 +1,10 @@
 import type { Catalog } from "@guildhall/assets"
 import type { Stage } from "@guildhall/render"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ScreenCtx } from "../screens.ts"
+import { clipNames, isCharacter } from "../viewer/clips.ts"
 import { Inspector } from "../viewer/Inspector.tsx"
+import type { Player } from "../viewer/player.ts"
 import { createPreviews, type Previews } from "../viewer/previews.ts"
 import { applyFilters, type Filters, NO_FILTERS, railCounts, toSearch } from "./filters.ts"
 import { Grid } from "./Grid.tsx"
@@ -13,6 +15,8 @@ export interface BrowserHandle {
   filters(): Filters
   setFilters(next: Filters): void
   select(id: string | null): void
+  /** The shown character's player, or null when the selection is not one (or is still loading). */
+  player(): Player | null
 }
 
 interface Props {
@@ -60,7 +64,21 @@ export function Browser({ catalog, ctx, initial, bind }: Props) {
   const counts = useMemo(() => railCounts(catalog, filters), [catalog, filters])
   const entry = selected ? (catalog.get(selected) ?? null) : null
 
-  useEffect(() => bind({ filters: () => filters, setFilters, select: setSelected }), [bind, filters])
+  const player = useRef<Player | null>(null)
+  const onPlayer = useCallback((next: Player | null) => {
+    player.current = next
+  }, [])
+  useEffect(
+    () => bind({ filters: () => filters, setFilters, select: setSelected, player: () => player.current }),
+    [bind, filters],
+  )
+
+  // Character tiles carry an "animated" badge with their clip count.
+  const clipCount = useCallback(
+    (e: (typeof entries)[number]) =>
+      isCharacter(e) ? clipNames(e, e.character ? catalog.rig(e.character.rig) : undefined).length : 0,
+    [catalog],
+  )
 
   // The deep link follows the state (replaceState: no history entry and no remount), so it can be shared.
   useEffect(() => {
@@ -84,9 +102,23 @@ export function Browser({ catalog, ctx, initial, bind }: Props) {
           <span className="of">of {catalog.all().length.toLocaleString("en-US")} pieces</span>
           <ActiveChips filters={filters} onChange={setFilters} />
         </div>
-        <Grid entries={entries} selected={selected} onSelect={select} previews={previews} track={ctx.load} />
+        <Grid
+          entries={entries}
+          selected={selected}
+          onSelect={select}
+          previews={previews}
+          track={ctx.load}
+          clipCount={clipCount}
+        />
       </main>
-      <Inspector entry={entry} ctx={ctx} packs={catalog.index.packs} onStage={onStage} />
+      <Inspector
+        entry={entry}
+        ctx={ctx}
+        packs={catalog.index.packs}
+        rig={catalog.rig}
+        onStage={onStage}
+        onPlayer={onPlayer}
+      />
     </div>
   )
 }

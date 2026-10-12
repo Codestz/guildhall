@@ -1,9 +1,13 @@
-import type { CatalogEntry, CatalogIndex } from "@guildhall/assets"
+import type { CatalogEntry, CatalogIndex, RigEntry } from "@guildhall/assets"
 import { log } from "@guildhall/core"
 import { createStage, createViewer, type Overlay, type Stage, type Viewer } from "@guildhall/render"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import { libraryUrl } from "../catalog.ts"
 import type { ScreenCtx } from "../screens.ts"
+import { AnimationPanel } from "./Animation.tsx"
+import { clipSearch, defaultClip, isCharacter, parseClipLink } from "./clips.ts"
+import { createPlayer, type Player } from "./player.ts"
+import { showCharacter } from "./stand.ts"
 import { describe, type Row } from "./stats.ts"
 
 const logger = log("studio:viewer")
@@ -52,7 +56,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-function Stats({ entry }: { entry: CatalogEntry }) {
+function Stats({ entry, children }: { entry: CatalogEntry; children?: ReactNode }) {
   const d = describe(entry)
   const flags = [
     ...d.scaleFlags.map((f) => ({ f, tone: "scale" })),
@@ -60,6 +64,7 @@ function Stats({ entry }: { entry: CatalogEntry }) {
   ]
   return (
     <div className="gh-stats">
+      {children}
       <Section title="Size">
         <Rows rows={d.size} />
       </Section>
@@ -101,15 +106,25 @@ function Stats({ entry }: { entry: CatalogEntry }) {
   )
 }
 
+/** Starts a new character on the clip the deep link asks for, when it has it, else on its idle. */
+function start(player: Player, link: ReturnType<typeof parseClipLink>): void {
+  const asked = link.clip && player.clips.includes(link.clip) ? link.clip : null
+  const clip = asked ?? defaultClip(player.clips)
+  if (clip) player.play(clip, asked && link.t !== undefined ? { t: link.t } : {})
+}
+
 /**
  * The piece panel: an orbit viewer (1 m grid, the 2.2 m hero beside the piece, the door-top band) over
- * the entry's stats. It owns the screen's stage, so it is mounted for the screen's whole life.
+ * the entry's stats. A character plays its rig's clips, with the player above its stats. It owns the
+ * screen's stage, so it is mounted for the screen's whole life.
  */
 export function Inspector({
   entry,
   ctx,
   packs,
+  rig,
   onStage,
+  onPlayer,
 }: {
   entry: CatalogEntry | null
   ctx: ScreenCtx
@@ -117,11 +132,18 @@ export function Inspector({
   packs: CatalogIndex["packs"]
   /** Lends the stage out (the grid draws its previews on its renderer); null once it is gone. */
   onStage(stage: Stage | null): void
+  /** A rig by id (`catalog.rig`), for a character's clips. */
+  rig(id: string): RigEntry | undefined
+  /** Lends the player out (`ext.studio.play`) while a character is shown; null otherwise. */
+  onPlayer(player: Player | null): void
 }) {
   const host = useRef<HTMLDivElement>(null)
   const viewer = useRef<Viewer | null>(null)
   const staged = useRef<Stage | null>(null)
   const [overlay, setOverlay] = useState<Overlay>(START)
+  const [player, setPlayer] = useState<Player | null>(null)
+  // The deep link's `&clip=`/`&t=` apply to the piece it opened on, once.
+  const link = useRef<URLSearchParams | null>(ctx.query)
 
   useEffect(() => {
     if (!host.current) return
@@ -145,15 +167,56 @@ export function Inspector({
     const shown = viewer.current
     const stage = staged.current
     if (!shown || !stage) return
+    const opened = link.current && link.current.get("id") === entry?.id ? link.current : null
+    if (!opened) link.current = null
     if (!entry) {
       shown.clear()
       aim(shown, stage)
       return
     }
+    const asked = opened ? parseClipLink(opened) : { clip: null }
+    const rigId = isCharacter(entry) ? entry.character?.rig : undefined
+    const rigEntry = rigId ? rig(rigId) : undefined
+    if (rigId && !rigEntry) logger.warn("no such rig: shown unanimated", { id: entry.id, rig: rigId })
+    let live = true
+    let made: Player | null = null
+    const animate = async (r: RigEntry) => {
+      const ch = await showCharacter(shown, stage, entry, r, () => live)
+      if (!ch || !live) return
+      made = createPlayer(stage, ch)
+      start(made, asked)
+      link.current = null
+      setPlayer(made)
+      onPlayer(made)
+    }
+    const work = rigEntry ? animate(rigEntry) : shown.show(entry, libraryUrl(entry.files.glb))
     ctx
-      .load(shown.show(entry, libraryUrl(entry.files.glb)).then(() => aim(shown, stage)))
+      .load(work.then(() => live && aim(shown, stage)))
       .catch((error: unknown) => logger.error("show failed", { id: entry.id, error: String(error) }))
-  }, [entry, ctx])
+    return () => {
+      live = false
+      made?.dispose()
+      setPlayer(null)
+      onPlayer(null)
+    }
+  }, [entry, ctx, rig, onPlayer])
+
+  // The deep link follows the player: `&clip=` while a character is shown, `&t=` while it is paused.
+  useEffect(() => {
+    const write = () => {
+      const search = clipSearch(new URLSearchParams(location.search), player?.state() ?? null)
+      if (search !== location.search) history.replaceState(null, "", search)
+    }
+    write()
+    if (!player) return
+    let last = ""
+    return player.subscribe((s) => {
+      const key = `${s.clip}|${s.playing}|${s.playing ? "" : s.t}`
+      if (key === last) return
+      last = key
+      write()
+    })
+  }, [player])
 
   const toggle = (key: Toggle) => {
     const next = { ...overlay, [key]: !overlay[key] }
@@ -193,7 +256,7 @@ export function Inspector({
         <div className="gh-hint">drag orbit · right-drag pan · wheel zoom</div>
       </div>
       {entry ? (
-        <Stats entry={entry} />
+        <Stats entry={entry}>{player && <AnimationPanel player={player} />}</Stats>
       ) : (
         <div className="gh-stats">
           <Section title="Library">

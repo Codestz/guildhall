@@ -235,6 +235,30 @@ const CSS = /* css */ `
 .gh-lead .num { color: var(--brass-hi); }
 .gh-kv dt small { color: var(--faint); opacity: 0.8; margin-left: 2px; }
 
+/* ── animation ──────────────────────────────────────────────────── */
+.gh-anim {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid var(--brass-line);
+  background: rgba(20, 15, 11, 0.78);
+  color: var(--brass-hi);
+  font: 10px/1.6 var(--mono);
+}
+.gh-transport { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.gh-now { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12.5px var(--mono); color: var(--brass-hi); }
+.gh-time { font-size: 11px; color: var(--faint); white-space: nowrap; }
+.gh-slider { display: grid; grid-template-columns: 44px minmax(0, 1fr) 48px; align-items: center; gap: 8px; font-size: 11.5px; color: var(--faint); }
+.gh-slider input { width: 100%; accent-color: var(--brass); }
+.gh-slider .num { text-align: right; font-size: 11.5px; color: var(--paper); }
+.gh-player .gh-search { margin-top: 6px; }
+.gh-clips { max-height: 230px; overflow-y: auto; margin-top: 4px; }
+.gh-clips .gh-group { padding: 6px 0 2px; }
+.gh-clips .gh-group > .gh-eyebrow { padding: 2px 6px 4px; }
+.gh-clips .gh-group > .gh-eyebrow .num { color: var(--faint); margin-left: 4px; }
+
 /* ── scale scene legend ─────────────────────────────────────────── */
 .gh-legend { position: absolute; top: 12px; left: 12px; width: 320px; padding: 11px 13px 10px; pointer-events: none; }
 .gh-legend h1 { margin: 2px 0 8px; font: 400 18px/1.1 var(--display); letter-spacing: 0.06em; }

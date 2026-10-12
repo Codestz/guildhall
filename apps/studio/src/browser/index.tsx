@@ -4,6 +4,7 @@ import { flushSync } from "react-dom"
 import { createRoot } from "react-dom/client"
 import { loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
+import type { PlayerState, PlayOptions } from "../viewer/player.ts"
 import { Browser, type BrowserHandle } from "./Browser.tsx"
 import { applyFilters, type Filters, parseFilters } from "./filters.ts"
 import { holdStudioStyle } from "./style.ts"
@@ -21,6 +22,8 @@ export interface StudioExt {
     packs: Record<string, number>
     shown: number
     selected: string | null
+    /** The shown character's player: its clips and what plays now; null for anything else. */
+    animation: (PlayerState & { clips: string[] }) | null
     filters: Filters
     facets: ReturnType<Catalog["facets"]> | null
   }
@@ -28,6 +31,11 @@ export interface StudioExt {
   select(id: string): Promise<boolean>
   /** Sets the browser's filters (text, or a partial filter set); returns the match count and ids. */
   query(q: string | Partial<Filters>): Promise<{ count: number; ids: string[] }>
+  /**
+   * Plays a clip on the shown character (`t` freezes it there, paused); resolves once it is drawn.
+   * False when no character is shown or it has no such clip.
+   */
+  play(name: string, opts?: PlayOptions): Promise<boolean>
 }
 
 function Empty() {
@@ -47,7 +55,8 @@ const nextFrame = () => new Promise<void>((done) => requestAnimationFrame(() => 
 
 /**
  * The piece browser (`?screen=pieces`): search and facet filters over the catalog, a virtualised
- * thumbnail grid and the piece inspector. Deep link: `&q=…&pack=…&cat=…&flag=a,b&misfit=1&id=…`.
+ * thumbnail grid and the piece inspector, which animates characters. Deep link:
+ * `&q=…&pack=…&cat=…&flag=a,b&misfit=1&id=…`, and for a character `&clip=…` (`&t=…` holds it paused).
  */
 export const pieces: Screen = {
   id: "pieces",
@@ -70,11 +79,13 @@ export const pieces: Screen = {
     const ext: StudioExt = {
       stats: () => {
         const filters = handle?.filters() ?? parseFilters(new URLSearchParams())
+        const player = handle?.player() ?? null
         return {
           entries: catalog?.all().length ?? 0,
           packs: Object.fromEntries((catalog?.index.packs ?? []).map((p) => [p.id, p.count])),
           shown: catalog ? applyFilters(catalog, filters).length : 0,
           selected: new URLSearchParams(location.search).get("id"),
+          animation: player ? { ...player.state(), clips: player.clips } : null,
           filters,
           facets: catalog?.facets() ?? null,
         }
@@ -94,6 +105,12 @@ export const pieces: Screen = {
         await settle()
         const found = applyFilters(catalog, next)
         return { count: found.length, ids: found.slice(0, QUERY_IDS).map((e) => e.id) }
+      },
+      async play(name, opts) {
+        const player = handle?.player()
+        if (!player?.play(name, opts)) return false
+        await settle()
+        return true
       },
     }
     if (window.guildhall) window.guildhall.ext.studio = ext

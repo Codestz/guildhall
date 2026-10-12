@@ -38,10 +38,12 @@ interface TileProps {
   style: { left: number; top: number; width: number; height: number }
   /** A live preview's url, for a piece with no baked thumbnail. */
   preview: string | undefined
+  /** Clips a character plays (0: not animated). */
+  clips: number
   onSelect(id: string): void
 }
 
-const Tile = memo(function Tile({ entry, selected, style, preview, onSelect }: TileProps) {
+const Tile = memo(function Tile({ entry, selected, style, preview, clips, onSelect }: TileProps) {
   const image = entry.files.thumb ? libraryUrl(entry.files.thumb) : preview
   const flags = [...entry.scale.flags, ...entry.flags]
   return (
@@ -62,6 +64,11 @@ const Tile = memo(function Tile({ entry, selected, style, preview, onSelect }: T
             ))}
           </div>
         )}
+        {clips > 0 && (
+          <span className="gh-anim" title={`animated · ${clips} clips`}>
+            ▶ <span className="num">{clips}</span>
+          </span>
+        )}
       </div>
       <div className="gh-cap">
         <span className="name">{entry.name}</span>
@@ -81,10 +88,12 @@ interface GridProps {
   previews: Previews | null
   /** Hands async work to the screen, so `guildhall.ready()` waits for the previews in view. */
   track(work: Promise<void>): Promise<void>
+  /** Clips an entry plays; a tile with any is badged as animated. */
+  clipCount(entry: CatalogEntry): number
 }
 
 /** A windowed thumbnail grid: only the rows near the view are in the DOM, so 3k+ entries scroll freely. */
-export function Grid({ entries, selected, onSelect, previews, track }: GridProps) {
+export function Grid({ entries, selected, onSelect, previews, track, clipCount }: GridProps) {
   const box = useRef<HTMLDivElement>(null)
   const [view, setView] = useState({ width: 0, height: 0, scrollTop: 0 })
 
@@ -177,6 +186,7 @@ export function Grid({ entries, selected, onSelect, previews, track }: GridProps
         selected={entry.id === selected}
         style={style}
         preview={previews?.get(entry.id)}
+        clips={clipCount(entry)}
         onSelect={onSelect}
       />,
     )

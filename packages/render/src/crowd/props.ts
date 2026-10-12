@@ -56,7 +56,13 @@ function poseFor(mount: Mount, slot: MountSlot, clip: string): Pose {
  * `prop`'s matrix in the rig root's space for a person at `pose` playing `clip` (the clip names the
  * mount's overrides), into `target`; false when the clip hides it.
  */
-export function propMatrix(bake: BoneBake, pose: BakePose, clip: string, prop: HeldProp, target: Matrix4): boolean {
+export function propMatrix(
+  bake: BoneBake,
+  pose: BakePose,
+  clip: string,
+  prop: HeldProp,
+  target: Matrix4,
+): boolean {
   if (prop.mount.clips?.[clip]?.hide) return false
   const s = scratch
   const p = poseFor(prop.mount, prop.slot, clip)
@@ -65,7 +71,10 @@ export function propMatrix(bake: BoneBake, pose: BakePose, clip: string, prop: H
   const upright = prop.mount.upright
   if (upright) {
     s.socket.decompose(s.at, s.hand, s.size)
-    s.up.set(...upright.up).applyQuaternion(p.quaternion).applyQuaternion(s.hand)
+    s.up
+      .set(...upright.up)
+      .applyQuaternion(p.quaternion)
+      .applyQuaternion(s.hand)
     s.align.setFromUnitVectors(s.up.normalize(), UP)
     // pivot = hand⁻¹ · align · hand (character/upright.ts).
     s.turn.copy(s.hand).invert().multiply(s.align).multiply(s.hand)

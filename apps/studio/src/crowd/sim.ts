@@ -136,14 +136,25 @@ function cycle(t: number, busy: number, rest: number): { busy: boolean; into: nu
 }
 
 /** A person at time `t` (s): place, heading, clip and phase. `duration(clip)` is the clip's length in seconds. */
-export function sampleFolk(folk: Folk, look: Look, t: number, duration: (clip: string) => number): FolkSample {
+export function sampleFolk(
+  folk: Folk,
+  look: Look,
+  t: number,
+  duration: (clip: string) => number,
+): FolkSample {
   const task = folk.task
   const time = t + task.offset
-  const loop = (clip: string, seconds: number, rate = 1) => look.phase + (seconds * rate) / Math.max(duration(clip), 1e-3)
+  const loop = (clip: string, seconds: number, rate = 1) =>
+    look.phase + (seconds * rate) / Math.max(duration(clip), 1e-3)
   if (task.kind === "work") {
     const c = cycle(time, task.work, task.rest)
     const clip = c.busy ? look.clips.work : look.clips.idle
-    return { position: [task.at[0], 0, task.at[1]], heading: task.heading, clip, phase: frac(loop(clip, c.into)) }
+    return {
+      position: [task.at[0], 0, task.at[1]],
+      heading: task.heading,
+      clip,
+      phase: frac(loop(clip, c.into)),
+    }
   }
   const c = cycle(time, task.walk, task.rest)
   const speed = WALK_MPS * look.speed

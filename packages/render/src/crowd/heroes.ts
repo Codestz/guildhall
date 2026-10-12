@@ -52,6 +52,16 @@ export function chooseHeroes(
 }
 
 /**
+ * Whether a person is drawn as its hero this frame: when wanted and made, else not; but never switched
+ * mid-fade. A fade blends the two clips per bone in the rig's space (crowd) or per joint (mixer), which
+ * differ by centimetres mid-way, so the hand-off waits for the fade to finish and then changes nothing.
+ */
+export function heroShown(want: boolean, ready: boolean, shownNow: boolean, fade: number): boolean {
+  if (fade < 1) return shownNow && ready
+  return want && ready
+}
+
+/**
  * Light sources people carry that the static batch never places (GLOW_SWATCHES covers those): the
  * KayKit tools lantern's glass is snow-light (14), used nowhere else on it.
  */

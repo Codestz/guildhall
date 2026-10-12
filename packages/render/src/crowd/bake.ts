@@ -145,7 +145,13 @@ export function bakeClips(body: Object3D, clips: readonly AnimationClip[], fps: 
 
   const half = new Uint16Array(data.length)
   for (let i = 0; i < data.length; i++) half[i] = DataUtils.toHalfFloat(data[i] as number)
-  const texture = new DataTexture(half, bones.length * TEXELS_PER_BONE, Math.max(rows, 1), RGBAFormat, HalfFloatType)
+  const texture = new DataTexture(
+    half,
+    bones.length * TEXELS_PER_BONE,
+    Math.max(rows, 1),
+    RGBAFormat,
+    HalfFloatType,
+  )
   texture.minFilter = NearestFilter
   texture.magFilter = NearestFilter
   texture.generateMipmaps = false
@@ -222,7 +228,14 @@ const read = {
 }
 
 /** One bone's record at (row, blend): q into `q`, head into `head`, its scale returned. As the shader. */
-function recordAt(bake: BoneBake, row: number, blend: number, bone: number, q: Quaternion, head: Vector3): number {
+function recordAt(
+  bake: BoneBake,
+  row: number,
+  blend: number,
+  bone: number,
+  q: Quaternion,
+  head: Vector3,
+): number {
   const rowFloats = bake.bones.length * FLOATS_PER_BONE
   const first = row * rowFloats + bone * FLOATS_PER_BONE
   const next = first + rowFloats

@@ -39,7 +39,10 @@ export function tintTable(palette: Palette = PALETTE): DataTexture {
 }
 
 /** One row per outfit: swatch → worn swatch (identity where the outfit leaves it). */
-export function outfitTable(rampMaps: readonly Record<string, string>[], palette: Palette = PALETTE): DataTexture {
+export function outfitTable(
+  rampMaps: readonly Record<string, string>[],
+  palette: Palette = PALETTE,
+): DataTexture {
   const rows = Math.max(1, rampMaps.length)
   const data = new Uint8Array(OUTFIT_WIDTH * rows)
   for (let r = 0; r < rows; r++) {

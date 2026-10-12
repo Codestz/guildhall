@@ -41,7 +41,15 @@ import { loadPiece } from "../pieces.ts"
 import type { Stage } from "../stage.ts"
 import { type BakePose, type BoneBake, bakeBytes, bakeClips, boneMap, frameAt } from "./bake.ts"
 import { createBlobs } from "./blobs.ts"
-import { chooseHeroes, glowSwatches, type Hero, makeHero, type Playing, poseHero } from "./heroes.ts"
+import {
+  chooseHeroes,
+  glowSwatches,
+  type Hero,
+  heroShown,
+  makeHero,
+  type Playing,
+  poseHero,
+} from "./heroes.ts"
 import { crowdMaterial, crowdUniforms, PEOPLE_ROW, TEXELS_PER_PERSON } from "./material.ts"
 import { outfitTable, tintTable } from "./outfit.ts"
 import { mergeParts, type PartsTier, simplifyParts, skinnedParts } from "./parts.ts"
@@ -65,6 +73,8 @@ export interface ActorSample {
   clip: string
   /** 0–1 through the clip (wraps). */
   phase: number
+  /** Not drawn this frame (indoors): no body, props, shadow, nor hero. */
+  hidden?: boolean
 }
 
 /** Where bodies and props load from: the catalog (with mounts) and its library url mapping. */
@@ -80,6 +90,8 @@ export interface CrowdOpts {
   tall?: number
   /** Rows of the bake a second (default 30). */
   fps?: number
+  /** More clips to bake besides the looks' own (what a routine plays: sitting, fishing…). */
+  clips?: readonly string[]
 }
 
 export interface CrowdStats {
@@ -139,6 +151,8 @@ interface Person {
   /** A hero being made for it (resolves null when that failed or was given up). */
   pending: Promise<Hero | null> | null
   failed: boolean
+  /** Drawn as its hero (else as a crowd member). */
+  shown: boolean
 }
 
 /** Every clip name the looks play. */
@@ -169,9 +183,10 @@ export function bakePose(bake: BoneBake, playing: Playing, out: BakePose): BakeP
   return out
 }
 
-/** Moves `playing` on to the sample's clip and phase, starting a fade on a clip change. */
+/** Moves `playing` on to the sample's clip and phase, starting a fade on a clip change (not on the first: clip ""). */
 export function advance(playing: Playing, clip: string, phase: number, dt: number): void {
-  if (clip !== playing.clip) {
+  if (playing.clip === "") playing.clip = clip
+  else if (clip !== playing.clip) {
     playing.was = playing.clip
     playing.wasPhase = playing.phase
     playing.fade = 0
@@ -203,7 +218,7 @@ export async function createCrowd(
   const rig = firstEntry?.character && catalog.rig(firstEntry.character.rig)
   if (!firstEntry || !rig) throw new Error("createCrowd: no actors, or the first body has no rig")
   const rigBody = await loadCharacter(firstEntry, rig, url)
-  const wanted = lookClips(actors.map((a) => a.look))
+  const wanted = [...new Set([...lookClips(actors.map((a) => a.look)), ...(opts.clips ?? [])])].sort()
   const clips = wanted.flatMap((name) => rigBody.clips.filter((c) => c.name === name))
   for (const name of wanted)
     if (!clips.some((c) => c.name === name)) logger.warn("clip not in the rig", { clip: name })
@@ -228,7 +243,12 @@ export async function createCrowd(
   const indices = geometries.flat().reduce((n, g) => n + (g.index?.count ?? 0), 0)
 
   const material = crowdMaterial(uniforms)
-  const bodies = new LodBatchedMesh(Math.max(1, actors.length), Math.max(1, vertices), Math.max(1, indices), material)
+  const bodies = new LodBatchedMesh(
+    Math.max(1, actors.length),
+    Math.max(1, vertices),
+    Math.max(1, indices),
+    material,
+  )
   bodies.name = "crowd:bodies"
   bodies.perObjectFrustumCulled = true
   bodies.sortObjects = false
@@ -259,7 +279,12 @@ export async function createCrowd(
   const propCount = actors.reduce((n, a) => n + a.look.mounts.length, 0)
   const propVertices = [...propGeometry.values()].reduce((n, g) => n + g.getAttribute("position").count, 0)
   const propIndices = [...propGeometry.values()].reduce((n, g) => n + (g.index?.count ?? 0), 0)
-  const props = new BatchedMesh(Math.max(1, propCount), Math.max(1, propVertices), Math.max(1, propIndices), paletteMaterial())
+  const props = new BatchedMesh(
+    Math.max(1, propCount),
+    Math.max(1, propVertices),
+    Math.max(1, propIndices),
+    paletteMaterial(),
+  )
   props.name = "crowd:props"
   props.perObjectFrustumCulled = true
   props.sortObjects = false
@@ -286,7 +311,8 @@ export async function createCrowd(
   people.needsUpdate = true
   uniforms.crowdPeople.value = people
 
-  const slotBone = (slot: MountSlot) => bake.bones.indexOf(PropertyBinding.sanitizeNodeName(SLOT_FRAMES[slot].bone))
+  const slotBone = (slot: MountSlot) =>
+    bake.bones.indexOf(PropertyBinding.sanitizeNodeName(SLOT_FRAMES[slot].bone))
   const persons: Person[] = actors.map((actor, i) => {
     const body = bodyOf.get(actor.look.body) as Body
     const instance = bodies.addInstance(body.geometry)
@@ -302,9 +328,13 @@ export async function createCrowd(
         logger.warn("prop left out", { piece, slot })
         return []
       }
-      return [{ prop: { mount, slot, bone }, instance: props.addInstance(propGeometryId.get(piece) as number) }]
+      return [
+        { prop: { mount, slot, bone }, instance: props.addInstance(propGeometryId.get(piece) as number) },
+      ]
     })
-    const at = (i % PEOPLE_ROW) * TEXELS_PER_PERSON * 4 + Math.floor(i / PEOPLE_ROW) * PEOPLE_ROW * TEXELS_PER_PERSON * 4
+    const at =
+      (i % PEOPLE_ROW) * TEXELS_PER_PERSON * 4 +
+      Math.floor(i / PEOPLE_ROW) * PEOPLE_ROW * TEXELS_PER_PERSON * 4
     peopleData[at + 4] = 1
     peopleData[at + 5] = hidden
     peopleData[at + 6] = i
@@ -313,11 +343,12 @@ export async function createCrowd(
       body: body.geometry,
       instance,
       props: held,
-      playing: { clip: actor.look.clips.idle, phase: actor.look.phase, was: null, wasPhase: 0, fade: 1 },
+      playing: { clip: "", phase: actor.look.phase, was: null, wasPhase: 0, fade: 1 },
       hidden,
       hero: null,
       pending: null,
       failed: false,
+      shown: false,
     }
   })
 
@@ -354,7 +385,10 @@ export async function createCrowd(
           npc.dispose()
           return null
         }
-        return makeHero(npc, look.mounts.map((m) => m.piece))
+        return makeHero(
+          npc,
+          look.mounts.map((m) => m.piece),
+        )
       })
       .catch((error: unknown) => {
         logger.warn("hero failed; stays in the crowd", { id: person.actor.id, error: String(error) })
@@ -393,6 +427,10 @@ export async function createCrowd(
         const s = sample(person.actor.id)
         samples.push(s)
         advance(person.playing, s.clip, s.phase, dt)
+        if (s.hidden) {
+          talls.push(0)
+          continue
+        }
         const [x, y, z] = s.position
         const height = FIGURE_HEIGHT * person.actor.look.scale
         const depth = (x - eye.x) * forward.x + (y + height / 2 - eye.y) * forward.y + (z - eye.z) * forward.z
@@ -403,22 +441,41 @@ export async function createCrowd(
       const current = new Set(persons.filter((p) => p.hero || p.pending).map((p) => p.actor.id))
       wantHero = allHeroes
         ? new Set(persons.map((p) => p.actor.id))
-        : chooseHeroes(candidates, current, pinned, maxHeroes, opts.tall ? { tall: opts.tall, short: opts.tall * 0.8 } : {})
+        : chooseHeroes(
+            candidates,
+            current,
+            pinned,
+            maxHeroes,
+            opts.tall ? { tall: opts.tall, short: opts.tall * 0.8 } : {},
+          )
 
       let crowd = 0
       let held = 0
       for (const [i, person] of persons.entries()) {
         const s = samples[i] as ActorSample
+        if (s.hidden) {
+          person.hero?.dispose()
+          person.hero = null
+          person.shown = false
+          bodies.setVisibleAt(person.instance, false)
+          for (const p of person.props) props.setVisibleAt(p.instance, false)
+          blobs.place(i, 0, -1000, 0, 0)
+          continue
+        }
         const want = wantHero.has(person.actor.id) && !person.failed
         if (want && !person.hero && !person.pending) makeHeroFor(person)
-        if (!want && person.hero) {
-          person.hero.dispose()
-          person.hero = null
+        person.shown = heroShown(want, !!person.hero, person.shown, person.playing.fade)
+        if (!person.shown && person.hero) {
+          if (want) person.hero.npc.root.visible = false
+          else {
+            person.hero.dispose()
+            person.hero = null
+          }
         }
         const [x, y, z] = s.position
         const scale = person.actor.look.scale
         blobs.place(i, x, y, z, scale)
-        const hero = person.hero
+        const hero = person.shown ? person.hero : null
         if (hero) {
           const root = hero.npc.root
           root.position.set(x, y, z)
@@ -431,7 +488,9 @@ export async function createCrowd(
         }
         // The crowd member: its place, its rows in the bake, its props.
         bakePose(bake, person.playing, pose)
-        const o = (i % PEOPLE_ROW) * TEXELS_PER_PERSON * 4 + Math.floor(i / PEOPLE_ROW) * PEOPLE_ROW * TEXELS_PER_PERSON * 4
+        const o =
+          (i % PEOPLE_ROW) * TEXELS_PER_PERSON * 4 +
+          Math.floor(i / PEOPLE_ROW) * PEOPLE_ROW * TEXELS_PER_PERSON * 4
         peopleData[o] = pose.now
         peopleData[o + 1] = pose.blendNow
         peopleData[o + 2] = pose.was

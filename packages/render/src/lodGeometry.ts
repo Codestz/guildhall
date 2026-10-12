@@ -41,6 +41,7 @@ type Arrays = {
   _swatch: Uint8Array
   _shade: Uint8Array
   _ao: Uint8Array
+  _glow: Uint8Array
 }
 
 const arrays = (geometry: BufferGeometry) =>

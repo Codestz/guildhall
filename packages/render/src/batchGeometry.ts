@@ -22,7 +22,8 @@ const AO_NONE = 255
 
 /**
  * The batch's vertex format: float positions and normals, byte rgb colour (normalized), and the
- * palette bytes `_swatch` (raw), `_shade` and `_ao` (normalized) kept for a later GPU re-tint (ADR 008).
+ * palette bytes `_swatch` (raw), `_shade` and `_ao` (normalized) kept for a later GPU re-tint (ADR 008),
+ * and `_glow` (normalized): 1 on a light source's glass or flame, which glows by night (night/glow.ts).
  */
 export const BATCH_ATTRIBUTES = {
   position: { itemSize: 3, normalized: false, array: Float32Array },
@@ -31,6 +32,7 @@ export const BATCH_ATTRIBUTES = {
   _swatch: { itemSize: 1, normalized: false, array: Uint8Array },
   _shade: { itemSize: 1, normalized: true, array: Uint8Array },
   _ao: { itemSize: 1, normalized: true, array: Uint8Array },
+  _glow: { itemSize: 1, normalized: true, array: Uint8Array },
 } as const
 
 const byte = (value: number, normalized: boolean) =>
@@ -40,9 +42,14 @@ const byte = (value: number, normalized: boolean) =>
  * Every mesh under `root`, re-tinted by `swatchMap` (cached variants, ADR 008) and merged into one
  * indexed geometry in the batch format, in `root`'s space. A mesh without normals gets computed
  * ones, without colour white, without palette bytes neutral ones. The result is new and the
- * caller's: the sources are not touched.
+ * caller's: the sources are not touched. Vertices whose swatch is in `glow` (the piece's light-source
+ * swatches, GLOW_SWATCHES) get `_glow` 1; a source already in the batch format keeps its own.
  */
-export function batchGeometry(root: Object3D, swatchMap: Record<number, number> = {}): BufferGeometry {
+export function batchGeometry(
+  root: Object3D,
+  swatchMap: Record<number, number> = {},
+  glow: readonly number[] = [],
+): BufferGeometry {
   root.updateWorldMatrix(true, true)
   const toRoot = new Matrix4().copy(root.matrixWorld).invert()
   const parts: { geometry: Geometry; matrix: Matrix4 }[] = []
@@ -68,7 +75,9 @@ export function batchGeometry(root: Object3D, swatchMap: Record<number, number> 
     _swatch: new Uint8Array(vertices),
     _shade: new Uint8Array(vertices).fill(SHADE_NEUTRAL),
     _ao: new Uint8Array(vertices).fill(AO_NONE),
+    _glow: new Uint8Array(vertices),
   }
+  const glowing = new Set(glow)
   const index = new Uint32Array(indices)
 
   const p = new Vector3()
@@ -88,6 +97,7 @@ export function batchGeometry(root: Object3D, swatchMap: Record<number, number> 
     const swatch = geometry.getAttribute("_swatch")
     const shade = geometry.getAttribute("_shade")
     const ao = geometry.getAttribute("_ao")
+    const lit = geometry.getAttribute("_glow")
     for (let v = 0; v < position.count; v++) {
       const o = base + v
       // getX/Y/Z read quantized attributes as the values they stand for.
@@ -106,6 +116,8 @@ export function batchGeometry(root: Object3D, swatchMap: Record<number, number> 
       if (swatch) out._swatch[o] = byte(swatch.getX(v), swatch.normalized)
       if (shade) out._shade[o] = byte(shade.getX(v), shade.normalized)
       if (ao) out._ao[o] = byte(ao.getX(v), ao.normalized)
+      if (lit) out._glow[o] = byte(lit.getX(v), lit.normalized)
+      if (glowing.has(out._swatch[o] as number)) out._glow[o] = 255
     }
     const sourceIndex = geometry.index
     const count = sourceIndex?.count ?? position.count

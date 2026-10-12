@@ -7,6 +7,7 @@ import { grips } from "./grips/matrix/index.ts"
 import { home } from "./home/index.tsx"
 import { lineup } from "./lineup/index.ts"
 import { m0 } from "./m0/index.ts"
+import { night } from "./night/index.ts"
 import { npc } from "./npcs/index.tsx"
 import { palette } from "./palette/index.ts"
 import { planner } from "./planner/index.tsx"
@@ -50,6 +51,7 @@ export const SCREENS: readonly Screen[] = [
   batch,
   town,
   planner,
+  night,
 ]
 
 export const DEFAULT_SCREEN = "home"

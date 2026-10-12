@@ -14,10 +14,30 @@ export { createGizmo, type Gizmo, type GizmoMode, type GizmoOpts, type GizmoPose
 export { createGrid, type Disposable } from "./grid.ts"
 export { contactShade, createGround, type Ground, type GroundDraw, groundMesh } from "./ground.ts"
 export { disposeObject, heroSilhouette, testBox } from "./hero.ts"
-export { applyLight, type DayLight, GOLDEN_HOUR, goldenHour, lightAt, sunAt } from "./light.ts"
+export {
+  applyLight,
+  type DayLight,
+  GOLDEN_HOUR,
+  goldenHour,
+  keyLight,
+  lightAt,
+  moonAt,
+  sunAt,
+} from "./light.ts"
 export type { LodCounts } from "./lod.ts"
 export { paletteMaterial } from "./material.ts"
 export { group, loadModel, type Measure, measure, poseModel } from "./model.ts"
+export {
+  createNight,
+  GLOW_SWATCHES,
+  MAX_LIGHTS,
+  type Night,
+  type NightOpts,
+  type NightStats,
+  setGlow,
+  setNightGrade,
+  windowsDark,
+} from "./night/index.ts"
 export { loadPiece } from "./pieces.ts"
 export { instanceSwatchMap, placeInstance, recipeObject } from "./recipe.ts"
 export { createShadows, fitShadowCamera, type ShadowBox } from "./shadow.ts"

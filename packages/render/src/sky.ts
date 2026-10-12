@@ -1,5 +1,5 @@
 import { BackSide, Color, Fog, Mesh, ShaderMaterial, SphereGeometry, Vector3 } from "three"
-import { applyLight, type DayLight, GOLDEN_HOUR, hazeColour, lightAt } from "./light.ts"
+import { applyLight, type DayLight, GOLDEN_HOUR, hazeColour, keyLight, lightAt } from "./light.ts"
 import type { Stage } from "./stage.ts"
 import type { Sun } from "./sun/index.ts"
 
@@ -22,6 +22,12 @@ export interface Sky {
 /** The dome's radius: inside the camera's far plane (stage.ts: 2000). */
 const DOME_RADIUS = 1500
 const DEFAULT_REACH = 120
+/** Radians the key light turns before the cascades are redrawn (a quarter of a degree). */
+const SHADOW_TURN = (0.25 * Math.PI) / 180
+const smoothstep01 = (x: number) => {
+  const t = Math.min(1, Math.max(0, x))
+  return t * t * (3 - 2 * t)
+}
 
 const VERTEX = /* glsl */ `
 varying vec3 vDirection;
@@ -40,7 +46,15 @@ uniform vec3 glow;
 uniform vec3 sunColor;
 uniform vec3 sunDirection;
 uniform float sunDisc;
+uniform vec3 moonDirection;
+uniform float moonDisc;
+uniform float stars;
 varying vec3 vDirection;
+float starHash(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
 void main() {
   vec3 d = normalize(vDirection);
   float up = d.y;
@@ -49,6 +63,22 @@ void main() {
   float toward = max(dot(d, sunDirection), 0.0);
   colour += glow * (0.35 * pow(toward, 6.0) + 0.25 * pow(toward, 48.0)) * (1.0 - smoothstep(0.1, 0.7, up));
   colour = mix(colour, sunColor * 1.6, sunDisc * smoothstep(0.9993, 0.9997, toward));
+  // Stars: one in a few hundred cells of a fine grid over the dome, a round dot jittered in its cell,
+  // faded toward the horizon (the haze) and by the dusk.
+  if (stars > 0.0 && up > 0.0) {
+    vec3 q = d * 240.0;
+    vec3 cell = floor(q);
+    float h = starHash(cell);
+    if (h > 0.992) {
+      vec3 c = cell + 0.5 + 0.5 * (vec3(starHash(cell + 1.7), starHash(cell + 3.1), starHash(cell + 5.3)) - 0.5);
+      float twinkle = 0.35 + 0.65 * fract(h * 977.0);
+      colour += vec3(0.8, 0.86, 1.0) * stars * twinkle * smoothstep(0.38, 0.0, length(q - c)) * smoothstep(0.0, 0.3, up);
+    }
+  }
+  // The moon: a pale disc with a faint halo.
+  float moonward = max(dot(d, moonDirection), 0.0);
+  colour += vec3(0.62, 0.7, 0.92) * moonDisc * (0.05 * pow(moonward, 80.0) + 0.04 * pow(moonward, 12.0));
+  colour = mix(colour, vec3(0.92, 0.95, 1.0), moonDisc * smoothstep(0.99955, 0.9998, moonward));
   gl_FragColor = vec4(colour, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -57,7 +87,7 @@ void main() {
 
 /**
  * The sky (plan §5): one gradient dome round the camera (zenith → horizon → the haze below it, a warm
- * glow round the sun and its disc), the lights for the hour (`light.ts`) and a light haze that thickens
+ * glow round the sun and its disc; by night stars and the moon), the lights for the hour (`light.ts`) and a light haze that thickens
  * past `reach` from the camera's target, for depth. One draw call; the dome follows the camera.
  */
 export function createSky(stage: Stage, preset: SkyPreset = {}): Sky {
@@ -70,6 +100,9 @@ export function createSky(stage: Stage, preset: SkyPreset = {}): Sky {
     sunColor: { value: new Color() },
     sunDirection: { value: new Vector3(0, 1, 0) },
     sunDisc: { value: 0 },
+    moonDirection: { value: new Vector3(0, 1, 0) },
+    moonDisc: { value: 0 },
+    stars: { value: 0 },
   }
   const material = new ShaderMaterial({
     uniforms,
@@ -86,6 +119,9 @@ export function createSky(stage: Stage, preset: SkyPreset = {}): Sky {
   stage.scene.add(dome)
 
   let current = lightAt(preset.hour ?? GOLDEN_HOUR)
+  /** The key light's direction when the cascades were last redrawn (a slow cycle moves it a little a frame). */
+  const shadowDir = new Vector3()
+  const keyDir = new Vector3()
   const setHour = (hour: number) => {
     current = lightAt(hour)
     applyLight(stage, current)
@@ -106,7 +142,22 @@ export function createSky(stage: Stage, preset: SkyPreset = {}): Sky {
       )
       .normalize()
     uniforms.sunDisc.value = elevation > -1 ? 1 : 0
-    preset.sun?.markDirty()
+    const moonRad = (current.moonElevation * Math.PI) / 180
+    const [mx, , mz] = current.moonDir
+    const mh = Math.hypot(mx, mz) || 1
+    uniforms.moonDirection.value.set(
+      (mx / mh) * Math.cos(moonRad),
+      Math.sin(moonRad),
+      (mz / mh) * Math.cos(moonRad),
+    )
+    uniforms.moonDisc.value = current.night * smoothstep01(current.moonElevation / 6)
+    uniforms.stars.value = current.night * current.night
+    // The cascades redraw when the key light has turned a quarter of a degree since they last did.
+    keyDir.set(...keyLight(current).dir)
+    if (keyDir.angleTo(shadowDir) > SHADOW_TURN || shadowDir.lengthSq() === 0) {
+      shadowDir.copy(keyDir)
+      preset.sun?.markDirty()
+    }
   }
   setHour(current.hour)
 

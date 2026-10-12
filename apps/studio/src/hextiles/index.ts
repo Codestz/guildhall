@@ -96,8 +96,9 @@ export const hexTiles: Screen = {
         if (knight) {
           const root = await loadPiece(libraryUrl(knight.files.glb))
           if (disposed) return
-          root.position.set(x + R * 0.95, 0.5, z + R * 0.9)
-          root.rotation.y = -0.5
+          // beside the tile, level with its middle: the same distance from the camera as what stands on it
+          root.position.set(x + R * 0.74, 0.5, z + 0.4)
+          root.rotation.y = 0
           stage.scene.add(root)
           cleanup.push(() => root.removeFromParent())
         }

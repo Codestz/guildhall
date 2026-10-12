@@ -12,6 +12,7 @@ import {
   HEX_TILE_SIZE,
   type HexFineGround,
   type HexIsland,
+  type HexNature,
   type HexWorld,
   hexCentre,
   hexGroundFine,
@@ -70,7 +71,30 @@ export interface HexJobSpec {
   paint: boolean
   /** The authored tile prefabs (the main thread's `loadTiles`), installed before the build; null: world's fallback. */
   tiles: TilePrefab[] | null
+  /** The nature knobs (`natureOf`: `?tree= ?pine= ?bush= ?rock= ?grass= ?flower= ?woods= ?wild=`); left out: today's. */
+  nature?: HexNature
 }
+
+/** The nature knobs a page's query sets (nature.ts `HexNature`): only those given, each a positive number. */
+export function natureOf(query: Pick<URLSearchParams, "get">): HexNature {
+  const out: HexNature = {}
+  for (const k of NATURE_KNOBS) {
+    const raw = query.get(k)
+    const v = raw === null || raw === "" ? Number.NaN : Number(raw)
+    if (Number.isFinite(v) && v > 0 && v <= 4) out[k] = v
+  }
+  return out
+}
+const NATURE_KNOBS = [
+  "tree",
+  "pine",
+  "bush",
+  "rock",
+  "grass",
+  "flower",
+  "woods",
+  "wild",
+] as const satisfies readonly (keyof HexNature)[]
 
 /** Heights on a hex grid: what the camera and the townsfolk stand on (`heightsAt` reads it). */
 export type HexHeights = HexFineGround["heights"]
@@ -111,7 +135,13 @@ export interface MapStage {
   pools: { x: number; z: number; y: number; flow?: [number, number] }[]
   /** Where each lantern's light hangs (lanterns stand on flat tiles: the ground built under them keeps them there). */
   lamps: [number, number, number][]
-  stats: { land: number; tiles: number; prefabs: Record<string, number> }
+  stats: {
+    land: number
+    tiles: number
+    prefabs: Record<string, number>
+    /** With nature knobs: the nature pieces grown and those held back from a road or a building. */
+    nature?: { grown: number; held: number }
+  }
 }
 
 export interface GroundStage {
@@ -346,9 +376,9 @@ export function runHexJob(
   if (spec.tiles) installTilePrefabs(spec.tiles)
   const h = hexIsland({ seed: spec.seed, files: spec.files })
   lap("island")
-  const z = hexZones(h)
+  const z = hexZones(h, { wild: spec.nature?.wild })
   lap("zones")
-  const w = hexWorld(h, z, { step: spec.step })
+  const w = hexWorld(h, z, { step: spec.step, nature: spec.nature })
   lap("world")
   const R = HEX_TILE_SIZE
   const { pools, pooled, sunk } = sinkPools(w)
@@ -369,7 +399,12 @@ export function runHexJob(
       lamps: w.pieces
         .filter((p) => p.piece === LANTERN)
         .map((p) => [p.x, p.y + 2.03 * p.scale, p.z] as [number, number, number]),
-      stats: { land: h.stats.land, tiles: w.tiles.length, prefabs: w.stats.prefabs },
+      stats: {
+        land: h.stats.land,
+        tiles: w.tiles.length,
+        prefabs: w.stats.prefabs,
+        ...(w.stats.nature ? { nature: w.stats.nature } : {}),
+      },
     },
   })
   const palette = { top: TOP, side: SIDE, sideLand: SIDE_LAND, slope: TOP.sand! }

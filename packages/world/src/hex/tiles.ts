@@ -1128,7 +1128,8 @@ export function tileVariant(prefab: TilePrefab, seed: number): TilePrefab {
 
 /**
  * A tile's pieces in the world: its prefab (or, with `vary`, the variant this tile takes) turned by `rot`
- * (a sixth of a turn per step) and moved to `at`.
+ * (a sixth of a turn per step) and moved to `at`. `odds`, when given, multiplies each piece's chance of
+ * standing (its `odds`, 1 when left out) on the variant the tile took (nature.ts `natureOdds`).
  */
 export function placeTile(
   prefab: TilePrefab,
@@ -1137,6 +1138,7 @@ export function placeTile(
   rot: number,
   seed = 0,
   vary = true,
+  odds?: (q: TilePiece, variant: TilePrefab) => number,
 ): PlacedPiece[] {
   const t = vary ? tileVariant(prefab, seed) : prefab
   const c = Math.cos(rot)
@@ -1146,7 +1148,10 @@ export function placeTile(
     : undefined
   const out: PlacedPiece[] = []
   t.pieces.forEach((q, k) => {
-    if (q.odds !== undefined && hash2(seed, k, 9) >= q.odds) return
+    const m = odds ? odds(q, t) : 1
+    if (m !== 1) {
+      if (hash2(seed, k, 9) >= (q.odds ?? 1) * m) return
+    } else if (q.odds !== undefined && hash2(seed, k, 9) >= q.odds) return
     // a hair of jitter so repeated tiles are not identical
     const jx = (hash2(seed, k, 1) - 0.5) * 0.15
     const jz = (hash2(seed, k, 2) - 0.5) * 0.15

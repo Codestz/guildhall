@@ -7,6 +7,14 @@ import { hash2 } from "../geom/noise.ts"
 import { hexCentre } from "./grid.ts"
 import { type HexIsland, kindOf } from "./island.ts"
 import {
+  BUILDING_REACH,
+  growNature,
+  type HexNature,
+  isBuildingPiece,
+  isDefaultNature,
+  natureOdds,
+} from "./nature.ts"
+import {
   castleWalls,
   edgeDressing,
   HEX_TILE_SIZE,
@@ -84,7 +92,13 @@ export interface HexWorld {
   heightAt(x: number, z: number): number
   /** A walker's height on a road step's stairs or a bridge's deck at (x, z), or null off them. */
   stairAt(x: number, z: number): number | null
-  stats: { tiles: number; pieces: number; prefabs: Record<string, number> }
+  stats: {
+    tiles: number
+    pieces: number
+    prefabs: Record<string, number>
+    /** With `nature` knobs: the nature pieces grown, and those held back from a road or a building. */
+    nature?: { grown: number; held: number }
+  }
 }
 
 /** What a building tile of each place builds (picked by the tile's hash). */
@@ -181,9 +195,14 @@ const BY_USE: Record<string, string> = {
 
 /**
  * `agents` (default 3) is how many agents the guild has: with the repo's files it sets the Guildhall's
- * tier (`castleTier`; give hexZones the same count so its castle zone is that tier's size).
+ * tier (`castleTier`; give hexZones the same count so its castle zone is that tier's size). `nature`
+ * scales and thins the nature (nature.ts; give hexZones its `wild`): left out, today's island.
  */
-export function hexWorld(h: HexIsland, z: HexZones, opts: { step?: number; agents?: number } = {}): HexWorld {
+export function hexWorld(
+  h: HexIsland,
+  z: HexZones,
+  opts: { step?: number; agents?: number; nature?: HexNature } = {},
+): HexWorld {
   const STEP = opts.step ?? LEVEL_STEP
   const tier = opts.agents === undefined ? z.tier : castleTier(h.spec.files, opts.agents)
   const g = h.grid
@@ -194,6 +213,8 @@ export function hexWorld(h: HexIsland, z: HexZones, opts: { step?: number; agent
   const bridges: HexBridge[] = []
   const prefabs: Record<string, number> = {}
   const seed = h.spec.seed
+  const nature = isDefaultNature(opts.nature) ? undefined : opts.nature
+  const odds = natureOdds(nature)
   const at = (i: number): [number, number] => {
     const [x, y] = hexCentre({ q: g.q[i]!, r: g.r[i]! })
     return [x * R, y * R]
@@ -490,7 +511,7 @@ export function hexWorld(h: HexIsland, z: HexZones, opts: { step?: number; agent
       // a prefab's own pieces, minus those that would float on water tiles it was not made for
       // a castle's tiles all take its keep's colour
       const hue = zone?.kind === "castle" ? zone.tile : i
-      for (const q of placeTile(p, [x, zz], prefab === "dock" ? SEA_TOP : t, rot, i))
+      for (const q of placeTile(p, [x, zz], prefab === "dock" ? SEA_TOP : t, rot, i, true, odds))
         pieces.push({ ...q, piece: recolour(q.piece, hue) })
       prefabs[prefab!] = (prefabs[prefab!] ?? 0) + 1
     }
@@ -542,8 +563,8 @@ export function hexWorld(h: HexIsland, z: HexZones, opts: { step?: number; agent
       ...(door !== undefined ? { door } : {}),
     })
   }
-  const heightAt = (x: number, zz: number): number => {
-    // pixel → axial (pointy top), cube rounding
+  /** The tile under a point (pixel → axial, pointy top, cube rounding), or -1 off the grid. */
+  function tileAt(x: number, zz: number): number {
     const qf = ((Math.sqrt(3) / 3) * x - zz / 3) / R
     const rf = ((2 / 3) * zz) / R
     const sf = -qf - rf
@@ -555,11 +576,64 @@ export function hexWorld(h: HexIsland, z: HexZones, opts: { step?: number; agent
     const ds = Math.abs(s - sf)
     if (dq > dr && dq > ds) q = -r - s
     else if (dr > ds) r = -q - s
-    const i = g.index(q, r)
+    return g.index(q, r)
+  }
+  /**
+   * The nature knobs' sizes (nature.ts `growNature`): nothing grows into a road, a bridge, a square, a
+   * building's tile, a castle tile, a dock or a scene's ground, nor into a building on its own tile,
+   * further than it reaches at its authored size.
+   */
+  function growNatureOn(n: HexNature): { grown: number; held: number } {
+    const hard = new Uint8Array(g.size)
+    for (const t of tiles) {
+      const u = useOf(z, t.i)
+      if (
+        u === "road" ||
+        u === "bridge" ||
+        u === "square" ||
+        u === "building" ||
+        u === "landmark" ||
+        u === "dock" ||
+        claimedBy.has(t.i) ||
+        zoneAt(t.i)?.kind === "castle"
+      )
+        hard[t.i] = 1
+    }
+    const discs = new Map<number, [number, number, number][]>()
+    for (const p of pieces) {
+      if (!isBuildingPiece(p.piece)) continue
+      const i = tileAt(p.x, p.z)
+      if (i < 0) continue
+      if (!discs.has(i)) discs.set(i, [])
+      discs.get(i)!.push([p.x, p.z, BUILDING_REACH * p.scale])
+    }
+    return growNature(pieces, n, {
+      hardNear(x, zz) {
+        const own = tileAt(x, zz)
+        if (own < 0) return { own: false, tiles: [] }
+        // the tiles within two steps: a canopy at a tile's corner can reach the next ring's corner
+        const near = new Set<number>()
+        for (const j of g.neighbours(own)) {
+          if (j < 0) continue
+          near.add(j)
+          for (const k of g.neighbours(j)) if (k >= 0 && k !== own) near.add(k)
+        }
+        return { own: hard[own] === 1, tiles: [...near].filter((j) => hard[j] === 1).map(at) }
+      },
+      buildingsNear(x, zz) {
+        const own = tileAt(x, zz)
+        if (own < 0) return []
+        return [own, ...g.neighbours(own)].flatMap((j) => (j >= 0 ? (discs.get(j) ?? []) : []))
+      },
+    })
+  }
+  const heightAt = (x: number, zz: number): number => {
+    const i = tileAt(x, zz)
     const k = i >= 0 ? byTile.get(i) : undefined
     return k === undefined ? 0 : Math.max(0, tiles[k]!.top)
   }
   const walkways = [...stairs, ...bridges.flatMap((b) => b.legs)]
+  const grown = nature ? growNatureOn(nature) : undefined
   return {
     tiles,
     pieces,
@@ -583,6 +657,6 @@ export function hexWorld(h: HexIsland, z: HexZones, opts: { step?: number; agent
       }
       return null
     },
-    stats: { tiles: tiles.length, pieces: pieces.length, prefabs },
+    stats: { tiles: tiles.length, pieces: pieces.length, prefabs, ...(grown ? { nature: grown } : {}) },
   }
 }

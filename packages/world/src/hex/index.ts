@@ -40,6 +40,21 @@ export {
   WALK_MPS,
   workTiles,
 } from "./life.ts"
+export {
+  BUILDING_REACH,
+  growNature,
+  type HexNature,
+  hexDistance2D,
+  isBuildingPiece,
+  isDefaultNature,
+  NATURE_DEFAULTS,
+  NATURE_FAMILIES,
+  type NatureFamily,
+  natureFamily,
+  natureReach,
+  natureScale,
+  WOODED,
+} from "./nature.ts"
 export { parseTilePrefabs, SPOT_KINDS, TILE_GROUNDS, TILE_GROUPS, validateTilePrefab } from "./prefabs.ts"
 export { type Disc, type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
 export { hexStructures } from "./structures.ts"

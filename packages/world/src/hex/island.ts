@@ -54,6 +54,9 @@ export const HEX_ISLAND_DEFAULTS: Required<Omit<HexIslandSpec, "seed">> = {
   forest: 0.21,
 }
 
+/** How far under 1 the moisture a forest tile needs sits, for a forest share (zones' `wild` moves it). */
+export const forestLine = (forest: number): number => forest * 2.2
+
 /** The grid every island lives on: one size for all, so a tile's coordinates never change as it grows. */
 export const HEX_MAP_RADIUS = 56
 
@@ -85,6 +88,11 @@ export interface HexIsland {
   rivers: HexRiver[]
   /** Steps from the sea, per tile (0 on water). */
   coast: Int16Array
+  /**
+   * The moisture field that grows the woods, per tile the ground step judged (NaN elsewhere: water,
+   * the shore, the peaks): a tile is forest where it is over `1 - forestLine(spec.forest)`.
+   */
+  moisture: Float32Array
   /** The nature lake's tiles (every island has one; a bigger island keeps it). */
   lake: number[]
   stats: { land: number; rivers: number; lakes: number; ms: number }
@@ -429,6 +437,7 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
   const water = steps(g, (i) => kind[i] === K.river || kind[i] === K.lake)
   let maxLevel = 0
   for (let i = 0; i < N; i++) maxLevel = Math.max(maxLevel, level[i]!)
+  const moisture = new Float32Array(N).fill(Number.NaN)
   for (let i = 0; i < N; i++) {
     const k = kind[i]!
     if (isSea(i)) {
@@ -449,7 +458,8 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
       continue
     }
     const moist = fbm(seed + 41, x / 13, y / 13, 2) + 0.2 * (1 - Math.min(1, water[i]! / 4)) + 0.06 * L
-    if (moist > 1 - spec.forest * 2.2) kind[i] = K.forest
+    moisture[i] = moist
+    if (moist > 1 - forestLine(spec.forest)) kind[i] = K.forest
     else if (L >= 3) kind[i] = K.hill
     else kind[i] = fbm(seed + 43, x / 6, y / 6, 2) > 0.2 ? K.meadow : K.grass
   }
@@ -521,6 +531,7 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
     down,
     rivers,
     coast,
+    moisture,
     lake: natureLake,
     stats: { land: landCount, rivers: rivers.length, lakes, ms: Math.round(performance.now() - t0) },
   }

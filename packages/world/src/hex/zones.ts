@@ -19,8 +19,8 @@
  * the rest are yards and gardens. Round a farm village and the town's edge, open lowland becomes fields.
  */
 import { hash2 } from "../geom/noise.ts"
-import type { HexIsland } from "./island.ts"
-import { kindOf } from "./island.ts"
+import type { HexIsland, HexKind } from "./island.ts"
+import { forestLine, kindOf } from "./island.ts"
 
 export const ZONE_KINDS = [
   "town",
@@ -206,13 +206,30 @@ function path(
   return null
 }
 
-export function hexZones(h: HexIsland, opts: { agents?: number } = {}): HexZones {
+/**
+ * `wild` (default 1, nature.ts `HexNature.wild`) moves the open country's woods line: the island's forest
+ * share times `wild` decides which of the leftover country tiles (the ones no place, farm or work site took)
+ * are woods, by the same moisture field that grew the island's forest. Places and roads never move.
+ */
+export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } = {}): HexZones {
   const t0 = performance.now()
   const tier = castleTier(h.spec.files, opts.agents)
   const g = h.grid
   const N = g.size
   const seed = h.spec.seed
   const kind = (i: number) => kindOf(h, i)
+  const wild = opts.wild ?? 1
+  const wildLine = 1 - forestLine(h.spec.forest * wild)
+  /** A leftover country tile's ground once `wild` has moved the woods line (its own kind at wild 1). */
+  const wildKind = (i: number): HexKind => {
+    const k = kind(i)
+    const m = h.moisture[i]!
+    if (wild === 1 || Number.isNaN(m) || (k !== "forest" && k !== "hill" && k !== "grass" && k !== "meadow"))
+      return k
+    if (m > wildLine) return "forest"
+    if (k !== "forest") return k
+    return h.level[i]! >= 3 ? "hill" : "meadow"
+  }
   const dry = (i: number) => {
     const k = kind(i)
     return k !== "sea" && k !== "shallows" && k !== "lake" && k !== "river" && k !== "rock"
@@ -635,7 +652,7 @@ export function hexZones(h: HexIsland, opts: { agents?: number } = {}): HexZones
       if (free(i) && kind(i) === "rock") use[i] = toZone[i]! <= 2 ? U.quarry : U.crag
       continue
     }
-    const k = kind(i)
+    const k = wildKind(i)
     const near = toZone[i]! <= 3 || toRoad[i]! <= 1
     let u: TileUse = "meadow"
     // lone dwellings scattered over the country: a hunter at the wood's edge, a shepherd on the hills

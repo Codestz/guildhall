@@ -9,7 +9,10 @@
  * `?files=` sizes the island like a repo of that many files; `?hour=`, `?az=`, `?shadow=`, `?fill=`,
  * `?post=0`, `?aa=msaa|none` and `?ground=hex|soft` are for comparisons; `?step=` tries another height per
  * level (metres, default LEVEL_STEP) and `?detail=0` shows the ground without its painted small hexes and
- * speckle.
+ * speckle. The nature knobs (plan-hex "Nature pass", world nature.ts), all multipliers, 1 today:
+ * `?tree=` / `?pine=` / `?bush=` / `?rock=` / `?grass=` / `?flower=` size each family (nothing grows into
+ * a road or a building), `?woods=` thins or fills the trees of wooded tiles, `?wild=` moves the open
+ * country's share of woods.
  */
 import type { CameraPose } from "@guildhall/core"
 import { log } from "@guildhall/core"
@@ -48,6 +51,7 @@ import {
   type HexJobSpec,
   heightsAt,
   type MapStage,
+  natureOf,
   type PackedPieces,
   runHexJob,
   SEA_LEVEL,
@@ -159,6 +163,8 @@ export const hexWorldScreen: Screen = {
     // the worker starts first: it builds while the stage, its context and the catalog get ready
     const step = num("step", LEVEL_STEP)
     const detail = ctx.query.get("detail") !== "0"
+    // the nature knobs (?tree= ?pine= ?bush= ?rock= ?grass= ?flower= ?woods= ?wild=), for side-by-sides
+    const nature = natureOf(ctx.query)
     // the authored tile prefabs (data/tiles) before anything is built from them: here (life builds on
     // this thread too) and in the worker
     const job = startJob(
@@ -169,6 +175,7 @@ export const hexWorldScreen: Screen = {
         step,
         paint: detail,
         tiles: tiles.length ? tiles : null,
+        nature,
       })),
     )
     const catalogLoad = loadCatalog()
@@ -316,8 +323,8 @@ export const hexWorldScreen: Screen = {
       if (ctx.query.get("life") !== "0") {
         // Life plans on the map itself: its pure parts built again here (~0.1 s), once the island is drawn.
         const island = hexIsland({ seed, files })
-        const zones = hexZones(island)
-        const world = hexWorld(island, zones, { step })
+        const zones = hexZones(island, { wild: nature.wild })
+        const world = hexWorld(island, zones, { step, nature })
         life = createLife(stage, {
           host,
           island,
@@ -335,14 +342,22 @@ export const hexWorldScreen: Screen = {
         .slice(0, 8)
         .map(([k, n]) => `${k} ${n}`)
         .join(" · ")
+      const knobs = Object.entries(nature)
+        .map(([k, v]) => `${k} ×${v}`)
+        .join(" · ")
+      const grown = m.stats.nature
       info.textContent = [
         `hex island · seed ${seed} · ${files} files`,
         `${m.stats.land} land tiles · ${placed} pieces · first frame ${first} ms · all ${since()} ms`,
         top,
+        ...(knobs
+          ? [`nature ${knobs}${grown ? ` · ${grown.grown} grown, ${grown.held} held back` : ""}`]
+          : []),
       ].join("\n")
       logger.info("built", {
         tiles: m.stats.tiles,
         pieces: placed,
+        nature: grown,
         ground: arrived,
         first,
         ms: since(),

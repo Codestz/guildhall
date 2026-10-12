@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/assets" },
+    { "path": "packages/render" },
+    { "path": "packages/ui" },
+    { "path": "apps/studio" },
+    { "path": "tools/import" },
+    { "path": "tools/shots" }
+  ]
+}

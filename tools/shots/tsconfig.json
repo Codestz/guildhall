@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "types", "lib": ["ESNext", "DOM"] },
+  "include": ["src"],
+  "references": [{ "path": "../../packages/core" }]
+}

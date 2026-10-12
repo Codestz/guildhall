@@ -1,0 +1,13 @@
+{
+  "name": "@guildhall/render",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@guildhall/assets": "workspace:*",
+    "@guildhall/core": "workspace:*"
+  }
+}

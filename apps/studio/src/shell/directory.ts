@@ -121,6 +121,11 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         preview: true,
       },
       {
+        id: "planner",
+        name: "Town planner",
+        purpose: "A live fantasy map of a generated town, to judge its layout at a glance.",
+      },
+      {
         id: "town",
         name: "Town",
         purpose: "Whole towns grown from events: streets, districts, skyline.",

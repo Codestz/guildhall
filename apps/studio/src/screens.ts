@@ -9,6 +9,7 @@ import { lineup } from "./lineup/index.ts"
 import { m0 } from "./m0/index.ts"
 import { npc } from "./npcs/index.tsx"
 import { palette } from "./palette/index.ts"
+import { planner } from "./planner/index.tsx"
 import { scale } from "./scenes/scale.ts"
 import { shadows } from "./shadows/index.ts"
 import { placeOf } from "./shell/directory.ts"
@@ -46,6 +47,7 @@ export const SCREENS: readonly Screen[] = [
   grips,
   npc,
   batch,
+  planner,
 ]
 
 export const DEFAULT_SCREEN = "home"

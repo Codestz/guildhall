@@ -41,6 +41,7 @@ import type { Screen } from "../screens.ts"
 import { href } from "../shell/router.ts"
 import { worldCamera } from "../shell/worldCamera.ts"
 import { params, parse } from "../terra/index.ts"
+import { buildPlaces } from "./towns.ts"
 
 const logger = log("studio:terra3d")
 
@@ -143,65 +144,48 @@ function roadRibbons(t: Terra, plan: TerraPlan, width?: number): Float32Array {
   return new Float32Array(pos)
 }
 
-const HOUSES = [
-  "quaternius-village/house-1",
-  "quaternius-village/house-2",
-  "quaternius-village/house-3",
-  "quaternius-village/house-4",
-]
-/** Stand-in buildings per anchor (step 4 replaces them with real districts). */
-const HOUSES_BY_KIND: Record<string, number> = {
-  town: 14,
-  harbour: 6,
-  crossing: 5,
-  outpost: 2,
-  fishing: 4,
-  farm: 3,
+/** Street centrelines as ribbons of their own width, draped over the ground. */
+function streetRibbons(t: Terra, streets: { line: [number, number][]; half: number }[]): Float32Array {
+  const pos: number[] = []
+  for (const s of streets) {
+    if (s.half <= 0 || s.line.length < 2) continue
+    const one = roadRibbons(
+      t,
+      {
+        anchors: [],
+        roads: [{ a: 0, b: 0, line: s.line, bridges: [], kind: "main" }],
+        claim: new Uint8Array(0),
+        area: [],
+        ms: 0,
+      },
+      s.half,
+    )
+    for (const v of one) pos.push(v)
+  }
+  return new Float32Array(pos)
 }
 
-/**
- * Stand-ins so the anchors read in 3D: a ring of houses on flat ground round each anchor, facing it,
- * and a flag at its heart.
- */
-function anchorPieces(t: Terra, plan: TerraPlan, have: (id: string) => boolean): BatchInstance[] {
-  const houses = HOUSES.filter(have)
-  const out: BatchInstance[] = []
-  plan.anchors.forEach((a, k) => {
-    const count = houses.length ? (HOUSES_BY_KIND[a.kind] ?? 3) : 0
-    let placed = 0
-    for (let tries = 0; placed < count && tries < count * 12; tries++) {
-      const u = (s: number) => hash2(t.spec.seed + 4000 + k * 97 + s, tries, placed)
-      const ang = u(1) * Math.PI * 2
-      const d = 9 + u(2) * (a.kind === "town" ? 34 : 18)
-      const x = a.at[0] + Math.cos(ang) * d
-      const z = a.at[1] + Math.sin(ang) * d
-      const ix = Math.floor((x - t.origin[0]) / t.cell)
-      const iz = Math.floor((z - t.origin[1]) / t.cell)
-      const i = iz * t.w + ix
-      if (t.water[i] !== TERRA_WATER.land || t.slope[i]! > 0.18) continue
-      if (out.some((p) => Math.hypot(p.x - x, p.z - z) < 8)) continue
-      if (plan.roads.some((r) => r.line.some((p) => Math.hypot(p[0] - x, p[1] - z) < 5))) continue
-      out.push({
-        piece: houses[Math.floor(u(3) * houses.length) % houses.length]!,
-        x,
-        y: terraHeightAt(t, x, z) - 0.1,
-        z,
-        rot: Math.atan2(a.at[0] - x, a.at[1] - z),
-        scale: 1,
-      })
-      placed++
+/** The squares (closed rings, half width 0) as fans from their centre, draped over the ground. */
+function squares(t: Terra, streets: { line: [number, number][]; half: number }[]): Float32Array {
+  const pos: number[] = []
+  for (const s of streets) {
+    if (s.half > 0 || s.line.length < 4) continue
+    let cx = 0
+    let cz = 0
+    for (const [x, z] of s.line) {
+      cx += x
+      cz += z
     }
-    if (have("kenney-mini-forest/flag"))
-      out.push({
-        piece: "kenney-mini-forest/flag",
-        x: a.at[0],
-        y: terraHeightAt(t, a.at[0], a.at[1]),
-        z: a.at[1],
-        rot: 0,
-        scale: 3,
-      })
-  })
-  return out
+    cx /= s.line.length
+    cz /= s.line.length
+    const y = (x: number, z: number) => Math.max(terraHeightAt(t, x, z), 0.6) + 0.14
+    for (let k = 1; k < s.line.length; k++) {
+      const a = s.line[k - 1]!
+      const b = s.line[k]!
+      pos.push(cx, y(cx, cz), cz, b[0], y(b[0], b[1]), b[1], a[0], y(a[0], a[1]), a[1])
+    }
+  }
+  return new Float32Array(pos)
 }
 
 const CROPS = [
@@ -531,23 +515,34 @@ export const terra3d: Screen = {
       const catalog = await loadCatalog()
       if (!catalog || disposed) return
       const have = (id: string) => catalog.get(id) !== undefined
-      const settled = plan ? anchorPieces(t, plan, have) : []
+      const built = plan ? await buildPlaces(t, plan, catalog) : null
+      if (disposed) return
+      if (built) {
+        meshes.push(createSurface(stage, streetRibbons(t, built.streets), "#d6c29a"))
+        meshes.push(createSurface(stage, squares(t, built.streets), "#ddcda6"))
+      }
       const clear = (p: BatchInstance) =>
-        !settled.some((s) => Math.hypot(s.x - p.x, s.z - p.z) < 6) &&
         !(plan?.roads ?? []).some((r) => r.line.some((q) => Math.hypot(q[0] - p.x, q[1] - p.z) < 3.5))
       const nature = parcels ? dressParcels(t, parcels, have) : wild(t, have)
-      const pieces = [...settled, ...nature.filter(clear)]
-      batch = await createStaticBatch(stage, pieces, async (id) => {
-        const entry = catalog.get(id)
-        if (!entry) throw new Error(`terra3d: unknown piece "${id}"`)
-        return loadPiece(libraryUrl(entry.files.glb))
-      })
+      const pieces = nature.filter(clear)
+      const clusters = built?.clusters ?? []
+      batch = await createStaticBatch(
+        stage,
+        pieces,
+        async (id) => {
+          const entry = catalog.get(id)
+          if (!entry) throw new Error(`terra3d: unknown piece "${id}"`)
+          return loadPiece(libraryUrl(entry.files.glb))
+        },
+        clusters,
+      )
       if (disposed) batch.dispose()
       sun.markDirty()
       text.textContent = [
         `seed ${view.spec.seed} · ${view.spec.size} m`,
         `${t.rivers.length} rivers · ${t.stats.lakes} lakes · ${t.falls.length} falls`,
-        `${pieces.length} pieces: crops, orchards, vines, woods, flocks, houses`,
+        `${clusters.length} buildings · ${pieces.length} pieces`,
+        ...(built?.report ?? []),
       ].join("\n")
       logger.info("terra3d", { pieces: pieces.length })
     }

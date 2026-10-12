@@ -1,4 +1,10 @@
 export {
+  type DistrictBuilding,
+  type DistrictStreet,
+  type TerraDistricts,
+  terraDistricts,
+} from "./districts.ts"
+export {
   TERRA_CRAG,
   TERRA_DEFAULTS,
   TERRA_WATER,
@@ -8,6 +14,7 @@ export {
   type TerraSpecFull,
   terraHeightAt,
   terraIsland,
+  terraOutline,
   terraShore,
 } from "./island.ts"
 export { fbm, hash2, noise, ridged } from "./noise.ts"

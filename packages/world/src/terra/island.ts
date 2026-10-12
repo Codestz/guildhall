@@ -592,20 +592,27 @@ export function terraHeightAt(t: Terra, x: number, z: number): number {
  * metres. What the water reads its shore distance from (foam, shallows).
  */
 export function terraShore(t: Terra): [number, number][][] {
-  const { w, h, water, cell, origin } = t
-  const sea = (x: number, z: number): boolean =>
-    x < 0 || z < 0 || x >= w || z >= h || water[z * w + x] === TERRA_WATER.sea
-  // corner-grid keys: (x, z) of a cell corner → x * (h + 1) + z
+  return terraOutline(t, (i) => t.water[i] !== TERRA_WATER.sea).map((r) => [...r, r[0]!])
+}
+
+/**
+ * The outline of the cells `inside` accepts, as closed rings of cell edges in world metres, chained
+ * so the inside lies to the left (counter-clockwise round an area in x-right, z-down terms of the
+ * raster). Out of the raster counts as outside.
+ */
+export function terraOutline(t: Terra, inside: (i: number) => boolean): [number, number][][] {
+  const { w, h, cell, origin } = t
+  const out = (x: number, z: number): boolean => x < 0 || z < 0 || x >= w || z >= h || !inside(z * w + x)
   const next = new Map<number, number>()
   const key = (x: number, z: number) => x * (h + 1) + z
   const edge = (ax: number, az: number, bx: number, bz: number) => next.set(key(ax, az), key(bx, bz))
   for (let z = 0; z < h; z++)
     for (let x = 0; x < w; x++) {
-      if (sea(x, z)) continue
-      if (sea(x, z - 1)) edge(x, z, x + 1, z)
-      if (sea(x + 1, z)) edge(x + 1, z, x + 1, z + 1)
-      if (sea(x, z + 1)) edge(x + 1, z + 1, x, z + 1)
-      if (sea(x - 1, z)) edge(x, z + 1, x, z)
+      if (out(x, z)) continue
+      if (out(x, z - 1)) edge(x, z, x + 1, z)
+      if (out(x + 1, z)) edge(x + 1, z, x + 1, z + 1)
+      if (out(x, z + 1)) edge(x + 1, z + 1, x, z + 1)
+      if (out(x - 1, z)) edge(x, z + 1, x, z)
     }
   const lines: [number, number][][] = []
   const toWorld = (k: number): [number, number] => [
@@ -620,9 +627,9 @@ export function terraShore(t: Terra): [number, number][][] {
       const n = next.get(k)
       if (n === undefined) break
       next.delete(k)
-      line.push(toWorld(n))
       k = n
       if (k === start) break
+      line.push(toWorld(n))
     }
     if (line.length > 3) lines.push(line)
   }

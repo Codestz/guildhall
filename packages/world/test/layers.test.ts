@@ -14,7 +14,7 @@ const RULES: Readonly<Record<string, { folders: readonly string[]; packages: rea
   geom: { folders: ["geom"], packages: ["core"] },
   land: { folders: ["geom", "land"], packages: ["core"] },
   // the terrain-first island (terra lab): beside land, on geom only, until it replaces land
-  terra: { folders: ["geom", "terra"], packages: ["core"] },
+  terra: { folders: ["geom", "terra"], packages: ["core", "assets"] },
   town: { folders: ["geom", "land", "town"], packages: ["core", "assets"] },
   island: { folders: ["geom", "land", "town", "island"], packages: ["core", "assets"] },
 }

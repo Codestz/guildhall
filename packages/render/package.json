@@ -8,6 +8,10 @@
   },
   "dependencies": {
     "@guildhall/assets": "workspace:*",
-    "@guildhall/core": "workspace:*"
+    "@guildhall/core": "workspace:*",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0"
   }
 }

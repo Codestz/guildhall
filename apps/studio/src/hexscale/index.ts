@@ -28,16 +28,16 @@ const logger = log("studio:hexscale")
 
 /** An option: how much the buildings are scaled from today's import, trees too, and the tile that fits them. */
 interface Option {
-  id: string
+  key: string
   label: string
   building: number
   tree: number
 }
 
 const OPTIONS: Option[] = [
-  { id: "A", label: "A · V1: characters tower over doors", building: 0.32, tree: 0.45 },
-  { id: "B", label: "B · doors at a character's chest", building: 0.5, tree: 0.6 },
-  { id: "C", label: "C · today: doors fit a character", building: 1, tree: 1 },
+  { key: "A", label: "A · V1: characters tower over doors", building: 0.32, tree: 0.45 },
+  { key: "B", label: "B · doors at a character's chest", building: 0.5, tree: 0.6 },
+  { key: "C", label: "C · today: doors fit a character", building: 1, tree: 1 },
 ]
 
 /** The cluster: which tile holds what (axial coords round the middle). */

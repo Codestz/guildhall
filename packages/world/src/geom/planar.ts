@@ -48,24 +48,75 @@ export function planarize(lines: readonly (readonly Vec2[])[], tol = EPS): Plana
     for (let i = 0; i + 1 < pts.length; i++)
       segs.push({ a: at(pts, i), b: at(pts, i + 1), src, cuts: [0, 1] })
   })
-  for (let i = 0; i < segs.length; i++) {
-    for (let j = i + 1; j < segs.length; j++) {
-      const s = at(segs, i)
-      const o = at(segs, j)
-      const hit = intersect(s.a, s.b, o.a, o.b)
-      if (hit) {
-        s.cuts.push(hit.t)
-        o.cuts.push(hit.u)
-      }
-      touch(s, o, tol)
-      touch(o, s, tol)
-    }
+  // Segments are bucketed on a coarse grid by their bounds (padded by tol), so only neighbours are
+  // tested: each pair once, in the first cell they share.
+  const cell = Math.max(8 * tol, 16)
+  const key = (x: number, z: number) => `${x},${z}`
+  const span = (s: Seg) => {
+    const x0 = Math.floor((Math.min(s.a[0], s.b[0]) - tol) / cell)
+    const x1 = Math.floor((Math.max(s.a[0], s.b[0]) + tol) / cell)
+    const z0 = Math.floor((Math.min(s.a[1], s.b[1]) - tol) / cell)
+    const z1 = Math.floor((Math.max(s.a[1], s.b[1]) + tol) / cell)
+    return [x0, x1, z0, z1] as const
   }
+  const spans = segs.map(span)
+  const buckets = new Map<string, number[]>()
+  spans.forEach(([x0, x1, z0, z1], i) => {
+    for (let x = x0; x <= x1; x++)
+      for (let z = z0; z <= z1; z++) {
+        const k = key(x, z)
+        const list = buckets.get(k)
+        if (list) list.push(i)
+        else buckets.set(k, [i])
+      }
+  })
+  const pairs: [number, number][] = []
+  for (const [k, list] of buckets) {
+    const [cx, cz] = k.split(",").map(Number) as [number, number]
+    for (let p = 0; p < list.length; p++)
+      for (let q = p + 1; q < list.length; q++) {
+        const i = at(list, p)
+        const j = at(list, q)
+        const a = at(spans, i)
+        const b = at(spans, j)
+        if (a[1] < b[0] || b[1] < a[0] || a[3] < b[2] || b[3] < a[2]) continue
+        // The first shared cell owns the pair.
+        if (cx !== Math.max(a[0], b[0]) || cz !== Math.max(a[2], b[2])) continue
+        pairs.push(i < j ? [i, j] : [j, i])
+      }
+  }
+  pairs.sort((x, y) => x[0] - y[0] || x[1] - y[1])
+  for (const [i, j] of pairs) {
+    const s = at(segs, i)
+    const o = at(segs, j)
+    const hit = intersect(s.a, s.b, o.a, o.b)
+    if (hit) {
+      s.cuts.push(hit.t)
+      o.cuts.push(hit.u)
+    }
+    touch(s, o, tol)
+    touch(o, s, tol)
+  }
+  // Nodes are found through a grid of tol-sized cells: the first node made within tol wins.
   const nodes: Vec2[] = []
+  const nodeCells = new Map<string, number[]>()
   const nodeAt = (p: Vec2): number => {
-    for (let k = 0; k < nodes.length; k++) if (dist(at(nodes, k), p) <= tol) return k
-    nodes.push(snap(p))
-    return nodes.length - 1
+    const x = Math.floor(p[0] / tol)
+    const z = Math.floor(p[1] / tol)
+    let best = -1
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dz = -1; dz <= 1; dz++)
+        for (const k of nodeCells.get(key(x + dx, z + dz)) ?? [])
+          if ((best < 0 || k < best) && dist(at(nodes, k), p) <= tol) best = k
+    if (best >= 0) return best
+    const q = snap(p)
+    nodes.push(q)
+    const id = nodes.length - 1
+    const c = key(Math.floor(q[0] / tol), Math.floor(q[1] / tol))
+    const list = nodeCells.get(c)
+    if (list) list.push(id)
+    else nodeCells.set(c, [id])
+    return id
   }
   const edges: PlanarEdge[] = []
   const seen = new Set<string>()

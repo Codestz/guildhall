@@ -105,6 +105,18 @@ export interface StreetNode {
   id: number
   at: Vec2
   kind: "plaza" | "gate" | "junction" | "end" | "quay"
+  /**
+   * Outside the town: `fork` where a footpath leaves a country road, `road-end` where one stops short
+   * of the bounds (a place for a point of interest and its trail). Absent everywhere else.
+   */
+  tag?: "fork" | "road-end"
+}
+
+/** A small square where a street forks off (a triangle of street round it), and what it is for. */
+export interface Square {
+  /** A point inside the square's face. */
+  at: Vec2
+  kind: "well" | "chapel" | "inn"
 }
 
 /** Widths: main 7, street 5, lane 3.5, road 4 m. */
@@ -120,6 +132,8 @@ export interface StreetEdge {
 export interface StreetGraph {
   nodes: StreetNode[]
   edges: StreetEdge[]
+  /** The secondary squares, if any (towns get one to three; the market is the plaza). */
+  squares?: Square[]
 }
 
 export interface Block {
@@ -127,6 +141,8 @@ export interface Block {
   poly: Vec2[]
   use: "lots" | "plaza" | "castle" | "green" | "harbour"
   district: DistrictKind
+  /** Set on a green block that is a secondary square (open and unbuilt): what it is for. */
+  square?: Square["kind"]
 }
 
 export interface Lot {

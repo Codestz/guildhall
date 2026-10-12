@@ -21,7 +21,10 @@ import { TIER_DEFAULTS } from "../src/town/spec.ts"
 import { streets, townLand } from "../src/town/streets.ts"
 import type { Block, StreetGraph, Tier, TownSpecInput } from "../src/town/types.ts"
 
-/** world town: blocks (faces of the street graph, inset by the streets, cut by lanes until they fit). */
+/**
+ * world town: blocks (faces of the street graph, inset by the streets, cut by lanes until they fit,
+ * denser by the market; suburb frontage along the roads; a hamlet's frontage along its street).
+ */
 
 const SEEDS = Array.from({ length: 10 }, (_, i) => i + 1)
 const TIERS: Tier[] = ["hamlet", "village", "town", "city"]
@@ -200,28 +203,87 @@ describe("blocks", () => {
     for (const { spec, blocks: list } of built.filter((x) => x.spec.tier === "town"))
       expect(list.length, label(spec)).toBeLessThanOrEqual(60)
   })
+
+  test.each(["town", "city"] as const)(
+    "blocks are smaller by the market than out by the wall (%s)",
+    (tier) => {
+      const near: number[] = []
+      const far: number[] = []
+      for (const { site: s, blocks: list } of built.filter((x) => x.spec.tier === tier)) {
+        const c = centroid(s.plaza)
+        for (const b of list.filter((x) => x.use === "lots")) {
+          const d = dist(centroid(b.poly), c)
+          if (d < 0.4 * s.radius) near.push(area(b.poly))
+          else if (d > 0.65 * s.radius && d < s.radius) far.push(area(b.poly))
+        }
+      }
+      const median = (list: number[]) => [...list].sort((a, b) => a - b)[Math.floor(list.length / 2)]!
+      expect(median(near)).toBeLessThan(0.75 * median(far))
+    },
+  )
+
+  test("roads out of the gates get suburb frontage: lots blocks whose nearest street is a road", () => {
+    const withSuburb = built
+      .filter((x) => x.spec.tier !== "hamlet")
+      .filter(({ blocks: list, graph }) =>
+        list.some((b) => {
+          if (b.use !== "lots") return false
+          const c = centroid(b.poly)
+          let best = graph.edges[0]!
+          for (const e of graph.edges) if (distTo(c, e.points) < distTo(c, best.points)) best = e
+          return best.cls === "road"
+        }),
+      )
+    expect(withSuburb.length).toBeGreaterThanOrEqual(
+      0.8 * built.filter((x) => x.spec.tier !== "hamlet").length,
+    )
+  })
+
+  test("the street graph's squares come back as open green blocks, named for what they are for", () => {
+    for (const { spec, blocks: list, graph } of built) {
+      const squares = list.filter((b) => b.square)
+      for (const b of squares) expect(b.use, label(spec)).toBe("green")
+      if (spec.tier === "town" || spec.tier === "city")
+        expect(squares.length, label(spec)).toBeGreaterThanOrEqual(Math.min(1, graph.squares?.length ?? 0))
+      for (const q of graph.squares ?? [])
+        expect(
+          squares.some((b) => b.square === q.kind),
+          `${label(spec)} ${q.kind}`,
+        ).toBe(true)
+    }
+  })
+
+  test("a hamlet's houses front its street: lots blocks, and no face but its green", () => {
+    for (const { spec, blocks: list } of built.filter((x) => x.spec.tier === "hamlet")) {
+      expect(list.filter((b) => b.use === "lots").length, label(spec)).toBeGreaterThanOrEqual(2)
+      expect(list.filter((b) => b.use === "plaza").length).toBe(1)
+    }
+  })
 })
 
-/** The debug picture: land, water, street ribbons, blocks by use and district, nodes by kind. */
+/** The debug picture: land, water, street ribbons, blocks by use and district, nodes by kind and tag. */
 function svg(made: ReturnType<typeof make>): string {
   const h = 1.3 * made.site.radius
   const path = (ring: readonly Vec2[]) => `M${ring.map((p) => `${p[0]} ${-p[1]}`).join("L")}Z`
   const fill = (b: Block) =>
-    b.use === "plaza"
-      ? "#efe0b0"
-      : b.use === "green"
-        ? "#86ad5e"
-        : b.use === "castle"
-          ? "#8a8a8a"
-          : {
-              market: "#e6b45c",
-              residential: "#c97a5a",
-              craft: "#8d72b3",
-              harbour: "#5aa3ab",
-              castle: "#8a8a8a",
-              farm: "#86ad5e",
-            }[b.district]
+    b.square
+      ? "#d9c58e"
+      : b.use === "plaza"
+        ? "#efe0b0"
+        : b.use === "green"
+          ? "#86ad5e"
+          : b.use === "castle"
+            ? "#8a8a8a"
+            : {
+                market: "#e6b45c",
+                residential: "#c97a5a",
+                craft: "#8d72b3",
+                harbour: "#5aa3ab",
+                castle: "#8a8a8a",
+                farm: "#86ad5e",
+              }[b.district]
   const nodeFill = { gate: "#d22", plaza: "#f90", quay: "#13c", end: "#000", junction: "#444" } as const
+  const tagFill = { fork: "#0cc", "road-end": "#f0f" } as const
   const parts = [
     `<rect x="${-h}" y="${-h}" width="${2 * h}" height="${2 * h}" fill="#3d7fa6"/>`,
     ...made.site.land.map(
@@ -236,24 +298,26 @@ function svg(made: ReturnType<typeof make>): string {
     ),
     ...made.graph.nodes.map(
       (n) =>
-        `<circle cx="${n.at[0]}" cy="${-n.at[1]}" r="${n.kind === "junction" ? 0.8 : 2}" fill="${nodeFill[n.kind]}"/>`,
+        `<circle cx="${n.at[0]}" cy="${-n.at[1]}" r="${n.tag ? 3 : n.kind === "junction" ? 0.8 : 2}" fill="${n.tag ? tagFill[n.tag] : nodeFill[n.kind]}"/>`,
     ),
   ]
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-h} ${-h} ${2 * h} ${2 * h}" width="1000" height="1000">${parts.join("")}</svg>\n`
 }
 
-test("writes a debug SVG per tier to .probe/w2 (north up: +z is up the page)", () => {
-  const out = resolve(import.meta.dir, "../../../.probe/w2")
+test("writes a debug SVG per tier, and more seeds of town and city, to .probe/w2b (north up: +z is up the page)", () => {
+  const out = resolve(import.meta.dir, "../../../.probe/w2b")
   mkdirSync(out, { recursive: true })
-  const presets: TownSpecInput[] = [
-    { seed: 3, tier: "hamlet", harbour: null },
-    { seed: 13, tier: "village" },
-    { seed: 2, tier: "town" },
-    { seed: 1, tier: "city" },
+  const presets: [string, TownSpecInput][] = [
+    ["hamlet", { seed: 3, tier: "hamlet", harbour: null }],
+    ["village", { seed: 13, tier: "village" }],
+    ["town", { seed: 2, tier: "town" }],
+    ["city", { seed: 1, tier: "city" }],
+    ...[5, 7, 11].map((seed): [string, TownSpecInput] => [`town-s${seed}`, { seed, tier: "town" }]),
+    ...[4, 6, 9].map((seed): [string, TownSpecInput] => [`city-s${seed}`, { seed, tier: "city" }]),
   ]
-  for (const spec of presets) {
+  for (const [name, spec] of presets) {
     const text = svg(make(spec))
-    writeFileSync(join(out, `${spec.tier}.svg`), text)
+    writeFileSync(join(out, `${name}.svg`), text)
     expect(text).toContain("<path")
   }
 })

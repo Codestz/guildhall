@@ -20,6 +20,15 @@ export { type Character, createCharacter, loadCharacter, type PlayOpts } from ".
 export { attachMount, detachMount, type Mounted, mountClip, mountPose } from "./character/mount.ts"
 export { createNpc, dressNpc, type Npc, type NpcActivity, type NpcProp } from "./character/npc.ts"
 export { keepUpright } from "./character/upright.ts"
+export {
+  type ActorSample,
+  type Crowd,
+  type CrowdActor,
+  type CrowdLibrary,
+  type CrowdOpts,
+  type CrowdStats,
+  createCrowd,
+} from "./crowd/index.ts"
 export { createGizmo, type Gizmo, type GizmoMode, type GizmoOpts, type GizmoPose } from "./gizmo.ts"
 export { createGrid, type Disposable } from "./grid.ts"
 export { createGround, type Ground, type GroundDraw } from "./ground.ts"

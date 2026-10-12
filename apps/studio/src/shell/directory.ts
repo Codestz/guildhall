@@ -161,6 +161,12 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         purpose: "Clouds, their shadows and the water's reflections over the island town, hour by hour.",
         dev: true,
       },
+      {
+        id: "crowd",
+        name: "Crowd",
+        purpose: "Hundreds of townsfolk walking and working: heroes near, one baked crowd draw beyond.",
+        dev: true,
+      },
     ],
   },
 ]

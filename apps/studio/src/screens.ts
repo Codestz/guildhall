@@ -3,6 +3,7 @@ import { atmosphereLab } from "./atmosphere/index.ts"
 import { batch } from "./batch/index.ts"
 import { pieces } from "./browser/index.tsx"
 import { composer } from "./composer/index.tsx"
+import { crowdLab } from "./crowd/index.ts"
 import { grip } from "./grips/editor/index.ts"
 import { grips } from "./grips/matrix/index.ts"
 import { home } from "./home/index.tsx"
@@ -54,6 +55,7 @@ export const SCREENS: readonly Screen[] = [
   planner,
   night,
   atmosphereLab,
+  crowdLab,
 ]
 
 export const DEFAULT_SCREEN = "home"

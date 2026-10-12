@@ -14,3 +14,6 @@ docs/
 .claude/
 CONTEXT.md
 skills-lock.json
+
+.agentry
+library/.cache/

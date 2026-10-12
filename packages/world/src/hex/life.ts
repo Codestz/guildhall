@@ -355,10 +355,31 @@ export interface LifePlaces {
   slots(zone: number): LifeSpot[]
   /** Reserved slots by zone (indices into `slots(zone)`). */
   slotTaken: Map<number, Map<number, number>>
-  /** The free spots near a zone a role may use, nearest its heart first (kinds: work by default). */
-  free(zone: number, role: string | null, kinds?: readonly PlacedSpot["kind"][]): number[]
+  /**
+   * The free spots near a zone a role may use, nearest its heart first (kinds: work by default). With
+   * `when` (day hours [from, to]) only spots open then (their `hours`) and not booked for any of it.
+   */
+  free(
+    zone: number,
+    role: string | null,
+    kinds?: readonly PlacedSpot["kind"][],
+    when?: readonly [number, number],
+  ): number[]
+  /** Books a spot for part of the day (hours, `from` < `to`; may run past 24). */
+  book(spot: number, from: number, to: number): void
   /** Reserves a slot of a zone for someone: the least used, first in order. */
   takeSlot(zone: number): LifeSpot | undefined
+  /** The prefab standing on a tile (none: bare, or a scene's other part). */
+  prefabOf(tile: number): string | undefined
+}
+
+/** Whether a spot open `hours` ([from, to), wrapping past midnight when to < from) is open all of [a, b]. */
+export function openFor(hours: readonly [number, number] | undefined, a: number, b: number): boolean {
+  if (!hours) return true
+  const [s, e] = hours
+  const span = (((e - s) % 24) + 24) % 24 || 24
+  const into = (((a - s) % 24) + 24) % 24
+  return into + (b - a) <= span + 1e-9
 }
 
 /** The places of an island: its furniture, slots and the reservation book (empty). */
@@ -418,7 +439,21 @@ export function lifePlaces(
     return [...tiles].flatMap((i) => furniture.on(i))
   }
   const nearCache = new Map<number, number[]>()
-  const free = (zi: number, role: string | null, kinds: readonly PlacedSpot["kind"][] = ["work"]) => {
+  const booked = new Map<number, [number, number][]>()
+  const isBooked = (k: number, a: number, b: number) =>
+    // a day's booking also blocks the same hours a day on (an evening running past midnight)
+    (booked.get(k) ?? []).some(([s, e]) => [-24, 0, 24].some((d) => s + d < b && a < e + d))
+  const book = (k: number, a: number, b: number) => {
+    const list = booked.get(k)
+    if (list) list.push([a, b])
+    else booked.set(k, [[a, b]])
+  }
+  const free = (
+    zi: number,
+    role: string | null,
+    kinds: readonly PlacedSpot["kind"][] = ["work"],
+    when?: readonly [number, number],
+  ) => {
     let list = nearCache.get(zi)
     if (!list) {
       const heart = walk.nodes[walk.hearts[zi]!]
@@ -432,6 +467,7 @@ export function lifePlaces(
     return list.filter((k) => {
       const s = furniture.spots[k]!
       if (taken.has(k) || !kinds.includes(s.kind)) return false
+      if (when && (!openFor(s.hours, when[0], when[1]) || isBooked(k, when[0], when[1]))) return false
       return role === null || !s.roles || s.roles.includes(role)
     })
   }
@@ -495,13 +531,66 @@ export function lifePlaces(
     used.set(best, (used.get(best) ?? 0) + 1)
     return list[best]
   }
-  return { furniture, nodeOf, lifeSpot, taken, slots, slotTaken, free, takeSlot }
+  const prefabOf = (tile: number) => tileOf.get(tile)?.prefab ?? undefined
+  return { furniture, nodeOf, lifeSpot, taken, slots, slotTaken, free, book, takeSlot, prefabOf }
+}
+/** Where someone goes for a break: home, a seat, a stall's customer side, a neighbour's door, a square, the tavern. */
+export type Outing = "home" | "sit" | "market" | "talk" | "square" | "tavern"
+
+/** Lunch, by weight: most eat out, spread over the place's seats, stalls and doorsteps; few at the well. */
+export const LUNCH: readonly [Outing, number][] = [
+  ["sit", 0.28],
+  ["market", 0.22],
+  ["square", 0.17],
+  ["talk", 0.15],
+  ["home", 0.18],
+]
+/** The evening, by weight: the tavern's garden first, then benches, doorsteps, home. */
+export const EVENING: readonly [Outing, number][] = [
+  ["tavern", 0.56],
+  ["sit", 0.13],
+  ["talk", 0.1],
+  ["square", 0.06],
+  ["home", 0.15],
+]
+/** People on one place's square at once at most (round its well); the rest go elsewhere. */
+export const SQUARE_CAP = 5
+/** How far (metres, heart to heart) people go to another place's seats or square; the tavern, further. */
+const OUT_REACH = 55
+const TAVERN_REACH = 110
+
+/** Outings in a seeded order: drawn by weight one after another (the rest are the fallbacks). */
+function outingOrder(
+  choices: readonly [Outing, number][],
+  r: (salt: number) => number,
+  salt: number,
+): Outing[] {
+  const left = [...choices]
+  const out: Outing[] = []
+  for (let k = 0; left.length; k++) {
+    let pick = r(salt + k) * left.reduce((s, [, w]) => s + w, 0)
+    let at = left.length - 1
+    for (const [i, [, w]] of left.entries()) {
+      if (pick < w) {
+        at = i
+        break
+      }
+      pick -= w
+    }
+    out.push(left.splice(at, 1)[0]![0])
+  }
+  return out
 }
 
 /**
  * Everyone living on the island, their days laid out. `pace` is metres an hour of the day (a sped-up
  * day walks slower per hour so people walk at a natural speed on screen). `places` is the reservation
  * book to share with the agents (planned first, so their spots are already taken); a fresh one if left out.
+ *
+ * The day spreads people by hour and place: lunch on a bench, as a customer at a stall, at a
+ * neighbour's door, on a square (at most SQUARE_CAP round any one well) or at home; the evening in the
+ * tavern's garden (its seats open from five), on a bench, at a door or home. Every spot is booked only
+ * for the hours it is used and only when its `hours` allow, so one bench serves lunch and the evening.
  */
 export function planFolk(
   h: HexIsland,
@@ -513,7 +602,64 @@ export function planFolk(
   const { seed, pace } = opts
   const places = opts.places ?? lifePlaces(h, z, w, walk)
   const near = places.furniture.near
+  const spots = places.furniture.spots
   const folk: Folk[] = []
+  // the places round each place, nearest first (by heart): where people go out to
+  const hearts = z.zones.map((_, i) => walk.nodes[walk.hearts[i]!])
+  const around = (zi: number, reach: number): number[] => {
+    const a = hearts[zi]
+    if (!a) return [zi]
+    const d = (j: number) => Math.hypot(hearts[j]!.x - a.x, hearts[j]!.z - a.z)
+    return z.zones
+      .map((_, j) => j)
+      .filter((j) => hearts[j] && z.zones[j]!.tiles.length && d(j) <= reach)
+      .sort((p, q) => d(p) - d(q) || p - q)
+  }
+  // people on each place's square, by meal
+  const onSquare = new Map<string, number>()
+  /** A free spot for an outing near `zi` open over [a, b], among the nearest few to (x, z); booked. */
+  const outingSpot = (
+    out: Exclude<Outing, "home" | "square">,
+    zi: number,
+    role: string,
+    a: number,
+    b: number,
+    x: number,
+    zz: number,
+    pick: number,
+  ): LifeSpot | undefined => {
+    const kinds: PlacedSpot["kind"][] =
+      out === "sit" ? ["sit"] : out === "talk" ? ["talk"] : out === "market" ? ["stand"] : ["sit", "talk"]
+    const seen = new Set<number>()
+    const found: number[] = []
+    for (const zj of around(zi, out === "tavern" ? TAVERN_REACH : OUT_REACH))
+      for (const k of places.free(zj, role, kinds, [a, b])) {
+        if (seen.has(k)) continue
+        seen.add(k)
+        const s = spots[k]!
+        // the tavern's seats are the ones open only in the evening; the rest are any time's
+        const evening = !!s.hours && s.hours[0] >= 16
+        if ((out === "tavern") !== evening) continue
+        found.push(k)
+      }
+    if (!found.length) return undefined
+    const d = (k: number) => Math.hypot(spots[k]!.x - x, spots[k]!.z - zz)
+    found.sort((p, q) => d(p) - d(q) || p - q)
+    // one of the nearest few, so neighbours do not all crowd the first bench
+    const k = found[Math.floor(pick * Math.min(4, found.length))]!
+    places.book(k, a, b)
+    return places.lifeSpot(k)
+  }
+  /** A slot on a square near `zi` with room for one more at this meal. */
+  const squareSlot = (zi: number, meal: string): LifeSpot | undefined => {
+    for (const zj of around(zi, OUT_REACH)) {
+      const key = `${zj}:${meal}`
+      if ((onSquare.get(key) ?? 0) >= SQUARE_CAP || !places.slots(zj).length) continue
+      onSquare.set(key, (onSquare.get(key) ?? 0) + 1)
+      return places.takeSlot(zj)
+    }
+    return undefined
+  }
   for (const [zi, zone] of z.zones.entries()) {
     const heart = walk.hearts[zi]!
     if (heart < 0 || !zone.tiles.length) continue
@@ -532,42 +678,70 @@ export function planFolk(
         }
         pick -= wt
       }
-      // their work spot: a free one for the role, else for another role the place has; none: no work
+      const id = folk.length
+      const r = (salt: number) => rnd(seed + 900 + salt, id, zi)
+      const nightly = (role: string) => role === "night-watch" || (role === "guard" && r(5) < 0.4)
+      // the hours they are at work (the night shift's run past midnight)
+      const shift: [number, number] = nightly(wanted) ? [18, 30] : [9, 16]
+      // their work spot: a free one open on their shift for the role, else for another role the place
+      // has; none: no work
       let role = wanted
-      let spot = places.free(zi, role)[0]
-      for (const [r] of roles) {
+      let spot = places.free(zi, role, ["work"], shift)[0]
+      for (const [rr] of roles) {
         if (spot !== undefined) break
-        const other = places.free(zi, r)[0]
+        const other = places.free(zi, rr, ["work"], shift)[0]
         if (other !== undefined) {
-          role = r
+          role = rr
           spot = other
         }
       }
       if (spot !== undefined) places.taken.add(spot)
-      const id = folk.length
-      const r = (salt: number) => rnd(seed + 900 + salt, id, zi)
+      const night = nightly(role)
       const homeNode = homes.length ? homes[Math.floor(r(1) * homes.length)]! : heart
       const homeSpot: LifeSpot = homes.length
         ? spotAt(walk, homeNode, 0, 0)
         : spotAt(walk, heart, Math.floor(r(1) * 6), 2.4)
       const indoors = homes.length > 0
-      const meet = places.takeSlot(zi) ?? homeSpot
-      const work = spot !== undefined ? places.lifeSpot(spot) : meet
+      const work = spot !== undefined ? places.lifeSpot(spot) : (places.takeSlot(zi) ?? homeSpot)
       const workAct = spot !== undefined ? "work" : "idle"
-      // the evening on a bench now and then, if one near is free
-      const seat = r(17) < 0.4 ? places.free(zi, role, ["sit"])[0] : undefined
-      if (seat !== undefined) places.taken.add(seat)
-      const evening = seat !== undefined ? places.lifeSpot(seat) : meet
+      const open = spot !== undefined ? spots[spot]!.hours : undefined
       const lane = 0.25 + r(3) * 0.35
-      const night = role === "night-watch" || (role === "guard" && r(5) < 0.4)
       const prop = work.prop
+      /** Where an outing over [a, b] takes them (and whether indoors); the first of `order` that has room. */
+      const outing = (order: Outing[], a: number, b: number, meal: string, salt: number) => {
+        for (const out of order) {
+          if (out === "home") {
+            if (indoors) return { at: homeSpot, indoors: true }
+            continue
+          }
+          const at =
+            out === "square"
+              ? squareSlot(zi, meal)
+              : outingSpot(out, zi, role, a, b, work.at[0], work.at[2], r(salt))
+          if (at) return { at, indoors: false }
+        }
+        return { at: indoors ? homeSpot : work, indoors }
+      }
       if (night) {
-        // the night shift: on watch from dusk to dawn, home to sleep in the morning, the square after
+        // the night shift: on watch from dusk to dawn, home to sleep in the morning, out in the afternoon
         const patrol = role === "night-watch" ? patrolSpots(walk, z, zi, r(6)) : [work]
         const b = new LoopBuilder(walk, pace * (0.9 + r(4) * 0.2), lane, work, { act: workAct }, near)
         let t = b.go(6.2 + r(7) * 0.6, homeSpot, { act: "idle", indoors })
-        t = b.go(15.5 + r(8), evening, { act: "idle" })
-        t = b.go(t + 1.5, work, { act: workAct })
+        const out0 = 15.5 + r(8)
+        const out1 = out0 + 1.5
+        const away = outing(
+          outingOrder(
+            LUNCH.filter(([o]) => o !== "home"),
+            r,
+            40,
+          ),
+          out0,
+          out1,
+          "afternoon",
+          50,
+        )
+        t = b.go(out0, away.at, { act: "idle", indoors: away.indoors })
+        t = b.go(Math.max(t + 0.3, out1), work, { act: workAct })
         // a round of the streets now and then until dawn
         for (let k = 0; t < 22 && patrol.length > 1; k++)
           t = b.go(t + 0.4, patrol[k % patrol.length]!, { act: "idle" })
@@ -583,13 +757,38 @@ export function planFolk(
         { act: "idle", indoors },
         near,
       )
-      let t = b.go(6 + r(10) * 1.2, work, { act: workAct })
-      t = b.go(Math.max(t + 1, 11.7 + r(11) * 0.6), meet, { act: "idle" })
-      t = b.go(Math.max(t + 0.3, 12.8 + r(12) * 0.5), work, { act: workAct })
-      t = b.go(Math.max(t + 1, 16.5 + r(13) * 1.2), evening, { act: "idle" })
-      // the evening out; a few stay out late (lit by the lanterns)
-      const late = r(14) < 0.25 ? 21.5 + r(15) : 18.8 + r(16) * 1.6
-      t = b.go(Math.max(t + 0.3, late), homeSpot, { act: "idle", indoors })
+      // to work (not before their spot opens), lunch out somewhere of their own, back, the evening out
+      let t = b.go(Math.max(6 + r(10) * 1.2, open?.[0] ?? 0), work, { act: workAct })
+      const lunch0 = Math.max(t + 1, 11.2 + r(11) * 1.5)
+      const lunch1 = lunch0 + 0.8 + r(12) * 0.5
+      const noon = outing(outingOrder(LUNCH, r, 20), lunch0, lunch1 + 0.4, "lunch", 30)
+      t = b.go(lunch0, noon.at, { act: "idle", indoors: noon.indoors })
+      t = b.go(Math.max(t + 0.3, lunch1), work, { act: workAct })
+      const close = open && open[1] > open[0] ? open[1] - 0.1 : 24
+      const eve0 = Math.max(t + 1, Math.min(16.5 + r(13) * 1.2, close))
+      // the tavern keeps people late (lit by the lanterns); elsewhere home by dusk, a few later
+      const order = outingOrder(EVENING, r, 60)
+      const late = r(14) < 0.25 ? 21 + r(15) : 18.8 + r(16) * 1.2
+      const tavernLate = 20.5 + r(17) * 2.5
+      let eve: { at: LifeSpot; indoors: boolean } | undefined
+      let eve1 = late
+      for (const out of order) {
+        if (out === "home") {
+          if (!indoors) continue
+          eve = { at: homeSpot, indoors }
+          break
+        }
+        // talk spots close at eight: a chat by the door ends by then
+        const end = out === "tavern" ? tavernLate : out === "talk" ? Math.min(late, 19.8) : late
+        const got = outing([out], eve0, end, "evening", 70)
+        if (got.at === homeSpot || got.at === work) continue
+        eve = got
+        eve1 = end
+        break
+      }
+      eve ??= { at: homeSpot, indoors }
+      t = b.go(eve0, eve.at, { act: "idle", indoors: eve.indoors })
+      if (!eve.indoors) t = b.go(Math.max(t + 0.3, eve1), homeSpot, { act: "idle", indoors })
       folk.push({ id, role, zone: zi, day: b.close(24), ...(prop ? { prop } : {}) })
     }
   }
@@ -637,8 +836,12 @@ export function guildhallZone(walk: HexWalk, z: HexZones): number {
   )
 }
 
+/** The castle's heart tile (from tier 3): where the agents rest between errands. */
+export const GREAT_HALL = "great-hall"
+
 /**
- * An agent's loop in seconds: idle at the Guildhall (a slot of its own there) and walk each errand
+ * An agent's loop in seconds: idle at the Guildhall (a seat or talking place of the great hall's own,
+ * else a slot round the castle's heart) and walk each errand
  * there and back, working at a free spot of the place (its role's first, then one anyone may use).
  * With `places` the spots and slots are reserved in that book (plan agents before the townsfolk);
  * without, rings round the hearts stand in. Returns the steps and the loop's length.
@@ -652,7 +855,18 @@ export function agentLoop(
   const mps = opts.mps ?? WALK_MPS * 1.1
   const { places } = opts
   const home = guildhallZone(walk, z)
-  const hall = places?.takeSlot(home) ?? spotAt(walk, walk.hearts[home]!, opts.slot, 1.3)
+  // in the great hall itself: a seat or a talking place of its own there (not the guards' posts), else
+  // a slot round the heart
+  const inHall = places
+    ?.free(home, null, ["sit", "talk", "stand"])
+    .find(
+      (k) =>
+        !places.furniture.spots[k]!.roles && places.prefabOf(places.furniture.spots[k]!.tile) === GREAT_HALL,
+    )
+  if (inHall !== undefined) places!.taken.add(inHall)
+  const hall =
+    (inHall !== undefined ? places!.lifeSpot(inHall) : places?.takeSlot(home)) ??
+    spotAt(walk, walk.hearts[home]!, opts.slot, 1.3)
   const b = new LoopBuilder(walk, mps, 0.3, hall, { act: "idle" }, places?.furniture.near)
   let t = 0
   for (const [k, e] of errands.entries()) {

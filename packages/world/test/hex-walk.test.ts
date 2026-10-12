@@ -126,7 +126,8 @@ describe("hex life", () => {
   test("most are asleep indoors at 3:00 and out at noon", () => {
     const out = (hour: number) => folk.filter((f) => !lifePose(f.day, hour, 24).indoors).length
     expect(out(3)).toBeLessThan(folk.length * 0.2)
-    expect(out(12.3)).toBeGreaterThan(folk.length * 0.8)
+    // a few lunch at home (the rest spread over benches, stalls, doorsteps and squares)
+    expect(out(12.3)).toBeGreaterThan(folk.length * 0.7)
   })
 
   test("walks move continuously: no jump between nearby moments", () => {

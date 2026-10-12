@@ -34,6 +34,11 @@ export interface Stage {
   rig: Rig
   /** Calls `fn(dt seconds)` every frame before drawing; returns the unsubscribe. */
   onFrame(fn: (dt: number) => void): () => void
+  /**
+   * Draws the frame with `draw` in place of a plain `renderer.render(scene, camera)` (a post pipeline,
+   * `post/`); null puts the plain draw back.
+   */
+  setDraw(draw: (() => void) | null): void
   dispose(): void
 }
 
@@ -105,6 +110,7 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
   let counters: FrameCounters = NO_COUNTERS
   let last: number | null = null
   let raf = 0
+  let draw: (() => void) | null = null
 
   const frame = (now: number) => {
     const start = performance.now()
@@ -117,7 +123,8 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
     // The camera moves first: every hook (the sky's dome, the cascades, the haze) reads where it is now.
     rig.update(ms / 1000)
     for (const fn of frameFns) fn(ms / 1000)
-    renderer.render(scene, camera)
+    if (draw) draw()
+    else renderer.render(scene, camera)
     // The CPU side of the frame: hooks plus render. Headless Chrome has no vsync, so this, not the
     // rAF gap, is what the budget holds.
     const cost = performance.now() - start
@@ -166,6 +173,9 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
     onFrame(fn) {
       frameFns.add(fn)
       return () => frameFns.delete(fn)
+    },
+    setDraw(next) {
+      draw = next
     },
     dispose() {
       governor.dispose()

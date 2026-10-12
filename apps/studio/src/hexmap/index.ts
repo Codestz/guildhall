@@ -13,7 +13,7 @@ import {
   hexIsland,
   hexZones,
   kindOf,
-  useOf,
+  useOf as tileUse,
 } from "@guildhall/world"
 import type { Screen } from "../screens.ts"
 import { replaceQuery } from "../shell/router.ts"
@@ -116,7 +116,10 @@ function draw(
     const [r0, g0, b0] = COLOUR[kind] ?? [255, 0, 255]
     g.fillStyle = `rgb(${r0 * lift},${g0 * lift},${b0 * lift})`
     g.beginPath()
-    C.forEach(([dx, dy], k) => (k ? g.lineTo(px + dx, py + dy) : g.moveTo(px + dx, py + dy)))
+    C.forEach(([dx, dy], k) => {
+      if (k) g.lineTo(px + dx, py + dy)
+      else g.moveTo(px + dx, py + dy)
+    })
     g.closePath()
     g.fill()
     // a dark rim on each edge that drops to a lower neighbour: the steps read from above
@@ -365,7 +368,10 @@ function drawZones(
   const { grid } = h
   const hexPath = (px: number, py: number, k = 1) => {
     g.beginPath()
-    C.forEach(([dx, dy], i) => (i ? g.lineTo(px + dx * k, py + dy * k) : g.moveTo(px + dx * k, py + dy * k)))
+    C.forEach(([dx, dy], i) => {
+      if (i) g.lineTo(px + dx * k, py + dy * k)
+      else g.moveTo(px + dx * k, py + dy * k)
+    })
     g.closePath()
   }
   const centre = (i: number): [number, number] => {
@@ -373,7 +379,7 @@ function drawZones(
     return [cx + x * s, cy + y * s]
   }
   for (let i = 0; i < grid.size; i++) {
-    const u = useOf(z, i)
+    const u = tileUse(z, i)
     const zi = z.zoneOf[i]!
     const [px, py] = centre(i)
     if (zi) {
@@ -402,13 +408,13 @@ function drawZones(
       for (let k = 1; k < r.tiles.length; k++) {
         const a = r.tiles[k - 1]!
         const b = r.tiles[k]!
-        const bridge = useOf(z, a) === "bridge" || useOf(z, b) === "bridge"
+        const bridge = tileUse(z, a) === "bridge" || tileUse(z, b) === "bridge"
         if (pass === 0) band(a, b, "#7a5a36", Math.max(2, s * 0.62))
         else band(a, b, bridge ? "#a0703c" : "#e2c68f", Math.max(1.2, s * 0.4))
       }
   // buildings: a small roofed block per tile; the castle a keep
   for (let i = 0; i < grid.size; i++) {
-    const u = useOf(z, i)
+    const u = tileUse(z, i)
     if (u !== "building" && u !== "landmark") continue
     const [px, py] = centre(i)
     const zi = z.zoneOf[i]!

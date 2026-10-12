@@ -13,6 +13,15 @@ export {
   landTiles,
 } from "./island.ts"
 export {
+  HEX_TILE_SIZE,
+  placeTile,
+  SCALE_B,
+  TILE_PREFABS,
+  type TileGround,
+  type TilePiece,
+  type TilePrefab,
+} from "./tiles.ts"
+export {
   type HexRoad,
   type HexZone,
   type HexZones,

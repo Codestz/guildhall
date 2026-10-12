@@ -8,6 +8,7 @@ import { grip } from "./grips/editor/index.ts"
 import { grips } from "./grips/matrix/index.ts"
 import { hexmap } from "./hexmap/index.ts"
 import { hexScale } from "./hexscale/index.ts"
+import { hexTiles } from "./hextiles/index.ts"
 import { home } from "./home/index.tsx"
 import { island } from "./island/index.ts"
 import { lineup } from "./lineup/index.ts"
@@ -66,6 +67,7 @@ export const SCREENS: readonly Screen[] = [
   island,
   hexmap,
   hexScale,
+  hexTiles,
 ]
 
 export const DEFAULT_SCREEN = "home"

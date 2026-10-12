@@ -173,6 +173,13 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         dev: true,
       },
       {
+        id: "hextiles",
+        name: "Tile prefabs",
+        purpose:
+          "Every hex tile prefab (house, farmstead, woods, field, road…) at the chosen scale, with a character.",
+        dev: true,
+      },
+      {
         id: "hexscale",
         name: "Scale board",
         purpose:

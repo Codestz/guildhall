@@ -32,13 +32,15 @@ const PANEL = [
 
 type Knob = Exclude<keyof HexIslandSpec, "seed">
 const KNOBS: { key: Knob; label: string; min: number; max: number; step: number }[] = [
-  { key: "radius", label: "map rings", min: 14, max: 48, step: 1 },
-  { key: "land", label: "land", min: 0.2, max: 0.6, step: 0.01 },
+  { key: "files", label: "repo files", min: 0, max: 30000, step: 100 },
   { key: "coast", label: "coast shape", min: 0, max: 2, step: 0.05 },
   { key: "hills", label: "hill levels", min: 0, max: 9, step: 1 },
   { key: "rain", label: "rivers", min: 0.3, max: 3, step: 0.05 },
   { key: "forest", label: "forest", min: 0, max: 0.7, step: 0.01 },
 ]
+
+/** Rings shown: the biggest island fits, so every size is drawn at one scale and growth reads. */
+const FIT = 34
 
 /** Ground colours (top-down map; the 3D tiles come later from prefabs). */
 const COLOUR: Record<string, [number, number, number]> = {
@@ -58,6 +60,7 @@ const COLOUR: Record<string, [number, number, number]> = {
 interface View {
   spec: Required<Omit<HexIslandSpec, "seed">> & { seed: number }
   grid: boolean
+  growth: boolean
 }
 
 function parse(q: URLSearchParams): View {
@@ -67,20 +70,28 @@ function parse(q: URLSearchParams): View {
   }
   const spec = { ...HEX_ISLAND_DEFAULTS, seed: num("seed", 1) }
   for (const k of KNOBS) spec[k.key] = num(k.key, HEX_ISLAND_DEFAULTS[k.key])
-  return { spec, grid: q.get("grid") === "1" }
+  return { spec, grid: q.get("grid") === "1", growth: q.get("growth") === "1" }
 }
 
 function params(v: View): URLSearchParams {
   const q = new URLSearchParams({ seed: String(v.spec.seed) })
   for (const k of KNOBS) if (v.spec[k.key] !== HEX_ISLAND_DEFAULTS[k.key]) q.set(k.key, String(v.spec[k.key]))
   if (v.grid) q.set("grid", "1")
+  if (v.growth) q.set("growth", "1")
   return q
 }
 
 /** Draws island `h` centred at (cx, cy), fitted to `size` pixels across. */
-function draw(g: CanvasRenderingContext2D, h: HexIsland, cx: number, cy: number, size: number): void {
+function draw(
+  g: CanvasRenderingContext2D,
+  h: HexIsland,
+  cx: number,
+  cy: number,
+  size: number,
+  fit: number,
+): void {
   const { grid } = h
-  const s = size / (Math.sqrt(3) * (2 * grid.radius + 1))
+  const s = size / (Math.sqrt(3) * (2 * fit + 1))
   const corner = (k: number): [number, number] => {
     const a = (Math.PI / 180) * (60 * k - 30)
     return [Math.cos(a) * s, Math.sin(a) * s]
@@ -166,14 +177,28 @@ export const hexmap: Screen = {
       g.fillRect(0, 0, W, H)
       const left = 284
       const aw = W - left - 8
-      if (view.grid) {
+      if (view.growth) {
+        // one seed at growing repo sizes: the land already there never moves
+        const sizes = [100, 600, 2000, 6000, 14000, 30000]
+        const size = Math.min(aw / 3, (H - 16) / 2)
+        sizes.forEach((files, k) => {
+          const h = hexIsland({ ...view.spec, files })
+          const x = left + (k % 3) * size + size / 2
+          const y = 8 + Math.floor(k / 3) * size + size / 2
+          draw(g, h, x, y, size, FIT)
+          g.fillStyle = "#f3e9d4"
+          g.font = "12px ui-monospace,Menlo,monospace"
+          g.fillText(`${files} files · ${h.stats.land} tiles`, x - size / 2 + 8, y - size / 2 + 18)
+        })
+        stats.textContent = "growth: same seed, more files"
+      } else if (view.grid) {
         const size = Math.min(aw / 4, (H - 16) / 2)
         const lines: string[] = []
         for (let k = 0; k < 8; k++) {
           const h = hexIsland({ ...view.spec, seed: view.spec.seed + k })
           const x = left + (k % 4) * size + size / 2
           const y = 8 + Math.floor(k / 4) * size + size / 2
-          draw(g, h, x, y, size)
+          draw(g, h, x, y, size, FIT)
           g.fillStyle = "#f3e9d4"
           g.font = "12px ui-monospace,Menlo,monospace"
           g.fillText(`seed ${view.spec.seed + k}`, x - size / 2 + 8, y - size / 2 + 18)
@@ -182,12 +207,12 @@ export const hexmap: Screen = {
         stats.textContent = lines.join("\n")
       } else {
         const h = hexIsland(view.spec)
-        const size = Math.min(aw, H - 16) * 1.05
-        draw(g, h, left + aw / 2, H / 2, size)
+        const size = Math.min(aw, H - 16) * 1.02
+        draw(g, h, left + aw / 2, H / 2, size, FIT)
         const count: Record<string, number> = {}
         for (let i = 0; i < h.grid.size; i++) count[kindOf(h, i)] = (count[kindOf(h, i)] ?? 0) + 1
         stats.textContent = [
-          `land tiles ${h.stats.land}`,
+          `land tiles ${h.stats.land} (${view.spec.files} files)`,
           `rivers ${h.stats.rivers} · lakes ${h.stats.lakes}`,
           ...Object.entries(count)
             .filter(([k]) => k !== "sea")
@@ -234,7 +259,11 @@ export const hexmap: Screen = {
       view.grid = !view.grid
       gridBtn.textContent = view.grid ? "one island" : "8 seeds"
     })
-    row.append(gridBtn)
+    const growBtn = btn(view.growth ? "hide growth" : "growth", () => {
+      view.growth = !view.growth
+      growBtn.textContent = view.growth ? "hide growth" : "growth"
+    })
+    row.append(gridBtn, growBtn)
     panel.append(title, row)
     for (const k of KNOBS) {
       const label = document.createElement("label")

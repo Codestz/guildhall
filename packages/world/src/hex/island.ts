@@ -34,10 +34,8 @@ export type HexKind = (typeof HEX_KINDS)[number]
 
 export interface HexIslandSpec {
   seed: number
-  /** Rings of tiles round the middle (the map, sea included). */
-  radius?: number
-  /** Share of the map that is land, roughly. */
-  land?: number
+  /** Files in the repo: the island's size follows them (decisions.md "Island size and growth"). */
+  files?: number
   /** Coast irregularity. */
   coast?: number
   /** Hill massif height in levels. */
@@ -49,13 +47,20 @@ export interface HexIslandSpec {
 }
 
 export const HEX_ISLAND_DEFAULTS: Required<Omit<HexIslandSpec, "seed">> = {
-  radius: 30,
-  land: 0.34,
+  files: 1500,
   coast: 1,
   hills: 5,
   rain: 1,
   forest: 0.26,
 }
+
+/** The grid every island lives on: one size for all, so a tile's coordinates never change as it grows. */
+export const HEX_MAP_RADIUS = 48
+
+/** Land tiles for a repo of `files` files: 1.5 × V1's 40 + 13·√files, at most HEX_LAND_MAX. */
+export const HEX_LAND_MAX = 2100
+export const landTiles = (files: number): number =>
+  Math.min(HEX_LAND_MAX, Math.round(1.5 * (40 + 13 * Math.sqrt(Math.max(0, files)))))
 
 export interface HexRiver {
   /** Tile indices, source to mouth (the last one is sea or lake, or the river it joins). */
@@ -129,12 +134,15 @@ function pieces(g: HexGrid, inside: (i: number) => boolean): { label: Int32Array
 export function hexIsland(input: HexIslandSpec): HexIsland {
   const t0 = performance.now()
   const spec = { ...HEX_ISLAND_DEFAULTS, ...input }
-  const { seed, radius } = spec
+  const { seed } = spec
+  const radius = HEX_MAP_RADIUS
   const g = hexGrid(radius)
   const N = g.size
   const rnd = (k: number) => hash2(seed, k, 4111)
   const at = (i: number) => hexCentre({ q: g.q[i]!, r: g.r[i]! })
-  const R = radius * 1.5 // the map's radius in tile units, roughly
+  // the shape field is laid out at the largest island's scale, in fixed tile units: every island is
+  // the same field grown to a different size
+  const R = Math.sqrt(HEX_LAND_MAX / 2.6) * 1.5
 
   // ---- 1. shape ----
   const rot = rnd(1) * Math.PI * 2
@@ -145,9 +153,9 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
   for (let k = 0; k < 1 + Math.floor(rnd(4) * 2); k++)
     lobes.push([rnd(30 + k) * Math.PI * 2, 0.18 + 0.1 * rnd(40 + k), -0.2 * spec.coast])
   const massifAng = rnd(5) * Math.PI * 2
-  const massif: [number, number] = [Math.cos(massifAng) * R * 0.32, Math.sin(massifAng) * R * 0.32]
+  // the hills sit a fixed walk from the centre: a small island reaches their foot, a big one climbs them
+  const massif: [number, number] = [Math.cos(massifAng) * 12, Math.sin(massifAng) * 12]
   const landness = new Float32Array(N)
-  const cut = 1 - spec.land * 1.55
   for (let i = 0; i < N; i++) {
     const [x, y] = at(i)
     const s = 1 / (R * 0.55)
@@ -155,7 +163,7 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
     const wy = y + fbm(seed + 13, x * s, y * s, 3) * R * 0.22 * spec.coast
     const u = (wx * Math.cos(rot) + wy * Math.sin(rot)) / (R * Math.sqrt(stretch))
     const v = (-wx * Math.sin(rot) + wy * Math.cos(rot)) / (R / Math.sqrt(stretch))
-    let L = 1 - Math.hypot(u, v) - cut
+    let L = 1 - Math.hypot(u, v)
     L += 0.18 * spec.coast * fbm(seed + 17, wx * s * 1.7, wy * s * 1.7, 3)
     const ang = Math.atan2(y, x)
     for (const [a, wdt, h] of lobes) {
@@ -164,18 +172,60 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
     }
     // the massif keeps its land
     L += 0.25 * (1 - smoothstep(0, R * 0.4, Math.hypot(x - massif[0], y - massif[1])))
-    // the map's edge is always sea
-    L -= smoothstep(R * 0.72, R * 0.9, Math.hypot(x, y)) * 2
     landness[i] = L
   }
   const kind = new Uint8Array(N).fill(K.sea)
+  // grow the island from the centre, the most land-like tile on its edge first: one fixed order for the
+  // seed, so an island of n tiles is the first n tiles of every bigger one (stable growth)
+  const target = landTiles(spec.files)
   {
-    const { label, sizes } = pieces(g, (i) => landness[i]! > 0)
-    let big = 1
-    for (let k = 1; k < sizes.length; k++) if (sizes[k]! > sizes[big]!) big = k
-    for (let i = 0; i < N; i++) {
-      if (label[i] === big) kind[i] = K.grass
-      else if (label[i] && sizes[label[i]!]! <= 3) kind[i] = K.rock // a sea stack
+    const grown = new Uint8Array(N)
+    const heap: [number, number][] = []
+    const push = (p: number, i: number) => {
+      heap.push([p, i])
+      let j = heap.length - 1
+      while (j > 0) {
+        const up = (j - 1) >> 1
+        if (heap[up]![0] > p || (heap[up]![0] === p && heap[up]![1] < i)) break
+        ;[heap[up], heap[j]] = [heap[j]!, heap[up]!]
+        j = up
+      }
+    }
+    const pop = (): number => {
+      const top = heap[0]![1]
+      const last = heap.pop()!
+      if (heap.length) {
+        heap[0] = last
+        let j = 0
+        for (;;) {
+          const l = 2 * j + 1
+          const r = l + 1
+          let m = j
+          const more = (a: number, b: number) =>
+            heap[a]![0] > heap[b]![0] || (heap[a]![0] === heap[b]![0] && heap[a]![1] < heap[b]![1])
+          if (l < heap.length && more(l, m)) m = l
+          if (r < heap.length && more(r, m)) m = r
+          if (m === j) break
+          ;[heap[m], heap[j]] = [heap[j]!, heap[m]!]
+          j = m
+        }
+      }
+      return top
+    }
+    const origin = g.index(0, 0)
+    grown[origin] = 1
+    push(landness[origin]!, origin)
+    let n = 0
+    while (heap.length && n < target) {
+      const i = pop()
+      if (g.ring(i) >= radius - 3) continue
+      kind[i] = K.grass
+      n++
+      for (const j of g.neighbours(i))
+        if (j >= 0 && !grown[j]) {
+          grown[j] = 1
+          push(landness[j]!, j)
+        }
     }
     // fill inland seas
     const sea = pieces(g, (i) => kind[i] === K.sea)
@@ -284,9 +334,9 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
     const d = down[i]!
     if (d >= 0 && !isSea(d)) flow[d] = flow[d]! + flow[i]!
   }
-  let landTiles = 0
-  for (let i = 0; i < N; i++) if (!isSea(i)) landTiles++
-  const thr = Math.max(6, (landTiles * 0.03) / spec.rain)
+  let landCount = 0
+  for (let i = 0; i < N; i++) if (!isSea(i)) landCount++
+  const thr = Math.max(6, (landCount * 0.03) / spec.rain)
   const wet = (i: number) => !isSea(i) && kind[i] !== K.lake && flow[i]! >= thr
   const fed = new Uint8Array(N)
   for (let i = 0; i < N; i++) if (wet(i) && down[i]! >= 0) fed[down[i]!] = 1
@@ -389,7 +439,7 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
     down,
     rivers,
     coast,
-    stats: { land: landTiles, rivers: rivers.length, lakes, ms: Math.round(performance.now() - t0) },
+    stats: { land: landCount, rivers: rivers.length, lakes, ms: Math.round(performance.now() - t0) },
   }
 }
 

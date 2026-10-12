@@ -75,7 +75,7 @@ interface Stop {
   exposure: number
 }
 
-// Keyed by sun elevation, so dawn and dusk match. Golden hour (24°) is plan §5: sun #ffd2a1 at ~3,
+// Keyed by sun elevation, so dawn and dusk match. Golden hour (24°) is plan §5: sun #ffd2a1 at ~3 (warmed to #ffcc94 in the atmosphere pass),
 // hemisphere sky #9cc3e6 over ground #7a6a4f. The shade leans blue (warm key, cool fill).
 // biome-ignore format: a table reads better aligned
 const STOPS: readonly Stop[] = [
@@ -83,8 +83,8 @@ const STOPS: readonly Stop[] = [
   { at: -14, zenith: "#0a1838", horizon: "#24345e", glow: "#140f2a", sun: "#000000", sunIntensity: 0,   sky: "#65728f", ground: "#20222c", hemiIntensity: 1.0,  exposure: 1.45 },
   { at: -6,  zenith: "#18306a", horizon: "#6e6c94", glow: "#b0605a", sun: "#000000", sunIntensity: 0,   sky: "#7480a0", ground: "#2a2832", hemiIntensity: 0.95, exposure: 1.3 },
   { at: 0,   zenith: "#33589a", horizon: "#eea070", glow: "#ff8a4c", sun: "#ff9c5c", sunIntensity: 1.2, sky: "#8c9ccc", ground: "#4a3e36", hemiIntensity: 1.0,  exposure: 1.05 },
-  { at: 12,  zenith: "#4474b6", horizon: "#f2c49a", glow: "#ffb070", sun: "#ffbf86", sunIntensity: 2.6, sky: "#98b4dc", ground: "#6a5a44", hemiIntensity: 1.05, exposure: 1.0 },
-  { at: 24,  zenith: "#4a82c4", horizon: "#f1d4ae", glow: "#ffcf98", sun: "#ffd2a1", sunIntensity: 3.3, sky: "#9cc3e6", ground: "#7a6a4f", hemiIntensity: 1.15, exposure: 1.05 },
+  { at: 12,  zenith: "#4474b6", horizon: "#f2c49a", glow: "#ffb070", sun: "#ffbf86", sunIntensity: 2.6, sky: "#98b4dc", ground: "#6a5a44", hemiIntensity: 1.05, exposure: 1.08 },
+  { at: 24,  zenith: "#4a82c4", horizon: "#f1d4ae", glow: "#ffcf98", sun: "#ffcc94", sunIntensity: 3.3, sky: "#9cc3e6", ground: "#7a6a4f", hemiIntensity: 1.15, exposure: 1.12 },
   { at: 40,  zenith: "#3f84d0", horizon: "#cfe0ee", glow: "#fff0d8", sun: "#fff0dc", sunIntensity: 3.0, sky: "#b4d2f0", ground: "#7a7660", hemiIntensity: 1.15, exposure: 0.95 },
   { at: 90,  zenith: "#377ccf", horizon: "#cde2f6", glow: "#fff8ea", sun: "#fff8ee", sunIntensity: 3.1, sky: "#bcd8f4", ground: "#7c7a66", hemiIntensity: 1.15, exposure: 0.95 },
 ]

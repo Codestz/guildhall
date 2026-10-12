@@ -82,10 +82,11 @@ describe("patchAir (chained by patchCloudShade)", () => {
     patchCloudShade(shader)
     const f = shader.fragmentShader
     expect(f).toContain("skyLight( inverseTransformDirection( geometryNormal, viewMatrix ) )")
-    expect(f.indexOf("airHaze( gl_FragColor.rgb )")).toBeLessThan(f.indexOf("#include <tonemapping_fragment>"))
+    expect(f.indexOf("airHaze( gl_FragColor.rgb )")).toBeLessThan(
+      f.indexOf("#include <tonemapping_fragment>"),
+    )
     expect(f).toContain("gl_FragColor.rgb = airGrade( gl_FragColor.rgb );")
     expect(f).not.toContain("#include <fog_fragment>")
-    expect(shader.vertexShader).toContain("vAirWorld =")
     expect(shader.uniforms.uSkyLight).toBe(AIR.uSkyLight)
   })
 })

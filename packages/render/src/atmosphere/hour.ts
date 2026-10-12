@@ -74,8 +74,8 @@ const STOPS: readonly Stop[] = [
   { at: -20, density: 0.6, max: 0.3,  shadows: [0.92, 0.95, 1.00], highlights: [0.98, 0.96, 0.93], saturation: 0.96, contrast: 0.06 },
   { at: -6,  density: 0.9, max: 0.3,  shadows: [0.88, 0.91, 1.00], highlights: [1.00, 0.93, 0.88], saturation: 1.0,  contrast: 0.1 },
   { at: 2,   density: 1.5, max: 0.42, shadows: [0.86, 0.91, 1.00], highlights: [1.00, 0.91, 0.80], saturation: 1.04, contrast: 0.14 },
-  { at: 14,  density: 1.8, max: 0.5,  shadows: [0.86, 0.91, 1.00], highlights: [1.00, 0.91, 0.76], saturation: 1.05, contrast: 0.14 },
-  { at: 28,  density: 1.2, max: 0.4,  shadows: [0.88, 0.92, 1.00], highlights: [1.00, 0.93, 0.82], saturation: 1.03, contrast: 0.12 },
+  { at: 14,  density: 1.8, max: 0.5,  shadows: [0.86, 0.91, 1.00], highlights: [1.00, 0.91, 0.76], saturation: 1.05, contrast: 0.1 },
+  { at: 28,  density: 1.2, max: 0.4,  shadows: [0.88, 0.92, 1.00], highlights: [1.00, 0.93, 0.82], saturation: 1.03, contrast: 0.1 },
   { at: 50,  density: 0.7, max: 0.28, shadows: [0.92, 0.95, 1.00], highlights: [1.00, 0.97, 0.91], saturation: 1.0,  contrast: 0.1 },
 ]
 

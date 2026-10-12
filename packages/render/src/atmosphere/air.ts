@@ -119,7 +119,6 @@ uniform float uHazeFalloff;
 uniform float uHazeMax;
 uniform float uHazeClear;
 uniform float uHazeFar;
-varying vec3 vAirWorld;
 // The sky's light on a face with world normal n.
 vec3 skyLight( vec3 n ) {
 	float up = n.y;
@@ -133,10 +132,10 @@ vec3 skyLight( vec3 n ) {
 }
 // Aerial perspective: past the clear zone round the focus, thicker low down, all of it at the far plane.
 vec3 airHaze( vec3 colour ) {
-	vec3 v = vAirWorld - cameraPosition;
+	vec3 v = vCloudWorld - cameraPosition;
 	float dist = length( v );
 	float past = max( dist - uHazeClear, 0.0 );
-	float thin = exp( -max( vAirWorld.y, 0.0 ) / uHazeFalloff );
+	float thin = exp( -max( vCloudWorld.y, 0.0 ) / uHazeFalloff );
 	float amount = uHazeMax * ( 1.0 - exp( -past * uHazeDensity * thin ) );
 	amount = max( amount, smoothstep( 0.75 * uHazeFar, 0.97 * uHazeFar, dist ) );
 	// The focus (most of the screen) is clear: no sky to look up there.
@@ -145,23 +144,12 @@ vec3 airHaze( vec3 colour ) {
 }
 `
 
-const WORLD = /* glsl */ `
-vec4 airWorld = vec4( transformed, 1.0 );
-#ifdef USE_BATCHING
-airWorld = batchingMatrix * airWorld;
-#endif
-#ifdef USE_INSTANCING
-airWorld = instanceMatrix * airWorld;
-#endif
-vAirWorld = ( modelMatrix * airWorld ).xyz;`
-
 /** The hemisphere's own term in `lights_fragment_begin`, swapped for the sky's light. */
 const HEMI = "irradiance += getHemisphereLightIrradiance( hemisphereLights[ i ], geometryNormal );"
 const SKY = /* glsl */ `irradiance += uSkyLight > 0.5
 	? skyLight( inverseTransformDirection( geometryNormal, viewMatrix ) ) / float( NUM_HEMI_LIGHTS )
 	: getHemisphereLightIrradiance( hemisphereLights[ i ], geometryNormal );`
 
-const PROJECT = "#include <project_vertex>"
 const TONE = "#include <tonemapping_fragment>"
 const FOG = "#include <fog_fragment>"
 
@@ -169,23 +157,27 @@ const logger = log("render:air")
 let warned = false
 
 /**
- * `onBeforeCompile` for a lit material, after the lights chunk has been inlined (`patchCloudShade`
- * inlines it): the sky's light for the hemisphere fill, the haze before tone mapping, the grade after
- * the colour space (in place of three's fog).
+ * `onBeforeCompile` for a lit material, from `patchCloudShade` (which inlines the lights chunk and
+ * passes the world position, `vCloudWorld`, that the haze reads: one varying for both, the city has
+ * a lot of vertices): the sky's light for the hemisphere fill, the haze before tone mapping, the grade
+ * after the colour space (in place of three's fog).
  */
 export function patchAir(shader: WebGLProgramParametersWithUniforms): void {
   const fragment = shader.fragmentShader
-  if (!fragment.includes(HEMI) || !fragment.includes(TONE) || !fragment.includes(FOG)) {
+  if (
+    !fragment.includes(HEMI) ||
+    !fragment.includes(TONE) ||
+    !fragment.includes(FOG) ||
+    !fragment.includes("varying vec3 vCloudWorld;")
+  ) {
     if (!warned) logger.error("three's light or output chunks moved: no sky light, haze or grade")
     warned = true
     return
   }
   Object.assign(shader.uniforms, AIR)
-  shader.vertexShader = shader.vertexShader
-    .replace("#include <common>", "#include <common>\nvarying vec3 vAirWorld;")
-    .replace(PROJECT, () => `${PROJECT}\n${WORLD}`)
   shader.fragmentShader = fragment
-    .replace("#include <common>", () => `#include <common>\n${PARS}`)
+    // Before main, after every other patch's declarations (the cloud shade's vCloudWorld among them).
+    .replace("void main() {", () => `${PARS}\nvoid main() {`)
     .replace(HEMI, () => SKY)
     .replace(TONE, () => `gl_FragColor.rgb = airHaze( gl_FragColor.rgb );\n${TONE}`)
     .replace(FOG, () => "gl_FragColor.rgb = airGrade( gl_FragColor.rgb );")

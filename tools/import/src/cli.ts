@@ -13,6 +13,7 @@ import { PALETTE } from "@guildhall/assets"
 import { configureLog } from "@guildhall/core"
 import { checkLibrary } from "./check.ts"
 import { loadPacks, paths, REPO, selectPacks } from "./config.ts"
+import { overlayCommand } from "./overlay.ts"
 import { runImport } from "./pipeline.ts"
 import { type PackScan, rawFolders, scanMarkdown, scanPack } from "./scan.ts"
 import { tagCommand } from "./tags/command.ts"
@@ -23,6 +24,7 @@ const USAGE = `usage:
   bun import check                                         validate the library
   bun import scan <folder|pack|all> [--out dir]            raw report (default out: .probe/import)
   bun import thumbs [pack…] [--force]                      thumbnails into library/thumbs
+  bun import overlay                                       re-apply data/ overlays to the shards (no re-bake)
   bun import tag emit [pack…] [--batch 40]                 vision batches into library/tags/batches
   bun import tag apply [out-file…]                         vision answers into the catalog`
 
@@ -86,6 +88,7 @@ async function scan(names: string[], out: string): Promise<void> {
 async function main(argv: string[]): Promise<number> {
   configureLog(process.env.GUILDHALL_LOG ?? "")
   if (argv[0] === "thumbs") return thumbsCommand(argv.slice(1))
+  if (argv[0] === "overlay") return overlayCommand()
   if (argv[0] === "tag") return tagCommand(argv.slice(1))
   const args = parseArgs(argv)
   if (args.command === "help") {

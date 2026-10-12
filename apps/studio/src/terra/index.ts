@@ -110,7 +110,56 @@ function draw(
     g.arc(fx, fy, Math.max(2, 2.5 * k), 0, Math.PI * 2)
     g.fill()
   }
-  if (plan) drawPlan(g, plan, to, k)
+  if (plan) {
+    drawClaims(g, t, plan, x, y, size)
+    drawPlan(g, plan, to, k)
+  }
+}
+
+/** What each anchor grows into, as a tint of its colour with a darker rim. */
+function drawClaims(
+  g: CanvasRenderingContext2D,
+  t: Terra,
+  plan: TerraPlan,
+  x: number,
+  y: number,
+  size: number,
+): void {
+  const rgb = plan.anchors.map((a) => {
+    const hex = ANCHOR_COLOUR[a.kind] ?? "#ffffff"
+    return [1, 3, 5].map((o) => Number.parseInt(hex.slice(o, o + 2), 16))
+  })
+  const px = new Uint8ClampedArray(t.w * t.h * 4)
+  for (let i = 0; i < t.w * t.h; i++) {
+    const c = plan.claim[i]!
+    if (!c) continue
+    const col = rgb[c - 1]!
+    const xx = i % t.w
+    const rim =
+      (xx > 0 && plan.claim[i - 1] !== c) ||
+      (xx < t.w - 1 && plan.claim[i + 1] !== c) ||
+      plan.claim[i - t.w] !== c ||
+      plan.claim[i + t.w] !== c
+    px[i * 4] = col[0]!
+    px[i * 4 + 1] = col[1]!
+    px[i * 4 + 2] = col[2]!
+    px[i * 4 + 3] = rim ? 230 : 95
+  }
+  const tmp = new OffscreenCanvas(t.w, t.h)
+  tmp.getContext("2d")!.putImageData(new ImageData(px, t.w, t.h), 0, 0)
+  g.imageSmoothingEnabled = false
+  g.drawImage(tmp, x, y, size, size)
+  g.imageSmoothingEnabled = true
+}
+
+/** What an anchor becomes, in a few words, for its label. */
+const ANCHOR_ROLE: Record<string, string> = {
+  town: "the town: market, guildhall, ~60 buildings",
+  harbour: "harbour quarter: quay, piers, warehouses",
+  crossing: "river village: bridge, mill, inn",
+  outpost: "hill outpost: watchtower, keep",
+  fishing: "fishing hamlet: huts, jetties",
+  farm: "farm hamlet: farmsteads, fields",
 }
 
 const ANCHOR_COLOUR: Record<string, string> = {
@@ -151,7 +200,7 @@ function drawPlan(
       g.strokeStyle = "#f3e9d4"
       g.strokeRect(x - 5, y - 5, 10, 10)
     }
-  g.font = "bold 12px ui-monospace,Menlo,monospace"
+  g.font = "bold 11px ui-monospace,Menlo,monospace"
   for (const a of plan.anchors) {
     const [x, y] = to(a.at as [number, number])
     g.fillStyle = ANCHOR_COLOUR[a.kind] ?? "#fff"
@@ -161,7 +210,8 @@ function drawPlan(
     g.arc(x, y, a.kind === "town" ? 11 : 8, 0, Math.PI * 2)
     g.fill()
     g.stroke()
-    const label = a.kind === "outpost" ? `outpost (terrace ${a.level})` : a.kind
+    const ha = (plan.area[plan.anchors.indexOf(a)] ?? 0) / 1e4
+    const label = `${ANCHOR_ROLE[a.kind] ?? a.kind} · ${ha.toFixed(1)} ha${a.level ? ` · terrace ${a.level}` : ""}`
     g.lineWidth = 3
     g.strokeStyle = "rgba(20,16,12,0.85)"
     g.strokeText(label, x + 13, y + 4)

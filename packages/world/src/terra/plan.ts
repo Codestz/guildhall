@@ -41,7 +41,25 @@ export interface TerraRoad {
 export interface TerraPlan {
   anchors: TerraAnchor[]
   roads: TerraRoad[]
+  /**
+   * What each anchor grows into, per cell: the anchor's index + 1 (0 unclaimed). Grown from all the
+   * anchors at once over easy ground (flat, along roads), each up to its kind's area; rivers, cliffs
+   * and steep risers hold a place back, so a district's edge follows the land.
+   */
+  claim: Uint8Array
+  /** Square metres each anchor claimed. */
+  area: number[]
   ms: number
+}
+
+/** How much ground each kind of place grows into, m²: a town's quarter, a hamlet's yards and plots. */
+export const ANCHOR_AREA: Record<AnchorKind, number> = {
+  town: 14000,
+  harbour: 3500,
+  crossing: 3000,
+  outpost: 1200,
+  fishing: 1800,
+  farm: 4500,
 }
 
 /** The order anchors are placed in, and how far each keeps from those before it (metres). */
@@ -234,5 +252,75 @@ export function terraPlan(t: Terra): TerraPlan {
     // built road is cheap to follow
     for (const c of cells) if (Number.isFinite(cost[c]!)) cost[c] = Math.min(cost[c]!, 0.45)
   }
-  return { anchors, roads, ms: Math.round(performance.now() - t0) }
+  // ---- what each anchor grows into: all at once, cheapest ground first, each up to its area ----
+  const claim = new Uint8Array(N)
+  const area = anchors.map(() => 0)
+  const best = new Float64Array(N).fill(Infinity)
+  const heap: [number, number, number][] = []
+  const push = (d: number, i: number, k: number): void => {
+    heap.push([d, i, k])
+    let j = heap.length - 1
+    while (j > 0) {
+      const p = (j - 1) >> 1
+      if (heap[p]![0] <= d) break
+      ;[heap[p], heap[j]] = [heap[j]!, heap[p]!]
+      j = p
+    }
+  }
+  const pop = (): [number, number, number] => {
+    const top = heap[0]!
+    const last = heap.pop()!
+    if (heap.length) {
+      heap[0] = last
+      let j = 0
+      for (;;) {
+        const l = 2 * j + 1
+        const r = l + 1
+        let m = j
+        if (l < heap.length && heap[l]![0] < heap[m]![0]) m = l
+        if (r < heap.length && heap[r]![0] < heap[m]![0]) m = r
+        if (m === j) break
+        ;[heap[m], heap[j]] = [heap[j]!, heap[m]!]
+        j = m
+      }
+    }
+    return top
+  }
+  anchors.forEach((a, k) => {
+    const i = cellOf(a.at)
+    best[i] = 0
+    push(0, i, k)
+  })
+  const a2 = cell * cell
+  while (heap.length) {
+    const [d, i, k] = pop()
+    if (claim[i] || d > best[i]!) continue
+    if (area[k]! >= ANCHOR_AREA[anchors[k]!.kind]) continue
+    claim[i] = k + 1
+    area[k] = area[k]! + a2
+    const x = i % w
+    const y = (i - x) / w
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const xx = x + dx
+      const yy = y + dy
+      if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue
+      const j = yy * w + xx
+      if (claim[j] || water[j] !== TERRA_WATER.land || terraceLevel[j] === TERRA_CRAG) continue
+      // easy ground grows first: flat and along the roads; a riser or a cliff is a wall
+      const sl = slope[j]!
+      if (sl > 0.6) continue
+      const step = cell * (1 + 12 * sl + (cost[j]! < 0.5 ? -0.4 : 0))
+      const nd = d + step
+      if (nd < best[j]!) {
+        best[j] = nd
+        push(nd, j, k)
+      }
+    }
+  }
+  return { anchors, roads, claim, area, ms: Math.round(performance.now() - t0) }
 }

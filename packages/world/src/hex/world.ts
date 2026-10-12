@@ -43,6 +43,8 @@ export interface HexWorld {
   decks: number[]
   /** The island's ground height at a point (the top of the tile under it; 0 off the island). */
   heightAt(x: number, z: number): number
+  /** A walker's height on a road step's stairs at (x, z), or null off every stair. */
+  stairAt(x: number, z: number): number | null
   stats: { tiles: number; pieces: number; prefabs: Record<string, number> }
 }
 
@@ -170,6 +172,16 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
       link(r.tiles[k - 1]!, r.tiles[k]!)
       link(r.tiles[k]!, r.tiles[k - 1]!)
     }
+  const stairs: {
+    mx: number
+    mz: number
+    ux: number
+    uz: number
+    run: number
+    top: number
+    bot: number
+    half: number
+  }[] = []
   const byTile = new Map<number, number>()
   for (let i = 0; i < g.size; i++) {
     const k = kindOf(h, i)
@@ -242,8 +254,35 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
       const nb = g.neighbours(i)
       // a path only toward the tiles its own roads run on to: no web where two roads lie side by side
       const sides = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! >= 0 && (links.get(i)?.has(nb[d]!) ?? false))
-      if (u === "road") paths.push(...tilePath([x, zz], t + 0.07, sides.length ? sides : [0, 3]))
-      else {
+      if (u === "road") {
+        paths.push(...tilePath([x, zz], t + 0.07, sides.length ? sides : [0, 3]))
+        // stairs down every side where the road steps to a lower road tile: from the shared edge out over
+        // the lower tile, as long as the drop is deep (≈ 37°)
+        for (const d of sides) {
+          const j = nb[d]!
+          const drop = t - top(j)
+          if (drop < 0.3) continue
+          const a = (Math.PI / 180) * (60 * d)
+          const ux = Math.cos(a)
+          const uz = -Math.sin(a)
+          const e = (HEX_TILE_SIZE * Math.sqrt(3)) / 2
+          const mx = x + ux * e
+          const mz = zz + uz * e
+          const run = drop * 1.35
+          stairs.push({ mx, mz, ux, uz, run, top: t, bot: top(j), half: 0.95 })
+          // KayKit's wide stone stairs climb toward their -z: turned to climb back toward the upper tile,
+          // scaled so their 5.1 m rise matches the drop
+          const k = drop / 5.1
+          pieces.push({
+            piece: "kaykit-dungeon/stairs-wide",
+            x: mx + ux * run * 0.5,
+            y: top(j),
+            z: mz + uz * run * 0.5,
+            rot: Math.atan2(ux, uz),
+            scale: k,
+          })
+        }
+      } else {
         // a wooden bridge: a plank deck from the centre out through each side its road crosses, at the banks'
         // height, so it meets the road strips on both banks exactly; rails along both sides of each leg
         let bank = 0
@@ -353,6 +392,18 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
     paths,
     decks,
     heightAt,
+    stairAt(px: number, pz: number) {
+      for (const st of stairs) {
+        const dx = px - st.mx
+        const dz = pz - st.mz
+        const along = dx * st.ux + dz * st.uz
+        if (along < -0.05 || along > st.run + 0.05) continue
+        if (Math.abs(dx * -st.uz + dz * st.ux) > st.half + 0.4) continue
+        const f = Math.min(1, Math.max(0, along / st.run))
+        return st.top + (st.bot - st.top) * f
+      }
+      return null
+    },
     stats: { tiles: tiles.length, pieces: pieces.length, prefabs },
   }
 }

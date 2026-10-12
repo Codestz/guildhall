@@ -280,7 +280,7 @@ export const hexWorldScreen: Screen = {
           island: h,
           zones: z,
           world: w,
-          groundAt,
+          groundAt: (x: number, zz: number) => w.stairAt(x, zz) ?? groundAt(x, zz),
           hour: () => now,
           seed,
           agentT: num("lifeT", 0),

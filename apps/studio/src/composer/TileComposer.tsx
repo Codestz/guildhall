@@ -53,6 +53,8 @@ import { AROUND, type Around, createTileScene, type TileScene } from "./scene.ts
 
 const logger = log("studio:composer")
 const DEG = 180 / Math.PI
+/** A lean as stored: none when both turns are nil. */
+const leanOf = (x: number, z: number): [number, number] | undefined => (x || z ? [x, z] : undefined)
 const HITS = 48
 const GROUP_ORDER = ["town", "landmark", "country", "road", "ground"]
 
@@ -766,6 +768,24 @@ function Inspector({
             min={0.05}
             max={1}
             onChange={(o) => set({ odds: o >= 1 ? undefined : o })}
+          />
+          <NumberField
+            label="lean x"
+            value={(q.tilt?.[0] ?? 0) * DEG}
+            step={5}
+            min={-180}
+            max={180}
+            unit="°"
+            onChange={(d) => set({ tilt: leanOf(d / DEG, q.tilt?.[1] ?? 0) })}
+          />
+          <NumberField
+            label="lean z"
+            value={(q.tilt?.[1] ?? 0) * DEG}
+            step={5}
+            min={-180}
+            max={180}
+            unit="°"
+            onChange={(d) => set({ tilt: leanOf(q.tilt?.[0] ?? 0, d / DEG) })}
           />
         </div>
         <label className="gh-check">

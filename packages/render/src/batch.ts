@@ -7,7 +7,7 @@
  */
 import type { RecipeInstance } from "@guildhall/assets"
 import { log } from "@guildhall/core"
-import { type BufferGeometry, Matrix4, type Object3D, Quaternion, Vector3 } from "three"
+import { type BufferGeometry, Euler, Matrix4, type Object3D, Quaternion, Vector3 } from "three"
 import { batchGeometry } from "./batchGeometry.ts"
 import { LodBatchedMesh } from "./batchMesh.ts"
 import { type LodCounts, PIECE_TIERS, SHELL, TIER_MIN_AREA, TIER_MIN_SAVING } from "./lod.ts"
@@ -26,7 +26,7 @@ const logger = log("render:batch")
  */
 export type BatchInstance = Pick<
   RecipeInstance,
-  "piece" | "x" | "y" | "z" | "rot" | "scale" | "swatchMap" | "rampMap"
+  "piece" | "x" | "y" | "z" | "rot" | "scale" | "swatchMap" | "rampMap" | "tilt"
 >
 
 /**
@@ -96,14 +96,16 @@ const position = new Vector3()
 const turn = new Quaternion()
 const size = new Vector3()
 const up = new Vector3(0, 1, 0)
+const lean = new Euler(0, 0, 0, "YXZ")
 
 /** The placement of `instance` as a world matrix, as `placeInstance` would pose a scene node. */
 export function instanceMatrix(
-  instance: Pick<BatchInstance, "x" | "y" | "z" | "rot" | "scale">,
+  instance: Pick<BatchInstance, "x" | "y" | "z" | "rot" | "scale" | "tilt">,
   out = new Matrix4(),
 ): Matrix4 {
   position.set(instance.x, instance.y, instance.z)
-  turn.setFromAxisAngle(up, instance.rot)
+  if (instance.tilt) turn.setFromEuler(lean.set(instance.tilt[0], instance.rot, instance.tilt[1], "YXZ"))
+  else turn.setFromAxisAngle(up, instance.rot)
   size.setScalar(instance.scale)
   return out.compose(position, turn, size)
 }

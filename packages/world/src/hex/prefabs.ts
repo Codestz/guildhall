@@ -55,6 +55,13 @@ export function validateTilePrefab(json: unknown, file?: string): string[] {
       if (!isNum(q.rot)) at(`${path}.rot`, "radians")
       if (!isNum(q.scale) || q.scale <= 0 || q.scale > 4) at(`${path}.scale`, "a scale in (0, 4]")
       if (q.y !== undefined && (!isNum(q.y) || Math.abs(q.y) > 3)) at(`${path}.y`, "metres within ±3")
+      if (
+        q.tilt !== undefined &&
+        (!Array.isArray(q.tilt) ||
+          q.tilt.length !== 2 ||
+          !q.tilt.every((a) => isNum(a) && Math.abs(a) <= Math.PI))
+      )
+        at(`${path}.tilt`, "[about x, about z] radians within ±π")
       if (q.odds !== undefined && (!isNum(q.odds) || q.odds <= 0 || q.odds > 1))
         at(`${path}.odds`, "in (0, 1]")
       if (q.tone !== undefined && typeof q.tone !== "boolean") at(`${path}.tone`, "true or false")

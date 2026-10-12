@@ -30,6 +30,11 @@ export interface TilePiece {
   scale: number
   /** Metres above (or under) the tile's top: a dock's posts stand in the water, a boat floats. */
   y?: number
+  /**
+   * A lean before its turn: radians about the piece's own x, then its own z (a bow stood on end and
+   * leaned in its rack, a plank against a wall). None: as the piece stands.
+   */
+  tilt?: [number, number]
   /** A re-tint of this piece (palette swatch id → swatch id). */
   swatchMap?: Record<number, number>
   /** Foliage: takes the tile's tone (one of its prefab's `tones`, picked per tile). */
@@ -46,6 +51,8 @@ export interface PlacedPiece {
   z: number
   rot: number
   scale: number
+  /** As TilePiece's `tilt`. */
+  tilt?: [number, number]
   swatchMap?: Record<number, number>
 }
 
@@ -1186,6 +1193,7 @@ export function placeTile(
       rot: q.rot + rot,
       scale: q.scale,
     }
+    if (q.tilt) placed.tilt = q.tilt
     if (Object.keys(map).length) placed.swatchMap = map
     out.push(placed)
   })

@@ -1,0 +1,125 @@
+{
+  "anchors": [
+    {
+      "at": [
+        -3,
+        0,
+        2
+      ],
+      "facing": 3.1416,
+      "id": "labour-dig",
+      "kind": "station"
+    },
+    {
+      "at": [
+        4.5,
+        0,
+        6.75
+      ],
+      "facing": 3.1416,
+      "id": "labour-haul",
+      "kind": "station"
+    },
+    {
+      "at": [
+        -4.5,
+        0,
+        6
+      ],
+      "facing": 2.8798,
+      "id": "labour-sort",
+      "kind": "station"
+    }
+  ],
+  "dressing": [
+    {
+      "piece": "quaternius-rts/mine",
+      "rot": 0,
+      "scale": 1,
+      "x": 0,
+      "y": 0,
+      "z": -3.5
+    },
+    {
+      "piece": "quaternius-village-kit/prop-wagon",
+      "rot": 0,
+      "scale": 1,
+      "x": 4.5,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "piece": "kaykit-resources/iron-nuggets",
+      "rot": 0,
+      "scale": 1,
+      "x": 4.5,
+      "y": 1,
+      "z": 4
+    },
+    {
+      "piece": "kaykit-resources/stone-chunks-large",
+      "rot": 0,
+      "scale": 1,
+      "x": -4.5,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "piece": "kaykit-resources/copper-nuggets",
+      "rot": 0,
+      "scale": 1,
+      "x": -3,
+      "y": 0,
+      "z": 5.25
+    },
+    {
+      "piece": "kaykit-resources/wood-planks-stack-medium",
+      "rot": 1.5708,
+      "scale": 1,
+      "x": -7.5,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 1,
+      "x": 1.75,
+      "y": 0,
+      "z": 3.5
+    },
+    {
+      "piece": "kaykit-tools/pickaxe",
+      "rot": 0.5236,
+      "scale": 1,
+      "x": -1.5,
+      "y": 0,
+      "z": 5.5
+    },
+    {
+      "piece": "quaternius-props/barrel",
+      "rot": 0,
+      "scale": 1,
+      "x": 7.5,
+      "y": 0,
+      "z": 1
+    },
+    {
+      "piece": "kenney-survival/box",
+      "rot": 0,
+      "scale": 1,
+      "x": 8,
+      "y": 0,
+      "z": 2.25
+    }
+  ],
+  "fits": {},
+  "id": "mine",
+  "kind": "vignette",
+  "tags": [
+    "poi",
+    "mine",
+    "ore"
+  ],
+  "version": 1
+}

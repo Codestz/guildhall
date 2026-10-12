@@ -1,0 +1,175 @@
+{
+  "anchors": [
+    {
+      "at": [
+        0,
+        0.37,
+        -10.25
+      ],
+      "facing": 3.1416,
+      "id": "fish-end",
+      "kind": "station"
+    },
+    {
+      "at": [
+        1.5,
+        0.37,
+        -8.5
+      ],
+      "facing": 1.5708,
+      "id": "ship-boat",
+      "kind": "station"
+    },
+    {
+      "at": [
+        2.25,
+        0,
+        3
+      ],
+      "facing": 1.5708,
+      "id": "labour-crates",
+      "kind": "station"
+    },
+    {
+      "at": [
+        -5,
+        0,
+        3.5
+      ],
+      "facing": 0,
+      "id": "rest-bench",
+      "kind": "station"
+    }
+  ],
+  "dressing": [
+    {
+      "piece": "kenney-pirate/platform",
+      "rot": 0,
+      "scale": 1,
+      "x": 0,
+      "y": 0,
+      "z": -1
+    },
+    {
+      "piece": "kenney-pirate/platform",
+      "rot": 0,
+      "scale": 1,
+      "x": 0,
+      "y": 0,
+      "z": -5
+    },
+    {
+      "piece": "kenney-pirate/platform",
+      "rot": 0,
+      "scale": 1,
+      "x": 0,
+      "y": 0,
+      "z": -9
+    },
+    {
+      "piece": "kenney-town/pillar-wood",
+      "rot": 0,
+      "scale": 0.5,
+      "x": -2.25,
+      "y": 0,
+      "z": -10.75
+    },
+    {
+      "piece": "kenney-town/pillar-wood",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 2.25,
+      "y": 0,
+      "z": -10.75
+    },
+    {
+      "piece": "kenney-town/pillar-wood",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 2.25,
+      "y": 0,
+      "z": -6.75
+    },
+    {
+      "piece": "quaternius-ships/boat",
+      "rot": 0,
+      "scale": 1,
+      "x": 3.75,
+      "y": 0,
+      "z": -8.5
+    },
+    {
+      "piece": "kenney-nature/canoe",
+      "rot": 0,
+      "scale": 1,
+      "x": -3.25,
+      "y": 0,
+      "z": -6
+    },
+    {
+      "piece": "kaykit-tools/rope-bundle-a",
+      "rot": 0,
+      "scale": 1,
+      "x": 1,
+      "y": 0.37,
+      "z": -9.5
+    },
+    {
+      "piece": "kenney-pirate/tool-paddle",
+      "rot": 1.5708,
+      "scale": 1,
+      "x": -1.25,
+      "y": 0.37,
+      "z": -4.5
+    },
+    {
+      "piece": "quaternius-rts/houses-first-age-3-level1",
+      "rot": 0,
+      "scale": 1,
+      "x": -5,
+      "y": 0,
+      "z": 3.5
+    },
+    {
+      "piece": "kenney-pirate/crate",
+      "rot": 0,
+      "scale": 1,
+      "x": 3.5,
+      "y": 0,
+      "z": 2.5
+    },
+    {
+      "piece": "kenney-pirate/crate",
+      "rot": 0.2618,
+      "scale": 1,
+      "x": 3.5,
+      "y": 0,
+      "z": 3.75
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 1,
+      "x": 5,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": 0,
+      "scale": 1,
+      "x": -5,
+      "y": 0,
+      "z": 3.5
+    }
+  ],
+  "fits": {},
+  "id": "lake-pier",
+  "kind": "vignette",
+  "tags": [
+    "poi",
+    "pier",
+    "lake"
+  ],
+  "version": 1
+}

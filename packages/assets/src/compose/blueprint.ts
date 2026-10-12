@@ -21,6 +21,8 @@ export const PREFAB_KINDS = [
   "dock",
   "gatehouse",
   "well",
+  /** A countryside POI's look: dressing only, its station anchors become the POI's stations (ADR 013). */
+  "vignette",
 ] as const
 export type PrefabKind = (typeof PREFAB_KINDS)[number]
 

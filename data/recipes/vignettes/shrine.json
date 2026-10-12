@@ -1,0 +1,187 @@
+{
+  "anchors": [
+    {
+      "at": [
+        0,
+        0,
+        1
+      ],
+      "facing": 3.1416,
+      "id": "pray-altar",
+      "kind": "station"
+    },
+    {
+      "at": [
+        0,
+        0,
+        4
+      ],
+      "facing": 3.1416,
+      "id": "pray-bench",
+      "kind": "station"
+    }
+  ],
+  "dressing": [
+    {
+      "piece": "kenney-nature/path-stone-circle",
+      "rot": 0,
+      "scale": 1.3,
+      "x": 0,
+      "y": 0,
+      "z": -1
+    },
+    {
+      "piece": "kenney-nature/statue-ring",
+      "rot": 0,
+      "scale": 1.3,
+      "x": 0,
+      "y": 0,
+      "z": -3
+    },
+    {
+      "piece": "kenney-graveyard/altar-stone",
+      "rot": 0,
+      "scale": 1,
+      "x": 0,
+      "y": 0,
+      "z": -0.75
+    },
+    {
+      "piece": "kaykit-dungeon/candle-lit",
+      "rot": 0,
+      "scale": 0.6,
+      "x": -0.75,
+      "y": 1.07,
+      "z": -0.75
+    },
+    {
+      "piece": "kaykit-dungeon/candle-triple",
+      "rot": 0,
+      "scale": 0.6,
+      "x": 0.75,
+      "y": 1.07,
+      "z": -0.75
+    },
+    {
+      "piece": "kenney-nature/statue-obelisk",
+      "rot": 0,
+      "scale": 1,
+      "x": -3.5,
+      "y": 0,
+      "z": -3
+    },
+    {
+      "piece": "kenney-nature/statue-obelisk",
+      "rot": 0,
+      "scale": 1,
+      "x": 3.5,
+      "y": 0,
+      "z": -3
+    },
+    {
+      "piece": "kenney-graveyard/lantern-candle",
+      "rot": 0,
+      "scale": 1,
+      "x": -2.25,
+      "y": 0,
+      "z": 1.5
+    },
+    {
+      "piece": "kenney-graveyard/lantern-candle",
+      "rot": 0,
+      "scale": 1,
+      "x": 2.25,
+      "y": 0,
+      "z": 1.5
+    },
+    {
+      "piece": "kenney-nature/flower-red-a",
+      "rot": 0,
+      "scale": 1,
+      "x": -1.75,
+      "y": 0,
+      "z": 0.5
+    },
+    {
+      "piece": "kenney-nature/flower-yellow-b",
+      "rot": 0,
+      "scale": 1,
+      "x": 1.75,
+      "y": 0,
+      "z": 0.75
+    },
+    {
+      "piece": "kenney-nature/flower-purple-a",
+      "rot": 0,
+      "scale": 1,
+      "x": -2.5,
+      "y": 0,
+      "z": -2
+    },
+    {
+      "piece": "kenney-nature/flower-purple-b",
+      "rot": 0,
+      "scale": 1,
+      "x": 2.5,
+      "y": 0,
+      "z": -1.75
+    },
+    {
+      "piece": "kenney-nature/flower-red-c",
+      "rot": 0,
+      "scale": 1,
+      "x": -4.5,
+      "y": 0,
+      "z": -1
+    },
+    {
+      "piece": "kenney-nature/flower-yellow-a",
+      "rot": 0,
+      "scale": 1,
+      "x": 4.5,
+      "y": 0,
+      "z": -0.5
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": 3.1416,
+      "scale": 1,
+      "x": 0,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "piece": "quaternius-nature/rock-moss-2",
+      "rot": 0,
+      "scale": 1,
+      "x": -5,
+      "y": 0,
+      "z": 2
+    },
+    {
+      "piece": "quaternius-nature/rock-moss-5",
+      "rot": 0,
+      "scale": 1,
+      "x": 5,
+      "y": 0,
+      "z": 2.5
+    },
+    {
+      "piece": "kaykit-forest/tree-3-c-color1",
+      "rot": 0,
+      "scale": 1,
+      "x": -5.5,
+      "y": 0,
+      "z": -6.5
+    }
+  ],
+  "fits": {},
+  "id": "shrine",
+  "kind": "vignette",
+  "tags": [
+    "poi",
+    "shrine",
+    "faith"
+  ],
+  "version": 1
+}

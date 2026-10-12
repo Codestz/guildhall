@@ -63,16 +63,18 @@ export const MAX_DATA_BYTES = 1 << 20
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
 /** The folders under `data/recipes/` (plan §2.1); each holds `<id>.json` prefab recipes. */
-const RECIPE_FOLDERS = ["houses", "landmarks", "stalls", "docks", "farm"]
+const RECIPE_FOLDERS = ["houses", "landmarks", "stalls", "docks", "farm", "vignettes"]
 
 /** Folders whose `<id>.json` files the endpoint lists, reads and writes. */
-export const DATA_FOLDERS = [...RECIPE_FOLDERS.map((f) => `recipes/${f}`), "npcs", "towns"]
+export const DATA_FOLDERS = [...RECIPE_FOLDERS.map((f) => `recipes/${f}`), "npcs", "towns", "islands"]
 
 type Validate = (json: unknown) => string[]
 
-/** No town validator exists yet (W1 owns TownSpec); until one lands a preset need only be an object. */
-const validateTown: Validate = (json) =>
-  json !== null && typeof json === "object" && !Array.isArray(json) ? [] : ["town: expected an object"]
+/** No town or island validator exists yet (world owns TownSpec, IslandSpec); a preset need only be an object. */
+const anObject =
+  (what: string): Validate =>
+  (json) =>
+    json !== null && typeof json === "object" && !Array.isArray(json) ? [] : [`${what}: expected an object`]
 
 /**
  * The validator for a data path (relative to `data/`, already URL-decoded), or null when the path is not
@@ -86,7 +88,8 @@ export function dataRoute(path: string): Validate | null {
   const file = path.slice(slash + 1)
   if (!DATA_FOLDERS.includes(folder) || !file.endsWith(".json") || !ID.test(file.slice(0, -5))) return null
   if (folder === "npcs") return (json) => validateNpc(json, PALETTE)
-  if (folder === "towns") return validateTown
+  if (folder === "towns") return anObject("town")
+  if (folder === "islands") return anObject("island")
   return (json) => validatePrefab(json, PALETTE)
 }
 

@@ -15,6 +15,7 @@ import { openPage, waitReady } from "./app.ts"
 import { parseArgs, report, type ShotOptions, USAGE } from "./args.ts"
 import { launchChrome } from "./chrome.ts"
 import { type Server, serveStudio } from "./server.ts"
+import { runSet } from "./set.ts"
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"])
 
@@ -52,6 +53,9 @@ async function shoot(options: ShotOptions): Promise<string[]> {
   console.log(`${out}.png\n${out}.json`)
   return errors
 }
+
+// `bun shots set <name>`: a regression set (set.ts).
+if (process.argv[2] === "set") process.exit(await runSet(process.argv.slice(3)))
 
 let options: ShotOptions
 try {

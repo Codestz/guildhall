@@ -40,8 +40,8 @@ export {
   WALK_MPS,
   workTiles,
 } from "./life.ts"
-export { hexStructures } from "./structures.ts"
 export { type Disc, type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
+export { hexStructures } from "./structures.ts"
 export {
   CHARACTER_SCALE,
   castleWalls,

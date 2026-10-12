@@ -178,6 +178,16 @@ const PIECE_RULES: PieceRule[] = [
   { test: /^kaykit-halloween\/post-lantern$/, r: 0.35 },
   { test: /^kenney-survival\/signpost$/, r: 0.3 },
   { test: /^kenney-town\/hedge$/, r: 0.9 },
+  { test: /^kenney-survival\/tent/, r: 1.5 },
+  {
+    // sitting on the ground round the campfire
+    test: /^kenney-survival\/campfire/,
+    r: 0.45,
+    spots: [
+      { kind: "sit", x: 0, z: 0.85, facing: Math.PI, clip: "Sit_Floor_Idle" },
+      { kind: "sit", x: -0.75, z: -0.4, facing: Math.PI * 0.35, clip: "Sit_Floor_Idle" },
+    ],
+  },
 ]
 
 const DOCK_END = { clip: "Fishing_Idle", roles: ["fisher"] }

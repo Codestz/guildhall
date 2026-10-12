@@ -313,6 +313,8 @@ export function workTiles(h: HexIsland, z: HexZones): number[] {
       }
     if (kinds.includes("farmer")) for (const f of fieldsNear(h, z, zone.tile, 4)) out.add(f)
   }
+  // the campsite on the nature lake's shore: campers and fishers walk out to it
+  for (let i = 0; i < g.size; i++) if (useOf(z, i) === "campsite") out.add(i)
   return [...out].sort((a, b) => a - b)
 }
 

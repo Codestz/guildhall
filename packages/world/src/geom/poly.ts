@@ -103,8 +103,40 @@ export function contains(shape: Ring | Polygon, p: Vec2, eps = EPS): boolean {
 }
 
 /**
+ * A point-in-shape test for many queries against big rings (an island's coast, the green round a
+ * town): the rings' sides bucketed in rows `cell` metres high, inside by crossings alone (even–odd
+ * over all the rings). Unlike `contains` it measures no distances, so a point on a side may fall
+ * either way.
+ */
+export function insideIndex(rings: readonly (readonly Vec2[])[], cell = 8): (p: Vec2) => boolean {
+  const rows = new Map<number, [Vec2, Vec2][]>()
+  for (const ring of rings)
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const a = at(ring, i)
+      const b = at(ring, j)
+      for (
+        let r = Math.floor(Math.min(a[1], b[1]) / cell);
+        r <= Math.floor(Math.max(a[1], b[1]) / cell);
+        r++
+      ) {
+        const list = rows.get(r)
+        if (list) list.push([a, b])
+        else rows.set(r, [[a, b]])
+      }
+    }
+  return (p) => {
+    let odd = false
+    for (const [a, b] of rows.get(Math.floor(p[1] / cell)) ?? [])
+      if (a[1] > p[1] !== b[1] > p[1] && p[0] < ((b[0] - a[0]) * (p[1] - a[1])) / (b[1] - a[1]) + a[0])
+        odd = !odd
+    return odd
+  }
+}
+
+/**
  * The boolean `a op b`, as clean polygons on the 1e-3 grid (outer rings CCW, holes CW). The
  * polygons within one multipolygon must not overlap each other: union them first if they might.
+ * Near-degenerate input that trips the booleans is retried a grid step or two off (see `run`).
  */
 export function clip(a: Shape, b: Shape, op: ClipOp): MultiPolygon {
   return run(op, toMulti(a), [toMulti(b)])
@@ -191,6 +223,23 @@ function buffer(raw: Ring, d: number): Ring[] {
   return out
 }
 
+/**
+ * The ring without spikes: a vertex where the boundary runs out and straight back along itself (the
+ * booleans can leave one where two inputs share a collinear edge) is dropped, until none is left.
+ */
+function despike(ring: Ring): Ring {
+  const out = [...ring]
+  for (let i = 0; out.length >= 3 && i < out.length; ) {
+    const u = sub(at(out, i), at(out, i - 1))
+    const v = sub(at(out, i + 1), at(out, i))
+    if (Math.abs(cross(u, v)) <= EPS * (len(u) + len(v)) && dot(u, v) < 0) {
+      out.splice(i, 1)
+      i = Math.max(0, i - 1)
+    } else i++
+  }
+  return dedupe(out, true)
+}
+
 function isRing(shape: Shape | Ring): shape is Ring {
   const first = shape[0]
   return first !== undefined && typeof first[0] === "number"
@@ -203,22 +252,60 @@ function toMulti(shape: Shape): MultiPolygon {
   return isRing(first) ? [shape as Polygon] : (shape as MultiPolygon)
 }
 
+/** Grid steps the clip operands are moved by when the booleans trip over them. */
+const NUDGES: Vec2[] = [
+  [0.001, 0],
+  [0, 0.001],
+  [-0.001, 0.001],
+  [0.002, -0.001],
+]
+
+/**
+ * The boolean, retried with the clip operands (or the subject, when there are none) moved by a grid
+ * step or two when polygon-clipping trips over near-degenerate input ("Unable to complete output
+ * ring"). A millimetre is far below anything a town draws.
+ */
 function run(op: ClipOp, subject: MultiPolygon, clips: MultiPolygon[]): MultiPolygon {
+  for (let k = 0; ; k++) {
+    const d = NUDGES[k - 1]
+    try {
+      if (!d) return runOnce(op, subject, clips)
+      const others = clips.filter((m) => m.length > 0)
+      return others.length > 0
+        ? runOnce(
+            op,
+            subject,
+            others.map((m) => nudge(m, d)),
+          )
+        : runOnce(op, nudge(subject, d), clips)
+    } catch (err) {
+      if (k >= NUDGES.length) throw err
+    }
+  }
+}
+
+function nudge(m: MultiPolygon, d: Vec2): MultiPolygon {
+  return m.map((poly) => poly.map((ring) => ring.map((p) => snap([p[0] + d[0], p[1] + d[1]]))))
+}
+
+function runOnce(op: ClipOp, subject: MultiPolygon, clips: MultiPolygon[]): MultiPolygon {
   const input = (m: MultiPolygon) => m.map((poly) => poly.map((ring) => ring.map(snap)))
   const others = clips.filter((m) => m.length > 0)
   if (subject.length === 0) {
     // Nothing intersected or cut is nothing; nothing joined to the rest is the rest.
     const [first, ...rest] = others
-    return op === "intersection" || op === "difference" || !first ? [] : run(op, first, rest)
+    return op === "intersection" || op === "difference" || !first ? [] : runOnce(op, first, rest)
   }
   const result = pc[op](input(subject), ...others.map(input))
   const out: MultiPolygon = []
   for (const poly of result) {
     const rings = poly
       .map((ring) =>
-        dedupe(
-          ring.map((p) => snap(p as Vec2)),
-          true,
+        despike(
+          dedupe(
+            ring.map((p) => snap(p as Vec2)),
+            true,
+          ),
         ),
       )
       .filter((ring) => ring.length >= 3 && Math.abs(area(ring)) > EPS * EPS)

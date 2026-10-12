@@ -158,3 +158,62 @@ export function ribbon(line: readonly Vec2[], width: number): Vec2[] {
   const left = offsetLine(line, width / 2).reverse()
   return [...right, ...left]
 }
+
+/**
+ * The polylines' segments bucketed on a grid `cell` metres wide, for many distance queries against
+ * long lines (a coast, a block's outline): `near(p, max)` is the distance from p to the nearest
+ * segment, or `max` when none is nearer.
+ */
+export function lineIndex(
+  lines: readonly (readonly Vec2[])[],
+  closed: boolean,
+  cell = 16,
+): { near: (p: Vec2, max: number) => number } {
+  const grid = new Map<number, [Vec2, Vec2][]>()
+  const key = (i: number, j: number) => (i + 32768) * 65536 + (j + 32768)
+  for (const line of lines)
+    for (const [i, j] of segments(line.length, closed)) {
+      const a = at(line, i)
+      const b = at(line, j)
+      // Walked in pieces no longer than a cell, so a long diagonal sits only in the cells it crosses.
+      const n = Math.max(1, Math.ceil(dist(a, b) / cell))
+      const seen = new Set<number>()
+      for (let k = 0; k < n; k++) {
+        const p = lerp(a, b, k / n)
+        const q = lerp(a, b, (k + 1) / n)
+        for (
+          let x = Math.floor(Math.min(p[0], q[0]) / cell);
+          x <= Math.floor(Math.max(p[0], q[0]) / cell);
+          x++
+        )
+          for (
+            let z = Math.floor(Math.min(p[1], q[1]) / cell);
+            z <= Math.floor(Math.max(p[1], q[1]) / cell);
+            z++
+          ) {
+            const c = key(x, z)
+            if (seen.has(c)) continue
+            seen.add(c)
+            const list = grid.get(c)
+            if (list) list.push([a, b])
+            else grid.set(c, [[a, b]])
+          }
+      }
+    }
+  return {
+    near(p, max) {
+      // Ring by ring of cells outward from p's, stopping once nothing further out can be nearer.
+      let best = max
+      const ci = Math.floor(p[0] / cell)
+      const cj = Math.floor(p[1] / cell)
+      const rings = Math.ceil(max / cell)
+      for (let r = 0; r <= rings && best > (r - 1) * cell; r++)
+        for (let i = ci - r; i <= ci + r; i++)
+          for (let j = cj - r; j <= cj + r; j++) {
+            if (Math.max(Math.abs(i - ci), Math.abs(j - cj)) !== r) continue
+            for (const [a, b] of grid.get(key(i, j)) ?? []) best = Math.min(best, closest(p, a, b).d)
+          }
+      return best
+    },
+  }
+}

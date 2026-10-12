@@ -49,7 +49,7 @@ export type NormalSpec = Required<TownSpec>
 
 /** What a tier gives a spec that leaves a field out, and the knobs later stages read from it. */
 export interface TierDefaults {
-  /** Metres from the centre to the gates; the bounds are a 2.6r square. */
+  /** Metres from the centre to the gates; the bounds are a 4.5r square. */
   radius: number
   districts: DistrictKind[]
   /** Street density: the largest lots block (m²) before a lane cuts it. */
@@ -70,7 +70,10 @@ export const LEVELS = { land: 0, water: -0.6 } as const
 /** The ground a town is laid out on (site.ts): flat land, the water cut out of it, and the reserves. */
 export interface Site {
   radius: number
-  /** The 2.6r square, counter-clockwise, centred on the origin. */
+  /**
+   * A 4.5r square, counter-clockwise, holding the town (centred on the origin) off-centre: its centre
+   * lies 0.9r from the origin away from the water, so the countryside opens on the land side.
+   */
   bounds: Ring
   /** The bounds minus the water: outer rings CCW, holes CW. */
   land: Ring[][]
@@ -105,6 +108,18 @@ export interface StreetNode {
   id: number
   at: Vec2
   kind: "plaza" | "gate" | "junction" | "end" | "quay"
+  /**
+   * Outside the town: `fork` where a footpath leaves a country road, `road-end` where one stops short
+   * of the bounds (a place for a point of interest and its trail). Absent everywhere else.
+   */
+  tag?: "fork" | "road-end"
+}
+
+/** A small square where a street forks off (a triangle of street round it), and what it is for. */
+export interface Square {
+  /** A point inside the square's face. */
+  at: Vec2
+  kind: "well" | "chapel" | "inn"
 }
 
 /** Widths: main 7, street 5, lane 3.5, road 4 m. */
@@ -120,6 +135,8 @@ export interface StreetEdge {
 export interface StreetGraph {
   nodes: StreetNode[]
   edges: StreetEdge[]
+  /** The secondary squares, if any (towns get one to three; the market is the plaza). */
+  squares?: Square[]
 }
 
 export interface Block {
@@ -127,6 +144,8 @@ export interface Block {
   poly: Vec2[]
   use: "lots" | "plaza" | "castle" | "green" | "harbour"
   district: DistrictKind
+  /** Set on a green block that is a secondary square (open and unbuilt): what it is for. */
+  square?: Square["kind"]
 }
 
 export interface Lot {

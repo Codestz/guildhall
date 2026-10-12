@@ -5,16 +5,30 @@
  * become strip fields, one crop each, planted in
  * rows along the field's long side; every 3–4 slots a farmstead (farmhouse and barn facing the road,
  * hay, an animal paddock behind them), and now and then an orchard. Every field, paddock, orchard
- * and farmstead is closed by a fence or hedge with a gate toward the road (Look bar #5). The outer
- * band of the bounds is left to nature's forest belt. Placements stand at their footprint's centre,
+ * and farmstead is closed by a fence or hedge with a gate toward the road (Look bar #5). The shore
+ * and the band inland of it along the coast are left to nature's forest belt. Placements stand at their footprint's centre,
  * turned so their +z faces the road (the lot frame of obb.ts).
  */
 import { DMath } from "@guildhall/core"
-import { length } from "../geom/line.ts"
+import { length, lineIndex } from "../geom/line.ts"
 import { axes, type Rect, rectCorners, rectInPoly, rectsOverlap } from "../geom/obb.ts"
 import { bbox, contains, orient } from "../geom/poly.ts"
 import { poissonIn, type Roll } from "../geom/sample.ts"
-import { add, at, cross, dist, dot, norm, perp, round3, scale, snap, sub, type Vec2 } from "../geom/vec.ts"
+import {
+  add,
+  at,
+  cross,
+  dist,
+  dot,
+  lerp,
+  norm,
+  perp,
+  round3,
+  scale,
+  snap,
+  sub,
+  type Vec2,
+} from "../geom/vec.ts"
 import { normalizeSpec } from "./spec.ts"
 import type { Block, Edge, Field, Placement, Station, TownLibrary, TownPlan, TownSpecInput } from "./types.ts"
 
@@ -35,7 +49,7 @@ export type FarmLibrary = TownLibrary & { farm?: FarmExtras }
  * clear of; `edges` only numbers the new edges after the existing ones.
  */
 export type FarmInput = Pick<TownPlan, "bounds" | "streets" | "blocks"> &
-  Partial<Pick<TownPlan, "edges" | "placements">>
+  Partial<Pick<TownPlan, "edges" | "placements" | "water">>
 
 export interface Farms {
   fields: Field[]
@@ -45,8 +59,13 @@ export interface Farms {
   stations: Station[]
 }
 
-/** Fields keep this far in from the bounds (the forest belt's ground): a share of the radius, at most 10 m. */
+/**
+ * Fields keep this far in from the land's edge (the forest belt's ground): a share of the radius, at
+ * most 10 m, inland of the shore band where there is a coast, or in from the bounds where there is not.
+ */
 export const beltReserve = (radius: number): number => Math.min(10, 0.08 * radius)
+/** The open shore band along the coast (grass and rocks, no trees: nature.ts), wavering between these, metres. */
+export const SHORE = [5, 9] as const
 /** Grass between a road's kerb and the fences along it, metres. */
 const VERGE = 1.5
 /** A field's side along the road and its depth away from it, metres (plan: 14–20 × 30–60). */
@@ -133,7 +152,32 @@ export function farms(plan: FarmInput, spec: TownSpecInput, lib: FarmLibrary, ro
     const m = sizes.get(pl.prefab)
     return m ? [{ c: pl.at, rot: pl.rot, w: m.frontage, d: m.depth }] : []
   })
-  const free = (r: Rect) => inBounds(r) && !taken.some((t) => rectsOverlap(t, r)) && onFarmland(r)
+  const water = (plan.water ?? []).filter((w) => w.length > 2)
+  const coast = water.length > 0 ? lineIndex(water, true) : null
+  const inland = SHORE[1] + reserve
+  // Along its whole outline (a bay can reach in toward the middle of a side), unless its centre is
+  // so far inland that no side can be near.
+  const offShore = (r: Rect) => {
+    if (!coast) return true
+    const half = Math.hypot(r.w, r.d) / 2
+    if (coast.near(r.c, inland + half) >= inland + half) return true
+    const ring = rectCorners(r)
+    return ring.every((p, i) => {
+      const q = at(ring, i + 1)
+      const l = dist(p, q)
+      // A point d from the coast clears the next d − inland metres of the side too.
+      for (let s = 0; s <= l; ) {
+        const d = coast.near(lerp(p, q, s / l), inland + 20)
+        if (d < inland) return false
+        s += Math.max(0.5, d - inland)
+      }
+      return true
+    })
+  }
+  const reachOf = (r: Rect) => Math.hypot(r.w, r.d) / 2
+  const clear = (r: Rect) =>
+    !taken.some((t) => dist(t.c, r.c) < reachOf(t) + reachOf(r) && rectsOverlap(t, r))
+  const free = (r: Rect) => inBounds(r) && clear(r) && offShore(r) && onFarmland(r)
 
   const fronts = frontages(green)
   const crops = cropGroups(lib)

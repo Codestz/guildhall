@@ -10,6 +10,7 @@ import {
   distTo,
   dot,
   lerp,
+  rectCorners,
   rectInPoly,
   rectsOverlap,
   scale,
@@ -121,6 +122,18 @@ describe("lots", () => {
     }
   })
 
+  test("no lot reaches into a street's ribbon, its own street's or any other's", () => {
+    for (const { spec, graph, lots: list } of built)
+      for (const l of list)
+        for (const e of graph.edges) {
+          const ring = rectCorners(lotRect(l))
+          // Corners, and the street's own line where it passes the lot's sides.
+          for (const c of ring) expect(distTo(c, e.points) - e.width / 2, label(spec, l)).toBeGreaterThan(0)
+          for (const p of e.points)
+            expect(distTo(p, ring, true) - e.width / 2, label(spec, l)).toBeGreaterThan(0)
+        }
+  })
+
   test("a lot is as wide as a building its district builds there, and deep enough for one", () => {
     for (const { spec, lots: list } of built) {
       list.forEach((l, i) => {
@@ -145,9 +158,10 @@ describe("lots", () => {
     expect(village.filter((l) => l.status === "garden").length).toBeGreaterThan(0)
   })
 
-  test("a town's frontages are mostly lots (≥ 70% of the block edges have a lot behind them)", () => {
+  test("a town's frontages are mostly lots (≥ 70% of the block edges on a street have a lot behind them)", () => {
     // A block edge point counts as fronted when a lot covers it (its kerb, bow and nudge allowed), by
-    // its front or, at a corner, by its side.
+    // its front or, at a corner, by its side. Only edges on a street's kerb count: a suburb block's
+    // back, set off from the road, faces no street.
     const covered = (p: Vec2, group: readonly TownLot[]) =>
       group.some((l) => {
         const { x, z } = axes(l.rot)
@@ -155,7 +169,8 @@ describe("lots", () => {
         return Math.abs(dot(q, x)) <= l.w / 2 + 1 && Math.abs(dot(q, z)) <= l.depth / 2 + 2
       })
     const fills: [string, number][] = []
-    for (const { spec, blocks: b, lots: list } of built.filter((x) => x.spec.tier !== "hamlet")) {
+    for (const { spec, blocks: b, graph, lots: list } of built.filter((x) => x.spec.tier !== "hamlet")) {
+      const onKerb = (p: Vec2) => graph.edges.some((e) => distTo(p, e.points) - e.width / 2 < 3)
       let all = 0
       let hit = 0
       for (const block of b.filter((x) => x.use === "lots")) {
@@ -164,8 +179,10 @@ describe("lots", () => {
           const q = block.poly[(i + 1) % block.poly.length]!
           const n = Math.ceil(Math.hypot(...sub(q, p)))
           for (let k = 0; k < n; k++) {
+            const at = lerp(p, q, (k + 0.5) / n)
+            if (!onKerb(at)) continue
             all++
-            if (covered(lerp(p, q, (k + 0.5) / n), group)) hit++
+            if (covered(at, group)) hit++
           }
         })
       }

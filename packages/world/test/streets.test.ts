@@ -1,12 +1,16 @@
 import { describe, expect, test } from "bun:test"
 import { roll } from "@guildhall/core"
-import { centroid, contains, dist, intersect, type Vec2 } from "../src/index.ts"
+import { centroid, contains, dist, distTo, intersect, type Vec2 } from "../src/index.ts"
 import { site } from "../src/town/site.ts"
-import { TIER_DEFAULTS } from "../src/town/spec.ts"
+import { normalizeSpec, TIER_DEFAULTS } from "../src/town/spec.ts"
 import { STREET_WIDTH, streets, townLand } from "../src/town/streets.ts"
 import type { StreetGraph, Tier, TownSpecInput } from "../src/town/types.ts"
 
-/** world town: the street graph (wall street through the gates, market oval, main roads, harbour street, ring). */
+/**
+ * world town: the street graph (wall street through the gates, the market square's frame, main
+ * streets, partial rings, side streets and squares, harbour street, country roads and their forks;
+ * a hamlet's street past its green).
+ */
 
 const SEEDS = Array.from({ length: 20 }, (_, i) => i + 1)
 const TIERS: Tier[] = ["hamlet", "village", "town", "city"]
@@ -92,23 +96,24 @@ describe("streets", () => {
     }
   })
 
-  test("gates sit on the wall line (radius r, on the wall street) and a road runs on out of each", () => {
+  test("gates sit on the wall line (radius r, on the wall street; a hamlet has none) and a road runs on out of each", () => {
     for (const { spec, site: s, graph } of built) {
       const gates = graph.nodes.filter((n) => n.kind === "gate")
       expect(gates.length, label(spec)).toBeGreaterThanOrEqual(2)
       expect(gates.length).toBeLessThanOrEqual(TIER_DEFAULTS[spec.tier].gates)
       const wall = TIER_DEFAULTS[spec.tier].walls ? "street" : "lane"
+      const walls = spec.tier === "hamlet" ? 0 : 2
       for (const g of gates) {
         expect(Math.abs(Math.hypot(...g.at) - s.radius), label(spec)).toBeLessThanOrEqual(1)
         const classes = graph.edges.filter((e) => e.a === g.id || e.b === g.id).map((e) => e.cls)
-        expect(classes.filter((c) => c === wall).length, label(spec)).toBe(2)
+        expect(classes.filter((c) => c === wall).length, label(spec)).toBe(walls)
         expect(classes).toContain("main")
         expect(classes).toContain("road")
       }
     }
   })
 
-  test("main roads start on the street round the plaza (the oval, or the waterfront where it gives way)", () => {
+  test("main roads start on the street round the plaza (the square's frame or the hamlet's green, or the waterfront where it gives way)", () => {
     for (const { spec, site: s, graph } of built) {
       const plaza = graph.nodes.filter((n) => n.kind === "plaza")
       expect(plaza.length, label(spec)).toBeGreaterThanOrEqual(2)
@@ -118,7 +123,8 @@ describe("streets", () => {
         const classes = graph.edges.filter((e) => e.a === n.id || e.b === n.id).map((e) => e.cls)
         expect(classes, label(spec)).toContain("main")
         expect(classes.some((cls) => cls !== "main")).toBe(true)
-        expect(dist(n.at, c)).toBeLessThan(2 * reach + 12)
+        // The main gate's corner is drawn out, so its street widens into the square: half a plaza more.
+        expect(dist(n.at, c), label(spec)).toBeLessThan(3 * reach + 12)
       }
     }
   })
@@ -126,7 +132,8 @@ describe("streets", () => {
   test("a harbour gets one quay at the water's edge; no harbour, no quay", () => {
     for (const { spec, site: s, graph } of built) {
       const quays = graph.nodes.filter((n) => n.kind === "quay")
-      if (s.water.length === 0) {
+      // The sea is all round every island: only a harbour town comes down to it.
+      if (!normalizeSpec(spec).harbour) {
         expect(quays).toEqual([])
         continue
       }
@@ -139,18 +146,74 @@ describe("streets", () => {
     }
   })
 
-  test("roads run from the gates out to the bounds", () => {
+  test("each gate's road runs on out to the coast, never back into the town", () => {
     for (const { spec, site: s, graph } of built) {
-      const roads = graph.edges.filter((e) => e.cls === "road")
-      expect(roads.length, label(spec)).toBe(graph.nodes.filter((n) => n.kind === "gate").length)
-      const h = 1.3 * s.radius
-      for (const e of roads) {
-        const ends = [graph.nodes[e.a]!, graph.nodes[e.b]!]
-        expect(ends.some((n) => n.kind === "gate")).toBe(true)
-        const far = ends.find((n) => n.kind === "end")
-        expect(far, label(spec)).toBeDefined()
-        expect(Math.max(Math.abs(far!.at[0]), Math.abs(far!.at[1]))).toBeCloseTo(h, 1)
+      const atEdge = (p: Vec2) => s.water.some((w) => distTo(p, w, true) < 0.1)
+      for (const gate of graph.nodes.filter((n) => n.kind === "gate")) {
+        // Walk the roads out of the gate: some end of them is on the shore.
+        const seen = new Set([gate.id])
+        const stack = [gate.id]
+        let out = false
+        while (stack.length > 0) {
+          const v = stack.pop()!
+          for (const e of graph.edges.filter((x) => x.cls === "road" && (x.a === v || x.b === v))) {
+            const w = e.a === v ? e.b : e.a
+            if (seen.has(w)) continue
+            seen.add(w)
+            stack.push(w)
+            const n = graph.nodes[w]!
+            if (n.kind === "end" && atEdge(n.at)) out = true
+            for (const p of e.points) expect(Math.hypot(...p), label(spec)).toBeGreaterThan(s.radius - 1)
+          }
+        }
+        expect(out, `${label(spec)} gate ${gate.id}`).toBe(true)
       }
+    }
+  })
+
+  test("a fork is where a footpath leaves a road; a road end is a footpath's dead end inland", () => {
+    let forks = 0
+    for (const { spec, site: s, graph } of built) {
+      for (const n of graph.nodes.filter((x) => x.tag)) {
+        const classes = graph.edges.filter((e) => e.a === n.id || e.b === n.id).map((e) => e.cls)
+        expect(
+          classes.every((c) => c === "road"),
+          label(spec),
+        ).toBe(true)
+        if (n.tag === "fork") {
+          forks++
+          expect(classes.length, label(spec)).toBe(3)
+        } else {
+          expect(n.kind, label(spec)).toBe("end")
+          expect(Math.min(...s.water.map((w) => distTo(n.at, w, true))), label(spec)).toBeGreaterThan(0.1)
+          expect(
+            s.water.some((w) => contains(w, n.at, 0)),
+            label(spec),
+          ).toBe(false)
+        }
+      }
+    }
+    // Most roads out of a village or bigger have room for one.
+    const roads = built
+      .filter((b) => b.spec.tier !== "hamlet")
+      .reduce((sum, b) => sum + b.graph.nodes.filter((n) => n.kind === "gate").length, 0)
+    expect(forks / roads).toBeGreaterThan(0.6)
+  })
+
+  test("a hamlet is a street past a green, not a ring: its only loop is the green's", () => {
+    for (const { spec, graph } of built.filter((b) => b.spec.tier === "hamlet")) {
+      // Connected, so the loops are edges − nodes + 1.
+      expect(graph.edges.length - graph.nodes.length + 1, label(spec)).toBe(1)
+      expect(graph.edges.some((e) => e.cls === "main")).toBe(true)
+    }
+  })
+
+  test("towns grow side streets and partial rings, and forks round small squares", () => {
+    for (const { spec, graph } of built.filter((b) => b.spec.tier === "town" || b.spec.tier === "city")) {
+      expect(graph.squares?.length ?? 0, label(spec)).toBeGreaterThanOrEqual(1)
+      for (const q of graph.squares ?? []) expect(["well", "inn", "chapel"]).toContain(q.kind)
+      // More streets than the wall, the square's frame and the main streets alone would make.
+      expect(graph.edges.filter((e) => e.cls === "street").length, label(spec)).toBeGreaterThan(8)
     }
   })
 })

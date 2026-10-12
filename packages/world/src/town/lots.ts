@@ -13,9 +13,9 @@
  */
 import type { PrefabKind, PrefabMeta } from "@guildhall/assets"
 import { DMath } from "@guildhall/core"
-import { closest, intersect } from "../geom/line.ts"
-import { frontRect, type Rect, rectInPoly, rectsOverlap } from "../geom/obb.ts"
-import { bbox, type Ring } from "../geom/poly.ts"
+import { closest, distTo, intersect } from "../geom/line.ts"
+import { frontRect, type Rect, rectCorners, rectInPoly, rectsOverlap } from "../geom/obb.ts"
+import { bbox, contains, type Ring } from "../geom/poly.ts"
 import type { Roll } from "../geom/sample.ts"
 import {
   add,
@@ -61,6 +61,8 @@ const BEND = Math.PI / 6
 const MIN_RUN = 6
 /** The yard behind the house, metres: drawn per lot in this range. */
 const YARD: readonly [number, number] = [2, 5]
+/** Lots within this of either end of their run keep no yard, metres. */
+const CORNER_ZONE = 12
 /**
  * The least space between two lots, metres: a party wall's centimetre, so lots that share a side are
  * apart by more than rounding and the buildings in them (a hair wider, at kit units) never touch.
@@ -71,11 +73,19 @@ const STEP = 0.5
 /** How far a lot is moved inward, at most, when a bowed side leaves its front corners outside. */
 const SHIFTS = [0, 0.25, 0.5, 1] as const
 /** The cosine of the most a lot's front may turn from its street's run past it (1°). */
-const SQUARE = DMath.cos(Math.PI / 180)
-/** How nearly two stretches of a street may tie for the point a lot corner faces, metres. */
-const AMBIGUOUS = 0.25
+const SQUARE = DMath.cos((0.8 * Math.PI) / 180)
+/** A lot's frame is turned toward its street's run until they agree this well (0.25°), or tries out. */
+const SQUARE_TIGHT = DMath.cos(Math.PI / 720)
+const FRAME_TRIES = 5
+/** Two stretches of a street within this of each other both count as the one a lot corner faces (rounding of the corner can tip it either way), metres. */
+const TIE = 0.02
 /** The most a lot's front stands behind the block side where that side bows in, metres. */
 const MAX_BOW = 1.5
+/**
+ * The most a lot's front stands off its street's edge, metres: the kerb, a bowed side, a nudge. A
+ * block side further off than this (a suburb block's back) fronts no street and gets no lots.
+ */
+const MAX_GAP = 2.5
 /** Street classes, busiest first: their frontages are packed first and keep the corners. */
 const RANK = { main: 0, street: 1, road: 2, lane: 3 } as const
 /** The chance a lot is left as a garden, by tier: villages breathe, cities are packed. */
@@ -131,11 +141,13 @@ export function lots(
     if (prefabs.length === 0) continue
     const draw: Roll = (salt) => roll(`${salt}:${block.id}:lots`)
     const taken: Rect[] = []
+    // Runs with no street near them front nothing.
     const ranked = frontageRuns(block.poly)
-      .map((run) => ({ run, rank: RANK[nearestStreet(graph.edges, pointAt(run, run.length / 2)).cls] }))
+      .map((run) => ({ run, near: streetsNear(graph, run.line) }))
+      .filter(({ near }) => near.length > 0)
+      .map((x) => ({ ...x, rank: RANK[nearestStreet(x.near, pointAt(x.run, x.run.length / 2)).cls] }))
       .sort((a, b) => a.rank - b.rank || b.run.length - a.run.length)
-    ranked.forEach(({ run }, ri) => {
-      const near = streetsNear(graph, run.line)
+    ranked.forEach(({ run, near }, ri) => {
       const packed = packRun(run, block, prefabs, near, taken, tier, (salt) => draw(`${ri}:${salt}`))
       for (const lot of packed)
         out.push({ ...lot, id: out.length, block: block.id, district: block.district })
@@ -298,34 +310,88 @@ function fitLot(
   // Round the outside of a street's bend the lot's ends meet the street at nearly one point: it
   // fronts no stretch of it.
   if (len(chord) < w / 2 || dot(chord, sub(b, a)) <= 0) return null
-  const t = norm(chord)
-  const inward = perp(t)
-  // The side between the lot's ends may lie inside its front line: the front starts behind that.
-  let bow = 0
   const between = run.line.filter((_, i) => inside(i))
-  for (const p of [b, ...between]) bow = Math.max(bow, dot(sub(p, a), inward))
+  // The lot's frame along `t`: the side between its ends may lie inside its front line, so the front
+  // starts behind that (`bow`), and `shift` further in.
+  const frameOf = (t: Vec2, shift: number) => {
+    const inward = perp(t)
+    let bow = 0
+    for (const p of [b, ...between]) bow = Math.max(bow, dot(sub(p, a), inward))
+    return { t, inward, bow, front: add(a, scale(inward, bow + shift)) }
+  }
+  const first = frameOf(norm(chord), 0)
   // A side that leaves the street's line this far does not front it (a junction's rounded corner).
-  if (bow > MAX_BOW) return null
-  const spine = rayTo(poly, lerp(a, b, 0.5), inward) / 2
+  if (first.bow > MAX_BOW) return null
+  const spine = rayTo(poly, lerp(a, b, 0.5), first.inward) / 2
   const deepest = at(depths, 0)
-  // A corner lot keeps no yard: its side is the cross street's frontage.
-  const yard = atCorner(run, s, end) ? 0 : YARD[0] + (YARD[1] - YARD[0]) * u
+  // A lot near either end of its run keeps no yard: its back would take the cross street's frontage
+  // (a corner lot's side is that frontage).
+  const byCorner = s < CORNER_ZONE || end > run.length - CORNER_ZONE
+  const yard = byCorner ? 0 : YARD[0] + (YARD[1] - YARD[0]) * u
   const wanted = round3(Math.min(deepest + yard, Math.max(spine, at(depths, depths.length - 1))))
   const options = [...new Set([wanted, ...depths.filter((d) => d < wanted).map(round3)])]
   for (const shift of SHIFTS) {
-    const front = add(a, scale(inward, bow + shift))
-    // Measured from the lot's own front corners the street must still run square past it (it does not
-    // where they straddle a sharp bend of the street).
-    const from = facing(street, front)
-    const to = facing(street, add(front, scale(t, w)))
-    if (!from || !to || dot(norm(sub(to, from)), t) < SQUARE) continue
+    // Square to the street's run past the lot's own front corners: the chord between the points of
+    // the street they face. A wandering street's run turns with the lot, so the frame is turned to
+    // it until the two agree (or they straddle a sharp bend of the street, and there is no lot).
+    let f = frameOf(first.t, shift)
+    // Every reading of it, where a corner stands as near two stretches of the street (inside a bend).
+    const runsOf = (g: typeof f): Vec2[] | null => {
+      const out: Vec2[] = []
+      for (const from of facing(street, g.front))
+        for (const to of facing(street, add(g.front, scale(g.t, w)))) {
+          if (dist(from, to) < w / 2) return null
+          out.push(norm(sub(to, from)))
+        }
+      return out
+    }
+    let runs = runsOf(f)
+    for (let i = 0; runs && i < FRAME_TRIES && dot(at(runs, 0), f.t) < SQUARE_TIGHT; i++) {
+      f = frameOf(at(runs, 0), shift)
+      runs = runsOf(f)
+    }
+    if (!runs || f.bow > MAX_BOW || runs.some((run) => dot(run, f.t) < SQUARE)) continue
+    const { t, front } = f
+    // A side set back from its street (a suburb block's back, a side along the green) fronts none.
+    const mid = add(front, scale(t, w / 2))
+    if (dist(mid, onStreet(street, mid)) - street.width / 2 > MAX_GAP) break
     for (const d of options) {
       const rect = frontRect(front, add(front, scale(t, w)), 0, w, d)
-      if (!taken.some((o) => near2(rect, o) && rectsOverlap(rect, o, 0)) && rectInPoly(rect, poly))
+      if (
+        !taken.some((o) => near2(rect, o) && rectsOverlap(rect, o, 0)) &&
+        rectInPoly(rect, poly) &&
+        clearOfStreets(rect, near)
+      )
         return { rect, street: street.id }
     }
   }
   return null
+}
+
+/**
+ * Whether the rect keeps off every street's ribbon: a block can still reach into one where its
+ * carving left a sliver (a street ending on another at a slant, or bending in past a block side).
+ */
+function clearOfStreets(rect: Rect, near: readonly StreetEdge[]): boolean {
+  const ring = rectCorners(rect)
+  const [lo, hi] = bbox(ring)
+  for (const e of near) {
+    const reach = e.width / 2 + PARTY
+    const [elo, ehi] = bbox(e.points)
+    if (elo[0] > hi[0] + reach || ehi[0] < lo[0] - reach || elo[1] > hi[1] + reach || ehi[1] < lo[1] - reach)
+      continue
+    if (ring.some((c) => distTo(c, e.points) <= reach)) return false
+    // The street's own line, wherever it comes within its half-width of the rect's sides or inside.
+    for (let i = 0; i + 1 < e.points.length; i++) {
+      const p = at(e.points, i)
+      const q = at(e.points, i + 1)
+      if (contains(ring, p, 0) || distTo(p, ring, true) <= reach) return false
+      for (let j = 0; j < 4; j++) if (intersect(p, q, at(ring, j), at(ring, j + 1))) return false
+    }
+    const last = at(e.points, e.points.length - 1)
+    if (distTo(last, ring, true) <= reach) return false
+  }
+  return true
 }
 
 /** Whether two rects are close enough to overlap at all (their bounding circles meet). */
@@ -393,18 +459,15 @@ function onStreet(e: StreetEdge, p: Vec2): Vec2 {
 }
 
 /**
- * The point of the street p faces: its nearest, unless p lies about as near another stretch of the
- * street (by a sharp bend), when it faces no one point and this is null.
+ * The points of the street p faces: its nearest, and any on another stretch about as near (p stands
+ * inside a bend): a lot whose run differs between them is not square to its street.
  */
-function facing(e: StreetEdge, p: Vec2): Vec2 | null {
-  let best = { d: Infinity, at: p }
-  let other = { d: Infinity, at: p }
-  for (let i = 0; i + 1 < e.points.length; i++) {
-    const c = closest(p, at(e.points, i), at(e.points, i + 1))
-    if (c.d < best.d) [best, other] = [c, best]
-    else if (c.d < other.d) other = c
-  }
-  return other.d - best.d < AMBIGUOUS && dist(other.at, best.at) > AMBIGUOUS ? null : best.at
+function facing(e: StreetEdge, p: Vec2): Vec2[] {
+  const near = e.points.slice(0, -1).map((a, i) => closest(p, a, at(e.points, i + 1)))
+  const best = Math.min(...near.map((c) => c.d))
+  const out: Vec2[] = []
+  for (const c of near) if (c.d - best <= TIE && !out.some((q) => dist(q, c.at) < EPS)) out.push(c.at)
+  return out
 }
 
 /** The street whose centre line is nearest p. */

@@ -14,7 +14,7 @@ const warmth = (c: { r: number; b: number }) => c.r - c.b
 describe("lightAt's true directions", () => {
   test("by day the true sun is the shadow sun; by dusk it is below the horizon, the shadow sun is not", () => {
     const noon = lightAt(13)
-    noon.sunTrue.forEach((v, i) => expect(v).toBeCloseTo(noon.sunDir[i] as number, 6))
+    for (const [i, v] of noon.sunTrue.entries()) expect(v).toBeCloseTo(noon.sunDir[i] as number, 6)
     const dusk = lightAt(19.5)
     expect(Math.hypot(...dusk.sunTrue)).toBeCloseTo(1, 6)
     expect(dusk.sunTrue[1]).toBeLessThan(0)

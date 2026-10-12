@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src=".github/media/island-sunset.webp" alt="The guild's island at sunset from a low angle: a walled keep with a glowing hearth, a village, forest and mountains, ships on a pink sea, and a story caption reading 'The Architect and the Librarian bring their loot home.'" width="100%" />
+  <img src="legacy/.github/media/island-sunset.webp" alt="The guild's island at sunset from a low angle: a walled keep with a glowing hearth, a village, forest and mountains, ships on a pink sea, and a story caption reading 'The Architect and the Librarian bring their loot home.'" width="100%" />
 </p>
 
 Guildhall is a 3D world engine for event streams. Whatever you plug in, each worker becomes an
@@ -157,14 +157,14 @@ growth from the first commit, then its packages as an archipelago with a simulat
 ## Watch it work
 
 <p align="center">
-  <img src=".github/media/saga-loop.webp" alt="An animated loop of the island at night during the closing festival: lanterns and bunting strung over the village square, the keep's hearth glowing, fireworks bursting above the keep, and a caption reading 'The quest is complete. The Guildmaster has the last word.'" width="100%" />
-  <br /><sub><a href=".github/media/saga-loop.mp4">Watch the loop as MP4</a></sub>
+  <img src="legacy/.github/media/saga-loop.webp" alt="An animated loop of the island at night during the closing festival: lanterns and bunting strung over the village square, the keep's hearth glowing, fireworks bursting above the keep, and a caption reading 'The quest is complete. The Guildmaster has the last word.'" width="100%" />
+  <br /><sub><a href="legacy/.github/media/saga-loop.mp4">Watch the loop as MP4</a></sub>
 </p>
 
 <table>
   <tr>
     <td colspan="2">
-      <img src=".github/media/work-sites.webp" alt="Three close-ups: an explorer chopping at the forest edge, two researchers fishing at the river bend, a verifier shooting arrows at the proving grounds." width="100%" />
+      <img src="legacy/.github/media/work-sites.webp" alt="Three close-ups: an explorer chopping at the forest edge, two researchers fishing at the river bend, a verifier shooting arrows at the proving grounds." width="100%" />
       <p><strong>Real work, real places.</strong> Each role has a trade. Explorers chop wood while they
       search your code, researchers fish while they read the web, verifiers shoot at targets while your
       tests run, and implementers raise a building in the yard as they write. Logs, fish and arrows
@@ -173,7 +173,7 @@ growth from the first commit, then its packages as an archipelago with a simulat
   </tr>
   <tr>
     <td colspan="2">
-      <img src=".github/media/weather.webp" alt="The same village four ways: a clear noon, a rainy night lit by lanterns, a grey storm and a snowy morning." width="100%" />
+      <img src="legacy/.github/media/weather.webp" alt="The same village four ways: a clear noon, a rainy night lit by lanterns, a grey storm and a snowy morning." width="100%" />
       <p><strong>A living island.</strong> Day and night follow your clock (or a fixed hour), and the
       weather follows the share of recent deeds that failed. A busy guild runs warm; a guild left
       quiet for a long time turns cold.</p>
@@ -181,19 +181,19 @@ growth from the first commit, then its packages as an archipelago with a simulat
   </tr>
   <tr>
     <td width="50%">
-      <img src=".github/media/graveyard.webp" alt="A graveyard at night. Two hooded skeletons have risen by their graves near a lit crypt. Caption: 'The Verifier and the Explorer II fall, and the graveyard stirs.'" width="100%" />
+      <img src="legacy/.github/media/graveyard.webp" alt="A graveyard at night. Two hooded skeletons have risen by their graves near a lit crypt. Caption: 'The Verifier and the Explorer II fall, and the graveyard stirs.'" width="100%" />
       <p><strong>The graveyard.</strong> A failed session rises as a skeleton and keeps vigil until it
       recovers. Failed deeds raise minions that crumble away.</p>
     </td>
     <td width="50%">
-      <img src=".github/media/legends.webp" alt="The Legends book open over the island: a party's quest told chapter by chapter, with each adventurer's deeds, loot, time, tokens and cost." width="100%" />
+      <img src="legacy/.github/media/legends.webp" alt="The Legends book open over the island: a party's quest told chapter by chapter, with each adventurer's deeds, loot, time, tokens and cost." width="100%" />
       <p><strong>Captions and Legends.</strong> The bard narrates as it happens. The Legends book tells
       each quest chapter by chapter, with deeds, loot, tokens and cost, and copies out as text.</p>
     </td>
   </tr>
   <tr>
     <td colspan="2">
-      <img src=".github/media/parties.webp" alt="The full HUD: a plea banner waiting for permission, a parties panel listing three quests, the guild roster, and a chronicle of every deed with a timeline." width="100%" />
+      <img src="legacy/.github/media/parties.webp" alt="The full HUD: a plea banner waiting for permission, a parties panel listing three quests, the guild roster, and a chronicle of every deed with a timeline." width="100%" />
       <p><strong>Parties, pleas and the chronicle.</strong> Several conversations at once become
       separate parties, each under its own banner. A permission request shows up as a plea you can
       open. The chronicle lists every deed, and the timeline lets you scrub through the whole session.</p>
@@ -221,10 +221,10 @@ pirates, comets, a dragon. Each has its own trigger, and they're more fun to fin
 about.
 
 <p align="center">
-  <img src=".github/media/rainbow-dragon.webp" alt="A rainbow over the village while a red dragon circles above the mountains." width="100%" />
+  <img src="legacy/.github/media/rainbow-dragon.webp" alt="A rainbow over the village while a red dragon circles above the mountains." width="100%" />
 </p>
 <p align="center">
-  <img src=".github/media/events-pair.webp" alt="Left: lanterns and bunting strung across the square at night for a festival. Right: a glowing green ghost ship on a dark sea." width="100%" />
+  <img src="legacy/.github/media/events-pair.webp" alt="Left: lanterns and bunting strung across the square at night for a festival. Right: a glowing green ghost ship on a dark sea." width="100%" />
 </p>
 
 ## How it works

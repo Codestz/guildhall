@@ -125,9 +125,12 @@ export function generate(
   // The whole generator, once it exists, is the truth the 3D town draws; take its plan as it is.
   const whole = stageFn("generateTown", mod)
   if (whole) {
-    const plan = time("generateTown", () => whole(spec, lib))
+    const times: Record<string, number> = {}
+    const plan = time("generateTown", () => whole(spec, lib, times))
     if (isRecord(plan) && Array.isArray(plan.blocks)) {
       out.plan = plan as unknown as TownPlan
+      // The generator reports its own per-stage ms; show those beside the total.
+      for (const [stage, ms] of Object.entries(times)) out.timings.push({ stage, ms })
       return out
     }
   }

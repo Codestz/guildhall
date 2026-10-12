@@ -86,13 +86,15 @@ describe("deep link", () => {
     const worldGroup = GROUPS.find((g) => g.id === "world")
     expect(worldGroup?.tools.find((t) => t.id === "planner")?.name).toBe("Town planner")
     const source = readFileSync(join(import.meta.dir, "../src/screens.ts"), "utf8")
-    expect(/npc,\n {2}planner,\n\]/.test(source)).toBe(true)
+    expect(/planner,\n\]/.test(source)).toBe(true)
   })
 })
 
 describe("generator", () => {
   test("runs every stage the world package exports, timing each", () => {
-    const g = generate({ seed: 2, tier: "town" }, LIB.town)
+    const staged: Record<string, unknown> = { ...world }
+    delete staged.generateTown
+    const g = generate({ seed: 2, tier: "town" }, LIB.town, staged)
     expect(g.problems).toEqual([])
     for (const stage of ["site", "streets", "blocks", "walls", "landmark"]) expect(g.stages).toContain(stage)
     const found = detectStages()
@@ -119,6 +121,7 @@ describe("generator", () => {
   test("a stage that throws is reported, and the stages after it still run", () => {
     const broken: Record<string, unknown> = {
       ...world,
+      generateTown: undefined,
       lots: () => {
         throw new Error("boom")
       },

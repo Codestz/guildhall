@@ -210,14 +210,17 @@ function HouseControls({ h, recipe, onEdit }: { h: HouseBlueprint; recipe: Prefa
   const chosen = h.vary.openings ?? []
   return (
     <div className="gh-col-body">
-      <Section title="Footprint" aside={<span className="gh-aside num">{kit.module} m modules</span>}>
+      <Section
+        title="Footprint"
+        aside={<span className="gh-aside num">{kit.module.toFixed(2)} m modules</span>}
+      >
         <Field label="frontage">
           <Stepper
             value={h.size.w}
             min={1}
             max={MAX_CELLS}
             onStep={(w) => onEdit(setSize(recipe, w, h.size.d))}
-            unit={` · ${h.size.w * kit.module} m`}
+            unit={` · ${(h.size.w * kit.module).toFixed(1)} m`}
           />
         </Field>
         <Field label="depth">
@@ -226,7 +229,7 @@ function HouseControls({ h, recipe, onEdit }: { h: HouseBlueprint; recipe: Prefa
             min={1}
             max={MAX_CELLS}
             onStep={(d) => onEdit(setSize(recipe, h.size.w, d))}
-            unit={` · ${h.size.d * kit.module} m`}
+            unit={` · ${(h.size.d * kit.module).toFixed(1)} m`}
           />
         </Field>
       </Section>

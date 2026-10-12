@@ -1,9 +1,11 @@
 export { cameraToPose, poseToCamera } from "./camera.ts"
+export { createGizmo, type Gizmo, type GizmoMode, type GizmoOpts, type GizmoPose } from "./gizmo.ts"
 export { createGrid, type Disposable } from "./grid.ts"
 export { disposeObject, heroSilhouette, testBox } from "./hero.ts"
 export { paletteMaterial } from "./material.ts"
 export { group, loadModel, type Measure, measure, poseModel } from "./model.ts"
 export { loadPiece } from "./pieces.ts"
+export { instanceSwatchMap, placeInstance, recipeObject } from "./recipe.ts"
 export { createShadows, fitShadowCamera, type ShadowBox } from "./shadow.ts"
 export { createStage, type Stage, toScreen } from "./stage.ts"
 export {
@@ -16,6 +18,7 @@ export {
   type SunStats,
 } from "./sun/index.ts"
 export { boundingSphere, fitSphere, renderThumbnail, type ThumbnailOpts } from "./thumbnail.ts"
+export { recolour, recolourPiece, swatchMapKey } from "./tint.ts"
 export {
   createViewer,
   type Overlay,

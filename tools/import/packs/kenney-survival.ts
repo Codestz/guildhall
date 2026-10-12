@@ -2,13 +2,31 @@
 // with trees, rocks, tools, crates and campfires.
 import type { PackConfig } from "@guildhall/assets"
 
+/**
+ * The green texels of its trees, grass and the grass on rock-flat-grass (and the bottle, as green glass), by the teal tone they would bake to: teal reads
+ * cold against the warm palette, so the dark half pins to leaf and the light half to grass; the
+ * gradient left over survives as `_SHADE`.
+ */
+// biome-ignore format: one tone per block
+const GREENS: Record<string, string[]> = {
+  leaf: [
+    "#20896b", "#248d6d", "#29926f", "#2e9772", "#329c74", "#37a177", "#3ca579", "#41ab7b",
+  ],
+  grass: [
+    "#47b17e", "#4cb581", "#50ba83", "#55bf85", "#5ac487", "#61cb8b",
+  ],
+}
+
 export default {
   id: "kenney-survival",
   source: "kenney_survival-kit",
   vendor: "kenney",
   license: "CC0",
   include: ["Models/GLB format/*.glb"],
-  colour: { mode: "colormap" },
+  colour: {
+    mode: "colormap",
+    map: Object.fromEntries(Object.entries(GREENS).flatMap(([tone, hexes]) => hexes.map((h) => [h, tone]))),
+  },
   // A hut module is 0.5 raw and its doorway 0.517: x5 makes a 2.5 m wall with a 2.6 m door, a tent
   // 2.5 m, a tree 7-8.6 m and a boulder 2-2.5 m.
   scale: { factor: 5 },

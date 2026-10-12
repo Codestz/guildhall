@@ -8,7 +8,9 @@ export default {
   vendor: "kaykit",
   license: "CC0",
   include: ["Models/objects/gltf/*.glb"],
-  colour: { mode: "material" },
+  // The Green material (detail_hill's turf) is nearest teal, cold against the warm palette: pinned
+  // to grass. The well's Water stays teal.
+  colour: { mode: "material", map: { "#48bc8d": "grass" } },
   // Tile-scale miniatures like the hexagon pack. The house's arched door (on +z) rises from the
   // 0.145 raw floor to 0.389 raw: at 2.6 m that is x10.7, so the house stands 9.8 m.
   scale: { ref: "house.gltf", measure: "doorTop", metres: 2.6 },

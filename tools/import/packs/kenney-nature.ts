@@ -7,7 +7,15 @@ export default {
   vendor: "kenney",
   license: "CC0",
   include: ["Models/GLTF format/*.glb"],
-  colour: { mode: "material" },
+  // The kit's three foliage materials are pale mint, nearest teal-light, which reads cold against
+  // the warm palette. leafsDark (the *_dark trees, pines, the melon's leaves, the bedroll's
+  // blanket) pins to leaf, leafsGreen (the other trees, flat plants, cacti, lilies) to grass-light,
+  // and grass (tufts, crops, flower stems, bushes, hanging moss, the grass tops of cliffs and rocks)
+  // to moss.
+  colour: {
+    mode: "material",
+    map: { "#72d3d5": "leaf", "#70e6d6": "grass-light", "#73eddd": "moss" },
+  },
   // Trees are 0.9-2.1 raw (tree_default 1.71): x4 makes tree_default 6.8 m and a cliff block 4 m.
   // The small and ground-hugging pines (tree_pineSmall*, tree_pineGround*) are 3.7-4.5 m young pines:
   // the ones under 4 m flag, by design.

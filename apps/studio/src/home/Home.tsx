@@ -13,15 +13,9 @@ const SOURCES = [
     name: "KayKit",
     by: "Kay Lousberg",
     href: "https://kaylousberg.com/game-assets",
-    what: "characters, rigs, tools",
+    what: "hex tiles, characters, rigs",
   },
   { name: "Kenney", by: "Kenney Vleugels", href: "https://kenney.nl/assets", what: "town, castle, nature" },
-  {
-    name: "Quaternius",
-    by: "Quaternius",
-    href: "https://quaternius.com",
-    what: "buildings, nature, animals",
-  },
 ] as const
 
 const STAT_ROWS: readonly { key: keyof Omit<StudioStats, "palette">; label: string }[] = [
@@ -110,8 +104,6 @@ export function Home({
 }) {
   const plate = useRef<HTMLDivElement>(null)
   useEffect(() => (plate.current ? vignette(plate.current) : undefined), [vignette])
-  const lab = GROUPS.find((g) => g.id === "lab")
-  const toolGroups = GROUPS.filter((g) => g.id !== "lab")
 
   return (
     <div className="gh gh-home">
@@ -168,7 +160,7 @@ export function Home({
             <p className="gh-eyebrow">The tools</p>
             <h2 id="tools-title">Everything the world is made with</h2>
           </div>
-          {toolGroups.map((group) => (
+          {GROUPS.map((group) => (
             <Group key={group.id} group={group} />
           ))}
         </section>
@@ -181,7 +173,7 @@ export function Home({
           <div className="cols">
             <article>
               <h3>CC0 sources</h3>
-              <p>Every model is public-domain, from three makers whose work this stands on:</p>
+              <p>Every model is public-domain, from two makers whose work this stands on:</p>
               <ul className="sources">
                 {SOURCES.map((s) => (
                   <li key={s.name}>
@@ -218,16 +210,6 @@ export function Home({
             <Mark size={20} />
             Guildhall Studio
           </span>
-          {lab && (
-            <span>
-              Lab:{" "}
-              {lab.tools.map((t) => (
-                <a key={t.id} href={linkTo(t.id)} onClick={follow(t.id)}>
-                  {t.name}
-                </a>
-              ))}
-            </span>
-          )}
           {stats?.palette && (
             <span className="num">
               palette <b>{stats.palette}</b>

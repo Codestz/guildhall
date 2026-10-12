@@ -44,7 +44,6 @@ describe("dataRoute", () => {
       "recipes/docks/a.json",
       "recipes/farm/a.json",
       "npcs/farmer.json",
-      "towns/riverside.json",
       "mounts.json",
     ])
       expect(dataRoute(path)).not.toBeNull()
@@ -81,8 +80,6 @@ describe("dataRoute", () => {
     expect(dataRoute("npcs/farmer.json")?.(stall()).length).toBeGreaterThan(0)
     expect(dataRoute("mounts.json")?.(mounts())).toEqual([])
     expect(dataRoute("mounts.json")?.(npc()).length).toBeGreaterThan(0)
-    expect(dataRoute("towns/a.json")?.({ seed: 1 })).toEqual([])
-    expect(dataRoute("towns/a.json")?.([1])).toEqual(["town: expected an object"])
   })
 })
 
@@ -197,11 +194,11 @@ describe("PUT /data/", () => {
     const outside = await mkdtemp(join(tmpdir(), "guildhall-outside-"))
     await writeFile(join(outside, "farmer.json"), "{}")
     await symlink(outside, join(root, "npcs"))
-    await mkdir(join(root, "towns"))
-    await symlink(join(outside, "farmer.json"), join(root, "towns/a.json"))
+    await mkdir(join(root, "recipes/farm"), { recursive: true })
+    await symlink(join(outside, "farmer.json"), join(root, "recipes/farm/a.json"))
     const base = await serve()
     expect((await put(`${base}/npcs/farmer.json`, JSON.stringify(npc()))).status).toBe(403)
-    expect((await put(`${base}/towns/a.json`, "{}")).status).toBe(403)
+    expect((await put(`${base}/recipes/farm/a.json`, "{}")).status).toBe(403)
     expect((await fetch(`${base}/npcs/farmer.json`)).status).toBe(403)
     expect((await fetch(`${base}/npcs/`)).status).toBe(403)
     expect(await readFile(join(outside, "farmer.json"), "utf8")).toBe("{}")

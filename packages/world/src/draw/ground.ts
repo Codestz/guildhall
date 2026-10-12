@@ -1,5 +1,5 @@
 /**
- * The town's ground as plain typed arrays (plan §5), pure so the town worker can build it: render
+ * The ground as plain typed arrays (plan §5), pure so a worker can build it: render
  * only wraps the arrays. No polygon booleans: the land is a signed-distance field on a CELL-metre grid
  * cut along its zero line (marching squares, so the coast is smooth and watertight), and the painted
  * ground (streets, squares, fields, plots) is rasterised SS × SS per cell into a mask that every vertex
@@ -11,8 +11,7 @@ import { PALETTE, srgbToLinear } from "@guildhall/assets"
 import { roll } from "@guildhall/core"
 import { bbox, contains } from "../geom/poly.ts"
 import type { Vec2 } from "../geom/vec.ts"
-import type { GroundTint } from "./nature-field.ts"
-import type { TownDraw } from "./types.ts"
+import type { GroundTint, TownDraw } from "./types.ts"
 
 export type GroundDraw = TownDraw["ground"]
 type OverlayKind = GroundDraw["overlays"][number]["kind"]
@@ -175,7 +174,7 @@ function noise(seed: number, salt: string, cell: number): (x: number, z: number)
   }
 }
 
-/** Where nature's field says the grass is shaded, light, dry or worn (nature-field.ts `groundTint`). */
+/** Where the grass is shaded, light, dry or worn. */
 export type Tint = (x: number, z: number) => GroundTint
 
 /** How far each tint pulls the grass toward its swatch at full strength. */
@@ -332,7 +331,7 @@ function rasterize(g: Grid, overlays: GroundDraw["overlays"]): Uint16Array {
 /**
  * The ground's geometry: the land (its holes cut out, its islets beside it) on the CELL grid with
  * the overlays painted in as vertex colours, contact-darkened round the footprints and darker along
- * the coast, the grass tinted where `tint` (nature's field) says; then the bank skirt down every coast
+ * the coast, the grass tinted where `tint` says; then the bank skirt down every coast
  * segment, facing out of the land.
  */
 export function groundGeometry(gd: GroundDraw, seed = 0, tint?: Tint): GroundGeometry {

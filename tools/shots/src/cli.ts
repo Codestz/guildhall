@@ -2,7 +2,7 @@
 /**
  * Drive an app headless: URL + camera → PNG + metrics.
  *
- *   bun shots "http://localhost:5300/lab/m0?hud=perf" --camera 0,60,25,0,0,0 --out .probe/m0/m0
+ *   bun shots "http://localhost:5300/town/1?hud=perf" --camera 0,60,25,0,0,0 --out .probe/town/town
  *
  * Waits for `guildhall.ready()`, sets the camera, samples `perf` for `--sample` ms, screenshots, and
  * writes `<out>.png` and `<out>.json`. Any page or console error is reported there and exits 1. A

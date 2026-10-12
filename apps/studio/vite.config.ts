@@ -16,13 +16,8 @@ const page = (name: string) => fileURLToPath(new URL(name, import.meta.url))
 /** The generated asset library at the repo root (tools/import writes it). It may not exist yet. */
 const LIBRARY = fileURLToPath(new URL("../../library", import.meta.url))
 
-/** Authored, committed data at the repo root (ADR 005): recipes, mounts, npcs, town presets. */
+/** Authored, committed data at the repo root (ADR 005): recipes, mounts, npcs. */
 const DATA = fileURLToPath(new URL("../../data", import.meta.url))
-
-/** The raw vendor packs the lineup screen previews: `$GUILDHALL_ASSETS`, else the repo's `assets/src`. */
-const RAW = resolve(
-  process.env.GUILDHALL_ASSETS || fileURLToPath(new URL("../../assets/src", import.meta.url)),
-)
 
 const TYPES: Record<string, string> = {
   ".json": "application/json",
@@ -66,15 +61,9 @@ const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/
 const RECIPE_FOLDERS = ["houses", "landmarks", "stalls", "docks", "farm", "vignettes"]
 
 /** Folders whose `<id>.json` files the endpoint lists, reads and writes. */
-export const DATA_FOLDERS = [...RECIPE_FOLDERS.map((f) => `recipes/${f}`), "npcs", "towns", "islands"]
+export const DATA_FOLDERS = [...RECIPE_FOLDERS.map((f) => `recipes/${f}`), "npcs"]
 
 type Validate = (json: unknown) => string[]
-
-/** No town or island validator exists yet (world owns TownSpec, IslandSpec); a preset need only be an object. */
-const anObject =
-  (what: string): Validate =>
-  (json) =>
-    json !== null && typeof json === "object" && !Array.isArray(json) ? [] : [`${what}: expected an object`]
 
 /**
  * The validator for a data path (relative to `data/`, already URL-decoded), or null when the path is not
@@ -88,8 +77,6 @@ export function dataRoute(path: string): Validate | null {
   const file = path.slice(slash + 1)
   if (!DATA_FOLDERS.includes(folder) || !file.endsWith(".json") || !ID.test(file.slice(0, -5))) return null
   if (folder === "npcs") return (json) => validateNpc(json, PALETTE)
-  if (folder === "towns") return anObject("town")
-  if (folder === "islands") return anObject("island")
   return (json) => validatePrefab(json, PALETTE)
 }
 
@@ -325,14 +312,12 @@ function hostLike(): Plugin {
 }
 
 export default defineConfig({
-  // `/library/` is what the importer wrote; `/raw/` is the untouched packs, for the lineup preview;
-  // `/data/` is the authored data the studio edits. The showcase serves none of them: its build copies
-  // the library and the data into dist, and its preview serves dist alone, as the host will.
+  // `/library/` is what the importer wrote; `/data/` is the authored data the studio edits. The showcase
+  // serves neither: its build copies the library and the data into dist, and its preview serves dist
+  // alone, as the host will.
   plugins: [
     react(),
-    ...(SHOWCASE
-      ? [showcase(LIBRARY, DATA), hostLike()]
-      : [folder("library", LIBRARY), folder("raw", RAW), data(DATA)]),
+    ...(SHOWCASE ? [showcase(LIBRARY, DATA), hostLike()] : [folder("library", LIBRARY), data(DATA)]),
   ],
   server: { port: 5300, strictPort: true },
   preview: { port: 5310, strictPort: true },

@@ -17,9 +17,7 @@ export type DataKind =
   | "recipes/docks"
   | "recipes/farm"
   | "recipes/vignettes"
-  | "islands"
   | "npcs"
-  | "towns"
 
 /** A save either landed, or was refused with the endpoint's reasons (422: the validator's problems). */
 export type SaveResult = { ok: true } | { ok: false; status: number; problems: string[] }

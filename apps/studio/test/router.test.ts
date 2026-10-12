@@ -12,7 +12,7 @@ const at = (url: string, base = "/") => {
 describe("router", () => {
   test("every screen screens.ts registers has exactly one route", () => {
     const source = readFileSync(join(import.meta.dir, "../src/screens.ts"), "utf8")
-    const files = [...source.matchAll(/from "\.\/([^"]+\/index\.tsx?|scenes\/scale\.ts)"/g)].map((m) => m[1])
+    const files = [...source.matchAll(/from "\.\/([^"]+\/index\.tsx?)"/g)].map((m) => m[1])
     const ids = files.map((f) => {
       const text = readFileSync(join(import.meta.dir, "../src", f as string), "utf8")
       return /\bid: (?:"([^"]+)"|HOME_ID)/.exec(text)?.[1] ?? "home"
@@ -39,15 +39,15 @@ describe("router", () => {
       screen: "grip",
       query: { piece: "kaykit-tools/axe" },
     })
-    expect(at("/lab/m0")).toEqual({ screen: "m0", query: {} })
-    expect(at("/site/?hour=17.5")).toEqual({ screen: "site", query: { hour: "17.5" } })
+    expect(at("/lab/hexmap")).toEqual({ screen: "hexmap", query: {} })
+    expect(at("/palette/?hour=17.5")).toEqual({ screen: "palette", query: { hour: "17.5" } })
   })
 
   test("a path no route matches, or with the wrong number of id segments, names no screen", () => {
     expect(at("/nope").screen).toBeNull()
     expect(at("/pieces/only-one").screen).toBeNull()
     expect(at("/npcs/a/b").screen).toBeNull()
-    expect(at("/scale/extra").screen).toBeNull()
+    expect(at("/palette/extra").screen).toBeNull()
     expect(at("/lab").screen).toBeNull()
     expect(at("/pieces/%E0%A4%A/x").screen).toBeNull()
   })
@@ -82,7 +82,7 @@ describe("router", () => {
       "/composer/houses/cottage?seed=3&strip=1",
       "/npcs/guard?seed=1&strip=8&clip=work",
       "/grips/editor/kaykit-tools/axe?body=x",
-      "/site?hour=17.5",
+      "/town/3?hour=17.5",
     ]) {
       const u = new URL(url, "http://x")
       const { screen, query } = resolve(u.pathname, u.search, "/")
@@ -111,6 +111,6 @@ describe("router", () => {
     expect(href("npc", { recipe: "guard" }, "/studio/")).toBe("/studio/npcs/guard")
     expect(canonical("/pieces", "/studio/")).toBe("/studio/pieces")
     expect(canonical("/studio/pieces", "/studio/")).toBe("/studio/pieces")
-    expect(canonical("?screen=site&hour=6", "/studio/")).toBe("/studio/site?hour=6")
+    expect(canonical("?screen=palette&hour=6", "/studio/")).toBe("/studio/palette?hour=6")
   })
 })

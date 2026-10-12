@@ -1,5 +1,5 @@
 /**
- * The water's mesh as plain typed arrays, pure so the town worker can build it (render wraps them and
+ * The water's mesh as plain typed arrays, pure so a worker can build it (render wraps them and
  * shades the water). A PITCH grid round the shore lines and a FAR_PITCH grid past them, cell by cell
  * wherever there is water; no polygon booleans. Each vertex carries its signed distance to the shore
  * (negative under the land, which hides it), so interpolated across a cell it is zero on the coast.

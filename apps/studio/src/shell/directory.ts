@@ -50,32 +50,25 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         purpose: "Tune the one shared palette every piece is re-tinted to.",
         preview: true,
       },
-      {
-        id: "scale",
-        name: "Scale",
-        purpose: "Line packs up side by side to check they share one scale.",
-        preview: true,
-      },
-      {
-        id: "lineup",
-        name: "Lineup",
-        purpose: "The untouched vendor packs, before import, for comparison.",
-        preview: true,
-        // It reads the raw vendor packs (`/raw/`), which only a local checkout has.
-        dev: true,
-      },
     ],
   },
   {
     id: "build",
     name: "Build",
-    blurb: "Turn pieces into buildings a town can use.",
+    blurb: "Turn pieces into the tiles and people the hex world is made of.",
     tools: [
       {
         id: "composer",
         name: "Composer",
         purpose: "Assemble a house from modules: storeys, roof, door, windows, dressing.",
         preview: true,
+      },
+      {
+        id: "hextiles",
+        name: "Tile prefabs",
+        purpose:
+          "Every hex tile prefab (house, farmstead, woods, field, road…) at the chosen scale, with a character.",
+        dev: true,
       },
       {
         id: "npc",
@@ -106,83 +99,17 @@ const ALL_GROUPS: readonly ToolGroup[] = [
   {
     id: "world",
     name: "World",
-    blurb: "The ground, the light and the town around them.",
+    blurb: "The hex island: its map, its scale and the town on it.",
     tools: [
-      {
-        id: "site",
-        name: "Site & light",
-        purpose: "A town site grown from a seed, lit from dawn to golden hour.",
-        preview: true,
-      },
-      {
-        id: "shadows",
-        name: "Shadows",
-        purpose: "World-fixed sun shadows that hold still as the camera moves.",
-        preview: true,
-      },
-      {
-        id: "planner",
-        name: "Town planner",
-        purpose: "A live fantasy map of a generated town, to judge its layout at a glance.",
-      },
-      {
-        id: "island",
-        name: "Island",
-        purpose: "The whole island: a city, hamlets, fields, woods, rivers and landmarks under a live sky.",
-      },
       {
         id: "town",
         name: "Town",
-        purpose: "A generated town in 3D under the golden-hour sun: streets, walls, harbour, skyline.",
-      },
-    ],
-  },
-  {
-    id: "lab",
-    name: "Lab",
-    blurb: "Benches the studio was built on.",
-    tools: [
-      {
-        id: "m0",
-        name: "M0 skeleton",
-        purpose: "The first render bench: a stage, a camera, a frame budget.",
-        dev: true,
+        purpose: "The hex island in 3D, built tile by tile from the tile prefabs, with its folk at work.",
       },
       {
-        id: "batch",
-        name: "Static batch",
-        purpose: "Thousands of pieces in one draw: calls stay flat as the count grows.",
-        dev: true,
-      },
-      {
-        id: "night",
-        name: "Night",
-        purpose: "A town from day to night: lamps, lit windows, moonlight, a clock to scrub.",
-        dev: true,
-      },
-      {
-        id: "atmosphere",
-        name: "Atmosphere",
-        purpose: "Clouds, their shadows and the water's reflections over the island town, hour by hour.",
-        dev: true,
-      },
-      {
-        id: "crowd",
-        name: "Crowd",
-        purpose: "Hundreds of townsfolk walking and working: heroes near, one baked crowd draw beyond.",
-        dev: true,
-      },
-      {
-        id: "hexworld",
-        name: "Hex island",
-        purpose: "The hex island in 3D, built tile by tile from the tile prefabs.",
-        dev: true,
-      },
-      {
-        id: "hextiles",
-        name: "Tile prefabs",
-        purpose:
-          "Every hex tile prefab (house, farmstead, woods, field, road…) at the chosen scale, with a character.",
+        id: "hexmap",
+        name: "Hex map",
+        purpose: "The hex world from above: island, heights in steps, sand, cliffs, rivers, lakes, forest.",
         dev: true,
       },
       {
@@ -193,21 +120,9 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         dev: true,
       },
       {
-        id: "hexmap",
-        name: "Hex map",
-        purpose: "The hex world from above: island, heights in steps, sand, cliffs, rivers, lakes, forest.",
-        dev: true,
-      },
-      {
-        id: "terra",
-        name: "Terrain",
-        purpose: "The island's land and water first: coast, terraced hills, cliffs, rivers and lakes.",
-        dev: true,
-      },
-      {
-        id: "terra3d",
-        name: "Terrain 3D",
-        purpose: "The terrain lab's island in 3D, with woods, pines and rocks standing on it.",
+        id: "hexworld",
+        name: "Hex island",
+        purpose: "The town's hex island on its own lab path, for probes and shots.",
         dev: true,
       },
     ],

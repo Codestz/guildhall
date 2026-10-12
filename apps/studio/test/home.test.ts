@@ -68,10 +68,10 @@ describe("directory", () => {
     expect(search("").length).toBe(openable().length)
     expect(search("grip").map((p) => p.tool.id)).toEqual(["grip", "grips"])
     expect(search("grip matrix").map((p) => p.tool.id)).toEqual(["grips"])
-    // "shadow" names Shadows and is only in the purpose of nothing else ranked above it.
-    expect(search("shadow")[0]?.tool.id).toBe("shadows")
+    // "scale" names Scale board; the tile prefabs only mention it in their purpose.
+    expect(search("scale")[0]?.tool.id).toBe("hexscale")
     // A group name finds its tools.
-    expect(search("library").map((p) => p.tool.id)).toEqual(["pieces", "palette", "scale", "lineup"])
+    expect(search("library").map((p) => p.tool.id)).toEqual(["pieces", "palette"])
     expect(search("zzz")).toEqual([])
   })
 

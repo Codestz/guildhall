@@ -5,19 +5,16 @@ import {
   CONTACT_REACH,
   contactShade,
   contains,
-  dressTown,
   type GroundGeometry,
   groundGeometry,
   LEVELS,
   SKIRT_BOTTOM,
   type TownDraw,
-  type TownSpecInput,
   type Vec2,
   waterGeometry,
 } from "../src/index.ts"
-import { COMPILED, PRESETS, town } from "./town.fixture.ts"
 
-/** world town: the ground's and the water's meshes as typed arrays (ground.ts, water.ts). */
+/** world draw: the ground's and the water's meshes as typed arrays (ground.ts, water.ts). */
 
 type GroundDraw = TownDraw["ground"]
 
@@ -199,42 +196,5 @@ describe("waterGeometry", () => {
 
   test("is empty without water", () => {
     expect(waterGeometry({ polys: [], level: LEVELS.water, shore: [] }).index).toHaveLength(0)
-  })
-})
-
-describe("an island town's ground and water", () => {
-  const spec = PRESETS[3] as TownSpecInput
-  const plan = town(spec)
-  const drawn = dressTown(plan, COMPILED)
-
-  test("the land is the island: land and sea tile the bounds with no sea left in the land", () => {
-    const g = drawn.ground
-    const land =
-      Math.abs(area(g.land)) -
-      g.holes.reduce((s, h) => s + Math.abs(area(h)), 0) +
-      (g.islets ?? []).reduce((s, r) => s + Math.abs(area(r)), 0)
-    const sea = plan.water.reduce((s, r) => s + Math.abs(area(r)), 0)
-    expect(land + sea).toBeCloseTo(Math.abs(area(plan.bounds)), -2)
-    // Before the fix the land took a difference against all the sea at once and kept a triangle of it.
-    expect(land).toBeLessThan(0.4 * Math.abs(area(plan.bounds)))
-  })
-
-  test("the shore is the land's outline: closed lines, none along a seam between sea pieces", () => {
-    const g = drawn.ground
-    expect(drawn.water.shore.length).toBe(1 + g.holes.length + (g.islets?.length ?? 0))
-    for (const line of drawn.water.shore) expect(line.at(-1)).toEqual(line[0])
-  })
-
-  test("builds the ground, every street painted, in well under the old seconds", () => {
-    const t0 = performance.now()
-    const m = groundGeometry(drawn.ground, spec.seed)
-    const ms = performance.now() - t0
-    expect(total(m)).toBeCloseTo(
-      Math.abs(area(drawn.ground.land)) +
-        (drawn.ground.islets ?? []).reduce((s, r) => s + Math.abs(area(r)), 0),
-      -2,
-    )
-    // The polygon booleans took 5–17 s (or failed) for a city; the raster takes a few hundred ms.
-    expect(ms).toBeLessThan(1500)
   })
 })

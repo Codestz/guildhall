@@ -8,7 +8,6 @@ or by the studio, and reviewed as a diff.
 | `recipes/{houses,landmarks,stalls,docks,farm}/<id>.json` | prefab recipes | `validatePrefab` |
 | `mounts.json` | `{ version: 1, mounts: Record<catalogId, Mount> }` (ADR 010) | `validateMounts` |
 | `npcs/<role>.json` | NPC recipes | `validateNpc` |
-| `towns/<preset>.json` | town presets (`TownSpec`) | an object, until the world package has a validator |
 
 File names are kebab-case ids. Files hold sorted keys, 2-space indentation, every object and array
 expanded, and a final newline; biome enforces the same shape here (`biome.json`, `data/**`).

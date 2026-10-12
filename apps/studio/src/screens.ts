@@ -1,9 +1,6 @@
 import type { Stage } from "@guildhall/render"
-import { atmosphereLab } from "./atmosphere/index.ts"
-import { batch } from "./batch/index.ts"
 import { pieces } from "./browser/index.tsx"
 import { composer } from "./composer/index.tsx"
-import { crowdLab } from "./crowd/index.ts"
 import { grip } from "./grips/editor/index.ts"
 import { grips } from "./grips/matrix/index.ts"
 import { hexmap } from "./hexmap/index.ts"
@@ -11,20 +8,10 @@ import { hexScale } from "./hexscale/index.ts"
 import { hexTiles } from "./hextiles/index.ts"
 import { hexWorldScreen } from "./hexworld/index.ts"
 import { home } from "./home/index.tsx"
-import { island } from "./island/index.ts"
-import { lineup } from "./lineup/index.ts"
-import { m0 } from "./m0/index.ts"
-import { night } from "./night/index.ts"
 import { npc } from "./npcs/index.tsx"
 import { palette } from "./palette/index.ts"
-import { planner } from "./planner/index.tsx"
-import { scale } from "./scenes/scale.ts"
-import { shadows } from "./shadows/index.ts"
 import { placeOf } from "./shell/directory.ts"
-import { siteScreen } from "./site/index.ts"
-import { terraLab } from "./terra/index.ts"
-import { terra3d } from "./terra3d/index.ts"
-import { town } from "./town/index.tsx"
+import { town } from "./town/index.ts"
 
 /** What the shell hands a screen when it mounts it. */
 export interface ScreenCtx {
@@ -46,29 +33,16 @@ export interface Screen {
 /** Every screen the studio can open (paths in `shell/router.ts`). New screens register here, one line each. */
 export const SCREENS: readonly Screen[] = [
   home,
-  m0,
-  lineup,
   pieces,
-  scale,
   palette,
-  shadows,
   composer,
-  siteScreen,
+  hexTiles,
+  npc,
   grip,
   grips,
-  npc,
-  batch,
   town,
-  planner,
-  night,
-  atmosphereLab,
-  crowdLab,
-  terraLab,
-  terra3d,
-  island,
   hexmap,
   hexScale,
-  hexTiles,
   hexWorldScreen,
 ]
 

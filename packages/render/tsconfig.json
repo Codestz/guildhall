@@ -7,5 +7,5 @@
     "types": []
   },
   "include": ["src"],
-  "references": [{ "path": "../core" }, { "path": "../assets" }]
+  "references": [{ "path": "../core" }, { "path": "../assets" }, { "path": "../world" }]
 }

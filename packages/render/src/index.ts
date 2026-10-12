@@ -4,12 +4,15 @@ export { attachMount, detachMount, type Mounted, mountClip, mountPose } from "./
 export { keepUpright } from "./character/upright.ts"
 export { createGizmo, type Gizmo, type GizmoMode, type GizmoOpts, type GizmoPose } from "./gizmo.ts"
 export { createGrid, type Disposable } from "./grid.ts"
+export { contactShade, createGround, type Ground, type GroundDraw, groundMesh } from "./ground.ts"
 export { disposeObject, heroSilhouette, testBox } from "./hero.ts"
+export { applyLight, type DayLight, GOLDEN_HOUR, goldenHour, lightAt, sunAt } from "./light.ts"
 export { paletteMaterial } from "./material.ts"
 export { group, loadModel, type Measure, measure, poseModel } from "./model.ts"
 export { loadPiece } from "./pieces.ts"
 export { instanceSwatchMap, placeInstance, recipeObject } from "./recipe.ts"
 export { createShadows, fitShadowCamera, type ShadowBox } from "./shadow.ts"
+export { createSky, type Sky, type SkyPreset } from "./sky.ts"
 export { createStage, type Stage, toScreen } from "./stage.ts"
 export {
   type Box,
@@ -30,3 +33,4 @@ export {
   type ViewerOpts,
   type ViewerStats,
 } from "./viewer.ts"
+export { createWater, type Water, type WaterDraw } from "./water.ts"

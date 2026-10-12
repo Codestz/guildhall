@@ -9,6 +9,7 @@
   "dependencies": {
     "@guildhall/assets": "workspace:*",
     "@guildhall/core": "workspace:*",
+    "@guildhall/world": "workspace:*",
     "three": "^0.186.1"
   },
   "devDependencies": {

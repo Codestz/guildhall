@@ -13,6 +13,7 @@
     "@guildhall/core": "workspace:*",
     "@guildhall/render": "workspace:*",
     "@guildhall/ui": "workspace:*",
+    "@guildhall/world": "workspace:*",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

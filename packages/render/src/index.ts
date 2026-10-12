@@ -73,3 +73,4 @@ export {
   type ViewerStats,
 } from "./viewer.ts"
 export { createWater, MAX_WAKES, type Wake, type Water, type WaterDraw } from "./water.ts"
+export { type ActorSample, type Crowd, type CrowdActor, type CrowdLibrary, type CrowdOpts, type CrowdStats, createCrowd } from "./crowd/index.ts"

@@ -463,10 +463,29 @@ export function terraIsland(input: TerraSpec): Terra {
   const taken = new Uint8Array(N)
   const rivers: TerraRiver[] = []
   const falls: [number, number][] = []
-  const widthAt = (i: number): number => Math.min(9, 1.6 + 2 * Math.sqrt(acc[i]! / thr))
+  const widthAt = (i: number): number => Math.min(9, 0.9 + 2.2 * Math.sqrt(acc[i]! / thr))
+  // each river is followed back up its biggest feeder to where the water starts: a spring in the hills
+  const upMax = new Int32Array(N).fill(-1)
+  for (let i = 0; i < N; i++) {
+    const d = down[i]!
+    if (!land[i] || d < 0 || !land[d]) continue
+    if (upMax[d]! < 0 || acc[i]! > acc[upMax[d]!]!) upMax[d] = i
+  }
+  const springs: number[] = []
   for (const head of heads) {
     const line: [number, number][] = []
     const width: number[] = []
+    const upstream: number[] = []
+    let src = head
+    while (upMax[src]! >= 0 && acc[upMax[src]!]! > thr * 0.05) {
+      src = upMax[src]!
+      upstream.push(src)
+    }
+    for (let k = upstream.length - 1; k >= 0; k--) {
+      const u = upstream[k]!
+      line.push([px(u), pz(u)])
+      width.push(widthAt(u))
+    }
     let c = head
     let last = c
     while (c >= 0 && land[c]) {
@@ -482,6 +501,7 @@ export function terraIsland(input: TerraSpec): Terra {
       width.push(widthAt(last))
     }
     if (line.length * cell < 30) continue
+    springs.push(src)
     const [sl, sw] = chaikin(line, width, 2)
     rivers.push({ line: sl, width: sw, flow: acc[last]! })
   }
@@ -523,6 +543,69 @@ export function terraIsland(input: TerraSpec): Terra {
       const i0 = Math.floor((p[1] - oz) / cell) * w + Math.floor((p[0] - ox) / cell)
       const i1 = Math.floor((q[1] - oz) / cell) * w + Math.floor((q[0] - ox) / cell)
       if (hf[i0]! - hf[i1]! > 1.3) falls.push(q)
+    }
+  }
+
+  // still water: a spring pond where each river starts, and a lake the main river runs through
+  const pond = (
+    cx: number,
+    cz: number,
+    rx: number,
+    rz: number,
+    ang: number,
+    surf: number,
+    depth: number,
+  ): void => {
+    const gx = Math.floor((cx - ox) / cell)
+    const gz = Math.floor((cz - oz) / cell)
+    const rc = Math.ceil((Math.max(rx, rz) * 1.4) / cell)
+    const ca = Math.cos(ang)
+    const sa = Math.sin(ang)
+    for (let dz = -rc; dz <= rc; dz++)
+      for (let dx = -rc; dx <= rc; dx++) {
+        const xx = gx + dx
+        const zz = gz + dz
+        if (xx < 0 || zz < 0 || xx >= w || zz >= h) continue
+        const j = zz * w + xx
+        if (!land[j]) continue
+        const ex = px(j) - cx
+        const ez = pz(j) - cz
+        const a = (ex * ca + ez * sa) / rx
+        const b = (-ex * sa + ez * ca) / rz
+        const wob = 1 + 0.18 * fbm(seed + 991, px(j) / 14, pz(j) / 14, 2)
+        const r = Math.hypot(a, b) / wob
+        if (r <= 1) {
+          water[j] = TERRA_WATER.lake
+          surface[j] = surf
+          height[j] = Math.min(height[j]!, surf - depth * (1.2 - r))
+        } else if (r <= 1.4) height[j] = Math.min(height[j]!, surf + (r - 1) * 2.5)
+      }
+  }
+  for (const sp of springs) {
+    pond(px(sp), pz(sp), 4.5, 3.5, rnd(500 + (sp % 97)) * Math.PI, hf[sp]!, 0.8)
+    lakes++
+  }
+  let main: TerraRiver | null = null
+  for (const r of rivers) if (!main || r.flow > main.flow) main = r
+  if (main && main.line.length > 12) {
+    const line = main.line
+    const n = line.length
+    for (let k = Math.floor(n * 0.35); k < Math.floor(n * 0.75); k++) {
+      const p0 = line[k]!
+      const i = Math.floor((p0[1] - oz) / cell) * w + Math.floor((p0[0] - ox) / cell)
+      if (!land[i] || terraceLevel[i] !== 0 || coastDist[i]! < 40) continue
+      const p1 = line[Math.min(n - 1, k + 3)]!
+      pond(
+        p0[0],
+        p0[1],
+        16 + 8 * rnd(510),
+        10 + 5 * rnd(511),
+        Math.atan2(p1[1] - p0[1], p1[0] - p0[0]),
+        hf[i]!,
+        1.8,
+      )
+      lakes++
+      break
     }
   }
 

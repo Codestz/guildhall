@@ -229,10 +229,10 @@ export function nature(
         const what = scatterAt(field, p, u)
         if (!what) continue
         if (what.slot === "flower") {
-          // A drift: two or three flowers of one kind close together.
+          // A drift: three to five flowers of one kind close together.
           // Its ground is checked once, wide enough for every flower in it (none is over 0.7 m out).
           if (!fits(p, "flower", 0.75)) continue
-          const n = 2 + Math.floor(2 * u(20))
+          const n = 3 + Math.floor(3 * u(20))
           for (let k = 0; k < n; k++) {
             const q: Vec2 = [p[0] + 1.4 * (u(30 + k) - 0.5), p[1] + 1.4 * (u(40 + k) - 0.5)]
             put(
@@ -291,7 +291,7 @@ function scatterAt(
     if (x < 0.17) return { slot: "grass", size: 1 }
   }
   const d = field.drift(p)
-  if (d > 0 && u(6) < 0.85 * d) return { slot: "flower", size: 1 }
+  if (d > 0 && u(6) < 0.55 * d) return { slot: "flower", size: 1 }
   if (x > 0.9993 && field.glade(p) < 0) return { slot: treeSlot(field, p, edge, u), size: 1.15 + 0.25 * u(4) }
   return null
 }

@@ -211,7 +211,7 @@ export function natureField(plan: FieldInput, roll: Roll): NatureField {
 
   function pineAt(p: Vec2): number {
     const belt = 1 - smooth((coast(p) - SHORE[1] - BELT[1]) / 15)
-    return clamp01(0.08 + 0.3 * belt + 0.3 * wild(p) + 1.1 * (pineN(p) - 0.5))
+    return clamp01(0.05 + 0.22 * belt + 0.15 * wild(p) + 1.1 * (pineN(p) - 0.5))
   }
 
   /** Cover from the woods at a warped point, and which wood gives it. */
@@ -347,7 +347,7 @@ export function natureField(plan: FieldInput, roll: Roll): NatureField {
     birch: (p) => smooth((birchN(p) - 0.62) / 0.12),
     stand: (p) => Math.min(0.999, standN(p)),
     wild,
-    drift: (p) => smooth((driftN(p) - 0.7) / 0.1) * smooth((driftGate(p) - 0.35) / 0.25),
+    drift: (p) => smooth((driftN(p) - 0.72) / 0.08) * smooth((driftGate(p) - 0.35) / 0.25),
     rocky: (p) => smooth((rockN(p) - 0.55) / 0.2) * (0.35 + 0.65 * Math.max(wild(p), coast(p) < 14 ? 1 : 0)),
     tone: (p) => 2 * toneN(p) - 1,
     groundTint(x, z) {

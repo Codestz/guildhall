@@ -257,7 +257,10 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         hidden: p.indoors,
       }
     }
+    // the CPU a frame of life costs (sampling, the crowd's update, the banners), smoothed
+    let cpuMs = 0
     const tick = (step: number) => {
+      const t1 = performance.now()
       dt = step
       const clock = opts.hour()
       if (Math.abs(clock - seen) > 1e-6) {
@@ -284,6 +287,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         placed.push([x, y])
         el.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`
       }
+      cpuMs += (performance.now() - t1 - cpuMs) * 0.05
     }
     unFrame = stage.onFrame(tick)
     tick(0)
@@ -293,7 +297,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     const ext = window.guildhall?.ext
     if (ext)
       ext.life = {
-        stats: () => ({ folk: folk.length, agents: agentIds.length, ...crowd?.stats() }),
+        stats: () => ({ folk: folk.length, agents: agentIds.length, cpuMs, ...crowd?.stats() }),
         walk: { nodes: walk.nodes.length, edges: walk.edges.length },
       }
     logger.info("life", {

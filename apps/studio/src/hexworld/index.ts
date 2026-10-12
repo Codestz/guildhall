@@ -275,7 +275,16 @@ export const hexWorldScreen: Screen = {
       sun.markDirty()
       // ---- life (track B): townsfolk and agents on the walk graph; `?life=0` turns it off ----
       if (ctx.query.get("life") !== "0") {
-        life = createLife(stage, { host, island: h, zones: z, world: w, groundAt, hour: () => now, seed })
+        life = createLife(stage, {
+          host,
+          island: h,
+          zones: z,
+          world: w,
+          groundAt,
+          hour: () => now,
+          seed,
+          agentT: num("lifeT", 0),
+        })
         await life.ready
       }
       const top = Object.entries(w.stats.prefabs)

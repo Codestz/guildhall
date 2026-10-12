@@ -37,6 +37,10 @@
   },
   "overrides": [
     {
+      "includes": ["data/**"],
+      "json": { "formatter": { "expand": "always" } }
+    },
+    {
       "includes": ["**/test/**"],
       "linter": {
         "rules": {

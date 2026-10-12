@@ -3,7 +3,8 @@
  * on hex": in V1 the characters stand taller than the doors). Three options side by side, each the same
  * little cluster (a house, a tavern, a well, trees, a road, a field) on hex tiles sized to fit, with the
  * same KayKit characters standing in front: A as small as V1, B in between, C as the library imports
- * them today. A label under each gives the numbers.
+ * them today. A label under each gives the numbers. Scale B is chosen (decisions.md): this board is at
+ * `?board=scale`; `/lab/hexscale` itself opens the nature board (nature.ts).
  */
 import type { CameraPose } from "@guildhall/core"
 import { log } from "@guildhall/core"
@@ -23,6 +24,7 @@ import { hexCentre } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
 import { worldCamera } from "../shell/worldCamera.ts"
+import { mountNatureBoard } from "./nature.ts"
 
 const logger = log("studio:hexscale")
 
@@ -81,6 +83,8 @@ export const hexScale: Screen = {
   id: "hexscale",
   title: "Scale board",
   mount(host, ctx) {
+    // the nature board (nature.ts) is the default now scale B is chosen; `?board=scale` shows this one
+    if (ctx.query.get("board") !== "scale") return mountNatureBoard(host, ctx)
     const stage = createStage(host)
     ctx.attach(stage)
     let disposed = false

@@ -70,7 +70,7 @@ export const hexTiles: Screen = {
       shown.forEach((t, k) => {
         const [x, z] = at(k)
         tiles.push({ x, z, top: t.ground === "water" ? 0.15 : 0.5, color: GROUND[t.ground], side: SIDE })
-        pieces.push(...placeTile(t, [x, z], 0.5, 0, k + 1).filter((q) => catalog.get(q.piece)))
+        pieces.push(...placeTile(t, [x, z], 0.5, 0, k + 1, false).filter((q) => catalog.get(q.piece)))
         // a dirt path from the centre out through each side the tile names (side d's middle sits at
         // 30° + 60°·d on a pointy-top hex), a round patch where they meet
         if (t.path) {

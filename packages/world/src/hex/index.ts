@@ -21,7 +21,12 @@ export {
 } from "./island.ts"
 export {
   CHARACTER_SCALE,
+  castleWalls,
+  edgeDressing,
   HEX_TILE_SIZE,
+  KENNEY_WOOD,
+  LEAF_TONES,
+  type PlacedPiece,
   placeTile,
   SCALE_B,
   TILE_PREFABS,
@@ -30,6 +35,7 @@ export {
   type TilePrefab,
   tilePath,
   tilePrefab,
+  tileVariant,
 } from "./tiles.ts"
 export { type HexWorld, type HexWorldTile, hexWorld, LEVEL_STEP } from "./world.ts"
 export {

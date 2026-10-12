@@ -6,11 +6,23 @@
 import { hash2 } from "../geom/noise.ts"
 import { hexCentre } from "./grid.ts"
 import { type HexIsland, kindOf } from "./island.ts"
-import { HEX_TILE_SIZE, placeTile, type TileGround, tilePath, tilePrefab } from "./tiles.ts"
+import {
+  castleWalls,
+  edgeDressing,
+  HEX_TILE_SIZE,
+  type PlacedPiece,
+  placeTile,
+  type TileGround,
+  tilePath,
+  tilePrefab,
+} from "./tiles.ts"
 import { type HexZones, useOf } from "./zones.ts"
 
 /** Metres per height level. */
 export const LEVEL_STEP = 1.1
+
+/** The top of a shallows tile's bed, where a dock's posts stand. */
+const SEA_TOP = -0.4
 
 export interface HexWorldTile {
   i: number
@@ -24,7 +36,7 @@ export interface HexWorldTile {
 
 export interface HexWorld {
   tiles: HexWorldTile[]
-  pieces: { piece: string; x: number; y: number; z: number; rot: number; scale: number }[]
+  pieces: PlacedPiece[]
   /** Path strips (triangle positions) over road tiles. */
   paths: number[]
   /** Bridge decks (triangle positions), drawn in plank colour. */
@@ -37,7 +49,7 @@ export interface HexWorld {
 /** What a building tile of each place builds (picked by the tile's hash). */
 const BUILDS: Record<string, string[]> = {
   town: ["house", "townhouse", "cottage", "house", "townhouse", "tavern", "smithy", "market"],
-  harbour: ["warehouse", "cottage", "house"],
+  harbour: ["storehouse", "house", "warehouse", "cottage", "tavern", "boathouse"],
   castle: ["barracks"],
   farm: ["farmstead", "cottage"],
   fishing: ["cottage", "cottage", "house"],
@@ -186,6 +198,13 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
       } else prefab = pick(BUILDS[zone?.kind ?? "town"] ?? BUILDS.town!)
       rot = rotOf(facing(i))
     } else if (u === "landmark") prefab = "castle"
+    else if (zone?.kind === "castle" && (u === "yard" || u === "garden" || u === "well" || u === "market")) {
+      // the castle's other tiles are its wards, inside the curtain wall
+      prefab = "castle-ward"
+      const d = g.neighbours(i).indexOf(zone.tile)
+      rot = rotOf(d >= 0 ? d : 4)
+    } else if (zone?.kind === "harbour" && (u === "yard" || u === "garden" || u === "well" || u === "market"))
+      prefab = "quay"
     else if (u === "square") {
       prefab = HEART[zone?.kind ?? "town"] ?? "well-square"
       ground = "paved"
@@ -255,8 +274,15 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
               })
         }
       }
-    } else if (u === "dock") prefab = "dock"
-    else if (BY_USE[u]) {
+    } else if (u === "dock") {
+      prefab = "dock"
+      // the pier runs out from the shore: its land end toward the dry tile beside it, a harbour's first
+      const nb = g.neighbours(i)
+      const dry = (j: number) => j >= 0 && kindOf(h, j) !== "shallows" && kindOf(h, j) !== "sea"
+      let d = [0, 1, 2, 3, 4, 5].find((e) => dry(nb[e]!) && z.zoneOf[nb[e]!]! > 0)
+      if (d === undefined) d = [0, 1, 2, 3, 4, 5].find((e) => dry(nb[e]!))
+      rot = rotOf(d ?? 4)
+    } else if (BY_USE[u]) {
       prefab = BY_USE[u]!
       if (prefab === "farmstead" || prefab === "market" || prefab === "windmill") rot = rotOf(facing(i))
     } else if (k === "forest") prefab = "woods"
@@ -268,9 +294,38 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
     if (p) {
       if (p.ground === "dirt" || p.ground === "paved") ground = p.ground
       // a prefab's own pieces, minus those that would float on water tiles it was not made for
-      for (const q of placeTile(p, [x, zz], prefab === "dock" ? 0.1 : t, rot, i))
-        pieces.push({ ...q, piece: recolour(q.piece, i) })
+      // a castle's tiles all take its keep's colour
+      const hue = zone?.kind === "castle" ? zone.tile : i
+      for (const q of placeTile(p, [x, zz], prefab === "dock" ? SEA_TOP : t, rot, i))
+        pieces.push({ ...q, piece: recolour(q.piece, hue) })
       prefabs[prefab!] = (prefabs[prefab!] ?? 0) + 1
+    }
+    if (ground !== "water" && u !== "road" && u !== "bridge" && u !== "square" && u !== "building" && !zone) {
+      // reeds along a river's or lake's banks, fallen rocks at the foot of a high step
+      const nb = g.neighbours(i)
+      const wet = (j: number) => j >= 0 && (kindOf(h, j) === "river" || kindOf(h, j) === "lake")
+      const banks = [0, 1, 2, 3, 4, 5].filter((d) => wet(nb[d]!))
+      const feet = [0, 1, 2, 3, 4, 5].filter(
+        (d) => nb[d]! >= 0 && !wet(nb[d]!) && h.level[nb[d]!]! - h.level[i]! >= 2,
+      )
+      if (banks.length || feet.length) pieces.push(...edgeDressing([x, zz], t, banks, feet, i))
+    }
+    if (zone?.kind === "castle") {
+      // the curtain wall: along every side that faces out of the castle, a gate where a road comes in
+      const nb = g.neighbours(i)
+      const out = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! < 0 || z.zoneOf[nb[d]!] !== z.zoneOf[i])
+      const gates = out.filter((d) => nb[d]! >= 0 && roadLike(nb[d]!))
+      const colour = recolour("kaykit-hexagon/building-castle-blue", zone.tile).split("-").pop()!
+      pieces.push(
+        ...castleWalls(
+          [x, zz],
+          t,
+          out.filter((d) => !gates.includes(d)),
+          gates,
+          colour,
+        ),
+      )
+      if (u === "road") ground = "paved"
     }
     byTile.set(i, tiles.length)
     tiles.push({ i, x, z: zz, top: k === "shallows" ? -0.4 : t, ground, prefab })

@@ -1,23 +1,24 @@
 /**
  * The main thread's half of a town: each placed prefab variant compiled once (cached across towns, so
- * stepping seeds re-compiles only what is new), the layout dressed (ground, water, the metrics' draw
+ * stepping seeds re-compiles only what is new), the layout dressed (the metrics' draw
  * list), and its pieces cut into what the static batch streams in, in order: the buildings as LOD
  * clusters (one per house, keyed by recipe and seed, so houses alike share a far shell), then walls,
- * fences and props as loose pieces, then the plants clustered by grid cell.
+ * fences, props and the lamps as loose pieces, then the plants clustered (by wood, else grid cell); and
+ * the town's lights for the night.
  */
 import { type Catalog, compilePrefab, type PrefabRecipe, type Recipe } from "@guildhall/assets"
 import { log } from "@guildhall/core"
 import type { BatchCluster, BatchInstance } from "@guildhall/render"
 import {
-  area,
-  clip,
   dressTown,
-  type MultiPolygon,
   PLANT_ROLES,
   type Placement,
   recipeKey,
   type TownDraw,
   type TownLayout,
+  type TownLibrary,
+  type TownLights,
+  townLights,
   type Vec2,
 } from "@guildhall/world"
 
@@ -27,8 +28,10 @@ const logger = log("studio:town")
 const CACHE = 4000
 
 export interface Dressed {
-  /** The whole town as dressTown draws it (ground, water with the sea, every piece flat). */
+  /** The whole town as dressTown draws it (the metrics count its pieces; the worker builds the ground and water). */
   draw: TownDraw
+  /** The lamps (their posts are among the loose pieces), their light points and the lit windows. */
+  lights: TownLights
   /** The same pieces as the batch takes them: houses, loose pieces (edges, props), plants. */
   houses: BatchCluster[]
   loose: BatchInstance[]
@@ -77,104 +80,58 @@ export type Compiler = ReturnType<typeof createCompiler>
 export const PLANT_CELL = 16
 
 /**
- * Plants as clusters, one per PLANT_CELL grid cell they stand in (a field's rows, a stretch of wood):
- * each cluster sits at its cell's centre with its plants as parts around it, keyed by its cell.
+ * Plants as clusters: those nature grouped (`cluster`: a wood's or the wild's cell) one per group,
+ * centred on its plants' mean; the rest (a field's rows, an orchard) one per PLANT_CELL grid cell they
+ * stand in, at the cell's centre. Each plant keeps its size and tone (`scale`, `swatchMap`).
  */
 export function plantClusters(plants: readonly Placement[]): BatchCluster[] {
-  const cells = new Map<string, { i: number; j: number; parts: BatchInstance[] }>()
+  const groups = new Map<string, { centre: Vec2 | null; members: Placement[] }>()
   for (const p of plants) {
     const i = Math.floor(p.at[0] / PLANT_CELL)
     const j = Math.floor(p.at[1] / PLANT_CELL)
-    const key = `plants:${i},${j}`
-    let cell = cells.get(key)
-    if (!cell) {
-      cell = { i, j, parts: [] }
-      cells.set(key, cell)
+    const key = p.cluster ? `plants:${p.cluster}` : `plants:${i},${j}`
+    let group = groups.get(key)
+    if (!group) {
+      group = { centre: p.cluster ? null : [(i + 0.5) * PLANT_CELL, (j + 0.5) * PLANT_CELL], members: [] }
+      groups.set(key, group)
     }
-    const cx = (i + 0.5) * PLANT_CELL
-    const cz = (j + 0.5) * PLANT_CELL
-    cell.parts.push({ piece: p.prefab, x: p.at[0] - cx, y: 0, z: p.at[1] - cz, rot: p.rot, scale: 1 })
+    group.members.push(p)
   }
-  return [...cells.entries()]
+  return [...groups.entries()]
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([key, c]) => ({
-      key,
-      parts: c.parts,
-      x: (c.i + 0.5) * PLANT_CELL,
-      y: 0,
-      z: (c.j + 0.5) * PLANT_CELL,
-      rot: 0,
-      scale: 1,
-    }))
-}
-
-/** How far the sea runs past the site's bounds, as a share of their half side (the haze hides its edge). */
-const SEA_REACH = 3
-
-/**
- * The water with open sea round the site: four bands (not overlapping, as the water mesh needs) from
- * the bounds' box out to SEA_REACH × its half side. The shore lines (where foam breaks) are the land's
- * outline and its holes, exactly: the seams where an island's sea pieces meet, or a lake meets the
- * bounds, are water on both sides and get none. On an island site the sea is inside the bounds
- * already; the bands then only carry it out to the haze.
- */
-export function withSea(
-  water: TownDraw["water"],
-  bounds: readonly Vec2[],
-  { land, holes }: { land: readonly Vec2[]; holes: readonly Vec2[][] },
-): TownDraw["water"] {
-  if (bounds.length < 3) return water
-  let x0 = Number.POSITIVE_INFINITY
-  let z0 = Number.POSITIVE_INFINITY
-  let x1 = Number.NEGATIVE_INFINITY
-  let z1 = Number.NEGATIVE_INFINITY
-  for (const [x, z] of bounds) {
-    x0 = Math.min(x0, x)
-    z0 = Math.min(z0, z)
-    x1 = Math.max(x1, x)
-    z1 = Math.max(z1, z)
-  }
-  const r = SEA_REACH * Math.max(x1 - x0, z1 - z0) * 0.5
-  const box = (a: number, b: number, c: number, d: number): Vec2[] => [
-    [a, b],
-    [c, b],
-    [c, d],
-    [a, d],
-  ]
-  const bands = [
-    box(x0 - r, z0 - r, x1 + r, z0),
-    box(x0 - r, z1, x1 + r, z1 + r),
-    box(x0 - r, z0, x0, z1),
-    box(x1, z0, x1 + r, z1),
-  ]
-  const closed = (ring: readonly Vec2[]): Vec2[] => [...ring, ring[0] as Vec2]
-  const shore = [land, ...holes].filter((ring) => ring.length > 2).map(closed)
-  return { ...water, polys: [...water.polys, ...bands], shore: shore.length > 0 ? shore : water.shore }
-}
-
-/**
- * The land as the bounds minus the water: its largest piece and that piece's holes. The water rings
- * are unioned first: an island's sea comes in pieces that overlap, and a difference taken against
- * overlapping pieces leaves sea in the land (dressTown's own land does, so it is redone here).
- */
-export function landOf(bounds: readonly Vec2[], water: readonly Vec2[][]): { land: Vec2[]; holes: Vec2[][] } {
-  if (water.length === 0) return { land: [...bounds], holes: [] }
-  let sea: MultiPolygon = []
-  for (const ring of water) sea = sea.length === 0 ? clip(ring, ring, "union") : clip(sea, ring, "union")
-  const parts = clip([...bounds], sea, "difference")
-  let best: Vec2[][] | null = null
-  for (const p of parts)
-    if (p[0] && (!best || Math.abs(area(p[0])) > Math.abs(area(best[0] as Vec2[])))) best = p
-  return best ? { land: best[0] as Vec2[], holes: best.slice(1) } : { land: [...bounds], holes: [] }
+    .map(([key, g]) => {
+      const n = g.members.length
+      const [x, z] = g.centre ?? [
+        g.members.reduce((s, p) => s + p.at[0], 0) / n,
+        g.members.reduce((s, p) => s + p.at[1], 0) / n,
+      ]
+      const parts = g.members.map(
+        (p): BatchInstance => ({
+          piece: p.prefab,
+          x: p.at[0] - x,
+          y: 0,
+          z: p.at[1] - z,
+          rot: p.rot,
+          scale: p.scale ?? 1,
+          ...(p.swatchMap ? { swatchMap: p.swatchMap } : {}),
+        }),
+      )
+      return { key, parts, x, y: 0, z, rot: 0, scale: 1 }
+    })
 }
 
 /** Compiles, dresses and clusters a layout. */
-export function dress(layout: TownLayout, compiler: Compiler, now = () => performance.now()): Dressed {
+export function dress(
+  layout: TownLayout,
+  compiler: Compiler,
+  lib: Pick<TownLibrary, "prefabs">,
+  now = () => performance.now(),
+): Dressed {
   const t0 = now()
   const { compiled, misses } = compiler.compile(layout)
   const t1 = now()
-  const dressed = dressTown(layout, compiled)
-  const draw = { ...dressed, ground: { ...dressed.ground, ...landOf(layout.bounds, layout.water) } }
+  const draw = dressTown(layout, compiled)
+  const lights = townLights(layout, compiled, lib)
   const houses: BatchCluster[] = []
   const rest: Placement[] = []
   const plants: Placement[] = [...layout.nature]
@@ -186,11 +143,15 @@ export function dress(layout: TownLayout, compiler: Compiler, now = () => perfor
     else if (PLANT_ROLES.has(p.role ?? "")) plants.push(p)
     else rest.push(p)
   }
-  // Edges and the uncompiled placements, laid out exactly as the full draw lays them out.
-  const loose = dressTown({ ...layout, placements: rest, nature: [] }, new Map()).pieces
+  // Edges and the uncompiled placements, laid out exactly as the full draw lays them out; the lamps.
+  const loose = [
+    ...dressTown({ ...layout, placements: rest, nature: [] }, new Map()).pieces,
+    ...lights.pieces,
+  ]
   const t2 = now()
   return {
-    draw: { ...draw, water: withSea(draw.water, layout.bounds, draw.ground) },
+    draw,
+    lights,
     houses,
     loose,
     plants: plantClusters(plants),

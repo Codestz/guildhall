@@ -153,7 +153,7 @@ export function createTownController(
     if (disposed || wanted !== spec) return
     const genMs = performance.now() - t0
     publish({ busy: "dressing" })
-    const dressed = dress(job.layout, compiler)
+    const dressed = dress(job.layout, compiler, lib.job.town)
     const report = townMetrics(job.layout, {
       draw: dressed.draw,
       tris: (lib.job.town as { tris?: Record<string, number> }).tris,
@@ -170,7 +170,7 @@ export function createTownController(
       busy: "streaming",
     })
     frame()
-    const build = await scene.show(job.layout, dressed)
+    const build = await scene.show(job, dressed)
     if (disposed || wanted !== spec) return
     publish({ build, busy: null })
   }

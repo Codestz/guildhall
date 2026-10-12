@@ -297,10 +297,7 @@ export function Stats({ town, stage }: { town: TownController; stage: Stage }) {
               label="Stream (bld · edge · plant)"
               value={s.build.stagesMs.map((v) => ms(v)).join(" · ")}
             />
-            <Stat
-              label="Ground"
-              value={`${ms(s.build.groundMs)}${s.build.groundSnap === null ? " (bare)" : ` (${s.build.groundSnap} m snap)`}`}
-            />
+            <Stat label="Ground · water upload" value={ms(s.build.groundMs)} />
           </>
         )}
         {s.error && <p className="gh-pl-note warn">Could not build this town: {s.error}</p>}

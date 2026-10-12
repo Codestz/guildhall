@@ -22,7 +22,7 @@ export { createNpc, dressNpc, type Npc, type NpcActivity, type NpcProp } from ".
 export { keepUpright } from "./character/upright.ts"
 export { createGizmo, type Gizmo, type GizmoMode, type GizmoOpts, type GizmoPose } from "./gizmo.ts"
 export { createGrid, type Disposable } from "./grid.ts"
-export { contactShade, createGround, type Ground, type GroundDraw, groundMesh } from "./ground.ts"
+export { createGround, type Ground, type GroundDraw } from "./ground.ts"
 export { disposeObject, heroSilhouette, testBox } from "./hero.ts"
 export {
   applyLight,

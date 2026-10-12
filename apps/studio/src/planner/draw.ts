@@ -4,7 +4,7 @@
  * is; text, the frame, the compass and the scale bar are drawn after, in screen pixels, so they stay
  * crisp at any zoom. The sun stands upper left: shadows fall down and right.
  */
-import type { Vec2 } from "@guildhall/world"
+import { insideIndex, type Vec2 } from "@guildhall/world"
 import { cornersOf, toWorld as frameToWorld, type MapData, mix, type Tones } from "./derive.ts"
 import { overlayLabels, poiGlyph } from "./glyphs.ts"
 import type { Layer } from "./query.ts"
@@ -146,6 +146,15 @@ function onSheetEdge(a: Vec2, b: Vec2, box: MapData["box"]): boolean {
   )
 }
 
+/** Whether a water ring's side is a seam between two water pieces: water just off it on both sides. */
+function isSeam(a: Vec2, b: Vec2, wet: (p: Vec2) => boolean): boolean {
+  const l = Math.hypot(b[0] - a[0], b[1] - a[1])
+  if (l < 1e-9) return false
+  const m: Vec2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+  const n: Vec2 = [(-(b[1] - a[1]) / l) * 0.5, ((b[0] - a[0]) / l) * 0.5]
+  return wet([m[0] + n[0], m[1] + n[1]]) && wet([m[0] - n[0], m[1] - n[1]])
+}
+
 function build(map: MapData, theme: Theme): Built {
   const plan = map.plan
   const box = map.box
@@ -156,13 +165,16 @@ function build(map: MapData, theme: Theme): Built {
   const coast = new Path2D()
   const landClip = new Path2D()
   landClip.rect(box[0], box[1], box[2] - box[0], box[3] - box[1])
+  // The sea comes in pieces: where two meet is water on both sides, not a coast.
+  const tests = plan.water.map((ring) => insideIndex([ring]))
+  const wet = (p: Vec2) => tests.some((t) => t(p))
   for (const ring of plan.water) {
     poly(water, ring)
     poly(landClip, ring)
     for (let i = 0; i < ring.length; i++) {
       const a = ring[i] as Vec2
       const b = ring[(i + 1) % ring.length] as Vec2
-      if (onSheetEdge(a, b, box)) continue
+      if (onSheetEdge(a, b, box) || isSeam(a, b, wet)) continue
       coast.moveTo(a[0], a[1])
       coast.lineTo(b[0], b[1])
     }

@@ -1,15 +1,6 @@
 import { PALETTE } from "@guildhall/assets"
 import { log } from "@guildhall/core"
-import {
-  bbox,
-  clip,
-  closest,
-  type MultiPolygon,
-  orient,
-  type Ring,
-  type TownDraw,
-  type Vec2,
-} from "@guildhall/world"
+import { type TownDraw, type WaterGeometry, waterGeometry } from "@guildhall/world"
 import {
   BufferAttribute,
   BufferGeometry,
@@ -21,19 +12,13 @@ import {
   type WebGLProgramParametersWithUniforms,
 } from "three"
 import { ATMOSPHERE, patchCloudShade } from "./atmosphere/shade.ts"
-import { type FlatMesh, gridMesh } from "./ground.ts"
 import type { Stage } from "./stage.ts"
 import { patchCascades } from "./sun/patch.ts"
 
 export type WaterDraw = TownDraw["water"]
 
-/** The water's grid pitch near the shore, metres: the shore distance it carries is interpolated across it. */
-const PITCH = 4
 /** Past this distance from the shore the water is at its deepest colour, metres. */
 const DEEP_AT = 10
-/** Water further than this past the shore lines' box is all deep: one coarse grid, metres. */
-const NEAR = 30
-const FAR_PITCH = 40
 
 const logger = log("render:water")
 
@@ -41,15 +26,6 @@ const swatch = (name: string): Color => {
   const s = PALETTE.swatches.find((w) => w.name === name)
   if (!s) throw new Error(`water: no swatch "${name}"`)
   return new Color(s.hex)
-}
-
-/** Per vertex of the water's polygons: its distance to the nearest shore line, metres. */
-export function shoreDistance(p: Vec2, shore: readonly Vec2[][]): number {
-  let best = Number.POSITIVE_INFINITY
-  for (const line of shore)
-    for (let i = 0; i + 1 < line.length; i++)
-      best = Math.min(best, closest(p, line[i] as Vec2, line[i + 1] as Vec2).d)
-  return best
 }
 
 /** Boats' wakes the water draws at once (`Water.setWakes`). */
@@ -239,26 +215,6 @@ if (uReflect > 0.5) {
     )
 }
 
-/** The water's polygons on a fine grid near the shore lines and a coarse one past them. */
-function waterMesh(w: WaterDraw): FlatMesh {
-  const polys: MultiPolygon = w.polys.filter((ring) => ring.length >= 3).map((ring) => [orient(ring, true)])
-  const [min, max] = bbox(w.shore.flat())
-  const box: Ring = [
-    [min[0] - NEAR, min[1] - NEAR],
-    [max[0] + NEAR, min[1] - NEAR],
-    [max[0] + NEAR, max[1] + NEAR],
-    [min[0] - NEAR, max[1] + NEAR],
-  ]
-  if (w.shore.length === 0) return gridMesh(polys, PITCH)
-  const near = gridMesh(clip(polys, [[box]], "intersection"), PITCH)
-  const far = gridMesh(clip(polys, [[box]], "difference"), FAR_PITCH)
-  const base = near.points.length / 2
-  return {
-    points: [...near.points, ...far.points],
-    indices: [...near.indices, ...far.indices.map((i) => i + base)],
-  }
-}
-
 export interface Water {
   mesh: Mesh
   /** The wakes of the boats moving now (at most MAX_WAKES; more are dropped). */
@@ -269,27 +225,18 @@ export interface Water {
 /**
  * The water (plan §5): its polygons as one flat mesh at `level`, each vertex carrying its distance to
  * the shore lines; a small patched standard material does the rest (depth tint, foam, ripples, sky
- * fresnel, the sun's glint, and the cascaded shadows of what stands over it). One draw call.
+ * fresnel, the sun's glint, and the cascaded shadows of what stands over it). One draw call. Takes
+ * the geometry prebuilt (world `waterGeometry`, in a worker) or builds it here from the draw.
  */
-export function createWater(stage: Stage, w: WaterDraw): Water {
+export function createWater(stage: Stage, w: WaterDraw | WaterGeometry): Water {
   const start = performance.now()
-  const flat = waterMesh(w)
-  const count = flat.points.length / 2
-  const position = new Float32Array(count * 3)
-  const normal = new Float32Array(count * 3)
-  const shore = new Float32Array(count)
-  for (let i = 0; i < count; i++) {
-    const x = flat.points[2 * i] as number
-    const z = flat.points[2 * i + 1] as number
-    position.set([x, w.level, z], 3 * i)
-    normal[3 * i + 1] = 1
-    shore[i] = Math.min(shoreDistance([x, z], w.shore), 1e3)
-  }
+  const built = "position" in w ? w : waterGeometry(w)
+  const count = built.position.length / 3
   const geometry = new BufferGeometry()
-  geometry.setAttribute("position", new BufferAttribute(position, 3))
-  geometry.setAttribute("normal", new BufferAttribute(normal, 3))
-  geometry.setAttribute("shore", new BufferAttribute(shore, 1))
-  geometry.setIndex(flat.indices)
+  geometry.setAttribute("position", new BufferAttribute(built.position, 3))
+  geometry.setAttribute("normal", new BufferAttribute(built.normal, 3))
+  geometry.setAttribute("shore", new BufferAttribute(built.shore, 1))
+  geometry.setIndex(new BufferAttribute(built.index, 1))
   geometry.computeBoundingSphere()
 
   const uniforms = {
@@ -318,7 +265,7 @@ export function createWater(stage: Stage, w: WaterDraw): Water {
   })
   logger.info("water", {
     vertices: count,
-    triangles: flat.indices.length / 3,
+    triangles: built.index.length / 3,
     ms: Math.round(performance.now() - start),
   })
   return {

@@ -1,5 +1,5 @@
 /** The asset library as the studio reads it: `/library/catalog/index.json` plus one shard per pack. */
-import { type Catalog, type CatalogEntry, type CatalogIndex, createCatalog } from "@guildhall/assets"
+import { type Catalog, type CatalogEntry, type CatalogIndex, createCatalog, inStyle } from "@guildhall/assets"
 import { log } from "@guildhall/core"
 import { BASE } from "./env.ts"
 
@@ -11,16 +11,29 @@ export const LIBRARY = `${BASE}library`
 type Fetch = (url: string) => Promise<Pick<Response, "ok" | "status" | "json">>
 
 /**
+ * Whether the Studio shows every imported pack (`?packs=all`) or only the house style's (the default:
+ * decisions.md "Clean restart on hex").
+ */
+const allPacks = (): boolean =>
+  typeof location !== "undefined" && new URLSearchParams(location.search).get("packs") === "all"
+
+/**
  * The library's catalog, or null when there is no library yet (no index, or an index listing no
  * pieces). A shard that fails to load is logged and left out, so one broken pack does not hide the rest.
+ * Only the house style's packs are read unless `all` (default: the page's `?packs=all`).
  */
-export async function loadCatalog(fetcher: Fetch = fetch, base = LIBRARY): Promise<Catalog | null> {
+export async function loadCatalog(
+  fetcher: Fetch = fetch,
+  base = LIBRARY,
+  all = allPacks(),
+): Promise<Catalog | null> {
   const response = await fetcher(`${base}/catalog/index.json`).catch(() => null)
   if (!response?.ok) {
     logger.info("no library", { status: response?.status ?? "unreachable" })
     return null
   }
-  const index = (await response.json()) as CatalogIndex
+  const full = (await response.json()) as CatalogIndex
+  const index: CatalogIndex = all ? full : { ...full, packs: full.packs.filter((p) => inStyle(p.id)) }
   const shards = await Promise.all(
     index.packs.map(async ({ id }): Promise<CatalogEntry[]> => {
       try {

@@ -23,7 +23,7 @@ describe("loadCatalog", () => {
       "/library/catalog/a.json": [entry("a/one")],
       "/library/catalog/b.json": [entry("b/two"), entry("b/three")],
     }
-    const catalog = await loadCatalog(fakeFetch(files))
+    const catalog = await loadCatalog(fakeFetch(files), undefined, true)
     expect(catalog?.all().map((e) => e.id)).toEqual(["a/one", "b/three", "b/two"])
   })
 
@@ -44,7 +44,21 @@ describe("loadCatalog", () => {
       ]),
       "/library/catalog/a.json": [entry("a/one")],
     }
-    expect((await loadCatalog(fakeFetch(files)))?.all().map((e) => e.id)).toEqual(["a/one"])
+    expect((await loadCatalog(fakeFetch(files), undefined, true))?.all().map((e) => e.id)).toEqual(["a/one"])
+  })
+
+  test("only the house style's packs load unless all are asked for", async () => {
+    const files = {
+      "/library/catalog/index.json": index([
+        { id: "kaykit-hexagon", vendor: "kaykit" },
+        { id: "quaternius-nature", vendor: "quaternius" },
+      ]),
+      "/library/catalog/kaykit-hexagon.json": [entry("kaykit-hexagon/one")],
+      "/library/catalog/quaternius-nature.json": [entry("quaternius-nature/two")],
+    }
+    expect((await loadCatalog(fakeFetch(files), undefined, false))?.all().map((e) => e.id)).toEqual([
+      "kaykit-hexagon/one",
+    ])
   })
 
   test("library paths are url-encoded segment by segment", () => {

@@ -13,13 +13,14 @@ import { createRoot } from "react-dom/client"
 import { holdStudioStyle } from "../browser/style.ts"
 import { loadCatalog } from "../catalog.ts"
 import { type DataKind, list, load } from "../data.ts"
+import { island } from "../island/index.ts"
 import { buildLibrary } from "../planner/library.ts"
 import { holdPlannerStyle } from "../planner/style.ts"
 import type { Screen } from "../screens.ts"
 import { replaceQuery } from "../shell/router.ts"
 import { createTownController, type TownLib } from "./controller.ts"
 import { Compare, Controls, Stats } from "./Panels.tsx"
-import { CAMS, type Cam, parseTownQuery, townParams, townSpec } from "./query.ts"
+import { CAMS, type Cam, parseTownQuery, TOWN_KEY, townParams, townSpec } from "./query.ts"
 import { holdTownStyle } from "./style.ts"
 
 const logger = log("studio:town")
@@ -77,6 +78,15 @@ export const town: Screen = {
   id: "town",
   title: "Town",
   mount(host, ctx) {
+    // The town is the island now (decisions.md "Make /town the new island"): `/town/<seed>` opens the
+    // terrain-first island; the old ring town stays at `?classic=1` until it is retired.
+    if (ctx.query.get("classic") !== "1") {
+      const id = ctx.query.get(TOWN_KEY)
+      const q = new URLSearchParams(ctx.query)
+      if (id && /^\d+$/.test(id)) q.set("seed", id)
+      q.delete(TOWN_KEY)
+      return island.mount(host, { ...ctx, query: q })
+    }
     const studio = holdStudioStyle()
     const planner = holdPlannerStyle()
     const own = holdTownStyle()

@@ -42,7 +42,7 @@ import {
 } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
-import { href } from "../shell/router.ts"
+import { current, href } from "../shell/router.ts"
 import { worldCamera } from "../shell/worldCamera.ts"
 import { params, parse } from "../terra/index.ts"
 import { buildPlaces } from "./towns.ts"
@@ -584,7 +584,37 @@ export const terra3d: Screen = {
     back.href = href("terra", params(view))
     back.style.cssText = "color:#e8c27a;display:block;margin-bottom:4px"
     const text = document.createElement("div")
-    info.append(back, text)
+    // seed and camera: ◀ ▶ open the next island; hero, street, map and free framings
+    const bar = document.createElement("div")
+    bar.style.cssText = "display:flex;gap:4px;flex-wrap:wrap;margin:4px 0"
+    const button = (label: string, on: () => void): HTMLButtonElement => {
+      const b = document.createElement("button")
+      b.textContent = label
+      b.style.cssText =
+        "font:inherit;color:inherit;background:#3a2f22;border:1px solid #6b5636;border-radius:3px;padding:1px 7px;cursor:pointer"
+      b.onclick = on
+      return b
+    }
+    const openSeed = (seed: number) => {
+      const screen = current().screen ?? "island"
+      const q = params({ ...view, spec: { ...view.spec, seed } })
+      if (screen === "town") {
+        q.set("town", String(seed))
+        q.delete("seed")
+      }
+      if (ctx.query.has("hour")) q.set("hour", String(clockHour))
+      location.assign(href(screen, q))
+    }
+    let frame: (cam: "hero" | "street" | "map") => void = () => {}
+    bar.append(
+      button("◀", () => openSeed(Math.max(1, view.spec.seed - 1))),
+      button("▶", () => openSeed(view.spec.seed + 1)),
+      button("hero", () => frame("hero")),
+      button("street", () => frame("street")),
+      button("map", () => frame("map")),
+      button("free", () => stage.rig.setMode(stage.rig.mode() === "free" ? "orbit" : "free")),
+    )
+    info.append(back, bar, text)
 
     const build = async () => {
       host.append(info)
@@ -603,6 +633,27 @@ export const terra3d: Screen = {
         seed: view.spec.seed,
       })
       const plan = view.plan ? terraPlan(t) : null
+      const heart = plan?.anchors.find((a) => a.kind === "town")?.at ?? [0, 0]
+      /** Down the old town's longest street, from behind its far end (set once the town is built). */
+      let streetPose: CameraPose | null = null
+      frame = (cam) => {
+        if (stage.rig.mode() === "free") stage.rig.setMode("orbit")
+        const y = terraHeightAt(t, heart[0], heart[1])
+        const poses: Record<typeof cam, CameraPose> = {
+          hero: { target: [heart[0], y, heart[1]], azimuth: 35, elevation: 30, distance: R * 1.15 },
+          street: streetPose ?? {
+            target: [heart[0], y + 2, heart[1]],
+            azimuth: 20,
+            elevation: 14,
+            distance: 30,
+          },
+          map: { target: [0, 0, 0], azimuth: 0, elevation: 88, distance: R * 3.2 },
+        }
+        stage.setCamera(poses[cam])
+      }
+      // open on the town, as the town screen always did (?cam=map or street to start there)
+      const start = ctx.query.get("cam")
+      frame(start === "map" || start === "street" ? start : "hero")
       if (plan) meshes.push(createSurface(stage, roadRibbons(t, plan), ROAD))
       meshes.push(
         createHeightGround(stage, {
@@ -662,6 +713,28 @@ export const terra3d: Screen = {
             : []
         meshes.push(createSurface(stage, streetRibbons(t, [...built.paved, ...inCore], 0.03), COBBLE))
         meshes.push(createSurface(stage, squares(t, built.paved, 0.04), COBBLE))
+      }
+      if (built) {
+        const longest = built.paved
+          .filter((st) => st.half > 0)
+          .reduce<{ line: [number, number][]; half: number } | null>(
+            (m, st) => (!m || st.line.length > m.line.length ? st : m),
+            null,
+          )
+        if (longest && longest.line.length > 4) {
+          const a = longest.line[0]!
+          const b = longest.line[Math.min(longest.line.length - 1, 5)]!
+          // the camera stands at the street's start looking along it: the orbit's azimuth is where
+          // the eye sits seen from the target
+          const az = (Math.atan2(a[0] - b[0], a[1] - b[1]) * 180) / Math.PI
+          streetPose = {
+            target: [b[0], terraHeightAt(t, b[0], b[1]) + 2.5, b[1]],
+            azimuth: az,
+            elevation: 12,
+            distance: Math.hypot(b[0] - a[0], b[1] - a[1]) + 4,
+          }
+          if (ctx.query.get("cam") === "street") frame("street")
+        }
       }
       const clear = (p: BatchInstance) =>
         !(plan?.roads ?? []).some((r) => r.line.some((q) => Math.hypot(q[0] - p.x, q[1] - p.z) < 3.5))

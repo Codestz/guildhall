@@ -4,6 +4,7 @@ import { createStage, createViewer, type Overlay, type Stage, type Viewer } from
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import { libraryUrl } from "../catalog.ts"
 import type { ScreenCtx } from "../screens.ts"
+import { currentQuery, replaceQuery } from "../shell/router.ts"
 import { AnimationPanel } from "./Animation.tsx"
 import { clipSearch, defaultClip, isCharacter, parseClipLink } from "./clips.ts"
 import { createPlayer, type Player } from "./player.ts"
@@ -204,8 +205,7 @@ export function Inspector({
   // The deep link follows the player: `&clip=` while a character is shown, `&t=` while it is paused.
   useEffect(() => {
     const write = () => {
-      const search = clipSearch(new URLSearchParams(location.search), player?.state() ?? null)
-      if (search !== location.search) history.replaceState(null, "", search)
+      replaceQuery(clipSearch(currentQuery(), player?.state() ?? null))
     }
     write()
     if (!player) return

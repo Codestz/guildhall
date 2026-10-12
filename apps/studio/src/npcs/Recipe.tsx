@@ -2,6 +2,7 @@
 import { type Catalog, type MountSlot, type NpcRecipe, PALETTE } from "@guildhall/assets"
 import { type ReactNode, useMemo } from "react"
 import { short } from "../composer/Blueprint.tsx"
+import { linkTo } from "../shell/directory.ts"
 import {
   bodyChoices,
   clothRamps,
@@ -196,7 +197,8 @@ function Headwear({ recipe, catalog, onEdit }: { recipe: NpcRecipe; catalog: Cat
         />
       ) : (
         <p className="gh-hint-line">
-          No piece has a head mount yet: author one in the <a href="?screen=grip">grip editor</a> (slot head).
+          No piece has a head mount yet: author one in the <a href={linkTo("grip")}>grip editor</a> (slot
+          head).
         </p>
       )}
       {pieces.length > 0 && (

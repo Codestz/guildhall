@@ -74,8 +74,10 @@ describe("directory", () => {
     expect(search("zzz")).toEqual([])
   })
 
-  test("deep links are ?screen=<id>", () => {
-    expect(linkTo("pieces")).toBe("?screen=pieces")
+  test("deep links are paths", () => {
+    expect(linkTo("pieces")).toBe("/pieces")
+    expect(linkTo(HOME_ID)).toBe("/")
+    expect(linkTo("grip")).toBe("/grips/editor")
   })
 })
 

@@ -40,7 +40,7 @@ export interface GuildhallDebug {
   log: { records: typeof logRecords; configure: typeof configureLog }
   perf: { now(): FrameStats; sample(ms: number): Promise<FrameStats> }
   camera: { get(): CameraPose; set(p: CameraPose): Promise<void> }
-  /** Navigate within the app by deep-link query; resolves when rendered. */
+  /** Navigate within the app by deep link (a path, or an app's query form); resolves when rendered. */
   open(query: string): Promise<void>
   /** Per-app extensions (studio puts `studio`/`thumbs` here). */
   ext: Record<string, unknown>

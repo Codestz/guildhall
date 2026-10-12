@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { holdStudioStyle } from "../browser/style.ts"
+import { SHOWCASE } from "../env.ts"
 import { HOME_ID, linkTo, placeOf } from "./directory.ts"
 import { Mark, MOD_KEY, SearchIcon } from "./icons.tsx"
 import { follow, go } from "./nav.ts"
@@ -43,10 +44,6 @@ export function TopBar({
     return () => removeEventListener("keydown", onKey)
   }, [])
 
-  useEffect(() => {
-    document.title = screen === HOME_ID ? "Guildhall Studio" : `${name} · Guildhall Studio`
-  }, [screen, name])
-
   const close = () => {
     setOpen(false)
     trigger.current?.focus()
@@ -82,6 +79,11 @@ export function TopBar({
           </div>
         )}
         <span className="spacer" />
+        {SHOWCASE && (
+          <span className="gh-showcase" title="A public build: nothing saves here; saves download JSON instead.">
+            Showcase · read-only
+          </span>
+        )}
         <button
           ref={trigger}
           type="button"

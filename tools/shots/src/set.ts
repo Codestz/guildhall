@@ -26,7 +26,7 @@ const SETS = fileURLToPath(new URL("../sets/", import.meta.url))
 export interface SetShot {
   /** File-safe: the PNG is `<out>/<name>.png`. */
   name: string
-  /** Path and query on the studio: `/?screen=grips&t=0.3`. */
+  /** Path and query on the studio: `/grips?t=0.3`. */
   url: string
   /** `az,el,dist,tx,ty,tz`, as `bun shots --camera`; the page's own camera when absent. */
   camera?: string

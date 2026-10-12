@@ -15,6 +15,7 @@ import {
   SKIN_RAMPS,
   validateNpc,
 } from "@guildhall/assets"
+import { href } from "../shell/router.ts"
 
 /** The rig every townsperson body shares (decisions, Characters). */
 export const RIG = "rig-medium"
@@ -144,7 +145,7 @@ export function propChoices(
 }
 
 /** Where a prop's mount is authored. */
-export const gripLink = (piece: string): string => `?screen=grip&piece=${encodeURIComponent(piece)}`
+export const gripLink = (piece: string): string => href("grip", { piece })
 
 /**
  * The ramps the recipe's bodies are painted with that an outfit may swap (skin never), in palette

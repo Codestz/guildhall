@@ -2,6 +2,7 @@ import type { Catalog } from "@guildhall/assets"
 import type { Stage } from "@guildhall/render"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { ScreenCtx } from "../screens.ts"
+import { currentQuery, replaceQuery } from "../shell/router.ts"
 import { clipNames, isCharacter } from "../viewer/clips.ts"
 import { Inspector } from "../viewer/Inspector.tsx"
 import type { Player } from "../viewer/player.ts"
@@ -82,8 +83,7 @@ export function Browser({ catalog, ctx, initial, bind }: Props) {
 
   // The deep link follows the state (replaceState: no history entry and no remount), so it can be shared.
   useEffect(() => {
-    const search = toSearch(new URLSearchParams(location.search), filters, selected)
-    if (search !== location.search) history.replaceState(null, "", search)
+    replaceQuery(toSearch(currentQuery(), filters, selected))
   }, [filters, selected])
 
   // Tiles without a baked thumbnail get a live preview, drawn on the inspector's renderer.

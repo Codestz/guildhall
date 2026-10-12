@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Segments, Stepper } from "../composer/Blueprint.tsx"
 import * as data from "../data.ts"
 import type { ScreenCtx } from "../screens.ts"
+import { currentQuery, replaceQuery } from "../shell/router.ts"
 import {
   ACTIVITIES,
   type Activity,
@@ -58,7 +59,7 @@ function resolveStrip(recipe: NpcRecipe, seeds: readonly number[], catalog: Cata
 
 /** The deep link for what is on screen, so a reload (or a shot) opens it again. */
 function syncUrl(q: NpcQuery): void {
-  const p = new URLSearchParams(location.search)
+  const p = currentQuery()
   p.set("recipe", q.role)
   p.set("seed", String(q.seed))
   p.set("strip", String(q.strip))
@@ -67,8 +68,7 @@ function syncUrl(q: NpcQuery): void {
   else p.set("t", String(q.t))
   if (q.map) p.set("cam", "map")
   else p.delete("cam")
-  const search = `?${p.toString()}`
-  if (search !== location.search) history.replaceState(null, "", search)
+  replaceQuery(p)
 }
 
 function TimeControl({ t, onT }: { t: number | null; onT: (t: number | null) => void }) {

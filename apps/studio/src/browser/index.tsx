@@ -4,6 +4,7 @@ import { flushSync } from "react-dom"
 import { createRoot } from "react-dom/client"
 import { loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
+import { currentQuery } from "../shell/router.ts"
 import type { PlayerState, PlayOptions } from "../viewer/player.ts"
 import { Browser, type BrowserHandle } from "./Browser.tsx"
 import { applyFilters, type Filters, parseFilters } from "./filters.ts"
@@ -84,7 +85,7 @@ export const pieces: Screen = {
           entries: catalog?.all().length ?? 0,
           packs: Object.fromEntries((catalog?.index.packs ?? []).map((p) => [p.id, p.count])),
           shown: catalog ? applyFilters(catalog, filters).length : 0,
-          selected: new URLSearchParams(location.search).get("id"),
+          selected: currentQuery().get("id"),
           animation: player ? { ...player.state(), clips: player.clips } : null,
           filters,
           facets: catalog?.facets() ?? null,

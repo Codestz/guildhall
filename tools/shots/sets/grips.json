@@ -4,22 +4,22 @@
   "shots": [
     {
       "name": "matrix",
-      "url": "/?screen=grips&t=0.3,0.7&axes=1&dpr=1&bar=0",
+      "url": "/grips?t=0.3,0.7&axes=1&dpr=1&bar=0",
       "size": "2400x2560"
     },
     {
       "name": "axes",
-      "url": "/?screen=grips&props=&axes=1&clips=chop,pickaxe,hammer&t=0.15,0.35,0.55,0.75&dpr=1&bar=0",
+      "url": "/grips?props=&axes=1&clips=chop,pickaxe,hammer&t=0.15,0.35,0.55,0.75&dpr=1&bar=0",
       "size": "2400x700"
     },
     {
       "name": "working",
-      "url": "/?screen=grips&props=kaykit-tools/axe,kaykit-tools/pickaxe,kaykit-tools/hammer,kaykit-tools/shovel&clips=chop,pickaxe,hammer&t=0.3,0.7&dpr=1&bar=0",
+      "url": "/grips?props=kaykit-tools/axe,kaykit-tools/pickaxe,kaykit-tools/hammer,kaykit-tools/shovel&clips=chop,pickaxe,hammer&t=0.3,0.7&dpr=1&bar=0",
       "size": "1800x1400"
     },
     {
       "name": "upright",
-      "url": "/?screen=grips&props=kaykit-tools/lantern,kaykit-adventurers/mug-full,kaykit-tools/bucket-metal&clips=idle,sit,wave&t=0.3,0.7&dpr=1&bar=0",
+      "url": "/grips?props=kaykit-tools/lantern,kaykit-adventurers/mug-full,kaykit-tools/bucket-metal&clips=idle,sit,wave&t=0.3,0.7&dpr=1&bar=0",
       "size": "1800x1100"
     }
   ]

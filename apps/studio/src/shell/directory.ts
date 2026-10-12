@@ -1,11 +1,14 @@
 /**
  * The studio's directory: every tool by purpose, with a plain-words line on what it is for. The home
  * page draws its cards from it and the top bar its name and quick switcher. A tool marked `soon` has no
- * screen yet; every other id is a screen in `screens.ts` (home.test.ts holds the two in step).
+ * screen yet; every other id is a screen in `screens.ts` (home.test.ts holds the two in step). The
+ * showcase build leaves out the tools marked `dev`.
  */
+import { SHOWCASE } from "../env.ts"
+import { href } from "./router.ts"
 
 export interface Tool {
-  /** The screen id (`?screen=<id>`). */
+  /** The screen id (`screens.ts`); its path is in `router.ts`. */
   id: string
   /** The name people see: on the card, in the top bar and in the switcher. */
   name: string
@@ -15,6 +18,8 @@ export interface Tool {
   soon?: boolean
   /** Has a committed preview at `/home/<id>.webp`. */
   preview?: boolean
+  /** A bench for working on the studio itself: not in the public showcase. */
+  dev?: boolean
 }
 
 export interface ToolGroup {
@@ -27,7 +32,7 @@ export interface ToolGroup {
 
 export const HOME_ID = "home"
 
-export const GROUPS: readonly ToolGroup[] = [
+const ALL_GROUPS: readonly ToolGroup[] = [
   {
     id: "library",
     name: "Library",
@@ -130,10 +135,16 @@ export const GROUPS: readonly ToolGroup[] = [
         id: "m0",
         name: "M0 skeleton",
         purpose: "The first render bench: a stage, a camera, a frame budget.",
+        dev: true,
       },
     ],
   },
 ]
+
+/** Every group and tool this build offers: the showcase drops the `dev` tools, and a group left empty. */
+export const GROUPS: readonly ToolGroup[] = SHOWCASE
+  ? ALL_GROUPS.map((g) => ({ ...g, tools: g.tools.filter((t) => !t.dev) })).filter((g) => g.tools.length > 0)
+  : ALL_GROUPS
 
 /** The home page itself, for the top bar and the switcher. */
 export const HOME_TOOL: Tool = {
@@ -190,5 +201,5 @@ export function search(text: string, from: readonly Placed[] = openable()): Plac
   return scored.sort((a, b) => b.score - a.score || a.i - b.i).map((s) => s.p)
 }
 
-/** The deep link to a screen. */
-export const linkTo = (id: string): string => `?screen=${encodeURIComponent(id)}`
+/** The deep link to a screen: its path (`/pieces`). */
+export const linkTo = (id: string): string => href(id)

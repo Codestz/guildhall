@@ -2,7 +2,11 @@ import { configureLog, type FrameStats, log } from "@guildhall/core"
 import { PerfHud } from "@guildhall/ui"
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react"
 import type { DebugHost } from "./debug.ts"
-import { DEFAULT_SCREEN, SCREENS, screenFor } from "./screens.ts"
+import { BASE } from "./env.ts"
+import { screenFor } from "./screens.ts"
+import { HOME_ID, openable, placeOf } from "./shell/directory.ts"
+import { follow } from "./shell/nav.ts"
+import { canonical, here, resolve } from "./shell/router.ts"
 import { BAR_PX } from "./shell/style.ts"
 import { TopBar } from "./shell/TopBar.tsx"
 
@@ -31,37 +35,58 @@ const missing: CSSProperties = {
   color: "#f3e9d4",
   font: "14px/1.6 ui-monospace, Menlo, monospace",
 }
+const link: CSSProperties = { color: "#e2b85c" }
 
-/** The URL's query, kept in step with back/forward and `guildhall.open`. */
-function useSearch(): string {
-  const [search, setSearch] = useState(location.search)
-  useEffect(() => {
-    const sync = () => setSearch(location.search)
-    addEventListener("popstate", sync)
-    return () => removeEventListener("popstate", sync)
-  }, [])
-  return search
+/** The URL now, after replacing an old `?screen=` link (or any non-canonical form) in place. */
+function sync(): string {
+  const want = canonical(here())
+  if (want !== here()) history.replaceState(null, "", want)
+  return here()
 }
 
-/** The studio shell: the top bar, the screen the deep link names in the window below it, the perf HUD. */
+/** The URL (path and query), kept in step with back/forward and `guildhall.open`. */
+function useUrl(): string {
+  const [url, setUrl] = useState(sync)
+  useEffect(() => {
+    const onPop = () => setUrl(sync())
+    addEventListener("popstate", onPop)
+    return () => removeEventListener("popstate", onPop)
+  }, [])
+  return url
+}
+
+/** The tab's title for a screen: its directory name, "Not found" for a path no screen answers. */
+function titleOf(id: string | null, fallback: string): string {
+  if (id === HOME_ID) return "Guildhall Studio"
+  const name = id ? (placeOf(id)?.tool.name ?? fallback) : "Not found"
+  return `${name} · Guildhall Studio`
+}
+
+/** The studio shell: the top bar, the screen the URL names in the window below it, the perf HUD. */
 export function App({ debug }: { debug: DebugHost }) {
-  const search = useSearch()
+  const url = useUrl()
   const host = useRef<HTMLDivElement>(null)
-  const query = new URLSearchParams(search)
-  const screen = screenFor(query)
+  const { pathname, search } = new URL(url, location.origin)
+  const { screen: id, query } = resolve(pathname, search)
+  const screen = id ? screenFor(id) : undefined
   const [hud, setHud] = useState(query.get("hud") === "perf")
   // `?bar=0` hides the top bar: bare screens, for shots and embeds.
   const bar = query.get("bar") !== "0"
 
-  // A deep link is a fresh load: any change to the query remounts the screen.
   useEffect(() => {
-    const params = new URLSearchParams(search)
+    document.title = titleOf(screen ? screen.id : null, screen?.title ?? "")
+  }, [screen])
+
+  // A deep link is a fresh load: any change to the URL remounts the screen.
+  useEffect(() => {
+    const at = new URL(url, location.origin)
+    const { screen: id, query: params } = resolve(at.pathname, at.search)
     const spec = params.get("log")
     if (spec) configureLog(spec)
     setHud(params.get("hud") === "perf")
-    const target = screenFor(params)
+    const target = id ? screenFor(id) : undefined
     if (!target || !host.current) {
-      logger.warn("unknown screen", { screen: params.get("screen") })
+      logger.warn("unknown route", { url })
       debug.mounted()
       return
     }
@@ -72,7 +97,7 @@ export function App({ debug }: { debug: DebugHost }) {
       dispose()
       debug.attach(null)
     }
-  }, [search, debug])
+  }, [url, debug])
 
   useEffect(() => {
     const toggle = (e: KeyboardEvent) => {
@@ -85,11 +110,17 @@ export function App({ debug }: { debug: DebugHost }) {
   const stats = useCallback(() => debug.stage()?.stats() ?? NO_STATS, [debug])
 
   if (!screen) {
-    const known = SCREENS.map((s) => s.id).join(", ")
+    const known = openable()
+      .map((p) => p.tool.name)
+      .join(", ")
     return (
       <div style={missing}>
+        <p>Nothing at “{pathname}”.</p>
         <p>
-          No screen “{query.get("screen")}”. Known: {known} (default {DEFAULT_SCREEN}).
+          The studio has: {known}.{" "}
+          <a style={link} href={BASE} onClick={follow(HOME_ID)}>
+            Go home
+          </a>
         </p>
       </div>
     )

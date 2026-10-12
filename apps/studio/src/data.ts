@@ -3,9 +3,10 @@
  * vite.config.ts. Saving works in the dev server only; the endpoint validates every write.
  */
 import type { DataOverlay, MountsFile } from "@guildhall/assets"
+import { BASE } from "./env.ts"
 
 /** Where vite serves `data/` (vite.config.ts). */
-export const DATA = "/data"
+export const DATA = `${BASE}data`
 
 /** A folder of `<id>.json` files under `data/`. */
 export type DataKind =

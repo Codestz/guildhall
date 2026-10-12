@@ -16,6 +16,7 @@ import type { GizmoMode } from "@guildhall/render"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as data from "../data.ts"
 import type { ScreenCtx } from "../screens.ts"
+import { currentQuery, replaceQuery } from "../shell/router.ts"
 import { Blueprint, Stepper } from "./Blueprint.tsx"
 import { Dressing } from "./Dressing.tsx"
 import {
@@ -72,13 +73,12 @@ function compile(recipe: PrefabRecipe, seed: number, strip: boolean, catalog: Ca
 
 /** The deep link for the current document, so a reload (or a shot) opens what is on screen. */
 function syncUrl(ref: RecipeRef, seed: number, strip: boolean): void {
-  const q = new URLSearchParams(location.search)
+  const q = currentQuery()
   q.set("recipe", refText(ref))
   q.set("seed", String(seed))
   if (strip) q.set("strip", "1")
   else q.delete("strip")
-  const search = `?${q.toString().replaceAll("%2F", "/")}`
-  if (search !== location.search) history.replaceState(null, "", search)
+  replaceQuery(q)
 }
 
 export function Composer({

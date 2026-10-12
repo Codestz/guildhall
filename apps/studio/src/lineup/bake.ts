@@ -1,4 +1,5 @@
 import type { CatalogEntry } from "@guildhall/assets"
+import { LIBRARY } from "../catalog.ts"
 
 /**
  * Which pieces the lineup shows: the raw vendor files, the importer's baked GLBs, or both, raw in
@@ -25,10 +26,10 @@ export interface Baked {
 }
 
 /** The catalog index the importer wrote: which packs the library holds. */
-export const INDEX_URL = "/library/catalog/index.json"
+export const INDEX_URL = `${LIBRARY}/catalog/index.json`
 
 /** The pack catalog shard the importer wrote, under `/library/`. */
-export const shardUrl = (pack: string): string => `/library/catalog/${encodeURIComponent(pack)}.json`
+export const shardUrl = (pack: string): string => `${LIBRARY}/catalog/${encodeURIComponent(pack)}.json`
 
 /**
  * Raw part path (`<pack folder>/<path in the pack>`) → its baked piece, from a pack's catalog
@@ -39,6 +40,6 @@ export function bakedPart(file: string, entries: readonly CatalogEntry[]): Baked
   const inPack = file.slice(file.indexOf("/") + 1)
   const entry = entries.find((e) => e.kind === "static" && e.source === inPack)
   if (!entry) return undefined
-  const url = `/library/${entry.files.glb.split("/").map(encodeURIComponent).join("/")}`
+  const url = `${LIBRARY}/${entry.files.glb.split("/").map(encodeURIComponent).join("/")}`
   return { url, factor: entry.scale.factor }
 }

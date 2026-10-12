@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react"
+import { BASE } from "../env.ts"
 import { GROUPS, linkTo, type Tool, type ToolGroup } from "../shell/directory.ts"
 import { Arrow, Mark, MOD_KEY } from "../shell/icons.tsx"
 import { follow } from "../shell/nav.ts"
 import { formatCount, type StudioStats } from "./stats.ts"
 
 /** Where the committed card previews are served (apps/studio/public/home/). */
-export const PREVIEWS = "/home"
+export const PREVIEWS = `${BASE}home`
 
 const SOURCES = [
   {

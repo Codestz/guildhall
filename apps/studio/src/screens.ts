@@ -10,11 +10,12 @@ import { npc } from "./npcs/index.tsx"
 import { palette } from "./palette/index.ts"
 import { scale } from "./scenes/scale.ts"
 import { shadows } from "./shadows/index.ts"
+import { placeOf } from "./shell/directory.ts"
 import { siteScreen } from "./site/index.ts"
 
 /** What the shell hands a screen when it mounts it. */
 export interface ScreenCtx {
-  /** The deep-link query the screen was opened with (`?screen=…` and anything the screen reads). */
+  /** The deep link the screen was opened with: the query, plus the path's id under its key (`router.ts`). */
   query: URLSearchParams
   /** Hands the shell the screen's stage, so the HUD and `window.guildhall` read and drive it. */
   attach(stage: Stage): void
@@ -29,7 +30,7 @@ export interface Screen {
   mount(host: HTMLElement, ctx: ScreenCtx): () => void
 }
 
-/** Every screen the studio can open with `?screen=<id>`. New screens register here, one line each. */
+/** Every screen the studio can open (paths in `shell/router.ts`). New screens register here, one line each. */
 export const SCREENS: readonly Screen[] = [
   home,
   m0,
@@ -47,8 +48,7 @@ export const SCREENS: readonly Screen[] = [
 
 export const DEFAULT_SCREEN = "home"
 
-/** The screen a query names, the default when it names none. Undefined for an unknown id. */
-export function screenFor(query: URLSearchParams): Screen | undefined {
-  const id = query.get("screen") ?? DEFAULT_SCREEN
-  return SCREENS.find((screen) => screen.id === id)
+/** The screen with `id`; undefined for an unknown id, or one this build leaves out of the directory (showcase). */
+export function screenFor(id: string): Screen | undefined {
+  return placeOf(id) ? SCREENS.find((screen) => screen.id === id) : undefined
 }

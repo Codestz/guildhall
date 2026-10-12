@@ -1,5 +1,6 @@
 import { configureLog, type GuildhallDebug, logRecords } from "@guildhall/core"
 import type { Stage } from "@guildhall/render"
+import { canonical, here } from "./shell/router.ts"
 
 declare global {
   interface Window {
@@ -93,11 +94,12 @@ export function createDebug(): DebugHost {
         await frames(1)
       },
     },
-    async open(query) {
-      const search = query === "" || query.startsWith("?") ? query : `?${query}`
-      if (search !== location.search) {
+    // A path (`/pieces/kaykit-adventurers/barbarian?clip=Chopping`) or an old query (`?screen=pieces&…`).
+    async open(target) {
+      const url = canonical(target)
+      if (url !== here()) {
         expectMount()
-        history.pushState(null, "", search === "" ? location.pathname : search)
+        history.pushState(null, "", url)
         dispatchEvent(new PopStateEvent("popstate"))
       }
       await ready()

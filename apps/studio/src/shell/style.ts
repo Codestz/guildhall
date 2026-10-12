@@ -108,6 +108,22 @@ const CSS = /* css */ `
 .gh-toggle[aria-pressed="true"] { background: var(--brass-wash); border-color: var(--brass-line); color: var(--brass-hi); }
 .gh-toggle[aria-pressed="true"] .led { background: #8fdc7a; box-shadow: 0 0 6px rgba(143, 220, 122, 0.7); }
 
+/* The showcase build's marker: nothing saves here. */
+.gh-showcase {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border: 1px solid var(--brass-line);
+  border-radius: 999px;
+  background: var(--brass-wash);
+  color: var(--brass-hi);
+  font: 500 10.5px/1 var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 /* ── quick switcher ─────────────────────────────────────────────── */
 .gh-switch-back {
   position: fixed;

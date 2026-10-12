@@ -5,6 +5,7 @@
  * and `windows` here.
  */
 import type { TownLights } from "@guildhall/world"
+import type { DayLight } from "../light.ts"
 import type { Sky } from "../sky.ts"
 import type { Stage } from "../stage.ts"
 import { setGlow, setNightGrade } from "./glow.ts"
@@ -18,6 +19,14 @@ export { windowsDark } from "./windows.ts"
 const smoothstep = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
   return t * t * (3 - 2 * t)
+}
+
+/**
+ * The lamps' light on the ground: the lanterns glow from late afternoon, but a pool of lamplight only
+ * shows once the sun is low and going (in daylight it reads as a yellow stain on the street).
+ */
+export function poolLevel(light: Pick<DayLight, "lamps" | "elevation">): number {
+  return light.lamps * (1 - 0.9 * smoothstep(-2, 12, light.elevation))
 }
 
 export interface NightOpts {
@@ -62,7 +71,7 @@ export function createNight(
     hour = ((h % 24) + 24) % 24
     opts.sky.setHour(hour)
     const light = opts.sky.light()
-    setGlow(light.lamps)
+    setGlow(light.fire)
     // The grade comes in with the dusk (blue hour), ahead of the stars.
     setNightGrade(1 - smoothstep(-10, 3, light.elevation))
     windows.update(light.lamps, light.night, hour)
@@ -71,7 +80,7 @@ export function createNight(
 
   const unsubscribe = stage.onFrame((dt) => {
     if (speed !== 0) setHour(hour + speed * dt)
-    lamps.update(opts.sky.light().lamps, dt)
+    lamps.update(poolLevel(opts.sky.light()), dt)
   })
 
   return {

@@ -52,7 +52,26 @@ describe("airAt", () => {
     expect(warmth(golden.highlights)).toBeGreaterThan(0.1)
     expect(warmth(golden.shadows)).toBeLessThan(-0.05)
     expect(warmth(noon.highlights)).toBeLessThan(warmth(golden.highlights))
-    expect(Math.abs(noon.saturation - 1)).toBeLessThan(0.05)
+    // A touch over 1 by day: the grass reads bright and saturated (V1's 1.04), never garish.
+    expect(noon.saturation).toBeGreaterThanOrEqual(1)
+    expect(noon.saturation).toBeLessThan(1.1)
+    // A gentle curve by day: the shade is not crushed toward black.
+    expect(noon.contrast).toBeLessThanOrEqual(0.05)
+  })
+
+  test("the shade is bright (warmth pass): a wall turned from the sun gets a third of a sunlit wall's light", () => {
+    const lum = (c: { r: number; g: number; b: number }) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+    for (const hour of [10, 13, 16.5, 17.5]) {
+      const light = lightAt(hour)
+      const { sky } = airAt(light)
+      // A level face turned from the sun sees the cool side of the sky and the bounce off the ground
+      // (air.ts `skyLight`, n = −sun across): half and half.
+      const fill = sky.intensity * lum(sky.away.clone().lerp(sky.bounce, 0.5))
+      const across = Math.hypot(light.sunDir[0], light.sunDir[2])
+      const lit = light.sunIntensity * across + fill
+      expect(fill / lit, `${hour} h`).toBeGreaterThan(0.25)
+      expect(fill / lit, `${hour} h`).toBeLessThan(0.6)
+    }
   })
 
   test("nothing pops as the clock runs: every value moves a little per five minutes", () => {
@@ -63,7 +82,8 @@ describe("airAt", () => {
       expect(Math.abs(next.haze.max - last.haze.max)).toBeLessThan(0.03)
       expect(Math.abs(next.grade.contrast - last.grade.contrast)).toBeLessThan(0.01)
       expect(Math.abs(next.grade.highlights.b - last.grade.highlights.b)).toBeLessThan(0.02)
-      expect(Math.abs(next.sky.intensity - last.sky.intensity)).toBeLessThan(0.05)
+      // Relative: the day fill is brighter since the warmth pass, so a step is judged against the level.
+      expect(Math.abs(next.sky.intensity - last.sky.intensity) / last.sky.intensity).toBeLessThan(0.045)
       last = next
     }
   })

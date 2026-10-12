@@ -50,7 +50,7 @@ export async function buildBench(
 
   const sun = createSun(stage, { town: { min: [-half, 0, -half], max: [half, 12, half] }, radii: [24, 90] })
   const sky: Sky = createSky(stage, { sun, hour: q.hour, reach: half })
-  setGlow(sky.light().lamps)
+  setGlow(sky.light().fire)
   const ground: Ground = createGround(
     stage,
     {

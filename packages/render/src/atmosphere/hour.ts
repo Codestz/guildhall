@@ -72,11 +72,11 @@ interface Stop {
 // biome-ignore format: a table reads better aligned
 const STOPS: readonly Stop[] = [
   { at: -20, density: 0.6, max: 0.3,  shadows: [0.92, 0.95, 1.00], highlights: [0.98, 0.96, 0.93], saturation: 0.96, contrast: 0.06 },
-  { at: -6,  density: 0.9, max: 0.3,  shadows: [0.88, 0.91, 1.00], highlights: [1.00, 0.93, 0.88], saturation: 1.0,  contrast: 0.1 },
-  { at: 2,   density: 1.5, max: 0.42, shadows: [0.86, 0.91, 1.00], highlights: [1.00, 0.91, 0.80], saturation: 1.04, contrast: 0.14 },
-  { at: 14,  density: 1.8, max: 0.5,  shadows: [0.86, 0.91, 1.00], highlights: [1.00, 0.91, 0.76], saturation: 1.05, contrast: 0.1 },
-  { at: 28,  density: 1.2, max: 0.4,  shadows: [0.88, 0.92, 1.00], highlights: [1.00, 0.93, 0.82], saturation: 1.03, contrast: 0.1 },
-  { at: 50,  density: 0.7, max: 0.28, shadows: [0.92, 0.95, 1.00], highlights: [1.00, 0.97, 0.91], saturation: 1.0,  contrast: 0.1 },
+  { at: -6,  density: 0.9, max: 0.3,  shadows: [0.88, 0.91, 1.00], highlights: [1.00, 0.93, 0.88], saturation: 1.0,  contrast: 0.08 },
+  { at: 2,   density: 1.5, max: 0.42, shadows: [0.88, 0.93, 1.00], highlights: [1.00, 0.91, 0.80], saturation: 1.06, contrast: 0.08 },
+  { at: 14,  density: 1.8, max: 0.5,  shadows: [0.90, 0.94, 1.00], highlights: [1.00, 0.91, 0.78], saturation: 1.08, contrast: 0.05 },
+  { at: 28,  density: 1.2, max: 0.4,  shadows: [0.92, 0.95, 1.00], highlights: [1.00, 0.94, 0.84], saturation: 1.08, contrast: 0.04 },
+  { at: 50,  density: 0.7, max: 0.28, shadows: [0.95, 0.97, 1.00], highlights: [1.00, 0.97, 0.92], saturation: 1.06, contrast: 0.04 },
 ]
 
 function around(elevation: number): [Stop, Stop, number] {
@@ -88,24 +88,28 @@ function around(elevation: number): [Stop, Stop, number] {
 }
 
 /** The sky's light is brighter than the flat fill it replaces: shade reads soft and blue, not grey and dark. */
-const SKY_GAIN = 1.3
+const SKY_GAIN = 1.35
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 
 /** The sky's light, the haze and the grade at `light`'s hour. */
 export function airAt(light: DayLight): AirLook {
   const [a, b, t] = around(light.elevation)
-  const day = smoothstep(-8, 6, light.elevation)
+  // Wide (a couple of hours either side of sunset): the brighter day fill comes and goes without a step.
+  const day = smoothstep(-12, 12, light.elevation)
   // The cool side of the sky: the hemisphere's blue pulled toward the zenith, deeper at golden hour.
   // By night the zenith is near black: the fill keeps the hemisphere's moonlit blue instead.
-  const away = light.hemiSky.clone().lerp(light.zenith, (0.5 + 0.2 * light.golden) * day)
+  // Only a touch of the zenith: a face turned from the sun still sees a bright sky (the opposite-sun
+  // fill that keeps back-lit walls readable).
+  const away = light.hemiSky.clone().lerp(light.zenith, 0.2 * day)
   // The warm side: the hemisphere's sky tinted by the glow, as much as the sun is low and up.
   const toward = light.hemiSky.clone().lerp(light.glow, (0.25 + 0.45 * light.golden) * day)
   const sky: SkyLight = {
-    top: light.hemiSky.clone().lerp(light.zenith, 0.4 * day),
+    top: light.hemiSky.clone().lerp(light.zenith, 0.25 * day),
     away,
     toward,
-    bounce: light.hemiGround.clone(),
+    // The ground lit by the sun: its own warm colour, brighter the more sun falls on it.
+    bounce: light.hemiGround.clone().lerp(light.sun, 0.12 * Math.min(1, light.sunIntensity / 3) * day),
     intensity: light.hemiIntensity * (1 + (SKY_GAIN - 1) * day),
   }
   const haze: Haze = {

@@ -31,8 +31,15 @@ export interface DayLight {
   golden: number
   /** 0 by day, 1 in deep night (the sun 14° under the horizon): stars, the moon, the night grade. */
   night: number
-  /** How lit the town's lamps, fires and windows are: 0 by day, 1 from just before sunset to dawn. */
+  /**
+   * How lit the town's lanterns and windows are: 0 through the bright day, a soft first glow from
+   * late afternoon (~16:30), about half by golden hour, 1 from just before sunset to dawn.
+   */
   lamps: number
+  /** How lit the light sources' own flames and glass are: never below FIRE_FLOOR (fires burn all day). */
+  fire: number
+  /** How much of the key light a shadow takes (three's `shadow.intensity`): the rest lifts the shade warm. */
+  shadow: number
   /** Unit vector toward the moon (clamped no lower than MIN_MOON_ELEVATION, for its shadows). */
   moonDir: [number, number, number]
   /** Unit vector toward where the moon really is: its disc. */
@@ -60,6 +67,24 @@ const MIN_MOON_ELEVATION = 30
  */
 const MOON = "#b3bdd4"
 const MOON_INTENSITY = 0.6
+/** Fires, forges and lantern flames glow a little all day (V1's always-cozy town). */
+export const FIRE_FLOOR = 0.15
+/** A sunlit shadow keeps this much of the warm key, so shade is a lifted blue-warm, never black. */
+const SUN_SHADOW = 0.9
+/** Moonlight is soft: its shadows are fainter still. */
+const MOON_SHADOW = 0.65
+
+/**
+ * Lamplight by sun elevation. The evening lights early (V1's always-cozy town): a soft first glow from
+ * ~40° (16:15), ~0.45 at golden hour (24°), full a little under the horizon. The morning puts them out
+ * briskly once the sun is up (by ~9°). The two meet at noon, where both are 0: no pop.
+ */
+export function lampsAt(elevation: number, evening: boolean): number {
+  if (!evening) return 1 - smoothstep(-3, 9, elevation)
+  const afternoon = 1 - smoothstep(22, 40, elevation)
+  const dusk = 1 - smoothstep(-3, 20, elevation)
+  return Math.min(1, 0.4 * afternoon + 0.6 * dusk)
+}
 
 interface Stop {
   /** Sun elevation, degrees. */
@@ -75,18 +100,20 @@ interface Stop {
   exposure: number
 }
 
-// Keyed by sun elevation, so dawn and dusk match. Golden hour (24°) is plan §5: sun #ffd2a1 at ~3 (warmed to #ffcc94 in the atmosphere pass),
-// hemisphere sky #9cc3e6 over ground #7a6a4f. The shade leans blue (warm key, cool fill).
+// Keyed by sun elevation, so dawn and dusk match. Golden hour (24°) is plan §5's warm key (#ffcc94).
+// The fill is V1's: a pale, bright sky over a warm, sunlit ground (the bounce off sand and grass), so
+// the shade reads soft and cheerful, never brown-black. The warmth pass (2026-10) raised it from a
+// darker blue sky over a brown ground; shade then sat at ~11% of lit faces, it now sits near a third.
 // biome-ignore format: a table reads better aligned
 const STOPS: readonly Stop[] = [
-  { at: -24, zenith: "#040a1c", horizon: "#13213f", glow: "#000000", sun: "#000000", sunIntensity: 0,   sky: "#5d6a86", ground: "#1c1f28", hemiIntensity: 1.0,  exposure: 1.45 },
-  { at: -14, zenith: "#0a1838", horizon: "#24345e", glow: "#140f2a", sun: "#000000", sunIntensity: 0,   sky: "#65728f", ground: "#20222c", hemiIntensity: 1.0,  exposure: 1.45 },
-  { at: -6,  zenith: "#18306a", horizon: "#6e6c94", glow: "#b0605a", sun: "#000000", sunIntensity: 0,   sky: "#7480a0", ground: "#2a2832", hemiIntensity: 0.95, exposure: 1.3 },
-  { at: 0,   zenith: "#33589a", horizon: "#eea070", glow: "#ff8a4c", sun: "#ff9c5c", sunIntensity: 1.2, sky: "#8c9ccc", ground: "#4a3e36", hemiIntensity: 1.0,  exposure: 1.05 },
-  { at: 12,  zenith: "#4474b6", horizon: "#f2c49a", glow: "#ffb070", sun: "#ffbf86", sunIntensity: 2.6, sky: "#98b4dc", ground: "#6a5a44", hemiIntensity: 1.05, exposure: 1.08 },
-  { at: 24,  zenith: "#4a82c4", horizon: "#f1d4ae", glow: "#ffcf98", sun: "#ffcc94", sunIntensity: 3.3, sky: "#9cc3e6", ground: "#7a6a4f", hemiIntensity: 1.15, exposure: 1.12 },
-  { at: 40,  zenith: "#3f84d0", horizon: "#cfe0ee", glow: "#fff0d8", sun: "#fff0dc", sunIntensity: 3.0, sky: "#b4d2f0", ground: "#7a7660", hemiIntensity: 1.15, exposure: 0.95 },
-  { at: 90,  zenith: "#377ccf", horizon: "#cde2f6", glow: "#fff8ea", sun: "#fff8ee", sunIntensity: 3.1, sky: "#bcd8f4", ground: "#7c7a66", hemiIntensity: 1.15, exposure: 0.95 },
+  { at: -24, zenith: "#040a1c", horizon: "#13213f", glow: "#000000", sun: "#000000", sunIntensity: 0,   sky: "#66749a", ground: "#22252f", hemiIntensity: 1.1,  exposure: 1.5 },
+  { at: -14, zenith: "#0a1838", horizon: "#24345e", glow: "#140f2a", sun: "#000000", sunIntensity: 0,   sky: "#6e7ba0", ground: "#262833", hemiIntensity: 1.1,  exposure: 1.5 },
+  { at: -6,  zenith: "#18306a", horizon: "#6e6c94", glow: "#b0605a", sun: "#000000", sunIntensity: 0,   sky: "#8290b4", ground: "#38333a", hemiIntensity: 1.1,  exposure: 1.4 },
+  { at: 0,   zenith: "#33589a", horizon: "#eea070", glow: "#ff8a4c", sun: "#ff9c5c", sunIntensity: 1.2, sky: "#a2acd4", ground: "#6a5444", hemiIntensity: 1.22, exposure: 1.2 },
+  { at: 12,  zenith: "#4474b6", horizon: "#f2c49a", glow: "#ffb070", sun: "#ffbf86", sunIntensity: 2.4, sky: "#b8c6e4", ground: "#9c7c58", hemiIntensity: 1.35, exposure: 1.14 },
+  { at: 24,  zenith: "#4a82c4", horizon: "#f1d4ae", glow: "#ffcf98", sun: "#ffcc94", sunIntensity: 2.9, sky: "#c4d6ee", ground: "#aa8c64", hemiIntensity: 1.45, exposure: 1.12 },
+  { at: 40,  zenith: "#3f84d0", horizon: "#cfe0ee", glow: "#fff0d8", sun: "#fff0d8", sunIntensity: 3.0, sky: "#d0e2f6", ground: "#ac9670", hemiIntensity: 1.35, exposure: 1.04 },
+  { at: 90,  zenith: "#377ccf", horizon: "#cde2f6", glow: "#fff8ea", sun: "#fff6e8", sunIntensity: 3.0, sky: "#d6e6fa", ground: "#b09c78", hemiIntensity: 1.35, exposure: 1.02 },
 ]
 
 const RAD = Math.PI / 180
@@ -144,13 +171,17 @@ export function lightAt(hour: number): DayLight {
   const sh = Math.hypot(heading[0], heading[1]) || 1
   const e = elevation * RAD
   const me = moon.elevation * RAD
+  const sunIntensity = a.sunIntensity + (b.sunIntensity - a.sunIntensity) * t
+  // The moon takes over once the sun is gone (both dark at the hand-over: no pop).
+  const moonIntensity =
+    MOON_INTENSITY * (1 - smoothstep(-12, -6, elevation)) * smoothstep(-4, 12, moon.elevation)
   return {
     hour: wrapHour(hour),
     sunDir: [heading[0] * flat, Math.sin(lift), heading[1] * flat],
     sunTrue: [(heading[0] / sh) * Math.cos(e), Math.sin(e), (heading[1] / sh) * Math.cos(e)],
     elevation,
     sun: mix(a.sun, b.sun, t),
-    sunIntensity: a.sunIntensity + (b.sunIntensity - a.sunIntensity) * t,
+    sunIntensity,
     hemiSky: mix(a.sky, b.sky, t),
     hemiGround: mix(a.ground, b.ground, t),
     hemiIntensity: a.hemiIntensity + (b.hemiIntensity - a.hemiIntensity) * t,
@@ -160,13 +191,14 @@ export function lightAt(hour: number): DayLight {
     exposure: a.exposure + (b.exposure - a.exposure) * t,
     golden: smoothstep(-6, 8, elevation) * (1 - smoothstep(26, 40, elevation)),
     night: 1 - smoothstep(-14, -4, elevation),
-    lamps: 1 - smoothstep(-3, 9, elevation),
+    lamps: lampsAt(elevation, wrapHour(hour) >= 12),
+    fire: Math.max(FIRE_FLOOR, lampsAt(elevation, wrapHour(hour) >= 12)),
+    shadow: sunIntensity >= moonIntensity ? SUN_SHADOW : MOON_SHADOW,
     moonDir: [(mx / mh) * Math.cos(moonLift), Math.sin(moonLift), (mz / mh) * Math.cos(moonLift)],
     moonTrue: [(mx / mh) * Math.cos(me), Math.sin(me), (mz / mh) * Math.cos(me)],
     moonElevation: moon.elevation,
     moon: new Color(MOON),
-    // The moon takes over once the sun is gone (both dark at the hand-over: no pop).
-    moonIntensity: MOON_INTENSITY * (1 - smoothstep(-12, -6, elevation)) * smoothstep(-4, 12, moon.elevation),
+    moonIntensity,
   }
 }
 
@@ -193,6 +225,8 @@ export function applyLight(stage: Stage, light: DayLight): void {
   sun.position.set(at.x + x * 100, at.y + y * 100, at.z + z * 100)
   sun.color.copy(key.colour)
   sun.intensity = key.intensity
+  // The cascades copy the key's shadow strength (sun/cascades.ts).
+  sun.shadow.intensity = light.shadow
   const fill = hemisphere(stage)
   fill.color.copy(light.hemiSky)
   fill.groundColor.copy(light.hemiGround)

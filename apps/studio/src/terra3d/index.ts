@@ -409,6 +409,42 @@ function trailRibbons(t: Terra, pc: TerraParcels): Float32Array {
   )
 }
 
+/** A plank bridge wherever a road crosses a river, laid along the road at the water's surface. */
+function bridges(t: Terra, plan: TerraPlan, have: (id: string) => boolean): BatchInstance[] {
+  const piece = "kenney-nature/bridge-center-wood"
+  if (!have(piece)) return []
+  const out: BatchInstance[] = []
+  for (const r of plan.roads)
+    for (const b of r.bridges) {
+      let k = 0
+      let best = Infinity
+      r.line.forEach((p, j) => {
+        const d = Math.hypot(p[0] - b[0], p[1] - b[1])
+        if (d < best) {
+          best = d
+          k = j
+        }
+      })
+      const a = r.line[Math.max(0, k - 1)]!
+      const c = r.line[Math.min(r.line.length - 1, k + 1)]!
+      const rot = Math.atan2(c[0] - a[0], c[1] - a[1])
+      const p = r.line[k]!
+      const y =
+        Math.max(terraHeightAt(t, p[0] + (c[0] - a[0]), p[1] + (c[1] - a[1])), terraHeightAt(t, p[0], p[1])) +
+        0.2
+      for (const s of [-1, 0, 1])
+        out.push({
+          piece,
+          x: p[0] + Math.sin(rot) * s * 2,
+          y,
+          z: p[1] + Math.cos(rot) * s * 2,
+          rot,
+          scale: 1.4,
+        })
+    }
+  return out
+}
+
 /** The wild on the land: a jittered 4 m grid read against woods noise, height, slope and the coast. */
 function wild(t: Terra, have: (id: string) => boolean): BatchInstance[] {
   const seed = t.spec.seed
@@ -499,7 +535,7 @@ export const terra3d: Screen = {
       const plan = view.plan ? terraPlan(t) : null
       if (plan) meshes.push(createSurface(stage, roadRibbons(t, plan), ROAD))
       meshes.push(
-        createHeightGround(stage, { ...t, rgba: paintTerra(t, { shade: false, contours: false }) }),
+        createHeightGround(stage, { ...t, rgba: paintTerra(t, { shade: false, contours: false, beds: true }) }),
         createInlandWater(stage, inlandWater(t)),
       )
       water = createWater(stage, {
@@ -520,7 +556,14 @@ export const terra3d: Screen = {
       const built = plan ? await buildPlaces(t, plan, catalog) : null
       if (disposed) return
       // parcels after the districts: what a place claimed but left unbuilt is farmed too
-      const parcels = plan ? terraParcels(t, plan, built?.ground) : null
+      const parcels = plan
+        ? terraParcels(
+            t,
+            plan,
+            built?.ground,
+            (built?.landmarks ?? []).map((l) => ({ kind: l.kind, at: l.at })),
+          )
+        : null
       if (parcels) meshes.push(createSurface(stage, trailRibbons(t, parcels), "#b89a6a"))
       if (built) {
         meshes.push(createSurface(stage, streetRibbons(t, built.streets), ROAD))
@@ -529,6 +572,7 @@ export const terra3d: Screen = {
       const clear = (p: BatchInstance) =>
         !(plan?.roads ?? []).some((r) => r.line.some((q) => Math.hypot(q[0] - p.x, q[1] - p.z) < 3.5))
       const nature = parcels ? dressParcels(t, parcels, have) : wild(t, have)
+      if (plan) nature.push(...bridges(t, plan, have))
       const pieces = nature.filter(clear)
       const clusters = built?.clusters ?? []
       batch = await createStaticBatch(

@@ -12,8 +12,10 @@ import {
   prefabLibrary,
   recipeKey,
   type Terra,
+  type TerraLandmark,
   type TerraPlan,
   terraDistricts,
+  terraLandmarks,
 } from "@guildhall/world"
 import type { loadCatalog } from "../catalog.ts"
 import * as data from "../data.ts"
@@ -29,18 +31,23 @@ export interface BuiltPlaces {
   streets: { line: [number, number][]; half: number }[]
   /** One line per place: what was built. */
   report: string[]
-  /** The ground the districts use; the rest of each claim goes to the parcels. */
+  /** The ground the districts and landmarks use; the rest of each claim goes to the parcels. */
   ground: Uint8Array
+  landmarks: TerraLandmark[]
 }
 
 async function recipes(catalog: Catalog) {
-  const load = async (kind: "recipes/houses" | "recipes/landmarks") => {
+  const load = async (kind: "recipes/houses" | "recipes/landmarks" | "recipes/vignettes") => {
     const ids = await data.list(kind)
     return (await Promise.all(ids.map((id) => data.load(kind, id)))).filter(
       (json): json is PrefabRecipe => json !== null && validatePrefab(json).length === 0,
     )
   }
-  const all = [...(await load("recipes/houses")), ...(await load("recipes/landmarks"))]
+  const all = [
+    ...(await load("recipes/houses")),
+    ...(await load("recipes/landmarks")),
+    ...(await load("recipes/vignettes")),
+  ]
   const compiled = new Map<string, Recipe>()
   for (const r of all)
     try {
@@ -74,7 +81,25 @@ export async function buildPlaces(t: Terra, plan: TerraPlan, catalog: Catalog): 
     ...d.streets.map((s) => ({ line: s.line as [number, number][], half: s.half })),
     ...d.squares.map((sq) => ({ line: [...sq, sq[0]!] as [number, number][], half: 0 })),
   ]
-  const report = plan.anchors.map((a, i) => `${a.kind}: ${d.counts[i] ?? 0} buildings`)
+  const ground = districtGround(t, d)
+  const landmarks = terraLandmarks(t, plan, ground, lib.prefabs)
+  for (const l of landmarks) {
+    const recipe = compiled.get(l.prefab)
+    if (recipe)
+      clusters.push({
+        key: l.prefab,
+        parts: recipe.instances,
+        x: l.at[0],
+        y: l.y - 0.1,
+        z: l.at[1],
+        rot: l.rot,
+        scale: 1,
+      })
+  }
+  const report = [
+    ...plan.anchors.map((a, i) => `${a.kind}: ${d.counts[i] ?? 0} buildings`),
+    `landmarks: ${landmarks.map((l) => l.kind).join(", ") || "none"}`,
+  ]
   logger.info("districts", { ms: d.ms, buildings: d.buildings.length, streets: d.streets.length })
-  return { clusters, streets, report, ground: districtGround(t, d) }
+  return { clusters, streets, report, ground, landmarks }
 }

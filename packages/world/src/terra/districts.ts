@@ -24,6 +24,8 @@ export interface DistrictStreet {
   line: Vec2[]
   /** Half its width, metres. */
   half: number
+  /** Steps between two terraces (drawn as a stair). */
+  stairs?: boolean
 }
 
 export interface DistrictBuilding {
@@ -166,13 +168,36 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
     half: r.kind === "main" ? 2.2 : 1.5,
   }))
   const allStreets = (): DistrictStreet[] => [...roadLines, ...streets]
-  const nearStreet = (p: Vec2, clear: number, skip?: DistrictStreet): boolean => {
+  const nearStreet = (p: Vec2, clear: number, ...skip: (DistrictStreet | undefined)[]): boolean => {
     for (const s of allStreets()) {
-      if (s === skip) continue
+      if (skip.includes(s)) continue
       for (let k = 1; k < s.line.length; k++)
         if (segDist(p, s.line[k - 1]!, s.line[k]!) < clear + s.half) return true
     }
     return false
+  }
+
+  /** The nearest point on any street but `skip`, and how far it is. */
+  const nearestOn = (
+    p: Vec2,
+    ...skip: (DistrictStreet | undefined)[]
+  ): { at: Vec2; d: number; on: DistrictStreet } | null => {
+    let best: { at: Vec2; d: number; on: DistrictStreet } | null = null
+    for (const s of allStreets()) {
+      if (skip.includes(s)) continue
+      for (let k = 1; k < s.line.length; k++) {
+        const a = s.line[k - 1]!
+        const b = s.line[k]!
+        const dx = b[0] - a[0]
+        const dz = b[1] - a[1]
+        const l2 = dx * dx + dz * dz || 1
+        const f = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / l2))
+        const q: Vec2 = [a[0] + f * dx, a[1] + f * dz]
+        const d = Math.hypot(p[0] - q[0], p[1] - q[1])
+        if (!best || d < best.d) best = { at: q, d, on: s }
+      }
+    }
+    return best
   }
 
   plan.anchors.forEach((a, ai) => {
@@ -208,7 +233,7 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
 
     // ---- side streets off the roads through the place ----
     const sideStreets: DistrictStreet[] = []
-    const grow = (start: Vec2, dir: Vec2, depth: number): void => {
+    const grow = (start: Vec2, dir: Vec2, depth: number, from?: DistrictStreet): DistrictStreet | null => {
       const line: Vec2[] = [start]
       // a street keeps to the terrace it starts on: on the hill it runs along the tread
       const lvl = levelAt(start)
@@ -242,9 +267,10 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
         d = [nx / nl, nz / nl]
         const q: Vec2 = [p[0] + d[0] * step, p[1] + d[1] * step]
         if (!mine(q, 0.32, lvl)) break
-        if (n > 0 && nearStreet(q, 6, street)) {
-          // join the street it meets, unless that leaves a sliver
-          if (n > 2) line.push(q)
+        if (n > 0 && nearStreet(q, 6, street, from)) {
+          // run on into the street it meets, so the two join
+          const meet = nearestOn(q, street, from)
+          if (n > 2 && meet) line.push(meet.at)
           break
         }
         line.push(q)
@@ -255,7 +281,11 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
           sideStreets.push({ line: [p, [p[0] - d[1] * side, p[1] + d[0] * side]], half: -1 })
         }
       }
-      if (line.length >= 4) streets.push(street)
+      if (line.length >= 4) {
+        streets.push(street)
+        return street
+      }
+      return null
     }
     if (P.branch > 0)
       for (const road of roadLines) {
@@ -271,7 +301,7 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
           const dz = (b0[1] - a0[1]) / (len || 1)
           for (const side of [1, -1]) {
             const n: Vec2 = [-dz * side, dx * side]
-            grow([b0[0] + n[0] * 3, b0[1] + n[1] * 3], n, 0)
+            grow(b0, n, 0, road)
           }
         }
       }
@@ -295,13 +325,21 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
           const gz = terraHeightAt(t, p[0], p[1] + e) - terraHeightAt(t, p[0], p[1] - e)
           const gl = Math.hypot(gx, gz)
           const along: Vec2 = gl > 0.02 ? [-gz / gl, gx / gl] : [1, 0]
-          grow(p, along, 0)
-          grow(p, [-along[0], -along[1]], 0)
+          const one = grow(p, along, 0)
+          const two = grow(p, [-along[0], -along[1]], 0, one ?? undefined)
+          // a street on a step joins the network: steps down to the nearest street off its terrace
+          const tread = one ?? two
+          if (tread) {
+            const mid = tread.line[Math.floor(tread.line.length / 2)]!
+            const link = nearestOn(mid, one ?? undefined, two ?? undefined)
+            if (link && link.d > 2 && link.d < 34)
+              streets.push({ line: [mid, link.at], half: 1, stairs: true })
+          }
         }
     }
     for (const s of sideStreets) {
       const [p, q] = s.line as [Vec2, Vec2]
-      grow(p, [q[0] - p[0], q[1] - p[1]], 1)
+      grow(p, [q[0] - p[0], q[1] - p[1]], 1, nearestOn(p)?.on)
     }
 
     // ---- buildings ----
@@ -390,6 +428,7 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
     const mineB = buildings.slice(before)
     for (let k = streets.length - 1; k >= firstStreet; k--) {
       const st = streets[k]!
+      if (st.stairs) continue
       const used = mineB.some((b) =>
         st.line.some((q) => Math.hypot(q[0] - b.at[0], q[1] - b.at[1]) < st.half + 11),
       )

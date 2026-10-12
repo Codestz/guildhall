@@ -18,6 +18,7 @@ export {
   terraOutline,
   terraShore,
 } from "./island.ts"
+export { type LandmarkKind, type TerraLandmark, terraLandmarks } from "./landmarks.ts"
 export { fbm, hash2, noise, ridged } from "./noise.ts"
 export { type PaintOptions, paintTerra } from "./paint.ts"
 export {

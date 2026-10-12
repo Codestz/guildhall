@@ -16,6 +16,7 @@
 import { type CostGrid, gridAStar, smoothRoute, stringPull } from "../geom/route.ts"
 import type { Vec2 } from "../geom/vec.ts"
 import { TERRA_CRAG, TERRA_WATER, type Terra } from "./island.ts"
+import type { LandmarkKind } from "./landmarks.ts"
 import { fbm, hash2 } from "./noise.ts"
 import type { TerraPlan } from "./plan.ts"
 
@@ -45,7 +46,7 @@ export interface Parcel {
   level: number
 }
 
-export type PoiKind = "lookout" | "quarry" | "shrine" | "lighthouse" | "farmstead"
+export type PoiKind = "lookout" | "quarry" | "shrine" | "lighthouse" | "farmstead" | LandmarkKind
 
 export interface TerraPoi {
   kind: PoiKind
@@ -72,7 +73,13 @@ export interface TerraParcels {
  * `built`, when given, is the ground the districts really use (`districtGround`): what a place claimed
  * but left unbuilt is parcelled too. Without it the whole of every claim is the place's.
  */
-export function terraParcels(t: Terra, plan: TerraPlan, built?: Uint8Array): TerraParcels {
+export function terraParcels(
+  t: Terra,
+  plan: TerraPlan,
+  built?: Uint8Array,
+  /** Places already standing (the landmarks) that want a trail too. */
+  extra: readonly TerraPoi[] = [],
+): TerraParcels {
   const t0 = performance.now()
   const { w, h, cell, origin, water, slope, coastDist, terraceLevel, height, spec } = t
   const N = w * h
@@ -282,7 +289,7 @@ export function terraParcels(t: Terra, plan: TerraPlan, built?: Uint8Array): Ter
   if (quarry >= 0) pois.push({ kind: "quarry", at: parcels[quarry]!.at })
   const woods = parcels.filter((p) => p.use === "wood").sort((a, b) => near(town, b.at) - near(town, a.at))
   if (woods[0]) pois.push({ kind: "shrine", at: woods[0].at })
-  {
+  if (!extra.some((e) => e.kind === "lighthouse")) {
     // the lighthouse: the dry cell furthest from the island's middle, on high coast
     let best = -1
     let bd = 0
@@ -316,6 +323,7 @@ export function terraParcels(t: Terra, plan: TerraPlan, built?: Uint8Array): Ter
   }
   const grid: CostGrid = { w, h, cost, cell, origin: [origin[0], origin[1]] }
   const trails: TerraTrail[] = []
+  pois.push(...extra)
   for (const poi of pois) {
     if (poi.kind === "farmstead") continue
     const from = cellOf(poi.at)

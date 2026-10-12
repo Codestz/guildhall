@@ -16,6 +16,7 @@ const SEA_DEEP: RGB = [38, 102, 152]
 const FOAM: RGB = [214, 238, 246]
 const LAKE: RGB = [79, 151, 214]
 const RIVER: RGB = [88, 162, 220]
+const BED: RGB = [128, 150, 96]
 const SAND: RGB = [236, 217, 160]
 const ROCK: RGB = [150, 128, 104]
 const STACK: RGB = [156, 143, 128]
@@ -32,6 +33,8 @@ export interface PaintOptions {
   contours?: boolean
   /** Tint by flow accumulation instead (debug). */
   flow?: boolean
+  /** Paint river and lake beds as muddy bank (3D: the water surface is drawn on top). */
+  beds?: boolean
 }
 
 /** RGBA, `t.w × t.h`, row-major. */
@@ -53,7 +56,8 @@ export function paintTerra(t: Terra, opts: PaintOptions = {}): Uint8ClampedArray
       if (wk === TERRA_WATER.sea) {
         const nearLand = coastDistToLand(t, i)
         c = nearLand ? FOAM : mix(SEA_SHALLOW, SEA_DEEP, (-ht - 0.6) / 9)
-      } else if (wk === TERRA_WATER.lake) c = LAKE
+      } else if (opts.beds && (wk === TERRA_WATER.lake || wk === TERRA_WATER.river)) c = BED
+      else if (wk === TERRA_WATER.lake) c = LAKE
       else if (wk === TERRA_WATER.river) c = RIVER
       else if (wk === TERRA_WATER.stack) c = STACK
       else {

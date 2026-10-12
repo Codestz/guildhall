@@ -1,4 +1,5 @@
 import type { Stage } from "@guildhall/render"
+import { atmosphereLab } from "./atmosphere/index.ts"
 import { batch } from "./batch/index.ts"
 import { pieces } from "./browser/index.tsx"
 import { composer } from "./composer/index.tsx"
@@ -52,6 +53,7 @@ export const SCREENS: readonly Screen[] = [
   town,
   planner,
   night,
+  atmosphereLab,
 ]
 
 export const DEFAULT_SCREEN = "home"

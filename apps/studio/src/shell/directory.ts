@@ -155,6 +155,12 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         purpose: "A town from day to night: lamps, lit windows, moonlight, a clock to scrub.",
         dev: true,
       },
+      {
+        id: "atmosphere",
+        name: "Atmosphere",
+        purpose: "Clouds, their shadows and the water's reflections over the island town, hour by hour.",
+        dev: true,
+      },
     ],
   },
 ]

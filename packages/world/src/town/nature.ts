@@ -11,7 +11,7 @@
  */
 import { distTo, lineIndex } from "../geom/line.ts"
 import { axes, type Rect } from "../geom/obb.ts"
-import { bbox, contains, type Ring } from "../geom/poly.ts"
+import { bbox, contains, insideIndex } from "../geom/poly.ts"
 import { poissonIn, type Roll } from "../geom/sample.ts"
 import { add, at, dist, dot, round3, snap, sub, type Vec2 } from "../geom/vec.ts"
 import { SHORE, seedOf } from "./farms.ts"
@@ -90,7 +90,7 @@ export function nature(plan: NatureInput, lib: NatureLibrary, roll: Roll): Place
 
   const green = plan.blocks
     .filter((b) => b.use === "green")
-    .map((b) => ({ b, box: bbox(b.poly), rows: rows(b.poly), edge: lineIndex([b.poly], true) }))
+    .map((b) => ({ b, box: bbox(b.poly), inside: insideIndex([b.poly]), edge: lineIndex([b.poly], true) }))
   const tiles = Array.from({ length: TILE_VARIANTS }, (_, v) => tile((salt) => roll(`${v}:${salt}:tile`)))
   const out: Placement[] = []
   for (let tx = Math.floor(bmin[0] / TILE); tx * TILE < bmax[0]; tx++)
@@ -103,7 +103,7 @@ export function nature(plan: NatureInput, lib: NatureLibrary, roll: Roll): Place
       const pattern = at(tiles, Math.floor(roll(`${tx}:${tz}:pattern`) * TILE_VARIANTS))
       pattern.forEach((q, i) => {
         const p = snap(add(o, q))
-        const home = near.find((g) => g.rows(p))
+        const home = near.find((g) => g.inside(p))
         if (!home) return
         const draw = (salt: string) => roll(`${tx}:${tz}:${i}:${salt}`)
         const edge = fromCoast(p)
@@ -169,31 +169,6 @@ function tile(draw: Roll): Vec2[] {
 function* cellsOf(lo: Vec2, hi: Vec2): Generator<string> {
   for (let i = Math.floor(lo[0] / CELL); i <= Math.floor(hi[0] / CELL); i++)
     for (let j = Math.floor(lo[1] / CELL); j <= Math.floor(hi[1] / CELL); j++) yield `${i},${j}`
-}
-
-/**
- * Whether a point is inside the ring, by crossings alone, with the ring's sides bucketed in rows: the
- * samples (thousands per town, most of them outside) cannot afford every side, nor `contains`'s
- * distance to each. A sample on a side is then kept off it by the clearance anyway.
- */
-function rows(ring: Ring): (p: Vec2) => boolean {
-  const byRow = new Map<number, [Vec2, Vec2][]>()
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const a = ring[i] as Vec2
-    const b = ring[j] as Vec2
-    for (let r = Math.floor(Math.min(a[1], b[1]) / CELL); r <= Math.floor(Math.max(a[1], b[1]) / CELL); r++) {
-      const list = byRow.get(r)
-      if (list) list.push([a, b])
-      else byRow.set(r, [[a, b]])
-    }
-  }
-  return (p) => {
-    let odd = false
-    for (const [a, b] of byRow.get(Math.floor(p[1] / CELL)) ?? [])
-      if (a[1] > p[1] !== b[1] > p[1] && p[0] < ((b[0] - a[0]) * (p[1] - a[1])) / (b[1] - a[1]) + a[0])
-        odd = !odd
-    return odd
-  }
 }
 
 /**

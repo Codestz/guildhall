@@ -10,8 +10,10 @@ import {
   distTo,
   faces,
   frontRect,
+  insideIndex,
   intersect,
   length,
+  lineIndex,
   type MultiPolygon,
   obb,
   offset,
@@ -561,5 +563,34 @@ describe("oriented rectangles", () => {
       // Neighbours on one edge touch: no gaps were asked for.
       expect(rectsOverlap(lots[0]!, lots[1]!, -1e-3)).toBe(true)
     }
+  })
+})
+
+describe("indexes for long lines", () => {
+  // A wobbly ring of 200 points, about 150 m across: a coast.
+  const coast: Ring = Array.from({ length: 200 }, (_, i) => {
+    const t = (2 * Math.PI * i) / 200
+    const r = 150 * (1 + 0.1 * DMath.sin(5 * t) + 0.04 * DMath.sin(17 * t))
+    return snap([r * DMath.cos(t), r * DMath.sin(t)])
+  })
+
+  test("lineIndex gives the distance to the nearest segment, capped at max", () => {
+    const index = lineIndex([coast], true)
+    for (const seed of SEEDS) {
+      const p: Vec2 = [400 * (rand(seed, "x") - 0.5), 400 * (rand(seed, "z") - 0.5)]
+      const exact = distTo(p, coast, true)
+      for (const max of [5, 40, 400]) expect(index.near(p, max)).toBeCloseTo(Math.min(exact, max), 9)
+    }
+  })
+
+  test("insideIndex agrees with contains off the sides, over several rings (even-odd)", () => {
+    const hole = coast.map((p): Vec2 => [p[0] / 3, p[1] / 3]).reverse()
+    const inside = insideIndex([coast, hole])
+    for (const seed of SEEDS)
+      for (let k = 0; k < 20; k++) {
+        const p: Vec2 = [400 * (rand(seed, `${k}:x`) - 0.5), 400 * (rand(seed, `${k}:z`) - 0.5)]
+        if (distTo(p, coast, true) < 0.01 || distTo(p, hole, true) < 0.01) continue
+        expect(inside(p)).toBe(contains([coast, hole], p, 0))
+      }
   })
 })

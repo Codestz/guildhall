@@ -19,6 +19,7 @@ export {
   centroid,
   clip,
   contains,
+  insideIndex,
   type MultiPolygon,
   offset,
   orient,

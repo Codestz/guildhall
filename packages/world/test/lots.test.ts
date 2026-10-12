@@ -10,6 +10,7 @@ import {
   distTo,
   dot,
   lerp,
+  rectCorners,
   rectInPoly,
   rectsOverlap,
   scale,
@@ -119,6 +120,18 @@ describe("lots", () => {
         expect(dot(f.z, sub(onStreet(graph, l.street, f.at), f.at)), label(spec, l)).toBeGreaterThan(0)
       }
     }
+  })
+
+  test("no lot reaches into a street's ribbon, its own street's or any other's", () => {
+    for (const { spec, graph, lots: list } of built)
+      for (const l of list)
+        for (const e of graph.edges) {
+          const ring = rectCorners(lotRect(l))
+          // Corners, and the street's own line where it passes the lot's sides.
+          for (const c of ring) expect(distTo(c, e.points) - e.width / 2, label(spec, l)).toBeGreaterThan(0)
+          for (const p of e.points)
+            expect(distTo(p, ring, true) - e.width / 2, label(spec, l)).toBeGreaterThan(0)
+        }
   })
 
   test("a lot is as wide as a building its district builds there, and deep enough for one", () => {

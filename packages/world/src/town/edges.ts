@@ -7,9 +7,9 @@
  * piece filling each gate gap. Kits are measured pieces, chosen by tier.
  */
 import { DMath } from "@guildhall/core"
-import { closest, dedupe, distTo, intersect, length, offsetLine } from "../geom/line.ts"
+import { closest, dedupe, distTo, intersect, length, lineIndex, offsetLine } from "../geom/line.ts"
 import { faces, type PlanarGraph } from "../geom/planar.ts"
-import { area, centroid, contains, offset, type Polygon, type Ring } from "../geom/poly.ts"
+import { area, centroid, contains, insideIndex, offset, type Polygon, type Ring } from "../geom/poly.ts"
 import type { Roll } from "../geom/sample.ts"
 import {
   add,
@@ -478,8 +478,11 @@ function cutAtWater(
   water: readonly Vec2[][],
   reach: number,
 ): { points: Vec2[]; closed: boolean }[] {
-  const toWater = (p: Vec2) => Math.min(...water.map((w) => (contains(w, p, 0) ? 0 : distTo(p, w, true))))
-  const near = (p: Vec2) => toWater(p) < WATERFRONT
+  // The sea's rings are long (a whole island's coast): their sides are bucketed for the many queries.
+  const wet = insideIndex(water)
+  const shore = lineIndex(water, true)
+  const toWater = (p: Vec2, max = 2 * WATERFRONT) => (wet(p) ? 0 : shore.near(p, max))
+  const near = (p: Vec2) => toWater(p, WATERFRONT) < WATERFRONT
   const start = line.findIndex((p) => !near(p))
   if (start < 0) return []
   const loop = [...line.slice(start), ...line.slice(0, start), at(line, start)]
@@ -492,7 +495,7 @@ function cutAtWater(
     const a = at(loop, i)
     const b = at(loop, i + 1)
     if (!near(a)) cur.push(a)
-    const steps = Math.max(1, Math.ceil(dist(a, b) / 0.25))
+    const steps = Math.max(1, Math.ceil(dist(a, b)))
     for (let k = 1; k <= steps; k++) {
       const p = lerp(a, b, (k - 1) / steps)
       const q = lerp(a, b, k / steps)

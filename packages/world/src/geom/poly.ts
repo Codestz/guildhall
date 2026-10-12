@@ -103,6 +103,37 @@ export function contains(shape: Ring | Polygon, p: Vec2, eps = EPS): boolean {
 }
 
 /**
+ * A point-in-shape test for many queries against big rings (an island's coast, the green round a
+ * town): the rings' sides bucketed in rows `cell` metres high, inside by crossings alone (even–odd
+ * over all the rings). Unlike `contains` it measures no distances, so a point on a side may fall
+ * either way.
+ */
+export function insideIndex(rings: readonly (readonly Vec2[])[], cell = 8): (p: Vec2) => boolean {
+  const rows = new Map<number, [Vec2, Vec2][]>()
+  for (const ring of rings)
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const a = at(ring, i)
+      const b = at(ring, j)
+      for (
+        let r = Math.floor(Math.min(a[1], b[1]) / cell);
+        r <= Math.floor(Math.max(a[1], b[1]) / cell);
+        r++
+      ) {
+        const list = rows.get(r)
+        if (list) list.push([a, b])
+        else rows.set(r, [[a, b]])
+      }
+    }
+  return (p) => {
+    let odd = false
+    for (const [a, b] of rows.get(Math.floor(p[1] / cell)) ?? [])
+      if (a[1] > p[1] !== b[1] > p[1] && p[0] < ((b[0] - a[0]) * (p[1] - a[1])) / (b[1] - a[1]) + a[0])
+        odd = !odd
+    return odd
+  }
+}
+
+/**
  * The boolean `a op b`, as clean polygons on the 1e-3 grid (outer rings CCW, holes CW). The
  * polygons within one multipolygon must not overlap each other: union them first if they might.
  * Near-degenerate input that trips the booleans is retried a grid step or two off (see `run`).

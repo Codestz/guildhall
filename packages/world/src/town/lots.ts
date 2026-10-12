@@ -141,12 +141,13 @@ export function lots(
     if (prefabs.length === 0) continue
     const draw: Roll = (salt) => roll(`${salt}:${block.id}:lots`)
     const taken: Rect[] = []
+    // Runs with no street near them front nothing.
     const ranked = frontageRuns(block.poly)
-      .map((run) => ({ run, rank: RANK[nearestStreet(graph.edges, pointAt(run, run.length / 2)).cls] }))
+      .map((run) => ({ run, near: streetsNear(graph, run.line) }))
+      .filter(({ near }) => near.length > 0)
+      .map((x) => ({ ...x, rank: RANK[nearestStreet(x.near, pointAt(x.run, x.run.length / 2)).cls] }))
       .sort((a, b) => a.rank - b.rank || b.run.length - a.run.length)
-    ranked.forEach(({ run }, ri) => {
-      const near = streetsNear(graph, run.line)
-      if (near.length === 0) return
+    ranked.forEach(({ run, near }, ri) => {
       const packed = packRun(run, block, prefabs, near, taken, tier, (salt) => draw(`${ri}:${salt}`))
       for (const lot of packed)
         out.push({ ...lot, id: out.length, block: block.id, district: block.district })

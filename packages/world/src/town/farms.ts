@@ -164,13 +164,20 @@ export function farms(plan: FarmInput, spec: TownSpecInput, lib: FarmLibrary, ro
     const ring = rectCorners(r)
     return ring.every((p, i) => {
       const q = at(ring, i + 1)
-      const n = Math.ceil(dist(p, q) / 2)
-      for (let k = 0; k < n; k++) if (coast.near(lerp(p, q, k / n), inland) < inland) return false
+      const l = dist(p, q)
+      // A point d from the coast clears the next d − inland metres of the side too.
+      for (let s = 0; s <= l; ) {
+        const d = coast.near(lerp(p, q, s / l), inland + 20)
+        if (d < inland) return false
+        s += Math.max(0.5, d - inland)
+      }
       return true
     })
   }
-  const free = (r: Rect) =>
-    inBounds(r) && offShore(r) && !taken.some((t) => rectsOverlap(t, r)) && onFarmland(r)
+  const reachOf = (r: Rect) => Math.hypot(r.w, r.d) / 2
+  const clear = (r: Rect) =>
+    !taken.some((t) => dist(t.c, r.c) < reachOf(t) + reachOf(r) && rectsOverlap(t, r))
+  const free = (r: Rect) => inBounds(r) && clear(r) && offShore(r) && onFarmland(r)
 
   const fronts = frontages(green)
   const crops = cropGroups(lib)

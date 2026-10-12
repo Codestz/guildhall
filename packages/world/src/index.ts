@@ -1,5 +1,7 @@
 export * from "./geom/index.ts"
 export * from "./town/blocks.ts"
+export * from "./town/edges.ts"
+export * from "./town/landmark.ts"
 export * from "./town/site.ts"
 export * from "./town/spec.ts"
 export * from "./town/streets.ts"

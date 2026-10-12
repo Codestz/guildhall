@@ -231,7 +231,7 @@ export const TILE_PREFABS: TilePrefab[] = [
     group: "country",
     name: "Orchard",
     ground: "grass",
-    tones: [LEAF_TONES.base, LEAF_TONES.olive, LEAF_TONES.base, LEAF_TONES.gold],
+    tones: [LEAF_TONES.base, LEAF_TONES.olive, LEAF_TONES.base],
     pieces: [
       ...[
         [-1.3, -1.2],
@@ -1207,10 +1207,10 @@ export function edgeDressing(
       if (h < 0.82)
         put(
           d,
-          0.84 + hash2(seed, k, 41) * 0.08,
+          0.9 + hash2(seed, k, 41) * 0.08,
           along,
           F(h < 0.55 ? "grass-2-a" : "grass-1-a"),
-          1.1 + h * 0.4,
+          1.7 + h * 0.6,
           k,
           LEAF_TONES.olive,
         )
@@ -1220,8 +1220,8 @@ export function edgeDressing(
     for (const along of [-0.9, 0, 0.9]) {
       k++
       const h = hash2(seed, k, 43)
-      if (h < 0.35) continue
-      put(d, 0.8, along + (h - 0.5) * 0.4, F(`rock-3-${"ijkmno"[k % 6]}`), 0.45 + h * 0.35, k)
+      if (h < 0.5) continue
+      put(d, 0.8, along + (h - 0.5) * 0.4, F(`rock-3-${"ijkmno"[k % 6]}`), 0.3 + h * 0.3, k)
     }
   return out
 }

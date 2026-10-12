@@ -33,17 +33,37 @@ describe("percentile", () => {
 })
 
 describe("summarize", () => {
-  const counters = { calls: 4, tris: 1200, geometries: 3, textures: 0 }
+  const counters = { calls: 4, tris: 1200, shadowCalls: 1, shadowTris: 200, geometries: 3, textures: 0 }
 
-  test("fps is frames over the time they took", () => {
-    const stats = summarize([16, 16, 18, 14], counters, 2)
+  test("fps is frames over the gaps between them", () => {
+    const stats = summarize([16, 16, 18, 14], [3, 3, 3, 3], counters, 2)
     expect(stats.fps).toBeCloseTo(62.5, 9)
     expect(stats.frameMs).toEqual({ p50: 16, p95: 18 })
-    expect(stats).toMatchObject({ ...counters, dpr: 2 })
+    expect(stats).toMatchObject({ calls: 4, tris: 1200, geometries: 3, textures: 0, dpr: 2 })
+  })
+
+  test("cost is reported apart from the gaps", () => {
+    // Headless: no vsync, so the gaps are tiny while each frame's work is not.
+    const stats = summarize([0.7, 0.7, 0.7], [3, 2, 9], counters, 2)
+    expect(stats.costMs).toEqual({ p50: 3, p95: 9 })
+    expect(stats.frameMs.p95).toBe(0.7)
+  })
+
+  test("the main pass is the total minus the shadow passes", () => {
+    expect(summarize([16], [3], counters, 2)).toMatchObject({
+      mainCalls: 3,
+      mainTris: 1000,
+      shadowCalls: 1,
+      shadowTris: 200,
+    })
   })
 
   test("no frames is 0 fps, not NaN", () => {
-    expect(summarize([], counters, 1.5)).toMatchObject({ fps: 0, frameMs: { p50: 0, p95: 0 } })
+    expect(summarize([], [], counters, 1.5)).toMatchObject({
+      fps: 0,
+      frameMs: { p50: 0, p95: 0 },
+      costMs: { p50: 0, p95: 0 },
+    })
   })
 })
 

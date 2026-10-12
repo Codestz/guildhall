@@ -2,10 +2,23 @@ import type { FrameStats } from "@guildhall/core"
 
 /** The renderer's per-frame counters that go into `FrameStats`. */
 export interface FrameCounters {
+  /** All passes. */
   calls: number
   tris: number
+  /** The shadow-map passes; the main pass is the rest. */
+  shadowCalls: number
+  shadowTris: number
   geometries: number
   textures: number
+}
+
+export const NO_COUNTERS: FrameCounters = {
+  calls: 0,
+  tris: 0,
+  shadowCalls: 0,
+  shadowTris: 0,
+  geometries: 0,
+  textures: 0,
 }
 
 /** The p-th percentile (0..100) of some values, nearest-rank; 0 when there are none. */
@@ -16,13 +29,35 @@ export function percentile(values: readonly number[], p: number): number {
   return sorted[Math.max(0, rank - 1)] as number
 }
 
-/** Frame rate and frame-time percentiles of some frame times (ms), plus the counters, as `FrameStats`. */
-export function summarize(frameMs: readonly number[], counters: FrameCounters, dpr: number): FrameStats {
-  const total = frameMs.reduce((sum, ms) => sum + ms, 0)
+const percentiles = (values: readonly number[]) => ({
+  p50: percentile(values, 50),
+  p95: percentile(values, 95),
+})
+
+/**
+ * `FrameStats` for a stretch of frames: the gaps between them (`intervalMs`, which give the rate), the
+ * work each one took (`costMs`), and the last frame's counters split into main and shadow passes.
+ */
+export function summarize(
+  intervalMs: readonly number[],
+  costMs: readonly number[],
+  counters: FrameCounters,
+  dpr: number,
+): FrameStats {
+  const total = intervalMs.reduce((sum, ms) => sum + ms, 0)
+  const { calls, tris, shadowCalls, shadowTris, geometries, textures } = counters
   return {
-    fps: total > 0 ? (frameMs.length * 1000) / total : 0,
-    frameMs: { p50: percentile(frameMs, 50), p95: percentile(frameMs, 95) },
-    ...counters,
+    fps: total > 0 ? (intervalMs.length * 1000) / total : 0,
+    frameMs: percentiles(intervalMs),
+    costMs: percentiles(costMs),
+    calls,
+    tris,
+    mainCalls: calls - shadowCalls,
+    mainTris: tris - shadowTris,
+    shadowCalls,
+    shadowTris,
+    geometries,
+    textures,
     dpr,
   }
 }

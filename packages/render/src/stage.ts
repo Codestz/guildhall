@@ -11,7 +11,8 @@ import {
   WebGLRenderer,
 } from "three"
 import { attachOrbitInput, poseToCamera } from "./camera.ts"
-import { type FrameCounters, FrameRing, summarize } from "./stats.ts"
+import { createGovernor, parseDprPin } from "./governor.ts"
+import { type FrameCounters, FrameRing, NO_COUNTERS, summarize } from "./stats.ts"
 
 export interface Stage {
   scene: Scene
@@ -23,6 +24,8 @@ export interface Stage {
   stats(): FrameStats
   /** The frames drawn over the next `ms` milliseconds. */
   sample(ms: number): Promise<FrameStats>
+  /** Draws at this device pixel ratio from the next frame on (the governor's lever). */
+  setDpr(dpr: number): void
   setCamera(p: CameraPose): void
   getCamera(): CameraPose
   /** Calls `fn(dt seconds)` every frame before drawing; returns the unsubscribe. */
@@ -32,6 +35,8 @@ export interface Stage {
 
 /** The default DPR range: never below 1.5 (supersamples low-DPR screens), never above 2. */
 const DPR: [number, number] = [1.5, 2]
+/** The p95 frame cost (ms) the DPR governor holds. */
+const BUDGET_MS = 12
 const DEFAULT_POSE: CameraPose = { target: [0, 1, 0], azimuth: 35, elevation: 28, distance: 12 }
 
 const logger = log("render:stage")
@@ -41,13 +46,17 @@ export function clampDpr(device: number, [min, max]: readonly [number, number]):
   return Math.min(max, Math.max(min, device || 1))
 }
 
-/** A lit scene drawn every animation frame into a canvas that fills `host`, with an orbit camera. */
+/**
+ * A lit scene drawn every animation frame into a canvas that fills `host`, with an orbit camera. A DPR
+ * governor keeps the frame cost under budget within `opts.dpr`; `?dpr=` in the page's URL pins it.
+ */
 export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } = {}): Stage {
   ColorManagement.enabled = true
   const renderer = new WebGLRenderer({ antialias: true, powerPreference: "high-performance" })
   renderer.outputColorSpace = SRGBColorSpace
   renderer.info.autoReset = false
-  const dpr = clampDpr(globalThis.devicePixelRatio, opts.dpr ?? DPR)
+  const range = opts.dpr ?? DPR
+  let dpr = clampDpr(globalThis.devicePixelRatio, range)
   renderer.setPixelRatio(dpr)
   renderer.domElement.style.display = "block"
   host.append(renderer.domElement)
@@ -80,28 +89,51 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
   const observer = new ResizeObserver(resize)
   observer.observe(host)
 
-  const ring = new FrameRing()
-  const samplers = new Set<number[]>()
+  // three counts shadow-map draws into the same `info.render` as the main pass; tally them apart.
+  let shadowCalls = 0
+  let shadowTris = 0
+  const shadowMap = renderer.shadowMap
+  const renderShadows = shadowMap.render.bind(shadowMap)
+  shadowMap.render = (...args) => {
+    const { calls, triangles } = renderer.info.render
+    renderShadows(...args)
+    shadowCalls += renderer.info.render.calls - calls
+    shadowTris += renderer.info.render.triangles - triangles
+  }
+
+  const intervals = new FrameRing()
+  const costs = new FrameRing()
+  const samplers = new Set<{ intervals: number[]; costs: number[] }>()
   const frameFns = new Set<(dt: number) => void>()
-  let counters: FrameCounters = { calls: 0, tris: 0, geometries: 0, textures: 0 }
+  let counters: FrameCounters = NO_COUNTERS
   let last: number | null = null
   let raf = 0
 
   const frame = (now: number) => {
+    const start = performance.now()
     raf = requestAnimationFrame(frame)
     const ms = last === null ? 0 : now - last
     last = now
-    if (ms > 0) {
-      ring.push(ms)
-      for (const times of samplers) times.push(ms)
-    }
     renderer.info.reset()
+    shadowCalls = 0
+    shadowTris = 0
     for (const fn of frameFns) fn(ms / 1000)
     renderer.render(scene, camera)
+    // The CPU side of the frame: hooks plus render. Headless Chrome has no vsync, so this, not the
+    // rAF gap, is what the budget holds.
+    const cost = performance.now() - start
+    costs.push(cost)
+    if (ms > 0) intervals.push(ms)
+    for (const s of samplers) {
+      s.costs.push(cost)
+      if (ms > 0) s.intervals.push(ms)
+    }
     const { render, memory } = renderer.info
     counters = {
       calls: render.calls,
       tris: render.triangles,
+      shadowCalls,
+      shadowTris,
       geometries: memory.geometries,
       textures: memory.textures,
     }
@@ -109,21 +141,25 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
   raf = requestAnimationFrame(frame)
   logger.info("created", { dpr, size: [host.clientWidth, host.clientHeight] })
 
-  return {
+  const stage: Stage = {
     scene,
     camera,
     renderer,
     sun,
-    stats: () => summarize(ring.values(), counters, dpr),
+    stats: () => summarize(intervals.values(), costs.values(), counters, dpr),
     sample(ms) {
-      const times: number[] = []
-      samplers.add(times)
+      const s = { intervals: [] as number[], costs: [] as number[] }
+      samplers.add(s)
       return new Promise((done) =>
         setTimeout(() => {
-          samplers.delete(times)
-          done(summarize(times, counters, dpr))
+          samplers.delete(s)
+          done(summarize(s.intervals, s.costs, counters, dpr))
         }, ms),
       )
+    },
+    setDpr(next) {
+      dpr = next
+      renderer.setPixelRatio(dpr)
     },
     setCamera,
     getCamera: () => ({ ...pose, target: [...pose.target] }),
@@ -132,6 +168,7 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
       return () => frameFns.delete(fn)
     },
     dispose() {
+      governor.dispose()
       cancelAnimationFrame(raf)
       observer.disconnect()
       detachInput()
@@ -140,6 +177,12 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
       logger.info("disposed")
     },
   }
+  const governor = createGovernor(stage, {
+    targetMs: BUDGET_MS,
+    dpr: range,
+    pin: parseDprPin(globalThis.location?.search ?? ""),
+  })
+  return stage
 }
 
 /**

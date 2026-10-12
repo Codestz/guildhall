@@ -1,11 +1,24 @@
 import type { configureLog, logRecords } from "./log.ts"
 
-/** What one stretch of frames cost: rate, frame-time percentiles and the renderer's counters. */
+/**
+ * What one stretch of frames cost: rate, frame-time percentiles and the renderer's counters.
+ * `fps` and `frameMs` are the gaps between animation frames: vsync-bound in a real browser, unbounded
+ * headless. `costMs` is the work itself, and the number the frame budget is held to.
+ */
 export interface FrameStats {
   fps: number
   frameMs: { p50: number; p95: number }
+  /** CPU time spent inside the frame callback (frame hooks plus `renderer.render`), ms. */
+  costMs?: { p50: number; p95: number }
+  /** Every draw and triangle of the frame: the main pass plus the shadow passes. */
   calls: number
   tris: number
+  /** The main (camera) pass alone: what the triangle budget counts. */
+  mainCalls?: number
+  mainTris?: number
+  /** The shadow-map passes alone, reported apart from the budget. */
+  shadowCalls?: number
+  shadowTris?: number
   geometries: number
   textures: number
   dpr: number

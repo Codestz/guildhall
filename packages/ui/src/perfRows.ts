@@ -9,14 +9,37 @@ export interface PerfRow {
 const count = (n: number): string => Math.round(n).toLocaleString("en-US")
 const ms = (n: number): string => n.toFixed(1)
 
-/** The HUD's rows for one reading, in display order. Formatting only; the numbers are the stage's. */
+/**
+ * The HUD's rows for one reading, in display order. Formatting only; the numbers are the stage's.
+ * The frame cost leads: it is what the budget holds. The animation-frame rate follows, labelled as
+ * such, since without vsync (headless) it says nothing about cost. Draws split into main and shadow
+ * passes when the reading has them.
+ */
 export function perfRows(s: FrameStats): PerfRow[] {
+  const cost: PerfRow[] = s.costMs
+    ? [
+        { label: "cost p50", value: ms(s.costMs.p50), unit: "ms" },
+        { label: "cost p95", value: ms(s.costMs.p95), unit: "ms" },
+      ]
+    : []
+  const draws: PerfRow[] =
+    s.mainCalls !== undefined
+      ? [
+          { label: "calls main", value: count(s.mainCalls), unit: "" },
+          { label: "calls shadow", value: count(s.shadowCalls ?? 0), unit: "" },
+          { label: "tris main", value: count(s.mainTris ?? 0), unit: "" },
+          { label: "tris shadow", value: count(s.shadowTris ?? 0), unit: "" },
+        ]
+      : [
+          { label: "draw calls", value: count(s.calls), unit: "" },
+          { label: "triangles", value: count(s.tris), unit: "" },
+        ]
   return [
-    { label: "fps", value: count(s.fps), unit: "" },
-    { label: "frame p50", value: ms(s.frameMs.p50), unit: "ms" },
-    { label: "frame p95", value: ms(s.frameMs.p95), unit: "ms" },
-    { label: "draw calls", value: count(s.calls), unit: "" },
-    { label: "triangles", value: count(s.tris), unit: "" },
+    ...cost,
+    { label: "rAF fps", value: count(s.fps), unit: "" },
+    { label: "rAF p50", value: ms(s.frameMs.p50), unit: "ms" },
+    { label: "rAF p95", value: ms(s.frameMs.p95), unit: "ms" },
+    ...draws,
     { label: "geometries", value: count(s.geometries), unit: "" },
     { label: "textures", value: count(s.textures), unit: "" },
     { label: "dpr", value: s.dpr.toFixed(2), unit: "×" },

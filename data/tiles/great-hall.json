@@ -1,0 +1,115 @@
+{
+  "blockers": [
+    {
+      "r": 1.525,
+      "x": 0,
+      "z": -0.45
+    },
+    {
+      "r": 0.365,
+      "x": -1.05,
+      "z": 1.15
+    },
+    {
+      "r": 0.365,
+      "x": 1.05,
+      "z": 1.15
+    },
+    {
+      "r": 0.482,
+      "x": -1.707,
+      "z": 1.389
+    },
+    {
+      "r": 0.482,
+      "x": 1.707,
+      "z": 1.389
+    }
+  ],
+  "ground": "paved",
+  "group": "landmark",
+  "id": "great-hall",
+  "name": "Great hall",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-church-red",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 0,
+      "z": -0.45
+    },
+    {
+      "piece": "kaykit-dungeon/banner-red",
+      "rot": 0,
+      "scale": 0.42,
+      "x": -1.05,
+      "z": 1.15
+    },
+    {
+      "piece": "kaykit-dungeon/banner-red",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 1.05,
+      "z": 1.15
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": -1.707,
+      "z": 1.389
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 1.707,
+      "z": 1.389
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_A",
+      "facing": 0,
+      "kind": "stand",
+      "roles": [
+        "guard"
+      ],
+      "x": -0.55,
+      "z": 1.75
+    },
+    {
+      "clip": "Idle_A",
+      "facing": 0,
+      "kind": "stand",
+      "roles": [
+        "guard"
+      ],
+      "x": 0.55,
+      "z": 1.75
+    },
+    {
+      "clip": "Idle_B",
+      "facing": 1.222,
+      "hours": [
+        9,
+        20
+      ],
+      "kind": "talk",
+      "x": -1.2,
+      "z": 2.1
+    },
+    {
+      "clip": "Waving",
+      "facing": -1.92,
+      "hours": [
+        9,
+        20
+      ],
+      "kind": "talk",
+      "x": -0.6,
+      "z": 2.35
+    }
+  ],
+  "tier": 3
+}

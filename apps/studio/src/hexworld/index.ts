@@ -48,6 +48,7 @@ import {
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
 import { worldCamera } from "../shell/worldCamera.ts"
+import { loadTiles } from "../tiles.ts"
 import { createLife, type Life } from "./life.ts"
 
 const logger = log("studio:hexworld")
@@ -124,6 +125,8 @@ export const hexWorldScreen: Screen = {
     host.append(info)
 
     const build = async () => {
+      // the authored tile prefabs (data/tiles) before anything is built from them
+      await loadTiles()
       const t0 = performance.now()
       const h = hexIsland({ seed, files })
       const z = hexZones(h)

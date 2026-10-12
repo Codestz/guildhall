@@ -5,7 +5,7 @@ or by the studio, and reviewed as a diff.
 
 | Path | What | Validated by (`@guildhall/assets`) |
 |---|---|---|
-| `recipes/{houses,landmarks,stalls,docks,farm}/<id>.json` | prefab recipes | `validatePrefab` |
+| `tiles/<id>.json` | hex tile prefabs (pieces, activity spots, blockers; the tile composer at `/composer/<id>`) | `validateTilePrefab` (`@guildhall/world`) |
 | `mounts.json` | `{ version: 1, mounts: Record<catalogId, Mount> }` (ADR 010) | `validateMounts` |
 | `npcs/<role>.json` | NPC recipes | `validateNpc` |
 
@@ -24,3 +24,15 @@ A write must be a JSON body (`Content-Type: application/json`, at most 1 MiB) se
 to one of the paths above. It is checked by the validator for its folder (422 with the problems when
 it fails), then written atomically. Nothing outside these paths is served or written, and symlinks
 under `data/` are refused. `apps/studio/src/data.ts` is the client.
+
+## Tile prefabs
+
+`tiles/<id>.json` is one hex tile's scene in tile space: metres round its centre, `+z` its front (the side
+the world turns toward the street), corners on `±x`, sides numbered 0–5 from 30° counter-clockwise
+(`TILE_SIDES`, `sideDir` in `packages/world/src/hex/tiles.ts`). `spots` are where people do things (kind,
+facing, rig-medium clip, held prop from `mounts.json`, roles from `npcs/`, optional hours); `blockers`
+are discs nobody walks through; `footprint` (proposed, not yet placed by the world) lists the
+neighbouring sides a larger scene also covers; `tier` marks the Guildhall castle's pieces. The world
+reads these files through `installTilePrefabs`; its code `TILE_PREFABS` is only the fallback.
+
+The old house/landmark/vignette recipes the ring town read are archived in `legacy/data/recipes/`.

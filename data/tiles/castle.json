@@ -1,0 +1,57 @@
+{
+  "blockers": [
+    {
+      "r": 1.949,
+      "x": 0,
+      "z": -0.2
+    },
+    {
+      "r": 0.482,
+      "x": 1.794,
+      "z": 1.239
+    }
+  ],
+  "ground": "rock",
+  "group": "landmark",
+  "id": "castle",
+  "name": "Castle",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-castle-blue",
+      "rot": 0,
+      "scale": 0.36,
+      "x": 0,
+      "z": -0.2
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 1.794,
+      "z": 1.239
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_A",
+      "facing": 0,
+      "kind": "stand",
+      "roles": [
+        "guard"
+      ],
+      "x": -0.75,
+      "z": 2.15
+    },
+    {
+      "clip": "Idle_A",
+      "facing": 0,
+      "kind": "stand",
+      "roles": [
+        "guard"
+      ],
+      "x": 0.75,
+      "z": 2.15
+    }
+  ],
+  "tier": 1
+}

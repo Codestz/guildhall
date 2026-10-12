@@ -1,0 +1,112 @@
+{
+  "blockers": [
+    {
+      "r": 0.404,
+      "x": -0.396,
+      "z": 0.866
+    },
+    {
+      "r": 0.407,
+      "x": -0.757,
+      "z": -1.065
+    },
+    {
+      "r": 0.608,
+      "x": 1.653,
+      "z": -0.157
+    },
+    {
+      "r": 0.35,
+      "x": 0.6,
+      "z": -0.6
+    },
+    {
+      "r": 0.35,
+      "x": -1,
+      "z": 1
+    },
+    {
+      "r": 0.288,
+      "x": -1.7,
+      "z": -0.4
+    }
+  ],
+  "ground": "grass",
+  "group": "ground",
+  "id": "hillside",
+  "name": "Hillside",
+  "pieces": [
+    {
+      "piece": "kaykit-forest/rock-3-e-color1",
+      "rot": 0,
+      "scale": 0.6,
+      "x": -0.396,
+      "z": 0.866
+    },
+    {
+      "piece": "kaykit-forest/rock-3-f-color1",
+      "rot": 1,
+      "scale": 0.6,
+      "x": -0.757,
+      "z": -1.065
+    },
+    {
+      "piece": "kaykit-forest/rock-3-g-color1",
+      "rot": 2,
+      "scale": 0.6,
+      "x": 1.653,
+      "z": -0.157
+    },
+    {
+      "piece": "kaykit-forest/tree-4-b-color1",
+      "rot": 0,
+      "scale": 0.48,
+      "tone": true,
+      "x": 0.6,
+      "z": -0.6
+    },
+    {
+      "piece": "kaykit-forest/tree-4-a-color1",
+      "rot": 0,
+      "scale": 0.48,
+      "tone": true,
+      "x": -1,
+      "z": 1
+    },
+    {
+      "odds": 0.4,
+      "piece": "kaykit-forest/tree-4-a-color1",
+      "rot": 1,
+      "scale": 0.42,
+      "tone": true,
+      "x": 1.5,
+      "z": 1.2
+    },
+    {
+      "odds": 0.5,
+      "piece": "kaykit-forest/bush-1-c-color1",
+      "rot": 0,
+      "scale": 0.6,
+      "tone": true,
+      "x": -1.7,
+      "z": -0.4
+    }
+  ],
+  "tones": [
+    {
+      "0": 33,
+      "1": 34,
+      "2": 34,
+      "34": 33
+    },
+    {
+      "2": 1
+    },
+    {
+      "0": 34,
+      "1": 35,
+      "2": 35,
+      "34": 34
+    }
+  ]
+}

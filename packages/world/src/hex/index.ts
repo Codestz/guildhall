@@ -40,19 +40,24 @@ export {
   WALK_MPS,
   workTiles,
 } from "./life.ts"
+export { parseTilePrefabs, SPOT_KINDS, TILE_GROUNDS, TILE_GROUPS, validateTilePrefab } from "./prefabs.ts"
 export { type Disc, type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
 export { hexStructures } from "./structures.ts"
 export {
   CHARACTER_SCALE,
   castleWalls,
   edgeDressing,
+  FRONT_SIDE,
   HEX_TILE_SIZE,
+  installTilePrefabs,
   KENNEY_WOOD,
   LEAF_TONES,
   type PlacedPiece,
   placeTile,
   SCALE_B,
+  sideDir,
   TILE_PREFABS,
+  TILE_SIDES,
   type TileBlocker,
   type TileGround,
   type TilePiece,
@@ -60,7 +65,9 @@ export {
   type TileSpot,
   tilePath,
   tilePrefab,
+  tilePrefabs,
   tileVariant,
+  worldSide,
 } from "./tiles.ts"
 export {
   clearWay,

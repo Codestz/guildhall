@@ -1,0 +1,59 @@
+{
+  "blockers": [
+    {
+      "r": 0.482,
+      "x": 1.3,
+      "z": -0.9
+    },
+    {
+      "r": 0.345,
+      "x": -1.8,
+      "z": -1.2
+    }
+  ],
+  "ground": "grass",
+  "group": "road",
+  "id": "road",
+  "name": "Road",
+  "path": [
+    0,
+    3
+  ],
+  "pieces": [
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 1.3,
+      "z": -0.9
+    },
+    {
+      "piece": "kaykit-forest/grass-2-c-color1",
+      "rot": 0,
+      "scale": 0.8,
+      "x": -1.4,
+      "z": 1.3
+    },
+    {
+      "piece": "kaykit-forest/grass-2-c-color1",
+      "rot": 1,
+      "scale": 0.8,
+      "x": 1.6,
+      "z": 1.4
+    },
+    {
+      "piece": "kaykit-forest/rock-3-e-color1",
+      "rot": 0.3,
+      "scale": 0.5,
+      "x": -1.8,
+      "z": -1.2
+    },
+    {
+      "piece": "kenney-nature/flower-yellow-a",
+      "rot": 0,
+      "scale": 1,
+      "x": -2,
+      "z": 0.2
+    }
+  ]
+}

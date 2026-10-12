@@ -1,0 +1,116 @@
+{
+  "blockers": [
+    {
+      "r": 1.253,
+      "x": 0.3,
+      "z": -0.5
+    },
+    {
+      "r": 0.54,
+      "x": -1.5,
+      "z": 1.2
+    },
+    {
+      "r": 0.482,
+      "x": 0.9,
+      "z": 1.9
+    },
+    {
+      "r": 0.35,
+      "x": -1.6,
+      "z": -1.4
+    }
+  ],
+  "ground": "grass",
+  "group": "town",
+  "id": "house-porch",
+  "name": "House with a bench",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-home-b-red",
+      "rot": 0,
+      "scale": 0.475,
+      "x": 0.3,
+      "z": -0.5
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": 0.2,
+      "scale": 0.55,
+      "x": -1.5,
+      "z": 1.2
+    },
+    {
+      "piece": "kenney-nature/pot-small",
+      "rot": 0,
+      "scale": 0.32,
+      "x": -1.9,
+      "z": 0.2
+    },
+    {
+      "piece": "kenney-nature/flower-red-a",
+      "rot": 0,
+      "scale": 0.7,
+      "x": -1.9,
+      "y": 0.3,
+      "z": 0.2
+    },
+    {
+      "piece": "kenney-nature/pot-small",
+      "rot": 0,
+      "scale": 0.32,
+      "x": 1.7,
+      "z": 1.3
+    },
+    {
+      "piece": "kenney-nature/flower-yellow-a",
+      "rot": 0,
+      "scale": 0.7,
+      "x": 1.7,
+      "y": 0.3,
+      "z": 1.3
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 0.9,
+      "z": 1.9
+    },
+    {
+      "piece": "kaykit-forest/tree-3-a-color1",
+      "rot": 0,
+      "scale": 0.33,
+      "tone": true,
+      "x": -1.6,
+      "z": -1.4
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0.2,
+      "kind": "sit",
+      "x": -1.733,
+      "z": 1.308
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0.2,
+      "kind": "sit",
+      "x": -1.243,
+      "z": 1.209
+    }
+  ],
+  "tones": [
+    {
+      "2": 1
+    },
+    {
+      "0": 34,
+      "1": 35,
+      "2": 35,
+      "34": 34
+    }
+  ]
+}

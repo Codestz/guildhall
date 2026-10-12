@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url"
 import { PALETTE, validateMounts, validateNpc, validatePrefab } from "@guildhall/assets"
 import react from "@vitejs/plugin-react"
 import { type Connect, defineConfig, type Plugin } from "vite"
+// the validator alone (its module only imports types): the world package itself does not load in a config
+import { validateTilePrefab } from "../../packages/world/src/hex/prefabs.ts"
 import { formatData } from "./src/json.ts"
 
 export { formatData }
@@ -16,7 +18,7 @@ const page = (name: string) => fileURLToPath(new URL(name, import.meta.url))
 /** The generated asset library at the repo root (tools/import writes it). It may not exist yet. */
 const LIBRARY = fileURLToPath(new URL("../../library", import.meta.url))
 
-/** Authored, committed data at the repo root (ADR 005): recipes, mounts, npcs. */
+/** Authored, committed data at the repo root (ADR 005): recipes, mounts, npcs, tile prefabs. */
 const DATA = fileURLToPath(new URL("../../data", import.meta.url))
 
 const TYPES: Record<string, string> = {
@@ -61,7 +63,7 @@ const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/
 const RECIPE_FOLDERS = ["houses", "landmarks", "stalls", "docks", "farm", "vignettes"]
 
 /** Folders whose `<id>.json` files the endpoint lists, reads and writes. */
-export const DATA_FOLDERS = [...RECIPE_FOLDERS.map((f) => `recipes/${f}`), "npcs"]
+export const DATA_FOLDERS = [...RECIPE_FOLDERS.map((f) => `recipes/${f}`), "npcs", "tiles"]
 
 type Validate = (json: unknown) => string[]
 
@@ -77,6 +79,7 @@ export function dataRoute(path: string): Validate | null {
   const file = path.slice(slash + 1)
   if (!DATA_FOLDERS.includes(folder) || !file.endsWith(".json") || !ID.test(file.slice(0, -5))) return null
   if (folder === "npcs") return (json) => validateNpc(json, PALETTE)
+  if (folder === "tiles") return (json) => validateTilePrefab(json, file.slice(0, -5))
   return (json) => validatePrefab(json, PALETTE)
 }
 

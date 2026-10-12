@@ -1,0 +1,131 @@
+{
+  "blockers": [
+    {
+      "r": 0.504,
+      "x": -0.6,
+      "z": -0.4
+    },
+    {
+      "r": 0.3,
+      "x": 0.7,
+      "z": 0.5
+    }
+  ],
+  "ground": "grass",
+  "group": "country",
+  "id": "pasture",
+  "name": "Pasture",
+  "pieces": [
+    {
+      "piece": "kaykit-resources/wood-log-stack",
+      "rot": 0.4,
+      "scale": 0.54,
+      "x": -0.6,
+      "z": -0.4
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0.7,
+      "z": 0.5
+    },
+    {
+      "piece": "kaykit-forest/grass-2-c-color1",
+      "rot": 0,
+      "scale": 0.8,
+      "x": 1.285,
+      "z": 0.543
+    },
+    {
+      "piece": "kaykit-forest/grass-2-d-color1",
+      "rot": 1,
+      "scale": 0.8,
+      "x": 0.172,
+      "z": 1.384
+    },
+    {
+      "piece": "kaykit-forest/grass-2-c-color1",
+      "rot": 2,
+      "scale": 0.8,
+      "x": -1.113,
+      "z": 0.841
+    },
+    {
+      "piece": "kaykit-forest/grass-2-d-color1",
+      "rot": 3,
+      "scale": 0.8,
+      "x": -1.285,
+      "z": -0.543
+    },
+    {
+      "piece": "kaykit-forest/grass-2-c-color1",
+      "rot": 4,
+      "scale": 0.8,
+      "x": -0.172,
+      "z": -1.384
+    },
+    {
+      "piece": "kaykit-forest/grass-2-d-color1",
+      "rot": 5,
+      "scale": 0.8,
+      "x": 1.113,
+      "z": -0.841
+    },
+    {
+      "piece": "kenney-nature/flower-yellow-a",
+      "rot": 0,
+      "scale": 1,
+      "x": 1.2,
+      "z": -1
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": -1.047,
+      "scale": 0.723,
+      "x": 2.255,
+      "z": -1.302
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": 0,
+      "scale": 0.723,
+      "x": 0,
+      "z": -2.604
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": 1.047,
+      "scale": 0.723,
+      "x": -2.255,
+      "z": -1.302
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": 3.142,
+      "scale": 0.723,
+      "x": 0,
+      "z": 2.604
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": 4.189,
+      "scale": 0.723,
+      "x": 2.255,
+      "z": 1.302
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Chopping",
+      "facing": -2.536,
+      "kind": "work",
+      "prop": "kaykit-tools/axe",
+      "roles": [
+        "farmer"
+      ],
+      "x": -0.15,
+      "z": 0.25
+    }
+  ]
+}

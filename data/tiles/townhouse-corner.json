@@ -1,0 +1,81 @@
+{
+  "blockers": [
+    {
+      "r": 1.318,
+      "x": -0.4,
+      "z": -0.4
+    },
+    {
+      "r": 0.54,
+      "x": 1.5,
+      "z": 0.3
+    },
+    {
+      "r": 0.934,
+      "x": -1.309,
+      "z": 1.174
+    },
+    {
+      "r": 0.482,
+      "x": 0.4,
+      "z": 1.9
+    }
+  ],
+  "ground": "grass",
+  "group": "town",
+  "id": "townhouse-corner",
+  "name": "Town house on a corner",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-home-b-blue",
+      "rot": 0.5,
+      "scale": 0.5,
+      "x": -0.4,
+      "z": -0.4
+    },
+    {
+      "piece": "kenney-survival/signpost",
+      "rot": 0.4,
+      "scale": 0.9,
+      "x": 1.6,
+      "z": 1.6
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": -1.2,
+      "scale": 0.55,
+      "x": 1.5,
+      "z": 0.3
+    },
+    {
+      "piece": "kenney-town/cart",
+      "rot": 1.9,
+      "scale": 0.38,
+      "x": -1.309,
+      "z": 1.174
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 0.4,
+      "z": 1.9
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": -1.2,
+      "kind": "sit",
+      "x": 1.353,
+      "z": 0.089
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": -1.2,
+      "kind": "sit",
+      "x": 1.535,
+      "z": 0.555
+    }
+  ]
+}

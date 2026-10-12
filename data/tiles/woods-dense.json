@@ -1,0 +1,209 @@
+{
+  "blockers": [
+    {
+      "r": 0.35,
+      "x": -0.9,
+      "z": -1
+    },
+    {
+      "r": 0.35,
+      "x": 1.2,
+      "z": -0.9
+    },
+    {
+      "r": 0.35,
+      "x": 0.1,
+      "z": 0.3
+    },
+    {
+      "r": 0.35,
+      "x": -1.7,
+      "z": 0.6
+    },
+    {
+      "r": 0.35,
+      "x": 1.4,
+      "z": 1.3
+    },
+    {
+      "r": 0.35,
+      "x": -0.5,
+      "z": 1.9
+    },
+    {
+      "r": 0.35,
+      "x": 0.3,
+      "z": -2.1
+    },
+    {
+      "r": 0.29,
+      "x": 1.713,
+      "z": 1.517
+    },
+    {
+      "r": 0.312,
+      "x": -0.457,
+      "z": 2.215
+    },
+    {
+      "r": 0.396,
+      "x": -2.056,
+      "z": 0.659
+    },
+    {
+      "r": 0.264,
+      "x": -1.741,
+      "z": -1.533
+    },
+    {
+      "r": 0.343,
+      "x": 0.457,
+      "z": -2.176
+    },
+    {
+      "r": 0.36,
+      "x": 2.095,
+      "z": -0.681
+    }
+  ],
+  "ground": "grass",
+  "group": "country",
+  "id": "woods-dense",
+  "name": "Deep woods",
+  "pieces": [
+    {
+      "piece": "kaykit-forest/tree-4-c-color1",
+      "rot": 0.3,
+      "scale": 0.42,
+      "tone": true,
+      "x": -0.9,
+      "z": -1
+    },
+    {
+      "piece": "kaykit-forest/tree-1-b-color1",
+      "rot": 1.2,
+      "scale": 0.63,
+      "tone": true,
+      "x": 1.2,
+      "z": -0.9
+    },
+    {
+      "piece": "kaykit-forest/tree-4-b-color1",
+      "rot": 2.1,
+      "scale": 0.57,
+      "tone": true,
+      "x": 0.1,
+      "z": 0.3
+    },
+    {
+      "piece": "kaykit-forest/tree-4-a-color1",
+      "rot": 0.7,
+      "scale": 0.6,
+      "tone": true,
+      "x": -1.7,
+      "z": 0.6
+    },
+    {
+      "piece": "kaykit-forest/tree-2-d-color1",
+      "rot": 1.9,
+      "scale": 0.45,
+      "tone": true,
+      "x": 1.4,
+      "z": 1.3
+    },
+    {
+      "piece": "kaykit-forest/tree-4-b-color1",
+      "rot": 2.5,
+      "scale": 0.51,
+      "tone": true,
+      "x": -0.5,
+      "z": 1.9
+    },
+    {
+      "odds": 0.7,
+      "piece": "kaykit-forest/tree-3-c-color1",
+      "rot": 0.4,
+      "scale": 0.36,
+      "tone": true,
+      "x": 0.3,
+      "z": -2.1
+    },
+    {
+      "odds": 0.5,
+      "piece": "kaykit-forest/bush-2-c-color1",
+      "rot": 0,
+      "scale": 0.55,
+      "tone": true,
+      "x": 1.713,
+      "z": 1.517
+    },
+    {
+      "odds": 0.5,
+      "piece": "kaykit-forest/bush-1-c-color1",
+      "rot": 1,
+      "scale": 0.65,
+      "tone": true,
+      "x": -0.457,
+      "z": 2.215
+    },
+    {
+      "odds": 0.5,
+      "piece": "kaykit-forest/bush-2-c-color1",
+      "rot": 2,
+      "scale": 0.75,
+      "tone": true,
+      "x": -2.056,
+      "z": 0.659
+    },
+    {
+      "odds": 0.5,
+      "piece": "kaykit-forest/bush-1-c-color1",
+      "rot": 3,
+      "scale": 0.55,
+      "tone": true,
+      "x": -1.741,
+      "z": -1.533
+    },
+    {
+      "odds": 0.5,
+      "piece": "kaykit-forest/bush-2-c-color1",
+      "rot": 4,
+      "scale": 0.65,
+      "tone": true,
+      "x": 0.457,
+      "z": -2.176
+    },
+    {
+      "odds": 0.5,
+      "piece": "kaykit-forest/bush-1-c-color1",
+      "rot": 5,
+      "scale": 0.75,
+      "tone": true,
+      "x": 2.095,
+      "z": -0.681
+    }
+  ],
+  "tones": [
+    {
+      "0": 33,
+      "1": 34,
+      "2": 34,
+      "34": 33
+    },
+    {
+      "0": 33,
+      "1": 34,
+      "2": 34,
+      "34": 33
+    },
+    {
+      "2": 1
+    },
+    {
+      "0": 34,
+      "1": 35,
+      "2": 35,
+      "34": 34
+    }
+  ]
+}

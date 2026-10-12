@@ -1,0 +1,49 @@
+{
+  "blockers": [
+    {
+      "r": 0.98,
+      "x": 0.9,
+      "z": 0
+    },
+    {
+      "r": 0.3,
+      "x": 1.6,
+      "z": -1
+    }
+  ],
+  "ground": "grass",
+  "group": "road",
+  "id": "road-end",
+  "name": "Road end",
+  "path": [
+    3
+  ],
+  "pieces": [
+    {
+      "piece": "kenney-town/cart",
+      "rot": 0.4,
+      "scale": 0.4,
+      "x": 0.9,
+      "z": 0
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 1.6,
+      "z": -1
+    }
+  ],
+  "spots": [
+    {
+      "clip": "PickUp",
+      "facing": 2.246,
+      "kind": "work",
+      "roles": [
+        "merchant"
+      ],
+      "x": 0.15,
+      "z": 0.6
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "blockers": [
+    {
+      "r": 0.886,
+      "x": 0,
+      "z": 0
+    },
+    {
+      "r": 0.3,
+      "x": 1.1,
+      "z": 0.7
+    }
+  ],
+  "ground": "paved",
+  "group": "landmark",
+  "id": "castle-tower",
+  "name": "Castle tower",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-tower-a-blue",
+      "rot": 0,
+      "scale": 0.32,
+      "x": 0,
+      "z": 0
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 1.1,
+      "z": 0.7
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_A",
+      "facing": 0,
+      "kind": "stand",
+      "roles": [
+        "guard",
+        "night-watch"
+      ],
+      "x": -1.15,
+      "z": 1.2
+    }
+  ],
+  "tier": 4
+}

@@ -1,0 +1,134 @@
+{
+  "blockers": [
+    {
+      "r": 1.312,
+      "x": 0,
+      "z": -0.25
+    },
+    {
+      "r": 0.495,
+      "x": -1.75,
+      "z": 1
+    },
+    {
+      "r": 0.495,
+      "x": 1.75,
+      "z": 1
+    },
+    {
+      "r": 0.317,
+      "x": -2.1,
+      "z": -0.6
+    },
+    {
+      "r": 0.317,
+      "x": 2.1,
+      "z": -0.6
+    },
+    {
+      "r": 0.482,
+      "x": 0,
+      "z": 2.15
+    }
+  ],
+  "ground": "paved",
+  "group": "town",
+  "id": "well-square",
+  "name": "Well square",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-well-yellow",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 0,
+      "z": -0.25
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": 0.524,
+      "scale": 0.5,
+      "x": -1.75,
+      "z": 1
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": -0.524,
+      "scale": 0.5,
+      "x": 1.75,
+      "z": 1
+    },
+    {
+      "piece": "kaykit-forest/bush-2-c-color1",
+      "rot": 0,
+      "scale": 0.6,
+      "x": -2.1,
+      "z": -0.6
+    },
+    {
+      "piece": "kaykit-forest/bush-2-c-color1",
+      "rot": 1,
+      "scale": 0.6,
+      "x": 2.1,
+      "z": -0.6
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 0,
+      "z": 2.15
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Interact",
+      "facing": 3.142,
+      "kind": "work",
+      "prop": "kaykit-tools/bucket-metal",
+      "x": 0,
+      "z": 1.05
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0.524,
+      "kind": "sit",
+      "x": -1.936,
+      "z": 1.177
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0.524,
+      "kind": "sit",
+      "x": -1.504,
+      "z": 0.927
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": -0.524,
+      "kind": "sit",
+      "x": 1.504,
+      "z": 0.927
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": -0.524,
+      "kind": "sit",
+      "x": 1.936,
+      "z": 1.177
+    },
+    {
+      "clip": "Idle_B",
+      "facing": 1.92,
+      "kind": "talk",
+      "x": -0.6,
+      "z": 1.75
+    },
+    {
+      "clip": "Idle_B",
+      "facing": -1.92,
+      "kind": "talk",
+      "x": 0.6,
+      "z": 1.75
+    }
+  ]
+}

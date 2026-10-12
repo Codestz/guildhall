@@ -1,0 +1,101 @@
+{
+  "blockers": [
+    {
+      "r": 0.35,
+      "x": 1.1,
+      "z": -0.8
+    },
+    {
+      "r": 0.382,
+      "x": -1.2,
+      "z": 0.6
+    },
+    {
+      "r": 0.346,
+      "x": -0.6,
+      "z": -1.4
+    }
+  ],
+  "ground": "grass",
+  "group": "country",
+  "id": "meadow",
+  "name": "Meadow",
+  "pieces": [
+    {
+      "piece": "kaykit-forest/tree-2-b-color1",
+      "rot": 0.5,
+      "scale": 0.54,
+      "x": 1.1,
+      "z": -0.8
+    },
+    {
+      "piece": "kenney-nature/flower-red-a",
+      "rot": 0,
+      "scale": 1,
+      "x": 1.629,
+      "z": 0.504
+    },
+    {
+      "piece": "kenney-nature/flower-yellow-a",
+      "rot": 1,
+      "scale": 1,
+      "x": 0.378,
+      "z": 1.663
+    },
+    {
+      "piece": "kaykit-forest/grass-2-c-color1",
+      "rot": 2,
+      "scale": 1,
+      "x": -1.251,
+      "z": 1.159
+    },
+    {
+      "piece": "kenney-nature/flower-red-a",
+      "rot": 3,
+      "scale": 1,
+      "x": -1.629,
+      "z": -0.504
+    },
+    {
+      "piece": "kenney-nature/flower-yellow-a",
+      "rot": 4,
+      "scale": 1,
+      "x": -0.378,
+      "z": -1.663
+    },
+    {
+      "piece": "kaykit-forest/grass-2-c-color1",
+      "rot": 5,
+      "scale": 1,
+      "x": 1.251,
+      "z": -1.159
+    },
+    {
+      "piece": "kaykit-forest/rock-3-e-color1",
+      "rot": 0,
+      "scale": 0.562,
+      "x": -1.2,
+      "z": 0.6
+    },
+    {
+      "piece": "kaykit-forest/bush-1-c-color1",
+      "rot": 0,
+      "scale": 0.72,
+      "x": -0.6,
+      "z": -1.4
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Sit_Floor_Idle",
+      "facing": 0.349,
+      "hours": [
+        10,
+        18
+      ],
+      "kind": "sit",
+      "x": 0.4,
+      "z": 0.25
+    }
+  ]
+}

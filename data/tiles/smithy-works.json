@@ -1,0 +1,166 @@
+{
+  "blockers": [
+    {
+      "r": 1.7,
+      "x": -0.25,
+      "z": -0.35
+    },
+    {
+      "r": 0.478,
+      "x": 3.95,
+      "z": 2.385
+    },
+    {
+      "r": 0.478,
+      "x": 5.35,
+      "z": 3.185
+    },
+    {
+      "r": 0.29,
+      "x": 6.05,
+      "z": 1.785
+    },
+    {
+      "r": 0.428,
+      "x": 3.15,
+      "z": 3.185
+    },
+    {
+      "r": 0.318,
+      "x": 4.75,
+      "z": 1.385
+    },
+    {
+      "r": 0.47,
+      "x": -1.9,
+      "z": 1.3
+    },
+    {
+      "r": 0.464,
+      "x": 6.15,
+      "z": 3.785
+    },
+    {
+      "r": 0.482,
+      "x": 0.9,
+      "z": 2
+    }
+  ],
+  "footprint": [
+    5
+  ],
+  "ground": "dirt",
+  "group": "town",
+  "id": "smithy-works",
+  "name": "Smithy with a working yard",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-blacksmith-red",
+      "rot": 0,
+      "scale": 0.55,
+      "x": -0.25,
+      "z": -0.35
+    },
+    {
+      "piece": "kenney-survival/workbench-anvil",
+      "rot": -0.349,
+      "scale": 0.95,
+      "x": 3.95,
+      "z": 2.385
+    },
+    {
+      "piece": "kenney-survival/workbench-anvil",
+      "rot": 0.698,
+      "scale": 0.95,
+      "x": 5.35,
+      "z": 3.185
+    },
+    {
+      "piece": "kaykit-resources/iron-bars-stack-medium",
+      "rot": 0,
+      "scale": 0.6,
+      "x": 6.05,
+      "z": 1.785
+    },
+    {
+      "piece": "kaykit-resources/fuel-a-barrels",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 3.15,
+      "z": 3.185
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.4,
+      "x": 4.75,
+      "z": 1.385
+    },
+    {
+      "piece": "kaykit-resources/wood-log-stack",
+      "rot": 0.5,
+      "scale": 0.5,
+      "x": -1.9,
+      "z": 1.3
+    },
+    {
+      "piece": "kenney-survival/workbench-grind",
+      "rot": 0.3,
+      "scale": 0.9,
+      "x": 6.15,
+      "z": 3.785
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 0.9,
+      "z": 2
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Hammering",
+      "facing": 2.634,
+      "kind": "work",
+      "prop": "kaykit-tools/hammer",
+      "roles": [
+        "smith"
+      ],
+      "x": 3.7,
+      "z": 2.835
+    },
+    {
+      "clip": "Hammering",
+      "facing": 2.29,
+      "kind": "work",
+      "prop": "kaykit-tools/hammer",
+      "roles": [
+        "smith"
+      ],
+      "x": 4.95,
+      "z": 3.535
+    },
+    {
+      "clip": "Working_B",
+      "facing": 2.554,
+      "kind": "work",
+      "roles": [
+        "smith"
+      ],
+      "x": 5.85,
+      "z": 4.235
+    },
+    {
+      "clip": "Idle_B",
+      "facing": 1.169,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "stand",
+      "x": 1.4,
+      "z": 1.3
+    }
+  ]
+}

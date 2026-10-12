@@ -1,0 +1,130 @@
+{
+  "blockers": [
+    {
+      "r": 1.094,
+      "x": 0,
+      "z": -0.35
+    },
+    {
+      "r": 0.345,
+      "x": -2.117,
+      "z": 0.952
+    },
+    {
+      "r": 0.345,
+      "x": -1.829,
+      "z": 1.451
+    },
+    {
+      "r": 0.275,
+      "x": 2.122,
+      "z": 1.084
+    },
+    {
+      "r": 0.399,
+      "x": 1.702,
+      "z": 1.564
+    },
+    {
+      "r": 0.482,
+      "x": 0,
+      "z": 2.173
+    }
+  ],
+  "ground": "paved",
+  "group": "town",
+  "id": "market",
+  "name": "Market",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-market-red",
+      "rot": 0,
+      "scale": 0.38,
+      "x": 0,
+      "z": -0.35
+    },
+    {
+      "piece": "kenney-pirate/crate",
+      "rot": 0.2,
+      "scale": 0.45,
+      "x": -2.117,
+      "z": 0.952
+    },
+    {
+      "piece": "kenney-pirate/crate-bottles",
+      "rot": 0.6,
+      "scale": 0.45,
+      "x": -1.829,
+      "z": 1.451
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.45,
+      "x": 2.122,
+      "z": 1.084
+    },
+    {
+      "piece": "kaykit-resources/textiles-stack-large-colored",
+      "rot": 0.4,
+      "scale": 0.42,
+      "x": 1.702,
+      "z": 1.564
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 0,
+      "z": 2.173
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_A",
+      "facing": 0,
+      "kind": "work",
+      "roles": [
+        "merchant"
+      ],
+      "x": -1,
+      "z": 0.2
+    },
+    {
+      "clip": "Idle_A",
+      "facing": 0,
+      "kind": "work",
+      "roles": [
+        "merchant"
+      ],
+      "x": 1,
+      "z": 0.2
+    },
+    {
+      "clip": "Idle_B",
+      "facing": 3.142,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "stand",
+      "x": -1,
+      "z": 1.45
+    },
+    {
+      "clip": "Interact",
+      "facing": 3.142,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "stand",
+      "x": 1,
+      "z": 1.45
+    }
+  ],
+  "variants": [
+    "market-stalls",
+    "market-carts"
+  ]
+}

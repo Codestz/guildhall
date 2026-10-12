@@ -1,0 +1,156 @@
+{
+  "blockers": [
+    {
+      "r": 1.523,
+      "x": -0.75,
+      "z": 0.15
+    },
+    {
+      "r": 0.426,
+      "x": 5,
+      "z": -3.637
+    },
+    {
+      "r": 0.384,
+      "x": 4.8,
+      "z": -3.517
+    },
+    {
+      "r": 0.426,
+      "x": 5.55,
+      "z": -2.685
+    },
+    {
+      "r": 0.384,
+      "x": 5.35,
+      "z": -2.565
+    },
+    {
+      "r": 0.426,
+      "x": 6.1,
+      "z": -1.732
+    },
+    {
+      "r": 0.384,
+      "x": 5.9,
+      "z": -1.612
+    },
+    {
+      "r": 0.182,
+      "x": 1.55,
+      "z": 1.75
+    },
+    {
+      "r": 0.275,
+      "x": 2.15,
+      "z": 1.35
+    }
+  ],
+  "footprint": [
+    0
+  ],
+  "ground": "dirt",
+  "group": "town",
+  "id": "archery-range",
+  "name": "Archery range with butts",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-archeryrange-red",
+      "rot": 0,
+      "scale": 0.38,
+      "x": -0.75,
+      "z": 0.15
+    },
+    {
+      "piece": "kaykit-resources/wood-planks-stack-large",
+      "rot": -2.094,
+      "scale": 0.45,
+      "x": 5,
+      "z": -3.637
+    },
+    {
+      "piece": "kaykit-dungeon/banner-shield-red",
+      "rot": -2.094,
+      "scale": 0.3,
+      "x": 4.8,
+      "z": -3.517
+    },
+    {
+      "piece": "kaykit-resources/wood-planks-stack-large",
+      "rot": -2.094,
+      "scale": 0.45,
+      "x": 5.55,
+      "z": -2.685
+    },
+    {
+      "piece": "kaykit-dungeon/banner-shield-red",
+      "rot": -2.094,
+      "scale": 0.3,
+      "x": 5.35,
+      "z": -2.565
+    },
+    {
+      "piece": "kaykit-resources/wood-planks-stack-large",
+      "rot": -2.094,
+      "scale": 0.45,
+      "x": 6.1,
+      "z": -1.732
+    },
+    {
+      "piece": "kaykit-dungeon/banner-shield-red",
+      "rot": -2.094,
+      "scale": 0.3,
+      "x": 5.9,
+      "z": -1.612
+    },
+    {
+      "piece": "kaykit-adventurers/arrow-bow-bundle",
+      "rot": 0,
+      "scale": 0.6,
+      "x": 1.55,
+      "z": 1.75
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.45,
+      "x": 2.15,
+      "z": 1.35
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Ranged_Bow_Aiming_Idle",
+      "facing": 2.166,
+      "kind": "work",
+      "prop": "kaykit-adventurers/bow-with-string",
+      "roles": [
+        "archer"
+      ],
+      "x": 0.95,
+      "z": 0.43
+    },
+    {
+      "clip": "Ranged_Bow_Aiming_Idle",
+      "facing": 2.299,
+      "kind": "work",
+      "prop": "kaykit-adventurers/bow-with-string",
+      "roles": [
+        "archer"
+      ],
+      "x": 1.325,
+      "z": 1.08
+    },
+    {
+      "clip": "Ranged_Bow_Aiming_Idle",
+      "facing": 2.424,
+      "kind": "work",
+      "prop": "kaykit-adventurers/bow-with-string",
+      "roles": [
+        "archer"
+      ],
+      "x": 1.7,
+      "z": 1.729
+    }
+  ]
+}

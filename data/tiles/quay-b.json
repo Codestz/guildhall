@@ -1,0 +1,83 @@
+{
+  "blockers": [
+    {
+      "r": 1.027,
+      "x": -0.6,
+      "z": 0.2
+    },
+    {
+      "r": 0.551,
+      "x": 1.1,
+      "z": -0.8
+    },
+    {
+      "r": 0.378,
+      "x": 1.2,
+      "z": 0.6
+    },
+    {
+      "r": 0.331,
+      "x": 0.4,
+      "z": 1.4
+    },
+    {
+      "r": 0.503,
+      "x": -1.3,
+      "z": -1.1
+    }
+  ],
+  "ground": "dirt",
+  "group": "town",
+  "id": "quay-b",
+  "name": "Quay with a cart",
+  "pieces": [
+    {
+      "piece": "kenney-town/cart",
+      "rot": 0.8,
+      "scale": 0.42,
+      "x": -0.6,
+      "z": 0.2
+    },
+    {
+      "piece": "kaykit-resources/wood-planks-stack-medium",
+      "rot": 0.2,
+      "scale": 0.6,
+      "x": 1.1,
+      "z": -0.8
+    },
+    {
+      "piece": "kenney-pirate/crate",
+      "rot": 0.4,
+      "scale": 0.5,
+      "x": 1.2,
+      "z": 0.6
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 0.4,
+      "z": 1.4
+    },
+    {
+      "odds": 0.5,
+      "piece": "kaykit-resources/fuel-a-barrels",
+      "rot": 0,
+      "scale": 0.6,
+      "x": -1.3,
+      "z": -1.1
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Holding_A",
+      "facing": 1.19,
+      "kind": "work",
+      "roles": [
+        "merchant"
+      ],
+      "x": 0.45,
+      "z": 0.3
+    }
+  ]
+}

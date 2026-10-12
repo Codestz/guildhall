@@ -1,0 +1,153 @@
+{
+  "blockers": [
+    {
+      "r": 0.35,
+      "x": -1,
+      "z": -1
+    },
+    {
+      "r": 0.35,
+      "x": 1.1,
+      "z": -0.8
+    },
+    {
+      "r": 0.35,
+      "x": 0,
+      "z": 0.4
+    },
+    {
+      "r": 0.35,
+      "x": -1.5,
+      "z": 1.1
+    },
+    {
+      "r": 0.35,
+      "x": 1.5,
+      "z": 1.2
+    },
+    {
+      "r": 0.35,
+      "x": 0.1,
+      "z": -1.9
+    },
+    {
+      "r": 0.312,
+      "x": -0.957,
+      "z": 2.215
+    },
+    {
+      "r": 0.264,
+      "x": -1.491,
+      "z": -1.966
+    },
+    {
+      "r": 0.36,
+      "x": 2.345,
+      "z": -0.248
+    }
+  ],
+  "ground": "grass",
+  "group": "ground",
+  "id": "pines",
+  "name": "Pine woods",
+  "pieces": [
+    {
+      "piece": "kaykit-forest/tree-4-b-color1",
+      "rot": 0,
+      "scale": 0.48,
+      "tone": true,
+      "x": -1,
+      "z": -1
+    },
+    {
+      "piece": "kaykit-forest/tree-4-a-color1",
+      "rot": 1,
+      "scale": 0.54,
+      "tone": true,
+      "x": 1.1,
+      "z": -0.8
+    },
+    {
+      "piece": "kaykit-forest/tree-4-c-color1",
+      "rot": 2,
+      "scale": 0.36,
+      "tone": true,
+      "x": 0,
+      "z": 0.4
+    },
+    {
+      "piece": "kaykit-forest/tree-4-b-color1",
+      "rot": 3,
+      "scale": 0.54,
+      "tone": true,
+      "x": -1.5,
+      "z": 1.1
+    },
+    {
+      "piece": "kaykit-forest/tree-4-a-color1",
+      "rot": 4,
+      "scale": 0.48,
+      "tone": true,
+      "x": 1.5,
+      "z": 1.2
+    },
+    {
+      "piece": "kaykit-forest/tree-4-c-color1",
+      "rot": 5,
+      "scale": 0.36,
+      "tone": true,
+      "x": 0.1,
+      "z": -1.9
+    },
+    {
+      "odds": 0.5,
+      "piece": "kaykit-forest/bush-1-c-color1",
+      "rot": 1,
+      "scale": 0.65,
+      "tone": true,
+      "x": -0.957,
+      "z": 2.215
+    },
+    {
+      "odds": 0.5,
+      "piece": "kaykit-forest/bush-1-c-color1",
+      "rot": 3,
+      "scale": 0.55,
+      "tone": true,
+      "x": -1.491,
+      "z": -1.966
+    },
+    {
+      "odds": 0.5,
+      "piece": "kaykit-forest/bush-1-c-color1",
+      "rot": 5,
+      "scale": 0.75,
+      "tone": true,
+      "x": 2.345,
+      "z": -0.248
+    }
+  ],
+  "tones": [
+    {
+      "0": 33,
+      "1": 34,
+      "2": 34,
+      "34": 33
+    },
+    {
+      "0": 33,
+      "1": 34,
+      "2": 34,
+      "34": 33
+    },
+    {
+      "2": 1
+    },
+    {
+      "0": 34,
+      "1": 35,
+      "2": 35,
+      "34": 34
+    }
+  ]
+}

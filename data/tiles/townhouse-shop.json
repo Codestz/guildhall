@@ -1,0 +1,111 @@
+{
+  "blockers": [
+    {
+      "r": 1.318,
+      "x": 0,
+      "z": -0.6
+    },
+    {
+      "r": 0.408,
+      "x": 1.2,
+      "z": 1.35
+    },
+    {
+      "r": 0.325,
+      "x": -0.4,
+      "z": 1.5
+    },
+    {
+      "r": 0.305,
+      "x": -1.5,
+      "z": 1.3
+    }
+  ],
+  "ground": "grass",
+  "group": "town",
+  "id": "townhouse-shop",
+  "name": "Shop with an awning",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-home-b-green",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0,
+      "z": -0.6
+    },
+    {
+      "piece": "kenney-town/stall-red",
+      "rot": 3.142,
+      "scale": 0.42,
+      "x": 1.2,
+      "z": 1.35
+    },
+    {
+      "piece": "kenney-pirate/crate",
+      "rot": 0.3,
+      "scale": 0.42,
+      "x": -0.4,
+      "z": 1.5
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.38,
+      "x": -1.5,
+      "z": 1.3
+    },
+    {
+      "piece": "kenney-nature/pot-small",
+      "rot": 0,
+      "scale": 0.32,
+      "x": -2,
+      "z": 0.1
+    },
+    {
+      "piece": "kenney-nature/flower-yellow-a",
+      "rot": 0,
+      "scale": 0.7,
+      "x": -2,
+      "y": 0.3,
+      "z": 0.1
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_A",
+      "facing": 0,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "work",
+      "roles": [
+        "merchant"
+      ],
+      "x": 1.2,
+      "z": 0.85
+    },
+    {
+      "clip": "Idle_B",
+      "facing": 1.047,
+      "hours": [
+        8,
+        20
+      ],
+      "kind": "talk",
+      "x": -0.55,
+      "z": 1.55
+    },
+    {
+      "clip": "Waving",
+      "facing": -2.094,
+      "hours": [
+        8,
+        20
+      ],
+      "kind": "talk",
+      "x": 0.35,
+      "z": 1.8
+    }
+  ]
+}

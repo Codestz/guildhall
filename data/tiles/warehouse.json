@@ -1,0 +1,63 @@
+{
+  "blockers": [
+    {
+      "r": 1.477,
+      "x": 0,
+      "z": -0.3
+    },
+    {
+      "r": 0.378,
+      "x": 1.8,
+      "z": 1.4
+    },
+    {
+      "r": 0.378,
+      "x": 2.1,
+      "z": 0.6
+    }
+  ],
+  "ground": "dirt",
+  "group": "town",
+  "id": "warehouse",
+  "name": "Warehouse",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-lumbermill-blue",
+      "rot": 0,
+      "scale": 0.45,
+      "x": 0,
+      "z": -0.3
+    },
+    {
+      "piece": "kenney-pirate/crate",
+      "rot": 0.3,
+      "scale": 0.5,
+      "x": 1.8,
+      "z": 1.4
+    },
+    {
+      "piece": "kenney-pirate/crate",
+      "rot": 1,
+      "scale": 0.5,
+      "x": 2.1,
+      "z": 0.6
+    }
+  ],
+  "spots": [
+    {
+      "clip": "PickUp",
+      "facing": 0.844,
+      "kind": "work",
+      "roles": [
+        "merchant"
+      ],
+      "x": 1.35,
+      "z": 1
+    }
+  ],
+  "variants": [
+    "storehouse",
+    "storehouse",
+    "boathouse"
+  ]
+}

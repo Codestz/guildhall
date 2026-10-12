@@ -1,0 +1,47 @@
+{
+  "blockers": [
+    {
+      "r": 1.935,
+      "x": 0,
+      "z": 0
+    },
+    {
+      "r": 0.5,
+      "x": 1.846,
+      "z": 1.111
+    }
+  ],
+  "ground": "rock",
+  "group": "landmark",
+  "id": "mine",
+  "name": "Mine",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-mine-blue",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 0,
+      "z": 0
+    },
+    {
+      "piece": "kaykit-resources/stone-chunks-large",
+      "rot": 0,
+      "scale": 0.6,
+      "x": 1.846,
+      "z": 1.111
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Pickaxing",
+      "facing": 1.077,
+      "kind": "work",
+      "prop": "kaykit-tools/pickaxe",
+      "roles": [
+        "miner"
+      ],
+      "x": 1.35,
+      "z": 0.85
+    }
+  ]
+}

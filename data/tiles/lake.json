@@ -1,0 +1,22 @@
+{
+  "blockers": [
+    {
+      "r": 0.345,
+      "x": 1.9,
+      "z": -1
+    }
+  ],
+  "ground": "water",
+  "group": "ground",
+  "id": "lake",
+  "name": "Lake",
+  "pieces": [
+    {
+      "piece": "kaykit-forest/rock-3-e-color1",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 1.9,
+      "z": -1
+    }
+  ]
+}

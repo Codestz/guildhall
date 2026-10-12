@@ -1,0 +1,59 @@
+{
+  "blockers": [
+    {
+      "r": 1.385,
+      "x": 0,
+      "z": 0
+    },
+    {
+      "r": 0.345,
+      "x": -0.738,
+      "z": -0.855
+    },
+    {
+      "r": 0.348,
+      "x": 0.97,
+      "z": 1.123
+    }
+  ],
+  "ground": "grass",
+  "group": "landmark",
+  "id": "watchtower",
+  "name": "Watchtower",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-tower-a-green",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0,
+      "z": 0
+    },
+    {
+      "piece": "kaykit-forest/rock-3-e-color1",
+      "rot": 0,
+      "scale": 0.5,
+      "x": -0.738,
+      "z": -0.855
+    },
+    {
+      "piece": "kaykit-forest/rock-3-f-color1",
+      "rot": 1,
+      "scale": 0.5,
+      "x": 0.97,
+      "z": 1.123
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_A",
+      "facing": 0,
+      "kind": "stand",
+      "roles": [
+        "guard",
+        "night-watch"
+      ],
+      "x": 0.4,
+      "z": 2
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "blockers": [
+    {
+      "r": 1.493,
+      "x": 0,
+      "z": 0
+    },
+    {
+      "r": 0.375,
+      "x": 0.521,
+      "z": -1.762
+    },
+    {
+      "r": 0.377,
+      "x": 0.656,
+      "z": 0.69
+    },
+    {
+      "r": 0.562,
+      "x": -1.27,
+      "z": 0.305
+    }
+  ],
+  "ground": "rock",
+  "group": "landmark",
+  "id": "lighthouse",
+  "name": "Lighthouse",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-tower-b-red",
+      "rot": 0,
+      "scale": 0.45,
+      "x": 0,
+      "z": 0
+    },
+    {
+      "piece": "kaykit-forest/rock-3-e-color1",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 0.521,
+      "z": -1.762
+    },
+    {
+      "piece": "kaykit-forest/rock-3-f-color1",
+      "rot": 1,
+      "scale": 0.55,
+      "x": 0.656,
+      "z": 0.69
+    },
+    {
+      "piece": "kaykit-forest/rock-3-g-color1",
+      "rot": 2,
+      "scale": 0.55,
+      "x": -1.27,
+      "z": 0.305
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_A",
+      "facing": 0,
+      "kind": "stand",
+      "roles": [
+        "night-watch"
+      ],
+      "x": -0.6,
+      "z": 2
+    }
+  ]
+}

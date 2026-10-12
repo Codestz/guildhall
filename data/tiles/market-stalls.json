@@ -1,0 +1,171 @@
+{
+  "blockers": [
+    {
+      "r": 0.466,
+      "x": -1.35,
+      "z": -0.8
+    },
+    {
+      "r": 0.466,
+      "x": 1.35,
+      "z": -0.8
+    },
+    {
+      "r": 0.466,
+      "x": 0,
+      "z": 1.4
+    },
+    {
+      "r": 0.325,
+      "x": -2.15,
+      "z": 0.55
+    },
+    {
+      "r": 0.325,
+      "x": -1.95,
+      "z": 1.05
+    },
+    {
+      "r": 0.305,
+      "x": 2.15,
+      "z": 0.55
+    },
+    {
+      "r": 0.399,
+      "x": 0,
+      "z": -1.9
+    },
+    {
+      "r": 0.482,
+      "x": 1.512,
+      "z": 1.728
+    }
+  ],
+  "ground": "paved",
+  "group": "town",
+  "id": "market-stalls",
+  "name": "Market stalls",
+  "pieces": [
+    {
+      "piece": "kenney-town/stall-red",
+      "rot": 0.25,
+      "scale": 0.48,
+      "x": -1.35,
+      "z": -0.8
+    },
+    {
+      "piece": "kenney-town/stall-green",
+      "rot": -0.25,
+      "scale": 0.48,
+      "x": 1.35,
+      "z": -0.8
+    },
+    {
+      "piece": "kenney-town/stall-red",
+      "rot": 3.142,
+      "scale": 0.48,
+      "x": 0,
+      "z": 1.4
+    },
+    {
+      "piece": "kenney-pirate/crate",
+      "rot": 0.2,
+      "scale": 0.42,
+      "x": -2.15,
+      "z": 0.55
+    },
+    {
+      "piece": "kenney-pirate/crate",
+      "rot": 1,
+      "scale": 0.42,
+      "x": -1.95,
+      "z": 1.05
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.38,
+      "x": 2.15,
+      "z": 0.55
+    },
+    {
+      "piece": "kaykit-resources/textiles-stack-large-colored",
+      "rot": 0.4,
+      "scale": 0.42,
+      "x": 0,
+      "z": -1.9
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 1.512,
+      "z": 1.728
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_A",
+      "facing": 0.25,
+      "kind": "work",
+      "roles": [
+        "merchant"
+      ],
+      "x": -1.55,
+      "z": -1.25
+    },
+    {
+      "clip": "Idle_A",
+      "facing": -0.25,
+      "kind": "work",
+      "roles": [
+        "merchant"
+      ],
+      "x": 1.55,
+      "z": -1.25
+    },
+    {
+      "clip": "Idle_A",
+      "facing": 3.142,
+      "kind": "work",
+      "roles": [
+        "merchant"
+      ],
+      "x": 0,
+      "z": 1.95
+    },
+    {
+      "clip": "Interact",
+      "facing": -2.737,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "stand",
+      "x": -1,
+      "z": -0.05
+    },
+    {
+      "clip": "Idle_B",
+      "facing": 2.737,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "stand",
+      "x": 1,
+      "z": -0.05
+    },
+    {
+      "clip": "Idle_A",
+      "facing": -0.261,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "stand",
+      "x": 0.2,
+      "z": 0.6
+    }
+  ]
+}

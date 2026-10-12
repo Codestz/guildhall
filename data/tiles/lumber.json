@@ -1,0 +1,69 @@
+{
+  "blockers": [
+    {
+      "r": 1.477,
+      "x": 0,
+      "z": -0.4
+    },
+    {
+      "r": 0.554,
+      "x": -1.775,
+      "z": 1.128
+    },
+    {
+      "r": 0.467,
+      "x": 1.806,
+      "z": 1.246
+    }
+  ],
+  "ground": "dirt",
+  "group": "landmark",
+  "id": "lumber",
+  "name": "Lumber camp",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-lumbermill-yellow",
+      "rot": 0,
+      "scale": 0.45,
+      "x": 0,
+      "z": -0.4
+    },
+    {
+      "piece": "kaykit-resources/wood-log-stack",
+      "rot": 0.5,
+      "scale": 0.6,
+      "x": -1.775,
+      "z": 1.128
+    },
+    {
+      "piece": "kaykit-resources/wood-planks-stack-large",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 1.806,
+      "z": 1.246
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Chopping",
+      "facing": -0.552,
+      "kind": "work",
+      "prop": "kaykit-tools/axe",
+      "roles": [
+        "lumberjack"
+      ],
+      "x": -1.5,
+      "z": 0.55
+    },
+    {
+      "clip": "Sawing",
+      "facing": 0.785,
+      "kind": "work",
+      "roles": [
+        "lumberjack"
+      ],
+      "x": 1.35,
+      "z": 0.75
+    }
+  ]
+}

@@ -2,8 +2,9 @@
  * Tile prefabs (decisions.md "Clean restart on hex", scale B): what stands on one hex tile, composed
  * from the house-style packs. A tile is its ground (a colour, plus a path across it for road tiles)
  * and its pieces, in metres round the tile's centre with the tile's corner at HEX_TILE_SIZE; turning a
- * tile turns everything on it. These are code for the first look; once the look is approved they move
- * into the Composer as editable recipes.
+ * tile turns everything on it. The authored prefabs are data (`data/tiles/<id>.json`, edited in the tile
+ * composer) and are installed with `installTilePrefabs`; `TILE_PREFABS` here is the code fallback the
+ * world uses until then (tests, a build with no data).
  */
 import { hash2 } from "../geom/noise.ts"
 
@@ -65,7 +66,35 @@ export interface TilePrefab {
   spots?: TileSpot[]
   /** What people walk round (props on the tile): discs in tile space. */
   blockers?: TileBlocker[]
+  /**
+   * Proposed, not yet honoured by placement: the neighbouring tiles this prefab also covers, as tile
+   * sides (`TILE_SIDES`: 4 is the front, toward the street), for a scene too big for one hex (a tavern
+   * with its beer garden, an archery range). Its pieces, spots and blockers may stand over those tiles;
+   * `worldSide` says which neighbour a side is once the tile is turned.
+   */
+  footprint?: number[]
+  /**
+   * For the Guildhall's castle pieces (decisions.md: the castle is the Guildhall, growing keep → walled
+   * keep → castle with wards → citadel): the first tier, 1–4, whose castle uses this tile.
+   */
+  tier?: number
 }
+
+/**
+ * A tile's own frame (tile space, what pieces, spots and footprints are written in): every tile is
+ * placed turned by `rotOf(d)` = 90° + 60°·d, so in tile space the hexagon has its corners at 0°, 60°…
+ * (on ±x) and its sides at 30° + 60°·k, measured like tilePath (counter-clockwise from +x, toward -z).
+ * Side 4 (270°) is +z, the front the world turns toward the street.
+ */
+export const TILE_SIDES = 6
+export const FRONT_SIDE = 4
+/** The direction (x, z) out through tile side `k` in tile space, a unit vector. */
+export function sideDir(k: number): [number, number] {
+  const a = (Math.PI / 180) * (30 + 60 * k)
+  return [Math.cos(a), -Math.sin(a)]
+}
+/** The world side (tilePath / grid DIRS order) tile side `k` faces on a tile whose front faces world side `d`. */
+export const worldSide = (k: number, d: number): number => (((k + d + 2) % 6) + 6) % 6
 
 /**
  * An activity spot (decisions.md "Activity spots"): where one person stands to do something on a tile,
@@ -86,6 +115,8 @@ export interface TileSpot {
   roles?: string[]
   /** Ground height offset (a bench seat, a dock deck), metres. */
   y?: number
+  /** When the spot is used, day hours [from, to) (to < from wraps past midnight); any time when left out. */
+  hours?: [number, number]
 }
 
 /** A disc nobody walks through (a cart, a stall, a well), tile space. */
@@ -151,14 +182,20 @@ const ringAt = (k: number, a = 0): [number, number][] =>
 /** A fence round the tile just inside its edge: one piece per side (pointy-top hex, sides 30° off the axes). */
 function fenceRing(gap = -1): TilePiece[] {
   const out: TilePiece[] = []
-  const inR = R * 0.82 * (Math.sqrt(3) / 2)
-  const side = R * 0.82
+  // on the tile's own sides (TILE_SIDES: 30° + 60°·k in tile space), just inside the edge, spanning it
+  const inset = 0.97
+  const apothem = R * (Math.sqrt(3) / 2) * inset
   for (let k = 0; k < 6; k++) {
     if (k === gap) continue
-    const a = (k * Math.PI) / 3
-    // the side's middle, and its run (perpendicular to the direction out)
+    const a = ((30 + 60 * k) * Math.PI) / 180
     out.push(
-      p("kenney-nature/fence-simple", Math.cos(a) * inR, Math.sin(a) * inR, -a + Math.PI / 2, side / 4),
+      p(
+        "kenney-nature/fence-simple-low",
+        Math.cos(a) * apothem,
+        -Math.sin(a) * apothem,
+        a - Math.PI / 2,
+        (R * inset) / 4.16,
+      ),
     )
   }
   return out
@@ -1297,5 +1334,22 @@ export function tilePath(at: [number, number], y: number, sides: readonly number
   return out
 }
 
+const FALLBACK = new Map(TILE_PREFABS.map((t) => [t.id, t]))
+let installed: Map<string, TilePrefab> | null = null
+
+/**
+ * Puts the authored prefabs (data/tiles, validated: see `validateTilePrefab`) in place of the code
+ * fallback; an id the data does not have still reads the fallback. `null` goes back to the fallback.
+ */
+export function installTilePrefabs(list: readonly TilePrefab[] | null): void {
+  installed = list ? new Map(list.map((t) => [t.id, t])) : null
+}
+
+/** Every prefab the world builds from now: the installed data over the code fallback. */
+export function tilePrefabs(): TilePrefab[] {
+  if (!installed) return TILE_PREFABS
+  return [...installed.values(), ...TILE_PREFABS.filter((t) => !installed!.has(t.id))]
+}
+
 /** The prefab with this id. */
-export const tilePrefab = (id: string): TilePrefab | undefined => TILE_PREFABS.find((t) => t.id === id)
+export const tilePrefab = (id: string): TilePrefab | undefined => installed?.get(id) ?? FALLBACK.get(id)

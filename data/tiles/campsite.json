@@ -1,0 +1,80 @@
+{
+  "blockers": [
+    {
+      "r": 1.033,
+      "x": -0.8,
+      "z": -0.6
+    },
+    {
+      "r": 0.59,
+      "x": 1.6,
+      "z": 0
+    },
+    {
+      "r": 0.35,
+      "x": 1.6,
+      "z": -1.6
+    }
+  ],
+  "ground": "grass",
+  "group": "landmark",
+  "id": "campsite",
+  "name": "Campsite",
+  "pieces": [
+    {
+      "piece": "kenney-survival/tent-canvas",
+      "rot": 0.5,
+      "scale": 0.7,
+      "x": -0.8,
+      "z": -0.6
+    },
+    {
+      "piece": "kenney-survival/campfire-pit",
+      "rot": 0,
+      "scale": 1,
+      "x": 0.8,
+      "z": 0.6
+    },
+    {
+      "piece": "kaykit-resources/wood-log-a",
+      "rot": 1,
+      "scale": 0.8,
+      "x": 1.6,
+      "z": 0
+    },
+    {
+      "piece": "kaykit-forest/tree-1-a-color1",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 1.6,
+      "z": -1.6
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Sit_Floor_Idle",
+      "facing": 2.536,
+      "kind": "sit",
+      "x": 0.35,
+      "z": 1.25
+    },
+    {
+      "clip": "Sit_Floor_Idle",
+      "facing": -2.176,
+      "kind": "sit",
+      "x": 1.45,
+      "z": 1.05
+    },
+    {
+      "clip": "Lie_Idle",
+      "facing": 0.5,
+      "hours": [
+        22,
+        6
+      ],
+      "kind": "sleep",
+      "x": -0.6,
+      "z": 0.6
+    }
+  ]
+}

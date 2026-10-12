@@ -1,0 +1,117 @@
+{
+  "blockers": [
+    {
+      "r": 1.025,
+      "x": 0.5,
+      "z": -0.6
+    },
+    {
+      "r": 0.694,
+      "x": -1.267,
+      "z": 1.281
+    },
+    {
+      "r": 0.694,
+      "x": -2,
+      "z": 0
+    },
+    {
+      "r": 0.54,
+      "x": -0.6,
+      "z": 0.4
+    }
+  ],
+  "ground": "grass",
+  "group": "town",
+  "id": "cottage-garden",
+  "name": "Cottage with a garden",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-home-a-yellow",
+      "rot": -0.3,
+      "scale": 0.5,
+      "x": 0.5,
+      "z": -0.6
+    },
+    {
+      "piece": "kenney-town/hedge",
+      "rot": 0.5,
+      "scale": 0.5,
+      "x": -1.267,
+      "z": 1.281
+    },
+    {
+      "piece": "kenney-town/hedge",
+      "rot": 1.6,
+      "scale": 0.5,
+      "x": -2,
+      "z": 0
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": 0.4,
+      "scale": 0.55,
+      "x": -0.6,
+      "z": 0.4
+    },
+    {
+      "piece": "kenney-nature/flower-red-a",
+      "rot": 0,
+      "scale": 1,
+      "x": 1.3,
+      "z": 1.4
+    },
+    {
+      "piece": "kenney-nature/flower-purple-a",
+      "rot": 0,
+      "scale": 1,
+      "x": 0.6,
+      "z": 1.8
+    },
+    {
+      "piece": "kenney-nature/flower-yellow-a",
+      "rot": 0,
+      "scale": 1,
+      "x": 1.9,
+      "z": 0.9
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0.4,
+      "kind": "sit",
+      "x": -0.807,
+      "z": 0.553
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0.4,
+      "kind": "sit",
+      "x": -0.346,
+      "z": 0.358
+    },
+    {
+      "clip": "Idle_B",
+      "facing": 1.047,
+      "hours": [
+        8,
+        20
+      ],
+      "kind": "talk",
+      "x": -0.05,
+      "z": 1.55
+    },
+    {
+      "clip": "Waving",
+      "facing": -2.094,
+      "hours": [
+        8,
+        20
+      ],
+      "kind": "talk",
+      "x": 0.85,
+      "z": 1.8
+    }
+  ]
+}

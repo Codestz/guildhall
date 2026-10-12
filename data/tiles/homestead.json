@@ -1,0 +1,72 @@
+{
+  "blockers": [
+    {
+      "r": 1.187,
+      "x": 0,
+      "z": -0.6
+    },
+    {
+      "r": 0.275,
+      "x": 1.9,
+      "z": 0
+    }
+  ],
+  "ground": "grass",
+  "group": "country",
+  "id": "homestead",
+  "name": "Homestead",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-home-b-yellow",
+      "rot": 0,
+      "scale": 0.45,
+      "x": 0,
+      "z": -0.6
+    },
+    {
+      "piece": "kenney-nature/crop-pumpkin",
+      "rot": 0,
+      "scale": 0.55,
+      "x": -1.3,
+      "z": 1.2
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 1.3,
+      "z": 1.1
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.45,
+      "x": 1.9,
+      "z": 0
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": 3.142,
+      "scale": 0.448,
+      "x": 0,
+      "z": 2.604
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Digging",
+      "facing": 1.571,
+      "hours": [
+        7,
+        18
+      ],
+      "kind": "work",
+      "prop": "kaykit-tools/shovel",
+      "roles": [
+        "farmer"
+      ],
+      "x": 0,
+      "z": 1.15
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "blockers": [
+    {
+      "r": 0.613,
+      "x": -0.6,
+      "z": -0.5
+    },
+    {
+      "r": 0.3,
+      "x": 0.5,
+      "z": -0.9
+    },
+    {
+      "r": 0.3,
+      "x": 0.9,
+      "z": -0.3
+    },
+    {
+      "r": 0.47,
+      "x": 0.4,
+      "z": 0.7
+    },
+    {
+      "r": 0.482,
+      "x": -0.7,
+      "z": 0.8
+    }
+  ],
+  "ground": "paved",
+  "group": "landmark",
+  "id": "castle-ward",
+  "name": "Castle ward",
+  "pieces": [
+    {
+      "piece": "kaykit-dungeon/crates-stacked",
+      "rot": 0.3,
+      "scale": 0.5,
+      "x": -0.6,
+      "z": -0.5
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0.5,
+      "z": -0.9
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0.9,
+      "z": -0.3
+    },
+    {
+      "piece": "kaykit-resources/wood-log-stack",
+      "rot": 1.2,
+      "scale": 0.5,
+      "x": 0.4,
+      "z": 0.7
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": -0.7,
+      "z": 0.8
+    }
+  ],
+  "spots": [
+    {
+      "clip": "PickUp",
+      "facing": -2.509,
+      "kind": "work",
+      "x": -0.05,
+      "z": 0.25
+    }
+  ],
+  "tier": 3,
+  "variants": [
+    "castle-yard",
+    "castle-tower"
+  ]
+}

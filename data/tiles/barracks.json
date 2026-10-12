@@ -1,0 +1,45 @@
+{
+  "blockers": [
+    {
+      "r": 1.654,
+      "x": 0,
+      "z": 0
+    }
+  ],
+  "ground": "dirt",
+  "group": "town",
+  "id": "barracks",
+  "name": "Barracks",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-barracks-red",
+      "rot": 0,
+      "scale": 0.44,
+      "x": 0,
+      "z": 0
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Melee_2H_Idle",
+      "facing": 0,
+      "kind": "stand",
+      "prop": "kaykit-weapons/sword-a",
+      "roles": [
+        "guard"
+      ],
+      "x": -1,
+      "z": 2
+    },
+    {
+      "clip": "Idle_A",
+      "facing": 0,
+      "kind": "stand",
+      "roles": [
+        "guard"
+      ],
+      "x": 1,
+      "z": 2
+    }
+  ]
+}

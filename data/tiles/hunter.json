@@ -1,0 +1,82 @@
+{
+  "blockers": [
+    {
+      "r": 0.871,
+      "x": -0.3,
+      "z": -0.4
+    },
+    {
+      "r": 0.512,
+      "x": 1.7,
+      "z": 0.9
+    },
+    {
+      "r": 0.35,
+      "x": 1.6,
+      "z": -1.4
+    },
+    {
+      "r": 0.422,
+      "x": -1.729,
+      "z": 1.159
+    }
+  ],
+  "ground": "grass",
+  "group": "country",
+  "id": "hunter",
+  "name": "Hunter's lodge",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-home-a-green",
+      "rot": 0,
+      "scale": 0.425,
+      "x": -0.3,
+      "z": -0.4
+    },
+    {
+      "piece": "kaykit-resources/wood-log-stack",
+      "rot": 0.5,
+      "scale": 0.55,
+      "x": 1.7,
+      "z": 0.9
+    },
+    {
+      "piece": "kaykit-forest/tree-1-a-color1",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 1.6,
+      "z": -1.4
+    },
+    {
+      "piece": "kaykit-forest/bush-2-c-color1",
+      "rot": 0,
+      "scale": 0.8,
+      "x": -1.729,
+      "z": 1.159
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_B",
+      "facing": 1.047,
+      "hours": [
+        8,
+        20
+      ],
+      "kind": "talk",
+      "x": -0.85,
+      "z": 1.55
+    },
+    {
+      "clip": "Waving",
+      "facing": -2.094,
+      "hours": [
+        8,
+        20
+      ],
+      "kind": "talk",
+      "x": 0.05,
+      "z": 1.8
+    }
+  ]
+}

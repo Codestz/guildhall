@@ -1,0 +1,27 @@
+{
+  "blockers": [
+    {
+      "r": 0.482,
+      "x": 0.9,
+      "z": 0.9
+    }
+  ],
+  "ground": "grass",
+  "group": "road",
+  "id": "road-fork",
+  "name": "Road fork",
+  "path": [
+    0,
+    2,
+    4
+  ],
+  "pieces": [
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 0.9,
+      "z": 0.9
+    }
+  ]
+}

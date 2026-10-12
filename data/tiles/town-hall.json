@@ -1,0 +1,104 @@
+{
+  "blockers": [
+    {
+      "r": 1.45,
+      "x": 0,
+      "z": -0.55
+    },
+    {
+      "r": 0.32,
+      "x": -0.95,
+      "z": 0.95
+    },
+    {
+      "r": 0.32,
+      "x": 0.95,
+      "z": 0.95
+    },
+    {
+      "r": 0.495,
+      "x": -1.85,
+      "z": 1.05
+    },
+    {
+      "r": 0.482,
+      "x": 1.636,
+      "z": 1.513
+    }
+  ],
+  "ground": "paved",
+  "group": "town",
+  "id": "town-hall",
+  "name": "Town hall",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-home-b-red",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 0,
+      "z": -0.55
+    },
+    {
+      "piece": "kaykit-dungeon/banner-red",
+      "rot": 0,
+      "scale": 0.36,
+      "x": -0.95,
+      "z": 0.95
+    },
+    {
+      "piece": "kaykit-dungeon/banner-red",
+      "rot": 0,
+      "scale": 0.36,
+      "x": 0.95,
+      "z": 0.95
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": 0.524,
+      "scale": 0.5,
+      "x": -1.85,
+      "z": 1.05
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 1.636,
+      "z": 1.513
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_A",
+      "facing": 0,
+      "kind": "stand",
+      "x": 0,
+      "z": 1.6
+    },
+    {
+      "clip": "Idle_B",
+      "facing": -1.745,
+      "hours": [
+        9,
+        18
+      ],
+      "kind": "talk",
+      "x": 0.75,
+      "z": 2
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0.524,
+      "kind": "sit",
+      "x": -2.036,
+      "z": 1.227
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0.524,
+      "kind": "sit",
+      "x": -1.604,
+      "z": 0.977
+    }
+  ]
+}

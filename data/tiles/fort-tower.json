@@ -1,0 +1,47 @@
+{
+  "blockers": [
+    {
+      "r": 1.565,
+      "x": 0,
+      "z": 0
+    },
+    {
+      "r": 0.275,
+      "x": 1.8,
+      "z": 1.2
+    }
+  ],
+  "ground": "dirt",
+  "group": "town",
+  "id": "fort-tower",
+  "name": "Fort tower",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-tower-catapult-red",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0,
+      "z": 0
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.45,
+      "x": 1.8,
+      "z": 1.2
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_A",
+      "facing": 0,
+      "kind": "stand",
+      "roles": [
+        "guard",
+        "night-watch"
+      ],
+      "x": 0.9,
+      "z": 1.95
+    }
+  ]
+}

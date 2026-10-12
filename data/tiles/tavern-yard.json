@@ -1,0 +1,221 @@
+{
+  "blockers": [
+    {
+      "r": 1.535,
+      "x": 0.35,
+      "z": -0.75
+    },
+    {
+      "r": 0.95,
+      "x": -1.15,
+      "z": 1.3
+    },
+    {
+      "r": 0.602,
+      "x": -1.15,
+      "z": 0.6
+    },
+    {
+      "r": 0.602,
+      "x": -1.15,
+      "z": 2
+    },
+    {
+      "r": 0.331,
+      "x": 1.15,
+      "z": 1.55
+    },
+    {
+      "r": 0.226,
+      "x": 0.7,
+      "z": 1.95
+    },
+    {
+      "r": 0.226,
+      "x": 1.65,
+      "z": 2
+    },
+    {
+      "r": 0.331,
+      "x": 2.25,
+      "z": 0.35
+    },
+    {
+      "r": 0.331,
+      "x": 2,
+      "z": 0.85
+    },
+    {
+      "r": 0.482,
+      "x": -2.126,
+      "z": 0.663
+    }
+  ],
+  "ground": "grass",
+  "group": "town",
+  "id": "tavern-yard",
+  "name": "Tavern with a beer garden",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-tavern-red",
+      "rot": 0,
+      "scale": 0.48,
+      "x": 0.35,
+      "z": -0.75
+    },
+    {
+      "piece": "kaykit-dungeon/table-long",
+      "rot": 1.571,
+      "scale": 0.45,
+      "x": -1.15,
+      "z": 1.3
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": 0,
+      "scale": 0.62,
+      "x": -1.15,
+      "z": 0.6
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": 3.142,
+      "scale": 0.62,
+      "x": -1.15,
+      "z": 2
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 1.15,
+      "z": 1.55
+    },
+    {
+      "piece": "kaykit-dungeon/stool",
+      "rot": 0,
+      "scale": 0.47,
+      "x": 0.7,
+      "z": 1.95
+    },
+    {
+      "piece": "kaykit-dungeon/stool",
+      "rot": 0,
+      "scale": 0.47,
+      "x": 1.65,
+      "z": 2
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0.5,
+      "scale": 0.42,
+      "x": 2.25,
+      "z": 0.35
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 2,
+      "z": 0.85
+    },
+    {
+      "piece": "kenney-survival/signpost",
+      "rot": 1.1,
+      "scale": 0.9,
+      "x": -2.3,
+      "z": -0.2
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": -2.126,
+      "z": 0.663
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": -1.4,
+      "z": 0.66
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": -0.9,
+      "z": 0.66
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 3.142,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": -0.9,
+      "z": 1.94
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 3.142,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": -1.4,
+      "z": 1.94
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 2.297,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 0.7,
+      "z": 1.95
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": -2.304,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 1.65,
+      "z": 2
+    },
+    {
+      "clip": "Interact",
+      "facing": 1.571,
+      "kind": "work",
+      "roles": [
+        "tavern-keeper"
+      ],
+      "x": 1.6,
+      "z": 0.6
+    }
+  ]
+}

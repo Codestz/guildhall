@@ -1,0 +1,257 @@
+{
+  "ground": "soil",
+  "group": "country",
+  "id": "field",
+  "name": "Field",
+  "pieces": [
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 0,
+      "scale": 0.6,
+      "x": -1.4,
+      "z": -1.6
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 1,
+      "scale": 0.6,
+      "x": -0.7,
+      "z": -1.6
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 2,
+      "scale": 0.6,
+      "x": 0,
+      "z": -1.6
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 3,
+      "scale": 0.6,
+      "x": 0.7,
+      "z": -1.6
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 4,
+      "scale": 0.6,
+      "x": 1.4,
+      "z": -1.6
+    },
+    {
+      "piece": "kenney-nature/crops-corn-stage-c",
+      "rot": 0,
+      "scale": 0.42,
+      "x": -2.1,
+      "z": -0.8
+    },
+    {
+      "piece": "kenney-nature/crops-corn-stage-c",
+      "rot": 1,
+      "scale": 0.42,
+      "x": -1.4,
+      "z": -0.8
+    },
+    {
+      "piece": "kenney-nature/crops-corn-stage-c",
+      "rot": 2,
+      "scale": 0.42,
+      "x": -0.7,
+      "z": -0.8
+    },
+    {
+      "piece": "kenney-nature/crops-corn-stage-c",
+      "rot": 3,
+      "scale": 0.42,
+      "x": 0,
+      "z": -0.8
+    },
+    {
+      "piece": "kenney-nature/crops-corn-stage-c",
+      "rot": 4,
+      "scale": 0.42,
+      "x": 0.7,
+      "z": -0.8
+    },
+    {
+      "piece": "kenney-nature/crops-corn-stage-c",
+      "rot": 5,
+      "scale": 0.42,
+      "x": 1.4,
+      "z": -0.8
+    },
+    {
+      "piece": "kenney-nature/crops-corn-stage-c",
+      "rot": 6,
+      "scale": 0.42,
+      "x": 2.1,
+      "z": -0.8
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 0,
+      "scale": 0.6,
+      "x": -2.1,
+      "z": 0
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 1,
+      "scale": 0.6,
+      "x": -1.4,
+      "z": 0
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 2,
+      "scale": 0.6,
+      "x": -0.7,
+      "z": 0
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 3,
+      "scale": 0.6,
+      "x": 0,
+      "z": 0
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 4,
+      "scale": 0.6,
+      "x": 0.7,
+      "z": 0
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 5,
+      "scale": 0.6,
+      "x": 1.4,
+      "z": 0
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 6,
+      "scale": 0.6,
+      "x": 2.1,
+      "z": 0
+    },
+    {
+      "piece": "kenney-nature/crops-corn-stage-c",
+      "rot": 0,
+      "scale": 0.42,
+      "x": -2.1,
+      "z": 0.8
+    },
+    {
+      "piece": "kenney-nature/crops-corn-stage-c",
+      "rot": 1,
+      "scale": 0.42,
+      "x": -1.4,
+      "z": 0.8
+    },
+    {
+      "piece": "kenney-nature/crops-corn-stage-c",
+      "rot": 2,
+      "scale": 0.42,
+      "x": -0.7,
+      "z": 0.8
+    },
+    {
+      "piece": "kenney-nature/crops-corn-stage-c",
+      "rot": 3,
+      "scale": 0.42,
+      "x": 0,
+      "z": 0.8
+    },
+    {
+      "piece": "kenney-nature/crops-corn-stage-c",
+      "rot": 4,
+      "scale": 0.42,
+      "x": 0.7,
+      "z": 0.8
+    },
+    {
+      "piece": "kenney-nature/crops-corn-stage-c",
+      "rot": 5,
+      "scale": 0.42,
+      "x": 1.4,
+      "z": 0.8
+    },
+    {
+      "piece": "kenney-nature/crops-corn-stage-c",
+      "rot": 6,
+      "scale": 0.42,
+      "x": 2.1,
+      "z": 0.8
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 0,
+      "scale": 0.6,
+      "x": -1.4,
+      "z": 1.6
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 1,
+      "scale": 0.6,
+      "x": -0.7,
+      "z": 1.6
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 2,
+      "scale": 0.6,
+      "x": 0,
+      "z": 1.6
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 3,
+      "scale": 0.6,
+      "x": 0.7,
+      "z": 1.6
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 4,
+      "scale": 0.6,
+      "x": 1.4,
+      "z": 1.6
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Digging",
+      "facing": 1.571,
+      "hours": [
+        6,
+        19
+      ],
+      "kind": "work",
+      "prop": "kenney-survival/tool-hoe",
+      "roles": [
+        "farmer"
+      ],
+      "x": -0.9,
+      "z": -1.2
+    },
+    {
+      "clip": "Digging",
+      "facing": -1.571,
+      "hours": [
+        6,
+        19
+      ],
+      "kind": "work",
+      "prop": "kenney-survival/tool-hoe",
+      "roles": [
+        "farmer"
+      ],
+      "x": 0.9,
+      "z": 0.4
+    }
+  ]
+}

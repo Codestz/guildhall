@@ -1,0 +1,100 @@
+{
+  "blockers": [
+    {
+      "r": 0.922,
+      "x": -0.6,
+      "z": -0.6
+    },
+    {
+      "r": 0.47,
+      "x": -1.9,
+      "z": 0.9
+    }
+  ],
+  "ground": "grass",
+  "group": "town",
+  "id": "cottage-veg",
+  "name": "Cottage with a vegetable patch",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-home-a-green",
+      "rot": 0.2,
+      "scale": 0.45,
+      "x": -0.6,
+      "z": -0.6
+    },
+    {
+      "piece": "kenney-nature/crop-pumpkin",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 0.6,
+      "z": 0.8
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 1,
+      "scale": 0.55,
+      "x": 0.6,
+      "z": 1.4
+    },
+    {
+      "piece": "kenney-nature/crop-carrot",
+      "rot": 1,
+      "scale": 0.55,
+      "x": 1.2,
+      "z": 0.8
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 2,
+      "scale": 0.55,
+      "x": 1.2,
+      "z": 1.4
+    },
+    {
+      "piece": "kenney-nature/crop-pumpkin",
+      "rot": 2,
+      "scale": 0.55,
+      "x": 1.8,
+      "z": 0.8
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 3,
+      "scale": 0.55,
+      "x": 1.8,
+      "z": 1.4
+    },
+    {
+      "piece": "kaykit-resources/wood-log-stack",
+      "rot": 0.6,
+      "scale": 0.5,
+      "x": -1.9,
+      "z": 0.9
+    },
+    {
+      "piece": "kenney-survival/bucket",
+      "rot": 0,
+      "scale": 0.8,
+      "x": 0.1,
+      "z": 1.6
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Digging",
+      "facing": -1.571,
+      "hours": [
+        7,
+        18
+      ],
+      "kind": "work",
+      "prop": "kenney-survival/tool-hoe",
+      "roles": [
+        "farmer"
+      ],
+      "x": 1.2,
+      "z": 1.1
+    }
+  ]
+}

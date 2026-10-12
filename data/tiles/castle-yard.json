@@ -1,0 +1,83 @@
+{
+  "blockers": [
+    {
+      "r": 0.608,
+      "x": -0.3,
+      "z": -0.7
+    },
+    {
+      "r": 0.608,
+      "x": 0.6,
+      "z": -0.7
+    },
+    {
+      "r": 0.98,
+      "x": 0.4,
+      "z": 0.6
+    },
+    {
+      "r": 0.3,
+      "x": -0.9,
+      "z": 0.4
+    }
+  ],
+  "ground": "paved",
+  "group": "landmark",
+  "id": "castle-yard",
+  "name": "Castle yard",
+  "pieces": [
+    {
+      "piece": "kaykit-dungeon/sword-shield",
+      "rot": 0,
+      "scale": 0.5,
+      "x": -0.3,
+      "z": -0.7
+    },
+    {
+      "piece": "kaykit-dungeon/sword-shield",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0.6,
+      "z": -0.7
+    },
+    {
+      "piece": "kenney-town/cart",
+      "rot": 1.1,
+      "scale": 0.4,
+      "x": 0.4,
+      "z": 0.6
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.5,
+      "x": -0.9,
+      "z": 0.4
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Melee_2H_Attack_Chop",
+      "facing": 0.524,
+      "kind": "work",
+      "prop": "kaykit-weapons/sword-a",
+      "roles": [
+        "guard"
+      ],
+      "x": -0.6,
+      "z": 0.1
+    },
+    {
+      "clip": "Melee_Block",
+      "facing": -2.618,
+      "kind": "work",
+      "prop": "kaykit-weapons/sword-a",
+      "roles": [
+        "guard"
+      ],
+      "x": 0.6,
+      "z": -0.05
+    }
+  ],
+  "tier": 3
+}

@@ -1,0 +1,142 @@
+{
+  "blockers": [
+    {
+      "r": 0.298,
+      "x": -1.4,
+      "z": -0.6
+    },
+    {
+      "r": 0.298,
+      "x": -1.4,
+      "z": 0.8
+    },
+    {
+      "r": 0.298,
+      "x": 0,
+      "z": -0.6
+    },
+    {
+      "r": 0.298,
+      "x": 0,
+      "z": 0.8
+    },
+    {
+      "r": 0.298,
+      "x": 1.4,
+      "z": -0.6
+    },
+    {
+      "r": 0.298,
+      "x": 1.4,
+      "z": 0.8
+    },
+    {
+      "r": 0.35,
+      "x": -1.8,
+      "z": 1.5
+    }
+  ],
+  "ground": "grass",
+  "group": "town",
+  "id": "graveyard",
+  "name": "Graveyard",
+  "pieces": [
+    {
+      "piece": "kenney-graveyard/gravestone-round",
+      "rot": 0,
+      "scale": 0.5,
+      "x": -1.4,
+      "z": -0.6
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-bevel",
+      "rot": 0,
+      "scale": 0.5,
+      "x": -1.4,
+      "z": 0.8
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-cross",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0,
+      "z": -0.6
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-bevel",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0,
+      "z": 0.8
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-round",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 1.4,
+      "z": -0.6
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-bevel",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 1.4,
+      "z": 0.8
+    },
+    {
+      "piece": "kaykit-forest/tree-bare-1-c-color1",
+      "rot": 0,
+      "scale": 0.4,
+      "x": -1.8,
+      "z": 1.5
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": -1.047,
+      "scale": 0.723,
+      "x": 2.255,
+      "z": -1.302
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": 0,
+      "scale": 0.723,
+      "x": 0,
+      "z": -2.604
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": 1.047,
+      "scale": 0.723,
+      "x": -2.255,
+      "z": -1.302
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": 3.142,
+      "scale": 0.723,
+      "x": 0,
+      "z": 2.604
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": 4.189,
+      "scale": 0.723,
+      "x": 2.255,
+      "z": 1.302
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_A",
+      "facing": 3.142,
+      "hours": [
+        9,
+        18
+      ],
+      "kind": "stand",
+      "x": 0.7,
+      "z": 0.1
+    }
+  ]
+}

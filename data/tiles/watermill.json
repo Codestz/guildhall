@@ -1,0 +1,31 @@
+{
+  "blockers": [
+    {
+      "r": 1.484,
+      "x": 0,
+      "z": 0
+    }
+  ],
+  "ground": "grass",
+  "group": "landmark",
+  "id": "watermill",
+  "name": "Watermill",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-watermill-red",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0,
+      "z": 0
+    }
+  ],
+  "spots": [
+    {
+      "clip": "PickUp",
+      "facing": 0,
+      "kind": "work",
+      "x": 1.5,
+      "z": 1.6
+    }
+  ]
+}

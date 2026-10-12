@@ -1,0 +1,77 @@
+{
+  "blockers": [
+    {
+      "r": 0.275,
+      "x": 0.3,
+      "z": 1.8
+    }
+  ],
+  "ground": "water",
+  "group": "town",
+  "id": "dock-boats",
+  "name": "Boat moorings",
+  "pieces": [
+    {
+      "piece": "kenney-pirate/structure-platform",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0,
+      "z": 2.05
+    },
+    {
+      "piece": "kenney-pirate/structure-platform",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0,
+      "z": 0.05
+    },
+    {
+      "piece": "kenney-pirate/boat-row-small",
+      "rot": 0.15,
+      "scale": 0.42,
+      "x": 1.4,
+      "y": 0.2,
+      "z": 0
+    },
+    {
+      "piece": "kenney-pirate/boat-row-large",
+      "rot": -0.1,
+      "scale": 0.42,
+      "x": -1.5,
+      "y": 0.2,
+      "z": -0.3
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.45,
+      "x": 0.3,
+      "y": 0.75,
+      "z": 1.8
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Fishing_Idle",
+      "facing": 3.142,
+      "kind": "work",
+      "roles": [
+        "fisher"
+      ],
+      "x": -0.4,
+      "y": 0.75,
+      "z": -0.45
+    },
+    {
+      "clip": "Fishing_Idle",
+      "facing": 2.443,
+      "kind": "work",
+      "roles": [
+        "fisher"
+      ],
+      "x": 0.45,
+      "y": 0.75,
+      "z": -0.15
+    }
+  ]
+}

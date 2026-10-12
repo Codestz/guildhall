@@ -1,0 +1,100 @@
+{
+  "blockers": [
+    {
+      "r": 1.318,
+      "x": 0,
+      "z": -0.3
+    },
+    {
+      "r": 0.352,
+      "x": 1.7,
+      "z": 1.2
+    },
+    {
+      "r": 0.403,
+      "x": -1.793,
+      "z": 1.096
+    },
+    {
+      "r": 0.482,
+      "x": 1.2,
+      "z": 1.9
+    }
+  ],
+  "ground": "grass",
+  "group": "town",
+  "id": "house",
+  "name": "House",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-home-b-red",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0,
+      "z": -0.3
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0.4,
+      "scale": 0.45,
+      "x": 1.7,
+      "z": 1.2
+    },
+    {
+      "piece": "kaykit-forest/bush-1-c-color1",
+      "rot": 0,
+      "scale": 0.84,
+      "x": -1.793,
+      "z": 1.096
+    },
+    {
+      "piece": "kenney-nature/flower-red-a",
+      "rot": 0,
+      "scale": 1,
+      "x": -1.1,
+      "z": 1.7
+    },
+    {
+      "piece": "kenney-nature/flower-yellow-a",
+      "rot": 0,
+      "scale": 1,
+      "x": -0.6,
+      "z": 1.9
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 1.2,
+      "z": 1.9
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_B",
+      "facing": 1.047,
+      "hours": [
+        8,
+        20
+      ],
+      "kind": "talk",
+      "x": -0.55,
+      "z": 1.55
+    },
+    {
+      "clip": "Waving",
+      "facing": -2.094,
+      "hours": [
+        8,
+        20
+      ],
+      "kind": "talk",
+      "x": 0.35,
+      "z": 1.8
+    }
+  ],
+  "variants": [
+    "house-porch",
+    "house-pair"
+  ]
+}

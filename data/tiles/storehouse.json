@@ -1,0 +1,101 @@
+{
+  "blockers": [
+    {
+      "r": 1.318,
+      "x": -0.3,
+      "z": -0.6
+    },
+    {
+      "r": 0.613,
+      "x": 1.6,
+      "z": -0.4
+    },
+    {
+      "r": 0.378,
+      "x": 1.2,
+      "z": 1.1
+    },
+    {
+      "r": 0.331,
+      "x": 1.8,
+      "z": 1.4
+    },
+    {
+      "r": 0.331,
+      "x": -1.4,
+      "z": 1.4
+    }
+  ],
+  "ground": "dirt",
+  "group": "town",
+  "id": "storehouse",
+  "name": "Storehouse",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-home-b-blue",
+      "rot": 0,
+      "scale": 0.5,
+      "x": -0.3,
+      "z": -0.6
+    },
+    {
+      "piece": "kaykit-dungeon/crates-stacked",
+      "rot": 0.4,
+      "scale": 0.5,
+      "x": 1.6,
+      "z": -0.4
+    },
+    {
+      "piece": "kenney-pirate/crate",
+      "rot": 0.3,
+      "scale": 0.5,
+      "x": 1.2,
+      "z": 1.1
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 1.8,
+      "z": 1.4
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.42,
+      "x": -1.4,
+      "z": 1.4
+    },
+    {
+      "piece": "kaykit-resources/pallet-wood-covered-b",
+      "rot": 0.1,
+      "scale": 0.6,
+      "x": -0.2,
+      "z": 1.5
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_B",
+      "facing": 1.047,
+      "hours": [
+        8,
+        20
+      ],
+      "kind": "talk",
+      "x": -0.85,
+      "z": 1.55
+    },
+    {
+      "clip": "Waving",
+      "facing": -2.094,
+      "hours": [
+        8,
+        20
+      ],
+      "kind": "talk",
+      "x": 0.05,
+      "z": 1.8
+    }
+  ]
+}

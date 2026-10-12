@@ -1,0 +1,72 @@
+{
+  "blockers": [
+    {
+      "r": 0.77,
+      "x": -0.45,
+      "z": -0.35
+    },
+    {
+      "r": 0.515,
+      "x": 1.05,
+      "z": 0.65
+    },
+    {
+      "r": 0.286,
+      "x": -0.9,
+      "z": 1.15
+    },
+    {
+      "r": 0.258,
+      "x": 1.4,
+      "z": -0.85
+    }
+  ],
+  "ground": "rock",
+  "group": "ground",
+  "id": "rocky",
+  "name": "Rocky ground",
+  "pieces": [
+    {
+      "piece": "kaykit-forest/rock-3-m-color1",
+      "rot": 0.3,
+      "scale": 0.42,
+      "x": -0.45,
+      "z": -0.35
+    },
+    {
+      "piece": "kaykit-forest/rock-3-g-color1",
+      "rot": 1.1,
+      "scale": 0.5,
+      "x": 1.05,
+      "z": 0.65
+    },
+    {
+      "piece": "kaykit-forest/rock-3-e-color1",
+      "rot": 0.6,
+      "scale": 0.4,
+      "x": -0.9,
+      "z": 1.15
+    },
+    {
+      "piece": "kaykit-forest/rock-3-f-color1",
+      "rot": 2.2,
+      "scale": 0.35,
+      "x": 1.4,
+      "z": -0.85
+    },
+    {
+      "piece": "kaykit-forest/grass-2-c-color1",
+      "rot": 0,
+      "scale": 0.8,
+      "x": -1.6,
+      "z": 0.5
+    },
+    {
+      "piece": "kaykit-forest/grass-2-d-color1",
+      "rot": 0,
+      "scale": 0.8,
+      "x": 0.5,
+      "z": -1.55
+    }
+  ]
+}

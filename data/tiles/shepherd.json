@@ -1,0 +1,74 @@
+{
+  "blockers": [
+    {
+      "r": 0.768,
+      "x": 0.6,
+      "z": -0.8
+    }
+  ],
+  "ground": "grass",
+  "group": "country",
+  "id": "shepherd",
+  "name": "Shepherd's hut",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-home-a-yellow",
+      "rot": 0,
+      "scale": 0.375,
+      "x": 0.6,
+      "z": -0.8
+    },
+    {
+      "piece": "kaykit-forest/grass-2-d-color1",
+      "rot": 0,
+      "scale": 1,
+      "x": -1,
+      "z": 0.8
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": 2.094,
+      "scale": 0.723,
+      "x": -2.255,
+      "z": 1.302
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": 3.142,
+      "scale": 0.723,
+      "x": 0,
+      "z": 2.604
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": 4.189,
+      "scale": 0.723,
+      "x": 2.255,
+      "z": 1.302
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_B",
+      "facing": 1.047,
+      "hours": [
+        8,
+        20
+      ],
+      "kind": "talk",
+      "x": 0.05,
+      "z": 1.55
+    },
+    {
+      "clip": "Waving",
+      "facing": -2.094,
+      "hours": [
+        8,
+        20
+      ],
+      "kind": "talk",
+      "x": 0.95,
+      "z": 1.8
+    }
+  ]
+}

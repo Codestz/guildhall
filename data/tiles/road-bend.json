@@ -1,0 +1,33 @@
+{
+  "blockers": [
+    {
+      "r": 0.48,
+      "x": -1.6,
+      "z": 1
+    }
+  ],
+  "ground": "grass",
+  "group": "road",
+  "id": "road-bend",
+  "name": "Road bend",
+  "path": [
+    0,
+    2
+  ],
+  "pieces": [
+    {
+      "piece": "kaykit-forest/bush-1-c-color1",
+      "rot": 0,
+      "scale": 1,
+      "x": -1.6,
+      "z": 1
+    },
+    {
+      "piece": "kaykit-forest/grass-2-c-color1",
+      "rot": 0,
+      "scale": 1,
+      "x": 1.2,
+      "z": 1.5
+    }
+  ]
+}

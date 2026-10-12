@@ -1,0 +1,58 @@
+{
+  "blockers": [
+    {
+      "r": 1.443,
+      "x": -0.35,
+      "z": -0.25
+    },
+    {
+      "r": 0.182,
+      "x": 2.25,
+      "z": 0.25
+    }
+  ],
+  "ground": "dirt",
+  "group": "town",
+  "id": "archery",
+  "name": "Archery range",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-archeryrange-red",
+      "rot": 0,
+      "scale": 0.36,
+      "x": -0.35,
+      "z": -0.25
+    },
+    {
+      "piece": "kaykit-adventurers/arrow-bow-bundle",
+      "rot": 0,
+      "scale": 0.6,
+      "x": 2.25,
+      "z": 0.25
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Ranged_Bow_Aiming_Idle",
+      "facing": -1.96,
+      "kind": "work",
+      "prop": "kaykit-adventurers/bow-with-string",
+      "roles": [
+        "archer"
+      ],
+      "x": 0.75,
+      "z": 1.95
+    },
+    {
+      "clip": "Ranged_Bow_Aiming_Idle",
+      "facing": -1.785,
+      "kind": "work",
+      "prop": "kaykit-adventurers/bow-with-string",
+      "roles": [
+        "archer"
+      ],
+      "x": 1.6,
+      "z": 1.55
+    }
+  ]
+}

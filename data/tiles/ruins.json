@@ -1,0 +1,43 @@
+{
+  "blockers": [
+    {
+      "r": 1.551,
+      "x": 0,
+      "z": 0
+    },
+    {
+      "r": 0.422,
+      "x": 1.729,
+      "z": 1.159
+    }
+  ],
+  "ground": "grass",
+  "group": "landmark",
+  "id": "ruins",
+  "name": "Ruins",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-destroyed",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 0,
+      "z": 0
+    },
+    {
+      "piece": "kaykit-forest/bush-2-c-color1",
+      "rot": 0,
+      "scale": 0.8,
+      "x": 1.729,
+      "z": 1.159
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_B",
+      "facing": 3.142,
+      "kind": "stand",
+      "x": 1.2,
+      "z": 1.9
+    }
+  ]
+}

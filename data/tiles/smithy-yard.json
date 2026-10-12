@@ -1,0 +1,94 @@
+{
+  "blockers": [
+    {
+      "r": 1.483,
+      "x": -0.3,
+      "z": -0.5
+    },
+    {
+      "r": 0.455,
+      "x": 1.4,
+      "z": 0.9
+    },
+    {
+      "r": 0.29,
+      "x": 1.9,
+      "z": -0.2
+    },
+    {
+      "r": 0.512,
+      "x": -1.6,
+      "z": 1.3
+    },
+    {
+      "r": 0.305,
+      "x": 0.5,
+      "z": 1.7
+    }
+  ],
+  "ground": "dirt",
+  "group": "town",
+  "id": "smithy-yard",
+  "name": "Smithy with a yard",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-blacksmith-red",
+      "rot": 0.3,
+      "scale": 0.48,
+      "x": -0.3,
+      "z": -0.5
+    },
+    {
+      "piece": "kenney-survival/workbench-anvil",
+      "rot": 0.4,
+      "scale": 0.9,
+      "x": 1.4,
+      "z": 0.9
+    },
+    {
+      "piece": "kaykit-resources/iron-bars-stack-medium",
+      "rot": 0,
+      "scale": 0.6,
+      "x": 1.9,
+      "z": -0.2
+    },
+    {
+      "piece": "kaykit-resources/wood-log-stack",
+      "rot": 0.5,
+      "scale": 0.55,
+      "x": -1.6,
+      "z": 1.3
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.38,
+      "x": 0.5,
+      "z": 1.7
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Hammering",
+      "facing": 2.481,
+      "kind": "work",
+      "prop": "kaykit-tools/hammer",
+      "roles": [
+        "smith"
+      ],
+      "x": 1.05,
+      "z": 1.35
+    },
+    {
+      "clip": "Chopping",
+      "facing": -2.078,
+      "kind": "work",
+      "prop": "kaykit-tools/axe",
+      "roles": [
+        "smith"
+      ],
+      "x": -1.15,
+      "z": 1.55
+    }
+  ]
+}

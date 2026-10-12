@@ -1,0 +1,150 @@
+{
+  "blockers": [
+    {
+      "r": 0.922,
+      "x": -0.4,
+      "z": -1.1
+    },
+    {
+      "r": 1.096,
+      "x": 1.385,
+      "z": -0.718
+    },
+    {
+      "r": 0.3,
+      "x": 2.1,
+      "z": 0.2
+    }
+  ],
+  "ground": "grass",
+  "group": "country",
+  "id": "farmstead",
+  "name": "Farmstead",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-home-a-yellow",
+      "rot": 0,
+      "scale": 0.45,
+      "x": -0.4,
+      "z": -1.1
+    },
+    {
+      "piece": "kenney-town/cart",
+      "rot": 0.6,
+      "scale": 0.45,
+      "x": 1.385,
+      "z": -0.718
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 2.1,
+      "z": 0.2
+    },
+    {
+      "piece": "kenney-nature/crop-pumpkin",
+      "rot": 0,
+      "scale": 0.55,
+      "x": -1.4,
+      "z": 1.1
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 1,
+      "scale": 0.55,
+      "x": -1.4,
+      "z": 1.8
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 1,
+      "scale": 0.55,
+      "x": -0.6,
+      "z": 1.1
+    },
+    {
+      "piece": "kenney-nature/crop-pumpkin",
+      "rot": 2,
+      "scale": 0.55,
+      "x": -0.6,
+      "z": 1.8
+    },
+    {
+      "piece": "kenney-nature/crop-pumpkin",
+      "rot": 2,
+      "scale": 0.55,
+      "x": 0.2,
+      "z": 1.1
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 3,
+      "scale": 0.55,
+      "x": 0.2,
+      "z": 1.8
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 3,
+      "scale": 0.55,
+      "x": 1,
+      "z": 1.1
+    },
+    {
+      "piece": "kenney-nature/crop-pumpkin",
+      "rot": 4,
+      "scale": 0.55,
+      "x": 1,
+      "z": 1.8
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": 3.142,
+      "scale": 0.448,
+      "x": 0,
+      "z": 2.604
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Digging",
+      "facing": 1.571,
+      "hours": [
+        6,
+        19
+      ],
+      "kind": "work",
+      "prop": "kaykit-tools/shovel",
+      "roles": [
+        "farmer"
+      ],
+      "x": -1,
+      "z": 1.45
+    },
+    {
+      "clip": "PickUp",
+      "facing": -1.571,
+      "hours": [
+        6,
+        19
+      ],
+      "kind": "work",
+      "roles": [
+        "farmer"
+      ],
+      "x": 0.6,
+      "z": 1.45
+    },
+    {
+      "clip": "Interact",
+      "facing": 2.678,
+      "kind": "stand",
+      "roles": [
+        "farmer"
+      ],
+      "x": 1.35,
+      "z": -0.2
+    }
+  ]
+}

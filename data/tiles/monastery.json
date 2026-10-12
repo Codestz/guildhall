@@ -1,0 +1,69 @@
+{
+  "blockers": [
+    {
+      "r": 1.386,
+      "x": 0,
+      "z": -0.3
+    },
+    {
+      "r": 0.35,
+      "x": 1.9,
+      "z": 1.2
+    },
+    {
+      "r": 0.298,
+      "x": -1.8,
+      "z": 1.3
+    }
+  ],
+  "ground": "paved",
+  "group": "town",
+  "id": "monastery",
+  "name": "Monastery",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-church-yellow",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0,
+      "z": -0.3
+    },
+    {
+      "piece": "kaykit-forest/tree-3-a-color1",
+      "rot": 0,
+      "scale": 0.36,
+      "x": 1.9,
+      "z": 1.2
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-cross",
+      "rot": 0,
+      "scale": 0.5,
+      "x": -1.8,
+      "z": 1.3
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_A",
+      "facing": -0.96,
+      "kind": "stand",
+      "roles": [
+        "monk"
+      ],
+      "x": -1.3,
+      "z": 0.95
+    },
+    {
+      "clip": "Digging",
+      "facing": 0.785,
+      "kind": "work",
+      "prop": "kaykit-tools/shovel",
+      "roles": [
+        "monk"
+      ],
+      "x": 1.3,
+      "z": 1.6
+    }
+  ]
+}

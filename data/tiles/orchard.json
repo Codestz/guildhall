@@ -1,0 +1,119 @@
+{
+  "blockers": [
+    {
+      "r": 0.35,
+      "x": -1.3,
+      "z": -1.2
+    },
+    {
+      "r": 0.35,
+      "x": 1.3,
+      "z": -1.2
+    },
+    {
+      "r": 0.35,
+      "x": -1.3,
+      "z": 1.2
+    },
+    {
+      "r": 0.35,
+      "x": 1.3,
+      "z": 1.2
+    },
+    {
+      "r": 0.35,
+      "x": 0,
+      "z": 0
+    }
+  ],
+  "ground": "grass",
+  "group": "country",
+  "id": "orchard",
+  "name": "Orchard",
+  "pieces": [
+    {
+      "piece": "kaykit-forest/tree-3-a-color1",
+      "rot": 0,
+      "scale": 0.372,
+      "tone": true,
+      "x": -1.3,
+      "z": -1.2
+    },
+    {
+      "piece": "kaykit-forest/tree-3-a-color1",
+      "rot": 1,
+      "scale": 0.372,
+      "tone": true,
+      "x": 1.3,
+      "z": -1.2
+    },
+    {
+      "piece": "kaykit-forest/tree-3-a-color1",
+      "rot": 2,
+      "scale": 0.372,
+      "tone": true,
+      "x": -1.3,
+      "z": 1.2
+    },
+    {
+      "piece": "kaykit-forest/tree-3-a-color1",
+      "rot": 3,
+      "scale": 0.372,
+      "tone": true,
+      "x": 1.3,
+      "z": 1.2
+    },
+    {
+      "piece": "kaykit-forest/tree-3-a-color1",
+      "rot": 4,
+      "scale": 0.372,
+      "tone": true,
+      "x": 0,
+      "z": 0
+    },
+    {
+      "piece": "kaykit-forest/grass-2-c-color1",
+      "rot": 0,
+      "scale": 0.8,
+      "x": -2,
+      "z": 0
+    },
+    {
+      "piece": "kaykit-forest/grass-2-c-color1",
+      "rot": 1,
+      "scale": 0.8,
+      "x": 2,
+      "z": 0.2
+    }
+  ],
+  "spots": [
+    {
+      "clip": "PickUp",
+      "facing": -2.316,
+      "hours": [
+        8,
+        17
+      ],
+      "kind": "work",
+      "roles": [
+        "farmer"
+      ],
+      "x": 0.65,
+      "z": 0.6
+    }
+  ],
+  "tones": [
+    {
+      "2": 1
+    },
+    {
+      "0": 34,
+      "1": 35,
+      "2": 35,
+      "34": 34
+    },
+    {
+      "2": 1
+    }
+  ]
+}

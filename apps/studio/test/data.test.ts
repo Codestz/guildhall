@@ -44,6 +44,7 @@ describe("dataRoute", () => {
       "recipes/docks/a.json",
       "recipes/farm/a.json",
       "npcs/farmer.json",
+      "tiles/tavern-yard.json",
       "mounts.json",
     ])
       expect(dataRoute(path)).not.toBeNull()
@@ -80,6 +81,11 @@ describe("dataRoute", () => {
     expect(dataRoute("npcs/farmer.json")?.(stall()).length).toBeGreaterThan(0)
     expect(dataRoute("mounts.json")?.(mounts())).toEqual([])
     expect(dataRoute("mounts.json")?.(npc()).length).toBeGreaterThan(0)
+    const tile = { id: "demo", name: "Demo", ground: "grass", pieces: [] }
+    expect(dataRoute("tiles/demo.json")?.(tile)).toEqual([])
+    // a tile file must be named after its id
+    expect(dataRoute("tiles/other.json")?.(tile).join()).toContain("file's name")
+    expect(dataRoute("tiles/demo.json")?.(npc()).length).toBeGreaterThan(0)
   })
 })
 

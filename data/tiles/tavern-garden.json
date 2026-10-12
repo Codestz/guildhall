@@ -1,0 +1,485 @@
+{
+  "blockers": [
+    {
+      "r": 1.759,
+      "x": -0.2,
+      "z": -0.45
+    },
+    {
+      "r": 0.331,
+      "x": 2.15,
+      "z": -0.35
+    },
+    {
+      "r": 0.331,
+      "x": 2.4,
+      "z": 0.15
+    },
+    {
+      "r": 0.331,
+      "x": 2,
+      "z": 0.25
+    },
+    {
+      "r": 0.47,
+      "x": 3.75,
+      "z": 1.985
+    },
+    {
+      "r": 0.226,
+      "x": 3,
+      "z": 1.985
+    },
+    {
+      "r": 0.226,
+      "x": 4.5,
+      "z": 1.985
+    },
+    {
+      "r": 0.226,
+      "x": 3.75,
+      "z": 1.235
+    },
+    {
+      "r": 0.226,
+      "x": 3.75,
+      "z": 2.735
+    },
+    {
+      "r": 0.47,
+      "x": 5.55,
+      "z": 3.085
+    },
+    {
+      "r": 0.226,
+      "x": 4.8,
+      "z": 3.085
+    },
+    {
+      "r": 0.226,
+      "x": 6.3,
+      "z": 3.085
+    },
+    {
+      "r": 0.226,
+      "x": 5.55,
+      "z": 2.335
+    },
+    {
+      "r": 0.226,
+      "x": 5.55,
+      "z": 3.835
+    },
+    {
+      "r": 0.47,
+      "x": 4.05,
+      "z": 3.985
+    },
+    {
+      "r": 0.226,
+      "x": 3.3,
+      "z": 3.985
+    },
+    {
+      "r": 0.226,
+      "x": 4.8,
+      "z": 3.985
+    },
+    {
+      "r": 0.226,
+      "x": 4.05,
+      "z": 3.235
+    },
+    {
+      "r": 0.226,
+      "x": 4.05,
+      "z": 4.735
+    },
+    {
+      "r": 0.482,
+      "x": 6.35,
+      "z": 1.585
+    },
+    {
+      "r": 0.482,
+      "x": 2.75,
+      "z": 2.985
+    },
+    {
+      "r": 0.482,
+      "x": 0.95,
+      "z": 1.95
+    }
+  ],
+  "footprint": [
+    5
+  ],
+  "ground": "grass",
+  "group": "town",
+  "id": "tavern-garden",
+  "name": "Canteen with a beer garden",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-tavern-red",
+      "rot": 0,
+      "scale": 0.55,
+      "x": -0.2,
+      "z": -0.45
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 2.15,
+      "z": -0.35
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0.6,
+      "scale": 0.42,
+      "x": 2.4,
+      "z": 0.15
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0.3,
+      "scale": 0.42,
+      "x": 2,
+      "z": 0.25
+    },
+    {
+      "piece": "kaykit-dungeon/table-medium",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 3.75,
+      "z": 1.985
+    },
+    {
+      "piece": "kaykit-dungeon/stool",
+      "rot": 0,
+      "scale": 0.47,
+      "x": 3,
+      "z": 1.985
+    },
+    {
+      "piece": "kaykit-dungeon/stool",
+      "rot": 0,
+      "scale": 0.47,
+      "x": 4.5,
+      "z": 1.985
+    },
+    {
+      "piece": "kaykit-dungeon/stool",
+      "rot": 0,
+      "scale": 0.47,
+      "x": 3.75,
+      "z": 1.235
+    },
+    {
+      "piece": "kaykit-dungeon/stool",
+      "rot": 0,
+      "scale": 0.47,
+      "x": 3.75,
+      "z": 2.735
+    },
+    {
+      "piece": "kaykit-dungeon/table-medium",
+      "rot": 0.1,
+      "scale": 0.42,
+      "x": 5.55,
+      "z": 3.085
+    },
+    {
+      "piece": "kaykit-dungeon/stool",
+      "rot": 0,
+      "scale": 0.47,
+      "x": 4.8,
+      "z": 3.085
+    },
+    {
+      "piece": "kaykit-dungeon/stool",
+      "rot": 0,
+      "scale": 0.47,
+      "x": 6.3,
+      "z": 3.085
+    },
+    {
+      "piece": "kaykit-dungeon/stool",
+      "rot": 0,
+      "scale": 0.47,
+      "x": 5.55,
+      "z": 2.335
+    },
+    {
+      "piece": "kaykit-dungeon/stool",
+      "rot": 0,
+      "scale": 0.47,
+      "x": 5.55,
+      "z": 3.835
+    },
+    {
+      "piece": "kaykit-dungeon/table-medium",
+      "rot": 0.2,
+      "scale": 0.42,
+      "x": 4.05,
+      "z": 3.985
+    },
+    {
+      "piece": "kaykit-dungeon/stool",
+      "rot": 0,
+      "scale": 0.47,
+      "x": 3.3,
+      "z": 3.985
+    },
+    {
+      "piece": "kaykit-dungeon/stool",
+      "rot": 0,
+      "scale": 0.47,
+      "x": 4.8,
+      "z": 3.985
+    },
+    {
+      "piece": "kaykit-dungeon/stool",
+      "rot": 0,
+      "scale": 0.47,
+      "x": 4.05,
+      "z": 3.235
+    },
+    {
+      "piece": "kaykit-dungeon/stool",
+      "rot": 0,
+      "scale": 0.47,
+      "x": 4.05,
+      "z": 4.735
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 6.35,
+      "z": 1.585
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 2.75,
+      "z": 2.985
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 0.95,
+      "z": 1.95
+    },
+    {
+      "piece": "kenney-survival/signpost",
+      "rot": 0.4,
+      "scale": 0.9,
+      "x": -1.9,
+      "z": 1.6
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": -1.047,
+      "scale": 0.723,
+      "x": 6.905,
+      "z": 1.383
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": 0,
+      "scale": 0.723,
+      "x": 4.65,
+      "z": 0.081
+    },
+    {
+      "piece": "kenney-nature/fence-simple-low",
+      "rot": 4.189,
+      "scale": 0.723,
+      "x": 6.905,
+      "z": 3.987
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 1.571,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 3,
+      "z": 1.985
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": -1.571,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 4.5,
+      "z": 1.985
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 3.75,
+      "z": 1.235
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 3.142,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 3.75,
+      "z": 2.735
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 1.571,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 4.8,
+      "z": 3.085
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": -1.571,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 6.3,
+      "z": 3.085
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 5.55,
+      "z": 2.335
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 3.142,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 5.55,
+      "z": 3.835
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 1.571,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 3.3,
+      "z": 3.985
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": -1.571,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 4.8,
+      "z": 3.985
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 4.05,
+      "z": 3.235
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 3.142,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "sit",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 4.05,
+      "z": 4.735
+    },
+    {
+      "clip": "Idle_B",
+      "facing": 2.2,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "talk",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 1.4,
+      "z": 1.05
+    },
+    {
+      "clip": "Idle_B",
+      "facing": -0.942,
+      "hours": [
+        17,
+        1
+      ],
+      "kind": "talk",
+      "prop": "kaykit-adventurers/mug-full",
+      "x": 1.95,
+      "z": 0.65
+    },
+    {
+      "clip": "Interact",
+      "facing": 1.997,
+      "kind": "work",
+      "roles": [
+        "tavern-keeper"
+      ],
+      "x": 1.6,
+      "z": -0.1
+    }
+  ]
+}

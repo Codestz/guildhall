@@ -1,0 +1,74 @@
+{
+  "blockers": [
+    {
+      "r": 1.318,
+      "x": 0,
+      "z": -0.3
+    },
+    {
+      "r": 0.275,
+      "x": 1.8,
+      "z": 1.2
+    },
+    {
+      "r": 0.384,
+      "x": -1.8,
+      "z": 1.1
+    }
+  ],
+  "ground": "grass",
+  "group": "town",
+  "id": "townhouse",
+  "name": "Town house",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-home-b-green",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0,
+      "z": -0.3
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.45,
+      "x": 1.8,
+      "z": 1.2
+    },
+    {
+      "piece": "kaykit-forest/bush-1-c-color1",
+      "rot": 0,
+      "scale": 0.8,
+      "x": -1.8,
+      "z": 1.1
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Idle_B",
+      "facing": 1.047,
+      "hours": [
+        8,
+        20
+      ],
+      "kind": "talk",
+      "x": -0.55,
+      "z": 1.55
+    },
+    {
+      "clip": "Waving",
+      "facing": -2.094,
+      "hours": [
+        8,
+        20
+      ],
+      "kind": "talk",
+      "x": 0.35,
+      "z": 1.8
+    }
+  ],
+  "variants": [
+    "townhouse-shop",
+    "townhouse-corner"
+  ]
+}

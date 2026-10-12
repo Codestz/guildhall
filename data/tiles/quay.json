@@ -1,0 +1,132 @@
+{
+  "blockers": [
+    {
+      "r": 0.378,
+      "x": -1.1,
+      "z": 0.7
+    },
+    {
+      "r": 0.378,
+      "x": -0.5,
+      "z": 0.9
+    },
+    {
+      "r": 0.378,
+      "x": -0.8,
+      "z": 0.8
+    },
+    {
+      "r": 0.331,
+      "x": 0.9,
+      "z": -0.6
+    },
+    {
+      "r": 0.331,
+      "x": 1.4,
+      "z": -0.1
+    },
+    {
+      "r": 0.331,
+      "x": 0.8,
+      "z": 0.1
+    },
+    {
+      "r": 0.548,
+      "x": 0.9,
+      "z": 1.3
+    },
+    {
+      "r": 0.482,
+      "x": 1.9,
+      "z": 1
+    }
+  ],
+  "ground": "dirt",
+  "group": "town",
+  "id": "quay",
+  "name": "Quay",
+  "pieces": [
+    {
+      "piece": "kaykit-resources/pallet-wood-covered-a",
+      "rot": 0.3,
+      "scale": 0.7,
+      "x": -0.9,
+      "z": -0.5
+    },
+    {
+      "piece": "kenney-pirate/crate",
+      "rot": 0.2,
+      "scale": 0.5,
+      "x": -1.1,
+      "z": 0.7
+    },
+    {
+      "piece": "kenney-pirate/crate",
+      "rot": 1.1,
+      "scale": 0.5,
+      "x": -0.5,
+      "z": 0.9
+    },
+    {
+      "odds": 0.6,
+      "piece": "kenney-pirate/crate-bottles",
+      "rot": 0.6,
+      "scale": 0.5,
+      "x": -0.8,
+      "z": 0.8
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 0.9,
+      "z": -0.6
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 1.4,
+      "z": -0.1
+    },
+    {
+      "odds": 0.6,
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 0.8,
+      "z": 0.1
+    },
+    {
+      "odds": 0.6,
+      "piece": "kaykit-resources/textiles-stack-large-colored",
+      "rot": 0.4,
+      "scale": 0.6,
+      "x": 0.9,
+      "z": 1.3
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": 1.9,
+      "z": 1
+    }
+  ],
+  "spots": [
+    {
+      "clip": "PickUp",
+      "facing": -1.207,
+      "kind": "work",
+      "roles": [
+        "fisher",
+        "merchant"
+      ],
+      "x": 0.15,
+      "z": 0.3
+    }
+  ],
+  "variants": [
+    "quay-b"
+  ]
+}

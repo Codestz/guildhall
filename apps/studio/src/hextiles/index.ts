@@ -1,7 +1,7 @@
 /**
  * Tile gallery (`/lab/hextiles`): every hex tile prefab at scale B, each on its own hex with a KayKit
- * character beside it for scale and its name under it; `?tile=<id>` shows one large. The prefabs are
- * world's TILE_PREFABS (code for the first look; the Composer takes them over once approved).
+ * character beside it for scale and its name under it; `?tile=<id>` shows one large, `?group=` one group.
+ * The prefabs are the authored data (data/tiles, edited in the tile composer at `/composer/<id>`).
  */
 import type { CameraPose } from "@guildhall/core"
 import { log } from "@guildhall/core"
@@ -19,10 +19,18 @@ import {
   type TerrainMesh,
   toScreen,
 } from "@guildhall/render"
-import { CHARACTER_SCALE, HEX_TILE_SIZE, placeTile, TILE_PREFABS, type TileGround } from "@guildhall/world"
+import {
+  CHARACTER_SCALE,
+  HEX_TILE_SIZE,
+  placeTile,
+  type TileGround,
+  tilePrefabs,
+  worldSide,
+} from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
 import { worldCamera } from "../shell/worldCamera.ts"
+import { loadTiles } from "../tiles.ts"
 
 const logger = log("studio:hextiles")
 
@@ -37,6 +45,9 @@ const GROUND: Record<TileGround, [number, number, number]> = {
 }
 const SIDE: [number, number, number] = [122, 90, 60]
 const CHARACTER = "kaykit-adventurers/knight"
+/** Every tile turned as the island turns one fronting world side FACE (world.ts rotOf), toward the camera. */
+const FACE = 5
+const TURN = (Math.PI / 180) * (90 + 60 * FACE)
 
 export const hexTiles: Screen = {
   id: "hextiles",
@@ -51,15 +62,12 @@ export const hexTiles: Screen = {
     const cleanup: (() => void)[] = []
     const one = ctx.query.get("tile")
     const group = ctx.query.get("group")
-    const shown = one
-      ? TILE_PREFABS.filter((t) => t.id === one)
-      : group
-        ? TILE_PREFABS.filter((t) => t.group === group)
-        : TILE_PREFABS
 
     const build = async () => {
-      const catalog = await loadCatalog()
+      const [catalog] = await Promise.all([loadCatalog(), loadTiles()])
       if (!catalog || disposed) return
+      const all = tilePrefabs()
+      const shown = one ? all.filter((t) => t.id === one) : group ? all.filter((t) => t.group === group) : all
       const R = HEX_TILE_SIZE
       const gap = R * 2.9
       const cols = Math.min(7, shown.length)
@@ -70,14 +78,14 @@ export const hexTiles: Screen = {
       shown.forEach((t, k) => {
         const [x, z] = at(k)
         tiles.push({ x, z, top: t.ground === "water" ? 0.15 : 0.5, color: GROUND[t.ground], side: SIDE })
-        pieces.push(...placeTile(t, [x, z], 0.5, 0, k + 1, false).filter((q) => catalog.get(q.piece)))
+        pieces.push(...placeTile(t, [x, z], 0.5, TURN, k + 1, false).filter((q) => catalog.get(q.piece)))
         // a dirt path from the centre out through each side the tile names (side d's middle sits at
         // 30° + 60°·d on a pointy-top hex), a round patch where they meet
         if (t.path) {
           const y = 0.53
           const w = 0.85
           const reach = R * (Math.sqrt(3) / 2) + 0.05
-          for (const d of t.path) {
+          for (const d of t.path.map((k) => worldSide(k, FACE))) {
             const a = (Math.PI / 180) * (60 * d)
             const ex = Math.cos(a) * reach
             const ez = -Math.sin(a) * reach

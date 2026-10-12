@@ -22,7 +22,7 @@ import {
   type TerrainMesh,
   type Water,
 } from "@guildhall/render"
-import { HEX_TILE_SIZE, hexGroundMesh, hexIsland, hexWorld, hexZones } from "@guildhall/world"
+import { HEX_TILE_SIZE, hexGroundFine, hexGroundMesh, hexIsland, hexWorld, hexZones } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
 import { worldCamera } from "../shell/worldCamera.ts"
@@ -77,6 +77,7 @@ export const hexWorldScreen: Screen = {
       const z = hexZones(h)
       const w = hexWorld(h, z)
       const R = HEX_TILE_SIZE
+      let groundAt = (x: number, zz: number) => w.heightAt(x, zz)
       const tiles: HexPrism[] = w.tiles.map((t) => {
         const v = 0.95 + 0.1 * (((t.i * 2654435761) >>> 0) / 4294967296)
         const c = TOP[t.ground] ?? TOP.grass!
@@ -92,9 +93,18 @@ export const hexWorldScreen: Screen = {
       // (`?ground=hex` shows every tile as its own prism)
       if (ctx.query.get("ground") === "hex")
         meshes.push(createHexGround(stage, { size: R, base: -2.5, tiles }))
-      else {
+      else if (ctx.query.get("ground") === "soft") {
         const m = hexGroundMesh(h, w, { top: TOP, side: SIDE, sideLand: SIDE_LAND, slope: TOP.sand! })
         meshes.push(createVertexMesh(stage, m.position, m.color))
+      } else {
+        // fine ground: small hexes, low terraces on the hills, land falling to the shore; nature stands on it
+        const m = hexGroundFine(h, w, { top: TOP, side: SIDE, sideLand: SIDE_LAND, slope: TOP.sand! })
+        meshes.push(createVertexMesh(stage, m.position, m.color))
+        for (const p of w.pieces) {
+          const y = m.heightAt(p.x, p.z)
+          if (y > 0 && Math.abs(y - p.y) < 3) p.y = y
+        }
+        groundAt = m.heightAt
       }
       if (w.paths.length) meshes.push(createSurface(stage, new Float32Array(w.paths), "#d9c08c"))
       let span = 0

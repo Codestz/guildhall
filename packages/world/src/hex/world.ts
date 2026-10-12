@@ -186,21 +186,73 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
     else if (u === "square") {
       prefab = HEART[zone?.kind ?? "town"] ?? "well-square"
       ground = "paved"
+      // a square streets meet on: paved through, the well standing in a corner no street runs to
+      const nb = g.neighbours(i)
+      const sides = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! >= 0 && (links.get(i)?.has(nb[d]!) ?? false))
+      if (prefab === "well-square" && sides.length >= 2) {
+        prefab = null
+        paths.push(...tilePath([x, zz], t + 0.03, sides, 1.1))
+        const free = [0, 1, 2, 3, 4, 5].filter((d) => !sides.includes(d))
+        // the free side furthest from every street: the middle of the widest gap
+        const d = free.length ? free[Math.floor(free.length / 2)]! : 0
+        const a = (Math.PI / 180) * (60 * d)
+        const e = HEX_TILE_SIZE * 0.55
+        pieces.push(
+          {
+            piece: recolour("kaykit-hexagon/building-well-yellow", i),
+            x: x + Math.cos(a) * e,
+            y: t,
+            z: zz - Math.sin(a) * e,
+            rot: rotOf((d + 3) % 6),
+            scale: 0.32,
+          },
+          {
+            piece: "kaykit-halloween/post-lantern",
+            x: x + Math.cos(a + 0.9) * e,
+            y: t,
+            z: zz - Math.sin(a + 0.9) * e,
+            rot: 0,
+            scale: 0.55,
+          },
+        )
+      }
     } else if (u === "road" || u === "bridge") {
       const nb = g.neighbours(i)
       // a path only toward the tiles its own roads run on to: no web where two roads lie side by side
       const sides = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! >= 0 && (links.get(i)?.has(nb[d]!) ?? false))
       if (u === "road") paths.push(...tilePath([x, zz], t + 0.03, sides.length ? sides : [0, 3]))
       else {
-        // a bridge: planks across the water, toward the road on either side
-        const d = sides[0] ?? 0
+        // a bridge runs from the edge where its road comes in to the edge where it leaves (whatever the bend),
+        // so its ends meet the road on both banks; deck at the higher bank
+        const mid = (d: number): [number, number] => {
+          const a = (Math.PI / 180) * (60 * d)
+          const e = (HEX_TILE_SIZE * Math.sqrt(3)) / 2
+          return [x + Math.cos(a) * e, zz - Math.sin(a) * e]
+        }
+        const ends =
+          sides.length >= 2
+            ? [sides[0]!, sides[sides.length - 1]!]
+            : [sides[0] ?? 0, ((sides[0] ?? 0) + 3) % 6]
+        const A = mid(ends[0]!)
+        const Bp = mid(ends[1]!)
+        let bank = 0
+        let n = 0
+        for (const d of ends) {
+          const j = nb[d]!
+          if (j >= 0) {
+            bank += top(j)
+            n++
+          }
+        }
+        bank = n ? bank / n : t
+        const len = Math.hypot(Bp[0] - A[0], Bp[1] - A[1]) + 1.4
         pieces.push({
           piece: "kaykit-hexagon/building-bridge-a",
-          x,
-          y: t + 0.2,
-          z: zz,
-          rot: rotOf(d) + Math.PI / 2,
-          scale: 0.36,
+          x: (A[0] + Bp[0]) / 2,
+          y: bank - 0.55,
+          z: (A[1] + Bp[1]) / 2,
+          rot: Math.atan2(Bp[0] - A[0], Bp[1] - A[1]),
+          scale: len / 15.4,
         })
       }
     } else if (u === "dock") prefab = "dock"

@@ -113,3 +113,175 @@ export function hexGroundMesh(h: HexIsland, w: HexWorld, pal: GroundPalette, bas
   }
   return { position: new Float32Array(pos), color: new Float32Array(col) }
 }
+
+/** Tiles whose ground may bend into small terraces (nature); everything else stays flat at its tile's top. */
+const SOFT = new Set([
+  null,
+  "woods",
+  "meadow",
+  "pasture",
+  "orchard",
+  "hillside",
+  "pines",
+  "reeds",
+  "hunter",
+  "shepherd",
+])
+
+export interface HexFineGround extends HexGroundMesh {
+  /** The ground at a point: a small hex's top. */
+  heightAt(x: number, z: number): number
+  /** Small hexes drawn. */
+  count: number
+}
+
+/**
+ * The ground on a finer hex grid (`sub` small hexes across a tile): every small hex takes the top of the
+ * tile under it where that tile must stay flat (buildings, roads, fields, rock, water), else a height
+ * blended from the tiles round it and snapped to small steps, so hills rise in many low terraces and land
+ * falls toward the shore. Walls stand only where a small hex is higher than its neighbour.
+ */
+export function hexGroundFine(
+  h: HexIsland,
+  w: HexWorld,
+  pal: GroundPalette,
+  sub = 3,
+  base = -2.5,
+): HexFineGround {
+  const g = h.grid
+  const R = HEX_TILE_SIZE
+  const r = R / sub
+  const step = 0.37
+  const seed = h.spec.seed
+  const tileOf = new Map<number, (typeof w.tiles)[number]>()
+  for (const t of w.tiles) tileOf.set(t.i, t)
+  const SQ3 = Math.sqrt(3)
+  const axial = (x: number, z: number, size: number): [number, number] => {
+    const qf = ((SQ3 / 3) * x - z / 3) / size
+    const rf = ((2 / 3) * z) / size
+    const sf = -qf - rf
+    let q = Math.round(qf)
+    let rr = Math.round(rf)
+    const s = Math.round(sf)
+    const dq = Math.abs(q - qf)
+    const dr = Math.abs(rr - rf)
+    const ds = Math.abs(s - sf)
+    if (dq > dr && dq > ds) q = -rr - s
+    else if (dr > ds) rr = -q - s
+    return [q, rr]
+  }
+  const parent = (x: number, z: number) => {
+    const [q, rr] = axial(x, z, R)
+    const i = g.index(q, rr)
+    return i >= 0 ? tileOf.get(i) : undefined
+  }
+  const soft = (t: (typeof w.tiles)[number]) =>
+    SOFT.has(t.prefab) &&
+    t.ground !== "water" &&
+    t.ground !== "rock" &&
+    t.ground !== "cliff" &&
+    t.ground !== "paved"
+  /** A small hex's height: the parent's, or a blend of the tiles within reach. */
+  const heightOf = (x: number, z: number): number | null => {
+    const p = parent(x, z)
+    if (!p) return null
+    if (!soft(p)) return p.top
+    let sum = 0
+    let wt = 0
+    const [pq, pr] = axial(x, z, R)
+    for (let dq = -1; dq <= 1; dq++)
+      for (let dr = -1; dr <= 1; dr++) {
+        if (Math.abs(dq + dr) > 1) continue
+        const i = g.index(pq + dq, pr + dr)
+        const n = i >= 0 ? tileOf.get(i) : undefined
+        const cx = SQ3 * (pq + dq + (pr + dr) / 2) * R
+        const cz = 1.5 * (pr + dr) * R
+        const d = Math.hypot(x - cx, z - cz) / R
+        const k = Math.max(0, 1.25 - d) ** 2
+        if (k <= 0) continue
+        // the sea pulls the land down toward the shore; water tiles count at their bank
+        const y = !n ? 0.2 : n.ground === "water" ? Math.max(n.top + 0.45, 0.2) : n.top
+        sum += y * k
+        wt += k
+      }
+    const y = wt ? sum / wt : p.top
+    return Math.max(0.35, Math.round(y / step) * step)
+  }
+  const cells = new Map<string, { x: number; z: number; y: number; t: (typeof w.tiles)[number] }>()
+  let minQ = 1e9
+  let maxQ = -1e9
+  let minR = 1e9
+  let maxR = -1e9
+  for (const t of w.tiles) {
+    const [q, rr] = axial(t.x, t.z, r)
+    minQ = Math.min(minQ, q - sub - 1)
+    maxQ = Math.max(maxQ, q + sub + 1)
+    minR = Math.min(minR, rr - sub - 1)
+    maxR = Math.max(maxR, rr + sub + 1)
+  }
+  for (let rr = minR; rr <= maxR; rr++)
+    for (let q = minQ; q <= maxQ; q++) {
+      const x = SQ3 * (q + rr / 2) * r
+      const z = 1.5 * rr * r
+      const p = parent(x, z)
+      if (!p) continue
+      const y = heightOf(x, z)
+      if (y === null) continue
+      cells.set(`${q},${rr}`, { x, z, y, t: p })
+    }
+  const pos: number[] = []
+  const col: number[] = []
+  const tone = (x: number, z: number) => 0.93 + 0.12 * (fbm(seed + 77, x / 22, z / 22, 2) * 0.5 + 0.5)
+  const put = (x: number, y: number, z: number, c: RGB, k: number) => {
+    pos.push(x, y, z)
+    col.push((c[0] * k) / 255, (c[1] * k) / 255, (c[2] * k) / 255)
+  }
+  const corners: [number, number][] = []
+  for (let k = 0; k < 6; k++) {
+    const a = (Math.PI / 180) * (60 * k - 30)
+    corners.push([Math.cos(a) * r, Math.sin(a) * r])
+  }
+  // neighbour across edge k (normal at 60°·k in x/z): axial step
+  const STEP: [number, number][] = [
+    [1, 0],
+    [0, 1],
+    [-1, 1],
+    [-1, 0],
+    [0, -1],
+    [1, -1],
+  ]
+  for (const [key, c] of cells) {
+    const [q, rr] = key.split(",").map(Number) as [number, number]
+    const top = pal.top[c.t.ground] ?? pal.top.grass!
+    // grass on a soft tile tints a little lighter as it climbs
+    const lift = soft(c.t) ? 1 + Math.min(0.08, (c.y - c.t.top) * 0.03) : 1
+    const P = corners.map(([dx, dz]) => [c.x + dx, c.z + dz] as const)
+    for (let k = 0; k < 6; k++) {
+      const a = P[k]!
+      const b = P[(k + 1) % 6]!
+      put(c.x, c.y, c.z, top, tone(c.x, c.z) * lift)
+      put(b[0], c.y, b[1], top, tone(b[0], b[1]) * lift)
+      put(a[0], c.y, a[1], top, tone(a[0], a[1]) * lift)
+    }
+    const side = pal.side[c.t.ground] ?? pal.sideLand
+    for (let k = 0; k < 6; k++) {
+      const [sq, sr] = STEP[k]!
+      const n = cells.get(`${q + sq},${rr + sr}`)
+      const floor = n ? n.y : base
+      if (floor >= c.y - 0.01) continue
+      const a = P[k]!
+      const b = P[(k + 1) % 6]!
+      put(a[0], c.y, a[1], side, 1)
+      put(b[0], c.y, b[1], side, 1)
+      put(b[0], floor, b[1], side, 0.62)
+      put(a[0], c.y, a[1], side, 1)
+      put(b[0], floor, b[1], side, 0.62)
+      put(a[0], floor, a[1], side, 0.62)
+    }
+  }
+  const heightAt = (x: number, z: number): number => {
+    const [q, rr] = axial(x, z, r)
+    return cells.get(`${q},${rr}`)?.y ?? 0
+  }
+  return { position: new Float32Array(pos), color: new Float32Array(col), heightAt, count: cells.size }
+}

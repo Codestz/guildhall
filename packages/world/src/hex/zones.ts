@@ -393,9 +393,13 @@ export function hexZones(h: HexIsland): HexZones {
 
   // ---- roads: spanning tree + one loop, cheapest tile paths ----
   const use = new Uint8Array(N)
+  const hearts = new Set(zones.map((zz) => zz.tile))
+  const routeEnds: [number, number] = [-1, -1]
   const roadCost = (a: number, b: number): number => {
     const k = kind(b)
     if (k === "sea" || k === "shallows" || k === "rock" || k === "lake") return Infinity
+    // never through another place's heart: its square holds its well, market or chapel
+    if (hearts.has(b) && b !== routeEnds[0] && b !== routeEnds[1]) return Infinity
     const climb = Math.abs(h.level[b]! - h.level[a]!)
     if (climb > 1) return Infinity
     let c = 1 + climb * 2.5
@@ -428,6 +432,8 @@ export function hexZones(h: HexIsland): HexZones {
   const roads: HexRoad[] = []
   for (const [a, b] of links) {
     const target = zones[b]!.tile
+    routeEnds[0] = zones[a]!.tile
+    routeEnds[1] = target
     const tiles = path(h, zones[a]!.tile, (i) => i === target, roadCost)
     if (!tiles) continue
     roads.push({ a, b, tiles })

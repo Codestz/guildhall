@@ -1,0 +1,68 @@
+{
+  "activity": {
+    "idle": [
+      "Idle_A",
+      "Idle_B"
+    ],
+    "walk": "Walking_A",
+    "work": "Fishing_Idle"
+  },
+  "body": [
+    "kaykit-adventurers/ranger",
+    "kaykit-adventurers/rogue",
+    "kaykit-adventurers/rogue-hooded"
+  ],
+  "hands": {
+    "r": [
+      "kaykit-tools/bucket-metal",
+      "quaternius-props/bag"
+    ]
+  },
+  "hide": [
+    "Ranger_Cape",
+    "Ranger_Quiver",
+    "Rogue_Cape",
+    "RogueHooded_Cape",
+    "RogueHooded_Mask"
+  ],
+  "id": "fisher",
+  "outfit": {
+    "dirt": [
+      "dirt",
+      "snow",
+      "sand"
+    ],
+    "grass": [
+      "water",
+      "slate"
+    ],
+    "leaf": [
+      "water",
+      "teal",
+      "slate"
+    ],
+    "sand": [
+      "water",
+      "snow",
+      "teal"
+    ],
+    "timber": [
+      "timber",
+      "dirt",
+      "thatch",
+      "grey"
+    ]
+  },
+  "role": "fisher",
+  "vary": {
+    "height": [
+      0.96,
+      1.04
+    ],
+    "speed": [
+      0.9,
+      1.1
+    ]
+  },
+  "version": 1
+}

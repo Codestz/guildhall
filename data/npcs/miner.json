@@ -1,0 +1,66 @@
+{
+  "activity": {
+    "idle": [
+      "Idle_A",
+      "Idle_B"
+    ],
+    "walk": "Walking_A",
+    "work": "Pickaxing"
+  },
+  "body": [
+    "kaykit-adventurers/barbarian",
+    "kaykit-adventurers/ranger",
+    "kaykit-adventurers/rogue"
+  ],
+  "hands": {
+    "r": [
+      "kaykit-tools/pickaxe"
+    ]
+  },
+  "hide": [
+    "Barbarian_BearHat",
+    "Ranger_Cape",
+    "Ranger_Quiver",
+    "Rogue_Cape"
+  ],
+  "id": "miner",
+  "outfit": {
+    "dirt": [
+      "cobble",
+      "grey",
+      "dirt"
+    ],
+    "leaf": [
+      "cobble",
+      "grey",
+      "dirt"
+    ],
+    "sand": [
+      "cobble",
+      "stone",
+      "dirt"
+    ],
+    "stone": [
+      "stone",
+      "cobble"
+    ],
+    "timber": [
+      "timber",
+      "dirt",
+      "thatch",
+      "grey"
+    ]
+  },
+  "role": "miner",
+  "vary": {
+    "height": [
+      0.96,
+      1.04
+    ],
+    "speed": [
+      0.9,
+      1.1
+    ]
+  },
+  "version": 1
+}

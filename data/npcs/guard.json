@@ -1,0 +1,48 @@
+{
+  "activity": {
+    "idle": [
+      "Idle_A",
+      "Melee_2H_Idle"
+    ],
+    "walk": "Walking_C",
+    "work": "Melee_Blocking"
+  },
+  "body": [
+    "kaykit-adventurers/knight",
+    "kaykit-adventurers/barbarian"
+  ],
+  "hands": {
+    "l": [
+      "kaykit-adventurers/shield-round",
+      "kaykit-adventurers/shield-round-color",
+      "kaykit-adventurers/shield-round-barbarian"
+    ],
+    "r": [
+      "kaykit-adventurers/sword-1handed",
+      "kaykit-weapons/sword-a"
+    ]
+  },
+  "hide": [
+    "Barbarian_BearHat"
+  ],
+  "id": "guard",
+  "outfit": {
+    "stone": [
+      "stone",
+      "slate",
+      "roof-blue"
+    ]
+  },
+  "role": "guard",
+  "vary": {
+    "height": [
+      0.96,
+      1.04
+    ],
+    "speed": [
+      0.9,
+      1.1
+    ]
+  },
+  "version": 1
+}

@@ -1,0 +1,55 @@
+{
+  "activity": {
+    "idle": [
+      "Ranged_Bow_Idle",
+      "Idle_A"
+    ],
+    "walk": "Walking_B",
+    "work": "Ranged_Bow_Aiming_Idle"
+  },
+  "body": [
+    "kaykit-adventurers/ranger",
+    "kaykit-adventurers/rogue-hooded",
+    "kaykit-adventurers/rogue"
+  ],
+  "hands": {
+    "l": [
+      "kaykit-adventurers/bow-with-string",
+      "kaykit-adventurers/bow"
+    ]
+  },
+  "hide": [
+    "RogueHooded_Mask"
+  ],
+  "id": "archer",
+  "outfit": {
+    "leaf": [
+      "leaf",
+      "grass",
+      "dirt"
+    ],
+    "sand": [
+      "leaf",
+      "dry-grass",
+      "sand"
+    ],
+    "timber": [
+      "timber",
+      "dirt",
+      "thatch",
+      "grey"
+    ]
+  },
+  "role": "archer",
+  "vary": {
+    "height": [
+      0.96,
+      1.04
+    ],
+    "speed": [
+      0.9,
+      1.1
+    ]
+  },
+  "version": 1
+}

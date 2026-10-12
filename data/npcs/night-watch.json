@@ -1,0 +1,69 @@
+{
+  "activity": {
+    "idle": [
+      "Idle_A",
+      "Idle_B"
+    ],
+    "walk": "Walking_C",
+    "work": "Holding_A"
+  },
+  "body": [
+    "kaykit-adventurers/knight",
+    "kaykit-adventurers/rogue-hooded",
+    "kaykit-adventurers/ranger"
+  ],
+  "hands": {
+    "r": [
+      "kaykit-tools/lantern",
+      "kaykit-tools/torch"
+    ]
+  },
+  "hide": [
+    "Knight_HelmetVisor",
+    "RogueHooded_Mask",
+    "Ranger_Quiver"
+  ],
+  "id": "night-watch",
+  "outfit": {
+    "grass": [
+      "slate",
+      "cobble"
+    ],
+    "leaf": [
+      "slate",
+      "cobble",
+      "water"
+    ],
+    "sand": [
+      "slate",
+      "cobble",
+      "water"
+    ],
+    "stone": [
+      "cobble",
+      "slate"
+    ],
+    "terracotta": [
+      "slate",
+      "water"
+    ],
+    "timber": [
+      "timber",
+      "dirt",
+      "thatch",
+      "grey"
+    ]
+  },
+  "role": "night-watch",
+  "vary": {
+    "height": [
+      0.96,
+      1.04
+    ],
+    "speed": [
+      0.9,
+      1.1
+    ]
+  },
+  "version": 1
+}

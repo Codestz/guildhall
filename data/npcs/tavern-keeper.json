@@ -1,0 +1,62 @@
+{
+  "activity": {
+    "idle": [
+      "Idle_A",
+      "Idle_B"
+    ],
+    "walk": "Walking_A",
+    "work": "Holding_A"
+  },
+  "body": [
+    "kaykit-adventurers/barbarian",
+    "kaykit-adventurers/ranger",
+    "kaykit-adventurers/rogue"
+  ],
+  "hands": {
+    "r": [
+      "kaykit-adventurers/mug-full",
+      "kaykit-adventurers/mug-empty"
+    ]
+  },
+  "hide": [
+    "Barbarian_BearHat",
+    "Ranger_Cape",
+    "Ranger_Quiver",
+    "Rogue_Cape"
+  ],
+  "id": "tavern-keeper",
+  "outfit": {
+    "dirt": [
+      "snow",
+      "dirt",
+      "timber"
+    ],
+    "leaf": [
+      "timber",
+      "terracotta",
+      "snow"
+    ],
+    "sand": [
+      "snow",
+      "sand"
+    ],
+    "timber": [
+      "timber",
+      "dirt",
+      "thatch",
+      "grey"
+    ]
+  },
+  "role": "tavern-keeper",
+  "vary": {
+    "height": [
+      0.96,
+      1.04
+    ],
+    "speed": [
+      0.9,
+      1.1
+    ]
+  },
+  "version": 1
+}

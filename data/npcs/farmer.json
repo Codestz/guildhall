@@ -1,0 +1,63 @@
+{
+  "activity": {
+    "idle": [
+      "Idle_A",
+      "Idle_B"
+    ],
+    "walk": "Walking_A",
+    "work": "Digging"
+  },
+  "body": [
+    "kaykit-adventurers/ranger",
+    "kaykit-adventurers/rogue",
+    "kaykit-adventurers/barbarian"
+  ],
+  "hands": {
+    "r": [
+      "kenney-survival/tool-hoe",
+      "kaykit-tools/shovel"
+    ]
+  },
+  "hide": [
+    "Barbarian_BearHat",
+    "Ranger_Cape",
+    "Ranger_Quiver",
+    "Rogue_Cape"
+  ],
+  "id": "farmer",
+  "outfit": {
+    "dirt": [
+      "dirt",
+      "sand",
+      "dry-grass"
+    ],
+    "leaf": [
+      "dry-grass",
+      "leaf",
+      "dirt"
+    ],
+    "sand": [
+      "sand",
+      "thatch",
+      "dry-grass"
+    ],
+    "timber": [
+      "timber",
+      "dirt",
+      "thatch",
+      "grey"
+    ]
+  },
+  "role": "farmer",
+  "vary": {
+    "height": [
+      0.96,
+      1.04
+    ],
+    "speed": [
+      0.9,
+      1.1
+    ]
+  },
+  "version": 1
+}

@@ -1,0 +1,71 @@
+{
+  "activity": {
+    "idle": [
+      "Idle_A",
+      "Idle_B"
+    ],
+    "walk": "Walking_B",
+    "work": "Interact"
+  },
+  "body": [
+    "kaykit-adventurers/mage",
+    "kaykit-adventurers/rogue-hooded",
+    "kaykit-adventurers/ranger"
+  ],
+  "hands": {
+    "r": [
+      "quaternius-props/bag",
+      "kaykit-tools/lantern"
+    ]
+  },
+  "hide": [
+    "Mage_Hat",
+    "RogueHooded_Mask",
+    "Ranger_Cape",
+    "Ranger_Quiver"
+  ],
+  "id": "merchant",
+  "outfit": {
+    "accent": [
+      "terracotta",
+      "orange",
+      "autumn"
+    ],
+    "dirt": [
+      "terracotta",
+      "thatch"
+    ],
+    "grass": [
+      "terracotta",
+      "orange"
+    ],
+    "leaf": [
+      "terracotta",
+      "orange",
+      "metal"
+    ],
+    "sand": [
+      "orange",
+      "terracotta",
+      "metal"
+    ],
+    "timber": [
+      "timber",
+      "dirt",
+      "thatch",
+      "grey"
+    ]
+  },
+  "role": "merchant",
+  "vary": {
+    "height": [
+      0.96,
+      1.04
+    ],
+    "speed": [
+      0.9,
+      1.1
+    ]
+  },
+  "version": 1
+}

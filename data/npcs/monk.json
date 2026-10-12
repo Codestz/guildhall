@@ -1,0 +1,66 @@
+{
+  "activity": {
+    "idle": [
+      "Idle_A",
+      "Idle_B"
+    ],
+    "walk": "Walking_A",
+    "work": "Holding_C"
+  },
+  "body": [
+    "kaykit-adventurers/rogue-hooded",
+    "kaykit-adventurers/mage"
+  ],
+  "hands": {
+    "l": [
+      "kaykit-adventurers/spellbook-open",
+      "kaykit-adventurers/spellbook-closed"
+    ],
+    "r": [
+      "kaykit-tools/lantern",
+      ""
+    ]
+  },
+  "hide": [
+    "Mage_Hat",
+    "RogueHooded_Mask"
+  ],
+  "id": "monk",
+  "outfit": {
+    "accent": [
+      "grey",
+      "dirt",
+      "cobble"
+    ],
+    "grass": [
+      "grey",
+      "dirt"
+    ],
+    "leaf": [
+      "grey",
+      "dirt",
+      "cobble"
+    ],
+    "slate": [
+      "grey"
+    ],
+    "timber": [
+      "timber",
+      "dirt",
+      "thatch",
+      "grey"
+    ]
+  },
+  "role": "monk",
+  "vary": {
+    "height": [
+      0.96,
+      1.04
+    ],
+    "speed": [
+      0.9,
+      1.1
+    ]
+  },
+  "version": 1
+}

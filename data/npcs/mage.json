@@ -1,0 +1,57 @@
+{
+  "activity": {
+    "idle": [
+      "Idle_A",
+      "Idle_B"
+    ],
+    "walk": "Walking_A",
+    "work": "Ranged_Magic_Spellcasting"
+  },
+  "body": [
+    "kaykit-adventurers/mage",
+    "kaykit-adventurers/rogue-hooded"
+  ],
+  "hands": {
+    "l": [
+      "kaykit-adventurers/spellbook-closed",
+      ""
+    ],
+    "r": [
+      "kaykit-adventurers/staff",
+      "kaykit-adventurers/wand"
+    ]
+  },
+  "hide": [
+    "RogueHooded_Mask"
+  ],
+  "id": "mage",
+  "outfit": {
+    "accent": [
+      "accent",
+      "roof-blue",
+      "teal"
+    ],
+    "leaf": [
+      "accent",
+      "water",
+      "teal"
+    ],
+    "slate": [
+      "slate",
+      "accent",
+      "roof-blue"
+    ]
+  },
+  "role": "mage",
+  "vary": {
+    "height": [
+      0.96,
+      1.04
+    ],
+    "speed": [
+      0.9,
+      1.1
+    ]
+  },
+  "version": 1
+}

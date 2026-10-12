@@ -1,0 +1,59 @@
+{
+  "activity": {
+    "idle": [
+      "Idle_A",
+      "Idle_B"
+    ],
+    "walk": "Walking_A",
+    "work": "Chopping"
+  },
+  "body": [
+    "kaykit-adventurers/barbarian",
+    "kaykit-adventurers/ranger",
+    "kaykit-adventurers/rogue"
+  ],
+  "hands": {
+    "r": [
+      "kaykit-tools/axe",
+      "kaykit-adventurers/axe-1handed"
+    ]
+  },
+  "hide": [
+    "Ranger_Cape",
+    "Ranger_Quiver",
+    "Rogue_Cape"
+  ],
+  "id": "lumberjack",
+  "outfit": {
+    "dirt": [
+      "dirt",
+      "timber"
+    ],
+    "leaf": [
+      "terracotta",
+      "autumn",
+      "leaf"
+    ],
+    "sand": [
+      "terracotta",
+      "dirt"
+    ],
+    "timber": [
+      "timber",
+      "dirt",
+      "thatch"
+    ]
+  },
+  "role": "lumberjack",
+  "vary": {
+    "height": [
+      0.96,
+      1.04
+    ],
+    "speed": [
+      0.9,
+      1.1
+    ]
+  },
+  "version": 1
+}

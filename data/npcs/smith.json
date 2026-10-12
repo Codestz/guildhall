@@ -1,0 +1,56 @@
+{
+  "activity": {
+    "idle": [
+      "Idle_A",
+      "Idle_B"
+    ],
+    "walk": "Walking_A",
+    "work": "Hammering"
+  },
+  "body": [
+    "kaykit-adventurers/barbarian",
+    "kaykit-adventurers/knight"
+  ],
+  "hands": {
+    "r": [
+      "kaykit-tools/hammer",
+      "kaykit-tools/mallet"
+    ]
+  },
+  "hide": [
+    "Barbarian_BearHat",
+    "Knight_Cape",
+    "Knight_Helmet",
+    "Knight_HelmetVisor"
+  ],
+  "id": "smith",
+  "outfit": {
+    "grey": [
+      "grey",
+      "timber",
+      "dirt"
+    ],
+    "stone": [
+      "dirt",
+      "timber",
+      "cobble"
+    ],
+    "timber": [
+      "timber",
+      "dirt",
+      "cobble"
+    ]
+  },
+  "role": "smith",
+  "vary": {
+    "height": [
+      0.96,
+      1.04
+    ],
+    "speed": [
+      0.9,
+      1.1
+    ]
+  },
+  "version": 1
+}

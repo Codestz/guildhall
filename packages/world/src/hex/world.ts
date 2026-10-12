@@ -18,8 +18,36 @@ import {
 } from "./tiles.ts"
 import { type HexZones, useOf } from "./zones.ts"
 
-/** Metres per height level. */
-export const LEVEL_STEP = 1.1
+/** Metres per height level (the default; `hexWorld(h, z, { step })` tries others). */
+export const LEVEL_STEP = 0.8
+
+/** A bridge deck's (and the walk graph's bridge node's) lift over its banks' road. */
+const DECK_LIFT = 0.08
+
+/**
+ * A straight walkway a walker climbs or crosses off the ground: a flight of road stairs or a leg of a
+ * bridge deck, from (ax, az) at height ay to (bx, bz) at by, `half` metres either side of its line.
+ */
+export interface HexWalkway {
+  kind: "stairs" | "deck"
+  ax: number
+  az: number
+  ay: number
+  bx: number
+  bz: number
+  by: number
+  half: number
+  /** Stairs only: how many steps the flight has. */
+  steps?: number
+}
+
+/** A bridge over one river tile: its deck legs (centre to bank) and the river bed its posts stand in. */
+export interface HexBridge {
+  tile: number
+  legs: HexWalkway[]
+  /** The bed under the deck (posts reach down to it). */
+  bed: number
+}
 
 /** The top of a shallows tile's bed, where a dock's posts stand. */
 const SEA_TOP = -0.4
@@ -32,6 +60,10 @@ export interface HexWorldTile {
   top: number
   ground: TileGround | "cliff" | "shore"
   prefab: string | null
+  /** Sides (0–5) a path strip runs out through (roads and squares). */
+  paths?: number[]
+  /** The side (0–5) a building's door faces. */
+  door?: number
 }
 
 export interface HexWorld {
@@ -39,11 +71,15 @@ export interface HexWorld {
   pieces: PlacedPiece[]
   /** Path strips (triangle positions) over road tiles. */
   paths: number[]
-  /** Bridge decks (triangle positions), drawn in plank colour. */
-  decks: number[]
+  /** Road stairs where a road steps down a level: built as ground (ground.ts `hexStructures`). */
+  stairs: HexWalkway[]
+  /** Bridges over the rivers: built as ground (ground.ts `hexStructures`). */
+  bridges: HexBridge[]
+  /** Metres per height level this world was built with. */
+  step: number
   /** The island's ground height at a point (the top of the tile under it; 0 off the island). */
   heightAt(x: number, z: number): number
-  /** A walker's height on a road step's stairs at (x, z), or null off every stair. */
+  /** A walker's height on a road step's stairs or a bridge's deck at (x, z), or null off them. */
   stairAt(x: number, z: number): number | null
   stats: { tiles: number; pieces: number; prefabs: Record<string, number> }
 }
@@ -116,13 +152,14 @@ const BY_USE: Record<string, string> = {
   dock: "dock",
 }
 
-export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
+export function hexWorld(h: HexIsland, z: HexZones, opts: { step?: number } = {}): HexWorld {
+  const STEP = opts.step ?? LEVEL_STEP
   const g = h.grid
   const R = HEX_TILE_SIZE
   const tiles: HexWorldTile[] = []
   const pieces: HexWorld["pieces"] = []
   const paths: number[] = []
-  const decks: number[] = []
+  const bridges: HexBridge[] = []
   const prefabs: Record<string, number> = {}
   const seed = h.spec.seed
   const at = (i: number): [number, number] => {
@@ -132,9 +169,9 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
   const top = (i: number) => {
     const k = kindOf(h, i)
     const L = Math.max(0, h.level[i]!)
-    if (k === "lake" || k === "river") return 0.35 + L * LEVEL_STEP - 0.45
+    if (k === "lake" || k === "river") return 0.35 + L * STEP - 0.45
     if (k === "sea" || k === "shallows") return -0.6
-    return 0.35 + L * LEVEL_STEP
+    return 0.35 + L * STEP
   }
   const roadLike = (i: number) => {
     const u = useOf(z, i)
@@ -172,16 +209,18 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
       link(r.tiles[k - 1]!, r.tiles[k]!)
       link(r.tiles[k]!, r.tiles[k - 1]!)
     }
-  const stairs: {
-    mx: number
-    mz: number
-    ux: number
-    uz: number
-    run: number
-    top: number
-    bot: number
-    half: number
-  }[] = []
+  const stairs: HexWalkway[] = []
+  /** A bridge tile's deck at its centre: its banks' road height, as the walk graph lays it (walk.ts). */
+  const deckY = (i: number): number => {
+    let bank = 0
+    let n = 0
+    for (const j of links.get(i) ?? []) {
+      if (useOf(z, j) === "bridge") continue
+      bank += Math.max(0, top(j))
+      n++
+    }
+    return (n ? bank / n : Math.max(0, top(i)) + 0.4) + DECK_LIFT
+  }
   const byTile = new Map<number, number>()
   for (let i = 0; i < g.size; i++) {
     const k = kindOf(h, i)
@@ -197,6 +236,8 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
     else if (k === "rock") ground = "rock"
     else if (k === "cliff") ground = "cliff"
     let prefab: string | null = null
+    let pathSides: number[] | undefined
+    let door: number | undefined
     let rot = rotOf(Math.floor(hash2(seed + 3, g.q[i]!, g.r[i]!) * 6))
     const pick = (list: string[]) =>
       list[Math.floor(hash2(seed + 5, g.q[i]!, g.r[i]!) * list.length) % list.length]!
@@ -208,7 +249,8 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
         )
         prefab = pick(d <= 3 ? TOWN_HEART : byWater ? TOWN_WATER : TOWN_EDGE)
       } else prefab = pick(BUILDS[zone?.kind ?? "town"] ?? BUILDS.town!)
-      rot = rotOf(facing(i))
+      door = facing(i)
+      rot = rotOf(door)
     } else if (u === "landmark") prefab = "castle"
     else if (zone?.kind === "castle" && (u === "yard" || u === "garden" || u === "well" || u === "market")) {
       // the castle's other tiles are its wards, inside the curtain wall
@@ -226,6 +268,7 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
       if (prefab === "well-square" && sides.length >= 2) {
         prefab = null
         paths.push(...tilePath([x, zz], t + 0.07, sides, 1.1))
+        pathSides = sides
         const free = [0, 1, 2, 3, 4, 5].filter((d) => !sides.includes(d))
         // the free side furthest from every street: the middle of the widest gap
         const d = free.length ? free[Math.floor(free.length / 2)]! : 0
@@ -254,64 +297,61 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
       const nb = g.neighbours(i)
       // a path only toward the tiles its own roads run on to: no web where two roads lie side by side
       const sides = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! >= 0 && (links.get(i)?.has(nb[d]!) ?? false))
+      const e = (HEX_TILE_SIZE * Math.sqrt(3)) / 2
       if (u === "road") {
-        paths.push(...tilePath([x, zz], t + 0.07, sides.length ? sides : [0, 3]))
-        // stairs down every side where the road steps to a lower road tile: from the shared edge out over
-        // the lower tile, as long as the drop is deep (≈ 37°)
+        const legs = sides.length ? sides : [0, 3]
+        paths.push(...tilePath([x, zz], t + 0.07, legs))
+        pathSides = legs
+        // stairs down every side where the road steps to a lower road tile: built into the ground from the
+        // shared edge straight out along the lower tile's road strip (never across a hex edge), one stone
+        // step per ~17 cm of drop, about 36° steep
         for (const d of sides) {
           const j = nb[d]!
           const drop = t - top(j)
-          if (drop < 0.3) continue
+          // a bridge's deck meets the bank's road at its own height: no stairs onto it
+          if (drop < 0.3 || useOf(z, j) === "bridge") continue
           const a = (Math.PI / 180) * (60 * d)
           const ux = Math.cos(a)
           const uz = -Math.sin(a)
-          const e = (HEX_TILE_SIZE * Math.sqrt(3)) / 2
-          const mx = x + ux * e
-          const mz = zz + uz * e
-          const run = drop * 1.35
-          stairs.push({ mx, mz, ux, uz, run, top: t, bot: top(j), half: 0.95 })
-          // KayKit's wide stone stairs climb toward their -z: turned to climb back toward the upper tile,
-          // scaled so their 5.1 m rise matches the drop
-          const k = drop / 5.1
-          pieces.push({
-            piece: "kaykit-dungeon/stairs-wide",
-            x: mx + ux * run * 0.5,
-            y: top(j),
-            z: mz + uz * run * 0.5,
-            rot: Math.atan2(ux, uz),
-            scale: k,
+          const run = Math.min(e * 0.8, drop * 1.35)
+          stairs.push({
+            kind: "stairs",
+            ax: x + ux * e,
+            az: zz + uz * e,
+            ay: t,
+            bx: x + ux * (e + run),
+            bz: zz + uz * (e + run),
+            by: top(j),
+            half: 0.95,
+            steps: Math.max(2, Math.round(drop / 0.17)),
           })
         }
       } else {
-        // a wooden bridge: a plank deck from the centre out through each side its road crosses, at the banks'
-        // height, so it meets the road strips on both banks exactly; rails along both sides of each leg
-        let bank = 0
-        let n = 0
-        for (const d of sides) {
-          const j = nb[d]!
-          if (j >= 0) {
-            bank += top(j)
-            n++
-          }
-        }
-        bank = n ? bank / n : t + 0.4
+        // a wooden bridge: a plank deck from the centre out through each side its road crosses, from bank to
+        // bank (each leg runs a little onto its bank's road), sloping between the banks' heights; posts and
+        // rails are built with it (ground.ts `hexStructures`)
         const legs = sides.length ? sides : [0, 3]
-        decks.push(...tilePath([x, zz], bank + 0.08, legs, 0.95))
+        const mid = deckY(i)
+        const bridge: HexBridge = { tile: i, legs: [], bed: t - 0.6 }
         for (const d of legs) {
+          const j = nb[d]!
           const a = (Math.PI / 180) * (60 * d)
           const ux = Math.cos(a)
           const uz = -Math.sin(a)
-          for (const side of [-1, 1])
-            for (const f of [0.35, 0.75])
-              pieces.push({
-                piece: "kenney-nature/fence-simple",
-                x: x + ux * HEX_TILE_SIZE * f * 0.87 - uz * side * 1.05,
-                y: bank + 0.08,
-                z: zz + uz * HEX_TILE_SIZE * f * 0.87 + ux * side * 1.05,
-                rot: Math.atan2(ux, uz) + Math.PI / 2,
-                scale: 0.32,
-              })
+          const onto = j >= 0 && useOf(z, j) === "bridge"
+          const reach = onto ? e : e + 0.45
+          bridge.legs.push({
+            kind: "deck",
+            ax: x,
+            az: zz,
+            ay: mid,
+            bx: x + ux * reach,
+            bz: zz + uz * reach,
+            by: onto ? (mid + deckY(j)) / 2 : j >= 0 ? Math.max(0, top(j)) + DECK_LIFT : mid,
+            half: 1,
+          })
         }
+        bridges.push(bridge)
       }
     } else if (u === "dock") {
       prefab = "dock"
@@ -323,7 +363,10 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
       rot = rotOf(d ?? 4)
     } else if (BY_USE[u]) {
       prefab = BY_USE[u]!
-      if (prefab === "farmstead" || prefab === "market" || prefab === "windmill") rot = rotOf(facing(i))
+      if (prefab === "farmstead" || prefab === "market" || prefab === "windmill") {
+        door = facing(i)
+        rot = rotOf(door)
+      }
     } else if (k === "forest") prefab = "woods"
     else if (k === "rock") prefab = "rocky"
     else if (k === "sand") prefab = "beach"
@@ -367,7 +410,16 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
       if (u === "road") ground = "paved"
     }
     byTile.set(i, tiles.length)
-    tiles.push({ i, x, z: zz, top: k === "shallows" ? -0.4 : t, ground, prefab })
+    tiles.push({
+      i,
+      x,
+      z: zz,
+      top: k === "shallows" ? -0.4 : t,
+      ground,
+      prefab,
+      ...(pathSides ? { paths: pathSides } : {}),
+      ...(door !== undefined ? { door } : {}),
+    })
   }
   const heightAt = (x: number, zz: number): number => {
     // pixel → axial (pointy top), cube rounding
@@ -386,21 +438,27 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
     const k = i >= 0 ? byTile.get(i) : undefined
     return k === undefined ? 0 : Math.max(0, tiles[k]!.top)
   }
+  const walkways = [...stairs, ...bridges.flatMap((b) => b.legs)]
   return {
     tiles,
     pieces,
     paths,
-    decks,
+    stairs,
+    bridges,
+    step: STEP,
     heightAt,
     stairAt(px: number, pz: number) {
-      for (const st of stairs) {
-        const dx = px - st.mx
-        const dz = pz - st.mz
-        const along = dx * st.ux + dz * st.uz
-        if (along < -0.05 || along > st.run + 0.05) continue
-        if (Math.abs(dx * -st.uz + dz * st.ux) > st.half + 0.4) continue
-        const f = Math.min(1, Math.max(0, along / st.run))
-        return st.top + (st.bot - st.top) * f
+      for (const st of walkways) {
+        const lx = st.bx - st.ax
+        const lz = st.bz - st.az
+        const len = Math.hypot(lx, lz)
+        const dx = px - st.ax
+        const dz = pz - st.az
+        const along = (dx * lx + dz * lz) / len
+        if (along < -0.05 || along > len + 0.05) continue
+        if (Math.abs((dx * -lz + dz * lx) / len) > st.half + (st.kind === "stairs" ? 0.4 : 0.05)) continue
+        const f = Math.min(1, Math.max(0, along / len))
+        return st.ay + (st.by - st.ay) * f
       }
       return null
     },

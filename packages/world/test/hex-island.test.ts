@@ -26,6 +26,18 @@ describe("hex island", () => {
     expect(landTiles(1e6)).toBe(2800)
   })
 
+  test("every island has a lake of several tiles, and a bigger island keeps it", () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const mid = hexIsland({ seed, files: 1500 })
+      const big = hexIsland({ seed, files: 8000 })
+      const lake = (h: typeof mid) => [...h.kind.keys()].filter((i) => kindOf(h, i) === "lake")
+      expect(lake(mid).length).toBeGreaterThanOrEqual(5)
+      const kept = new Set(lake(big))
+      // the nature lake (most of mid's lake tiles) is lake in the bigger island too
+      expect(lake(mid).filter((i) => kept.has(i)).length).toBeGreaterThanOrEqual(5)
+    }
+  })
+
   test("stable growth: every land tile of a smaller island is land in a bigger one", () => {
     for (const seed of [1, 2, 3]) {
       const small = hexIsland({ seed, files: 600 })

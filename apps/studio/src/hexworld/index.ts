@@ -5,7 +5,8 @@
  * the post pipeline grades it (bloom, ink, mood LUT, vignette, SMAA), and the opening camera sees the sun
  * from the side so the shadows read.
  * `?files=` sizes the island like a repo of that many files; `?hour=`, `?az=`, `?shadow=`, `?fill=`,
- * `?post=0` and `?aa=msaa|none` are for comparisons.
+ * `?post=0` and `?aa=msaa|none` are for comparisons; `?step=` tries another height per level (metres,
+ * default LEVEL_STEP) and `?detail=0` shows the ground without its painted small hexes and speckle.
  */
 import type { CameraPose } from "@guildhall/core"
 import { log } from "@guildhall/core"
@@ -32,7 +33,18 @@ import {
   type TerrainMesh,
   type Water,
 } from "@guildhall/render"
-import { HEX_TILE_SIZE, hexGroundFine, hexGroundMesh, hexIsland, hexWorld, hexZones } from "@guildhall/world"
+import {
+  HEX_TILE_SIZE,
+  hexCentre,
+  hexGroundFine,
+  hexGroundMesh,
+  hexIsland,
+  hexStructures,
+  hexWorld,
+  hexZones,
+  kindOf,
+  LEVEL_STEP,
+} from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
 import { worldCamera } from "../shell/worldCamera.ts"
@@ -66,6 +78,8 @@ const SURFACE_DROP = 0.14
 const SEA_LEVEL = -0.05
 const SHORE_REACH = 9
 const SHORE_TEXEL = 0.2
+/** How fast a river runs, metres a second. */
+const RIVER_SPEED = 0.9
 /**
  * The camera's azimuth (degrees) that sees the sun from the side and a little ahead, `SUN_SIDE`
  * degrees off the way it looks: shadows fall across the view toward the camera, as in V1.
@@ -113,7 +127,7 @@ export const hexWorldScreen: Screen = {
       const t0 = performance.now()
       const h = hexIsland({ seed, files })
       const z = hexZones(h)
-      const w = hexWorld(h, z)
+      const w = hexWorld(h, z, { step: num("step", LEVEL_STEP) })
       const R = HEX_TILE_SIZE
       let groundAt = (x: number, zz: number) => w.heightAt(x, zz)
       // Inland water (lakes, rivers, docks above the sea): a bed sunk under the tile and a surface over it.
@@ -144,8 +158,16 @@ export const hexWorldScreen: Screen = {
         meshes.push(createVertexMesh(stage, m.position, m.color))
       } else {
         // fine ground: small hexes, low terraces on the hills, land falling to the shore; nature stands on it
-        const m = hexGroundFine(h, sunk, { top: TOP, side: SIDE, sideLand: SIDE_LAND, slope: TOP.sand! })
-        meshes.push(createVertexMesh(stage, m.position, m.color))
+        const detail = ctx.query.get("detail") !== "0"
+        const m = hexGroundFine(
+          h,
+          sunk,
+          { top: TOP, side: SIDE, sideLand: SIDE_LAND, slope: TOP.sand! },
+          3,
+          -2.5,
+          detail,
+        )
+        meshes.push(createVertexMesh(stage, m.position, m.color, { speckle: detail }))
         for (const p of w.pieces) {
           const y = m.heightAt(p.x, p.z)
           if (y > 0 && Math.abs(y - p.y) < 3) p.y = y
@@ -153,7 +175,9 @@ export const hexWorldScreen: Screen = {
         groundAt = m.heightAt
       }
       if (w.paths.length) meshes.push(createSurface(stage, new Float32Array(w.paths), "#d9c08c"))
-      if (w.decks.length) meshes.push(createSurface(stage, new Float32Array(w.decks), "#9a6a3c"))
+      // stone stairs where roads step down, plank bridges over the rivers: built like the ground
+      const built = hexStructures(w, seed)
+      if (built.position.length) meshes.push(createVertexMesh(stage, built.position, built.color))
       let span = 0
       for (const t of w.tiles) span = Math.max(span, Math.abs(t.x), Math.abs(t.z))
       span += R * 4
@@ -175,6 +199,15 @@ export const hexWorldScreen: Screen = {
       }
       for (const t of w.tiles) if (t.ground !== "water") land.add(axial(t.x, t.z))
       const half = span
+      // a river runs downhill along its course: toward the tile it drains into
+      const flowOf = (i: number): [number, number] | undefined => {
+        const d = h.down[i]!
+        if (kindOf(h, i) !== "river" || d < 0) return undefined
+        const [ax, az] = hexCentre({ q: h.grid.q[i]!, r: h.grid.r[i]! })
+        const [bx, bz] = hexCentre({ q: h.grid.q[d]!, r: h.grid.r[d]! })
+        const l = Math.hypot(bx - ax, bz - az) || 1
+        return [((bx - ax) / l) * RIVER_SPEED, ((bz - az) / l) * RIVER_SPEED]
+      }
       const tf = performance.now()
       const field = bakeShoreField({
         min: [-half, -half],
@@ -187,7 +220,10 @@ export const hexWorldScreen: Screen = {
       water = createFieldWater(stage, {
         field,
         sea: { level: SEA_LEVEL, half: span * 3 },
-        pools: { size: R * 1.01, tiles: pools.map((t) => ({ x: t.x, z: t.z, y: t.top - SURFACE_DROP })) },
+        pools: {
+          size: R * 1.01,
+          tiles: pools.map((t) => ({ x: t.x, z: t.z, y: t.top - SURFACE_DROP, flow: flowOf(t.i) })),
+        },
       })
       disposeField = () => field.dispose()
       const hour = num("hour", 15.5)

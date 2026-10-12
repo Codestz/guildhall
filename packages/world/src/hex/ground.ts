@@ -6,7 +6,7 @@
  * the edge becomes a sand slope running down under the water, so the coast reads as a beach, not a cut;
  * high land meets the sea as a cliff down to the island's base.
  */
-import { fbm } from "../geom/noise.ts"
+import { fbm, hash2 } from "../geom/noise.ts"
 import type { HexIsland } from "./island.ts"
 import { HEX_TILE_SIZE } from "./tiles.ts"
 import type { HexWorld } from "./world.ts"
@@ -123,6 +123,128 @@ export function hexGroundMesh(h: HexIsland, w: HexWorld, pal: GroundPalette, bas
   return { position: new Float32Array(pos), color: new Float32Array(col) }
 }
 
+/** Tiles under trees: the grass there is darker and bluer. */
+const SHADED = new Set<string | null>(["woods", "pines", "hunter", "lumber"])
+/** Open grass that takes lighter, sunnier patches. */
+const OPEN = new Set([null, "meadow", "pasture", "orchard", "hillside", "shepherd", "homestead"])
+const DIRT: RGB = [170, 140, 96]
+const DEEP_GRASS: RGB = [70, 112, 46]
+const SUN_GRASS: RGB = [150, 178, 78]
+const DAMP: RGB = [92, 120, 58]
+
+type Cell = { x: number; z: number; y: number; t: HexWorld["tiles"][number] }
+
+const mix = (a: RGB, b: RGB, f: number): RGB => [
+  a[0] + (b[0] - a[0]) * f,
+  a[1] + (b[1] - a[1]) * f,
+  a[2] + (b[2] - a[2]) * f,
+]
+
+/** Squared distance from (px, pz) to the segment a→b. */
+const segment2 = (px: number, pz: number, ax: number, az: number, bx: number, bz: number) => {
+  const lx = bx - ax
+  const lz = bz - az
+  const f = Math.max(0, Math.min(1, ((px - ax) * lx + (pz - az) * lz) / (lx * lx + lz * lz || 1)))
+  const dx = px - ax - lx * f
+  const dz = pz - az - lz * f
+  return dx * dx + dz * dz
+}
+
+/**
+ * Every small hex's own flat colour (decisions.md "Polish round": a varied ground that keeps the low-poly
+ * feel): a small per-hex shift in tone and hue, darker grass under woods, sunny patches in the open, worn
+ * dirt along the paths and before the doors, damp grass on the banks, and a blended hex wherever two
+ * grounds meet (sand into grass, gravel round rock), so no seam is a hard cut.
+ */
+function groundPaint(
+  h: HexIsland,
+  w: HexWorld,
+  pal: GroundPalette,
+  cells: Map<string, Cell>,
+  seed: number,
+): Map<string, RGB> {
+  const g = h.grid
+  const R = HEX_TILE_SIZE
+  const e = (R * Math.sqrt(3)) / 2
+  const tileOf = new Map<number, HexWorld["tiles"][number]>()
+  for (const t of w.tiles) tileOf.set(t.i, t)
+  const out = new Map<string, RGB>()
+  const base = new Map<string, RGB>()
+  for (const [key, c] of cells) base.set(key, pal.top[c.t.ground] ?? pal.top.grass!)
+  const STEP6: [number, number][] = [
+    [1, 0],
+    [0, 1],
+    [-1, 1],
+    [-1, 0],
+    [0, -1],
+    [1, -1],
+  ]
+  for (const [key, c] of cells) {
+    const [q, rr] = key.split(",").map(Number) as [number, number]
+    let col = base.get(key)!
+    const grass = c.t.ground === "grass"
+    // every small hex a touch apart from its neighbours: lighter or darker, a little yellower or bluer
+    const v = hash2(seed + 91, q, rr) - 0.5
+    const hue = hash2(seed + 93, q, rr) - 0.5
+    col = [
+      col[0] * (1 + 0.07 * v) + 14 * hue,
+      col[1] * (1 + 0.07 * v) + 4 * hue,
+      col[2] * (1 + 0.07 * v) - 6 * hue,
+    ]
+    if (grass) {
+      if (SHADED.has(c.t.prefab)) col = mix(col, DEEP_GRASS, 0.5)
+      else if (OPEN.has(c.t.prefab)) {
+        const patch = fbm(seed + 95, c.x / 9, c.z / 9, 2)
+        if (patch > 0.12) col = mix(col, SUN_GRASS, Math.min(0.55, (patch - 0.12) * 2.4))
+      }
+    }
+    // worn ground beside the paths and before the doors (the road strip itself is drawn over it)
+    if (c.t.ground !== "water" && c.t.ground !== "rock" && c.t.ground !== "cliff") {
+      let near = 9
+      const around = [c.t.i, ...g.neighbours(c.t.i)]
+      for (const i of around) {
+        const t = i >= 0 ? tileOf.get(i) : undefined
+        if (!t) continue
+        for (const d of t.paths ?? []) {
+          const a = (Math.PI / 180) * (60 * d)
+          near = Math.min(near, segment2(c.x, c.z, t.x, t.z, t.x + Math.cos(a) * e, t.z - Math.sin(a) * e))
+        }
+        if (t.door !== undefined && i === c.t.i) {
+          const a = (Math.PI / 180) * (60 * t.door)
+          const dx = c.x - (t.x + Math.cos(a) * e * 0.8)
+          const dz = c.z - (t.z - Math.sin(a) * e * 0.8)
+          near = Math.min(near, (dx * dx + dz * dz) * 0.7)
+        }
+      }
+      const d = Math.sqrt(near)
+      if (d < 2.2) col = mix(col, DIRT, 0.42 * (1 - d / 2.2) + 0.08 * hash2(seed + 99, q, rr))
+    }
+    // where grounds meet, a hex takes some of the other ground: sand into grass, gravel round rock,
+    // damp grass on a bank
+    if (c.t.ground !== "water") {
+      let n = 0
+      let sum: RGB = [0, 0, 0]
+      let wet = false
+      for (const [sq, sr] of STEP6) {
+        const nk = `${q + sq},${rr + sr}`
+        const o = cells.get(nk)
+        if (!o || o.t.ground === c.t.ground) continue
+        if (o.t.ground === "water") {
+          wet = true
+          continue
+        }
+        const b = base.get(nk)!
+        sum = [sum[0] + b[0], sum[1] + b[1], sum[2] + b[2]]
+        n++
+      }
+      if (n) col = mix(col, [sum[0] / n, sum[1] / n, sum[2] / n], 0.3)
+      if (wet && grass) col = mix(col, DAMP, 0.35)
+    }
+    out.set(key, col)
+  }
+  return out
+}
+
 /** Tiles whose ground may bend into small terraces (nature); everything else stays flat at its tile's top. */
 const SOFT = new Set([
   null,
@@ -156,11 +278,13 @@ export function hexGroundFine(
   pal: GroundPalette,
   sub = 3,
   base = -2.5,
+  /** Paint every small hex its own colour (groundPaint); off, the plain tile colours (for comparisons). */
+  paint = true,
 ): HexFineGround {
   const g = h.grid
   const R = HEX_TILE_SIZE
   const r = R / sub
-  const step = 0.37
+  const step = (w.step ?? 0.8) / 3
   const seed = h.spec.seed
   const tileOf = new Map<number, (typeof w.tiles)[number]>()
   for (const t of w.tiles) tileOf.set(t.i, t)
@@ -277,9 +401,10 @@ export function hexGroundFine(
     [0, -1],
     [1, -1],
   ]
+  const painted = paint ? groundPaint(h, w, pal, cells, seed) : new Map<string, RGB>()
   for (const [key, c] of cells) {
     const [q, rr] = key.split(",").map(Number) as [number, number]
-    const top = pal.top[c.t.ground] ?? pal.top.grass!
+    const top = painted.get(key) ?? pal.top[c.t.ground] ?? pal.top.grass!
     // grass on a soft tile tints a little lighter as it climbs
     const lift = soft(c.t) ? 1 + Math.min(0.08, (c.y - c.t.top) * 0.03) : 1
     const P = corners.map(([dx, dz]) => [c.x + dx, c.z + dz] as const)

@@ -1,16 +1,79 @@
 /**
  * A ready-made triangle mesh (positions + sRGB vertex colours, flat-shaded) in the palette material, so it
  * takes the cascaded sun like every placed piece: what a world builder hands render as plain arrays.
+ * `{ speckle: true }` draws it in the ground material instead: the same light, plus clover and drifts of
+ * small flowers dotted over the green from a cheap world-space hash (no textures, the low-poly feel kept).
  */
-import { BufferAttribute, BufferGeometry, Color, Mesh, SRGBColorSpace } from "three"
+import { BufferAttribute, BufferGeometry, Color, Mesh, MeshStandardMaterial, SRGBColorSpace } from "three"
+import { patchCloudShade } from "./atmosphere/shade.ts"
 import { paletteMaterial } from "./material.ts"
 import type { Stage } from "./stage.ts"
+import { patchCascades } from "./sun/patch.ts"
 import type { TerrainMesh } from "./terrain.ts"
+
+const SPECKLE_VERTEX = /* glsl */ `#include <begin_vertex>
+vSpeckleAt = (modelMatrix * vec4(transformed, 1.0)).xyz;
+vSpeckleUp = normalize(mat3(modelMatrix) * objectNormal).y;`
+
+const SPECKLE_FRAGMENT = /* glsl */ `#include <color_fragment>
+{
+	// one dot per 0.3 m cell at most, jittered in it; only on upward green faces, faded out where a cell
+	// shrinks under a pixel (no shimmer from afar)
+	vec2 sp = vSpeckleAt.xz / 0.3;
+	vec2 cell = floor(sp);
+	float h = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
+	vec2 jit = vec2(fract(h * 17.31), fract(h * 31.17)) - 0.5;
+	float d = length(fract(sp) - 0.5 - jit * 0.5);
+	vec3 c = diffuseColor.rgb;
+	float green = step(c.r * 1.05, c.g) * step(c.b * 1.5, c.g);
+	float near = 1.0 - smoothstep(0.12, 0.35, length(fwidth(sp)));
+	float up = smoothstep(0.92, 0.99, vSpeckleUp);
+	// flowers come in drifts: a coarse cell decides whether this patch flowers
+	float drift = fract(sin(dot(floor(vSpeckleAt.xz / 4.0), vec2(269.5, 183.3))) * 43758.5453);
+	float k = green * near * up;
+	if (k > 0.0) {
+		if (h > 0.9 && drift > 0.55) {
+			float pick = fract(h * 53.7);
+			vec3 petal = pick < 0.35 ? vec3(0.95, 0.93, 0.85) : pick < 0.65 ? vec3(0.98, 0.82, 0.25) : pick < 0.85 ? vec3(0.93, 0.52, 0.62) : vec3(0.62, 0.52, 0.9);
+			diffuseColor.rgb = mix(c, petal, k * (1.0 - smoothstep(0.08, 0.13, d)));
+		} else if (h < 0.22) {
+			diffuseColor.rgb = mix(c, c * vec3(0.8, 0.86, 0.78), k * (1.0 - smoothstep(0.14, 0.22, d)));
+		}
+	}
+}`
+
+let ground: MeshStandardMaterial | null = null
+
+/** The ground's material: the palette material's light and shadows plus the speckle. Shared. */
+function groundMaterial(): MeshStandardMaterial {
+  if (!ground) {
+    ground = new MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 })
+    ground.onBeforeCompile = (shader) => {
+      patchCascades(shader)
+      patchCloudShade(shader)
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          "#include <common>",
+          "#include <common>\nvarying vec3 vSpeckleAt;\nvarying float vSpeckleUp;",
+        )
+        .replace("#include <begin_vertex>", SPECKLE_VERTEX)
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          "#include <common>",
+          "#include <common>\nvarying vec3 vSpeckleAt;\nvarying float vSpeckleUp;",
+        )
+        .replace("#include <color_fragment>", SPECKLE_FRAGMENT)
+    }
+    ground.customProgramCacheKey = () => "guildhall-ground"
+  }
+  return ground
+}
 
 export function createVertexMesh(
   stage: Pick<Stage, "scene">,
   position: Float32Array,
   srgb: Float32Array,
+  opts: { speckle?: boolean } = {},
 ): TerrainMesh {
   const color = new Float32Array(srgb.length)
   const c = new Color()
@@ -24,7 +87,7 @@ export function createVertexMesh(
   geometry.setAttribute("position", new BufferAttribute(position, 3))
   geometry.setAttribute("color", new BufferAttribute(color, 3))
   geometry.computeVertexNormals()
-  const mesh = new Mesh(geometry, paletteMaterial())
+  const mesh = new Mesh(geometry, opts.speckle ? groundMaterial() : paletteMaterial())
   mesh.receiveShadow = true
   mesh.castShadow = true
   stage.scene.add(mesh)

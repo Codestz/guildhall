@@ -1,6 +1,5 @@
 import { PALETTE } from "@guildhall/assets"
 import { log } from "@guildhall/core"
-import { type TownDraw, type WaterGeometry, waterGeometry } from "@guildhall/world"
 import {
   BufferAttribute,
   BufferGeometry,
@@ -15,8 +14,6 @@ import { ATMOSPHERE, patchCloudShade } from "./atmosphere/shade.ts"
 import type { ShoreField } from "./shoreField.ts"
 import type { Stage } from "./stage.ts"
 import { patchCascades } from "./sun/patch.ts"
-
-export type WaterDraw = TownDraw["water"]
 
 /**
  * V1's water (legacy/packages/hall/src/scene/nature/waterNodes.ts) measured its shore distances in its
@@ -82,6 +79,7 @@ float cloudShade() { return 1.0; }
 varying float vShore;
 varying float vInland;
 varying vec3 vWater;
+varying vec2 vFlow;
 
 float waterHash( vec2 p ) {
 	p = fract( p * vec2( 0.1031, 0.1030 ) );
@@ -185,11 +183,19 @@ function patchWater(
   shader.vertexShader = shader.vertexShader
     .replace(
       "#include <common>",
-      `#include <common>\nattribute float shore;\nattribute float inland;\nvarying float vShore;\nvarying float vInland;\nvarying vec3 vWater;`,
+      `#include <common>\nattribute float shore;\nattribute float inland;\nattribute vec2 flow;\nuniform float uTime;\nvarying float vShore;\nvarying float vInland;\nvarying vec3 vWater;\nvarying vec2 vFlow;`,
     )
     .replace(
       "#include <begin_vertex>",
-      "#include <begin_vertex>\nvShore = shore;\nvInland = inland;\nvWater = (modelMatrix * vec4(position, 1.0)).xyz;",
+      /* glsl */ `#include <begin_vertex>
+vShore = shore;
+vInland = inland;
+vFlow = flow;
+// a gentle bob: the sea rises and falls as one (its few vertices span the world), inland water swells
+// across its surface (the same at a shared corner, so pools never crack apart)
+float bobPhase = inland > 0.5 ? dot(position.xz, vec2(0.37, 0.23)) : 0.0;
+transformed.y += (inland > 0.5 ? 0.018 : 0.05) * (0.6 * sin(uTime * 1.1 + bobPhase) + 0.4 * sin(uTime * 0.7 - bobPhase * 1.7));
+vWater = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
     )
   shader.fragmentShader = shader.fragmentShader
     .replace("#include <dithering_pars_fragment>", () => `#include <dithering_pars_fragment>\n${PARS}`)
@@ -213,7 +219,34 @@ vec2 wSlope = waveSlope(vWorld, uTime) * mix(1.0, 0.5, smoothstep(40.0, 300.0, w
 // V1's broad swell: a slow, large noise that still reads as streaks from the whole-island view.
 vec2 wBroad = vWorld * 0.09 + vec2(0.05, 0.03) * uTime;
 wSlope += 0.1 * noiseSlope(wBroad) * (1.0 - smoothstep(0.3, 0.7, length(fwidth(wBroad))));
-wSlope *= wInland ? 0.6 : 1.0;
+// Inland water moves too: a river's ripples and foam streaks travel down its course (vFlow, metres a
+// second), read through two half-cycle phases of a flow map so they never smear where the course bends;
+// a lake keeps the wind's drift.
+float wStreak = 0.0;
+float wSpeed = length(vFlow);
+if (wInland && wSpeed > 0.02) {
+	vec2 wDir = vFlow / wSpeed;
+	vec2 wAcross = vec2(-wDir.y, wDir.x);
+	float wCycle = uTime * 0.4;
+	float wPh0 = fract(wCycle);
+	float wPh1 = fract(wCycle + 0.5);
+	float wMix = abs(2.0 * wPh0 - 1.0);
+	// the flow's own frame, stretched along it so ripples and streaks lie with the current
+	vec2 wF = vec2(dot(vWorld, wDir), dot(vWorld, wAcross));
+	float wRun = wSpeed / 0.4;
+	vec2 wR0 = noiseSlope(wF * vec2(0.7, 1.9) - vec2(wPh0 * wRun * 0.7, 0.0));
+	vec2 wR1 = noiseSlope(wF * vec2(0.7, 1.9) - vec2(wPh1 * wRun * 0.7, 0.0) + vec2(3.7, 1.3));
+	vec2 wR = mix(wR0, wR1, wMix);
+	wSlope = wSlope * 0.35 + 0.07 * (wDir * wR.x * 0.7 + wAcross * wR.y * 1.9);
+	float wS0 = waterNoise(wF * vec2(0.9, 3.6) - vec2(wPh0 * wRun * 0.9, 0.0));
+	float wS1 = waterNoise(wF * vec2(0.9, 3.6) - vec2(wPh1 * wRun * 0.9, 0.0) + vec2(7.1, 2.9));
+	float wS = mix(wS0, wS1, wMix);
+	wStreak = smoothstep(0.7, 0.9, wS) * (0.45 + 0.55 * (1.0 - smoothstep(0.2, 1.4, wD))) * min(1.0, wSpeed * 1.2);
+} else if (wInland) {
+	// a lake: wind ripples drifting one way
+	vec2 wL = vWorld * 0.8 + vec2(0.23, 0.11) * uTime;
+	wSlope = wSlope * 0.6 + 0.035 * noiseSlope(wL) * (1.0 - smoothstep(0.25, 0.6, length(fwidth(wL))));
+}
 float wBreak = waterNoise(wQ * 0.5 + vec2(uTime * 0.04, 0.0));
 // Body: shallow by the shore, deep further out, stepped through soft toon bands (V1 water v2).
 float wDepth = wInland ? smoothstep(0.3, 2.0, wD) * 0.35 + 0.35 : smoothstep(0.4, 7.5, wD);
@@ -237,13 +270,24 @@ if (wShallow > 0.01) {
 // Foam: a soft rim where the water meets the land, and wave lines rolling in toward the shore.
 float foam = 1.0 - smoothstep(0.05, wBreak * 0.35 + 0.55, wD);
 if (!wInland) {
-	float band = fract(wD * 0.42 - uTime * 0.16 + wBreak * 0.9);
+	float band = fract(wD * 0.42 - uTime * 0.22 + wBreak * 0.9);
 	float lines = smoothstep(0.78, 0.93, band) * (1.0 - smoothstep(0.93, 1.0, band));
 	foam = max(foam, lines * (1.0 - smoothstep(0.6, 3.2, wD)) * smoothstep(0.35, 0.65, wBreak + 0.25));
-} else foam *= 0.8;
+} else {
+	foam *= 0.8;
+	// bubbles drifting along a lake's or river's rim
+	float wDrift = waterNoise(wQ * 2.2 + vec2(uTime * 0.09, -uTime * 0.06));
+	foam = max(foam, smoothstep(0.8, 0.92, wDrift) * (1.0 - smoothstep(0.4, 1.3, wD)) * 0.6);
+}
+foam = max(foam, wStreak * 0.75);
 foam = max(foam, wakeFoam(vWorld));
 foam = clamp(foam, 0.0, 1.0);
 diffuseColor.rgb = mix(diffuseColor.rgb, uFoam, foam * (0.9 - 0.4 * wNight));`,
+    )
+    .replace(
+      "#include <roughnessmap_fragment>",
+      // inland water is small and seen close: a sharp sun highlight blows a whole pool out to white
+      "#include <roughnessmap_fragment>\nif (wInland) roughnessFactor = 0.6;",
     )
     .replace(
       "#include <normal_fragment_maps>",
@@ -263,7 +307,8 @@ if (uReflect > 0.5) {
 	vec2 hit = vWater.xz + rc.xz * (uCloudHeight - vWater.y) / max(rc.y, 0.06);
 	vec2 cuv = (hit - uCloudWindow.xy) * uCloudWindow.zw;
 	if (all(greaterThan(cuv, vec2(0.0))) && all(lessThan(cuv, vec2(1.0))))
-		mirror = mix(mirror, uCloudLit, 0.7 * uCloudReflect * cloudMask(cuv).g);
+		// (inland water mirrors them faintly: a whole cloud in a river reads as snow)
+		mirror = mix(mirror, uCloudLit, 0.7 * uCloudReflect * cloudMask(cuv).g * (wInland ? 0.3 : 1.0));
 	float facing = clamp(dot(n, toEye), 0.0, 1.0);
 	// V1's fresnel: Schlick lifted halfway toward a 0.35 floor, so the sky shows even from above.
 	float schlick = 0.04 + 0.96 * pow(1.0 - facing, 5.0);
@@ -276,10 +321,12 @@ if (uReflect > 0.5) {
 	// The glint path: a broad sheen toward the sun and sparkles where a wave faces it exactly.
 	float toward = max(dot(r, uSunDirection), 0.0);
 	float glint = 0.18 * pow(toward, 60.0) + 2.4 * pow(toward, 900.0);
+	// a river's chop faces the sun at every other ripple: inland, only a few glints, or it reads as snow
+	glint *= wInland ? 0.15 : 1.0;
 	outgoingLight += uSunColor * glint * cloudShade() * (1.0 - foam) * smoothstep(0.0, 0.08, uSunDirection.y);
 	// V1's glints: the key light off the ripples, broken up by a fine noise (bright: the bloom takes them).
 	float wSparkle = waterNoise(wQ * 6.0 + wSlope * 4.0);
-	float spec = pow(max(dot(n, normalize(uSunDirection + toEye)), 0.0), 220.0) * (wSparkle * 1.6 + 0.6);
+	float spec = pow(max(dot(n, normalize(uSunDirection + toEye)), 0.0), 220.0) * (wSparkle * 1.6 + 0.6) * (wInland ? 0.15 : 1.0);
 	outgoingLight += uSunColor * spec * 1.2 * cloudShade() * (1.0 - foam) * smoothstep(0.0, 0.08, uSunDirection.y);
 } else {
 	float level = clamp(dot(inverseTransformDirection(normal, viewMatrix), toEye), 0.0, 1.0);
@@ -296,36 +343,13 @@ export interface Water {
   dispose(): void
 }
 
-/**
- * The water (plan §5): its polygons as one flat mesh at `level`, each vertex carrying its distance to
- * the shore lines; a small patched standard material does the rest (depth tint, foam, ripples, sky
- * fresnel, the sun's glint, and the cascaded shadows of what stands over it). One draw call. Takes
- * the geometry prebuilt (world `waterGeometry`, in a worker) or builds it here from the draw.
- */
-export function createWater(stage: Stage, w: WaterDraw | WaterGeometry): Water {
-  const start = performance.now()
-  const built = "position" in w ? w : waterGeometry(w)
-  const geometry = new BufferGeometry()
-  geometry.setAttribute("position", new BufferAttribute(built.position, 3))
-  geometry.setAttribute("normal", new BufferAttribute(built.normal, 3))
-  geometry.setAttribute("shore", new BufferAttribute(built.shore, 1))
-  geometry.setAttribute("inland", new BufferAttribute(new Float32Array(built.shore.length), 1))
-  geometry.setIndex(new BufferAttribute(built.index, 1))
-  geometry.computeBoundingSphere()
-  const water = waterMesh(stage, geometry, null)
-  logger.info("water", {
-    vertices: built.position.length / 3,
-    triangles: built.index.length / 3,
-    ms: Math.round(performance.now() - start),
-  })
-  return water
-}
-
 /** A pool of water over one hex: its centre and its surface's height. */
 export interface WaterPool {
   x: number
   z: number
   y: number
+  /** Which way and how fast the water runs, metres a second (a river's course; none for a lake). */
+  flow?: [number, number]
 }
 
 export interface FieldWaterOpts {
@@ -349,6 +373,24 @@ export function createFieldWater(stage: Stage, opts: FieldWaterOpts): Water {
   const n = 4 + hexes.length * 7
   const position = new Float32Array(n * 3)
   const inland = new Float32Array(n)
+  const flow = new Float32Array(n * 2)
+  // a corner's flow is the mean of the pools that share it, so the current turns smoothly between hexes
+  const cornerFlow = new Map<string, [number, number, number]>()
+  const key = (x: number, z: number) => `${Math.round(x * 20)},${Math.round(z * 20)}`
+  const size = pools?.size ?? 1
+  const cornerAt = (t: WaterPool, k: number): [number, number] => {
+    const a = (Math.PI / 180) * (60 * k - 30)
+    return [t.x + Math.cos(a) * size, t.z + Math.sin(a) * size]
+  }
+  for (const t of hexes)
+    for (let k = 0; k < 6; k++) {
+      const [x, z] = cornerAt(t, k)
+      const c = cornerFlow.get(key(x, z)) ?? [0, 0, 0]
+      c[0] += t.flow?.[0] ?? 0
+      c[1] += t.flow?.[1] ?? 0
+      c[2]++
+      cornerFlow.set(key(x, z), c)
+    }
   const index: number[] = []
   const h = sea.half
   position.set([
@@ -367,14 +409,16 @@ export function createFieldWater(stage: Stage, opts: FieldWaterOpts): Water {
   ])
   index.push(0, 2, 1, 0, 3, 2)
   let v = 4
-  const size = pools?.size ?? 1
   for (const t of hexes) {
     const c = v
     position.set([t.x, t.y, t.z], v * 3)
+    flow.set(t.flow ?? [0, 0], v * 2)
     inland[v++] = 1
     for (let k = 0; k < 6; k++) {
-      const a = (Math.PI / 180) * (60 * k - 30)
-      position.set([t.x + Math.cos(a) * size, t.y, t.z + Math.sin(a) * size], v * 3)
+      const [x, z] = cornerAt(t, k)
+      position.set([x, t.y, z], v * 3)
+      const f = cornerFlow.get(key(x, z))!
+      flow.set([f[0] / f[2], f[1] / f[2]], v * 2)
       inland[v++] = 1
     }
     for (let k = 0; k < 6; k++) index.push(c, c + 1 + ((k + 1) % 6), c + 1 + k)
@@ -386,6 +430,7 @@ export function createFieldWater(stage: Stage, opts: FieldWaterOpts): Water {
   geometry.setAttribute("normal", new BufferAttribute(normal, 3))
   geometry.setAttribute("shore", new BufferAttribute(new Float32Array(n), 1))
   geometry.setAttribute("inland", new BufferAttribute(inland, 1))
+  geometry.setAttribute("flow", new BufferAttribute(flow, 2))
   geometry.setIndex(index)
   geometry.computeBoundingSphere()
   logger.info("field water", { pools: hexes.length, half: h })

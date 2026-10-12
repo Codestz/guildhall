@@ -95,11 +95,8 @@ export {
   type SunStats,
 } from "./sun/index.ts"
 export {
-  createHeightGround,
   createHexGround,
-  createInlandWater,
   createSurface,
-  type HeightGrid,
   type HexPrism,
   type TerrainMesh,
 } from "./terrain.ts"
@@ -116,11 +113,9 @@ export {
 export { createVertexMesh } from "./vmesh.ts"
 export {
   createFieldWater,
-  createWater,
   type FieldWaterOpts,
   MAX_WAKES,
   type Wake,
   type Water,
-  type WaterDraw,
   type WaterPool,
 } from "./water.ts"

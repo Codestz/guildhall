@@ -37,6 +37,7 @@ export {
   WALK_MPS,
   workTiles,
 } from "./life.ts"
+export { hexStructures } from "./structures.ts"
 export {
   CHARACTER_SCALE,
   castleWalls,
@@ -66,7 +67,14 @@ export {
   type HexWalkNode,
   hexWalk,
 } from "./walk.ts"
-export { type HexWorld, type HexWorldTile, hexWorld, LEVEL_STEP } from "./world.ts"
+export {
+  type HexBridge,
+  type HexWalkway,
+  type HexWorld,
+  type HexWorldTile,
+  hexWorld,
+  LEVEL_STEP,
+} from "./world.ts"
 export {
   type HexRoad,
   type HexZone,

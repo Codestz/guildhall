@@ -51,11 +51,14 @@ export const HEX_ISLAND_DEFAULTS: Required<Omit<HexIslandSpec, "seed">> = {
   coast: 1,
   hills: 5,
   rain: 1,
-  forest: 0.26,
+  forest: 0.21,
 }
 
 /** The grid every island lives on: one size for all, so a tile's coordinates never change as it grows. */
 export const HEX_MAP_RADIUS = 56
+
+/** The nature lake is chosen among this many first-grown land tiles, so every bigger island keeps it. */
+const LAKE_REF = 700
 
 /** Land tiles for a repo of `files` files: 2 × V1's 40 + 13·√files, at most HEX_LAND_MAX. */
 export const HEX_LAND_MAX = 2800
@@ -82,6 +85,8 @@ export interface HexIsland {
   rivers: HexRiver[]
   /** Steps from the sea, per tile (0 on water). */
   coast: Int16Array
+  /** The nature lake's tiles (every island has one; a bigger island keeps it). */
+  lake: number[]
   stats: { land: number; rivers: number; lakes: number; ms: number }
 }
 
@@ -188,6 +193,8 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
     landness[i] = L
   }
   const kind = new Uint8Array(N).fill(K.sea)
+  // each land tile's place in the growth order (-1 for sea): what stays fixed as the island grows
+  const rank = new Int32Array(N).fill(-1)
   // grow the island from the centre, the most land-like tile on its edge first: one fixed order for the
   // seed, so an island of n tiles is the first n tiles of every bigger one (stable growth)
   const target = landTiles(spec.files)
@@ -233,6 +240,7 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
       const i = pop()
       if (g.ring(i) >= radius - 3) continue
       kind[i] = K.grass
+      rank[i] = n
       n++
       for (const j of g.neighbours(i))
         if (j >= 0 && !grown[j]) {
@@ -445,6 +453,54 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
     else if (L >= 3) kind[i] = K.hill
     else kind[i] = fbm(seed + 43, x / 6, y / 6, 2) > 0.2 ? K.meadow : K.grass
   }
+  // ---- 5. the nature lake: every island has one, in the thick of its biggest stretch of woods and meadow ----
+  // Chosen among the first tiles of the growth order only (at most LAKE_REF of them), by size-independent
+  // fields, so a bigger island keeps the same lake (decisions.md "Island size and growth").
+  const natureLake: number[] = []
+  {
+    const ref = Math.min(landCount, LAKE_REF)
+    // nature by the moisture field that grows the woods (step 4), read raw: a tile's coast and height
+    // change as the island grows, this does not
+    const moist = (i: number) => {
+      const [x, y] = at(i)
+      return fbm(seed + 41, x / 13, y / 13, 2)
+    }
+    const fit = (i: number) => rank[i]! >= 0 && rank[i]! < ref * 0.8 && g.ring(i) >= 6
+    let site = -1
+    let best = -1e9
+    for (let i = 0; i < N; i++) {
+      if (!fit(i)) continue
+      // the wettest stretch, two rings round
+      let wild = moist(i)
+      for (const j of g.neighbours(i))
+        if (j >= 0) for (const k of g.neighbours(j)) if (k >= 0) wild += moist(k)
+      const score = wild + hash2(seed + 67, g.q[i]!, g.r[i]!) * 0.5
+      if (score > best) {
+        best = score
+        site = i
+      }
+    }
+    if (site >= 0) {
+      const size = 6 + Math.floor(rnd(90) * 4)
+      const lake = [site]
+      const seen = new Set(lake)
+      for (let k = 0; k < lake.length && lake.length < size; k++)
+        for (const j of g.neighbours(lake[k]!))
+          if (j >= 0 && !seen.has(j) && lake.length < size) {
+            seen.add(j)
+            if (fit(j)) if (hash2(seed + 71, g.q[j]!, g.r[j]!) < 0.85 || k === 0) lake.push(j)
+          }
+      // one flat surface, at the lowest of its tiles
+      let lvl = 127
+      for (const i of lake) lvl = Math.min(lvl, level[i]!)
+      for (const i of lake) {
+        kind[i] = K.lake
+        level[i] = lvl
+      }
+      natureLake.push(...lake)
+      lakes++
+    }
+  }
   // shallows reach a second ring where the sea is calm (round sand)
   const shore = steps(g, (i) => !isSea(i))
   for (let i = 0; i < N; i++)
@@ -465,6 +521,7 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
     down,
     rivers,
     coast,
+    lake: natureLake,
     stats: { land: landCount, rivers: rivers.length, lakes, ms: Math.round(performance.now() - t0) },
   }
 }

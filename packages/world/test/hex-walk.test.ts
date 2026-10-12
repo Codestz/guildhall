@@ -46,8 +46,10 @@ describe("hex walk graph", () => {
   })
 
   test("a route steps only along edges", () => {
-    const { walk } = islands[0]!
-    const path = walk.route(walk.hearts[0]!, walk.hearts[walk.hearts.length - 1]!)!
+    const { z, walk } = islands[0]!
+    // the furthest-down place that has tiles (a place the island had no room for has no heart node)
+    const far = z.zones.findLastIndex((zone) => zone.tiles.length > 0)
+    const path = walk.route(walk.hearts[0]!, walk.hearts[far]!)!
     for (let k = 1; k < path.length; k++)
       expect(
         walk.out[path[k - 1]!]!.some((e) => [walk.edges[e]!.a, walk.edges[e]!.b].includes(path[k]!)),

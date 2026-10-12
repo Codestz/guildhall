@@ -550,10 +550,17 @@ export function hexZones(h: HexIsland): HexZones {
   pick("shrine", (i) =>
     kind(i) === "meadow" || kind(i) === "grass" ? toZone[i]! * 0.6 + h1(4, i) * 3 - toRoad[i]! * 0.3 : -1e9,
   )
+  // the campsite and its fishing spot on the nature lake's shore, near a road (any lake if it has none)
+  const natureLake = new Set(h.lake)
   pick("campsite", (i) => {
     let lake = 0
-    for (const j of g.neighbours(i)) if (j >= 0 && kind(j) === "lake") lake++
-    return lake ? lake + h1(5, i) : -1e9
+    let nature = 0
+    for (const j of g.neighbours(i))
+      if (j >= 0 && kind(j) === "lake") {
+        lake++
+        if (natureLake.has(j)) nature++
+      }
+    return lake ? lake + (nature ? 6 : 0) - Math.min(4, toRoad[i]!) * 0.8 + h1(5, i) : -1e9
   })
   for (let n = 0; n < Math.max(1, Math.round(land / 900)); n++)
     pick("windmill", (i) => {

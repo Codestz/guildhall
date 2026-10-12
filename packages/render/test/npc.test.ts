@@ -19,7 +19,7 @@ import { createCharacter } from "../src/character/load.ts"
 import { dressNpc } from "../src/character/npc.ts"
 
 const ramp = (name: string) => PALETTE.ramps.find((r) => r.name === name)!.tones
-const [TIMBER, THATCH, SKIN] = [ramp("timber"), ramp("thatch"), ramp("sandstone")]
+const [TIMBER, THATCH, SKIN] = [ramp("timber"), ramp("thatch"), ramp("skin")]
 
 /** A two-vertex skinned body part as GLTFLoader hands it over: one cloth vertex, one skin vertex. */
 function part(name: string, skeleton: Skeleton): SkinnedMesh {

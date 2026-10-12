@@ -47,7 +47,7 @@ const farmer = (over: Partial<NpcRecipe> = {}): NpcRecipe => ({
   role: "farmer",
   body: ["kaykit-adventurers/barbarian", "kaykit-adventurers/rogue", "kaykit-adventurers/knight"],
   hide: ["Barbarian_BearHat", "Rogue_Cape"],
-  outfit: { timber: ["timber", "thatch", "terracotta"], sandstone: ["slate"] },
+  outfit: { timber: ["timber", "thatch", "terracotta"], skin: ["slate"] },
   head: { pieces: ["kaykit-tools/hat-straw"], chance: 0.5 },
   hands: { r: ["kaykit-tools/pitchfork", "kaykit-tools/lantern", ""], l: ["", "kaykit-tools/lantern"] },
   activity: { work: "Pickaxing", idle: ["Idle_A", "Idle_B"], walk: "Walking_A" },

@@ -43,6 +43,11 @@ export const BAKE_WEIGHTS: ColourWeights = { l: 1, chroma: 2, hue: 2 }
  * is a colour miss: the piece is flagged `colour-miss` and `colour.map` can pin the source hex.
  */
 export const MISS_THRESHOLD = 0.06
+/**
+ * Palette groups no colour bakes to by nearness. Skin sits beside the sandstone ramp, so by nearness
+ * building stone would bake to it; the character packs pin their skin to it with `colour.map`.
+ */
+export const PIN_ONLY_GROUPS: readonly string[] = ["skin"]
 
 /** Barycentric sample points for `average`: the centroid and six interior points around it. */
 const AVERAGE_POINTS: readonly (readonly [number, number, number])[] = [
@@ -249,10 +254,15 @@ const toByte = (linear: number): number => Math.round(linearToSrgb(Math.min(1, M
 /**
  * Linear RGB (3 floats per entry) → swatch, shade and baked colour. Each source colour is rounded to its
  * sRGB hex first; `map` (source hex → swatch name) wins over the nearest swatch and never counts as a miss.
+ * PIN_ONLY_GROUPS are left out of the nearest search: only a `map` pin reaches them.
  */
 export function bakePalette(rgb: Float32Array, palette: Palette, map: Record<string, string> = {}): Bake {
   if (palette.swatches.length > 256)
     throw new Error("bakePalette: _SWATCH is one byte, but the palette has more than 256 swatches")
+  const open: Palette = {
+    ...palette,
+    swatches: palette.swatches.filter((s) => !PIN_ONLY_GROUPS.includes(s.group)),
+  }
   const pinned = new Map<string, Swatch>()
   for (const [hex, name] of Object.entries(map)) {
     const swatch = palette.swatches.find((s) => s.name === name)
@@ -277,7 +287,7 @@ export function bakePalette(rgb: Float32Array, palette: Palette, map: Record<str
       const lab: Lab = srgbToOklab([(key >> 16) / 255, ((key >> 8) & 255) / 255, (key & 255) / 255])
       const hex = `#${key.toString(16).padStart(6, "0")}`
       const mapped = pinned.get(hex)
-      const swatch = mapped ?? nearestSwatch(lab, palette, BAKE_WEIGHTS).swatch
+      const swatch = mapped ?? nearestSwatch(lab, open, BAKE_WEIGHTS).swatch
       const shade = shadeOf(lab, swatch)
       const baked: Lab = [swatch.lab[0] + shade, swatch.lab[1], swatch.lab[2]]
       const miss = !mapped && Math.sqrt(labDistance2(lab, baked)) > MISS_THRESHOLD

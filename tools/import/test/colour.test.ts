@@ -5,6 +5,7 @@ import { KHRTextureTransform } from "@gltf-transform/extensions"
 import { type ColourMode, linearToSrgb, nearestSwatch, PALETTE, srgbToOklab } from "@guildhall/assets"
 import { log } from "@guildhall/core"
 import { encode as encodeJpeg } from "jpeg-js"
+import adventurers from "../packs/kaykit-adventurers.ts"
 import { packProblems } from "../src/config.ts"
 import { encodePng } from "../src/png.ts"
 import { gltfIO } from "../src/read.ts"
@@ -341,6 +342,36 @@ describe("bakePalette", () => {
     const bake = bakePalette(Float32Array.from([1, 0, 1, ...lin]), PALETTE)
     expect(bake.misses).toBe(1)
     expect(bake.missed).toEqual(["#ff00ff"])
+  })
+
+  const skin = PALETTE.swatches.filter((s) => s.group === "skin")
+  const linear = (hexes: string[]): Float32Array =>
+    Float32Array.from(
+      hexes.flatMap((h) =>
+        [1, 3, 5].map((i) => {
+          const c = Number.parseInt(h.slice(i, i + 2), 16) / 255
+          return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+        }),
+      ),
+    )
+
+  test("skin is pin-only: unpinned sandstone-ish colours, even a skin swatch's own, never bake to skin", () => {
+    expect(skin.map((s) => s.name)).toEqual(["skin-dark", "skin", "skin-light"])
+    // Sandstone, KayKit's own skin texels, and the skin swatches themselves, with no map.
+    const hexes = ["#e2a983", "#f6c6a5", "#f6c29e", "#f2a87e", ...skin.map((s) => s.hex)]
+    const bake = bakePalette(linear(hexes), PALETTE)
+    for (const id of bake.swatch) expect(PALETTE.swatches[id]!.group).not.toBe("skin")
+  })
+
+  test("a KayKit skin texel pinned by kaykit-adventurers' colour.map bakes to the skin ramp", () => {
+    const hexes = ["#f8ccab", "#f6be9a", "#f2a87e"]
+    const bake = bakePalette(linear(hexes), PALETTE, adventurers.colour.map)
+    expect([...bake.swatch].map((id) => PALETTE.swatches[id]!.name)).toEqual([
+      "skin-light",
+      "skin",
+      "skin-dark",
+    ])
+    expect(bake.misses).toBe(0)
   })
 })
 

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "status": "DRAFT — user tunes in Studio",
-  "groups": ["ground", "stone", "timber", "roof", "foliage", "water", "metal", "accent"],
+  "groups": ["ground", "stone", "timber", "roof", "foliage", "water", "metal", "accent", "skin"],
   "swatches": [
     {
       "id": 0,
@@ -529,6 +529,30 @@
       "hex": "#82e0ff",
       "group": "water",
       "ramp": "sky",
+      "tone": "light"
+    },
+    {
+      "id": 66,
+      "name": "skin-dark",
+      "hex": "#f4b58e",
+      "group": "skin",
+      "ramp": "skin",
+      "tone": "dark"
+    },
+    {
+      "id": 67,
+      "name": "skin",
+      "hex": "#f5bc97",
+      "group": "skin",
+      "ramp": "skin",
+      "tone": "base"
+    },
+    {
+      "id": 68,
+      "name": "skin-light",
+      "hex": "#f6c3a0",
+      "group": "skin",
+      "ramp": "skin",
       "tone": "light"
     }
   ],

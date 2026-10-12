@@ -7,6 +7,7 @@ export default {
   vendor: "kaykit",
   license: "CC0",
   include: ["**/characters/gltf/*.glb", "**/assets/gltf/*.gltf"],
+  // Bone is not skin: no colour.map pin, so it bakes by nearness (skin is pin-only).
   colour: { mode: "atlas" },
   // Hero scale as authored (Minion 2.17 raw, Warrior 2.59 with its helmet): factor 1, as the adventurers.
   scale: { factor: 1 },

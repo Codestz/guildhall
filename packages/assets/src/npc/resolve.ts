@@ -10,10 +10,10 @@ import type { Catalog } from "../query.ts"
 import { type NpcLook, type NpcRecipe, validateNpc } from "./recipe.ts"
 
 /**
- * Ramps that are skin on the KayKit bodies (measured from `_SWATCH`: every head and hand is sandstone),
- * so an outfit never re-tints them; a recipe's outfit entry for one is ignored.
+ * Ramps that are skin on the KayKit bodies (kaykit-adventurers pins its skin cell to them), so an
+ * outfit never re-tints them; a recipe's outfit entry for one is ignored.
  */
-export const SKIN_RAMPS: readonly string[] = ["sandstone"]
+export const SKIN_RAMPS: readonly string[] = ["skin"]
 
 /** One of `options`, drawn by `salt`. */
 const pick = <T>(options: readonly T[], seed: number, salt: string): T =>

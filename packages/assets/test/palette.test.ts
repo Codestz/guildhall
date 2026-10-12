@@ -27,6 +27,13 @@ const SHIPPED = [
   "water-deep", "water-shallow", "water-foam",
   "iron", "gold", "glow",
   "purple", "royal-blue", "banner-red",
+  "teal-dark", "teal", "teal-light",
+  "sandstone-dark", "sandstone", "sandstone-light",
+  "orange-dark", "orange", "orange-light",
+  "roof-blue-dark", "roof-blue", "roof-blue-light",
+  "grey-dark", "grey", "grey-light",
+  "sky-dark", "sky", "sky-light",
+  "skin-dark", "skin", "skin-light",
 ]
 
 describe("palette.json", () => {
@@ -39,9 +46,9 @@ describe("palette.json", () => {
     expect(palette.swatches.slice(0, SHIPPED.length).map((s) => s.name)).toEqual(SHIPPED)
   })
 
-  test("is 16 to 22 ramps of dark/base/light", () => {
+  test("is 16 to 23 ramps of dark/base/light", () => {
     expect(palette.ramps.length).toBeGreaterThanOrEqual(16)
-    expect(palette.ramps.length).toBeLessThanOrEqual(22)
+    expect(palette.ramps.length).toBeLessThanOrEqual(23)
     expect(palette.swatches).toHaveLength(palette.ramps.length * TONES.length)
   })
 

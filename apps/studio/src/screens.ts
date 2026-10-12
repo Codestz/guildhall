@@ -3,6 +3,7 @@ import { pieces } from "./browser/index.tsx"
 import { composer } from "./composer/index.tsx"
 import { grip } from "./grips/editor/index.ts"
 import { grips } from "./grips/matrix/index.ts"
+import { home } from "./home/index.tsx"
 import { lineup } from "./lineup/index.ts"
 import { m0 } from "./m0/index.ts"
 import { npc } from "./npcs/index.tsx"
@@ -30,6 +31,7 @@ export interface Screen {
 
 /** Every screen the studio can open with `?screen=<id>`. New screens register here, one line each. */
 export const SCREENS: readonly Screen[] = [
+  home,
   m0,
   lineup,
   pieces,
@@ -43,7 +45,7 @@ export const SCREENS: readonly Screen[] = [
   npc,
 ]
 
-export const DEFAULT_SCREEN = "pieces"
+export const DEFAULT_SCREEN = "home"
 
 /** The screen a query names, the default when it names none. Undefined for an unknown id. */
 export function screenFor(query: URLSearchParams): Screen | undefined {

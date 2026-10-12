@@ -3,6 +3,8 @@ import { PerfHud } from "@guildhall/ui"
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react"
 import type { DebugHost } from "./debug.ts"
 import { DEFAULT_SCREEN, SCREENS, screenFor } from "./screens.ts"
+import { BAR_PX } from "./shell/style.ts"
+import { TopBar } from "./shell/TopBar.tsx"
 
 const logger = log("studio:shell")
 
@@ -17,6 +19,10 @@ const NO_STATS: FrameStats = {
 }
 
 const fill: CSSProperties = { position: "fixed", inset: 0, overflow: "hidden" }
+/** Below the top bar: screens fill what is left, so the bar never covers them. */
+const belowBar: CSSProperties = { ...fill, top: BAR_PX }
+/** The perf HUD's frame: its own `top: 12; right: 12` then lands below the bar. */
+const hudFrame = (top: number): CSSProperties => ({ position: "fixed", top, left: 0, right: 0, zIndex: 40 })
 const missing: CSSProperties = {
   ...fill,
   display: "grid",
@@ -37,13 +43,15 @@ function useSearch(): string {
   return search
 }
 
-/** The studio shell: mounts the screen the deep link names into a full-window host, plus the perf HUD. */
+/** The studio shell: the top bar, the screen the deep link names in the window below it, the perf HUD. */
 export function App({ debug }: { debug: DebugHost }) {
   const search = useSearch()
   const host = useRef<HTMLDivElement>(null)
   const query = new URLSearchParams(search)
   const screen = screenFor(query)
   const [hud, setHud] = useState(query.get("hud") === "perf")
+  // `?bar=0` hides the top bar: bare screens, for shots and embeds.
+  const bar = query.get("bar") !== "0"
 
   // A deep link is a fresh load: any change to the query remounts the screen.
   useEffect(() => {
@@ -88,8 +96,13 @@ export function App({ debug }: { debug: DebugHost }) {
   }
   return (
     <>
-      <div ref={host} style={fill} data-screen={screen.id} />
-      {hud && <PerfHud stats={stats} />}
+      {bar && <TopBar screen={screen.id} title={screen.title} hud={hud} onHud={setHud} />}
+      <div ref={host} style={bar ? belowBar : fill} data-screen={screen.id} />
+      {hud && (
+        <div style={hudFrame(bar ? BAR_PX : 0)}>
+          <PerfHud stats={stats} />
+        </div>
+      )}
     </>
   )
 }

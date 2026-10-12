@@ -86,9 +86,11 @@ export {
 } from "./sun/index.ts"
 export {
   createHeightGround,
+  createHexGround,
   createInlandWater,
   createSurface,
   type HeightGrid,
+  type HexPrism,
   type TerrainMesh,
 } from "./terrain.ts"
 export { boundingSphere, fitSphere, renderThumbnail, type ThumbnailOpts } from "./thumbnail.ts"

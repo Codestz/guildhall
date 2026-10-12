@@ -11,6 +11,7 @@ import {
   type BatchInstance,
   createAtmosphere,
   createHeightGround,
+  createHexGround,
   createInlandWater,
   createNight,
   createSky,
@@ -35,6 +36,7 @@ import {
   type TerraParcels,
   type TerraPlan,
   terraHeightAt,
+  terraHexes,
   terraIsland,
   terraParcels,
   terraPlan,
@@ -45,9 +47,13 @@ import type { Screen } from "../screens.ts"
 import { current, href } from "../shell/router.ts"
 import { worldCamera } from "../shell/worldCamera.ts"
 import { params, parse } from "../terra/index.ts"
+import { hexBridges, hexBuildings, hexTiles, hexWater } from "./hex.ts"
 import { buildPlaces } from "./towns.ts"
 
 const logger = log("studio:terra3d")
+
+/** The ground under a piece: the smooth relief, or the top of its hex tile in the hex skin. */
+let heightOf = (t: Terra, x: number, z: number): number => terraHeightAt(t, x, z)
 
 /** One colour for every road, street and square, so where they meet they read as one surface. */
 const ROAD = "#cbb48a"
@@ -103,7 +109,7 @@ function inlandWater(t: Terra): Float32Array {
       dz /= len
       const half = r.width[k]! / 2 + 0.6
       // the water never climbs downstream: bed + 0.45, held at or under the last point
-      const y = Math.min(prevY, Math.max(terraHeightAt(t, p[0], p[1]) + 0.45, 0.05))
+      const y = Math.min(prevY, Math.max(heightOf(t, p[0], p[1]) + 0.45, 0.05))
       prevY = y
       side.push([
         [p[0] - dz * half, y, p[1] + dx * half],
@@ -141,7 +147,7 @@ function strip(
   const last = line[line.length - 1]
   if (last) pts.push([last[0], last[1]])
   if (pts.length < 2) return
-  const at = (x: number, z: number) => Math.max(terraHeightAt(t, x, z), 0.6) + 0.12 + lift
+  const at = (x: number, z: number) => Math.max(heightOf(t, x, z), 0.6) + 0.12 + lift
   type P3 = [number, number, number]
   const side: [P3, P3][] = []
   for (let k = 0; k < pts.length; k++) {
@@ -198,7 +204,7 @@ function squares(t: Terra, streets: { line: [number, number][]; half: number }[]
     }
     cx /= s.line.length
     cz /= s.line.length
-    const y = (x: number, z: number) => Math.max(terraHeightAt(t, x, z), 0.6) + 0.14 + lift
+    const y = (x: number, z: number) => Math.max(heightOf(t, x, z), 0.6) + 0.14 + lift
     for (let k = 1; k < s.line.length; k++) {
       const a = s.line[k - 1]!
       const b = s.line[k]!
@@ -272,7 +278,7 @@ function dressParcels(t: Terra, pc: TerraParcels, have: (id: string) => boolean)
     return pc.cell[iz * t.w + ix]!
   }
   const put = (piece: string | undefined, x: number, z: number, rot: number, scale = 1) => {
-    if (piece) out.push({ piece, x, y: terraHeightAt(t, x, z) - 0.03, z, rot, scale })
+    if (piece) out.push({ piece, x, y: heightOf(t, x, z) - 0.03, z, rot, scale })
   }
   for (const p of pc.parcels) {
     const id = p.id + 1
@@ -446,8 +452,7 @@ function bridges(t: Terra, plan: TerraPlan, have: (id: string) => boolean): Batc
       const rot = Math.atan2(c[0] - a[0], c[1] - a[1])
       const p = r.line[k]!
       const y =
-        Math.max(terraHeightAt(t, p[0] + (c[0] - a[0]), p[1] + (c[1] - a[1])), terraHeightAt(t, p[0], p[1])) +
-        0.2
+        Math.max(heightOf(t, p[0] + (c[0] - a[0]), p[1] + (c[1] - a[1])), heightOf(t, p[0], p[1])) + 0.2
       for (const s of [-1, 0, 1])
         out.push({
           piece,
@@ -504,7 +509,7 @@ function wild(t: Terra, have: (id: string) => boolean): BatchInstance[] {
         scale *= 1.2
       } else if (u(3) < 0.05) id = pick(bushes, 4)
       if (!id) continue
-      out.push({ piece: id, x, y: terraHeightAt(t, x, z) - 0.05, z, rot: u(6) * Math.PI * 2, scale })
+      out.push({ piece: id, x, y: heightOf(t, x, z) - 0.05, z, rot: u(6) * Math.PI * 2, scale })
     }
   return out
 }
@@ -522,7 +527,7 @@ export const terra3d: Screen = {
     cam.start({
       centre: [0, 0],
       half: span0 * 1.4,
-      heightAt: (x, z) => terraHeightAt(t, x, z),
+      heightAt: (x, z) => heightOf(t, x, z),
       water: 0,
       free: true,
     })
@@ -633,12 +638,17 @@ export const terra3d: Screen = {
         seed: view.spec.seed,
       })
       const plan = view.plan ? terraPlan(t) : null
+      // the skin: V1's low-poly hex tiles (default), or the smooth relief (?skin=smooth)
+      const hx = ctx.query.get("skin") === "smooth" ? null : terraHexes(t, 4)
+      heightOf = hx
+        ? (_t: Terra, x: number, z: number) => hx.heightAt(x, z)
+        : (tt: Terra, x: number, z: number) => terraHeightAt(tt, x, z)
       const heart = plan?.anchors.find((a) => a.kind === "town")?.at ?? [0, 0]
       /** Down the old town's longest street, from behind its far end (set once the town is built). */
       let streetPose: CameraPose | null = null
       frame = (cam) => {
         if (stage.rig.mode() === "free") stage.rig.setMode("orbit")
-        const y = terraHeightAt(t, heart[0], heart[1])
+        const y = heightOf(t, heart[0], heart[1])
         const poses: Record<typeof cam, CameraPose> = {
           hero: { target: [heart[0], y, heart[1]], azimuth: 35, elevation: 30, distance: R * 1.15 },
           street: streetPose ?? {
@@ -654,14 +664,16 @@ export const terra3d: Screen = {
       // open on the town, as the town screen always did (?cam=map or street to start there)
       const start = ctx.query.get("cam")
       frame(start === "map" || start === "street" ? start : "hero")
-      if (plan) meshes.push(createSurface(stage, roadRibbons(t, plan), ROAD))
-      meshes.push(
-        createHeightGround(stage, {
-          ...t,
-          rgba: paintTerra(t, { shade: false, contours: false, beds: true }),
-        }),
-        createInlandWater(stage, inlandWater(t)),
-      )
+      if (!hx) {
+        if (plan) meshes.push(createSurface(stage, roadRibbons(t, plan), ROAD))
+        meshes.push(
+          createHeightGround(stage, {
+            ...t,
+            rgba: paintTerra(t, { shade: false, contours: false, beds: true }),
+          }),
+          createInlandWater(stage, inlandWater(t)),
+        )
+      }
       water = createWater(stage, {
         polys: [
           [
@@ -688,8 +700,25 @@ export const terra3d: Screen = {
             (built?.landmarks ?? []).map((l) => ({ kind: l.kind, at: l.at })),
           )
         : null
-      if (parcels) meshes.push(createSurface(stage, trailRibbons(t, parcels), "#b89a6a"))
-      if (built) {
+      if (hx) {
+        meshes.push(
+          createHexGround(stage, {
+            size: hx.size,
+            base: hx.base,
+            tiles: hexTiles({
+              t,
+              hx,
+              plan,
+              parcels,
+              streets: built ? [...built.streets, ...built.paved.map((p) => ({ ...p, paved: true }))] : [],
+              core: built?.core ?? null,
+            }),
+          }),
+          createSurface(stage, hexWater(hx), "#4f9ad8", 0.25),
+        )
+      }
+      if (parcels && !hx) meshes.push(createSurface(stage, trailRibbons(t, parcels), "#b89a6a"))
+      if (built && !hx) {
         meshes.push(createSurface(stage, streetRibbons(t, built.streets), ROAD))
         // the old town: cobbled streets and square, and the roads through it cobbled too
         const inCore =
@@ -728,7 +757,7 @@ export const terra3d: Screen = {
           // the eye sits seen from the target
           const az = (Math.atan2(a[0] - b[0], a[1] - b[1]) * 180) / Math.PI
           streetPose = {
-            target: [b[0], terraHeightAt(t, b[0], b[1]) + 2.5, b[1]],
+            target: [b[0], heightOf(t, b[0], b[1]) + 2.5, b[1]],
             azimuth: az,
             elevation: 12,
             distance: Math.hypot(b[0] - a[0], b[1] - a[1]) + 4,
@@ -739,9 +768,19 @@ export const terra3d: Screen = {
       const clear = (p: BatchInstance) =>
         !(plan?.roads ?? []).some((r) => r.line.some((q) => Math.hypot(q[0] - p.x, q[1] - p.z) < 3.5))
       const nature = parcels ? dressParcels(t, parcels, have) : wild(t, have)
-      if (plan) nature.push(...bridges(t, plan, have))
-      const pieces = [...(built?.pieces ?? []), ...nature.filter(clear)]
-      const clusters = built?.clusters ?? []
+      if (plan) nature.push(...(hx ? hexBridges(hx, plan, have) : bridges(t, plan, have)))
+      // the hex skin builds with KayKit hex buildings, one to a tile; recipes only for the vignettes
+      let clusters = built?.clusters ?? []
+      const housing: BatchInstance[] = []
+      if (hx && built) {
+        const hb = hexBuildings(t, hx, built.buildings, have)
+        housing.push(...hb.pieces)
+        clusters = built.byBuilding.filter((c, i): c is NonNullable<typeof c> => !!c && hb.keep.has(i))
+      }
+      const taken = housing.map((p) => [p.x, p.z] as const)
+      const off = (p: BatchInstance) =>
+        !hx || !taken.some(([x, z]) => Math.hypot(x - p.x, z - p.z) < hx.size * 1.2)
+      const pieces = [...(built?.pieces ?? []), ...housing, ...nature.filter(clear).filter(off)]
       batch = await createStaticBatch(
         stage,
         pieces,
@@ -759,7 +798,7 @@ export const terra3d: Screen = {
       text.textContent = [
         `seed ${view.spec.seed} · ${view.spec.size} m`,
         `${t.rivers.length} rivers · ${t.stats.lakes} lakes · ${t.falls.length} falls`,
-        `${clusters.length} buildings · ${pieces.length} pieces`,
+        `${clusters.length + housing.length} buildings · ${pieces.length} pieces${hx ? ` · ${hx.tiles.length} hex tiles` : ""}`,
         ...(built?.report ?? []),
       ].join("\n")
       logger.info("terra3d", { pieces: pieces.length })

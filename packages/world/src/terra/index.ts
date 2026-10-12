@@ -5,6 +5,7 @@ export {
   type TerraDistricts,
   terraDistricts,
 } from "./districts.ts"
+export { type HexKind, type HexTile, type TerraHexes, terraHexes } from "./hexes.ts"
 export {
   TERRA_CRAG,
   TERRA_DEFAULTS,

@@ -65,7 +65,13 @@ export interface NatureExtras {
 export type NatureLibrary = TownLibrary & { wild?: NatureExtras }
 
 export type NatureInput = Pick<TownPlan, "bounds" | "blocks"> &
-  Partial<Pick<TownPlan, "placements" | "edges" | "fields" | "water" | "spec" | "streets">>
+  Partial<Pick<TownPlan, "placements" | "edges" | "fields" | "water" | "spec" | "streets">> & {
+    /**
+     * Whether the ground within `clear` of p is free of what the plan's own lists do not hold (the
+     * island's occupancy raster: settlement frames, POI pads, lakes); absent, all of it is.
+     */
+    free?: (p: Vec2, clear: number) => boolean
+  }
 
 /** The scatter's grid pitch, metres: one candidate per cell. */
 const PITCH = 2
@@ -131,6 +137,7 @@ export function nature(
     if (!home) return false
     if (!(home.deep && pad === 0) && home.home.edge.near(p, clear) < clear) return false
     if (blocked(p, clear)) return false
+    if (plan.free && !plan.free(p, clear)) return false
     if (role === "tree" && field.inShore(p)) return false
     return true
   }

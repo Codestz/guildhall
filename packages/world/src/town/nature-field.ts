@@ -13,15 +13,26 @@
  */
 import { DMath } from "@guildhall/core"
 import { lineIndex } from "../geom/line.ts"
-import { bbox, contains } from "../geom/poly.ts"
+import { bbox, contains, insideIndex, type Ring } from "../geom/poly.ts"
 import type { Roll } from "../geom/sample.ts"
 import { round3, type Vec2 } from "../geom/vec.ts"
 import { SHORE } from "./farms.ts"
 import { normalizeSpec } from "./spec.ts"
 import type { TownPlan } from "./types.ts"
 
-/** What the field reads: the ground only (never the placements), so render can rebuild it. */
-export type FieldInput = Pick<TownPlan, "bounds"> & Partial<Pick<TownPlan, "water" | "spec" | "streets">>
+/**
+ * What the field reads: the ground only (never the placements), so render can rebuild it. The island
+ * (W8) adds its own landform: the main town's radius (the island has no town spec of its own), its
+ * rock fields (open rocky ground, where no wood stands) and clearings carved into its biggest woods.
+ */
+export type FieldInput = Pick<TownPlan, "bounds"> &
+  Partial<Pick<TownPlan, "water" | "spec" | "streets">> & {
+    /** The town radius the wildness ramps out from; default: the spec's, else a ninth of the bounds. */
+    radius?: number
+    rough?: Ring[]
+    /** Extra glades: one at the heart of each of this many of the biggest woods that have none. */
+    clearings?: number
+  }
 
 /** A wood (forest cluster), by its core: W8 may claim one for a lumber camp, wildlife, a ruin. */
 export interface Wood {
@@ -107,7 +118,8 @@ export function natureField(plan: FieldInput, roll: Roll): NatureField {
   const seed = Math.floor(roll("field-seed") * 4294967296) >>> 0
   const n = (salt: number, cell: number) => noise(seed, salt, cell)
   const [bmin, bmax] = bbox(plan.bounds)
-  const radius = plan.spec ? normalizeSpec(plan.spec).radius : (bmax[0] - bmin[0]) / 9
+  const radius = plan.radius ?? (plan.spec ? normalizeSpec(plan.spec).radius : (bmax[0] - bmin[0]) / 9)
+  const onRough = plan.rough && plan.rough.length > 0 ? insideIndex(plan.rough) : () => false
 
   // --- The coast, as a raster of distances (exact queries are kept for the few that need them).
   const water = (plan.water ?? []).filter((w) => w.length > 2)
@@ -175,7 +187,7 @@ export function natureField(plan: FieldInput, roll: Roll): NatureField {
       const h = (k: number) => hash(seed, ci, cj, 100 + k)
       const at: Vec2 = [(ci + 0.15 + 0.7 * h(0)) * WOOD_CELL, (cj + 0.15 + 0.7 * h(1)) * WOOD_CELL]
       const w = wild(at)
-      if (w < 0.02 || h(2) > 0.35 + 0.6 * w || coast(at) < SHORE[1] || wet(at)) continue
+      if (w < 0.02 || h(2) > 0.35 + 0.6 * w || coast(at) < SHORE[1] || wet(at) || onRough(at)) continue
       const r = round3((20 + 30 * h(3)) * (0.7 + 0.45 * w))
       const id = woods.length
       const lead = pineAt(at) > 0.5 ? "pine" : birchN(at) > 0.68 ? "birch" : "broadleaf"
@@ -208,6 +220,23 @@ export function natureField(plan: FieldInput, roll: Roll): NatureField {
         glades.push(g)
       }
     }
+  // The island's clearings: the biggest woods without a glade (biggest first, then by id) get one at
+  // their heart, 9–15 m in radius, where the wood closes round it.
+  const glazed = new Set(glades.map((g) => g.wood))
+  const bare = woods
+    .filter((w) => !glazed.has(w.id) && w.r >= 20 && coast(w.at) > SHORE[1] + 20)
+    .sort((a, b) => b.r - a.r || a.id - b.id)
+  for (const w of bare.slice(0, plan.clearings ?? 0)) {
+    const u = (k: number) => hash(seed, w.id, -1, 500 + k)
+    const a = 2 * Math.PI * u(0)
+    const d = 0.15 * w.r * u(1)
+    glades.push({
+      id: glades.length,
+      wood: w.id,
+      at: [round3(w.at[0] + d * cos(a)), round3(w.at[1] + d * sin(a))],
+      r: round3(9 + 6 * u(2)),
+    })
+  }
 
   function pineAt(p: Vec2): number {
     const belt = 1 - smooth((coast(p) - SHORE[1] - BELT[1]) / 15)
@@ -281,7 +310,7 @@ export function natureField(plan: FieldInput, roll: Roll): NatureField {
   /** Cover worked out in full at p, and the wood it comes from (-1: none, or the coast's belt). */
   const coverAt = (p: Vec2): { c: number; wood: number } => {
     const edge = coast(p)
-    if (edge < shore(p) - 1 || (edge >= COAST_REACH && !nearWood(p))) return { c: 0, wood: -1 }
+    if (edge < shore(p) - 1 || (edge >= COAST_REACH && !nearWood(p)) || onRough(p)) return { c: 0, wood: -1 }
     const q = warp(p)
     const w = woodCover(q)
     const c = Math.max(w.c, edge < COAST_REACH ? beltCover(q, edge) : 0)
@@ -348,7 +377,10 @@ export function natureField(plan: FieldInput, roll: Roll): NatureField {
     stand: (p) => Math.min(0.999, standN(p)),
     wild,
     drift: (p) => smooth((driftN(p) - 0.72) / 0.08) * smooth((driftGate(p) - 0.35) / 0.25),
-    rocky: (p) => smooth((rockN(p) - 0.55) / 0.2) * (0.35 + 0.65 * Math.max(wild(p), coast(p) < 14 ? 1 : 0)),
+    rocky: (p) =>
+      onRough(p)
+        ? 1
+        : smooth((rockN(p) - 0.55) / 0.2) * (0.35 + 0.65 * Math.max(wild(p), coast(p) < 14 ? 1 : 0)),
     tone: (p) => 2 * toneN(p) - 1,
     groundTint(x, z) {
       const p: Vec2 = [x, z]

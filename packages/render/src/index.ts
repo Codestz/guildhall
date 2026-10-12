@@ -1,4 +1,10 @@
-export { type BatchInstance, createStaticBatch, instanceMatrix, type StaticBatch } from "./batch.ts"
+export {
+  type BatchCluster,
+  type BatchInstance,
+  createStaticBatch,
+  instanceMatrix,
+  type StaticBatch,
+} from "./batch.ts"
 export { cameraToPose, poseToCamera } from "./camera.ts"
 export { type Character, createCharacter, loadCharacter, type PlayOpts } from "./character/load.ts"
 export { attachMount, detachMount, type Mounted, mountClip, mountPose } from "./character/mount.ts"
@@ -9,6 +15,7 @@ export { createGrid, type Disposable } from "./grid.ts"
 export { contactShade, createGround, type Ground, type GroundDraw, groundMesh } from "./ground.ts"
 export { disposeObject, heroSilhouette, testBox } from "./hero.ts"
 export { applyLight, type DayLight, GOLDEN_HOUR, goldenHour, lightAt, sunAt } from "./light.ts"
+export type { LodCounts } from "./lod.ts"
 export { paletteMaterial } from "./material.ts"
 export { group, loadModel, type Measure, measure, poseModel } from "./model.ts"
 export { loadPiece } from "./pieces.ts"

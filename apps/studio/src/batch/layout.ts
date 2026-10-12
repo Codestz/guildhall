@@ -1,10 +1,16 @@
-/** The batch screen's pure side: `n` static pieces as houses, crop fields and woods on a grid of cells. */
+/**
+ * The batch screen's pure side: `n` static pieces as houses, crop fields and woods on a grid of cells,
+ * each cell one cluster (drawn as one merged shell when far).
+ */
 import type { RecipeInstance } from "@guildhall/assets"
 import { roll } from "@guildhall/core"
-import type { BatchInstance } from "@guildhall/render"
+import type { BatchCluster, BatchInstance } from "@guildhall/render"
 
-/** A compiled house: its pieces in house space, door side +z. */
-export type House = readonly RecipeInstance[]
+/** A compiled house: its pieces in house space, door side +z; `key` names the recipe and seed. */
+export interface House {
+  key: string
+  parts: readonly RecipeInstance[]
+}
 
 export type Role = "house" | "field" | "wood"
 
@@ -36,18 +42,6 @@ export function* spiral(): Generator<[number, number]> {
     }
 }
 
-/** `instance` (house space) turned by `turn` radians and set down at x, z. */
-function place(instance: RecipeInstance, x: number, z: number, turn: number): BatchInstance {
-  const c = Math.cos(turn)
-  const s = Math.sin(turn)
-  return {
-    ...instance,
-    x: x + instance.x * c + instance.z * s,
-    z: z - instance.x * s + instance.z * c,
-    rot: instance.rot + turn,
-  }
-}
-
 const at = (piece: string, x: number, z: number, rot: number): BatchInstance => ({
   piece,
   x,
@@ -72,16 +66,17 @@ function nextRole(left: Record<Role, number>, budget: Record<Role, number>): Rol
 }
 
 /**
- * `n` pieces for `seed`: about SHARE of them in houses (whole houses, so it may run a house over),
- * the rest crops in rows and trees in jittered woods, exactly. Cells go out from the centre and each
- * takes whichever role is furthest behind, so the roles interleave. A role with no pieces to draw
- * from gets none and its share goes unplaced.
+ * `n` pieces for `seed`, one cluster per cell: about SHARE of them in houses (whole houses, so it may
+ * run a house over), the rest crops in rows and trees in jittered woods, exactly. Cells go out from the
+ * centre and each takes whichever role is furthest behind, so the roles interleave. A role with no
+ * pieces to draw from gets none and its share goes unplaced. A house's cluster is keyed by its recipe
+ * and seed (houses alike share a shell); a field or wood is its own.
  */
 export function batchLayout(
   n: number,
   pieces: { houses: readonly House[]; trees: readonly string[]; crops: readonly string[] },
   seed: number,
-): { instances: BatchInstance[]; cells: Record<Role, number> } {
+): { clusters: BatchCluster[]; cells: Record<Role, number> } {
   const budget: Record<Role, number> = {
     house: pieces.houses.length > 0 ? Math.round(n * SHARE.house) : 0,
     field: pieces.crops.length > 0 ? Math.round(n * SHARE.field) : 0,
@@ -89,7 +84,7 @@ export function batchLayout(
   }
   const left = { ...budget }
   const cells: Record<Role, number> = { house: 0, field: 0, wood: 0 }
-  const out: BatchInstance[] = []
+  const clusters: BatchCluster[] = []
   for (const [i, j] of spiral()) {
     const role = nextRole(left, budget)
     if (!role) break
@@ -99,30 +94,35 @@ export function batchLayout(
     const key = `${i},${j}`
     const pick = <T>(list: readonly T[], salt: string) =>
       list[Math.floor(roll(seed, `${salt}:${key}`) * list.length)] as T
+    const cell = (key: string, parts: BatchInstance[], rot = 0) =>
+      clusters.push({ key, parts, x: cx, y: 0, z: cz, rot, scale: 1 })
     if (role === "house") {
       const house = pick(pieces.houses, "house")
-      const turn = (Math.floor(roll(seed, `turn:${key}`) * 4) * Math.PI) / 2
-      for (const instance of house) out.push(place(instance, cx, cz, turn))
-      left.house -= Math.max(1, house.length)
+      cell(house.key, [...house.parts], (Math.floor(roll(seed, `turn:${key}`) * 4) * Math.PI) / 2)
+      left.house -= Math.max(1, house.parts.length)
     } else if (role === "field") {
       const crop = pick(pieces.crops, "crop")
       const side = Math.floor((CELL - 2) / ROW)
+      const parts: BatchInstance[] = []
       for (let k = 0; k < side * side && left.field > 0; k++, left.field--) {
-        const x = cx + (k % side) * ROW - ((side - 1) * ROW) / 2
-        const z = cz + Math.floor(k / side) * ROW - ((side - 1) * ROW) / 2
-        out.push(at(crop, x, z, roll(seed, `crot:${key}:${k}`) * Math.PI * 2))
+        const x = (k % side) * ROW - ((side - 1) * ROW) / 2
+        const z = Math.floor(k / side) * ROW - ((side - 1) * ROW) / 2
+        parts.push(at(crop, x, z, roll(seed, `crot:${key}:${k}`) * Math.PI * 2))
       }
+      cell(`field:${key}`, parts)
     } else {
       const pitch = CELL / WOOD
+      const parts: BatchInstance[] = []
       for (let k = 0; k < WOOD * WOOD && left.wood > 0; k++, left.wood--) {
         const jx = (roll(seed, `tx:${key}:${k}`) - 0.5) * pitch * 0.6
         const jz = (roll(seed, `tz:${key}:${k}`) - 0.5) * pitch * 0.6
-        const x = cx + ((k % WOOD) + 0.5) * pitch - CELL / 2 + jx
-        const z = cz + (Math.floor(k / WOOD) + 0.5) * pitch - CELL / 2 + jz
-        out.push(at(pick(pieces.trees, `tree:${k}`), x, z, roll(seed, `trot:${key}:${k}`) * Math.PI * 2))
+        const x = ((k % WOOD) + 0.5) * pitch - CELL / 2 + jx
+        const z = (Math.floor(k / WOOD) + 0.5) * pitch - CELL / 2 + jz
+        parts.push(at(pick(pieces.trees, `tree:${k}`), x, z, roll(seed, `trot:${key}:${k}`) * Math.PI * 2))
       }
+      cell(`wood:${key}`, parts)
     }
     left[role] = Math.max(0, left[role])
   }
-  return { instances: out, cells }
+  return { clusters, cells }
 }

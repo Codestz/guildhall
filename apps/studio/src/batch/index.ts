@@ -59,7 +59,10 @@ async function houses(catalog: NonNullable<Awaited<ReturnType<typeof loadCatalog
   return recipes.flatMap((json, i) => {
     if (json === null || validatePrefab(json).length > 0) return []
     try {
-      return SEEDS.map((seed) => compilePrefab(json as PrefabRecipe, seed, catalog).recipe.instances)
+      return SEEDS.map((seed) => ({
+        key: `${ids[i]}:${seed}`,
+        parts: compilePrefab(json as PrefabRecipe, seed, catalog).recipe.instances,
+      }))
     } catch (error) {
       logger.warn("house skipped", { id: ids[i], error: String(error) })
       return []
@@ -70,7 +73,8 @@ async function houses(catalog: NonNullable<Awaited<ReturnType<typeof loadCatalog
 /**
  * The static-batch bench (`/lab/batch?n=10000`, R2 / ADR 007): `n` library pieces (compiled houses,
  * crop fields, woods) in one BatchedMesh under the cascaded sun, with the draw counters in a panel.
- * The draw calls stay flat whatever `n` is. `?move=pan` sweeps the camera's target so the near cascades
+ * The draw calls stay flat whatever `n` is; triangles stay in budget by LOD (pieces by screen size, a far
+ * cell — house, field, wood — as one merged shell), the tiers drawn shown in the panel. `?move=pan` sweeps the camera's target so the near cascades
  * re-render every frame (the worst case; an orbit about a still target re-renders none); `guildhall.ext.batch.stats()` reads the batch.
  */
 export const batch: Screen = {
@@ -100,7 +104,7 @@ export const batch: Screen = {
         return
       }
       const present = (ids: readonly string[]) => ids.filter((id) => catalog.get(id))
-      const { instances, cells } = batchLayout(
+      const { clusters, cells } = batchLayout(
         n,
         { houses: await houses(catalog), trees: present(TREES), crops: present(CROPS) },
         SEED,
@@ -112,11 +116,16 @@ export const batch: Screen = {
       sky = createSky(stage, { sun, reach: 1.4 * reach })
       Object.assign(pose, { distance: 1.6 * reach + 30 })
       stage.setCamera(pose)
-      const next = await createStaticBatch(stage, instances, async (id) => {
-        const entry = catalog.get(id)
-        if (!entry) throw new Error(`batch: unknown piece "${id}"`)
-        return loadPiece(libraryUrl(entry.files.glb))
-      })
+      const next = await createStaticBatch(
+        stage,
+        [],
+        async (id) => {
+          const entry = catalog.get(id)
+          if (!entry) throw new Error(`batch: unknown piece "${id}"`)
+          return loadPiece(libraryUrl(entry.files.glb))
+        },
+        clusters,
+      )
       if (disposed) {
         next.dispose()
         return
@@ -144,7 +153,13 @@ export const batch: Screen = {
     const ext = window.guildhall?.ext
     if (ext)
       ext.batch = {
-        stats: () => ({ n, instances: built?.count ?? 0, geometries: built?.geometries ?? 0 }),
+        stats: () => ({
+          n,
+          instances: built?.count ?? 0,
+          geometries: built?.geometries ?? 0,
+          clusters: built?.clusters ?? 0,
+          lod: built?.lod ?? null,
+        }),
       }
 
     return () => {
@@ -164,7 +179,8 @@ export const batch: Screen = {
 function describe(b: StaticBatch | null, f: FrameStats): string {
   if (!b) return "building the batch…"
   return [
-    `batch: ${b.count} instances · ${b.geometries} geometries`,
+    `batch: ${b.count} instances · ${b.geometries} geometries · ${b.clusters} cells`,
+    `lod: pieces ${b.lod.tiers.join(" / ")} (full / mid / low) · cells ${b.lod.near} near / ${b.lod.shells} shells`,
     `main ${f.mainCalls ?? "?"} calls · ${f.mainTris ?? "?"} tris · shadow ${f.shadowCalls ?? "?"} calls · ${f.shadowTris ?? "?"} tris`,
     `cost p95 ${f.costMs?.p95.toFixed(1) ?? "?"} ms · dpr ${f.dpr}`,
   ].join("\n")

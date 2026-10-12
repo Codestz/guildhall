@@ -1,0 +1,51 @@
+{
+  "mounts": {
+    "kaykit-tools/lantern": {
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        1.05,
+        0
+      ],
+      "hands": 1,
+      "scale": 0.5,
+      "slot": "hand.r",
+      "upright": {
+        "up": [
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    "kaykit-weapons/sword-a": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.15,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.r"
+    }
+  },
+  "version": 1
+}

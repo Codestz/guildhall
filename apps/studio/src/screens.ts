@@ -66,6 +66,7 @@ export const SCREENS: readonly Screen[] = [
   island,
   hexmap,
   hexScale,
+  hexScale,
 ]
 
 export const DEFAULT_SCREEN = "home"

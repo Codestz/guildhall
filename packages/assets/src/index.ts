@@ -1,1 +1,46 @@
-export {}
+export type {
+  CatalogEntry,
+  CatalogIndex,
+  Category,
+  Kind,
+  PieceFlag,
+  RigEntry,
+  ScaleFlag,
+  ScaleInfo,
+  ScaleTarget,
+} from "./catalog.ts"
+export { CATEGORIES, KINDS, PIECE_FLAGS, SCALE_FLAGS } from "./catalog.ts"
+export type { ColourWeights, Lab, Rgb } from "./colour.ts"
+export {
+  EUCLIDEAN,
+  hexToSrgb,
+  labDistance2,
+  linearToOklab,
+  linearToSrgb,
+  nearestSwatch,
+  oklabToLinear,
+  oklabToSrgb,
+  SHADE_RANGE,
+  shadeOf,
+  srgbToLinear,
+  srgbToOklab,
+} from "./colour.ts"
+export type {
+  Anchor,
+  AnchorKind,
+  AttachRole,
+  ComposeMeta,
+  ComposeSource,
+  EdgeKind,
+  Facing,
+} from "./compose.ts"
+export { ANCHOR_KINDS, ATTACH_ROLES, EDGE_KINDS, FACINGS } from "./compose.ts"
+export type { ColourMode, PackConfig, PackRule, PackScale, PieceOverride, Pivot } from "./pack.ts"
+export type { Palette, PaletteJson, Ramp, Swatch, SwatchJson, Tone } from "./palette.ts"
+export { loadPalette, paletteHash, paletteProblems, TONES } from "./palette.ts"
+export type { Catalog, CatalogQuery, Facets } from "./query.ts"
+export { createCatalog } from "./query.ts"
+export type { Recipe, RecipeInstance } from "./recipe.ts"
+export { recipeHash } from "./recipe.ts"
+export { checkScale, DOOR_TOP, HERO_HEIGHT, SCALE_TARGETS, STOREY } from "./scale.ts"
+export { validateEntry, validateIndex } from "./validate.ts"

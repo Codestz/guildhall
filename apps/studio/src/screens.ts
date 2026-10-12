@@ -14,6 +14,7 @@ import { scale } from "./scenes/scale.ts"
 import { shadows } from "./shadows/index.ts"
 import { placeOf } from "./shell/directory.ts"
 import { siteScreen } from "./site/index.ts"
+import { town } from "./town/index.tsx"
 
 /** What the shell hands a screen when it mounts it. */
 export interface ScreenCtx {
@@ -47,6 +48,7 @@ export const SCREENS: readonly Screen[] = [
   grips,
   npc,
   batch,
+  town,
   planner,
 ]
 

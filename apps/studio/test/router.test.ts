@@ -17,7 +17,7 @@ describe("router", () => {
       const text = readFileSync(join(import.meta.dir, "../src", f as string), "utf8")
       return /\bid: (?:"([^"]+)"|HOME_ID)/.exec(text)?.[1] ?? "home"
     })
-    expect(ids.length).toBe(14)
+    expect(ids.length).toBe(15)
     for (const id of ids) expect(ROUTES.filter((r) => r.screen === id).length).toBe(1)
   })
 
@@ -72,7 +72,7 @@ describe("router", () => {
     expect(href("grips", { props: "kaykit-tools/axe,kaykit-tools/hammer" })).toBe(
       "/grips?props=kaykit-tools/axe,kaykit-tools/hammer",
     )
-    expect(() => href("town")).toThrow()
+    expect(() => href("nowhere")).toThrow()
   })
 
   test("resolve and href round-trip", () => {

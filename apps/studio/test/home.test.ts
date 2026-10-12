@@ -53,7 +53,7 @@ describe("directory", () => {
   test("openable lists home first and leaves out the tools still to come", () => {
     const ids = openable().map((p) => p.tool.id)
     expect(ids[0]).toBe(HOME_ID)
-    expect(ids).not.toContain("npc")
+    expect(ids).toContain("npc")
     expect(ids).not.toContain("town")
   })
 

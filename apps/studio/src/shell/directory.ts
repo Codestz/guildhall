@@ -74,7 +74,6 @@ export const GROUPS: readonly ToolGroup[] = [
         id: "npc",
         name: "NPC builder",
         purpose: "Dress and equip the townsfolk from KayKit bodies and props.",
-        soon: true,
       },
     ],
   },

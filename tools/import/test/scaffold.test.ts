@@ -236,8 +236,9 @@ describe("import", () => {
     await runImport({ paths: p, packs: await fixturePacks(), jobs: 1 })
     const { problems, entries } = await checkLibrary(p.library, (await import("@guildhall/assets")).PALETTE)
     expect(entries).toBe(4)
-    expect(problems).toContain("fixture-atlas/crate: 1 texture(s); the palette bake removes them")
-    expect(problems).toContain('fixture-material/bush: mesh "bush" primitive 0: no COLOR_0, _SWATCH')
+    expect(problems).toEqual([
+      'fixture-material/villager: mesh "villager" primitive 0: no COLOR_0, _SWATCH, _SHADE',
+    ])
   })
 
   test("workers produce the same shards as a single thread", async () => {

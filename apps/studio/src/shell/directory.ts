@@ -18,7 +18,7 @@ export interface Tool {
   soon?: boolean
   /** Has a committed preview at `/home/<id>.webp`. */
   preview?: boolean
-  /** A bench for working on the studio itself: not in the public showcase. */
+  /** Needs the local checkout (a bench, the raw packs): not in the public showcase. */
   dev?: boolean
 }
 
@@ -61,6 +61,8 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         name: "Lineup",
         purpose: "The untouched vendor packs, before import, for comparison.",
         preview: true,
+        // It reads the raw vendor packs (`/raw/`), which only a local checkout has.
+        dev: true,
       },
     ],
   },

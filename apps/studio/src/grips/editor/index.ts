@@ -3,7 +3,9 @@ import { log } from "@guildhall/core"
 import { holdStudioStyle } from "../../browser/style.ts"
 import { loadCatalog } from "../../catalog.ts"
 import { loadOverlay, saveMounts } from "../../data.ts"
+import { SHOWCASE } from "../../env.ts"
 import type { Screen } from "../../screens.ts"
+import { copyJson, downloadJson } from "../../showcase.ts"
 import { createPanel, type PanelState } from "./panel.ts"
 import * as edit from "./state.ts"
 import { addGripStyle } from "./style.ts"
@@ -150,7 +152,8 @@ export const grip: Screen = {
       logger.info("opened", { piece: piece.id, body: body.id, clip: state.clip, t: state.t })
     }
 
-    const save = async () => {
+    /** `save` writes through the dev server; the showcase downloads or copies the merged file instead. */
+    const save = async (how: "save" | "download" | "copy" = SHOWCASE ? "download" : "save") => {
       if (!state.piece) return
       state.saving = true
       state.status = "saving…"
@@ -160,6 +163,18 @@ export const grip: Screen = {
         saved = (await loadOverlay()).mounts
         const file = edit.mergeMount(saved, state.piece.id, state.mount)
         const problems = validateMounts(file)
+        if (problems.length === 0 && how !== "save") {
+          const count = `${Object.keys(file.mounts).length} mounts`
+          if (how === "download") downloadJson("mounts.json", file)
+          const ok = how === "download" || (await copyJson(file))
+          state.problems = []
+          state.status = !ok
+            ? "The browser refused the clipboard."
+            : how === "download"
+              ? `Downloaded mounts.json (${count}).`
+              : `Copied mounts.json (${count}).`
+          return
+        }
         const result =
           problems.length > 0 ? { ok: false as const, status: 0, problems } : await saveMounts(file)
         if (result.ok) {
@@ -209,6 +224,7 @@ export const grip: Screen = {
       scale: (k) => change(edit.setScale(state.mount, k)),
       clip: (c) => change(edit.setClip(state.mount, state.clip, c), true),
       save: () => void ctx.load(save()),
+      copy: () => void ctx.load(save("copy")),
     })
     render()
 

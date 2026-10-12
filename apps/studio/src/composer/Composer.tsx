@@ -15,7 +15,9 @@ import { log } from "@guildhall/core"
 import type { GizmoMode } from "@guildhall/render"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as data from "../data.ts"
+import { SHOWCASE } from "../env.ts"
 import type { ScreenCtx } from "../screens.ts"
+import { ExportButtons } from "../shell/Export.tsx"
 import { currentQuery, replaceQuery } from "../shell/router.ts"
 import { Blueprint, Stepper } from "./Blueprint.tsx"
 import { Dressing } from "./Dressing.tsx"
@@ -264,9 +266,18 @@ export function Composer({
               ))}
             </optgroup>
           </select>
-          <button type="button" className="gh-tool gh-save" disabled={problems.length > 0} onClick={save}>
-            save
-          </button>
+          {SHOWCASE ? (
+            <ExportButtons
+              file={`${recipe.id}.json`}
+              json={recipe}
+              disabled={problems.length > 0}
+              onDone={(ok, text) => setStatus({ tone: ok ? "ok" : "fail", text })}
+            />
+          ) : (
+            <button type="button" className="gh-tool gh-save" disabled={problems.length > 0} onClick={save}>
+              save
+            </button>
+          )}
         </div>
         <div className="gh-view">
           <div ref={host} className="gh-stage-host" />

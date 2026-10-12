@@ -5,7 +5,7 @@ import type { AddressInfo } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as data from "../src/data.ts"
-import { dataHandler, dataRoute, formatData, MAX_DATA_BYTES } from "../vite.config.ts"
+import { copyData, dataHandler, dataRoute, formatData, MAX_DATA_BYTES } from "../vite.config.ts"
 
 /** A dressing-only stall: the smallest prefab recipe validatePrefab accepts. */
 const stall = () => ({
@@ -256,5 +256,37 @@ describe("data client", () => {
     expect(await data.loadOverlay(fetch, base)).toEqual({})
     expect(await data.saveMounts(mounts() as never, fetch, base)).toEqual({ ok: true })
     expect(await data.loadOverlay(fetch, base)).toEqual({ mounts: mounts().mounts } as never)
+  })
+})
+
+describe("showcase data", () => {
+  test("copyData ships mounts and every valid id, and an index of each folder's ids", async () => {
+    const from = await mkdtemp(join(tmpdir(), "gh-showcase-from-"))
+    const out = await mkdtemp(join(tmpdir(), "gh-showcase-out-"))
+    await mkdir(join(from, "recipes/houses"), { recursive: true })
+    await writeFile(join(from, "mounts.json"), "{}\n")
+    await writeFile(join(from, "recipes/houses/cottage.json"), "{}\n")
+    await writeFile(join(from, "recipes/houses/Not An Id.json"), "{}\n")
+    await writeFile(join(from, "recipes/houses/notes.txt"), "x")
+    expect(await copyData(from, out)).toEqual({ "recipes/houses": ["cottage"] })
+    expect(JSON.parse(await readFile(join(out, "index.json"), "utf8"))).toEqual({
+      "recipes/houses": ["cottage"],
+    })
+    expect((await readdir(join(out, "recipes/houses"))).sort()).toEqual(["cottage.json"])
+    expect(await readFile(join(out, "mounts.json"), "utf8")).toBe("{}\n")
+    await rm(from, { recursive: true })
+    await rm(out, { recursive: true })
+  })
+
+  test("a static build lists a folder from the index; a folder it does not name is empty", async () => {
+    const index = { "recipes/houses": ["cottage", "tavern"] }
+    const asked: string[] = []
+    const fetcher = async (url: string) => {
+      asked.push(url)
+      return { ok: true, status: 200, json: async () => index } as never
+    }
+    expect(await data.list("recipes/houses", fetcher, "/data", true)).toEqual(["cottage", "tavern"])
+    expect(await data.list("npcs", fetcher, "/data", true)).toEqual([])
+    expect(asked).toEqual(["/data/index.json", "/data/index.json"])
   })
 })

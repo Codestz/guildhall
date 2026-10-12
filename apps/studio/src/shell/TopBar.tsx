@@ -80,7 +80,10 @@ export function TopBar({
         )}
         <span className="spacer" />
         {SHOWCASE && (
-          <span className="gh-showcase" title="A public build: nothing saves here; saves download JSON instead.">
+          <span
+            className="gh-showcase"
+            title="A public build: nothing saves here; saves download JSON instead."
+          >
             Showcase · read-only
           </span>
         )}

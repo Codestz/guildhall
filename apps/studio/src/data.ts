@@ -1,9 +1,10 @@
 /**
  * Authored data (`data/`, ADR 005) as the studio reads and writes it, through the `/data/` endpoint in
- * vite.config.ts. Saving works in the dev server only; the endpoint validates every write.
+ * vite.config.ts. Saving works in the dev server only; the endpoint validates every write. The showcase
+ * build ships `data/` as static files with one `index.json` of every folder's ids, and never writes.
  */
 import type { DataOverlay, MountsFile } from "@guildhall/assets"
-import { BASE } from "./env.ts"
+import { BASE, SHOWCASE } from "./env.ts"
 
 /** Where vite serves `data/` (vite.config.ts). */
 export const DATA = `${BASE}data`
@@ -36,6 +37,7 @@ async function getJson(url: string, fetcher: Fetch): Promise<unknown | null> {
 }
 
 async function put(url: string, json: unknown, fetcher: Fetch): Promise<SaveResult> {
+  if (SHOWCASE) return { ok: false, status: 405, problems: ["the showcase is read-only"] }
   const response = await fetcher(url, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -46,8 +48,23 @@ async function put(url: string, json: unknown, fetcher: Fetch): Promise<SaveResu
   return { ok: false, status: response.status, problems: body?.problems ?? [body?.error ?? "save failed"] }
 }
 
-/** The ids saved in a data folder, sorted; none when the folder does not exist yet. */
-export async function list(kind: DataKind, fetcher: Fetch = fetch, base = DATA): Promise<string[]> {
+/** The file the showcase build writes beside the data: every folder's ids, `{ "npcs": ["guard"], … }`. */
+export const DATA_INDEX = "index.json"
+
+/**
+ * The ids saved in a data folder, sorted; none when the folder does not exist yet. A static build
+ * (`fromIndex`, the showcase) has no folder listing, so it reads them from `DATA_INDEX`.
+ */
+export async function list(
+  kind: DataKind,
+  fetcher: Fetch = fetch,
+  base = DATA,
+  fromIndex = SHOWCASE,
+): Promise<string[]> {
+  if (fromIndex) {
+    const index = (await getJson(`${base}/${DATA_INDEX}`, fetcher)) as Record<string, string[]> | null
+    return index?.[kind] ?? []
+  }
   return ((await getJson(`${base}/${kind}/`, fetcher)) as string[] | null) ?? []
 }
 

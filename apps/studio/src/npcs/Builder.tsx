@@ -8,7 +8,9 @@ import { log } from "@guildhall/core"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Segments, Stepper } from "../composer/Blueprint.tsx"
 import * as data from "../data.ts"
+import { SHOWCASE } from "../env.ts"
 import type { ScreenCtx } from "../screens.ts"
+import { ExportButtons } from "../shell/Export.tsx"
 import { currentQuery, replaceQuery } from "../shell/router.ts"
 import {
   ACTIVITIES,
@@ -313,9 +315,18 @@ export function Builder({
               ))}
             </optgroup>
           </select>
-          <button type="button" className="gh-tool gh-save" disabled={problems.length > 0} onClick={save}>
-            save
-          </button>
+          {SHOWCASE ? (
+            <ExportButtons
+              file={`${recipe.id}.json`}
+              json={recipe}
+              disabled={problems.length > 0}
+              onDone={(ok, text) => setStatus({ tone: ok ? "ok" : "fail", text })}
+            />
+          ) : (
+            <button type="button" className="gh-tool gh-save" disabled={problems.length > 0} onClick={save}>
+              save
+            </button>
+          )}
         </div>
         <div className="gh-view">
           <div ref={stripHost} className="gh-stage-host" />

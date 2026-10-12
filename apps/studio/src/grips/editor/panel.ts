@@ -5,6 +5,7 @@
  * `actions`; the screen owns the state.
  */
 import type { CatalogEntry, Mount, Vec3 } from "@guildhall/assets"
+import { SHOWCASE } from "../../env.ts"
 import {
   AXIS_NAMES,
   type AxisName,
@@ -50,7 +51,10 @@ export interface PanelActions {
   upright(up: AxisName | null): void
   scale(k: number): void
   clip(edit: ClipEdit): void
+  /** Saves (the dev server), or downloads the merged file (the read-only showcase). */
   save(): void
+  /** The showcase's second way out: the merged file on the clipboard. */
+  copy(): void
 }
 
 export interface Panel {
@@ -213,16 +217,26 @@ export function createPanel(side: HTMLElement, actions: PanelActions): Panel {
 
   // ── problems, save ────────────────────────────────────────────
   const problems = el("ul", "gh-grip-problems")
-  const save = el("button", "gh-grip-save", "Save to data/mounts.json")
+  const save = el("button", "gh-grip-save", SHOWCASE ? "Download mounts.json" : "Save to data/mounts.json")
   save.type = "button"
   save.onclick = () => actions.save()
+  const copy = el("button", "gh-grip-save", "Copy JSON")
+  copy.type = "button"
+  copy.onclick = () => actions.copy()
   const status = el("p", "gh-grip-status")
   const hint = el("p", "gh-grip-hint")
-  hint.append(
-    document.createTextNode("Save merges this prop into data/mounts.json; then run "),
-    el("code", "", "bun import overlay"),
-    document.createTextNode(" to apply the overlay to the catalog."),
-  )
+  if (SHOWCASE)
+    hint.append(
+      document.createTextNode(
+        "This showcase is read-only: download or copy data/mounts.json with this prop merged in.",
+      ),
+    )
+  else
+    hint.append(
+      document.createTextNode("Save merges this prop into data/mounts.json; then run "),
+      el("code", "", "bun import overlay"),
+      document.createTextNode(" to apply the overlay to the catalog."),
+    )
 
   const scroll = el("div", "gh-grip-scroll")
   scroll.append(
@@ -244,7 +258,7 @@ export function createPanel(side: HTMLElement, actions: PanelActions): Panel {
     clipSec,
   )
   const foot = el("footer", "gh-grip-foot")
-  foot.append(problems, save, status, hint)
+  foot.append(problems, save, ...(SHOWCASE ? [copy] : []), status, hint)
   side.append(head, scroll, foot)
 
   const options = (
@@ -340,6 +354,7 @@ export function createPanel(side: HTMLElement, actions: PanelActions): Panel {
       problems.replaceChildren(...s.problems.map((p) => el("li", "", p)))
       problems.hidden = s.problems.length === 0
       save.disabled = s.saving || s.piece === null
+      copy.disabled = save.disabled
       status.textContent = s.status
     },
     dispose() {

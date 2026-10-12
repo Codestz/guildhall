@@ -1,12 +1,15 @@
 import { randomUUID } from "node:crypto"
 import { createReadStream, statSync } from "node:fs"
-import { lstat, mkdir, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises"
+import { cp, lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import { dirname, extname, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { PALETTE, validateMounts, validateNpc, validatePrefab } from "@guildhall/assets"
 import react from "@vitejs/plugin-react"
 import { type Connect, defineConfig, type Plugin } from "vite"
+import { formatData } from "./src/json.ts"
+
+export { formatData }
 
 const page = (name: string) => fileURLToPath(new URL(name, import.meta.url))
 
@@ -85,15 +88,6 @@ export function dataRoute(path: string): Validate | null {
   if (folder === "npcs") return (json) => validateNpc(json, PALETTE)
   if (folder === "towns") return validateTown
   return (json) => validatePrefab(json, PALETTE)
-}
-
-/** Data as the writer stores it: keys sorted at every depth, 2-space indent, final newline (biome-clean). */
-export function formatData(value: unknown): string {
-  const sorted = (_key: string, v: unknown): unknown =>
-    v !== null && typeof v === "object" && !Array.isArray(v)
-      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
-      : v
-  return `${JSON.stringify(value, sorted, 2)}\n`
 }
 
 /** True when `rel` (under the real `root`), or any folder on the way to it, is a symlink. */
@@ -225,15 +219,126 @@ function data(root: string): Plugin {
   }
 }
 
+/** `bun run build:showcase` / `preview:showcase`: the read-only public build (src/env.ts reads the same flag). */
+const SHOWCASE = process.env.VITE_STUDIO_SHOWCASE === "1"
+
+/** The library folders the showcase ships; never `.cache`, nor the importer's working folders. */
+export const SHOWCASE_LIBRARY = ["catalog", "pieces", "rigs", "thumbs"]
+const LEFT_OUT = new Set(["tags", "batches"])
+
+/** Every file under `dir`: how many, and their bytes. */
+async function measure(dir: string): Promise<{ files: number; bytes: number }> {
+  const total = { files: 0, bytes: 0 }
+  for (const entry of await readdir(dir, { withFileTypes: true, recursive: true })) {
+    if (!entry.isFile()) continue
+    total.files += 1
+    total.bytes += (await stat(join(entry.parentPath, entry.name))).size
+  }
+  return total
+}
+
+/**
+ * The showcase's static copy of `data/`: mounts.json and every valid `<folder>/<id>.json`, plus
+ * `index.json` naming each folder's ids (a static host has no folder listing; src/data.ts reads it).
+ */
+export async function copyData(root: string, out: string): Promise<Record<string, string[]>> {
+  const index: Record<string, string[]> = {}
+  await mkdir(out, { recursive: true })
+  const mounts = join(root, "mounts.json")
+  if (statSync(mounts, { throwIfNoEntry: false })?.isFile()) await cp(mounts, join(out, "mounts.json"))
+  for (const folder of DATA_FOLDERS) {
+    const names = await readdir(join(root, folder), { withFileTypes: true }).catch(() => [])
+    const ids = names
+      .filter((d) => d.isFile() && d.name.endsWith(".json") && ID.test(d.name.slice(0, -5)))
+      .map((d) => d.name.slice(0, -5))
+      .sort()
+    if (ids.length === 0) continue
+    await mkdir(join(out, folder), { recursive: true })
+    for (const id of ids) await cp(join(root, folder, `${id}.json`), join(out, folder, `${id}.json`))
+    index[folder] = ids
+  }
+  await writeFile(join(out, "index.json"), formatData(index))
+  return index
+}
+
+/** After a showcase build: the library and the data beside the app, so it runs with no server behind it. */
+function showcase(library: string, data: string): Plugin {
+  let outDir = "dist"
+  return {
+    name: "guildhall-showcase",
+    apply: "build",
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir)
+    },
+    async writeBundle() {
+      const from = await realpath(library).catch(() => null)
+      if (!from) throw new Error(`showcase: no library at ${library} (run bun import first)`)
+      for (const folder of SHOWCASE_LIBRARY)
+        await cp(join(from, folder), join(outDir, "library", folder), {
+          recursive: true,
+          dereference: true,
+          filter: (src) => {
+            const name = src.slice(src.lastIndexOf(sep) + 1)
+            return !name.startsWith(".") && !LEFT_OUT.has(name)
+          },
+        })
+      const index = await copyData(data, join(outDir, "data"))
+      const lib = await measure(join(outDir, "library"))
+      const all = await measure(outDir)
+      const mb = (bytes: number) => `${(bytes / 1e6).toFixed(1)} MB`
+      const recipes = Object.entries(index).map(([folder, ids]) => `${folder} ${ids.length}`)
+      this.info(
+        `library ${lib.files} files, ${mb(lib.bytes)}; data ${recipes.join(", ") || "mounts only"}; ` +
+          `dist ${all.files} files, ${mb(all.bytes)}`,
+      )
+    },
+  }
+}
+
+/**
+ * The showcase preview answers like the host (vercel.json): a missing `/library/` or `/data/` file is a
+ * 404, not the app's index.html, which vite's SPA fallback would otherwise serve in its place.
+ */
+function hostLike(): Plugin {
+  return {
+    name: "guildhall-host-like",
+    configurePreviewServer(server) {
+      const dist = resolve(server.config.root, server.config.build.outDir)
+      server.middlewares.use((req, res, next) => {
+        const url = (req.url ?? "").split("?")[0] ?? ""
+        if (!url.startsWith("/library/") && !url.startsWith("/data/")) return next()
+        let file: string
+        try {
+          file = resolve(dist, `.${decodeURIComponent(url)}`)
+        } catch {
+          file = ""
+        }
+        if (file.startsWith(dist + sep) && statSync(file, { throwIfNoEntry: false })?.isFile()) return next()
+        res.statusCode = 404
+        res.end()
+      })
+    },
+  }
+}
+
 export default defineConfig({
   // `/library/` is what the importer wrote; `/raw/` is the untouched packs, for the lineup preview;
-  // `/data/` is the authored data the studio edits.
-  plugins: [react(), folder("library", LIBRARY), folder("raw", RAW), data(DATA)],
+  // `/data/` is the authored data the studio edits. The showcase serves none of them: its build copies
+  // the library and the data into dist, and its preview serves dist alone, as the host will.
+  plugins: [
+    react(),
+    ...(SHOWCASE
+      ? [showcase(LIBRARY, DATA), hostLike()]
+      : [folder("library", LIBRARY), folder("raw", RAW), data(DATA)]),
+  ],
   server: { port: 5300, strictPort: true },
+  preview: { port: 5310, strictPort: true },
   build: {
     rollupOptions: {
-      // The studio, and the thumbnail page tools/import drives headless.
-      input: { main: page("index.html"), thumbs: page("thumbs.html") },
+      // The studio, and (not in the showcase) the thumbnail page tools/import drives headless.
+      input: SHOWCASE
+        ? { main: page("index.html") }
+        : { main: page("index.html"), thumbs: page("thumbs.html") },
     },
   },
 })

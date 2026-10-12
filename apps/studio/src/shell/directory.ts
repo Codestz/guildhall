@@ -139,6 +139,12 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         purpose: "The first render bench: a stage, a camera, a frame budget.",
         dev: true,
       },
+      {
+        id: "batch",
+        name: "Static batch",
+        purpose: "Thousands of pieces in one draw: calls stay flat as the count grows.",
+        dev: true,
+      },
     ],
   },
 ]

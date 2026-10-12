@@ -1,3 +1,4 @@
+export { type BatchInstance, createStaticBatch, instanceMatrix, type StaticBatch } from "./batch.ts"
 export { cameraToPose, poseToCamera } from "./camera.ts"
 export { type Character, createCharacter, loadCharacter, type PlayOpts } from "./character/load.ts"
 export { attachMount, detachMount, type Mounted, mountClip, mountPose } from "./character/mount.ts"

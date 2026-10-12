@@ -17,7 +17,7 @@ describe("router", () => {
       const text = readFileSync(join(import.meta.dir, "../src", f as string), "utf8")
       return /\bid: (?:"([^"]+)"|HOME_ID)/.exec(text)?.[1] ?? "home"
     })
-    expect(ids.length).toBe(12)
+    expect(ids.length).toBe(13)
     for (const id of ids) expect(ROUTES.filter((r) => r.screen === id).length).toBe(1)
   })
 

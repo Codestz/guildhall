@@ -1,4 +1,5 @@
 import type { Stage } from "@guildhall/render"
+import { batch } from "./batch/index.ts"
 import { pieces } from "./browser/index.tsx"
 import { composer } from "./composer/index.tsx"
 import { grip } from "./grips/editor/index.ts"
@@ -44,6 +45,7 @@ export const SCREENS: readonly Screen[] = [
   grip,
   grips,
   npc,
+  batch,
 ]
 
 export const DEFAULT_SCREEN = "home"

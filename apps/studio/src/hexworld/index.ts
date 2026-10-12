@@ -36,6 +36,7 @@ import { HEX_TILE_SIZE, hexGroundFine, hexGroundMesh, hexIsland, hexWorld, hexZo
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
 import { worldCamera } from "../shell/worldCamera.ts"
+import { createLife, type Life } from "./life.ts"
 
 const logger = log("studio:hexworld")
 
@@ -101,6 +102,7 @@ export const hexWorldScreen: Screen = {
     let unTick = () => {}
     let post: Post | null = null
     let disposeField = () => {}
+    let life: Life | null = null
     const meshes: TerrainMesh[] = []
     const info = document.createElement("div")
     info.style.cssText =
@@ -271,6 +273,11 @@ export const hexWorldScreen: Screen = {
         return
       }
       sun.markDirty()
+      // ---- life (track B): townsfolk and agents on the walk graph; `?life=0` turns it off ----
+      if (ctx.query.get("life") !== "0") {
+        life = createLife(stage, { host, island: h, zones: z, world: w, groundAt, hour: () => now, seed })
+        await life.ready
+      }
       const top = Object.entries(w.stats.prefabs)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 8)
@@ -292,6 +299,7 @@ export const hexWorldScreen: Screen = {
       disposeField()
       atmosphere?.dispose()
       night?.dispose()
+      life?.dispose()
       unTick()
       post?.dispose()
       for (const m of meshes) m.dispose()

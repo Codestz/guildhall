@@ -20,6 +20,24 @@ export {
   landTiles,
 } from "./island.ts"
 export {
+  type AgentErrand,
+  type AgentSpec,
+  agentLoop,
+  type Folk,
+  type LifeAct,
+  type LifePose,
+  type LifeSpot,
+  type LifeStay,
+  type LifeStep,
+  type LifeWalk,
+  lifePose,
+  PLACE_ROLES,
+  peopleFor,
+  planFolk,
+  WALK_MPS,
+  workTiles,
+} from "./life.ts"
+export {
   CHARACTER_SCALE,
   HEX_TILE_SIZE,
   placeTile,
@@ -31,6 +49,15 @@ export {
   tilePath,
   tilePrefab,
 } from "./tiles.ts"
+export {
+  DOOR_OUT,
+  HEX_WALK_KINDS,
+  type HexWalk,
+  type HexWalkEdge,
+  type HexWalkKind,
+  type HexWalkNode,
+  hexWalk,
+} from "./walk.ts"
 export { type HexWorld, type HexWorldTile, hexWorld, LEVEL_STEP } from "./world.ts"
 export {
   type HexRoad,

@@ -45,6 +45,9 @@ import { buildPlaces } from "./towns.ts"
 
 const logger = log("studio:terra3d")
 
+/** One colour for every road, street and square, so where they meet they read as one surface. */
+const ROAD = "#cbb48a"
+
 const TREES = [
   "kaykit-forest/tree-1-b-color1",
   "kaykit-forest/tree-1-c-color1",
@@ -110,58 +113,59 @@ function inlandWater(t: Terra): Float32Array {
   return new Float32Array(pos)
 }
 
-/** Each road as a ribbon draped over the ground (sampled every metre so it follows the terraces). */
+/**
+ * One continuous strip per road: the line resampled every metre, each point offset both ways along the
+ * mean of its two segments' normals (a mitre, so joints close), each edge vertex draped on the ground
+ * under it.
+ */
+function strip(t: Terra, line: readonly (readonly [number, number])[], half: number, pos: number[]): void {
+  const pts: [number, number][] = []
+  for (let k = 1; k < line.length; k++) {
+    const a = line[k - 1]!
+    const b = line[k]!
+    const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1])))
+    for (let j = 0; j < n; j++) pts.push([a[0] + ((b[0] - a[0]) * j) / n, a[1] + ((b[1] - a[1]) * j) / n])
+  }
+  const last = line[line.length - 1]
+  if (last) pts.push([last[0], last[1]])
+  if (pts.length < 2) return
+  const at = (x: number, z: number) => Math.max(terraHeightAt(t, x, z), 0.6) + 0.12
+  type P3 = [number, number, number]
+  const side: [P3, P3][] = []
+  for (let k = 0; k < pts.length; k++) {
+    const p = pts[k]!
+    const a = pts[Math.max(0, k - 1)]!
+    const b = pts[Math.min(pts.length - 1, k + 1)]!
+    let dx = b[0] - a[0]
+    let dz = b[1] - a[1]
+    const len = Math.hypot(dx, dz) || 1
+    dx /= len
+    dz /= len
+    const l: [number, number] = [p[0] - dz * half, p[1] + dx * half]
+    const r: [number, number] = [p[0] + dz * half, p[1] - dx * half]
+    side.push([
+      [l[0], at(l[0], l[1]), l[1]],
+      [r[0], at(r[0], r[1]), r[1]],
+    ])
+  }
+  for (let k = 1; k < side.length; k++) {
+    const [a0, a1] = side[k - 1]!
+    const [b0, b1] = side[k]!
+    pos.push(...a0, ...b0, ...a1, ...a1, ...b0, ...b1)
+  }
+}
+
+/** Each road as a continuous strip draped over the ground. */
 function roadRibbons(t: Terra, plan: TerraPlan, width?: number): Float32Array {
   const pos: number[] = []
-  for (const r of plan.roads) {
-    const half = width ?? (r.kind === "main" ? 2.2 : 1.5)
-    const pts: [number, number][] = []
-    for (let k = 1; k < r.line.length; k++) {
-      const a = r.line[k - 1]!
-      const b = r.line[k]!
-      const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1])))
-      for (let j = 0; j < n; j++) pts.push([a[0] + ((b[0] - a[0]) * j) / n, a[1] + ((b[1] - a[1]) * j) / n])
-    }
-    pts.push(r.line[r.line.length - 1] as [number, number])
-    const at = (p: [number, number]) => Math.max(terraHeightAt(t, p[0], p[1]), 0.6) + 0.12
-    for (let k = 1; k < pts.length; k++) {
-      const a = pts[k - 1]!
-      const b = pts[k]!
-      let dx = b[0] - a[0]
-      let dz = b[1] - a[1]
-      const len = Math.hypot(dx, dz) || 1
-      dx /= len
-      dz /= len
-      const ya = at(a)
-      const yb = at(b)
-      const a0 = [a[0] - dz * half, ya, a[1] + dx * half]
-      const a1 = [a[0] + dz * half, ya, a[1] - dx * half]
-      const b0 = [b[0] - dz * half, yb, b[1] + dx * half]
-      const b1 = [b[0] + dz * half, yb, b[1] - dx * half]
-      pos.push(...a0, ...b0, ...a1, ...a1, ...b0, ...b1)
-    }
-  }
+  for (const r of plan.roads) strip(t, r.line, width ?? (r.kind === "main" ? 2.2 : 1.5), pos)
   return new Float32Array(pos)
 }
 
-/** Street centrelines as ribbons of their own width, draped over the ground. */
+/** Street centrelines as continuous strips of their own width, draped over the ground. */
 function streetRibbons(t: Terra, streets: { line: [number, number][]; half: number }[]): Float32Array {
   const pos: number[] = []
-  for (const s of streets) {
-    if (s.half <= 0 || s.line.length < 2) continue
-    const one = roadRibbons(
-      t,
-      {
-        anchors: [],
-        roads: [{ a: 0, b: 0, line: s.line, bridges: [], kind: "main" }],
-        claim: new Uint8Array(0),
-        area: [],
-        ms: 0,
-      },
-      s.half,
-    )
-    for (const v of one) pos.push(v)
-  }
+  for (const s of streets) if (s.half > 0) strip(t, s.line, s.half, pos)
   return new Float32Array(pos)
 }
 
@@ -493,9 +497,7 @@ export const terra3d: Screen = {
       const sun = createSun(stage, { town: { min: [-span, -2, -span], max: [span, 22, span] } })
       createSky(stage, { sun, hour: 15.5, reach: R * 2.2 })
       const plan = view.plan ? terraPlan(t) : null
-      const parcels = plan ? terraParcels(t, plan) : null
-      if (plan) meshes.push(createSurface(stage, roadRibbons(t, plan), "#c9a774"))
-      if (parcels) meshes.push(createSurface(stage, trailRibbons(t, parcels), "#b89a6a"))
+      if (plan) meshes.push(createSurface(stage, roadRibbons(t, plan), ROAD))
       meshes.push(
         createHeightGround(stage, { ...t, rgba: paintTerra(t, { shade: false, contours: false }) }),
         createInlandWater(stage, inlandWater(t)),
@@ -517,9 +519,12 @@ export const terra3d: Screen = {
       const have = (id: string) => catalog.get(id) !== undefined
       const built = plan ? await buildPlaces(t, plan, catalog) : null
       if (disposed) return
+      // parcels after the districts: what a place claimed but left unbuilt is farmed too
+      const parcels = plan ? terraParcels(t, plan, built?.ground) : null
+      if (parcels) meshes.push(createSurface(stage, trailRibbons(t, parcels), "#b89a6a"))
       if (built) {
-        meshes.push(createSurface(stage, streetRibbons(t, built.streets), "#d6c29a"))
-        meshes.push(createSurface(stage, squares(t, built.streets), "#ddcda6"))
+        meshes.push(createSurface(stage, streetRibbons(t, built.streets), ROAD))
+        meshes.push(createSurface(stage, squares(t, built.streets), ROAD))
       }
       const clear = (p: BatchInstance) =>
         !(plan?.roads ?? []).some((r) => r.line.some((q) => Math.hypot(q[0] - p.x, q[1] - p.z) < 3.5))

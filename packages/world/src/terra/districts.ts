@@ -16,7 +16,7 @@
  */
 import type { PrefabMeta } from "@guildhall/assets"
 import type { Vec2 } from "../geom/vec.ts"
-import { TERRA_WATER, type Terra, terraHeightAt } from "./island.ts"
+import { TERRA_CRAG, TERRA_WATER, type Terra, terraHeightAt } from "./island.ts"
 import { hash2 } from "./noise.ts"
 import type { AnchorKind, TerraPlan } from "./plan.ts"
 
@@ -177,16 +177,20 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
 
   plan.anchors.forEach((a, ai) => {
     const P = PLAN_OF[a.kind]
-    const mine = (p: Vec2, flat = 0.28): boolean => {
+    /** On this place's dry, gentle ground; on one terrace when `level` is given. */
+    const mine = (p: Vec2, flat = 0.28, level?: number): boolean => {
       const i = cellAt(p)
       return (
         i >= 0 &&
         plan.claim[i] === ai + 1 &&
-        terraceLevel[i] === a.level &&
+        terraceLevel[i] !== TERRA_CRAG &&
+        (level === undefined || terraceLevel[i] === level) &&
         water[i] === TERRA_WATER.land &&
         slope[i]! <= flat
       )
     }
+    const levelAt = (p: Vec2): number => terraceLevel[Math.max(0, cellAt(p))]!
+    const firstStreet = streets.length
     const u = (k: number, x = 0, z = 0) =>
       hash2(seed + 9100 + ai * 37 + k, Math.round(x * 4), Math.round(z * 4))
     const before = buildings.length
@@ -206,10 +210,12 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
     const sideStreets: DistrictStreet[] = []
     const grow = (start: Vec2, dir: Vec2, depth: number): void => {
       const line: Vec2[] = [start]
+      // a street keeps to the terrace it starts on: on the hill it runs along the tread
+      const lvl = levelAt(start)
       let d = dir
       let p = start
       const step = 4
-      const street: DistrictStreet = { line, half: depth === 0 ? 2 : 1.6 }
+      const street: DistrictStreet = { line, half: depth === 0 ? 1.7 : 1.3 }
       for (let n = 0; n < P.reach / step; n++) {
         // turn toward the contour: across the slope, whichever way is nearer the current heading
         const e = 1.5
@@ -235,9 +241,10 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
         const nl = Math.hypot(nx, nz) || 1
         d = [nx / nl, nz / nl]
         const q: Vec2 = [p[0] + d[0] * step, p[1] + d[1] * step]
-        if (!mine(q, 0.32)) break
-        if (n > 1 && nearStreet(q, 5, street)) {
-          line.push(q)
+        if (!mine(q, 0.32, lvl)) break
+        if (n > 0 && nearStreet(q, 6, street)) {
+          // join the street it meets, unless that leaves a sliver
+          if (n > 2) line.push(q)
           break
         }
         line.push(q)
@@ -268,6 +275,30 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
           }
         }
       }
+    // a town's square sends streets out each way
+    if (a.kind === "town" && P.square > 0)
+      for (let k = 0; k < 4; k++) {
+        const ang = (k / 4) * Math.PI * 2 + u(11) * 1.5
+        const n: Vec2 = [Math.cos(ang), Math.sin(ang)]
+        grow([a.at[0] + n[0] * (P.square + 1), a.at[1] + n[1] * (P.square + 1)], n, 0)
+      }
+    // streets along each terrace step the place reaches: started anywhere on open, gentle ground no
+    // street serves yet, running both ways along the contour
+    if (P.branch > 0) {
+      const pitch = 16
+      for (let z = a.at[1] - P.reach * 2; z <= a.at[1] + P.reach * 2; z += pitch)
+        for (let x = a.at[0] - P.reach * 2; x <= a.at[0] + P.reach * 2; x += pitch) {
+          const p: Vec2 = [x + (u(31, x, z) - 0.5) * 6, z + (u(32, x, z) - 0.5) * 6]
+          if (!mine(p, 0.2) || nearStreet(p, 11)) continue
+          const e = 1.5
+          const gx = terraHeightAt(t, p[0] + e, p[1]) - terraHeightAt(t, p[0] - e, p[1])
+          const gz = terraHeightAt(t, p[0], p[1] + e) - terraHeightAt(t, p[0], p[1] - e)
+          const gl = Math.hypot(gx, gz)
+          const along: Vec2 = gl > 0.02 ? [-gz / gl, gx / gl] : [1, 0]
+          grow(p, along, 0)
+          grow(p, [-along[0], -along[1]], 0)
+        }
+    }
     for (const s of sideStreets) {
       const [p, q] = s.line as [Vec2, Vec2]
       grow(p, [q[0] - p[0], q[1] - p[1]], 1)
@@ -289,12 +320,16 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
         [c[0] + uu[0] * hu - v[0] * hv, c[1] + uu[1] * hu - v[1] * hv],
         [c[0] - uu[0] * hu - v[0] * hv, c[1] - uu[1] * hu - v[1] * hv],
       ]
-      if (!mine(c) || corners.some((q) => !mine(q, 0.4))) return 0
+      const front: Vec2 = [c[0] + v[0] * hv, c[1] + v[1] * hv]
+      const lvl = levelAt(front)
+      // the front stands on its tread; the back may run into the step above (built into the hillside)
+      const onTread = (q: Vec2) => mine(q, 0.4, lvl) || mine(q, 1.2, lvl + 1)
+      if (!mine(front, 0.35, lvl) || !onTread(c) || corners.some((q) => !onTread(q))) return 0
       if (boxes.some((b) => overlap(b, box))) return 0
       if (corners.some((q) => nearStreet(q, 0.6)) || nearStreet(c, 0.6)) return 0
       if (squares.some((sq) => sq.some((q) => Math.hypot(q[0] - c[0], q[1] - c[1]) < hv * 0.6))) return 0
       let y = Infinity
-      for (const q of [c, ...corners]) y = Math.min(y, terraHeightAt(t, q[0], q[1]))
+      for (const q of [front, corners[0]!, corners[1]!]) y = Math.min(y, terraHeightAt(t, q[0], q[1]))
       boxes.push(box)
       buildings.push({
         prefab: id,
@@ -351,7 +386,49 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
         }
       }
     }
+    // a street nobody lives on is not a street: drop this place's empty ones
+    const mineB = buildings.slice(before)
+    for (let k = streets.length - 1; k >= firstStreet; k--) {
+      const st = streets[k]!
+      const used = mineB.some((b) =>
+        st.line.some((q) => Math.hypot(q[0] - b.at[0], q[1] - b.at[1]) < st.half + 11),
+      )
+      if (!used) streets.splice(k, 1)
+    }
     counts.push(buildings.length - before)
   })
   return { streets, squares, buildings, counts, ms: Math.round(performance.now() - t0) }
+}
+
+/**
+ * The ground the districts actually use: every cell under or beside a building (its footprint and a
+ * yard's width round it) and under every street or square. What a place claimed but did not build on
+ * goes back to the parcels: gardens and orchards round the town, fields round a farm.
+ */
+export function districtGround(t: Terra, d: TerraDistricts): Uint8Array {
+  const { w, h, cell, origin } = t
+  const out = new Uint8Array(w * h)
+  const disc = (x: number, z: number, r: number): void => {
+    const ix = Math.floor((x - origin[0]) / cell)
+    const iz = Math.floor((z - origin[1]) / cell)
+    const rc = Math.ceil(r / cell)
+    for (let dz = -rc; dz <= rc; dz++)
+      for (let dx = -rc; dx <= rc; dx++) {
+        const xx = ix + dx
+        const zz = iz + dz
+        if (xx < 0 || zz < 0 || xx >= w || zz >= h) continue
+        if ((dx * dx + dz * dz) * cell * cell <= r * r) out[zz * w + xx] = 1
+      }
+  }
+  for (const b of d.buildings) disc(b.at[0], b.at[1], 9)
+  for (const s of d.streets)
+    for (let k = 1; k < s.line.length; k++) {
+      const a = s.line[k - 1]!
+      const b = s.line[k]!
+      const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / cell)
+      for (let j = 0; j <= n; j++)
+        disc(a[0] + ((b[0] - a[0]) * j) / n, a[1] + ((b[1] - a[1]) * j) / n, s.half + 2)
+    }
+  for (const sq of d.squares) for (const p of sq) disc(p[0], p[1], 6)
+  return out
 }

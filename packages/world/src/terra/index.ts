@@ -1,6 +1,7 @@
 export {
   type DistrictBuilding,
   type DistrictStreet,
+  districtGround,
   type TerraDistricts,
   terraDistricts,
 } from "./districts.ts"

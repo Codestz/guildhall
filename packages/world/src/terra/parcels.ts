@@ -68,7 +68,11 @@ export interface TerraParcels {
   ms: number
 }
 
-export function terraParcels(t: Terra, plan: TerraPlan): TerraParcels {
+/**
+ * `built`, when given, is the ground the districts really use (`districtGround`): what a place claimed
+ * but left unbuilt is parcelled too. Without it the whole of every claim is the place's.
+ */
+export function terraParcels(t: Terra, plan: TerraPlan, built?: Uint8Array): TerraParcels {
   const t0 = performance.now()
   const { w, h, cell, origin, water, slope, coastDist, terraceLevel, height, spec } = t
   const N = w * h
@@ -96,7 +100,7 @@ export function terraParcels(t: Terra, plan: TerraPlan): TerraParcels {
     }
   const open = (i: number): boolean =>
     water[i] === TERRA_WATER.land &&
-    !plan.claim[i] &&
+    !(built ? built[i] : plan.claim[i]) &&
     !road[i] &&
     terraceLevel[i] !== TERRA_CRAG &&
     slope[i]! <= 0.6
@@ -328,7 +332,14 @@ export function terraParcels(t: Terra, plan: TerraPlan): TerraParcels {
   for (let i = 0; i < N; i++) {
     if (water[i] !== TERRA_WATER.land) continue
     dry++
-    if (plan.claim[i] || owner[i] || road[i] || slope[i]! > 0.6 || terraceLevel[i] === TERRA_CRAG) used++
+    if (
+      (built ? built[i] : plan.claim[i]) ||
+      owner[i] ||
+      road[i] ||
+      slope[i]! > 0.6 ||
+      terraceLevel[i] === TERRA_CRAG
+    )
+      used++
   }
   const cellOut = new Int32Array(N)
   for (let i = 0; i < N; i++) if (owner[i] && byId.has(owner[i]! - 1)) cellOut[i] = owner[i]!

@@ -7,7 +7,14 @@
 import { compilePrefab, type PrefabRecipe, type Recipe, validatePrefab } from "@guildhall/assets"
 import { log } from "@guildhall/core"
 import type { BatchCluster } from "@guildhall/render"
-import { prefabLibrary, recipeKey, type Terra, type TerraPlan, terraDistricts } from "@guildhall/world"
+import {
+  districtGround,
+  prefabLibrary,
+  recipeKey,
+  type Terra,
+  type TerraPlan,
+  terraDistricts,
+} from "@guildhall/world"
 import type { loadCatalog } from "../catalog.ts"
 import * as data from "../data.ts"
 
@@ -22,6 +29,8 @@ export interface BuiltPlaces {
   streets: { line: [number, number][]; half: number }[]
   /** One line per place: what was built. */
   report: string[]
+  /** The ground the districts use; the rest of each claim goes to the parcels. */
+  ground: Uint8Array
 }
 
 async function recipes(catalog: Catalog) {
@@ -67,5 +76,5 @@ export async function buildPlaces(t: Terra, plan: TerraPlan, catalog: Catalog): 
   ]
   const report = plan.anchors.map((a, i) => `${a.kind}: ${d.counts[i] ?? 0} buildings`)
   logger.info("districts", { ms: d.ms, buildings: d.buildings.length, streets: d.streets.length })
-  return { clusters, streets, report }
+  return { clusters, streets, report, ground: districtGround(t, d) }
 }

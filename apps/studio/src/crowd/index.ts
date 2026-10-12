@@ -4,6 +4,7 @@ import { type Crowd, createCrowd, createStage, loadCharacter, toScreen } from "@
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import * as data from "../data.ts"
 import type { Screen } from "../screens.ts"
+import { worldCamera } from "../shell/worldCamera.ts"
 import { buildBench } from "./bench.ts"
 import { type CrowdPath, parseCrowdQuery } from "./query.ts"
 import type { FolkGroup, FolkScene } from "./scene.ts"
@@ -70,6 +71,7 @@ export const crowdLab: Screen = {
     const q = parseCrowdQuery(ctx.query)
     const stage = createStage(host)
     ctx.attach(stage)
+    const cam = worldCamera(stage, host, ctx.query)
 
     let disposed = false
     let clock = q.t
@@ -112,6 +114,7 @@ export const crowdLab: Screen = {
       }
       scene = built
       stage.setCamera(built.camera)
+      cam.start()
       for (const group of built.groups) {
         const t0 = performance.now()
         const crowd = await createCrowd(
@@ -182,6 +185,7 @@ export const crowdLab: Screen = {
 
     return () => {
       disposed = true
+      cam.dispose()
       if (ext) delete ext.crowd
       unsubscribe()
       panel.remove()

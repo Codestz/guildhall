@@ -9,10 +9,10 @@ import { log } from "@guildhall/core"
 import type { BatchCluster, LodCounts, Stage } from "@guildhall/render"
 import { normalizeSpec, type TownReport, type TownSpecInput, townMetrics } from "@guildhall/world"
 import type { JobLib } from "../planner/job.ts"
-import { FAR, LENS, poseFor } from "./camera.ts"
+import { FAR, heroPose, LENS, poseFor, townWorld } from "./camera.ts"
 import { createCompiler, type Dressed, dress } from "./dress.ts"
 import { type FromWorker, runTownJob, type ToWorker, type TownJob } from "./job.ts"
-import { type TownQuery, townSpec } from "./query.ts"
+import { type Cam, type TownQuery, townSpec } from "./query.ts"
 import { type BuildTimes, createTownScene } from "./scene.ts"
 
 const logger = log("studio:town")
@@ -130,18 +130,67 @@ export function createTownController(
     const c = stage.renderer.domElement
     return Math.max(0.1, c.clientWidth / Math.max(1, c.clientHeight))
   }
+  /** The preset free flight was entered from: Escape hands the camera back to it. */
+  let before: Exclude<Cam, "free"> = initial.cam === "free" ? "hero" : initial.cam
+  /** The preset on screen, and the town the camera was last framed on. */
+  let shown: Cam = initial.cam
+  let framed: TownJob | null = null
+  const lens = (map: boolean, distance: number) => {
+    stage.camera.fov = map ? LENS.map : LENS.perspective
+    stage.camera.far = map ? FAR.map(distance) : FAR.perspective
+    stage.camera.updateProjectionMatrix()
+  }
+  const hero = (job: TownJob) =>
+    heroPose(job.layout, normalizeSpec(job.layout.spec).radius, { aspect: aspect() })
+  /**
+   * Free flight is taking off from the preset on screen: Escape comes back to it. Flight uses the
+   * perspective lens, so from the map it comes back to the hero shot instead.
+   */
+  const takeOff = (job: TownJob | null) => {
+    if (shown !== "free") before = shown === "map" ? "hero" : shown
+    if (shown === "map") {
+      lens(false, 0)
+      if (job) stage.rig.setHome(hero(job))
+    }
+    shown = "free"
+  }
   const frame = () => {
     const job = state.job
     if (!job) return
-    const map = state.query.cam === "map"
-    const radius = normalizeSpec(job.layout.spec).radius
-    const pose = poseFor(state.query.cam, job.layout, radius, { aspect: aspect() })
+    stage.rig.setWorld(townWorld(job.layout))
+    const cam = state.query.cam
+    const first = framed !== job
+    framed = job
+    if (cam === "free") {
+      // A new town keeps a flight going; a first frame takes off from the hero shot, the button from
+      // wherever the orbit is.
+      if (stage.rig.mode() === "free") return
+      if (first) {
+        lens(false, 0)
+        stage.setCamera(hero(job))
+        shown = "hero"
+      }
+      takeOff(job)
+      stage.rig.setMode("free")
+      return
+    }
+    const pose = poseFor(cam, job.layout, normalizeSpec(job.layout.spec).radius, { aspect: aspect() })
     // The map looks through a narrower lens from further off: the camera's lens and far plane follow.
-    stage.camera.fov = map ? LENS.map : LENS.perspective
-    stage.camera.far = map ? FAR.map(pose.distance) : FAR.perspective
-    stage.camera.updateProjectionMatrix()
-    stage.setCamera(pose)
+    lens(cam === "map", pose.distance)
+    shown = cam
+    if (stage.rig.mode() === "free") stage.rig.glide(pose)
+    else stage.setCamera(pose)
   }
+  // F and Escape switch the rig itself: the query (the link, the Camera buttons) follows it.
+  const offRig = stage.rig.subscribe(() => {
+    const free = stage.rig.mode() === "free"
+    if (free === (state.query.cam === "free")) return
+    if (free) takeOff(state.job)
+    else shown = before
+    const query: TownQuery = { ...state.query, cam: free ? "free" : before }
+    publish({ query })
+    onQuery(query)
+  })
 
   const regrow = async (spec: TownSpecInput) => {
     const t0 = performance.now()
@@ -226,6 +275,7 @@ export function createTownController(
     },
     dispose() {
       disposed = true
+      offRig()
       worker?.terminate()
       for (const done of pending.values()) done(new Error("town closed"))
       pending.clear()

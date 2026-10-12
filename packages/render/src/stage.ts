@@ -10,8 +10,8 @@ import {
   Vector3,
   WebGLRenderer,
 } from "three"
-import { attachOrbitInput, poseToCamera } from "./camera.ts"
 import { createGovernor, parseDprPin } from "./governor.ts"
+import { createRig, type Rig } from "./rig/index.ts"
 import { type FrameCounters, FrameRing, NO_COUNTERS, summarize } from "./stats.ts"
 
 export interface Stage {
@@ -26,8 +26,12 @@ export interface Stage {
   sample(ms: number): Promise<FrameStats>
   /** Draws at this device pixel ratio from the next frame on (the governor's lever). */
   setDpr(dpr: number): void
+  /** Puts the camera at a pose at once (the rig holds it inside its world, when it has one). */
   setCamera(p: CameraPose): void
+  /** The pose being drawn (in free flight: the eye and the point it looks at). */
   getCamera(): CameraPose
+  /** The camera rig: orbit and free flight, eased, held inside a world (rig/index.ts). */
+  rig: Rig
   /** Calls `fn(dt seconds)` every frame before drawing; returns the unsubscribe. */
   onFrame(fn: (dt: number) => void): () => void
   dispose(): void
@@ -69,14 +73,7 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
   scene.add(sun)
 
   const camera = new PerspectiveCamera(40, 1, 0.05, 2000)
-  let pose: CameraPose = DEFAULT_POSE
-  const setCamera = (p: CameraPose) => {
-    pose = { ...p, target: [...p.target] }
-    camera.position.set(...poseToCamera(pose))
-    camera.lookAt(...pose.target)
-  }
-  setCamera(pose)
-  const detachInput = attachOrbitInput(renderer.domElement, { get: () => pose, set: setCamera })
+  const rig = createRig(camera, renderer.domElement, DEFAULT_POSE)
 
   const resize = () => {
     const w = Math.max(1, host.clientWidth)
@@ -117,6 +114,8 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
     renderer.info.reset()
     shadowCalls = 0
     shadowTris = 0
+    // The camera moves first: every hook (the sky's dome, the cascades, the haze) reads where it is now.
+    rig.update(ms / 1000)
     for (const fn of frameFns) fn(ms / 1000)
     renderer.render(scene, camera)
     // The CPU side of the frame: hooks plus render. Headless Chrome has no vsync, so this, not the
@@ -161,8 +160,9 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
       dpr = next
       renderer.setPixelRatio(dpr)
     },
-    setCamera,
-    getCamera: () => ({ ...pose, target: [...pose.target] }),
+    setCamera: (p) => rig.set(p),
+    getCamera: () => rig.get(),
+    rig,
     onFrame(fn) {
       frameFns.add(fn)
       return () => frameFns.delete(fn)
@@ -171,7 +171,7 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
       governor.dispose()
       cancelAnimationFrame(raf)
       observer.disconnect()
-      detachInput()
+      rig.dispose()
       renderer.dispose()
       renderer.domElement.remove()
       logger.info("disposed")

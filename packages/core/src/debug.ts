@@ -32,6 +32,13 @@ export interface CameraPose {
   distance: number
 }
 
+/** A free camera's eye and heading (degrees). */
+export interface FreeCamera {
+  eye: [number, number, number]
+  yaw: number
+  pitch: number
+}
+
 /** `window.guildhall`: what tools and agents drive an app through. */
 export interface GuildhallDebug {
   version: string
@@ -39,7 +46,16 @@ export interface GuildhallDebug {
   ready(): Promise<void>
   log: { records: typeof logRecords; configure: typeof configureLog }
   perf: { now(): FrameStats; sample(ms: number): Promise<FrameStats> }
-  camera: { get(): CameraPose; set(p: CameraPose): Promise<void> }
+  camera: {
+    get(): CameraPose
+    set(p: CameraPose): Promise<void>
+    /** `orbit` or `free` flight (an app with a free camera). */
+    mode?(): "orbit" | "free"
+    /** Enters free flight from the current view, or glides back to orbit; resolves once settled. */
+    setMode?(mode: "orbit" | "free"): Promise<void>
+    /** Places the free camera: its eye, yaw (as an azimuth) and pitch up from level, degrees. */
+    fly?(state: FreeCamera): Promise<void>
+  }
   /** Navigate within the app by deep link (a path, or an app's query form); resolves when rendered. */
   open(query: string): Promise<void>
   /** Per-app extensions (studio puts `studio`/`thumbs` here). */

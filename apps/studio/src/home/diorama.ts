@@ -20,6 +20,7 @@ import {
   type Sky,
   type Stage,
   type Sun,
+  type World,
 } from "@guildhall/render"
 import type { Vec2 } from "@guildhall/world"
 import { libraryUrl } from "../catalog.ts"
@@ -82,6 +83,15 @@ export const FIGURES: readonly Figure[] = [
 
 /** The view: a three-quarter look at the figures, the houses behind them, the whole island in frame. */
 export const POSE: CameraPose = { target: [0.2, 1.4, 0.6], azimuth: 18, elevation: 19, distance: 27 }
+
+/** What the view is held inside: the plinth, no water, a wide zoom so the low three-quarter view stands. */
+export const DIORAMA_WORLD: World = {
+  centre: [0, 0],
+  half: ISLAND_R,
+  water: null,
+  maxReach: 2.5,
+  free: false,
+}
 
 const octagon = (r: number): Vec2[] =>
   Array.from({ length: 8 }, (_, i) => {
@@ -152,6 +162,8 @@ export function createDiorama(
   mounts: Record<string, Mount> | undefined,
 ): Diorama {
   const stage = createStage(host)
+  // Held over its plinth: never below the grass, never looking up from under it. No free flight here.
+  stage.rig.setWorld(DIORAMA_WORLD)
   stage.setCamera(POSE)
   const town = { min: [-ISLAND_R, -1.5, -ISLAND_R], max: [ISLAND_R, 12, ISLAND_R] } as const
   const sun: Sun = createSun(stage, {

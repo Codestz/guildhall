@@ -1,14 +1,15 @@
 import type { FrameStats } from "@guildhall/core"
-import type { Stage } from "@guildhall/render"
+import type { Rig, Stage } from "@guildhall/render"
 import { TIERS, type Tier } from "@guildhall/world"
 import { useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { drawMap } from "../planner/draw.ts"
 import { COMPASS, type CompassPoint, compassOf, DEFAULT_LAYERS, type WallChoice } from "../planner/query.ts"
 import { themeOf } from "../planner/theme.ts"
 import { fit } from "../planner/view.ts"
+import { createCamKeys } from "../shell/camKeys.ts"
 import { href } from "../shell/router.ts"
 import type { TownController, TownState } from "./controller.ts"
-import { type Cam, plannerLink } from "./query.ts"
+import { CAMS, type Cam, plannerLink } from "./query.ts"
 
 const TIER_NAMES: Record<Tier, string> = {
   hamlet: "Hamlet",
@@ -17,7 +18,7 @@ const TIER_NAMES: Record<Tier, string> = {
   city: "City",
   capital: "Capital",
 }
-const CAM_NAMES: Record<Cam, string> = { hero: "Hero", street: "Street", map: "Map" }
+const CAM_NAMES: Record<Cam, string> = { hero: "Hero", street: "Street", map: "Map", free: "Free" }
 const BUSY: Record<NonNullable<TownState["busy"]>, string> = {
   growing: "growing the town…",
   dressing: "dressing…",
@@ -95,7 +96,18 @@ function SeedField({ seed, onSeed }: { seed: number; onSeed(n: number): void }) 
   )
 }
 
-export function Controls({ town }: { town: TownController }) {
+/** The camera's controls for the mode the rig is in (shell/camKeys.ts). */
+function CamKeys({ rig }: { rig: Rig }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const keys = createCamKeys(rig)
+    ref.current?.append(keys.el)
+    return keys.dispose
+  }, [rig])
+  return <div ref={ref} className="gh-tw-camkeys" />
+}
+
+export function Controls({ town, rig }: { town: TownController; rig: Rig }) {
   const s = useTown(town)
   const q = s.query
   const harbourValue =
@@ -196,7 +208,7 @@ export function Controls({ town }: { town: TownController }) {
           <div style={{ flex: 1 }}>
             <Segmented<Cam>
               label="Camera"
-              options={(["hero", "street", "map"] as const).map((c) => ({ value: c, name: CAM_NAMES[c] }))}
+              options={CAMS.map((c) => ({ value: c, name: CAM_NAMES[c] }))}
               value={q.cam}
               onChange={(cam) => (cam === q.cam ? town.frame() : town.set({ cam }))}
             />
@@ -211,6 +223,7 @@ export function Controls({ town }: { town: TownController }) {
             Compare
           </button>
         </div>
+        <CamKeys rig={rig} />
       </div>
     </>
   )

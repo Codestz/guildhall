@@ -8,8 +8,8 @@ import { GOLDEN_HOUR } from "@guildhall/render"
 import { TIERS, type Tier, type TownSpecInput } from "@guildhall/world"
 import { compassOf, type HarbourChoice, parseHarbour, specOf, type WallChoice } from "../planner/query.ts"
 
-/** The camera presets: the 3/4 establishing shot, down among the houses, and straight down. */
-export const CAMS = ["hero", "street", "map"] as const
+/** The camera presets: the 3/4 establishing shot, down among the houses, straight down, and free flight. */
+export const CAMS = ["hero", "street", "map", "free"] as const
 export type Cam = (typeof CAMS)[number]
 
 export interface TownQuery {

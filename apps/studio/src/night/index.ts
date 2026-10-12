@@ -30,6 +30,9 @@ import {
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import * as data from "../data.ts"
 import type { Screen } from "../screens.ts"
+import { worldCamera } from "../shell/worldCamera.ts"
+import { townWorld } from "../town/camera.ts"
+import { withSea } from "../town/job.ts"
 import { clock, parseNightQuery } from "./params.ts"
 
 const logger = log("studio:night")
@@ -95,6 +98,7 @@ export const night: Screen = {
     ctx.attach(stage)
     const pose: CameraPose = { target: [0, 0, 0], azimuth: 40, elevation: 34, distance: 110 }
     stage.setCamera(pose)
+    const cam = worldCamera(stage, host, ctx.query)
 
     let disposed = false
     let built: StaticBatch | null = null
@@ -165,11 +169,14 @@ export const night: Screen = {
       const square = plan.plazas[0]
       const c = square && square.length > 2 ? centroid(square) : [0, 0]
       Object.assign(pose, { target: [c[0], 0, c[1]] })
+      stage.rig.setWorld(townWorld(plan))
       stage.setCamera(pose)
+      cam.start()
       sun = createSun(stage, { town: { min: [min[0], 0, min[1]], max: [max[0], 30, max[1]] } })
       sky = createSky(stage, { sun, hour: q.hour, reach: 200 })
       ground = createGround(stage, draw.ground, { seed: q.seed })
-      water = createWater(stage, draw.water)
+      // The open sea past the site, as the town screen draws it: the haze hides its end, not the void.
+      water = createWater(stage, withSea(draw.water, plan.bounds))
       const batch = await createStaticBatch(
         stage,
         pieces,
@@ -216,6 +223,7 @@ export const night: Screen = {
 
     return () => {
       disposed = true
+      cam.dispose()
       if (ext) delete ext.night
       unsubscribe()
       panel.remove()

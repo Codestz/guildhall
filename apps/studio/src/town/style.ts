@@ -5,6 +5,7 @@ const CSS = /* css */ `
 .gh-town .gh-pl-stats { max-height: calc(100% - 24px); }
 .gh-town[data-ui="off"] .gh-panel { display: none; }
 .gh-tw-hour { width: 100%; accent-color: var(--brass); }
+.gh-tw-camkeys { margin-top: 10px; }
 .gh-tw-compare {
   position: absolute; right: 282px; bottom: 12px; margin: 0; width: 300px; padding: 6px;
   display: flex; flex-direction: column; gap: 4px;

@@ -4,10 +4,13 @@
  *   harbour lies lower-left when the town has one, within the arc where the evening sun lights the
  *   street fronts the camera sees;
  * - `street`: low among the houses, down a main street toward the square;
- * - `map`: straight down with a narrow lens (near-orthographic), north up as on the planner's sheet.
+ * - `map`: straight down with a narrow lens (near-orthographic), north up as on the planner's sheet;
+ * - `free`: free flight (the stage's rig), starting from the hero shot.
+ * `townWorld` is what the rig is held inside: the site's box, the land's height and the water's.
  */
 import type { CameraPose } from "@guildhall/core"
-import type { TownPlan, Vec2 } from "@guildhall/world"
+import type { World } from "@guildhall/render"
+import { LEVELS, type TownPlan, type Vec2 } from "@guildhall/world"
 import type { Cam } from "./query.ts"
 
 /** The stage's own lens, and the narrow one the map preset swaps in (degrees, vertical). */
@@ -26,8 +29,10 @@ const HERO = { azimuth: 40, elevation: 38 } as const
 const LIT_ARC: readonly [number, number] = [0, 85]
 /** The street preset: where along the street the eye and the look point are, and their heights (metres). */
 const STREET = { eye: 42, look: 8, eyeHeight: 6, lookHeight: 3 } as const
-/** The orbit input's ceiling (render/camera.ts); straight down would flip the view. */
+/** The orbit's ceiling (render rig/world.ts LIMITS); straight down would flip the view. */
 const TOP = 89
+/** The closest the town orbit comes (metres): the street preset on a bent street stands this close. */
+const STREET_MIN = 6
 
 export interface Framing {
   /** Width over height of the canvas. */
@@ -160,7 +165,18 @@ export function mapPose(plan: Pick<TownPlan, "bounds">, f: Framing): CameraPose 
   return { target: [centre[0], 0, centre[1]], azimuth: 0, elevation: TOP, distance }
 }
 
-/** The pose of a preset for a plan. */
+/**
+ * The world a town's camera is held inside: the site's box (the island and the sea round it; the sea
+ * is drawn on past it to the haze), the land and the water's levels. The land is flat today: terraced
+ * terrain hands its `heightAt` in here, and every clamp follows it.
+ */
+export function townWorld(plan: Pick<TownPlan, "bounds">): World {
+  const { centre, half } = sheet(plan)
+  // Close enough for the street preset, whose look point can sit a few metres off the eye on a bend.
+  return { centre, half, heightAt: () => LEVELS.land, water: LEVELS.water, minDistance: STREET_MIN }
+}
+
+/** The pose of a preset for a plan (free flight starts from the hero shot). */
 export function poseFor(
   cam: Cam,
   plan: Pick<TownPlan, "bounds" | "plazas" | "spec" | "streets">,

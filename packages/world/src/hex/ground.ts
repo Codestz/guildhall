@@ -31,6 +31,15 @@ export interface HexGroundMesh {
 const SLOPE_OUT = 0.55
 const SLOPE_DEPTH = -0.9
 
+/**
+ * A wall's shade at height y: by the world height, not the wall's own top and foot, so every wall's bands
+ * line up across the island like rock strata (darker low, a lighter band every 0.74 m).
+ */
+const strata = (y: number): number => {
+  const band = Math.floor((y + 10) / 0.74)
+  return 0.62 + 0.3 * Math.min(1, Math.max(0, (y + 2.5) / 9)) + (band % 2 ? 0.04 : 0)
+}
+
 export function hexGroundMesh(h: HexIsland, w: HexWorld, pal: GroundPalette, base = -2.5): HexGroundMesh {
   const g = h.grid
   const R = HEX_TILE_SIZE
@@ -103,12 +112,12 @@ export function hexGroundMesh(h: HexIsland, w: HexWorld, pal: GroundPalette, bas
       }
       const floor = sea ? base : n ? n.top : base
       if (floor >= t.top - 0.01) continue
-      put(a[0], t.top, a[1], side, 1)
-      put(b[0], t.top, b[1], side, 1)
-      put(b[0], floor, b[1], side, 0.6)
-      put(a[0], t.top, a[1], side, 1)
-      put(b[0], floor, b[1], side, 0.6)
-      put(a[0], floor, a[1], side, 0.6)
+      put(a[0], t.top, a[1], side, strata(t.top))
+      put(b[0], t.top, b[1], side, strata(t.top))
+      put(b[0], floor, b[1], side, strata(floor))
+      put(a[0], t.top, a[1], side, strata(t.top))
+      put(b[0], floor, b[1], side, strata(floor))
+      put(a[0], floor, a[1], side, strata(floor))
     }
   }
   return { position: new Float32Array(pos), color: new Float32Array(col) }
@@ -263,7 +272,7 @@ export function hexGroundFine(
       put(b[0], c.y, b[1], top, tone(b[0], b[1]) * lift)
       put(a[0], c.y, a[1], top, tone(a[0], a[1]) * lift)
     }
-    const side = pal.side[c.t.ground] ?? pal.sideLand
+    const side = c.t.ground === "rock" || c.t.ground === "cliff" ? (pal.side[c.t.ground] ?? pal.sideLand) : pal.sideLand
     for (let k = 0; k < 6; k++) {
       const [sq, sr] = STEP[k]!
       const n = cells.get(`${q + sq},${rr + sr}`)
@@ -271,12 +280,12 @@ export function hexGroundFine(
       if (floor >= c.y - 0.01) continue
       const a = P[k]!
       const b = P[(k + 1) % 6]!
-      put(a[0], c.y, a[1], side, 1)
-      put(b[0], c.y, b[1], side, 1)
-      put(b[0], floor, b[1], side, 0.62)
-      put(a[0], c.y, a[1], side, 1)
-      put(b[0], floor, b[1], side, 0.62)
-      put(a[0], floor, a[1], side, 0.62)
+      put(a[0], c.y, a[1], side, strata(c.y))
+      put(b[0], c.y, b[1], side, strata(c.y))
+      put(b[0], floor, b[1], side, strata(floor))
+      put(a[0], c.y, a[1], side, strata(c.y))
+      put(b[0], floor, b[1], side, strata(floor))
+      put(a[0], floor, a[1], side, strata(floor))
     }
   }
   const heightAt = (x: number, z: number): number => {

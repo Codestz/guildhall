@@ -159,6 +159,157 @@ function draw(
   if (zones) drawZones(g, h, zones, cx, cy, s, C)
 }
 
+/** A tile's content as a little glyph: what its prefab will hold. */
+function paintContent(
+  g: CanvasRenderingContext2D,
+  u: string,
+  px: number,
+  py: number,
+  s: number,
+  hexPath: (x: number, y: number, k?: number) => void,
+  i: number,
+): void {
+  const r = (k: number) => {
+    const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453
+    return x - Math.floor(x)
+  }
+  const dot = (x: number, y: number, rad: number, c: string) => {
+    g.fillStyle = c
+    g.beginPath()
+    g.arc(px + x * s, py + y * s, Math.max(0.6, rad * s), 0, Math.PI * 2)
+    g.fill()
+  }
+  const tree = (x: number, y: number, rad: number, c = "#2f6a33") => {
+    dot(x + 0.05, y + 0.08, rad, "rgba(0,0,0,0.25)")
+    dot(x, y, rad, c)
+  }
+  const house = (x: number, y: number, w: number, roof: string) => {
+    const W = w * s
+    g.fillStyle = "#f3e9d4"
+    g.fillRect(px + x * s - W / 2, py + y * s - W / 2, W, W)
+    g.fillStyle = roof
+    g.beginPath()
+    g.moveTo(px + x * s - W / 2 - 1, py + y * s - W / 2 + 1)
+    g.lineTo(px + x * s, py + y * s - W)
+    g.lineTo(px + x * s + W / 2 + 1, py + y * s - W / 2 + 1)
+    g.closePath()
+    g.fill()
+  }
+  const rows = (c: string, back: string, angle: number) => {
+    g.fillStyle = back
+    hexPath(px, py, 0.9)
+    g.fill()
+    g.save()
+    hexPath(px, py, 0.9)
+    g.clip()
+    g.strokeStyle = c
+    g.lineWidth = Math.max(0.6, s * 0.14)
+    const ca = Math.cos(angle)
+    const sa = Math.sin(angle)
+    for (let k = -3; k <= 3; k++) {
+      g.beginPath()
+      g.moveTo(px - ca * s + -sa * k * s * 0.28, py - sa * s + ca * k * s * 0.28)
+      g.lineTo(px + ca * s + -sa * k * s * 0.28, py + sa * s + ca * k * s * 0.28)
+      g.stroke()
+    }
+    g.restore()
+  }
+  const icon = (glyph: string) => {
+    g.font = `${Math.max(9, s * 1.4)}px system-ui`
+    g.textAlign = "center"
+    g.textBaseline = "middle"
+    g.fillText(glyph, px, py)
+    g.textAlign = "start"
+    g.textBaseline = "alphabetic"
+  }
+  switch (u) {
+    case "field":
+      rows("#c9a33c", "#e6c75e", (i % 3) * 1.05)
+      break
+    case "orchard":
+      for (const [x, y] of [
+        [-0.4, -0.3],
+        [0.3, -0.35],
+        [-0.35, 0.35],
+        [0.35, 0.3],
+        [0, 0],
+      ])
+        tree(x!, y!, 0.2, "#4f9a3c")
+      break
+    case "pasture":
+      for (let k = 0; k < 3; k++) dot(r(k) - 0.5, r(k + 5) - 0.5, 0.11, "#ffffff")
+      break
+    case "woods":
+      for (let k = 0; k < 5; k++)
+        tree(r(k) * 1.2 - 0.6, r(k + 7) * 1.1 - 0.55, 0.3, k % 2 ? "#2b6232" : "#357a38")
+      break
+    case "grove":
+      tree(r(1) * 0.6 - 0.3, r(2) * 0.6 - 0.3, 0.32, "#3f8a3c")
+      tree(r(3) * 0.6 - 0.1, r(4) * 0.6 - 0.1, 0.22, "#4e9a40")
+      break
+    case "meadow":
+      for (let k = 0; k < 3; k++) dot(r(k) - 0.5, r(k + 3) - 0.5, 0.06, ["#f2d24a", "#e86ca0", "#ffffff"][k]!)
+      break
+    case "hillside":
+      dot(r(1) * 0.8 - 0.4, r(2) * 0.8 - 0.4, 0.16, "#8b7d68")
+      tree(r(3) * 0.8 - 0.4, r(4) * 0.8 - 0.4, 0.2, "#2f5f3a")
+      break
+    case "crag":
+    case "quarry":
+      dot(-0.2, 0.1, 0.3, u === "quarry" ? "#d8d0c2" : "#7d7468")
+      dot(0.25, -0.15, 0.22, "#958b7c")
+      break
+    case "reeds":
+      for (let k = 0; k < 4; k++) dot(r(k) - 0.5, r(k + 4) - 0.5, 0.07, "#3d7a4a")
+      break
+    case "beach":
+      if (r(1) < 0.3) dot(r(2) - 0.5, r(3) - 0.5, 0.08, "#b89a6a")
+      break
+    case "farmstead":
+      rows("#c9a33c", "#e6c75e", 0.5)
+      house(0, 0.05, 0.75, "#b8483e")
+      break
+    case "windmill":
+      house(0, 0.1, 0.6, "#8a6a4a")
+      g.fillStyle = "#3a2a1a"
+      icon("✣")
+      break
+    case "lighthouse":
+      g.fillStyle = "#fff"
+      icon("☼")
+      break
+    case "watchtower":
+      g.fillStyle = "#3a3a46"
+      icon("♜")
+      break
+    case "ruins":
+      g.fillStyle = "#6f6a60"
+      icon("⌂")
+      break
+    case "shrine":
+      g.fillStyle = "#f3e9d4"
+      icon("✧")
+      break
+    case "campsite":
+      g.fillStyle = "#b8483e"
+      icon("▲")
+      break
+    case "sawmill":
+      house(0, 0, 0.7, "#6a4a2a")
+      break
+    case "square":
+      g.fillStyle = "#cfc4ae"
+      hexPath(px, py, 0.95)
+      g.fill()
+      break
+    case "dock":
+      g.fillStyle = "#8a6038"
+      hexPath(px, py, 0.55)
+      g.fill()
+      break
+  }
+}
+
 /** Zone colours (a tint over the place's tiles, its name at the heart). */
 const ZONE_COLOUR: Record<string, string> = {
   town: "#d8463a",
@@ -203,27 +354,7 @@ function drawZones(
       hexPath(px, py)
       g.fill()
     }
-    if (u === "field") {
-      g.fillStyle = "#e3c25a"
-      hexPath(px, py, 0.92)
-      g.fill()
-      g.strokeStyle = "#b8963c"
-      g.lineWidth = Math.max(0.6, s * 0.12)
-      for (let k = -2; k <= 2; k++) {
-        g.beginPath()
-        g.moveTo(px - s * 0.7, py + k * s * 0.3)
-        g.lineTo(px + s * 0.7, py + k * s * 0.3)
-        g.stroke()
-      }
-    } else if (u === "square") {
-      g.fillStyle = "#cfc4ae"
-      hexPath(px, py, 0.95)
-      g.fill()
-    } else if (u === "dock") {
-      g.fillStyle = "#8a6038"
-      hexPath(px, py, 0.55)
-      g.fill()
-    }
+    paintContent(g, u, px, py, s, hexPath, i)
   }
   // roads: a band from tile centre to tile centre
   g.lineCap = "round"
@@ -298,6 +429,40 @@ export const hexmap: Screen = {
     const stats = document.createElement("div")
     stats.style.cssText = "opacity:.85;white-space:pre"
 
+    const cam = { x: 0, y: 0, zoom: 1 }
+    canvas.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault()
+        const k = Math.exp(-e.deltaY * 0.0015)
+        const z = Math.min(12, Math.max(1, cam.zoom * k))
+        const f = z / cam.zoom
+        cam.x = e.offsetX - (e.offsetX - cam.x) * f
+        cam.y = e.offsetY - (e.offsetY - cam.y) * f
+        cam.zoom = z
+        if (z === 1) {
+          cam.x = 0
+          cam.y = 0
+        }
+        render()
+      },
+      { passive: false },
+    )
+    let drag: { x: number; y: number } | null = null
+    canvas.addEventListener("pointerdown", (e) => {
+      drag = { x: e.clientX, y: e.clientY }
+      canvas.setPointerCapture(e.pointerId)
+    })
+    canvas.addEventListener("pointermove", (e) => {
+      if (!drag) return
+      cam.x += e.clientX - drag.x
+      cam.y += e.clientY - drag.y
+      drag = { x: e.clientX, y: e.clientY }
+      render()
+    })
+    canvas.addEventListener("pointerup", () => {
+      drag = null
+    })
     const render = (): void => {
       const dpr = Math.min(2, window.devicePixelRatio || 1)
       const W = host.clientWidth
@@ -342,7 +507,12 @@ export const hexmap: Screen = {
         const h = hexIsland(view.spec)
         const zones = view.zones ? hexZones(h) : undefined
         const size = Math.min(aw, H - 16) * 1.02
+        // zoom about the cursor, drag to pan (wheel / drag on the map)
+        g.save()
+        g.translate(cam.x, cam.y)
+        g.scale(cam.zoom, cam.zoom)
         draw(g, h, left + aw / 2, H / 2, size, FIT, zones)
+        g.restore()
         const count: Record<string, number> = {}
         for (let i = 0; i < h.grid.size; i++) count[kindOf(h, i)] = (count[kindOf(h, i)] ?? 0) + 1
         stats.textContent = [

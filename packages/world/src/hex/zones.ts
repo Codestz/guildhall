@@ -36,6 +36,26 @@ export const TILE_USES = [
   "bridge",
   "field",
   "dock",
+  // the countryside: every land tile outside the places gets one of these (each a tile prefab later)
+  "farmstead",
+  "orchard",
+  "pasture",
+  "woods",
+  "grove",
+  "meadow",
+  "hillside",
+  "crag",
+  "quarry",
+  "beach",
+  "bluff",
+  "reeds",
+  "windmill",
+  "lighthouse",
+  "watchtower",
+  "ruins",
+  "shrine",
+  "campsite",
+  "sawmill",
 ] as const
 export type TileUse = (typeof TILE_USES)[number]
 
@@ -373,12 +393,85 @@ export function hexZones(h: HexIsland): HexZones {
       if (hash2(seed + 31, g.q[i]!, g.r[i]!) < (z.kind === "farm" ? 0.85 : 0.5)) use[i] = U.field
     }
   }
+  // ---- the countryside: every land tile gets content, so nothing is bare ----
+  const toRoad = stepsFrom((i) => use[i] === U.road || use[i] === U.bridge)
+  const toZone = stepsFrom((i) => zoneOf[i]! > 0)
+  const free = (i: number) => !use[i] && !zoneOf[i]
+  const h1 = (k: number, i: number) => hash2(seed + 100 + k, g.q[i]!, g.r[i]!)
+  // landmarks first, one each where it suits best
+  const pick = (u: TileUse, score: (i: number) => number) => {
+    let best = -1
+    let bs = -1e9
+    for (let i = 0; i < N; i++) {
+      if (!free(i) || !dry(i)) continue
+      const sc = score(i)
+      if (sc > bs && zones.every((zz) => dist(i, zz.tile) >= 3)) {
+        bs = sc
+        best = i
+      }
+    }
+    if (best >= 0 && bs > -1e8) use[best] = U[u]
+  }
+  const townTile = zones[0]?.tile ?? 0
+  pick("lighthouse", (i) => (kind(i) === "cliff" ? dist(i, townTile) + h1(1, i) : -1e9))
+  pick("watchtower", (i) => (kind(i) === "hill" ? h.level[i]! * 2 - dist(i, townTile) / 6 + h1(2, i) : -1e9))
+  pick("ruins", (i) => (kind(i) === "forest" ? toZone[i]! + toRoad[i]! * 0.5 + h1(3, i) : -1e9))
+  pick("shrine", (i) =>
+    kind(i) === "meadow" || kind(i) === "grass" ? toZone[i]! * 0.6 + h1(4, i) * 3 - toRoad[i]! * 0.3 : -1e9,
+  )
+  pick("campsite", (i) => {
+    let lake = 0
+    for (const j of g.neighbours(i)) if (j >= 0 && kind(j) === "lake") lake++
+    return lake ? lake + h1(5, i) : -1e9
+  })
+  for (let n = 0; n < Math.max(1, Math.round(land / 900)); n++)
+    pick("windmill", (i) => {
+      let fields = 0
+      for (const j of g.neighbours(i)) if (j >= 0 && use[j] === U.field) fields++
+      return fields ? fields + h.level[i]! * 0.5 + h1(6 + n, i) : -1e9
+    })
+  const lumber = zones.find((zz) => zz.kind === "lumber")
+  if (lumber) pick("sawmill", (i) => (toWater[i]! <= 1 ? -dist(i, lumber.tile) : -1e9))
+  // farmsteads along the roads in the open country, a few tiles apart
+  const farms: number[] = []
+  for (let i = 0; i < N; i++) {
+    if (!free(i) || toRoad[i] !== 1 || toZone[i]! < 3) continue
+    const k = kind(i)
+    if (k !== "grass" && k !== "meadow") continue
+    if (farms.some((f) => dist(f, i) < 4) || h1(10, i) > 0.55) continue
+    use[i] = U.farmstead
+    farms.push(i)
+  }
+  // fields and orchards round each farmstead
+  for (const f of farms)
+    for (const j of g.neighbours(f))
+      if (j >= 0 && free(j) && (kind(j) === "grass" || kind(j) === "meadow"))
+        use[j] = h1(11, j) < 0.65 ? U.field : U.orchard
+  // the rest, by the ground under it
+  for (let i = 0; i < N; i++) {
+    if (!free(i) || !dry(i)) {
+      if (free(i) && kind(i) === "rock") use[i] = toZone[i]! <= 2 ? U.quarry : U.crag
+      continue
+    }
+    const k = kind(i)
+    const near = toZone[i]! <= 3 || toRoad[i]! <= 1
+    let u: TileUse
+    if (k === "forest") u = h1(20, i) < 0.82 ? "woods" : "grove"
+    else if (k === "sand") u = "beach"
+    else if (k === "cliff") u = "bluff"
+    else if (k === "hill") u = h1(21, i) < 0.55 ? "hillside" : h1(22, i) < 0.6 ? "pasture" : "grove"
+    else if (toWater[i] === 1 && h1(23, i) < 0.45) u = "reeds"
+    else if (near) u = h1(24, i) < 0.4 ? "field" : h1(25, i) < 0.55 ? "pasture" : "orchard"
+    else u = h1(26, i) < 0.4 ? "meadow" : h1(27, i) < 0.55 ? "grove" : h1(28, i) < 0.6 ? "pasture" : "meadow"
+    use[i] = U[u]
+  }
+
   let buildings = 0
   let roadTiles = 0
   let bridges = 0
   let fields = 0
   for (let i = 0; i < N; i++) {
-    if (use[i] === U.building) buildings++
+    if (use[i] === U.building || use[i] === U.farmstead) buildings++
     if (use[i] === U.road) roadTiles++
     if (use[i] === U.bridge) bridges++
     if (use[i] === U.field) fields++

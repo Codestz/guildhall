@@ -31,6 +31,8 @@ export interface PieceOverride {
   tags: string[]
   front: Facing
   anchors: Anchor[]
+  /** Mesh simplify ratio in (0, 1]; the optimize stage runs simplify only when this is set. */
+  simplify: number
 }
 
 export interface PackConfig {

@@ -231,14 +231,12 @@ describe("import", () => {
     ])
   })
 
-  test("check flags what the identity stages leave: textures and missing palette attributes", async () => {
+  test("check passes once every stage has run: no textures, palette attributes on every primitive", async () => {
     const p = fixturePaths()
     await runImport({ paths: p, packs: await fixturePacks(), jobs: 1 })
     const { problems, entries } = await checkLibrary(p.library, (await import("@guildhall/assets")).PALETTE)
     expect(entries).toBe(4)
-    expect(problems).toEqual([
-      'fixture-material/villager: mesh "villager" primitive 0: no COLOR_0, _SWATCH, _SHADE',
-    ])
+    expect(problems).toEqual([])
   })
 
   test("workers produce the same shards as a single thread", async () => {

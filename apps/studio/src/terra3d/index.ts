@@ -535,7 +535,10 @@ export const terra3d: Screen = {
       const plan = view.plan ? terraPlan(t) : null
       if (plan) meshes.push(createSurface(stage, roadRibbons(t, plan), ROAD))
       meshes.push(
-        createHeightGround(stage, { ...t, rgba: paintTerra(t, { shade: false, contours: false, beds: true }) }),
+        createHeightGround(stage, {
+          ...t,
+          rgba: paintTerra(t, { shade: false, contours: false, beds: true }),
+        }),
         createInlandWater(stage, inlandWater(t)),
       )
       water = createWater(stage, {

@@ -173,6 +173,13 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         dev: true,
       },
       {
+        id: "hexscale",
+        name: "Scale board",
+        purpose:
+          "The hex world's proportions side by side: tile, buildings, trees and characters at three scales.",
+        dev: true,
+      },
+      {
         id: "hexmap",
         name: "Hex map",
         purpose: "The hex world from above: island, heights in steps, sand, cliffs, rivers, lakes, forest.",

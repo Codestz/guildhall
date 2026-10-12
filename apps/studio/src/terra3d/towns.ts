@@ -6,7 +6,7 @@
  */
 import { compilePrefab, type PrefabRecipe, type Recipe, validatePrefab } from "@guildhall/assets"
 import { log } from "@guildhall/core"
-import type { BatchCluster } from "@guildhall/render"
+import type { BatchCluster, BatchInstance } from "@guildhall/render"
 import {
   districtGround,
   prefabLibrary,
@@ -29,6 +29,12 @@ export interface BuiltPlaces {
   clusters: BatchCluster[]
   /** Streets and squares, as [centreline, half width] in world metres (squares: closed, half 0). */
   streets: { line: [number, number][]; half: number }[]
+  /** The old town's cobbled streets and square, the same way. */
+  paved: { line: [number, number][]; half: number }[]
+  /** The old town (roads inside it are cobbled too). */
+  core: { at: [number, number]; r: number } | null
+  /** Gatehouses: gate, walls and towers as pieces. */
+  pieces: BatchInstance[]
   /** One line per place: what was built. */
   report: string[]
   /** The ground the districts and landmarks use; the rest of each claim goes to the parcels. */
@@ -77,10 +83,27 @@ export async function buildPlaces(t: Terra, plan: TerraPlan, catalog: Catalog): 
       scale: 1,
     })
   }
-  const streets: BuiltPlaces["streets"] = [
-    ...d.streets.map((s) => ({ line: s.line as [number, number][], half: s.half })),
+  const streets: BuiltPlaces["streets"] = d.streets
+    .filter((s) => !s.paved)
+    .map((s) => ({ line: s.line as [number, number][], half: s.half }))
+  const paved: BuiltPlaces["paved"] = [
+    ...d.streets.filter((s) => s.paved).map((s) => ({ line: s.line as [number, number][], half: s.half })),
     ...d.squares.map((sq) => ({ line: [...sq, sq[0]!] as [number, number][], half: 0 })),
   ]
+  // a gatehouse: the gate over the road, two wall lengths and a tower either side
+  const pieces: BatchInstance[] = []
+  for (const g of d.gates) {
+    const ax = Math.cos(g.rot)
+    const az = -Math.sin(g.rot)
+    const put = (piece: string, off: number) =>
+      pieces.push({ piece, x: g.at[0] + ax * off, y: g.y - 0.1, z: g.at[1] + az * off, rot: g.rot, scale: 1 })
+    put("quaternius-castle/wall-entrance", 0)
+    for (const side of [-1, 1]) {
+      put("quaternius-castle/wall", side * 3.88)
+      put("quaternius-castle/wall", side * 7.76)
+      put("quaternius-castle/tower", side * 10.6)
+    }
+  }
   const ground = districtGround(t, d)
   const landmarks = terraLandmarks(t, plan, ground, lib.prefabs)
   for (const l of landmarks) {
@@ -101,5 +124,14 @@ export async function buildPlaces(t: Terra, plan: TerraPlan, catalog: Catalog): 
     `landmarks: ${landmarks.map((l) => l.kind).join(", ") || "none"}`,
   ]
   logger.info("districts", { ms: d.ms, buildings: d.buildings.length, streets: d.streets.length })
-  return { clusters, streets, report, ground, landmarks }
+  return {
+    clusters,
+    streets,
+    paved,
+    core: d.core ? { at: [d.core.at[0], d.core.at[1]], r: d.core.r } : null,
+    pieces,
+    report,
+    ground,
+    landmarks,
+  }
 }

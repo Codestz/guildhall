@@ -47,6 +47,8 @@ const logger = log("studio:terra3d")
 
 /** One colour for every road, street and square, so where they meet they read as one surface. */
 const ROAD = "#cbb48a"
+/** The old town's cobbles. */
+const COBBLE = "#b9b0a0"
 
 const TREES = [
   "kaykit-forest/tree-1-b-color1",
@@ -118,7 +120,13 @@ function inlandWater(t: Terra): Float32Array {
  * mean of its two segments' normals (a mitre, so joints close), each edge vertex draped on the ground
  * under it.
  */
-function strip(t: Terra, line: readonly (readonly [number, number])[], half: number, pos: number[]): void {
+function strip(
+  t: Terra,
+  line: readonly (readonly [number, number])[],
+  half: number,
+  pos: number[],
+  lift = 0,
+): void {
   const pts: [number, number][] = []
   for (let k = 1; k < line.length; k++) {
     const a = line[k - 1]!
@@ -129,7 +137,7 @@ function strip(t: Terra, line: readonly (readonly [number, number])[], half: num
   const last = line[line.length - 1]
   if (last) pts.push([last[0], last[1]])
   if (pts.length < 2) return
-  const at = (x: number, z: number) => Math.max(terraHeightAt(t, x, z), 0.6) + 0.12
+  const at = (x: number, z: number) => Math.max(terraHeightAt(t, x, z), 0.6) + 0.12 + lift
   type P3 = [number, number, number]
   const side: [P3, P3][] = []
   for (let k = 0; k < pts.length; k++) {
@@ -163,14 +171,18 @@ function roadRibbons(t: Terra, plan: TerraPlan, width?: number): Float32Array {
 }
 
 /** Street centrelines as continuous strips of their own width, draped over the ground. */
-function streetRibbons(t: Terra, streets: { line: [number, number][]; half: number }[]): Float32Array {
+function streetRibbons(
+  t: Terra,
+  streets: { line: [number, number][]; half: number }[],
+  lift = 0,
+): Float32Array {
   const pos: number[] = []
-  for (const s of streets) if (s.half > 0) strip(t, s.line, s.half, pos)
+  for (const s of streets) if (s.half > 0) strip(t, s.line, s.half, pos, lift)
   return new Float32Array(pos)
 }
 
 /** The squares (closed rings, half width 0) as fans from their centre, draped over the ground. */
-function squares(t: Terra, streets: { line: [number, number][]; half: number }[]): Float32Array {
+function squares(t: Terra, streets: { line: [number, number][]; half: number }[], lift = 0): Float32Array {
   const pos: number[] = []
   for (const s of streets) {
     if (s.half > 0 || s.line.length < 4) continue
@@ -182,7 +194,7 @@ function squares(t: Terra, streets: { line: [number, number][]; half: number }[]
     }
     cx /= s.line.length
     cz /= s.line.length
-    const y = (x: number, z: number) => Math.max(terraHeightAt(t, x, z), 0.6) + 0.14
+    const y = (x: number, z: number) => Math.max(terraHeightAt(t, x, z), 0.6) + 0.14 + lift
     for (let k = 1; k < s.line.length; k++) {
       const a = s.line[k - 1]!
       const b = s.line[k]!
@@ -570,13 +582,34 @@ export const terra3d: Screen = {
       if (parcels) meshes.push(createSurface(stage, trailRibbons(t, parcels), "#b89a6a"))
       if (built) {
         meshes.push(createSurface(stage, streetRibbons(t, built.streets), ROAD))
-        meshes.push(createSurface(stage, squares(t, built.streets), ROAD))
+        // the old town: cobbled streets and square, and the roads through it cobbled too
+        const inCore =
+          built.core && plan
+            ? plan.roads.flatMap((r) => {
+                const { at, r: R } = built.core!
+                const runs: [number, number][][] = []
+                let run: [number, number][] = []
+                for (const p of r.line) {
+                  if (Math.hypot(p[0] - at[0], p[1] - at[1]) < R + 4) run.push([p[0], p[1]])
+                  else if (run.length) {
+                    runs.push(run)
+                    run = []
+                  }
+                }
+                if (run.length) runs.push(run)
+                return runs
+                  .filter((l) => l.length > 1)
+                  .map((line) => ({ line, half: r.kind === "main" ? 2.3 : 1.6 }))
+              })
+            : []
+        meshes.push(createSurface(stage, streetRibbons(t, [...built.paved, ...inCore], 0.03), COBBLE))
+        meshes.push(createSurface(stage, squares(t, built.paved, 0.04), COBBLE))
       }
       const clear = (p: BatchInstance) =>
         !(plan?.roads ?? []).some((r) => r.line.some((q) => Math.hypot(q[0] - p.x, q[1] - p.z) < 3.5))
       const nature = parcels ? dressParcels(t, parcels, have) : wild(t, have)
       if (plan) nature.push(...bridges(t, plan, have))
-      const pieces = nature.filter(clear)
+      const pieces = [...(built?.pieces ?? []), ...nature.filter(clear)]
       const clusters = built?.clusters ?? []
       batch = await createStaticBatch(
         stage,

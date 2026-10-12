@@ -26,6 +26,16 @@ export interface DistrictStreet {
   half: number
   /** Steps between two terraces (drawn as a stair). */
   stairs?: boolean
+  /** Cobbled: the city's old town. */
+  paved?: boolean
+}
+
+/** A gatehouse where a road enters the old town: the gate across the road, walls and towers either side. */
+export interface DistrictGate {
+  at: Vec2
+  /** Turn about +y so the gate's length (+x) runs across the road. */
+  rot: number
+  y: number
 }
 
 export interface DistrictBuilding {
@@ -45,6 +55,9 @@ export interface TerraDistricts {
   buildings: DistrictBuilding[]
   /** Buildings per place, in anchor order. */
   counts: number[]
+  /** The city's old town: its heart and radius (its streets are cobbled), if there is one. */
+  core: { at: Vec2; r: number } | null
+  gates: DistrictGate[]
   ms: number
 }
 
@@ -59,6 +72,8 @@ const PLAN_OF: Record<
     branch: number
     reach: number
     square: number
+    /** Radius of a dense old town of joined rows round the square (0: none). */
+    core?: number
   }
 > = {
   town: {
@@ -67,8 +82,9 @@ const PLAN_OF: Record<
     far: ["timber-house", "stone-house", "cottage", "long-house", "smithy"],
     gap: 0.6,
     branch: 26,
-    reach: 70,
-    square: 12,
+    reach: 95,
+    square: 14,
+    core: 52,
   },
   harbour: {
     civic: ["warehouse-row", "tavern"],
@@ -177,6 +193,21 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
     return false
   }
 
+  const gates: DistrictGate[] = []
+  let core: { at: Vec2; r: number } | null = null
+  /** Whether a river or lake lies within r metres of p. */
+  const nearWater = (p: Vec2, r: number): boolean => {
+    for (let k = 0; k < 8; k++) {
+      const i = cellAt([p[0] + Math.cos(k * 0.785) * r, p[1] + Math.sin(k * 0.785) * r])
+      if (i >= 0 && (water[i] === TERRA_WATER.river || water[i] === TERRA_WATER.lake)) return true
+    }
+    return false
+  }
+  /** The craft quarter: workshops along the water outside the old town. */
+  const CRAFT = ["smithy", "works-yard", "bakery", "long-house", "timber-house"]
+  /** The old town: tall narrow houses and shops in joined rows. */
+  const CORE = ["narrow-city-house", "townhouse-shop", "corner-house", "narrow-city-house", "merchant-hall"]
+
   /** The nearest point on any street but `skip`, and how far it is. */
   const nearestOn = (
     p: Vec2,
@@ -229,6 +260,73 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
         ring.push([a.at[0] + Math.cos(ang) * r, a.at[1] + Math.sin(ang) * r])
       }
       squares.push(ring)
+    }
+
+    // ---- the old town: a tight, slightly crooked grid of cobbled streets round the square ----
+    if (P.core) {
+      const R = P.core
+      core = { at: a.at, r: R }
+      // the grid follows the main road through the square
+      let axis: Vec2 = [1, 0]
+      let bestD = Infinity
+      for (const road of roadLines)
+        for (let k = 1; k < road.line.length; k++) {
+          const d = segDist(a.at, road.line[k - 1]!, road.line[k]!)
+          if (d < bestD) {
+            bestD = d
+            const dx = road.line[k]![0] - road.line[k - 1]![0]
+            const dz = road.line[k]![1] - road.line[k - 1]![1]
+            const l = Math.hypot(dx, dz) || 1
+            axis = [dx / l, dz / l]
+          }
+        }
+      const perp: Vec2 = [-axis[1], axis[0]]
+      const pitch = 21
+      const families: [Vec2, Vec2][] = [
+        [axis, perp],
+        [perp, axis],
+      ]
+      for (const [dir, across] of families)
+        for (let o = -Math.floor(R / pitch) * pitch; o <= R; o += pitch) {
+          if (Math.abs(o) < P.square * 0.5) continue
+          let run: Vec2[] = []
+          const flush = () => {
+            if (run.length >= 5) streets.push({ line: run, half: 1.5, paved: true })
+            run = []
+          }
+          for (let tt = -R - 8; tt <= R + 8; tt += 3) {
+            const bend = Math.sin(tt / 23 + o + ai) * 1.6
+            const p: Vec2 = [
+              a.at[0] + dir[0] * tt + across[0] * (o + bend),
+              a.at[1] + dir[1] * tt + across[1] * (o + bend),
+            ]
+            const d = Math.hypot(p[0] - a.at[0], p[1] - a.at[1])
+            const clearOfRoads = !roadLines.some((r) =>
+              r.line.some((q) => Math.hypot(q[0] - p[0], q[1] - p[1]) < 5),
+            )
+            if (d < R + 6 && d > P.square + 1 && mine(p, 0.3) && clearOfRoads) run.push(p)
+            else flush()
+          }
+          flush()
+        }
+      // gatehouses where the roads cross into the old town
+      for (const road of roadLines)
+        for (let k = 1; k < road.line.length; k++) {
+          const p0 = road.line[k - 1]!
+          const p1 = road.line[k]!
+          const d0 = Math.hypot(p0[0] - a.at[0], p0[1] - a.at[1])
+          const d1 = Math.hypot(p1[0] - a.at[0], p1[1] - a.at[1])
+          const ring = R + 4
+          if ((d0 - ring) * (d1 - ring) > 0) continue
+          const f = (ring - d0) / (d1 - d0 || 1)
+          const at: Vec2 = [p0[0] + (p1[0] - p0[0]) * f, p0[1] + (p1[1] - p0[1]) * f]
+          if (!mine(at, 1) || gates.some((g) => Math.hypot(g.at[0] - at[0], g.at[1] - at[1]) < 20)) continue
+          gates.push({
+            at,
+            rot: Math.atan2(-(p1[0] - p0[0]), -(p1[1] - p0[1])),
+            y: terraHeightAt(t, at[0], at[1]),
+          })
+        }
     }
 
     // ---- side streets off the roads through the place ----
@@ -343,7 +441,7 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
     }
 
     // ---- buildings ----
-    const place = (id: string, p: Vec2, n: Vec2, streetHalf: number, setback: number): number => {
+    const place = (id: string, p: Vec2, n: Vec2, streetHalf: number, setback: number, pad = 0.25): number => {
       const m = meta.get(id)
       if (!m) return 0
       const hu = m.frontage / 2
@@ -351,7 +449,7 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
       const c: Vec2 = [p[0] + n[0] * (streetHalf + setback + hv), p[1] + n[1] * (streetHalf + setback + hv)]
       const v: Vec2 = [-n[0], -n[1]] // the front faces the street
       const uu: Vec2 = [v[1], -v[0]]
-      const box: Box = { c, u: uu, v, hu: hu + 0.25, hv: hv + 0.25 }
+      const box: Box = { c, u: uu, v, hu: hu + pad, hv: hv + pad }
       const corners: Vec2[] = [
         [c[0] + uu[0] * hu + v[0] * hv, c[1] + uu[1] * hu + v[1] * hv],
         [c[0] - uu[0] * hu + v[0] * hv, c[1] - uu[1] * hu + v[1] * hv],
@@ -364,7 +462,9 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
       const onTread = (q: Vec2) => mine(q, 0.4, lvl) || mine(q, 1.2, lvl + 1)
       if (!mine(front, 0.35, lvl) || !onTread(c) || corners.some((q) => !onTread(q))) return 0
       if (boxes.some((b) => overlap(b, box))) return 0
-      if (corners.some((q) => nearStreet(q, 0.6)) || nearStreet(c, 0.6)) return 0
+      // off every street: a house may stand right at the edge of the one it faces (an old-town row)
+      const clear = Math.min(0.6, setback * 0.5)
+      if (corners.some((q) => nearStreet(q, clear)) || nearStreet(c, 0.6)) return 0
       if (squares.some((sq) => sq.some((q) => Math.hypot(q[0] - c[0], q[1] - c[1]) < hv * 0.6))) return 0
       let y = Infinity
       for (const q of [front, corners[0]!, corners[1]!]) y = Math.min(y, terraHeightAt(t, q[0], q[1]))
@@ -415,10 +515,22 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
               continue
             }
             const dist = Math.hypot(p[0] - a.at[0], p[1] - a.at[1])
+            const inCore = !!P.core && dist < P.core
             const near = dist < (P.reach || 30) * 0.45
-            const id = pick(near ? P.near : P.far, u(7, p[0], p[1]))
-            const used = id ? place(id, p, n, s.half, near ? 0.6 : 1.5 + u(8, p[0], p[1]) * 2) : 0
-            pos += used ? used + P.gap + (near ? 0 : u(9, p[0], p[1]) * P.gap) : 2
+            const craft = !inCore && a.kind === "town" && nearWater(p, 16)
+            const list = inCore ? CORE : craft ? CRAFT : near ? P.near : P.far
+            const id = pick(list, u(7, p[0], p[1]))
+            // the old town builds wall to wall, right on the street
+            const used = id
+              ? inCore
+                ? place(id, p, n, s.half, 0.15, 0.02)
+                : place(id, p, n, s.half, near ? 0.6 : 1.5 + u(8, p[0], p[1]) * 2)
+              : 0
+            pos += used
+              ? used + (inCore ? 0.05 : P.gap + (near ? 0 : u(9, p[0], p[1]) * P.gap))
+              : inCore
+                ? 1
+                : 2
           }
           carry = pos - len
         }
@@ -436,7 +548,7 @@ export function terraDistricts(t: Terra, plan: TerraPlan, prefabs: readonly Pref
     }
     counts.push(buildings.length - before)
   })
-  return { streets, squares, buildings, counts, ms: Math.round(performance.now() - t0) }
+  return { streets, squares, buildings, counts, core, gates, ms: Math.round(performance.now() - t0) }
 }
 
 /**

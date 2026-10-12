@@ -54,7 +54,7 @@ export interface TerraPlan {
 
 /** How much ground each kind of place grows into, m²: a town's quarter, a hamlet's yards and plots. */
 export const ANCHOR_AREA: Record<AnchorKind, number> = {
-  town: 20000,
+  town: 32000,
   harbour: 3500,
   crossing: 3000,
   outpost: 1200,

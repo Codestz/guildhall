@@ -5,10 +5,19 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import type { CatalogEntry, CatalogIndex, PackConfig, Palette, RigEntry, ScaleInfo } from "@guildhall/assets"
-import { paletteHash } from "@guildhall/assets"
+import type {
+  CatalogEntry,
+  CatalogIndex,
+  DataOverlay,
+  PackConfig,
+  Palette,
+  RigEntry,
+  ScaleInfo,
+} from "@guildhall/assets"
+import { applyOverlay, paletteHash } from "@guildhall/assets"
 import { contentHash } from "./cache.ts"
 import { IMPORTER } from "./config.ts"
+import { loadOverlay } from "./overlay.ts"
 import type { PieceReport, PieceSource } from "./stages/types.ts"
 import type { Written } from "./write.ts"
 
@@ -92,9 +101,19 @@ export function readShard(library: string, pack: string): CatalogEntry[] {
   return existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as CatalogEntry[]) : []
 }
 
-/** Writes the shard sorted by id; returns the shard's content hash. */
-export function writeShard(library: string, pack: string, entries: readonly CatalogEntry[]): string {
-  const sorted = entries.map(normalizeEntry).sort((a, b) => byText(a.id, b.id))
+/**
+ * Writes the shard sorted by id, with the authored data overlay (`data/mounts.json`) laid on last;
+ * returns the shard's content hash. An invalid overlay throws before anything is written.
+ */
+export function writeShard(
+  library: string,
+  pack: string,
+  entries: readonly CatalogEntry[],
+  overlay: DataOverlay = loadOverlay(),
+): string {
+  const sorted = applyOverlay(entries, overlay)
+    .map(normalizeEntry)
+    .sort((a, b) => byText(a.id, b.id))
   const text = `${JSON.stringify(sorted, null, 2)}\n`
   mkdirSync(join(library, "catalog"), { recursive: true })
   writeFileSync(shardFile(library, pack), text)

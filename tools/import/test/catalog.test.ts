@@ -124,6 +124,15 @@ describe("shards and index", () => {
       ["town", 2, "other"],
     ])
   })
+
+  test("given rigs replace the indexed rigs of their id; the other indexed rigs stay", async () => {
+    const { dir } = await library(["wall-a"])
+    const rig = (id: string, bones: number) => ({ id, file: `rigs/${id}.glb`, clips: [], bones })
+    writeIndex(dir, PALETTE, { town: "other" }, [rig("b", 1), rig("a", 1)])
+    const index = writeIndex(dir, PALETTE, { town: "other" }, [rig("b", 2)])
+    expect(index.rigs).toEqual([rig("a", 1), rig("b", 2)])
+    expect(writeIndex(dir, PALETTE, { town: "other" }).rigs).toEqual([rig("a", 1), rig("b", 2)])
+  })
 })
 
 describe("check", () => {

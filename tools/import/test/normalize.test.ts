@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test"
+import { mkdirSync } from "node:fs"
+import { join } from "node:path"
 import { Document, type Node } from "@gltf-transform/core"
 import { getBounds } from "@gltf-transform/functions"
 import { PALETTE, type PackConfig, type PieceOverride } from "@guildhall/assets"
 import { log } from "@guildhall/core"
 import { classify, discover } from "../src/discover.ts"
 import { startReport } from "../src/pipeline.ts"
-import { readModel } from "../src/read.ts"
+import { gltfIO, readModel } from "../src/read.ts"
 import { measure } from "../src/stages/measure.ts"
 import { normalize, refScale } from "../src/stages/normalize.ts"
 import type { StageCtx } from "../src/stages/types.ts"
@@ -59,6 +61,8 @@ function ctxFor(doc: Document, p: PackConfig, name = "piece", override?: Partial
     pack: p,
     source,
     palette: PALETTE,
+    raw: FIXTURES,
+    library: tempDir(),
     log: log("test"),
     out: startReport(source, doc),
   }
@@ -202,6 +206,39 @@ describe("normalize: reference scale", () => {
     const door = { id: "d", kind: "door" as const, at: [0, 0.8, 0] as V3, facing: 0 }
     expect(refScale(doc, "doorTop", 2.6, [door])).toBeCloseTo(2, 9)
     expect(() => refScale(doc, "doorTop", 2.6, [])).toThrow('needs a "door" anchor')
+  })
+
+  test("doorTop measures from the door's threshold (at.y − height), not the bottom of a plinth", () => {
+    // A house on a 0.5-unit plinth: bbox bottom 0, door threshold 0.5, door top 2.5, roof 4.
+    const plinthed = boxDoc([-2, 0, -2], [2, 4, 2])
+    const door = { id: "d", kind: "door" as const, at: [0, 2.5, 2] as V3, facing: 0 }
+    expect(refScale(plinthed, "doorTop", 2.6, [{ ...door, height: 2 }])).toBeCloseTo(1.3, 9)
+    // Without a height there is no threshold to read: the bbox bottom stands in (the plinth counts).
+    expect(refScale(plinthed, "doorTop", 2.6, [door])).toBeCloseTo(2.6 / 2.5, 9)
+  })
+
+  test("a doorTop ref pack reads the plinthed reference from ctx.raw and solves from its threshold", async () => {
+    const raw = tempDir()
+    mkdirSync(join(raw, "town"), { recursive: true })
+    await (await gltfIO()).write(join(raw, "town/house.glb"), boxDoc([-2, 0, -2], [2, 4, 2]))
+    const door = { id: "d", kind: "door" as const, at: [0, 2.5, 2] as V3, facing: 0, height: 2 }
+    const p = pack({
+      source: "town",
+      scale: { ref: "house", measure: "doorTop", metres: 2.6 },
+      overrides: { house: { anchors: [door] } },
+    })
+    const doc = boxDoc([0, 0, 0], [1, 1, 1])
+    const ctx = { ...ctxFor(doc, p, "crate"), raw }
+    await normalize(doc, ctx)
+    expect(ctx.out.scale?.factor).toBeCloseTo(1.3, 6)
+  })
+
+  test("an override anchor's door height is not carried into the piece's anchors", async () => {
+    const doc = boxDoc([0, 0, 0], [1, 1, 1])
+    const anchor = { id: "door", kind: "door" as const, at: [0.5, 0.8, 1] as V3, facing: 0 }
+    const ctx = ctxFor(doc, pack(), "piece", { anchors: [{ ...anchor, height: 0.8 }] })
+    await normalize(doc, ctx)
+    expect(ctx.out.compose.anchors).toEqual([{ ...anchor, at: [0, 0.8, 0.5] }])
   })
 
   test("a ref pack measures its named piece and scales to it (the committed colormap fixture)", async () => {

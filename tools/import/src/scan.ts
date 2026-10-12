@@ -227,7 +227,7 @@ const MODE_FOR: Record<ColourKind, string> = {
   atlas: "atlas",
   colormap: "colormap",
   material: "material",
-  vertex: "material (vertex colours; no mode yet)",
+  vertex: "vertex",
   texture: "texture-average",
 }
 

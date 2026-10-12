@@ -4,7 +4,7 @@ import { type Category, PALETTE, type PackConfig, type PackRule, type PieceOverr
 import { log } from "@guildhall/core"
 import { classify } from "../src/discover.ts"
 import { startReport } from "../src/pipeline.ts"
-import { DEFAULT_TRI_BUDGET, footprintOf, measure } from "../src/stages/measure.ts"
+import { DEFAULT_TRI_BUDGET, footprintOf, measure, TRI_BUDGET } from "../src/stages/measure.ts"
 import type { StageCtx } from "../src/stages/types.ts"
 
 const pack = (rules: PackRule[] = []): PackConfig => ({
@@ -57,7 +57,7 @@ function ctxFor(
   if (opts.override) source.override = opts.override
   const out = startReport(source, doc)
   out.scale = { factor: 1, rule: "factor", confidence: "pack", flags: [] }
-  return { pack: p, source, palette: PALETTE, log: log("test"), out }
+  return { pack: p, source, palette: PALETTE, raw: "/raw", library: "/library", log: log("test"), out }
 }
 
 const oneBox = (size: [number, number, number], tris?: number, swatches?: number[]): Document => {
@@ -157,6 +157,17 @@ describe("measure: flags and compose", () => {
     const treeCtx = ctxFor(tree, { category: "tree" })
     await measure(tree, treeCtx)
     expect(treeCtx.out.flags.has("high-tris")).toBe(false)
+  })
+
+  test("a character's budget is 8000 triangles", async () => {
+    expect(TRI_BUDGET.character).toBe(8000)
+    const flagged = async (tris: number) => {
+      const doc = oneBox([1, 1, 1], tris)
+      const ctx = ctxFor(doc, { category: "character" })
+      await measure(doc, ctx)
+      return ctx.out.flags.has("high-tris")
+    }
+    expect([await flagged(8000), await flagged(8001)]).toEqual([false, true])
   })
 
   test("without rule or override fields, compose stays a placeholder", async () => {

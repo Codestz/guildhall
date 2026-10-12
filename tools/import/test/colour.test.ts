@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import { join } from "node:path"
 import { Accessor, Document, type Material, type Primitive } from "@gltf-transform/core"
+import { KHRTextureTransform } from "@gltf-transform/extensions"
 import { type ColourMode, linearToSrgb, nearestSwatch, PALETTE, srgbToOklab } from "@guildhall/assets"
 import { log } from "@guildhall/core"
+import { encode as encodeJpeg } from "jpeg-js"
+import { packProblems } from "../src/config.ts"
 import { encodePng } from "../src/png.ts"
 import { gltfIO } from "../src/read.ts"
 import {
@@ -13,7 +16,7 @@ import {
   MISS_THRESHOLD,
   SHADE_NEUTRAL,
 } from "../src/sample.ts"
-import { colour, PALETTE_MATERIAL } from "../src/stages/colour.ts"
+import { colour, decodeImage, PALETTE_MATERIAL, sourceMode } from "../src/stages/colour.ts"
 import type { StageCtx } from "../src/stages/types.ts"
 import { FIXTURES } from "./fixtures/env.ts"
 
@@ -31,6 +34,8 @@ const ctx = (mode: ColourMode, map?: Record<string, string>): StageCtx => ({
   },
   source: { pack: "test", file: "/x.glb", source: "x.glb", name: "x", slug: "x", category: "prop", tags: [] },
   palette: PALETTE,
+  raw: "/raw",
+  library: "/library",
   log: log("test"),
   out: { slug: "x", kind: "static", flags: new Set(), swatches: new Set(), compose: {} as never },
 })
@@ -336,5 +341,88 @@ describe("bakePalette", () => {
     const bake = bakePalette(Float32Array.from([1, 0, 1, ...lin]), PALETTE)
     expect(bake.misses).toBe(1)
     expect(bake.missed).toEqual(["#ff00ff"])
+  })
+})
+
+describe("texture sources", () => {
+  const leaf: [number, number, number] = [79, 122, 58]
+  const white: [number, number, number] = [250, 250, 250]
+  /** The quad's texture replaced by `image` (keeps its UVs and material). */
+  const retexture = (doc: Document, image: Uint8Array, mime: string): Material => {
+    const material = doc.getRoot().listMaterials()[0] as Material
+    material.getBaseColorTexture()?.setImage(image).setMimeType(mime)
+    return material
+  }
+
+  test("a JPEG base-colour texture is decoded and sampled, not dropped to the material colour", async () => {
+    const pixels = new Uint8Array(8 * 8 * 4)
+    for (let i = 0; i < 64; i++) pixels.set([...leaf, 255], i * 4)
+    const jpeg = Uint8Array.from(encodeJpeg({ width: 8, height: 8, data: pixels }, 100).data)
+    const decoded = decodeImage(jpeg)
+    expect(decoded?.width).toBe(8)
+    const doc = quad([[0, 0, 0]], [0, 0, 1, 0, 1, 1, 0, 1])
+    retexture(doc, jpeg, "image/jpeg")
+    const c = ctx("atlas")
+    await colour(doc, c)
+    const got = Array.from(decoded?.data.subarray(0, 3) ?? []) as [number, number, number]
+    expect(new Set(array(prims(doc)[0] as Primitive, "_SWATCH"))).toEqual(new Set([expected(got)]))
+    expect(c.out.flags.has("texture-lost")).toBe(false)
+  })
+
+  test("decodeImage: neither PNG nor JPEG is null", () => {
+    expect(decodeImage(Uint8Array.of(1, 2, 3, 4))).toBeNull()
+    expect(decodeImage(null)).toBeNull()
+  })
+
+  // Texel 0 is leaf, texel 1 the card's background. Face 1 sees both; face 2 sees only the background.
+  const card = (alphaMode: "MASK" | "OPAQUE"): Document => {
+    const doc = quad([leaf, white], [0, 0, 0.6, 0, 1, 1, 0.6, 1])
+    const data = new Uint8Array([...leaf, 255, ...white, 0])
+    retexture(doc, encodePng({ width: 2, height: 1, data }), "image/png").setAlphaMode(alphaMode)
+    return doc
+  }
+
+  test("a MASK leaf card averages its visible texels only: every face bakes to the leaf", async () => {
+    const doc = card("MASK")
+    const c = ctx("texture-average")
+    await colour(doc, c)
+    expect(new Set(array(prims(doc)[0] as Primitive, "_SWATCH"))).toEqual(new Set([expected(leaf)]))
+    expect(c.out.flags.has("texture-lost")).toBe(true)
+  })
+
+  test("without MASK the transparent background still counts (the control)", async () => {
+    const doc = card("OPAQUE")
+    await colour(doc, ctx("texture-average"))
+    expect(faceSwatches(prims(doc)[0] as Primitive)[0]).not.toEqual([expected(leaf)])
+  })
+
+  test("KHR_texture_transform leaves extensionsUsed once no texture is left; kept while one is", async () => {
+    const used = async (mode: ColourMode) => {
+      const doc = quad([leaf], [0, 0, 1, 0, 1, 1, 0, 1])
+      const transform = doc.createExtension(KHRTextureTransform)
+      doc
+        .getRoot()
+        .listMaterials()[0]
+        ?.getBaseColorTextureInfo()
+        ?.setExtension("KHR_texture_transform", transform.createTransform().setScale([2, 2]))
+      await colour(doc, ctx(mode))
+      const json = await (await gltfIO()).writeJSON(doc)
+      return json.json.extensionsUsed ?? []
+    }
+    expect(await used("atlas")).not.toContain("KHR_texture_transform")
+    expect(await used("keep-texture")).toContain("KHR_texture_transform")
+  })
+})
+
+describe("vertex mode", () => {
+  test("reads like material: COLOR_0 times the factor, and a config may name it", async () => {
+    const red: [number, number, number] = [128, 30, 30]
+    const doc = vertexColoured([red, red, red])
+    expect(sourceMode(prims(doc)[0] as Primitive, "vertex")).toBe("material")
+    await colour(doc, ctx("vertex"))
+    expect(new Set(array(prims(doc)[0] as Primitive, "_SWATCH"))).toEqual(
+      new Set([expected(fromLinear(red.map((x) => x / 255)))]),
+    )
+    expect(packProblems({ ...ctx("vertex").pack, include: ["*.glb"] })).toEqual([])
   })
 })

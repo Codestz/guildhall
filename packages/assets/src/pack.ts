@@ -5,7 +5,8 @@
 import type { Category } from "./catalog.ts"
 import type { Anchor, AttachRole, EdgeKind, Facing } from "./compose.ts"
 
-export type ColourMode = "atlas" | "colormap" | "material" | "texture-average" | "keep-texture"
+/** `vertex` reads like `material` (factor × COLOR_0, textures by how faces sit): for vertex-coloured packs. */
+export type ColourMode = "atlas" | "colormap" | "material" | "vertex" | "texture-average" | "keep-texture"
 export type Pivot = "bottom-centre" | "trunk" | "keep"
 
 /** ADR 004: a fixed factor, or a reference piece measured to a hero-relative size. */
@@ -23,6 +24,12 @@ export interface PackRule {
   edgeKind?: EdgeKind
 }
 
+/**
+ * An override anchor, in the raw model's frame. A `door` anchor's `at` marks the top of the opening;
+ * `height` (raw units) puts its threshold at `at.y − height`, which `doorTop` measures from.
+ */
+export type OverrideAnchor = Anchor & { height?: number }
+
 export interface PieceOverride {
   exclude: true
   factor: number
@@ -30,7 +37,7 @@ export interface PieceOverride {
   category: Category
   tags: string[]
   front: Facing
-  anchors: Anchor[]
+  anchors: OverrideAnchor[]
   /** Mesh simplify ratio in (0, 1]; the optimize stage runs simplify only when this is set. */
   simplify: number
 }

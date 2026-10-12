@@ -145,6 +145,8 @@ const ctx = (ao?: PackConfig["ao"]): StageCtx => ({
   },
   source: { pack: "test", file: "/x.glb", source: "x.glb", name: "x", slug: "x", category: "prop", tags: [] },
   palette: PALETTE,
+  raw: "/raw",
+  library: "/library",
   log: log("test"),
   out: { slug: "x", kind: "static", flags: new Set(), swatches: new Set(), compose: {} as never },
 })

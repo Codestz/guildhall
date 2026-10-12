@@ -6,7 +6,10 @@
  *   corner   (atlas, colormap) nearest texel at each corner's UV pulled INSET toward the triangle's UV
  *            centroid, so a corner on a swatch edge reads its own face's swatch (plan R2), and gradient
  *            swatches keep their variation (it becomes `_SHADE`)
- *   average  (texture-average, keep-texture) the mean of 7 interior barycentric samples: one colour a face
+ *   average  (texture-average, keep-texture) the mean of 7 interior barycentric samples: one colour a face.
+ *            With alphaMode MASK, samples below the alpha cutoff (cut out when drawn, so at least every
+ *            fully transparent texel) are left out, so a leaf card reads its leaves, not the background
+ *            around them; a face with no visible sample takes the primitive's visible mean
  * `material` ignores any texture. Results are per corner (the index list, or 0..n-1 without one), because
  * one vertex can read different colours from different faces; the colour stage splits such vertices.
  */
@@ -76,15 +79,18 @@ function wrap(t: number, mode: number): number {
   return t - Math.floor(t)
 }
 
-/** Nearest-texel lookup in linear RGB, honouring the sampler's wrap modes (default repeat). */
+/**
+ * Nearest-texel lookup, honouring the sampler's wrap modes (default repeat): writes linear RGB to `out`
+ * and returns the texel's alpha in [0, 1].
+ */
 function texelReader(image: Raster, wrapS: number, wrapT: number) {
   const { width, height, data } = image
-  return ([u, v]: Uv, out: Rgb3): Rgb3 => {
+  return ([u, v]: Uv, out: Rgb3): number => {
     const x = Math.min(width - 1, Math.floor(wrap(u, wrapS) * width))
     const y = Math.min(height - 1, Math.floor(wrap(v, wrapT) * height))
     const at = (y * width + x) * 4
     for (let c = 0; c < 3; c++) out[c] = SRGB_TO_LINEAR[data[at + c] ?? 0] ?? 0
-    return out
+    return (data[at + 3] ?? 255) / 255
   }
 }
 
@@ -108,11 +114,18 @@ function textureTerm(
   const texel = texelReader(image, info.getWrapS(), info.getWrapT())
   const uvOf = (corner: number): Uv => uv.getElement(corners[corner] ?? 0, [0, 0]) as Uv
   const rgb: Rgb3 = [0, 0, 0]
+  const at = (uv: Uv): Rgb3 => {
+    texel(uv, rgb)
+    return rgb
+  }
   if (prim.getMode() !== Primitive.Mode.TRIANGLES || corners.length % 3 !== 0) {
-    for (let i = 0; i < corners.length; i++) out.set(texel(uvOf(i), rgb), i * 3)
+    for (let i = 0; i < corners.length; i++) out.set(at(uvOf(i)), i * 3)
     return out
   }
-  const average = mode === "texture-average" || mode === "keep-texture"
+  if (mode === "texture-average" || mode === "keep-texture") {
+    averageFaces(out, corners.length / 3, texel, uvOf, maskCutoff(prim))
+    return out
+  }
   // Pulling a corner INSET of the way to the centroid weighs it 1 − 2·INSET/3 and the other two INSET/3.
   const own = 1 - (2 * INSET) / 3
   const other = INSET / 3
@@ -120,20 +133,68 @@ function textureTerm(
     const p = uvOf(t)
     const q = uvOf(t + 1)
     const r = uvOf(t + 2)
-    if (average) {
-      const sum: Rgb3 = [0, 0, 0]
-      for (const [a, b, c] of AVERAGE_POINTS) {
-        texel(blend(p, q, r, a, b, c), rgb)
-        for (let k = 0; k < 3; k++) sum[k as 0] += (rgb[k as 0] ?? 0) / AVERAGE_POINTS.length
-      }
-      for (let k = 0; k < 3; k++) out.set(sum, (t + k) * 3)
-    } else {
-      out.set(texel(blend(p, q, r, own, other, other), rgb), t * 3)
-      out.set(texel(blend(p, q, r, other, own, other), rgb), (t + 1) * 3)
-      out.set(texel(blend(p, q, r, other, other, own), rgb), (t + 2) * 3)
-    }
+    out.set(at(blend(p, q, r, own, other, other)), t * 3)
+    out.set(at(blend(p, q, r, other, own, other)), (t + 1) * 3)
+    out.set(at(blend(p, q, r, other, other, own)), (t + 2) * 3)
   }
   return out
+}
+
+/** The alpha below which a texel is cut out when drawn: the cutoff with alphaMode MASK, else none. */
+function maskCutoff(prim: Primitive): number | undefined {
+  const material = prim.getMaterial()
+  return material?.getAlphaMode() === "MASK" ? material.getAlphaCutoff() : undefined
+}
+
+/**
+ * One colour a face: the mean of its AVERAGE_POINTS samples, leaving out samples below `cutoff`. A face
+ * with no sample left takes the mean of every kept sample of the primitive (or, with none at all, its
+ * own plain mean), so a cut-out face never reads the background.
+ */
+function averageFaces(
+  out: Float32Array,
+  faces: number,
+  texel: (uv: Uv, out: Rgb3) => number,
+  uvOf: (corner: number) => Uv,
+  cutoff: number | undefined,
+): void {
+  const rgb: Rgb3 = [0, 0, 0]
+  const plain = new Float32Array(faces * 3)
+  const kept = new Float32Array(faces * 3)
+  const count = new Uint8Array(faces)
+  const total: Rgb3 = [0, 0, 0]
+  let totalCount = 0
+  for (let f = 0; f < faces; f++) {
+    const [p, q, r] = [uvOf(3 * f), uvOf(3 * f + 1), uvOf(3 * f + 2)]
+    for (const [a, b, c] of AVERAGE_POINTS) {
+      const alpha = texel(blend(p, q, r, a, b, c), rgb)
+      const visible = cutoff === undefined || alpha >= cutoff
+      for (let k = 0; k < 3; k++) {
+        const v = rgb[k as 0]
+        plain[f * 3 + k] = (plain[f * 3 + k] ?? 0) + v / AVERAGE_POINTS.length
+        if (visible) {
+          kept[f * 3 + k] = (kept[f * 3 + k] ?? 0) + v
+          total[k as 0] += v
+        }
+      }
+      if (visible) {
+        count[f] = (count[f] ?? 0) + 1
+        totalCount++
+      }
+    }
+  }
+  for (let f = 0; f < faces; f++) {
+    const n = count[f] ?? 0
+    const face: Rgb3 = [0, 0, 0]
+    for (let k = 0; k < 3; k++)
+      face[k as 0] =
+        n > 0
+          ? (kept[f * 3 + k] ?? 0) / n
+          : totalCount > 0
+            ? total[k as 0] / totalCount
+            : (plain[f * 3 + k] ?? 0)
+    for (let c = 0; c < 3; c++) out.set(face, (3 * f + c) * 3)
+  }
 }
 
 /**

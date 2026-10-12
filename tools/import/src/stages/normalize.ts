@@ -9,18 +9,18 @@
  *
  * Units: `ground` is in source units (as `bun import scan` reports them), `sink` in metres. Override
  * anchors are authored in the raw model's frame and come out in piece space, through the same
- * transform as the vertices.
+ * transform as the vertices (a door's `height` only serves `doorTop` and is not carried on).
  */
 import { join } from "node:path"
 import type { Document, Node, Scene } from "@gltf-transform/core"
 import { clearNodeParent, clearNodeTransform, getBounds, transformMesh } from "@gltf-transform/functions"
-import type { Anchor, PackConfig, PackScale, ScaleInfo } from "@guildhall/assets"
+import type { PackConfig, PackScale, PieceOverride, ScaleInfo } from "@guildhall/assets"
 import { hypot } from "@guildhall/core"
-import { paths } from "../config.ts"
 import { discover, kebab, matches } from "../discover.ts"
 import { defaultScene, readModel, splitTopNodes } from "../read.ts"
 import type { PieceSource, Stage, StageCtx } from "./types.ts"
 
+type OverrideAnchor = PieceOverride["anchors"][number]
 type RefMeasure = Extract<PackScale, { ref: string }>["measure"]
 type Vec3 = [number, number, number]
 
@@ -69,7 +69,13 @@ export const normalize: Stage = async (doc, ctx) => {
 
   ctx.out.scale = scale
   const anchors = ctx.source.override?.anchors
-  if (anchors) ctx.out.compose.anchors = anchors.map((a) => ({ ...a, at: place(a.at) }))
+  if (anchors)
+    ctx.out.compose.anchors = anchors.map((a) => ({
+      id: a.id,
+      kind: a.kind,
+      at: place(a.at),
+      facing: a.facing,
+    }))
   if (box) {
     const lo = place(box.min)
     const hi = place(box.max)
@@ -144,13 +150,15 @@ function trunk(points: readonly Vec3[]): [x: number, z: number] {
 
 /**
  * The factor that brings a reference piece's measure to `metres`. `height` and `storey` read the
- * bbox height; `doorTop` reads the `door` anchor's height above the bbox bottom (raw frame).
+ * bbox height. `doorTop` reads the door's top above its threshold, in the raw frame: the `door`
+ * anchor's `at` marks the top of the opening, and its threshold is `at.y − height` when the anchor
+ * carries a `height` (so a plinth or steps under the door do not count), else the bbox bottom.
  */
 export function refScale(
   doc: Document,
   measure: RefMeasure,
   metres: number,
-  anchors?: readonly Anchor[],
+  anchors?: readonly OverrideAnchor[],
 ): number {
   const scene = defaultScene(doc)
   const box = scene ? getBounds(scene) : undefined
@@ -159,7 +167,8 @@ export function refScale(
   if (measure === "doorTop") {
     const door = anchors?.find((a) => a.kind === "door")
     if (!door) throw new Error('measure "doorTop" needs a "door" anchor in the reference piece\'s override')
-    raw = door.at[1] - box.min[1]
+    const threshold = door.height !== undefined ? door.at[1] - door.height : box.min[1]
+    raw = door.at[1] - threshold
   }
   if (!(raw > 0)) throw new Error(`reference piece measures ${raw} (${measure}); cannot solve a scale`)
   return metres / raw
@@ -193,12 +202,10 @@ const refs = new Map<string, Promise<number>>()
 
 /** One measurement per pack folder, reference and target, for the life of the process. */
 function refFactor(ctx: StageCtx, r: { ref: string; measure: RefMeasure; metres: number }): Promise<number> {
-  const { pack, source } = ctx
-  const packDir = source.file.slice(0, source.file.length - source.source.length).replace(/[\\/]+$/, "")
-  const key = [packDir, r.ref, r.measure, r.metres].join("\0")
+  const key = [join(ctx.raw, ctx.pack.source), r.ref, r.measure, r.metres].join("\0")
   let factor = refs.get(key)
   if (!factor) {
-    factor = measureRef(pack, packDir, r)
+    factor = measureRef(ctx, r)
     refs.set(key, factor)
   }
   return factor
@@ -209,13 +216,11 @@ const isRef = (ref: string, name: string, path: string): boolean =>
   kebab(name) === kebab(ref) || matches(ref, name, path)
 
 async function measureRef(
-  pack: PackConfig,
-  packDir: string,
+  { pack, raw, library }: StageCtx,
   r: { ref: string; measure: RefMeasure; metres: number },
 ): Promise<number> {
-  const rawRoot = packDir.slice(0, packDir.length - pack.source.length)
-  const cache = join(paths().library, ".cache")
-  for (const file of discover(pack, rawRoot)) {
+  const cache = join(library, ".cache")
+  for (const file of discover(pack, raw)) {
     const whole = pack.split !== "top-nodes"
     if (whole && !isRef(r.ref, file.name, file.source)) continue
     const doc = await readModel(file.file, cache)

@@ -21,6 +21,7 @@ export const TRI_BUDGET: Readonly<Partial<Record<Category, number>>> = {
   bridge: 4000,
   tree: 4000,
   vehicle: 4000,
+  character: 8000,
 }
 export const DEFAULT_TRI_BUDGET = 2500
 

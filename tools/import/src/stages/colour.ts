@@ -10,14 +10,17 @@
  *   textured, any other pack mode   by how its faces sit on the texture (scan's `colourKind`): faces that
  *                                   span real image area are averaged (`texture-lost`); the rest are
  *                                   corner-sampled (atlas / colormap)
- * so a piece that mixes kinds is handled primitive by primitive. Vertex colours need no mode of their own:
- * COLOR_0 is always part of the base colour.
+ * so a piece that mixes kinds is handled primitive by primitive. COLOR_0 is always part of the base
+ * colour, so the pack mode "vertex" reads exactly like "material". Base-colour textures may be PNG or
+ * JPEG; with alphaMode MASK, averaging leaves out the texels the cutoff hides (see sample.ts).
  *
  * A vertex shared by faces that bake to different swatches is split, one copy per swatch, so swatches
  * never blend across an edge (plan R2); copies of one swatch average their shade. Optimize welds again.
+ * Once no texture is left, the texture-only extensions go from extensionsUsed / extensionsRequired too.
  */
 import type { Accessor, Document, Material, Primitive, Texture, TypedArray } from "@gltf-transform/core"
 import type { ColourMode, Palette } from "@guildhall/assets"
+import { decode as decodeJpeg } from "jpeg-js"
 import { decodePng, isPng, type Raster } from "../png.ts"
 import {
   type Bake,
@@ -33,6 +36,15 @@ import type { Stage } from "./types.ts"
 
 /** The name of the one vertex-colour material every baked primitive shares. */
 export const PALETTE_MATERIAL = "palette"
+
+/** Extensions that only describe textures: dropped once the bake leaves none. */
+const TEXTURE_EXTENSIONS: readonly string[] = [
+  "KHR_texture_transform",
+  "KHR_texture_basisu",
+  "EXT_texture_webp",
+  "EXT_texture_avif",
+]
+const isJpeg = (bytes: Uint8Array): boolean => bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
 
 /** How this primitive's colour is read, given the pack's mode (see the header). */
 export function sourceMode(prim: Primitive, mode: ColourMode): ColourMode {
@@ -150,12 +162,18 @@ export function writeBake(
   return replaced
 }
 
-/** The decoded base-colour image, or null when it is not a PNG (or missing). */
-function decode(texture: Texture, cache: Map<Texture, Raster | null>): Raster | null {
-  if (!cache.has(texture)) {
-    const bytes = texture.getImage()
-    cache.set(texture, bytes && isPng(bytes) ? decodePng(bytes) : null)
+/** The decoded base-colour image (RGBA), or null when it is neither PNG nor JPEG (or missing). */
+export function decodeImage(bytes: Uint8Array | null): Raster | null {
+  if (bytes && isPng(bytes)) return decodePng(bytes)
+  if (bytes && isJpeg(bytes)) {
+    const { width, height, data } = decodeJpeg(bytes, { useTArray: true, formatAsRGBA: true })
+    return { width, height, data }
   }
+  return null
+}
+
+function decode(texture: Texture, cache: Map<Texture, Raster | null>): Raster | null {
+  if (!cache.has(texture)) cache.set(texture, decodeImage(texture.getImage()))
   return cache.get(texture) ?? null
 }
 
@@ -179,7 +197,7 @@ export const colour: Stage = async (doc, ctx) => {
         image = (texture && decode(texture, images)) || undefined
         if (!image) {
           ctx.log.warn(
-            `texture "${texture?.getName() ?? "?"}" (${texture?.getMimeType() ?? "?"}) is not a PNG; using the material colour`,
+            `texture "${texture?.getName() ?? "?"}" (${texture?.getMimeType() ?? "?"}) is not a PNG or JPEG; using the material colour`,
           )
           ctx.out.flags.add("texture-lost")
           mode = "material"
@@ -204,6 +222,9 @@ export const colour: Stage = async (doc, ctx) => {
   for (const m of root.listMaterials()) if (!kept.has(m)) m.dispose()
   for (const t of root.listTextures()) if (!used(t)) t.dispose()
   for (const a of replaced) if (!used(a)) a.dispose()
+  if (root.listTextures().length === 0)
+    for (const ext of root.listExtensionsUsed())
+      if (TEXTURE_EXTENSIONS.includes(ext.extensionName)) ext.dispose()
 
   if (misses > 0) {
     ctx.out.flags.add("colour-miss")

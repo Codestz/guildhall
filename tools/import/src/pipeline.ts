@@ -1,25 +1,27 @@
 /**
- * The import run: discover each pack, skip pieces whose cache key is unchanged, push the rest through
- * read → stages → write (in Bun workers with `--jobs` > 1), then write the shard, cache and index.
+ * The import run: build the rigs the packs declare, then discover each pack, skip pieces whose cache
+ * key is unchanged, push the rest through read → stages → write (in Bun workers with `--jobs` > 1),
+ * then write the shard, cache and index (with the rigs).
  * This file is also the worker entry: off the main thread it serves `importFile` jobs.
  */
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import type { Document } from "@gltf-transform/core"
-import { type CatalogEntry, PALETTE, type PackConfig, paletteHash } from "@guildhall/assets"
+import { type CatalogEntry, PALETTE, type PackConfig, paletteHash, type RigEntry } from "@guildhall/assets"
 import { type Logger, log } from "@guildhall/core"
 import { loadCache, type PackCache, pieceKey, saveCache } from "./cache.ts"
 import { readShard, toEntry, writeIndex, writeShard } from "./catalog.ts"
 import { IMPORTER, loadPacks, type Paths } from "./config.ts"
 import { classify, discover, slugClashes } from "./discover.ts"
 import { readModel, splitTopNodes } from "./read.ts"
+import { importRigs } from "./rigs.ts"
 import { ao } from "./stages/ao.ts"
 import { characters } from "./stages/characters.ts"
 import { colour } from "./stages/colour.ts"
 import { measure } from "./stages/measure.ts"
 import { normalize } from "./stages/normalize.ts"
 import { optimize } from "./stages/optimize.ts"
-import type { PieceReport, PieceSource, Stage } from "./stages/types.ts"
+import type { PieceReport, PieceSource, Stage, StageCtx } from "./stages/types.ts"
 import { removeOrphans, writePiece } from "./write.ts"
 
 /** Static pieces, in order. Characters run `characters` alone. */
@@ -45,14 +47,13 @@ export function startReport(source: PieceSource, doc: Document): PieceReport {
   return report
 }
 
+/** The roots a piece's import reads from and writes to. */
+export type Roots = Pick<Paths, "raw" | "library">
+
 /** One raw file → its catalog entries (one, or one per node with `split: "top-nodes"`). */
-export async function importFile(
-  pack: PackConfig,
-  file: PieceSource,
-  library: string,
-): Promise<CatalogEntry[]> {
+export async function importFile(pack: PackConfig, file: PieceSource, roots: Roots): Promise<CatalogEntry[]> {
   const logger = log("import").child(pack.id)
-  const doc = await readModel(file.file, join(library, ".cache"))
+  const doc = await readModel(file.file, join(roots.library, ".cache"))
   const parts =
     pack.split === "top-nodes"
       ? (await splitTopNodes(doc)).map((p) => ({
@@ -63,7 +64,7 @@ export async function importFile(
   const entries: CatalogEntry[] = []
   for (const { source, doc: piece } of parts) {
     if (source.override?.exclude === true) continue
-    entries.push(await importPiece(pack, source, piece, library, logger))
+    entries.push(await importPiece(pack, source, piece, roots, logger))
   }
   return entries
 }
@@ -72,13 +73,21 @@ async function importPiece(
   pack: PackConfig,
   source: PieceSource,
   doc: Document,
-  library: string,
+  roots: Roots,
   logger: Logger,
 ) {
   const out = startReport(source, doc)
-  const ctx = { pack, source, palette: PALETTE, log: logger.child(source.slug), out }
+  const ctx: StageCtx = {
+    pack,
+    source,
+    palette: PALETTE,
+    raw: roots.raw,
+    library: roots.library,
+    log: logger.child(source.slug),
+    out,
+  }
   for (const stage of out.kind === "character" ? [characters] : STAGES) await stage(doc, ctx)
-  const written = await writePiece(doc, library, pack.id, source.slug)
+  const written = await writePiece(doc, roots.library, pack.id, source.slug)
   return toEntry(pack, source, out, written)
 }
 
@@ -99,11 +108,15 @@ export interface ImportOptions {
   jobs?: number
 }
 
-/** Runs the import for the given packs and returns what happened per pack. */
+/**
+ * Runs the import for the given packs and returns what happened per pack. The rigs the given packs
+ * declare are built first, so a character finds its rig in the same run.
+ */
 export async function runImport(opts: ImportOptions): Promise<PackSummary[]> {
   const { paths, force = false, dry = false } = opts
   const logger = log("import")
   const summaries: PackSummary[] = []
+  const rigs = dry ? undefined : await buildRigs(opts.packs, paths, logger)
   const pool = dry ? undefined : new Pool(Math.max(1, opts.jobs ?? 1), paths)
   try {
     for (const pack of opts.packs) {
@@ -116,8 +129,17 @@ export async function runImport(opts: ImportOptions): Promise<PackSummary[]> {
   } finally {
     pool?.close()
   }
-  if (!dry) writeIndex(paths.library, PALETTE, Object.fromEntries(opts.packs.map((p) => [p.id, p.vendor])))
+  if (!dry)
+    writeIndex(paths.library, PALETTE, Object.fromEntries(opts.packs.map((p) => [p.id, p.vendor])), rigs)
   return summaries
+}
+
+/** Builds the rigs every given pack declares (all of them together, so packs can share a rig). */
+function buildRigs(packs: readonly PackConfig[], paths: Paths, logger: Logger): Promise<RigEntry[]> {
+  const declaring = packs.filter((p) => (p.rigs?.length ?? 0) > 0)
+  return declaring.length === 0
+    ? Promise.resolve([])
+    : importRigs(declaring, paths.raw, paths.library, logger.child("rigs"))
 }
 
 async function runPack(
@@ -203,6 +225,7 @@ async function runPack(
 interface Job {
   id: number
   packs: string
+  raw: string
   library: string
   pack: string
   file: PieceSource
@@ -238,7 +261,7 @@ class Pool {
 
   run(pack: PackConfig, file: PieceSource): Promise<CatalogEntry[]> {
     if (this.all.length === 0) {
-      const job = this.serial.then(() => importFile(pack, file, this.paths.library))
+      const job = this.serial.then(() => importFile(pack, file, this.paths))
       this.serial = job.catch(() => undefined)
       return job
     }
@@ -249,6 +272,7 @@ class Pool {
           const job: Job = {
             id: this.next++,
             packs: this.paths.packs,
+            raw: this.paths.raw,
             library: this.paths.library,
             pack: pack.id,
             file,
@@ -289,7 +313,10 @@ if (!Bun.isMainThread) {
       if (!configs.has(job.packs)) configs.set(job.packs, loadPacks(job.packs))
       const pack = (await configs.get(job.packs))?.find((p) => p.id === job.pack)
       if (!pack) throw new Error(`unknown pack ${job.pack}`)
-      port.postMessage({ id: job.id, entries: await importFile(pack, job.file, job.library) })
+      port.postMessage({
+        id: job.id,
+        entries: await importFile(pack, job.file, { raw: job.raw, library: job.library }),
+      })
     } catch (err) {
       port.postMessage({ id: job.id, error: err instanceof Error ? err.message : String(err) })
     }

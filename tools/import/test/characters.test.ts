@@ -1,11 +1,11 @@
-import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, statSync, utimesSync } from "node:fs"
+import { describe, expect, test } from "bun:test"
+import { existsSync, mkdirSync, readFileSync, statSync, utimesSync } from "node:fs"
 import { join } from "node:path"
 import type { Document, Node } from "@gltf-transform/core"
 import { PALETTE, type PackConfig } from "@guildhall/assets"
 import { log } from "@guildhall/core"
 import { Matrix4, Quaternion, Vector3 } from "three"
-import { startReport } from "../src/pipeline.ts"
+import { runImport, startReport } from "../src/pipeline.ts"
 import { gltfIO } from "../src/read.ts"
 import { characterScale, importRigs, scaleSkeleton } from "../src/rigs.ts"
 import { characters } from "../src/stages/characters.ts"
@@ -45,7 +45,7 @@ const node = (doc: Document, name: string): Node => {
   return n
 }
 
-function ctxFor(doc: Document, p: PackConfig = pack()): StageCtx {
+function ctxFor(doc: Document, p: PackConfig = pack(), library = tempDir()): StageCtx {
   const source = {
     pack: p.id,
     file: VILLAGER,
@@ -56,7 +56,15 @@ function ctxFor(doc: Document, p: PackConfig = pack()): StageCtx {
     tags: [],
     rig: "test-rig",
   }
-  return { pack: p, source, palette: PALETTE, log: quiet, out: startReport(source, doc) }
+  return {
+    pack: p,
+    source,
+    palette: PALETTE,
+    raw: FIXTURES,
+    library,
+    log: quiet,
+    out: startReport(source, doc),
+  }
 }
 
 /** World positions of the skinned vertices in the current pose: Σ w · (J · IBM) · v. */
@@ -134,12 +142,6 @@ const addClip = (name: string) => (doc: Document) => {
     )
 }
 
-const saved = process.env.GUILDHALL_LIBRARY
-afterEach(() => {
-  if (saved === undefined) delete process.env.GUILDHALL_LIBRARY
-  else process.env.GUILDHALL_LIBRARY = saved
-})
-
 /** Builds `test-rig` from `rig` into a fresh library that the characters stage then reads. */
 async function libraryWithRig(rig: Document): Promise<string> {
   const raw = tempDir()
@@ -151,13 +153,11 @@ async function libraryWithRig(rig: Document): Promise<string> {
     library,
     quiet,
   )
-  process.env.GUILDHALL_LIBRARY = library
   return library
 }
 
 describe("characters stage", () => {
   test("keeps skin and joints, bakes the palette, strips clips and records their names", async () => {
-    process.env.GUILDHALL_LIBRARY = tempDir()
     const doc = await villager()
     const c = ctxFor(doc)
     await characters(doc, c)
@@ -177,7 +177,6 @@ describe("characters stage", () => {
   })
 
   test("the pack factor scales the skeleton: bind pose and any pose come out f times larger", async () => {
-    process.env.GUILDHALL_LIBRARY = tempDir()
     const plain = await villager(pose)
     const expected = skinned(plain).map((v) => v.multiplyScalar(2.5))
     const doc = await villager()
@@ -191,18 +190,55 @@ describe("characters stage", () => {
   })
 
   test("a skeleton that matches the built rig passes", async () => {
-    await libraryWithRig(await villager())
+    const library = await libraryWithRig(await villager())
     const doc = await villager()
-    await characters(doc, ctxFor(doc))
+    await characters(doc, ctxFor(doc, pack(), library))
     expect(doc.getRoot().listSkins()).toHaveLength(1)
   })
 
   test("a skeleton without a bone the rig animates is rejected by name", async () => {
-    await libraryWithRig(await villager())
+    const library = await libraryWithRig(await villager())
     const doc = await villager((d) => node(d, "Chest").setName("Torso"))
-    await expect(characters(doc, ctxFor(doc))).rejects.toThrow(
+    await expect(characters(doc, ctxFor(doc, pack(), library))).rejects.toThrow(
       'skeleton does not match rig "test-rig": no Chest',
     )
+  })
+})
+
+describe("import run: rigs are built before the pieces", () => {
+  /** One pack: the villager as a piece, and a rig built from `anims/rig.glb`. */
+  const charPack = pack({
+    source: "chars",
+    include: ["villager.glb"],
+    rules: [{ match: "villager", category: "character" }],
+    rigs: [{ id: "test-rig", files: ["anims/*.glb"] }],
+  })
+  async function run(rig: Document) {
+    const raw = tempDir()
+    const library = tempDir()
+    await rawPack(raw, "chars", { "villager.glb": await villager() })
+    await rawPack(raw, "chars/anims", { "rig.glb": rig })
+    const [summary] = await runImport({ paths: { raw, library, packs: tempDir() }, packs: [charPack] })
+    const index = JSON.parse(readFileSync(join(library, "catalog/index.json"), "utf8"))
+    return { summary, index, library }
+  }
+
+  test("the rig is written and indexed, and the character imports against it", async () => {
+    const { summary, index, library } = await run(await villager())
+    expect(summary?.failed).toEqual([])
+    expect(summary?.imported).toBe(1)
+    expect(index.rigs.map((r: { id: string; file: string }) => [r.id, r.file])).toEqual([
+      ["test-rig", "rigs/test-rig.glb"],
+    ])
+    expect(existsSync(join(library, "rigs/test-rig.glb"))).toBe(true)
+  })
+
+  test("a character is checked against the rig built in the same run", async () => {
+    const other = await villager((d) => {
+      node(d, "Chest").setName("Spine")
+    })
+    const { summary } = await run(other)
+    expect(summary?.failed).toEqual(['villager.glb: skeleton does not match rig "test-rig": no Spine'])
   })
 })
 

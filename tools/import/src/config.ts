@@ -28,7 +28,7 @@ export function paths(env: Record<string, string | undefined> = process.env): Pa
 }
 
 const KEBAB = /^[a-z0-9]+(-[a-z0-9]+)*$/
-const COLOUR_MODES = ["atlas", "colormap", "material", "texture-average", "keep-texture"]
+const COLOUR_MODES = ["atlas", "colormap", "material", "vertex", "texture-average", "keep-texture"]
 const PIVOTS = ["bottom-centre", "trunk", "keep"]
 
 /** Shape problems the type checker cannot see once a config is loaded at runtime. */

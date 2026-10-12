@@ -34,6 +34,8 @@ const ctx = (override?: Record<string, unknown>): StageCtx => ({
     ...(override ? { override } : {}),
   },
   palette: PALETTE,
+  raw: "/raw",
+  library: "/library",
   log: log("test"),
   out: { slug: "x", kind: "static", flags: new Set(), swatches: new Set(), compose: {} as never },
 })

@@ -4,8 +4,7 @@
  *   scale     the pack factor, baked into the skeleton (`scaleSkeleton`: node translations, vertices,
  *             inverse bind matrices), so the model stays in bind space and fits a rig built at that factor
  *   bones     every bone the rig's clips animate must be a node of this model, checked against
- *             `<library>/rigs/<rig>.glb` once it is built (the library from $GUILDHALL_LIBRARY, as
- *             normalize's reference cache)
+ *             `<library>/rigs/<rig>.glb` (`ctx.library`); the import builds the rigs before any piece
  *   clips     stripped from the piece; their names stay in the report, the rig GLB carries the clips
  *   colour    the palette bake (skin attributes are carried through); `keep-texture` keeps the texture
  *   optimize  meshopt with POSITION left in float, then measure
@@ -15,7 +14,6 @@
 import { existsSync, statSync } from "node:fs"
 import { join } from "node:path"
 import type { Document } from "@gltf-transform/core"
-import { paths } from "../config.ts"
 import { animatedNodes, characterScale, rigFile, scaleSkeleton } from "../rigs.ts"
 import { colour } from "./colour.ts"
 import { measure } from "./measure.ts"
@@ -67,7 +65,7 @@ export const characters: Stage = async (doc, ctx) => {
   scaleSkeleton(doc, scale.factor)
   ctx.out.scale = { ...scale, confidence: "pack", flags: [] }
 
-  const file = join(paths().library, rigFile(rig))
+  const file = join(ctx.library, rigFile(rig))
   const bones = await bonesOf(file)
   if (!bones) {
     if (!unbuilt.has(file)) ctx.log.warn(`rig "${rig}" is not built (${file}); bones not checked`)

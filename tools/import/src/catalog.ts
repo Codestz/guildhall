@@ -113,7 +113,8 @@ export function shardIds(library: string): string[] {
 
 /**
  * Rebuilds `index.json` from every shard on disk, so importing one pack keeps the others listed.
- * `vendors` names the vendor of each configured pack; `rigs` are kept from the previous index unless given.
+ * `vendors` names the vendor of each configured pack; each given rig replaces the previous index's
+ * rig of that id, and the previous index's other rigs are kept.
  */
 export function writeIndex(
   library: string,
@@ -132,7 +133,9 @@ export function writeIndex(
       const vendor = vendors[id] ?? previous?.packs.find((p) => p.id === id)?.vendor ?? "other"
       return { id, vendor, count: (JSON.parse(text) as unknown[]).length, hash: contentHash(text) }
     }),
-    rigs: [...(rigs ?? previous?.rigs ?? [])].sort((a, b) => byText(a.id, b.id)),
+    rigs: [...(previous?.rigs ?? []).filter((r) => !rigs?.some((x) => x.id === r.id)), ...(rigs ?? [])].sort(
+      (a, b) => byText(a.id, b.id),
+    ),
   }
   mkdirSync(join(library, "catalog"), { recursive: true })
   writeFileSync(file, `${JSON.stringify(index, null, 2)}\n`)

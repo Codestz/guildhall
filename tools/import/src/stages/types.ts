@@ -68,6 +68,10 @@ export interface StageCtx {
   pack: PackConfig
   source: PieceSource
   palette: Palette
+  /** The raw packs root (`Paths.raw`): reference pieces are read from under it. */
+  raw: string
+  /** The library root (`Paths.library`): the read cache, and the rigs a character is checked against. */
+  library: string
   log: Logger
   out: PieceReport
 }

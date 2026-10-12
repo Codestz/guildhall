@@ -1,4 +1,14 @@
 export {
+  ATMOSPHERE,
+  type Atmosphere,
+  type AtmosphereOpts,
+  type AtmosphereParams,
+  cloudLook,
+  createAtmosphere,
+  DEFAULT_ATMOSPHERE,
+  patchCloudShade,
+} from "./atmosphere/index.ts"
+export {
   type BatchCluster,
   type BatchInstance,
   createStaticBatch,
@@ -14,10 +24,30 @@ export { createGizmo, type Gizmo, type GizmoMode, type GizmoOpts, type GizmoPose
 export { createGrid, type Disposable } from "./grid.ts"
 export { createGround, type Ground, type GroundDraw } from "./ground.ts"
 export { disposeObject, heroSilhouette, testBox } from "./hero.ts"
-export { applyLight, type DayLight, GOLDEN_HOUR, goldenHour, lightAt, sunAt } from "./light.ts"
+export {
+  applyLight,
+  type DayLight,
+  GOLDEN_HOUR,
+  goldenHour,
+  keyLight,
+  lightAt,
+  moonAt,
+  sunAt,
+} from "./light.ts"
 export type { LodCounts } from "./lod.ts"
 export { paletteMaterial } from "./material.ts"
 export { group, loadModel, type Measure, measure, poseModel } from "./model.ts"
+export {
+  createNight,
+  GLOW_SWATCHES,
+  MAX_LIGHTS,
+  type Night,
+  type NightOpts,
+  type NightStats,
+  setGlow,
+  setNightGrade,
+  windowsDark,
+} from "./night/index.ts"
 export { loadPiece } from "./pieces.ts"
 export { instanceSwatchMap, placeInstance, recipeObject } from "./recipe.ts"
 export { createShadows, fitShadowCamera, type ShadowBox } from "./shadow.ts"
@@ -42,4 +72,4 @@ export {
   type ViewerOpts,
   type ViewerStats,
 } from "./viewer.ts"
-export { createWater, type Water, type WaterDraw } from "./water.ts"
+export { createWater, MAX_WAKES, type Wake, type Water, type WaterDraw } from "./water.ts"

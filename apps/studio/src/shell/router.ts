@@ -32,6 +32,8 @@ export const ROUTES: readonly Route[] = [
   { screen: "batch", path: "lab/batch" },
   { screen: "planner", path: "planner" },
   { screen: "town", path: "town", param: { key: "town", parts: 1 } },
+  { screen: "night", path: "lab/night" },
+  { screen: "atmosphere", path: "lab/atmosphere" },
 ]
 
 /** Longest path first, so `/grips/editor` is never read as `/grips` plus an id. */

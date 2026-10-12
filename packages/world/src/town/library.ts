@@ -114,17 +114,17 @@ export function prefabLibrary(recipes: readonly PrefabRecipe[], catalog: Catalog
   const trees = pick(
     [
       "kaykit-forest/tree-1-b-color1",
-      "kaykit-forest/tree-2-b-color1",
+      "kaykit-forest/tree-1-c-color1",
+      "kaykit-forest/tree-3-b-color1",
+      "kaykit-forest/tree-3-c-color1",
       "kaykit-forest/tree-2-c-color1",
-      "kaykit-forest/tree-4-b-color1",
-      "kenney-town/tree",
-      "kenney-town/tree-high-round",
-      "kenney-survival/tree",
+      "quaternius-nature/common-tree-1",
+      "quaternius-nature/common-tree-2",
     ],
     { category: "tree", minSize: [2, 4, 2], maxSize: [7, 10, 7] },
   )
   const pines = pick(
-    ["kenney-nature/tree-pine-tall-a", "kenney-nature/tree-pine-tall-d", "kenney-platformer/tree-pine"],
+    ["quaternius-nature/pine-tree-2", "quaternius-nature/pine-tree-3", "kenney-nature/tree-pine-round-a"],
     { category: "tree", text: "pine", minSize: [1, 4, 1] },
   )
   const bushes = pick(
@@ -244,7 +244,29 @@ export function prefabLibrary(recipes: readonly PrefabRecipe[], catalog: Catalog
     edges: kits,
     nature: { trees: ids(trees), bushes: ids(bushes), crops: crops.flat(), hay: ids(hay), rocks: ids(rocks) },
     farm: { crops, animals: ids(animals), orchard: ids(orchard) },
-    wild: { pines: ids(pines), flowers: ids(flowers) },
+    wild: {
+      pines: ids(pines),
+      flowers: ids(flowers),
+      birches: ids(pick(["quaternius-nature/birch-tree-1", "quaternius-nature/birch-tree-3"], null)),
+      willows: ids(pick(["quaternius-nature/willow-2", "quaternius-nature/willow-4"], null)),
+      grass: ids(
+        pick(
+          ["kenney-nature/grass-large", "kaykit-forest/grass-2-d-color1", "quaternius-nature/grass-2"],
+          null,
+        ),
+      ),
+      reeds: ids(pick(["kenney-nature/grass-leafs-large", "quaternius-nature/grass"], null)),
+      mushrooms: ids(pick(["kenney-nature/mushroom-red-group", "kenney-nature/mushroom-tan-group"], null)),
+      logs: ids(pick(["quaternius-nature/wood-log-moss", "kenney-nature/log"], null)),
+      stumps: ids(pick(["kenney-nature/stump-old", "quaternius-nature/tree-stump-moss"], null)),
+      boulders: ids(
+        pick(
+          ["kaykit-forest/rock-3-k-color1", "kenney-nature/rock-large-b", "kaykit-forest/rock-1-j-color1"],
+          null,
+        ),
+      ),
+      stones: ids(pick(["kenney-nature/stone-small-flat-a", "kenney-nature/rock-small-flat-b"], null)),
+    },
     harbour: {
       ...(decks[0] ? { deck: { id: decks[0].id, w: decks[0].w, d: decks[0].d } } : {}),
       boats,

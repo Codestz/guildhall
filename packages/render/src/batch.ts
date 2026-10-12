@@ -13,6 +13,7 @@ import { LodBatchedMesh } from "./batchMesh.ts"
 import { type LodCounts, PIECE_TIERS, SHELL, TIER_MIN_AREA, TIER_MIN_SAVING } from "./lod.ts"
 import { shellGeometry, simplifierReady, simplifyGeometry, surfaceArea } from "./lodGeometry.ts"
 import { paletteMaterial } from "./material.ts"
+import { GLOW_SWATCHES } from "./night/glow.ts"
 import { instanceSwatchMap } from "./recipe.ts"
 import type { Stage } from "./stage.ts"
 import { swatchMapKey } from "./tint.ts"
@@ -147,7 +148,7 @@ export async function createStaticBatch(
         pieces.set(instance.piece, piece)
       }
       geometry = Promise.all([piece, simplifierReady]).then(([root]) =>
-        withTiers(batchGeometry(root, instanceSwatchMap(instance))),
+        withTiers(batchGeometry(root, instanceSwatchMap(instance), GLOW_SWATCHES[instance.piece])),
       )
       baked.set(key, geometry)
     }

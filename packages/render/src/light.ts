@@ -27,6 +27,16 @@ export interface DayLight {
   exposure: number
   /** 0 by day, 1 at golden hour: how thick the warm haze is. */
   golden: number
+  /** 0 by day, 1 in deep night (the sun 14° under the horizon): stars, the moon, the night grade. */
+  night: number
+  /** How lit the town's lamps, fires and windows are: 0 by day, 1 from just before sunset to dawn. */
+  lamps: number
+  /** Unit vector toward the moon (clamped no lower than MIN_MOON_ELEVATION, for its shadows). */
+  moonDir: [number, number, number]
+  /** The moon's true elevation, degrees (negative by day). */
+  moonElevation: number
+  moon: Color
+  moonIntensity: number
 }
 
 /** The default hour: the low, warm light the concept image is lit by. */
@@ -36,6 +46,16 @@ const SUNSET = 19.25
 const NOON_ELEVATION = 62
 /** Shadows from a grazing sun smear across the town; the key light never goes lower than this. */
 const MIN_SHADOW_ELEVATION = 10
+/** The moon crosses the night sky from SUNSET to SUNRISE, this high at its highest (degrees). */
+const MOON_ELEVATION = 48
+/** Moonlight is soft and high: its shadows never come from lower than this. */
+const MIN_MOON_ELEVATION = 30
+/**
+ * A grey-blue moon, faint, so firelight keeps its colour against it and a red roof stays a dark red
+ * (V1's #9fb6ff turned every roof electric blue here).
+ */
+const MOON = "#b3bdd4"
+const MOON_INTENSITY = 0.6
 
 interface Stop {
   /** Sun elevation, degrees. */
@@ -55,8 +75,9 @@ interface Stop {
 // hemisphere sky #9cc3e6 over ground #7a6a4f. The shade leans blue (warm key, cool fill).
 // biome-ignore format: a table reads better aligned
 const STOPS: readonly Stop[] = [
-  { at: -24, zenith: "#081530", horizon: "#1a2848", glow: "#000000", sun: "#000000", sunIntensity: 0,   sky: "#3a5590", ground: "#151a28", hemiIntensity: 0.6,  exposure: 1.5 },
-  { at: -9,  zenith: "#1c3266", horizon: "#6e6c94", glow: "#b0605a", sun: "#000000", sunIntensity: 0,   sky: "#6c80bc", ground: "#2c2a38", hemiIntensity: 1.1,  exposure: 1.4 },
+  { at: -24, zenith: "#040a1c", horizon: "#13213f", glow: "#000000", sun: "#000000", sunIntensity: 0,   sky: "#5d6a86", ground: "#1c1f28", hemiIntensity: 1.0,  exposure: 1.45 },
+  { at: -14, zenith: "#0a1838", horizon: "#24345e", glow: "#140f2a", sun: "#000000", sunIntensity: 0,   sky: "#65728f", ground: "#20222c", hemiIntensity: 1.0,  exposure: 1.45 },
+  { at: -6,  zenith: "#18306a", horizon: "#6e6c94", glow: "#b0605a", sun: "#000000", sunIntensity: 0,   sky: "#7480a0", ground: "#2a2832", hemiIntensity: 0.95, exposure: 1.3 },
   { at: 0,   zenith: "#33589a", horizon: "#eea070", glow: "#ff8a4c", sun: "#ff9c5c", sunIntensity: 1.2, sky: "#8c9ccc", ground: "#4a3e36", hemiIntensity: 1.0,  exposure: 1.05 },
   { at: 12,  zenith: "#4474b6", horizon: "#f2c49a", glow: "#ffb070", sun: "#ffbf86", sunIntensity: 2.6, sky: "#98b4dc", ground: "#6a5a44", hemiIntensity: 1.05, exposure: 1.0 },
   { at: 24,  zenith: "#4a82c4", horizon: "#f1d4ae", glow: "#ffcf98", sun: "#ffd2a1", sunIntensity: 3.3, sky: "#9cc3e6", ground: "#7a6a4f", hemiIntensity: 1.15, exposure: 1.05 },
@@ -71,6 +92,20 @@ const smoothstep = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t)
 }
 const wrapHour = (h: number) => ((h % 24) + 24) % 24
+
+/** The moon's elevation (degrees) and heading: it rises in −x at SUNSET and sets in +x at SUNRISE. */
+export function moonAt(hour: number): { elevation: number; heading: [number, number] } {
+  const night = 24 - (SUNSET - SUNRISE)
+  const t = wrapHour(hour - SUNSET) / night
+  // Above the horizon by night; under it by day, on the same kind of arc.
+  const elevation =
+    t <= 1
+      ? MOON_ELEVATION * Math.sin(Math.PI * t)
+      : -MOON_ELEVATION * Math.sin((Math.PI * (t - 1) * night) / (24 - night))
+  // A little south of the sun's path, so its shadows read across the streets.
+  const sweep = Math.PI * Math.min(1.15, Math.max(-0.15, t))
+  return { elevation, heading: [-Math.cos(sweep), 0.35 + 0.65 * Math.sin(sweep)] }
+}
 
 /** The sun's elevation (degrees) and its heading in the ground plane at `hour`. */
 export function sunAt(hour: number): { elevation: number; heading: [number, number] } {
@@ -98,6 +133,10 @@ export function lightAt(hour: number): DayLight {
   const [a, b, t] = stopsAround(elevation)
   const lift = Math.max(elevation, MIN_SHADOW_ELEVATION) * RAD
   const flat = Math.cos(lift)
+  const moon = moonAt(hour)
+  const moonLift = Math.max(moon.elevation, MIN_MOON_ELEVATION) * RAD
+  const [mx, mz] = moon.heading
+  const mh = Math.hypot(mx, mz) || 1
   return {
     hour: wrapHour(hour),
     sunDir: [heading[0] * flat, Math.sin(lift), heading[1] * flat],
@@ -112,6 +151,13 @@ export function lightAt(hour: number): DayLight {
     glow: mix(a.glow, b.glow, t),
     exposure: a.exposure + (b.exposure - a.exposure) * t,
     golden: smoothstep(-6, 8, elevation) * (1 - smoothstep(26, 40, elevation)),
+    night: 1 - smoothstep(-14, -4, elevation),
+    lamps: 1 - smoothstep(-3, 9, elevation),
+    moonDir: [(mx / mh) * Math.cos(moonLift), Math.sin(moonLift), (mz / mh) * Math.cos(moonLift)],
+    moonElevation: moon.elevation,
+    moon: new Color(MOON),
+    // The moon takes over once the sun is gone (both dark at the hand-over: no pop).
+    moonIntensity: MOON_INTENSITY * (1 - smoothstep(-12, -6, elevation)) * smoothstep(-4, 12, moon.elevation),
   }
 }
 
@@ -131,11 +177,13 @@ function hemisphere(stage: Stage): HemisphereLight {
  */
 export function applyLight(stage: Stage, light: DayLight): void {
   const { sun, scene, renderer } = stage
-  const [x, y, z] = light.sunDir
+  // The key light (and its cascades) is whichever of the sun and the moon is brighter.
+  const key = keyLight(light)
+  const [x, y, z] = key.dir
   const at = sun.target.position
   sun.position.set(at.x + x * 100, at.y + y * 100, at.z + z * 100)
-  sun.color.copy(light.sun)
-  sun.intensity = light.sunIntensity
+  sun.color.copy(key.colour)
+  sun.intensity = key.intensity
   const fill = hemisphere(stage)
   fill.color.copy(light.hemiSky)
   fill.groundColor.copy(light.hemiGround)
@@ -147,6 +195,17 @@ export function applyLight(stage: Stage, light: DayLight): void {
   if (scene.fog instanceof Fog) scene.fog.color.copy(haze)
   else scene.fog = new Fog(haze, 1e4, 2e4)
   scene.background = haze
+}
+
+/** The light that casts the shadows at this hour: the sun, or the moon once it outshines the sun. */
+export function keyLight(light: DayLight): {
+  dir: [number, number, number]
+  colour: Color
+  intensity: number
+} {
+  return light.sunIntensity >= light.moonIntensity
+    ? { dir: light.sunDir, colour: light.sun, intensity: light.sunIntensity }
+    : { dir: light.moonDir, colour: light.moon, intensity: light.moonIntensity }
 }
 
 /** The haze: the horizon, warmer toward the glow at golden hour. */

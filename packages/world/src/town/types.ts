@@ -5,7 +5,7 @@
  */
 import type { PrefabMeta } from "@guildhall/assets"
 import type { Rect } from "../geom/obb.ts"
-import type { Ring } from "../geom/poly.ts"
+import type { Polygon, Ring } from "../geom/poly.ts"
 import type { Vec2 } from "../geom/vec.ts"
 
 export type { Vec2 }
@@ -85,6 +85,20 @@ export interface Site {
   castleSite: Rect | null
 }
 
+/**
+ * The ground a town lays out on when an island hosts it (ADR 011), in the town's local frame (its
+ * centre at the origin). Framed, the town stays on `land`, its gate roads stop at `reach` metres from
+ * the centre as `exit` nodes, and the island-wide nature is left to the island.
+ */
+export interface TownFrame {
+  /** The land the town may use: outer rings CCW, holes CW. */
+  land: Polygon[]
+  /** Water it borders; `[0]` is the harbour's water, if it has one. */
+  water: Ring[]
+  /** Metres from the centre where its roads leave the frame. */
+  reach: number
+}
+
 /** Edge dressing, per edge kind: catalog ids for the run, its posts or towers, and its gate. */
 export interface EdgeKit {
   /** The repeating piece along a chord. */
@@ -110,9 +124,10 @@ export interface StreetNode {
   kind: "plaza" | "gate" | "junction" | "end" | "quay"
   /**
    * Outside the town: `fork` where a footpath leaves a country road, `road-end` where one stops short
-   * of the bounds (a place for a point of interest and its trail). Absent everywhere else.
+   * of the bounds (a place for a point of interest and its trail), `exit` where a framed town's road
+   * leaves its frame (the island's road network joins it there). Absent everywhere else.
    */
-  tag?: "fork" | "road-end"
+  tag?: "fork" | "road-end" | "exit"
 }
 
 /** A small square where a street forks off (a triangle of street round it), and what it is for. */
@@ -170,6 +185,12 @@ export interface Placement {
   rot: number
   lot?: number
   role?: string
+  /** Uniform size (nature: a tree's age, a vignette's size); 1 when absent. */
+  scale?: number
+  /** Palette swatch id → swatch id, a tone shift for this one (nature: lighter or darker foliage). */
+  swatchMap?: Record<number, number>
+  /** The LOD group it belongs to (nature: a wood's or the wild's grid cell), drawn as one far shell. */
+  cluster?: string
 }
 
 export interface Edge {
@@ -188,9 +209,79 @@ export interface Field {
   rows: number
 }
 
+/** Where someone works or rests: the town's own kinds first, then the island's (POIs, pastures, piers). */
+export const STATION_KINDS = [
+  "market",
+  "forge",
+  "tavern",
+  "dock",
+  "field",
+  "hall",
+  "well",
+  "gate",
+  "lumber",
+  "sawmill",
+  "quarry",
+  "mine",
+  "fishing",
+  "ruins",
+  "shrine",
+  "lighthouse",
+  "lookout",
+  "camp",
+  "training",
+  "pasture",
+  "pier",
+] as const
+export type StationKind = (typeof STATION_KINDS)[number]
+
+/** What a townsperson or an agent goes to a station to do (plan-w8 §7: events map to activities). */
+export const ACTIVITIES = [
+  "investigate",
+  "craft",
+  "train",
+  "labour",
+  "rest",
+  "fish",
+  "ship",
+  "quest",
+  "pray",
+  "watch",
+  "trade",
+] as const
+export type Activity = (typeof ACTIVITIES)[number]
+
+/**
+ * The pinned link from station kinds to activities (plan-w8 §7): a trip for an activity goes to a
+ * station whose kind lists it. M6 maps events to activities; this maps activities to places.
+ */
+export const STATION_ACTIVITY: Readonly<Record<StationKind, readonly Activity[]>> = {
+  market: ["trade"],
+  forge: ["craft"],
+  tavern: ["rest"],
+  dock: ["ship", "fish"],
+  field: ["labour"],
+  hall: ["quest", "investigate"],
+  well: ["rest"],
+  gate: ["watch"],
+  lumber: ["labour"],
+  sawmill: ["craft"],
+  quarry: ["labour"],
+  mine: ["labour"],
+  fishing: ["fish", "rest"],
+  ruins: ["investigate"],
+  shrine: ["pray"],
+  lighthouse: ["watch"],
+  lookout: ["watch"],
+  camp: ["rest"],
+  training: ["train"],
+  pasture: ["labour"],
+  pier: ["fish", "rest"],
+}
+
 export interface Station {
   id: string
-  kind: "market" | "forge" | "tavern" | "dock" | "field" | "hall" | "well" | "gate"
+  kind: StationKind
   at: Vec2
   facing: number
 }

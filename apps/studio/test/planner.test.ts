@@ -78,7 +78,7 @@ describe("deep link", () => {
     expect(neighbourSeeds(1)).toEqual([0, 2, 3, 4, 5, 6])
   })
 
-  test("the planner has a route, a World entry, and is the last screen registered", () => {
+  test("the planner has a route, a World entry, and is registered", () => {
     expect(ROUTES.filter((r) => r.screen === "planner")).toEqual([{ screen: "planner", path: "planner" }])
     expect(href("planner", "seed=3&tier=city")).toBe("/planner?seed=3&tier=city")
     expect(resolve("/planner", "?seed=3").screen).toBe("planner")
@@ -86,7 +86,7 @@ describe("deep link", () => {
     const worldGroup = GROUPS.find((g) => g.id === "world")
     expect(worldGroup?.tools.find((t) => t.id === "planner")?.name).toBe("Town planner")
     const source = readFileSync(join(import.meta.dir, "../src/screens.ts"), "utf8")
-    expect(/planner,\n\]/.test(source)).toBe(true)
+    expect(/\n {2}planner,\n/.test(source)).toBe(true)
   })
 })
 

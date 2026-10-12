@@ -26,6 +26,17 @@ export interface SkyPreset {
   reach?: number
   /** The air's parts on or off; all on when left out. */
   look?: Partial<SkyLook>
+  /**
+   * How much of the key light a shadow takes by sunlight, in place of the hour's own (light.ts
+   * SUN_SHADOW, 0.9). V1 took all of it (1): its shade is the sky's light alone and reads deeper.
+   * Moonlight keeps its own, softer value.
+   */
+  shadow?: number
+  /**
+   * The sky's fill on the shade, as a share of the hour's own (1). Lower is V1's deeper shade: the
+   * shadows read against the sunlit ground from any side.
+   */
+  fill?: number
 }
 
 export interface Sky {
@@ -170,6 +181,8 @@ export function createSky(stage: Stage, preset: SkyPreset = {}): Sky {
     current = lightAt(hour)
     air = airAt(current)
     applyLight(stage, current)
+    if (preset.shadow !== undefined && current.sunIntensity >= current.moonIntensity)
+      stage.sun.shadow.intensity = preset.shadow
     AIR.uAirZenith.value.copy(current.zenith)
     AIR.uAirHorizon.value.copy(current.horizon)
     AIR.uAirAway.value.copy(air.haze.away)
@@ -180,7 +193,7 @@ export function createSky(stage: Stage, preset: SkyPreset = {}): Sky {
     AIR.uSkyAway.value.copy(air.sky.away)
     AIR.uSkyToward.value.copy(air.sky.toward)
     AIR.uSkyBounce.value.copy(air.sky.bounce)
-    AIR.uSkyIntensity.value = air.sky.intensity
+    AIR.uSkyIntensity.value = air.sky.intensity * (preset.fill ?? 1)
     AIR.uHazeFalloff.value = air.haze.falloff
     AIR.uHazeMax.value = air.haze.max
     AIR.uGradeShadows.value.copy(air.grade.shadows)

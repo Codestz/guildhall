@@ -12,13 +12,23 @@ import {
   type WebGLProgramParametersWithUniforms,
 } from "three"
 import { ATMOSPHERE, patchCloudShade } from "./atmosphere/shade.ts"
+import type { ShoreField } from "./shoreField.ts"
 import type { Stage } from "./stage.ts"
 import { patchCascades } from "./sun/patch.ts"
 
 export type WaterDraw = TownDraw["water"]
 
-/** Past this distance from the shore the water is at its deepest colour, metres. */
-const DEEP_AT = 10
+/**
+ * V1's water (legacy/packages/hall/src/scene/nature/waterNodes.ts) measured its shore distances in its
+ * own hex units (HEX_SCALE 5); V2's hexes are 3.1 m across the corners, about 0.6 of V1's. Every V1
+ * distance threshold is read in these units, so the bands keep V1's proportions to the tiles.
+ */
+const V1_UNIT = 0.7
+/** V1's sea: deep blue out, a bright teal over the shallows (Water.tsx DEEP, SHALLOW). */
+const V1_DEEP = "#1d6aa6"
+const V1_SHALLOW = "#3fb0b8"
+/** V1's foam, lit like the surface (waterNodes.ts `foamLit`). */
+const V1_FOAM = new Color(0.92, 0.95, 0.97)
 
 const logger = log("render:water")
 
@@ -49,6 +59,12 @@ uniform vec3 uBank;
 uniform vec4 uWakes[${MAX_WAKES}];
 uniform int uWakeCount;
 uniform float uReflect;
+uniform float uUnit;
+#ifdef SHORE_FIELD
+uniform sampler2D uField;
+uniform vec4 uFieldWindow;
+uniform float uFieldReach;
+#endif
 uniform float uCloudHeight;
 uniform float uCloudReflect;
 uniform vec3 uCloudLit;
@@ -64,7 +80,22 @@ vec4 cloudMask( vec2 uv ) { return vec4( 0.0 ); }
 float cloudShade() { return 1.0; }
 #endif
 varying float vShore;
+varying float vInland;
 varying vec3 vWater;
+
+float waterHash( vec2 p ) {
+	p = fract( p * vec2( 0.1031, 0.1030 ) );
+	p += dot( p, p.yx + 33.33 );
+	return fract( ( p.x + p.y ) * p.x );
+}
+// Value noise in 0..1: what V1 read from its noise texture's alpha (breakup, sparkle, caustics).
+float waterNoise( vec2 p ) {
+	vec2 i = floor( p );
+	vec2 f = fract( p );
+	f = f * f * ( 3.0 - 2.0 * f );
+	return mix( mix( waterHash( i ), waterHash( i + vec2( 1.0, 0.0 ) ), f.x ),
+		mix( waterHash( i + vec2( 0.0, 1.0 ) ), waterHash( i + vec2( 1.0, 1.0 ) ), f.x ), f.y );
+}
 
 vec2 waveHash( vec2 p ) {
 	p = vec2( dot( p, vec2( 127.1, 311.7 ) ), dot( p, vec2( 269.5, 183.3 ) ) );
@@ -154,11 +185,11 @@ function patchWater(
   shader.vertexShader = shader.vertexShader
     .replace(
       "#include <common>",
-      `#include <common>\nattribute float shore;\nvarying float vShore;\nvarying vec3 vWater;`,
+      `#include <common>\nattribute float shore;\nattribute float inland;\nvarying float vShore;\nvarying float vInland;\nvarying vec3 vWater;`,
     )
     .replace(
       "#include <begin_vertex>",
-      "#include <begin_vertex>\nvShore = shore;\nvWater = (modelMatrix * vec4(position, 1.0)).xyz;",
+      "#include <begin_vertex>\nvShore = shore;\nvInland = inland;\nvWater = (modelMatrix * vec4(position, 1.0)).xyz;",
     )
   shader.fragmentShader = shader.fragmentShader
     .replace("#include <dithering_pars_fragment>", () => `#include <dithering_pars_fragment>\n${PARS}`)
@@ -166,21 +197,58 @@ function patchWater(
       "#include <color_fragment>",
       /* glsl */ `#include <color_fragment>
 vec2 vWorld = vWater.xz;
-float depth = smoothstep(1.2, ${DEEP_AT.toFixed(1)}, vShore);
-diffuseColor.rgb = mix(uShallow, uDeep, depth);
-float lap = 0.12 * sin(uTime * 0.9 + vWorld.x * 0.21 + vWorld.y * 0.17);
-float foam = 1.0 - smoothstep(0.45 + lap, 1.1 + lap, vShore);
-float ring = 1.0 - smoothstep(0.0, 0.18, abs(vShore - (1.7 + 0.35 * sin(uTime * 0.6 + vWorld.x * 0.05))));
-foam = max(foam, 0.45 * ring);
+float shoreD = vShore;
+#ifdef SHORE_FIELD
+vec2 fieldUv = (vWorld - uFieldWindow.xy) * uFieldWindow.zw;
+shoreD = all(greaterThan(fieldUv, vec2(0.0))) && all(lessThan(fieldUv, vec2(1.0)))
+	? texture2D(uField, fieldUv).r * uFieldReach
+	: uFieldReach;
+#endif
+bool wInland = vInland > 0.5;
+// V1 (waterNodes.ts waterColour), in V1's units: wD is the distance to the shore, wQ the place.
+float wD = shoreD / uUnit;
+vec2 wQ = vWorld / uUnit;
+float wFar = length(vViewPosition);
+vec2 wSlope = waveSlope(vWorld, uTime) * mix(1.0, 0.5, smoothstep(40.0, 300.0, wFar));
+// V1's broad swell: a slow, large noise that still reads as streaks from the whole-island view.
+vec2 wBroad = vWorld * 0.09 + vec2(0.05, 0.03) * uTime;
+wSlope += 0.1 * noiseSlope(wBroad) * (1.0 - smoothstep(0.3, 0.7, length(fwidth(wBroad))));
+wSlope *= wInland ? 0.6 : 1.0;
+float wBreak = waterNoise(wQ * 0.5 + vec2(uTime * 0.04, 0.0));
+// Body: shallow by the shore, deep further out, stepped through soft toon bands (V1 water v2).
+float wDepth = wInland ? smoothstep(0.3, 2.0, wD) * 0.35 + 0.35 : smoothstep(0.4, 7.5, wD);
+float wSteps = wDepth * 3.0 + (wSlope.x + wSlope.y) * 1.8;
+float wBanded = (floor(wSteps) + smoothstep(0.35, 0.65, fract(wSteps))) / 3.0;
+wDepth = mix(wDepth, clamp(wBanded, 0.0, 1.0), 0.7);
+diffuseColor.rgb = mix(uShallow, uDeep, wDepth);
+// By night the body calms to a dim, greyer blue (V1 dimmed its water with the light; a saturated
+// blue under the moon's fill outshines the land).
+float wNight = 1.0 - smoothstep(-0.24, -0.07, uSunDirection.y);
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(dot(diffuseColor.rgb, vec3(0.3, 0.55, 0.15))), 0.4 * wNight) * (1.0 - 0.45 * wNight);
+// Caustics: a bright wiggly net where two drifting layers of noise cross, over the sunlit shallows.
+float wShallow = (1.0 - smoothstep(0.5, wInland ? 1.8 : 3.5, wD)) * smoothstep(0.15, 0.6, wD);
+if (wShallow > 0.01) {
+	vec2 cq = wQ * 1.9;
+	float c1 = waterNoise(cq + vec2(0.021, 0.013) * uTime * 6.0);
+	float c2 = waterNoise(cq * 1.31 - vec2(0.017, -0.019) * uTime * 6.0 + vec2(5.0, 2.0));
+	float net = 1.0 - smoothstep(0.0, 0.05, abs(c1 - c2));
+	diffuseColor.rgb += vec3(0.85, 1.0, 0.95) * net * net * wShallow * (wInland ? 0.25 : 0.45) * (1.0 - wNight);
+}
+// Foam: a soft rim where the water meets the land, and wave lines rolling in toward the shore.
+float foam = 1.0 - smoothstep(0.05, wBreak * 0.35 + 0.55, wD);
+if (!wInland) {
+	float band = fract(wD * 0.42 - uTime * 0.16 + wBreak * 0.9);
+	float lines = smoothstep(0.78, 0.93, band) * (1.0 - smoothstep(0.93, 1.0, band));
+	foam = max(foam, lines * (1.0 - smoothstep(0.6, 3.2, wD)) * smoothstep(0.35, 0.65, wBreak + 0.25));
+} else foam *= 0.8;
 foam = max(foam, wakeFoam(vWorld));
-diffuseColor.rgb = mix(diffuseColor.rgb, uFoam, foam);`,
+foam = clamp(foam, 0.0, 1.0);
+diffuseColor.rgb = mix(diffuseColor.rgb, uFoam, foam * (0.9 - 0.4 * wNight));`,
     )
     .replace(
       "#include <normal_fragment_maps>",
       /* glsl */ `#include <normal_fragment_maps>
-float far = length(vViewPosition);
-vec2 slope = waveSlope(vWorld, uTime) * mix(1.0, 0.3, smoothstep(40.0, 300.0, far));
-normal = normalize(normal + (viewMatrix * vec4(-slope.x, 0.0, -slope.y, 0.0)).xyz * (1.0 - foam));`,
+normal = normalize(normal + (viewMatrix * vec4(-wSlope.x, 0.0, -wSlope.y, 0.0)).xyz * (1.0 - foam));`,
     )
     .replace(
       "#include <opaque_fragment>",
@@ -197,16 +265,22 @@ if (uReflect > 0.5) {
 	if (all(greaterThan(cuv, vec2(0.0))) && all(lessThan(cuv, vec2(1.0))))
 		mirror = mix(mirror, uCloudLit, 0.7 * uCloudReflect * cloudMask(cuv).g);
 	float facing = clamp(dot(n, toEye), 0.0, 1.0);
-	float fresnel = 0.04 + 0.96 * pow(1.0 - facing, 4.0);
-	float clear = smoothstep(0.6, 5.0, vShore) * (1.0 - foam);
-	outgoingLight = mix(outgoingLight, mirror, fresnel * clear);
+	// V1's fresnel: Schlick lifted halfway toward a 0.35 floor, so the sky shows even from above.
+	float schlick = 0.04 + 0.96 * pow(1.0 - facing, 5.0);
+	float fresnel = mix(schlick, schlick * 0.65 + 0.35, 0.5);
+	float clear = smoothstep(0.6, 5.0, shoreD) * (1.0 - foam);
+	outgoingLight = mix(outgoingLight, mirror * 0.85, fresnel * clear);
 	// The coast mirrored: a darker, greener band just off the shore, stronger the flatter the view.
-	float bank = (1.0 - smoothstep(1.2, 8.0, vShore)) * smoothstep(0.6, 1.6, vShore) * (1.0 - foam);
+	float bank = (1.0 - smoothstep(1.2, 8.0, shoreD)) * smoothstep(0.6, 1.6, shoreD) * (1.0 - foam) * (wInland ? 0.0 : 1.0);
 	outgoingLight = mix(outgoingLight, uBank * (0.4 + 0.6 * dot(uSkyHorizon, vec3(0.33))), 0.45 * bank * (0.35 + fresnel));
 	// The glint path: a broad sheen toward the sun and sparkles where a wave faces it exactly.
 	float toward = max(dot(r, uSunDirection), 0.0);
 	float glint = 0.18 * pow(toward, 60.0) + 2.4 * pow(toward, 900.0);
 	outgoingLight += uSunColor * glint * cloudShade() * (1.0 - foam) * smoothstep(0.0, 0.08, uSunDirection.y);
+	// V1's glints: the key light off the ripples, broken up by a fine noise (bright: the bloom takes them).
+	float wSparkle = waterNoise(wQ * 6.0 + wSlope * 4.0);
+	float spec = pow(max(dot(n, normalize(uSunDirection + toEye)), 0.0), 220.0) * (wSparkle * 1.6 + 0.6);
+	outgoingLight += uSunColor * spec * 1.2 * cloudShade() * (1.0 - foam) * smoothstep(0.0, 0.08, uSunDirection.y);
 } else {
 	float level = clamp(dot(inverseTransformDirection(normal, viewMatrix), toEye), 0.0, 1.0);
 	outgoingLight = mix(outgoingLight, uSky, 0.45 * pow(1.0 - level, 5.0) * (1.0 - foam));
@@ -231,27 +305,112 @@ export interface Water {
 export function createWater(stage: Stage, w: WaterDraw | WaterGeometry): Water {
   const start = performance.now()
   const built = "position" in w ? w : waterGeometry(w)
-  const count = built.position.length / 3
   const geometry = new BufferGeometry()
   geometry.setAttribute("position", new BufferAttribute(built.position, 3))
   geometry.setAttribute("normal", new BufferAttribute(built.normal, 3))
   geometry.setAttribute("shore", new BufferAttribute(built.shore, 1))
+  geometry.setAttribute("inland", new BufferAttribute(new Float32Array(built.shore.length), 1))
   geometry.setIndex(new BufferAttribute(built.index, 1))
   geometry.computeBoundingSphere()
+  const water = waterMesh(stage, geometry, null)
+  logger.info("water", {
+    vertices: built.position.length / 3,
+    triangles: built.index.length / 3,
+    ms: Math.round(performance.now() - start),
+  })
+  return water
+}
 
+/** A pool of water over one hex: its centre and its surface's height. */
+export interface WaterPool {
+  x: number
+  z: number
+  y: number
+}
+
+export interface FieldWaterOpts {
+  /** How far each point is from the land (`bakeShoreField`): depth, foam and waves read it. */
+  field: ShoreField
+  /** The open sea: a square of `half` metres round `centre`, at `level`. */
+  sea: { level: number; half: number; centre?: [number, number] }
+  /** Inland water (lakes, rivers): flat hexes of corner radius `size`, drawn as V1 drew its rivers. */
+  pools?: { size: number; tiles: readonly WaterPool[] }
+}
+
+/**
+ * Water over any ground the caller can say is land or not (the hex island): the open sea as one
+ * square and the inland pools as hexes, in the same material, reading their shore distances from a
+ * baked field instead of per-vertex. One draw call.
+ */
+export function createFieldWater(stage: Stage, opts: FieldWaterOpts): Water {
+  const { sea, pools } = opts
+  const [cx, cz] = sea.centre ?? [0, 0]
+  const hexes = pools?.tiles ?? []
+  const n = 4 + hexes.length * 7
+  const position = new Float32Array(n * 3)
+  const inland = new Float32Array(n)
+  const index: number[] = []
+  const h = sea.half
+  position.set([
+    cx - h,
+    sea.level,
+    cz - h,
+    cx + h,
+    sea.level,
+    cz - h,
+    cx + h,
+    sea.level,
+    cz + h,
+    cx - h,
+    sea.level,
+    cz + h,
+  ])
+  index.push(0, 2, 1, 0, 3, 2)
+  let v = 4
+  const size = pools?.size ?? 1
+  for (const t of hexes) {
+    const c = v
+    position.set([t.x, t.y, t.z], v * 3)
+    inland[v++] = 1
+    for (let k = 0; k < 6; k++) {
+      const a = (Math.PI / 180) * (60 * k - 30)
+      position.set([t.x + Math.cos(a) * size, t.y, t.z + Math.sin(a) * size], v * 3)
+      inland[v++] = 1
+    }
+    for (let k = 0; k < 6; k++) index.push(c, c + 1 + ((k + 1) % 6), c + 1 + k)
+  }
+  const normal = new Float32Array(n * 3)
+  for (let i = 0; i < n; i++) normal[i * 3 + 1] = 1
+  const geometry = new BufferGeometry()
+  geometry.setAttribute("position", new BufferAttribute(position, 3))
+  geometry.setAttribute("normal", new BufferAttribute(normal, 3))
+  geometry.setAttribute("shore", new BufferAttribute(new Float32Array(n), 1))
+  geometry.setAttribute("inland", new BufferAttribute(inland, 1))
+  geometry.setIndex(index)
+  geometry.computeBoundingSphere()
+  logger.info("field water", { pools: hexes.length, half: h })
+  return waterMesh(stage, geometry, opts.field)
+}
+
+function waterMesh(stage: Stage, geometry: BufferGeometry, field: ShoreField | null): Water {
   const uniforms = {
     uTime: { value: 0 },
-    uShallow: { value: swatch("water-shallow").lerp(swatch("water-foam"), 0.4) },
-    uDeep: { value: swatch("water-shallow").lerp(swatch("water-deep"), 0.3) },
-    uFoam: { value: swatch("water-foam") },
+    uShallow: { value: new Color(V1_SHALLOW) },
+    uDeep: { value: new Color(V1_DEEP) },
+    uFoam: { value: V1_FOAM.clone() },
+    uUnit: { value: V1_UNIT },
     uSky: { value: new Color("#cde2f6") },
     uBank: { value: swatch("grass-dark").lerp(swatch("water-deep"), 0.45) },
     uWakes: { value: Array.from({ length: MAX_WAKES }, () => new Vector4()) },
     uWakeCount: { value: 0 },
+    uField: { value: field?.texture ?? null },
+    uFieldWindow: { value: field?.window ?? new Vector4() },
+    uFieldReach: { value: field?.reach ?? 1 },
   }
   const material = new MeshStandardMaterial({ roughness: 0.28, metalness: 0 })
+  if (field) material.defines = { SHORE_FIELD: "" }
   material.onBeforeCompile = (shader) => patchWater(shader, uniforms)
-  material.customProgramCacheKey = () => "guildhall-water"
+  material.customProgramCacheKey = () => (field ? "guildhall-water-field" : "guildhall-water")
   const mesh = new Mesh(geometry, material)
   mesh.name = "water"
   mesh.receiveShadow = true
@@ -263,20 +422,15 @@ export function createWater(stage: Stage, w: WaterDraw | WaterGeometry): Water {
     const fog = stage.scene.fog
     if (fog instanceof Fog) uniforms.uSky.value.copy(fog.color)
   })
-  logger.info("water", {
-    vertices: count,
-    triangles: built.index.length / 3,
-    ms: Math.round(performance.now() - start),
-  })
   return {
     mesh,
     setWakes(wakes) {
-      const n = Math.min(wakes.length, MAX_WAKES)
-      for (let i = 0; i < n; i++) {
+      const count = Math.min(wakes.length, MAX_WAKES)
+      for (let i = 0; i < count; i++) {
         const w = wakes[i] as Wake
         uniforms.uWakes.value[i]?.set(w.x, w.z, w.heading, w.speed)
       }
-      uniforms.uWakeCount.value = n
+      uniforms.uWakeCount.value = count
     },
     dispose() {
       unsubscribe()

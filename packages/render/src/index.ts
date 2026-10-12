@@ -58,6 +58,15 @@ export {
   windowsDark,
 } from "./night/index.ts"
 export { loadPiece } from "./pieces.ts"
+export {
+  createPost,
+  DEFAULT_POST_LOOK,
+  type MoodId,
+  type Post,
+  type PostAa,
+  type PostLook,
+  type PostOpts,
+} from "./post/index.ts"
 export { instanceSwatchMap, placeInstance, recipeObject } from "./recipe.ts"
 export { blendPose, type FreeState, lookVector, type Rig, type RigMode } from "./rig/index.ts"
 export {
@@ -73,6 +82,7 @@ export {
   zoomTilt,
 } from "./rig/world.ts"
 export { createShadows, fitShadowCamera, type ShadowBox } from "./shadow.ts"
+export { bakeShoreField, type ShoreField, type ShoreFieldOpts, shoreDistances } from "./shoreField.ts"
 export { createSky, type Sky, type SkyPreset } from "./sky.ts"
 export { createStage, type Stage, toScreen } from "./stage.ts"
 export {
@@ -103,4 +113,13 @@ export {
   type ViewerOpts,
   type ViewerStats,
 } from "./viewer.ts"
-export { createWater, MAX_WAKES, type Wake, type Water, type WaterDraw } from "./water.ts"
+export {
+  createFieldWater,
+  createWater,
+  type FieldWaterOpts,
+  MAX_WAKES,
+  type Wake,
+  type Water,
+  type WaterDraw,
+  type WaterPool,
+} from "./water.ts"

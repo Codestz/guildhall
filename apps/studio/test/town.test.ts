@@ -1,17 +1,25 @@
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import type { PrefabRecipe } from "@guildhall/assets"
 import { poseToCamera } from "@guildhall/render"
 import { area, type TownDraw, type Vec2, validateTownSpec } from "@guildhall/world"
+import { buildLibrary } from "../src/planner/library.ts"
 import { COMPASS } from "../src/planner/query.ts"
 import { href, resolve } from "../src/shell/router.ts"
 import { along, heroAzimuth, mapPose, sheet, streetPose } from "../src/town/camera.ts"
-import { landOf, PLANT_CELL, plantClusters, withSea } from "../src/town/dress.ts"
-import { paintGround, SNAPS, snapOverlays } from "../src/town/ground.ts"
+import { PLANT_CELL, plantClusters } from "../src/town/dress.ts"
+import { runTownJob, transferables, withSea } from "../src/town/job.ts"
 import { DEFAULT_TOWN, parseTownQuery, townParams, townSpec } from "../src/town/query.ts"
 import { sumLod } from "../src/town/scene.ts"
 
-/** studio town: the deep link, the camera presets, clustering, the sea and the ground's fallbacks. */
+/** studio town: the deep link, the camera presets, clustering, the sea and the worker's job. */
+
+const HOUSES = join(import.meta.dir, "../../../data/recipes/houses")
+const RECIPES = readdirSync(HOUSES)
+  .filter((f) => f.endsWith(".json"))
+  .sort()
+  .map((f) => JSON.parse(readFileSync(join(HOUSES, f), "utf8")) as PrefabRecipe)
 
 const q = (s: string) => parseTownQuery(new URLSearchParams(s))
 const square = (x0: number, z0: number, x1: number, z1: number): Vec2[] => [
@@ -149,63 +157,37 @@ describe("draw", () => {
     expect(home?.x).toBe(PLANT_CELL / 2)
   })
 
-  test("land: overlapping sea pieces are unioned before the difference", () => {
-    const bounds = square(0, 0, 100, 100)
-    // Two sea pieces overlapping in the middle, leaving land only in the top-right corner.
-    const water = [square(0, 0, 100, 60), square(0, 40, 60, 100)]
-    const { land, holes } = landOf(bounds, water)
-    expect(Math.abs(area(land))).toBeCloseTo(40 * 40)
-    expect(holes).toEqual([])
-    expect(landOf(bounds, []).land).toEqual(bounds)
-  })
-
-  test("the sea: bands round the bounds that do not overlap, foam on the land's outline only", () => {
-    const water: TownDraw["water"] = { polys: [square(0, 0, 50, 100)], level: -0.6, shore: [[[50, 0]]] }
-    const ground = { land: square(50, 0, 100, 100), holes: [square(60, 10, 70, 20)] }
-    const out = withSea(water, square(0, 0, 100, 100), ground)
+  test("the sea: bands round the bounds that do not overlap; the shore stays the land's", () => {
+    const shore = [[[50, 0] as Vec2, [50, 100] as Vec2]]
+    const water: TownDraw["water"] = { polys: [square(0, 0, 50, 100)], level: -0.6, shore }
+    const out = withSea(water, square(0, 0, 100, 100))
     expect(out.polys.length).toBe(5)
     const bands = out.polys.slice(1).map((r) => Math.abs(area(r)))
     // 3 × the half side (50) out, all round: the four bands tile the frame round the 100 m square.
     expect(bands.reduce((a, b) => a + b, 0)).toBeCloseTo(400 * 400 - 100 * 100)
-    expect(out.shore.length).toBe(2)
-    expect(out.shore[0]?.[0]).toEqual(out.shore[0]?.at(-1))
+    expect(out.shore).toBe(shore)
   })
 })
 
-describe("ground", () => {
-  const g: TownDraw["ground"] = {
-    land: square(0, 0, 10, 10),
-    holes: [],
-    overlays: [{ kind: "cobble", poly: square(1.13, 1.13, 4.4, 4.4) }],
-    footprints: [square(5, 5, 6, 6)],
-  }
+describe("the worker's job", () => {
+  const job = runTownJob({ seed: 2, tier: "town" }, buildLibrary(RECIPES, null))
 
-  test("snaps overlay corners to the step", () => {
-    expect(snapOverlays(g, 0.25).overlays[0]?.poly[0]).toEqual([1.25, 1.25])
-    expect(snapOverlays(g, 1).footprints).toBe(g.footprints)
+  test("carries the ground and water meshes, timed, every array handed over", () => {
+    expect(job.ground.index.length).toBeGreaterThan(0)
+    expect(job.ground.color.length).toBe(job.ground.position.length)
+    expect(job.water.shore.length * 3).toBe(job.water.position.length)
+    expect(job.times.ground).toBeGreaterThan(0)
+    expect(job.times.water).toBeGreaterThan(0)
+    expect(transferables(job)).toHaveLength(8)
+    expect(new Set(transferables(job)).size).toBe(8)
   })
 
-  test("paints at the first snap that goes through", () => {
-    const tried: number[] = []
-    const out = paintGround(g, (d) => {
-      const x = d.overlays[0]?.poly[0]?.[0] ?? 0
-      tried.push(x)
-      if (tried.length < 2) throw new Error("Unable to complete output ring")
-      return x
-    })
-    expect(out.snap).toBe(SNAPS[1] as number)
-    expect(out.failures.length).toBe(1)
-    expect(out.failures[0]).toContain("Unable to complete")
-  })
-
-  test("falls back to bare land, footprints kept, when no snap goes through", () => {
-    const out = paintGround(g, (d) => {
-      if (d.overlays.length > 0) throw new RangeError("Maximum call stack size exceeded")
-      return d
-    })
-    expect(out.snap).toBeNull()
-    expect(out.built.footprints).toBe(g.footprints)
-    expect(out.failures.length).toBe(SNAPS.length)
+  test("the sea reaches past the bounds to the haze", () => {
+    const [lo, hi] = [job.layout.bounds[0] as Vec2, job.layout.bounds[2] as Vec2]
+    let far = 0
+    for (let j = 0; j < job.water.position.length / 3; j++)
+      if ((job.water.position[3 * j] as number) < lo[0] - (hi[0] - lo[0])) far++
+    expect(far).toBeGreaterThan(0)
   })
 })
 

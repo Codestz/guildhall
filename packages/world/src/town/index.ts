@@ -31,7 +31,23 @@ import { streets, sturdyClip } from "./streets.ts"
 import type { Block, Edge, Lot, PieceInstance, Placement, TownPlan, TownSpecInput } from "./types.ts"
 import { type WalkGraph, walkGraph } from "./walk.ts"
 
-export { type DressInput, type DressKits, dressTown, PLANT_ROLES, recipeKey } from "./dress.ts"
+export {
+  type DressInput,
+  type DressKits,
+  dressTown,
+  PLANT_ROLES,
+  recipeKey,
+  townGround,
+  townWater,
+} from "./dress.ts"
+export {
+  CONTACT_MAX,
+  CONTACT_REACH,
+  contactShade,
+  type GroundGeometry,
+  groundGeometry,
+  SKIRT_BOTTOM,
+} from "./ground.ts"
 export { PLOT_KINDS, type Plot } from "./interiors.ts"
 export { type PlanLibrary, type PropKit, prefabLibrary } from "./library.ts"
 export { type StageTimes, type TownReport, townMetrics } from "./metrics.ts"
@@ -46,6 +62,7 @@ export {
   type WalkNode,
   walkGraph,
 } from "./walk.ts"
+export { type WaterGeometry, waterGeometry } from "./water.ts"
 
 /**
  * The plan as generation leaves it: the pinned TownPlan plus what dressing and the metrics read

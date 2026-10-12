@@ -1,6 +1,6 @@
 /**
  * The main thread's half of a town: each placed prefab variant compiled once (cached across towns, so
- * stepping seeds re-compiles only what is new), the layout dressed (ground, water, the metrics' draw
+ * stepping seeds re-compiles only what is new), the layout dressed (the metrics' draw
  * list), and its pieces cut into what the static batch streams in, in order: the buildings as LOD
  * clusters (one per house, keyed by recipe and seed, so houses alike share a far shell), then walls,
  * fences and props as loose pieces, then the plants clustered by grid cell.
@@ -9,16 +9,12 @@ import { type Catalog, compilePrefab, type PrefabRecipe, type Recipe } from "@gu
 import { log } from "@guildhall/core"
 import type { BatchCluster, BatchInstance } from "@guildhall/render"
 import {
-  area,
-  clip,
   dressTown,
-  type MultiPolygon,
   PLANT_ROLES,
   type Placement,
   recipeKey,
   type TownDraw,
   type TownLayout,
-  type Vec2,
 } from "@guildhall/world"
 
 const logger = log("studio:town")
@@ -27,7 +23,7 @@ const logger = log("studio:town")
 const CACHE = 4000
 
 export interface Dressed {
-  /** The whole town as dressTown draws it (ground, water with the sea, every piece flat). */
+  /** The whole town as dressTown draws it (the metrics count its pieces; the worker builds the ground and water). */
   draw: TownDraw
   /** The same pieces as the batch takes them: houses, loose pieces (edges, props), plants. */
   houses: BatchCluster[]
@@ -108,73 +104,12 @@ export function plantClusters(plants: readonly Placement[]): BatchCluster[] {
     }))
 }
 
-/** How far the sea runs past the site's bounds, as a share of their half side (the haze hides its edge). */
-const SEA_REACH = 3
-
-/**
- * The water with open sea round the site: four bands (not overlapping, as the water mesh needs) from
- * the bounds' box out to SEA_REACH × its half side. The shore lines (where foam breaks) are the land's
- * outline and its holes, exactly: the seams where an island's sea pieces meet, or a lake meets the
- * bounds, are water on both sides and get none. On an island site the sea is inside the bounds
- * already; the bands then only carry it out to the haze.
- */
-export function withSea(
-  water: TownDraw["water"],
-  bounds: readonly Vec2[],
-  { land, holes }: { land: readonly Vec2[]; holes: readonly Vec2[][] },
-): TownDraw["water"] {
-  if (bounds.length < 3) return water
-  let x0 = Number.POSITIVE_INFINITY
-  let z0 = Number.POSITIVE_INFINITY
-  let x1 = Number.NEGATIVE_INFINITY
-  let z1 = Number.NEGATIVE_INFINITY
-  for (const [x, z] of bounds) {
-    x0 = Math.min(x0, x)
-    z0 = Math.min(z0, z)
-    x1 = Math.max(x1, x)
-    z1 = Math.max(z1, z)
-  }
-  const r = SEA_REACH * Math.max(x1 - x0, z1 - z0) * 0.5
-  const box = (a: number, b: number, c: number, d: number): Vec2[] => [
-    [a, b],
-    [c, b],
-    [c, d],
-    [a, d],
-  ]
-  const bands = [
-    box(x0 - r, z0 - r, x1 + r, z0),
-    box(x0 - r, z1, x1 + r, z1 + r),
-    box(x0 - r, z0, x0, z1),
-    box(x1, z0, x1 + r, z1),
-  ]
-  const closed = (ring: readonly Vec2[]): Vec2[] => [...ring, ring[0] as Vec2]
-  const shore = [land, ...holes].filter((ring) => ring.length > 2).map(closed)
-  return { ...water, polys: [...water.polys, ...bands], shore: shore.length > 0 ? shore : water.shore }
-}
-
-/**
- * The land as the bounds minus the water: its largest piece and that piece's holes. The water rings
- * are unioned first: an island's sea comes in pieces that overlap, and a difference taken against
- * overlapping pieces leaves sea in the land (dressTown's own land does, so it is redone here).
- */
-export function landOf(bounds: readonly Vec2[], water: readonly Vec2[][]): { land: Vec2[]; holes: Vec2[][] } {
-  if (water.length === 0) return { land: [...bounds], holes: [] }
-  let sea: MultiPolygon = []
-  for (const ring of water) sea = sea.length === 0 ? clip(ring, ring, "union") : clip(sea, ring, "union")
-  const parts = clip([...bounds], sea, "difference")
-  let best: Vec2[][] | null = null
-  for (const p of parts)
-    if (p[0] && (!best || Math.abs(area(p[0])) > Math.abs(area(best[0] as Vec2[])))) best = p
-  return best ? { land: best[0] as Vec2[], holes: best.slice(1) } : { land: [...bounds], holes: [] }
-}
-
 /** Compiles, dresses and clusters a layout. */
 export function dress(layout: TownLayout, compiler: Compiler, now = () => performance.now()): Dressed {
   const t0 = now()
   const { compiled, misses } = compiler.compile(layout)
   const t1 = now()
-  const dressed = dressTown(layout, compiled)
-  const draw = { ...dressed, ground: { ...dressed.ground, ...landOf(layout.bounds, layout.water) } }
+  const draw = dressTown(layout, compiled)
   const houses: BatchCluster[] = []
   const rest: Placement[] = []
   const plants: Placement[] = [...layout.nature]
@@ -190,7 +125,7 @@ export function dress(layout: TownLayout, compiler: Compiler, now = () => perfor
   const loose = dressTown({ ...layout, placements: rest, nature: [] }, new Map()).pieces
   const t2 = now()
   return {
-    draw: { ...draw, water: withSea(draw.water, layout.bounds, draw.ground) },
+    draw,
     houses,
     loose,
     plants: plantClusters(plants),

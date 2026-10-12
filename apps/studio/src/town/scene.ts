@@ -1,10 +1,10 @@
 /**
- * The 3D town on a stage, built in stages so the first frame comes fast: sky, sun, bare land and
- * water as soon as the layout is dressed, then the pieces streamed in, each stage drawn before the
- * next loads: the houses as LOD clusters, the walls and props added to their batch, the plants as
- * clusters in a second batch (a batch only takes clusters when it is made); last the painted ground
- * in place of the bare land (seconds for a city: render builds it on the main thread). A newer town
- * abandons an older build between stages. The light keeps its hour across towns.
+ * The 3D town on a stage, built in stages so the first frame comes fast: sky, sun, the painted ground
+ * and the water (their meshes built in the worker, only uploaded here) as soon as the layout is
+ * dressed, then the pieces streamed in, each stage drawn before the next loads: the houses as LOD
+ * clusters, the walls and props added to their batch, the plants as clusters in a second batch (a
+ * batch only takes clusters when it is made). A newer town abandons an older build between stages.
+ * The light keeps its hour across towns.
  */
 import type { Catalog } from "@guildhall/assets"
 import { log } from "@guildhall/core"
@@ -23,11 +23,11 @@ import {
   type Sun,
   type Water,
 } from "@guildhall/render"
-import { normalizeSpec, type TownLayout } from "@guildhall/world"
+import { normalizeSpec } from "@guildhall/world"
 import { libraryUrl } from "../catalog.ts"
 import { sheet } from "./camera.ts"
 import type { Dressed } from "./dress.ts"
-import { bareGround, paintGround } from "./ground.ts"
+import type { TownJob } from "./job.ts"
 
 const logger = log("studio:town")
 
@@ -36,20 +36,19 @@ const CEILING = 40
 /** The town cascade's half side, in town radii (the town is centred on the origin). */
 const SHADOW_REACH = 2
 
-/** What the last build took, ms: to the first frame (bare land, water, sky), per batch stage, the ground. */
+/** What the last build took, ms: to the first frame (ground, water, sky), per batch stage. */
 export interface BuildTimes {
   firstFrameMs: number
   /** Houses, walls and props, plants. */
   stagesMs: number[]
+  /** Uploading the worker's ground and water meshes (main thread). */
   groundMs: number
-  /** The snap the ground's overlays went through (ground.ts); null: bare land. */
-  groundSnap: number | null
   totalMs: number
 }
 
 export interface TownScene {
   /** Replaces the town on the stage; resolves when every stage is in (null: a newer build took over). */
-  show(layout: TownLayout, dressed: Dressed): Promise<BuildTimes | null>
+  show(job: Pick<TownJob, "layout" | "ground" | "water">, dressed: Dressed): Promise<BuildTimes | null>
   setHour(hour: number): void
   /** What the last frame's main pass drew per LOD tier, both batches together. */
   lod(): LodCounts
@@ -104,7 +103,8 @@ export function createTownScene(stage: Stage, catalog: Catalog, initialHour: num
   }
 
   return {
-    async show(layout, dressed) {
+    async show(job, dressed) {
+      const layout = job.layout
       const mine = ++build
       const start = performance.now()
       clear()
@@ -113,10 +113,10 @@ export function createTownScene(stage: Stage, catalog: Catalog, initialHour: num
       const light = createSun(stage, { town: { min: [-t, 0, -t], max: [t, CEILING, t] } })
       sun = light
       sky = createSky(stage, { hour, sun: light, reach: 0.9 * sheet(layout).half })
-      const seed = layout.spec.seed
-      const bare = createGround(stage, bareGround(dressed.draw.ground), { seed })
-      ground = bare
-      water = createWater(stage, dressed.draw.water)
+      const t0 = performance.now()
+      ground = createGround(stage, job.ground)
+      water = createWater(stage, job.water)
+      const groundMs = performance.now() - t0
       await nextFrame()
       const firstFrameMs = performance.now() - start
       const stagesMs: number[] = []
@@ -153,23 +153,16 @@ export function createTownScene(stage: Stage, catalog: Catalog, initialHour: num
         await nextFrame()
         stagesMs.push(performance.now() - t0)
       }
-      const t1 = performance.now()
-      const painted = paintGround(dressed.draw.ground, (g) => createGround(stage, g, { seed }))
-      if (painted.failures.length > 0) logger.warn("ground snapped", { failures: painted.failures })
-      bare.dispose()
-      ground = painted.built
-      const groundMs = performance.now() - t1
-      await nextFrame()
       const totalMs = performance.now() - start
       logger.info("town drawn", {
-        seed,
+        seed: layout.spec.seed,
         tier: layout.spec.tier,
         pieces: (town?.count ?? 0) + (plants?.count ?? 0),
         clusters: (town?.clusters ?? 0) + (plants?.clusters ?? 0),
         firstFrameMs: Math.round(firstFrameMs),
         totalMs: Math.round(totalMs),
       })
-      return { firstFrameMs, stagesMs, groundMs, groundSnap: painted.snap, totalMs }
+      return { firstFrameMs, stagesMs, groundMs, totalMs }
     },
     setHour(next) {
       hour = next

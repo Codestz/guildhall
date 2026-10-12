@@ -170,7 +170,7 @@ export function createTownController(
       busy: "streaming",
     })
     frame()
-    const build = await scene.show(job.layout, dressed)
+    const build = await scene.show(job, dressed)
     if (disposed || wanted !== spec) return
     publish({ build, busy: null })
   }

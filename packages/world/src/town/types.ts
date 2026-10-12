@@ -224,8 +224,11 @@ export interface PieceInstance {
 export interface TownDraw {
   pieces: PieceInstance[]
   ground: {
+    /** The main land (the island) and its holes (lakes). */
     land: Vec2[]
     holes: Vec2[][]
+    /** Further land pieces beside it (islets), outlines without holes. */
+    islets?: Vec2[][]
     overlays: { kind: "cobble" | "plaza" | "dirt" | "field" | "garden" | "sand"; poly: Vec2[] }[]
     /** Building and wall footprints, for contact darkening. */
     footprints: Vec2[][]

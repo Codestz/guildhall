@@ -49,3 +49,12 @@ import paletteJson from "./palette.json" with { type: "json" }
 import { loadPalette as load, type PaletteJson as PJ } from "./palette.ts"
 /** The shared palette (placeholder until the user picks the swatches). */
 export const PALETTE = load(paletteJson as PJ)
+export type { HouseBlueprint, PrefabKind, PrefabMeta, PrefabRecipe, Storey } from "./compose/blueprint.ts"
+export { PREFAB_KINDS, validatePrefab } from "./compose/blueprint.ts"
+export type { Mount, MountClip, MountSlot, MountsFile, Vec3 } from "./mount.ts"
+export { MOUNT_SLOTS, mountBasis, SLOT_FRAMES, validateMount, validateMounts } from "./mount.ts"
+export type { NpcLook, NpcRecipe } from "./npc/recipe.ts"
+export { validateNpc } from "./npc/recipe.ts"
+export type { DataOverlay } from "./overlay.ts"
+export { applyOverlay } from "./overlay.ts"
+export { decodeShade, rampMapToSwatchMap, tintColours } from "./tint.ts"

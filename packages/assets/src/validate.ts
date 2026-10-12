@@ -4,23 +4,27 @@
  */
 import { CATEGORIES, KINDS, PIECE_FLAGS, SCALE_CONFIDENCES, SCALE_FLAGS, SCALE_RULES } from "./catalog.ts"
 import { ANCHOR_KINDS, ATTACH_ROLES, COMPOSE_SOURCES, EDGE_KINDS, FACINGS } from "./compose.ts"
+import { validateMount } from "./mount.ts"
 import type { Palette } from "./palette.ts"
 
-const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/
+/** kebab-case: also the rule for data ids (prefab, NPC recipe). */
+export const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
-const isRecord = (v: unknown): v is Record<string, unknown> =>
+// Shape guards, shared with the data validators (compose/blueprint.ts, npc/recipe.ts).
+export const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v)
-const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v)
-const isCount = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0
-const isStr = (v: unknown): v is string => typeof v === "string" && v.length > 0
-const isStrList = (v: unknown): v is string[] => Array.isArray(v) && v.every(isStr)
-const isVec3 = (v: unknown): v is [number, number, number] =>
+export const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v)
+export const isCount = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0
+export const isStr = (v: unknown): v is string => typeof v === "string" && v.length > 0
+export const isStrList = (v: unknown): v is string[] => Array.isArray(v) && v.every(isStr)
+export const isVec3 = (v: unknown): v is [number, number, number] =>
   Array.isArray(v) && v.length === 3 && v.every(isNum)
-const oneOf = (list: readonly string[], v: unknown): boolean => typeof v === "string" && list.includes(v)
-const show = (v: unknown): string => JSON.stringify(v) ?? String(v)
+export const oneOf = (list: readonly string[], v: unknown): boolean =>
+  typeof v === "string" && list.includes(v)
+export const show = (v: unknown): string => JSON.stringify(v) ?? String(v)
 
 /** A list of distinct values, each from `list`. */
-function checkSet(out: string[], at: string, list: readonly string[], v: unknown): void {
+export function checkSet(out: string[], at: string, list: readonly string[], v: unknown): void {
   if (!Array.isArray(v)) return void out.push(`${at}: expected an array`)
   for (const x of v) if (!oneOf(list, x)) out.push(`${at}: unknown ${show(x)}`)
   if (new Set(v).size !== v.length) out.push(`${at}: duplicates`)
@@ -49,17 +53,23 @@ function checkCompose(out: string[], c: unknown): void {
   if (c.edgeKind !== undefined && !oneOf(EDGE_KINDS, c.edgeKind))
     out.push(`compose.edgeKind: unknown ${show(c.edgeKind)}`)
   if (!oneOf(COMPOSE_SOURCES, c.source)) out.push(`compose.source: unknown ${show(c.source)}`)
-  if (!Array.isArray(c.anchors)) return void out.push("compose.anchors: expected an array")
-  for (const [i, a] of (c.anchors as unknown[]).entries()) {
-    const at = `compose.anchors[${i}]`
+  checkAnchors(out, "compose.anchors", c.anchors)
+  if (c.mount !== undefined) out.push(...validateMount(c.mount, "compose.mount"))
+}
+
+/** A list of Anchors. */
+export function checkAnchors(out: string[], at: string, v: unknown): void {
+  if (!Array.isArray(v)) return void out.push(`${at}: expected an array`)
+  for (const [i, a] of (v as unknown[]).entries()) {
+    const where = `${at}[${i}]`
     if (!isRecord(a)) {
-      out.push(`${at}: expected an object`)
+      out.push(`${where}: expected an object`)
       continue
     }
-    if (!isStr(a.id)) out.push(`${at}.id: expected a string`)
-    if (!oneOf(ANCHOR_KINDS, a.kind)) out.push(`${at}.kind: unknown ${show(a.kind)}`)
-    if (!isVec3(a.at)) out.push(`${at}.at: expected [x, y, z]`)
-    if (!isNum(a.facing)) out.push(`${at}.facing: expected a number`)
+    if (!isStr(a.id)) out.push(`${where}.id: expected a string`)
+    if (!oneOf(ANCHOR_KINDS, a.kind)) out.push(`${where}.kind: unknown ${show(a.kind)}`)
+    if (!isVec3(a.at)) out.push(`${where}.at: expected [x, y, z]`)
+    if (!isNum(a.facing)) out.push(`${where}.facing: expected a number`)
   }
 }
 
@@ -106,6 +116,7 @@ export function validateEntry(value: unknown, palette?: Palette): string[] {
     const c = e.character
     if (!isRecord(c) || !isStr(c.rig) || !isStrList(c.clips) || !isCount(c.bones))
       out.push("character: expected { rig, clips, bones }")
+    else if (c.parts !== undefined && !isStrList(c.parts)) out.push("character.parts: expected strings")
   }
   if (!isRecord(e.files) || !isStr(e.files.glb) || !(e.files.thumb === null || isStr(e.files.thumb)))
     out.push("files: expected { glb, thumb | null }")

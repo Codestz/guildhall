@@ -93,7 +93,8 @@ export interface CatalogEntry {
   scale: ScaleInfo
   flags: PieceFlag[]
   compose: ComposeMeta
-  character?: { rig: string; clips: string[]; bones: number }
+  /** `parts`: the body's sub-mesh names, for NPC recipes to hide (absent until re-imported). */
+  character?: { rig: string; clips: string[]; bones: number; parts?: string[] }
   files: { glb: string; thumb: string | null }
   /** Content hash of the written GLB. */
   hash: string

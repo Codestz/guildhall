@@ -1,4 +1,5 @@
 /** Composition metadata (Look bar #2): how a piece sits in a street, a wall run or a roofline. */
+import type { Mount } from "./mount.ts"
 
 /** A side of the piece, in piece space. */
 export const FACINGS = ["+z", "-z", "+x", "-x"] as const
@@ -15,6 +16,7 @@ export const ATTACH_ROLES = [
   "floor",
   "ground",
   "held",
+  "worn",
 ] as const
 export type AttachRole = (typeof ATTACH_ROLES)[number]
 
@@ -44,4 +46,6 @@ export interface ComposeMeta {
   edgeKind?: EdgeKind
   anchors: Anchor[]
   source: ComposeSource
+  /** How a held/worn piece sits on a character (ADR 010); filled from `data/mounts.json`. */
+  mount?: Mount
 }

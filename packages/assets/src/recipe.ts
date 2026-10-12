@@ -16,6 +16,8 @@ export interface RecipeInstance {
   scale: number
   /** Swatch id → swatch id, a per-instance re-tint. */
   swatchMap?: Record<number, number>
+  /** Ramp name → ramp name, tone for tone (ADR 008); what composers and NPC recipes author. */
+  rampMap?: Record<string, string>
 }
 
 export interface Recipe {
@@ -34,7 +36,7 @@ const num = (value: number): string => {
 
 /**
  * A stable fingerprint of what a recipe draws: instances and sockets in order, a fixed field order,
- * numbers to 1e-2 (the archive's rule), swatch maps by sorted key. 8 hex digits.
+ * numbers to 1e-2 (the archive's rule), swatch and ramp maps by sorted key. 8 hex digits.
  */
 export function recipeHash(recipe: Recipe): string {
   const parts: string[] = [recipe.id, String(recipe.seed)]
@@ -45,7 +47,15 @@ export function recipeHash(recipe: Recipe): string {
       .sort((a, b) => a - b)
       .map((from) => `${from}>${map[from]}`)
       .join(";")
-    parts.push(`i:${i.piece},${num(i.x)},${num(i.y)},${num(i.z)},${num(i.rot)},${num(i.scale)},${swaps}`)
+    // Ramp maps are appended only when present, so recipes without one keep their pinned hashes.
+    const ramps = Object.keys(i.rampMap ?? {})
+      .sort()
+      .map((from) => `${from}>${i.rampMap?.[from]}`)
+      .join(";")
+    const tail = ramps ? `,r:${ramps}` : ""
+    parts.push(
+      `i:${i.piece},${num(i.x)},${num(i.y)},${num(i.z)},${num(i.rot)},${num(i.scale)},${swaps}${tail}`,
+    )
   }
   for (const s of recipe.sockets) {
     const [x, y, z] = s.at

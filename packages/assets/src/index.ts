@@ -44,3 +44,8 @@ export type { Recipe, RecipeInstance } from "./recipe.ts"
 export { recipeHash } from "./recipe.ts"
 export { checkScale, DOOR_TOP, HERO_HEIGHT, SCALE_TARGETS, STOREY } from "./scale.ts"
 export { validateEntry, validateIndex } from "./validate.ts"
+
+import paletteJson from "./palette.json" with { type: "json" }
+import { loadPalette as load, type PaletteJson as PJ } from "./palette.ts"
+/** The shared palette (placeholder until the user picks the swatches). */
+export const PALETTE = load(paletteJson as PJ)

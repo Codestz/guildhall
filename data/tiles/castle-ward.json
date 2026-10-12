@@ -78,7 +78,6 @@
   ],
   "tier": 3,
   "variants": [
-    "castle-yard",
-    "castle-tower"
+    "castle-yard"
   ]
 }

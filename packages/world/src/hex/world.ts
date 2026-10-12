@@ -15,8 +15,9 @@ import {
   type TileGround,
   tilePath,
   tilePrefab,
+  worldSide,
 } from "./tiles.ts"
-import { type HexZones, useOf } from "./zones.ts"
+import { castleTier, type HexZones, type TileUse, useOf } from "./zones.ts"
 
 /** Metres per height level (the default; `hexWorld(h, z, { step })` tries others). */
 export const LEVEL_STEP = 0.8
@@ -122,6 +123,30 @@ const HEART: Record<string, string | null> = {
 
 const COLOURS = ["red", "red", "blue", "blue", "green", "yellow"]
 
+/**
+ * The scene a tile's prefab grows into when the tiles its footprint covers are free (decisions.md
+ * "Prefabs are composed scenes"): a canteen with its beer garden, a smithy with its working yard, the
+ * camp's archery range with its butts, the town's market square (one per town).
+ */
+const SCENES: Record<string, string> = {
+  tavern: "tavern-garden",
+  smithy: "smithy-works",
+  archery: "archery-range",
+}
+/** The scenes each kind of place has once, wherever a building of it has room for one. */
+const PLACE_SCENES: Partial<Record<string, string[]>> = {
+  town: ["market-square", "tavern-garden", "smithy-works"],
+  market: ["tavern-garden"],
+  harbour: ["tavern-garden"],
+  camp: ["archery-range"],
+  mine: ["smithy-works"],
+}
+/** The prefab a tile a neighbour's scene covers takes: nothing of its own, no spots, no blockers. */
+const SCENE_PART = "scene-part"
+/** What a scene may spread over: its own place's open ground, or the open country. */
+const OPEN_IN_PLACE = new Set<TileUse>(["yard", "garden", "well", "market"])
+const OPEN_COUNTRY = new Set<TileUse>(["meadow", "grove", "pasture", "orchard", "field"])
+
 /** The prefab for a tile's use (besides buildings and roads). */
 const BY_USE: Record<string, string> = {
   field: "field",
@@ -154,8 +179,13 @@ const BY_USE: Record<string, string> = {
   dock: "dock",
 }
 
-export function hexWorld(h: HexIsland, z: HexZones, opts: { step?: number } = {}): HexWorld {
+/**
+ * `agents` (default 3) is how many agents the guild has: with the repo's files it sets the Guildhall's
+ * tier (`castleTier`; give hexZones the same count so its castle zone is that tier's size).
+ */
+export function hexWorld(h: HexIsland, z: HexZones, opts: { step?: number; agents?: number } = {}): HexWorld {
   const STEP = opts.step ?? LEVEL_STEP
+  const tier = opts.agents === undefined ? z.tier : castleTier(h.spec.files, opts.agents)
   const g = h.grid
   const R = HEX_TILE_SIZE
   const tiles: HexWorldTile[] = []
@@ -223,6 +253,67 @@ export function hexWorld(h: HexIsland, z: HexZones, opts: { step?: number } = {}
     }
     return (n ? bank / n : Math.max(0, top(i)) + 0.4) + DECK_LIFT
   }
+  const dryLand = (i: number) => {
+    const k = kindOf(h, i)
+    return k !== "sea" && k !== "shallows" && k !== "lake" && k !== "river" && k !== "rock" && k !== "cliff"
+  }
+  const zoneAt = (i: number) => (z.zoneOf[i] ? z.zones[z.zoneOf[i]! - 1] : undefined)
+  /** What a building tile builds: by district in the town, by the place's kind elsewhere. */
+  const buildOf = (i: number): string => {
+    const zone = zoneAt(i)
+    const pick = (list: string[]) =>
+      list[Math.floor(hash2(seed + 5, g.q[i]!, g.r[i]!) * list.length) % list.length]!
+    if (zone?.kind !== "town") return pick(BUILDS[zone?.kind ?? "town"] ?? BUILDS.town!)
+    const byWater = [...g.neighbours(i)].some(
+      (j) => j >= 0 && (kindOf(h, j) === "river" || kindOf(h, j) === "lake"),
+    )
+    return pick(steps(i, zone.tile) <= 3 ? TOWN_HEART : byWater ? TOWN_WATER : TOWN_EDGE)
+  }
+  // ---- scenes bigger than a tile: each claims the neighbours across its footprint's sides, when they
+  // are free open ground on its own level (never a road, water or another building), else it stays
+  // its one-tile self ----
+  const scenes = new Map<number, string>()
+  const claimedBy = new Map<number, number>()
+  const claimable = (i: number, j: number) => {
+    if (j < 0 || claimedBy.has(j) || scenes.has(j) || !dryLand(j) || h.level[j] !== h.level[i]) return false
+    const u = useOf(z, j)
+    return z.zoneOf[j] === 0
+      ? OPEN_COUNTRY.has(u)
+      : z.zoneOf[j] === z.zoneOf[i] && OPEN_IN_PLACE.has(u) && zoneAt(j)!.kind !== "castle"
+  }
+  /** Puts `scene` on building tile i if its footprint fits there. */
+  const claim = (i: number, scene: string): boolean => {
+    const p = tilePrefab(scene)
+    if (!p?.footprint?.length || !tilePrefab(SCENE_PART) || scenes.has(i) || claimedBy.has(i)) return false
+    const nb = g.neighbours(i)
+    // the side the building turns to (walk.ts puts its door there too)
+    const door = facing(i)
+    const cover = p.footprint.map((k) => nb[worldSide(k, door)]!)
+    if (!cover.every((j) => claimable(i, j))) return false
+    scenes.set(i, scene)
+    for (const j of cover) claimedBy.set(j, i)
+    return true
+  }
+  const buildings = (zi: number) =>
+    z.zones[zi]!.tiles.filter((i) => useOf(z, i) === "building").sort(
+      (a, b) => steps(a, z.zones[zi]!.tile) - steps(b, z.zones[zi]!.tile) || a - b,
+    )
+  // each place's own scenes first, on the building nearest its heart they fit beside
+  for (const [zi, zone] of z.zones.entries())
+    for (const scene of PLACE_SCENES[zone.kind] ?? []) buildings(zi).some((i) => claim(i, scene))
+  // then every other tavern, smithy and archery range the tiles picked, where there is room
+  for (let i = 0; i < g.size; i++) {
+    if (useOf(z, i) !== "building") continue
+    const scene = SCENES[buildOf(i)]
+    if (scene) claim(i, scene)
+  }
+  /** The first of `ids` the castle's tier has (a castle piece's `tier`: the first tier that uses it). */
+  const atTier = (...ids: string[]): string | null =>
+    ids.find((id) => {
+      const p = tilePrefab(id)
+      return p !== undefined && (p.tier ?? 1) <= tier
+    }) ?? null
+
   const byTile = new Map<number, number>()
   for (let i = 0; i < g.size; i++) {
     const k = kindOf(h, i)
@@ -241,23 +332,42 @@ export function hexWorld(h: HexIsland, z: HexZones, opts: { step?: number } = {}
     let pathSides: number[] | undefined
     let door: number | undefined
     let rot = rotOf(Math.floor(hash2(seed + 3, g.q[i]!, g.r[i]!) * 6))
-    const pick = (list: string[]) =>
-      list[Math.floor(hash2(seed + 5, g.q[i]!, g.r[i]!) * list.length) % list.length]!
-    if (u === "building") {
-      if (zone?.kind === "town") {
-        const d = steps(i, zone.tile)
-        const byWater = [...g.neighbours(i)].some(
-          (j) => j >= 0 && (kindOf(h, j) === "river" || kindOf(h, j) === "lake"),
-        )
-        prefab = pick(d <= 3 ? TOWN_HEART : byWater ? TOWN_WATER : TOWN_EDGE)
-      } else prefab = pick(BUILDS[zone?.kind ?? "town"] ?? BUILDS.town!)
+    const origin = claimedBy.get(i)
+    if (origin !== undefined) {
+      // under a neighbour's scene: its ground, nothing of its own
+      prefab = SCENE_PART
+      const p = tilePrefab(scenes.get(origin)!)!
+      if (p.ground === "dirt" || p.ground === "paved") ground = p.ground
+    } else if (u === "building") {
+      prefab = scenes.get(i) ?? buildOf(i)
       door = facing(i)
       rot = rotOf(door)
-    } else if (u === "landmark") prefab = "castle"
-    else if (zone?.kind === "castle" && (u === "yard" || u === "garden" || u === "well" || u === "market")) {
-      // the castle's other tiles are its wards, inside the curtain wall
-      prefab = "castle-ward"
-      const d = g.neighbours(i).indexOf(zone.tile)
+    } else if (u === "landmark" && zone) {
+      // the Guildhall: its keep on the castle's first tile, its great hall (tier 3 up) at its heart
+      const nb = g.neighbours(i)
+      if (i === zone.tiles[0]) {
+        prefab = "castle"
+        const d = nb.indexOf(zone.tile)
+        if (d >= 0) rot = rotOf(d)
+      } else {
+        prefab = atTier("great-hall", "castle-yard", "castle-ward")
+        // its door toward the road coming in, its back to the keep
+        const d = [0, 1, 2, 3, 4, 5].find((e) => nb[e]! >= 0 && roadLike(nb[e]!))
+        door = d ?? (nb.indexOf(zone.tiles[0]!) + 3) % 6
+        rot = rotOf(door)
+      }
+    } else if (
+      zone?.kind === "castle" &&
+      (u === "yard" || u === "garden" || u === "well" || u === "market")
+    ) {
+      // the castle's other tiles: its bailey (tier 2), its wards (3), towers on the citadel's ring (4)
+      const nb = g.neighbours(i)
+      const out = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! < 0 || z.zoneOf[nb[d]!] !== z.zoneOf[i])
+      const ring = out.length >= 2 && hash2(seed + 43, g.q[i]!, g.r[i]!) < 0.65
+      prefab = ring
+        ? atTier("castle-tower", "castle-ward", "castle-yard")
+        : atTier("castle-ward", "castle-yard")
+      const d = nb.indexOf(zone.tile)
       rot = rotOf(d >= 0 ? d : 4)
     } else if (zone?.kind === "harbour" && (u === "yard" || u === "garden" || u === "well" || u === "market"))
       prefab = "quay"
@@ -384,7 +494,15 @@ export function hexWorld(h: HexIsland, z: HexZones, opts: { step?: number } = {}
         pieces.push({ ...q, piece: recolour(q.piece, hue) })
       prefabs[prefab!] = (prefabs[prefab!] ?? 0) + 1
     }
-    if (ground !== "water" && u !== "road" && u !== "bridge" && u !== "square" && u !== "building" && !zone) {
+    if (
+      ground !== "water" &&
+      u !== "road" &&
+      u !== "bridge" &&
+      u !== "square" &&
+      u !== "building" &&
+      !zone &&
+      origin === undefined
+    ) {
       // reeds along a river's or lake's banks, fallen rocks at the foot of a high step
       const nb = g.neighbours(i)
       const wet = (j: number) => j >= 0 && (kindOf(h, j) === "river" || kindOf(h, j) === "lake")
@@ -394,8 +512,8 @@ export function hexWorld(h: HexIsland, z: HexZones, opts: { step?: number } = {}
       )
       if (banks.length || feet.length) pieces.push(...edgeDressing([x, zz], t, banks, feet, i))
     }
-    if (zone?.kind === "castle") {
-      // the curtain wall: along every side that faces out of the castle, a gate where a road comes in
+    if (zone?.kind === "castle" && tier >= 2) {
+      // the curtain wall (a walled keep up): along every side that faces out of the castle, a gate where a road comes in: along every side that faces out of the castle, a gate where a road comes in
       const nb = g.neighbours(i)
       const out = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! < 0 || z.zoneOf[nb[d]!] !== z.zoneOf[i])
       const gates = out.filter((d) => nb[d]! >= 0 && roadLike(nb[d]!))

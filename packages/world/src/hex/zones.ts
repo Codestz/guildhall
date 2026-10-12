@@ -102,14 +102,30 @@ export interface HexZones {
   zoneOf: Int16Array
   /** TILE_USES index per tile. */
   use: Uint8Array
+  /** The Guildhall castle's tier, 1–4 (`castleTier`): how big its zone grew and what is built on it. */
+  tier: number
   stats: { buildings: number; roadTiles: number; bridges: number; fields: number; ms: number }
 }
+
+/**
+ * The Guildhall's tier (decisions.md "Castle = the Guildhall"): a keep alone (1), a walled keep (2), a
+ * castle with wards and its great hall (3), a citadel (4). It grows with the repo's files, a step up for
+ * a big crew of agents and a step down for a lone one.
+ */
+export function castleTier(files: number, agents = 3): number {
+  const base = files < 1000 ? 1 : files < 3000 ? 2 : files < 8000 ? 3 : 4
+  return Math.min(4, Math.max(1, base + (agents >= 6 ? 1 : agents <= 1 ? -1 : 0)))
+}
+
+/** The castle zone's tiles at each tier: the keep, its bailey, the wards and hall, the citadel's ring. */
+export const CASTLE_TILES = [1, 4, 8, 14] as const
 
 /** How big each kind grows (tiles, per 1,000 land tiles, at least `min`), how built up it is, and how far apart it keeps. */
 const PLAN: Record<ZoneKind, { per1k: number; min: number; density: number; apart: number }> = {
   town: { per1k: 62, min: 30, density: 0.8, apart: 0 },
   harbour: { per1k: 9, min: 6, density: 0.55, apart: 6 },
-  castle: { per1k: 3, min: 3, density: 0.4, apart: 6 },
+  // its size is its tier's (CASTLE_TILES), not the island's
+  castle: { per1k: 0, min: 1, density: 0.4, apart: 6 },
   farm: { per1k: 10, min: 6, density: 0.32, apart: 10 },
   fishing: { per1k: 7, min: 5, density: 0.4, apart: 10 },
   mine: { per1k: 5, min: 4, density: 0.4, apart: 9 },
@@ -190,8 +206,9 @@ function path(
   return null
 }
 
-export function hexZones(h: HexIsland): HexZones {
+export function hexZones(h: HexIsland, opts: { agents?: number } = {}): HexZones {
   const t0 = performance.now()
+  const tier = castleTier(h.spec.files, opts.agents)
   const g = h.grid
   const N = g.size
   const seed = h.spec.seed
@@ -367,7 +384,10 @@ export function hexZones(h: HexIsland): HexZones {
   // ---- each place grows over easy tiles round its heart ----
   const zoneOf = new Int16Array(N)
   for (const [zi, z] of zones.entries()) {
-    const want = Math.max(PLAN[z.kind].min, Math.round((PLAN[z.kind].per1k * land) / 1000))
+    const want =
+      z.kind === "castle"
+        ? CASTLE_TILES[tier - 1]!
+        : Math.max(PLAN[z.kind].min, Math.round((PLAN[z.kind].per1k * land) / 1000))
     const lvl = h.level[z.tile]!
     const queue = [z.tile]
     const seen = new Set(queue)
@@ -391,9 +411,31 @@ export function hexZones(h: HexIsland): HexZones {
     }
   }
 
+  // the Guildhall's great hall (tier 3 up): beside the keep, on its level, toward the town; it is the
+  // castle's heart from then on (the roads come in to it, agents gather there), the keep its first tile
+  const keeps = new Set<number>()
+  for (const z of zones) {
+    if (z.kind !== "castle" || tier < 3) continue
+    const keep = z.tiles[0]!
+    const town = zones[0]!.tile
+    let hall = -1
+    let hs = Infinity
+    for (const i of z.tiles) {
+      if (dist(i, keep) !== 1) continue
+      const sc = dist(i, town) + (h.level[i] === h.level[keep] ? 0 : 3) + hash2(seed + 5, i, 1) * 0.5
+      if (sc < hs) {
+        hs = sc
+        hall = i
+      }
+    }
+    if (hall < 0) continue
+    keeps.add(keep)
+    z.tile = hall
+  }
+
   // ---- roads: spanning tree + one loop, cheapest tile paths ----
   const use = new Uint8Array(N)
-  const hearts = new Set(zones.map((zz) => zz.tile))
+  const hearts = new Set([...zones.map((zz) => zz.tile), ...keeps])
   const routeEnds: [number, number] = [-1, -1]
   const roadCost = (a: number, b: number): number => {
     const k = kind(b)
@@ -481,6 +523,8 @@ export function hexZones(h: HexIsland): HexZones {
   // ---- every tile of a place gets a job ----
   for (const [zi, z] of zones.entries()) {
     use[z.tile] = z.kind === "castle" ? U.landmark : U.square
+    // the keep stands behind its great hall
+    if (z.kind === "castle") use[z.tiles[0]!] = U.landmark
     const P = PLAN[z.kind]
     for (const i of z.tiles) {
       if (use[i]) continue
@@ -635,6 +679,7 @@ export function hexZones(h: HexIsland): HexZones {
     roads,
     zoneOf,
     use,
+    tier,
     stats: { buildings, roadTiles, bridges, fields, ms: Math.round(performance.now() - t0) },
   }
 }

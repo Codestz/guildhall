@@ -31,8 +31,9 @@ under `data/` are refused. `apps/studio/src/data.ts` is the client.
 the world turns toward the street), corners on `±x`, sides numbered 0–5 from 30° counter-clockwise
 (`TILE_SIDES`, `sideDir` in `packages/world/src/hex/tiles.ts`). `spots` are where people do things (kind,
 facing, rig-medium clip, held prop from `mounts.json`, roles from `npcs/`, optional hours); `blockers`
-are discs nobody walks through; `footprint` (proposed, not yet placed by the world) lists the
-neighbouring sides a larger scene also covers; `tier` marks the Guildhall castle's pieces. The world
+are discs nobody walks through; `footprint` lists the neighbouring sides a larger scene also
+covers (the world claims those tiles when they are free open ground on its level, giving each the empty
+`scene-part` tile, else places the scene's one-tile prefab); `tier` marks the Guildhall castle's pieces. The world
 reads these files through `installTilePrefabs`; its code `TILE_PREFABS` is only the fallback.
 
 The old house/landmark/vignette recipes the ring town read are archived in `legacy/data/recipes/`.

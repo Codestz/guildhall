@@ -15,13 +15,16 @@ import { checkLibrary } from "./check.ts"
 import { loadPacks, paths, REPO, selectPacks } from "./config.ts"
 import { runImport } from "./pipeline.ts"
 import { type PackScan, rawFolders, scanMarkdown, scanPack } from "./scan.ts"
+import { tagCommand } from "./tags/command.ts"
 import { thumbsCommand } from "./thumbs.ts"
 
 const USAGE = `usage:
   bun import [all|<pack…>] [--force] [--jobs n] [--dry]   import packs into the library
   bun import check                                         validate the library
   bun import scan <folder|pack|all> [--out dir]            raw report (default out: .probe/import)
-  bun import thumbs [pack…] [--force]                      thumbnails into library/thumbs`
+  bun import thumbs [pack…] [--force]                      thumbnails into library/thumbs
+  bun import tag emit [pack…] [--batch 40]                 vision batches into library/tags/batches
+  bun import tag apply [out-file…]                         vision answers into the catalog`
 
 interface Args {
   command: "import" | "check" | "scan" | "help"
@@ -83,6 +86,7 @@ async function scan(names: string[], out: string): Promise<void> {
 async function main(argv: string[]): Promise<number> {
   configureLog(process.env.GUILDHALL_LOG ?? "")
   if (argv[0] === "thumbs") return thumbsCommand(argv.slice(1))
+  if (argv[0] === "tag") return tagCommand(argv.slice(1))
   const args = parseArgs(argv)
   if (args.command === "help") {
     console.log(USAGE)

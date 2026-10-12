@@ -1,4 +1,14 @@
 export {
+  ATMOSPHERE,
+  type Atmosphere,
+  type AtmosphereOpts,
+  type AtmosphereParams,
+  cloudLook,
+  createAtmosphere,
+  DEFAULT_ATMOSPHERE,
+  patchCloudShade,
+} from "./atmosphere/index.ts"
+export {
   type BatchCluster,
   type BatchInstance,
   createStaticBatch,
@@ -62,4 +72,4 @@ export {
   type ViewerOpts,
   type ViewerStats,
 } from "./viewer.ts"
-export { createWater, type Water, type WaterDraw } from "./water.ts"
+export { createWater, MAX_WAKES, type Wake, type Water, type WaterDraw } from "./water.ts"

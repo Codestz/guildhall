@@ -15,11 +15,6 @@
     "size": [2.09, 2.14, 2.25]
   },
   {
-    "category": "tree",
-    "id": "kaykit-forest/tree-2-b-color1",
-    "size": [3.7, 6.04, 2.1]
-  },
-  {
     "category": "building",
     "id": "kaykit-hexagon/building-castle-blue",
     "size": [15.8, 31.83, 18.05]
@@ -93,11 +88,6 @@
     "category": "tower",
     "id": "kenney-castle/tower-square-base",
     "size": [4.3, 4.34, 4.3]
-  },
-  {
-    "category": "tower",
-    "id": "kenney-castle/tower-square-mid",
-    "size": [4, 4.34, 4]
   },
   {
     "category": "tower",

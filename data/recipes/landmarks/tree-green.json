@@ -2,12 +2,12 @@
   "anchors": [],
   "dressing": [
     {
-      "piece": "kaykit-forest/tree-2-b-color1",
+      "piece": "kenney-town/tree-high-round",
       "rot": 0,
-      "scale": 1.3,
+      "scale": 1.15,
       "x": 0,
       "y": 0,
-      "z": -0.5
+      "z": -0.75
     },
     {
       "piece": "quaternius-village/bench-1",

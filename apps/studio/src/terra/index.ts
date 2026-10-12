@@ -8,9 +8,11 @@ import {
   paintTerra,
   TERRA_DEFAULTS,
   type Terra,
+  type TerraParcels,
   type TerraPlan,
   type TerraSpecFull,
   terraIsland,
+  terraParcels,
   terraPlan,
 } from "@guildhall/world"
 import type { Screen } from "../screens.ts"
@@ -111,9 +113,138 @@ function draw(
     g.fill()
   }
   if (plan) {
+    const parcels = terraParcels(t, plan)
+    drawParcels(g, t, parcels, x, y, size)
     drawClaims(g, t, plan, x, y, size)
+    drawTrails(g, parcels, to)
     drawPlan(g, plan, to, k)
+    drawPois(g, parcels, to)
+    lastParcels = parcels
   }
+}
+
+/** The parcels of the last single-island draw, for the stats line. */
+let lastParcels: TerraParcels | null = null
+
+/** Parcel colours by use (the legend under the panel uses the same). */
+const USE_COLOUR: Record<string, string> = {
+  garden: "#a8d47a",
+  orchard: "#8fc35a",
+  field: "#e6c76a",
+  pasture: "#bcdc8e",
+  meadow: "#cfe59a",
+  wood: "#3f8f45",
+  pine: "#2f6f43",
+  vineyard: "#a98bc4",
+  "terrace-field": "#d9b85e",
+  quarry: "#bdb4a6",
+  reeds: "#86bf98",
+  dune: "#efe0ae",
+}
+
+const rgbOf = (hex: string): [number, number, number] => [
+  Number.parseInt(hex.slice(1, 3), 16),
+  Number.parseInt(hex.slice(3, 5), 16),
+  Number.parseInt(hex.slice(5, 7), 16),
+]
+
+/** Every parcel filled with its use's colour, a darker hedge line where two parcels meet, rows on fields. */
+function drawParcels(
+  g: CanvasRenderingContext2D,
+  t: Terra,
+  pc: TerraParcels,
+  x: number,
+  y: number,
+  size: number,
+): void {
+  const byId = new Map(pc.parcels.map((p) => [p.id + 1, p]))
+  const px = new Uint8ClampedArray(t.w * t.h * 4)
+  for (let i = 0; i < t.w * t.h; i++) {
+    const id = pc.cell[i]!
+    const p = id ? byId.get(id) : undefined
+    if (!p) continue
+    let [r, gg, b] = rgbOf(USE_COLOUR[p.use] ?? "#ffffff")
+    const xx = i % t.w
+    const yy = (i - xx) / t.w
+    const edge = (xx > 0 && pc.cell[i - 1] !== id) || pc.cell[i - t.w] !== id
+    let k = edge ? 0.62 : 1
+    // rows on crops and vines, dots on orchards
+    if (
+      (p.use === "field" || p.use === "terrace-field" || p.use === "vineyard") &&
+      (xx + yy * ((p.id % 3) - 1)) % 3 === 0
+    )
+      k *= 0.88
+    if (p.use === "orchard" && xx % 3 === 0 && yy % 3 === 0) k *= 0.7
+    // shade with the hillside, so the terraces still read
+    const slopeK = 1 - Math.min(0.25, t.slope[i]! * 0.4)
+    k *= slopeK
+    r *= k
+    gg *= k
+    b *= k
+    px[i * 4] = r
+    px[i * 4 + 1] = gg
+    px[i * 4 + 2] = b
+    px[i * 4 + 3] = 215
+  }
+  const tmp = new OffscreenCanvas(t.w, t.h)
+  tmp.getContext("2d")!.putImageData(new ImageData(px, t.w, t.h), 0, 0)
+  g.imageSmoothingEnabled = false
+  g.drawImage(tmp, x, y, size, size)
+  g.imageSmoothingEnabled = true
+}
+
+/** Footpaths to the places worth a walk: dashed. */
+function drawTrails(
+  g: CanvasRenderingContext2D,
+  pc: TerraParcels,
+  to: (p: [number, number]) => [number, number],
+): void {
+  g.setLineDash([4, 3])
+  g.strokeStyle = "#6b4a2a"
+  g.lineWidth = 1.8
+  for (const tr of pc.trails) {
+    g.beginPath()
+    tr.line.forEach((p, i) => {
+      const [x, y] = to(p as [number, number])
+      if (i === 0) g.moveTo(x, y)
+      else g.lineTo(x, y)
+    })
+    g.stroke()
+  }
+  g.setLineDash([])
+}
+
+const POI_GLYPH: Record<string, string> = {
+  lookout: "⚑",
+  quarry: "⛏",
+  shrine: "✧",
+  lighthouse: "☼",
+  farmstead: "⌂",
+}
+
+function drawPois(
+  g: CanvasRenderingContext2D,
+  pc: TerraParcels,
+  to: (p: [number, number]) => [number, number],
+): void {
+  g.font = "bold 13px ui-monospace,Menlo,monospace"
+  g.textAlign = "center"
+  for (const p of pc.pois) {
+    const [x, y] = to(p.at as [number, number])
+    const glyph = POI_GLYPH[p.kind] ?? "•"
+    g.lineWidth = 3
+    g.strokeStyle = "rgba(20,16,12,0.85)"
+    g.strokeText(glyph, x, y + 5)
+    g.fillStyle = "#fff"
+    g.fillText(glyph, x, y + 5)
+    if (p.kind !== "farmstead") {
+      g.font = "bold 10px ui-monospace,Menlo,monospace"
+      g.strokeText(p.kind, x, y + 18)
+      g.fillText(p.kind, x, y + 18)
+      g.font = "bold 13px ui-monospace,Menlo,monospace"
+    }
+  }
+  g.textAlign = "start"
 }
 
 /** What each anchor grows into, as a tint of its colour with a darker rim. */
@@ -143,7 +274,7 @@ function drawClaims(
     px[i * 4] = col[0]!
     px[i * 4 + 1] = col[1]!
     px[i * 4 + 2] = col[2]!
-    px[i * 4 + 3] = rim ? 230 : 95
+    px[i * 4 + 3] = rim ? 235 : 150
   }
   const tmp = new OffscreenCanvas(t.w, t.h)
   tmp.getContext("2d")!.putImageData(new ImageData(px, t.w, t.h), 0, 0)
@@ -280,6 +411,12 @@ export const terraLab: Screen = {
             ? [
                 `anchors   ${plan.anchors.length} · roads ${plan.roads.length}`,
                 `bridges   ${plan.roads.reduce((n, r) => n + r.bridges.length, 0)} · plan ${plan.ms} ms`,
+                `parcels   ${lastParcels?.parcels.length ?? 0} · land used ${Math.round((lastParcels?.covered ?? 0) * 100)}%`,
+                `places    ${(lastParcels?.pois ?? [])
+                  .filter((p) => p.kind !== "farmstead")
+                  .map((p) => p.kind)
+                  .join(", ")}`,
+                `farms     ${(lastParcels?.pois ?? []).filter((p) => p.kind === "farmstead").length} farmsteads`,
               ]
             : []),
         ].join("\n")
@@ -289,7 +426,7 @@ export const terraLab: Screen = {
 
     // controls
     const title = document.createElement("div")
-    title.innerHTML = "<b>Island plan</b> · 1 terrain + water · 2 anchors + roads"
+    title.innerHTML = "<b>Island plan</b> · 1 terrain + water · 2 places + roads · 3 parcels + trails"
     panel.append(title)
     const seedRow = document.createElement("div")
     seedRow.style.cssText = "display:flex;gap:6px;align-items:center"
@@ -361,9 +498,9 @@ export const terraLab: Screen = {
     sync3d()
     panel.addEventListener("click", sync3d)
     panel.addEventListener("change", sync3d)
-    const planBtn = btn(view.plan ? "hide roads" : "show roads", () => {
+    const planBtn = btn(view.plan ? "terrain only" : "show plan", () => {
       view.plan = !view.plan
-      planBtn.textContent = view.plan ? "hide roads" : "show roads"
+      planBtn.textContent = view.plan ? "terrain only" : "show plan"
     })
     toggles.append(gridBtn, flowBtn, planBtn, go3d)
     panel.append(toggles, stats)

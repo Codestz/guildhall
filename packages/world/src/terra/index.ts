@@ -13,6 +13,16 @@ export {
 export { fbm, hash2, noise, ridged } from "./noise.ts"
 export { type PaintOptions, paintTerra } from "./paint.ts"
 export {
+  PARCEL_USES,
+  type Parcel,
+  type ParcelUse,
+  type PoiKind,
+  type TerraParcels,
+  type TerraPoi,
+  type TerraTrail,
+  terraParcels,
+} from "./parcels.ts"
+export {
   ANCHOR_AREA,
   type AnchorKind,
   type TerraAnchor,

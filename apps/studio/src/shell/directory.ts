@@ -128,8 +128,7 @@ const ALL_GROUPS: readonly ToolGroup[] = [
       {
         id: "town",
         name: "Town",
-        purpose: "Whole towns grown from events: streets, districts, skyline.",
-        soon: true,
+        purpose: "A generated town in 3D under the golden-hour sun: streets, walls, harbour, skyline.",
       },
     ],
   },

@@ -144,6 +144,17 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
     if (!m) return piece
     return `${m[1]}-${COLOURS[Math.floor(hash2(seed + 41, g.q[i]!, g.r[i]!) * COLOURS.length) % COLOURS.length]}`
   }
+  // which tiles each road tile joins: consecutive tiles along every road
+  const links = new Map<number, Set<number>>()
+  const link = (a: number, b: number) => {
+    if (!links.has(a)) links.set(a, new Set())
+    links.get(a)!.add(b)
+  }
+  for (const r of z.roads)
+    for (let k = 1; k < r.tiles.length; k++) {
+      link(r.tiles[k - 1]!, r.tiles[k]!)
+      link(r.tiles[k]!, r.tiles[k - 1]!)
+    }
   const byTile = new Map<number, number>()
   for (let i = 0; i < g.size; i++) {
     const k = kindOf(h, i)
@@ -177,7 +188,8 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
       ground = "paved"
     } else if (u === "road" || u === "bridge") {
       const nb = g.neighbours(i)
-      const sides = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! >= 0 && roadLike(nb[d]!))
+      // a path only toward the tiles its own roads run on to: no web where two roads lie side by side
+      const sides = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! >= 0 && (links.get(i)?.has(nb[d]!) ?? false))
       if (u === "road") paths.push(...tilePath([x, zz], t + 0.03, sides.length ? sides : [0, 3]))
       else {
         // a bridge: planks across the water, toward the road on either side

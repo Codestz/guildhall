@@ -397,7 +397,7 @@ export function hexZones(h: HexIsland): HexZones {
   const town = zones.find((z) => z.kind === "town")
   if (town) {
     const ti = zones.indexOf(town) + 1
-    for (let d = 0; d < 6; d++) {
+    for (const d of [0, 2, 3, 5]) {
       let i: number = town.tile
       const street = [i]
       for (let k = 0; k < 12; k++) {

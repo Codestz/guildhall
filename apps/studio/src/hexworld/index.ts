@@ -15,6 +15,7 @@ import {
   createAtmosphere,
   createFieldWater,
   createHexGround,
+  createNight,
   createPost,
   createSky,
   createStage,
@@ -24,6 +25,7 @@ import {
   createVertexMesh,
   type HexPrism,
   loadPiece,
+  type Night,
   type Post,
   type PostAa,
   type StaticBatch,
@@ -39,7 +41,7 @@ const logger = log("studio:hexworld")
 
 type RGB = [number, number, number]
 const TOP: Record<string, RGB> = {
-  grass: [134, 190, 78],
+  grass: [122, 172, 70],
   soil: [150, 112, 70],
   dirt: [196, 160, 108],
   paved: [196, 186, 166],
@@ -95,6 +97,8 @@ export const hexWorldScreen: Screen = {
     let batch: StaticBatch | null = null
     let water: Water | null = null
     let atmosphere: Atmosphere | null = null
+    let night: Night | null = null
+    let unTick = () => {}
     let post: Post | null = null
     let disposeField = () => {}
     const meshes: TerrainMesh[] = []
@@ -193,6 +197,51 @@ export const hexWorldScreen: Screen = {
         shadow: num("shadow", 1),
         fill: num("fill", 0.75),
       })
+      // the night: a light in every lantern the tiles hold
+      const lamps = w.pieces
+        .filter((p) => p.piece === "kaykit-halloween/post-lantern")
+        .map((p) => ({
+          kind: "street" as const,
+          at: [p.x, p.y + 2.03 * p.scale, p.z] as [number, number, number],
+          radius: 6,
+        }))
+      night = createNight(stage, { points: lamps, windows: [] }, { sky, hour })
+      // a clock: drag to set the hour, ▶ plays the day
+      const clock = document.createElement("div")
+      clock.style.cssText =
+        "position:absolute;left:12px;bottom:12px;z-index:2;padding:6px 10px;border-radius:4px;background:rgba(21,17,13,0.82);color:#f3e9d4;font:12px ui-monospace,Menlo,monospace;display:flex;gap:8px;align-items:center;min-width:300px"
+      const play = document.createElement("button")
+      play.textContent = "▶"
+      play.style.cssText =
+        "font:inherit;color:inherit;background:#3a2f22;border:1px solid #6b5636;border-radius:3px;padding:1px 8px;cursor:pointer"
+      const slider = document.createElement("input")
+      slider.type = "range"
+      slider.min = "0"
+      slider.max = "24"
+      slider.step = "0.05"
+      slider.value = String(hour)
+      slider.style.flex = "1"
+      const label = document.createElement("span")
+      let now = hour
+      let playing = false
+      const show = (h: number) => {
+        now = (h + 24) % 24
+        label.textContent = `${String(Math.floor(now)).padStart(2, "0")}:${String(Math.floor((now % 1) * 60)).padStart(2, "0")}`
+        night?.setHour(now)
+      }
+      show(hour)
+      slider.oninput = () => show(Number(slider.value))
+      play.onclick = () => {
+        playing = !playing
+        play.textContent = playing ? "❚❚" : "▶"
+      }
+      unTick = stage.onFrame((dt) => {
+        if (!playing) return
+        show(now + dt * 0.5)
+        slider.value = String(now)
+      })
+      clock.append(play, label, slider)
+      host.append(clock)
       atmosphere = createAtmosphere(stage, { light: () => sky.light(), centre: [0, 0], reach: span, seed })
       if (ctx.query.get("post") !== "0")
         post = createPost(stage, { light: () => sky.light(), aa: aaOf(ctx.query.get("aa")) })
@@ -205,7 +254,7 @@ export const hexWorldScreen: Screen = {
       cam.start({
         centre: [0, 0],
         half: span * 1.2,
-        heightAt: (x, zz) => w.heightAt(x, zz),
+        heightAt: (x, zz) => groundAt(x, zz),
         water: 0,
         free: true,
       })
@@ -242,6 +291,8 @@ export const hexWorldScreen: Screen = {
       water?.dispose()
       disposeField()
       atmosphere?.dispose()
+      night?.dispose()
+      unTick()
       post?.dispose()
       for (const m of meshes) m.dispose()
       stage.dispose()

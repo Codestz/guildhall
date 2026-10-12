@@ -41,7 +41,7 @@ const BUILDS: Record<string, string[]> = {
   castle: ["barracks"],
   farm: ["farmstead", "cottage"],
   fishing: ["cottage", "cottage", "house"],
-  mine: ["cottage", "smithy"],
+  mine: ["cottage", "smithy", "warehouse", "homestead", "house"],
   lumber: ["cottage", "lumber", "hunter"],
   monastery: ["monastery", "cottage", "graveyard"],
   camp: ["barracks", "fort-tower", "archery", "cottage"],

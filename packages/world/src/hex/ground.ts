@@ -272,7 +272,8 @@ export function hexGroundFine(
       put(b[0], c.y, b[1], top, tone(b[0], b[1]) * lift)
       put(a[0], c.y, a[1], top, tone(a[0], a[1]) * lift)
     }
-    const side = c.t.ground === "rock" || c.t.ground === "cliff" ? (pal.side[c.t.ground] ?? pal.sideLand) : pal.sideLand
+    const side =
+      c.t.ground === "rock" || c.t.ground === "cliff" ? (pal.side[c.t.ground] ?? pal.sideLand) : pal.sideLand
     for (let k = 0; k < 6; k++) {
       const [sq, sr] = STEP[k]!
       const n = cells.get(`${q + sq},${rr + sr}`)

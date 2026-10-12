@@ -137,8 +137,20 @@ export const TILE_PREFABS: TilePrefab[] = [
     group: "country",
     name: "Field",
     ground: "soil",
-    // KayKit's own hex field (V1's), scaled from its native hex to ours
-    pieces: [p("kaykit-hexagon/building-grain", 0, 0, 0, 0.37)],
+    // flat soil in crop rows (no hex slab): neighbouring fields merge into a patchwork
+    pieces: [-2, -1, 0, 1, 2].flatMap((row) =>
+      [-2.1, -1.4, -0.7, 0, 0.7, 1.4, 2.1]
+        .filter((x) => Math.hypot(x, row * 0.8) < R * 0.8)
+        .map((x, k) =>
+          p(
+            row % 2 ? "kenney-nature/crops-corn-stage-c" : "kenney-nature/crops-leafs-stage-b",
+            x,
+            row * 0.8,
+            k,
+            row % 2 ? 0.42 : 0.6,
+          ),
+        ),
+    ),
   },
   {
     id: "orchard",
@@ -387,7 +399,18 @@ TILE_PREFABS.push(
       p("kaykit-forest/grass-2-c-color1", -1.6, -1.2, 0, 1),
     ],
   },
-  { id: "rocky", name: "Rocky ground", group: "ground", ground: "rock", pieces: rocks(6, 0.7, 1) },
+  {
+    id: "rocky",
+    name: "Rocky ground",
+    group: "ground",
+    ground: "rock",
+    pieces: [
+      p("kaykit-forest/rock-3-m-color1", -0.6, -0.4, 0.3, 0.55),
+      p("kaykit-forest/rock-3-g-color1", 1.3, 0.8, 1.1, 0.6),
+      p("kaykit-forest/grass-2-c-color1", -1.5, 1.2, 0, 1),
+      p("kaykit-forest/grass-2-d-color1", 1.6, -1.2, 0, 1),
+    ],
+  },
   {
     id: "hillside",
     name: "Hillside",

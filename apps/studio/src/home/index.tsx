@@ -1,5 +1,6 @@
 import type { Mount } from "@guildhall/assets"
 import { log } from "@guildhall/core"
+import { tilePrefabs } from "@guildhall/world"
 import { flushSync } from "react-dom"
 import { createRoot } from "react-dom/client"
 import { holdStudioStyle } from "../browser/style.ts"
@@ -7,6 +8,7 @@ import { loadCatalog } from "../catalog.ts"
 import { list, loadOverlay } from "../data.ts"
 import type { Screen } from "../screens.ts"
 import { HOME_ID } from "../shell/directory.ts"
+import { loadTiles } from "../tiles.ts"
 import { createDiorama, type Diorama } from "./diorama.ts"
 import { Home } from "./Home.tsx"
 import { studioStats } from "./stats.ts"
@@ -15,7 +17,7 @@ import { holdHomeStyle } from "./style.ts"
 const logger = log("studio:home")
 
 /**
- * The home page (`?screen=home`, the default): the studio's front door, with a live diorama, the
+ * The home page (`/`, the default): the studio's front door, with a live hex vignette, the
  * library's numbers, every tool by purpose and how the assets are made.
  */
 export const home: Screen = {
@@ -35,6 +37,8 @@ export const home: Screen = {
       loadOverlay()
         .then((o) => o.mounts as Record<string, Mount> | undefined)
         .catch(() => undefined),
+      // the authored tile prefabs, so the vignette and the numbers are the world's own
+      loadTiles().catch(() => []),
     ])
 
     /** The diorama lives as long as its element; it waits for the catalog it draws from. */
@@ -58,7 +62,7 @@ export const home: Screen = {
 
     const boot = async () => {
       const [[catalog, mounts]] = await Promise.all([data, style.ready, own.ready])
-      const stats = await studioStats(catalog, mounts, (kind) => list(kind))
+      const stats = await studioStats(catalog, mounts, (kind) => list(kind), tilePrefabs())
       if (disposed) return
       logger.info("stats", { ...stats })
       flushSync(() => root.render(<Home stats={stats} vignette={vignette} />))

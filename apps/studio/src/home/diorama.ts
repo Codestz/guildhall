@@ -1,7 +1,8 @@
 /**
- * The home page's vignette: a small island of library pieces (three houses, trees, a cobbled square)
- * with two KayKit adventurers holding props whose grips were authored in the grip editor, under the
- * golden-hour sky, turning slowly. It costs nothing while it cannot be seen: off screen or in a
+ * The home page's vignette: a small piece of the hex world, built the way the island is (tile prefabs
+ * placed with `placeTile` on hex prisms): the canteen with its beer garden in the middle, people at its
+ * tables and by its door, cottages, an orchard, pines and a pond round it, a road out to the front, in
+ * the early-evening light, turning slowly. It costs nothing while it cannot be seen: off screen or in a
  * hidden tab it stops updating and draws an empty scene. Reduced motion stops the turn.
  */
 import type { Catalog, Mount } from "@guildhall/assets"
@@ -9,123 +10,130 @@ import type { CameraPose } from "@guildhall/core"
 import {
   attachMount,
   type Character,
-  createGround,
+  createHexGround,
   createSky,
   createStage,
+  createStaticBatch,
   createSun,
-  type Ground,
+  createSurface,
+  type HexPrism,
   loadCharacter,
   loadPiece,
-  measure,
   type Sky,
   type Stage,
+  type StaticBatch,
   type Sun,
+  type TerrainMesh,
   type World,
 } from "@guildhall/render"
-import type { Vec2 } from "@guildhall/world"
+import {
+  CHARACTER_SCALE,
+  DIRS,
+  HEX_TILE_SIZE,
+  hexCentre,
+  type PlacedPiece,
+  placeTile,
+  type TileGround,
+  type TileSpot,
+  tilePath,
+  tilePrefab,
+  worldSide,
+} from "@guildhall/world"
 import { libraryUrl } from "../catalog.ts"
 
-/** The island's radius (m): an octagon whose bank skirt reads as the diorama's plinth. */
-export const ISLAND_R = 12
 /** Degrees the camera turns per second (a full turn in two minutes). */
 export const TURN_DEG_S = 3
 export const RIG = "rig-medium"
+const R = HEX_TILE_SIZE
+/** Tops of land and water tiles over the plinth's base, metres. */
+const LAND = 0.5
+const WATER = 0.2
 
-type Piece = Awaited<ReturnType<typeof loadPiece>>
-
-interface Stand {
-  id: string
-  /** x, z in metres. */
-  at: Vec2
-  /** Yaw, radians. */
-  rot: number
+/** One tile of the vignette: axial cell, the prefab on it (none: bare ground), the world side it fronts. */
+export interface VignetteTile {
+  q: number
+  r: number
+  prefab?: string
+  /** The world side (DIRS order) its front faces: buildings face the camera's side. */
+  face: number
+  ground?: TileGround
 }
 
+/** Every building fronts world side 5, toward the camera's start. */
+const FRONT = 5
+/** The canteen's beer garden spills onto its side-5 neighbour (its prefab's `footprint`). */
+const GARDEN = DIRS[worldSide(5, FRONT)]!
+
+/** The canteen in the middle, its garden beside it, the village round them. */
+export const TILES: readonly VignetteTile[] = [
+  { q: 0, r: 0, prefab: "tavern-garden", face: FRONT },
+  { q: GARDEN.q, r: GARDEN.r, face: FRONT },
+  // the road out to the front, then houses, a pond, an orchard and pines round the back
+  { q: 0, r: 1, prefab: "road", face: 0 },
+  { q: -1, r: 1, prefab: "lake", face: 2, ground: "water" },
+  { q: -1, r: 0, prefab: "cottage-garden", face: FRONT },
+  { q: 0, r: -1, prefab: "pines", face: 1 },
+  { q: 1, r: -1, prefab: "house", face: FRONT },
+  { q: 1, r: 1, prefab: "orchard", face: 3 },
+  { q: 2, r: -1, prefab: "pines", face: 4 },
+  { q: -2, r: 1, prefab: "house", face: FRONT },
+  { q: -1, r: -1, prefab: "pines", face: 2 },
+]
+
+/** Who is out at the canteen: a body, the kind of spot they take (the k-th of that kind), what they hold. */
 interface Figure {
   body: string
-  prop: string
-  clip: string
-  at: Vec2
-  rot: number
+  spot: TileSpot["kind"]
+  k: number
+  prop?: string
 }
 
-/** Houses round a little square, opening onto the camera's side; trees closing the back. */
-export const HOUSES: readonly Stand[] = [
-  { id: "quaternius-rts/houses-second-age-1-level1", at: [-5.4, -4.6], rot: 0.55 },
-  { id: "quaternius-rts/houses-second-age-3-level1", at: [4.9, -4.9], rot: -0.45 },
-]
-
-export const TREES: readonly Stand[] = [
-  { id: "kenney-town/tree-high", at: [-0.4, -9.4], rot: 0 },
-  { id: "kenney-town/tree-high-round", at: [-9.2, 1.8], rot: 0.4 },
-  { id: "kenney-town/tree-high-crooked", at: [9.4, -0.6], rot: 2 },
-  { id: "quaternius-nature/bush-1", at: [-6.2, 6.4], rot: 0.3 },
-  { id: "quaternius-nature/bush-2", at: [6.4, 6.2], rot: 0.7 },
-  { id: "quaternius-nature/bush-berries-2", at: [-8.6, -4.6], rot: 1.2 },
-]
-
 export const FIGURES: readonly Figure[] = [
-  {
-    body: "kaykit-adventurers/knight",
-    prop: "kaykit-weapons/sword-a",
-    clip: "Idle_B",
-    at: [-0.9, 1.5],
-    rot: 0.35,
-  },
-  {
-    body: "kaykit-adventurers/mage",
-    prop: "kaykit-tools/lantern",
-    clip: "Idle_A",
-    at: [1.3, 2.3],
-    rot: -0.4,
-  },
+  { body: "kaykit-adventurers/knight", spot: "sit", k: 0, prop: "kaykit-adventurers/mug-full" },
+  { body: "kaykit-adventurers/mage", spot: "sit", k: 1 },
+  { body: "kaykit-adventurers/barbarian", spot: "sit", k: 2, prop: "kaykit-adventurers/mug-full" },
+  { body: "kaykit-adventurers/rogue-hooded", spot: "sit", k: 5 },
+  { body: "kaykit-adventurers/ranger", spot: "sit", k: 6, prop: "kaykit-adventurers/mug-full" },
+  { body: "kaykit-adventurers/rogue", spot: "sit", k: 9 },
+  { body: "kaykit-adventurers/mage", spot: "talk", k: 0, prop: "kaykit-tools/lantern" },
+  { body: "kaykit-adventurers/knight", spot: "talk", k: 1, prop: "kaykit-weapons/sword-a" },
+  { body: "kaykit-adventurers/barbarian", spot: "work", k: 0 },
 ]
 
-/** The view: a three-quarter look at the figures, the houses behind them, the whole island in frame. */
-export const POSE: CameraPose = { target: [0.2, 1.4, 0.6], azimuth: 18, elevation: 19, distance: 27 }
+/** A tile's centre, metres. */
+export const tileAt = (t: Pick<VignetteTile, "q" | "r">): [number, number] => {
+  const [x, z] = hexCentre(t)
+  return [x * R, z * R]
+}
 
-/** What the view is held inside: the plinth, no water, a wide zoom so the low three-quarter view stands. */
+/** A tile's turn for the side it fronts (world.ts rotOf). */
+const rotOf = (d: number) => {
+  const a = (Math.PI / 180) * (60 * d)
+  return Math.atan2(Math.cos(a), -Math.sin(a))
+}
+
+/** The view: three-quarters onto the canteen's front and garden, the whole cluster in frame. */
+export const POSE: CameraPose = { target: [2.6, 1, 0.9], azimuth: 24, elevation: 31, distance: 23.5 }
+
+/** What the view is held inside: no water, no free flight, a wide zoom so the low view stands. */
 export const DIORAMA_WORLD: World = {
-  centre: [0, 0],
-  half: ISLAND_R,
+  centre: [2, 1],
+  half: R * 4,
   water: null,
   maxReach: 2.5,
   free: false,
 }
 
-const octagon = (r: number): Vec2[] =>
-  Array.from({ length: 8 }, (_, i) => {
-    const a = ((i + 0.5) / 8) * Math.PI * 2
-    return [Math.cos(a) * r, Math.sin(a) * r]
-  })
-
-const disc = (cx: number, cz: number, r: number, n = 18): Vec2[] =>
-  Array.from({ length: n }, (_, i) => {
-    const a = (i / n) * Math.PI * 2
-    return [cx + Math.cos(a) * r, cz + Math.sin(a) * r * 0.85]
-  })
-
-/** A strip `w` wide along x = `x`, from z0 to z1. */
-const lane = (x: number, z0: number, z1: number, w: number): Vec2[] => [
-  [x - w / 2, z0],
-  [x + w / 2, z0],
-  [x + w / 2, z1],
-  [x - w / 2, z1],
-]
-
-/** The ground: grass, a cobbled square with a road out to the near edge, a garden behind. */
-export function islandGround(footprints: Vec2[][]) {
-  return {
-    land: octagon(ISLAND_R),
-    holes: [],
-    overlays: [
-      { kind: "garden" as const, poly: lane(-7.4, -1.8, 3.4, 2.8) },
-      { kind: "cobble" as const, poly: lane(0.4, 1, ISLAND_R + 1, 3) },
-      { kind: "plaza" as const, poly: disc(0.2, 0.8, 3.9) },
-    ],
-    footprints,
-  }
+const GROUND: Record<TileGround, [number, number, number]> = {
+  grass: [143, 195, 86],
+  soil: [150, 112, 70],
+  dirt: [196, 160, 108],
+  paved: [196, 186, 166],
+  sand: [232, 210, 150],
+  rock: [150, 140, 128],
+  water: [86, 170, 222],
 }
+const SIDE: [number, number, number] = [122, 90, 60]
 
 export interface Diorama {
   stage: Stage
@@ -134,27 +142,53 @@ export interface Diorama {
   dispose(): void
 }
 
-function footprintOf(object: Piece): Vec2[] {
-  const m = measure(object)
-  const [w, , d] = m.size
-  const [cx, , cz] = m.centre
-  return [
-    [cx - w / 2, cz - d / 2],
-    [cx + w / 2, cz - d / 2],
-    [cx + w / 2, cz + d / 2],
-    [cx - w / 2, cz + d / 2],
-  ]
+/** The vignette's pieces, ground prisms and road, laid out as the island would lay them. */
+export function vignetteLayout() {
+  const pieces: PlacedPiece[] = []
+  const prisms: HexPrism[] = []
+  const road: number[] = []
+  for (const [k, t] of TILES.entries()) {
+    const at = tileAt(t)
+    const prefab = t.prefab ? tilePrefab(t.prefab) : undefined
+    const ground = t.ground ?? prefab?.ground ?? "grass"
+    const top = ground === "water" ? WATER : LAND
+    prisms.push({ x: at[0], z: at[1], top, color: GROUND[ground], side: SIDE })
+    if (!prefab) continue
+    const rot = rotOf(t.face)
+    pieces.push(...placeTile(prefab, at, top, rot, k + 11, false))
+    if (prefab.path)
+      road.push(
+        ...tilePath(
+          at,
+          LAND + 0.03,
+          prefab.path.map((s) => worldSide(s, t.face)),
+        ),
+      )
+  }
+  return { pieces, prisms, road }
 }
 
-const shadowed = (object: Piece) =>
-  object.traverse((node) => {
-    node.castShadow = true
-    node.receiveShadow = true
-  })
+/** The canteen's spots in the world: where its people sit, talk and serve. */
+export function canteenSpots(): (TileSpot & { y: number })[] {
+  const t = TILES[0]!
+  const prefab = t.prefab ? tilePrefab(t.prefab) : undefined
+  const [ox, oz] = tileAt(t)
+  const rot = rotOf(t.face)
+  const c = Math.cos(rot)
+  const s = Math.sin(rot)
+  return (prefab?.spots ?? []).map((spot) => ({
+    ...spot,
+    x: ox + spot.x * c + spot.z * s,
+    z: oz - spot.x * s + spot.z * c,
+    facing: spot.facing + rot,
+    y: LAND + (spot.y ?? 0),
+  }))
+}
 
 /**
  * Builds the vignette into `host`. `mounts` are the authored grips (`data/mounts.json`); a figure whose
- * prop has none falls back to the catalog's own, and is left empty-handed when there is neither.
+ * prop has none falls back to the catalog's own, and is left empty-handed when there is neither. The
+ * tile prefabs must be loaded (`loadTiles`) first; a prefab missing from them is left as bare ground.
  */
 export function createDiorama(
   host: HTMLElement,
@@ -165,13 +199,13 @@ export function createDiorama(
   // Held over its plinth: never below the grass, never looking up from under it. No free flight here.
   stage.rig.setWorld(DIORAMA_WORLD)
   stage.setCamera(POSE)
-  const town = { min: [-ISLAND_R, -1.5, -ISLAND_R], max: [ISLAND_R, 12, ISLAND_R] } as const
+  const span = R * 4
   const sun: Sun = createSun(stage, {
-    town: { min: [...town.min], max: [...town.max] },
-    radii: [20],
+    town: { min: [-span, -1, -span], max: [span + 4, 12, span + 2] },
+    radii: [26],
     mapSize: 1024,
   })
-  const sky: Sky = createSky(stage, { sun, reach: 2.2 * ISLAND_R })
+  const sky: Sky = createSky(stage, { sun, hour: 17.4, reach: 2.4 * span })
 
   // The page scrolls under the wheel, and only a left drag turns the view.
   const swallow = (e: Event) => e.stopPropagation()
@@ -183,7 +217,8 @@ export function createDiorama(
   host.addEventListener("contextmenu", swallow, { capture: true })
 
   const figures: Character[] = []
-  let ground: Ground | null = null
+  const meshes: TerrainMesh[] = []
+  let batch: StaticBatch | null = null
   let disposed = false
 
   // Motion only while it can be seen.
@@ -214,8 +249,8 @@ export function createDiorama(
   const unsubscribe = stage.onFrame((dt) => {
     if (!active()) return
     for (const ch of figures) ch.update(dt)
-    // The figures move, so the near cascade (the sun's own) is redrawn every other frame: their idle
-    // sway is slow enough that half rate does not show. The town map is never redrawn.
+    // The figures move, so the near cascade is redrawn every other frame: their idle sway is slow
+    // enough that half rate does not show.
     if (figures.length > 0 && frame++ % 2 === 0) stage.sun.shadow.needsUpdate = true
     if (!reduce.matches && !dragging && dt > 0) {
       const pose = stage.getCamera()
@@ -223,64 +258,55 @@ export function createDiorama(
     }
   })
 
-  const place = (object: Piece, s: Stand) => {
-    object.position.set(s.at[0], 0, s.at[1])
-    object.rotation.y = s.rot
-    shadowed(object)
-    return object
-  }
-
   const build = async () => {
+    const { pieces, prisms, road } = vignetteLayout()
+    meshes.push(createHexGround(stage, { size: R, base: -0.6, tiles: prisms }))
+    if (road.length) meshes.push(createSurface(stage, new Float32Array(road), "#d9c08c"))
     if (!catalog) return
-    const load = (id: string) => {
-      const entry = catalog.get(id)
-      return entry ? loadPiece(libraryUrl(entry.files.glb)) : Promise.resolve(null)
-    }
     const rig = catalog.rig(RIG)
-    const [houses, trees, people] = await Promise.all([
-      Promise.all(HOUSES.map((s) => load(s.id))),
-      Promise.all(TREES.map((s) => load(s.id))),
+    const spots = canteenSpots()
+    const [made, people] = await Promise.all([
+      createStaticBatch(
+        stage,
+        pieces.filter((p) => catalog.get(p.piece)),
+        async (id) => loadPiece(libraryUrl(catalog.get(id)!.files.glb)),
+      ),
       Promise.all(
         FIGURES.map(async (f) => {
+          const spot = spots.filter((s) => s.kind === f.spot)[f.k]
           const body = catalog.get(f.body)
-          const prop = catalog.get(f.prop)
-          if (!body || !rig) return null
+          if (!spot || !body || !rig) return null
+          const prop = f.prop ? catalog.get(f.prop) : undefined
           const [ch, held] = await Promise.all([
             loadCharacter(body, rig, libraryUrl),
             prop ? loadPiece(libraryUrl(prop.files.glb)) : Promise.resolve(null),
           ])
-          return { f, ch, held, mount: mounts?.[f.prop] ?? prop?.compose.mount }
+          return { f, spot, ch, held, mount: f.prop ? (mounts?.[f.prop] ?? prop?.compose.mount) : undefined }
         }),
       ),
     ])
-    if (disposed) return
-
-    const footprints: Vec2[][] = []
-    houses.forEach((object, i) => {
-      const s = HOUSES[i]
-      if (!object || !s) return
-      stage.scene.add(place(object, s))
-      object.updateMatrixWorld(true)
-      footprints.push(footprintOf(object))
-    })
-    trees.forEach((object, i) => {
-      const s = TREES[i]
-      if (object && s) stage.scene.add(place(object, s))
-    })
-    for (const person of people) {
+    if (disposed) {
+      made.dispose()
+      return
+    }
+    batch = made
+    for (const [i, person] of people.entries()) {
       if (!person) continue
-      const { f, ch, held, mount } = person
-      // Each figure starts at its own point in the clip, so the two never breathe in step.
-      ch.play(f.clip, { speed: 0.9 })
-      ch.update(f.at[0] * 0.37 + 1)
+      const { spot, ch, held, mount } = person
+      // Each figure starts at its own point in its clip, so nobody breathes in step.
+      ch.play(spot.clip ?? "Idle_A", { speed: 0.9 })
+      ch.update(i * 0.61 + 0.3)
       if (held && mount) attachMount(ch, held, mount)
-      ch.root.position.set(f.at[0], 0, f.at[1])
-      ch.root.rotation.y = f.rot
-      shadowed(ch.root as Piece)
+      ch.root.position.set(spot.x, spot.y, spot.z)
+      ch.root.rotation.y = spot.facing
+      ch.root.scale.setScalar(CHARACTER_SCALE)
+      ch.root.traverse((node) => {
+        node.castShadow = true
+        node.receiveShadow = true
+      })
       stage.scene.add(ch.root)
       figures.push(ch)
     }
-    ground = createGround(stage, islandGround(footprints), { seed: 7 })
     sun.markDirty()
   }
   const ready = build()
@@ -298,7 +324,8 @@ export function createDiorama(
       host.removeEventListener("contextmenu", swallow, { capture: true })
       host.removeEventListener("pointerdown", down)
       removeEventListener("pointerup", up)
-      ground?.dispose()
+      batch?.dispose()
+      for (const m of meshes) m.dispose()
       sky.dispose()
       sun.dispose()
       stage.dispose()

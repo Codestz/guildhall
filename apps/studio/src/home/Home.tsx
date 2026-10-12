@@ -1,8 +1,9 @@
-import { useEffect, useRef } from "react"
+import { type MouseEvent, useEffect, useRef } from "react"
 import { BASE } from "../env.ts"
 import { GROUPS, linkTo, type Tool, type ToolGroup } from "../shell/directory.ts"
 import { Arrow, Mark, MOD_KEY } from "../shell/icons.tsx"
 import { follow } from "../shell/nav.ts"
+import { href } from "../shell/router.ts"
 import { formatCount, type StudioStats } from "./stats.ts"
 
 /** Where the committed card previews are served (apps/studio/public/home/). */
@@ -21,11 +22,25 @@ const SOURCES = [
 const STAT_ROWS: readonly { key: keyof Omit<StudioStats, "palette">; label: string }[] = [
   { key: "pieces", label: "pieces" },
   { key: "packs", label: "packs" },
-  { key: "clips", label: "animation clips" },
-  { key: "rigs", label: "rigs" },
-  { key: "mounts", label: "grips authored" },
   { key: "tiles", label: "tile prefabs" },
+  { key: "spots", label: "activity spots" },
+  { key: "clips", label: "animation clips" },
 ]
+
+/** The island the hero button opens (the Town screen's first seed). */
+export const ISLAND_LINK = href("town", { town: "1" })
+
+/** A plain click opens `url` in place (through `guildhall.open` when it is there); others go to the browser. */
+const openInPlace = (url: string) => (e: MouseEvent<HTMLAnchorElement>) => {
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+  e.preventDefault()
+  if (window.guildhall) {
+    void window.guildhall.open(url)
+    return
+  }
+  history.pushState(null, "", url)
+  dispatchEvent(new PopStateEvent("popstate"))
+}
 
 function Card({ tool }: { tool: Tool }) {
   const body = (
@@ -116,17 +131,18 @@ export function Home({
             </h1>
             <p className="pitch">Events in. A living world out.</p>
             <p className="lede">
-              Guildhall turns what happens into a town that lives it. This is the workshop where its world is
-              made: every piece sized to one hero, tinted from one palette, built into houses and put into
-              people’s hands.
+              Guildhall turns what happens in a repository into a hex island that lives it: towns, farms and
+              harbours grown tile by tile, folk at work, agents walking their errands. This is the workshop
+              where that world is made, every tile composed from free pieces, every bench, stall and anvil a
+              spot where someone sits, sells or works.
             </p>
             <div className="actions">
-              <a className="gh-btn primary" href={linkTo("pieces")} onClick={follow("pieces")}>
-                Browse the library
+              <a className="gh-btn primary" href={ISLAND_LINK} onClick={openInPlace(ISLAND_LINK)}>
+                Open the island
                 <Arrow />
               </a>
               <a className="gh-btn" href={linkTo("composer")} onClick={follow("composer")}>
-                Compose a house
+                Compose a tile
               </a>
             </div>
             <p className="hint">
@@ -137,9 +153,7 @@ export function Home({
             <div className="stage" ref={plate} />
             <figcaption>
               <span className="live">live</span>
-              <span>
-                Library houses, a knight with an authored sword, a mage with a lantern, at golden hour.
-              </span>
+              <span>A canteen and its beer garden at five, built from the island’s own tile prefabs.</span>
             </figcaption>
           </figure>
         </section>
@@ -196,10 +210,11 @@ export function Home({
               </p>
             </article>
             <article>
-              <h3>World-fixed shadows</h3>
+              <h3>Life at spots</h3>
               <p>
-                The sun’s shadow cascades are pinned to the world and snapped to whole texels, so shadows hold
-                still while the camera moves: no swimming, no shimmer.
+                Every tile carries the spots its scene offers: a seat, a stall, a fishing pier, open at their
+                hours. People go only to spots, one to a spot, so the noon crowd spreads over benches and
+                stalls and the evening fills the beer garden.
               </p>
             </article>
           </div>

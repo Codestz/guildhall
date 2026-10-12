@@ -145,7 +145,7 @@ const CSS = /* css */ `
 /* ── stats ──────────────────────────────────────────────────────── */
 .gh-home-stats dl {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 0;
   border: 1px solid var(--hair-2);
   border-radius: 9px;

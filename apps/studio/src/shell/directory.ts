@@ -34,14 +34,47 @@ export const HOME_ID = "home"
 
 const ALL_GROUPS: readonly ToolGroup[] = [
   {
+    id: "world",
+    name: "World",
+    blurb: "The hex island: its map, its scale and the town on it.",
+    tools: [
+      {
+        id: "town",
+        name: "Town",
+        purpose: "The hex island in 3D, built tile by tile, its folk living their day and agents on errands.",
+        preview: true,
+      },
+      {
+        id: "hexmap",
+        name: "Hex map",
+        purpose: "The hex world from above: island, heights in steps, sand, cliffs, rivers, lakes, forest.",
+        preview: true,
+        dev: true,
+      },
+      {
+        id: "hexscale",
+        name: "Scale board",
+        purpose:
+          "The hex world's proportions side by side: tile, buildings, trees and characters at three scales.",
+        dev: true,
+      },
+      {
+        id: "hexworld",
+        name: "Hex island",
+        purpose: "The town's hex island on its own lab path, for probes and shots.",
+        dev: true,
+      },
+    ],
+  },
+  {
     id: "library",
     name: "Library",
-    blurb: "Every CC0 piece, sized to one hero and tinted from one palette.",
+    blurb: "Every CC0 piece the island is built from, tinted from one palette.",
     tools: [
       {
         id: "pieces",
         name: "Pieces",
-        purpose: "Search the whole library and stand any piece beside a 2.2 m hero.",
+        purpose: "Search the whole library and stand any piece beside a townsperson at the world's scale.",
         preview: true,
       },
       {
@@ -69,12 +102,14 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         name: "Tile prefabs",
         purpose:
           "Every hex tile prefab (house, farmstead, woods, field, road…) at the chosen scale, with a character.",
+        preview: true,
         dev: true,
       },
       {
         id: "npc",
         name: "NPC builder",
         purpose: "Dress and equip the townsfolk from KayKit bodies and props.",
+        preview: true,
       },
     ],
   },
@@ -94,37 +129,6 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         name: "Grip matrix",
         purpose: "Every held prop in every key clip, on one sheet.",
         preview: true,
-      },
-    ],
-  },
-  {
-    id: "world",
-    name: "World",
-    blurb: "The hex island: its map, its scale and the town on it.",
-    tools: [
-      {
-        id: "town",
-        name: "Town",
-        purpose: "The hex island in 3D, built tile by tile from the tile prefabs, with its folk at work.",
-      },
-      {
-        id: "hexmap",
-        name: "Hex map",
-        purpose: "The hex world from above: island, heights in steps, sand, cliffs, rivers, lakes, forest.",
-        dev: true,
-      },
-      {
-        id: "hexscale",
-        name: "Scale board",
-        purpose:
-          "The hex world's proportions side by side: tile, buildings, trees and characters at three scales.",
-        dev: true,
-      },
-      {
-        id: "hexworld",
-        name: "Hex island",
-        purpose: "The town's hex island on its own lab path, for probes and shots.",
-        dev: true,
       },
     ],
   },

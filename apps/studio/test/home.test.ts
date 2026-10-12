@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { createCatalog } from "@guildhall/assets"
-import { ISLAND_R, islandGround, POSE } from "../src/home/diorama.ts"
+import { POSE, TILES, tileAt } from "../src/home/diorama.ts"
 import { formatCount, studioStats, TILE_KINDS } from "../src/home/stats.ts"
 import { GROUPS, HOME_ID, linkTo, openable, placeOf, search } from "../src/shell/directory.ts"
 import { entry, index } from "./entries.ts"
@@ -122,7 +122,16 @@ describe("studioStats", () => {
 
   test("no library, no data endpoint: zeros, not a failure", async () => {
     const stats = await studioStats(null, undefined, () => Promise.reject(new Error("404")))
-    expect(stats).toEqual({ pieces: 0, packs: 0, clips: 0, rigs: 0, mounts: 0, tiles: 0, palette: null })
+    expect(stats).toEqual({
+      pieces: 0,
+      packs: 0,
+      clips: 0,
+      rigs: 0,
+      mounts: 0,
+      tiles: 0,
+      spots: 0,
+      palette: null,
+    })
   })
 
   test("formatCount groups thousands", () => {
@@ -130,11 +139,29 @@ describe("studioStats", () => {
   })
 })
 
-describe("diorama layout", () => {
-  test("the island is an octagon of ISLAND_R and the camera stands off it", () => {
-    const ground = islandGround([])
-    expect(ground.land).toHaveLength(8)
-    for (const [x, z] of ground.land) expect(Math.hypot(x, z)).toBeCloseTo(ISLAND_R)
-    expect(POSE.distance).toBeGreaterThan(2 * ISLAND_R)
+describe("hex vignette layout", () => {
+  test("its tiles are distinct cells of one cluster round the canteen, and the camera stands off it", () => {
+    const cells = new Set(TILES.map((t) => `${t.q},${t.r}`))
+    expect(cells.size).toBe(TILES.length)
+    expect(TILES[0]).toMatchObject({ q: 0, r: 0, prefab: "tavern-garden" })
+    // every tile touches another (no island apart): a neighbour is one tile width away
+    const width = Math.hypot(...tileAt({ q: 1, r: 0 }))
+    for (const t of TILES) {
+      const [x, z] = tileAt(t)
+      const near = TILES.some(
+        (o) => o !== t && Math.abs(Math.hypot(x - tileAt(o)[0], z - tileAt(o)[1]) - width) < 1e-6,
+      )
+      expect(near).toBe(true)
+    }
+    const reach = Math.max(...TILES.map((t) => Math.hypot(...tileAt(t))))
+    expect(POSE.distance).toBeGreaterThan(reach * 2)
+  })
+})
+
+describe("home links", () => {
+  test("the hero opens the island at its first seed and the tile composer", async () => {
+    const { ISLAND_LINK } = await import("../src/home/Home.tsx")
+    expect(ISLAND_LINK).toBe("/town/1")
+    expect(linkTo("composer")).toBe("/composer")
   })
 })

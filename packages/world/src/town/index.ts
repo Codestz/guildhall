@@ -1,19 +1,20 @@
 /**
  * The town generator (plan §4): spec → TownPlan, one pure stage after another, each drawing from its
- * own salted roll of the seed. Streets → blocks → lots and buildings (W3), the landmark special →
+ * own salted roll of the seed. Streets → blocks → lots and buildings (W3), the civic lots claimed first (civic.ts) →
  * walls and the castle (W4) → farms, harbour (W5) → nature (W5) → the dressing of yards, gardens and
  * the square (interiors.ts) → stations → the walk graph. Farms lay out from the farmland beyond the
  * wall and keep clear of anything already built out there, so nothing is placed twice. Edge ids are
  * renumbered in order at the end, and the plan's hash fingerprints everything it holds.
  */
 import type { PrefabMeta } from "@guildhall/assets"
-import { DMath, fnv1a, roll } from "@guildhall/core"
+import { fnv1a, roll } from "@guildhall/core"
 import { ribbon } from "../geom/line.ts"
 import { type Rect, rectsOverlap } from "../geom/obb.ts"
 import { area, bbox, centroid } from "../geom/poly.ts"
 import type { Roll } from "../geom/sample.ts"
-import { add, at, dist, round3, scale, snap, type Vec2 } from "../geom/vec.ts"
+import { at, round3, type Vec2 } from "../geom/vec.ts"
 import { blocks as blockStage } from "./blocks.ts"
+import { claimCivic } from "./civic.ts"
 import { PLANT_ROLES } from "./dress.ts"
 import { type EdgeKitProfile, edgeKits, layoutEdge, townEdgeKind, walls } from "./edges.ts"
 import { farms } from "./farms.ts"
@@ -28,7 +29,7 @@ import { site } from "./site.ts"
 import { normalizeSpec } from "./spec.ts"
 import { stations } from "./stations.ts"
 import { streets, sturdyClip } from "./streets.ts"
-import type { Block, Edge, Lot, PieceInstance, Placement, TownPlan, TownSpecInput } from "./types.ts"
+import type { Block, Edge, PieceInstance, Placement, TownPlan, TownSpecInput } from "./types.ts"
 import { type WalkGraph, walkGraph } from "./walk.ts"
 
 export { type DressInput, type DressKits, dressTown, PLANT_ROLES, recipeKey } from "./dress.ts"
@@ -113,15 +114,16 @@ export function generateTown(
   lap("walls")
   plan.lots = lotStage(plan.blocks, cut.graph, lib, stage("lots"), s.tier)
   lap("lots")
-  const lotList = plan.lots
-  plan.placements = special(
-    place(lotList, lib, s, stage("place")),
-    lotList,
+  // Civic, working and open-space lots are claimed first (civic.ts), then every other lot gets a house.
+  plan.lots = claimCivic(
+    plan.lots,
     lib,
     s,
-    ground.plaza,
+    { plaza: ground.plaza, graph: cut.graph, blocks: plan.blocks },
     stage("special"),
   )
+  const lotList = plan.lots
+  plan.placements = place(lotList, lib, s, stage("place"), centroid(ground.plaza))
   lap("place")
   const castle = landmark(plan, s, lib, stage("landmark"))
   plan.placements.push(...castle.placements)
@@ -289,57 +291,4 @@ const sizeOf = (m: PrefabMeta | undefined): [number, number] | undefined =>
 export function planHash(plan: TownPlan): string {
   const { hash: _, ...rest } = plan
   return fnv1a(JSON.stringify(rest)).toString(16).padStart(8, "0")
-}
-
-/**
- * The landmark a lot stands for (plan §4, "specials first"): a chapel takes a lot on a street a
- * little way out from the square, a guildhall the best lot on the square itself. The building on
- * that lot is replaced, centred on the lot's width with its front on the street; a town without a
- * prefab of the kind, or a lot it fits, keeps its houses. The castle is landmark.ts's.
- */
-function special(
-  placed: Placement[],
-  lots: readonly TownLot[],
-  lib: PlanLibrary,
-  spec: ReturnType<typeof normalizeSpec>,
-  plaza: Vec2[],
-  draw: Roll,
-): Placement[] {
-  const want = spec.landmark
-  if (want !== "chapel" && want !== "guildhall") return placed
-  const metas = lib.prefabs.filter((m) =>
-    want === "chapel" ? m.kind === "chapel" : m.kind === "landmark" || m.tags.includes("hall"),
-  )
-  const centre = centroid(plaza)
-  const byLot = new Map(placed.map((p, i) => [p.lot, i]))
-  type Choice = { lot: Lot; meta: PrefabMeta; score: number }
-  const choices: Choice[] = []
-  for (const lot of lots) {
-    const i = byLot.get(lot.id)
-    if (i === undefined || lot.district === "castle") continue
-    const far = dist(lot.origin, centre)
-    // A guildhall wants the square; a chapel a quieter street 0.25–0.6 r out.
-    const score =
-      want === "guildhall" ? far : Math.abs(far - 0.4 * spec.radius) + (far < 0.2 * spec.radius ? 1e3 : 0)
-    for (const meta of metas)
-      if (meta.frontage <= lot.w + 1e-3 && meta.depth <= lot.depth + 1e-3)
-        choices.push({ lot, meta, score: score - meta.frontage })
-  }
-  choices.sort((a, b) => a.score - b.score || a.lot.id - b.lot.id || (a.meta.id < b.meta.id ? -1 : 1))
-  const top = choices.slice(0, 3)
-  const pick = top[Math.floor(draw("lot") * top.length)]
-  if (!pick) return placed
-  const { lot, meta } = pick
-  const z: Vec2 = [DMath.sin(lot.rot), DMath.cos(lot.rot)]
-  const at = snap(add(lot.origin, scale(z, lot.depth / 2 - meta.depth / 2)))
-  const out = [...placed]
-  out[byLot.get(lot.id) as number] = {
-    prefab: meta.id,
-    seed: Math.floor(draw("seed") * 0x7fffffff),
-    at,
-    rot: lot.rot,
-    lot: lot.id,
-    role: want === "guildhall" ? "hall" : "chapel",
-  }
-  return out
 }

@@ -1,0 +1,66 @@
+{
+  "anchors": [
+    {
+      "at": [
+        0,
+        0,
+        5
+      ],
+      "facing": 3.141592653589793,
+      "id": "miller",
+      "kind": "station"
+    }
+  ],
+  "dressing": [
+    {
+      "piece": "quaternius-village/mill",
+      "rot": 0,
+      "scale": 1,
+      "x": 0,
+      "y": 0,
+      "z": -1
+    },
+    {
+      "piece": "quaternius-village/cart",
+      "rot": 0.39269908169872414,
+      "scale": 1,
+      "x": -4.75,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "piece": "quaternius-village/bags",
+      "rot": 0,
+      "scale": 1,
+      "x": 3.25,
+      "y": 0,
+      "z": 4.75
+    },
+    {
+      "piece": "quaternius-village/bag-open",
+      "rot": 0,
+      "scale": 1,
+      "x": 4.25,
+      "y": 0,
+      "z": 4.25
+    },
+    {
+      "piece": "kenney-graveyard/hay-bale",
+      "rot": 0,
+      "scale": 1,
+      "x": 5,
+      "y": 0,
+      "z": 2
+    }
+  ],
+  "fits": {},
+  "id": "windmill",
+  "kind": "landmark",
+  "tags": [
+    "civic",
+    "mill",
+    "windmill",
+    "skyline"
+  ],
+  "version": 1
+}

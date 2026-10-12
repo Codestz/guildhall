@@ -1,0 +1,210 @@
+{
+  "anchors": [
+    {
+      "at": [
+        -3.5,
+        0,
+        6.5
+      ],
+      "facing": 3.141592653589793,
+      "id": "porch",
+      "kind": "station"
+    }
+  ],
+  "dressing": [
+    {
+      "piece": "kaykit-hexagon/building-church-blue",
+      "rot": 0,
+      "scale": 1.1,
+      "x": -3.5,
+      "y": 0,
+      "z": -0.5
+    },
+    {
+      "piece": "kenney-castle/tower-square-base",
+      "rampMap": {
+        "sand": "stone",
+        "sandstone": "grey",
+        "terracotta": "stone"
+      },
+      "rot": 0,
+      "scale": 1,
+      "x": 3.5,
+      "y": 0,
+      "z": -3
+    },
+    {
+      "piece": "kenney-castle/tower-square-mid-windows",
+      "rampMap": {
+        "sand": "stone",
+        "sandstone": "grey",
+        "terracotta": "stone"
+      },
+      "rot": 0,
+      "scale": 1,
+      "x": 3.5,
+      "y": 4.34,
+      "z": -3
+    },
+    {
+      "piece": "kenney-castle/tower-square-mid-windows",
+      "rampMap": {
+        "sand": "stone",
+        "sandstone": "grey",
+        "terracotta": "stone"
+      },
+      "rot": 0,
+      "scale": 1,
+      "x": 3.5,
+      "y": 8.68,
+      "z": -3
+    },
+    {
+      "piece": "kenney-castle/tower-square-top",
+      "rampMap": {
+        "sand": "stone",
+        "sandstone": "grey",
+        "terracotta": "stone"
+      },
+      "rot": 0,
+      "scale": 1,
+      "x": 3.5,
+      "y": 13.02,
+      "z": -3
+    },
+    {
+      "piece": "kenney-castle/tower-square-roof",
+      "rampMap": {
+        "sand": "stone",
+        "sandstone": "grey",
+        "terracotta": "stone"
+      },
+      "rot": 0,
+      "scale": 1,
+      "x": 3.5,
+      "y": 14.31,
+      "z": -3
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-cross",
+      "rot": 0,
+      "scale": 1,
+      "x": 3,
+      "y": 0,
+      "z": 1.5
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-round",
+      "rot": 0,
+      "scale": 1,
+      "x": 5,
+      "y": 0,
+      "z": 1.5
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-bevel",
+      "rot": 0,
+      "scale": 1,
+      "x": 7,
+      "y": 0,
+      "z": 1.5
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-decorative",
+      "rot": 0,
+      "scale": 1,
+      "x": 3,
+      "y": 0,
+      "z": 3.5
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-cross-large",
+      "rot": 0,
+      "scale": 1,
+      "x": 5,
+      "y": 0,
+      "z": 3.5
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-roof",
+      "rot": 0,
+      "scale": 1,
+      "x": 7,
+      "y": 0,
+      "z": 3.5
+    },
+    {
+      "piece": "kenney-town/tree-high-round",
+      "rot": 0,
+      "scale": 0.9,
+      "x": 7.25,
+      "y": 0,
+      "z": -2.25
+    },
+    {
+      "piece": "kenney-graveyard/iron-fence-border-column",
+      "rot": 0,
+      "scale": 1,
+      "x": 2.75,
+      "y": 0,
+      "z": 5.5
+    },
+    {
+      "piece": "kenney-graveyard/iron-fence-border-column",
+      "rot": 0,
+      "scale": 1,
+      "x": 4.25,
+      "y": 0,
+      "z": 5.5
+    },
+    {
+      "piece": "kenney-graveyard/iron-fence-border-column",
+      "rot": 0,
+      "scale": 1,
+      "x": 5.75,
+      "y": 0,
+      "z": 5.5
+    },
+    {
+      "piece": "kenney-graveyard/iron-fence-border-column",
+      "rot": 0,
+      "scale": 1,
+      "x": 7.5,
+      "y": 0,
+      "z": 5.5
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": 0,
+      "scale": 1,
+      "x": -3.5,
+      "y": 0,
+      "z": 5.5
+    },
+    {
+      "piece": "kenney-nature/flower-purple-a",
+      "rot": 0,
+      "scale": 1,
+      "x": -7,
+      "y": 0,
+      "z": 5.25
+    },
+    {
+      "piece": "kenney-nature/flower-red-a",
+      "rot": 0,
+      "scale": 1,
+      "x": -6.25,
+      "y": 0,
+      "z": 5.5
+    }
+  ],
+  "fits": {},
+  "id": "chapel-spire",
+  "kind": "chapel",
+  "tags": [
+    "civic",
+    "chapel",
+    "skyline"
+  ],
+  "version": 1
+}

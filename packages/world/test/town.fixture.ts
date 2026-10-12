@@ -49,11 +49,25 @@ export function entry(
   }
 }
 
-const RECIPES_DIR = join(import.meta.dir, "../../../data/recipes/houses")
-export const RECIPES: PrefabRecipe[] = readdirSync(RECIPES_DIR)
-  .filter((f) => f.endsWith(".json"))
-  .sort()
-  .map((f) => JSON.parse(readFileSync(join(RECIPES_DIR, f), "utf8")) as PrefabRecipe)
+const recipesIn = (folder: string): PrefabRecipe[] => {
+  const dir = join(import.meta.dir, "../../../data/recipes", folder)
+  return readdirSync(dir)
+    .filter((f) => f.endsWith(".json"))
+    .sort()
+    .map((f) => JSON.parse(readFileSync(join(dir, f), "utf8")) as PrefabRecipe)
+}
+/** The authored houses and the civic and landmark buildings (data/recipes/houses, landmarks). */
+export const RECIPES: PrefabRecipe[] = [...recipesIn("houses"), ...recipesIn("landmarks")].sort((a, b) =>
+  a.id < b.id ? -1 : 1,
+)
+/** The measured sizes of the pieces the landmark recipes use (from library/ after import). */
+const CIVIC_PIECES = (
+  JSON.parse(readFileSync(join(import.meta.dir, "civic-pieces.json"), "utf8")) as {
+    id: string
+    category: Category
+    size: [number, number, number]
+  }[]
+).map((p) => entry(p.id, p.category, p.size))
 
 /** Every catalog id in the kit profile and the recipes' dressing: what compiling the houses needs. */
 function housePieces(): string[] {
@@ -116,9 +130,19 @@ const PIECES: CatalogEntry[] = [
 ]
 
 export const INDEX = { version: 1 as const, palette: "test", importer: "test", packs: [], rigs: [] }
-const known = new Set(PIECES.map((e) => e.id))
+// A piece both lists hold keeps its tags here and takes the measured size (the keep's stand-in castle
+// above is only footprint-true).
+const measured = new Map(CIVIC_PIECES.map((e) => [e.id, e]))
+const pieces = PIECES.map((e) => {
+  const m = measured.get(e.id)
+  return m ? { ...e, size: m.size, footprint: m.footprint } : e
+})
+const known = new Set(pieces.map((e) => e.id))
+const civic = CIVIC_PIECES.filter((e) => !known.has(e.id))
+for (const e of civic) known.add(e.id)
 export const CATALOG = createCatalog(INDEX, [
-  PIECES,
+  pieces,
+  civic,
   housePieces()
     .filter((id) => !known.has(id))
     .map((id) => entry(id, "wall", [0.35, 3.47, 3.47])),

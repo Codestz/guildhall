@@ -1,0 +1,104 @@
+{
+  "anchors": [
+    {
+      "at": [
+        0,
+        0,
+        6.5
+      ],
+      "facing": 3.141592653589793,
+      "id": "groom",
+      "kind": "station"
+    }
+  ],
+  "dressing": [
+    {
+      "piece": "quaternius-village/stable",
+      "rot": 0,
+      "scale": 1,
+      "x": 0,
+      "y": 0,
+      "z": -1
+    },
+    {
+      "piece": "quaternius-village/fence",
+      "rot": 0,
+      "scale": 1,
+      "x": -6.5,
+      "y": 0,
+      "z": 6.25
+    },
+    {
+      "piece": "quaternius-village/fence",
+      "rot": 0,
+      "scale": 1,
+      "x": -3.75,
+      "y": 0,
+      "z": 6.25
+    },
+    {
+      "piece": "quaternius-village/fence",
+      "rot": 0,
+      "scale": 1,
+      "x": 3.75,
+      "y": 0,
+      "z": 6.25
+    },
+    {
+      "piece": "quaternius-village/fence",
+      "rot": 0,
+      "scale": 1,
+      "x": 6.5,
+      "y": 0,
+      "z": 6.25
+    },
+    {
+      "piece": "kenney-graveyard/hay-bale",
+      "rot": 0,
+      "scale": 1,
+      "x": -7,
+      "y": 0,
+      "z": 4.75
+    },
+    {
+      "piece": "kenney-graveyard/hay-bale-bundled",
+      "rot": 1.5707963267948966,
+      "scale": 1,
+      "x": -5.25,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "piece": "quaternius-village/hay",
+      "rot": 0,
+      "scale": 1,
+      "x": 6.5,
+      "y": 0,
+      "z": 4.75
+    },
+    {
+      "piece": "quaternius-village/hay",
+      "rot": 0,
+      "scale": 1,
+      "x": 7,
+      "y": 0,
+      "z": 5.25
+    },
+    {
+      "piece": "kenney-survival/bucket",
+      "rot": 0,
+      "scale": 1,
+      "x": 2.5,
+      "y": 0,
+      "z": 5
+    }
+  ],
+  "fits": {},
+  "id": "stables",
+  "kind": "landmark",
+  "tags": [
+    "civic",
+    "stables"
+  ],
+  "version": 1
+}

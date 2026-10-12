@@ -16,7 +16,7 @@ import { STREET_WIDTH } from "./streets.ts"
 import type { Edge, Placement, TownLibrary, TownPlan, TownSpecInput } from "./types.ts"
 
 /** The keep's authored recipe id (data/recipes/landmarks/castle-keep.json). */
-export const KEEP_RECIPE = "landmarks/castle-keep"
+export const KEEP_RECIPE = "castle-keep"
 /** The catalog castle that stands in for the keep until its recipe is authored: id and footprint (m). */
 export const KEEP_FALLBACK = { piece: "kaykit-hexagon/building-castle-blue", w: 15.8, d: 18.05 } as const
 /** The castle's towers stand closer than the town's, metres. */

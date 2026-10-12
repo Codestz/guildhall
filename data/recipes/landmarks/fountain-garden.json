@@ -1,0 +1,104 @@
+{
+  "anchors": [],
+  "dressing": [
+    {
+      "piece": "kenney-town/fountain-round-detail",
+      "rot": 0,
+      "scale": 1,
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "piece": "kenney-town/tree-high-round",
+      "rot": 0,
+      "scale": 0.9,
+      "x": -5.5,
+      "y": 0,
+      "z": -5.25
+    },
+    {
+      "piece": "kenney-town/tree-high-round",
+      "rot": 0,
+      "scale": 0.9,
+      "x": 5.5,
+      "y": 0,
+      "z": -5.25
+    },
+    {
+      "piece": "kenney-town/tree",
+      "rot": 0,
+      "scale": 0.9,
+      "x": -5.5,
+      "y": 0,
+      "z": 4.75
+    },
+    {
+      "piece": "kenney-town/tree",
+      "rot": 0,
+      "scale": 0.9,
+      "x": 5.5,
+      "y": 0,
+      "z": 4.75
+    },
+    {
+      "piece": "quaternius-village/bench-2",
+      "rot": 0,
+      "scale": 1,
+      "x": 0,
+      "y": 0,
+      "z": 5.25
+    },
+    {
+      "piece": "quaternius-village/bench-2",
+      "rot": 3.141592653589793,
+      "scale": 1,
+      "x": 0,
+      "y": 0,
+      "z": -5.5
+    },
+    {
+      "piece": "kenney-nature/plant-bush",
+      "rot": 0,
+      "scale": 1,
+      "x": -5.75,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "piece": "kenney-nature/plant-bush",
+      "rot": 0,
+      "scale": 1,
+      "x": 5.75,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "piece": "kenney-nature/flower-purple-a",
+      "rot": 0,
+      "scale": 1,
+      "x": -2.5,
+      "y": 0,
+      "z": 5.25
+    },
+    {
+      "piece": "kenney-nature/flower-yellow-b",
+      "rot": 0,
+      "scale": 1,
+      "x": 2.5,
+      "y": 0,
+      "z": 5.25
+    }
+  ],
+  "fits": {},
+  "id": "fountain-garden",
+  "kind": "well",
+  "tags": [
+    "civic",
+    "square",
+    "open",
+    "fountain",
+    "garden"
+  ],
+  "version": 1
+}

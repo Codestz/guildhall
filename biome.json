@@ -9,6 +9,7 @@
     "includes": [
       "**",
       "!!legacy",
+      "!!library",
       "!**/node_modules",
       "!**/dist",
       "!**/types",

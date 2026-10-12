@@ -14,6 +14,7 @@ import {
   createStaticBatch,
   createSun,
   createSurface,
+  createVertexMesh,
   createWater,
   type HexPrism,
   loadPiece,
@@ -21,7 +22,7 @@ import {
   type TerrainMesh,
   type Water,
 } from "@guildhall/render"
-import { HEX_TILE_SIZE, hexIsland, hexWorld, hexZones } from "@guildhall/world"
+import { HEX_TILE_SIZE, hexGroundMesh, hexIsland, hexWorld, hexZones } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
 import { worldCamera } from "../shell/worldCamera.ts"
@@ -87,7 +88,14 @@ export const hexWorldScreen: Screen = {
           side: SIDE[t.ground] ?? SIDE_LAND,
         }
       })
-      meshes.push(createHexGround(stage, { size: R, base: -2.5, tiles }))
+      // the soft ground: equal tiles merge, walls only at steps, sand slopes into the sea
+      // (`?ground=hex` shows every tile as its own prism)
+      if (ctx.query.get("ground") === "hex")
+        meshes.push(createHexGround(stage, { size: R, base: -2.5, tiles }))
+      else {
+        const m = hexGroundMesh(h, w, { top: TOP, side: SIDE, sideLand: SIDE_LAND, slope: TOP.sand! })
+        meshes.push(createVertexMesh(stage, m.position, m.color))
+      }
       if (w.paths.length) meshes.push(createSurface(stage, new Float32Array(w.paths), "#d9c08c"))
       let span = 0
       for (const t of w.tiles) span = Math.max(span, Math.abs(t.x), Math.abs(t.z))

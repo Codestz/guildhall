@@ -103,4 +103,5 @@ export {
   type ViewerOpts,
   type ViewerStats,
 } from "./viewer.ts"
+export { createVertexMesh } from "./vmesh.ts"
 export { createWater, MAX_WAKES, type Wake, type Water, type WaterDraw } from "./water.ts"

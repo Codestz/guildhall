@@ -1,4 +1,5 @@
 export { DIRS, type Hex, type HexGrid, hexAt, hexCentre, hexDistance, hexGrid } from "./grid.ts"
+export { type GroundPalette, type HexGroundMesh, hexGroundMesh } from "./ground.ts"
 export {
   HEX_ISLAND_DEFAULTS,
   HEX_KINDS,

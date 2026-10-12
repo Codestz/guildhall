@@ -167,6 +167,18 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         purpose: "Hundreds of townsfolk walking and working: heroes near, one baked crowd draw beyond.",
         dev: true,
       },
+      {
+        id: "terra",
+        name: "Terrain",
+        purpose: "The island's land and water first: coast, terraced hills, cliffs, rivers and lakes.",
+        dev: true,
+      },
+      {
+        id: "terra3d",
+        name: "Terrain 3D",
+        purpose: "The terrain lab's island in 3D, with woods, pines and rocks standing on it.",
+        dev: true,
+      },
     ],
   },
 ]

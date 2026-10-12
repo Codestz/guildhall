@@ -71,6 +71,7 @@ export {
   type SunOpts,
   type SunStats,
 } from "./sun/index.ts"
+export { createHeightGround, createInlandWater, type HeightGrid, type TerrainMesh } from "./terrain.ts"
 export { boundingSphere, fitSphere, renderThumbnail, type ThumbnailOpts } from "./thumbnail.ts"
 export { recolour, recolourPiece, swatchMapKey } from "./tint.ts"
 export {

@@ -17,6 +17,8 @@ import { scale } from "./scenes/scale.ts"
 import { shadows } from "./shadows/index.ts"
 import { placeOf } from "./shell/directory.ts"
 import { siteScreen } from "./site/index.ts"
+import { terraLab } from "./terra/index.ts"
+import { terra3d } from "./terra/scene.ts"
 import { town } from "./town/index.tsx"
 
 /** What the shell hands a screen when it mounts it. */
@@ -56,6 +58,8 @@ export const SCREENS: readonly Screen[] = [
   night,
   atmosphereLab,
   crowdLab,
+  terraLab,
+  terra3d,
 ]
 
 export const DEFAULT_SCREEN = "home"

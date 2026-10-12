@@ -173,6 +173,12 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         dev: true,
       },
       {
+        id: "hexmap",
+        name: "Hex map",
+        purpose: "The hex world from above: island, heights in steps, sand, cliffs, rivers, lakes, forest.",
+        dev: true,
+      },
+      {
         id: "terra",
         name: "Terrain",
         purpose: "The island's land and water first: coast, terraced hills, cliffs, rivers and lakes.",

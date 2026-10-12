@@ -1,4 +1,5 @@
 export * from "./geom/index.ts"
+export * from "./hex/index.ts"
 export * from "./terra/index.ts"
 export * from "./town/blocks.ts"
 export * from "./town/civic.ts"

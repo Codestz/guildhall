@@ -15,6 +15,8 @@ const RULES: Readonly<Record<string, { folders: readonly string[]; packages: rea
   land: { folders: ["geom", "land"], packages: ["core"] },
   // the terrain-first island (terra lab): beside land, on geom only, until it replaces land
   terra: { folders: ["geom", "terra"], packages: ["core", "assets"] },
+  // the hex world (decisions.md "Clean restart on hex"): on geom only
+  hex: { folders: ["geom", "hex"], packages: ["core", "assets"] },
   town: { folders: ["geom", "land", "town"], packages: ["core", "assets"] },
   island: { folders: ["geom", "land", "town", "island"], packages: ["core", "assets"] },
 }

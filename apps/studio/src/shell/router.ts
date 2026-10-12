@@ -38,6 +38,7 @@ export const ROUTES: readonly Route[] = [
   { screen: "terra", path: "lab/terra" },
   { screen: "terra3d", path: "lab/terra3d" },
   { screen: "island", path: "island" },
+  { screen: "hexmap", path: "lab/hexmap" },
 ]
 
 /** Longest path first, so `/grips/editor` is never read as `/grips` plus an id. */

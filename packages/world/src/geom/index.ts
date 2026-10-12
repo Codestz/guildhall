@@ -10,6 +10,7 @@ export {
   resample,
   ribbon,
 } from "./line.ts"
+export { fbm, hash2, noise, ridged, smoothstep } from "./noise.ts"
 export { axes, frontRect, hull, obb, type Rect, rectCorners, rectInPoly, rectsOverlap } from "./obb.ts"
 export { type Face, faces, type PlanarEdge, type PlanarGraph, planarize } from "./planar.ts"
 export {

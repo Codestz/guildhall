@@ -5,7 +5,7 @@ export {
   type TerraDistricts,
   terraDistricts,
 } from "./districts.ts"
-export { type HexKind, type HexTile, type TerraHexes, terraHexes } from "./hexes.ts"
+export { type HexKind as TerraHexKind, type HexTile, type TerraHexes, terraHexes } from "./hexes.ts"
 export {
   TERRA_CRAG,
   TERRA_DEFAULTS,
@@ -20,7 +20,6 @@ export {
   terraShore,
 } from "./island.ts"
 export { type LandmarkKind, type TerraLandmark, terraLandmarks } from "./landmarks.ts"
-export { fbm, hash2, noise, ridged } from "./noise.ts"
 export { type PaintOptions, paintTerra } from "./paint.ts"
 export {
   PARCEL_USES,

@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/core" },
     { "path": "packages/assets" },
+    { "path": "packages/world" },
     { "path": "packages/render" },
     { "path": "packages/ui" },
     { "path": "apps/studio" },

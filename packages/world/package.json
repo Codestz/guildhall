@@ -1,0 +1,14 @@
+{
+  "name": "@guildhall/world",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@guildhall/assets": "workspace:*",
+    "@guildhall/core": "workspace:*",
+    "polygon-clipping": "0.15.7"
+  }
+}

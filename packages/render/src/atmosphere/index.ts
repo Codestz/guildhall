@@ -7,6 +7,7 @@
 import { Color, Fog, Vector3 } from "three"
 import type { DayLight } from "../light.ts"
 import type { Stage } from "../stage.ts"
+import { AIR } from "./air.ts"
 import { cloudMask, cloudMesh, fieldUniforms, puffAttributes } from "./clouds.ts"
 import { cloudField, focusWeight, swell, VIEW_REACH } from "./field.ts"
 import { cloudLook } from "./look.ts"
@@ -63,11 +64,7 @@ const RAD = Math.PI / 180
 
 /** The sun's true direction (light.ts clamps `sunDir` for shadows; the glow and disc sit where it is). */
 export function trueSun(light: DayLight, out = new Vector3()): Vector3 {
-  const flat = Math.hypot(light.sunDir[0], light.sunDir[2]) || 1
-  const e = light.elevation * RAD
-  return out
-    .set((light.sunDir[0] / flat) * Math.cos(e), Math.sin(e), (light.sunDir[2] / flat) * Math.cos(e))
-    .normalize()
+  return out.set(...light.sunTrue)
 }
 
 export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere {
@@ -102,9 +99,12 @@ export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere
     mesh.uniforms.uLit.value.copy(look.lit)
     mesh.uniforms.uShade.value.copy(look.shade)
     ATMOSPHERE.uCloudLit.value.copy(look.lit)
+    AIR.uCirrusLit.value.copy(look.lit)
     trueSun(light, sun)
-    mesh.uniforms.uSun.value.copy(sun)
     ATMOSPHERE.uSunDirection.value.copy(sun)
+    // The clouds are lit from whichever is up and brighter: by night the moon catches their tops.
+    if (light.moonIntensity > light.sunIntensity) mesh.uniforms.uSun.value.set(...light.moonTrue)
+    else mesh.uniforms.uSun.value.copy(sun)
     ATMOSPHERE.uSunColor.value.copy(light.sun).multiplyScalar(light.sunIntensity / 3)
     ATMOSPHERE.uSkyZenith.value.copy(light.zenith)
     ATMOSPHERE.uSkyHorizon.value.copy(light.horizon)
@@ -133,6 +133,9 @@ export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere
     drift.x = (drift.x + Math.cos(params.windHeading * RAD) * step) % (2 * span)
     drift.z = (drift.z + Math.sin(params.windHeading * RAD) * step) % (2 * span)
     field.uDrift.value.set(drift.x, drift.z)
+    // The high layer drifts the same way, slower (it is far above), and thickens with the coverage.
+    AIR.uCirrusDrift.value.set(drift.x * 0.5, drift.z * 0.5)
+    AIR.uCirrus.value = params.clouds ? 0.4 + 0.6 * params.coverage : 0
     const pose = stage.getCamera()
     field.uEye.value.copy(stage.camera.position)
     field.uTarget.value.set(...pose.target)
@@ -140,7 +143,6 @@ export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere
     field.uFocus.value = focusWeight(pose.distance)
     const fog = stage.scene.fog
     if (fog instanceof Fog) {
-      mesh.uniforms.uHaze.value.copy(fog.color)
       mesh.uniforms.uHazeRange.value.set(fog.near, fog.far * 1.6)
     }
     mesh.mesh.visible = params.clouds && params.coverage > 0
@@ -184,6 +186,7 @@ export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere
       }
       mask.target.dispose()
       ATMOSPHERE.uCloudShadow.value = 0
+      AIR.uCirrus.value = 0
       ATMOSPHERE.uReflect.value = 0
       ATMOSPHERE.uCloudReflect.value = 0
     },

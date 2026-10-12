@@ -69,7 +69,7 @@ function camPose(cam: Cam, spec: TownSpecInput): CameraPose {
 
 /**
  * The atmosphere lab (`/lab/atmosphere?seed=&hour=&coverage=&wind=&speed=&clouds=&shadows=&reflections=
- * &wake=&cam=hero|coast|wide&ui=0`): the island town under drifting clouds, their shadows and the
+ * &skylight=&haze=&grade=&wake=&cam=hero|coast|wide&ui=0`): the island town under drifting clouds, their shadows and the
  * water's reflections, each switchable, with the hour, coverage and wind on sliders. `ui=0` hides the
  * panel for shots.
  */
@@ -85,7 +85,7 @@ export const atmosphereLab: Screen = {
     stage.setCamera(camPose(q.cam, spec))
     const t = 2 * r
     const sun = createSun(stage, { town: { min: [-t, 0, -t], max: [t, 40, t] } })
-    const sky = createSky(stage, { hour: q.hour, sun, reach: 1.4 * r })
+    const sky = createSky(stage, { hour: q.hour, sun, reach: 1.4 * r, look: q.look })
     const atmosphere: Atmosphere = createAtmosphere(stage, {
       light: () => sky.light(),
       centre: [0, 0],

@@ -31,15 +31,19 @@ export interface Sun {
 }
 
 const DEFAULTS = { radii: [24, 80], mapSize: 2048 } as const
-/** Penumbra width aimed for, in metres: a near map spreads its kernel wider (in texels) than a far one. */
-const SOFTNESS_M = 0.04
+/**
+ * Kernel spacing in texels (the 3x3 taps of `sun/patch.ts`), smallest cascade first, then the town's:
+ * crisp edges up close, softer ones far off, where a wide texel would otherwise step. Past 2 the taps
+ * leave gaps between their hardware-filtered footprints and the edge doubles.
+ */
+export const SOFTNESS_TEXELS = { near: [1, 1.5], town: 2 } as const
 /** Depth bias in texels of the cascade, and how far along the normal (in texels) a receiver is pushed. */
 const BIAS_TEXELS = 0.5
 const NORMAL_BIAS_TEXELS = 1
 
 const logger = log("render:sun")
 
-function aim(light: DirectionalLight, fit: CascadeFit): void {
+function aim(light: DirectionalLight, fit: CascadeFit, softness: number): void {
   light.position.set(...fit.position)
   light.target.position.set(...fit.target)
   const { shadow } = light
@@ -55,7 +59,7 @@ function aim(light: DirectionalLight, fit: CascadeFit): void {
   // three reads bias as a share of the light's depth range.
   shadow.bias = -(BIAS_TEXELS * fit.texel) / (fit.far - fit.near)
   shadow.normalBias = NORMAL_BIAS_TEXELS * fit.texel
-  shadow.radius = Math.min(2, Math.max(1, SOFTNESS_M / fit.texel))
+  shadow.radius = softness
   shadow.needsUpdate = true
 }
 
@@ -93,14 +97,14 @@ export function createSun(stage: Stage, opts: SunOpts): Sun {
     fitCascades(target, dir, radii, mapSize, span).forEach((fit, i) => {
       if (keys[i] === fit.key) return
       keys[i] = fit.key
-      aim(lights[i] as DirectionalLight, fit)
+      aim(lights[i] as DirectionalLight, fit, SOFTNESS_TEXELS.near[i] ?? SOFTNESS_TEXELS.town)
     })
   }
   const markDirty = () => {
     const d = new Vector3().subVectors(sun.position, sun.target.position).normalize()
     dir = [d.x, d.y, d.z]
     keys.length = 0
-    aim(town, fitBox(opts.town, dir, mapSize))
+    aim(town, fitBox(opts.town, dir, mapSize), SOFTNESS_TEXELS.town)
     refit()
   }
   markDirty()

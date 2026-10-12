@@ -30,7 +30,13 @@ const OVERCAST_SHADE = new Color("#7f8896")
 export function cloudLook(light: DayLight, coverage: number): CloudLook {
   const e = light.elevation
   // Night: the sky's own blue, a little lighter than the dome behind it, so a cloud is a veil, not a hole.
-  const nightLit = light.zenith.clone().lerp(light.horizon, 0.45).multiplyScalar(1.35)
+  // The moon silvers the tops it lights (light.ts: moonIntensity peaks at 0.6).
+  const moonlit = Math.min(1, light.moonIntensity / 0.6)
+  const nightLit = light.zenith
+    .clone()
+    .lerp(light.horizon, 0.45)
+    .multiplyScalar(1.35)
+    .lerp(light.moon.clone().multiplyScalar(0.3), 0.55 * moonlit)
   const nightShade = light.zenith.clone().multiplyScalar(0.9)
   const dusk = smoothstep(-10, -1, e)
   const golden = smoothstep(2, 14, e)

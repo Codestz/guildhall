@@ -23,11 +23,14 @@ import {
   Vector3,
   WebGLRenderTarget,
 } from "three"
+import { AIR, GRADE_GLSL, SKY_GLSL } from "./air.ts"
 import type { Cloud } from "./field.ts"
 import { ATMOSPHERE } from "./shade.ts"
 
 /** The puff mesh: an icosahedron split once, so it reads round but every face shows. */
 const DETAIL = 1
+/** How tall a lump is for its width: low, broad clouds (a sphere read as a cotton ball). */
+const SQUASH = 0.66
 /** The cloud-shadow mask's resolution, texels a side. */
 export const MASK_SIZE = 512
 
@@ -80,6 +83,7 @@ float cloudView( vec3 centre ) {
 `
 
 const MESH_VERTEX = /* glsl */ `
+#define SQUASH ${SQUASH.toFixed(2)}
 ${FIELD}
 varying vec3 vWorld;
 varying float vFade;
@@ -89,7 +93,7 @@ void main() {
 	vec3 centre = cloudCentre( local );
 	// Coverage grows a cloud in from nothing (no see-through stipple); only the view fade dissolves.
 	float grow = smoothstep( 0.0, 1.0, presence );
-	vec3 world = centre + ( aPuff.xyz * uSwell + position * vec3( 1.0, 0.74, 1.0 ) * aPuff.w * uSwell ) * grow;
+	vec3 world = centre + ( aPuff.xyz * uSwell + position * vec3( 1.15, SQUASH, 1.0 ) * aPuff.w * uSwell ) * grow;
 	world.y = max( world.y, aCloud.z );
 	vFade = step( 0.02, grow ) * cloudView( centre );
 	vWorld = world;
@@ -99,10 +103,11 @@ void main() {
 `
 
 const MESH_FRAGMENT = /* glsl */ `
+${SKY_GLSL}
+${GRADE_GLSL}
 uniform vec3 uLit;
 uniform vec3 uShade;
 uniform vec3 uSun;
-uniform vec3 uHaze;
 uniform vec2 uHazeRange;
 varying vec3 vWorld;
 varying float vFade;
@@ -115,10 +120,12 @@ void main() {
 	float up = 0.6 + 0.4 * clamp( n.y, 0.0, 1.0 );
 	vec3 colour = mix( uShade, uLit, lit * up );
 	colour = mix( colour, uShade * 0.94, smoothstep( -0.8, -0.95, n.y ) );
-	colour = mix( colour, uHaze, 0.55 * smoothstep( uHazeRange.x, uHazeRange.y, length( toEye ) ) );
+	// Far clouds sink into the sky behind them (the dome's own colour, air.ts), as the land does.
+	colour = mix( colour, skyAt( normalize( -toEye ) ), 0.55 * smoothstep( uHazeRange.x, uHazeRange.y, length( toEye ) ) );
 	gl_FragColor = vec4( colour, vFade );
 	#include <tonemapping_fragment>
 	#include <colorspace_fragment>
+	gl_FragColor.rgb = airGrade( gl_FragColor.rgb );
 }
 `
 
@@ -195,7 +202,7 @@ export function cloudMesh(a: ReturnType<typeof puffAttributes>, field: FieldUnif
     uLit: { value: new Color() },
     uShade: { value: new Color() },
     uSun: { value: new Vector3(0, 1, 0) },
-    uHaze: { value: new Color() },
+    ...AIR,
     uHazeRange: { value: new Vector2(600, 1600) },
   }
   const material = new ShaderMaterial({

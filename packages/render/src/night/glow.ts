@@ -47,7 +47,7 @@ export function setGlow(level: number): void {
 export const glowLevel = (): number => uniforms.uGlow.value
 
 /**
- * The night grade, 0 (day) to 1 (deep night): what only moonlight lights goes grey-blue (night
+ * The night grade, 0 (day) to 1 (deep night): what only moonlight lights goes moonlit blue (night
  * vision), what a lamp or a window lights keeps its colour, as V1's grade did without a post pass.
  */
 export function setNightGrade(night: number): void {
@@ -59,7 +59,7 @@ const GRADE = /* glsl */ `
   vec3 lit = outgoingLight - totalEmissiveRadiance;
   float lum = dot(lit, vec3(0.2126, 0.7152, 0.0722));
   float amount = uNight * (0.3 + 0.5 * (1.0 - smoothstep(0.03, 0.3, lum)));
-  outgoingLight = mix(lit, lum * vec3(0.9, 0.96, 1.1), amount) + totalEmissiveRadiance;
+  outgoingLight = mix(lit, lum * vec3(0.78, 0.92, 1.22), amount) + totalEmissiveRadiance;
 }`
 
 /**

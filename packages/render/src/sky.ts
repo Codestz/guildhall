@@ -1,7 +1,21 @@
 import { BackSide, Color, Fog, Mesh, ShaderMaterial, SphereGeometry, Vector3 } from "three"
-import { applyLight, type DayLight, GOLDEN_HOUR, hazeColour, keyLight, lightAt } from "./light.ts"
+import { AIR, GRADE_GLSL, SKY_GLSL } from "./atmosphere/air.ts"
+import { airAt } from "./atmosphere/hour.ts"
+import { applyLight, type DayLight, GOLDEN_HOUR, keyLight, lightAt } from "./light.ts"
 import type { Stage } from "./stage.ts"
 import type { Sun } from "./sun/index.ts"
+
+/** The air's parts, each switchable (for before/after comparisons; all on by default). */
+export interface SkyLook {
+  /** The sky's light by direction in place of the flat hemisphere fill (atmosphere/air.ts). */
+  skyLight: boolean
+  /** Aerial perspective: distance and height haze toward the sky's own colour. */
+  haze: boolean
+  /** The per-hour colour grade. */
+  grade: boolean
+}
+
+export const DEFAULT_SKY_LOOK: SkyLook = { skyLight: true, haze: true, grade: true }
 
 export interface SkyPreset {
   /** The hour to start at (0–24); golden hour when left out. */
@@ -10,18 +24,25 @@ export interface SkyPreset {
   sun?: Sun
   /** How far the scene reaches from the camera's target (metres): the haze thickens past it. */
   reach?: number
+  /** The air's parts on or off; all on when left out. */
+  look?: Partial<SkyLook>
 }
 
 export interface Sky {
   /** Moves the sun, the lights, the dome and the haze to `hour` (0–24, wraps). */
   setHour(hour: number): void
   light(): DayLight
+  /** Turns parts of the air on or off (before/after shots). */
+  setLook(look: Partial<SkyLook>): void
+  look(): SkyLook
   dispose(): void
 }
 
 /** The dome's radius: inside the camera's far plane (stage.ts: 2000). */
 const DOME_RADIUS = 1500
 const DEFAULT_REACH = 120
+/** The haze starts this many `reach`es past the camera's target: the focus stays crisp. */
+const CLEAR = 0.05
 /** Radians the key light turns before the cascades are redrawn (a quarter of a degree). */
 const SHADOW_TURN = (0.25 * Math.PI) / 180
 const smoothstep01 = (x: number) => {
@@ -39,17 +60,34 @@ void main() {
 `
 
 const FRAGMENT = /* glsl */ `
-uniform vec3 zenith;
-uniform vec3 horizon;
-uniform vec3 haze;
-uniform vec3 glow;
-uniform vec3 sunColor;
-uniform vec3 sunDirection;
+${SKY_GLSL}
+${GRADE_GLSL}
 uniform float sunDisc;
+uniform vec3 sunColor;
 uniform vec3 moonDirection;
 uniform float moonDisc;
 uniform float stars;
+uniform float uCirrus;
+uniform vec3 uCirrusLit;
+uniform vec2 uCirrusDrift;
 varying vec3 vDirection;
+float cirrusHash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+float cirrusNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(cirrusHash(i), cirrusHash(i + vec2(1.0, 0.0)), f.x),
+             mix(cirrusHash(i + vec2(0.0, 1.0)), cirrusHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+// The high thin layer: wisps stretched along the wind on a plane far above the low clouds.
+float cirrus(vec3 d) {
+  vec2 p = d.xz / (d.y + 0.12) * 1.6 + uCirrusDrift * 0.004;
+  vec2 q = vec2(p.x * 0.45 + p.y * 0.2, p.y * 2.6 - p.x * 0.3);
+  float n = 0.55 * cirrusNoise(q) + 0.3 * cirrusNoise(q * 2.3 + 7.1) + 0.15 * cirrusNoise(q * 5.1 + 3.3);
+  return smoothstep(0.55, 0.85, n) * smoothstep(0.03, 0.2, d.y) * (1.0 - smoothstep(0.55, 0.9, d.y));
+}
 float starHash(vec3 p) {
   p = fract(p * 0.1031);
   p += dot(p, p.zyx + 31.32);
@@ -58,10 +96,9 @@ float starHash(vec3 p) {
 void main() {
   vec3 d = normalize(vDirection);
   float up = d.y;
-  vec3 colour = mix(horizon, zenith, pow(smoothstep(0.0, 1.0, up), 0.55));
-  colour = mix(haze, colour, smoothstep(-0.12, 0.04, up));
-  float toward = max(dot(d, sunDirection), 0.0);
-  colour += glow * (0.35 * pow(toward, 6.0) + 0.25 * pow(toward, 48.0)) * (1.0 - smoothstep(0.1, 0.7, up));
+  vec3 colour = skyAt(d);
+  if (uCirrus > 0.0 && up > 0.0) colour = mix(colour, uCirrusLit, 0.45 * uCirrus * cirrus(d));
+  float toward = max(dot(d, uAirSun), 0.0);
   colour = mix(colour, sunColor * 1.6, sunDisc * smoothstep(0.9993, 0.9997, toward));
   // Stars: one in a few hundred cells of a fine grid over the dome, a round dot jittered in its cell,
   // faded toward the horizon (the haze) and by the dusk.
@@ -82,23 +119,23 @@ void main() {
   gl_FragColor = vec4(colour, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
+  gl_FragColor.rgb = airGrade(gl_FragColor.rgb);
 }
 `
 
 /**
- * The sky (plan §5): one gradient dome round the camera (zenith → horizon → the haze below it, a warm
- * glow round the sun and its disc; by night stars and the moon), the lights for the hour (`light.ts`) and a light haze that thickens
- * past `reach` from the camera's target, for depth. One draw call; the dome follows the camera.
+ * The sky (plan §5): one gradient dome round the camera (zenith → horizon, warm toward the sun and
+ * cool away from it, its glow and disc; by night stars and the moon), the lights for the hour
+ * (`light.ts`) and the air (`atmosphere/air.ts`): the sky's light on the shade, a haze past `reach`
+ * from the camera's target that fades into exactly the dome behind it, and the hour's grade on both.
+ * One draw call; the dome follows the camera.
  */
 export function createSky(stage: Stage, preset: SkyPreset = {}): Sky {
   const reach = preset.reach ?? DEFAULT_REACH
+  let look: SkyLook = { ...DEFAULT_SKY_LOOK, ...preset.look }
   const uniforms = {
-    zenith: { value: new Color() },
-    horizon: { value: new Color() },
-    haze: { value: new Color() },
-    glow: { value: new Color() },
+    ...AIR,
     sunColor: { value: new Color() },
-    sunDirection: { value: new Vector3(0, 1, 0) },
     sunDisc: { value: 0 },
     moonDirection: { value: new Vector3(0, 1, 0) },
     moonDisc: { value: 0 },
@@ -112,44 +149,48 @@ export function createSky(stage: Stage, preset: SkyPreset = {}): Sky {
     depthWrite: false,
     fog: false,
   })
-  const dome = new Mesh(new SphereGeometry(DOME_RADIUS, 32, 16), material)
+  const dome = new Mesh(new SphereGeometry(DOME_RADIUS, 48, 24), material)
   dome.frustumCulled = false
   dome.renderOrder = -1000
   dome.name = "sky"
   stage.scene.add(dome)
 
   let current = lightAt(preset.hour ?? GOLDEN_HOUR)
+  let air = airAt(current)
   /** The key light's direction when the cascades were last redrawn (a slow cycle moves it a little a frame). */
   const shadowDir = new Vector3()
   const keyDir = new Vector3()
+  const applyLook = () => {
+    AIR.uSkyLight.value = look.skyLight ? 1 : 0
+    AIR.uGrade.value = look.grade ? 1 : 0
+    AIR.uHazeDensity.value = look.haze ? air.haze.density : 0
+    AIR.uHazeFar.value = look.haze ? stage.camera.far : 1e9
+  }
   const setHour = (hour: number) => {
     current = lightAt(hour)
+    air = airAt(current)
     applyLight(stage, current)
-    uniforms.zenith.value.copy(current.zenith)
-    uniforms.horizon.value.copy(current.horizon)
-    uniforms.haze.value.copy(hazeColour(current))
-    uniforms.glow.value.copy(current.glow)
+    AIR.uAirZenith.value.copy(current.zenith)
+    AIR.uAirHorizon.value.copy(current.horizon)
+    AIR.uAirAway.value.copy(air.haze.away)
+    AIR.uAirGlow.value.copy(current.glow)
+    AIR.uAirSun.value.set(...current.sunTrue)
+    AIR.uAirSplit.value = 0.35 + 0.65 * current.golden
+    AIR.uSkyTop.value.copy(air.sky.top)
+    AIR.uSkyAway.value.copy(air.sky.away)
+    AIR.uSkyToward.value.copy(air.sky.toward)
+    AIR.uSkyBounce.value.copy(air.sky.bounce)
+    AIR.uSkyIntensity.value = air.sky.intensity
+    AIR.uHazeFalloff.value = air.haze.falloff
+    AIR.uHazeMax.value = air.haze.max
+    AIR.uGradeShadows.value.copy(air.grade.shadows)
+    AIR.uGradeHighlights.value.copy(air.grade.highlights)
+    AIR.uGradeSaturation.value = air.grade.saturation
+    AIR.uGradeContrast.value = air.grade.contrast
+    applyLook()
     uniforms.sunColor.value.copy(current.sun)
-    // The disc and glow sit where the sun really is, even below the shadow clamp.
-    const { elevation } = current
-    const rad = (elevation * Math.PI) / 180
-    const flat = Math.hypot(current.sunDir[0], current.sunDir[2]) || 1
-    uniforms.sunDirection.value
-      .set(
-        (current.sunDir[0] / flat) * Math.cos(rad),
-        Math.sin(rad),
-        (current.sunDir[2] / flat) * Math.cos(rad),
-      )
-      .normalize()
-    uniforms.sunDisc.value = elevation > -1 ? 1 : 0
-    const moonRad = (current.moonElevation * Math.PI) / 180
-    const [mx, , mz] = current.moonDir
-    const mh = Math.hypot(mx, mz) || 1
-    uniforms.moonDirection.value.set(
-      (mx / mh) * Math.cos(moonRad),
-      Math.sin(moonRad),
-      (mz / mh) * Math.cos(moonRad),
-    )
+    uniforms.sunDisc.value = current.elevation > -1 ? 1 : 0
+    uniforms.moonDirection.value.set(...current.moonTrue)
     uniforms.moonDisc.value = current.night * smoothstep01(current.moonElevation / 6)
     uniforms.stars.value = current.night * current.night
     // The cascades redraw when the key light has turned a quarter of a degree since they last did.
@@ -161,12 +202,15 @@ export function createSky(stage: Stage, preset: SkyPreset = {}): Sky {
   }
   setHour(current.hour)
 
-  // Haze from the camera: clear up to the target and a little past it, thick far beyond `reach`.
+  // Haze from the camera: clear up to the target and a little past it, thicker beyond. Three's linear
+  // fog (for programs without the air patch) follows the same zone.
   const unsubscribe = stage.onFrame(() => {
     dome.position.copy(stage.camera.position)
+    const distance = stage.getCamera().distance
+    AIR.uHazeClear.value = distance + reach * CLEAR
+    if (look.haze) AIR.uHazeFar.value = stage.camera.far
     const fog = stage.scene.fog
     if (!(fog instanceof Fog)) return
-    const distance = stage.getCamera().distance
     const thick = 0.35 + 0.4 * current.golden
     fog.near = distance + reach * 0.8
     fog.far = distance + reach * (4.5 - 2 * thick)
@@ -175,12 +219,21 @@ export function createSky(stage: Stage, preset: SkyPreset = {}): Sky {
   return {
     setHour,
     light: () => current,
+    setLook(next) {
+      look = { ...look, ...next }
+      applyLook()
+    },
+    look: () => ({ ...look }),
     dispose() {
       unsubscribe()
       dome.removeFromParent()
       dome.geometry.dispose()
       material.dispose()
       stage.scene.fog = null
+      AIR.uSkyLight.value = 0
+      AIR.uGrade.value = 0
+      AIR.uHazeDensity.value = 0
+      AIR.uHazeFar.value = 1e9
     },
   }
 }

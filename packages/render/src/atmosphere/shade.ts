@@ -3,7 +3,8 @@
  * (the palette material, the water), so the atmosphere writes them once a frame and every program
  * sees the same sky. `patchCloudShade` is the opt-in hook (like `patchCascades`): the sun's direct
  * light is dimmed by the cloud-shadow mask under each fragment. With no atmosphere the mask is a black
- * texel and the strength 0, so a patched program draws exactly as before.
+ * texel and the strength 0, so a patched program draws exactly as before. It chains `patchAir` (air.ts):
+ * the sky's light, the haze and the grade, which the sky drives.
  */
 import { log } from "@guildhall/core"
 import {
@@ -17,6 +18,7 @@ import {
   Vector4,
   type WebGLProgramParametersWithUniforms,
 } from "three"
+import { patchAir } from "./air.ts"
 
 const empty = new DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, RGBAFormat)
 empty.needsUpdate = true
@@ -100,4 +102,6 @@ export function patchCloudShade(shader: WebGLProgramParametersWithUniforms): voi
   shader.fragmentShader = fragment
     .replace("#include <common>", () => `#include <common>\n${FUNCTION}`)
     .replace(ANCHOR, () => `${ANCHOR}\ndirectLight.color *= cloudShade();`)
+  // The lights chunk is inlined now: the sky's light, the haze and the grade can patch into it.
+  patchAir(shader)
 }

@@ -13,6 +13,8 @@ export interface DayLight {
   hour: number
   /** Unit vector from the ground toward the sun, clamped no lower than MIN_SHADOW_ELEVATION. */
   sunDir: [number, number, number]
+  /** Unit vector toward where the sun really is (below the horizon by night): the sky's glow and disc. */
+  sunTrue: [number, number, number]
   /** The sun's true elevation, degrees (negative after sunset). */
   elevation: number
   sun: Color
@@ -33,6 +35,8 @@ export interface DayLight {
   lamps: number
   /** Unit vector toward the moon (clamped no lower than MIN_MOON_ELEVATION, for its shadows). */
   moonDir: [number, number, number]
+  /** Unit vector toward where the moon really is: its disc. */
+  moonTrue: [number, number, number]
   /** The moon's true elevation, degrees (negative by day). */
   moonElevation: number
   moon: Color
@@ -137,9 +141,13 @@ export function lightAt(hour: number): DayLight {
   const moonLift = Math.max(moon.elevation, MIN_MOON_ELEVATION) * RAD
   const [mx, mz] = moon.heading
   const mh = Math.hypot(mx, mz) || 1
+  const sh = Math.hypot(heading[0], heading[1]) || 1
+  const e = elevation * RAD
+  const me = moon.elevation * RAD
   return {
     hour: wrapHour(hour),
     sunDir: [heading[0] * flat, Math.sin(lift), heading[1] * flat],
+    sunTrue: [(heading[0] / sh) * Math.cos(e), Math.sin(e), (heading[1] / sh) * Math.cos(e)],
     elevation,
     sun: mix(a.sun, b.sun, t),
     sunIntensity: a.sunIntensity + (b.sunIntensity - a.sunIntensity) * t,
@@ -154,6 +162,7 @@ export function lightAt(hour: number): DayLight {
     night: 1 - smoothstep(-14, -4, elevation),
     lamps: 1 - smoothstep(-3, 9, elevation),
     moonDir: [(mx / mh) * Math.cos(moonLift), Math.sin(moonLift), (mz / mh) * Math.cos(moonLift)],
+    moonTrue: [(mx / mh) * Math.cos(me), Math.sin(me), (mz / mh) * Math.cos(me)],
     moonElevation: moon.elevation,
     moon: new Color(MOON),
     // The moon takes over once the sun is gone (both dark at the hand-over: no pop).

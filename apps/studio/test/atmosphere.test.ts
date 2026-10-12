@@ -32,6 +32,15 @@ describe("atmosphere lab link", () => {
     expect(q.wake).toBe(true)
   })
 
+  test("reads the sky's air parts, and only those the link sets", () => {
+    expect(parseAtmosphereQuery(new URLSearchParams("")).look).toEqual({})
+    expect(parseAtmosphereQuery(new URLSearchParams("skylight=0&haze=1&grade=0")).look).toEqual({
+      skyLight: false,
+      haze: true,
+      grade: false,
+    })
+  })
+
   test("an unknown camera falls back to the hero view", () => {
     expect(parseAtmosphereQuery(new URLSearchParams("cam=space")).cam).toBe("hero")
   })

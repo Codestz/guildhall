@@ -12,10 +12,12 @@ export interface AtmosphereQuery {
   cam: Cam
   /** Only what the link sets: the rest keep the atmosphere's defaults. */
   params: Partial<AtmosphereParams>
+  /** The sky's air (render/sky.ts `SkyLook`): only what the link sets. */
+  look: { skyLight?: boolean; haze?: boolean; grade?: boolean }
   wake: boolean
 }
 
-/** `?seed=&harbour=&hour=&cam=&coverage=&wind=&speed=&clouds=0|1&shadows=0|1&reflections=0|1&wake=0|1`. */
+/** `?seed=&harbour=&hour=&cam=&coverage=&wind=&speed=&clouds=0|1&shadows=0|1&reflections=0|1&skylight=0|1&haze=0|1&grade=0|1&wake=0|1`. */
 export function parseAtmosphereQuery(q: URLSearchParams): AtmosphereQuery {
   const num = (key: string, fallback: number) => {
     const v = Number(q.get(key))
@@ -27,6 +29,10 @@ export function parseAtmosphereQuery(q: URLSearchParams): AtmosphereQuery {
   if (q.has("coverage")) params.coverage = Math.min(1, Math.max(0, num("coverage", 0.45)))
   if (q.has("wind")) params.windHeading = num("wind", 30)
   if (q.has("speed")) params.windSpeed = Math.max(0, num("speed", 4))
+  const look: AtmosphereQuery["look"] = {}
+  if (q.has("skylight")) look.skyLight = q.get("skylight") !== "0"
+  if (q.has("haze")) look.haze = q.get("haze") !== "0"
+  if (q.has("grade")) look.grade = q.get("grade") !== "0"
   const cam = q.get("cam") as Cam | null
   return {
     seed: Math.max(0, Math.floor(num("seed", 1))),
@@ -34,6 +40,7 @@ export function parseAtmosphereQuery(q: URLSearchParams): AtmosphereQuery {
     hour: num("hour", 17.5),
     cam: cam && CAMS.includes(cam) ? cam : "hero",
     params,
+    look,
     wake: q.get("wake") === "1",
   }
 }

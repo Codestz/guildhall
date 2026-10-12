@@ -40,36 +40,43 @@ export interface FieldOpts {
 }
 
 /**
- * A cloud's puffs, the KayKit way: a row of round lumps of clearly different sizes along its length
- * (the biggest off-centre, so no two clouds are symmetric), a second, narrower row behind it, and one or
- * two lumps sitting on top. Radii and offsets are in units of the swell (field.ts `swell`).
+ * A cloud's puffs, the KayKit way: low and wide, not a cotton ball. A long row of lumps of clearly
+ * different sizes (the biggest off-centre, the ends tapering, so no two clouds are symmetric), a row
+ * behind it and a shorter one in front for depth, all sitting on one flat base, and a single low lump
+ * on top. Radii and offsets are in units of the swell (field.ts `swell`); the mesh squashes each lump
+ * vertically too (clouds.ts).
  */
 function puffsOf(r: (salt: string) => number): Puff[] {
   const puffs: Puff[] = []
-  const count = 3 + Math.floor(r("count") * 3)
-  const peak = Math.floor(r("peak") * count)
+  const count = 4 + Math.floor(r("count") * 4)
+  const peak = 1 + Math.floor(r("peak") * (count - 2))
   let x = 0
   for (let k = 0; k < count; k++) {
-    const radius = k === peak ? 1 : 0.5 + 0.35 * r(`${k}:r`)
-    if (k > 0) x += 0.55 * (radius + (puffs[k - 1] as Puff).r) * (0.75 + 0.2 * r(`${k}:gap`))
-    puffs.push({ x, y: 0.25 * (radius - 1), z: (r(`${k}:z`) - 0.5) * 0.35, r: radius })
+    // Toward the ends the lumps get smaller: the cloud's outline tapers like a loaf.
+    const end = Math.abs(k - peak) / Math.max(peak, count - 1 - peak)
+    const radius = k === peak ? 1 : (0.5 + 0.3 * r(`${k}:r`)) * (1 - 0.35 * end)
+    if (k > 0) x += 0.62 * (radius + (puffs[k - 1] as Puff).r) * (0.85 + 0.25 * r(`${k}:gap`))
+    puffs.push({ x, y: 0.12 * (radius - 1), z: (r(`${k}:z`) - 0.5) * 0.3, r: radius })
   }
-  const back = Math.max(1, count - 2)
-  for (let k = 0; k < back; k++) {
-    const front = puffs[1 + Math.floor(r(`${k}:b`) * (count - 1))] ?? (puffs[0] as Puff)
-    puffs.push({
-      x: front.x + (r(`${k}:bx`) - 0.5) * 0.6,
-      y: -0.05,
-      z: -0.55 - 0.2 * r(`${k}:bz`),
-      r: 0.55 + 0.25 * r(`${k}:br`),
-    })
+  // A row behind (one lump fewer) and a shorter one in front: z, how many fewer, radius.
+  const rows: [number, number, number][] = [
+    [-0.6, 1, 0.6],
+    [0.55, 2, 0.5],
+  ]
+  for (const [z, fewer, size] of rows) {
+    const n = Math.max(1, count - fewer)
+    for (let k = 0; k < n; k++) {
+      const next = puffs[Math.min(count - 1, k + Math.floor(fewer / 2))] as Puff
+      puffs.push({
+        x: next.x + (r(`${z}:${k}:x`) - 0.5) * 0.7,
+        y: -0.08,
+        z: z + (r(`${z}:${k}:z`) - 0.5) * 0.2,
+        r: size + 0.2 * r(`${z}:${k}:r`),
+      })
+    }
   }
   const top = puffs[peak] as Puff
-  puffs.push({ x: top.x + (r("tx") - 0.5) * 0.5, y: 0.55, z: -0.15, r: 0.6 + 0.15 * r("tr") })
-  if (r("second") < 0.5) {
-    const other = puffs[(peak + 1) % count] as Puff
-    puffs.push({ x: other.x, y: 0.35, z: -0.1, r: 0.45 + 0.1 * r("sr") })
-  }
+  puffs.push({ x: top.x + (r("tx") - 0.5) * 0.6, y: 0.42, z: -0.1, r: 0.62 + 0.15 * r("tr") })
   // Centred on its middle, so a cloud turns about itself.
   const mid = (puffs[count - 1] as Puff).x / 2
   return puffs.map((p) => ({ ...p, x: p.x - mid }))

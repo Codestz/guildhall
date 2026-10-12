@@ -1,0 +1,81 @@
+{
+  "anchors": [
+    {
+      "at": [
+        6.5,
+        0,
+        6
+      ],
+      "facing": 3.141592653589793,
+      "id": "anvil",
+      "kind": "station"
+    }
+  ],
+  "dressing": [
+    {
+      "piece": "quaternius-village/blacksmith",
+      "rot": 0,
+      "scale": 1,
+      "x": -2.75,
+      "y": 0,
+      "z": -0.5
+    },
+    {
+      "piece": "quaternius-props/anvil-log",
+      "rot": 0,
+      "scale": 1,
+      "x": 6.5,
+      "y": 0,
+      "z": 2.75
+    },
+    {
+      "piece": "kenney-survival/workbench-anvil",
+      "rot": 0,
+      "scale": 1,
+      "x": 6.25,
+      "y": 0,
+      "z": 4.75
+    },
+    {
+      "piece": "quaternius-props/barrel",
+      "rot": 0,
+      "scale": 1,
+      "x": 7.75,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "piece": "kenney-nature/log-stack-large",
+      "rot": 0,
+      "scale": 1,
+      "x": 6.5,
+      "y": 0,
+      "z": -1.5
+    },
+    {
+      "piece": "kaykit-resources/wood-planks-stack-large",
+      "rot": 0,
+      "scale": 1,
+      "x": 6.75,
+      "y": 0,
+      "z": -4.75
+    },
+    {
+      "piece": "quaternius-props/workbench",
+      "rot": 0,
+      "scale": 1,
+      "x": -3,
+      "y": 0,
+      "z": 6.25
+    }
+  ],
+  "fits": {},
+  "id": "works-yard",
+  "kind": "forge",
+  "tags": [
+    "civic",
+    "smithy",
+    "works-yard"
+  ],
+  "version": 1
+}

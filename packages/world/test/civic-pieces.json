@@ -1,0 +1,392 @@
+[
+  {
+    "category": "prop",
+    "id": "kaykit-dungeon/barrel-large",
+    "size": [1.8, 2, 1.8]
+  },
+  {
+    "category": "prop",
+    "id": "kaykit-dungeon/barrel-small-stack",
+    "size": [1.85, 1.77, 1]
+  },
+  {
+    "category": "prop",
+    "id": "kaykit-dungeon/crates-stacked",
+    "size": [2.09, 2.14, 2.25]
+  },
+  {
+    "category": "building",
+    "id": "kaykit-hexagon/building-castle-blue",
+    "size": [15.8, 31.83, 18.05]
+  },
+  {
+    "category": "building",
+    "id": "kaykit-hexagon/building-church-blue",
+    "size": [8.23, 13.16, 9.24]
+  },
+  {
+    "category": "building",
+    "id": "kaykit-hexagon/building-home-a-blue",
+    "size": [6.34, 7.44, 6.83]
+  },
+  {
+    "category": "building",
+    "id": "kaykit-hexagon/building-market-blue",
+    "size": [14.4, 7.85, 10.53]
+  },
+  {
+    "category": "building",
+    "id": "kaykit-hexagon/building-tavern-blue",
+    "size": [9.37, 11.17, 10.66]
+  },
+  {
+    "category": "tower",
+    "id": "kaykit-hexagon/building-tower-a-blue",
+    "size": [7.95, 17.53, 9.23]
+  },
+  {
+    "category": "tower",
+    "id": "kaykit-hexagon/building-tower-b-blue",
+    "size": [9.58, 19.88, 11.06]
+  },
+  {
+    "category": "building",
+    "id": "kaykit-hexagon/building-watermill-blue",
+    "size": [8.4, 12.54, 9.89]
+  },
+  {
+    "category": "prop",
+    "id": "kaykit-hexagon/building-well-blue",
+    "size": [5.21, 6.61, 6.01]
+  },
+  {
+    "category": "prop",
+    "id": "kaykit-resources/wood-planks-stack-large",
+    "size": [1.67, 1.22, 1.62]
+  },
+  {
+    "category": "prop",
+    "id": "kaykit-tools/rope-bundle-a",
+    "size": [1.39, 0.25, 0.53]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-castle/flag-banner-short",
+    "size": [0.17, 3.35, 2.71]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-castle/flag-pennant",
+    "size": [0.46, 3.72, 2.47]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-castle/flag-wide",
+    "size": [0.46, 3.72, 2.35]
+  },
+  {
+    "category": "tower",
+    "id": "kenney-castle/tower-square-base",
+    "size": [4.3, 4.34, 4.3]
+  },
+  {
+    "category": "tower",
+    "id": "kenney-castle/tower-square-mid-windows",
+    "size": [4, 4.34, 4]
+  },
+  {
+    "category": "roof",
+    "id": "kenney-castle/tower-square-roof",
+    "size": [4.3, 8.64, 4.3]
+  },
+  {
+    "category": "tower",
+    "id": "kenney-castle/tower-square-top",
+    "size": [4.3, 1.29, 4.3]
+  },
+  {
+    "category": "furniture",
+    "id": "kenney-graveyard/bench",
+    "size": [1.78, 1.16, 1]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-graveyard/gravestone-bevel",
+    "size": [0.99, 1.16, 0.55]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-graveyard/gravestone-cross",
+    "size": [0.99, 2.01, 0.73]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-graveyard/gravestone-cross-large",
+    "size": [0.99, 2.06, 0.73]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-graveyard/gravestone-decorative",
+    "size": [1.12, 1.31, 0.55]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-graveyard/gravestone-roof",
+    "size": [1.07, 1.34, 0.55]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-graveyard/gravestone-round",
+    "size": [0.99, 1.26, 0.55]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-graveyard/hay-bale",
+    "size": [1.33, 0.78, 0.88]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-graveyard/hay-bale-bundled",
+    "size": [1.33, 0.84, 0.95]
+  },
+  {
+    "category": "fence",
+    "id": "kenney-graveyard/iron-fence-border-column",
+    "size": [1.55, 1.36, 0.34]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-graveyard/lightpost-single",
+    "size": [0.71, 4.31, 1.58]
+  },
+  {
+    "category": "ground",
+    "id": "kenney-nature/flower-purple-a",
+    "size": [0.4, 0.61, 0.45]
+  },
+  {
+    "category": "ground",
+    "id": "kenney-nature/flower-purple-b",
+    "size": [0.52, 0.52, 0.6]
+  },
+  {
+    "category": "ground",
+    "id": "kenney-nature/flower-purple-c",
+    "size": [0.45, 0.46, 0.45]
+  },
+  {
+    "category": "ground",
+    "id": "kenney-nature/flower-red-a",
+    "size": [0.4, 0.73, 0.45]
+  },
+  {
+    "category": "ground",
+    "id": "kenney-nature/flower-red-c",
+    "size": [0.45, 0.58, 0.45]
+  },
+  {
+    "category": "ground",
+    "id": "kenney-nature/flower-yellow-a",
+    "size": [0.4, 0.48, 0.45]
+  },
+  {
+    "category": "ground",
+    "id": "kenney-nature/flower-yellow-b",
+    "size": [0.52, 0.4, 0.6]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-nature/log-stack",
+    "size": [1.7, 1.39, 2.84]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-nature/log-stack-large",
+    "size": [2.54, 1.39, 2.84]
+  },
+  {
+    "category": "bush",
+    "id": "kenney-nature/plant-bush",
+    "size": [1.58, 0.98, 1.58]
+  },
+  {
+    "category": "bush",
+    "id": "kenney-nature/plant-bush-large",
+    "size": [1.5, 0.97, 1.34]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-pirate/barrel",
+    "size": [1.34, 1.23, 1.34]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-pirate/crate",
+    "size": [1.08, 0.77, 1.31]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-pirate/crate-bottles",
+    "size": [1.08, 1.06, 1.31]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-survival/bucket",
+    "size": [0.4, 0.54, 0.4]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-survival/workbench-anvil",
+    "size": [0.9, 0.94, 0.83]
+  },
+  {
+    "category": "vehicle",
+    "id": "kenney-town/cart",
+    "size": [3.1, 1.86, 4.65]
+  },
+  {
+    "category": "vehicle",
+    "id": "kenney-town/cart-high",
+    "size": [3.1, 2.98, 4.82]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-town/fountain-round-detail",
+    "size": [6.93, 1.66, 6.93]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-town/lantern",
+    "size": [0.75, 5.39, 0.78]
+  },
+  {
+    "category": "prop",
+    "id": "kenney-town/stall-red",
+    "size": [3.47, 4.29, 3.47]
+  },
+  {
+    "category": "tree",
+    "id": "kenney-town/tree",
+    "size": [2.86, 6.76, 2.86]
+  },
+  {
+    "category": "tree",
+    "id": "kenney-town/tree-crooked",
+    "size": [2.86, 6.76, 2.86]
+  },
+  {
+    "category": "tree",
+    "id": "kenney-town/tree-high-round",
+    "size": [2.85, 7.7, 2.85]
+  },
+  {
+    "category": "furniture",
+    "id": "quaternius-props/anvil-log",
+    "size": [1.07, 1.23, 0.94]
+  },
+  {
+    "category": "prop",
+    "id": "quaternius-props/barrel",
+    "size": [0.8, 1.03, 0.8]
+  },
+  {
+    "category": "prop",
+    "id": "quaternius-props/barrel-apples",
+    "size": [0.8, 1.03, 0.8]
+  },
+  {
+    "category": "prop",
+    "id": "quaternius-props/farm-crate-apple",
+    "size": [0.82, 0.28, 0.48]
+  },
+  {
+    "category": "prop",
+    "id": "quaternius-props/farm-crate-carrot",
+    "size": [0.82, 0.47, 0.65]
+  },
+  {
+    "category": "prop",
+    "id": "quaternius-props/lantern-wall",
+    "size": [0.41, 1.54, 1.5]
+  },
+  {
+    "category": "furniture",
+    "id": "quaternius-props/workbench",
+    "size": [2.32, 1.03, 1.18]
+  },
+  {
+    "category": "building",
+    "id": "quaternius-rts/storage-first-age-level1",
+    "size": [15.16, 8.18, 15.75]
+  },
+  {
+    "category": "building",
+    "id": "quaternius-rts/storage-second-age-level2",
+    "size": [17.72, 9.57, 13.45]
+  },
+  {
+    "category": "tower",
+    "id": "quaternius-rts/watch-tower-second-age-level3",
+    "size": [8.74, 15.59, 9.58]
+  },
+  {
+    "category": "prop",
+    "id": "quaternius-village/bag-open",
+    "size": [0.54, 0.38, 0.73]
+  },
+  {
+    "category": "prop",
+    "id": "quaternius-village/bags",
+    "size": [0.97, 0.39, 0.86]
+  },
+  {
+    "category": "tower",
+    "id": "quaternius-village/bell-tower",
+    "size": [6.97, 17.14, 8.02]
+  },
+  {
+    "category": "furniture",
+    "id": "quaternius-village/bench-1",
+    "size": [2.39, 1.14, 0.87]
+  },
+  {
+    "category": "furniture",
+    "id": "quaternius-village/bench-2",
+    "size": [2.39, 0.67, 0.8]
+  },
+  {
+    "category": "building",
+    "id": "quaternius-village/blacksmith",
+    "size": [14, 10.81, 11.82]
+  },
+  {
+    "category": "vehicle",
+    "id": "quaternius-village/cart",
+    "size": [1.66, 2.87, 3.34]
+  },
+  {
+    "category": "fence",
+    "id": "quaternius-village/fence",
+    "size": [2.85, 1.17, 0.09]
+  },
+  {
+    "category": "prop",
+    "id": "quaternius-village/hay",
+    "size": [0.44, 0.64, 0.45]
+  },
+  {
+    "category": "building",
+    "id": "quaternius-village/inn",
+    "size": [14.5, 12.57, 14.48]
+  },
+  {
+    "category": "building",
+    "id": "quaternius-village/mill",
+    "size": [12.23, 17.29, 9.83]
+  },
+  {
+    "category": "building",
+    "id": "quaternius-village/stable",
+    "size": [16.92, 8.96, 11.98]
+  }
+]

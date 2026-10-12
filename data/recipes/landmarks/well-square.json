@@ -1,0 +1,87 @@
+{
+  "anchors": [],
+  "dressing": [
+    {
+      "piece": "kaykit-hexagon/building-well-blue",
+      "rot": 0,
+      "scale": 0.75,
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "piece": "kenney-town/tree",
+      "rot": 0,
+      "scale": 1,
+      "x": -4.5,
+      "y": 0,
+      "z": -3.5
+    },
+    {
+      "piece": "kenney-town/tree-crooked",
+      "rot": 0,
+      "scale": 1,
+      "x": 4.5,
+      "y": 0,
+      "z": -3.75
+    },
+    {
+      "piece": "quaternius-village/bench-2",
+      "rot": 0.5235987755982988,
+      "scale": 1,
+      "x": -4,
+      "y": 0,
+      "z": 3.5
+    },
+    {
+      "piece": "quaternius-village/bench-2",
+      "rot": -0.5235987755982988,
+      "scale": 1,
+      "x": 4,
+      "y": 0,
+      "z": 3.5
+    },
+    {
+      "piece": "kenney-nature/flower-red-a",
+      "rot": 0,
+      "scale": 1,
+      "x": -1.5,
+      "y": 0,
+      "z": 4.5
+    },
+    {
+      "piece": "kenney-nature/flower-yellow-a",
+      "rot": 0,
+      "scale": 1,
+      "x": 1.5,
+      "y": 0,
+      "z": 4.5
+    },
+    {
+      "piece": "kenney-nature/flower-purple-b",
+      "rot": 0,
+      "scale": 1,
+      "x": 5.5,
+      "y": 0,
+      "z": 0.5
+    },
+    {
+      "piece": "kenney-nature/flower-red-c",
+      "rot": 0,
+      "scale": 1,
+      "x": -5.5,
+      "y": 0,
+      "z": 0.5
+    }
+  ],
+  "fits": {},
+  "id": "well-square",
+  "kind": "well",
+  "tags": [
+    "civic",
+    "square",
+    "open",
+    "well"
+  ],
+  "version": 1
+}

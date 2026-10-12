@@ -97,11 +97,15 @@ const GARDEN_ODDS: Readonly<Record<Tier, number>> = {
   capital: 0.02,
 }
 
-/** The prefabs a district may put on a lot, at a tier when it is known. */
+/**
+ * The prefabs a district may put on a lot, at a tier when it is known. Civic recipes (tagged `civic`)
+ * are never in it: they are claimed by their own rules (civic.ts), not drawn from the mix.
+ */
 export function lotPrefabs(lib: TownLibrary, district: DistrictKind, tier?: Tier): PrefabMeta[] {
   const fits = (mix: Partial<Record<PrefabKind, number>>) =>
     lib.prefabs.filter(
       (p) =>
+        !p.tags.includes("civic") &&
         (mix[p.kind] ?? 0) > 0 &&
         (!p.fits.districts?.length || p.fits.districts.includes(district)) &&
         (!tier || !p.fits.tiers?.length || p.fits.tiers.includes(tier)),

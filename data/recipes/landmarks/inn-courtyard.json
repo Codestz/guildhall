@@ -1,0 +1,136 @@
+{
+  "anchors": [
+    {
+      "at": [
+        4,
+        0,
+        4.5
+      ],
+      "facing": 3.141592653589793,
+      "id": "bench",
+      "kind": "station"
+    }
+  ],
+  "dressing": [
+    {
+      "piece": "kaykit-hexagon/building-tavern-blue",
+      "rot": 0,
+      "scale": 1,
+      "x": -3.75,
+      "y": 0,
+      "z": 0
+    },
+    {
+      "piece": "quaternius-village/fence",
+      "rot": 0,
+      "scale": 1,
+      "x": 2.75,
+      "y": 0,
+      "z": 6.25
+    },
+    {
+      "piece": "quaternius-village/fence",
+      "rot": 0,
+      "scale": 1,
+      "x": 5.5,
+      "y": 0,
+      "z": 6.25
+    },
+    {
+      "piece": "quaternius-village/fence",
+      "rot": 1.5707963267948966,
+      "scale": 1,
+      "x": 7.5,
+      "y": 0,
+      "z": -3.5
+    },
+    {
+      "piece": "quaternius-village/fence",
+      "rot": 1.5707963267948966,
+      "scale": 1,
+      "x": 7.5,
+      "y": 0,
+      "z": -0.75
+    },
+    {
+      "piece": "quaternius-village/fence",
+      "rot": 1.5707963267948966,
+      "scale": 1,
+      "x": 7.5,
+      "y": 0,
+      "z": 2.25
+    },
+    {
+      "piece": "quaternius-village/fence",
+      "rot": 1.5707963267948966,
+      "scale": 1,
+      "x": 7.5,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "piece": "quaternius-village/bench-1",
+      "rot": 1.5707963267948966,
+      "scale": 1,
+      "x": 3,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "piece": "quaternius-village/bench-1",
+      "rot": 1.5707963267948966,
+      "scale": 1,
+      "x": 5.25,
+      "y": 0,
+      "z": 3
+    },
+    {
+      "piece": "quaternius-props/barrel",
+      "rot": 0,
+      "scale": 1,
+      "x": 2.75,
+      "y": 0,
+      "z": -3.75
+    },
+    {
+      "piece": "quaternius-props/barrel",
+      "rot": 0,
+      "scale": 1,
+      "x": 3.75,
+      "y": 0,
+      "z": -4.25
+    },
+    {
+      "piece": "quaternius-village/cart",
+      "rot": 0.2617993877991494,
+      "scale": 1,
+      "x": 4.75,
+      "y": 0,
+      "z": -1.5
+    },
+    {
+      "piece": "kenney-graveyard/hay-bale",
+      "rot": 0,
+      "scale": 1,
+      "x": 6,
+      "y": 0,
+      "z": -4.75
+    },
+    {
+      "piece": "kenney-town/lantern",
+      "rot": 0,
+      "scale": 1,
+      "x": 1.75,
+      "y": 0,
+      "z": 5.75
+    }
+  ],
+  "fits": {},
+  "id": "inn-courtyard",
+  "kind": "tavern",
+  "tags": [
+    "civic",
+    "inn"
+  ],
+  "version": 1
+}

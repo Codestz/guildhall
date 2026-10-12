@@ -61,6 +61,38 @@ export interface TilePrefab {
   tones?: Record<number, number>[]
   /** Other prefabs that stand in for this one on some tiles (picked per tile), so streets do not repeat. */
   variants?: string[]
+  /** Where people do things on this tile (tile space, metres round its centre; turned with the tile). */
+  spots?: TileSpot[]
+  /** What people walk round (props on the tile): discs in tile space. */
+  blockers?: TileBlocker[]
+}
+
+/**
+ * An activity spot (decisions.md "Activity spots"): where one person stands to do something on a tile,
+ * which way they face, the clip they play there and what they hold. Life sends people only to spots, so
+ * an archer shoots at the target, a sitter sits on the bench, nobody works in the street.
+ */
+export interface TileSpot {
+  kind: "sit" | "work" | "stand" | "sleep" | "talk"
+  x: number
+  z: number
+  /** Turn about +y, radians (tile space; 0 faces +z). */
+  facing: number
+  /** Rig clip name (KayKit rig-medium), e.g. "Sit_Chair_Idle", "Interact", "Use_Item". */
+  clip?: string
+  /** Catalog piece held in the right hand while here (a grips mount). */
+  prop?: string
+  /** Who may use it: NPC roles (data/npcs ids); any when left out. */
+  roles?: string[]
+  /** Ground height offset (a bench seat, a dock deck), metres. */
+  y?: number
+}
+
+/** A disc nobody walks through (a cart, a stall, a well), tile space. */
+export interface TileBlocker {
+  x: number
+  z: number
+  r: number
 }
 
 /**

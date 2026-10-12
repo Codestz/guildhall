@@ -4,7 +4,7 @@
  *
  * A vertex is drawn the way the re-tint shader will draw it: its swatch's OKLab colour with the
  * lightness moved by the `_SHADE` byte decoded as the colour stage encodes it (128 = the swatch itself,
- * ±127 = ±SHADE_RANGE). Baked AO lives in that byte too, so it survives the recolour.
+ * ±127 = ±SHADE_RANGE), then times the vertex's baked `_AO` (byte / 255), so AO survives the recolour.
  */
 import {
   hexToSrgb,
@@ -63,12 +63,25 @@ export function shadeTable(hexes: readonly string[], ids: readonly number[]): Fl
   return out
 }
 
-/** The colour a vertex is drawn with, written into `out` (3 floats) from a `shadeTable`. */
-export function vertexColour(table: Float32Array, swatch: number, shade: number, out: number[]): number[] {
+/** The `_AO` byte for "unoccluded" (what a piece without `_AO`, a character, is drawn with). */
+export const AO_OPEN = 255
+
+/**
+ * The colour a vertex is drawn with, written into `out` (3 floats) from a `shadeTable`: the table's
+ * colour for (swatch, shade) times `ao` / 255.
+ */
+export function vertexColour(
+  table: Float32Array,
+  swatch: number,
+  shade: number,
+  out: number[],
+  ao = AO_OPEN,
+): number[] {
   const at = (swatch * SHADES + Math.min(SHADES - 1, Math.max(0, Math.round(shade)))) * 3
-  out[0] = table[at] ?? 0
-  out[1] = table[at + 1] ?? 0
-  out[2] = table[at + 2] ?? 0
+  const occlusion = ao / AO_OPEN
+  out[0] = (table[at] ?? 0) * occlusion
+  out[1] = (table[at + 1] ?? 0) * occlusion
+  out[2] = (table[at + 2] ?? 0) * occlusion
   return out
 }
 

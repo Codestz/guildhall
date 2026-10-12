@@ -1,6 +1,6 @@
 /**
- * Palette variants (ADR 008): vertex colours recomputed from `_SWATCH` and `_SHADE` with some swatches
- * swapped, so a re-tinted piece is a baked geometry variant, not a material change.
+ * Palette variants (ADR 008): vertex colours recomputed from `_SWATCH`, `_SHADE` and `_AO` with some
+ * swatches swapped, so a re-tinted piece is a baked geometry variant, not a material change.
  */
 import { oklabToLinear, SHADE_RANGE } from "./colour.ts"
 import type { Palette } from "./palette.ts"
@@ -14,18 +14,21 @@ export const decodeShade = (byte: number): number => ((byte - SHADE_NEUTRAL) * S
 
 /**
  * Linear RGB, 3 floats per vertex: `palette[map(swatch)]` with its lightness moved by the decoded
- * shade and clamped to [0, 1], the import's formula. Swatch ids the map does not name are kept.
- * Note: the import's AO stage multiplies the `_SHADE` byte and COLOR_0 after this formula runs, so
- * for occluded vertices the result differs from the baked COLOR_0 (see the S1 report).
+ * shade and clamped to [0, 1], then times the `_AO` byte / 255 — the import's formula, so with the
+ * piece's `_AO` the identity map gives back its baked COLOR_0. Without `ao` every vertex is unoccluded
+ * (characters have no AO). Swatch ids the map does not name are kept.
  */
 export function tintColours(
   swatch: Uint8Array,
   shade: Uint8Array,
   p: Palette,
   map?: Record<number, number>,
+  ao?: Uint8Array,
 ): Float32Array {
   if (shade.length !== swatch.length)
     throw new Error(`tintColours: ${swatch.length} swatches but ${shade.length} shades`)
+  if (ao && ao.length !== swatch.length)
+    throw new Error(`tintColours: ${swatch.length} swatches but ${ao.length} AO values`)
   const out = new Float32Array(swatch.length * 3)
   const clamp = (x: number): number => Math.min(1, Math.max(0, x))
   for (let v = 0; v < swatch.length; v++) {
@@ -34,9 +37,10 @@ export function tintColours(
     const s = p.swatches[id]
     if (!s) throw new Error(`tintColours: swatch ${id} is not in the palette`)
     const [r, g, b] = oklabToLinear([s.lab[0] + decodeShade(shade[v] as number), s.lab[1], s.lab[2]])
-    out[v * 3] = clamp(r)
-    out[v * 3 + 1] = clamp(g)
-    out[v * 3 + 2] = clamp(b)
+    const occlusion = ao ? (ao[v] as number) / 255 : 1
+    out[v * 3] = clamp(r) * occlusion
+    out[v * 3 + 1] = clamp(g) * occlusion
+    out[v * 3 + 2] = clamp(b) * occlusion
   }
   return out
 }

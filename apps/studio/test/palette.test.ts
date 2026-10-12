@@ -34,6 +34,15 @@ describe("shadeTable / vertexColour", () => {
     expect(sum(200)).toBeGreaterThan(sum(SHADE_NEUTRAL))
   })
 
+  test("_AO scales the drawn colour by byte / 255; no _AO is unoccluded", () => {
+    const table = shadeTable(hexes, identity)
+    const id = byName("stone-light").id
+    const open = vertexColour(table, id, 100, [0, 0, 0])
+    expect(vertexColour(table, id, 100, [0, 0, 0], 255)).toEqual(open)
+    const dark = vertexColour(table, id, 100, [0, 0, 0], 102)
+    for (const [i, c] of open.entries()) expect(dark[i]!).toBeCloseTo((c * 102) / 255, 6)
+  })
+
   test("an edited hex changes only its own swatch", () => {
     const edited = [...hexes]
     const grass = byName("grass").id

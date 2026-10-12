@@ -47,7 +47,7 @@ interface Corner {
 
 /**
  * Non-indexed triangles on a palette-baked layout: POSITION, NORMAL (+y), COLOR_0 (float),
- * _SWATCH and _SHADE (bytes), as the colour stage leaves them.
+ * _SWATCH, _SHADE and _AO (bytes), as the colour and AO stages leave them.
  */
 function triangles(corners: Corner[]): Document {
   const doc = new GltfDocument().setLogger(new Logger(Logger.Verbosity.WARN))
@@ -60,6 +60,7 @@ function triangles(corners: Corner[]): Document {
   const rgb = new Float32Array(n * 3)
   const swatch = new Uint8Array(n)
   const shade = new Uint8Array(n).fill(128)
+  const occlusion = new Uint8Array(n).fill(200)
   for (const [i, c] of corners.entries()) {
     pos.set(c.p, i * 3)
     nor.set([0, 1, 0], i * 3)
@@ -74,6 +75,7 @@ function triangles(corners: Corner[]): Document {
     .setAttribute("COLOR_0", acc("VEC3", rgb))
     .setAttribute("_SWATCH", acc("SCALAR", swatch))
     .setAttribute("_SHADE", acc("SCALAR", shade, true))
+    .setAttribute("_AO", acc("SCALAR", occlusion, true))
   doc.createScene().addChild(doc.createNode("piece").setMesh(doc.createMesh("piece").addPrimitive(prim)))
   return doc
 }
@@ -149,12 +151,12 @@ describe("optimize: weld", () => {
     expect(swatches.sort()).toEqual([3, 3, 3, 4, 4, 4])
   })
 
-  test("corners that differ only in _SHADE or COLOR_0 stay split", async () => {
-    for (const semantic of ["_SHADE", "COLOR_0"]) {
+  test("corners that differ only in _SHADE, _AO or COLOR_0 stay split", async () => {
+    for (const semantic of ["_SHADE", "_AO", "COLOR_0"]) {
       const doc = triangles(quad(1, [3, 3]))
       const acc = prims(doc)[0]?.getAttribute(semantic)
       const el = acc?.getElement(3, []) ?? []
-      acc?.setElement(3, semantic === "_SHADE" ? [100] : [0.9, el[1] ?? 0, el[2] ?? 0])
+      acc?.setElement(3, semantic === "COLOR_0" ? [0.9, el[1] ?? 0, el[2] ?? 0] : [100])
       await optimize(doc, ctx())
       expect(verts(doc)).toBe(5)
     }
@@ -180,7 +182,7 @@ describe("optimize: meshopt", () => {
     expect(worst).toBeLessThanOrEqual(POSITION_STEP / 2)
   })
 
-  test("normals stay within a degree; _SWATCH and _SHADE come back exactly", async () => {
+  test("normals stay within a degree; _SWATCH, _SHADE and _AO come back exactly", async () => {
     const doc = triangles(quad(2, [3, 4]))
     const n = prims(doc)[0]?.getAttribute("NORMAL")
     const tilted = [0.3, 0.9, 0.1]
@@ -202,6 +204,8 @@ describe("optimize: meshopt", () => {
     expect(prim.getAttribute("_SWATCH")?.getNormalized()).toBe(false)
     expect(Array.from(prim.getAttribute("_SHADE")?.getArray() ?? [])).toEqual([128, 128, 128, 128, 128, 128])
     expect(prim.getAttribute("_SHADE")?.getNormalized()).toBe(true)
+    expect(Array.from(prim.getAttribute("_AO")?.getArray() ?? [])).toEqual([200, 200, 200, 200, 200, 200])
+    expect(prim.getAttribute("_AO")?.getNormalized()).toBe(true)
   })
 
   test("the written GLB is smaller than the unoptimized one", async () => {

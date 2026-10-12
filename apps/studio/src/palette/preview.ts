@@ -1,6 +1,6 @@
 /**
  * The live preview: the cast in a 4 × 3 grid, each piece fitted to one cell, recoloured on the client by
- * rewriting COLOR_0 from its `_SWATCH` / `_SHADE` attributes (no shader, no re-import). Every mesh gets
+ * rewriting COLOR_0 from its `_SWATCH` / `_SHADE` / `_AO` attributes (no shader, no re-import). Every mesh gets
  * its own copy of its geometry first, because `loadPiece` shares geometry with every other screen.
  */
 import type { CatalogEntry } from "@guildhall/assets"
@@ -16,7 +16,7 @@ import {
   toScreen,
 } from "@guildhall/render"
 import { libraryUrl } from "../catalog.ts"
-import { vertexColour } from "./colour.ts"
+import { AO_OPEN, vertexColour } from "./colour.ts"
 
 const COLUMNS = 4
 /** Metres between cell centres. */
@@ -44,11 +44,12 @@ interface MeshLike {
   geometry: Geometry
 }
 
-/** One mesh's colour attribute and the swatch and shade each of its vertices was baked with. */
+/** One mesh's colour attribute and the swatch, shade and AO each of its vertices was baked with. */
 interface Target {
   colour: Attribute
   swatch: Uint8Array
   shade: Uint8Array
+  ao: Uint8Array
 }
 
 export interface Preview {
@@ -76,12 +77,16 @@ function targetOf(mesh: MeshLike, geometries: Geometry[]): Target | null {
   const swatch = own.getAttribute("_swatch")
   const shade = own.getAttribute("_shade")
   if (!colour || !swatch || !shade) return null
+  const ao = own.getAttribute("_ao")
   const ids = new Uint8Array(swatch.count)
   const bytes = new Uint8Array(shade.count)
-  // _SHADE is normalized, so three reads it as byte / 255.
+  // Characters have no _AO: unoccluded.
+  const occlusion = new Uint8Array(swatch.count).fill(AO_OPEN)
+  // _SHADE and _AO are normalized, so three reads them as byte / 255.
   for (let i = 0; i < ids.length; i++) ids[i] = Math.round(swatch.getX(i))
   for (let i = 0; i < bytes.length; i++) bytes[i] = Math.round(shade.getX(i) * 255)
-  return { colour, swatch: ids, shade: bytes }
+  if (ao) for (let i = 0; i < occlusion.length; i++) occlusion[i] = Math.round(ao.getX(i) * 255)
+  return { colour, swatch: ids, shade: bytes, ao: occlusion }
 }
 
 /** A text label under each piece, kept in place every frame. */
@@ -154,9 +159,9 @@ export async function createPreview(
   return {
     skipped,
     recolour(table) {
-      for (const { colour, swatch, shade } of targets) {
+      for (const { colour, swatch, shade, ao } of targets) {
         for (let i = 0; i < swatch.length; i++) {
-          vertexColour(table, swatch[i] ?? 0, shade[i] ?? 0, rgb)
+          vertexColour(table, swatch[i] ?? 0, shade[i] ?? 0, rgb, ao[i])
           colour.setXYZ(i, rgb[0] ?? 0, rgb[1] ?? 0, rgb[2] ?? 0)
         }
         colour.needsUpdate = true

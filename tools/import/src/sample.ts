@@ -216,7 +216,7 @@ export function sampleVertexColours(prim: Primitive, mode: ColourMode, image?: R
   return out
 }
 
-/** The `_SHADE` byte for "the swatch's own lightness" (normalized uint8, the AO stage multiplies it). */
+/** The `_SHADE` byte for "the swatch's own lightness" (normalized uint8; AO lives apart, in `_AO`). */
 export const SHADE_NEUTRAL = 128
 /** OKLab lightness offset (±SHADE_RANGE) → `_SHADE` byte: 128 + 127 · shade / SHADE_RANGE, clamped. */
 export const encodeShade = (shade: number): number =>

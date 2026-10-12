@@ -1,13 +1,15 @@
 /**
  * `bun import check`: the library is consistent. Every shard entry passes `validateEntry`, every file
  * it names exists, ids are unique, the index validates and lists every shard, and every GLB is
- * texture-free with COLOR_0 / _SWATCH / _SHADE on every primitive (ADR 003).
+ * texture-free with COLOR_0 / _SWATCH / _SHADE on every primitive (ADR 003), and _AO too on a static
+ * piece (characters get no AO bake).
  */
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import {
   type CatalogEntry,
   type CatalogIndex,
+  type Kind,
   type Palette,
   validateEntry,
   validateIndex,
@@ -16,6 +18,8 @@ import { shardFile, shardIds } from "./catalog.ts"
 import { gltfIO } from "./read.ts"
 
 export const VERTEX_ATTRIBUTES = ["COLOR_0", "_SWATCH", "_SHADE"] as const
+/** A static piece also carries the AO stage's `_AO`. */
+export const STATIC_ATTRIBUTES = [...VERTEX_ATTRIBUTES, "_AO"] as const
 
 export interface CheckResult {
   shards: number
@@ -24,15 +28,16 @@ export interface CheckResult {
 }
 
 /** Problems with one written GLB, as "what" (the caller prefixes the entry id). */
-export async function glbProblems(file: string): Promise<string[]> {
+export async function glbProblems(file: string, kind: Kind): Promise<string[]> {
   const io = await gltfIO()
   const root = (await io.read(file)).getRoot()
   const out: string[] = []
   if (root.listTextures().length > 0)
     out.push(`${root.listTextures().length} texture(s); the palette bake removes them`)
+  const required = kind === "character" ? VERTEX_ATTRIBUTES : STATIC_ATTRIBUTES
   for (const mesh of root.listMeshes())
     for (const [i, prim] of mesh.listPrimitives().entries()) {
-      const missing = VERTEX_ATTRIBUTES.filter((a) => !prim.getAttribute(a))
+      const missing = required.filter((a) => !prim.getAttribute(a))
       if (missing.length > 0) out.push(`mesh "${mesh.getName()}" primitive ${i}: no ${missing.join(", ")}`)
     }
   return out
@@ -74,7 +79,7 @@ export async function checkLibrary(library: string, palette: Palette): Promise<C
       if (!files.glb) continue
       const glb = join(library, files.glb)
       if (!existsSync(glb)) problems.push(`${e.id}: glb ${files.glb} missing`)
-      else problems.push(...(await glbProblems(glb)).map((p) => `${e.id}: ${p}`))
+      else problems.push(...(await glbProblems(glb, e.kind)).map((p) => `${e.id}: ${p}`))
     }
   }
   return result

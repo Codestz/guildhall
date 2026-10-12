@@ -48,8 +48,8 @@ const report = (slug: string): PieceReport => ({
   measures: { size: [2.5049, 2.61234, 0.30001], footprint: { w: 3, d: 1 }, tris: 12, verts: 8 },
 })
 
-/** A one-triangle GLB carrying the three palette attributes (what a finished piece looks like). */
-function bakedDoc(): Document {
+/** A one-triangle GLB carrying the palette attributes and `_AO` (what a finished static piece looks like). */
+function bakedDoc(ao = true): Document {
   const doc = new Document()
   const buffer = doc.createBuffer()
   const attr = (type: "VEC3" | "VEC4" | "SCALAR", array: Float32Array | Uint8Array) =>
@@ -60,15 +60,16 @@ function bakedDoc(): Document {
     .setAttribute("COLOR_0", attr("VEC3", new Float32Array(9).fill(0.5)))
     .setAttribute("_SWATCH", attr("SCALAR", Uint8Array.of(1, 1, 5)))
     .setAttribute("_SHADE", attr("SCALAR", Uint8Array.of(128, 128, 128)))
+  if (ao) prim.setAttribute("_AO", attr("SCALAR", Uint8Array.of(255, 200, 255)).setNormalized(true))
   doc.createScene().addChild(doc.createNode("p").setMesh(doc.createMesh("p").addPrimitive(prim)))
   return doc
 }
 
-async function library(slugs: string[]): Promise<{ dir: string; entries: CatalogEntry[] }> {
+async function library(slugs: string[], ao = true): Promise<{ dir: string; entries: CatalogEntry[] }> {
   const dir = tempDir()
   const entries: CatalogEntry[] = []
   for (const slug of slugs)
-    entries.push(toEntry(PACK, source(slug), report(slug), await writePiece(bakedDoc(), dir, "town", slug)))
+    entries.push(toEntry(PACK, source(slug), report(slug), await writePiece(bakedDoc(ao), dir, "town", slug)))
   writeShard(dir, "town", entries)
   writeIndex(dir, PALETTE, { town: "other" })
   return { dir, entries }
@@ -139,6 +140,14 @@ describe("check", () => {
   test("a baked library has no problems", async () => {
     const { dir } = await library(["wall-a", "wall-b"])
     expect(await checkLibrary(dir, PALETTE)).toEqual({ shards: 1, entries: 2, problems: [] })
+  })
+
+  test("a static piece without _AO is reported; a character needs none", async () => {
+    const { dir, entries } = await library(["wall-a", "wall-b"], false)
+    const character = { ...(entries[1] as CatalogEntry), kind: "character" as const }
+    writeFileSync(shardFile(dir, "town"), JSON.stringify([entries[0], character]))
+    const { problems } = await checkLibrary(dir, PALETTE)
+    expect(problems.filter((p) => p.includes("_AO"))).toEqual(['town/wall-a: mesh "p" primitive 0: no _AO'])
   })
 
   test("a missing GLB, an unknown category and an unlisted shard are reported", async () => {

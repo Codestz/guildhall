@@ -3,12 +3,12 @@
  * EXT_meshopt_compression in its QUANTIZE mode, plan's "meshopt medium").
  *
  * Weld merges only bitwise-identical vertices, so the colour stage's per-swatch splits (a different
- * _SWATCH, _SHADE or COLOR_0) survive; prune runs first so attributes nothing reads (stray UVs) do not
- * keep vertices apart.
+ * _SWATCH, _SHADE or COLOR_0) survive, and so do vertices with a different _AO; prune runs first so
+ * attributes nothing reads (stray UVs) do not keep vertices apart.
  *
  * Quantization: POSITION gets the fewest bits (≥ 14) whose grid step is ≤ POSITION_STEP over the
  * largest mesh (14 bits hold 1 cm up to ~160 m); NORMAL 8 bits (< 0.5° error); COLOR_0 8 bits;
- * _SWATCH and _SHADE are bytes already and stay as they are. A skinned document keeps POSITION in
+ * _SWATCH, _SHADE and _AO are bytes already and stay as they are. A skinned document keeps POSITION in
  * float: quantizing it would fold a per-model scale into the inverse bind matrices, and every model
  * that shares a rig wants the same bind pose.
  *
@@ -79,7 +79,7 @@ export const optimize: Stage = async (doc, ctx) => {
     await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio, error: SIMPLIFY_ERROR }))
 
   const bits = skinned ? undefined : positionBits(doc)
-  const pattern = bits === undefined ? /^(?!POSITION$|_SWATCH$|_SHADE$)/ : /^(?!_SWATCH$|_SHADE$)/
+  const pattern = bits === undefined ? /^(?!POSITION$|_SWATCH$|_SHADE$|_AO$)/ : /^(?!_SWATCH$|_SHADE$|_AO$)/
   await doc.transform(
     reorder({ encoder: MeshoptEncoder, target: "size" }),
     quantize({ pattern, quantizePosition: bits ?? 14, quantizeNormal: 8, quantizeColor: 8 }),

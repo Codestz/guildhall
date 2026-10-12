@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { Document, type Primitive } from "@gltf-transform/core"
 import { PALETTE, type PackConfig } from "@guildhall/assets"
 import { log } from "@guildhall/core"
-import { AO_DEFAULTS, ao, autoDistance, bakeAO, hemisphere, NEUTRAL_SHADE } from "../src/stages/ao.ts"
+import { AO_DEFAULTS, AO_OPEN, ao, autoDistance, bakeAO, hemisphere } from "../src/stages/ao.ts"
 import type { StageCtx } from "../src/stages/types.ts"
 
 interface Mesh {
@@ -225,28 +225,42 @@ describe("bakeAO", () => {
 })
 
 describe("ao stage", () => {
-  test("multiplies _SHADE and darkens COLOR_0 rgb (alpha kept) after colour has run", async () => {
+  test("writes _AO and darkens COLOR_0 rgb by exactly _AO / 255 (alpha kept); _SHADE is untouched", async () => {
     const { doc, prim } = docOf(box([0, 0, 0], [1, 1, 1]), true)
     await ao(doc, ctx())
-    const shade = array(prim, "_SHADE")
+    const occlusion = prim.getAttribute("_AO")
+    expect(occlusion?.getNormalized()).toBe(true)
+    expect(occlusion?.getArray()).toBeInstanceOf(Uint8Array)
+    const bytes = array(prim, "_AO")
     const colour = array(prim, "COLOR_0")
     // vertex 12 is on the underside (fully occluded), vertex 8 on the top (open).
-    expect(shade[8]).toBe(200)
-    expect(shade[12]).toBe(Math.round(200 * (1 - AO_DEFAULTS.strength)))
+    expect(bytes[8]).toBe(AO_OPEN)
+    expect(bytes[12]).toBe(Math.round(AO_OPEN * (1 - AO_DEFAULTS.strength)))
     expect(colour.slice(32, 36)).toEqual([0.5, 0.5, 0.5, 0.5])
-    expect(colour[48] as number).toBeCloseTo(0.5 * (1 - AO_DEFAULTS.strength), 6)
+    expect(colour[48] as number).toBeCloseTo((0.5 * (bytes[12] as number)) / AO_OPEN, 6)
     expect(colour[51]).toBe(0.5)
+    expect(array(prim, "_SHADE").every((s) => s === 200)).toBe(true)
     expect(array(prim, "_SWATCH").every((s) => s === 3)).toBe(true)
   })
 
-  test("creates only _SHADE when colour has not run", async () => {
+  test("multiplies into an existing _AO, and COLOR_0 follows the stored bytes", async () => {
+    const { doc, prim } = docOf(box([0, 0, 0], [1, 1, 1]), true)
+    await ao(doc, ctx())
+    const once = array(prim, "_AO")
+    await ao(doc, ctx())
+    const twice = array(prim, "_AO")
+    const colour = array(prim, "COLOR_0")
+    expect(twice[8]).toBe(AO_OPEN)
+    expect(twice[12]).toBe(Math.round((once[12] as number) * (1 - AO_DEFAULTS.strength)))
+    expect(colour[48] as number).toBeCloseTo((0.5 * (twice[12] as number)) / AO_OPEN, 6)
+  })
+
+  test("creates only _AO when colour has not run", async () => {
     const { doc, prim } = docOf(box([0, 0, 0], [1, 1, 1]), false)
     await ao(doc, ctx())
-    const shade = prim.getAttribute("_SHADE")
-    expect(shade?.getNormalized()).toBe(true)
-    expect(shade?.getArray()).toBeInstanceOf(Uint8Array)
-    expect(array(prim, "_SHADE")[8]).toBe(NEUTRAL_SHADE)
-    expect(array(prim, "_SHADE")[12]).toBeLessThan(NEUTRAL_SHADE)
+    expect(array(prim, "_AO")[8]).toBe(AO_OPEN)
+    expect(array(prim, "_AO")[12]).toBeLessThan(AO_OPEN)
+    expect(prim.getAttribute("_SHADE")).toBeNull()
     expect(prim.getAttribute("COLOR_0")).toBeNull()
   })
 
@@ -254,13 +268,14 @@ describe("ao stage", () => {
     const { doc, prim } = docOf(box([0, 0, 0], [1, 1, 1]), true)
     doc.getRoot().listNodes()[0]?.setTranslation([0, 5, 0])
     await ao(doc, ctx())
-    expect(array(prim, "_SHADE")[12]).toBe(200)
+    expect(array(prim, "_AO")[12]).toBe(AO_OPEN)
   })
 
   test("ao: false leaves the piece untouched", async () => {
     const { doc, prim } = docOf(box([0, 0, 0], [1, 1, 1]), true)
     await ao(doc, ctx(false))
-    expect(array(prim, "_SHADE").every((s) => s === 200)).toBe(true)
+    expect(prim.getAttribute("_AO")).toBeNull()
+    expect(array(prim, "COLOR_0").every((c) => c === 0.5)).toBe(true)
   })
 
   test("the same input bakes identical output", async () => {
@@ -268,7 +283,7 @@ describe("ao stage", () => {
       [0, 1].map(async () => {
         const { doc, prim } = docOf(sphere(20, 16), true)
         await ao(doc, ctx({ rays: 32 }))
-        return [array(prim, "_SHADE"), array(prim, "COLOR_0")]
+        return [array(prim, "_AO"), array(prim, "COLOR_0")]
       }),
     )
     expect(runs[0]).toEqual(runs[1] as number[][])

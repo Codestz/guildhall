@@ -1,12 +1,13 @@
 /**
- * Bake per-vertex ambient occlusion into _SHADE and COLOR_0 (T14, ADR 003: COLOR_0 = swatch × shade × AO).
+ * Bake per-vertex ambient occlusion into _AO and COLOR_0 (T14, ADR 003: COLOR_0 = swatch × shade × AO).
  *
  * Each vertex casts `rays` cosine-weighted hemisphere rays along its normal (a fixed Hammersley set, so
  * the bake is deterministic), offset by EPSILON, against the whole piece in world space (one BVH) plus
  * the ground plane y = 0, so bottoms and contact edges darken. A ray that hits within `distance` counts
- * as occluded; the vertex factor is 1 − strength × occluded fraction. The factor multiplies the stored
- * `_SHADE` and the RGB of `COLOR_0`; when colour has not run (no `_SHADE`), `_SHADE` is created from
- * NEUTRAL_SHADE × factor and COLOR_0 is left absent.
+ * as occluded; the vertex factor is 1 − strength × occluded fraction. The factor is stored as `_AO`
+ * (uint8 normalized, 255 = unoccluded; an existing `_AO` is multiplied) and the RGB of `COLOR_0` is
+ * multiplied by exactly that stored byte / 255, so a re-tint (`tintColours` with `_AO`) reproduces it.
+ * `_SHADE` is never touched: it holds only the colour stage's lightness offset.
  */
 import type { Accessor, Document, Node, Primitive } from "@gltf-transform/core"
 import { DMath } from "@guildhall/core"
@@ -27,8 +28,8 @@ export const AO_DEFAULTS = { rays: 48, strength: 0.6 } as const
 const AUTO_DISTANCE = { scale: 0.25, min: 0.3, max: 2 } as const
 /** Ray origins sit this far off the surface (metres) so a vertex does not hit its own faces. */
 const EPSILON = 1e-3
-/** `_SHADE` byte for "no lightness offset" (uint8 normalized, centred), used only when colour did not run. */
-export const NEUTRAL_SHADE = 128
+/** The `_AO` byte for "unoccluded" (uint8 normalized). */
+export const AO_OPEN = 255
 const TRIANGLES = 4
 
 /** `n` cosine-weighted directions in the local frame (z = normal), from the Hammersley sequence. */
@@ -255,15 +256,39 @@ function vertexNormals(p: ArrayLike<number>, tris: ArrayLike<number>): Float32Ar
   return n
 }
 
-/** Multiplies the first `channels` components of each element by its vertex factor (integers rounded). */
-function darken(accessor: Accessor, factors: Float32Array, channels: number): void {
+/**
+ * Multiplies the primitive's `_AO` by the vertex factors (creating it at AO_OPEN when absent) and
+ * returns the per-vertex ratio new / old byte, which is what COLOR_0 has to be multiplied by.
+ */
+function writeAO(doc: Document, prim: Primitive, factors: Float32Array): Float32Array {
+  const old = prim.getAttribute("_AO")
+  const before = old?.getArray()
+  const bytes = new Uint8Array(factors.length)
+  const ratio = new Float32Array(factors.length).fill(1)
+  for (let v = 0; v < factors.length; v++) {
+    const from = before ? (before[v] as number) : AO_OPEN
+    bytes[v] = Math.round(from * (factors[v] as number))
+    if (from > 0) ratio[v] = (bytes[v] as number) / from
+  }
+  const buffer = prim.getAttribute("POSITION")?.getBuffer() ?? doc.getRoot().listBuffers()[0] ?? null
+  if (old) old.setArray(bytes)
+  else
+    prim.setAttribute(
+      "_AO",
+      doc.createAccessor().setType("SCALAR").setArray(bytes).setNormalized(true).setBuffer(buffer),
+    )
+  return ratio
+}
+
+/** Multiplies the RGB of each COLOR_0 element by its vertex factor (integers rounded; alpha kept). */
+function darken(accessor: Accessor, factors: Float32Array): void {
   const src = accessor.getArray()
   if (!src) return
   const out = src.slice()
   const size = accessor.getElementSize()
   const integer = !(out instanceof Float32Array)
   for (let v = 0; v < factors.length; v++)
-    for (let c = 0; c < channels; c++) {
+    for (let c = 0; c < 3; c++) {
       const value = (out[v * size + c] as number) * (factors[v] as number)
       out[v * size + c] = integer ? Math.round(value) : value
     }
@@ -281,21 +306,13 @@ export const ao: Stage = async (doc, ctx) => {
   for (const { prim, start, count } of parts) {
     if (done.has(prim)) continue
     done.add(prim)
-    const f = factors.subarray(start, start + count)
-    const shade = prim.getAttribute("_SHADE")
-    if (shade && !done.has(shade)) darken(shade, f, 1)
-    else if (!shade) {
-      const bytes = Uint8Array.from(f, (x) => Math.round(NEUTRAL_SHADE * x))
-      const buffer = prim.getAttribute("POSITION")?.getBuffer() ?? doc.getRoot().listBuffers()[0] ?? null
-      prim.setAttribute(
-        "_SHADE",
-        doc.createAccessor().setType("SCALAR").setArray(bytes).setNormalized(true).setBuffer(buffer),
-      )
-    }
-    if (shade) done.add(shade)
+    const shared = prim.getAttribute("_AO")
+    if (shared && done.has(shared)) continue
+    const ratio = writeAO(doc, prim, factors.subarray(start, start + count))
+    done.add(prim.getAttribute("_AO") as Accessor)
     const colour = prim.getAttribute("COLOR_0")
     if (colour && !done.has(colour)) {
-      darken(colour, f, 3)
+      darken(colour, ratio)
       done.add(colour)
     }
   }

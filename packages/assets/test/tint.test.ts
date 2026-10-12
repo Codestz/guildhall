@@ -74,8 +74,24 @@ describe("tintColours", () => {
     expect(tintColours(new Uint8Array(0), new Uint8Array(0), palette).length).toBe(0)
   })
 
+  test("_AO multiplies the shaded colour by byte / 255; 255 everywhere is the same as no _AO", () => {
+    const swatch = Uint8Array.of(1, 2, 3)
+    const shade = Uint8Array.of(100, 128, 160)
+    const open = tintColours(swatch, shade, palette)
+    expect(tintColours(swatch, shade, palette, undefined, Uint8Array.of(255, 255, 255))).toEqual(open)
+    const out = tintColours(swatch, shade, palette, undefined, Uint8Array.of(255, 102, 0))
+    for (let k = 0; k < 3; k++) {
+      expect(out[k]).toBe(open[k]!)
+      expect(out[3 + k]!).toBeCloseTo((open[3 + k]! * 102) / 255, 6)
+      expect(out[6 + k]).toBe(0)
+    }
+  })
+
   test("throws on mismatched lengths and on a swatch outside the palette", () => {
     expect(() => tintColours(Uint8Array.of(1, 2), Uint8Array.of(128), palette)).toThrow("1 shades")
+    expect(() =>
+      tintColours(Uint8Array.of(1), Uint8Array.of(128), palette, undefined, Uint8Array.of()),
+    ).toThrow("0 AO values")
     expect(() => tintColours(Uint8Array.of(250), Uint8Array.of(128), palette)).toThrow("swatch 250")
     expect(() => tintColours(Uint8Array.of(1), Uint8Array.of(128), palette, { 1: 250 })).toThrow("swatch 250")
   })

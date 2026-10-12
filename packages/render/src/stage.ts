@@ -7,6 +7,7 @@ import {
   PerspectiveCamera,
   Scene,
   SRGBColorSpace,
+  Vector3,
   WebGLRenderer,
 } from "three"
 import { attachOrbitInput, poseToCamera } from "./camera.ts"
@@ -16,6 +17,8 @@ export interface Stage {
   scene: Scene
   camera: PerspectiveCamera
   renderer: WebGLRenderer
+  /** The key light; `createShadows` turns its shadow on. */
+  sun: DirectionalLight
   /** The last ~4 s of frames and the last frame's renderer counters. */
   stats(): FrameStats
   /** The frames drawn over the next `ms` milliseconds. */
@@ -110,6 +113,7 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
     scene,
     camera,
     renderer,
+    sun,
     stats: () => summarize(ring.values(), counters, dpr),
     sample(ms) {
       const times: number[] = []
@@ -136,4 +140,15 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
       logger.info("disposed")
     },
   }
+}
+
+/**
+ * Where the world `point` lands on the stage's canvas, in CSS pixels from its top left; null when it
+ * is behind the camera. For DOM labels that follow the scene.
+ */
+export function toScreen(stage: Stage, point: [number, number, number]): [number, number] | null {
+  const ndc = new Vector3(...point).project(stage.camera)
+  if (ndc.z > 1) return null
+  const canvas = stage.renderer.domElement
+  return [((ndc.x + 1) / 2) * canvas.clientWidth, ((1 - ndc.y) / 2) * canvas.clientHeight]
 }

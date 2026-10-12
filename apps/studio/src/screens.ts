@@ -1,4 +1,5 @@
 import type { Stage } from "@guildhall/render"
+import { lineup } from "./lineup/index.ts"
 import { m0 } from "./m0/index.ts"
 
 /** What the shell hands a screen when it mounts it. */
@@ -19,7 +20,7 @@ export interface Screen {
 }
 
 /** Every screen the studio can open with `?screen=<id>`. New screens register here, one line each. */
-export const SCREENS: readonly Screen[] = [m0]
+export const SCREENS: readonly Screen[] = [m0, lineup]
 
 export const DEFAULT_SCREEN = "m0"
 

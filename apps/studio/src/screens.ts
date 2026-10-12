@@ -5,6 +5,7 @@ import { grip } from "./grips/editor/index.ts"
 import { grips } from "./grips/matrix/index.ts"
 import { lineup } from "./lineup/index.ts"
 import { m0 } from "./m0/index.ts"
+import { npc } from "./npcs/index.tsx"
 import { palette } from "./palette/index.ts"
 import { scale } from "./scenes/scale.ts"
 import { shadows } from "./shadows/index.ts"
@@ -39,6 +40,7 @@ export const SCREENS: readonly Screen[] = [
   siteScreen,
   grip,
   grips,
+  npc,
 ]
 
 export const DEFAULT_SCREEN = "pieces"

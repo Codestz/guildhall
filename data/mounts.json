@@ -309,18 +309,6 @@
         1,
         0
       ],
-      "edge": [
-        1,
-        0,
-        0
-      ],
-      "handle": [
-        0,
-        -0.15,
-        0
-      ],
-      "hands": 1,
-      "slot": "hand.r",
       "clips": {
         "Sit_Chair_Idle": {
           "hide": true
@@ -334,7 +322,19 @@
         "Walking_C": {
           "hide": true
         }
-      }
+      },
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.15,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.r"
     },
     "kaykit-adventurers/wand": {
       "axis": [
@@ -738,11 +738,11 @@
         ]
       }
     },
-    "kaykit-weapons/sword-a": {
+    "kaykit-weapons/staff-a": {
       "axis": [
         0,
-        1,
-        0
+        0.574,
+        -0.819
       ],
       "edge": [
         1,
@@ -751,11 +751,19 @@
       ],
       "handle": [
         0,
-        -0.15,
+        -0.8,
         0
       ],
       "hands": 1,
-      "slot": "hand.r",
+      "scale": 1.3,
+      "slot": "hand.r"
+    },
+    "kaykit-weapons/sword-a": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
       "clips": {
         "Sit_Chair_Idle": {
           "hide": true
@@ -769,7 +777,19 @@
         "Walking_C": {
           "hide": true
         }
-      }
+      },
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.15,
+        0
+      ],
+      "hands": 1,
+      "slot": "hand.r"
     },
     "kenney-survival/tool-hoe": {
       "axis": [

@@ -1,6 +1,5 @@
 export {
   type DistrictBuilding,
-  type DistrictGate,
   type DistrictStreet,
   districtGround,
   type TerraDistricts,

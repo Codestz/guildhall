@@ -40,6 +40,10 @@ export function terraLandmarks(
   plan: TerraPlan,
   used: Uint8Array,
   prefabs: readonly PrefabMeta[],
+  /** Only these kinds (the castle goes first, before the town spreads); all when left out. */
+  only?: readonly LandmarkKind[],
+  /** Landmarks already standing, kept clear of. */
+  before: readonly TerraLandmark[] = [],
 ): TerraLandmark[] {
   const { w, h, cell, origin, water, slope, terraceLevel, coastDist, height } = t
   const N = w * h
@@ -77,6 +81,7 @@ export function terraLandmarks(
   for (let i = 0; i < N; i++) if (water[i] === TERRA_WATER.lake) lakeArea++
 
   const out: TerraLandmark[] = []
+  const others = [...before]
   /** Whether the footprint of `m` centred at c, turned by rot, fits on one terrace of free, dry, gentle land. */
   const fits = (m: PrefabMeta, c: Vec2, rot: number, flat: number): number | null => {
     const lvl = terraceLevel[Math.max(0, cellAt(c))]!
@@ -94,7 +99,7 @@ export function terraLandmarks(
         if (terraceLevel[i] === TERRA_CRAG) return null
         y = Math.min(y, terraHeightAt(t, p[0], p[1]))
       }
-    if (out.some((o) => Math.hypot(o.at[0] - c[0], o.at[1] - c[1]) < 30)) return null
+    if ([...others, ...out].some((o) => Math.hypot(o.at[0] - c[0], o.at[1] - c[1]) < 30)) return null
     if (roadNear(c, Math.max(m.frontage, m.depth) / 2 + 2.5)) return null
     return y
   }
@@ -145,6 +150,7 @@ export function terraLandmarks(
     }
   }
   for (const L of LANDMARKS) {
+    if (only && !only.includes(L.kind)) continue
     const m = meta.get(L.prefab)
     if (!m) continue
     const ranked: [number, number][] = []

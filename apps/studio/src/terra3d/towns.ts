@@ -22,6 +22,9 @@ import * as data from "../data.ts"
 
 const logger = log("studio:terra-towns")
 
+/** Compiled variants per house recipe. */
+const VARIANTS = 6
+
 type Catalog = NonNullable<Awaited<ReturnType<typeof loadCatalog>>>
 
 export interface BuiltPlaces {
@@ -67,11 +70,25 @@ async function recipes(catalog: Catalog) {
 export async function buildPlaces(t: Terra, plan: TerraPlan, catalog: Catalog): Promise<BuiltPlaces> {
   const { all, compiled } = await recipes(catalog)
   const lib = prefabLibrary(all, catalog)
-  const d = terraDistricts(t, plan, lib.prefabs)
+  // the castle takes its hill before the town spreads
+  const reserved = new Uint8Array(t.w * t.h)
+  const castle = terraLandmarks(t, plan, reserved, lib.prefabs, ["castle"])
+  const d = terraDistricts(t, plan, lib.prefabs, reserved)
   const clusters: BatchCluster[] = []
+  const byId = new Map(all.map((r) => [r.id, r]))
   for (const b of d.buildings) {
-    const key = compiled.has(recipeKey(b.prefab, b.seed)) ? recipeKey(b.prefab, b.seed) : b.prefab
-    const recipe = compiled.get(key)
+    // a few variants per recipe (roof and wall colours, details), so neighbours differ
+    const v = b.seed % VARIANTS
+    const key = recipeKey(b.prefab, v)
+    if (!compiled.has(key)) {
+      const r = byId.get(b.prefab)
+      try {
+        if (r) compiled.set(key, compilePrefab(r, v, catalog).recipe)
+      } catch (error) {
+        logger.warn("variant skipped", { key, error: String(error) })
+      }
+    }
+    const recipe = compiled.get(key) ?? compiled.get(b.prefab)
     if (!recipe) continue
     clusters.push({
       key,
@@ -90,22 +107,20 @@ export async function buildPlaces(t: Terra, plan: TerraPlan, catalog: Catalog): 
     ...d.streets.filter((s) => s.paved).map((s) => ({ line: s.line as [number, number][], half: s.half })),
     ...d.squares.map((sq) => ({ line: [...sq, sq[0]!] as [number, number][], half: 0 })),
   ]
-  // a gatehouse: the gate over the road, two wall lengths and a tower either side
   const pieces: BatchInstance[] = []
-  for (const g of d.gates) {
-    const ax = Math.cos(g.rot)
-    const az = -Math.sin(g.rot)
-    const put = (piece: string, off: number) =>
-      pieces.push({ piece, x: g.at[0] + ax * off, y: g.y - 0.1, z: g.at[1] + az * off, rot: g.rot, scale: 1 })
-    put("quaternius-castle/wall-entrance", 0)
-    for (const side of [-1, 1]) {
-      put("quaternius-castle/wall", side * 3.88)
-      put("quaternius-castle/wall", side * 7.76)
-      put("quaternius-castle/tower", side * 10.6)
-    }
-  }
   const ground = districtGround(t, d)
-  const landmarks = terraLandmarks(t, plan, ground, lib.prefabs)
+  for (let i = 0; i < ground.length; i++) if (reserved[i]) ground[i] = 1
+  const landmarks = [
+    ...castle,
+    ...terraLandmarks(
+      t,
+      plan,
+      ground,
+      lib.prefabs,
+      ["watermill", "windmill", "lighthouse", "ruins", "campsite"],
+      castle,
+    ),
+  ]
   for (const l of landmarks) {
     const recipe = compiled.get(l.prefab)
     if (recipe)

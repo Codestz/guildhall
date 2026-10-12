@@ -4,12 +4,16 @@
  * dressed, then the pieces streamed in, each stage drawn before the next loads: the houses as LOD
  * clusters, the walls and props added to their batch, the plants as clusters in a second batch (a
  * batch only takes clusters when it is made). A newer town abandons an older build between stages.
- * The light keeps its hour across towns.
+ * The light keeps its hour across towns; the lamps and lit windows (render's night) and the drifting
+ * clouds (its atmosphere) come with the sky.
  */
 import type { Catalog } from "@guildhall/assets"
 import { log } from "@guildhall/core"
 import {
+  type Atmosphere,
+  createAtmosphere,
   createGround,
+  createNight,
   createSky,
   createStaticBatch,
   createSun,
@@ -17,6 +21,7 @@ import {
   type Ground,
   type LodCounts,
   loadPiece,
+  type Night,
   type Sky,
   type Stage,
   type StaticBatch,
@@ -75,6 +80,8 @@ export function createTownScene(stage: Stage, catalog: Catalog, initialHour: num
   let sky: Sky | null = null
   let ground: Ground | null = null
   let water: Water | null = null
+  let night: Night | null = null
+  let atmosphere: Atmosphere | null = null
   /** The town (houses, then walls and props added) and the plants: one draw each per pass. */
   let town: StaticBatch | null = null
   let plants: StaticBatch | null = null
@@ -88,6 +95,10 @@ export function createTownScene(stage: Stage, catalog: Catalog, initialHour: num
   }
 
   const clear = () => {
+    atmosphere?.dispose()
+    night?.dispose()
+    atmosphere = null
+    night = null
     town?.dispose()
     plants?.dispose()
     ground?.dispose()
@@ -112,7 +123,17 @@ export function createTownScene(stage: Stage, catalog: Catalog, initialHour: num
       const t = SHADOW_REACH * normalizeSpec(layout.spec).radius
       const light = createSun(stage, { town: { min: [-t, 0, -t], max: [t, CEILING, t] } })
       sun = light
-      sky = createSky(stage, { hour, sun: light, reach: 0.9 * sheet(layout).half })
+      const daylight = createSky(stage, { hour, sun: light, reach: 0.9 * sheet(layout).half })
+      sky = daylight
+      // The lamps and lit windows follow the hour (night moves the sky); clouds drift over the island.
+      night = createNight(stage, dressed.lights, { sky: daylight, hour })
+      const radius = normalizeSpec(layout.spec).radius
+      atmosphere = createAtmosphere(stage, {
+        light: () => daylight.light(),
+        centre: [0, 0],
+        reach: 2.4 * radius,
+        seed: layout.spec.seed,
+      })
       const t0 = performance.now()
       ground = createGround(stage, job.ground)
       water = createWater(stage, job.water)
@@ -166,7 +187,8 @@ export function createTownScene(stage: Stage, catalog: Catalog, initialHour: num
     },
     setHour(next) {
       hour = next
-      sky?.setHour(next)
+      if (night) night.setHour(next)
+      else sky?.setHour(next)
     },
     lod: () => sumLod(town?.lod ?? NO_LOD, plants?.lod ?? NO_LOD),
     dispose() {

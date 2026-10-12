@@ -11,6 +11,7 @@ import { PALETTE, srgbToLinear } from "@guildhall/assets"
 import { roll } from "@guildhall/core"
 import { bbox, contains } from "../geom/poly.ts"
 import type { Vec2 } from "../geom/vec.ts"
+import type { GroundTint } from "./nature-field.ts"
 import type { TownDraw } from "./types.ts"
 
 export type GroundDraw = TownDraw["ground"]
@@ -72,7 +73,9 @@ export function stampSegment(g: Grid, out: Float32Array, a: Vec2, b: Vec2, reach
     for (let i = i0; i <= i1; i++) {
       const px = g.x0 + i * g.step
       const t = l2 === 0 ? 0 : clamp01(((px - a[0]) * dx + (pz - a[1]) * dz) / l2)
-      const d = Math.hypot(a[0] + t * dx - px, a[1] + t * dz - pz)
+      const ex = a[0] + t * dx - px
+      const ez = a[1] + t * dz - pz
+      const d = Math.sqrt(ex * ex + ez * ez)
       const k = j * (g.nx + 1) + i
       if (d < (out[k] as number)) out[k] = d
     }
@@ -144,29 +147,105 @@ function noise(seed: number, salt: string, cell: number): (x: number, z: number)
     }
     return v
   }
+  // The last lattice cell's corners: the grid walks in rows, so most lookups land in the same cell.
+  let ci = Number.NaN
+  let cj = Number.NaN
+  let a = 0
+  let b = 0
+  let c = 0
+  let d = 0
   return (x, z) => {
     const fx = x / cell
     const fz = z / cell
     const i = Math.floor(fx)
     const j = Math.floor(fz)
+    if (i !== ci || j !== cj) {
+      ci = i
+      cj = j
+      a = at(i, j)
+      b = at(i + 1, j)
+      c = at(i, j + 1)
+      d = at(i + 1, j + 1)
+    }
     const u = smoothstep(0, 1, fx - i)
     const v = smoothstep(0, 1, fz - j)
-    const a = at(i, j)
-    const b = at(i + 1, j)
-    const c = at(i, j + 1)
     const top = a + (b - a) * u
-    const bottom = c + (at(i + 1, j + 1) - c) * u
+    const bottom = c + (d - c) * u
     return top + (bottom - top) * v
   }
 }
 
+/** Where nature's field says the grass is shaded, light, dry or worn (nature-field.ts `groundTint`). */
+export type Tint = (x: number, z: number) => GroundTint
+
+/** How far each tint pulls the grass toward its swatch at full strength. */
+export const TINT = { light: 0.6, dry: 0.65, shade: 0.8, worn: 0.7 } as const
+
+/** The grass tint's lattice pitch, metres: woods, meadows and wear vary over tens of metres. */
+const TINT_CELL = 8
+
+/**
+ * A tint looked up once per TINT_CELL lattice point and blended between them, into `out` (the last
+ * cell's corners kept: the grid walks in rows).
+ */
+function lattice(tint: Tint): (x: number, z: number, out: GroundTint) => GroundTint {
+  const cache = new Map<number, GroundTint>()
+  const at = (i: number, j: number) => {
+    const key = i * 262144 + j
+    let v = cache.get(key)
+    if (!v) {
+      v = tint(i * TINT_CELL, j * TINT_CELL)
+      cache.set(key, v)
+    }
+    return v
+  }
+  let ci = Number.NaN
+  let cj = Number.NaN
+  let a = at(0, 0)
+  let b = a
+  let c = a
+  let d = a
+  return (x, z, out) => {
+    const fx = x / TINT_CELL
+    const fz = z / TINT_CELL
+    const i = Math.floor(fx)
+    const j = Math.floor(fz)
+    if (i !== ci || j !== cj) {
+      ci = i
+      cj = j
+      a = at(i, j)
+      b = at(i + 1, j)
+      c = at(i, j + 1)
+      d = at(i + 1, j + 1)
+    }
+    const u = fx - i
+    const v = fz - j
+    const w00 = (1 - u) * (1 - v)
+    const w10 = u * (1 - v)
+    const w01 = (1 - u) * v
+    const w11 = u * v
+    out.shade = a.shade * w00 + b.shade * w10 + c.shade * w01 + d.shade * w11
+    out.light = a.light * w00 + b.light * w10 + c.light * w01 + d.light * w11
+    out.dry = a.dry * w00 + b.dry * w10 + c.dry * w01 + d.dry * w11
+    out.worn = a.worn * w00 + b.worn * w10 + c.worn * w01 + d.worn * w11
+    return out
+  }
+}
+
 /** Each ground kind's colour at a point: palette ramps, gently varied. Fields are their base here. */
-function painter(seed: number) {
+function painter(seed: number, tint?: Tint) {
   const broad = noise(seed, "ground-broad", 23)
   const fine = noise(seed, "ground-fine", 4.5)
+  // The same lattices read elsewhere (swapped, scaled) get their own instance: each keeps its last cell.
+  const broadSwapped = noise(seed, "ground-broad", 23)
+  const leafy = noise(seed, "ground-fine", 4.5)
+  const tinted = tint ? lattice(tint) : null
+  const t: GroundTint = { shade: 0, light: 0, dry: 0, worn: 0 }
   const c = {
     grass: swatch("grass"),
+    grassDark: swatch("grass-dark"),
     grassLight: swatch("grass-light"),
+    dryGrass: swatch("dry-grass"),
     dry: swatch("dry-grass-light"),
     cobble: swatch("cobble-light"),
     cobbleDark: swatch("cobble"),
@@ -179,9 +258,17 @@ function painter(seed: number) {
   }
   return (kind: "grass" | OverlayKind, x: number, z: number, out: RGB): RGB => {
     switch (kind) {
-      case "grass":
+      case "grass": {
         mix(set(out, c.grass), c.grassLight, 0.35 + 0.5 * broad(x, z))
-        return mix(out, c.dry, 0.12 + 0.3 * smoothstep(0.5, 0.95, fine(x, z)) * broad(z, x))
+        mix(out, c.dry, 0.12 + 0.3 * smoothstep(0.5, 0.95, fine(x, z)) * broadSwapped(z, x))
+        if (!tinted) return out
+        // The ramps sit close: strong weights, so woods, meadows and worn verges read from the hero.
+        tinted(x, z, t)
+        mix(out, c.grassLight, TINT.light * t.light)
+        mix(out, c.dryGrass, TINT.dry * t.dry)
+        mix(out, c.grassDark, TINT.shade * t.shade)
+        return mix(out, c.dirt, TINT.worn * t.worn)
+      }
       case "cobble":
         return mix(mix(set(out, c.cobble), c.sandDark, 0.45), c.cobbleDark, 0.4 * fine(x, z))
       case "plaza":
@@ -191,7 +278,7 @@ function painter(seed: number) {
       case "sand":
         return mix(set(out, c.sand), c.sandDark, 0.5 * fine(x, z))
       case "garden":
-        return mix(set(out, c.dirtDark), c.leaf, 0.25 + 0.5 * smoothstep(0.4, 0.8, fine(x * 3, z * 3)))
+        return mix(set(out, c.dirtDark), c.leaf, 0.25 + 0.5 * smoothstep(0.4, 0.8, leafy(x * 3, z * 3)))
       case "field":
         return mix(set(out, c.dirt), c.dirtLight, 0.3 * broad(x, z))
     }
@@ -243,9 +330,10 @@ function rasterize(g: Grid, overlays: GroundDraw["overlays"]): Uint16Array {
 /**
  * The ground's geometry: the land (its holes cut out, its islets beside it) on the CELL grid with
  * the overlays painted in as vertex colours, contact-darkened round the footprints and darker along
- * the coast; then the bank skirt down every coast segment, facing out of the land.
+ * the coast, the grass tinted where `tint` (nature's field) says; then the bank skirt down every coast
+ * segment, facing out of the land.
  */
-export function groundGeometry(gd: GroundDraw, seed = 0): GroundGeometry {
+export function groundGeometry(gd: GroundDraw, seed = 0, tint?: Tint): GroundGeometry {
   const rings = [gd.land, ...gd.holes, ...(gd.islets ?? [])].filter((r) => r.length >= 3)
   const pos = growable((n) => new Float32Array(n))
   const nor = growable((n) => new Float32Array(n))
@@ -321,7 +409,7 @@ export function groundGeometry(gd: GroundDraw, seed = 0): GroundGeometry {
   const mw = g.nx * SS
   const mh = g.nz * SS
   const s = CELL / SS
-  const paint = painter(seed)
+  const paint = painter(seed, tint)
   const darkGrass = swatch("grass-dark")
   const fields = gd.overlays.map((o) =>
     o.kind === "field" ? { c: Math.cos(rowAngle(o.poly)), s: Math.sin(rowAngle(o.poly)) } : null,

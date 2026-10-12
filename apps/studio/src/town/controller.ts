@@ -153,7 +153,7 @@ export function createTownController(
     if (disposed || wanted !== spec) return
     const genMs = performance.now() - t0
     publish({ busy: "dressing" })
-    const dressed = dress(job.layout, compiler)
+    const dressed = dress(job.layout, compiler, lib.job.town)
     const report = townMetrics(job.layout, {
       draw: dressed.draw,
       tris: (lib.job.town as { tris?: Record<string, number> }).tris,

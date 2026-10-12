@@ -152,6 +152,14 @@ describe("groundGeometry", () => {
     expect(length).toBeCloseTo(200, 0)
   })
 
+  test("tints the grass from nature's field: darker under woods, the streets left alone", () => {
+    const overlays: GroundDraw["overlays"] = [{ kind: "cobble", poly: square(6, -20, 12, 20) }]
+    const plain = groundGeometry(draw({ overlays }))
+    const shaded = groundGeometry(draw({ overlays }), 0, () => ({ shade: 1, light: 0, dry: 0, worn: 0 }))
+    expect(greenAt(shaded, 0, 15)).toBeLessThan(0.8 * greenAt(plain, 0, 15))
+    expect(greenAt(shaded, 9, 0)).toBeCloseTo(greenAt(plain, 9, 0), 6)
+  })
+
   test("is empty without land", () => {
     expect(groundGeometry(draw({ land: [], holes: [] })).index).toHaveLength(0)
   })

@@ -47,6 +47,8 @@ export {
   type GroundGeometry,
   groundGeometry,
   SKIRT_BOTTOM,
+  TINT,
+  type Tint,
 } from "./ground.ts"
 export { PLOT_KINDS, type Plot } from "./interiors.ts"
 export { type PlanLibrary, type PropKit, prefabLibrary } from "./library.ts"

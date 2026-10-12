@@ -1,5 +1,5 @@
 import { log } from "@guildhall/core"
-import { type GroundGeometry, groundGeometry, type TownDraw } from "@guildhall/world"
+import { type GroundGeometry, groundGeometry, type Tint, type TownDraw } from "@guildhall/world"
 import { BufferAttribute, BufferGeometry, Mesh } from "three"
 import { paletteMaterial } from "./material.ts"
 import type { Stage } from "./stage.ts"
@@ -21,10 +21,10 @@ export interface Ground {
 export function createGround(
   stage: Stage,
   g: GroundDraw | GroundGeometry,
-  opts: { seed?: number } = {},
+  opts: { seed?: number; tint?: Tint } = {},
 ): Ground {
   const start = performance.now()
-  const built = "position" in g ? g : groundGeometry(g, opts.seed ?? 0)
+  const built = "position" in g ? g : groundGeometry(g, opts.seed ?? 0, opts.tint)
   const geometry = new BufferGeometry()
   geometry.setAttribute("position", new BufferAttribute(built.position, 3))
   geometry.setAttribute("normal", new BufferAttribute(built.normal, 3))

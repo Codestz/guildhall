@@ -4,6 +4,7 @@ import { join } from "node:path"
 import type { PrefabRecipe } from "@guildhall/assets"
 import { poseToCamera } from "@guildhall/render"
 import { area, type TownDraw, type Vec2, validateTownSpec } from "@guildhall/world"
+import { CATALOG } from "../../../packages/world/test/town.fixture.ts"
 import { buildLibrary } from "../src/planner/library.ts"
 import { COMPASS } from "../src/planner/query.ts"
 import { href, resolve } from "../src/shell/router.ts"
@@ -157,6 +158,30 @@ describe("draw", () => {
     expect(home?.x).toBe(PLANT_CELL / 2)
   })
 
+  test("nature's plants cluster by their group, centred on them, each keeping its size and tone", () => {
+    const tree = (x: number, z: number, cluster: string) => ({
+      prefab: "tree",
+      seed: 0,
+      at: [x, z] as Vec2,
+      rot: 0,
+      scale: 1.3,
+      swatchMap: { 4: 5 },
+      cluster,
+    })
+    const clusters = plantClusters([
+      tree(0, 0, "wood1:0,0"),
+      tree(40, 0, "wood1:0,0"),
+      tree(2, 2, "wild:0,0"),
+    ])
+    expect(clusters.map((c) => c.key)).toEqual(["plants:wild:0,0", "plants:wood1:0,0"])
+    const wood = clusters[1]
+    expect([wood?.x, wood?.z]).toEqual([20, 0])
+    expect(wood?.parts.map((p) => [p.x, p.scale, p.swatchMap])).toEqual([
+      [-20, 1.3, { 4: 5 }],
+      [20, 1.3, { 4: 5 }],
+    ])
+  })
+
   test("the sea: bands round the bounds that do not overlap; the shore stays the land's", () => {
     const shore = [[[50, 0] as Vec2, [50, 100] as Vec2]]
     const water: TownDraw["water"] = { polys: [square(0, 0, 50, 100)], level: -0.6, shore }
@@ -170,7 +195,7 @@ describe("draw", () => {
 })
 
 describe("the worker's job", () => {
-  const job = runTownJob({ seed: 2, tier: "town" }, buildLibrary(RECIPES, null))
+  const job = runTownJob({ seed: 2, tier: "town" }, buildLibrary(RECIPES, CATALOG))
 
   test("carries the ground and water meshes, timed, every array handed over", () => {
     expect(job.ground.index.length).toBeGreaterThan(0)

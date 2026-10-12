@@ -4,10 +4,13 @@
  * (with open sea round the site) as typed arrays render only uploads. Everything returned is plain
  * data. Pure.
  */
+import { roll } from "@guildhall/core"
 import {
   type GroundGeometry,
   generateTown,
   groundGeometry,
+  natureField,
+  normalizeSpec,
   type TownDraw,
   type TownLayout,
   type TownSpecInput,
@@ -92,7 +95,10 @@ export function runTownJob(
   const prefabs = new Set(lib.town.prefabs.map((p) => p.id))
   t0 = now()
   const draw = townGround(layout, (p) => prefabs.has(p.prefab))
-  const ground = groundGeometry(draw, layout.spec.seed)
+  // The grass tinted by the very field nature planted from: shade under woods, wear along the roads.
+  const seed = normalizeSpec(layout.spec).seed
+  const field = natureField(layout, (salt) => roll(seed, `${salt}:nature`))
+  const ground = groundGeometry(draw, seed, (x, z) => field.groundTint(x, z))
   lap("ground", t0)
   t0 = now()
   const water = waterGeometry(withSea(townWater(layout, draw), layout.bounds))

@@ -3,7 +3,8 @@
  * stepping seeds re-compiles only what is new), the layout dressed (the metrics' draw
  * list), and its pieces cut into what the static batch streams in, in order: the buildings as LOD
  * clusters (one per house, keyed by recipe and seed, so houses alike share a far shell), then walls,
- * fences and props as loose pieces, then the plants clustered by grid cell.
+ * fences, props and the lamps as loose pieces, then the plants clustered (by wood, else grid cell); and
+ * the town's lights for the night.
  */
 import { type Catalog, compilePrefab, type PrefabRecipe, type Recipe } from "@guildhall/assets"
 import { log } from "@guildhall/core"
@@ -15,6 +16,10 @@ import {
   recipeKey,
   type TownDraw,
   type TownLayout,
+  type TownLibrary,
+  type TownLights,
+  townLights,
+  type Vec2,
 } from "@guildhall/world"
 
 const logger = log("studio:town")
@@ -25,6 +30,8 @@ const CACHE = 4000
 export interface Dressed {
   /** The whole town as dressTown draws it (the metrics count its pieces; the worker builds the ground and water). */
   draw: TownDraw
+  /** The lamps (their posts are among the loose pieces), their light points and the lit windows. */
+  lights: TownLights
   /** The same pieces as the batch takes them: houses, loose pieces (edges, props), plants. */
   houses: BatchCluster[]
   loose: BatchInstance[]
@@ -73,43 +80,58 @@ export type Compiler = ReturnType<typeof createCompiler>
 export const PLANT_CELL = 16
 
 /**
- * Plants as clusters, one per PLANT_CELL grid cell they stand in (a field's rows, a stretch of wood):
- * each cluster sits at its cell's centre with its plants as parts around it, keyed by its cell.
+ * Plants as clusters: those nature grouped (`cluster`: a wood's or the wild's cell) one per group,
+ * centred on its plants' mean; the rest (a field's rows, an orchard) one per PLANT_CELL grid cell they
+ * stand in, at the cell's centre. Each plant keeps its size and tone (`scale`, `swatchMap`).
  */
 export function plantClusters(plants: readonly Placement[]): BatchCluster[] {
-  const cells = new Map<string, { i: number; j: number; parts: BatchInstance[] }>()
+  const groups = new Map<string, { centre: Vec2 | null; members: Placement[] }>()
   for (const p of plants) {
     const i = Math.floor(p.at[0] / PLANT_CELL)
     const j = Math.floor(p.at[1] / PLANT_CELL)
-    const key = `plants:${i},${j}`
-    let cell = cells.get(key)
-    if (!cell) {
-      cell = { i, j, parts: [] }
-      cells.set(key, cell)
+    const key = p.cluster ? `plants:${p.cluster}` : `plants:${i},${j}`
+    let group = groups.get(key)
+    if (!group) {
+      group = { centre: p.cluster ? null : [(i + 0.5) * PLANT_CELL, (j + 0.5) * PLANT_CELL], members: [] }
+      groups.set(key, group)
     }
-    const cx = (i + 0.5) * PLANT_CELL
-    const cz = (j + 0.5) * PLANT_CELL
-    cell.parts.push({ piece: p.prefab, x: p.at[0] - cx, y: 0, z: p.at[1] - cz, rot: p.rot, scale: 1 })
+    group.members.push(p)
   }
-  return [...cells.entries()]
+  return [...groups.entries()]
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([key, c]) => ({
-      key,
-      parts: c.parts,
-      x: (c.i + 0.5) * PLANT_CELL,
-      y: 0,
-      z: (c.j + 0.5) * PLANT_CELL,
-      rot: 0,
-      scale: 1,
-    }))
+    .map(([key, g]) => {
+      const n = g.members.length
+      const [x, z] = g.centre ?? [
+        g.members.reduce((s, p) => s + p.at[0], 0) / n,
+        g.members.reduce((s, p) => s + p.at[1], 0) / n,
+      ]
+      const parts = g.members.map(
+        (p): BatchInstance => ({
+          piece: p.prefab,
+          x: p.at[0] - x,
+          y: 0,
+          z: p.at[1] - z,
+          rot: p.rot,
+          scale: p.scale ?? 1,
+          ...(p.swatchMap ? { swatchMap: p.swatchMap } : {}),
+        }),
+      )
+      return { key, parts, x, y: 0, z, rot: 0, scale: 1 }
+    })
 }
 
 /** Compiles, dresses and clusters a layout. */
-export function dress(layout: TownLayout, compiler: Compiler, now = () => performance.now()): Dressed {
+export function dress(
+  layout: TownLayout,
+  compiler: Compiler,
+  lib: Pick<TownLibrary, "prefabs">,
+  now = () => performance.now(),
+): Dressed {
   const t0 = now()
   const { compiled, misses } = compiler.compile(layout)
   const t1 = now()
   const draw = dressTown(layout, compiled)
+  const lights = townLights(layout, compiled, lib)
   const houses: BatchCluster[] = []
   const rest: Placement[] = []
   const plants: Placement[] = [...layout.nature]
@@ -121,11 +143,15 @@ export function dress(layout: TownLayout, compiler: Compiler, now = () => perfor
     else if (PLANT_ROLES.has(p.role ?? "")) plants.push(p)
     else rest.push(p)
   }
-  // Edges and the uncompiled placements, laid out exactly as the full draw lays them out.
-  const loose = dressTown({ ...layout, placements: rest, nature: [] }, new Map()).pieces
+  // Edges and the uncompiled placements, laid out exactly as the full draw lays them out; the lamps.
+  const loose = [
+    ...dressTown({ ...layout, placements: rest, nature: [] }, new Map()).pieces,
+    ...lights.pieces,
+  ]
   const t2 = now()
   return {
     draw,
+    lights,
     houses,
     loose,
     plants: plantClusters(plants),

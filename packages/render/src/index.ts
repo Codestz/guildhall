@@ -1,4 +1,7 @@
 export { cameraToPose, poseToCamera } from "./camera.ts"
+export { type Character, createCharacter, loadCharacter, type PlayOpts } from "./character/load.ts"
+export { attachMount, detachMount, type Mounted, mountClip, mountPose } from "./character/mount.ts"
+export { keepUpright } from "./character/upright.ts"
 export { createGizmo, type Gizmo, type GizmoMode, type GizmoOpts, type GizmoPose } from "./gizmo.ts"
 export { createGrid, type Disposable } from "./grid.ts"
 export { disposeObject, heroSilhouette, testBox } from "./hero.ts"

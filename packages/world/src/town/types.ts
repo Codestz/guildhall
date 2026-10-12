@@ -170,6 +170,12 @@ export interface Placement {
   rot: number
   lot?: number
   role?: string
+  /** Uniform size (nature: a tree's age, a vignette's size); 1 when absent. */
+  scale?: number
+  /** Palette swatch id → swatch id, a tone shift for this one (nature: lighter or darker foliage). */
+  swatchMap?: Record<number, number>
+  /** The LOD group it belongs to (nature: a wood's or the wild's grid cell), drawn as one far shell. */
+  cluster?: string
 }
 
 export interface Edge {

@@ -54,7 +54,8 @@ describe("directory", () => {
     const ids = openable().map((p) => p.tool.id)
     expect(ids[0]).toBe(HOME_ID)
     expect(ids).toContain("npc")
-    expect(ids).not.toContain("town")
+    expect(ids).toContain("town")
+    expect(openable().every((p) => !p.tool.soon)).toBe(true)
   })
 
   test("placeOf gives the group, none for home, null for an unknown id", () => {

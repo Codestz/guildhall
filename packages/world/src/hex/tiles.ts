@@ -67,7 +67,7 @@ export interface TilePrefab {
   /** What people walk round (props on the tile): discs in tile space. */
   blockers?: TileBlocker[]
   /**
-   * Proposed, not yet honoured by placement: the neighbouring tiles this prefab also covers, as tile
+   * The neighbouring tiles this prefab also covers (world.ts claims them, or falls back to one tile), as tile
    * sides (`TILE_SIDES`: 4 is the front, toward the street), for a scene too big for one hex (a tavern
    * with its beer garden, an archery range). Its pieces, spots and blockers may stand over those tiles;
    * `worldSide` says which neighbour a side is once the tile is turned.

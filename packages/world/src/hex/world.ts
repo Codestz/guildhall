@@ -91,7 +91,7 @@ export interface HexWorld {
 const BUILDS: Record<string, string[]> = {
   town: ["house", "townhouse", "cottage", "house", "townhouse", "tavern", "smithy", "market"],
   harbour: ["storehouse", "house", "warehouse", "cottage", "tavern", "boathouse"],
-  castle: ["barracks"],
+  castle: ["castle-ward", "castle-yard", "barracks"],
   farm: ["farmstead", "cottage"],
   fishing: ["cottage", "cottage", "house"],
   mine: ["cottage", "smithy", "warehouse", "homestead", "house"],

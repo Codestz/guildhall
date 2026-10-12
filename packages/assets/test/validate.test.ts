@@ -74,10 +74,11 @@ describe("validateEntry", () => {
       "town/wall-door: swatches: expected sorted, distinct ids",
     ])
     expect(validateEntry({ ...ok, swatches: [1, 1] })).toHaveLength(1)
-    expect(validateEntry({ ...ok, swatches: [1, 48, 99] }, palette)).toEqual([
-      "town/wall-door: swatches: not in the palette: 48, 99",
+    const past = palette.swatches.length
+    expect(validateEntry({ ...ok, swatches: [1, past, past + 1] }, palette)).toEqual([
+      `town/wall-door: swatches: not in the palette: ${past}, ${past + 1}`,
     ])
-    expect(validateEntry({ ...ok, swatches: [1, 48] })).toEqual([])
+    expect(validateEntry({ ...ok, swatches: [1, past] })).toEqual([])
   })
 
   test("checks the scale block", () => {

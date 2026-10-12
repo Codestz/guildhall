@@ -30,8 +30,8 @@ const SHIPPED = [
 ]
 
 describe("palette.json", () => {
-  test("is marked PLACEHOLDER", () => {
-    expect(palette.status).toStartWith("PLACEHOLDER")
+  test("is marked DRAFT", () => {
+    expect(palette.status).toStartWith("DRAFT")
   })
 
   test("is append-only: every shipped swatch keeps its id and name", () => {
@@ -39,9 +39,10 @@ describe("palette.json", () => {
     expect(palette.swatches.slice(0, SHIPPED.length).map((s) => s.name)).toEqual(SHIPPED)
   })
 
-  test("is 16 ramps of dark/base/light", () => {
-    expect(palette.swatches).toHaveLength(48)
-    expect(palette.ramps).toHaveLength(16)
+  test("is 16 to 22 ramps of dark/base/light", () => {
+    expect(palette.ramps.length).toBeGreaterThanOrEqual(16)
+    expect(palette.ramps.length).toBeLessThanOrEqual(22)
+    expect(palette.swatches).toHaveLength(palette.ramps.length * TONES.length)
   })
 
   test("each ramp gets lighter from dark to light (OKLab L)", () => {
@@ -61,7 +62,7 @@ describe("loadPalette", () => {
   test("indexes swatches by id and carries sRGB and OKLab", () => {
     const grass = palette.swatches[1]!
     expect(grass.name).toBe("grass")
-    expect(grass.srgb[0]).toBeCloseTo(0x6b / 255, 6)
+    expect(grass.srgb[0]).toBeCloseTo(Number.parseInt(grass.hex.slice(1, 3), 16) / 255, 6)
     expect(grass.lab[0]).toBeGreaterThan(0)
   })
 

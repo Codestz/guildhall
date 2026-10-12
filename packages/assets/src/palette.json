@@ -1,15 +1,36 @@
 {
   "version": 1,
-  "status": "PLACEHOLDER: hand-seeded near KayKit's look (mid saturation, mid brightness), not yet chosen by the user (plan Q3). Tune hex values freely; append new swatches at the end, never reorder or delete (ADR 003). Biomes swap whole ramps, tone for tone.",
+  "status": "DRAFT — user tunes in Studio",
   "groups": ["ground", "stone", "timber", "roof", "foliage", "water", "metal", "accent"],
   "swatches": [
-    { "id": 0, "name": "grass-dark", "hex": "#4f7a3a", "group": "ground", "ramp": "grass", "tone": "dark" },
-    { "id": 1, "name": "grass", "hex": "#6b9a45", "group": "ground", "ramp": "grass", "tone": "base" },
-    { "id": 2, "name": "grass-light", "hex": "#8fbb5a", "group": "ground", "ramp": "grass", "tone": "light" },
+    {
+      "id": 0,
+      "name": "grass-dark",
+      "hex": "#2a8439",
+      "group": "ground",
+      "ramp": "grass",
+      "tone": "dark"
+    },
+    {
+      "id": 1,
+      "name": "grass",
+      "hex": "#61a93d",
+      "group": "ground",
+      "ramp": "grass",
+      "tone": "base"
+    },
+    {
+      "id": 2,
+      "name": "grass-light",
+      "hex": "#8fcd49",
+      "group": "ground",
+      "ramp": "grass",
+      "tone": "light"
+    },
     {
       "id": 3,
       "name": "dry-grass-dark",
-      "hex": "#86833f",
+      "hex": "#786914",
       "group": "ground",
       "ramp": "dry-grass",
       "tone": "dark"
@@ -17,7 +38,7 @@
     {
       "id": 4,
       "name": "dry-grass",
-      "hex": "#aca557",
+      "hex": "#a18c24",
       "group": "ground",
       "ramp": "dry-grass",
       "tone": "base"
@@ -25,29 +46,127 @@
     {
       "id": 5,
       "name": "dry-grass-light",
-      "hex": "#cdc47a",
+      "hex": "#c8b462",
       "group": "ground",
       "ramp": "dry-grass",
       "tone": "light"
     },
-    { "id": 6, "name": "dirt-dark", "hex": "#5e4632", "group": "ground", "ramp": "dirt", "tone": "dark" },
-    { "id": 7, "name": "dirt", "hex": "#7d5d42", "group": "ground", "ramp": "dirt", "tone": "base" },
-    { "id": 8, "name": "dirt-light", "hex": "#a07d5b", "group": "ground", "ramp": "dirt", "tone": "light" },
-    { "id": 9, "name": "sand-dark", "hex": "#b39868", "group": "ground", "ramp": "sand", "tone": "dark" },
-    { "id": 10, "name": "sand", "hex": "#d4bb86", "group": "ground", "ramp": "sand", "tone": "base" },
-    { "id": 11, "name": "sand-light", "hex": "#e8d9ac", "group": "ground", "ramp": "sand", "tone": "light" },
-    { "id": 12, "name": "snow-shadow", "hex": "#a9b8c9", "group": "ground", "ramp": "snow", "tone": "dark" },
-    { "id": 13, "name": "snow", "hex": "#dce5ee", "group": "ground", "ramp": "snow", "tone": "base" },
-    { "id": 14, "name": "snow-light", "hex": "#f5f8fb", "group": "ground", "ramp": "snow", "tone": "light" },
-    { "id": 15, "name": "stone-dark", "hex": "#5d6064", "group": "stone", "ramp": "stone", "tone": "dark" },
-    { "id": 16, "name": "stone-light", "hex": "#9b9a93", "group": "stone", "ramp": "stone", "tone": "base" },
-    { "id": 17, "name": "whitewash", "hex": "#e4ddcd", "group": "stone", "ramp": "stone", "tone": "light" },
-    { "id": 18, "name": "cobble-dark", "hex": "#59514a", "group": "stone", "ramp": "cobble", "tone": "dark" },
-    { "id": 19, "name": "cobble", "hex": "#7e756a", "group": "stone", "ramp": "cobble", "tone": "base" },
+    {
+      "id": 6,
+      "name": "dirt-dark",
+      "hex": "#5e4632",
+      "group": "ground",
+      "ramp": "dirt",
+      "tone": "dark"
+    },
+    {
+      "id": 7,
+      "name": "dirt",
+      "hex": "#7d5d42",
+      "group": "ground",
+      "ramp": "dirt",
+      "tone": "base"
+    },
+    {
+      "id": 8,
+      "name": "dirt-light",
+      "hex": "#a07d5b",
+      "group": "ground",
+      "ramp": "dirt",
+      "tone": "light"
+    },
+    {
+      "id": 9,
+      "name": "sand-dark",
+      "hex": "#b39868",
+      "group": "ground",
+      "ramp": "sand",
+      "tone": "dark"
+    },
+    {
+      "id": 10,
+      "name": "sand",
+      "hex": "#d4bb86",
+      "group": "ground",
+      "ramp": "sand",
+      "tone": "base"
+    },
+    {
+      "id": 11,
+      "name": "sand-light",
+      "hex": "#e8d9ac",
+      "group": "ground",
+      "ramp": "sand",
+      "tone": "light"
+    },
+    {
+      "id": 12,
+      "name": "snow-shadow",
+      "hex": "#a9b8c9",
+      "group": "ground",
+      "ramp": "snow",
+      "tone": "dark"
+    },
+    {
+      "id": 13,
+      "name": "snow",
+      "hex": "#dce5ee",
+      "group": "ground",
+      "ramp": "snow",
+      "tone": "base"
+    },
+    {
+      "id": 14,
+      "name": "snow-light",
+      "hex": "#f5f8fb",
+      "group": "ground",
+      "ramp": "snow",
+      "tone": "light"
+    },
+    {
+      "id": 15,
+      "name": "stone-dark",
+      "hex": "#596064",
+      "group": "stone",
+      "ramp": "stone",
+      "tone": "dark"
+    },
+    {
+      "id": 16,
+      "name": "stone-light",
+      "hex": "#7a8388",
+      "group": "stone",
+      "ramp": "stone",
+      "tone": "base"
+    },
+    {
+      "id": 17,
+      "name": "whitewash",
+      "hex": "#c4ced2",
+      "group": "stone",
+      "ramp": "stone",
+      "tone": "light"
+    },
+    {
+      "id": 18,
+      "name": "cobble-dark",
+      "hex": "#42494d",
+      "group": "stone",
+      "ramp": "cobble",
+      "tone": "dark"
+    },
+    {
+      "id": 19,
+      "name": "cobble",
+      "hex": "#697276",
+      "group": "stone",
+      "ramp": "cobble",
+      "tone": "base"
+    },
     {
       "id": 20,
       "name": "cobble-light",
-      "hex": "#a2998b",
+      "hex": "#95a0a6",
       "group": "stone",
       "ramp": "cobble",
       "tone": "light"
@@ -55,16 +174,23 @@
     {
       "id": 21,
       "name": "timber-dark",
-      "hex": "#4a3426",
+      "hex": "#5d3827",
       "group": "timber",
       "ramp": "timber",
       "tone": "dark"
     },
-    { "id": 22, "name": "timber", "hex": "#6e4c33", "group": "timber", "ramp": "timber", "tone": "base" },
+    {
+      "id": 22,
+      "name": "timber",
+      "hex": "#814f3c",
+      "group": "timber",
+      "ramp": "timber",
+      "tone": "base"
+    },
     {
       "id": 23,
       "name": "timber-light",
-      "hex": "#9a7049",
+      "hex": "#a86751",
       "group": "timber",
       "ramp": "timber",
       "tone": "light"
@@ -77,7 +203,14 @@
       "ramp": "thatch",
       "tone": "dark"
     },
-    { "id": 25, "name": "thatch", "hex": "#b6904e", "group": "timber", "ramp": "thatch", "tone": "base" },
+    {
+      "id": 25,
+      "name": "thatch",
+      "hex": "#b6904e",
+      "group": "timber",
+      "ramp": "thatch",
+      "tone": "base"
+    },
     {
       "id": 26,
       "name": "thatch-light",
@@ -110,12 +243,54 @@
       "ramp": "terracotta",
       "tone": "light"
     },
-    { "id": 30, "name": "slate-dark", "hex": "#3e4b5c", "group": "roof", "ramp": "slate", "tone": "dark" },
-    { "id": 31, "name": "slate", "hex": "#55677d", "group": "roof", "ramp": "slate", "tone": "base" },
-    { "id": 32, "name": "slate-light", "hex": "#7a8ca1", "group": "roof", "ramp": "slate", "tone": "light" },
-    { "id": 33, "name": "pine", "hex": "#2f5a45", "group": "foliage", "ramp": "leaf", "tone": "dark" },
-    { "id": 34, "name": "leaf", "hex": "#5a8f3e", "group": "foliage", "ramp": "leaf", "tone": "base" },
-    { "id": 35, "name": "moss", "hex": "#93a052", "group": "foliage", "ramp": "leaf", "tone": "light" },
+    {
+      "id": 30,
+      "name": "slate-dark",
+      "hex": "#5f6177",
+      "group": "roof",
+      "ramp": "slate",
+      "tone": "dark"
+    },
+    {
+      "id": 31,
+      "name": "slate",
+      "hex": "#7d819c",
+      "group": "roof",
+      "ramp": "slate",
+      "tone": "base"
+    },
+    {
+      "id": 32,
+      "name": "slate-light",
+      "hex": "#a7afd2",
+      "group": "roof",
+      "ramp": "slate",
+      "tone": "light"
+    },
+    {
+      "id": 33,
+      "name": "pine",
+      "hex": "#185b37",
+      "group": "foliage",
+      "ramp": "leaf",
+      "tone": "dark"
+    },
+    {
+      "id": 34,
+      "name": "leaf",
+      "hex": "#438e41",
+      "group": "foliage",
+      "ramp": "leaf",
+      "tone": "base"
+    },
+    {
+      "id": 35,
+      "name": "moss",
+      "hex": "#92aa54",
+      "group": "foliage",
+      "ramp": "leaf",
+      "tone": "light"
+    },
     {
       "id": 36,
       "name": "autumn-dark",
@@ -124,9 +299,30 @@
       "ramp": "autumn",
       "tone": "dark"
     },
-    { "id": 37, "name": "autumn", "hex": "#cf7a2e", "group": "foliage", "ramp": "autumn", "tone": "base" },
-    { "id": 38, "name": "blossom", "hex": "#e7a8b9", "group": "foliage", "ramp": "autumn", "tone": "light" },
-    { "id": 39, "name": "water-deep", "hex": "#2c5c87", "group": "water", "ramp": "water", "tone": "dark" },
+    {
+      "id": 37,
+      "name": "autumn",
+      "hex": "#c86732",
+      "group": "foliage",
+      "ramp": "autumn",
+      "tone": "base"
+    },
+    {
+      "id": 38,
+      "name": "blossom",
+      "hex": "#f19398",
+      "group": "foliage",
+      "ramp": "autumn",
+      "tone": "light"
+    },
+    {
+      "id": 39,
+      "name": "water-deep",
+      "hex": "#2c5c87",
+      "group": "water",
+      "ramp": "water",
+      "tone": "dark"
+    },
     {
       "id": 40,
       "name": "water-shallow",
@@ -135,18 +331,221 @@
       "ramp": "water",
       "tone": "base"
     },
-    { "id": 41, "name": "water-foam", "hex": "#cfe9ee", "group": "water", "ramp": "water", "tone": "light" },
-    { "id": 42, "name": "iron", "hex": "#4a4d52", "group": "metal", "ramp": "metal", "tone": "dark" },
-    { "id": 43, "name": "gold", "hex": "#d0a33a", "group": "metal", "ramp": "metal", "tone": "base" },
-    { "id": 44, "name": "glow", "hex": "#ffe08a", "group": "metal", "ramp": "metal", "tone": "light" },
-    { "id": 45, "name": "purple", "hex": "#5f4386", "group": "accent", "ramp": "accent", "tone": "dark" },
-    { "id": 46, "name": "royal-blue", "hex": "#3d5cab", "group": "accent", "ramp": "accent", "tone": "base" },
-    { "id": 47, "name": "banner-red", "hex": "#bf3c3c", "group": "accent", "ramp": "accent", "tone": "light" }
+    {
+      "id": 41,
+      "name": "water-foam",
+      "hex": "#cfe9ee",
+      "group": "water",
+      "ramp": "water",
+      "tone": "light"
+    },
+    {
+      "id": 42,
+      "name": "iron",
+      "hex": "#4a4d52",
+      "group": "metal",
+      "ramp": "metal",
+      "tone": "dark"
+    },
+    {
+      "id": 43,
+      "name": "gold",
+      "hex": "#d0a33a",
+      "group": "metal",
+      "ramp": "metal",
+      "tone": "base"
+    },
+    {
+      "id": 44,
+      "name": "glow",
+      "hex": "#ffe08a",
+      "group": "metal",
+      "ramp": "metal",
+      "tone": "light"
+    },
+    {
+      "id": 45,
+      "name": "purple",
+      "hex": "#5f4386",
+      "group": "accent",
+      "ramp": "accent",
+      "tone": "dark"
+    },
+    {
+      "id": 46,
+      "name": "royal-blue",
+      "hex": "#3d5cab",
+      "group": "accent",
+      "ramp": "accent",
+      "tone": "base"
+    },
+    {
+      "id": 47,
+      "name": "banner-red",
+      "hex": "#cc3333",
+      "group": "accent",
+      "ramp": "accent",
+      "tone": "light"
+    },
+    {
+      "id": 48,
+      "name": "teal-dark",
+      "hex": "#269573",
+      "group": "foliage",
+      "ramp": "teal",
+      "tone": "dark"
+    },
+    {
+      "id": 49,
+      "name": "teal",
+      "hex": "#43c09f",
+      "group": "foliage",
+      "ramp": "teal",
+      "tone": "base"
+    },
+    {
+      "id": 50,
+      "name": "teal-light",
+      "hex": "#72e9da",
+      "group": "foliage",
+      "ramp": "teal",
+      "tone": "light"
+    },
+    {
+      "id": 51,
+      "name": "sandstone-dark",
+      "hex": "#cb8f6a",
+      "group": "stone",
+      "ramp": "sandstone",
+      "tone": "dark"
+    },
+    {
+      "id": 52,
+      "name": "sandstone",
+      "hex": "#e2a983",
+      "group": "stone",
+      "ramp": "sandstone",
+      "tone": "base"
+    },
+    {
+      "id": 53,
+      "name": "sandstone-light",
+      "hex": "#f6c6a5",
+      "group": "stone",
+      "ramp": "sandstone",
+      "tone": "light"
+    },
+    {
+      "id": 54,
+      "name": "orange-dark",
+      "hex": "#de7b2e",
+      "group": "accent",
+      "ramp": "orange",
+      "tone": "dark"
+    },
+    {
+      "id": 55,
+      "name": "orange",
+      "hex": "#f79945",
+      "group": "accent",
+      "ramp": "orange",
+      "tone": "base"
+    },
+    {
+      "id": 56,
+      "name": "orange-light",
+      "hex": "#ffc474",
+      "group": "accent",
+      "ramp": "orange",
+      "tone": "light"
+    },
+    {
+      "id": 57,
+      "name": "roof-blue-dark",
+      "hex": "#246099",
+      "group": "roof",
+      "ramp": "roof-blue",
+      "tone": "dark"
+    },
+    {
+      "id": 58,
+      "name": "roof-blue",
+      "hex": "#2581bf",
+      "group": "roof",
+      "ramp": "roof-blue",
+      "tone": "base"
+    },
+    {
+      "id": 59,
+      "name": "roof-blue-light",
+      "hex": "#658ed7",
+      "group": "roof",
+      "ramp": "roof-blue",
+      "tone": "light"
+    },
+    {
+      "id": 60,
+      "name": "grey-dark",
+      "hex": "#4e4d49",
+      "group": "stone",
+      "ramp": "grey",
+      "tone": "dark"
+    },
+    {
+      "id": 61,
+      "name": "grey",
+      "hex": "#878682",
+      "group": "stone",
+      "ramp": "grey",
+      "tone": "base"
+    },
+    {
+      "id": 62,
+      "name": "grey-light",
+      "hex": "#bebeb9",
+      "group": "stone",
+      "ramp": "grey",
+      "tone": "light"
+    },
+    {
+      "id": 63,
+      "name": "sky-dark",
+      "hex": "#4895c1",
+      "group": "water",
+      "ramp": "sky",
+      "tone": "dark"
+    },
+    {
+      "id": 64,
+      "name": "sky",
+      "hex": "#64bae0",
+      "group": "water",
+      "ramp": "sky",
+      "tone": "base"
+    },
+    {
+      "id": 65,
+      "name": "sky-light",
+      "hex": "#82e0ff",
+      "group": "water",
+      "ramp": "sky",
+      "tone": "light"
+    }
   ],
   "biomes": {
     "temperate": {},
-    "autumn": { "leaf": "autumn", "grass": "dry-grass" },
-    "snow": { "grass": "snow", "dry-grass": "snow" },
-    "desert": { "grass": "sand", "dry-grass": "sand", "leaf": "dry-grass" }
+    "autumn": {
+      "leaf": "autumn",
+      "grass": "dry-grass"
+    },
+    "snow": {
+      "grass": "snow",
+      "dry-grass": "snow"
+    },
+    "desert": {
+      "grass": "sand",
+      "dry-grass": "sand",
+      "leaf": "dry-grass"
+    }
   }
 }

@@ -1,0 +1,12 @@
+{
+  "name": "@guildhall/palette",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@guildhall/assets": "workspace:*",
+    "@guildhall/core": "workspace:*",
+    "@guildhall/import": "workspace:*"
+  }
+}

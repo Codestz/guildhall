@@ -81,6 +81,16 @@
         "fbx2gltf": "0.9.7-p1",
       },
     },
+    "tools/palette": {
+      "name": "@guildhall/palette",
+      "version": "0.0.0",
+      "dependencies": {
+        "@gltf-transform/core": "^4.5.1",
+        "@guildhall/assets": "workspace:*",
+        "@guildhall/core": "workspace:*",
+        "@guildhall/import": "workspace:*",
+      },
+    },
     "tools/shots": {
       "name": "@guildhall/shots",
       "version": "0.0.0",
@@ -124,6 +134,8 @@
     "@guildhall/core": ["@guildhall/core@workspace:packages/core"],
 
     "@guildhall/import": ["@guildhall/import@workspace:tools/import"],
+
+    "@guildhall/palette": ["@guildhall/palette@workspace:tools/palette"],
 
     "@guildhall/render": ["@guildhall/render@workspace:packages/render"],
 

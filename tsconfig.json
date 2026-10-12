@@ -7,6 +7,7 @@
     { "path": "packages/ui" },
     { "path": "apps/studio" },
     { "path": "tools/import" },
-    { "path": "tools/shots" }
+    { "path": "tools/shots" },
+    { "path": "tools/palette" }
   ]
 }

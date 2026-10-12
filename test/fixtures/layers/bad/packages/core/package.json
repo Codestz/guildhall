@@ -1,0 +1,6 @@
+{
+  "name": "@guildhall/core",
+  "dependencies": {
+    "react": "*"
+  }
+}

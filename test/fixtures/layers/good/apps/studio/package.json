@@ -1,0 +1,8 @@
+{
+  "name": "@guildhall/studio",
+  "dependencies": {
+    "@guildhall/render": "workspace:*",
+    "@guildhall/ui": "workspace:*",
+    "react-dom": "*"
+  }
+}

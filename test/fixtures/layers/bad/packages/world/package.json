@@ -1,0 +1,6 @@
+{
+  "name": "@guildhall/world",
+  "dependencies": {
+    "@guildhall/sim": "workspace:*"
+  }
+}

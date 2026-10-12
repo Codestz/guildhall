@@ -1,0 +1,7 @@
+{
+  "name": "@guildhall/import",
+  "dependencies": {
+    "@guildhall/shots": "workspace:*",
+    "three": "*"
+  }
+}

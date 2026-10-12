@@ -1,0 +1,7 @@
+{
+  "name": "@guildhall/render",
+  "dependencies": {
+    "@guildhall/assets": "workspace:*",
+    "three": "*"
+  }
+}

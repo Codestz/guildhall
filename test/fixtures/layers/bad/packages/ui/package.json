@@ -1,0 +1,6 @@
+{
+  "name": "@guildhall/ui",
+  "dependencies": {
+    "@guildhall/core": "workspace:*"
+  }
+}

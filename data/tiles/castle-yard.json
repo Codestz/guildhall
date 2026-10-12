@@ -17,8 +17,8 @@
     },
     {
       "r": 0.3,
-      "x": -0.9,
-      "z": 0.4
+      "x": -1.55,
+      "z": -0.3
     }
   ],
   "ground": "paved",
@@ -51,8 +51,8 @@
       "piece": "kaykit-dungeon/barrel-small",
       "rot": 0,
       "scale": 0.5,
-      "x": -0.9,
-      "z": 0.4
+      "x": -1.55,
+      "z": -0.3
     }
   ],
   "spots": [

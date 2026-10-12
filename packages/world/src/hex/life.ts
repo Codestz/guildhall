@@ -22,7 +22,7 @@ import { hash2 } from "../geom/noise.ts"
 import { hexAt } from "./grid.ts"
 import { type HexIsland, kindOf } from "./island.ts"
 import { type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
-import { HEX_TILE_SIZE } from "./tiles.ts"
+import { HEX_TILE_SIZE, opensEvening, type SpotHours, spotWindows } from "./tiles.ts"
 import { clearWay, type HexWalk, type HexWalkNode } from "./walk.ts"
 import type { HexWorld } from "./world.ts"
 import { type HexZones, useOf, type ZoneKind } from "./zones.ts"
@@ -299,6 +299,18 @@ export function lifePose(steps: readonly LifeStep[], t: number, period: number):
   }
 }
 
+const BUILT = new Set<string>(["building", "farmstead", "homestead", "landmark"])
+const roadLike = (z: HexZones, i: number) => {
+  const u = useOf(z, i)
+  return u === "road" || u === "bridge" || u === "square"
+}
+const WATER_KINDS = new Set<string>(["sea", "shallows", "lake", "river"])
+/** Land a path may cross onto (no water, no bare rock). */
+const dry = (h: HexIsland, i: number) => {
+  const k = kindOf(h, i)
+  return !WATER_KINDS.has(k) && k !== "rock" && k !== "cliff"
+}
+
 /** The tiles people of a place work on that the roads do not reach (for hexWalk's `reach`). */
 export function workTiles(h: HexIsland, z: HexZones): number[] {
   const g = h.grid
@@ -312,6 +324,24 @@ export function workTiles(h: HexIsland, z: HexZones): number[] {
         if (kindOf(h, j) === "forest" && zone.kind === "lumber") out.add(j)
       }
     if (kinds.includes("farmer")) for (const f of fieldsNear(h, z, zone.tile, 4)) out.add(f)
+    // a place's tiles no street runs beside (a house up a lane, the castle's wards): a way out to them,
+    // so the seats and work on them are reached; a building's way ends on the open ground before it
+    for (const i of zone.tiles) {
+      const nb = g.neighbours(i)
+      if (nb.some((j) => j >= 0 && roadLike(z, j)) || roadLike(z, i)) continue
+      const u = useOf(z, i)
+      if (!BUILT.has(u)) {
+        if (dry(h, i)) out.add(i)
+        continue
+      }
+      // the open neighbour in front first (side 4, where an unturned building faces), then round
+      for (const d of [4, 3, 5, 2, 0, 1]) {
+        const j = nb[d]!
+        if (j < 0 || BUILT.has(useOf(z, j)) || !dry(h, j) || Math.abs(h.level[j]! - h.level[i]!) > 1) continue
+        out.add(j)
+        break
+      }
+    }
   }
   // the campsite on the nature lake's shore: campers and fishers walk out to it
   for (let i = 0; i < g.size; i++) if (useOf(z, i) === "campsite") out.add(i)
@@ -373,13 +403,17 @@ export interface LifePlaces {
   prefabOf(tile: number): string | undefined
 }
 
-/** Whether a spot open `hours` ([from, to), wrapping past midnight when to < from) is open all of [a, b]. */
-export function openFor(hours: readonly [number, number] | undefined, a: number, b: number): boolean {
+/**
+ * Whether a spot open `hours` (a window [from, to), wrapping past midnight when to < from, or several) is
+ * open all of [a, b] within one of its windows.
+ */
+export function openFor(hours: SpotHours | undefined, a: number, b: number): boolean {
   if (!hours) return true
-  const [s, e] = hours
-  const span = (((e - s) % 24) + 24) % 24 || 24
-  const into = (((a - s) % 24) + 24) % 24
-  return into + (b - a) <= span + 1e-9
+  return spotWindows(hours).some(([s, e]) => {
+    const span = (((e - s) % 24) + 24) % 24 || 24
+    const into = (((a - s) % 24) + 24) % 24
+    return into + (b - a) <= span + 1e-9
+  })
 }
 
 /** The places of an island: its furniture, slots and the reservation book (empty). */
@@ -393,21 +427,69 @@ export function lifePlaces(
   const furniture = tileFurniture(g, w)
   const tileOf = new Map(w.tiles.map((t) => [t.i, t]))
   const nodes = new Map<number, number>()
+  /** Whether the straight way from a node to a spot crosses water (a lake, a river, the sea) off its docks and bridges. */
+  const wet = (a: { x: number; z: number }, b: { x: number; z: number }): boolean => {
+    const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.5)
+    for (let k = 1; k < n; k++) {
+      const { q, r } = hexAt(
+        (a.x + ((b.x - a.x) * k) / n) / HEX_TILE_SIZE,
+        (a.z + ((b.z - a.z) * k) / n) / HEX_TILE_SIZE,
+      )
+      const i = g.index(q, r)
+      if (i < 0) return true
+      const u = useOf(z, i)
+      if (WATER_KINDS.has(kindOf(h, i)) && u !== "dock" && u !== "bridge") return true
+    }
+    return false
+  }
+  /** How many big blockers (a house, a well, a cart) the straight way from a node to a spot cuts through. */
+  const inTheWay = (a: { x: number; z: number }, b: { x: number; z: number }): number => {
+    const len = Math.hypot(b.x - a.x, b.z - a.z)
+    if (len < 1e-6) return 0
+    const ux = (b.x - a.x) / len
+    const uz = (b.z - a.z) / len
+    let n = 0
+    for (const d of furniture.near((a.x + b.x) / 2, (a.z + b.z) / 2, len / 2 + 1)) {
+      if (d.r < 0.6 || Math.hypot(b.x - d.x, b.z - d.z) < d.r || Math.hypot(a.x - d.x, a.z - d.z) < d.r)
+        continue
+      const t = (d.x - a.x) * ux + (d.z - a.z) * uz
+      if (t > 0 && t < len && Math.abs((d.x - a.x) * -uz + (d.z - a.z) * ux) < d.r) n++
+    }
+    return n
+  }
   const nodeOf = (spot: number): number => {
     let n = nodes.get(spot)
     if (n !== undefined) return n
     const s = furniture.spots[spot]!
-    // its tile's node or door; else the nearest of its neighbours'
+    // its tile's node or door; else the nearest node or door two tiles round it (or round the tile it
+    // stands over: a scene's spot out on its footprint), on that ground's level or a step off it
     n = walk.at(s.tile) >= 0 ? walk.at(s.tile) : walk.door(s.tile)
     if (n < 0) {
+      const { q, r } = hexAt(s.x / HEX_TILE_SIZE, s.z / HEX_TILE_SIZE)
+      const under = g.index(q, r)
+      const level = h.level[under >= 0 ? under : s.tile]!
+      const round = new Set<number>()
+      for (const i of [s.tile, under]) {
+        if (i < 0) continue
+        round.add(i)
+        for (const j of g.neighbours(i)) {
+          if (j < 0) continue
+          round.add(j)
+          for (const k of g.neighbours(j)) if (k >= 0) round.add(k)
+        }
+      }
       let best = Infinity
-      for (const j of g.neighbours(s.tile)) {
-        if (j < 0) continue
+      for (const j of round) {
+        if (Math.abs(h.level[j]! - level) > 1) continue
         for (const c of [walk.at(j), walk.door(j)]) {
           if (c < 0) continue
-          const d = Math.hypot(walk.nodes[c]!.x - s.x, walk.nodes[c]!.z - s.z)
-          if (d < best && d < HEX_TILE_SIZE * 2.2) {
-            best = d
+          const node = walk.nodes[c]!
+          const d = Math.hypot(node.x - s.x, node.z - s.z)
+          if (d >= HEX_TILE_SIZE * 2.6 || wet(node, s)) continue
+          // the nearest, a house or a well in the straight way counting as a few metres more
+          const cost = d + 2.5 * inTheWay(node, s)
+          if (cost < best - 1e-9) {
+            best = cost
             n = c
           }
         }
@@ -537,13 +619,17 @@ export function lifePlaces(
 /** Where someone goes for a break: home, a seat, a stall's customer side, a neighbour's door, a square, the tavern. */
 export type Outing = "home" | "sit" | "market" | "talk" | "square" | "tavern"
 
-/** Lunch, by weight: most eat out, spread over the place's seats, stalls and doorsteps; few at the well. */
+/**
+ * Lunch, by weight: most eat out, spread over the place's seats, stalls and doorsteps; few at the well;
+ * some at a canteen's garden (its seats open at noon too; a plain tavern's only in the evening).
+ */
 export const LUNCH: readonly [Outing, number][] = [
-  ["sit", 0.28],
-  ["market", 0.22],
-  ["square", 0.17],
-  ["talk", 0.15],
-  ["home", 0.18],
+  ["sit", 0.22],
+  ["market", 0.18],
+  ["tavern", 0.2],
+  ["square", 0.14],
+  ["talk", 0.12],
+  ["home", 0.14],
 ]
 /** The evening, by weight: the tavern's garden first, then benches, doorsteps, home. */
 export const EVENING: readonly [Outing, number][] = [
@@ -632,14 +718,15 @@ export function planFolk(
       out === "sit" ? ["sit"] : out === "talk" ? ["talk"] : out === "market" ? ["stand"] : ["sit", "talk"]
     const seen = new Set<number>()
     const found: number[] = []
-    for (const zj of around(zi, out === "tavern" ? TAVERN_REACH : OUT_REACH))
+    // the evening goes further for its tavern; a lunch break has no time to
+    for (const zj of around(zi, out === "tavern" && a >= 16 ? TAVERN_REACH : OUT_REACH))
       for (const k of places.free(zj, role, kinds, [a, b])) {
         if (seen.has(k)) continue
         seen.add(k)
         const s = spots[k]!
-        // the tavern's seats are the ones open only in the evening; the rest are any time's
-        const evening = !!s.hours && s.hours[0] >= 16
-        if ((out === "tavern") !== evening) continue
+        // a tavern's seats are the ones that open in the evening (a canteen's at lunch as well): a tavern
+        // outing goes only to them, any other outing never does
+        if ((out === "tavern") !== opensEvening(s.hours)) continue
         found.push(k)
       }
     if (!found.length) return undefined
@@ -704,7 +791,7 @@ export function planFolk(
       const indoors = homes.length > 0
       const work = spot !== undefined ? places.lifeSpot(spot) : (places.takeSlot(zi) ?? homeSpot)
       const workAct = spot !== undefined ? "work" : "idle"
-      const open = spot !== undefined ? spots[spot]!.hours : undefined
+      const open = spot !== undefined ? spotWindows(spots[spot]!.hours)[0] : undefined
       const lane = 0.25 + r(3) * 0.35
       const prop = work.prop
       /** Where an outing over [a, b] takes them (and whether indoors); the first of `order` that has room. */

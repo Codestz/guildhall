@@ -115,9 +115,25 @@ export interface TileSpot {
   roles?: string[]
   /** Ground height offset (a bench seat, a dock deck), metres. */
   y?: number
-  /** When the spot is used, day hours [from, to) (to < from wraps past midnight); any time when left out. */
-  hours?: [number, number]
+  /**
+   * When the spot is used, day hours [from, to) (to < from wraps past midnight), or several such windows
+   * (a canteen's seats at lunch and in the evening); any time when left out.
+   */
+  hours?: SpotHours
 }
+
+/** One opening window [from, to) in day hours, or a list of them. */
+export type SpotHours = [number, number] | [number, number][]
+
+/** A spot's opening windows as a list (none: open any time). */
+export function spotWindows(hours: SpotHours | undefined): [number, number][] {
+  if (!hours) return []
+  return typeof hours[0] === "number" ? [hours as [number, number]] : (hours as [number, number][])
+}
+
+/** Whether a spot's windows include an evening one (from five on): a drinking place's seats. */
+export const opensEvening = (hours: SpotHours | undefined): boolean =>
+  spotWindows(hours).some(([from]) => from >= 16)
 
 /** A disc nobody walks through (a cart, a stall, a well), tile space. */
 export interface TileBlocker {

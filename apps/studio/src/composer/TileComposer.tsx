@@ -9,6 +9,7 @@ import { log } from "@guildhall/core"
 import type { GizmoMode } from "@guildhall/render"
 import {
   SPOT_KINDS,
+  spotWindows,
   TILE_GROUNDS,
   type TileGround,
   type TilePrefab,
@@ -887,25 +888,50 @@ function Inspector({
               />
               {s.hours ? "only between" : "any time"}
             </label>
+            {spotWindows(s.hours).map(([from, to], w, all) => {
+              // one window is stored as [from, to], several as a list of them
+              const put = (next: [number, number][]) =>
+                set({ hours: next.length === 0 ? undefined : next.length === 1 ? next[0] : next })
+              const edit = (win: [number, number]) => put(all.map((x, k) => (k === w ? win : x)))
+              return (
+                // biome-ignore lint/suspicious/noArrayIndexKey: windows have no id; their order is the identity
+                <div className="gh-nums" key={w}>
+                  <NumberField
+                    label="from"
+                    value={from}
+                    step={0.5}
+                    min={0}
+                    max={24}
+                    onChange={(h) => edit([h, to])}
+                  />
+                  <NumberField
+                    label="to"
+                    value={to}
+                    step={0.5}
+                    min={0}
+                    max={24}
+                    onChange={(h) => edit([from, h])}
+                  />
+                  {all.length > 1 && (
+                    <button
+                      type="button"
+                      className="gh-toggle"
+                      onClick={() => put(all.filter((_, k) => k !== w))}
+                    >
+                      drop this window
+                    </button>
+                  )}
+                </div>
+              )
+            })}
             {s.hours && (
-              <div className="gh-nums">
-                <NumberField
-                  label="from"
-                  value={s.hours[0]}
-                  step={1}
-                  min={0}
-                  max={24}
-                  onChange={(h) => set({ hours: [h, s.hours![1]] })}
-                />
-                <NumberField
-                  label="to"
-                  value={s.hours[1]}
-                  step={1}
-                  min={0}
-                  max={24}
-                  onChange={(h) => set({ hours: [s.hours![0], h] })}
-                />
-              </div>
+              <button
+                type="button"
+                className="gh-toggle"
+                onClick={() => set({ hours: [...spotWindows(s.hours), [11.5, 14]] })}
+              >
+                + another window
+              </button>
             )}
           </div>
         </Field>

@@ -16,7 +16,15 @@ import {
   SQUARE_CAP,
   workTiles,
 } from "../src/hex/life.ts"
-import { hexIsland, hexWalk, hexWorld, hexZones, installTilePrefabs, type TilePrefab } from "../src/index.ts"
+import {
+  hexIsland,
+  hexWalk,
+  hexWorld,
+  hexZones,
+  installTilePrefabs,
+  opensEvening,
+  type TilePrefab,
+} from "../src/index.ts"
 
 const DIR = join(import.meta.dir, "../../../data/tiles")
 installTilePrefabs(
@@ -56,9 +64,24 @@ describe("the day spreads the crowd", () => {
     const tavern = folk.filter((f) => {
       const p = lifePose(f.day, 19.5, 24)
       const s = spotAt.get(key(p.at[0], p.at[2]))
-      return p.act !== "walk" && !!s?.hours && s.hours[0] >= 16
+      return p.act !== "walk" && opensEvening(s?.hours)
     })
     expect(tavern.length).toBeGreaterThan(10)
+  })
+
+  test("at lunch the canteen's garden has a crowd; a plain tavern's seats stay empty till the evening", () => {
+    const at = (hour: number, prefabs: string[]) =>
+      folk.filter((f) => {
+        const p = lifePose(f.day, hour, 24)
+        const s = spotAt.get(key(p.at[0], p.at[2]))
+        return (
+          p.act !== "walk" && !!s && opensEvening(s.hours) && prefabs.includes(places.prefabOf(s.tile) ?? "")
+        )
+      }).length
+    const lunch = [12, 12.25, 12.5, 12.75, 13, 13.25, 13.5]
+    expect(Math.max(...lunch.map((hour) => at(hour, ["tavern-garden"])))).toBeGreaterThanOrEqual(4)
+    for (const hour of lunch) expect(at(hour, ["tavern", "tavern-yard"])).toBe(0)
+    expect(at(15.5, ["tavern-garden", "tavern", "tavern-yard"])).toBe(0)
   })
 
   test("every spot is used in its open hours, by one person at a time", () => {
@@ -106,5 +129,14 @@ describe("the day spreads the crowd", () => {
     expect(openFor([17, 1], 12, 13)).toBe(false)
     expect(openFor([8, 20], 17, 20.5)).toBe(false)
     expect(openFor(undefined, 0, 24)).toBe(true)
+    // a canteen's seats: lunch and the evening, closed between
+    const canteen: [number, number][] = [
+      [11.5, 14],
+      [17, 1],
+    ]
+    expect(openFor(canteen, 12, 13.5)).toBe(true)
+    expect(openFor(canteen, 20, 24.5)).toBe(true)
+    expect(openFor(canteen, 15, 16)).toBe(false)
+    expect(openFor(canteen, 13, 18)).toBe(false)
   })
 })

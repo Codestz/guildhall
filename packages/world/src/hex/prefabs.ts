@@ -88,13 +88,8 @@ export function validateTilePrefab(json: unknown, file?: string): string[] {
         )
           at(`${path}.roles`, "a list of npc role ids")
         if (s.y !== undefined && (!isNum(s.y) || Math.abs(s.y) > 3)) at(`${path}.y`, "metres within ±3")
-        if (
-          s.hours !== undefined &&
-          (!Array.isArray(s.hours) ||
-            s.hours.length !== 2 ||
-            !s.hours.every((h) => isNum(h) && h >= 0 && h <= 24))
-        )
-          at(`${path}.hours`, "[from, to] day hours 0–24")
+        if (s.hours !== undefined && !hoursOk(s.hours))
+          at(`${path}.hours`, "[from, to] day hours 0–24, or a list of such windows")
       })
   }
   if (t.blockers !== undefined) {
@@ -119,6 +114,13 @@ export function validateTilePrefab(json: unknown, file?: string): string[] {
   }
   return out
 }
+
+/** One window [from, to] in day hours 0–24. */
+const windowOk = (v: unknown): boolean =>
+  Array.isArray(v) && v.length === 2 && v.every((h) => isNum(h) && h >= 0 && h <= 24)
+/** A window, or a non-empty list of windows. */
+const hoursOk = (v: unknown): boolean =>
+  windowOk(v) || (Array.isArray(v) && v.length > 0 && v.every(windowOk))
 
 const swatchMap = (v: unknown): boolean =>
   isObj(v) &&

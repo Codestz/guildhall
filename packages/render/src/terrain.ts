@@ -73,10 +73,26 @@ export function createHeightGround(stage: Pick<Stage, "scene">, g: HeightGrid): 
 
 /** Flat inland water from triangle positions (x, y, z per vertex). */
 export function createInlandWater(stage: Pick<Stage, "scene">, positions: Float32Array): TerrainMesh {
+  return createSurface(stage, positions, "#4f9ad8", 0.25)
+}
+
+/** A draped surface (roads, water) from triangle positions in one colour. */
+export function createSurface(
+  stage: Pick<Stage, "scene">,
+  positions: Float32Array,
+  color: string,
+  roughness = 1,
+): TerrainMesh {
   const geometry = new BufferGeometry()
   geometry.setAttribute("position", new BufferAttribute(positions, 3))
   geometry.computeVertexNormals()
-  const material = new MeshStandardMaterial({ color: "#4f9ad8", roughness: 0.25, metalness: 0 })
+  const material = new MeshStandardMaterial({
+    color,
+    roughness,
+    metalness: 0,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+  })
   const mesh = new Mesh(geometry, material)
   mesh.receiveShadow = true
   stage.scene.add(mesh)

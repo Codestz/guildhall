@@ -14,6 +14,7 @@ import {
   createStage,
   createStaticBatch,
   createSun,
+  createSurface,
   createWater,
   loadPiece,
   type StaticBatch,
@@ -27,14 +28,17 @@ import {
   TERRA_CRAG,
   TERRA_WATER,
   type Terra,
+  type TerraPlan,
   terraHeightAt,
   terraIsland,
+  terraPlan,
   terraShore,
 } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
 import { href } from "../shell/router.ts"
-import { params, parse } from "./index.ts"
+import { worldCamera } from "../shell/worldCamera.ts"
+import { params, parse } from "../terra/index.ts"
 
 const logger = log("studio:terra3d")
 
@@ -103,6 +107,101 @@ function inlandWater(t: Terra): Float32Array {
   return new Float32Array(pos)
 }
 
+/** Each road as a ribbon draped over the ground (sampled every metre so it follows the terraces). */
+function roadRibbons(t: Terra, plan: TerraPlan): Float32Array {
+  const pos: number[] = []
+  for (const r of plan.roads) {
+    const half = r.kind === "main" ? 2.2 : 1.5
+    const pts: [number, number][] = []
+    for (let k = 1; k < r.line.length; k++) {
+      const a = r.line[k - 1]!
+      const b = r.line[k]!
+      const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1])))
+      for (let j = 0; j < n; j++) pts.push([a[0] + ((b[0] - a[0]) * j) / n, a[1] + ((b[1] - a[1]) * j) / n])
+    }
+    pts.push(r.line[r.line.length - 1] as [number, number])
+    const at = (p: [number, number]) => Math.max(terraHeightAt(t, p[0], p[1]), 0.6) + 0.12
+    for (let k = 1; k < pts.length; k++) {
+      const a = pts[k - 1]!
+      const b = pts[k]!
+      let dx = b[0] - a[0]
+      let dz = b[1] - a[1]
+      const len = Math.hypot(dx, dz) || 1
+      dx /= len
+      dz /= len
+      const ya = at(a)
+      const yb = at(b)
+      const a0 = [a[0] - dz * half, ya, a[1] + dx * half]
+      const a1 = [a[0] + dz * half, ya, a[1] - dx * half]
+      const b0 = [b[0] - dz * half, yb, b[1] + dx * half]
+      const b1 = [b[0] + dz * half, yb, b[1] - dx * half]
+      pos.push(...a0, ...b0, ...a1, ...a1, ...b0, ...b1)
+    }
+  }
+  return new Float32Array(pos)
+}
+
+const HOUSES = [
+  "quaternius-village/house-1",
+  "quaternius-village/house-2",
+  "quaternius-village/house-3",
+  "quaternius-village/house-4",
+]
+/** Stand-in buildings per anchor (step 4 replaces them with real districts). */
+const HOUSES_BY_KIND: Record<string, number> = {
+  town: 14,
+  harbour: 6,
+  crossing: 5,
+  outpost: 2,
+  fishing: 4,
+  farm: 3,
+}
+
+/**
+ * Stand-ins so the anchors read in 3D: a ring of houses on flat ground round each anchor, facing it,
+ * and a flag at its heart.
+ */
+function anchorPieces(t: Terra, plan: TerraPlan, have: (id: string) => boolean): BatchInstance[] {
+  const houses = HOUSES.filter(have)
+  const out: BatchInstance[] = []
+  plan.anchors.forEach((a, k) => {
+    const count = houses.length ? (HOUSES_BY_KIND[a.kind] ?? 3) : 0
+    let placed = 0
+    for (let tries = 0; placed < count && tries < count * 12; tries++) {
+      const u = (s: number) => hash2(t.spec.seed + 4000 + k * 97 + s, tries, placed)
+      const ang = u(1) * Math.PI * 2
+      const d = 9 + u(2) * (a.kind === "town" ? 34 : 18)
+      const x = a.at[0] + Math.cos(ang) * d
+      const z = a.at[1] + Math.sin(ang) * d
+      const ix = Math.floor((x - t.origin[0]) / t.cell)
+      const iz = Math.floor((z - t.origin[1]) / t.cell)
+      const i = iz * t.w + ix
+      if (t.water[i] !== TERRA_WATER.land || t.slope[i]! > 0.18) continue
+      if (out.some((p) => Math.hypot(p.x - x, p.z - z) < 8)) continue
+      if (plan.roads.some((r) => r.line.some((p) => Math.hypot(p[0] - x, p[1] - z) < 5))) continue
+      out.push({
+        piece: houses[Math.floor(u(3) * houses.length) % houses.length]!,
+        x,
+        y: terraHeightAt(t, x, z) - 0.1,
+        z,
+        rot: Math.atan2(a.at[0] - x, a.at[1] - z),
+        scale: 1,
+      })
+      placed++
+    }
+    if (have("kenney-mini-forest/flag"))
+      out.push({
+        piece: "kenney-mini-forest/flag",
+        x: a.at[0],
+        y: terraHeightAt(t, a.at[0], a.at[1]),
+        z: a.at[1],
+        rot: 0,
+        scale: 3,
+      })
+  })
+  return out
+}
+
 /** The wild on the land: a jittered 4 m grid read against woods noise, height, slope and the coast. */
 function wild(t: Terra, have: (id: string) => boolean): BatchInstance[] {
   const seed = t.spec.seed
@@ -159,6 +258,15 @@ export const terra3d: Screen = {
     const t = terraIsland(view.spec)
     const stage = createStage(host)
     ctx.attach(stage)
+    const cam = worldCamera(stage, host, ctx.query)
+    const span0 = (t.w * t.cell) / 2
+    cam.start({
+      centre: [0, 0],
+      half: span0 * 1.4,
+      heightAt: (x, z) => terraHeightAt(t, x, z),
+      water: 0,
+      free: true,
+    })
     let disposed = false
     let batch: StaticBatch | null = null
     let water: Water | null = null
@@ -181,6 +289,8 @@ export const terra3d: Screen = {
       const span = (t.w * t.cell) / 2
       const sun = createSun(stage, { town: { min: [-span, -2, -span], max: [span, 22, span] } })
       createSky(stage, { sun, hour: 15.5, reach: R * 2.2 })
+      const plan = view.plan ? terraPlan(t) : null
+      if (plan) meshes.push(createSurface(stage, roadRibbons(t, plan), "#c9a774"))
       meshes.push(
         createHeightGround(stage, { ...t, rgba: paintTerra(t, { shade: false, contours: false }) }),
         createInlandWater(stage, inlandWater(t)),
@@ -199,7 +309,12 @@ export const terra3d: Screen = {
       })
       const catalog = await loadCatalog()
       if (!catalog || disposed) return
-      const pieces = wild(t, (id) => catalog.get(id) !== undefined)
+      const have = (id: string) => catalog.get(id) !== undefined
+      const settled = plan ? anchorPieces(t, plan, have) : []
+      const clear = (p: BatchInstance) =>
+        !settled.some((s) => Math.hypot(s.x - p.x, s.z - p.z) < 6) &&
+        !(plan?.roads ?? []).some((r) => r.line.some((q) => Math.hypot(q[0] - p.x, q[1] - p.z) < 3.5))
+      const pieces = [...settled, ...wild(t, have).filter(clear)]
       batch = await createStaticBatch(stage, pieces, async (id) => {
         const entry = catalog.get(id)
         if (!entry) throw new Error(`terra3d: unknown piece "${id}"`)
@@ -218,6 +333,7 @@ export const terra3d: Screen = {
     ctx.load(ready).catch((error: unknown) => logger.error("build failed", { error: String(error) }))
     return () => {
       disposed = true
+      cam.dispose()
       batch?.dispose()
       water?.dispose()
       for (const m of meshes) m.dispose()

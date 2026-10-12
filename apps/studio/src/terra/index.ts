@@ -4,7 +4,15 @@
  * side; sliders for every knob of `terraIsland`; rivers drawn as lines over the hillshaded map.
  * Everything is in the query, so a link opens exactly what is on screen.
  */
-import { paintTerra, TERRA_DEFAULTS, type Terra, type TerraSpecFull, terraIsland } from "@guildhall/world"
+import {
+  paintTerra,
+  TERRA_DEFAULTS,
+  type Terra,
+  type TerraPlan,
+  type TerraSpecFull,
+  terraIsland,
+  terraPlan,
+} from "@guildhall/world"
 import type { Screen } from "../screens.ts"
 import { href, replaceQuery } from "../shell/router.ts"
 
@@ -38,6 +46,8 @@ export interface View {
   spec: TerraSpecFull
   grid: boolean
   flow: boolean
+  /** Step 2 on top: anchors and roads (on unless `plan=0`). */
+  plan: boolean
 }
 
 export function parse(q: URLSearchParams): View {
@@ -47,7 +57,7 @@ export function parse(q: URLSearchParams): View {
   }
   const spec = { seed: num("seed", 1), ...TERRA_DEFAULTS } as TerraSpecFull
   for (const k of KNOBS) spec[k.key] = num(k.key, TERRA_DEFAULTS[k.key])
-  return { spec, grid: q.get("grid") === "1", flow: q.get("flow") === "1" }
+  return { spec, grid: q.get("grid") === "1", flow: q.get("flow") === "1", plan: q.get("plan") !== "0" }
 }
 
 export function params(v: View): URLSearchParams {
@@ -55,6 +65,7 @@ export function params(v: View): URLSearchParams {
   for (const k of KNOBS) if (v.spec[k.key] !== TERRA_DEFAULTS[k.key]) q.set(k.key, String(v.spec[k.key]))
   if (v.grid) q.set("grid", "1")
   if (v.flow) q.set("flow", "1")
+  if (!v.plan) q.set("plan", "0")
   return q
 }
 
@@ -66,6 +77,7 @@ function draw(
   y: number,
   size: number,
   flow: boolean,
+  plan?: TerraPlan,
 ): void {
   const img = new ImageData(paintTerra(t, { flow }) as Uint8ClampedArray<ArrayBuffer>, t.w, t.h)
   const tmp = new OffscreenCanvas(t.w, t.h)
@@ -97,6 +109,64 @@ function draw(
     g.beginPath()
     g.arc(fx, fy, Math.max(2, 2.5 * k), 0, Math.PI * 2)
     g.fill()
+  }
+  if (plan) drawPlan(g, plan, to, k)
+}
+
+const ANCHOR_COLOUR: Record<string, string> = {
+  town: "#d8463a",
+  harbour: "#7a4fd6",
+  crossing: "#2f8fd0",
+  outpost: "#6a4a2a",
+  fishing: "#2aa39a",
+  farm: "#d9a520",
+}
+
+/** Roads (dirt with a dark edge; the loop track dashed), bridges, and each anchor as a labelled disc. */
+function drawPlan(
+  g: CanvasRenderingContext2D,
+  plan: TerraPlan,
+  to: (p: [number, number]) => [number, number],
+  k: number,
+): void {
+  for (const pass of [0, 1])
+    for (const r of plan.roads) {
+      g.setLineDash(r.kind === "track" && pass === 1 ? [6, 4] : [])
+      g.strokeStyle = pass === 0 ? "rgba(70,50,30,0.75)" : "#e3c78f"
+      g.lineWidth = Math.max(pass === 0 ? 3.5 : 2, (r.kind === "main" ? 4.5 : 3) * k + (pass === 0 ? 2 : 0))
+      g.beginPath()
+      r.line.forEach((p, i) => {
+        const [x, y] = to(p as [number, number])
+        if (i === 0) g.moveTo(x, y)
+        else g.lineTo(x, y)
+      })
+      g.stroke()
+    }
+  g.setLineDash([])
+  for (const r of plan.roads)
+    for (const b of r.bridges) {
+      const [x, y] = to(b as [number, number])
+      g.fillStyle = "#7a5233"
+      g.fillRect(x - 5, y - 5, 10, 10)
+      g.strokeStyle = "#f3e9d4"
+      g.strokeRect(x - 5, y - 5, 10, 10)
+    }
+  g.font = "bold 12px ui-monospace,Menlo,monospace"
+  for (const a of plan.anchors) {
+    const [x, y] = to(a.at as [number, number])
+    g.fillStyle = ANCHOR_COLOUR[a.kind] ?? "#fff"
+    g.strokeStyle = "#fff"
+    g.lineWidth = 2
+    g.beginPath()
+    g.arc(x, y, a.kind === "town" ? 11 : 8, 0, Math.PI * 2)
+    g.fill()
+    g.stroke()
+    const label = a.kind === "outpost" ? `outpost (terrace ${a.level})` : a.kind
+    g.lineWidth = 3
+    g.strokeStyle = "rgba(20,16,12,0.85)"
+    g.strokeText(label, x + 13, y + 4)
+    g.fillStyle = "#fff"
+    g.fillText(label, x + 13, y + 4)
   }
 }
 
@@ -145,8 +215,9 @@ export const terraLab: Screen = {
         stats.textContent = lines.join("\n")
       } else {
         const t = terraIsland(view.spec)
+        const plan = view.plan ? terraPlan(t) : undefined
         const size = Math.min(aw, H - 24)
-        draw(g, t, left + (aw - size) / 2, 12 + (H - 24 - size) / 2, size, view.flow)
+        draw(g, t, left + (aw - size) / 2, 12 + (H - 24 - size) / 2, size, view.flow, plan)
         const s = t.stats
         stats.textContent = [
           `land      ${(s.landM2 / 1e4).toFixed(1)} ha`,
@@ -155,6 +226,12 @@ export const terraLab: Screen = {
           `lakes     ${s.lakes}`,
           `falls     ${t.falls.length}`,
           `generated ${s.ms} ms`,
+          ...(plan
+            ? [
+                `anchors   ${plan.anchors.length} · roads ${plan.roads.length}`,
+                `bridges   ${plan.roads.reduce((n, r) => n + r.bridges.length, 0)} · plan ${plan.ms} ms`,
+              ]
+            : []),
         ].join("\n")
       }
       replaceQuery(params(view))
@@ -162,7 +239,7 @@ export const terraLab: Screen = {
 
     // controls
     const title = document.createElement("div")
-    title.innerHTML = "<b>Terrain + water</b> · step 1"
+    title.innerHTML = "<b>Island plan</b> · 1 terrain + water · 2 anchors + roads"
     panel.append(title)
     const seedRow = document.createElement("div")
     seedRow.style.cssText = "display:flex;gap:6px;align-items:center"
@@ -234,7 +311,11 @@ export const terraLab: Screen = {
     sync3d()
     panel.addEventListener("click", sync3d)
     panel.addEventListener("change", sync3d)
-    toggles.append(gridBtn, flowBtn, go3d)
+    const planBtn = btn(view.plan ? "hide roads" : "show roads", () => {
+      view.plan = !view.plan
+      planBtn.textContent = view.plan ? "hide roads" : "show roads"
+    })
+    toggles.append(gridBtn, flowBtn, planBtn, go3d)
     panel.append(toggles, stats)
 
     const onKey = (e: KeyboardEvent): void => {

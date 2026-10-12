@@ -14,8 +14,7 @@
   ],
   "hands": {
     "r": [
-      "kaykit-tools/bucket-metal",
-      "quaternius-props/bag"
+      "kaykit-tools/bucket-metal"
     ]
   },
   "hide": [

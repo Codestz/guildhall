@@ -42,7 +42,7 @@ const logger = log("studio:hexworld")
 
 type RGB = [number, number, number]
 const TOP: Record<string, RGB> = {
-  grass: [122, 172, 70],
+  grass: [112, 156, 64],
   soil: [150, 112, 70],
   dirt: [196, 160, 108],
   paved: [196, 186, 166],

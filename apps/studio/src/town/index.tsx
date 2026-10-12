@@ -110,7 +110,7 @@ export const town: Screen = {
     ctx.load(Promise.all([studio.ready, c.settled()]))
 
     const roots = [createRoot(panels.controls), createRoot(panels.stats), createRoot(panels.compare)] as const
-    roots[0].render(<Controls town={c} />)
+    roots[0].render(<Controls town={c} rig={stage.rig} />)
     roots[1].render(<Stats town={c} stage={stage} />)
     roots[2].render(<Compare town={c} />)
 

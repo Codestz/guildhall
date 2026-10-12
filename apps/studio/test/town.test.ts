@@ -2,13 +2,23 @@ import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import type { PrefabRecipe } from "@guildhall/assets"
-import { poseToCamera } from "@guildhall/render"
+import { clampOrbit, floorAt, poseToCamera } from "@guildhall/render"
 import { area, type TownDraw, type Vec2, validateTownSpec } from "@guildhall/world"
 import { CATALOG } from "../../../packages/world/test/town.fixture.ts"
 import { buildLibrary } from "../src/planner/library.ts"
 import { COMPASS } from "../src/planner/query.ts"
 import { href, resolve } from "../src/shell/router.ts"
-import { along, heroAzimuth, mapPose, sheet, streetPose } from "../src/town/camera.ts"
+import {
+  along,
+  FAR,
+  heroAzimuth,
+  heroPose,
+  LENS,
+  mapPose,
+  sheet,
+  streetPose,
+  townWorld,
+} from "../src/town/camera.ts"
 import { PLANT_CELL, plantClusters } from "../src/town/dress.ts"
 import { runTownJob, transferables, withSea } from "../src/town/job.ts"
 import { DEFAULT_TOWN, parseTownQuery, townParams, townSpec } from "../src/town/query.ts"
@@ -59,6 +69,11 @@ describe("deep link", () => {
       preset: null,
     })
     expect(q("hour=26").hour).toBe(2)
+  })
+
+  test("free flight is a camera in the link", () => {
+    expect(q("cam=free").cam).toBe("free")
+    expect(townParams({ ...DEFAULT_TOWN, cam: "free" }).toString()).toBe("town=1&cam=free")
   })
 
   test("params round-trip and leave defaults out; href puts the seed in the path", () => {
@@ -130,6 +145,51 @@ describe("cameras", () => {
     expect(eye[2]).toBeCloseTo(0)
     expect(eye[0]).toBeCloseTo(54)
     expect(eye[1]).toBeCloseTo(6)
+  })
+
+  test("the world the rig is held in: the sheet's box, land at 0, the water's level", () => {
+    const world = townWorld({ bounds: square(100, -50, 300, 150) })
+    expect(world.centre).toEqual([200, 50])
+    expect(world.half).toBe(100)
+    expect(floorAt(world, 0, 0)).toBe(0)
+    expect(world.water).toBeLessThan(0)
+  })
+
+  test("every preset survives the rig's clamp unchanged: the world never moves a designed shot", () => {
+    const plan = {
+      bounds: square(-400, -400, 400, 400),
+      plazas: [square(-10, -10, 10, 10)],
+      spec: { seed: 1, tier: "town" as const, harbour: { bearing: 1 } },
+      streets: {
+        nodes: [],
+        edges: [
+          // A main street that bends straight back: the look point a few metres off the eye.
+          {
+            id: 0,
+            a: 0,
+            b: 1,
+            cls: "main" as const,
+            width: 7,
+            points: [[12, 0] as Vec2, [30, 0] as Vec2, [26, 2] as Vec2],
+          },
+        ],
+      },
+    }
+    const world = townWorld(plan)
+    const aspect = 1440 / 820
+    const perspective = { fov: LENS.perspective, aspect, far: FAR.perspective }
+    const map = mapPose(plan, { aspect })
+    const shots = [
+      [heroPose(plan, 110, { aspect }), perspective],
+      [streetPose(plan), perspective],
+      [map, { fov: LENS.map, aspect, far: FAR.map(map.distance) }],
+    ] as const
+    for (const [pose, lens] of shots) {
+      const held = clampOrbit(pose, world, lens)
+      expect(held.distance).toBeCloseTo(pose.distance, 6)
+      expect(held.elevation).toBeCloseTo(pose.elevation, 6)
+      expect(held.target).toEqual(pose.target)
+    }
   })
 
   test("along walks a polyline and clamps at its ends", () => {

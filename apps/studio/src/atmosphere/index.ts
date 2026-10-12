@@ -15,6 +15,8 @@ import { loadCatalog } from "../catalog.ts"
 import { list, load } from "../data.ts"
 import { buildLibrary } from "../planner/library.ts"
 import type { Screen } from "../screens.ts"
+import { worldCamera } from "../shell/worldCamera.ts"
+import { townWorld } from "../town/camera.ts"
 import { createPanel } from "./panel.ts"
 import { type AtmosphereQuery, CAMS, type Cam, parseAtmosphereQuery } from "./query.ts"
 import { buildLabTown, type LabTown } from "./town.ts"
@@ -83,6 +85,7 @@ export const atmosphereLab: Screen = {
     const stage = createStage(host)
     ctx.attach(stage)
     stage.setCamera(camPose(q.cam, spec))
+    const cam = worldCamera(stage, host, ctx.query)
     const t = 2 * r
     const sun = createSun(stage, { town: { min: [-t, 0, -t], max: [t, 40, t] } })
     const sky = createSky(stage, { hour: q.hour, sun, reach: 1.4 * r, look: q.look })
@@ -118,6 +121,9 @@ export const atmosphereLab: Screen = {
         return
       }
       town = built
+      cam.start(townWorld(built.layout))
+      // The lab's framing, now held inside the island it frames.
+      if (stage.rig.mode() === "orbit") stage.setCamera(camPose(q.cam, spec))
       sun.markDirty()
     }
     ctx.load(build()).catch((error: unknown) => logger.error("build failed", { error: String(error) }))
@@ -154,6 +160,7 @@ export const atmosphereLab: Screen = {
 
     return () => {
       disposed = true
+      cam.dispose()
       if (ext) delete ext.atmosphere
       unsubscribe()
       panel?.dispose()

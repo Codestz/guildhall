@@ -59,6 +59,19 @@ export {
 } from "./night/index.ts"
 export { loadPiece } from "./pieces.ts"
 export { instanceSwatchMap, placeInstance, recipeObject } from "./recipe.ts"
+export { blendPose, type FreeState, lookVector, type Rig, type RigMode } from "./rig/index.ts"
+export {
+  clampEye,
+  clampOrbit,
+  distanceRange,
+  elevationRange,
+  floorAt,
+  LIMITS as RIG_LIMITS,
+  restingTilt,
+  type World,
+  zoomFraction,
+  zoomTilt,
+} from "./rig/world.ts"
 export { createShadows, fitShadowCamera, type ShadowBox } from "./shadow.ts"
 export { createSky, type Sky, type SkyPreset } from "./sky.ts"
 export { createStage, type Stage, toScreen } from "./stage.ts"

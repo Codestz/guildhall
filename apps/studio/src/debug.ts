@@ -93,6 +93,18 @@ export function createDebug(): DebugHost {
         requireStage().setCamera(pose)
         await frames(1)
       },
+      mode: () => requireStage().rig.mode(),
+      async setMode(mode) {
+        const rig = requireStage().rig
+        rig.setMode(mode)
+        // A glide back to orbit runs for under a second: wait it out, then one more frame drawn.
+        for (let i = 0; i < 240 && rig.gliding(); i++) await frames(1)
+        await frames(1)
+      },
+      async fly(state) {
+        requireStage().rig.fly(state)
+        await frames(1)
+      },
     },
     // A path (`/pieces/kaykit-adventurers/barbarian?clip=Chopping`) or an old query (`?screen=pieces&…`).
     async open(target) {

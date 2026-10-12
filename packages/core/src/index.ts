@@ -1,4 +1,4 @@
-export type { CameraPose, FrameStats, GuildhallDebug } from "./debug.ts"
+export type { CameraPose, FrameStats, FreeCamera, GuildhallDebug } from "./debug.ts"
 export * from "./dmath.ts"
 export { fnv1a, hash, roll } from "./hash.ts"
 export type { Level, Logger, LogRecord } from "./log.ts"

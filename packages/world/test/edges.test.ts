@@ -391,7 +391,7 @@ describe("landmark", () => {
 
 /** The debug picture: land, water, streets, blocks, then the edges' pieces as their footprints. */
 function svg(made: ReturnType<typeof make>): string {
-  const h = 1.3 * made.site.radius
+  const h = 1.6 * made.site.radius
   const path = (ring: readonly Vec2[], close = true) =>
     `M${ring.map((p) => `${p[0]} ${-p[1]}`).join("L")}${close ? "Z" : ""}`
   const parts = [

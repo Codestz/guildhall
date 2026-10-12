@@ -158,3 +158,41 @@ export function ribbon(line: readonly Vec2[], width: number): Vec2[] {
   const left = offsetLine(line, width / 2).reverse()
   return [...right, ...left]
 }
+
+/**
+ * The polylines' segments bucketed on a grid `cell` metres wide, for many distance queries against
+ * long lines (a coast, a block's outline): `near(p, max)` is the distance from p to the nearest
+ * segment, or `max` when none is nearer.
+ */
+export function lineIndex(
+  lines: readonly (readonly Vec2[])[],
+  closed: boolean,
+  cell = 8,
+): { near: (p: Vec2, max: number) => number } {
+  const grid = new Map<string, [Vec2, Vec2][]>()
+  const cells = (lo: Vec2, hi: Vec2, visit: (k: string) => void) => {
+    for (let i = Math.floor(lo[0] / cell); i <= Math.floor(hi[0] / cell); i++)
+      for (let j = Math.floor(lo[1] / cell); j <= Math.floor(hi[1] / cell); j++) visit(`${i},${j}`)
+  }
+  for (const line of lines)
+    for (const [i, j] of segments(line.length, closed)) {
+      const a = at(line, i)
+      const b = at(line, j)
+      const lo: Vec2 = [Math.min(a[0], b[0]), Math.min(a[1], b[1])]
+      const hi: Vec2 = [Math.max(a[0], b[0]), Math.max(a[1], b[1])]
+      cells(lo, hi, (k) => {
+        const list = grid.get(k)
+        if (list) list.push([a, b])
+        else grid.set(k, [[a, b]])
+      })
+    }
+  return {
+    near(p, max) {
+      let best = max
+      cells([p[0] - max, p[1] - max], [p[0] + max, p[1] + max], (k) => {
+        for (const [a, b] of grid.get(k) ?? []) best = Math.min(best, closest(p, a, b).d)
+      })
+      return best
+    },
+  }
+}

@@ -127,38 +127,48 @@ describe("blocks", () => {
     expect(bad).toEqual([])
   })
 
-  test.each(TIERS)("blocks tile the town's land: no overlaps, and every gap is street (%s)", (tier) => {
-    for (const { spec, site: s, blocks: list, graph } of built.filter((x) => x.spec.tier === tier)) {
-      const land = townLand(s)
-      const [min, max] = bbox(land[0]!)
-      const boxes = list.map((b) => bbox(b.poly))
-      const within = (box: [Vec2, Vec2], p: Vec2, pad = 0) =>
-        p[0] >= box[0][0] - pad &&
-        p[0] <= box[1][0] + pad &&
-        p[1] >= box[0][1] - pad &&
-        p[1] <= box[1][1] + pad
-      const streetBoxes = graph.edges.map((e) => bbox(e.points))
-      let samples = 0
-      let unexplained = 0
-      const overlaps: string[] = []
-      for (let x = min[0] + 0.5; x < max[0]; x += 3)
-        for (let z = min[1] + 0.5; z < max[1]; z += 3) {
-          const p: Vec2 = [x, z]
-          if (!contains(land, p, 0)) continue
-          samples++
-          const inside = list.filter((b, i) => within(boxes[i]!, p) && contains(b.poly, p, 0))
-          if (inside.length > 1) overlaps.push(`${p}: ${inside.map((b) => b.id)}`)
-          if (inside.length >= 1) continue
-          // A gap is street: within the kerbed ribbon (and a little for the corner discs) of a street.
-          const street = graph.edges.some(
-            (e, i) => within(streetBoxes[i]!, p, 5) && distTo(p, e.points) <= e.width / 2 + KERB + 0.6,
-          )
-          if (!street) unexplained++
-        }
-      expect(overlaps, label(spec)).toEqual([])
-      expect(unexplained / samples, label(spec)).toBeLessThan(0.002)
-    }
-  })
+  test.each(TIERS)(
+    "blocks tile the town's land: no overlaps, and every gap is street (%s)",
+    (tier) => {
+      for (const { spec, site: s, blocks: list, graph } of built.filter((x) => x.spec.tier === tier)) {
+        const land = townLand(s)
+        const [min, max] = bbox(land[0]!)
+        const boxes = list.map((b) => bbox(b.poly))
+        const within = (box: [Vec2, Vec2], p: Vec2, pad = 0) =>
+          p[0] >= box[0][0] - pad &&
+          p[0] <= box[1][0] + pad &&
+          p[1] >= box[0][1] - pad &&
+          p[1] <= box[1][1] + pad
+        const streetBoxes = graph.edges.map((e) => bbox(e.points))
+        let samples = 0
+        let unexplained = 0
+        const overlaps: string[] = []
+        // Every 3 m over the town and round it; the countryside beyond (one green field to the coast
+        // of the island) every 12 m.
+        const town = 1.5 * s.radius
+        for (let x = min[0] + 0.5; x < max[0]; x += 3)
+          for (let z = min[1] + 0.5; z < max[1]; z += 3) {
+            const p: Vec2 = [x, z]
+            const sparse =
+              Math.round((x - min[0] - 0.5) / 3) % 4 !== 0 || Math.round((z - min[1] - 0.5) / 3) % 4 !== 0
+            if (Math.hypot(x, z) > town && sparse) continue
+            if (!contains(land, p, 0)) continue
+            samples++
+            const inside = list.filter((b, i) => within(boxes[i]!, p) && contains(b.poly, p, 0))
+            if (inside.length > 1) overlaps.push(`${p}: ${inside.map((b) => b.id)}`)
+            if (inside.length >= 1) continue
+            // A gap is street: within the kerbed ribbon (and a little for the corner discs) of a street.
+            const street = graph.edges.some(
+              (e, i) => within(streetBoxes[i]!, p, 5) && distTo(p, e.points) <= e.width / 2 + KERB + 0.6,
+            )
+            if (!street) unexplained++
+          }
+        expect(overlaps, label(spec)).toEqual([])
+        expect(unexplained / samples, label(spec)).toBeLessThan(0.002)
+      }
+    },
+    30_000,
+  )
 
   test("lots blocks respect the tier's street density: area ≤ amax, short side ≤ two lot depths", () => {
     for (const { spec, blocks: list } of built) {
@@ -263,7 +273,7 @@ describe("blocks", () => {
 
 /** The debug picture: land, water, street ribbons, blocks by use and district, nodes by kind and tag. */
 function svg(made: ReturnType<typeof make>): string {
-  const h = 1.3 * made.site.radius
+  const h = 1.6 * made.site.radius
   const path = (ring: readonly Vec2[]) => `M${ring.map((p) => `${p[0]} ${-p[1]}`).join("L")}Z`
   const fill = (b: Block) =>
     b.square

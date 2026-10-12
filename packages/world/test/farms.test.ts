@@ -19,9 +19,9 @@ import {
   type Vec2,
 } from "../src/index.ts"
 import { blocks } from "../src/town/blocks.ts"
-import { beltReserve, type FarmLibrary, farms } from "../src/town/farms.ts"
+import { beltReserve, type FarmLibrary, farms, SHORE } from "../src/town/farms.ts"
 import { type HarbourLibrary, harbour } from "../src/town/harbour.ts"
-import { type NatureLibrary, nature } from "../src/town/nature.ts"
+import { BELT, type NatureLibrary, nature } from "../src/town/nature.ts"
 import { site } from "../src/town/site.ts"
 import { normalizeSpec } from "../src/town/spec.ts"
 import { streets } from "../src/town/streets.ts"
@@ -150,7 +150,12 @@ const inRect = (r: Rect, p: Vec2, pad = 0) => {
 const wet = (water: readonly Vec2[][], p: Vec2) => water.some((w) => contains(w, p, 0))
 /** Whether p is on a street's ribbon (its kerbed width). */
 const onStreet = (m: ReturnType<typeof make>, p: Vec2, pad = 0) =>
-  m.streets.edges.some((e) => distTo(p, e.points) < e.width / 2 + pad)
+  m.streets.edges.some(
+    (e) => near(bbox(e.points), p, e.width / 2 + pad) && distTo(p, e.points) < e.width / 2 + pad,
+  )
+/** Whether p is within `pad` of the box (a cheap test before the exact one). */
+const near = ([lo, hi]: [Vec2, Vec2], p: Vec2, pad = 0) =>
+  p[0] >= lo[0] - pad && p[0] <= hi[0] + pad && p[1] >= lo[1] - pad && p[1] <= hi[1] + pad
 
 describe("farms", () => {
   test("same spec, same farms", () => {
@@ -209,13 +214,10 @@ describe("farms", () => {
     const bad: string[] = []
     for (const m of built) {
       const { spec, farms: f, houses } = m
-      const [min, max] = bbox(m.bounds)
-      const reserve = beltReserve(normalizeSpec(spec).radius)
-      const inset = (p: Vec2) =>
-        p[0] >= min[0] + reserve - 0.01 &&
-        p[0] <= max[0] - reserve + 0.01 &&
-        p[1] >= min[1] + reserve - 0.01 &&
-        p[1] <= max[1] - reserve + 0.01
+      // The shore band and the belt's reserve inland of it are the woods' ground: the coast is the
+      // land's edge (the map is an island in the sea).
+      const inland = SHORE[1] + beltReserve(normalizeSpec(spec).radius)
+      const inset = (p: Vec2) => m.water.every((w) => distTo(p, w, true) >= inland - 0.01)
       for (const e of f.edges)
         for (let i = 0; i < e.points.length; i++) {
           const a = e.points[i]!
@@ -281,16 +283,26 @@ describe("nature", () => {
         ...m.houses,
         ...m.farms.placements.filter((p) => p.role === "farmhouse" || p.role === "barn"),
       ]
+      const boxed = <T>(list: readonly T[], ring: (t: T) => Vec2[]) =>
+        list.map((t) => ({ t, box: bbox(ring(t)) }))
+      const fields = boxed(m.farms.fields, (f) => f.poly)
+      const fences = boxed(m.farms.edges, (e) => e.points)
+      const town = boxed(
+        m.blocks.filter((b) => b.use !== "green"),
+        (b) => b.poly,
+      )
       for (const p of m.nature) {
         const where = `${label(m.spec)} ${p.role} ${p.prefab} at ${p.at}`
         if (onStreet(m, p.at, 0.5)) bad.push(`${where}: on a street`)
         if (wet(m.water, p.at)) bad.push(`${where}: in water`)
         for (const h of placed)
           if (inRect({ c: h.at, rot: h.rot, w: 9, d: 9 }, p.at, 0.5)) bad.push(`${where}: on a building`)
-        for (const f of m.farms.fields) if (contains(f.poly, p.at, 0)) bad.push(`${where}: in a field`)
-        for (const e of m.farms.edges) if (contains(e.points, p.at, 0)) bad.push(`${where}: inside a fence`)
-        const lots = m.blocks.filter((b) => b.use !== "green")
-        if (lots.some((b) => contains(b.poly, p.at, 0))) bad.push(`${where}: in a town block`)
+        for (const { t: f, box } of fields)
+          if (near(box, p.at) && contains(f.poly, p.at, 0)) bad.push(`${where}: in a field`)
+        for (const { t: e, box } of fences)
+          if (near(box, p.at) && contains(e.points, p.at, 0)) bad.push(`${where}: inside a fence`)
+        if (town.some(({ t: b, box }) => near(box, p.at) && contains(b.poly, p.at, 0)))
+          bad.push(`${where}: in a town block`)
       }
     }
     expect(bad).toEqual([])
@@ -304,12 +316,15 @@ describe("nature", () => {
       )
   })
 
-  test("a forest belt closes the bounds: a good share of the trees stand in the outer band", () => {
+  test("the coast closes the land: an open shore band of rocks, then a forest belt inland of it", () => {
     for (const m of built.filter((x) => x.spec.tier !== "hamlet")) {
-      const [min, max] = bbox(m.bounds)
-      const fromEdge = (p: Vec2) => Math.min(p[0] - min[0], max[0] - p[0], p[1] - min[1], max[1] - p[1])
+      const fromCoast = (p: Vec2) => Math.min(...m.water.map((w) => distTo(p, w, true)))
       const trees = m.nature.filter((p) => p.role === "tree")
-      const belt = trees.filter((p) => fromEdge(p.at) < 15).length
+      // No tree on the shore itself; rocks along it.
+      for (const t of trees) expect(fromCoast(t.at), label(m.spec)).toBeGreaterThan(SHORE[0])
+      expect(m.nature.some((p) => p.role === "rock" && fromCoast(p.at) < SHORE[1])).toBe(true)
+      // A good share of the trees stand in the belt along the coast.
+      const belt = trees.filter((p) => fromCoast(p.at) < SHORE[1] + BELT[1]).length
       expect(belt / trees.length, label(m.spec)).toBeGreaterThan(0.25)
       // Every role turns up.
       for (const role of ["tree", "bush", "rock", "flower"])
@@ -325,9 +340,10 @@ describe("nature", () => {
   })
 })
 
-/** The debug picture: the town's ground, then farms, harbour and nature on top. */
+/** The debug picture: the whole map (the island in its sea), then farms, harbour and nature on top. */
 function svg(m: ReturnType<typeof make>): string {
-  const h = 1.3 * m.site.radius
+  const [lo, hi] = bbox(m.bounds)
+  const box = `${lo[0]} ${-hi[1]} ${hi[0] - lo[0]} ${hi[1] - lo[1]}`
   const path = (ring: readonly Vec2[], close = true) =>
     `M${ring.map((p) => `${p[0]} ${-p[1]}`).join("L")}${close ? "Z" : ""}`
   const poly = (ring: readonly Vec2[], fill: string, extra = "") =>
@@ -346,7 +362,7 @@ function svg(m: ReturnType<typeof make>): string {
     })[id.split("/")[1]!.replace(/-\d$/, "")] ?? "#c9a"
   const pines = new Set(LIB.wild!.pines)
   const parts: string[] = [
-    `<rect x="${-h}" y="${-h}" width="${2 * h}" height="${2 * h}" fill="#3d7fa6"/>`,
+    `<rect x="${lo[0]}" y="${-hi[1]}" width="${hi[0] - lo[0]}" height="${hi[1] - lo[1]}" fill="#3d7fa6"/>`,
     ...m.site.land.map(
       (p) => `<path d="${p.map((r) => path(r)).join("")}" fill="#9cba6a" fill-rule="evenodd"/>`,
     ),
@@ -397,16 +413,16 @@ function svg(m: ReturnType<typeof make>): string {
     ),
     ...[...m.farms.stations, ...m.harbour.stations].map((s) => dot2(s.at, 0.9, "#e00")),
   ]
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-h} ${-h} ${2 * h} ${2 * h}" width="1400" height="1400">${parts.join("")}</svg>\n`
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${box}" width="1600" height="1600">${parts.join("")}</svg>\n`
 }
 
 test("writes a debug SVG per tier to .probe/w5 (north up: +z is up the page)", () => {
   const out = resolve(import.meta.dir, "../../../.probe/w5")
   mkdirSync(out, { recursive: true })
   const presets: TownSpecInput[] = [
-    { seed: 3, tier: "hamlet", harbour: { bearing: 2.4 } },
+    { seed: 3, tier: "hamlet", harbour: null },
     { seed: 13, tier: "village" },
-    { seed: 2, tier: "town", harbour: { bearing: -0.8 } },
+    { seed: 2, tier: "town" },
     { seed: 1, tier: "city" },
   ]
   for (const spec of presets) {

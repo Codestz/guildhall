@@ -5,6 +5,7 @@ export {
   distTo,
   intersect,
   length,
+  lineIndex,
   offsetLine,
   resample,
   ribbon,

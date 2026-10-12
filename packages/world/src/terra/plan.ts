@@ -197,7 +197,11 @@ export function terraPlan(t: Terra): TerraPlan {
       ])
   pairs.sort((p, q) => p[2] - q[2])
   const parent = anchors.map((_, i) => i)
-  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)))
+  const find = (i: number): number => {
+    let r = i
+    while (parent[r] !== r) r = parent[r]!
+    return r
+  }
   const edges: [number, number, "main" | "track"][] = []
   const spare: [number, number][] = []
   for (const [a, b] of pairs) {

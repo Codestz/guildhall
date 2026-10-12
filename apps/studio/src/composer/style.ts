@@ -1,6 +1,6 @@
 /**
- * The composer's own layout and controls, on top of the studio panels' look (browser/style.ts, which
- * owns the tokens and faces). Injected while the composer is mounted.
+ * The tile composer's layout and the shared form controls (the NPC builder uses them too), on top of
+ * the studio panels' look (browser/style.ts, which owns the tokens and faces). Injected while mounted.
  */
 
 const CSS = /* css */ `
@@ -67,14 +67,12 @@ const CSS = /* css */ `
 .gh-select.mini { width: auto; padding: 1px 4px; font-size: 11px; }
 .gh-bar .gh-select { width: auto; }
 
-.gh-storey { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; align-items: start; margin-top: 7px; }
-.gh-storey-n { margin-top: 4px; font: 600 12px var(--mono); color: var(--brass); text-align: center; }
-.gh-storey-body { display: grid; gap: 3px; }
-
 .gh-range { display: flex; align-items: center; gap: 8px; }
 .gh-range input { flex: 1; accent-color: var(--brass); }
 .gh-range span { width: 38px; text-align: right; font: 12px var(--mono); color: var(--paper); }
 
+fieldset.gh-seg, fieldset.gh-chips { margin: 0; min-width: 0; }
+fieldset.gh-chips { padding: 0; border: 0; }
 .gh-chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .gh-toggle {
   padding: 2px 9px;
@@ -87,9 +85,6 @@ const CSS = /* css */ `
 }
 .gh-toggle:hover { color: var(--paper); }
 .gh-toggle[aria-pressed="true"] { border-color: var(--brass-line); background: var(--brass-wash); color: var(--brass-hi); }
-.gh-ramp { display: grid; gap: 4px; margin-bottom: 7px; }
-.gh-ramp .from { font-size: 11.5px; color: var(--paper); }
-.gh-ramp .from::after { content: " →"; color: var(--brass); }
 
 .gh-hint-line { margin: 0 0 6px; font-size: 12px; color: var(--faint); }
 .gh-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
@@ -145,6 +140,97 @@ const CSS = /* css */ `
 .gh-status[data-tone="ok"] { color: #a6dd8f; }
 .gh-status[data-tone="warn"] { color: var(--warn); }
 .gh-status[data-tone="fail"] { color: var(--fail); }
+
+/* ── tile composer ─────────────────────────────────────────────── */
+.gh-tiles { grid-template-columns: 248px minmax(0, 1fr) 320px; }
+.gh-tiles :focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 1px; }
+.gh-tiles .gh-col-body { padding: 4px 8px 10px; }
+.gh-tiles .gh-group { padding: 8px 0 2px; }
+.gh-tiles .gh-group + .gh-group { border-top: 1px solid var(--hair); }
+.gh-tiles .gh-group > .gh-eyebrow { padding: 2px 6px 5px; }
+.gh-tiles .gh-group > .gh-eyebrow .num { color: var(--faint); margin-left: 4px; letter-spacing: 0; }
+.gh-tiles .gh-list li { min-height: 28px; }
+.gh-tiles .gh-list .pick { min-height: 26px; }
+.gh-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.gh-row .gh-tool { text-decoration: none; }
+.gh-title {
+  min-width: 0;
+  width: min(30ch, 45%);
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  font: 400 17px/1.1 var(--display) !important;
+  letter-spacing: 0.04em;
+  color: var(--paper);
+}
+.gh-title:hover { border-color: var(--hair-2); }
+.gh-title:focus { border-color: var(--brass-line); background: rgba(0, 0, 0, 0.3); outline: none; }
+.gh-bar .of { font-size: 11px; color: var(--faint); }
+.gh-bar-2 { flex-wrap: wrap; gap: 6px 14px; min-height: 40px; padding: 6px 12px; }
+.gh-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint); }
+.gh-inline .gh-seg button { flex: 0 0 auto; }
+.gh-tool:disabled { opacity: 0.4; cursor: default; }
+.gh-sep { width: 1px; height: 20px; background: var(--hair-2); }
+.gh-try[aria-pressed="true"] { box-shadow: 0 0 0 1px var(--brass) inset; }
+.gh-stage-host { position: absolute; inset: 0; }
+.gh-legend {
+  width: max-content;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 10px;
+  padding: 5px 10px;
+  border-radius: var(--r-sm);
+  background: rgba(20, 15, 11, 0.78);
+  border: 1px solid var(--hair);
+  font: 11px var(--mono);
+  color: var(--muted);
+  pointer-events: none;
+}
+.gh-legend span { display: inline-flex; align-items: center; white-space: nowrap; }
+.gh-legend i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 50%; vertical-align: -1px; }
+.gh-legend i.ring { background: transparent; border: 2px solid #ff6e5a; }
+.gh-warnings { margin: 0 0 4px; padding: 0 0 0 16px; color: var(--warn); font: 12px/1.45 var(--mono); }
+.gh-readout[data-tone="warn"] { border-color: rgba(255, 196, 81, 0.4); }
+.gh-tabs { display: flex; border-bottom: 1px solid var(--hair); padding: 6px 6px 0; gap: 2px; }
+.gh-tabs button {
+  flex: 1;
+  padding: 8px 6px 7px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: 500 11px/1 var(--mono) !important;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.gh-tabs button:hover { color: var(--paper); }
+.gh-tabs button[aria-selected="true"] { color: var(--brass-hi); border-bottom-color: var(--brass); }
+.gh-tabs .num { color: var(--faint); margin-left: 3px; letter-spacing: 0; }
+.gh-layer { padding-top: 8px !important; }
+.gh-add { margin-bottom: 8px; }
+.gh-tiles .gh-col-foot { max-height: 62%; }
+.gh-tiles .gh-inspect .gh-field { grid-template-columns: 48px minmax(0, 1fr); }
+.dot { display: inline-block; flex: none; width: 9px; height: 9px; margin-right: 4px; border-radius: 50%; }
+.gh-inspect { display: grid; gap: 8px; }
+.gh-inspect .gh-sec-head { margin-bottom: 0; }
+.gh-nums { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; }
+.gh-hours { display: grid; gap: 4px; }
+.gh-num { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 6px; border-radius: var(--r-sm); border: 1px solid var(--hair-2); background: rgba(0, 0, 0, 0.26); }
+.gh-num:focus-within { border-color: var(--brass-line); }
+.gh-num-label { flex: none; width: 3.6em; font: 11px var(--mono); color: var(--faint); }
+.gh-num input { flex: 1; min-width: 0; padding: 4px 0; border: 0; background: transparent; outline: none; font: 12.5px var(--mono) !important; color: var(--paper); text-align: right; }
+.gh-num-unit { flex: none; font: 11px var(--mono); color: var(--faint); }
+.gh-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.gh-check input { accent-color: var(--brass); }
+.gh-toggle.danger:hover { border-color: rgba(255, 139, 123, 0.5); color: var(--fail); }
+.gh-toggle .dot { margin-right: 5px; }
+.gh-adder { display: grid; gap: 8px; }
+.gh-adder .gh-hits { padding: 0; max-height: 300px; }
+.gh-tiles .gh-hit { min-height: 44px; }
 `
 
 let users = 0

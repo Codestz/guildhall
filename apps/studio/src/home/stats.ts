@@ -11,19 +11,13 @@ export interface StudioStats {
   rigs: number
   /** Props with an authored grip in `data/mounts.json`. */
   mounts: number
-  /** Prefab recipes saved under `data/recipes/`. */
-  recipes: number
+  /** Tile prefabs saved under `data/tiles/`. */
+  tiles: number
   /** The palette hash the library was baked with. */
   palette: string | null
 }
 
-export const RECIPE_KINDS: readonly DataKind[] = [
-  "recipes/houses",
-  "recipes/landmarks",
-  "recipes/stalls",
-  "recipes/docks",
-  "recipes/farm",
-]
+export const TILE_KINDS: readonly DataKind[] = ["tiles"]
 
 /**
  * The numbers for a catalog (null: no library yet), the authored mounts and a `list` of a data folder.
@@ -34,7 +28,7 @@ export async function studioStats(
   mounts: Record<string, unknown> | undefined,
   list: (kind: DataKind) => Promise<string[]>,
 ): Promise<StudioStats> {
-  const counts = await Promise.all(RECIPE_KINDS.map((kind) => list(kind).catch(() => [])))
+  const counts = await Promise.all(TILE_KINDS.map((kind) => list(kind).catch(() => [])))
   const rigs = catalog?.index.rigs ?? []
   return {
     pieces: catalog?.all().length ?? 0,
@@ -42,7 +36,7 @@ export async function studioStats(
     clips: rigs.reduce((n, rig) => n + rig.clips.length, 0),
     rigs: rigs.length,
     mounts: Object.keys(mounts ?? {}).length,
-    recipes: counts.reduce((n, ids) => n + ids.length, 0),
+    tiles: counts.reduce((n, ids) => n + ids.length, 0),
     palette: catalog?.index.palette ?? null,
   }
 }

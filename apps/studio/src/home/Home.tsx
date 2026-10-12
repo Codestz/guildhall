@@ -24,7 +24,7 @@ const STAT_ROWS: readonly { key: keyof Omit<StudioStats, "palette">; label: stri
   { key: "clips", label: "animation clips" },
   { key: "rigs", label: "rigs" },
   { key: "mounts", label: "grips authored" },
-  { key: "recipes", label: "recipes saved" },
+  { key: "tiles", label: "tile prefabs" },
 ]
 
 function Card({ tool }: { tool: Tool }) {

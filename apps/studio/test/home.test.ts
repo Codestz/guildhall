@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { createCatalog } from "@guildhall/assets"
 import { ISLAND_R, islandGround, POSE } from "../src/home/diorama.ts"
-import { formatCount, RECIPE_KINDS, studioStats } from "../src/home/stats.ts"
+import { formatCount, studioStats, TILE_KINDS } from "../src/home/stats.ts"
 import { GROUPS, HOME_ID, linkTo, openable, placeOf, search } from "../src/shell/directory.ts"
 import { entry, index } from "./entries.ts"
 
@@ -110,19 +110,19 @@ describe("studioStats", () => {
     [[entry("kaykit-a/one"), entry("kaykit-a/two")], [entry("kenney-b/three")]],
   )
 
-  test("counts pieces, packs with pieces, clips, rigs, mounts and every recipe folder", async () => {
+  test("counts pieces, packs with pieces, clips, rigs, mounts and the tile prefabs", async () => {
     const asked: string[] = []
     const stats = await studioStats(catalog, { "a/sword": {}, "b/lantern": {} }, async (kind) => {
       asked.push(kind)
-      return kind === "recipes/houses" ? ["cottage", "townhouse"] : kind === "recipes/stalls" ? ["fish"] : []
+      return kind === "tiles" ? ["cottage", "townhouse", "market"] : []
     })
-    expect(stats).toMatchObject({ pieces: 3, packs: 2, clips: 3, rigs: 2, mounts: 2, recipes: 3 })
-    expect(asked).toEqual([...RECIPE_KINDS])
+    expect(stats).toMatchObject({ pieces: 3, packs: 2, clips: 3, rigs: 2, mounts: 2, tiles: 3 })
+    expect(asked).toEqual([...TILE_KINDS])
   })
 
   test("no library, no data endpoint: zeros, not a failure", async () => {
     const stats = await studioStats(null, undefined, () => Promise.reject(new Error("404")))
-    expect(stats).toEqual({ pieces: 0, packs: 0, clips: 0, rigs: 0, mounts: 0, recipes: 0, palette: null })
+    expect(stats).toEqual({ pieces: 0, packs: 0, clips: 0, rigs: 0, mounts: 0, tiles: 0, palette: null })
   })
 
   test("formatCount groups thousands", () => {

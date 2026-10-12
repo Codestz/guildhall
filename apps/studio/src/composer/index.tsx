@@ -1,15 +1,16 @@
-import type { PrefabRecipe } from "@guildhall/assets"
-import { validatePrefab } from "@guildhall/assets"
+import { applyOverlay, createCatalog, type NpcRecipe, validateNpc } from "@guildhall/assets"
 import { log } from "@guildhall/core"
+import { tilePrefabs } from "@guildhall/world"
 import { flushSync } from "react-dom"
 import { createRoot } from "react-dom/client"
 import { holdStudioStyle } from "../browser/style.ts"
 import { loadCatalog } from "../catalog.ts"
 import * as data from "../data.ts"
 import type { Screen } from "../screens.ts"
-import { Composer, type ComposerState, type Initial } from "./Composer.tsx"
-import { blank, DEFAULT_REF, parseRef, parseSeed } from "./model.ts"
+import { loadTiles } from "../tiles.ts"
+import { parseTileId } from "./model.ts"
 import { holdComposerStyle } from "./style.ts"
+import { type ComposerData, type ComposerState, TileComposer } from "./TileComposer.tsx"
 
 const logger = log("studio:composer")
 
@@ -18,29 +19,38 @@ export interface ComposerExt {
   state(): ComposerState | null
 }
 
-/** The recipe the deep link names: its saved file, else a template of that id (unsaved). */
-async function initial(query: URLSearchParams): Promise<Initial> {
-  const ref = parseRef(query.get("recipe")) ?? DEFAULT_REF
-  const seed = parseSeed(query.get("seed"))
-  const strip = query.get("strip") === "1"
-  // Listed first: a missing file would be a 404 the browser logs as an error.
-  const saved = await data.list(ref.kind).catch((): string[] => [])
-  const json = saved.includes(ref.id) ? await data.load(ref.kind, ref.id) : null
-  if (json !== null && validatePrefab(json).length === 0)
-    return { ref, recipe: json as PrefabRecipe, source: "saved", seed, strip }
-  if (json !== null)
-    logger.warn("saved recipe is invalid, starting fresh", { problems: validatePrefab(json) })
-  return { ref, recipe: blank(ref.id), source: "new", seed, strip }
+/** The rig every KayKit townsperson plays. */
+const RIG = "rig-medium"
+
+/** The library (with `data/mounts.json` over it, so props carry their grips), the tiles, the roles, the clips. */
+async function boot(): Promise<ComposerData | null> {
+  const [catalog, overlay, ids] = await Promise.all([
+    loadCatalog(),
+    data.loadOverlay().catch(() => ({})),
+    data.list("npcs").catch((): string[] => []),
+    loadTiles(),
+  ])
+  if (!catalog) return null
+  const mounted = createCatalog(catalog.index, [applyOverlay(catalog.all(), overlay)])
+  const recipes = await Promise.all(ids.map((id) => data.load("npcs", id).catch(() => null)))
+  const roles = new Map(
+    recipes
+      .filter((r): r is NpcRecipe => r !== null && validateNpc(r).length === 0)
+      .map((r) => [r.id, r] as const),
+  )
+  const clips = (catalog.rig(RIG)?.clips ?? []).map((c) => c.name)
+  return { catalog: mounted, tiles: tilePrefabs(), roles, clips }
 }
 
 /**
- * The house composer (`?screen=composer&recipe=<kind/id>&seed=<n>&strip=1`, ADR 005): blueprint
- * controls, panel-click edits and gizmo-placed dressing over a live compile, the hero beside it, a
- * strip of six seeds, and save/load through `data/recipes/<kind>/<id>.json`.
+ * The tile composer (`/composer/<tile-id>`, decisions.md "Polish round"): a tile prefab on one hex at
+ * scale B with its neighbours; its pieces placed and turned with the gizmo, its activity spots and
+ * blockers drawn and edited, "try" stands townsfolk on every spot; saves to `data/tiles/<id>.json`.
+ * `?try=1`, `?around=grass|shore|step`, `?markers=0` and `?view=wide` open it in that state.
  */
 export const composer: Screen = {
   id: "composer",
-  title: "Composer",
+  title: "Tile composer",
   mount(host, ctx) {
     const style = holdStudioStyle()
     const own = holdComposerStyle()
@@ -53,16 +63,17 @@ export const composer: Screen = {
     const ext: ComposerExt = { state: () => read?.() ?? null }
     if (window.guildhall) window.guildhall.ext.composer = ext
 
-    const boot = async () => {
-      const [catalog, start] = await Promise.all([loadCatalog(), initial(ctx.query), style.ready])
+    const start = async () => {
+      const [input] = await Promise.all([boot(), style.ready])
       if (disposed) return
+      const initial = parseTileId(ctx.query.get("tile")) ?? "tavern"
       flushSync(() =>
         root.render(
-          catalog ? (
-            <Composer
-              catalog={catalog}
+          input?.tiles.length ? (
+            <TileComposer
               ctx={ctx}
-              initial={start}
+              input={input}
+              initial={initial}
               bind={(next) => {
                 read = next
               }}
@@ -79,16 +90,15 @@ export const composer: Screen = {
           ),
         ),
       )
-      // The first draw is registered with `ctx.load` by now; `ready()` waits for it.
       await new Promise<void>((done) => requestAnimationFrame(() => done()))
     }
-    ctx.load(boot()).catch((error: unknown) => logger.error("boot failed", { error: String(error) }))
+    ctx.load(start()).catch((error: unknown) => logger.error("boot failed", { error: String(error) }))
 
     return () => {
       disposed = true
       if (window.guildhall?.ext.composer === ext) delete window.guildhall.ext.composer
       node.style.display = "none"
-      // The shell tears screens down from its own React commit; a nested root unmounts after it.
+      // the shell tears screens down from its own React commit; a nested root unmounts after it
       setTimeout(() => {
         root.unmount()
         node.remove()

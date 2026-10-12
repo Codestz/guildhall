@@ -59,8 +59,9 @@ const ALL_GROUPS: readonly ToolGroup[] = [
     tools: [
       {
         id: "composer",
-        name: "Composer",
-        purpose: "Assemble a house from modules: storeys, roof, door, windows, dressing.",
+        name: "Tile composer",
+        purpose:
+          "Compose a hex tile's scene: its pieces, where people sit, work and talk, and what they walk round.",
         preview: true,
       },
       {

@@ -28,9 +28,9 @@ describe("router", () => {
       screen: "pieces",
       query: { clip: "Chopping", id: "kaykit-adventurers/barbarian" },
     })
-    expect(at("/composer/houses/cottage?seed=3")).toEqual({
+    expect(at("/composer/tavern?try=1")).toEqual({
       screen: "composer",
-      query: { seed: "3", recipe: "houses/cottage" },
+      query: { try: "1", tile: "tavern" },
     })
     expect(at("/npcs/guard")).toEqual({ screen: "npc", query: { recipe: "guard" } })
     expect(at("/grips?t=0.3,0.7")).toEqual({ screen: "grips", query: { t: "0.3,0.7" } })
@@ -79,7 +79,7 @@ describe("router", () => {
     for (const url of [
       "/",
       "/pieces/kaykit-adventurers/barbarian?clip=Chopping",
-      "/composer/houses/cottage?seed=3&strip=1",
+      "/composer/tavern?try=1&around=step",
       "/npcs/guard?seed=1&strip=8&clip=work",
       "/grips/editor/kaykit-tools/axe?body=x",
       "/town/3?hour=17.5",
@@ -98,7 +98,7 @@ describe("router", () => {
     expect(canonical("screen=grips&t=0.3")).toBe("/grips?t=0.3")
     expect(canonical("")).toBe("/")
     expect(canonical("?seed=2")).toBe("/?seed=2")
-    expect(canonical("/?screen=composer&recipe=houses/demo&seed=1")).toBe("/composer/houses/demo?seed=1")
+    expect(canonical("/?screen=composer&tile=market&try=1")).toBe("/composer/market?try=1")
     expect(canonical("/pieces?id=kaykit-adventurers/barbarian")).toBe("/pieces/kaykit-adventurers/barbarian")
     expect(canonical("/nope?x=1")).toBe("/nope?x=1")
     expect(canonical("?screen=nope")).toBe("/?screen=nope")

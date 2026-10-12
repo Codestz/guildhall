@@ -1,120 +1,123 @@
+/** The tile composer's document edits (composer/model.ts): pure functions over one tile prefab. */
 import { describe, expect, test } from "bun:test"
-import { buildHouse, validatePrefab } from "@guildhall/assets"
+import { HEX_TILE_SIZE, sideDir, type TilePrefab } from "@guildhall/world"
 import {
-  blank,
-  cyclePanel,
-  panelChoices,
-  parseRef,
-  parseSeed,
-  setSize,
-  setStoreyCount,
-  TEMPLATES,
+  addBlocker,
+  addPiece,
+  addSpot,
+  back,
+  blockerFor,
+  copyAs,
+  duplicate,
+  forward,
+  history,
+  KIND_CLIP,
+  lint,
+  moveTo,
+  onTile,
+  parseTileId,
+  patchPiece,
+  push,
+  remove,
+  snapToEdge,
+  tidy,
 } from "../src/composer/model.ts"
-import { inConvex, panelFaces, pickDressing, pickPanel, type Vec3 } from "../src/composer/pick.ts"
 
-describe("composer document", () => {
-  test("every template is a valid prefab", () => {
-    for (const r of Object.values(TEMPLATES)) expect(validatePrefab(r)).toEqual([])
-  })
-
-  test("a recipe ref names a recipe folder and a kebab id, or nothing", () => {
-    expect(parseRef("houses/demo")).toEqual({ kind: "recipes/houses", id: "demo" })
-    expect(parseRef("farm/hay-set")).toEqual({ kind: "recipes/farm", id: "hay-set" })
-    for (const bad of [null, "", "houses", "npcs/x", "houses/../x", "houses/Demo", "houses/a/b"])
-      expect(parseRef(bad)).toBeNull()
-  })
-
-  test("an unknown id starts from the cottage under that id", () => {
-    const r = blank("demo")
-    expect(r.id).toBe("demo")
-    expect(r.house).toEqual(TEMPLATES.cottage.house)
-  })
-
-  test("seeds are whole and non-negative, else 1", () => {
-    expect([parseSeed("7"), parseSeed(null), parseSeed("-2"), parseSeed("1.5")]).toEqual([7, 1, 1, 1])
-  })
-
-  test("a panel click steps the slot and cycling all the way round leaves no edit", () => {
-    const r = TEMPLATES.cottage
-    const slot = { storey: 0, side: "-z" as const, index: 0 }
-    const once = cyclePanel(r, 1, slot)
-    expect(once.house?.edits).toHaveLength(1)
-    let back = once
-    const n = panelChoices(r.house!, slot).length
-    for (let i = 1; i < n; i++) back = cyclePanel(back, 1, slot)
-    expect(back.house?.edits).toEqual([])
-    expect(cyclePanel(once, 1, slot, -1).house?.edits).toEqual([])
-  })
-
-  test("a panel cycled to empty draws nothing in that slot", () => {
-    // The back is blind: the first choice, so one step back wraps round to empty.
-    const slot = { storey: 0, side: "-z" as const, index: 0 }
-    let r = TEMPLATES.cottage
-    r = cyclePanel(r, 1, slot, -1)
-    expect(r.house?.edits).toEqual([{ ...slot, piece: null }])
-    const parts = buildHouse(r.house!, 1).parts
-    expect(parts.some((p) => p.slot?.side === "-z")).toBe(false)
-  })
-
-  test("shrinking drops edits beyond the new footprint and pulls the door in", () => {
-    let r = TEMPLATES.hall
-    r = { ...r, house: { ...r.house!, door: { index: 2 } } }
-    const smaller = setSize(r, 1, 2)
-    expect(smaller.house?.edits).toEqual([])
-    expect(smaller.house?.door.index).toBe(0)
-    expect(validatePrefab(smaller)).toEqual([])
-  })
-
-  test("a new storey copies the one below; fewer storeys drop their edits", () => {
-    const three = setStoreyCount(TEMPLATES.hall, 3)
-    expect(three.house?.storeys[2]).toEqual(TEMPLATES.hall.house?.storeys[1])
-    expect(setStoreyCount(TEMPLATES.hall, 1).house?.edits).toEqual([])
-    expect(setStoreyCount(TEMPLATES.hall, 9).house?.storeys).toHaveLength(3)
-  })
+const tile = (): TilePrefab => ({
+  id: "demo",
+  name: "Demo",
+  ground: "grass",
+  pieces: [{ piece: "kenney-nature/fence-simple-low", x: 0.3, z: 2.2, rot: 0, scale: 1 }],
 })
+const APOTHEM = (HEX_TILE_SIZE * Math.sqrt(3)) / 2
 
-describe("composer picking", () => {
-  // A top-down orthographic view: screen x = world x, screen y = world z.
-  const topDown = (p: Vec3): [number, number] => [p[0], p[2]]
-  // Looking from the front (+z) square on: screen x = x, screen y = -y.
-  const front = (p: Vec3): [number, number] => [p[0], -p[1]]
-
-  test("inConvex accepts either winding and refuses outside points", () => {
-    const square: [number, number][] = [
-      [0, 0],
-      [1, 0],
-      [1, 1],
-      [0, 1],
-    ]
-    expect(inConvex([0.5, 0.5], square)).toBe(true)
-    expect(inConvex([0.5, 0.5], [...square].reverse())).toBe(true)
-    expect(inConvex([1.5, 0.5], square)).toBe(false)
+describe("tile composer document", () => {
+  test("a deep link names a kebab tile id, or nothing", () => {
+    expect(parseTileId("tavern-yard")).toBe("tavern-yard")
+    for (const bad of [null, "", "Tavern", "a/b", "../x"]) expect(parseTileId(bad)).toBeNull()
   })
 
-  test("a click on the front picks that storey's cell; the back faces never compete", () => {
-    const h = TEMPLATES.hall.house!
-    const faces = panelFaces(h)
-    const eye: Vec3 = [0, 3, 30]
-    // Hall: 9 m wide (x -4.5..4.5), two 3 m storeys; the upper right cell is x 1.5..4.5, y 3..6.
-    expect(pickPanel(faces, eye, front, [3, -4.5])).toEqual({ storey: 1, side: "+z", index: 2 })
-    expect(pickPanel(faces, eye, front, [-3, -1])).toEqual({ storey: 0, side: "+z", index: 0 })
-    expect(pickPanel(faces, eye, front, [6, -1])).toBeNull()
+  test("adding returns the new item's index; spots take their kind's clip", () => {
+    const [t1, i] = addPiece(tile(), "kenney-pirate/barrel", 1, 1)
+    expect(i).toBe(1)
+    const [t2, s] = addSpot(t1, "sit")
+    expect(t2.spots?.[s]).toMatchObject({ kind: "sit", clip: KIND_CLIP.sit, facing: 0 })
+    const [t3, b] = addBlocker(t2, 1, 1, 0.4)
+    expect(t3.blockers?.[b]).toEqual({ x: 1, z: 1, r: 0.4 })
   })
 
-  test("a face edge-on or turned away is not picked", () => {
-    const faces = panelFaces(TEMPLATES.cottage.house!)
-    expect(pickPanel(faces, [0, 30, 0], topDown, [0, 1.5])).toBeNull()
+  test("moving takes a piece's turn and a spot's facing; a blocker only moves", () => {
+    const [t, s] = addSpot(tile(), "work")
+    const moved = moveTo(
+      moveTo(t, { layer: "pieces", i: 0 }, 1.23456, -0.5, 1),
+      { layer: "spots", i: s },
+      0.5,
+      0.5,
+      2,
+    )
+    expect(moved.pieces[0]).toMatchObject({ x: 1.235, z: -0.5, rot: 1 })
+    expect(moved.spots?.[s]).toMatchObject({ x: 0.5, z: 0.5, facing: 2 })
   })
 
-  test("overlapping dressing boxes pick the one nearer the eye", () => {
-    const box = (z: number) => ({
-      corners: [
-        [-1, 0, z],
-        [1, 1, z],
-      ] as Vec3[],
-      at: [0, 0.5, z] as Vec3,
+  test("removing the last spot drops the list; a piece list stays", () => {
+    const [t] = addSpot(tile(), "talk")
+    expect(remove(t, { layer: "spots", i: 0 }).spots).toBeUndefined()
+    expect(remove(t, { layer: "pieces", i: 0 }).pieces).toEqual([])
+  })
+
+  test("duplicate copies beside the original; a blocker for a piece covers its footprint", () => {
+    const [t, i] = duplicate(tile(), { layer: "pieces", i: 0 })
+    expect(t.pieces[i]).toMatchObject({ x: 0.8, z: 2.2 })
+    const [b, j] = blockerFor(patchPiece(t, 0, { scale: 0.5 }), 0, [1.2, 1, 0.8])
+    expect(b.blockers?.[j]?.r).toBeCloseTo(0.4)
+  })
+
+  test("to edge: on the nearest tile side, along it, spanning it", () => {
+    const t = snapToEdge(tile(), 0, 0.96, 4.16)
+    const q = t.pieces[0]!
+    const [dx, dz] = sideDir(4)
+    expect(q.x).toBeCloseTo(dx * APOTHEM * 0.96, 2)
+    expect(q.z).toBeCloseTo(dz * APOTHEM * 0.96, 2)
+    // the front side runs along x: no turn
+    expect(Math.abs(Math.sin(q.rot))).toBeCloseTo(0, 2)
+    expect(q.scale * 4.16).toBeCloseTo(HEX_TILE_SIZE * 0.96, 2)
+  })
+
+  test("the tile's outline: corners on ±x, a side across ±z", () => {
+    expect(onTile(3.0, 0)).toBe(true)
+    expect(onTile(0, 2.6)).toBe(true)
+    expect(onTile(0, 2.8)).toBe(false)
+    expect(onTile(2.5, 1.5)).toBe(false)
+  })
+
+  test("undo and redo step through the edits; a new edit drops the redo", () => {
+    let h = history(tile())
+    const a = addPiece(h.now, "a/b")[0]
+    h = push(h, a)
+    h = back(h)
+    expect(h.now.pieces.length).toBe(1)
+    h = forward(h)
+    expect(h.now).toBe(a)
+    h = push(back(h), copyAs(tile(), "other"))
+    expect(h.future).toEqual([])
+    expect(h.now.id).toBe("other")
+  })
+
+  test("tidy rounds to the millimetre and drops undefined fields", () => {
+    const t = tidy({
+      ...tile(),
+      pieces: [{ piece: "a/b", x: 1.23456, z: 0, rot: 0, scale: 1, odds: undefined }],
     })
-    expect(pickDressing([box(0), box(5)], [0, 0.5, 10], front, [0, -0.5])).toBe(1)
-    expect(pickDressing([box(0)], [0, 0.5, 10], front, [3, -0.5])).toBeNull()
+    expect(t.pieces[0]).toEqual({ piece: "a/b", x: 1.235, z: 0, rot: 0, scale: 1 })
+  })
+
+  test("lint names unknown pieces, clips and props, and things off the tile", () => {
+    const [t] = addSpot({ ...tile(), pieces: [{ piece: "x/y", x: 5, z: 0, rot: 0, scale: 1 }] }, "sit")
+    const t2 = { ...t, spots: [{ ...t.spots![0]!, prop: "a/b", clip: "Nope" }] }
+    const out = lint(t2, { piece: () => false, clip: () => false, prop: () => false }).join("\n")
+    expect(out).toContain("x/y is not in the library")
+    expect(out).toContain("off the tile")
+    expect(out).toContain('no clip "Nope"')
+    expect(out).toContain("has no grip")
   })
 })

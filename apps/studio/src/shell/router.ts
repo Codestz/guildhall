@@ -20,7 +20,7 @@ export const ROUTES: readonly Route[] = [
   { screen: "home", path: "" },
   { screen: "pieces", path: "pieces", param: { key: "id", parts: 2 } },
   { screen: "palette", path: "palette" },
-  { screen: "composer", path: "composer", param: { key: "recipe", parts: 2 } },
+  { screen: "composer", path: "composer", param: { key: "tile", parts: 1 } },
   { screen: "npc", path: "npcs", param: { key: "recipe", parts: 1 } },
   { screen: "grips", path: "grips" },
   { screen: "grip", path: "grips/editor", param: { key: "piece", parts: 2 } },

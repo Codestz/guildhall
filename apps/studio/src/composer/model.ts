@@ -1,230 +1,234 @@
 /**
- * The composer's document: a PrefabRecipe (ADR 005) and the pure edits the screen makes to it. Every
- * edit returns a new recipe and keeps it drawable where it can (edits and the door follow a resize);
- * what it cannot keep valid is left to `validatePrefab` and shown inline.
+ * The tile composer's document: one tile prefab (world `TilePrefab`, saved as `data/tiles/<id>.json`)
+ * and pure edits on it. Every edit returns a new prefab; nothing here touches the stage.
  */
 import {
-  buildHouse,
-  type HouseBlueprint,
-  KIT_PROFILES,
-  type PrefabRecipe,
-  type RecipeInstance,
-  type Storey,
-} from "@guildhall/assets"
-import type { DataKind } from "../data.ts"
+  HEX_TILE_SIZE,
+  type TileBlocker,
+  type TilePiece,
+  type TilePrefab,
+  type TileSpot,
+} from "@guildhall/world"
 
-export type Side = HouseBlueprint["edits"][number]["side"]
-
-/** One wall panel of the blueprint (what a panel click addresses). */
-export interface Slot {
-  storey: number
-  side: Side
-  index: number
+/** What the composer can select: a piece, a spot or a blocker, by its index in its list. */
+export type Layer = "pieces" | "spots" | "blockers"
+export interface Selection {
+  layer: Layer
+  i: number
 }
 
-/** A recipe file: `data/<kind>/<id>.json`. */
-export interface RecipeRef {
-  kind: DataKind
-  id: string
+export type SpotKind = TileSpot["kind"]
+
+/** The clip a new spot of each kind plays (KayKit rig-medium names). */
+export const KIND_CLIP: Record<SpotKind, string> = {
+  sit: "Sit_Chair_Idle",
+  work: "Working_A",
+  stand: "Idle_A",
+  talk: "Idle_B",
+  sleep: "Lie_Idle",
 }
 
-/** `?recipe=houses/demo` → the houses folder; anything unreadable falls back to it. */
-export const DEFAULT_REF: RecipeRef = { kind: "recipes/houses", id: "demo" }
+/** A spot kind's marker colour: distinct in hue and in lightness, so they read apart without colour too. */
+export const KIND_COLOUR: Record<SpotKind, string> = {
+  sit: "#4fc3f7",
+  work: "#ffb74d",
+  stand: "#e6ee9c",
+  talk: "#f48fb1",
+  sleep: "#b39ddb",
+}
+export const BLOCKER_COLOUR = "#ff6e5a"
 
-const FOLDERS = ["houses", "landmarks", "stalls", "docks", "farm", "vignettes"] as const
-const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/
+/** Numbers as the files keep them: millimetres. */
+const mm = (v: number) => Math.round(v * 1000) / 1000
 
-/** `kind/id` (e.g. `houses/demo`) as a data file, or null when it names no recipe folder. */
-export function parseRef(text: string | null): RecipeRef | null {
-  if (!text) return null
-  const [folder, id, ...rest] = text.split("/")
-  if (rest.length > 0 || !id || !ID.test(id) || !(FOLDERS as readonly string[]).includes(folder ?? ""))
-    return null
-  return { kind: `recipes/${folder}` as DataKind, id }
+/** The deep link's tile id (`/composer/<id>`), or null when it is missing or not a kebab id. */
+export function parseTileId(raw: string | null): string | null {
+  return raw && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(raw) ? raw : null
 }
 
-export const refText = (ref: RecipeRef): string => `${ref.kind.slice("recipes/".length)}/${ref.id}`
-
-const house = (over: Partial<HouseBlueprint>): HouseBlueprint => ({
-  kit: "kenney-town",
-  size: { w: 1, d: 1 },
-  storeys: [{ family: "plaster", openings: "home" }],
-  roof: { style: "gable", ridge: "x" },
-  door: { index: "centre" },
-  edits: [],
-  vary: {},
-  ...over,
-})
-
-const recipe = (id: string, h: HouseBlueprint, dressing: RecipeInstance[] = []): PrefabRecipe => ({
-  version: 1,
-  id,
-  kind: "house",
-  tags: [],
-  fits: {},
-  house: h,
-  dressing,
-  anchors: [],
-})
-
-/** Starting points for a new recipe: H1's three sample blueprints (.probe/h1). */
-export const TEMPLATES: Readonly<Record<"cottage" | "townhouse" | "hall", PrefabRecipe>> = {
-  cottage: recipe("cottage", house({ chimney: 1 })),
-  townhouse: recipe(
-    "townhouse",
-    house({
-      size: { w: 2, d: 1 },
-      storeys: [
-        { family: "stone", openings: "shop" },
-        { family: "wood", openings: "home" },
-      ],
-      door: { index: 0, style: "round" },
-    }),
-    [{ piece: "kenney-town/lantern", x: 2, y: 0, z: 2.5, rot: 0, scale: 1 }],
-  ),
-  hall: recipe(
-    "hall",
-    house({
-      size: { w: 3, d: 2 },
-      storeys: [
-        { family: "stone", openings: "home" },
-        { family: "plaster", openings: "home" },
-      ],
-      roof: { style: "high-gable", ridge: "x" },
-      door: { index: "centre", style: "square" },
-      chimney: 1,
-      edits: [{ storey: 1, side: "+z", index: 1, piece: "kenney-town/wall-window-round" }],
-    }),
-  ),
+/** A copy of `t` with every number rounded to the millimetre (what save writes). */
+export function tidy(t: TilePrefab): TilePrefab {
+  const round = (v: unknown): unknown =>
+    typeof v === "number"
+      ? mm(v)
+      : Array.isArray(v)
+        ? v.map(round)
+        : v && typeof v === "object"
+          ? Object.fromEntries(
+              Object.entries(v)
+                .filter(([, x]) => x !== undefined)
+                .map(([k, x]) => [k, round(x)]),
+            )
+          : v
+  return round(t) as TilePrefab
 }
 
-/** A fresh recipe for `id`: the template of that name, else the cottage renamed. */
-export function blank(id: string): PrefabRecipe {
-  const template = TEMPLATES[id as keyof typeof TEMPLATES] ?? TEMPLATES.cottage
-  return { ...structuredClone(template), id }
+/** `list` of `t` with item `i` replaced by `f(item)`. */
+function edit<K extends Layer>(
+  t: TilePrefab,
+  layer: K,
+  i: number,
+  f: (item: NonNullable<TilePrefab[K]>[number]) => NonNullable<TilePrefab[K]>[number],
+): TilePrefab {
+  const list = [...((t[layer] ?? []) as NonNullable<TilePrefab[K]>[number][])]
+  if (!list[i]) return t
+  list[i] = f(list[i]!)
+  return { ...t, [layer]: list }
 }
 
-/** Cells along a side: ±z run along the frontage (w), ±x along the depth (d). */
-export const cellsOn = (h: HouseBlueprint, side: Side): number =>
-  side === "+z" || side === "-z" ? h.size.w : h.size.d
-
-const withHouse = (r: PrefabRecipe, h: HouseBlueprint): PrefabRecipe => ({ ...r, house: h })
-
-/** Drops the edits a smaller blueprint no longer has a panel for. */
-function keepEdits(h: HouseBlueprint): HouseBlueprint {
-  const edits = h.edits.filter((e) => e.storey < h.storeys.length && e.index < cellsOn(h, e.side))
-  const index = h.door.index
-  const door = index !== "centre" && index >= h.size.w ? { ...h.door, index: h.size.w - 1 } : h.door
-  return { ...h, edits, door }
+/** Patches one piece (undefined fields are dropped, so `odds: undefined` clears the odds). */
+export function patchPiece(t: TilePrefab, i: number, patch: Partial<TilePiece>): TilePrefab {
+  return edit(t, "pieces", i, (q) => strip({ ...q, ...patch }))
+}
+export function patchSpot(t: TilePrefab, i: number, patch: Partial<TileSpot>): TilePrefab {
+  return edit(t, "spots", i, (s) => strip({ ...s, ...patch }))
+}
+export function patchBlocker(t: TilePrefab, i: number, patch: Partial<TileBlocker>): TilePrefab {
+  return edit(t, "blockers", i, (b) => strip({ ...b, ...patch }))
 }
 
-/** A new footprint, in whole modules (at least 1). */
-export function setSize(r: PrefabRecipe, w: number, d: number): PrefabRecipe {
-  if (!r.house) return r
-  const size = { w: Math.max(1, Math.round(w)), d: Math.max(1, Math.round(d)) }
-  return withHouse(r, keepEdits({ ...r.house, size }))
+const strip = <T extends object>(o: T): T =>
+  Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T
+
+/** Moves whatever `sel` names to (x, z) and, for a piece or spot, turns it to `rot` (radians). */
+export function moveTo(t: TilePrefab, sel: Selection, x: number, z: number, rot?: number): TilePrefab {
+  if (sel.layer === "pieces")
+    return patchPiece(t, sel.i, { x: mm(x), z: mm(z), ...(rot === undefined ? {} : { rot: mm(rot) }) })
+  if (sel.layer === "spots")
+    return patchSpot(t, sel.i, { x: mm(x), z: mm(z), ...(rot === undefined ? {} : { facing: mm(rot) }) })
+  return patchBlocker(t, sel.i, { x: mm(x), z: mm(z) })
 }
 
-/** 1–3 storeys; a new storey copies the one below it. */
-export function setStoreyCount(r: PrefabRecipe, n: number, max = 3): PrefabRecipe {
-  if (!r.house) return r
-  const count = Math.min(max, Math.max(1, Math.round(n)))
-  const storeys = r.house.storeys.slice(0, count)
-  while (storeys.length < count) storeys.push({ ...(storeys.at(-1) as Storey) })
-  return withHouse(r, keepEdits({ ...r.house, storeys }))
+/** Adds a piece at (x, z); returns the prefab and the new piece's index. */
+export function addPiece(t: TilePrefab, piece: string, x = 0, z = 0, scale = 0.5): [TilePrefab, number] {
+  const pieces = [...t.pieces, { piece, x: mm(x), z: mm(z), rot: 0, scale }]
+  return [{ ...t, pieces }, pieces.length - 1]
 }
 
-export function setStorey(r: PrefabRecipe, k: number, patch: Partial<Storey>): PrefabRecipe {
-  if (!r.house) return r
-  const storeys = r.house.storeys.map((s, i) => (i === k ? { ...s, ...patch } : s))
-  return withHouse(r, { ...r.house, storeys })
+/** Adds a spot of `kind` at (x, z) facing the street (+z), with its kind's clip. */
+export function addSpot(t: TilePrefab, kind: SpotKind, x = 0, z = 0.8): [TilePrefab, number] {
+  const spots = [...(t.spots ?? []), { kind, x: mm(x), z: mm(z), facing: 0, clip: KIND_CLIP[kind] }]
+  return [{ ...t, spots }, spots.length - 1]
 }
 
-export function patchHouse(r: PrefabRecipe, patch: Partial<HouseBlueprint>): PrefabRecipe {
-  return r.house ? withHouse(r, { ...r.house, ...patch }) : r
-}
-
-const sameSlot = (a: Slot) => (b: Slot) => a.storey === b.storey && a.side === b.side && a.index === b.index
-
-/** The piece the blueprint puts in `slot` with no edit there (null: the slot draws nothing). */
-export function defaultPanel(h: HouseBlueprint, seed: number, slot: Slot): string | null {
-  const plain = { ...h, edits: h.edits.filter((e) => !sameSlot(slot)(e)) }
-  return buildHouse(plain, seed).parts.find((p) => p.slot && sameSlot(slot)(p.slot))?.instance.piece ?? null
-}
-
-/** What a slot can hold: the family's blind panel, its windows, its shop front, doors on the ground front, empty. */
-export function panelChoices(h: HouseBlueprint, slot: Slot): (string | null)[] {
-  const set = KIT_PROFILES[h.kit].walls[(h.storeys[slot.storey] as Storey).family]
-  const doors = slot.storey === 0 && slot.side === "+z" ? Object.values(set.doors) : []
-  return [...new Set([set.blind, ...Object.values(set.windows), set.shop, ...doors]), null]
+export function addBlocker(t: TilePrefab, x = 0, z = 0, r = 0.5): [TilePrefab, number] {
+  const blockers = [...(t.blockers ?? []), { x: mm(x), z: mm(z), r: mm(r) }]
+  return [{ ...t, blockers }, blockers.length - 1]
 }
 
 /**
- * A panel click: the slot's piece steps to the next choice (`step` -1 goes back). Landing on what the
- * blueprint would draw anyway removes the edit, so cycling all the way round leaves no trace.
+ * A blocker round piece `i`: centred on it, as wide as its footprint (`size`, the catalog's metres at
+ * scale 1, times the piece's scale), half the larger side plus a little room to pass.
  */
-export function cyclePanel(r: PrefabRecipe, seed: number, slot: Slot, step: 1 | -1 = 1): PrefabRecipe {
-  const h = r.house
-  if (!h) return r
-  const fallback = defaultPanel(h, seed, slot)
-  const edit = h.edits.find(sameSlot(slot))
-  const current = edit ? edit.piece : fallback
-  const choices = panelChoices(h, slot)
-  if (!choices.includes(fallback)) choices.unshift(fallback)
-  const at = Math.max(0, choices.indexOf(current))
-  const next = choices[(at + step + choices.length) % choices.length] as string | null
-  const others = h.edits.filter((e) => !sameSlot(slot)(e))
-  const edits = next === fallback ? others : [...others, { ...slot, piece: next }]
-  return withHouse(r, { ...h, edits })
-}
-
-export function removeEdit(r: PrefabRecipe, slot: Slot): PrefabRecipe {
-  return r.house ? withHouse(r, { ...r.house, edits: r.house.edits.filter((e) => !sameSlot(slot)(e)) }) : r
-}
-
-/** Adds a dressing piece standing at (x, z), unturned; returns the recipe and its dressing index. */
-export function addDressing(r: PrefabRecipe, piece: string, x: number, z: number): [PrefabRecipe, number] {
-  const instance: RecipeInstance = { piece, x, y: 0, z, rot: 0, scale: 1 }
-  return [{ ...r, dressing: [...r.dressing, instance] }, r.dressing.length]
-}
-
-export function moveDressing(
-  r: PrefabRecipe,
+export function blockerFor(
+  t: TilePrefab,
   i: number,
-  pose: Pick<RecipeInstance, "x" | "y" | "z" | "rot">,
-): PrefabRecipe {
-  return { ...r, dressing: r.dressing.map((d, j) => (j === i ? { ...d, ...pose } : d)) }
+  size: readonly [number, number, number],
+): [TilePrefab, number] {
+  const q = t.pieces[i]
+  if (!q) return [t, -1]
+  const r = (Math.max(size[0], size[2]) * q.scale) / 2 + 0.1
+  return addBlocker(t, q.x, q.z, Math.min(3, Math.max(0.2, r)))
 }
 
-export function removeDressing(r: PrefabRecipe, i: number): PrefabRecipe {
-  return { ...r, dressing: r.dressing.filter((_, j) => j !== i) }
+/** Removes the selected item; an emptied optional list is dropped from the file. */
+export function remove(t: TilePrefab, sel: Selection): TilePrefab {
+  const list = ((t[sel.layer] ?? []) as unknown[]).filter((_, k) => k !== sel.i)
+  if (sel.layer !== "pieces" && list.length === 0) {
+    const { [sel.layer]: _gone, ...rest } = t
+    return rest as TilePrefab
+  }
+  return { ...t, [sel.layer]: list }
 }
 
-/** Ramp swaps: `from` may become any of `to` by seed; an empty list drops the swap. */
-export function setRampSwap(r: PrefabRecipe, from: string, to: string[]): PrefabRecipe {
-  if (!r.house) return r
-  const rampSwaps = { ...r.house.vary.rampSwaps }
-  if (to.length > 0) rampSwaps[from] = to
-  else delete rampSwaps[from]
-  const { rampSwaps: _, ...rest } = r.house.vary
-  const vary = Object.keys(rampSwaps).length > 0 ? { ...rest, rampSwaps } : rest
-  return withHouse(r, { ...r.house, vary })
+/** A copy of the selected item a little to its side; returns its index. */
+export function duplicate(t: TilePrefab, sel: Selection): [TilePrefab, number] {
+  const list = [...((t[sel.layer] ?? []) as { x: number; z: number }[])]
+  const item = list[sel.i]
+  if (!item) return [t, -1]
+  list.push({ ...item, x: mm(item.x + 0.5) })
+  return [{ ...t, [sel.layer]: list }, list.length - 1]
 }
 
-/** Window styles a seed picks from; none means each family's own default. */
-export function setOpeningStyles(r: PrefabRecipe, styles: string[]): PrefabRecipe {
-  if (!r.house) return r
-  const { openings: _, ...rest } = r.house.vary
-  const vary = styles.length > 0 ? { ...rest, openings: styles } : rest
-  return withHouse(r, { ...r.house, vary })
+/** Turn (radians) that faces from (x, z) toward (tx, tz): the TileSpot `facing` convention, 0 = +z. */
+export const facingToward = (x: number, z: number, tx: number, tz: number): number =>
+  Math.atan2(tx - x, tz - z)
+
+/** Whether a point (tile space) is on the tile: inside its hexagon (pointy-top, corner at HEX_TILE_SIZE). */
+export function onTile(x: number, z: number, inset = 0): boolean {
+  const R = HEX_TILE_SIZE - inset
+  const ax = Math.abs(x)
+  const az = Math.abs(z)
+  // tile space has its corners on ±x and a side across +z (tiles.ts TILE_SIDES)
+  return az <= (R * Math.sqrt(3)) / 2 && az <= Math.sqrt(3) * (R - ax)
 }
 
-/** The variants a seed strip shows: `count` seeds from `seed` on. */
-export const stripSeeds = (seed: number, count = 6): number[] =>
-  Array.from({ length: count }, (_, i) => seed + i)
+/** Everything wrong with the document a save would still accept, as warnings for the readout. */
+export function lint(
+  t: TilePrefab,
+  known: { piece(id: string): boolean; clip(name: string): boolean; prop(id: string): boolean },
+): string[] {
+  const out: string[] = []
+  t.pieces.forEach((q, k) => {
+    if (!known.piece(q.piece)) out.push(`piece ${k + 1}: ${q.piece} is not in the library`)
+    if (!onTile(q.x, q.z) && !t.footprint?.length)
+      out.push(`piece ${k + 1} (${q.piece.split("/")[1]}) stands off the tile`)
+  })
+  t.spots?.forEach((s, k) => {
+    if (s.clip && !known.clip(s.clip)) out.push(`spot ${k + 1}: no clip "${s.clip}" on rig-medium`)
+    if (s.prop && !known.prop(s.prop)) out.push(`spot ${k + 1}: ${s.prop} has no grip (data/mounts.json)`)
+    if (!onTile(s.x, s.z, 0.15) && !t.footprint?.length) out.push(`spot ${k + 1} is off the tile`)
+    for (const [j, b] of (t.blockers ?? []).entries())
+      if (Math.hypot(s.x - b.x, s.z - b.z) < b.r - 0.05 && s.kind !== "sit")
+        out.push(`spot ${k + 1} stands inside blocker ${j + 1}`)
+  })
+  return out
+}
 
-/** A whole, non-negative seed from the query, else 1. */
-export function parseSeed(text: string | null): number {
-  const n = Number(text)
-  return text !== null && Number.isInteger(n) && n >= 0 ? n : 1
+/**
+ * Piece `i` set on the tile edge nearest it (side d's middle at `inset` of the apothem), turned so its
+ * length (local x) runs along the edge; with `length` (its catalog width at scale 1) it is also scaled
+ * to span the edge exactly, so a ring of them closes with no gaps.
+ */
+export function snapToEdge(t: TilePrefab, i: number, inset = 0.95, length?: number): TilePrefab {
+  const q = t.pieces[i]
+  if (!q) return t
+  // tile side k faces 30° + 60°·k counter-clockwise from +x, toward -z (tiles.ts sideDir)
+  const a0 = Math.atan2(-q.z, q.x)
+  const k = Math.round((a0 - Math.PI / 6) / (Math.PI / 3))
+  const a = Math.PI / 6 + (Math.PI / 3) * k
+  const apothem = (HEX_TILE_SIZE * Math.sqrt(3)) / 2
+  const patch: Partial<TilePiece> = {
+    x: mm(Math.cos(a) * apothem * inset),
+    z: mm(-Math.sin(a) * apothem * inset),
+    rot: mm(a - Math.PI / 2),
+  }
+  if (length) patch.scale = mm((HEX_TILE_SIZE * inset) / length)
+  return patchPiece(t, i, patch)
+}
+
+/** Grid snap for a typed or dragged point: to `step` metres. */
+export const snap = (v: number, step = 0.05): number => mm(Math.round(v / step) * step)
+
+/** An undo history of documents: `push` a new state, step `back` and `forward`. */
+export interface History {
+  past: TilePrefab[]
+  now: TilePrefab
+  future: TilePrefab[]
+}
+const DEPTH = 200
+export const history = (now: TilePrefab): History => ({ past: [], now, future: [] })
+export const push = (h: History, next: TilePrefab): History =>
+  next === h.now ? h : { past: [...h.past, h.now].slice(-DEPTH), now: next, future: [] }
+export const back = (h: History): History =>
+  h.past.length
+    ? { past: h.past.slice(0, -1), now: h.past[h.past.length - 1]!, future: [h.now, ...h.future] }
+    : h
+export const forward = (h: History): History =>
+  h.future.length ? { past: [...h.past, h.now], now: h.future[0]!, future: h.future.slice(1) } : h
+
+/** A copy of `t` under a new id and name (the composer's "duplicate prefab"); variants are not carried over. */
+export function copyAs(t: TilePrefab, id: string, name?: string): TilePrefab {
+  const { variants: _v, ...rest } = t
+  return { ...rest, id, name: name ?? `${t.name} (copy)` }
 }

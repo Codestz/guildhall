@@ -1,7 +1,7 @@
 /** The recipe panel: every NpcRecipe option as a control (bodies, parts, outfit, headwear, hands, clips, ranges). */
 import { type Catalog, type MountSlot, type NpcRecipe, PALETTE } from "@guildhall/assets"
 import { type ReactNode, useMemo } from "react"
-import { short } from "../composer/Blueprint.tsx"
+import { short } from "../composer/controls.tsx"
 import { linkTo } from "../shell/directory.ts"
 import {
   bodyChoices,

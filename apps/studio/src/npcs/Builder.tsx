@@ -6,7 +6,7 @@
 import { type Catalog, type NpcLook, type NpcRecipe, PALETTE, resolveNpc } from "@guildhall/assets"
 import { log } from "@guildhall/core"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Segments, Stepper } from "../composer/Blueprint.tsx"
+import { Segments, Stepper } from "../composer/controls.tsx"
 import * as data from "../data.ts"
 import { SHOWCASE } from "../env.ts"
 import type { ScreenCtx } from "../screens.ts"

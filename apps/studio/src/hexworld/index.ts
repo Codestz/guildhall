@@ -4,15 +4,17 @@
  * V1's look over it: the sea and the inland water read a baked shore field (depth colour, foam, waves),
  * the post pipeline grades it (bloom, ink, mood LUT, vignette, SMAA), and the opening camera sees the sun
  * from the side so the shadows read.
+ * The island is built in a worker (job.ts) and arrives in stages: the ground first (drawn at once), the
+ * shore field and the water next, the pieces last, while their models load. This thread only uploads.
  * `?files=` sizes the island like a repo of that many files; `?hour=`, `?az=`, `?shadow=`, `?fill=`,
- * `?post=0` and `?aa=msaa|none` are for comparisons; `?step=` tries another height per level (metres,
- * default LEVEL_STEP) and `?detail=0` shows the ground without its painted small hexes and speckle.
+ * `?post=0`, `?aa=msaa|none` and `?ground=hex|soft` are for comparisons; `?step=` tries another height per
+ * level (metres, default LEVEL_STEP) and `?detail=0` shows the ground without its painted small hexes and
+ * speckle.
  */
 import type { CameraPose } from "@guildhall/core"
 import { log } from "@guildhall/core"
 import {
   type Atmosphere,
-  bakeShoreField,
   createAtmosphere,
   createFieldWater,
   createHexGround,
@@ -24,63 +26,40 @@ import {
   createSun,
   createSurface,
   createVertexMesh,
-  type HexPrism,
   loadPiece,
   type Night,
   type Post,
   type PostAa,
   type StaticBatch,
+  shoreFieldTexture,
   type TerrainMesh,
   type Water,
 } from "@guildhall/render"
-import {
-  HEX_TILE_SIZE,
-  hexCentre,
-  hexGroundFine,
-  hexGroundMesh,
-  hexIsland,
-  hexStructures,
-  hexWorld,
-  hexZones,
-  kindOf,
-  LEVEL_STEP,
-} from "@guildhall/world"
+import { HEX_TILE_SIZE, hexIsland, hexWorld, hexZones, LEVEL_STEP } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
 import { worldCamera } from "../shell/worldCamera.ts"
 import { loadTiles } from "../tiles.ts"
+import {
+  batchSets,
+  type FromWorker,
+  type GroundMode,
+  type GroundStage,
+  type HexJobSpec,
+  heightsAt,
+  type MapStage,
+  type PackedPieces,
+  runHexJob,
+  SEA_LEVEL,
+  type ShoreStage,
+  type ToWorker,
+} from "./job.ts"
 import { createLife, type Life } from "./life.ts"
 
 const logger = log("studio:hexworld")
 
-type RGB = [number, number, number]
-const TOP: Record<string, RGB> = {
-  grass: [112, 156, 64],
-  soil: [150, 112, 70],
-  dirt: [196, 160, 108],
-  paved: [196, 186, 166],
-  sand: [232, 210, 150],
-  rock: [150, 140, 128],
-  cliff: [140, 128, 112],
-  // under the water surface: the lake and river bed
-  water: [150, 128, 92],
-}
-const SIDE: Record<string, RGB> = {
-  rock: [118, 110, 100],
-  cliff: [118, 110, 100],
-  sand: [178, 144, 98],
-  water: [90, 120, 140],
-}
 const aaOf = (v: string | null): PostAa => (v === "msaa" || v === "none" ? v : "smaa")
-/** Inland water: the bed sits this far under its tile's top, the surface this far. */
-const BED_DROP = 0.55
-const SURFACE_DROP = 0.14
-/** The sea's level, and the shore field's reach (metres) and texel (metres). */
-const SEA_LEVEL = -0.05
-const SHORE_REACH = 9
-const SHORE_TEXEL = 0.2
-/** How fast a river runs, metres a second. */
-const RIVER_SPEED = 0.9
+const groundOf = (v: string | null): GroundMode => (v === "hex" || v === "soft" ? v : "fine")
 /**
  * The camera's azimuth (degrees) that sees the sun from the side and a little ahead, `SUN_SIDE`
  * degrees off the way it looks: shadows fall across the view toward the camera, as in V1.
@@ -94,21 +73,108 @@ export function sideLit(sunDir: readonly [number, number, number]): number {
   const az = (Math.atan2(-Math.cos(look), -Math.sin(look)) * 180) / Math.PI
   return Math.round(((az % 360) + 360) % 360)
 }
-const SIDE_LAND: RGB = [122, 90, 60]
+
+interface Stages {
+  map: Promise<MapStage>
+  ground: Promise<GroundStage>
+  pieces: Promise<PackedPieces>
+  shore: Promise<ShoreStage>
+  dispose(): void
+}
+
+/** The job's stages as they arrive: from the worker, or inline (a tick later) where there is none. */
+function startJob(spec: Promise<HexJobSpec>): Stages {
+  const waiting: { take(stage: unknown): void; fail(e: Error): void }[] = []
+  const stage = <T>() =>
+    new Promise<T>((take, fail) => {
+      waiting.push({ take: take as (stage: unknown) => void, fail })
+    })
+  const map = stage<MapStage>()
+  const ground = stage<GroundStage>()
+  const pieces = stage<PackedPieces>()
+  const shore = stage<ShoreStage>()
+  const [onMap, onGround, onPieces, onShore] = waiting as [
+    (typeof waiting)[0],
+    (typeof waiting)[0],
+    (typeof waiting)[0],
+    (typeof waiting)[0],
+  ]
+  const fail = (e: Error) => {
+    for (const w of waiting) w.fail(e)
+  }
+  // a screen torn down mid-build drops the stages it no longer waits on quietly
+  for (const p of [map, ground, pieces, shore]) p.catch(() => {})
+  const take = (msg: FromWorker) => {
+    if (msg.type === "map") onMap.take(msg.map)
+    else if (msg.type === "ground") onGround.take(msg.ground)
+    else if (msg.type === "pieces") onPieces.take(msg.pieces)
+    else if (msg.type === "shore") onShore.take(msg.shore)
+    else fail(new Error(msg.message))
+  }
+  let worker: Worker | null = null
+  try {
+    worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" })
+  } catch (error) {
+    logger.warn("no worker, building inline", { error: String(error) })
+  }
+  if (worker) {
+    worker.onmessage = (e: MessageEvent<FromWorker>) => take(e.data)
+    worker.onerror = (e) => fail(new Error(e.message))
+    // the worker boots while the spec (the authored tiles) loads
+    const w = worker
+    spec.then((s) => w.postMessage({ type: "job", spec: s } satisfies ToWorker), fail)
+  } else
+    spec.then((s) => {
+      try {
+        runHexJob(s, take)
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error(String(error)))
+      }
+    }, fail)
+  return {
+    map,
+    ground,
+    pieces,
+    shore,
+    dispose() {
+      worker?.terminate()
+      // a stage still awaited settles (a settled one ignores this), so nothing waits on a dead job
+      fail(new Error("disposed"))
+    },
+  }
+}
 
 export const hexWorldScreen: Screen = {
   id: "hexworld",
   title: "Hex island",
   mount(host, ctx) {
-    const stage = createStage(host)
-    ctx.attach(stage)
-    const cam = worldCamera(stage, host, ctx.query)
+    const t0 = performance.now()
+    const since = () => Math.round(performance.now() - t0)
     const num = (k: string, d: number) => {
       const v = Number(ctx.query.get(k))
       return ctx.query.has(k) && Number.isFinite(v) ? v : d
     }
     const seed = num("seed", Number(ctx.query.get("town")) || 1)
     const files = num("files", 4000)
+    // the worker starts first: it builds while the stage, its context and the catalog get ready
+    const step = num("step", LEVEL_STEP)
+    const detail = ctx.query.get("detail") !== "0"
+    // the authored tile prefabs (data/tiles) before anything is built from them: here (life builds on
+    // this thread too) and in the worker
+    const job = startJob(
+      loadTiles().then((tiles) => ({
+        seed,
+        files,
+        ground: groundOf(ctx.query.get("ground")),
+        step,
+        paint: detail,
+        tiles: tiles.length ? tiles : null,
+      })),
+    )
+    const catalogLoad = loadCatalog()
+    const stage = createStage(host)
+    ctx.attach(stage)
+    const cam = worldCamera(stage, host, ctx.query)
     let disposed = false
     let batch: StaticBatch | null = null
     let water: Water | null = null
@@ -125,110 +191,15 @@ export const hexWorldScreen: Screen = {
     host.append(info)
 
     const build = async () => {
-      // the authored tile prefabs (data/tiles) before anything is built from them
-      await loadTiles()
-      const t0 = performance.now()
-      const h = hexIsland({ seed, files })
-      const z = hexZones(h)
-      const w = hexWorld(h, z, { step: num("step", LEVEL_STEP) })
+      // The map: the sky, the sun, the night, the post and the camera are set up (and their shaders
+      // compiled by the frames drawn meanwhile) while the worker still builds the ground.
+      const m = await job.map
+      if (disposed) return
       const R = HEX_TILE_SIZE
-      let groundAt = (x: number, zz: number) => w.heightAt(x, zz)
-      // Inland water (lakes, rivers, docks above the sea): a bed sunk under the tile and a surface over it.
-      const pools = w.tiles.filter((t) => t.ground === "water" && t.top - SURFACE_DROP > SEA_LEVEL)
-      const pooled = new Set(pools.map((t) => t.i))
-      // the soft and fine grounds read the tiles with the pools' beds already sunk
-      const sunk = {
-        ...w,
-        tiles: w.tiles.map((t) => (pooled.has(t.i) ? { ...t, top: t.top - BED_DROP } : t)),
-      }
-      const tiles: HexPrism[] = w.tiles.map((t) => {
-        const v = 0.95 + 0.1 * (((t.i * 2654435761) >>> 0) / 4294967296)
-        const c = TOP[t.ground] ?? TOP.grass!
-        return {
-          x: t.x,
-          z: t.z,
-          top: pooled.has(t.i) ? t.top - BED_DROP : t.top,
-          color: [c[0] * v, c[1] * v, c[2] * v],
-          side: SIDE[t.ground] ?? SIDE_LAND,
-        }
-      })
-      // the soft ground: equal tiles merge, walls only at steps, sand slopes into the sea
-      // (`?ground=hex` shows every tile as its own prism)
-      if (ctx.query.get("ground") === "hex")
-        meshes.push(createHexGround(stage, { size: R, base: -2.5, tiles }))
-      else if (ctx.query.get("ground") === "soft") {
-        const m = hexGroundMesh(h, sunk, { top: TOP, side: SIDE, sideLand: SIDE_LAND, slope: TOP.sand! })
-        meshes.push(createVertexMesh(stage, m.position, m.color))
-      } else {
-        // fine ground: small hexes, low terraces on the hills, land falling to the shore; nature stands on it
-        const detail = ctx.query.get("detail") !== "0"
-        const m = hexGroundFine(
-          h,
-          sunk,
-          { top: TOP, side: SIDE, sideLand: SIDE_LAND, slope: TOP.sand! },
-          3,
-          -2.5,
-          detail,
-        )
-        meshes.push(createVertexMesh(stage, m.position, m.color, { speckle: detail }))
-        for (const p of w.pieces) {
-          const y = m.heightAt(p.x, p.z)
-          if (y > 0 && Math.abs(y - p.y) < 3) p.y = y
-        }
-        groundAt = m.heightAt
-      }
-      if (w.paths.length) meshes.push(createSurface(stage, new Float32Array(w.paths), "#d9c08c"))
+      if (m.paths.length) meshes.push(createSurface(stage, m.paths, "#d9c08c"))
       // stone stairs where roads step down, plank bridges over the rivers: built like the ground
-      const built = hexStructures(w, seed)
-      if (built.position.length) meshes.push(createVertexMesh(stage, built.position, built.color))
-      let span = 0
-      for (const t of w.tiles) span = Math.max(span, Math.abs(t.x), Math.abs(t.z))
-      span += R * 4
-      // The shore field: how far every point of the water is from land (anything but a water tile).
-      const land = new Set<string>()
-      const axial = (x: number, zz: number) => {
-        // pixel to axial (pointy top), cube rounding: the same as the world's heightAt
-        const qf = ((Math.sqrt(3) / 3) * x - zz / 3) / R
-        const rf = ((2 / 3) * zz) / R
-        const sf = -qf - rf
-        let q = Math.round(qf)
-        let r = Math.round(rf)
-        const s = Math.round(sf)
-        const dq = Math.abs(q - qf)
-        const dr = Math.abs(r - rf)
-        if (dq > dr && dq > Math.abs(s - sf)) q = -r - s
-        else if (dr > Math.abs(s - sf)) r = -q - s
-        return `${q},${r}`
-      }
-      for (const t of w.tiles) if (t.ground !== "water") land.add(axial(t.x, t.z))
-      const half = span
-      // a river runs downhill along its course: toward the tile it drains into
-      const flowOf = (i: number): [number, number] | undefined => {
-        const d = h.down[i]!
-        if (kindOf(h, i) !== "river" || d < 0) return undefined
-        const [ax, az] = hexCentre({ q: h.grid.q[i]!, r: h.grid.r[i]! })
-        const [bx, bz] = hexCentre({ q: h.grid.q[d]!, r: h.grid.r[d]! })
-        const l = Math.hypot(bx - ax, bz - az) || 1
-        return [((bx - ax) / l) * RIVER_SPEED, ((bz - az) / l) * RIVER_SPEED]
-      }
-      const tf = performance.now()
-      const field = bakeShoreField({
-        min: [-half, -half],
-        size: half * 2,
-        res: Math.min(2048, Math.ceil((half * 2) / SHORE_TEXEL)),
-        reach: SHORE_REACH,
-        isLand: (x, zz) => land.has(axial(x, zz)),
-      })
-      logger.info("shore field", { ms: Math.round(performance.now() - tf) })
-      water = createFieldWater(stage, {
-        field,
-        sea: { level: SEA_LEVEL, half: span * 3 },
-        pools: {
-          size: R * 1.01,
-          tiles: pools.map((t) => ({ x: t.x, z: t.z, y: t.top - SURFACE_DROP, flow: flowOf(t.i) })),
-        },
-      })
-      disposeField = () => field.dispose()
+      if (m.structures) meshes.push(createVertexMesh(stage, m.structures))
+      const span = m.span
       const hour = num("hour", 15.5)
       const sun = createSun(stage, { town: { min: [-span, -3, -span], max: [span, 20, span] } })
       const sky = createSky(stage, {
@@ -239,13 +210,7 @@ export const hexWorldScreen: Screen = {
         fill: num("fill", 0.75),
       })
       // the night: a light in every lantern the tiles hold
-      const lamps = w.pieces
-        .filter((p) => p.piece === "kaykit-halloween/post-lantern")
-        .map((p) => ({
-          kind: "street" as const,
-          at: [p.x, p.y + 2.03 * p.scale, p.z] as [number, number, number],
-          radius: 6,
-        }))
+      const lamps = m.lamps.map((at) => ({ kind: "street" as const, at, radius: 6 }))
       night = createNight(stage, { points: lamps, windows: [] }, { sky, hour })
       // a clock: drag to set the hour, ▶ plays the day
       const clock = document.createElement("div")
@@ -287,11 +252,17 @@ export const hexWorldScreen: Screen = {
       if (ctx.query.get("post") !== "0")
         post = createPost(stage, { light: () => sky.light(), aa: aaOf(ctx.query.get("aa")) })
       const azimuth = num("az", sideLit(sky.light().sunDir))
-      const heart = z.zones[0] ? w.tiles.find((t) => t.i === z.zones[0]!.tile) : undefined
-      const pose: CameraPose = heart
-        ? { target: [heart.x, heart.top, heart.z], azimuth, elevation: 38, distance: 70 }
+      const pose: CameraPose = m.heart
+        ? { target: m.heart, azimuth, elevation: 38, distance: 70 }
         : { target: [0, 0, 0], azimuth, elevation: 45, distance: span * 1.6 }
       stage.setCamera(pose)
+      // The ground.
+      const g = await job.ground
+      if (disposed) return
+      const arrived = since()
+      const groundAt = heightsAt(g.heights)
+      if (g.prisms) meshes.push(createHexGround(stage, { size: R, base: -2.5, tiles: g.prisms }))
+      else if (g.mesh) meshes.push(createVertexMesh(stage, g.mesh, undefined, { speckle: detail }))
       cam.start({
         centre: [0, 0],
         half: span * 1.2,
@@ -299,14 +270,43 @@ export const hexWorldScreen: Screen = {
         water: 0,
         free: true,
       })
-      const catalog = await loadCatalog()
-      if (!catalog || disposed) return
-      const pieces = w.pieces.filter((p) => catalog.get(p.piece))
-      batch = await createStaticBatch(stage, pieces, async (id) => {
-        const entry = catalog.get(id)
-        if (!entry) throw new Error(`hexworld: unknown piece "${id}"`)
-        return loadPiece(libraryUrl(entry.files.glb))
+      // The first frame with the ground in it: timed once it has been drawn (a task after the frame).
+      const firstFrame = new Promise<number>((done) => {
+        const off = stage.onFrame(() => {
+          off()
+          setTimeout(() => done(since()), 0)
+        })
       })
+      const first = await firstFrame
+      if (disposed) return
+      info.textContent = `hex island · seed ${seed} · ${files} files\nfirst frame ${first} ms · building…`
+      const shoreDone = job.shore.then((s) => {
+        if (disposed) return
+        const field = shoreFieldTexture(s)
+        water = createFieldWater(stage, {
+          field,
+          sea: { level: SEA_LEVEL, half: span * 3 },
+          pools: { size: R * 1.01, tiles: m.pools },
+        })
+        disposeField = () => field.dispose()
+        logger.info("shore field", { ms: s.ms, at: since() })
+      })
+      const catalog = await catalogLoad
+      if (!catalog || disposed) return
+      // the crop rows of each field as one cluster: its pieces near, one merged shell far
+      const { loose, clusters } = batchSets(await job.pieces, (p) => catalog.get(p.piece) !== undefined)
+      const placed = loose.length + clusters.reduce((n, c) => n + c.parts.length, 0)
+      batch = await createStaticBatch(
+        stage,
+        loose,
+        async (id) => {
+          const entry = catalog.get(id)
+          if (!entry) throw new Error(`hexworld: unknown piece "${id}"`)
+          return loadPiece(libraryUrl(entry.files.glb))
+        },
+        clusters,
+      )
+      await shoreDone
       if (disposed) {
         batch.dispose()
         return
@@ -314,33 +314,47 @@ export const hexWorldScreen: Screen = {
       sun.markDirty()
       // ---- life (track B): townsfolk and agents on the walk graph; `?life=0` turns it off ----
       if (ctx.query.get("life") !== "0") {
+        // Life plans on the map itself: its pure parts built again here (~0.1 s), once the island is drawn.
+        const island = hexIsland({ seed, files })
+        const zones = hexZones(island)
+        const world = hexWorld(island, zones, { step })
         life = createLife(stage, {
           host,
-          island: h,
-          zones: z,
-          world: w,
-          groundAt: (x: number, zz: number) => w.stairAt(x, zz) ?? groundAt(x, zz),
+          island,
+          zones,
+          world,
+          groundAt: (x: number, zz: number) => world.stairAt(x, zz) ?? groundAt(x, zz),
           hour: () => now,
           seed,
           agentT: num("lifeT", 0),
         })
         await life.ready
       }
-      const top = Object.entries(w.stats.prefabs)
+      const top = Object.entries(m.stats.prefabs)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 8)
         .map(([k, n]) => `${k} ${n}`)
         .join(" · ")
       info.textContent = [
         `hex island · seed ${seed} · ${files} files`,
-        `${h.stats.land} land tiles · ${pieces.length} pieces · ${Math.round(performance.now() - t0)} ms`,
+        `${m.stats.land} land tiles · ${placed} pieces · first frame ${first} ms · all ${since()} ms`,
         top,
       ].join("\n")
-      logger.info("built", { tiles: w.tiles.length, pieces: pieces.length })
+      logger.info("built", {
+        tiles: m.stats.tiles,
+        pieces: placed,
+        ground: arrived,
+        first,
+        ms: since(),
+        times: g.times,
+      })
     }
-    ctx.load(build()).catch((error: unknown) => logger.error("build failed", { error: String(error) }))
+    ctx
+      .load(build())
+      .catch((error: unknown) => disposed || logger.error("build failed", { error: String(error) }))
     return () => {
       disposed = true
+      job.dispose()
       cam.dispose()
       batch?.dispose()
       water?.dispose()

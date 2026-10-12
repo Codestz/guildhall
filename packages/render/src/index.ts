@@ -83,7 +83,16 @@ export {
   zoomTilt,
 } from "./rig/world.ts"
 export { createShadows, fitShadowCamera, type ShadowBox } from "./shadow.ts"
-export { bakeShoreField, type ShoreField, type ShoreFieldOpts, shoreDistances } from "./shoreField.ts"
+export {
+  bakeShoreField,
+  type ShoreField,
+  type ShoreFieldData,
+  type ShoreFieldOpts,
+  type ShoreWindow,
+  shoreBytes,
+  shoreDistances,
+  shoreFieldTexture,
+} from "./shoreField.ts"
 export { createSky, type Sky, type SkyPreset } from "./sky.ts"
 export { createStage, type Stage, toScreen } from "./stage.ts"
 export {
@@ -112,6 +121,7 @@ export {
   type ViewerStats,
 } from "./viewer.ts"
 export { createVertexMesh } from "./vmesh.ts"
+export { srgbToLinear, type VertexMeshData, vertexMeshData } from "./vmeshData.ts"
 export {
   createFieldWater,
   type FieldWaterOpts,

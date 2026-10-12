@@ -4,12 +4,13 @@
  * `{ speckle: true }` draws it in the ground material instead: the same light, plus clover and drifts of
  * small flowers dotted over the green from a cheap world-space hash (no textures, the low-poly feel kept).
  */
-import { BufferAttribute, BufferGeometry, Color, Mesh, MeshStandardMaterial, SRGBColorSpace } from "three"
+import { BufferAttribute, BufferGeometry, Mesh, MeshStandardMaterial } from "three"
 import { patchCloudShade } from "./atmosphere/shade.ts"
 import { paletteMaterial } from "./material.ts"
 import type { Stage } from "./stage.ts"
 import { patchCascades } from "./sun/patch.ts"
 import type { TerrainMesh } from "./terrain.ts"
+import { type VertexMeshData, vertexMeshData } from "./vmeshData.ts"
 
 const SPECKLE_VERTEX = /* glsl */ `#include <begin_vertex>
 vSpeckleAt = (modelMatrix * vec4(transformed, 1.0)).xyz;
@@ -69,24 +70,22 @@ function groundMaterial(): MeshStandardMaterial {
   return ground
 }
 
+/**
+ * The mesh of triangle `position`s and their sRGB colours, or of arrays already prepared off the main
+ * thread (`vertexMeshData`, then `srgb` is left out): then this only uploads.
+ */
 export function createVertexMesh(
   stage: Pick<Stage, "scene">,
-  position: Float32Array,
-  srgb: Float32Array,
+  position: Float32Array | VertexMeshData,
+  srgb?: Float32Array,
   opts: { speckle?: boolean } = {},
 ): TerrainMesh {
-  const color = new Float32Array(srgb.length)
-  const c = new Color()
-  for (let i = 0; i < srgb.length; i += 3) {
-    c.setRGB(srgb[i]!, srgb[i + 1]!, srgb[i + 2]!, SRGBColorSpace)
-    color[i] = c.r
-    color[i + 1] = c.g
-    color[i + 2] = c.b
-  }
+  const data =
+    position instanceof Float32Array ? vertexMeshData(position, srgb ?? new Float32Array(0)) : position
   const geometry = new BufferGeometry()
-  geometry.setAttribute("position", new BufferAttribute(position, 3))
-  geometry.setAttribute("color", new BufferAttribute(color, 3))
-  geometry.computeVertexNormals()
+  geometry.setAttribute("position", new BufferAttribute(data.position, 3))
+  geometry.setAttribute("color", new BufferAttribute(data.color, 3))
+  geometry.setAttribute("normal", new BufferAttribute(data.normal, 3))
   const mesh = new Mesh(geometry, opts.speckle ? groundMaterial() : paletteMaterial())
   mesh.receiveShadow = true
   mesh.castShadow = true

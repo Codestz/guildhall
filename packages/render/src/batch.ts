@@ -31,8 +31,9 @@ export type BatchInstance = Pick<
 
 /**
  * A group of pieces drawn as one when far away (a compiled house): `parts` in cluster space, placed by
- * the cluster's own x, y, z, rot and scale. Clusters with the same `key` must have the same parts
- * (e.g. key a recipe id and seed): they share one shell, the bigger parts merged and simplified.
+ * the cluster's own x, y, z, rot and scale. Clusters with the same `key` share one shell (the bigger
+ * parts merged and simplified), made from the first one's parts: give one key only to clusters whose
+ * parts look the same from afar (e.g. a recipe id and seed; tiles whose pieces lie alike to the metre).
  */
 export interface BatchCluster extends Pick<BatchInstance, "x" | "y" | "z" | "rot" | "scale"> {
   key: string

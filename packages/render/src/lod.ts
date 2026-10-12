@@ -21,6 +21,25 @@ export const TIER_MIN_SAVING = 0.85
 export const TIER_MIN_AREA = 0.8
 /** Screen radius (px) under which a piece drops to tier 1, then tier 2. */
 export const PIECE_PX: readonly number[] = [40, 12]
+/**
+ * Detail: a piece whose bounding radius is under DETAIL_RADIUS metres (grass, crops, flowers, small
+ * rocks, barrels, logs). The main view stops drawing it once its screen radius is under DETAIL_PX CSS
+ * pixels (whatever the DPR, so the governor never moves where it goes); shadows still cast it.
+ */
+export const DETAIL_RADIUS = 0.9
+export const DETAIL_PX = 4
+
+/**
+ * The boundaries (drawing-buffer px, descending) a piece of world `radius` is tiered by at `dpr`: the
+ * piece tiers, and for detail one more past them, under which it is not drawn (tier PIECE_PX.length + 1).
+ */
+export function pieceThresholds(radius: number, dpr: number): readonly number[] {
+  if (radius >= DETAIL_RADIUS) return PIECE_PX
+  const last = PIECE_PX[PIECE_PX.length - 1] as number
+  return [...PIECE_PX, Math.min(DETAIL_PX * dpr, last * 0.9)]
+}
+/** The tier `pickTier` gives a detail piece too small to draw. */
+export const CULLED = PIECE_PX.length + 1
 
 /**
  * A cluster's shell, from its parts' coarsest tiers: parts under 0.75 m radius left out (unless all

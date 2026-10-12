@@ -1,0 +1,157 @@
+{
+  "anchors": [
+    {
+      "at": [
+        -3.5,
+        0,
+        5.5
+      ],
+      "facing": 3.141592653589793,
+      "id": "trade",
+      "kind": "station"
+    }
+  ],
+  "dressing": [
+    {
+      "piece": "quaternius-props/banner-1-cloth",
+      "rot": 0,
+      "scale": 1,
+      "x": -5.25,
+      "y": 4.05,
+      "z": 3.5
+    },
+    {
+      "piece": "quaternius-props/banner-1-cloth",
+      "rot": 0,
+      "scale": 1,
+      "x": 5.25,
+      "y": 4.05,
+      "z": 3.5
+    },
+    {
+      "piece": "quaternius-rts/crate-stack2",
+      "rot": 0,
+      "scale": 1,
+      "x": -6.5,
+      "y": 0,
+      "z": 4.25
+    },
+    {
+      "piece": "quaternius-props/crate-wooden",
+      "rot": 0,
+      "scale": 1,
+      "x": -5.5,
+      "y": 0,
+      "z": 4.25
+    },
+    {
+      "piece": "quaternius-props/barrel",
+      "rot": 0,
+      "scale": 1,
+      "x": 6.5,
+      "y": 0,
+      "z": 4.25
+    },
+    {
+      "piece": "quaternius-props/barrel",
+      "rot": 0,
+      "scale": 1,
+      "x": 5.5,
+      "y": 0,
+      "z": 4.25
+    },
+    {
+      "piece": "quaternius-props/lantern-wall",
+      "rot": 0,
+      "scale": 0.4,
+      "x": -0.25,
+      "y": 2,
+      "z": 3.75
+    },
+    {
+      "piece": "quaternius-props/lantern-wall",
+      "rot": 0,
+      "scale": 0.4,
+      "x": 3.75,
+      "y": 2,
+      "z": 3.75
+    }
+  ],
+  "fits": {
+    "districts": [
+      "market"
+    ],
+    "tiers": [
+      "town",
+      "city",
+      "capital"
+    ]
+  },
+  "house": {
+    "chimney": 1,
+    "door": {
+      "index": 2,
+      "style": "wide"
+    },
+    "edits": [
+      {
+        "index": 0,
+        "piece": "kenney-town/wall-detail-cross",
+        "side": "+z",
+        "storey": 1
+      },
+      {
+        "index": 3,
+        "piece": "kenney-town/wall-detail-cross",
+        "side": "+z",
+        "storey": 1
+      }
+    ],
+    "kit": "kenney-town",
+    "roof": {
+      "ridge": "x",
+      "style": "high-gable"
+    },
+    "size": {
+      "d": 2,
+      "w": 4
+    },
+    "storeys": [
+      {
+        "family": "stone",
+        "openings": "shop"
+      },
+      {
+        "family": "plaster",
+        "openings": "home"
+      }
+    ],
+    "vary": {
+      "openings": [
+        "glass",
+        "shutters"
+      ],
+      "rampSwaps": {
+        "accent": [
+          "accent",
+          "cobble",
+          "roof-blue"
+        ],
+        "teal": [
+          "terracotta",
+          "slate",
+          "roof-blue"
+        ]
+      }
+    }
+  },
+  "id": "merchant-hall",
+  "kind": "shop",
+  "tags": [
+    "shop",
+    "hall",
+    "wealthy",
+    "wide"
+  ],
+  "version": 1
+}

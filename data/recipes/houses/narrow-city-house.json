@@ -1,0 +1,99 @@
+{
+  "anchors": [],
+  "dressing": [
+    {
+      "piece": "quaternius-props/lantern-wall",
+      "rot": 0,
+      "scale": 0.4,
+      "x": 1.25,
+      "y": 1.75,
+      "z": 2
+    },
+    {
+      "piece": "kenney-nature/pot-small",
+      "rot": 0,
+      "scale": 0.5,
+      "x": -1.25,
+      "y": 0,
+      "z": 2.25
+    },
+    {
+      "piece": "kenney-platformer/flowers-tall",
+      "rot": 0,
+      "scale": 0.4,
+      "x": -1.25,
+      "y": 0.4,
+      "z": 2.25
+    }
+  ],
+  "fits": {
+    "districts": [
+      "residential",
+      "market"
+    ],
+    "tiers": [
+      "city",
+      "capital"
+    ]
+  },
+  "house": {
+    "chimney": 0.7,
+    "door": {
+      "index": 0,
+      "style": "round"
+    },
+    "edits": [],
+    "kit": "kenney-town",
+    "roof": {
+      "ridge": "z",
+      "style": "high-gable"
+    },
+    "size": {
+      "d": 1,
+      "w": 1
+    },
+    "storeys": [
+      {
+        "family": "stone",
+        "openings": "home"
+      },
+      {
+        "family": "plaster",
+        "openings": "home"
+      },
+      {
+        "family": "wood",
+        "openings": "home"
+      }
+    ],
+    "vary": {
+      "openings": [
+        "shutters",
+        "glass",
+        "round"
+      ],
+      "rampSwaps": {
+        "accent": [
+          "accent",
+          "roof-blue",
+          "cobble"
+        ],
+        "teal": [
+          "terracotta",
+          "roof-blue",
+          "slate"
+        ]
+      }
+    }
+  },
+  "id": "narrow-city-house",
+  "kind": "house",
+  "tags": [
+    "home",
+    "city",
+    "narrow",
+    "tall",
+    "gable-front"
+  ],
+  "version": 1
+}

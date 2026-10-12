@@ -1,0 +1,133 @@
+{
+  "anchors": [
+    {
+      "at": [
+        3.5,
+        0,
+        3.25
+      ],
+      "facing": 3.141592653589793,
+      "id": "anvil",
+      "kind": "station"
+    }
+  ],
+  "dressing": [
+    {
+      "piece": "quaternius-props/anvil-log",
+      "rot": 0,
+      "scale": 1,
+      "x": 3.5,
+      "y": 0,
+      "z": 2.25
+    },
+    {
+      "piece": "kaykit-tools/grindstone",
+      "rot": 1.5707963267948966,
+      "scale": 0.75,
+      "x": 0.5,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "piece": "kaykit-resources/wood-log-stack",
+      "rot": 1.5707963267948966,
+      "scale": 0.85,
+      "x": -1.75,
+      "y": 0,
+      "z": 4.5
+    },
+    {
+      "piece": "quaternius-props/workbench",
+      "rot": 0,
+      "scale": 0.9,
+      "x": 3.5,
+      "y": 0,
+      "z": -1.75
+    },
+    {
+      "piece": "quaternius-props/bucket-wooden-1",
+      "rot": 0,
+      "scale": 1,
+      "x": 4.75,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "piece": "quaternius-props/barrel",
+      "rot": 0,
+      "scale": 1,
+      "x": 4.75,
+      "y": 0,
+      "z": 5
+    },
+    {
+      "piece": "quaternius-props/lantern-wall",
+      "rot": 0,
+      "scale": 0.4,
+      "x": -2,
+      "y": 1.75,
+      "z": 3.75
+    }
+  ],
+  "fits": {
+    "districts": [
+      "craft"
+    ],
+    "tiers": [
+      "village",
+      "town",
+      "city"
+    ]
+  },
+  "house": {
+    "chimney": 1,
+    "door": {
+      "index": 0,
+      "style": "square"
+    },
+    "edits": [
+      {
+        "index": 2,
+        "piece": null,
+        "side": "+z",
+        "storey": 0
+      }
+    ],
+    "kit": "kenney-town",
+    "roof": {
+      "ridge": "x",
+      "style": "high-gable"
+    },
+    "size": {
+      "d": 2,
+      "w": 3
+    },
+    "storeys": [
+      {
+        "family": "stone",
+        "openings": "home"
+      }
+    ],
+    "vary": {
+      "rampSwaps": {
+        "accent": [
+          "cobble",
+          "accent"
+        ],
+        "teal": [
+          "slate",
+          "terracotta"
+        ]
+      }
+    }
+  },
+  "id": "smithy",
+  "kind": "forge",
+  "tags": [
+    "forge",
+    "craft",
+    "smithy",
+    "yard"
+  ],
+  "version": 1
+}

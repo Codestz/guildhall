@@ -1,0 +1,99 @@
+{
+  "anchors": [],
+  "dressing": [
+    {
+      "piece": "quaternius-village/bench-2",
+      "rot": 0,
+      "scale": 1,
+      "x": -2,
+      "y": 0,
+      "z": 2.25
+    },
+    {
+      "piece": "kenney-nature/pot-small",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0.25,
+      "y": 0,
+      "z": 2.25
+    },
+    {
+      "piece": "kenney-platformer/flowers-tall",
+      "rot": 0,
+      "scale": 0.4,
+      "x": 0.25,
+      "y": 0.4,
+      "z": 2.25
+    },
+    {
+      "piece": "quaternius-props/lantern-wall",
+      "rot": 0,
+      "scale": 0.4,
+      "x": 3.25,
+      "y": 1.75,
+      "z": 2
+    }
+  ],
+  "fits": {
+    "districts": [
+      "residential",
+      "castle"
+    ],
+    "tiers": [
+      "village",
+      "town",
+      "city"
+    ]
+  },
+  "house": {
+    "chimney": 1,
+    "door": {
+      "index": 1,
+      "style": "round"
+    },
+    "edits": [],
+    "kit": "kenney-town",
+    "roof": {
+      "ridge": "x",
+      "style": "gable"
+    },
+    "size": {
+      "d": 1,
+      "w": 2
+    },
+    "storeys": [
+      {
+        "family": "stone",
+        "openings": "home"
+      },
+      {
+        "family": "stone",
+        "openings": "home"
+      }
+    ],
+    "vary": {
+      "openings": [
+        "stone",
+        "small"
+      ],
+      "rampSwaps": {
+        "accent": [
+          "cobble",
+          "accent"
+        ],
+        "teal": [
+          "slate",
+          "terracotta"
+        ]
+      }
+    }
+  },
+  "id": "stone-house",
+  "kind": "house",
+  "tags": [
+    "home",
+    "stone",
+    "sturdy"
+  ],
+  "version": 1
+}

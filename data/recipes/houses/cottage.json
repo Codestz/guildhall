@@ -1,0 +1,104 @@
+{
+  "anchors": [],
+  "dressing": [
+    {
+      "piece": "kenney-nature/pot-small",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "piece": "kenney-platformer/flowers-tall",
+      "rot": 0,
+      "scale": 0.4,
+      "x": 0,
+      "y": 0.4,
+      "z": 4
+    },
+    {
+      "piece": "kenney-platformer/flowers-tall",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 3,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "piece": "quaternius-village/bench-2",
+      "rot": 0,
+      "scale": 1,
+      "x": -1.75,
+      "y": 0,
+      "z": 4
+    },
+    {
+      "piece": "quaternius-props/lantern-wall",
+      "rot": 0,
+      "scale": 0.4,
+      "x": 3,
+      "y": 1.75,
+      "z": 3.75
+    }
+  ],
+  "fits": {
+    "districts": [
+      "residential",
+      "farm"
+    ],
+    "tiers": [
+      "hamlet",
+      "village"
+    ]
+  },
+  "house": {
+    "chimney": 0.8,
+    "door": {
+      "index": 1,
+      "style": "round"
+    },
+    "edits": [],
+    "kit": "kenney-town",
+    "roof": {
+      "ridge": "x",
+      "style": "high-gable"
+    },
+    "size": {
+      "d": 2,
+      "w": 2
+    },
+    "storeys": [
+      {
+        "family": "plaster",
+        "openings": "home"
+      }
+    ],
+    "vary": {
+      "openings": [
+        "shutters",
+        "small"
+      ],
+      "rampSwaps": {
+        "accent": [
+          "thatch",
+          "accent",
+          "cobble"
+        ],
+        "teal": [
+          "thatch",
+          "terracotta",
+          "slate"
+        ]
+      }
+    }
+  },
+  "id": "cottage",
+  "kind": "house",
+  "tags": [
+    "home",
+    "small",
+    "rural"
+  ],
+  "version": 1
+}

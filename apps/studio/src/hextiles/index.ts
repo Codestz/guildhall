@@ -19,7 +19,7 @@ import {
   type TerrainMesh,
   toScreen,
 } from "@guildhall/render"
-import { HEX_TILE_SIZE, placeTile, TILE_PREFABS, type TileGround } from "@guildhall/world"
+import { CHARACTER_SCALE, HEX_TILE_SIZE, placeTile, TILE_PREFABS, type TileGround } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
 import { worldCamera } from "../shell/worldCamera.ts"
@@ -97,8 +97,9 @@ export const hexTiles: Screen = {
           const root = await loadPiece(libraryUrl(knight.files.glb))
           if (disposed) return
           // beside the tile, level with its middle: the same distance from the camera as what stands on it
-          root.position.set(x + R * 0.74, 0.5, z + 0.4)
+          root.position.set(x + R * 0.45, 0.5, z + 1.4)
           root.rotation.y = 0
+          root.scale.setScalar(CHARACTER_SCALE)
           stage.scene.add(root)
           cleanup.push(() => root.removeFromParent())
         }

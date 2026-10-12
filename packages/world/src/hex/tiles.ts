@@ -13,6 +13,12 @@ export const HEX_TILE_SIZE = 3.1
 /** Scale B: KayKit hex buildings and trees as the library imports them, scaled to the hex world. */
 export const SCALE_B = { building: 0.5, tree: 0.6 } as const
 
+/**
+ * Characters in the hex world (user: "the door = the same height as the character"): the KayKit heroes
+ * scaled so their head reaches a door's top beside a scale-B building.
+ */
+export const CHARACTER_SCALE = 0.55
+
 export type TileGround = "grass" | "soil" | "dirt" | "paved" | "sand"
 
 export interface TilePiece {

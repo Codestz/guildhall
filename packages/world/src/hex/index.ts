@@ -13,6 +13,7 @@ export {
   landTiles,
 } from "./island.ts"
 export {
+  CHARACTER_SCALE,
   HEX_TILE_SIZE,
   placeTile,
   SCALE_B,

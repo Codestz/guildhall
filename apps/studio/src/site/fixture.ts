@@ -1,13 +1,16 @@
 /**
  * The site screen's pure side: a hand-made `TownDraw` ground and water over a real `site()` (plan §6
- * R3: a lake, a cobble ribbon, a field, footprints), and where the few library pieces stand.
+ * R3: the island in its sea, a cobble ribbon, a field, sand, footprints), and where the few library
+ * pieces stand.
  */
 import { roll } from "@guildhall/core"
 import {
   add,
   axes,
+  bbox,
   clip,
   contains,
+  dist,
   type MultiPolygon,
   norm,
   offset,
@@ -16,23 +19,24 @@ import {
   type Site,
   scale,
   shapeArea,
+  sub,
   type Tier,
   type TownDraw,
   type Vec2,
 } from "@guildhall/world"
 
-/** How far the sea runs past the site's bounds, in radii. */
+/** How far the sea runs on past the map's bounds, in radii. */
 const SEA = 3.5
 
 export interface SiteQuery {
   seed: number
   tier: Tier
-  /** Radians toward the lake; null for a town without one. */
+  /** Radians toward the harbour's water; null for a town without a harbour. */
   harbour: number | null
   hour: number
 }
 
-/** The lake lower-left of the concept camera (azimuth 40°). */
+/** The harbour lower-left of the concept camera (azimuth 40°). */
 const DEFAULT_HARBOUR = 1.66
 
 export function parseSiteQuery(q: URLSearchParams, tiers: readonly Tier[]): SiteQuery {
@@ -64,7 +68,7 @@ const square = (h: number): Ring => [
   [-h, h],
 ]
 
-/** The biggest polygon of the land: the ground takes one outline with holes. */
+/** The biggest polygon of the land (the island; the islets are the rest): the ground takes one outline. */
 function mainLand(site: Site): Ring[] {
   return [...site.land].sort((a, b) => shapeArea(b) - shapeArea(a))[0] ?? [square(site.radius)]
 }
@@ -102,17 +106,19 @@ function centre(ring: readonly Vec2[]): Vec2 {
 }
 
 /**
- * The ground and water a town of this site would draw: the plaza paved, a cobble street from it to the
- * shore (or across the town), a dirt lane, a field, a garden and a sand beach by the street's end; the
- * lake plus a sea all round the bounds, with the whole coast as the shore. `footprints` darken the ground.
+ * The ground and water a town of this site would draw: the plaza paved, a cobble street from inland
+ * through the plaza down to the nearest shore, a dirt lane, a field, a garden and a sand beach where
+ * the street meets the coast; the island is the ground, the sea all round it (on past the map's bounds
+ * to the horizon), and its coast the shore. The ground takes one outline, so the islets are left to
+ * the sea here. `footprints` darken the ground.
  */
 export function siteDraw(site: Site, footprints: Vec2[][]): Pick<TownDraw, "ground" | "water"> {
-  const [outer, ...holes] = mainLand(site)
+  const [outer = square(site.radius)] = mainLand(site)
   const c = centre(site.plaza)
   const r = site.radius
-  const lake = site.water[0]
-  const toShore: Vec2 = lake ? norm(add(centre(lake), scale(c, -1))) : [1, 0]
-  const street = ribbon([add(c, scale(toShore, -0.9 * r)), c, add(c, scale(toShore, 0.75 * r))], 6)
+  const shore = outer.reduce((best, p) => (dist(p, c) < dist(best, c) ? p : best), outer[0] as Vec2)
+  const toShore = norm(sub(shore, c))
+  const street = ribbon([add(c, scale(toShore, -0.9 * r)), c, add(shore, scale(toShore, 4))], 6)
   const side: Vec2 = [-toShore[1], toShore[0]]
   const lane = ribbon(
     [c, add(c, add(scale(side, 0.45 * r), scale(toShore, -0.2 * r))), add(c, scale(side, 1.1 * r))],
@@ -121,9 +127,9 @@ export function siteDraw(site: Site, footprints: Vec2[][]): Pick<TownDraw, "grou
   const fieldAt = add(c, add(scale(side, -0.6 * r), scale(toShore, -0.45 * r)))
   const field = rotRect(fieldAt, 34, 22, 0.3)
   const garden = rotRect(add(c, add(scale(side, 0.3 * r), scale(toShore, -0.45 * r))), 14, 10, 0.35)
-  const beach: MultiPolygon = lake
-    ? clip(offset(lake, 7), [[rotRect(add(c, scale(toShore, 0.6 * r)), 0.6 * r, 0.6 * r, 0)]], "intersection")
-    : []
+  // The beach: the coast's 7 m strip, near where the street comes down to it.
+  const strip = clip([[outer]], offset(outer, -7), "difference")
+  const beach: MultiPolygon = clip(strip, [[rotRect(shore, 0.6 * r, 0.6 * r, 0)]], "intersection")
   const overlays: TownDraw["ground"]["overlays"] = [
     { kind: "field", poly: field },
     { kind: "garden", poly: garden },
@@ -133,14 +139,24 @@ export function siteDraw(site: Site, footprints: Vec2[][]): Pick<TownDraw, "grou
     { kind: "plaza", poly: site.plaza },
   ]
 
-  const h = site.bounds[2]?.[0] ?? r
-  const s = h + SEA * r
-  // The sea as four strips round the bounds (the water takes outlines without holes), plus the lake.
-  const sea: Ring[] = [rect(-s, -s, s, -h), rect(-s, h, s, s), rect(-s, -h, -h, h), rect(h, -h, s, h)]
-  const coast = [outer ?? [], ...holes].map((ring) => [...ring, ring[0] as Vec2])
+  // The sea fills the bounds round the land; four strips carry it on (the water takes outlines
+  // without holes).
+  const [lo, hi] = bbox(site.bounds)
+  const e = SEA * r
+  const horizon: Ring[] = [
+    rect(lo[0] - e, lo[1] - e, hi[0] + e, lo[1]),
+    rect(lo[0] - e, hi[1], hi[0] + e, hi[1] + e),
+    rect(lo[0] - e, lo[1], lo[0], hi[1]),
+    rect(hi[0], lo[1], hi[0] + e, hi[1]),
+  ]
+  const islets = site.land.filter((poly) => poly[0] !== outer).map((poly) => poly[0] as Ring)
   return {
-    ground: { land: outer ?? [], holes, overlays, footprints },
-    water: { polys: [...site.water, ...sea], level: -0.6, shore: coast },
+    ground: { land: outer, holes: [], overlays, footprints },
+    water: {
+      polys: [...site.water, ...islets, ...horizon],
+      level: -0.6,
+      shore: [[...outer, outer[0] as Vec2]],
+    },
   }
 }
 

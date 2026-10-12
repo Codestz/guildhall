@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 import { createCatalog, type PrefabRecipe } from "@guildhall/assets"
 import {
+  bbox,
   contains,
   distTo,
   generateTown,
@@ -13,7 +14,9 @@ import {
   type Rect,
   rectCorners,
   rectsOverlap,
+  ribbon,
   STATION_PAD,
+  site,
   type Tier,
   type TownLayout,
   type TownSpecInput,
@@ -304,6 +307,12 @@ describe("walk graph", () => {
   })
 })
 
+/**
+ * The least `builtPct` per tier: towns and cities meet the Look bar's 35%; a village breathes; a
+ * hamlet is a few cottages, each with its garden on a small block of its own beyond the fence.
+ */
+const DENSITY: Record<Tier, number> = { hamlet: 0.12, village: 0.2, town: 0.35, city: 0.35, capital: 0.35 }
+
 describe("townMetrics", () => {
   test("per tier: dense towns and cities, dressed ground, no big bare patch; timings logged", () => {
     const rows: string[] = []
@@ -319,8 +328,7 @@ describe("townMetrics", () => {
             .map(([k, v]) => `${k} ${v.toFixed(0)}`)
             .join(", ")})`,
       )
-      if (s.tier === "town" || s.tier === "city") expect(m.builtPct, label(s)).toBeGreaterThanOrEqual(0.35)
-      expect(m.builtPct, label(s)).toBeGreaterThan(0.2)
+      expect(m.builtPct, label(s)).toBeGreaterThanOrEqual(DENSITY[s.tier])
       expect(m.dressedPct, label(s)).toBeGreaterThanOrEqual(0.85)
       expect(m.maxBare, label(s)).toBeLessThanOrEqual(150)
       expect(m.frontageFill, label(s)).toBeGreaterThan(0.6)
@@ -339,4 +347,76 @@ describe("townMetrics", () => {
     const m = townMetrics(plan, { draw: draw as never, tris: { "kenney-pirate/crate": 76 } })
     expect([m.pieces, m.estTris]).toEqual([1, 76])
   })
+})
+
+/** The debug picture of a whole plan: sea, island, ground, streets, footprints, edges, plants, stations. */
+function svg(plan: TownLayout): string {
+  const land = site(plan.spec).land
+  // A square round the island with a little sea (the map's own square is mostly sea).
+  const [a, b] = bbox(land.flatMap((p) => p[0] ?? []))
+  const h = 0.54 * Math.max(b[0] - a[0], b[1] - a[1])
+  const mid: Vec2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+  const [lo, hi]: Vec2[] = [
+    [mid[0] - h, mid[1] - h],
+    [mid[0] + h, mid[1] + h],
+  ]
+  const path = (ring: readonly Vec2[], close = true) =>
+    `M${ring.map((p) => `${p[0]} ${-p[1]}`).join("L")}${close ? "Z" : ""}`
+  const poly = (ring: readonly Vec2[], fill: string, extra = "") =>
+    `<path d="${path(ring)}" fill="${fill}" ${extra}/>`
+  const dot = (p: Vec2, r: number, fill: string) =>
+    `<circle cx="${p[0]}" cy="${-p[1]}" r="${r}" fill="${fill}"/>`
+  const block = { castle: "#b9b9a8", plaza: "#efe0b0", lots: "#c9b9a0", green: "none", harbour: "#d8c58e" }
+  const plot = { garden: "#7fae55", allotment: "#a08850", yard: "#bfae8a", orchard: "#6c9a48" }
+  const solid: Record<string, string> = {
+    house: "#c0623a",
+    shop: "#c47a3a",
+    tavern: "#8e3b2a",
+    forge: "#555",
+    chapel: "#f4efe4",
+    hall: "#d9b44a",
+    keep: "#4a6fb5",
+    farmhouse: "#c96",
+    barn: "#a33",
+    pier: "#9b6b3a",
+    boat: "#6b3f1f",
+  }
+  const edge = { wall: ["#5d5a56", 2.4], hedge: ["#2f6b2a", 1.2], fence: ["#6b4a2a", 0.4] } as const
+  const parts = [
+    `<rect x="${lo[0]}" y="${-hi[1]}" width="${hi[0] - lo[0]}" height="${hi[1] - lo[1]}" fill="#3d7fa6"/>`,
+    ...land.map((p) => `<path d="${p.map((r) => path(r)).join("")}" fill="#9cba6a" fill-rule="evenodd"/>`),
+    ...plan.blocks.map((b) => poly(b.poly, block[b.use])),
+    ...plan.plazas.map((p) => poly(p, "#efe0b0")),
+    ...plan.plots.map((p) => poly(p.poly, plot[p.kind])),
+    ...plan.fields.map((f) => poly(f.poly, "#b39a5a")),
+    ...plan.streets.edges.map((e) =>
+      poly(ribbon(e.points, e.width), e.cls === "road" ? "#b49a6a" : "#e2dccd"),
+    ),
+    ...plan.placements.flatMap((p) => {
+      const size = plan.sizes[p.prefab]
+      if (!size || PLANT_ROLES.has(p.role ?? "")) return []
+      const r = { c: p.at, rot: p.rot, w: size[0], d: size[1] }
+      return [poly(rectCorners(r), solid[p.role ?? ""] ?? "#8a7a6a", 'stroke="#222" stroke-width="0.15"')]
+    }),
+    ...plan.edges.map((e) => {
+      const [stroke, w] = edge[e.kind]
+      return `<path d="${path(e.points, e.closed)}" fill="none" stroke="${stroke}" stroke-width="${w}"/>`
+    }),
+    ...[...plan.placements, ...plan.nature]
+      .filter((p) => PLANT_ROLES.has(p.role ?? ""))
+      .map((p) => dot(p.at, p.role === "tree" ? 1.8 : 0.7, p.role === "tree" ? "#2f6b2a" : "#5f8f3a")),
+    ...plan.stations.map((s) => dot(s.at, 1.2, "#e00")),
+  ]
+  const box = `${lo[0]} ${-hi[1]} ${hi[0] - lo[0]} ${hi[1] - lo[1]}`
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${box}" width="2000" height="2000">${parts.join("")}</svg>\n`
+}
+
+test("writes a debug SVG of the whole plan per tier to .probe/w6 (north up: +z is up the page)", () => {
+  const out = resolve(import.meta.dir, "../../../.probe/w6")
+  mkdirSync(out, { recursive: true })
+  for (const s of PRESETS) {
+    const text = svg(town(s))
+    writeFileSync(join(out, `${s.tier}.svg`), text)
+    expect(text).toContain("<path")
+  }
 })

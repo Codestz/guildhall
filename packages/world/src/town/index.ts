@@ -15,7 +15,7 @@ import type { Roll } from "../geom/sample.ts"
 import { add, at, dist, round3, scale, snap, type Vec2 } from "../geom/vec.ts"
 import { blocks as blockStage } from "./blocks.ts"
 import { PLANT_ROLES } from "./dress.ts"
-import { type EdgeKitProfile, edgeKits, layoutEdge, walls } from "./edges.ts"
+import { type EdgeKitProfile, edgeKits, layoutEdge, townEdgeKind, walls } from "./edges.ts"
 import { farms } from "./farms.ts"
 import { harbour } from "./harbour.ts"
 import { furnish, type Plot } from "./interiors.ts"
@@ -87,17 +87,6 @@ export function generateTown(
   lap("streets")
   const cut = blockStage(graph, ground, s, stage("blocks"))
   lap("blocks")
-  const lotList = lotStage(cut.blocks, cut.graph, lib, stage("lots"), s.tier)
-  lap("lots")
-  const built = special(
-    place(lotList, lib, s, stage("place")),
-    lotList,
-    lib,
-    s,
-    ground.plaza,
-    stage("special"),
-  )
-  lap("place")
 
   const plan: TownLayout = {
     spec: s,
@@ -106,8 +95,8 @@ export function generateTown(
     plazas: [ground.plaza],
     streets: cut.graph,
     blocks: cut.blocks,
-    lots: lotList,
-    placements: built,
+    lots: [],
+    placements: [],
     edges: [],
     fields: [],
     nature: [],
@@ -117,11 +106,27 @@ export function generateTown(
     sizes: {},
     hash: "",
   }
+  // The town's edge runs just outside the wall street, so through the suburb blocks beyond it: their
+  // lots are laid with its ground cut out, and no house stands under the wall, hedge or fence.
   plan.edges.push(...walls(plan, s, stage("walls")))
+  plan.blocks = clearOf(plan.blocks, plan.edges, edgeKits(s.tier)[townEdgeKind(s)], "lots")
+  lap("walls")
+  plan.lots = lotStage(plan.blocks, cut.graph, lib, stage("lots"), s.tier)
+  lap("lots")
+  const lotList = plan.lots
+  plan.placements = special(
+    place(lotList, lib, s, stage("place")),
+    lotList,
+    lib,
+    s,
+    ground.plaza,
+    stage("special"),
+  )
+  lap("place")
   const castle = landmark(plan, s, lib, stage("landmark"))
   plan.placements.push(...castle.placements)
   plan.edges.push(...castle.edges)
-  lap("walls")
+  lap("landmark")
 
   // Farms keep clear of what is built on the farmland; lot buildings stand on lots blocks, so only a
   // lot on a green block (none today) or a piece outside the lots could be in their way.
@@ -134,7 +139,12 @@ export function generateTown(
   const farmed = farms(
     {
       ...plan,
-      blocks: farmland(plan.blocks, plan.edges, kit),
+      blocks: clearOf(
+        plan.blocks,
+        plan.edges.filter((e) => e.kind === "wall"),
+        kit,
+        "green",
+      ),
       placements: [
         ...plan.placements.filter((p) => p.lot === undefined || onGreen.has(p.lot)),
         ...wall.placements,
@@ -214,31 +224,37 @@ function wallGround(
 }
 
 /**
- * The green blocks with the wall's ground cut out of them (a strip as wide as its towers along each
- * wall run), so farms laid out from the farmland's edge start beyond the wall, not under it.
+ * The blocks of one use with the edges' ground cut out of them (a strip as wide as the kit's towers,
+ * and a metre each side, along every run): farms laid out from the farmland's edge start beyond the
+ * wall, and lots on a suburb block stop short of it. A green block keeps every piece the cut leaves; a
+ * lots block keeps its largest, so its id still names one block for the lots and plots on it.
  */
-function farmland(blocks: readonly Block[], edges: readonly Edge[], kit: EdgeKitProfile): Block[] {
+function clearOf(
+  blocks: readonly Block[],
+  edges: readonly Edge[],
+  kit: EdgeKitProfile,
+  use: "green" | "lots",
+): Block[] {
   const width = Math.max(kit.thickness, kit.towerSize ?? 0) + 2
-  const strips = edges
-    .filter((e) => e.kind === "wall")
-    .map((e) => ribbon(e.closed ? [...e.points, e.points[0] as Vec2] : e.points, width))
+  const strips = edges.map((e) => ribbon(e.closed ? [...e.points, e.points[0] as Vec2] : e.points, width))
   if (strips.length === 0) return [...blocks]
   return blocks.flatMap((b) => {
-    if (b.use !== "green") return [b]
+    if (b.use !== use) return [b]
     const [lo, hi] = bbox(b.poly)
     const near = strips.filter((r) => {
       const [a, z] = bbox(r)
       return a[0] <= hi[0] && z[0] >= lo[0] && a[1] <= hi[1] && z[1] >= lo[1]
     })
     if (near.length === 0) return [b]
-    return sturdyClip(
+    const left = sturdyClip(
       b.poly,
       near.map((r) => [r]),
       "difference",
     )
       .map((poly) => at(poly, 0))
       .filter((ring) => Math.abs(area(ring)) > 1)
-      .map((poly) => ({ ...b, poly }))
+      .sort((p, q) => Math.abs(area(q)) - Math.abs(area(p)))
+    return (use === "lots" ? left.slice(0, 1) : left).map((poly) => ({ ...b, poly }))
   })
 }
 

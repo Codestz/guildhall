@@ -41,7 +41,7 @@ const PIECES: Record<Exclude<Stand["role"], "hero">, readonly string[]> = {
 /**
  * The site screen (`?screen=site`, R3): a town site from `seed` and `tier` as ground, water and sky, a
  * few library pieces stood on it, lit for `hour` (`?hour=17.5`, golden hour by default). `?harbour=`
- * turns the lake (radians, or `none`). `guildhall.ext.site.setHour(h)` moves the sun live.
+ * turns the harbour's bay (radians, or `none`). `guildhall.ext.site.setHour(h)` moves the sun live.
  */
 export const siteScreen: Screen = {
   id: "site",

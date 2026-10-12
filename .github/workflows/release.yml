@@ -1,7 +1,7 @@
 # Publish opencode-guildhall to npm with Trusted Publishing (OIDC): no npm token is stored anywhere,
 # and every version carries provenance linking it to the commit it was built from.
 #
-# Release: bump packages/opencode-guildhall/package.json "version", commit, then
+# Release: bump legacy/packages/opencode-guildhall/package.json "version", commit, then
 #   git tag v0.1.0 && git push origin v0.1.0
 name: Release
 
@@ -33,12 +33,14 @@ jobs:
       - run: npm install -g npm@latest
 
       - run: bun install --frozen-lockfile
+        working-directory: legacy
 
       - name: Check (lint, typecheck, tests)
+        working-directory: legacy
         run: bun run check
 
       - name: Tag matches the package version
-        working-directory: packages/opencode-guildhall
+        working-directory: legacy/packages/opencode-guildhall
         run: |
           version="$(node -p "require('./package.json').version")"
           if [ "v$version" != "$GITHUB_REF_NAME" ]; then
@@ -48,5 +50,5 @@ jobs:
 
       # prepack builds the bundle (plugin, hub, hall) before packing.
       - name: Publish
-        working-directory: packages/opencode-guildhall
+        working-directory: legacy/packages/opencode-guildhall
         run: npm publish --provenance --access public

@@ -50,7 +50,8 @@ import { MeshoptEncoder, MeshoptSimplifier } from "meshoptimizer"
 import { bakeToPalette, coolStone, decodePng, encodePng, paletteOf } from "./palette.ts"
 
 const ROOT = join(import.meta.dir, "..")
-const SRC = join(ROOT, "assets/src")
+// The raw packs stay at the repo root (one level above legacy/), shared with V2's importer.
+const SRC = join(ROOT, "../assets/src")
 const OUT = join(ROOT, "packages/hall/public/assets")
 
 const CHARACTERS = ["Knight", "Barbarian", "Mage", "Rogue", "Rogue_Hooded", "Ranger"]

@@ -19,7 +19,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Codestz/guildhall.git",
-    "directory": "packages/opencode-guildhall"
+    "directory": "legacy/packages/opencode-guildhall"
   },
   "main": "./dist/server.js",
   "exports": {

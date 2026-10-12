@@ -222,7 +222,7 @@ describe("place", () => {
 
 /** The debug picture: land, water, streets, blocks, lots (gardens filled), footprints by kind with a door tick. */
 function svg(m: (typeof built)[number]): string {
-  const h = 1.3 * m.site.radius
+  const h = 1.6 * m.site.radius
   const path = (ring: readonly Vec2[]) => `M${ring.map((p) => `${p[0]} ${-p[1]}`).join("L")}Z`
   const fill: Record<string, string> = {
     house: "#c0603e",

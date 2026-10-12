@@ -12,3 +12,14 @@ export {
   kindOf,
   landTiles,
 } from "./island.ts"
+export {
+  type HexRoad,
+  type HexZone,
+  type HexZones,
+  hexZones,
+  TILE_USES,
+  type TileUse,
+  useOf,
+  ZONE_KINDS,
+  type ZoneKind,
+} from "./zones.ts"

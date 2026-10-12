@@ -8,9 +8,12 @@ import {
   HEX_ISLAND_DEFAULTS,
   type HexIsland,
   type HexIslandSpec,
+  type HexZones,
   hexCentre,
   hexIsland,
+  hexZones,
   kindOf,
+  useOf,
 } from "@guildhall/world"
 import type { Screen } from "../screens.ts"
 import { replaceQuery } from "../shell/router.ts"
@@ -61,6 +64,8 @@ interface View {
   spec: Required<Omit<HexIslandSpec, "seed">> & { seed: number }
   grid: boolean
   growth: boolean
+  /** Step 2 on top: zones, buildings, roads (on unless `zones=0`). */
+  zones: boolean
 }
 
 function parse(q: URLSearchParams): View {
@@ -70,7 +75,7 @@ function parse(q: URLSearchParams): View {
   }
   const spec = { ...HEX_ISLAND_DEFAULTS, seed: num("seed", 1) }
   for (const k of KNOBS) spec[k.key] = num(k.key, HEX_ISLAND_DEFAULTS[k.key])
-  return { spec, grid: q.get("grid") === "1", growth: q.get("growth") === "1" }
+  return { spec, grid: q.get("grid") === "1", growth: q.get("growth") === "1", zones: q.get("zones") !== "0" }
 }
 
 function params(v: View): URLSearchParams {
@@ -78,6 +83,7 @@ function params(v: View): URLSearchParams {
   for (const k of KNOBS) if (v.spec[k.key] !== HEX_ISLAND_DEFAULTS[k.key]) q.set(k.key, String(v.spec[k.key]))
   if (v.grid) q.set("grid", "1")
   if (v.growth) q.set("growth", "1")
+  if (!v.zones) q.set("zones", "0")
   return q
 }
 
@@ -89,6 +95,7 @@ function draw(
   cy: number,
   size: number,
   fit: number,
+  zones?: HexZones,
 ): void {
   const { grid } = h
   const s = size / (Math.sqrt(3) * (2 * fit + 1))
@@ -149,6 +156,132 @@ function draw(
       g.stroke()
     }
   }
+  if (zones) drawZones(g, h, zones, cx, cy, s, C)
+}
+
+/** Zone colours (a tint over the place's tiles, its name at the heart). */
+const ZONE_COLOUR: Record<string, string> = {
+  town: "#d8463a",
+  harbour: "#7a4fd6",
+  castle: "#5a5a6a",
+  farm: "#d9a520",
+  fishing: "#2aa39a",
+  mine: "#8a6a4a",
+  lumber: "#3f7a3a",
+}
+
+/**
+ * The zones over the land: each place's tiles tinted with its colour; a building tile as a small roofed
+ * block, the square paved, yards left as tinted ground; roads as a dirt band tile to tile, bridges plank
+ * brown; fields striped; docks planked out on the shallows.
+ */
+function drawZones(
+  g: CanvasRenderingContext2D,
+  h: HexIsland,
+  z: HexZones,
+  cx: number,
+  cy: number,
+  s: number,
+  C: [number, number][],
+): void {
+  const { grid } = h
+  const hexPath = (px: number, py: number, k = 1) => {
+    g.beginPath()
+    C.forEach(([dx, dy], i) => (i ? g.lineTo(px + dx * k, py + dy * k) : g.moveTo(px + dx * k, py + dy * k)))
+    g.closePath()
+  }
+  const centre = (i: number): [number, number] => {
+    const [x, y] = hexCentre({ q: grid.q[i]!, r: grid.r[i]! })
+    return [cx + x * s, cy + y * s]
+  }
+  for (let i = 0; i < grid.size; i++) {
+    const u = useOf(z, i)
+    const zi = z.zoneOf[i]!
+    const [px, py] = centre(i)
+    if (zi) {
+      g.fillStyle = `${ZONE_COLOUR[z.zones[zi - 1]!.kind] ?? "#fff"}55`
+      hexPath(px, py)
+      g.fill()
+    }
+    if (u === "field") {
+      g.fillStyle = "#e3c25a"
+      hexPath(px, py, 0.92)
+      g.fill()
+      g.strokeStyle = "#b8963c"
+      g.lineWidth = Math.max(0.6, s * 0.12)
+      for (let k = -2; k <= 2; k++) {
+        g.beginPath()
+        g.moveTo(px - s * 0.7, py + k * s * 0.3)
+        g.lineTo(px + s * 0.7, py + k * s * 0.3)
+        g.stroke()
+      }
+    } else if (u === "square") {
+      g.fillStyle = "#cfc4ae"
+      hexPath(px, py, 0.95)
+      g.fill()
+    } else if (u === "dock") {
+      g.fillStyle = "#8a6038"
+      hexPath(px, py, 0.55)
+      g.fill()
+    }
+  }
+  // roads: a band from tile centre to tile centre
+  g.lineCap = "round"
+  g.lineJoin = "round"
+  const band = (a: number, b: number, colour: string, w: number) => {
+    const [ax, ay] = centre(a)
+    const [bx, by] = centre(b)
+    g.strokeStyle = colour
+    g.lineWidth = w
+    g.beginPath()
+    g.moveTo(ax, ay)
+    g.lineTo(bx, by)
+    g.stroke()
+  }
+  // each road and street along its own tile path (never every adjacent pair: that draws triangles)
+  for (const pass of [0, 1])
+    for (const r of z.roads)
+      for (let k = 1; k < r.tiles.length; k++) {
+        const a = r.tiles[k - 1]!
+        const b = r.tiles[k]!
+        const bridge = useOf(z, a) === "bridge" || useOf(z, b) === "bridge"
+        if (pass === 0) band(a, b, "#7a5a36", Math.max(2, s * 0.62))
+        else band(a, b, bridge ? "#a0703c" : "#e2c68f", Math.max(1.2, s * 0.4))
+      }
+  // buildings: a small roofed block per tile; the castle a keep
+  for (let i = 0; i < grid.size; i++) {
+    const u = useOf(z, i)
+    if (u !== "building" && u !== "landmark") continue
+    const [px, py] = centre(i)
+    const zi = z.zoneOf[i]!
+    const colour = ZONE_COLOUR[z.zones[zi - 1]?.kind ?? "town"] ?? "#d8463a"
+    const w = s * (u === "landmark" ? 1.3 : 1.05)
+    g.fillStyle = "#f3e9d4"
+    g.fillRect(px - w / 2, py - w / 2, w, w)
+    g.fillStyle = colour
+    g.beginPath()
+    g.moveTo(px - w / 2 - s * 0.08, py - w / 2 + s * 0.05)
+    g.lineTo(px, py - w / 2 - s * 0.45)
+    g.lineTo(px + w / 2 + s * 0.08, py - w / 2 + s * 0.05)
+    g.closePath()
+    g.fill()
+    g.strokeStyle = "rgba(30,20,10,0.6)"
+    g.lineWidth = 0.8
+    g.strokeRect(px - w / 2, py - w / 2, w, w)
+  }
+  // names at the hearts
+  g.font = "bold 12px ui-monospace,Menlo,monospace"
+  g.textAlign = "center"
+  for (const zone of z.zones) {
+    const [px, py] = centre(zone.tile)
+    const label = `${zone.kind} · ${zone.buildings}`
+    g.lineWidth = 3
+    g.strokeStyle = "rgba(20,16,12,0.85)"
+    g.strokeText(label, px, py - s * 1.6)
+    g.fillStyle = "#fff"
+    g.fillText(label, px, py - s * 1.6)
+  }
+  g.textAlign = "start"
 }
 
 export const hexmap: Screen = {
@@ -207,13 +340,24 @@ export const hexmap: Screen = {
         stats.textContent = lines.join("\n")
       } else {
         const h = hexIsland(view.spec)
+        const zones = view.zones ? hexZones(h) : undefined
         const size = Math.min(aw, H - 16) * 1.02
-        draw(g, h, left + aw / 2, H / 2, size, FIT)
+        draw(g, h, left + aw / 2, H / 2, size, FIT, zones)
         const count: Record<string, number> = {}
         for (let i = 0; i < h.grid.size; i++) count[kindOf(h, i)] = (count[kindOf(h, i)] ?? 0) + 1
         stats.textContent = [
           `land tiles ${h.stats.land} (${view.spec.files} files)`,
           `rivers ${h.stats.rivers} · lakes ${h.stats.lakes}`,
+          ...(zones
+            ? [
+                `buildings ${zones.stats.buildings} · fields ${zones.stats.fields}`,
+                `road tiles ${zones.stats.roadTiles} · bridges ${zones.stats.bridges}`,
+                ...zones.zones.map(
+                  (q) =>
+                    `  ${q.kind.padEnd(8)} ${String(q.tiles.length).padStart(3)} tiles · ${q.buildings} bldg`,
+                ),
+              ]
+            : []),
           ...Object.entries(count)
             .filter(([k]) => k !== "sea")
             .sort((a, b) => b[1] - a[1])
@@ -225,7 +369,7 @@ export const hexmap: Screen = {
     }
 
     const title = document.createElement("div")
-    title.innerHTML = "<b>Hex world</b> · step 1: land + water"
+    title.innerHTML = "<b>Hex world</b> · 1 land + water · 2 zones + roads"
     const btn = (label: string, on: () => void): HTMLButtonElement => {
       const b = document.createElement("button")
       b.textContent = label
@@ -263,7 +407,12 @@ export const hexmap: Screen = {
       view.growth = !view.growth
       growBtn.textContent = view.growth ? "hide growth" : "growth"
     })
-    row.append(gridBtn, growBtn)
+    const zoneBtn = btn(view.zones ? "land only" : "zones", () => {
+      view.zones = !view.zones
+      zoneBtn.textContent = view.zones ? "land only" : "zones"
+    })
+    row.append(gridBtn, growBtn, zoneBtn)
+    row.style.flexWrap = "wrap"
     panel.append(title, row)
     for (const k of KNOBS) {
       const label = document.createElement("label")

@@ -126,6 +126,11 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         purpose: "A live fantasy map of a generated town, to judge its layout at a glance.",
       },
       {
+        id: "island",
+        name: "Island",
+        purpose: "The whole island: a city, hamlets, fields, woods, rivers and landmarks under a live sky.",
+      },
+      {
         id: "town",
         name: "Town",
         purpose: "A generated town in 3D under the golden-hour sun: streets, walls, harbour, skyline.",

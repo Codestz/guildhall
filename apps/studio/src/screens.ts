@@ -7,6 +7,7 @@ import { crowdLab } from "./crowd/index.ts"
 import { grip } from "./grips/editor/index.ts"
 import { grips } from "./grips/matrix/index.ts"
 import { home } from "./home/index.tsx"
+import { island } from "./island/index.ts"
 import { lineup } from "./lineup/index.ts"
 import { m0 } from "./m0/index.ts"
 import { night } from "./night/index.ts"
@@ -60,6 +61,7 @@ export const SCREENS: readonly Screen[] = [
   crowdLab,
   terraLab,
   terra3d,
+  island,
 ]
 
 export const DEFAULT_SCREEN = "home"

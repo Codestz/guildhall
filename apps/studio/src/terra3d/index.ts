@@ -7,9 +7,12 @@
 import type { CameraPose } from "@guildhall/core"
 import { log } from "@guildhall/core"
 import {
+  type Atmosphere,
   type BatchInstance,
+  createAtmosphere,
   createHeightGround,
   createInlandWater,
+  createNight,
   createSky,
   createStage,
   createStaticBatch,
@@ -17,6 +20,7 @@ import {
   createSurface,
   createWater,
   loadPiece,
+  type Night,
   type StaticBatch,
   type TerrainMesh,
   type Water,
@@ -523,6 +527,52 @@ export const terra3d: Screen = {
       free: true,
     })
     let disposed = false
+    // the clock: ?hour=, a slider and a play button (an hour every two seconds)
+    let clockHour = Number(ctx.query.get("hour") ?? 15.5)
+    let setHour: (h: number) => void = () => {}
+    let night: Night | null = null
+    let atmosphere: Atmosphere | null = null
+    let playing = false
+    const clock = document.createElement("div")
+    clock.style.cssText =
+      "position:absolute;left:12px;bottom:12px;z-index:2;padding:8px 12px;border-radius:4px;background:rgba(21,17,13,0.82);color:#f3e9d4;font:12px/1.5 ui-monospace,Menlo,monospace;display:flex;gap:8px;align-items:center;min-width:320px"
+    const play = document.createElement("button")
+    play.textContent = "▶ play day"
+    play.style.cssText =
+      "font:inherit;color:inherit;background:#3a2f22;border:1px solid #6b5636;border-radius:3px;padding:2px 8px;cursor:pointer"
+    const slider = document.createElement("input")
+    slider.type = "range"
+    slider.min = "0"
+    slider.max = "24"
+    slider.step = "0.05"
+    slider.value = String(clockHour)
+    slider.style.cssText = "flex:1"
+    const time = document.createElement("span")
+    const show = () => {
+      const hh = Math.floor(clockHour)
+      time.textContent = `${String(hh).padStart(2, "0")}:${String(Math.floor((clockHour - hh) * 60)).padStart(2, "0")}`
+    }
+    show()
+    slider.oninput = () => {
+      playing = false
+      play.textContent = "▶ play day"
+      clockHour = Number(slider.value)
+      setHour(clockHour)
+      show()
+    }
+    play.onclick = () => {
+      playing = !playing
+      play.textContent = playing ? "❚❚ pause" : "▶ play day"
+    }
+    clock.append(play, time, slider)
+    host.append(clock)
+    const unTick = stage.onFrame((dt) => {
+      if (!playing) return
+      clockHour = (clockHour + dt * 0.5) % 24
+      slider.value = String(clockHour)
+      setHour(clockHour)
+      show()
+    })
     let batch: StaticBatch | null = null
     let water: Water | null = null
     const meshes: TerrainMesh[] = []
@@ -543,7 +593,15 @@ export const terra3d: Screen = {
       stage.setCamera(pose)
       const span = (t.w * t.cell) / 2
       const sun = createSun(stage, { town: { min: [-span, -2, -span], max: [span, 22, span] } })
-      createSky(stage, { sun, hour: 15.5, reach: R * 2.2 })
+      const sky = createSky(stage, { sun, hour: clockHour, reach: R * 2.2 })
+      setHour = (hr) => (night ? night.setHour(hr) : sky.setHour(hr))
+      // clouds drift over the island, their shadows on the land and the water
+      atmosphere = createAtmosphere(stage, {
+        light: () => sky.light(),
+        centre: [0, 0],
+        reach: R * 1.3,
+        seed: view.spec.seed,
+      })
       const plan = view.plan ? terraPlan(t) : null
       if (plan) meshes.push(createSurface(stage, roadRibbons(t, plan), ROAD))
       meshes.push(
@@ -622,6 +680,8 @@ export const terra3d: Screen = {
         clusters,
       )
       if (disposed) batch.dispose()
+      // lamps and lit windows, following the hour
+      if (built) night = createNight(stage, built.lights, { sky, hour: clockHour })
       sun.markDirty()
       text.textContent = [
         `seed ${view.spec.seed} · ${view.spec.size} m`,
@@ -635,6 +695,9 @@ export const terra3d: Screen = {
     ctx.load(ready).catch((error: unknown) => logger.error("build failed", { error: String(error) }))
     return () => {
       disposed = true
+      unTick()
+      night?.dispose()
+      atmosphere?.dispose()
       cam.dispose()
       batch?.dispose()
       water?.dispose()

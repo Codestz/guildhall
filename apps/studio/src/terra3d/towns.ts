@@ -9,13 +9,18 @@ import { log } from "@guildhall/core"
 import type { BatchCluster, BatchInstance } from "@guildhall/render"
 import {
   districtGround,
+  normalizeSpec,
   prefabLibrary,
   recipeKey,
   type Terra,
   type TerraLandmark,
   type TerraPlan,
+  type TownLights,
+  type TownPlan,
   terraDistricts,
+  terraHeightAt,
   terraLandmarks,
+  townLights,
 } from "@guildhall/world"
 import type { loadCatalog } from "../catalog.ts"
 import * as data from "../data.ts"
@@ -36,8 +41,10 @@ export interface BuiltPlaces {
   paved: { line: [number, number][]; half: number }[]
   /** The old town (roads inside it are cobbled too). */
   core: { at: [number, number]; r: number } | null
-  /** Gatehouses: gate, walls and towers as pieces. */
+  /** Lamp posts and other loose pieces. */
   pieces: BatchInstance[]
+  /** Lamps and lit windows for the night, standing on the ground. */
+  lights: TownLights
   /** One line per place: what was built. */
   report: string[]
   /** The ground the districts and landmarks use; the rest of each claim goes to the parcels. */
@@ -139,8 +146,61 @@ export async function buildPlaces(t: Terra, plan: TerraPlan, catalog: Catalog): 
     `landmarks: ${landmarks.map((l) => l.kind).join(", ") || "none"}`,
   ]
   logger.info("districts", { ms: d.ms, buildings: d.buildings.length, streets: d.streets.length })
+  // the night: lamps by the streets and doors, lit windows, worked out as for a town (flat), then
+  // each lifted onto the ground under the building or the street it belongs to
+  const flat: TownPlan = {
+    spec: normalizeSpec({ seed: t.spec.seed, tier: "town", walls: false }),
+    bounds: [],
+    water: [],
+    plazas: d.squares,
+    streets: {
+      nodes: [],
+      edges: d.streets.map((st, id) => ({
+        id,
+        a: 0,
+        b: 0,
+        points: st.line,
+        cls: st.paved ? ("street" as const) : ("lane" as const),
+        width: st.half * 2,
+      })),
+    },
+    blocks: [],
+    lots: [],
+    placements: d.buildings.map((b) => ({ prefab: b.prefab, seed: b.seed % VARIANTS, at: b.at, rot: b.rot })),
+    edges: [],
+    fields: [],
+    nature: [],
+    stations: [],
+    hash: "",
+  }
+  const raw = townLights(flat, compiled, lib)
+  const groundUnder = (x: number, z: number): number => {
+    let best = Infinity
+    let y = terraHeightAt(t, x, z)
+    for (const b of d.buildings) {
+      const dd = Math.hypot(b.at[0] - x, b.at[1] - z)
+      if (dd < 9 && dd < best) {
+        best = dd
+        y = b.y
+      }
+    }
+    return y
+  }
+  const lights: TownLights = {
+    pieces: raw.pieces.map((p) => ({ ...p, y: p.y + groundUnder(p.x, p.z) })),
+    points: raw.points.map((q) => ({
+      ...q,
+      at: [q.at[0], q.at[1] + groundUnder(q.at[0], q.at[2]), q.at[2]],
+    })),
+    windows: raw.windows.map((w) => ({
+      ...w,
+      at: [w.at[0], w.at[1] + groundUnder(w.at[0], w.at[2]), w.at[2]],
+    })),
+  }
+  pieces.push(...lights.pieces)
   return {
     clusters,
+    lights,
     streets,
     paved,
     core: d.core ? { at: [d.core.at[0], d.core.at[1]], r: d.core.r } : null,

@@ -55,12 +55,12 @@ export const HEX_ISLAND_DEFAULTS: Required<Omit<HexIslandSpec, "seed">> = {
 }
 
 /** The grid every island lives on: one size for all, so a tile's coordinates never change as it grows. */
-export const HEX_MAP_RADIUS = 48
+export const HEX_MAP_RADIUS = 56
 
-/** Land tiles for a repo of `files` files: 1.5 × V1's 40 + 13·√files, at most HEX_LAND_MAX. */
-export const HEX_LAND_MAX = 2100
+/** Land tiles for a repo of `files` files: 2 × V1's 40 + 13·√files, at most HEX_LAND_MAX. */
+export const HEX_LAND_MAX = 2800
 export const landTiles = (files: number): number =>
-  Math.min(HEX_LAND_MAX, Math.round(1.5 * (40 + 13 * Math.sqrt(Math.max(0, files)))))
+  Math.min(HEX_LAND_MAX, Math.round(2 * (40 + 13 * Math.sqrt(Math.max(0, files)))))
 
 export interface HexRiver {
   /** Tile indices, source to mouth (the last one is sea or lake, or the river it joins). */
@@ -148,13 +148,24 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
   const rot = rnd(1) * Math.PI * 2
   const stretch = 1 + 0.45 * rnd(2)
   const lobes: [number, number, number][] = []
-  for (let k = 0; k < 2 + Math.floor(rnd(3) * 2); k++)
-    lobes.push([rnd(10 + k) * Math.PI * 2, 0.35 + 0.25 * rnd(20 + k), 0.22 * spec.coast])
-  for (let k = 0; k < 1 + Math.floor(rnd(4) * 2); k++)
-    lobes.push([rnd(30 + k) * Math.PI * 2, 0.18 + 0.1 * rnd(40 + k), -0.2 * spec.coast])
+  for (let k = 0; k < 3 + Math.floor(rnd(3) * 3); k++)
+    lobes.push([
+      rnd(10 + k) * Math.PI * 2,
+      0.22 + 0.25 * rnd(20 + k),
+      (0.18 + 0.14 * rnd(25 + k)) * spec.coast,
+    ])
+  for (let k = 0; k < 2 + Math.floor(rnd(4) * 3); k++)
+    lobes.push([
+      rnd(30 + k) * Math.PI * 2,
+      0.1 + 0.1 * rnd(40 + k),
+      -(0.18 + 0.14 * rnd(45 + k)) * spec.coast,
+    ])
   const massifAng = rnd(5) * Math.PI * 2
   // the hills sit a fixed walk from the centre: a small island reaches their foot, a big one climbs them
   const massif: [number, number] = [Math.cos(massifAng) * 12, Math.sin(massifAng) * 12]
+  // a second, lower range further out on another side: big islands climb it too
+  const ang2 = massifAng + (rnd(6) < 0.5 ? 1 : -1) * (1.9 + 0.8 * rnd(7))
+  const massif2: [number, number] = [Math.cos(ang2) * 24, Math.sin(ang2) * 24]
   const landness = new Float32Array(N)
   for (let i = 0; i < N; i++) {
     const [x, y] = at(i)
@@ -165,6 +176,8 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
     const v = (-wx * Math.sin(rot) + wy * Math.cos(rot)) / (R / Math.sqrt(stretch))
     let L = 1 - Math.hypot(u, v)
     L += 0.18 * spec.coast * fbm(seed + 17, wx * s * 1.7, wy * s * 1.7, 3)
+    // small bays and points at the coast's own scale, so big islands keep a ragged shore
+    L += 0.14 * spec.coast * fbm(seed + 19, x / 6, y / 6, 2)
     const ang = Math.atan2(y, x)
     for (const [a, wdt, h] of lobes) {
       const d = Math.atan2(Math.sin(ang - a), Math.cos(ang - a))
@@ -252,10 +265,20 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
         R * 0.42,
         Math.hypot(x - massif[0], y - massif[1]) * (1 + 0.35 * fbm(seed + 29, x / 7, y / 7, 2)),
       )
+    const m2 =
+      0.65 *
+      (1 -
+        smoothstep(
+          0,
+          R * 0.3,
+          Math.hypot(x - massif2[0], y - massif2[1]) * (1 + 0.35 * fbm(seed + 33, x / 7, y / 7, 2)),
+        ))
     const hill = Math.round(
-      m * spec.hills * (0.75 + 0.5 * ridged(seed + 31, x / 8, y / 8, 2)) * Math.min(1, D / 2),
+      Math.max(m, m2) * spec.hills * (0.75 + 0.5 * ridged(seed + 31, x / 8, y / 8, 2)) * Math.min(1, D / 2),
     )
-    level[i] = Math.max(D <= 1 ? 0 : 1, Math.min(low, D)) + hill
+    // bluffs: stretches of the coast stand high (more of them near the hills)
+    const bluff = D <= 2 && fbm(seed + 37, x / 9, y / 9, 2) + 0.6 * Math.max(m, m2) > 0.32 ? 2 : 0
+    level[i] = Math.max(D <= 1 ? 0 : 1, Math.min(low, D)) + hill + bluff
   }
 
   // ---- 3. water: drain every tile to the sea (priority flood), fill hollows as lakes ----

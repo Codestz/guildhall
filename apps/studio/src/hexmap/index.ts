@@ -40,7 +40,7 @@ const KNOBS: { key: Knob; label: string; min: number; max: number; step: number 
 ]
 
 /** Rings shown: the biggest island fits, so every size is drawn at one scale and growth reads. */
-const FIT = 34
+const FIT = 40
 
 /** Ground colours (top-down map; the 3D tiles come later from prefabs). */
 const COLOUR: Record<string, [number, number, number]> = {

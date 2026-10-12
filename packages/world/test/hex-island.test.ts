@@ -20,10 +20,10 @@ describe("hex island", () => {
     expect([...a.level]).toEqual([...b.level])
   })
 
-  test("size follows the repo: 1.5 × (40 + 13·√files), capped", () => {
-    expect(landTiles(0)).toBe(60)
-    expect(landTiles(10000)).toBe(2010)
-    expect(landTiles(1e6)).toBe(2100)
+  test("size follows the repo: 2 × (40 + 13·√files), capped", () => {
+    expect(landTiles(0)).toBe(80)
+    expect(landTiles(10000)).toBe(2680)
+    expect(landTiles(1e6)).toBe(2800)
   })
 
   test("stable growth: every land tile of a smaller island is land in a bigger one", () => {

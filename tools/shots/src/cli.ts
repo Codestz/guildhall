@@ -1,5 +1,65 @@
 #!/usr/bin/env bun
-// Drive the app headless: URL + camera → PNG + metrics. The harness lands in M0 (T5).
-console.log(
-  "usage: bun shots <url> [--camera az,el,dist,tx,ty,tz] [--sample ms] --out <path>\n\nNot implemented yet.",
-)
+/**
+ * Drive an app headless: URL + camera → PNG + metrics.
+ *
+ *   bun shots "http://localhost:5300/?screen=m0&hud=perf" --camera 0,60,25,0,0,0 --out .probe/m0/m0
+ *
+ * Waits for `guildhall.ready()`, sets the camera, samples `perf` for `--sample` ms, screenshots, and
+ * writes `<out>.png` and `<out>.json`. Any page or console error is reported there and exits 1. A
+ * localhost URL nobody answers gets the studio dev server started on its port (and stopped after).
+ */
+import { mkdirSync } from "node:fs"
+import { dirname, resolve } from "node:path"
+import type { CameraPose, FrameStats } from "@guildhall/core"
+import { openPage, waitReady } from "./app.ts"
+import { parseArgs, report, type ShotOptions, USAGE } from "./args.ts"
+import { launchChrome } from "./chrome.ts"
+import { type Server, serveStudio } from "./server.ts"
+
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"])
+
+async function shoot(options: ShotOptions): Promise<string[]> {
+  const url = new URL(options.url)
+  const server: Server | null = LOCAL_HOSTS.has(url.hostname)
+    ? await serveStudio(Number(url.port || 80))
+    : null
+  const browser = await launchChrome("shots")
+  const out = resolve(options.out)
+  mkdirSync(dirname(out), { recursive: true })
+  let camera: CameraPose | null = null
+  let stats: FrameStats | null = null
+  const errors: string[] = []
+  try {
+    const opened = await openPage(browser, options)
+    const { page } = opened
+    try {
+      await page.goto(options.url)
+      await waitReady(page)
+      if (options.camera) await page.evaluate((pose) => window.guildhall?.camera.set(pose), options.camera)
+      camera = await page.evaluate(() => window.guildhall?.camera.get() ?? null)
+      stats = await page.evaluate((ms) => window.guildhall?.perf.sample(ms) ?? null, options.sampleMs)
+    } catch (error) {
+      errors.push(`shots: ${(error as Error).message.split("\n")[0]}`)
+    }
+    await page.screenshot({ path: `${out}.png`, type: "png" })
+    errors.unshift(...opened.errors)
+  } finally {
+    await browser.close()
+    await server?.stop()
+  }
+  const json = report(options.url, camera, stats, errors, new Date())
+  await Bun.write(`${out}.json`, `${JSON.stringify(json, null, 2)}\n`)
+  console.log(`${out}.png\n${out}.json`)
+  return errors
+}
+
+let options: ShotOptions
+try {
+  options = parseArgs(process.argv.slice(2))
+} catch (error) {
+  console.error(`${(error as Error).message}\n\n${USAGE}`)
+  process.exit(2)
+}
+const errors = await shoot(options)
+for (const error of errors) console.error(error)
+process.exit(errors.length > 0 ? 1 : 0)

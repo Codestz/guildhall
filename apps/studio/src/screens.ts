@@ -4,6 +4,7 @@ import { lineup } from "./lineup/index.ts"
 import { m0 } from "./m0/index.ts"
 import { palette } from "./palette/index.ts"
 import { scale } from "./scenes/scale.ts"
+import { shadows } from "./shadows/index.ts"
 
 /** What the shell hands a screen when it mounts it. */
 export interface ScreenCtx {
@@ -23,7 +24,7 @@ export interface Screen {
 }
 
 /** Every screen the studio can open with `?screen=<id>`. New screens register here, one line each. */
-export const SCREENS: readonly Screen[] = [m0, lineup, pieces, scale, palette]
+export const SCREENS: readonly Screen[] = [m0, lineup, pieces, scale, palette, shadows]
 
 export const DEFAULT_SCREEN = "pieces"
 

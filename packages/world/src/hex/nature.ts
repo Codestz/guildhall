@@ -39,6 +39,21 @@ export const NATURE_DEFAULTS: Readonly<Required<Omit<HexNature, "pine">>> = {
   wild: 1,
 }
 
+/**
+ * The island's chosen nature (user, 2026-10-12, preset "C + small ground" from the nature board): trees
+ * stand over the cottages (an oak about 3× the eave), woods are fewer trees but a little more of the
+ * countryside, and the ground cover shrinks to knee height. The Studio builds with it unless
+ * `?nature=today` asks for the knobs at 1; any knob in the query overrides its value.
+ */
+export const NATURE_CHOSEN: Readonly<HexNature> = {
+  tree: 1.6,
+  bush: 0.8,
+  grass: 0.6,
+  flower: 0.6,
+  woods: 0.6,
+  wild: 1.15,
+}
+
 export type NatureFamily = "tree" | "pine" | "bush" | "rock" | "grass" | "flower"
 export const NATURE_FAMILIES: readonly NatureFamily[] = ["tree", "pine", "bush", "rock", "grass", "flower"]
 

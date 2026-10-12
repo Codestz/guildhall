@@ -23,6 +23,7 @@ import {
   hexZones,
   installTilePrefabs,
   kindOf,
+  NATURE_CHOSEN,
   type PlacedPiece,
   type TilePrefab,
 } from "@guildhall/world"
@@ -75,9 +76,12 @@ export interface HexJobSpec {
   nature?: HexNature
 }
 
-/** The nature knobs a page's query sets (nature.ts `HexNature`): only those given, each a positive number. */
+/**
+ * The nature a page builds with (nature.ts `HexNature`): the chosen nature (`NATURE_CHOSEN`, or today's
+ * with `?nature=today`), each knob the query gives (a positive number) over it.
+ */
 export function natureOf(query: Pick<URLSearchParams, "get">): HexNature {
-  const out: HexNature = {}
+  const out: HexNature = query.get("nature") === "today" ? {} : { ...NATURE_CHOSEN }
   for (const k of NATURE_KNOBS) {
     const raw = query.get(k)
     const v = raw === null || raw === "" ? Number.NaN : Number(raw)

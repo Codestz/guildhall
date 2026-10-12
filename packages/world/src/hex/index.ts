@@ -47,6 +47,7 @@ export {
   hexDistance2D,
   isBuildingPiece,
   isDefaultNature,
+  NATURE_CHOSEN,
   NATURE_DEFAULTS,
   NATURE_FAMILIES,
   type NatureFamily,

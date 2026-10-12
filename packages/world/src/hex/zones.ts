@@ -36,6 +36,10 @@ export const TILE_USES = [
   "bridge",
   "field",
   "dock",
+  // what fills a place between its buildings
+  "garden",
+  "market",
+  "well",
   // the countryside: every land tile outside the places gets one of these (each a tile prefab later)
   "farmstead",
   "orchard",
@@ -88,7 +92,7 @@ export interface HexZones {
 
 /** How big each kind grows (tiles, per 1,000 land tiles, at least `min`), how built up it is, and how far apart it keeps. */
 const PLAN: Record<ZoneKind, { per1k: number; min: number; density: number; apart: number }> = {
-  town: { per1k: 42, min: 22, density: 0.75, apart: 0 },
+  town: { per1k: 62, min: 30, density: 0.8, apart: 0 },
   harbour: { per1k: 9, min: 6, density: 0.55, apart: 6 },
   castle: { per1k: 3, min: 3, density: 0.4, apart: 6 },
   farm: { per1k: 10, min: 6, density: 0.32, apart: 10 },
@@ -308,7 +312,7 @@ export function hexZones(h: HexIsland): HexZones {
     const climb = Math.abs(h.level[b]! - h.level[a]!)
     if (climb > 1) return Infinity
     let c = 1 + climb * 2.5
-    if (k === "river") c += 6
+    if (k === "river") c += 2.5
     if (k === "forest") c += 1.2
     if (k === "cliff" || k === "sand") c += 0.8
     if (use[b] === U.road || use[b] === U.bridge) c *= 0.35
@@ -358,6 +362,27 @@ export function hexZones(h: HexIsland): HexZones {
       }
       if (street.length > 1) roads.push({ a: ti - 1, b: ti - 1, tiles: street })
     }
+    // a ring street round the square, three tiles out: the spokes meet it, so the town is a web of
+    // streets and every inner tile fronts one
+    const ringR = 3
+    let cur = -1
+    for (const i of town.tiles) if (dist(i, town.tile) === ringR && (cur < 0 || i < cur)) cur = i
+    if (cur >= 0) {
+      const ring = [cur]
+      const seen = new Set(ring)
+      for (;;) {
+        const next = [...g.neighbours(cur)].find(
+          (j) =>
+            j >= 0 && !seen.has(j) && dist(j, town.tile) === ringR && zoneOf[j] === ti && kind(j) !== "river",
+        )
+        if (next === undefined) break
+        seen.add(next)
+        ring.push(next)
+        cur = next
+      }
+      for (const i of ring) if (use[i] !== U.bridge) use[i] = U.road
+      if (ring.length > 2) roads.push({ a: ti - 1, b: ti - 1, tiles: ring })
+    }
   }
 
   // ---- every tile of a place gets a job ----
@@ -368,10 +393,23 @@ export function hexZones(h: HexIsland): HexZones {
       if (use[i]) continue
       const byRoad = [...g.neighbours(i)].some((j) => j >= 0 && (use[j] === U.road || use[j] === U.square))
       const built = [...g.neighbours(i)].filter((j) => j >= 0 && use[j] === U.building).length
-      // a building fronts a street; never a solid block (at most two built neighbours)
-      if (byRoad && built <= 2 && hash2(seed + 21, i, zi) < P.density + 0.25) use[i] = U.building
-      else if (!byRoad && built <= 1 && hash2(seed + 23, i, zi) < P.density * 0.45) use[i] = U.building
+      // a building fronts a street; never a solid block (at most two built neighbours, three in town)
+      const cap = z.kind === "town" ? 3 : 2
+      if (byRoad && built <= cap && hash2(seed + 21, i, zi) < P.density + 0.25) use[i] = U.building
+      else if (!byRoad && built <= cap - 1 && hash2(seed + 23, i, zi) < P.density * 0.45) use[i] = U.building
       else use[i] = U.yard
+    }
+    // what stands between the buildings: market stalls round the town square, a well in each place,
+    // gardens and allotments in the rest
+    let well = false
+    for (const i of z.tiles) {
+      if (use[i] !== U.yard) continue
+      const bySquare = [...g.neighbours(i)].some((j) => j === z.tile)
+      if (z.kind === "town" && bySquare) use[i] = U.market
+      else if (!well && dist(i, z.tile) <= 2) {
+        use[i] = U.well
+        well = true
+      } else use[i] = U.garden
     }
     // docks: the harbour's and the fishing village's sea side
     if (z.kind === "harbour" || z.kind === "fishing")

@@ -159,6 +159,9 @@ function draw(
   if (zones) drawZones(g, h, zones, cx, cy, s, C)
 }
 
+/** The map's zoom while drawing, so labels and icons keep their size on screen. */
+let zoomNow = 1
+
 /** A tile's content as a little glyph: what its prefab will hold. */
 function paintContent(
   g: CanvasRenderingContext2D,
@@ -297,6 +300,30 @@ function paintContent(
     case "sawmill":
       house(0, 0, 0.7, "#6a4a2a")
       break
+    case "garden":
+      for (const [x, y] of [
+        [-0.35, -0.2],
+        [0.3, 0.25],
+      ]) {
+        g.fillStyle = "#6fa84a"
+        g.fillRect(px + (x! - 0.22) * s, py + (y! - 0.16) * s, 0.44 * s, 0.32 * s)
+      }
+      tree(0.25, -0.35, 0.16, "#4e9a40")
+      break
+    case "market":
+      for (const [x, y, c] of [
+        [-0.3, -0.15, "#d8463a"],
+        [0.3, 0.1, "#3f7fc4"],
+        [-0.05, 0.4, "#e8b13a"],
+      ] as const) {
+        g.fillStyle = c
+        g.fillRect(px + (x - 0.18) * s, py + (y - 0.12) * s, 0.36 * s, 0.24 * s)
+      }
+      break
+    case "well":
+      dot(0, 0, 0.22, "#7d7468")
+      dot(0, 0, 0.12, "#4f97d6")
+      break
     case "square":
       g.fillStyle = "#cfc4ae"
       hexPath(px, py, 0.95)
@@ -401,12 +428,12 @@ function drawZones(
     g.strokeRect(px - w / 2, py - w / 2, w, w)
   }
   // names at the hearts
-  g.font = "bold 12px ui-monospace,Menlo,monospace"
+  g.font = `bold ${12 / zoomNow}px ui-monospace,Menlo,monospace`
   g.textAlign = "center"
   for (const zone of z.zones) {
     const [px, py] = centre(zone.tile)
     const label = `${zone.kind} · ${zone.buildings}`
-    g.lineWidth = 3
+    g.lineWidth = 3 / zoomNow
     g.strokeStyle = "rgba(20,16,12,0.85)"
     g.strokeText(label, px, py - s * 1.6)
     g.fillStyle = "#fff"
@@ -508,6 +535,7 @@ export const hexmap: Screen = {
         const zones = view.zones ? hexZones(h) : undefined
         const size = Math.min(aw, H - 16) * 1.02
         // zoom about the cursor, drag to pan (wheel / drag on the map)
+        zoomNow = cam.zoom
         g.save()
         g.translate(cam.x, cam.y)
         g.scale(cam.zoom, cam.zoom)

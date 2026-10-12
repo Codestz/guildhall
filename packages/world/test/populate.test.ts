@@ -3,11 +3,14 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import type { NpcRecipe } from "@guildhall/assets"
 import {
+  contains,
   distTo,
+  intersect,
   LANE_ROOM,
   POPULATION,
   populate,
   poseAt,
+  rectCorners,
   simulate,
   type Townsperson,
   type Vec2,
@@ -182,6 +185,33 @@ describe("populate", () => {
     }
   })
 
+  test("a step off the street never cuts through a stall, well or fountain", () => {
+    for (const t of TOWNS) {
+      const plan = town(PRESETS[t]!)
+      const rings = plan.placements
+        .filter((p) => ["stall", "well", "fountain"].includes(p.role ?? ""))
+        .map((p) => {
+          const [w, d] = plan.sizes[p.prefab] ?? [1.6, 1.6]
+          return rectCorners({ c: p.at, rot: p.rot, w, d })
+        })
+      let steps = 0
+      for (const a of folkOf(t))
+        for (const s of a.day) {
+          if (s.kind !== "walk") continue
+          s.edges.forEach((e, i) => {
+            if (e !== -1) return
+            steps++
+            const [p, q] = [xz(s.pts[i]!), xz(s.pts[i + 1]!)]
+            // Through: in one side and out the other (a spot on a garden or a way over one is fine).
+            for (const r of rings.filter((r) => !contains(r, p) && !contains(r, q)))
+              for (let k = 0; k < r.length; k++)
+                expect(intersect(p, q, r[k]!, r[(k + 1) % r.length]!)).toBeNull()
+          })
+        }
+      expect(steps).toBeGreaterThan(0)
+    }
+  })
+
   test("the pinned Actor fields are the pose at the chosen hour", () => {
     const plan = town(PRESETS[2]!)
     for (const a of populate(plan, NPCS, 2, { hour: 12 })) {
@@ -191,4 +221,28 @@ describe("populate", () => {
       expect(a.recipe).toBe(a.role)
     }
   })
+})
+
+describe("populate at a crowd", () => {
+  // Regression: 300 in a city or capital means more night watchmen than round stops; a watchman with
+  // an empty round crashed `populate` (patrol read `.key` of an undefined stop).
+  const SPECS = [
+    { seed: 1, tier: "city" },
+    { seed: 4, tier: "city" },
+    { seed: 2, tier: "capital" },
+    { seed: 9, tier: "capital" },
+  ] as const
+  for (const spec of SPECS)
+    test(`${spec.tier}#${spec.seed} takes 300, every watchman on a round, every day whole`, () => {
+      const plan = town(spec)
+      const folk = populate(plan, NPCS, spec.seed, { count: 300 })
+      const watch = folk.filter((p) => p.kind === "watch")
+      expect(watch.length).toBe(20)
+      for (const p of folk) {
+        expect(p.day[0]?.from).toBe(0)
+        expect(p.day[p.day.length - 1]?.to).toBe(24)
+      }
+      // Out at midnight, not indoors.
+      for (const w of watch) expect(poseAt(w, 0.1).indoors).toBe(false)
+    })
 })

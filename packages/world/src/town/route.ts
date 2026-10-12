@@ -5,7 +5,8 @@
  * can be checked against the graph and drawn with that edge's clip and speed. Boat lanes are left
  * out: townsfolk walk (boats carry them only when a later task says so).
  */
-import { closest } from "../geom/line.ts"
+import { closest, intersect } from "../geom/line.ts"
+import { contains, type Ring } from "../geom/poly.ts"
 import { add, dist, norm, perp, round3, scale, sub, type Vec2 } from "../geom/vec.ts"
 import { WALK_RULES, type WalkGraph, type WalkKind } from "./walk.ts"
 
@@ -59,11 +60,14 @@ const length3 = (pts: readonly Vec3[]): number => {
 /**
  * The walk graph with each of `spots` joined on: route nodes `0..walk.nodes.length-1` are the walk
  * nodes, then one per spot in order (the returned `spotNodes[i]`). A spot joins the nearest point of
- * a joinable edge, which is split there; a spot already on a node joins that node.
+ * a joinable edge, which is split there; a spot already on a node joins that node. A step that would
+ * cut through one of `blocked` (a stall, a fountain) joins the nearest point it can reach clear instead
+ * (or the nearest point, when none is clear).
  */
 export function routeGraph(
   walk: WalkGraph,
   spots: readonly Vec2[],
+  blocked: readonly Ring[] = [],
 ): { graph: RouteGraph; spotNodes: number[] } {
   const nodes = walk.nodes.map((n) => ({ at: n.at, y: n.y }))
   const out: Arc[][] = nodes.map(() => [])
@@ -76,15 +80,19 @@ export function routeGraph(
   // Where each spot joins: an edge, the segment and the parameter along it.
   type Join = { edge: number; seg: number; t: number; d: number }
   const joins = spots.map((p): Join => {
+    // Only what stands between: not one the spot is on (a garden, a square), not ones far off.
+    const near = blocked.filter((r) => r.some((q) => dist(q, p) < 20) && !contains(r, p))
     let best: Join = { edge: -1, seg: 0, t: 0, d: Infinity }
+    let clear: Join = best
     for (const e of walk.edges) {
       if (!JOINABLE.has(e.kind)) continue
       for (let k = 0; k + 1 < e.points.length; k++) {
         const c = closest(p, xz(e.points[k] as Vec3), xz(e.points[k + 1] as Vec3))
         if (c.d < best.d) best = { edge: e.id, seg: k, t: c.t, d: c.d }
+        if (c.d < clear.d && !crosses(p, c.at, near)) clear = { edge: e.id, seg: k, t: c.t, d: c.d }
       }
     }
-    return best
+    return clear.edge >= 0 ? clear : best
   })
 
   // Each spot's node, and the node it steps onto the edge at.
@@ -138,6 +146,12 @@ export function routeGraph(
   }
   return { graph: { nodes, out, walkNodes: walk.nodes.length }, spotNodes }
 }
+
+/** Whether the step a→b cuts through any of `rings` (a way that runs over one may be stepped onto). */
+const crosses = (a: Vec2, b: Vec2, rings: readonly Ring[]): boolean =>
+  rings.some(
+    (r) => !contains(r, b) && r.some((q, i) => intersect(a, b, q, r[(i + 1) % r.length] as Vec2) !== null),
+  )
 
 /** Seconds-per-metre weight of an arc: slower edge types (stairs, fords) cost more. */
 const weight = (a: Arc): number => a.len / WALK_RULES[a.kind].speed

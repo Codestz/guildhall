@@ -17,7 +17,7 @@
  */
 import type { NpcRecipe } from "@guildhall/assets"
 import { hash, roll } from "@guildhall/core"
-import { axes } from "../geom/obb.ts"
+import { axes, rectCorners } from "../geom/obb.ts"
 import { centroid } from "../geom/poly.ts"
 import { add, dist, norm, perp, scale, snap, sub, type Vec2 } from "../geom/vec.ts"
 import { pointAlong } from "./farms.ts"
@@ -190,11 +190,11 @@ export function populate(
   const doors = houses.map((p) => door(p, plan.sizes))
   const publics = publicPlaces(plan)
   const lamps = (options.lamps ?? streetLamps(plan)).map((l) => lampSpot(plan, l))
-  const { graph, spotNodes } = routeGraph(plan.walk, [
-    ...doors.map((d) => d.at),
-    ...publics.map((p) => p.at),
-    ...lamps.map((l) => l.at),
-  ])
+  const { graph, spotNodes } = routeGraph(
+    plan.walk,
+    [...doors.map((d) => d.at), ...publics.map((p) => p.at), ...lamps.map((l) => l.at)],
+    footprints(plan, ["stall", "well", "fountain"]),
+  )
   let k = 0
   const doorSpots = doors.map(
     (d, i): Spot => ({ ...d, key: `home:${i}`, node: spotNodes[k++] as number, y: 0 }),
@@ -452,8 +452,8 @@ function watchDay(c: Ctx, loop: readonly Spot[], lamps: readonly Spot[]): Step[]
   const lantern: StayAs = { clip: c.clips.work }
   const day = c.builder(post, lantern, 0.25)
   const patrol = (until: number) => {
-    for (let n = 1, guard = 0; day.until < until && guard < 64; n++, guard++) {
-      const stop = loop[n % Math.max(1, loop.length)] as Spot
+    for (let n = 1, guard = 0; loop.length > 0 && day.until < until && guard < 64; n++, guard++) {
+      const stop = loop[n % loop.length] as Spot
       if (!day.go([stop], lantern, { dwell: 0.06 + 0.08 * c.chance(`${n}:dwell`) })) break
     }
   }
@@ -573,6 +573,16 @@ function nearestPlaced(plan: PopulateInput, at: Vec2, roles: string[], max: numb
   return best?.p ?? null
 }
 
+/** The ground each placement of some roles stands on (a spot's step goes round them). */
+function footprints(plan: PopulateInput, roles: string[]): Vec2[][] {
+  return plan.placements
+    .filter((p) => roles.includes(p.role ?? ""))
+    .map((p) => {
+      const [w, d] = plan.sizes[p.prefab] ?? [1.6, 1.6]
+      return rectCorners({ c: p.at, rot: p.rot, w, d })
+    })
+}
+
 /**
  * The places visitors stand: a ring of four by each inn door, four round each well, a customer in
  * front of each stall or counter, three before each chapel or hall. Keys are `<station>#<n>`.
@@ -669,9 +679,17 @@ function watchRounds(plan: PopulateInput, n: number, centre: Vec2): number[][] {
   const degree = new Map<number, number>()
   for (const e of plan.streets.edges)
     if (e.cls !== "road") for (const id of [e.a, e.b]) degree.set(id, (degree.get(id) ?? 0) + 1)
-  const stops = plan.streets.nodes
-    .map((s, i) => ({ s, i, at: s.at }))
-    .filter(({ s }) => s.kind === "plaza" || s.kind === "gate" || (degree.get(s.id) ?? 0) >= 4)
+  const all = plan.streets.nodes.map((s, i) => ({ s, i, at: s.at, d: degree.get(s.id) ?? 0 }))
+  const busy = (x: (typeof all)[number]) => x.s.kind === "plaza" || x.s.kind === "gate" || x.d >= 4
+  const stops = all.filter(busy)
+  // More watchmen than such stops (a big crowd): the next busiest junctions too, so every slice has one.
+  if (stops.length < n)
+    stops.push(
+      ...all
+        .filter((x) => !busy(x) && x.d > 0)
+        .sort((a, b) => b.d - a.d || a.i - b.i)
+        .slice(0, n - stops.length),
+    )
   return splitByAngle(stops, n, centre).map((part) => {
     const step = Math.max(1, Math.ceil(part.length / 6))
     return part.filter((_, k) => k % step === 0).map((x) => x.i)

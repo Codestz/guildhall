@@ -1,5 +1,6 @@
 import type { Stage } from "@guildhall/render"
 import { pieces } from "./browser/index.tsx"
+import { composer } from "./composer/index.tsx"
 import { lineup } from "./lineup/index.ts"
 import { m0 } from "./m0/index.ts"
 import { palette } from "./palette/index.ts"
@@ -24,7 +25,7 @@ export interface Screen {
 }
 
 /** Every screen the studio can open with `?screen=<id>`. New screens register here, one line each. */
-export const SCREENS: readonly Screen[] = [m0, lineup, pieces, scale, palette, shadows]
+export const SCREENS: readonly Screen[] = [m0, lineup, pieces, scale, palette, shadows, composer]
 
 export const DEFAULT_SCREEN = "pieces"
 

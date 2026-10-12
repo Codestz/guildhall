@@ -238,6 +238,24 @@ export function hexGroundFine(
       if (y === null) continue
       cells.set(`${q},${rr}`, { x, z, y, t: p })
     }
+  // a soft (nature) cell never stands above a flat neighbour cell (a road, a field, a building's tile): its
+  // hexagon reaches over the tile edge, so a higher one would cover the road strip there
+  const STEP6: [number, number][] = [
+    [1, 0],
+    [0, 1],
+    [-1, 1],
+    [-1, 0],
+    [0, -1],
+    [1, -1],
+  ]
+  for (const [key, c] of cells) {
+    if (!soft(c.t)) continue
+    const [q, rr] = key.split(",").map(Number) as [number, number]
+    for (const [sq, sr] of STEP6) {
+      const n = cells.get(`${q + sq},${rr + sr}`)
+      if (n && !soft(n.t) && n.t.ground !== "water" && n.y < c.y) c.y = n.y
+    }
+  }
   const pos: number[] = []
   const col: number[] = []
   const tone = (x: number, z: number) => 0.93 + 0.12 * (fbm(seed + 77, x / 22, z / 22, 2) * 0.5 + 0.5)

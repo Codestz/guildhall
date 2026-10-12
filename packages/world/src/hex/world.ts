@@ -213,7 +213,7 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
       const sides = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! >= 0 && (links.get(i)?.has(nb[d]!) ?? false))
       if (prefab === "well-square" && sides.length >= 2) {
         prefab = null
-        paths.push(...tilePath([x, zz], t + 0.03, sides, 1.1))
+        paths.push(...tilePath([x, zz], t + 0.07, sides, 1.1))
         const free = [0, 1, 2, 3, 4, 5].filter((d) => !sides.includes(d))
         // the free side furthest from every street: the middle of the widest gap
         const d = free.length ? free[Math.floor(free.length / 2)]! : 0
@@ -242,7 +242,7 @@ export function hexWorld(h: HexIsland, z: HexZones): HexWorld {
       const nb = g.neighbours(i)
       // a path only toward the tiles its own roads run on to: no web where two roads lie side by side
       const sides = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! >= 0 && (links.get(i)?.has(nb[d]!) ?? false))
-      if (u === "road") paths.push(...tilePath([x, zz], t + 0.03, sides.length ? sides : [0, 3]))
+      if (u === "road") paths.push(...tilePath([x, zz], t + 0.07, sides.length ? sides : [0, 3]))
       else {
         // a wooden bridge: a plank deck from the centre out through each side its road crosses, at the banks'
         // height, so it meets the road strips on both banks exactly; rails along both sides of each leg

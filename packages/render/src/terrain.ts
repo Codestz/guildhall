@@ -91,7 +91,8 @@ export function createSurface(
     roughness,
     metalness: 0,
     polygonOffset: true,
-    polygonOffsetFactor: -2,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4,
   })
   const mesh = new Mesh(geometry, material)
   mesh.receiveShadow = true

@@ -65,6 +65,13 @@ const ALL_GROUPS: readonly ToolGroup[] = [
           "Every HUD panel (roster, chronicle, dossier, pleas, settings, timeline) in V1's layout, on fixtures.",
         dev: true,
       },
+      {
+        id: "sitelab",
+        name: "Site lab",
+        purpose:
+          "The website's own pieces: welcome card, crest menu, demo picker and How it's built, on fixtures.",
+        dev: true,
+      },
     ],
   },
   {

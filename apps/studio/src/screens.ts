@@ -11,6 +11,7 @@ import { hudLab } from "./hudlab/index.tsx"
 import { npc } from "./npcs/index.tsx"
 import { palette } from "./palette/index.ts"
 import { placeOf } from "./shell/directory.ts"
+import { siteLab } from "./sitelab/index.tsx"
 import { town } from "./town/index.ts"
 
 /** What the shell hands a screen when it mounts it. */
@@ -44,6 +45,7 @@ export const SCREENS: readonly Screen[] = [
   hexmap,
   hexScale,
   hudLab,
+  siteLab,
 ]
 
 export const DEFAULT_SCREEN = "home"

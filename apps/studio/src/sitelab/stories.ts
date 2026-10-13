@@ -1,0 +1,154 @@
+import type { Story } from "@guildhall/ui"
+
+const ART = "/lab/site/demos"
+
+/**
+ * V1's Demos page ("Every scene, one link away", packages/hall/demos.html on main) as fixture data: the same
+ * art, kickers, descriptions and "what it shows" lines, in the same shelves. The Saga carries its five acts
+ * (I Dawn · II The forge · III The storm · IV The mending · V Nightfall, from the saga story's chapters).
+ * Deviations from V1: no WebGPU card (V2 draws on WebGL only), the archipelago waits for its V2 port, the
+ * crowd is the `rush` story, and repo links are the V2 route (`/hall/<owner>/<repo>`).
+ */
+export const STORIES: readonly Story[] = [
+  {
+    id: "saga",
+    shelf: "Stories",
+    title: "The Saga",
+    kicker: "OpenCode · five acts · about 17 minutes",
+    blurb:
+      "The site's first home, with every lever in reach. One feature, “make Quill work offline”, from the quest to the clean sweep, told by a guild of OpenCode agents.",
+    shows: [
+      "A plan asked for and approved: pleas wait for you",
+      "Red tests bring a storm and a dragon; the fallen rise as skeletons",
+      "Every world event fires on its own: nothing is forced",
+    ],
+    art: `${ART}/saga.webp`,
+    alt: "The whole island at golden hour, its hall lit by the fire.",
+    acts: [
+      { n: 1, title: "Dawn" },
+      { n: 2, title: "The forge" },
+      { n: 3, title: "The storm" },
+      { n: 4, title: "The mending" },
+      { n: 5, title: "Nightfall" },
+    ],
+    link: "?story=saga",
+    feature: true,
+  },
+  {
+    id: "party",
+    shelf: "Stories",
+    title: "A party",
+    kicker: "One conversation",
+    blurb:
+      "One guildmaster and the adventurers it sends out. Each quest is taken from the board, walked to its station and worked in front of you.",
+    shows: ["Every tool call is a deed you can see", "Click anyone to follow them and read their dossier"],
+    art: `${ART}/party.webp`,
+    alt: "The keep's hall: a guildmaster by the fire, adventurers at their stations.",
+    link: "?story=party",
+  },
+  {
+    id: "solo",
+    shelf: "Stories",
+    title: "Alone",
+    kicker: "One agent, one task",
+    blurb:
+      "A single hero with no party: one task from the board, walked to its place and finished, with the island going about its day around it.",
+    shows: ["The smallest story: one hero, one quest", "Follow it and read its dossier as it works"],
+    art: "/lab/site/journey/tavern-night.webp",
+    alt: "A tavern yard at night: lit windows, tables and a few figures round a glowing lamp.",
+    link: "?story=solo",
+  },
+  {
+    id: "factions",
+    shelf: "Stories",
+    title: "Claude Code and OpenCode",
+    kicker: "Two harnesses at once",
+    blurb:
+      "An OpenCode party and a Claude Code party share one island, each under its own banner, each with its own guildmaster.",
+    shows: ["Two sources in one world", "Parties keep their colours and their own stations"],
+    art: `${ART}/factions.webp`,
+    alt: "Two parties at work in the keep at golden hour.",
+    link: "?story=factions",
+  },
+  {
+    id: "seas",
+    shelf: "Stories",
+    title: "GitHub seas",
+    kicker: "A repo's sea",
+    blurb:
+      "A party with its GitHub sea beside it, from the first push to the release: the repo's life as ships coming and going.",
+    shows: [
+      "Pull requests anchor offshore; a release arrives as a galleon",
+      "The lighthouse pulses red when CI fails",
+    ],
+    art: `${ART}/seas.webp`,
+    alt: "Ships at anchor off the island's quay.",
+    link: "?story=seas",
+  },
+  {
+    id: "rush",
+    shelf: "Stories",
+    title: "A crowd of 300",
+    kicker: "Stress test",
+    blurb:
+      "Three hundred adventurers on one island, every one animated. Baked bone textures, mesh LOD and instancing keep it smooth.",
+    shows: [
+      "300 skinned characters in a handful of draw calls",
+      "Turn on Stats for nerds to watch the frame rate",
+    ],
+    art: `${ART}/crowd.webp`,
+    alt: "Hundreds of adventurers packed into the keep's hall.",
+    link: "?story=rush&n=300",
+  },
+  {
+    id: "react",
+    shelf: "Repos",
+    title: "React grows from its first commit",
+    kicker: "A growth timelapse",
+    blurb:
+      "React's whole history as a timelapse: every folder a district, every release a milestone, every contributor a townsfolk.",
+    shows: ["Years of commits in a couple of minutes", "Milestones and captions along the tape"],
+    art: `${ART}/react.webp`,
+    alt: "A large voxel island crowded with districts: React's repository, grown whole.",
+    link: "/hall/facebook/react",
+  },
+  {
+    id: "world",
+    shelf: "Repos",
+    title: "New world",
+    kicker: "The generator",
+    blurb:
+      "One landmass sized by a repo's files, mountain ranges laid inland, rivers that fall to the sea, forests and hill towns.",
+    shows: [
+      "Rivers run from the ranges to the coast, under bridges where roads cross",
+      "Far land draws simpler, so the island stays light",
+    ],
+    art: `${ART}/world.webp`,
+    alt: "React's repository as one island with mountain ranges, rivers falling to the sea, forests and hill towns.",
+    link: "/hall/facebook/react",
+  },
+  {
+    id: "island",
+    shelf: "Repos",
+    title: "A repo as an island",
+    kicker: "Any public repo",
+    blurb:
+      "A public GitHub repo grown into an island: its folders become districts. The same tree always grows the same island. This one is mcpx.",
+    shows: ["Read from the public file tree, never the code", "Grow your own from “Your repo as an island”"],
+    art: `${ART}/island.webp`,
+    alt: "A small voxel island whose districts are a repository's folders.",
+    link: "/hall/Codestz/mcpx",
+  },
+  {
+    id: "night",
+    shelf: "The world",
+    title: "Night and weather",
+    kicker: "Time and sky",
+    blurb:
+      "The island at ten at night, in a storm: lamps along the paths, rain, lightning over the sea. Change the hour and the weather from the Director's controls.",
+    shows: ["A full day and night cycle, and four weathers", "In Auto, failures bring the clouds"],
+    art: `${ART}/night.webp`,
+    alt: "The island at night in a storm: dark sea, lamps lit along the paths, rain falling.",
+    link: "?hour=22&weather=storm",
+  },
+]

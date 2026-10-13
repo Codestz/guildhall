@@ -109,6 +109,7 @@ export {
   type RevealMesh,
   RISE_METRES,
 } from "./reveal.ts"
+export { framedTarget } from "./rig/frame.ts"
 export { blendPose, type FreeState, lookVector, type Rig, type RigMode, type RigMove } from "./rig/index.ts"
 export {
   clampEye,

@@ -17,7 +17,7 @@
  * `createHallCamera` wires them to a stage, a HUD and a session. `window.guildhall.ext.camera` is it.
  */
 import type { CameraPose } from "@guildhall/core"
-import { distanceRange, type RigMove, type Stage } from "@guildhall/render"
+import { distanceRange, framedTarget, type RigMove, type Stage } from "@guildhall/render"
 import { type Shot as DirectorShot, type Distance, director, type Focus } from "@guildhall/sim"
 import type { ViewerHud } from "@guildhall/ui"
 import type { Chips } from "../hexworld/chips.ts"
@@ -43,7 +43,6 @@ export const TRACK = { ground: 7, height: 2.5, snap: 40 } as const
 /** Held shots drift round, degrees per second (none with reduced motion). */
 export const DRIFT = { held: 0.7, map: 1.6 } as const
 
-const RAD = Math.PI / 180
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
 // ---------------------------------------------------------------------------------------------------
@@ -121,41 +120,12 @@ export function clearFrame(width: number, height: number, insets: Insets): Clear
   }
 }
 
+export { framedTarget } from "@guildhall/render"
+
 /** The camera's lens: vertical field of view (degrees), width over height. */
 export interface Lens {
   fov: number
   aspect: number
-}
-
-/**
- * The orbit target that puts `subject` at the clear frame's middle, seen from `pose`'s angles and
- * distance: moved across the ground along the view's right and forward (foreshortened by the tilt).
- * Pure and exact for a subject level with the target (the subject sits on the ray through the frame's
- * middle): a point `s` metres ahead of the target on its level shows at NDC y = s sin e / ((D + s cos e) ty).
- */
-export function framedTarget(
-  subject: Vec3,
-  pose: Pick<CameraPose, "azimuth" | "elevation" | "distance">,
-  lens: Lens,
-  frame: ClearFrame,
-): Vec3 {
-  if (frame.x === 0 && frame.y === 0) return [subject[0], subject[1], subject[2]]
-  const ty = Math.tan((lens.fov / 2) * RAD)
-  const el = clamp(pose.elevation, 5, 89) * RAD
-  const sin = Math.sin(el)
-  const cos = Math.cos(el)
-  const d = pose.distance
-  // how far ahead of the target the subject must stand (its depth grows with it), then how far across
-  const fy = clamp(frame.y, -0.9, 0.9)
-  const along = (fy * ty * d) / Math.max(0.05, sin - fy * ty * cos)
-  const across = frame.x * ty * lens.aspect * (d + along * cos)
-  const az = pose.azimuth * RAD
-  // the rig looks along (-sin az, -cos az) on the ground; its right is (cos az, -sin az)
-  const rx = Math.cos(az)
-  const rz = -Math.sin(az)
-  const fx = -Math.sin(az)
-  const fz = -Math.cos(az)
-  return [subject[0] - rx * across - fx * along, subject[1], subject[2] - rz * across - fz * along]
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -523,7 +493,7 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
     const from = rig.get()
     const pose = shotPose(next.focus.kind, next.distance, target, from, sizesOf(next.focus))
     pose.target = framedTarget(target, pose, lens(), frame())
-    rig.aim(pose.target)
+    rig.aim(target, frame())
     glide(pose, glideMs(from, pose))
     changed()
   }
@@ -557,7 +527,7 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
       const subject = subjectOf(focus)
       if (subject) {
         tracked = trackStep(tracked, subject, dt)
-        rig.aim(framedTarget(tracked, rig.goal(), lens(), frame()))
+        rig.aim(tracked, frame())
       }
       // a held director shot drifts slowly round (never while it glides, never with reduced motion)
       if (shot && !followId && !rig.gliding() && !still()) {
@@ -628,7 +598,7 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
           distance: Math.min(from.distance, CLOSE.distance),
         }
         pose.target = framedTarget(subject, pose, lens(), frame())
-        rig.aim(pose.target)
+        rig.aim(subject, frame())
         glide(pose, glideMs(from, pose, true))
       }
       changed()

@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import type { CameraPose } from "@guildhall/core"
+import { PerspectiveCamera, Vector3 } from "three"
 import { poseToCamera } from "../src/camera.ts"
-import { blendPose, lookVector } from "../src/rig/index.ts"
+import { blendPose, createRig, lookVector } from "../src/rig/index.ts"
 import {
   clampEye,
   clampOrbit,
@@ -209,5 +210,56 @@ describe("nearPlane", () => {
     const step = (near: number, z: number) => (z * z) / (near * 2 ** 24)
     expect(step(NEAR.min, 400)).toBeGreaterThan(0.18)
     expect(step(nearPlane(240), 400)).toBeLessThan(0.007)
+  })
+})
+
+describe("aiming at a subject (the follow camera)", () => {
+  /** A rig on a stand-in canvas (no input arrives) over the island. */
+  const aimedRig = () => {
+    const el = {
+      addEventListener() {},
+      removeEventListener() {},
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 1440, height: 820 }),
+      style: {},
+      isConnected: true,
+    } as unknown as HTMLElement
+    const camera = new PerspectiveCamera(LENS.fov, LENS.aspect, 0.1, LENS.far)
+    const rig = createRig(camera, el, pose({ target: [0, 0, 0], distance: 40, elevation: 30 }))
+    rig.setWorld(ISLAND)
+    return { rig, camera }
+  }
+  const screen = (camera: PerspectiveCamera, p: [number, number, number]) => {
+    camera.updateMatrixWorld()
+    return new Vector3(...p).project(camera)
+  }
+
+  test("holds the subject exactly at its frame while the angles and distance ease (no drift, no pop)", () => {
+    const { rig, camera } = aimedRig()
+    const subject: [number, number, number] = [20, 1, -10]
+    const frame = { x: -0.28, y: 0.12 }
+    rig.aim(subject, frame)
+    rig.update(1 / 60)
+    for (let i = 0; i < 90; i++) {
+      // a turn and a zoom under way every frame
+      if (i % 10 === 0) rig.steer({ azimuth: rig.goal().azimuth + 25, distance: rig.goal().distance * 1.3 })
+      rig.update(1 / 60)
+      const p = screen(camera, subject)
+      expect(Math.abs(p.x - frame.x)).toBeLessThan(1e-3)
+      expect(Math.abs(p.y - frame.y)).toBeLessThan(1e-3)
+    }
+  })
+
+  test("a glide lands on a subject that moves while it runs", () => {
+    const { rig, camera } = aimedRig()
+    const subject: [number, number, number] = [60, 1, 30]
+    rig.glide(pose({ target: subject, distance: 20, elevation: 26 }), 500)
+    for (let i = 0; i < 45; i++) {
+      subject[0] += 0.05
+      rig.aim(subject)
+      rig.update(1 / 60)
+    }
+    const p = screen(camera, subject)
+    expect(Math.abs(p.x)).toBeLessThan(1e-3)
+    expect(Math.abs(p.y)).toBeLessThan(1e-3)
   })
 })

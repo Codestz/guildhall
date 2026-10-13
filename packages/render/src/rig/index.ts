@@ -1,6 +1,7 @@
 import type { CameraPose } from "@guildhall/core"
 import { type PerspectiveCamera, Vector3 } from "three"
 import { cameraToPose, poseToCamera } from "../camera.ts"
+import { framedTarget } from "./frame.ts"
 import { attachRigInput, type RigHandlers } from "./input.ts"
 import {
   clampEye,
@@ -61,11 +62,12 @@ export interface Rig {
   /** True while a glide runs. */
   gliding(): boolean
   /**
-   * The orbit's target follows `target` (eased at the orbit's rate; a running glide lands on it) while
-   * the viewer still turns and zooms, and a zoom closes in on it rather than on the cursor. Called each
-   * frame by a follow camera; null lets go. Not a move (`onMove` does not hear it).
+   * Holds `subject` at `frame` on screen (NDC, x right, y up; the centre by default): each frame the
+   * orbit's target is set from the pose being drawn, so turning and zooming keep the subject exactly
+   * there, a running glide lands on it, and a zoom closes in on it rather than on the cursor. Called
+   * each frame by a follow camera (it smooths the subject itself); null lets go. Not a move.
    */
-  aim(target: Vec3 | null): void
+  aim(subject: Vec3 | null, frame?: { x: number; y: number }): void
   /** Eases the orbit's angles and distance toward `change` (a director's drift, a framing). Not a move. */
   steer(change: Partial<Omit<CameraPose, "target">>): void
   /** Where the orbit is easing to (its goal; the pose being drawn is `get`). */
@@ -142,6 +144,10 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
   let glide: { from: CameraPose; to: CameraPose; t: number; ms: number } | null = null
   /** The target a follow camera holds the orbit on (`aim`), and the driver run before each step. */
   let aimed: Vec3 | null = null
+  let aimFrame = { x: 0, y: 0 }
+  /** The target that puts the aimed subject at its frame, seen from `p`. */
+  const aimFrom = (p: CameraPose): Vec3 =>
+    framedTarget(aimed as Vec3, p, { fov: camera.fov, aspect: camera.aspect }, aimFrame)
   let driver: ((dt: number) => void) | null = null
   const listeners = new Set<() => void>()
   const notify = () => {
@@ -364,8 +370,9 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
     },
     free: () => ({ eye: [...fly.eye], yaw: fly.yaw, pitch: fly.pitch }),
     gliding: () => glide !== null,
-    aim(target) {
-      aimed = target ? [target[0], target[1], target[2]] : null
+    aim(subject, frame) {
+      aimed = subject ? [subject[0], subject[1], subject[2]] : null
+      aimFrame = frame ? { x: frame.x, y: frame.y } : { x: 0, y: 0 }
     },
     steer(change) {
       if (mode !== "orbit") return
@@ -388,10 +395,7 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
       const dt = Math.min(0.1, seconds)
       driver?.(dt)
       // a followed target: the glide lands on where it is now, then the goal rides it
-      if (aimed && mode === "orbit") {
-        if (glide) glide.to = held({ ...glide.to, target: aimed })
-        else goal = held({ ...goal, target: aimed })
-      }
+      if (aimed && mode === "orbit" && glide) glide.to = held({ ...glide.to, target: aimFrom(glide.to) })
       if (glide) {
         glide.t = Math.min(1, glide.t + (dt * 1000) / glide.ms)
         pose = blendPose(glide.from, glide.to, smooth(glide.t))
@@ -406,6 +410,11 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
         // The goal's azimuth may wind past 360: follow it exactly rather than the short way round.
         next.azimuth = pose.azimuth + (goal.azimuth - pose.azimuth) * a
         pose = held(next)
+        // aimed: the target is set from the pose as drawn, so the subject holds its place exactly
+        if (aimed) {
+          pose = held({ ...pose, target: aimFrom(pose) })
+          goal = { ...goal, target: pose.target }
+        }
       } else {
         const look = ease(LOOK_RATE, dt)
         fly.yaw += (fly.goalYaw - fly.yaw) * look

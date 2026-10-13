@@ -4,7 +4,7 @@
  * phone the sheets (dossier, settings) take the bottom and hide the toasts and timeline under them.
  */
 export const LAB_CSS = /* css */ `
-.lab-hud-root { position: absolute; inset: 0; overflow: hidden; background: #2d3b2a url("/home/town.webp") center 62% / 135% auto no-repeat; }
+.lab-hud-root { position: absolute; inset: 0; overflow: hidden; background: #2d3b2a url("/lab/hud/hud-bg.webp") center / cover no-repeat; }
 .lab-hud { --gut: 16px; --bar: 40px; position: absolute; inset: 0; pointer-events: none; }
 .lab-hud > * { position: absolute; pointer-events: none; }
 .lab-hud > * > * { pointer-events: auto; }

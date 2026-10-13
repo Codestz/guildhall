@@ -56,6 +56,7 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         name: "Scale board",
         purpose:
           "The hex world's proportions side by side: tile, buildings, trees and characters at three scales.",
+        preview: true,
         dev: true,
       },
       {
@@ -63,6 +64,7 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         name: "HUD lab",
         purpose:
           "Every HUD panel (roster, chronicle, dossier, pleas, settings, timeline) in V1's layout, on fixtures.",
+        preview: true,
         dev: true,
       },
       {
@@ -70,6 +72,7 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         name: "Site lab",
         purpose:
           "The website's own pieces: welcome card, crest menu, demo picker and How it's built, on fixtures.",
+        preview: true,
         dev: true,
       },
     ],

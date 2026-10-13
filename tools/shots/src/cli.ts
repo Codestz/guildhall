@@ -17,6 +17,7 @@ import { launchChrome } from "./chrome.ts"
 import { runPrefabs } from "./prefabs.ts"
 import { type Server, serveStudio } from "./server.ts"
 import { runSet } from "./set.ts"
+import { runStills, runThumbs } from "./thumbs.ts"
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"])
 
@@ -59,6 +60,10 @@ async function shoot(options: ShotOptions): Promise<string[]> {
 if (process.argv[2] === "set") process.exit(await runSet(process.argv.slice(3)))
 // `bun shots prefabs`: every tile prefab alone, composed into review sheets (prefabs.ts).
 if (process.argv[2] === "prefabs") process.exit(await runPrefabs(process.argv.slice(3)))
+
+// `bun shots thumbs` / `bun shots stills`: the Studio's committed card previews and lab backdrops (thumbs.ts).
+if (process.argv[2] === "thumbs") process.exit(await runThumbs(process.argv.slice(3)))
+if (process.argv[2] === "stills") process.exit(await runStills(process.argv.slice(3)))
 
 let options: ShotOptions
 try {

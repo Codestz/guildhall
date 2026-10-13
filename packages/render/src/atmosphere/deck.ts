@@ -58,10 +58,34 @@ export function deckHeight(farEye: number, tallest: number, share = 0.5): number
   return Math.max(tallest + 40, share * farEye)
 }
 
-/** How solid the deck is with the eye `gap` metres above or below it: none level with it. */
-export function deckGapFade(gap: number): number {
-  return smoothstep(18, 70, Math.abs(gap))
+/**
+ * How solid the deck is with the eye `gap` metres above or below a deck `height` metres up: none level
+ * with it. Above, it fills in slowly over the eye's height counted in doublings (a zoom is geometric,
+ * so every step of it moves the fade by about as much): from just over the deck to twice its height,
+ * the farthest eye. A fade over a fixed few metres would sweep in over a handful of zoom steps.
+ */
+export function deckGapFade(gap: number, height: number): number {
+  if (gap <= 0) return smoothstep(18, 70, -gap)
+  return smoothstep(0.1, 1, Math.log2(1 + gap / Math.max(1, height)))
 }
+
+/**
+ * The near fade, metres from the eye: x where the deck starts, y where it is whole. A smooth maximum
+ * of a floor and a share of the gap, so far above it scales with the gap and the fade holds still on
+ * the screen as the camera dollies (every distance to the deck scales with the gap too).
+ */
+export function deckNearFade(gap: number): [number, number] {
+  const near = Math.hypot(30, 0.6 * gap)
+  return [near * 0.4, near * 1.6]
+}
+
+/** The clear patch round the focus, metres: its inner and outer radius for an island of half side `span`. */
+export function deckHole(span: number): [number, number] {
+  return [span * 0.3, span * 1.15]
+}
+
+/** How deep a cloud's sides read from above, metres (a thin deck: the side wall under its top). */
+const WALL = 22
 
 /**
  * Where the camera's line of sight crosses the deck (x, z), or null when it does not (the eye under
@@ -178,6 +202,9 @@ uniform vec3 uDeckFade;
 // the clear patch over the focus: x, z, its inner and outer radius
 uniform vec4 uDeckHole;
 uniform float uDeckHoleMin;
+// how deep the clouds' sides read from above, metres; how much the moon silvers their edges (0..1)
+uniform float uDeckWall;
+uniform float uDeckMoon;
 varying vec3 vWorld;
 void main() {
 	vec3 toFrag = vWorld - cameraPosition;
@@ -188,16 +215,25 @@ void main() {
 	float fade = uDeckFade.x * smoothstep( uDeckFade.y, uDeckFade.z, dist ) * hole * ( 1.0 - horizon );
 	if ( fade < 0.01 ) discard;
 	float threshold = deckThreshold();
-	// the broad shapes first: where even the finest detail could not lift them to a cloud, sky (most of
-	// the deck between the clouds costs one read)
+	float above = step( vWorld.y, cameraPosition.y );
+	// Seen from above a cloud has sides: past a clear point of the top, the ray may still meet a cloud
+	// a little lower down (the column under the top, uDeckWall deep), and what it meets there is the
+	// cloud's side toward the eye. From under the deck there is none.
+	vec2 sink = above * uDeckWall * toFrag.xz / max( -toFrag.y, 0.33 * length( toFrag.xz ) + 1e-3 );
+	// the broad shapes first: where even the finest detail could not lift them to a cloud (at the top or
+	// down the side), sky (most of the deck between the clouds costs two reads)
 	vec2 q = deckUv( vWorld.xz );
+	vec2 qs = deckUv( vWorld.xz + sink );
 	float a = 0.68 * texture2D( uNoise, q ).r;
-	if ( a + 0.32 < threshold ) discard;
+	float aSide = 0.68 * texture2D( uNoise, qs ).r;
+	if ( max( a, aSide ) + 0.32 < threshold ) discard;
 	float fine = 0.32 * deckFine( q );
 	float n = a + fine;
 	// a soft but definite edge: shapes, not smoke
 	float body = smoothstep( threshold, threshold + 0.07, n );
-	float alpha = body * fade;
+	// the side: only under the fuller part of a cloud, so its thin edges stay thin
+	float side = above * ( 1.0 - body ) * smoothstep( threshold + 0.04, threshold + 0.12, aSide + 0.32 * deckFine( qs ) );
+	float alpha = max( body, side ) * fade;
 	if ( alpha < 0.01 ) discard;
 	// lit on the sunward edge (where the noise falls away toward the sun), in three soft bands
 	// (the broad shapes only toward the sun: the fine detail is too small to shade)
@@ -207,13 +243,19 @@ void main() {
 	lit = mix( band, lit, 0.35 );
 	// thick middles are fuller: brighter on top, darker beneath
 	float thick = smoothstep( threshold + 0.05, threshold + 0.3, n );
-	float above = step( vWorld.y, cameraPosition.y );
 	float light = above > 0.5 ? 0.2 + 0.6 * lit + 0.2 * thick : 0.12 + 0.45 * lit - 0.12 * thick;
+	// a side faces the eye: lit when the sun is behind the eye, in shade when the eye looks into it
+	float facing = dot( -normalize( toFrag.xz + 1e-4 ), uSunFlat );
+	light = mix( light, 0.1 + 0.35 * smoothstep( -0.6, 0.8, facing ), side / max( max( body, side ), 1e-3 ) );
 	vec3 colour = mix( uShade, uLit, clamp( light, 0.0, 1.0 ) );
+	// by night the moon catches the clouds' edges toward it: a thin silver rim, the cloud itself still a
+	// veil (the sky round it untouched)
+	float rim = uDeckMoon * body * ( 1.0 - smoothstep( threshold + 0.02, threshold + 0.14, n ) ) * smoothstep( 0.35, 0.9, lit );
+	colour = mix( colour, uLit * 1.9, 0.6 * rim );
 	// the far deck takes the sky's colour before it fades out
 	if ( horizon > 0.002 ) colour = mix( colour, skyAt( toFrag / dist ), 0.7 * horizon );
 	// clouds are a little translucent at their thin edges
-	gl_FragColor = vec4( colour, alpha * mix( 0.55, 0.92, thick ) );
+	gl_FragColor = vec4( colour, alpha * mix( 0.55, 0.92, max( thick, 0.6 * side ) ) * ( 1.0 + 0.8 * rim ) );
 	#include <tonemapping_fragment>
 	#include <colorspace_fragment>
 	gl_FragColor.rgb = airGrade( gl_FragColor.rgb );
@@ -302,6 +344,8 @@ export function createDeck(opts: DeckOpts) {
     uDeckFade: { value: new Vector3(1, 30, 110) },
     uDeckHole: { value: new Vector4(0, 0, -2, -1) },
     uDeckHoleMin: { value: 0.15 },
+    uDeckWall: { value: WALL },
+    uDeckMoon: { value: 0 },
   }
   const material = new ShaderMaterial({
     uniforms,
@@ -341,14 +385,20 @@ export function createDeck(opts: DeckOpts) {
     uniforms,
     /** Per frame: the eye and what it looks at, for the fades and the clear patch. */
     view(eye: Vector3, target: readonly [number, number, number], veil: number) {
+      // Every fade here is a continuous, eased function of the eye's place, slow against a zoom step,
+      // so dollying in or out never makes the deck pop or swim (decisions: performance must not change
+      // what you see).
       const gap = eye.y - opts.height
-      uniforms.uDeckFade.value.x = deckGapFade(gap) * veil
-      // the near fade grows with the gap: from far above the deck may come no nearer than half of it
-      const near = Math.max(30, 0.6 * Math.abs(gap))
-      uniforms.uDeckFade.value.y = near * 0.5
-      uniforms.uDeckFade.value.z = near * 1.6
+      uniforms.uDeckFade.value.x = deckGapFade(gap, opts.height) * veil
+      const [start, whole] = deckNearFade(gap)
+      uniforms.uDeckFade.value.y = start
+      uniforms.uDeckFade.value.z = whole
+      // the veil is the night's (index.ts: 0.45 by full night, 1 by day): the moon silvers the edges
+      uniforms.uDeckMoon.value = Math.min(1, Math.max(0, (1 - veil) / 0.55))
       const focus = deckFocus([eye.x, eye.y, eye.z], target, opts.height)
-      if (focus) uniforms.uDeckHole.value.set(focus[0], focus[1], opts.span * 0.35, opts.span * 0.95)
+      const [inner, outer] = deckHole(opts.span)
+      // under the deck (no focus) it is faded out by the gap long before the patch would matter
+      if (focus) uniforms.uDeckHole.value.set(focus[0], focus[1], inner, outer)
       else uniforms.uDeckHole.value.set(0, 0, -2, -1)
     },
     /** The sun's (or moon's) direction across the ground: the side the clouds are lit from. */

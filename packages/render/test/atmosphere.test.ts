@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import { cloudNoise, deckFocus, deckGapFade, deckHeight } from "../src/atmosphere/deck.ts"
+import {
+  cloudNoise,
+  deckFocus,
+  deckGapFade,
+  deckHeight,
+  deckHole,
+  deckNearFade,
+} from "../src/atmosphere/deck.ts"
 import {
   cloudField,
   focusWeight,
@@ -150,10 +157,31 @@ describe("the cloud deck", () => {
   })
 
   test("is gone level with the eye and whole well above or below it", () => {
-    expect(deckGapFade(0)).toBe(0)
-    expect(deckGapFade(-5)).toBe(0)
-    expect(deckGapFade(100)).toBe(1)
-    expect(deckGapFade(-100)).toBe(1)
+    expect(deckGapFade(0, 120)).toBe(0)
+    expect(deckGapFade(-5, 120)).toBe(0)
+    expect(deckGapFade(120, 120)).toBe(1)
+    expect(deckGapFade(-100, 120)).toBe(1)
+  })
+
+  test("fills in and clears slowly against a zoom: no step of a 48-step sweep moves a fade by much", () => {
+    // the eye from level with the deck to twice its height, in the sweep's geometric steps (3.7% each)
+    const height = 120
+    let gap = 1
+    let fade = deckGapFade(gap, height)
+    let near = deckNearFade(gap)
+    while (gap < height) {
+      const next = (height + gap) * 1.037 - height
+      const f = deckGapFade(next, height)
+      const n = deckNearFade(next)
+      expect(Math.abs(f - fade)).toBeLessThan(0.1)
+      // the near fade grows no faster than the gap: on the screen it holds still or eases away
+      expect(n[1] / near[1]).toBeLessThanOrEqual(next / gap + 1e-9)
+      gap = next
+      fade = f
+      near = n
+    }
+    const [inner, outer] = deckHole(100)
+    expect(outer - inner).toBeGreaterThan(80)
   })
 
   test("its clear patch sits where the line of sight crosses it", () => {

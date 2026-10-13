@@ -1,3 +1,5 @@
+import { STORY_CSS } from "./story/style.ts"
+
 /**
  * The HUD panels' sheet: V1's hall.css rules for the roster, chronicle, toasts, dossier, pleas, settings,
  * brand and tape, rebuilt on the `.gh` tokens (theme/tokens.ts) and the `ui-*` pieces (Panel's plaque,
@@ -500,7 +502,7 @@ export function holdHudStyle(): () => void {
   if (users++ === 0) {
     node = document.createElement("style")
     node.dataset.gh = "hud"
-    node.textContent = HUD_CSS
+    node.textContent = HUD_CSS + STORY_CSS
     document.head.append(node)
   }
   let released = false

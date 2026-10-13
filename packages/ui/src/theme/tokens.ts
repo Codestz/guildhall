@@ -5,12 +5,22 @@
  * faint 7.3:1, brass-hi 11.9:1, ink on brass 9.4:1.
  */
 
-/** V1's faces: Marcellus SC for titles, Alegreya Sans for text, JetBrains Mono for numbers and ids. */
+/**
+ * V1's faces: Marcellus SC for titles, Alegreya Sans for text, JetBrains Mono for numbers and ids, and
+ * Alegreya (the serif) for what is told: the Legends book, the captions, the Chronicle card.
+ */
 export const FONTS_URL =
-  "https://fonts.googleapis.com/css2?family=Marcellus+SC&family=Alegreya+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+  "https://fonts.googleapis.com/css2?family=Marcellus+SC&family=Alegreya:ital,wght@0,400;0,500;0,600;1,400&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap"
 
 /** Faces the UI uses, loaded before a screen reports ready so shots never catch the fallback. */
-export const FACES = ['400 17px "Marcellus SC"', '400 14px "Alegreya Sans"', '500 13px "JetBrains Mono"']
+export const FACES = [
+  '400 17px "Marcellus SC"',
+  '400 14px "Alegreya Sans"',
+  '500 13px "JetBrains Mono"',
+  '400 16px "Alegreya"',
+  'italic 400 16px "Alegreya"',
+  '600 16px "Alegreya"',
+]
 
 export const TOKENS_CSS = /* css */ `
 .gh {
@@ -46,6 +56,7 @@ export const TOKENS_CSS = /* css */ `
   --display: "Marcellus SC", "Cormorant SC", Georgia, serif;
   --body: "Alegreya Sans", "Gill Sans", "Trebuchet MS", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --serif: "Alegreya", "Iowan Old Style", Georgia, serif;
   --t-xs: 10.5px;
   --t-sm: 12px;
   --t-md: 13.5px;

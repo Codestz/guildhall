@@ -33,18 +33,21 @@ import {
   type HexIsland,
   type HexWorld,
   type HexZones,
+  hexCollide,
   hexWalk,
   type LifePose,
   type LifeStep,
   lifePlaces,
   lifePose,
   planFolk,
-  type TileFurniture,
+  solidDistance,
   workTiles,
 } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import * as data from "../data.ts"
+import { collideView } from "./collideView.ts"
 import { DEMO_AGENTS } from "./lifeAgents.ts"
+import { createSpace } from "./space.ts"
 
 const logger = log("studio:hexworld:life")
 
@@ -65,11 +68,13 @@ export interface LifeOpts {
   island: HexIsland
   zones: HexZones
   world: HexWorld
-  /** The ground under a point (the fine ground), metres. */
+  /** The fine ground under a point, as the worker built it (job.ts `heightsAt`), metres. */
   groundAt(x: number, z: number): number
   /** The screen's clock, hours. */
   hour(): number
   seed: number
+  /** Draw the collision layer over the scene (`?collide=1`, `?spots=1`: collideView.ts). */
+  overlay?: boolean
   /** Seconds into the agents' script at the start (`?lifeT=` for shots). */
   agentT?: number
 }
@@ -176,71 +181,8 @@ function banner(name: string, colour: string): HTMLElement {
   return el
 }
 
-/**
- * A debug overlay (`?spots=1`): spots as dots with a tick the way they face (green work, blue sit,
- * yellow stand / talk), blockers as red rings, within 30 m of the camera's target.
- */
-function spotsOverlay(
-  stage: Stage,
-  host: HTMLElement,
-  furniture: TileFurniture,
-  groundAt: (x: number, z: number) => number,
-): { draw(): void; dispose(): void } {
-  const canvas = document.createElement("canvas")
-  canvas.style.cssText = "position:absolute;inset:0;z-index:1;pointer-events:none;width:100%;height:100%"
-  host.append(canvas)
-  const colour = { work: "#3fd16b", sit: "#4aa3ff", sleep: "#b07cff", stand: "#ffd34a", talk: "#ffd34a" }
-  return {
-    draw() {
-      const w = host.clientWidth
-      const h = host.clientHeight
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w
-        canvas.height = h
-      }
-      const g = canvas.getContext("2d")
-      if (!g) return
-      g.clearRect(0, 0, w, h)
-      const target = stage.getCamera().target
-      const close = (x: number, z: number) => Math.hypot(x - target[0], z - target[2]) < 30
-      g.lineWidth = 2
-      for (const b of furniture.blockers) {
-        if (!close(b.x, b.z)) continue
-        const y = groundAt(b.x, b.z) + 0.05
-        g.strokeStyle = "rgba(255,60,60,0.9)"
-        g.beginPath()
-        for (let k = 0; k <= 16; k++) {
-          const a = (k / 16) * Math.PI * 2
-          const p = toScreen(stage, [b.x + Math.cos(a) * b.r, y, b.z + Math.sin(a) * b.r])
-          if (!p) continue
-          if (k === 0) g.moveTo(p[0], p[1])
-          else g.lineTo(p[0], p[1])
-        }
-        g.stroke()
-      }
-      for (const s of furniture.spots) {
-        if (!close(s.x, s.z)) continue
-        const y = groundAt(s.x, s.z) + 0.05
-        const p = toScreen(stage, [s.x, y, s.z])
-        const q = toScreen(stage, [s.x + Math.sin(s.facing) * 0.6, y, s.z + Math.cos(s.facing) * 0.6])
-        if (!p || !q) continue
-        g.strokeStyle = colour[s.kind]
-        g.fillStyle = colour[s.kind]
-        g.beginPath()
-        g.arc(p[0], p[1], 5, 0, Math.PI * 2)
-        g.fill()
-        g.beginPath()
-        g.moveTo(p[0], p[1])
-        g.lineTo(q[0], q[1])
-        g.stroke()
-      }
-    },
-    dispose: () => canvas.remove(),
-  }
-}
-
 export function createLife(stage: Stage, opts: LifeOpts): Life {
-  const { island: h, zones: z, world: w, groundAt } = opts
+  const { island: h, zones: z, world: w } = opts
   let disposed = false
   let crowd: Crowd | null = null
   let unFrame = () => {}
@@ -257,6 +199,13 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       ...agentLoop(walk, z, a.errands, { slot: slot * 2, mps: LIFE_MPS * 1.15, role: a.recipe, places }),
     }))
     const folk = planFolk(h, z, w, walk, { seed: opts.seed, pace: (LIFE_MPS * 3600) / SPEEDUP, places })
+    // the collision layer: the furniture's solids, the walkways, and the fine ground as the worker built
+    // it (its heights data: the numbers the ground mesh is built from)
+    const collide = hexCollide({
+      solids: places.furniture.solids,
+      walkways: [...w.stairs, ...w.bridges.flatMap((b) => b.legs), ...w.decks],
+      ground: opts.groundAt,
+    })
     const planned = performance.now() - t0
     const [catalog, recipes] = await Promise.all([mountedCatalog(), npcRecipes()])
     if (disposed || !catalog || recipes.size === 0) {
@@ -318,115 +267,40 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       body && rig ? (await loadCharacter(body, rig, libraryUrl)).clips.map((c) => [c.name, c.duration]) : [],
     )
     if (disposed) return
+    // personal space on the collision layer (space.ts): rounds as wide as each body is drawn, walkers
+    // queueing behind each other, nobody inside a wall, off a step or a flight of stairs
+    const n = looks.length
+    const radii = new Float32Array(n)
+    for (const [id, look] of looks.entries()) {
+      const size = catalog.get(look.body)?.size
+      // the body's depth (the mage's hat brim reaches furthest), at its scale
+      radii[id] = Math.min(0.5, Math.max(0.26, ((size?.[2] ?? 1.2) * look.scale) / 2))
+    }
+    const space = createSpace(radii, {
+      heightAt: collide.heightAt,
+      solidsNear: collide.solidsNear,
+      solidDistance,
+    })
+    const poses: LifePose[] = new Array(n)
+    /** Where person id's way has them now: their clock, less how late queueing has made them. */
     const pose = (id: number): LifePose => {
       const l = loops[id]!
-      return lifePose(l.steps, l.real ? secs : day, l.period)
+      const late = space.delay[id]!
+      return lifePose(l.steps, l.real ? secs - late : day - (late * SPEEDUP) / 3600, l.period)
     }
-    // personal space: walkers keep to the right of their way, and everyone near someone else is nudged
-    // apart (a smoothed offset per person, so nobody jumps), so two people never stand inside each other
-    const n = looks.length
-    const offX = new Float32Array(n)
-    const offZ = new Float32Array(n)
-    const baseX = new Float32Array(n)
-    const baseZ = new Float32Array(n)
-    const poses: LifePose[] = []
-    const SPACE = 0.8
-    /** A walker's half-width against blockers, metres. */
-    const BODY = 0.22
-    /** How much of a pair's push `a` takes from `b`: a stayer leaves it to a walker. */
-    const yields = (a: number, b: number) => {
-      const wa = poses[a]!.act === "walk"
-      const wb = poses[b]!.act === "walk"
-      return wa === wb ? 1 : wa ? 1.8 : 0.2
+    const place = (step: number) => {
+      for (let id = 0; id < n; id++) poses[id] = pose(id)
+      space.step(poses, step)
     }
-    const separate = () => {
-      const grid = new Map<number, number[]>()
-      for (let id = 0; id < n; id++) {
-        const p = pose(id)
-        poses[id] = p
-        let x = p.at[0]
-        let zz = p.at[2]
-        if (p.act === "walk") {
-          // keep right: a lane half a shoulder off the way's middle
-          x += Math.cos(p.facing) * 0.32
-          zz -= Math.sin(p.facing) * 0.32
-        }
-        baseX[id] = x
-        baseZ[id] = zz
-        if (p.indoors) continue
-        const key = (Math.floor(x) * 73856093) ^ (Math.floor(zz) * 19349663)
-        let cell = grid.get(key)
-        if (!cell) {
-          cell = []
-          grid.set(key, cell)
-        }
-        cell.push(id)
-      }
-      const pushX = new Float32Array(n)
-      const pushZ = new Float32Array(n)
-      for (let id = 0; id < n; id++) {
-        if (poses[id]!.indoors) continue
-        const x = baseX[id]! + offX[id]!
-        const zz = baseZ[id]! + offZ[id]!
-        const cx = Math.floor(baseX[id]!)
-        const cz = Math.floor(baseZ[id]!)
-        for (let dx = -1; dx <= 1; dx++)
-          for (let dz = -1; dz <= 1; dz++)
-            for (const o of grid.get(((cx + dx) * 73856093) ^ ((cz + dz) * 19349663)) ?? []) {
-              if (o <= id) continue
-              let ex = x - (baseX[o]! + offX[o]!)
-              let ez = zz - (baseZ[o]! + offZ[o]!)
-              let d = Math.hypot(ex, ez)
-              if (d >= SPACE) continue
-              if (d < 1e-3) {
-                // exactly together: part them along a fixed per-pair direction
-                const a = ((id * 92821 + o * 68917) % 628) / 100
-                ex = Math.cos(a)
-                ez = Math.sin(a)
-                d = 1e-3
-              }
-              // walkers step round whoever stands at a spot (it is theirs): a stayer barely gives
-              const k = (SPACE - d) / 2 / d
-              const ki = k * yields(id, o)
-              const ko = k * yields(o, id)
-              pushX[id] = pushX[id]! + ex * ki
-              pushZ[id] = pushZ[id]! + ez * ki
-              pushX[o] = pushX[o]! - ex * ko
-              pushZ[o] = pushZ[o]! - ez * ko
-            }
-      }
-      for (let id = 0; id < n; id++) {
-        // ease toward the push, let it relax back when alone, never more than a stride off the way
-        // (a stayer only a little: it stays at its spot)
-        offX[id] = offX[id]! * 0.9 + pushX[id]! * 0.6
-        offZ[id] = offZ[id]! * 0.9 + pushZ[id]! * 0.6
-        const cap = poses[id]!.act === "walk" ? 1.6 : 0.3
-        const m = Math.hypot(offX[id]!, offZ[id]!)
-        if (m > cap) {
-          offX[id] = (offX[id]! / m) * cap
-          offZ[id] = (offZ[id]! / m) * cap
-        }
-        // and never into a cart, a stall or a house: a walker pushed in is set back on the disc's edge
-        if (poses[id]!.act !== "walk" || poses[id]!.indoors) continue
-        const x = baseX[id]! + offX[id]!
-        const zz = baseZ[id]! + offZ[id]!
-        for (const b of places.furniture.near(x, zz, BODY)) {
-          const ex = x - b.x
-          const ez = zz - b.z
-          const d = Math.hypot(ex, ez) || 1e-3
-          const out = b.r + BODY - d
-          if (out <= 0) continue
-          offX[id] = offX[id]! + (ex / d) * out
-          offZ[id] = offZ[id]! + (ez / d) * out
-        }
-      }
-    }
+    /** Where feet stand: a stair's tread, a deck's planks, the ground (a dock's deck: the way's own height). */
+    const footAt = (x: number, zz: number, p: LifePose) =>
+      collide.walkwayAt(x, zz) ?? (p.ground ? collide.heightAt(x, zz) : p.at[1])
     const sample = (id: number): ActorSample => {
       const p = poses[id] ?? pose(id)
       const look = looks[id]!
-      const x = (poses[id] ? baseX[id]! : p.at[0]) + offX[id]!
-      const zz = (poses[id] ? baseZ[id]! : p.at[2]) + offZ[id]!
-      const y = (p.ground ? groundAt(x, zz) : p.at[1]) + (p.lift ?? 0)
+      const x = space.x[id]!
+      const zz = space.z[id]!
+      const y = footAt(x, zz, p) + (p.lift ?? 0)
       const prev = last[id]!
       const moved = Number.isNaN(prev[0]) ? 0 : Math.hypot(x - prev[0], zz - prev[1])
       prev[0] = x
@@ -455,16 +329,17 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         day = clock
       } else day = (day + (step * SPEEDUP) / 3600) % 24
       secs += step
-      separate()
-      separate()
+      place(step)
       crowd?.update(step, sample)
       // banners over their agents, nudged up off each other where they would overlap
       const placed: [number, number][] = []
       const shown = banners
         .map((el, k) => {
-          const p = pose(agentIds[k]!)
-          const y = p.ground ? groundAt(p.at[0], p.at[2]) : p.at[1]
-          return { el, at: toScreen(stage, [p.at[0], y + BANNER_UP, p.at[2]]) }
+          const id = agentIds[k]!
+          const x = space.x[id]!
+          const zz = space.z[id]!
+          const y = footAt(x, zz, poses[id] ?? pose(id))
+          return { el, at: toScreen(stage, [x, y + BANNER_UP, zz]) }
         })
         .sort((a, b) => (b.at?.[1] ?? 0) - (a.at?.[1] ?? 0))
       for (const { el, at } of shown) {
@@ -477,12 +352,14 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         el.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`
       }
       cpuMs += (performance.now() - t1 - cpuMs) * 0.05
-      overlay?.draw()
+      overlay?.draw(drawn)
     }
-    // `?spots=1`: every spot and blocker drawn over the scene, to check them against what stands there
-    const showSpots = new URLSearchParams(location.search).get("spots") === "1"
-    const overlay = showSpots ? spotsOverlay(stage, opts.host, places.furniture, groundAt) : null
+    // `?collide=1` (or `?spots=1`): the collision layer drawn over the scene, to check it against what stands there
+    const overlay = opts.overlay
+      ? collideView(stage, opts.host, { collide, furniture: places.furniture, walk, nodeOf: places.nodeOf })
+      : null
     if (overlay) cleanup.push(overlay.dispose)
+    const drawn = { x: space.x, z: space.z, r: radii, hidden: (id: number) => !!poses[id]?.indoors }
     unFrame = stage.onFrame(tick)
     tick(0)
     // heroes load as the crowd first updates: let them settle before `ready` resolves

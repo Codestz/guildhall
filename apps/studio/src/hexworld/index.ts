@@ -335,10 +335,11 @@ export const hexWorldScreen: Screen = {
           island,
           zones,
           world,
-          groundAt: (x: number, zz: number) => world.stairAt(x, zz) ?? groundAt(x, zz),
+          groundAt,
           hour: () => now,
           seed,
           agentT: num("lifeT", 0),
+          overlay: ctx.query.get("collide") === "1" || ctx.query.get("spots") === "1",
         })
         await life.ready
       }

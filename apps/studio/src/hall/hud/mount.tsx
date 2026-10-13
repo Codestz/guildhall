@@ -13,6 +13,7 @@ import { hallChronicle } from "../../site/chronicle.ts"
 import type { HallTime } from "../clock.ts"
 import { createSession, feedKindOf, type HallSession, openFeed } from "../feeds/index.ts"
 import { sessionPlaces } from "../feeds/places.ts"
+import { driveFx } from "../fx.ts"
 import { HallHud, REMEMBERED } from "./HallHud.tsx"
 import type { HudSession } from "./SessionHud.tsx"
 import { holdHallHudStyle } from "./style.ts"
@@ -90,6 +91,8 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
     }
     raf = requestAnimationFrame(frame)
   }
+  // the island's event FX (weather, ships, scaffolds) read the session, twice a second
+  const offFx = live && parts.fx ? driveFx(parts.fx, live.session) : () => {}
   void hallChronicle(opts.slug).then((found) => {
     if (gone) return
     const chronicle = found.status === "ok" ? found.chronicle : null
@@ -123,6 +126,7 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
   })
   return () => {
     gone = true
+    offFx()
     if (live) {
       cancelAnimationFrame(raf)
       live.session.stop()

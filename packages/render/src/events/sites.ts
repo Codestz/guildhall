@@ -1,6 +1,6 @@
 /**
  * Where the event FX happen on an island (pure, worker-safe: no three): the castle's keep (lightning),
- * each harbour's berths with a sea lane in to each (ships), and every place's heart (scaffolds).
+ * each harbour's berths (or, with no harbour, a fishing village's or the first coastal place's) with a sea lane in to each (ships), and every place's heart (scaffolds).
  *
  * A berth is a water tile off the harbour, a tile or two from its shore, beside one of its piers where
  * it can, never on a pier's own tile and never next to another berth (a ship needs its room). Its lane
@@ -160,8 +160,7 @@ export function eventSites(island: HexIsland, zones: HexZones, world: HexWorld, 
   const harbours: HarbourSite[] = []
   const max = opts.berths ?? 6
   const reach = opts.reach ?? 150
-  zones.zones.forEach((zone, zi) => {
-    if (zone.kind !== "harbour") return
+  const moor = (zone: HexZones["zones"][number], zi: number) => {
     const own = new Set(zone.tiles)
     const docks = new Set<number>()
     for (let i = 0; i < g.size; i++)
@@ -206,6 +205,7 @@ export function eventSites(island: HexIsland, zones: HexZones, world: HexWorld, 
       if (taken.some((t) => t === c.i || g.neighbours(t).includes(c.i))) continue
       taken.push(c.i)
     }
+    if (!taken.length) return false
     harbours.push({
       zone: zi,
       heart,
@@ -214,7 +214,16 @@ export function eventSites(island: HexIsland, zones: HexZones, world: HexWorld, 
         return { at: [x, opts.sea, z] as Vec3, lane: lane(i, reach) }
       }),
     })
+    return true
+  }
+  // the harbours; an island without one (a repo with no data or assets) moors at a fishing village, or
+  // at the first place on the coast, so its pull requests still have somewhere to dock
+  zones.zones.forEach((zone, zi) => {
+    if (zone.kind === "harbour") moor(zone, zi)
   })
+  if (!harbours.length)
+    for (const kind of ["fishing", null])
+      if (zones.zones.some((zone, zi) => (kind === null || zone.kind === kind) && moor(zone, zi))) break
 
   const plan = zones.castle
   const keep = plan ? top(plan.keep) : null

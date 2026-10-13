@@ -131,7 +131,9 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
                       onRest: writeT,
                     })
                   : null
-              const offMap = mountHexWorld(world, inner, past?.hooks, repo ? { repo, hud } : {})
+              // a hall with a session (`?feed=`) shows its events on the island: CI weather, PR ships, scaffolds
+              const fx = ctx.query.has("feed")
+              const offMap = mountHexWorld(world, inner, past?.hooks, repo ? { repo, hud, fx } : {})
               offWorld = () => {
                 offMap()
                 past?.dispose()

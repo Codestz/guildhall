@@ -66,6 +66,11 @@ export interface HarbourShips {
   ready: Promise<void>
   /** Reads a harbour (sim `harbourOf`): new pull requests sail in, vanished ones leave (merged or closed by the count). */
   update(harbour: HarbourReading): void
+  /**
+   * Forgets the fleet (a jump on the session's clock, a new log): the next `update` finds its pull
+   * requests already docked, so a scrub never sails or sinks a ship.
+   */
+  reset(): void
   /** A pull request opened now (`docked`: already there, no sail in); `colour` its pennant's. */
   open(key: string, opts?: { docked?: boolean; colour?: string }): void
   /** A pull request merged or closed now. */
@@ -326,9 +331,19 @@ export function createHarbourShips(stage: Stage, opts: HarbourShipsOpts): Harbou
     replan()
   }
 
+  const reset = () => {
+    logs.clear()
+    seenKeys = []
+    merged = null
+    replan()
+  }
+
   return {
     ready,
+    reset,
     update(harbour) {
+      // the merged count fell: the clock went back, so this is a new start, not a closing
+      if (merged !== null && harbour.merged < merged) reset()
       const first = merged === null
       const { opened, ended } = harbourChanges(seenKeys, merged ?? harbour.merged, harbour)
       for (const key of opened) open(key, { docked: first })

@@ -3,35 +3,33 @@
  * no LOD of its own: before every pass it walks the instances, frustum-culls them and lists each one's
  * geometry range for the multi-draw. This replaces that walk with one that lists a tier's range
  * instead (the tiers are extra geometries in the same buffers, never assigned to an instance), and
- * swaps a cluster's parts for its shell when it is far. The walk runs anyway, so LOD costs a distance
- * and a compare per visible instance. World bounding spheres are cached per instance, not rebuilt from
- * the matrix texture every pass.
+ * swaps a cluster's parts for its shell when it is far. No switch pops: an instance between two levels
+ * is listed twice, once per level, each with a fade code that keeps its share of a screen-space dither
+ * (lodFade.ts), and a small piece leaving is listed shrunk. The walk runs anyway, so LOD costs a
+ * distance and a few compares per visible instance. World bounding spheres are cached per instance,
+ * not rebuilt from the matrix texture every pass.
  */
 import {
   BatchedMesh,
   type BufferGeometry,
   type Camera,
+  DataTexture,
   Frustum,
+  type GeometryGroup,
   type Material,
   Matrix4,
   type Object3D,
   type PerspectiveCamera,
+  RedIntegerFormat,
+  type Scene,
   Sphere,
+  UnsignedIntType,
   Vector2,
   Vector3,
   type WebGLRenderer,
 } from "three"
-import {
-  CULLED,
-  DETAIL_RADIUS,
-  type LodCounts,
-  PIECE_PX,
-  pickTier,
-  pieceThresholds,
-  SHADOW_TIER,
-  SHELL_PX,
-  screenRadius,
-} from "./lod.ts"
+import { DETAIL_FADE_PX, DETAIL_RADIUS, fadeWeight, type LodCounts, SHADOW_TIER, SWAP_PX } from "./lod.ts"
+import { dithers, drawsNothing, FADE_STEPS, inCode, outCode, packDraw, shrinkCode } from "./lodFade.ts"
 
 /** The BatchedMesh internals the walk fills (three keeps them private). */
 interface Internals {
@@ -42,7 +40,7 @@ interface Internals {
   _multiDrawCount: number
   _multiDrawBytesPerElement: number
   _visibilityChanged: boolean
-  _indirectTexture: { image: { data: Uint32Array }; needsUpdate: boolean }
+  _indirectTexture: { image: { data: Uint32Array; width: number }; needsUpdate: boolean }
 }
 
 /** A cluster: its shell instance and its parts' instances. */
@@ -51,7 +49,7 @@ interface Cluster {
   parts: number[]
 }
 
-/** No cluster / not yet decided. */
+/** No cluster. */
 const NONE = -1
 
 const frustum = new Frustum()
@@ -62,18 +60,38 @@ const matrix = new Matrix4()
 const inverse = new Matrix4()
 const buffer = new Vector2()
 
+/** False draws every instance at full detail in the main view (no tiers, no shells, no culled detail): a reference for comparisons (`?lod=0`). */
+let lodOn = true
+export function setLod(on: boolean): void {
+  lodOn = on
+}
+
 export class LodBatchedMesh extends BatchedMesh {
   /** Geometry id → its tiers' geometry ids, finest first (a geometry without tiers is its own only). */
   private readonly tierIds: number[][] = []
-  /** Per instance: world bounding sphere (x, y, z, r), stale flag, last main-pass tier, cluster. */
+  /** Geometry id → how far it strays from what it stands in for, metres in its own space (0: exact). */
+  private readonly errors: number[] = []
+  /** Per instance: world bounding sphere (x, y, z, r), its matrix's largest scale, stale flag, cluster. */
   private readonly spheres: number[] = []
+  private readonly scales: number[] = []
   private readonly stale: boolean[] = []
-  private readonly tierOf: number[] = []
   private readonly clusterOf: number[] = []
   private readonly clusters: Cluster[] = []
-  /** Per cluster: drawn as its shell in the last main pass (0 / 1). */
-  private readonly shellOf: number[] = []
+  /** Per cluster: the shell's crossfade weight in the last main pass (0: parts, 1: shell). */
+  private readonly shellWeight: number[] = []
   private counts: LodCounts = { tiers: [0, 0, 0], near: 0, shells: 0 }
+  /**
+   * The material the crossfading draws use (`batchMaterial(true)`), drawn as a second multi-draw
+   * right after the main one; null lists them with the rest (they then need a dithering material).
+   */
+  fadeMaterial: Material | null = null
+  /** The second multi-draw's list: the draws mid-crossfade. */
+  private fade = {
+    starts: new Int32Array(0),
+    counts: new Int32Array(0),
+    count: 0,
+    ids: null as DataTexture | null,
+  }
 
   /** What the last main pass drew. */
   get lod(): LodCounts {
@@ -85,14 +103,19 @@ export class LodBatchedMesh extends BatchedMesh {
     this.tierIds[geometryId] = [geometryId, ...tiers]
   }
 
+  /** How far `geometryId` (a tier, a shell) strays from the full detail it stands in for, metres. */
+  setLodError(geometryId: number, metres: number): void {
+    this.errors[geometryId] = metres
+  }
+
   /**
-   * Makes `shell` the far stand-in of `parts` (instance ids): one of the two is drawn, never both.
-   * Clusters are fixed once made.
+   * Makes `shell` the far stand-in of `parts` (instance ids): one of the two is drawn, or both
+   * crossfading. Clusters are fixed once made.
    */
   addCluster(shell: number, parts: readonly number[]): void {
     const c = this.clusters.length
     this.clusters.push({ shell, parts: [...parts] })
-    this.shellOf.push(NONE)
+    this.shellWeight.push(1)
     this.clusterOf[shell] = c
     for (const id of parts) this.clusterOf[id] = c
   }
@@ -100,7 +123,6 @@ export class LodBatchedMesh extends BatchedMesh {
   override addInstance(geometryId: number): number {
     const id = super.addInstance(geometryId)
     this.stale[id] = true
-    this.tierOf[id] = 0
     this.clusterOf[id] = NONE
     return id
   }
@@ -122,16 +144,77 @@ export class LodBatchedMesh extends BatchedMesh {
     const s = this.spheres
     if (this.stale[id]) {
       this.getBoundingSphereAt(geometryId, sphere)
-      sphere.applyMatrix4(this.getMatrixAt(id, matrix))
+      this.getMatrixAt(id, matrix)
+      sphere.applyMatrix4(matrix)
       s[id * 4] = sphere.center.x
       s[id * 4 + 1] = sphere.center.y
       s[id * 4 + 2] = sphere.center.z
       s[id * 4 + 3] = sphere.radius
+      this.scales[id] = matrix.getMaxScaleOnAxis()
       this.stale[id] = false
     }
     sphere.center.set(s[id * 4] as number, s[id * 4 + 1] as number, s[id * 4 + 2] as number)
     sphere.radius = s[id * 4 + 3] as number
     return sphere
+  }
+
+  /** Sizes the crossfade list like the main one (they grow together). */
+  private fadeList(size: number, side: number) {
+    const f = this.fade
+    if (f.starts.length !== size) {
+      f.starts = new Int32Array(size)
+      f.counts = new Int32Array(size)
+    }
+    if (!f.ids || f.ids.image.width !== side) {
+      f.ids?.dispose()
+      f.ids = new DataTexture(new Uint32Array(side * side), side, side, RedIntegerFormat, UnsignedIntType)
+    }
+    return f
+  }
+
+  /** The crossfading draws, after the main ones: the same buffers, the dithering material. */
+  override onAfterRender(
+    renderer: WebGLRenderer,
+    scene: Scene,
+    camera: Camera,
+    geometry: BufferGeometry,
+    _material: Material,
+    group: Parameters<BatchedMesh["onAfterRender"]>[5],
+  ): void {
+    const f = this.fade
+    if (!this.fadeMaterial || f.count === 0 || !f.ids) return
+    const self = this as unknown as Internals
+    const main = {
+      starts: self._multiDrawStarts,
+      counts: self._multiDrawCounts,
+      count: self._multiDrawCount,
+      ids: self._indirectTexture,
+    }
+    self._multiDrawStarts = f.starts
+    self._multiDrawCounts = f.counts
+    self._multiDrawCount = f.count
+    self._indirectTexture = f.ids as unknown as Internals["_indirectTexture"]
+    try {
+      renderer.renderBufferDirect(
+        camera,
+        scene,
+        geometry,
+        this.fadeMaterial,
+        this,
+        group as unknown as GeometryGroup,
+      )
+    } finally {
+      self._multiDrawStarts = main.starts
+      self._multiDrawCounts = main.counts
+      self._multiDrawCount = main.count
+      self._indirectTexture = main.ids
+    }
+  }
+
+  override dispose(): this {
+    this.fade.ids?.dispose()
+    super.dispose()
+    return this
   }
 
   override onBeforeRender(
@@ -177,28 +260,30 @@ export class LodBatchedMesh extends BatchedMesh {
     frustum.setFromProjectionMatrix(toLocal, camera.coordinateSystem, camera.reversedDepth)
     viewer.setFromMatrixPosition(camera.matrixWorld).applyMatrix4(inverse.copy(this.matrixWorld).invert())
     const perspective = (camera as PerspectiveCamera).isPerspectiveCamera === true
-    // Only the main view picks tiers by size (and keeps hysteresis state); any other camera is drawn coarse.
-    const sized = !shadow && perspective
+    // Only the main view picks levels by size; any other camera is drawn coarse, whole.
+    const sized = !shadow && perspective && lodOn
+    const full = !shadow && perspective && !lodOn
     renderer.getDrawingBufferSize(buffer)
-    const projectionY = camera.projectionMatrix.elements[5] as number
-    const detailPx = pieceThresholds(0, renderer.getPixelRatio())
-    const px = (id: number, geometryId: number) => {
-      const s = this.sphereOf(id, geometryId)
-      return screenRadius(s.radius, s.center.distanceTo(viewer), projectionY, buffer.y)
-    }
+    // CSS pixels a metre covers at one metre away: every switch is judged in CSS px, whatever the DPR.
+    const cssPerMetre =
+      ((camera.projectionMatrix.elements[5] as number) * buffer.y) / (2 * renderer.getPixelRatio())
+    /** CSS px per metre at instance `id`'s sphere (cached by `sphereOf`). */
+    const scaleAt = (s: Sphere) => cssPerMetre / Math.max(s.center.distanceTo(viewer), 1e-3)
 
     const info = self._instanceInfo
-    // Clusters first: each is near or far for this pass, by its shell's sphere.
+    // Clusters first: each is its parts, its shell or a crossfade of the two, by its shell's error.
     let near = 0
     for (let c = 0; c < this.clusters.length; c++) {
       const { shell } = this.clusters[c] as Cluster
       const shellInfo = info[shell]
       if (!shellInfo?.active) continue
       if (sized) {
-        const previous = this.shellOf[c] === 1 ? 1 : 0
-        this.shellOf[c] = pickTier(px(shell, shellInfo.geometryIndex), previous, [SHELL_PX])
-        if (this.shellOf[c] === 0) near++
-      }
+        const s = this.sphereOf(shell, shellInfo.geometryIndex)
+        const error =
+          (this.errors[shellInfo.geometryIndex] ?? 0) * (this.scales[shell] as number) * scaleAt(s)
+        this.shellWeight[c] = fadeWeight(error, SWAP_PX)
+        if (inCode(this.shellWeight[c] as number) < FADE_STEPS) near++
+      } else this.shellWeight[c] = full ? 0 : 1
     }
 
     const tiers = [0, 0, 0]
@@ -206,49 +291,101 @@ export class LodBatchedMesh extends BatchedMesh {
     const starts = self._multiDrawStarts
     const counts = self._multiDrawCounts
     const indirect = self._indirectTexture.image.data
+    const capacity = Math.min(starts.length, indirect.length)
     const geometries = self._geometryInfo
     let drawn = 0
+    const fade = this.fadeList(starts.length, self._indirectTexture.image.width)
+    const fadeIds = (fade.ids as DataTexture).image.data as Uint32Array
+    fade.count = 0
+    const apart = this.fadeMaterial !== null
+    const emit = (id: number, geometryId: number, code: number) => {
+      if (drawsNothing(code)) return
+      const range = geometries[geometryId] as { start: number; count: number }
+      if (apart && dithers(code)) {
+        if (fade.count >= capacity) return
+        fade.starts[fade.count] = range.start * bytesPerElement * multiplier
+        fade.counts[fade.count] = range.count * multiplier
+        fadeIds[fade.count] = packDraw(id, code)
+        fade.count++
+        return
+      }
+      if (drawn >= capacity) return
+      starts[drawn] = range.start * bytesPerElement * multiplier
+      counts[drawn] = range.count * multiplier
+      indirect[drawn] = packDraw(id, code)
+      drawn++
+    }
+
     for (let i = 0; i < info.length; i++) {
       const instance = info[i] as Internals["_instanceInfo"][number]
       if (!instance.visible || !instance.active) continue
       const c = this.clusterOf[i] as number
       const isShell = c !== NONE && this.clusters[c]?.shell === i
+      // the cluster's crossfade: the shell comes in as its parts go out
+      let clusterCode = 0
       if (c !== NONE) {
-        // Shadows always cast from shells; the main view by the cluster's state (unknown → shell).
-        const far = shadow || !sized || this.shellOf[c] !== 0
-        if (isShell !== far) continue
+        const q = inCode(this.shellWeight[c] as number)
+        if (isShell ? q === 0 : q === FADE_STEPS) continue
+        clusterCode = isShell ? (q === FADE_STEPS ? 0 : q) : outCode(this.shellWeight[c] as number)
       }
       const geometryId = instance.geometryIndex
       const bounds = this.sphereOf(i, geometryId)
       if (!frustum.intersectsSphere(bounds)) continue
 
-      const ids = this.tierIds[geometryId]
-      const detail = !isShell && bounds.radius < DETAIL_RADIUS
+      const ids = this.tierIds[geometryId] ?? [geometryId]
+      if (isShell) {
+        shells++
+        emit(i, geometryId, clusterCode)
+        continue
+      }
+      if (!sized) {
+        const tier = full ? 0 : Math.min(shadow ? SHADOW_TIER : ids.length - 1, ids.length - 1)
+        tiers[tier] = (tiers[tier] as number) + 1
+        emit(i, ids[tier] as number, 0)
+        continue
+      }
+      const perMetre = scaleAt(bounds)
+      // the coarsest tier fully in, and the next on its way in with its weight (no allocation: per instance)
       let tier = 0
-      if (sized && (detail || (ids && ids.length > 1))) {
-        tier = pickTier(px(i, geometryId), this.tierOf[i] as number, detail ? detailPx : PIECE_PX)
-        this.tierOf[i] = tier
-        // detail too small to see is not drawn at all
-        if (tier >= CULLED) continue
-      } else if (!sized && ids && ids.length > 1) tier = shadow ? SHADOW_TIER : ids.length - 1
-      if (ids && ids.length > 1) {
-        tier = Math.min(tier, ids.length - 1)
-        // A tier that reuses the finer one's geometry counts as that one.
-        while (tier > 0 && ids[tier] === ids[tier - 1]) tier--
-      } else tier = 0
-      if (isShell) shells++
-      else tiers[tier] = (tiers[tier] as number) + 1
-      const range = geometries[ids ? (ids[tier] as number) : geometryId] as { start: number; count: number }
-      starts[drawn] = range.start * bytesPerElement * multiplier
-      counts[drawn] = range.count * multiplier
-      indirect[drawn] = i
-      drawn++
+      let next = 0
+      let w = 0
+      const toPx = (this.scales[i] as number) * perMetre
+      for (let k = 1; k < ids.length; k++) {
+        // a tier that reuses the finer one's geometry is that one
+        if (ids[k] === ids[k - 1]) break
+        const wk = fadeWeight((this.errors[ids[k] as number] ?? 0) * toPx, SWAP_PX)
+        if (wk >= 1) {
+          tier = k
+          continue
+        }
+        if (wk > 0) {
+          next = k
+          w = wk
+        }
+        break
+      }
+      if (w === 0) next = tier
+      // detail shrinks away as it falls through DETAIL_FADE_PX
+      const shrink =
+        bounds.radius < DETAIL_RADIUS ? 1 - fadeWeight(bounds.radius * perMetre, DETAIL_FADE_PX) : 1
+      if (shrink <= 0) continue
+      tiers[tier] = (tiers[tier] as number) + 1
+      if (clusterCode !== 0) {
+        // one fade per draw: a part fading out with its cluster keeps one tier
+        emit(i, ids[w >= 0.5 ? next : tier] as number, clusterCode)
+      } else if (shrink < 1) {
+        emit(i, ids[w >= 0.5 ? next : tier] as number, shrinkCode(shrink))
+      } else if (w > 0 && ids[next] !== ids[tier]) {
+        emit(i, ids[tier] as number, outCode(w))
+        emit(i, ids[next] as number, inCode(w))
+      } else emit(i, ids[w >= 0.5 ? next : tier] as number, 0)
     }
 
     self._indirectTexture.needsUpdate = true
+    if (fade.count > 0) (fade.ids as DataTexture).needsUpdate = true
     self._multiDrawCount = drawn
     self._multiDrawBytesPerElement = bytesPerElement
     self._visibilityChanged = false
-    if (sized) this.counts = { tiers, near, shells }
+    if (!shadow && perspective) this.counts = { tiers, near, shells }
   }
 }

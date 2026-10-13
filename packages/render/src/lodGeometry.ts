@@ -120,22 +120,40 @@ export function simplifyGeometry(
   const remap = MeshoptSimplifier.generatePositionRemap(source.position, 3)
   const lock = swatchBorders(remap, source._swatch)
   const { single, cards } = splitCards(Uint32Array.from(geometry.index?.array ?? []), remap)
-  const simplify = (index: Uint32Array) =>
-    index.length === 0
-      ? index
-      : MeshoptSimplifier.simplifyWithAttributes(
-          index,
-          source.position,
-          3,
-          source.normal,
-          3,
-          [NORMAL_WEIGHT, NORMAL_WEIGHT, NORMAL_WEIGHT],
-          lock,
-          Math.max(3, Math.floor((index.length * ratio) / 3) * 3),
-          error,
-          prune ? ["Permissive", "Prune"] : ["Permissive"],
-        )[0]
-  return rebuild(source, simplify(single), simplify(cards), geometry.name)
+  let worst = 0
+  const simplify = (index: Uint32Array) => {
+    if (index.length === 0) return index
+    const [out, deviation] = MeshoptSimplifier.simplifyWithAttributes(
+      index,
+      source.position,
+      3,
+      source.normal,
+      3,
+      [NORMAL_WEIGHT, NORMAL_WEIGHT, NORMAL_WEIGHT],
+      lock,
+      Math.max(3, Math.floor((index.length * ratio) / 3) * 3),
+      error,
+      prune ? ["Permissive", "Prune"] : ["Permissive"],
+    )
+    worst = Math.max(worst, deviation)
+    return out
+  }
+  const simplified = rebuild(source, simplify(single), simplify(cards), geometry.name)
+  setLodError(simplified, worst * MeshoptSimplifier.getScale(source.position, 3))
+  return simplified
+}
+
+/**
+ * How far (metres, in the geometry's own space) a coarser copy strays from what it stands in for: the
+ * simplifier's own measure of its deviation, plus what a shell leaves out. The batch switches to a
+ * copy only once this is under a pixel (lod.ts).
+ */
+export function lodError(geometry: BufferGeometry): number {
+  return (geometry.userData.lodError as number | undefined) ?? 0
+}
+
+function setLodError(geometry: BufferGeometry, metres: number): void {
+  geometry.userData.lodError = metres
 }
 
 /**
@@ -258,6 +276,13 @@ export function shellGeometry(
     return (geometry.boundingSphere?.radius ?? 0) * matrix.getMaxScaleOnAxis()
   }
   const big = parts.filter((part) => radius(part) >= minRadius)
+  // what the shell gives up: the parts left out (their whole size) and each part's own coarser tier
+  let given = 0
+  for (const part of parts) {
+    const scale = part.matrix.getMaxScaleOnAxis()
+    given = Math.max(given, lodError(part.geometry) * scale)
+    if (big.length > 0 && radius(part) < minRadius) given = Math.max(given, 2 * radius(part))
+  }
   const root = new Group()
   for (const { geometry, matrix } of big.length > 0 ? big : parts) {
     const mesh = new Mesh(geometry)
@@ -269,8 +294,10 @@ export function shellGeometry(
   const shell = simplifyGeometry(merged, simplify)
   if (surfaceArea(shell) >= minArea * surfaceArea(merged)) {
     merged.dispose()
+    setLodError(shell, given + lodError(shell))
     return shell
   }
   shell.dispose()
+  setLodError(merged, given)
   return merged
 }

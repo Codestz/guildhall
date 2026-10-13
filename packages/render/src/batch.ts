@@ -11,8 +11,8 @@ import { type BufferGeometry, Euler, Matrix4, type Object3D, Quaternion, Vector3
 import { batchGeometry } from "./batchGeometry.ts"
 import { LodBatchedMesh } from "./batchMesh.ts"
 import { type LodCounts, PIECE_TIERS, SHELL, TIER_MIN_AREA, TIER_MIN_SAVING } from "./lod.ts"
-import { shellGeometry, simplifierReady, simplifyGeometry, surfaceArea } from "./lodGeometry.ts"
-import { paletteMaterial } from "./material.ts"
+import { lodError, shellGeometry, simplifierReady, simplifyGeometry, surfaceArea } from "./lodGeometry.ts"
+import { batchMaterial } from "./material.ts"
 import { GLOW_SWATCHES } from "./night/glow.ts"
 import { instanceSwatchMap } from "./recipe.ts"
 import type { Stage } from "./stage.ts"
@@ -202,9 +202,10 @@ export async function createStaticBatch(
         Math.max(1, needInstances),
         Math.max(1, needVertices),
         Math.max(1, needIndices),
-        paletteMaterial(),
+        batchMaterial(),
       )
       mesh.name = "static-batch"
+      mesh.fadeMaterial = batchMaterial(true)
       mesh.perObjectFrustumCulled = true
       mesh.sortObjects = false
       mesh.castShadow = true
@@ -226,7 +227,9 @@ export async function createStaticBatch(
       const ids = new Map<BufferGeometry, number>()
       for (const g of tiers) {
         if (ids.has(g)) continue
-        ids.set(g, mesh.addGeometry(g))
+        const id = mesh.addGeometry(g)
+        ids.set(g, id)
+        mesh.setLodError(id, lodError(g))
         vertices += g.getAttribute("position").count
         indices += g.index?.count ?? 0
       }

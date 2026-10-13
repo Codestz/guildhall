@@ -1,12 +1,18 @@
 /**
- * The static batch's level-of-detail rules, by screen size: how big a bounding sphere looks (its
- * radius in drawing-buffer pixels) picks a tier, with a hysteresis band at every boundary so an
- * instance sitting on one does not flicker between tiers as the camera moves.
+ * The static batch's level-of-detail rules, by what a switch would change on screen, in CSS pixels
+ * (so the DPR governor never moves where anything switches):
  *
- *   pieces    tier 0 (full) → tier 1 (~40 % tris) → tier 2 (~15 %) as they shrink on screen
- *   clusters  (a house, a field, a wood) its pieces near, one merged shell far: one draw, not dozens
+ *   pieces    tier 0 (full) → tier 1 (~40 % tris) → tier 2 (~15 %): a tier comes in as its own
+ *             deviation from the full piece (the simplifier's measure, lodGeometry.ts) falls to ~2 px
+ *   clusters  (a house, a field, a wood) its pieces near, one merged shell far, as all the shell gives up
+ *             (left-out trim, the parts' coarser tiers, the merge's own simplification) falls to ~2 px
+ *   detail    small pieces shrink away round their own origin as their radius falls from 4 px to 2.5
  *   shadows   every pass draws clusters as shells and pieces at SHADOW_TIER, camera-independent, so a
  *             cached shadow cascade never changes with the view
+ *
+ * No switch is a swap: across SWAP_PX the two levels crossfade (a screen-space dither, lodFade.ts), and
+ * a piece leaving shrinks rather than blinks out. The band is the gap between where a switch starts
+ * and where it is done; a camera sitting inside it holds a steady mix, so nothing flickers back and forth.
  */
 import type { Shell, Simplify } from "./lodGeometry.ts"
 
@@ -19,27 +25,12 @@ export const PIECE_TIERS: readonly Simplify[] = [
 export const TIER_MIN_SAVING = 0.85
 /** A tier must keep this share of the full piece's surface area, or it has lost outline; it reuses the one before. */
 export const TIER_MIN_AREA = 0.8
-/** Screen radius (px) under which a piece drops to tier 1, then tier 2. */
-export const PIECE_PX: readonly number[] = [40, 12]
 /**
  * Detail: a piece whose bounding radius is under DETAIL_RADIUS metres (grass, crops, flowers, small
- * rocks, barrels, logs). The main view stops drawing it once its screen radius is under DETAIL_PX CSS
- * pixels (whatever the DPR, so the governor never moves where it goes); shadows still cast it.
+ * rocks, barrels, logs). The main view shrinks it away as its screen radius falls through
+ * DETAIL_FADE_PX; shadows still cast it.
  */
 export const DETAIL_RADIUS = 0.9
-export const DETAIL_PX = 4
-
-/**
- * The boundaries (drawing-buffer px, descending) a piece of world `radius` is tiered by at `dpr`: the
- * piece tiers, and for detail one more past them, under which it is not drawn (tier PIECE_PX.length + 1).
- */
-export function pieceThresholds(radius: number, dpr: number): readonly number[] {
-  if (radius >= DETAIL_RADIUS) return PIECE_PX
-  const last = PIECE_PX[PIECE_PX.length - 1] as number
-  return [...PIECE_PX, Math.min(DETAIL_PX * dpr, last * 0.9)]
-}
-/** The tier `pickTier` gives a detail piece too small to draw. */
-export const CULLED = PIECE_PX.length + 1
 
 /**
  * A cluster's shell, from its parts' coarsest tiers: parts under 0.75 m radius left out (unless all
@@ -50,29 +41,29 @@ export const SHELL: Shell = {
   simplify: { ratio: 0.1, error: 0.05, prune: true },
   minArea: TIER_MIN_AREA,
 }
-/** Screen radius (px) under which a cluster draws as its shell. */
-export const SHELL_PX = 90
-
 /** The piece tier the shadow passes draw: the coarsest (a tier only exists if it keeps the outline, TIER_MIN_AREA). */
 export const SHADOW_TIER = 2
 
-/** The hysteresis band: a boundary at t px is crossed coarser below t·(1−BAND), finer above t·(1+BAND). */
-export const BAND = 0.15
+/**
+ * A coarser stand-in's deviation on screen (CSS px) over which it crossfades in: none of it at the
+ * upper end, all of it at the lower. The deviation is the worst vertex's, so the typical one is well
+ * under a pixel. Measured from the hero view to the farthest zoom: half a pixel to one drew ~1.7x the
+ * triangles of the old radius switches and doubled the frame time; this band draws what they did, and
+ * a narrow band keeps few pieces drawn twice mid-crossfade.
+ */
+export const SWAP_PX: readonly [number, number] = [2, 2.8]
+/**
+ * A detail piece's screen radius (CSS px) over which it shrinks away: full size above, gone below.
+ * Where the old cut dropped it whole (4 px radius), it now starts to shrink.
+ */
+export const DETAIL_FADE_PX: readonly [number, number] = [2.5, 4]
 
 /**
- * The tier for an on-screen radius of `px`, given the tier it had (`previous`) and the boundaries
- * `thresholds` (px, descending: under the k-th it is at least tier k+1). Crossing a boundary takes
- * `band` beyond it in the direction of travel, so it stays put while it sits inside the band.
+ * How far into a band [lo, hi] a falling `value` has come: 0 at or above hi, 1 at or below lo,
+ * linear between (the weight of what comes in as it falls).
  */
-export function pickTier(px: number, previous: number, thresholds: readonly number[], band = BAND): number {
-  let tier = 0
-  for (let k = 0; k < thresholds.length; k++) {
-    const t = thresholds[k] as number
-    const coarser = previous > k ? px < t * (1 + band) : px < t * (1 - band)
-    if (!coarser) break
-    tier = k + 1
-  }
-  return tier
+export function fadeWeight(value: number, [lo, hi]: readonly [number, number]): number {
+  return Math.min(1, Math.max(0, (hi - value) / (hi - lo)))
 }
 
 /**

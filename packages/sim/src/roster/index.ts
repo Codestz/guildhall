@@ -14,7 +14,7 @@ export {
   type Site,
   type Station,
 } from "./archetypes.ts"
-export { BODIES, type Body, bodyOf } from "./bodies.ts"
+export { BODIES, type Body, bodyOf, TINTS } from "./bodies.ts"
 export { archetypeOf, type Casting, castOf } from "./cast.ts"
 export { type Clip, type DeedLook, deedLook, type Effect } from "./deeds.ts"
 export { interestOf } from "./interest.ts"

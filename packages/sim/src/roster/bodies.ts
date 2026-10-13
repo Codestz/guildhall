@@ -20,8 +20,13 @@ export const BODIES: Readonly<Record<ArchetypeId, Body>> = {
   artisan: "barbarian",
   archivist: "rogue",
   wanderer: "rogue",
-  /** Not named by the decision: a bot is drawn as the plain fallback, the Wanderer's body. */
-  automaton: "rogue",
+  /** A bot account (`…[bot]`): the knight's body cast in bronze (`TINTS`), a clockwork construct. */
+  automaton: "knight",
+}
+
+/** Archetypes drawn with their body re-coloured (one colour over the whole body), as a hex colour. */
+export const TINTS: Readonly<Partial<Record<ArchetypeId, string>>> = {
+  automaton: "#b0793a",
 }
 
 export function bodyOf(archetype: ArchetypeId): Body {

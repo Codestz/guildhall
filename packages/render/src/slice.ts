@@ -7,10 +7,15 @@
  *
  *   const slicer = createSlicer()
  *   for (const item of items) { work(item); await slicer.yield() }
+ *
+ * Callers that wait together take turns: each yield resolves after the one before it, so the work a
+ * caller does when its yield resolves is counted before the next caller is let through. (Checking the
+ * budget when `yield` is called would let every caller of one microtask burst through at once, their
+ * work then running back to back in one task: a 420 ms bake of a few hundred pieces, measured.)
  */
 
 export interface Slicer {
-  /** Resolves at once while the slice has budget left, else after the next task. */
+  /** Resolves (after the callers before it) while the slice has budget left, else after the next task. */
   yield(): Promise<void>
 }
 
@@ -21,18 +26,24 @@ export const SLICE_MS = 24
 export function createSlicer(budgetMs = SLICE_MS, now: () => number = () => performance.now()): Slicer {
   let since = now()
   let pending: Promise<void> | null = null
+  let turn: Promise<void> = Promise.resolve()
+  const check = (): Promise<void> | undefined => {
+    if (now() - since < budgetMs) return undefined
+    // every caller over the budget waits on the same fresh task, then the slice starts again
+    pending ??= new Promise<void>((done) =>
+      setTimeout(() => {
+        pending = null
+        since = now()
+        done()
+      }, 0),
+    )
+    return pending
+  }
   return {
     yield() {
-      if (now() - since < budgetMs) return Promise.resolve()
-      // every caller over the budget waits on the same fresh task, then the slice starts again
-      pending ??= new Promise<void>((done) =>
-        setTimeout(() => {
-          pending = null
-          since = now()
-          done()
-        }, 0),
-      )
-      return pending
+      const mine = turn.then(check)
+      turn = mine
+      return mine
     },
   }
 }

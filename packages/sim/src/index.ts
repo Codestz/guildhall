@@ -10,6 +10,7 @@
  *   events/  the wire normalised into world events, folded into the guild's world, logged with checkpoints
  *   stories/ told guild runs for the demos: V1's Script DSL and stories, and the saga for the hex island
  *   director/ which shot the camera runs: V1's ranking, holds and user override, as a pure pick
+ *   life/    the heroes' itineraries on the walk graph, planned from those events, sampled as poses
  */
 
 export * from "./director/index.ts"
@@ -57,6 +58,7 @@ export {
   titleOf,
   toolTarget,
 } from "./guild/views.ts"
+export * from "./life/index.ts"
 export * from "./repo/index.ts"
 export * from "./roster/index.ts"
 export * from "./stories/index.ts"

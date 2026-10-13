@@ -322,7 +322,8 @@ export default defineConfig({
     react(),
     ...(SHOWCASE ? [showcase(LIBRARY, DATA), hostLike()] : [folder("library", LIBRARY), data(DATA)]),
   ],
-  server: { port: 5300, strictPort: true },
+  // a Cloudflare quick tunnel may serve the dev Studio to a phone (writes stay local: `isLocal`)
+  server: { port: 5300, strictPort: true, allowedHosts: [".trycloudflare.com"] },
   preview: { port: 5310, strictPort: true },
   build: {
     rollupOptions: {

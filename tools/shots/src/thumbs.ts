@@ -4,6 +4,7 @@
  *   bun shots thumbs                   every home-directory card → apps/studio/public/home/<id>.webp
  *   bun shots thumbs hudlab sitelab    just these cards
  *   bun shots stills                   the lab backdrops (site, HUD) → apps/studio/public/lab/
+ *   bun shots repos [owner__repo …]    the demo picker's live-chronicle cards → apps/studio/public/site/repos/
  *   bun shots thumbs --out .probe/x --port 5341 --dpr 2
  *
  * Each card is the page at 1280×800 CSS px with no top bar, shot at device pixel ratio 2 and scaled
@@ -21,7 +22,7 @@ import { launchChrome } from "./chrome.ts"
 import { serveStudio } from "./server.ts"
 
 export const THUMBS_USAGE =
-  "usage: bun shots thumbs [id …] [--out dir] [--port n] [--dpr n]\n       bun shots stills [name …] [--out dir] [--port n]"
+  "usage: bun shots thumbs [id …] [--out dir] [--port n] [--dpr n]\n       bun shots stills [name …] [--out dir] [--port n]\n       bun shots repos [owner__repo …] [--out dir] [--port n]"
 
 const STUDIO_PUBLIC = fileURLToPath(new URL("../../../apps/studio/public/", import.meta.url))
 
@@ -91,6 +92,51 @@ export const STILLS: readonly Pose[] = [
     settle: 3000,
   },
 ]
+/**
+ * The demo picker's live chronicle cards: each repo's hall island at the hall's own opening camera, no
+ * plates and none of the site's pieces, 640×400 (shown ≤ 320 px wide: 2×). The id is the catalog stem
+ * (`owner__repo`, lower-cased), what `liveStories` looks the picture up by. Needs the chronicles reachable.
+ */
+export const REPO_SLUGS = [
+  "react/react",
+  "anomalyco/opencode",
+  "microsoft/vscode",
+  "Codestz/claude-hindsight",
+  "Codestz/mcpx",
+  "Codestz/opencode-cockpit",
+  "Codestz/guildhall",
+  "Codestz/Mintroot",
+] as const
+export const repoStem = (slug: string): string => slug.replace("/", "__").toLowerCase()
+const HIDE_SITE = `document.querySelector(".site-pieces")?.style.setProperty("display", "none")`
+const INDEX_URL = "https://cdn.jsdelivr.net/gh/Codestz/guildhall-chronicles@main/index.json"
+
+/**
+ * The camera pulled back until the whole island is in: the hall's opening distance times 2 (a small repo)
+ * to 5 (20k files), by the square root of the files (the island's width), at a 50° pitch.
+ */
+export const pullBack = (files: number): number => 2 + 3 * Math.min(1, Math.sqrt(files / 20_000))
+const pose = (slug: string, files: number): Pose => ({
+  id: repoStem(slug),
+  url: `/hall/${slug}?labels=0&${BARE}`,
+  size: [1280, 800],
+  width: 640,
+  quality: 72,
+  run: `${HIDE_SITE};(async () => { const c = guildhall.camera.get(); await guildhall.camera.set({ ...c, elevation: 50, distance: c.distance * ${pullBack(files).toFixed(2)} }) })()`,
+  settle: 6000,
+})
+/** The poses, sized by the catalog's file counts (read live; a repo it does not list gets the middle). */
+export async function repoPoses(): Promise<Pose[]> {
+  const files = new Map<string, number>()
+  try {
+    const index = (await (await fetch(INDEX_URL, { signal: AbortSignal.timeout(10_000) })).json()) as {
+      repos: { repo: string; files: number }[]
+    }
+    for (const r of index.repos) files.set(r.repo, r.files)
+  } catch {}
+  return REPO_SLUGS.map((slug) => pose(slug, files.get(slug) ?? 5000))
+}
+
 const STILL_DIRS: Record<string, string> = { "island-hero": "lab/site", "hud-bg": "lab/hud" }
 
 /** The screenshot as a WebP of `width` px: halved stepwise (smooth, never aliased), then encoded. */
@@ -217,4 +263,6 @@ async function capture(
 }
 
 export const runThumbs = (argv: readonly string[]) => capture(CARDS, argv, () => "home")
+export const runRepos = async (argv: readonly string[]) =>
+  capture(await repoPoses(), argv, () => "site/repos")
 export const runStills = (argv: readonly string[]) => capture(STILLS, argv, (p) => STILL_DIRS[p.id] ?? "lab")

@@ -18,7 +18,7 @@ import { launchChrome } from "./chrome.ts"
 import { runPrefabs } from "./prefabs.ts"
 import { type Server, serveStudio } from "./server.ts"
 import { runSet } from "./set.ts"
-import { runStills, runThumbs } from "./thumbs.ts"
+import { runRepos, runStills, runThumbs } from "./thumbs.ts"
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"])
 
@@ -66,6 +66,7 @@ if (process.argv[2] === "bench") process.exit(await runBench(process.argv.slice(
 
 // `bun shots thumbs` / `bun shots stills`: the Studio's committed card previews and lab backdrops (thumbs.ts).
 if (process.argv[2] === "thumbs") process.exit(await runThumbs(process.argv.slice(3)))
+if (process.argv[2] === "repos") process.exit(await runRepos(process.argv.slice(3)))
 if (process.argv[2] === "stills") process.exit(await runStills(process.argv.slice(3)))
 
 let options: ShotOptions

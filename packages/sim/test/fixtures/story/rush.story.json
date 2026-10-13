@@ -1,0 +1,2919 @@
+{
+  "start": 0,
+  "told": [
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0004",
+      "text": "Module 1",
+      "at": 1261,
+      "live": false,
+      "seq": 1
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0016",
+      "text": "Module 2",
+      "at": 1261,
+      "live": false,
+      "seq": 2
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0028",
+      "text": "Module 3",
+      "at": 1261,
+      "live": false,
+      "seq": 3
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0036",
+      "text": "Module 4",
+      "at": 1261,
+      "live": false,
+      "seq": 4
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0048",
+      "text": "Module 5",
+      "at": 1261,
+      "live": false,
+      "seq": 5
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0060",
+      "text": "Module 6",
+      "at": 1261,
+      "live": false,
+      "seq": 6
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0072",
+      "text": "Module 7",
+      "at": 1261,
+      "live": false,
+      "seq": 7
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0084",
+      "text": "Module 8",
+      "at": 1261,
+      "live": false,
+      "seq": 8
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0092",
+      "text": "Module 9",
+      "at": 1261,
+      "live": false,
+      "seq": 9
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0104",
+      "text": "Module 10",
+      "at": 1261,
+      "live": false,
+      "seq": 10
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0116",
+      "text": "Module 11",
+      "at": 1261,
+      "live": false,
+      "seq": 11
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0128",
+      "text": "Module 12",
+      "at": 1261,
+      "live": false,
+      "seq": 12
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 1581,
+      "live": false,
+      "seq": 13
+    },
+    {
+      "id": "ses_sim0049",
+      "agent": "guild-researcher",
+      "title": "Scholar",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 1602,
+      "live": false,
+      "seq": 14
+    },
+    {
+      "id": "ses_sim0017",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 1612,
+      "live": false,
+      "seq": 15
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-verifier",
+      "title": "Warden",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 1621,
+      "live": false,
+      "seq": 16
+    },
+    {
+      "id": "ses_sim0105",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 1633,
+      "live": false,
+      "seq": 17
+    },
+    {
+      "id": "ses_sim0129",
+      "agent": "general",
+      "title": "Wanderer",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 1643,
+      "live": false,
+      "seq": 18
+    },
+    {
+      "id": "ses_sim0037",
+      "agent": "guild-librarian",
+      "title": "Archivist II",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 1645,
+      "live": false,
+      "seq": 19
+    },
+    {
+      "id": "ses_sim0117",
+      "agent": "guild-researcher",
+      "title": "Scholar II",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 1668,
+      "live": false,
+      "seq": 20
+    },
+    {
+      "id": "ses_sim0061",
+      "agent": "general",
+      "title": "Wanderer II",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 1669,
+      "live": false,
+      "seq": 21
+    },
+    {
+      "id": "ses_sim0085",
+      "agent": "guild-explorer",
+      "title": "Scout II",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 1688,
+      "live": false,
+      "seq": 22
+    },
+    {
+      "id": "ses_sim0093",
+      "agent": "guild-verifier",
+      "title": "Warden II",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 1706,
+      "live": false,
+      "seq": 23
+    },
+    {
+      "id": "ses_sim0073",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 1738,
+      "live": false,
+      "seq": 24
+    },
+    {
+      "id": "ses_sim0017",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0019",
+      "at": 4429,
+      "live": false,
+      "seq": 25
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-verifier",
+      "title": "Warden",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "webfetch",
+      "call": "call_sim0031",
+      "at": 4558,
+      "live": false,
+      "seq": 26
+    },
+    {
+      "id": "ses_sim0061",
+      "agent": "general",
+      "title": "Wanderer II",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0063",
+      "at": 4593,
+      "live": false,
+      "seq": 27
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0007",
+      "at": 4669,
+      "live": false,
+      "seq": 28
+    },
+    {
+      "id": "ses_sim0049",
+      "agent": "guild-researcher",
+      "title": "Scholar",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0051",
+      "at": 4801,
+      "live": false,
+      "seq": 29
+    },
+    {
+      "id": "ses_sim0085",
+      "agent": "guild-explorer",
+      "title": "Scout II",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0087",
+      "at": 5027,
+      "live": false,
+      "seq": 30
+    },
+    {
+      "id": "ses_sim0093",
+      "agent": "guild-verifier",
+      "title": "Warden II",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0095",
+      "at": 5086,
+      "live": false,
+      "seq": 31
+    },
+    {
+      "id": "ses_sim0037",
+      "agent": "guild-librarian",
+      "title": "Archivist II",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "glob",
+      "call": "call_sim0039",
+      "at": 5130,
+      "live": false,
+      "seq": 32
+    },
+    {
+      "id": "ses_sim0073",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "webfetch",
+      "call": "call_sim0075",
+      "at": 5557,
+      "live": false,
+      "seq": 33
+    },
+    {
+      "id": "ses_sim0117",
+      "agent": "guild-researcher",
+      "title": "Scholar II",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0119",
+      "at": 5618,
+      "live": false,
+      "seq": 34
+    },
+    {
+      "id": "ses_sim0105",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0107",
+      "at": 5700,
+      "live": false,
+      "seq": 35
+    },
+    {
+      "id": "ses_sim0129",
+      "agent": "general",
+      "title": "Wanderer",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0131",
+      "at": 5809,
+      "live": false,
+      "seq": 36
+    },
+    {
+      "id": "ses_sim0017",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "webfetch",
+      "call": "call_sim0020",
+      "at": 6816,
+      "live": false,
+      "seq": 37
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-verifier",
+      "title": "Warden",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0032",
+      "at": 6913,
+      "live": false,
+      "seq": 38
+    },
+    {
+      "id": "ses_sim0061",
+      "agent": "general",
+      "title": "Wanderer II",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0064",
+      "at": 6986,
+      "live": false,
+      "seq": 39
+    },
+    {
+      "id": "ses_sim0049",
+      "agent": "guild-researcher",
+      "title": "Scholar",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0052",
+      "at": 7298,
+      "live": false,
+      "seq": 40
+    },
+    {
+      "id": "ses_sim0085",
+      "agent": "guild-explorer",
+      "title": "Scout II",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0088",
+      "at": 7383,
+      "live": false,
+      "seq": 41
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0008",
+      "at": 7386,
+      "live": false,
+      "seq": 42
+    },
+    {
+      "id": "ses_sim0093",
+      "agent": "guild-verifier",
+      "title": "Warden II",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "webfetch",
+      "call": "call_sim0096",
+      "at": 7486,
+      "live": false,
+      "seq": 43
+    },
+    {
+      "id": "ses_sim0073",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0076",
+      "at": 7898,
+      "live": false,
+      "seq": 44
+    },
+    {
+      "id": "ses_sim0037",
+      "agent": "guild-librarian",
+      "title": "Archivist II",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0040",
+      "at": 7930,
+      "live": false,
+      "seq": 45
+    },
+    {
+      "id": "ses_sim0105",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0108",
+      "at": 8149,
+      "live": false,
+      "seq": 46
+    },
+    {
+      "id": "ses_sim0117",
+      "agent": "guild-researcher",
+      "title": "Scholar II",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0120",
+      "at": 8406,
+      "live": false,
+      "seq": 47
+    },
+    {
+      "id": "ses_sim0129",
+      "agent": "general",
+      "title": "Wanderer",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0132",
+      "at": 8533,
+      "live": false,
+      "seq": 48
+    },
+    {
+      "id": "ses_sim0017",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0021",
+      "at": 9580,
+      "live": false,
+      "seq": 49
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-verifier",
+      "title": "Warden",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0033",
+      "at": 9640,
+      "live": false,
+      "seq": 50
+    },
+    {
+      "id": "ses_sim0061",
+      "agent": "general",
+      "title": "Wanderer II",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "glob",
+      "call": "call_sim0065",
+      "at": 9744,
+      "live": false,
+      "seq": 51
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "webfetch",
+      "call": "call_sim0009",
+      "at": 9909,
+      "live": false,
+      "seq": 52
+    },
+    {
+      "id": "ses_sim0049",
+      "agent": "guild-researcher",
+      "title": "Scholar",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0053",
+      "at": 10062,
+      "live": false,
+      "seq": 53
+    },
+    {
+      "id": "ses_sim0093",
+      "agent": "guild-verifier",
+      "title": "Warden II",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0097",
+      "at": 10113,
+      "live": false,
+      "seq": 54
+    },
+    {
+      "id": "ses_sim0105",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "glob",
+      "call": "call_sim0109",
+      "at": 10243,
+      "live": false,
+      "seq": 55
+    },
+    {
+      "id": "ses_sim0085",
+      "agent": "guild-explorer",
+      "title": "Scout II",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0089",
+      "at": 10468,
+      "live": false,
+      "seq": 56
+    },
+    {
+      "id": "ses_sim0129",
+      "agent": "general",
+      "title": "Wanderer",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0133",
+      "at": 10657,
+      "live": false,
+      "seq": 57
+    },
+    {
+      "id": "ses_sim0073",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0077",
+      "at": 10805,
+      "live": false,
+      "seq": 58
+    },
+    {
+      "id": "ses_sim0037",
+      "agent": "guild-librarian",
+      "title": "Archivist II",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0041",
+      "at": 10878,
+      "live": false,
+      "seq": 59
+    },
+    {
+      "id": "ses_sim0117",
+      "agent": "guild-researcher",
+      "title": "Scholar II",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0121",
+      "at": 11035,
+      "live": false,
+      "seq": 60
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-verifier",
+      "title": "Warden",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0034",
+      "at": 11968,
+      "live": false,
+      "seq": 61
+    },
+    {
+      "id": "ses_sim0061",
+      "agent": "general",
+      "title": "Wanderer II",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0066",
+      "at": 12352,
+      "live": false,
+      "seq": 62
+    },
+    {
+      "id": "ses_sim0017",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0022",
+      "at": 12449,
+      "live": false,
+      "seq": 63
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0010",
+      "at": 12462,
+      "live": false,
+      "seq": 64
+    },
+    {
+      "id": "ses_sim0049",
+      "agent": "guild-researcher",
+      "title": "Scholar",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0054",
+      "at": 12695,
+      "live": false,
+      "seq": 65
+    },
+    {
+      "id": "ses_sim0105",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0110",
+      "at": 12885,
+      "live": false,
+      "seq": 66
+    },
+    {
+      "id": "ses_sim0085",
+      "agent": "guild-explorer",
+      "title": "Scout II",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0090",
+      "at": 12891,
+      "live": false,
+      "seq": 67
+    },
+    {
+      "id": "ses_sim0093",
+      "agent": "guild-verifier",
+      "title": "Warden II",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0098",
+      "at": 12907,
+      "live": false,
+      "seq": 68
+    },
+    {
+      "id": "ses_sim0037",
+      "agent": "guild-librarian",
+      "title": "Archivist II",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0042",
+      "at": 13077,
+      "live": false,
+      "seq": 69
+    },
+    {
+      "id": "ses_sim0073",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "webfetch",
+      "call": "call_sim0078",
+      "at": 13115,
+      "live": false,
+      "seq": 70
+    },
+    {
+      "id": "ses_sim0129",
+      "agent": "general",
+      "title": "Wanderer",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0134",
+      "at": 13386,
+      "live": false,
+      "seq": 71
+    },
+    {
+      "id": "ses_sim0117",
+      "agent": "guild-researcher",
+      "title": "Scholar II",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0122",
+      "at": 13924,
+      "live": false,
+      "seq": 72
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-verifier",
+      "title": "Warden",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed-failed",
+      "tool": "bash",
+      "call": "call_sim0035",
+      "error": "3 failed",
+      "at": 14599,
+      "live": false,
+      "seq": 73
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-verifier",
+      "title": "Warden",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "fail",
+      "error": "Gave up: the module's tests keep failing",
+      "at": 14599,
+      "live": false,
+      "seq": 74
+    },
+    {
+      "id": "ses_sim0061",
+      "agent": "general",
+      "title": "Wanderer II",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0067",
+      "at": 14652,
+      "live": false,
+      "seq": 75
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0011",
+      "at": 14686,
+      "live": false,
+      "seq": 76
+    },
+    {
+      "id": "ses_sim0085",
+      "agent": "guild-explorer",
+      "title": "Scout II",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed-failed",
+      "tool": "bash",
+      "call": "call_sim0091",
+      "error": "3 failed",
+      "at": 14718,
+      "live": false,
+      "seq": 77
+    },
+    {
+      "id": "ses_sim0085",
+      "agent": "guild-explorer",
+      "title": "Scout II",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "fail",
+      "error": "Gave up: the module's tests keep failing",
+      "at": 14718,
+      "live": false,
+      "seq": 78
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0028",
+      "at": 14925,
+      "live": false,
+      "seq": 79
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0084",
+      "at": 14962,
+      "live": false,
+      "seq": 80
+    },
+    {
+      "id": "ses_sim0093",
+      "agent": "guild-verifier",
+      "title": "Warden II",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0099",
+      "at": 15242,
+      "live": false,
+      "seq": 81
+    },
+    {
+      "id": "ses_sim0017",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0023",
+      "at": 15279,
+      "live": false,
+      "seq": 82
+    },
+    {
+      "id": "ses_sim0073",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0079",
+      "at": 15350,
+      "live": false,
+      "seq": 83
+    },
+    {
+      "id": "ses_sim0049",
+      "agent": "guild-researcher",
+      "title": "Scholar",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0055",
+      "at": 15615,
+      "live": false,
+      "seq": 84
+    },
+    {
+      "id": "ses_sim0129",
+      "agent": "general",
+      "title": "Wanderer",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0135",
+      "at": 15628,
+      "live": false,
+      "seq": 85
+    },
+    {
+      "id": "ses_sim0105",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0111",
+      "at": 15633,
+      "live": false,
+      "seq": 86
+    },
+    {
+      "id": "ses_sim0037",
+      "agent": "guild-librarian",
+      "title": "Archivist II",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0043",
+      "at": 16060,
+      "live": false,
+      "seq": 87
+    },
+    {
+      "id": "ses_sim0117",
+      "agent": "guild-researcher",
+      "title": "Scholar II",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0123",
+      "at": 16091,
+      "live": false,
+      "seq": 88
+    },
+    {
+      "id": "ses_sim0061",
+      "agent": "general",
+      "title": "Wanderer II",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "webfetch",
+      "call": "call_sim0068",
+      "at": 16994,
+      "live": false,
+      "seq": 89
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0012",
+      "at": 17023,
+      "live": false,
+      "seq": 90
+    },
+    {
+      "id": "ses_sim0105",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0112",
+      "at": 17786,
+      "live": false,
+      "seq": 91
+    },
+    {
+      "id": "ses_sim0049",
+      "agent": "guild-researcher",
+      "title": "Scholar",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "webfetch",
+      "call": "call_sim0056",
+      "at": 17979,
+      "live": false,
+      "seq": 92
+    },
+    {
+      "id": "ses_sim0073",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0080",
+      "at": 17994,
+      "live": false,
+      "seq": 93
+    },
+    {
+      "id": "ses_sim0093",
+      "agent": "guild-verifier",
+      "title": "Warden II",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0100",
+      "at": 18115,
+      "live": false,
+      "seq": 94
+    },
+    {
+      "id": "ses_sim0017",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0024",
+      "at": 18160,
+      "live": false,
+      "seq": 95
+    },
+    {
+      "id": "ses_sim0129",
+      "agent": "general",
+      "title": "Wanderer",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "glob",
+      "call": "call_sim0136",
+      "at": 18344,
+      "live": false,
+      "seq": 96
+    },
+    {
+      "id": "ses_sim0037",
+      "agent": "guild-librarian",
+      "title": "Archivist II",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0044",
+      "at": 19056,
+      "live": false,
+      "seq": 97
+    },
+    {
+      "id": "ses_sim0117",
+      "agent": "guild-researcher",
+      "title": "Scholar II",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0124",
+      "at": 19188,
+      "live": false,
+      "seq": 98
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0013",
+      "at": 19612,
+      "live": false,
+      "seq": 99
+    },
+    {
+      "id": "ses_sim0105",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "webfetch",
+      "call": "call_sim0113",
+      "at": 20013,
+      "live": false,
+      "seq": 100
+    },
+    {
+      "id": "ses_sim0061",
+      "agent": "general",
+      "title": "Wanderer II",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0069",
+      "at": 20066,
+      "live": false,
+      "seq": 101
+    },
+    {
+      "id": "ses_sim0093",
+      "agent": "guild-verifier",
+      "title": "Warden II",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "webfetch",
+      "call": "call_sim0101",
+      "at": 20248,
+      "live": false,
+      "seq": 102
+    },
+    {
+      "id": "ses_sim0049",
+      "agent": "guild-researcher",
+      "title": "Scholar",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0057",
+      "at": 20374,
+      "live": false,
+      "seq": 103
+    },
+    {
+      "id": "ses_sim0017",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0025",
+      "at": 20489,
+      "live": false,
+      "seq": 104
+    },
+    {
+      "id": "ses_sim0129",
+      "agent": "general",
+      "title": "Wanderer",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0137",
+      "at": 20494,
+      "live": false,
+      "seq": 105
+    },
+    {
+      "id": "ses_sim0073",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0081",
+      "at": 20994,
+      "live": false,
+      "seq": 106
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0014",
+      "at": 22102,
+      "live": false,
+      "seq": 107
+    },
+    {
+      "id": "ses_sim0037",
+      "agent": "guild-librarian",
+      "title": "Archivist II",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0045",
+      "at": 22109,
+      "live": false,
+      "seq": 108
+    },
+    {
+      "id": "ses_sim0061",
+      "agent": "general",
+      "title": "Wanderer II",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0070",
+      "at": 22150,
+      "live": false,
+      "seq": 109
+    },
+    {
+      "id": "ses_sim0117",
+      "agent": "guild-researcher",
+      "title": "Scholar II",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0125",
+      "at": 22163,
+      "live": false,
+      "seq": 110
+    },
+    {
+      "id": "ses_sim0105",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "glob",
+      "call": "call_sim0114",
+      "at": 22380,
+      "live": false,
+      "seq": 111
+    },
+    {
+      "id": "ses_sim0017",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "webfetch",
+      "call": "call_sim0026",
+      "at": 22728,
+      "live": false,
+      "seq": 112
+    },
+    {
+      "id": "ses_sim0049",
+      "agent": "guild-researcher",
+      "title": "Scholar",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0058",
+      "at": 22756,
+      "live": false,
+      "seq": 113
+    },
+    {
+      "id": "ses_sim0093",
+      "agent": "guild-verifier",
+      "title": "Warden II",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0102",
+      "at": 22985,
+      "live": false,
+      "seq": 114
+    },
+    {
+      "id": "ses_sim0129",
+      "agent": "general",
+      "title": "Wanderer",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0138",
+      "at": 22992,
+      "live": false,
+      "seq": 115
+    },
+    {
+      "id": "ses_sim0061",
+      "agent": "general",
+      "title": "Wanderer II",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 23198,
+      "live": false,
+      "seq": 116
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 23430,
+      "live": false,
+      "seq": 117
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0060",
+      "at": 23441,
+      "live": false,
+      "seq": 118
+    },
+    {
+      "id": "ses_sim0105",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 23648,
+      "live": false,
+      "seq": 119
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0004",
+      "at": 23704,
+      "live": false,
+      "seq": 120
+    },
+    {
+      "id": "ses_sim0049",
+      "agent": "guild-researcher",
+      "title": "Scholar",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 23785,
+      "live": false,
+      "seq": 121
+    },
+    {
+      "id": "ses_sim0017",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 23843,
+      "live": false,
+      "seq": 122
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0104",
+      "at": 23923,
+      "live": false,
+      "seq": 123
+    },
+    {
+      "id": "ses_sim0073",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0082",
+      "at": 24019,
+      "live": false,
+      "seq": 124
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0048",
+      "at": 24104,
+      "live": false,
+      "seq": 125
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0016",
+      "at": 24133,
+      "live": false,
+      "seq": 126
+    },
+    {
+      "id": "ses_sim0093",
+      "agent": "guild-verifier",
+      "title": "Warden II",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 24255,
+      "live": false,
+      "seq": 127
+    },
+    {
+      "id": "ses_sim0129",
+      "agent": "general",
+      "title": "Wanderer",
+      "color": "#9a8f80",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 24277,
+      "live": false,
+      "seq": 128
+    },
+    {
+      "id": "ses_sim0037",
+      "agent": "guild-librarian",
+      "title": "Archivist II",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "glob",
+      "call": "call_sim0046",
+      "at": 24362,
+      "live": false,
+      "seq": 129
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0092",
+      "at": 24499,
+      "live": false,
+      "seq": 130
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0128",
+      "at": 24595,
+      "live": false,
+      "seq": 131
+    },
+    {
+      "id": "ses_sim0117",
+      "agent": "guild-researcher",
+      "title": "Scholar II",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0126",
+      "at": 24650,
+      "live": false,
+      "seq": 132
+    },
+    {
+      "id": "ses_sim0073",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 25393,
+      "live": false,
+      "seq": 133
+    },
+    {
+      "id": "ses_sim0037",
+      "agent": "guild-librarian",
+      "title": "Archivist II",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 25647,
+      "live": false,
+      "seq": 134
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0072",
+      "at": 25709,
+      "live": false,
+      "seq": 135
+    },
+    {
+      "id": "ses_sim0117",
+      "agent": "guild-researcher",
+      "title": "Scholar II",
+      "color": "#6fb3e0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 25902,
+      "live": false,
+      "seq": 136
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0036",
+      "at": 26001,
+      "live": false,
+      "seq": 137
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0116",
+      "at": 26205,
+      "live": false,
+      "seq": 138
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0140",
+      "text": "Retry module 8: fix the failing tests",
+      "at": 26302,
+      "live": false,
+      "seq": 139
+    },
+    {
+      "id": "ses_sim0085",
+      "agent": "guild-explorer",
+      "title": "Scout II",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "recover",
+      "at": 26750,
+      "live": false,
+      "seq": 140
+    },
+    {
+      "id": "ses_sim0085",
+      "agent": "guild-explorer",
+      "title": "Scout II",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0142",
+      "at": 29289,
+      "live": false,
+      "seq": 141
+    },
+    {
+      "id": "ses_sim0085",
+      "agent": "guild-explorer",
+      "title": "Scout II",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0143",
+      "at": 31856,
+      "live": false,
+      "seq": 142
+    },
+    {
+      "id": "ses_sim0085",
+      "agent": "guild-explorer",
+      "title": "Scout II",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 33276,
+      "live": false,
+      "seq": 143
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0140",
+      "at": 33519,
+      "live": false,
+      "seq": 144
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 34895,
+      "live": false,
+      "seq": 145
+    }
+  ],
+  "sessions": [
+    "ses_sim0001",
+    "ses_sim0005",
+    "ses_sim0049",
+    "ses_sim0017",
+    "ses_sim0029",
+    "ses_sim0105",
+    "ses_sim0129",
+    "ses_sim0037",
+    "ses_sim0117",
+    "ses_sim0061",
+    "ses_sim0085",
+    "ses_sim0093",
+    "ses_sim0073"
+  ],
+  "legend": {
+    "title": "Sweep the repo: 12 parallel quests",
+    "party": 13,
+    "span": 34895,
+    "tokens": 595000,
+    "cost": 0.952,
+    "outcome": "complete",
+    "opening": "It began at the quest board: “Sweep the repo: 12 parallel quests”. The Guildmaster called twelve adventurers to the work.",
+    "chapters": [
+      {
+        "numeral": "I",
+        "id": "ses_sim0005",
+        "who": "Artisan",
+        "color": "#e0702f",
+        "sentBy": "Guildmaster",
+        "quest": "Module 1",
+        "resumed": false,
+        "begin": 1261,
+        "end": 23430,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 1,
+            "label": "1 edit"
+          },
+          {
+            "craft": "run",
+            "count": 1,
+            "label": "1 command"
+          },
+          {
+            "craft": "read",
+            "count": 1,
+            "label": "1 read"
+          },
+          {
+            "craft": "search",
+            "count": 2,
+            "label": "2 searches"
+          },
+          {
+            "craft": "consult",
+            "count": 3,
+            "label": "3 consultations"
+          }
+        ],
+        "notables": [],
+        "loot": "Module 1 done.",
+        "tokens": 52000,
+        "cost": 0.0832
+      },
+      {
+        "numeral": "II",
+        "id": "ses_sim0017",
+        "who": "Scout",
+        "color": "#2fa7a0",
+        "sentBy": "Guildmaster",
+        "quest": "Module 2",
+        "resumed": false,
+        "begin": 1261,
+        "end": 23843,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 1,
+            "label": "1 edit"
+          },
+          {
+            "craft": "run",
+            "count": 2,
+            "label": "2 commands"
+          },
+          {
+            "craft": "search",
+            "count": 2,
+            "label": "2 searches"
+          },
+          {
+            "craft": "consult",
+            "count": 3,
+            "label": "3 consultations"
+          }
+        ],
+        "notables": [],
+        "loot": "Module 2 done.",
+        "tokens": 52000,
+        "cost": 0.0832
+      },
+      {
+        "numeral": "III",
+        "id": "ses_sim0029",
+        "who": "Warden",
+        "color": "#3fae6b",
+        "sentBy": "Guildmaster",
+        "quest": "Module 3",
+        "resumed": false,
+        "begin": 1261,
+        "end": 14599,
+        "outcome": "fallen",
+        "deeds": [
+          {
+            "craft": "test",
+            "count": 1,
+            "label": "1 test run"
+          },
+          {
+            "craft": "read",
+            "count": 2,
+            "label": "2 reads"
+          },
+          {
+            "craft": "consult",
+            "count": 2,
+            "label": "2 consultations"
+          }
+        ],
+        "notables": [
+          {
+            "kind": "flaw",
+            "at": 14599,
+            "text": "Tests failed: `bun test mod3`, 3 failing."
+          },
+          {
+            "kind": "fall",
+            "at": 14599,
+            "text": "Fell: “Gave up: the module's tests keep failing”, and rose in the graveyard."
+          }
+        ],
+        "tokens": 31500,
+        "cost": 0.0504
+      },
+      {
+        "numeral": "IV",
+        "id": "ses_sim0037",
+        "who": "Archivist II",
+        "color": "#8b6cd9",
+        "sentBy": "Guildmaster",
+        "quest": "Module 4",
+        "resumed": false,
+        "begin": 1261,
+        "end": 25647,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 1,
+            "label": "1 edit"
+          },
+          {
+            "craft": "run",
+            "count": 1,
+            "label": "1 command"
+          },
+          {
+            "craft": "read",
+            "count": 1,
+            "label": "1 read"
+          },
+          {
+            "craft": "search",
+            "count": 2,
+            "label": "2 searches"
+          },
+          {
+            "craft": "consult",
+            "count": 3,
+            "label": "3 consultations"
+          }
+        ],
+        "notables": [],
+        "loot": "Module 4 done.",
+        "tokens": 52000,
+        "cost": 0.0832
+      },
+      {
+        "numeral": "V",
+        "id": "ses_sim0049",
+        "who": "Scholar",
+        "color": "#6fb3e0",
+        "sentBy": "Guildmaster",
+        "quest": "Module 5",
+        "resumed": false,
+        "begin": 1261,
+        "end": 23785,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 1,
+            "label": "1 edit"
+          },
+          {
+            "craft": "run",
+            "count": 1,
+            "label": "1 command"
+          },
+          {
+            "craft": "read",
+            "count": 2,
+            "label": "2 reads"
+          },
+          {
+            "craft": "search",
+            "count": 2,
+            "label": "2 searches"
+          },
+          {
+            "craft": "consult",
+            "count": 2,
+            "label": "2 consultations"
+          }
+        ],
+        "notables": [],
+        "loot": "Module 5 done.",
+        "tokens": 52000,
+        "cost": 0.0832
+      },
+      {
+        "numeral": "VI",
+        "id": "ses_sim0061",
+        "who": "Wanderer II",
+        "color": "#9a8f80",
+        "sentBy": "Guildmaster",
+        "quest": "Module 6",
+        "resumed": false,
+        "begin": 1261,
+        "end": 23198,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "run",
+            "count": 1,
+            "label": "1 command"
+          },
+          {
+            "craft": "read",
+            "count": 3,
+            "label": "3 reads"
+          },
+          {
+            "craft": "search",
+            "count": 1,
+            "label": "1 search"
+          },
+          {
+            "craft": "consult",
+            "count": 3,
+            "label": "3 consultations"
+          }
+        ],
+        "notables": [],
+        "loot": "Module 6 done.",
+        "tokens": 52000,
+        "cost": 0.0832
+      },
+      {
+        "numeral": "VII",
+        "id": "ses_sim0073",
+        "who": "Artisan II",
+        "color": "#e0702f",
+        "sentBy": "Guildmaster",
+        "quest": "Module 7",
+        "resumed": false,
+        "begin": 1261,
+        "end": 25393,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 3,
+            "label": "3 edits"
+          },
+          {
+            "craft": "read",
+            "count": 2,
+            "label": "2 reads"
+          },
+          {
+            "craft": "consult",
+            "count": 3,
+            "label": "3 consultations"
+          }
+        ],
+        "notables": [],
+        "loot": "Module 7 done.",
+        "tokens": 52000,
+        "cost": 0.0832
+      },
+      {
+        "numeral": "VIII",
+        "id": "ses_sim0085",
+        "who": "Scout II",
+        "color": "#2fa7a0",
+        "sentBy": "Guildmaster",
+        "quest": "Module 8",
+        "resumed": false,
+        "begin": 1261,
+        "end": 14718,
+        "outcome": "fallen",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 1,
+            "label": "1 edit"
+          },
+          {
+            "craft": "test",
+            "count": 1,
+            "label": "1 test run"
+          },
+          {
+            "craft": "search",
+            "count": 2,
+            "label": "2 searches"
+          },
+          {
+            "craft": "consult",
+            "count": 1,
+            "label": "1 consultation"
+          }
+        ],
+        "notables": [
+          {
+            "kind": "flaw",
+            "at": 14718,
+            "text": "Tests failed: `bun test mod8`, 3 failing."
+          },
+          {
+            "kind": "fall",
+            "at": 14718,
+            "text": "Fell: “Gave up: the module's tests keep failing”, and rose in the graveyard."
+          },
+          {
+            "kind": "renown",
+            "at": 14718,
+            "text": "A ghost ship passed in the mist for the fallen."
+          }
+        ]
+      },
+      {
+        "numeral": "IX",
+        "id": "ses_sim0093",
+        "who": "Warden II",
+        "color": "#3fae6b",
+        "sentBy": "Guildmaster",
+        "quest": "Module 9",
+        "resumed": false,
+        "begin": 1261,
+        "end": 24255,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 2,
+            "label": "2 edits"
+          },
+          {
+            "craft": "run",
+            "count": 1,
+            "label": "1 command"
+          },
+          {
+            "craft": "search",
+            "count": 2,
+            "label": "2 searches"
+          },
+          {
+            "craft": "consult",
+            "count": 3,
+            "label": "3 consultations"
+          }
+        ],
+        "notables": [],
+        "loot": "Module 9 done.",
+        "tokens": 52000,
+        "cost": 0.0832
+      },
+      {
+        "numeral": "X",
+        "id": "ses_sim0105",
+        "who": "Archivist",
+        "color": "#8b6cd9",
+        "sentBy": "Guildmaster",
+        "quest": "Module 10",
+        "resumed": false,
+        "begin": 1261,
+        "end": 23648,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 1,
+            "label": "1 edit"
+          },
+          {
+            "craft": "run",
+            "count": 1,
+            "label": "1 command"
+          },
+          {
+            "craft": "read",
+            "count": 1,
+            "label": "1 read"
+          },
+          {
+            "craft": "search",
+            "count": 2,
+            "label": "2 searches"
+          },
+          {
+            "craft": "consult",
+            "count": 3,
+            "label": "3 consultations"
+          }
+        ],
+        "notables": [],
+        "loot": "Module 10 done.",
+        "tokens": 52000,
+        "cost": 0.0832
+      },
+      {
+        "numeral": "XI",
+        "id": "ses_sim0117",
+        "who": "Scholar II",
+        "color": "#6fb3e0",
+        "sentBy": "Guildmaster",
+        "quest": "Module 11",
+        "resumed": false,
+        "begin": 1261,
+        "end": 25902,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 1,
+            "label": "1 edit"
+          },
+          {
+            "craft": "read",
+            "count": 4,
+            "label": "4 reads"
+          },
+          {
+            "craft": "search",
+            "count": 2,
+            "label": "2 searches"
+          },
+          {
+            "craft": "consult",
+            "count": 1,
+            "label": "1 consultation"
+          }
+        ],
+        "notables": [],
+        "loot": "Module 11 done.",
+        "tokens": 52000,
+        "cost": 0.0832
+      },
+      {
+        "numeral": "XII",
+        "id": "ses_sim0129",
+        "who": "Wanderer",
+        "color": "#9a8f80",
+        "sentBy": "Guildmaster",
+        "quest": "Module 12",
+        "resumed": false,
+        "begin": 1261,
+        "end": 24277,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "run",
+            "count": 1,
+            "label": "1 command"
+          },
+          {
+            "craft": "read",
+            "count": 3,
+            "label": "3 reads"
+          },
+          {
+            "craft": "search",
+            "count": 3,
+            "label": "3 searches"
+          },
+          {
+            "craft": "consult",
+            "count": 1,
+            "label": "1 consultation"
+          }
+        ],
+        "notables": [],
+        "loot": "Module 12 done.",
+        "tokens": 52000,
+        "cost": 0.0832
+      },
+      {
+        "numeral": "XIII",
+        "id": "ses_sim0085",
+        "who": "Scout II",
+        "color": "#2fa7a0",
+        "sentBy": "Guildmaster",
+        "quest": "Retry module 8: fix the failing tests",
+        "resumed": true,
+        "begin": 26302,
+        "end": 33276,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 1,
+            "label": "1 edit"
+          },
+          {
+            "craft": "test",
+            "count": 1,
+            "label": "1 test run"
+          }
+        ],
+        "notables": [
+          {
+            "kind": "rise",
+            "at": 26750,
+            "text": "Rose again and took up the work."
+          }
+        ],
+        "loot": "Fixed and passing.",
+        "tokens": 43500,
+        "cost": 0.0696,
+        "usageNote": "for both quests"
+      }
+    ],
+    "lastWord": "All 12 modules swept.",
+    "closing": "It took 35s, and two fell, two trials failed and one rose again — but the quest was done.",
+    "renown": [
+      {
+        "kind": "ghost-ship",
+        "id": "ghost-ship",
+        "title": "The Ghost Ship",
+        "text": "Two fell in one quest, and a ghost ship passed in the mist.",
+        "count": 1,
+        "forced": false
+      }
+    ],
+    "unsung": [
+      {
+        "kind": "festival",
+        "hint": "When every deed of a long quest comes home clean…"
+      },
+      {
+        "kind": "rainbow",
+        "hint": "What follows the storm, if the work comes good…"
+      },
+      {
+        "kind": "raid",
+        "hint": "Spend long enough, and someone notices the treasury…"
+      },
+      {
+        "kind": "comet",
+        "hint": "Count the deeds, and look up…"
+      },
+      {
+        "kind": "dragon",
+        "hint": "Fail the same trial three times running…"
+      }
+    ]
+  },
+  "markdown": "# The Legend of “Sweep the repo: 12 parallel quests”\n\n*A party of 13 · 35s · 595k tokens · $0.952*\n\nIt began at the quest board: “Sweep the repo: 12 parallel quests”. The Guildmaster called twelve adventurers to the work.\n\n## I. The Artisan — “Module 1”\n\n*Sent by the Guildmaster · 0:01–0:23 (22s) · 52.0k tokens · $0.083*\n\n- **Deeds:** 1 edit, 1 command, 1 read, 2 searches, 3 consultations\n- **Loot:** Module 1 done.\n\n## II. The Scout — “Module 2”\n\n*Sent by the Guildmaster · 0:01–0:23 (23s) · 52.0k tokens · $0.083*\n\n- **Deeds:** 1 edit, 2 commands, 2 searches, 3 consultations\n- **Loot:** Module 2 done.\n\n## III. The Warden — “Module 3”\n\n*Sent by the Guildmaster · 0:01–0:14 (13s) · fallen · 31.5k tokens · $0.050*\n\n- **Deeds:** 1 test run, 2 reads, 2 consultations\n- **Failure** (0:14): Tests failed: \\`bun test mod3\\`, 3 failing.\n- **Fall** (0:14): Fell: “Gave up: the module's tests keep failing”, and rose in the graveyard.\n\n## IV. The Archivist II — “Module 4”\n\n*Sent by the Guildmaster · 0:01–0:25 (24s) · 52.0k tokens · $0.083*\n\n- **Deeds:** 1 edit, 1 command, 1 read, 2 searches, 3 consultations\n- **Loot:** Module 4 done.\n\n## V. The Scholar — “Module 5”\n\n*Sent by the Guildmaster · 0:01–0:23 (23s) · 52.0k tokens · $0.083*\n\n- **Deeds:** 1 edit, 1 command, 2 reads, 2 searches, 2 consultations\n- **Loot:** Module 5 done.\n\n## VI. The Wanderer II — “Module 6”\n\n*Sent by the Guildmaster · 0:01–0:23 (22s) · 52.0k tokens · $0.083*\n\n- **Deeds:** 1 command, 3 reads, 1 search, 3 consultations\n- **Loot:** Module 6 done.\n\n## VII. The Artisan II — “Module 7”\n\n*Sent by the Guildmaster · 0:01–0:25 (24s) · 52.0k tokens · $0.083*\n\n- **Deeds:** 3 edits, 2 reads, 3 consultations\n- **Loot:** Module 7 done.\n\n## VIII. The Scout II — “Module 8”\n\n*Sent by the Guildmaster · 0:01–0:14 (13s) · fallen*\n\n- **Deeds:** 1 edit, 1 test run, 2 searches, 1 consultation\n- **Failure** (0:14): Tests failed: \\`bun test mod8\\`, 3 failing.\n- **Fall** (0:14): Fell: “Gave up: the module's tests keep failing”, and rose in the graveyard.\n- **Renown** (0:14): A ghost ship passed in the mist for the fallen.\n\n## IX. The Warden II — “Module 9”\n\n*Sent by the Guildmaster · 0:01–0:24 (23s) · 52.0k tokens · $0.083*\n\n- **Deeds:** 2 edits, 1 command, 2 searches, 3 consultations\n- **Loot:** Module 9 done.\n\n## X. The Archivist — “Module 10”\n\n*Sent by the Guildmaster · 0:01–0:23 (22s) · 52.0k tokens · $0.083*\n\n- **Deeds:** 1 edit, 1 command, 1 read, 2 searches, 3 consultations\n- **Loot:** Module 10 done.\n\n## XI. The Scholar II — “Module 11”\n\n*Sent by the Guildmaster · 0:01–0:25 (25s) · 52.0k tokens · $0.083*\n\n- **Deeds:** 1 edit, 4 reads, 2 searches, 1 consultation\n- **Loot:** Module 11 done.\n\n## XII. The Wanderer — “Module 12”\n\n*Sent by the Guildmaster · 0:01–0:24 (23s) · 52.0k tokens · $0.083*\n\n- **Deeds:** 1 command, 3 reads, 3 searches, 1 consultation\n- **Loot:** Module 12 done.\n\n## XIII. The Scout II — “Retry module 8: fix the failing tests”\n\n*Called back by the Guildmaster · 0:26–0:33 (7s) · 43.5k tokens · $0.070 for both quests*\n\n- **Deeds:** 1 edit, 1 test run\n- **Rise** (0:26): Rose again and took up the work.\n- **Loot:** Fixed and passing.\n\n## Deeds of Renown\n\n- **The Ghost Ship**: Two fell in one quest, and a ghost ship passed in the mist.\n\n---\n\n> All 12 modules swept.\n\n*It took 35s, and two fell, two trials failed and one rose again — but the quest was done.*\n",
+  "recap": {
+    "title": "Sweep the repo: 12 parallel quests",
+    "guild": "Codestz/guildhall",
+    "story": "A party",
+    "outcome": "complete",
+    "numbers": [
+      {
+        "value": "13",
+        "label": "adventurers"
+      },
+      {
+        "value": "92",
+        "label": "deeds"
+      },
+      {
+        "value": "13",
+        "label": "quests"
+      },
+      {
+        "value": "595k",
+        "label": "tokens"
+      },
+      {
+        "value": "$0.952",
+        "label": "spent"
+      },
+      {
+        "value": "35s",
+        "label": "on the clock"
+      }
+    ],
+    "lines": [
+      {
+        "at": 14718,
+        "kind": "renown",
+        "parts": [
+          {
+            "text": "Two fell in one quest. Out in the mist, a green sail passes without a sound."
+          }
+        ],
+        "text": "Two fell in one quest. Out in the mist, a green sail passes without a sound."
+      },
+      {
+        "at": 26750,
+        "kind": "rise",
+        "parts": [
+          {
+            "text": "The Scout II",
+            "color": "#2fa7a0"
+          },
+          {
+            "text": " rises again and takes up the work."
+          }
+        ],
+        "text": "The Scout II rises again and takes up the work."
+      },
+      {
+        "at": 34895,
+        "kind": "complete",
+        "parts": [
+          {
+            "text": "The quest is complete: “All 12 modules swept.”"
+          }
+        ],
+        "text": "The quest is complete: “All 12 modules swept.”"
+      }
+    ],
+    "hero": {
+      "label": "The quest is done",
+      "at": 34895,
+      "shot": 37000,
+      "subject": {
+        "kind": "adventurer",
+        "id": "ses_sim0001",
+        "title": "Guildmaster",
+        "color": "#d4ad3a"
+      },
+      "score": 11.166666666666666
+    }
+  },
+  "renown": [
+    {
+      "kind": "ghost-ship",
+      "key": "ghost-ship:ses_sim0001:1",
+      "at": 14718,
+      "master": "ses_sim0001",
+      "anchored": true,
+      "hero": {
+        "id": "ses_sim0085",
+        "title": "Scout II",
+        "color": "#2fa7a0"
+      },
+      "facts": {
+        "fallen": 2,
+        "minutes": 0
+      }
+    }
+  ],
+  "captions": [
+    {
+      "at": 2000,
+      "caption": {
+        "key": 1,
+        "kind": "quest",
+        "priority": 3,
+        "text": "Twelve quests leave the board at once.",
+        "parts": [
+          {
+            "text": "Twelve quests leave the board at once."
+          }
+        ],
+        "hold": 3400,
+        "ids": [
+          "ses_sim0001",
+          "ses_sim0005",
+          "ses_sim0049",
+          "ses_sim0017",
+          "ses_sim0029",
+          "ses_sim0105",
+          "ses_sim0129",
+          "ses_sim0037",
+          "ses_sim0117",
+          "ses_sim0061",
+          "ses_sim0085",
+          "ses_sim0093",
+          "ses_sim0073"
+        ]
+      }
+    },
+    {
+      "at": 7200,
+      "caption": {
+        "key": 2,
+        "kind": "deed",
+        "priority": 0,
+        "text": "All over the island: 15 deeds, mostly reading.",
+        "parts": [
+          {
+            "text": "All over the island: 15 deeds, mostly reading."
+          }
+        ],
+        "hold": 3400,
+        "ids": [
+          "ses_sim0017",
+          "ses_sim0029",
+          "ses_sim0061",
+          "ses_sim0005",
+          "ses_sim0049",
+          "ses_sim0085",
+          "ses_sim0093",
+          "ses_sim0037",
+          "ses_sim0073",
+          "ses_sim0117",
+          "ses_sim0105",
+          "ses_sim0129"
+        ]
+      }
+    },
+    {
+      "at": 12400,
+      "caption": {
+        "key": 3,
+        "kind": "deed",
+        "priority": 0,
+        "text": "Across the guild: 23 deeds, mostly consulting the archives.",
+        "parts": [
+          {
+            "text": "Across the guild: 23 deeds, mostly consulting the archives."
+          }
+        ],
+        "hold": 3400,
+        "ids": [
+          "ses_sim0049",
+          "ses_sim0085",
+          "ses_sim0005",
+          "ses_sim0093",
+          "ses_sim0073",
+          "ses_sim0037",
+          "ses_sim0105",
+          "ses_sim0117",
+          "ses_sim0129",
+          "ses_sim0017",
+          "ses_sim0029",
+          "ses_sim0061"
+        ]
+      }
+    },
+    {
+      "at": 15800,
+      "caption": {
+        "key": 4,
+        "kind": "fall",
+        "priority": 5,
+        "text": "Two fall at once; the graveyard stirs.",
+        "parts": [
+          {
+            "text": "Two fall at once; the graveyard stirs."
+          }
+        ],
+        "hold": 4800,
+        "ids": ["ses_sim0029", "ses_sim0085"]
+      }
+    },
+    {
+      "at": 21000,
+      "caption": {
+        "key": 5,
+        "kind": "deed",
+        "priority": 0,
+        "text": "26 deeds, mostly consulting the archives, all at once.",
+        "parts": [
+          {
+            "text": "26 deeds, mostly consulting the archives, all at once."
+          }
+        ],
+        "hold": 3400,
+        "ids": [
+          "ses_sim0093",
+          "ses_sim0017",
+          "ses_sim0073",
+          "ses_sim0049",
+          "ses_sim0129",
+          "ses_sim0105",
+          "ses_sim0037",
+          "ses_sim0117",
+          "ses_sim0061",
+          "ses_sim0005"
+        ]
+      }
+    },
+    {
+      "at": 24400,
+      "caption": {
+        "key": 6,
+        "kind": "loot",
+        "priority": 2,
+        "text": "The Wanderer II, the Artisan and five others bring their loot home.",
+        "parts": [
+          {
+            "text": "The Wanderer II",
+            "color": "#9a8f80"
+          },
+          {
+            "text": ", "
+          },
+          {
+            "text": "the Artisan",
+            "color": "#e0702f"
+          },
+          {
+            "text": " and five others bring their loot home."
+          }
+        ],
+        "hold": 3610,
+        "ids": [
+          "ses_sim0061",
+          "ses_sim0005",
+          "ses_sim0105",
+          "ses_sim0049",
+          "ses_sim0017",
+          "ses_sim0093",
+          "ses_sim0129"
+        ]
+      }
+    },
+    {
+      "at": 27800,
+      "caption": {
+        "key": 7,
+        "kind": "quest",
+        "priority": 3,
+        "text": "The Guildmaster calls the Scout II back from the fall: “Retry module 8: fix the failing tests”.",
+        "parts": [
+          {
+            "text": "The Guildmaster",
+            "color": "#d4ad3a"
+          },
+          {
+            "text": " calls "
+          },
+          {
+            "text": "the Scout II",
+            "color": "#2fa7a0"
+          },
+          {
+            "text": " back from the fall: “Retry module 8: fix the failing tests”."
+          }
+        ],
+        "hold": 4450,
+        "ids": ["ses_sim0001", "ses_sim0085"]
+      }
+    },
+    {
+      "at": 31200,
+      "caption": {
+        "key": 8,
+        "kind": "loot",
+        "priority": 2,
+        "text": "The Artisan II, the Archivist II and the Scholar II bring their loot home.",
+        "parts": [
+          {
+            "text": "The Artisan II",
+            "color": "#e0702f"
+          },
+          {
+            "text": ", "
+          },
+          {
+            "text": "the Archivist II",
+            "color": "#8b6cd9"
+          },
+          {
+            "text": " and "
+          },
+          {
+            "text": "the Scholar II",
+            "color": "#6fb3e0"
+          },
+          {
+            "text": " bring their loot home."
+          }
+        ],
+        "hold": 3820,
+        "ids": ["ses_sim0073", "ses_sim0037", "ses_sim0117"]
+      }
+    },
+    {
+      "at": 34600,
+      "caption": {
+        "key": 9,
+        "kind": "loot",
+        "priority": 2,
+        "text": "The Scout II's quest is done: “Fixed and passing.”",
+        "parts": [
+          {
+            "text": "The Scout II",
+            "color": "#2fa7a0"
+          },
+          {
+            "text": "'s quest is done: “Fixed and passing.”"
+          }
+        ],
+        "hold": 3400,
+        "ids": ["ses_sim0085"]
+      }
+    },
+    {
+      "at": 38000,
+      "caption": {
+        "key": 10,
+        "kind": "complete",
+        "priority": 6,
+        "text": "The quest is complete: “All 12 modules swept.”",
+        "parts": [
+          {
+            "text": "The quest is complete: “All 12 modules swept.”"
+          }
+        ],
+        "hold": 6500,
+        "ids": ["ses_sim0001"]
+      }
+    }
+  ]
+}

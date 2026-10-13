@@ -1,0 +1,1545 @@
+{
+  "start": 0,
+  "told": [
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "todowrite",
+      "call": "call_sim0004",
+      "at": 4319,
+      "live": false,
+      "seq": 1
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0005",
+      "text": "Map how GET /users flows from route to query",
+      "at": 4319,
+      "live": false,
+      "seq": 2
+    },
+    {
+      "id": "ses_sim0006",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 4723,
+      "live": false,
+      "seq": 3
+    },
+    {
+      "id": "ses_sim0006",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "glob",
+      "call": "call_sim0008",
+      "at": 5915,
+      "live": false,
+      "seq": 4
+    },
+    {
+      "id": "ses_sim0006",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0009",
+      "at": 7221,
+      "live": false,
+      "seq": 5
+    },
+    {
+      "id": "ses_sim0006",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0010",
+      "at": 8498,
+      "live": false,
+      "seq": 6
+    },
+    {
+      "id": "ses_sim0006",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0011",
+      "at": 9961,
+      "live": false,
+      "seq": 7
+    },
+    {
+      "id": "ses_sim0006",
+      "agent": "guild-explorer",
+      "title": "Scout",
+      "color": "#2fa7a0",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 11267,
+      "live": false,
+      "seq": 8
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0005",
+      "at": 11558,
+      "live": false,
+      "seq": 9
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0013",
+      "text": "Design the pagination contract",
+      "at": 11558,
+      "live": false,
+      "seq": 10
+    },
+    {
+      "id": "ses_sim0014",
+      "agent": "guild-architect",
+      "title": "Architect",
+      "color": "#4f8fd6",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 12037,
+      "live": false,
+      "seq": 11
+    },
+    {
+      "id": "ses_sim0014",
+      "agent": "guild-architect",
+      "title": "Architect",
+      "color": "#4f8fd6",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "webfetch",
+      "call": "call_sim0016",
+      "at": 15769,
+      "live": false,
+      "seq": 12
+    },
+    {
+      "id": "ses_sim0014",
+      "agent": "guild-architect",
+      "title": "Architect",
+      "color": "#4f8fd6",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "write",
+      "call": "call_sim0018",
+      "at": 21832,
+      "live": false,
+      "seq": 13
+    },
+    {
+      "id": "ses_sim0014",
+      "agent": "guild-architect",
+      "title": "Architect",
+      "color": "#4f8fd6",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 22986,
+      "live": false,
+      "seq": 14
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0013",
+      "at": 23256,
+      "live": false,
+      "seq": 15
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0020",
+      "text": "API: parse cursor + limit, return nextCursor",
+      "at": 23256,
+      "live": false,
+      "seq": 16
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0028",
+      "text": "Query: keyset pagination on (created_at, id)",
+      "at": 23256,
+      "live": false,
+      "seq": 17
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0036",
+      "text": "Check the ORM's keyset API",
+      "at": 23256,
+      "live": false,
+      "seq": 18
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 23583,
+      "live": false,
+      "seq": 19
+    },
+    {
+      "id": "ses_sim0021",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 23601,
+      "live": false,
+      "seq": 20
+    },
+    {
+      "id": "ses_sim0037",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 23697,
+      "live": false,
+      "seq": 21
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0031",
+      "at": 24651,
+      "live": false,
+      "seq": 22
+    },
+    {
+      "id": "ses_sim0021",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0023",
+      "at": 24696,
+      "live": false,
+      "seq": 23
+    },
+    {
+      "id": "ses_sim0037",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "context7_query-docs",
+      "call": "call_sim0039",
+      "at": 27381,
+      "live": false,
+      "seq": 24
+    },
+    {
+      "id": "ses_sim0021",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0024",
+      "at": 27590,
+      "live": false,
+      "seq": 25
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0032",
+      "at": 27967,
+      "live": false,
+      "seq": 26
+    },
+    {
+      "id": "ses_sim0037",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 28687,
+      "live": false,
+      "seq": 27
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0036",
+      "at": 28981,
+      "live": false,
+      "seq": 28
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "write",
+      "call": "call_sim0033",
+      "at": 30094,
+      "live": false,
+      "seq": 29
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "plea",
+      "at": 30094,
+      "live": false,
+      "seq": 30
+    },
+    {
+      "id": "ses_sim0021",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0025",
+      "at": 30368,
+      "live": false,
+      "seq": 31
+    },
+    {
+      "id": "ses_sim0021",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0026",
+      "at": 34574,
+      "live": false,
+      "seq": 32
+    },
+    {
+      "id": "ses_sim0021",
+      "agent": "guild-implementer",
+      "title": "Artisan II",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 35671,
+      "live": false,
+      "seq": 33
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0020",
+      "at": 35934,
+      "live": false,
+      "seq": 34
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "plea-answered",
+      "at": 36703,
+      "live": false,
+      "seq": 35
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0034",
+      "at": 39526,
+      "live": false,
+      "seq": 36
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 40802,
+      "live": false,
+      "seq": 37
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0028",
+      "at": 41108,
+      "live": false,
+      "seq": 38
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0041",
+      "text": "Verify against the contract",
+      "at": 41202,
+      "live": false,
+      "seq": 39
+    },
+    {
+      "id": "ses_sim0042",
+      "agent": "guild-verifier",
+      "title": "Warden",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 41645,
+      "live": false,
+      "seq": 40
+    },
+    {
+      "id": "ses_sim0042",
+      "agent": "guild-verifier",
+      "title": "Warden",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0044",
+      "at": 43202,
+      "live": false,
+      "seq": 41
+    },
+    {
+      "id": "ses_sim0042",
+      "agent": "guild-verifier",
+      "title": "Warden",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed-failed",
+      "tool": "bash",
+      "call": "call_sim0045",
+      "error": "1 failed",
+      "at": 47502,
+      "live": false,
+      "seq": 42
+    },
+    {
+      "id": "ses_sim0042",
+      "agent": "guild-verifier",
+      "title": "Warden",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 51734,
+      "live": false,
+      "seq": 43
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0041",
+      "at": 52013,
+      "live": false,
+      "seq": 44
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0048",
+      "text": "Fix: fetch limit + 1 to detect the next page",
+      "at": 52013,
+      "live": false,
+      "seq": 45
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0050",
+      "at": 54738,
+      "live": false,
+      "seq": 46
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0051",
+      "at": 58009,
+      "live": false,
+      "seq": 47
+    },
+    {
+      "id": "ses_sim0029",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 59318,
+      "live": false,
+      "seq": 48
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0048",
+      "at": 59627,
+      "live": false,
+      "seq": 49
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0053",
+      "text": "Re-verify",
+      "at": 59627,
+      "live": false,
+      "seq": 50
+    },
+    {
+      "id": "ses_sim0054",
+      "agent": "guild-verifier",
+      "title": "Warden II",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 59967,
+      "live": false,
+      "seq": 51
+    },
+    {
+      "id": "ses_sim0054",
+      "agent": "guild-verifier",
+      "title": "Warden II",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0056",
+      "at": 64587,
+      "live": false,
+      "seq": 52
+    },
+    {
+      "id": "ses_sim0054",
+      "agent": "guild-verifier",
+      "title": "Warden II",
+      "color": "#3fae6b",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 65570,
+      "live": false,
+      "seq": 53
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0053",
+      "at": 65885,
+      "live": false,
+      "seq": 54
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 67261,
+      "live": false,
+      "seq": 55
+    }
+  ],
+  "sessions": [
+    "ses_sim0001",
+    "ses_sim0006",
+    "ses_sim0014",
+    "ses_sim0029",
+    "ses_sim0021",
+    "ses_sim0037",
+    "ses_sim0042",
+    "ses_sim0054"
+  ],
+  "legend": {
+    "title": "Add cursor pagination to GET /users",
+    "party": 8,
+    "span": 67261,
+    "tokens": 135500,
+    "cost": 0.2168,
+    "outcome": "complete",
+    "opening": "The Guildmaster took up the quest “Add cursor pagination to GET /users”, and sent seven adventurers out to see it done.",
+    "chapters": [
+      {
+        "numeral": "I",
+        "id": "ses_sim0001",
+        "who": "Guildmaster",
+        "color": "#d4ad3a",
+        "quest": "Add cursor pagination to GET /users",
+        "resumed": false,
+        "begin": 0,
+        "end": 67261,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "plan",
+            "count": 1,
+            "label": "1 plan"
+          }
+        ],
+        "notables": [],
+        "tokens": 2000,
+        "cost": 0.0031999999999999997
+      },
+      {
+        "numeral": "II",
+        "id": "ses_sim0006",
+        "who": "Scout",
+        "color": "#2fa7a0",
+        "sentBy": "Guildmaster",
+        "quest": "Map how GET /users flows from route to query",
+        "resumed": false,
+        "begin": 4319,
+        "end": 11267,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "read",
+            "count": 2,
+            "label": "2 reads"
+          },
+          {
+            "craft": "search",
+            "count": 2,
+            "label": "2 searches"
+          }
+        ],
+        "notables": [],
+        "loot": "routes.ts → service.ts → queries.ts; findUsers returns every row.",
+        "tokens": 12250,
+        "cost": 0.0196
+      },
+      {
+        "numeral": "III",
+        "id": "ses_sim0014",
+        "who": "Architect",
+        "color": "#4f8fd6",
+        "sentBy": "Guildmaster",
+        "quest": "Design the pagination contract",
+        "resumed": false,
+        "begin": 11558,
+        "end": 22986,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 1,
+            "label": "1 edit"
+          },
+          {
+            "craft": "consult",
+            "count": 1,
+            "label": "1 consultation"
+          }
+        ],
+        "notables": [],
+        "loot": "Contract: ?cursor&limit → { items, nextCursor }. Two tasks: API, query.",
+        "tokens": 15000,
+        "cost": 0.024
+      },
+      {
+        "numeral": "IV",
+        "id": "ses_sim0021",
+        "who": "Artisan II",
+        "color": "#e0702f",
+        "sentBy": "Guildmaster",
+        "quest": "API: parse cursor + limit, return nextCursor",
+        "resumed": false,
+        "begin": 23256,
+        "end": 35671,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 2,
+            "label": "2 edits"
+          },
+          {
+            "craft": "run",
+            "count": 1,
+            "label": "1 command"
+          },
+          {
+            "craft": "read",
+            "count": 1,
+            "label": "1 read"
+          }
+        ],
+        "notables": [],
+        "loot": "Route takes cursor & limit, encodes nextCursor.",
+        "tokens": 28250,
+        "cost": 0.0452
+      },
+      {
+        "numeral": "V",
+        "id": "ses_sim0029",
+        "who": "Artisan",
+        "color": "#e0702f",
+        "sentBy": "Guildmaster",
+        "quest": "Query: keyset pagination on (created_at, id)",
+        "resumed": false,
+        "begin": 23256,
+        "end": 40802,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 2,
+            "label": "2 edits"
+          },
+          {
+            "craft": "run",
+            "count": 1,
+            "label": "1 command"
+          },
+          {
+            "craft": "read",
+            "count": 1,
+            "label": "1 read"
+          }
+        ],
+        "notables": [
+          {
+            "kind": "plea",
+            "at": 30094,
+            "text": "Asked for your word; it was given after 7s."
+          }
+        ],
+        "loot": "findUsers(cursor, limit) with an index on (created_at, id)."
+      },
+      {
+        "numeral": "VI",
+        "id": "ses_sim0037",
+        "who": "Archivist",
+        "color": "#8b6cd9",
+        "sentBy": "Guildmaster",
+        "quest": "Check the ORM's keyset API",
+        "resumed": false,
+        "begin": 23256,
+        "end": 28687,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "consult",
+            "count": 1,
+            "label": "1 consultation"
+          }
+        ],
+        "notables": [],
+        "loot": "Use a row-value comparison: (created_at, id) > ($1, $2).",
+        "tokens": 10500,
+        "cost": 0.0168
+      },
+      {
+        "numeral": "VII",
+        "id": "ses_sim0042",
+        "who": "Warden",
+        "color": "#3fae6b",
+        "sentBy": "Guildmaster",
+        "quest": "Verify against the contract",
+        "resumed": false,
+        "begin": 41202,
+        "end": 51734,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "test",
+            "count": 1,
+            "label": "1 test run"
+          },
+          {
+            "craft": "read",
+            "count": 1,
+            "label": "1 read"
+          }
+        ],
+        "notables": [
+          {
+            "kind": "flaw",
+            "at": 47502,
+            "text": "Tests failed: `bun test users`, 1 failing."
+          }
+        ],
+        "loot": "FAIL: nextCursor skips the final row on exact page boundaries.",
+        "tokens": 15250,
+        "cost": 0.024399999999999998
+      },
+      {
+        "numeral": "VIII",
+        "id": "ses_sim0029",
+        "who": "Artisan",
+        "color": "#e0702f",
+        "sentBy": "Guildmaster",
+        "quest": "Fix: fetch limit + 1 to detect the next page",
+        "resumed": true,
+        "begin": 52013,
+        "end": 59318,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 1,
+            "label": "1 edit"
+          },
+          {
+            "craft": "test",
+            "count": 1,
+            "label": "1 test run"
+          }
+        ],
+        "notables": [],
+        "loot": "Lookahead row added; boundary test passes.",
+        "tokens": 39500,
+        "cost": 0.06319999999999999,
+        "usageNote": "for both quests"
+      },
+      {
+        "numeral": "IX",
+        "id": "ses_sim0054",
+        "who": "Warden II",
+        "color": "#3fae6b",
+        "sentBy": "Guildmaster",
+        "quest": "Re-verify",
+        "resumed": false,
+        "begin": 59627,
+        "end": 65570,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "test",
+            "count": 1,
+            "label": "1 test run"
+          }
+        ],
+        "notables": [],
+        "loot": "PASS: contract holds, boundaries covered.",
+        "tokens": 12750,
+        "cost": 0.020399999999999998
+      }
+    ],
+    "lastWord": "GET /users now pages by cursor: ?cursor&limit → { items, nextCursor }. All 214 tests pass.",
+    "closing": "The quest was done in 1m 07s, though not without cost: one trial failed.",
+    "renown": [],
+    "unsung": [
+      {
+        "kind": "festival",
+        "hint": "When every deed of a long quest comes home clean…"
+      },
+      {
+        "kind": "ghost-ship",
+        "hint": "A sail with no crew, for those who fall…"
+      },
+      {
+        "kind": "rainbow",
+        "hint": "What follows the storm, if the work comes good…"
+      },
+      {
+        "kind": "raid",
+        "hint": "Spend long enough, and someone notices the treasury…"
+      },
+      {
+        "kind": "comet",
+        "hint": "Count the deeds, and look up…"
+      },
+      {
+        "kind": "dragon",
+        "hint": "Fail the same trial three times running…"
+      }
+    ]
+  },
+  "markdown": "# The Legend of “Add cursor pagination to GET /users”\n\n*A party of eight · 1m 07s · 136k tokens · $0.217*\n\nThe Guildmaster took up the quest “Add cursor pagination to GET /users”, and sent seven adventurers out to see it done.\n\n## I. The Guildmaster at the Quest Board\n\n*0:00–1:07 (1m 07s) · 2.0k tokens · $0.003*\n\n- **Deeds:** 1 plan\n\n## II. The Scout — “Map how GET /users flows from route to query”\n\n*Sent by the Guildmaster · 0:04–0:11 (7s) · 12.3k tokens · $0.020*\n\n- **Deeds:** 2 reads, 2 searches\n- **Loot:** routes.ts → service.ts → queries.ts; findUsers returns every row.\n\n## III. The Architect — “Design the pagination contract”\n\n*Sent by the Guildmaster · 0:11–0:22 (11s) · 15.0k tokens · $0.024*\n\n- **Deeds:** 1 edit, 1 consultation\n- **Loot:** Contract: ?cursor&limit → { items, nextCursor }. Two tasks: API, query.\n\n## IV. The Artisan II — “API: parse cursor + limit, return nextCursor”\n\n*Sent by the Guildmaster · 0:23–0:35 (12s) · 28.3k tokens · $0.045*\n\n- **Deeds:** 2 edits, 1 command, 1 read\n- **Loot:** Route takes cursor & limit, encodes nextCursor.\n\n## V. The Artisan — “Query: keyset pagination on (created\\_at, id)”\n\n*Sent by the Guildmaster · 0:23–0:40 (18s)*\n\n- **Deeds:** 2 edits, 1 command, 1 read\n- **Plea** (0:30): Asked for your word; it was given after 7s.\n- **Loot:** findUsers(cursor, limit) with an index on (created\\_at, id).\n\n## VI. The Archivist — “Check the ORM's keyset API”\n\n*Sent by the Guildmaster · 0:23–0:28 (5s) · 10.5k tokens · $0.017*\n\n- **Deeds:** 1 consultation\n- **Loot:** Use a row-value comparison: (created\\_at, id) &gt; ($1, $2).\n\n## VII. The Warden — “Verify against the contract”\n\n*Sent by the Guildmaster · 0:41–0:51 (11s) · 15.3k tokens · $0.024*\n\n- **Deeds:** 1 test run, 1 read\n- **Failure** (0:47): Tests failed: \\`bun test users\\`, 1 failing.\n- **Loot:** FAIL: nextCursor skips the final row on exact page boundaries.\n\n## VIII. The Artisan — “Fix: fetch limit + 1 to detect the next page”\n\n*Called back by the Guildmaster · 0:52–0:59 (7s) · 39.5k tokens · $0.063 for both quests*\n\n- **Deeds:** 1 edit, 1 test run\n- **Loot:** Lookahead row added; boundary test passes.\n\n## IX. The Warden II — “Re-verify”\n\n*Sent by the Guildmaster · 0:59–1:05 (6s) · 12.8k tokens · $0.020*\n\n- **Deeds:** 1 test run\n- **Loot:** PASS: contract holds, boundaries covered.\n\n---\n\n> GET /users now pages by cursor: ?cursor&limit → { items, nextCursor }. All 214 tests pass.\n\n*The quest was done in 1m 07s, though not without cost: one trial failed.*\n",
+  "recap": {
+    "title": "Add cursor pagination to GET /users",
+    "guild": "Codestz/guildhall",
+    "story": "A party",
+    "outcome": "complete",
+    "numbers": [
+      {
+        "value": "8",
+        "label": "adventurers"
+      },
+      {
+        "value": "21",
+        "label": "deeds"
+      },
+      {
+        "value": "8",
+        "label": "quests"
+      },
+      {
+        "value": "136k",
+        "label": "tokens"
+      },
+      {
+        "value": "$0.217",
+        "label": "spent"
+      },
+      {
+        "value": "1m 07s",
+        "label": "on the clock"
+      }
+    ],
+    "lines": [
+      {
+        "at": 47502,
+        "kind": "flaw",
+        "parts": [
+          {
+            "text": "The Warden",
+            "color": "#3fae6b"
+          },
+          {
+            "text": " finds one failing."
+          }
+        ],
+        "text": "The Warden finds one failing."
+      },
+      {
+        "at": 65570,
+        "kind": "loot",
+        "parts": [
+          {
+            "text": "The Warden II",
+            "color": "#3fae6b"
+          },
+          {
+            "text": " returns with good news: “PASS: contract holds, boundaries covered.”"
+          }
+        ],
+        "text": "The Warden II returns with good news: “PASS: contract holds, boundaries covered.”"
+      },
+      {
+        "at": 67261,
+        "kind": "complete",
+        "parts": [
+          {
+            "text": "The quest is complete. "
+          },
+          {
+            "text": "The Guildmaster",
+            "color": "#d4ad3a"
+          },
+          {
+            "text": " has the last word: “GET /users now pages by cursor: ?cursor&limit → { items…”"
+          }
+        ],
+        "text": "The quest is complete. The Guildmaster has the last word: “GET /users now pages by cursor: ?cursor&limit → { items…”"
+      }
+    ],
+    "hero": {
+      "label": "The quest is done",
+      "at": 67261,
+      "shot": 69000,
+      "subject": {
+        "kind": "adventurer",
+        "id": "ses_sim0001",
+        "title": "Guildmaster",
+        "color": "#d4ad3a"
+      },
+      "score": 10.5
+    }
+  },
+  "renown": [],
+  "captions": [
+    {
+      "at": 5050,
+      "caption": {
+        "key": 1,
+        "kind": "quest",
+        "priority": 3,
+        "text": "The Guildmaster asks the Scout to map how GET /users flows from route to query.",
+        "parts": [
+          {
+            "text": "The Guildmaster",
+            "color": "#d4ad3a"
+          },
+          {
+            "text": " asks "
+          },
+          {
+            "text": "the Scout",
+            "color": "#2fa7a0"
+          },
+          {
+            "text": " to map how GET /users flows from route to query."
+          }
+        ],
+        "hold": 3970,
+        "ids": ["ses_sim0001", "ses_sim0006"]
+      }
+    },
+    {
+      "at": 10250,
+      "caption": {
+        "key": 2,
+        "kind": "deed",
+        "priority": 0,
+        "text": "Across the guild: five deeds, mostly reading.",
+        "parts": [
+          {
+            "text": "Across the guild: five deeds, mostly reading."
+          }
+        ],
+        "hold": 3400,
+        "ids": ["ses_sim0001", "ses_sim0006"]
+      }
+    },
+    {
+      "at": 13650,
+      "caption": {
+        "key": 3,
+        "kind": "quest",
+        "priority": 3,
+        "text": "A quest leaves the board: the Architect is to design the pagination contract.",
+        "parts": [
+          {
+            "text": "A quest leaves the board: "
+          },
+          {
+            "text": "the Architect",
+            "color": "#4f8fd6"
+          },
+          {
+            "text": " is to design the pagination contract."
+          }
+        ],
+        "hold": 3910,
+        "ids": ["ses_sim0001", "ses_sim0014"]
+      }
+    },
+    {
+      "at": 17050,
+      "caption": {
+        "key": 4,
+        "kind": "loot",
+        "priority": 2,
+        "text": "The Scout comes home: “routes.ts → service.ts → queries.ts; findUsers returns every…”",
+        "parts": [
+          {
+            "text": "The Scout",
+            "color": "#2fa7a0"
+          },
+          {
+            "text": " comes home: “routes.ts → service.ts → queries.ts; findUsers returns every…”"
+          }
+        ],
+        "hold": 4150,
+        "ids": ["ses_sim0006"]
+      }
+    },
+    {
+      "at": 22550,
+      "caption": {
+        "key": 5,
+        "kind": "deed",
+        "priority": 0,
+        "text": "The Architect reshapes pagination.md.",
+        "parts": [
+          {
+            "text": "The Architect",
+            "color": "#4f8fd6"
+          },
+          {
+            "text": " reshapes pagination.md."
+          }
+        ],
+        "hold": 3400,
+        "ids": ["ses_sim0014"]
+      }
+    },
+    {
+      "at": 25950,
+      "caption": {
+        "key": 6,
+        "kind": "quest",
+        "priority": 3,
+        "text": "The Guildmaster sends the Artisan, the Artisan II and the Archivist out at once.",
+        "parts": [
+          {
+            "text": "The Guildmaster",
+            "color": "#d4ad3a"
+          },
+          {
+            "text": " sends "
+          },
+          {
+            "text": "the Artisan",
+            "color": "#e0702f"
+          },
+          {
+            "text": ", "
+          },
+          {
+            "text": "the Artisan II",
+            "color": "#e0702f"
+          },
+          {
+            "text": " and "
+          },
+          {
+            "text": "the Archivist",
+            "color": "#8b6cd9"
+          },
+          {
+            "text": " out at once."
+          }
+        ],
+        "hold": 4000,
+        "ids": ["ses_sim0001", "ses_sim0029", "ses_sim0021", "ses_sim0037"]
+      }
+    },
+    {
+      "at": 29350,
+      "caption": {
+        "key": 7,
+        "kind": "loot",
+        "priority": 2,
+        "text": "The Architect and the Archivist bring their loot home.",
+        "parts": [
+          {
+            "text": "The Architect",
+            "color": "#4f8fd6"
+          },
+          {
+            "text": " and "
+          },
+          {
+            "text": "the Archivist",
+            "color": "#8b6cd9"
+          },
+          {
+            "text": " bring their loot home."
+          }
+        ],
+        "hold": 3400,
+        "ids": ["ses_sim0014", "ses_sim0037"]
+      }
+    },
+    {
+      "at": 32750,
+      "caption": {
+        "key": 8,
+        "kind": "plea",
+        "priority": 5,
+        "text": "The Artisan will go no further without your word.",
+        "parts": [
+          {
+            "text": "The Artisan",
+            "color": "#e0702f"
+          },
+          {
+            "text": " will go no further without your word."
+          }
+        ],
+        "hold": 4800,
+        "ids": ["ses_sim0029"]
+      }
+    },
+    {
+      "at": 36400,
+      "caption": {
+        "key": 9,
+        "kind": "loot",
+        "priority": 2,
+        "text": "The Artisan II's quest is done: “Route takes cursor & limit, encodes nextCursor.”",
+        "parts": [
+          {
+            "text": "The Artisan II",
+            "color": "#e0702f"
+          },
+          {
+            "text": "'s quest is done: “Route takes cursor & limit, encodes nextCursor.”"
+          }
+        ],
+        "hold": 4030,
+        "ids": ["ses_sim0021"]
+      }
+    },
+    {
+      "at": 41550,
+      "caption": {
+        "key": 10,
+        "kind": "loot",
+        "priority": 2,
+        "text": "The Artisan returns with the loot: “Lookahead row added; boundary test passes.”",
+        "parts": [
+          {
+            "text": "The Artisan",
+            "color": "#e0702f"
+          },
+          {
+            "text": " returns with the loot: “Lookahead row added; boundary test passes.”"
+          }
+        ],
+        "hold": 3970,
+        "ids": ["ses_sim0029"]
+      }
+    },
+    {
+      "at": 44950,
+      "caption": {
+        "key": 11,
+        "kind": "quest",
+        "priority": 3,
+        "text": "The Guildmaster sends the Warden to verify against the contract.",
+        "parts": [
+          {
+            "text": "The Guildmaster",
+            "color": "#d4ad3a"
+          },
+          {
+            "text": " sends "
+          },
+          {
+            "text": "the Warden",
+            "color": "#3fae6b"
+          },
+          {
+            "text": " to verify against the contract."
+          }
+        ],
+        "hold": 3520,
+        "ids": ["ses_sim0001", "ses_sim0042"]
+      }
+    },
+    {
+      "at": 48350,
+      "caption": {
+        "key": 12,
+        "kind": "flaw",
+        "priority": 3,
+        "text": "The Warden finds one failing.",
+        "parts": [
+          {
+            "text": "The Warden",
+            "color": "#3fae6b"
+          },
+          {
+            "text": " finds one failing."
+          }
+        ],
+        "hold": 3400,
+        "ids": ["ses_sim0042"]
+      }
+    },
+    {
+      "at": 52450,
+      "caption": {
+        "key": 13,
+        "kind": "loot",
+        "priority": 2,
+        "text": "The Warden returns with bad news: “FAIL: nextCursor skips the final row on exact page boundaries.”",
+        "parts": [
+          {
+            "text": "The Warden",
+            "color": "#3fae6b"
+          },
+          {
+            "text": " returns with bad news: “FAIL: nextCursor skips the final row on exact page boundaries.”"
+          }
+        ],
+        "hold": 4540,
+        "ids": ["ses_sim0042"]
+      }
+    },
+    {
+      "at": 55850,
+      "caption": {
+        "key": 14,
+        "kind": "quest",
+        "priority": 3,
+        "text": "The Guildmaster calls the Artisan back: “Fix: fetch limit + 1 to detect the next page”.",
+        "parts": [
+          {
+            "text": "The Guildmaster",
+            "color": "#d4ad3a"
+          },
+          {
+            "text": " calls "
+          },
+          {
+            "text": "the Artisan",
+            "color": "#e0702f"
+          },
+          {
+            "text": " back: “Fix: fetch limit + 1 to detect the next page”."
+          }
+        ],
+        "hold": 4210,
+        "ids": ["ses_sim0001"]
+      }
+    },
+    {
+      "at": 60050,
+      "caption": {
+        "key": 15,
+        "kind": "loot",
+        "priority": 2,
+        "text": "The Artisan's quest is done: “Lookahead row added; boundary test passes.”",
+        "parts": [
+          {
+            "text": "The Artisan",
+            "color": "#e0702f"
+          },
+          {
+            "text": "'s quest is done: “Lookahead row added; boundary test passes.”"
+          }
+        ],
+        "hold": 3790,
+        "ids": ["ses_sim0029"]
+      }
+    },
+    {
+      "at": 63450,
+      "caption": {
+        "key": 16,
+        "kind": "quest",
+        "priority": 3,
+        "text": "A quest leaves the board: the Warden II is to re-verify.",
+        "parts": [
+          {
+            "text": "A quest leaves the board: "
+          },
+          {
+            "text": "the Warden II",
+            "color": "#3fae6b"
+          },
+          {
+            "text": " is to re-verify."
+          }
+        ],
+        "hold": 3400,
+        "ids": ["ses_sim0001", "ses_sim0054"]
+      }
+    },
+    {
+      "at": 66850,
+      "caption": {
+        "key": 17,
+        "kind": "loot",
+        "priority": 2,
+        "text": "The Warden II returns with good news: “PASS: contract holds, boundaries covered.”",
+        "parts": [
+          {
+            "text": "The Warden II",
+            "color": "#3fae6b"
+          },
+          {
+            "text": " returns with good news: “PASS: contract holds, boundaries covered.”"
+          }
+        ],
+        "hold": 4030,
+        "ids": ["ses_sim0054"]
+      }
+    },
+    {
+      "at": 70250,
+      "caption": {
+        "key": 18,
+        "kind": "complete",
+        "priority": 6,
+        "text": "The quest is complete. the Guildmaster has the last word: “GET /users now pages by cursor: ?cursor&limit → { items…”",
+        "parts": [
+          {
+            "text": "The quest is complete. "
+          },
+          {
+            "text": "the Guildmaster",
+            "color": "#d4ad3a"
+          },
+          {
+            "text": " has the last word: “GET /users now pages by cursor: ?cursor&limit → { items…”"
+          }
+        ],
+        "hold": 8000,
+        "ids": ["ses_sim0001"]
+      }
+    }
+  ]
+}

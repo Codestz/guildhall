@@ -1,0 +1,1147 @@
+{
+  "start": 0,
+  "told": [
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0004",
+      "text": "Add dark theme tokens and wire the settings page",
+      "at": 2732,
+      "live": false,
+      "seq": 1
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 3052,
+      "live": false,
+      "seq": 2
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0007",
+      "at": 4164,
+      "live": false,
+      "seq": 3
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0008",
+      "at": 7980,
+      "live": false,
+      "seq": 4
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0009",
+      "at": 12254,
+      "live": false,
+      "seq": 5
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0010",
+      "at": 15356,
+      "live": false,
+      "seq": 6
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 16610,
+      "live": false,
+      "seq": 7
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0004",
+      "at": 16936,
+      "live": false,
+      "seq": 8
+    },
+    {
+      "id": "sea",
+      "agent": "",
+      "title": "Harbour",
+      "color": "#dcb662",
+      "master": "ses_sim0001",
+      "kind": "sea-push",
+      "event": {
+        "kind": "push",
+        "id": "push:acme/shop:dark-mode:0000000100000001000000010000000100000001",
+        "at": 18294,
+        "repo": "acme/shop",
+        "branch": "dark-mode",
+        "commits": 3,
+        "author": "mira",
+        "sha": "0000000100000001000000010000000100000001"
+      },
+      "at": 18294,
+      "live": false,
+      "seq": 9
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0012",
+      "at": 18294,
+      "live": false,
+      "seq": 10
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0013",
+      "at": 20450,
+      "live": false,
+      "seq": 11
+    },
+    {
+      "id": "sea",
+      "agent": "",
+      "title": "Harbour",
+      "color": "#dcb662",
+      "master": "ses_sim0001",
+      "kind": "sea-red",
+      "event": {
+        "kind": "ci",
+        "id": "ci:acme/shop:1002:failed",
+        "at": 39023,
+        "repo": "acme/shop",
+        "state": "failed",
+        "name": "CI",
+        "branch": "dark-mode",
+        "sha": "0000000100000001000000010000000100000001"
+      },
+      "at": 39023,
+      "live": false,
+      "seq": 12
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0015",
+      "at": 41030,
+      "live": false,
+      "seq": 13
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0017",
+      "text": "Fix: raise muted-text contrast to 4.5 in dark mode",
+      "at": 42822,
+      "live": false,
+      "seq": 14
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0019",
+      "at": 45260,
+      "live": false,
+      "seq": 15
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0020",
+      "at": 48802,
+      "live": false,
+      "seq": 16
+    },
+    {
+      "id": "ses_sim0005",
+      "agent": "guild-implementer",
+      "title": "Artisan",
+      "color": "#e0702f",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 49899,
+      "live": false,
+      "seq": 17
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0017",
+      "at": 50162,
+      "live": false,
+      "seq": 18
+    },
+    {
+      "id": "sea",
+      "agent": "",
+      "title": "Harbour",
+      "color": "#dcb662",
+      "master": "ses_sim0001",
+      "kind": "sea-push",
+      "event": {
+        "kind": "push",
+        "id": "push:acme/shop:dark-mode:0000000200000002000000020000000200000002",
+        "at": 51306,
+        "repo": "acme/shop",
+        "branch": "dark-mode",
+        "commits": 1,
+        "author": "mira",
+        "sha": "0000000200000002000000020000000200000002"
+      },
+      "at": 51306,
+      "live": false,
+      "seq": 19
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0022",
+      "at": 51306,
+      "live": false,
+      "seq": 20
+    },
+    {
+      "id": "sea",
+      "agent": "",
+      "title": "Harbour",
+      "color": "#dcb662",
+      "master": "ses_sim0001",
+      "kind": "sea-green",
+      "event": {
+        "kind": "ci",
+        "id": "ci:acme/shop:1007:passed",
+        "at": 70471,
+        "repo": "acme/shop",
+        "state": "passed",
+        "name": "CI",
+        "branch": "dark-mode",
+        "sha": "0000000200000002000000020000000200000002"
+      },
+      "at": 70471,
+      "live": false,
+      "seq": 21
+    },
+    {
+      "id": "sea",
+      "agent": "",
+      "title": "Harbour",
+      "color": "#dcb662",
+      "master": "ses_sim0001",
+      "kind": "sea-merged",
+      "event": {
+        "kind": "pr_merged",
+        "id": "pr_merged:acme/shop#128",
+        "at": 72772,
+        "repo": "acme/shop",
+        "number": 128,
+        "title": "Dark mode for the settings page",
+        "author": "mira",
+        "branch": "dark-mode"
+      },
+      "at": 72772,
+      "live": false,
+      "seq": 22
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0024",
+      "at": 72772,
+      "live": false,
+      "seq": 23
+    },
+    {
+      "id": "sea",
+      "agent": "",
+      "title": "Harbour",
+      "color": "#dcb662",
+      "master": "ses_sim0001",
+      "kind": "sea-push",
+      "event": {
+        "kind": "push",
+        "id": "push:acme/shop:main:0000000300000003000000030000000300000003",
+        "at": 73072,
+        "repo": "acme/shop",
+        "branch": "main",
+        "commits": 1,
+        "author": "mira",
+        "sha": "0000000300000003000000030000000300000003"
+      },
+      "at": 73072,
+      "live": false,
+      "seq": 24
+    },
+    {
+      "id": "sea",
+      "agent": "",
+      "title": "Harbour",
+      "color": "#dcb662",
+      "master": "ses_sim0001",
+      "kind": "sea-release",
+      "event": {
+        "kind": "release",
+        "id": "release:acme/shop:v1.4.0",
+        "at": 94185,
+        "repo": "acme/shop",
+        "tag": "v1.4.0",
+        "name": "Dark mode"
+      },
+      "at": 94185,
+      "live": false,
+      "seq": 25
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0025",
+      "at": 94185,
+      "live": false,
+      "seq": 26
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "quest",
+      "tool": "task",
+      "call": "call_sim0027",
+      "text": "Write the v1.4.0 changelog entry for dark mode",
+      "at": 96623,
+      "live": false,
+      "seq": 27
+    },
+    {
+      "id": "ses_sim0028",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "join",
+      "at": 97102,
+      "live": false,
+      "seq": 28
+    },
+    {
+      "id": "ses_sim0028",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0030",
+      "at": 98535,
+      "live": false,
+      "seq": 29
+    },
+    {
+      "id": "ses_sim0028",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0031",
+      "at": 100079,
+      "live": false,
+      "seq": 30
+    },
+    {
+      "id": "ses_sim0028",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0033",
+      "at": 106221,
+      "live": false,
+      "seq": 31
+    },
+    {
+      "id": "ses_sim0028",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0034",
+      "at": 109889,
+      "live": false,
+      "seq": 32
+    },
+    {
+      "id": "ses_sim0028",
+      "agent": "guild-librarian",
+      "title": "Archivist",
+      "color": "#8b6cd9",
+      "parent": "ses_sim0001",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 110969,
+      "live": false,
+      "seq": 33
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "task",
+      "call": "call_sim0027",
+      "at": 111227,
+      "live": false,
+      "seq": 34
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0036",
+      "at": 112972,
+      "live": false,
+      "seq": 35
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 116466,
+      "live": false,
+      "seq": 36
+    }
+  ],
+  "sessions": ["ses_sim0001", "ses_sim0005", "ses_sim0028"],
+  "legend": {
+    "title": "Ship dark mode for the settings page, behind a PR",
+    "party": 3,
+    "span": 116466,
+    "tokens": 96750,
+    "cost": 0.1548,
+    "outcome": "complete",
+    "opening": "It began at the quest board: “Ship dark mode for the settings page, behind a PR”. The Guildmaster called two adventurers to the work.",
+    "chapters": [
+      {
+        "numeral": "I",
+        "id": "ses_sim0001",
+        "who": "Guildmaster",
+        "color": "#d4ad3a",
+        "quest": "Ship dark mode for the settings page, behind a PR",
+        "resumed": false,
+        "begin": 0,
+        "end": 116466,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "run",
+            "count": 7,
+            "label": "7 commands"
+          }
+        ],
+        "notables": [
+          {
+            "kind": "flaw",
+            "at": 39023,
+            "sea": true,
+            "text": "CI failed on dark-mode, and the lighthouse burned red."
+          },
+          {
+            "kind": "rise",
+            "at": 70471,
+            "sea": true,
+            "text": "CI passed again on dark-mode; the lighthouse burned warm."
+          },
+          {
+            "kind": "renown",
+            "at": 72772,
+            "sea": true,
+            "text": "Pull request #128 “Dark mode for the settings page” was merged; its ship sailed into the harbour."
+          },
+          {
+            "kind": "renown",
+            "at": 94185,
+            "sea": true,
+            "text": "Released v1.4.0 “Dark mode”: a galleon came into the harbour."
+          },
+          {
+            "kind": "renown",
+            "at": 116466,
+            "text": "Came home clean; the village held a festival in their honour."
+          }
+        ],
+        "tokens": 27500,
+        "cost": 0.044
+      },
+      {
+        "numeral": "II",
+        "id": "ses_sim0005",
+        "who": "Artisan",
+        "color": "#e0702f",
+        "sentBy": "Guildmaster",
+        "quest": "Add dark theme tokens and wire the settings page",
+        "resumed": false,
+        "begin": 2732,
+        "end": 16610,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 2,
+            "label": "2 edits"
+          },
+          {
+            "craft": "test",
+            "count": 1,
+            "label": "1 test run"
+          },
+          {
+            "craft": "read",
+            "count": 1,
+            "label": "1 read"
+          }
+        ],
+        "notables": [],
+        "loot": "Dark tokens added; the settings page follows prefers-color-scheme."
+      },
+      {
+        "numeral": "III",
+        "id": "ses_sim0005",
+        "who": "Artisan",
+        "color": "#e0702f",
+        "sentBy": "Guildmaster",
+        "quest": "Fix: raise muted-text contrast to 4.5 in dark mode",
+        "resumed": true,
+        "begin": 42822,
+        "end": 49899,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 1,
+            "label": "1 edit"
+          },
+          {
+            "craft": "test",
+            "count": 1,
+            "label": "1 test run"
+          }
+        ],
+        "notables": [],
+        "loot": "Muted text lifted to #a3a3a3: 4.6 contrast; snapshot updated.",
+        "tokens": 41750,
+        "cost": 0.0668,
+        "usageNote": "for both quests"
+      },
+      {
+        "numeral": "IV",
+        "id": "ses_sim0028",
+        "who": "Archivist",
+        "color": "#8b6cd9",
+        "sentBy": "Guildmaster",
+        "quest": "Write the v1.4.0 changelog entry for dark mode",
+        "resumed": false,
+        "begin": 96623,
+        "end": 110969,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 2,
+            "label": "2 edits"
+          },
+          {
+            "craft": "read",
+            "count": 2,
+            "label": "2 reads"
+          }
+        ],
+        "notables": [],
+        "loot": "v1.4.0 in the changelog and the theming docs: dark settings page, muted text at 4.6 contrast.",
+        "tokens": 27500,
+        "cost": 0.044
+      }
+    ],
+    "lastWord": "Dark mode shipped: PR #128 merged after a contrast fix, CI green, v1.4.0 released and logged.",
+    "closing": "The quest was done in 1m 56s; the loot is home and the hearth is warm.",
+    "renown": [
+      {
+        "kind": "festival",
+        "id": "festival",
+        "title": "A Clean Sweep",
+        "text": "The whole quest came home clean — 17 deeds, not one failed — and the village held a festival.",
+        "count": 1,
+        "forced": false
+      }
+    ],
+    "unsung": [
+      {
+        "kind": "ghost-ship",
+        "hint": "A sail with no crew, for those who fall…"
+      },
+      {
+        "kind": "rainbow",
+        "hint": "What follows the storm, if the work comes good…"
+      },
+      {
+        "kind": "raid",
+        "hint": "Spend long enough, and someone notices the treasury…"
+      },
+      {
+        "kind": "comet",
+        "hint": "Count the deeds, and look up…"
+      },
+      {
+        "kind": "dragon",
+        "hint": "Fail the same trial three times running…"
+      }
+    ]
+  },
+  "markdown": "# The Legend of “Ship dark mode for the settings page, behind a PR”\n\n*A party of three · 1m 56s · 96.8k tokens · $0.155*\n\nIt began at the quest board: “Ship dark mode for the settings page, behind a PR”. The Guildmaster called two adventurers to the work.\n\n## I. The Guildmaster at the Quest Board\n\n*0:00–1:56 (1m 56s) · 27.5k tokens · $0.044*\n\n- **Deeds:** 7 commands\n- **Failure** (0:39): CI failed on dark-mode, and the lighthouse burned red.\n- **Rise** (1:10): CI passed again on dark-mode; the lighthouse burned warm.\n- **Renown** (1:12): Pull request #128 “Dark mode for the settings page” was merged; its ship sailed into the harbour.\n- **Renown** (1:34): Released v1.4.0 “Dark mode”: a galleon came into the harbour.\n- **Renown** (1:56): Came home clean; the village held a festival in their honour.\n\n## II. The Artisan — “Add dark theme tokens and wire the settings page”\n\n*Sent by the Guildmaster · 0:02–0:16 (14s)*\n\n- **Deeds:** 2 edits, 1 test run, 1 read\n- **Loot:** Dark tokens added; the settings page follows prefers-color-scheme.\n\n## III. The Artisan — “Fix: raise muted-text contrast to 4.5 in dark mode”\n\n*Called back by the Guildmaster · 0:42–0:49 (7s) · 41.8k tokens · $0.067 for both quests*\n\n- **Deeds:** 1 edit, 1 test run\n- **Loot:** Muted text lifted to #a3a3a3: 4.6 contrast; snapshot updated.\n\n## IV. The Archivist — “Write the v1.4.0 changelog entry for dark mode”\n\n*Sent by the Guildmaster · 1:36–1:50 (14s) · 27.5k tokens · $0.044*\n\n- **Deeds:** 2 edits, 2 reads\n- **Loot:** v1.4.0 in the changelog and the theming docs: dark settings page, muted text at 4.6 contrast.\n\n## Deeds of Renown\n\n- **A Clean Sweep**: The whole quest came home clean — 17 deeds, not one failed — and the village held a festival.\n\n---\n\n> Dark mode shipped: PR #128 merged after a contrast fix, CI green, v1.4.0 released and logged.\n\n*The quest was done in 1m 56s; the loot is home and the hearth is warm.*\n",
+  "recap": {
+    "title": "Ship dark mode for the settings page, behind a PR",
+    "guild": "Codestz/guildhall",
+    "story": "A party",
+    "outcome": "complete",
+    "numbers": [
+      {
+        "value": "3",
+        "label": "adventurers"
+      },
+      {
+        "value": "17",
+        "label": "deeds"
+      },
+      {
+        "value": "3",
+        "label": "quests"
+      },
+      {
+        "value": "96.8k",
+        "label": "tokens"
+      },
+      {
+        "value": "$0.155",
+        "label": "spent"
+      },
+      {
+        "value": "1m 56s",
+        "label": "on the clock"
+      }
+    ],
+    "lines": [
+      {
+        "at": 94185,
+        "kind": "sea",
+        "parts": [
+          {
+            "text": "Release v1.4.0 “Dark mode” is out — a galleon drops anchor, flags flying."
+          }
+        ],
+        "text": "Release v1.4.0 “Dark mode” is out — a galleon drops anchor, flags flying."
+      },
+      {
+        "at": 116466,
+        "kind": "renown",
+        "parts": [
+          {
+            "text": "A clean sweep — 17 deeds and not one failed. The village lights its lanterns."
+          }
+        ],
+        "text": "A clean sweep — 17 deeds and not one failed. The village lights its lanterns."
+      },
+      {
+        "at": 116466,
+        "kind": "complete",
+        "parts": [
+          {
+            "text": "And so it is done: “Dark mode shipped: PR #128 merged after a contrast fix, CI green…”"
+          }
+        ],
+        "text": "And so it is done: “Dark mode shipped: PR #128 merged after a contrast fix, CI green…”"
+      }
+    ],
+    "hero": {
+      "label": "v1.4.0: a galleon comes in",
+      "at": 94185,
+      "shot": 108000,
+      "subject": {
+        "kind": "sea",
+        "moment": "sea-release"
+      },
+      "score": 14
+    }
+  },
+  "renown": [
+    {
+      "kind": "festival",
+      "key": "festival:ses_sim0001:1",
+      "at": 116466,
+      "master": "ses_sim0001",
+      "anchored": true,
+      "hero": {
+        "id": "ses_sim0001",
+        "title": "Guildmaster",
+        "color": "#d4ad3a"
+      },
+      "facts": {
+        "deeds": 17,
+        "whole": true
+      }
+    }
+  ],
+  "captions": [
+    {
+      "at": 3450,
+      "caption": {
+        "key": 1,
+        "kind": "quest",
+        "priority": 3,
+        "text": "The Guildmaster sends the Artisan to add dark theme tokens and wire the settings page.",
+        "parts": [
+          {
+            "text": "The Guildmaster",
+            "color": "#d4ad3a"
+          },
+          {
+            "text": " sends "
+          },
+          {
+            "text": "the Artisan",
+            "color": "#e0702f"
+          },
+          {
+            "text": " to add dark theme tokens and wire the settings page."
+          }
+        ],
+        "hold": 4180,
+        "ids": ["ses_sim0001", "ses_sim0005"]
+      }
+    },
+    {
+      "at": 8650,
+      "caption": {
+        "key": 2,
+        "kind": "deed",
+        "priority": 0,
+        "text": "The Artisan pores over tokens.ts and sets hammer to tokens.ts.",
+        "parts": [
+          {
+            "text": "The Artisan",
+            "color": "#e0702f"
+          },
+          {
+            "text": " pores over tokens.ts and sets hammer to tokens.ts."
+          }
+        ],
+        "hold": 3460,
+        "ids": ["ses_sim0005"]
+      }
+    },
+    {
+      "at": 13850,
+      "caption": {
+        "key": 3,
+        "kind": "deed",
+        "priority": 0,
+        "text": "The Artisan reshapes SettingsPage.tsx.",
+        "parts": [
+          {
+            "text": "The Artisan",
+            "color": "#e0702f"
+          },
+          {
+            "text": " reshapes SettingsPage.tsx."
+          }
+        ],
+        "hold": 3400,
+        "ids": ["ses_sim0005"]
+      }
+    },
+    {
+      "at": 17350,
+      "caption": {
+        "key": 4,
+        "kind": "loot",
+        "priority": 2,
+        "text": "The Artisan comes home: “Muted text lifted to #a3a3a3: 4.6 contrast; snapshot updated.”",
+        "parts": [
+          {
+            "text": "The Artisan",
+            "color": "#e0702f"
+          },
+          {
+            "text": " comes home: “Muted text lifted to #a3a3a3: 4.6 contrast; snapshot updated.”"
+          }
+        ],
+        "hold": 4210,
+        "ids": ["ses_sim0005"]
+      }
+    },
+    {
+      "at": 22550,
+      "caption": {
+        "key": 5,
+        "kind": "deed",
+        "priority": 0,
+        "text": "The Guildmaster runs git push -u origin dark-mode and gh pr create --fill — #128.",
+        "parts": [
+          {
+            "text": "The Guildmaster",
+            "color": "#d4ad3a"
+          },
+          {
+            "text": " runs git push -u origin dark-mode and gh pr create --fill — #128."
+          }
+        ],
+        "hold": 4030,
+        "ids": ["ses_sim0001"]
+      }
+    },
+    {
+      "at": 39750,
+      "caption": {
+        "key": 6,
+        "kind": "sea",
+        "priority": 4,
+        "text": "The lighthouse burns red: CI failed on dark-mode.",
+        "parts": [
+          {
+            "text": "The lighthouse burns red: CI failed on dark-mode."
+          }
+        ],
+        "hold": 3400,
+        "ids": ["sea"]
+      }
+    },
+    {
+      "at": 43550,
+      "caption": {
+        "key": 7,
+        "kind": "quest",
+        "priority": 3,
+        "text": "The Artisan is called back from the tavern: “Fix: raise muted-text contrast to 4.5 in dark mode”.",
+        "parts": [
+          {
+            "text": "The Artisan",
+            "color": "#e0702f"
+          },
+          {
+            "text": " is called back from the tavern: “Fix: raise muted-text contrast to 4.5 in dark mode”."
+          }
+        ],
+        "hold": 4510,
+        "ids": ["ses_sim0001"]
+      }
+    },
+    {
+      "at": 48750,
+      "caption": {
+        "key": 8,
+        "kind": "deed",
+        "priority": 0,
+        "text": "The Artisan reshapes tokens.ts.",
+        "parts": [
+          {
+            "text": "The Artisan",
+            "color": "#e0702f"
+          },
+          {
+            "text": " reshapes tokens.ts."
+          }
+        ],
+        "hold": 3400,
+        "ids": ["ses_sim0005"]
+      }
+    },
+    {
+      "at": 52150,
+      "caption": {
+        "key": 9,
+        "kind": "loot",
+        "priority": 2,
+        "text": "The Artisan comes home: “Muted text lifted to #a3a3a3: 4.6 contrast; snapshot updated.”",
+        "parts": [
+          {
+            "text": "The Artisan",
+            "color": "#e0702f"
+          },
+          {
+            "text": " comes home: “Muted text lifted to #a3a3a3: 4.6 contrast; snapshot updated.”"
+          }
+        ],
+        "hold": 4210,
+        "ids": ["ses_sim0005"]
+      }
+    },
+    {
+      "at": 71200,
+      "caption": {
+        "key": 10,
+        "kind": "sea",
+        "priority": 4,
+        "text": "The lighthouse burns warm again: CI passes on dark-mode.",
+        "parts": [
+          {
+            "text": "The lighthouse burns warm again: CI passes on dark-mode."
+          }
+        ],
+        "hold": 3400,
+        "ids": ["sea"]
+      }
+    },
+    {
+      "at": 74600,
+      "caption": {
+        "key": 11,
+        "kind": "sea",
+        "priority": 4,
+        "text": "#128 “Dark mode for the settings page” is merged, and its ship comes home to the quay.",
+        "parts": [
+          {
+            "text": "#128 “Dark mode for the settings page” is merged, and its ship comes home to the quay."
+          }
+        ],
+        "hold": 4180,
+        "ids": ["sea"]
+      }
+    },
+    {
+      "at": 94900,
+      "caption": {
+        "key": 12,
+        "kind": "sea",
+        "priority": 4,
+        "text": "Release v1.4.0 “Dark mode” is out — a galleon drops anchor, flags flying.",
+        "parts": [
+          {
+            "text": "Release v1.4.0 “Dark mode” is out — a galleon drops anchor, flags flying."
+          }
+        ],
+        "hold": 3790,
+        "ids": ["sea"]
+      }
+    },
+    {
+      "at": 98300,
+      "caption": {
+        "key": 13,
+        "kind": "quest",
+        "priority": 3,
+        "text": "The Guildmaster asks the Archivist to write the v1.4.0 changelog entry for dark mode.",
+        "parts": [
+          {
+            "text": "The Guildmaster",
+            "color": "#d4ad3a"
+          },
+          {
+            "text": " asks "
+          },
+          {
+            "text": "the Archivist",
+            "color": "#8b6cd9"
+          },
+          {
+            "text": " to write the v1.4.0 changelog entry for dark mode."
+          }
+        ],
+        "hold": 4150,
+        "ids": ["ses_sim0001", "ses_sim0028"]
+      }
+    },
+    {
+      "at": 103500,
+      "caption": {
+        "key": 14,
+        "kind": "deed",
+        "priority": 0,
+        "text": "The Archivist studies CHANGELOG.md and tokens.ts.",
+        "parts": [
+          {
+            "text": "The Archivist",
+            "color": "#8b6cd9"
+          },
+          {
+            "text": " studies CHANGELOG.md and tokens.ts."
+          }
+        ],
+        "hold": 3400,
+        "ids": ["ses_sim0028"]
+      }
+    },
+    {
+      "at": 108700,
+      "caption": {
+        "key": 15,
+        "kind": "deed",
+        "priority": 0,
+        "text": "The Archivist reshapes CHANGELOG.md.",
+        "parts": [
+          {
+            "text": "The Archivist",
+            "color": "#8b6cd9"
+          },
+          {
+            "text": " reshapes CHANGELOG.md."
+          }
+        ],
+        "hold": 3400,
+        "ids": ["ses_sim0028"]
+      }
+    },
+    {
+      "at": 112100,
+      "caption": {
+        "key": 16,
+        "kind": "loot",
+        "priority": 2,
+        "text": "The Archivist's quest is done: “v1.4.0 in the changelog and the theming docs: dark settings…”",
+        "parts": [
+          {
+            "text": "The Archivist",
+            "color": "#8b6cd9"
+          },
+          {
+            "text": "'s quest is done: “v1.4.0 in the changelog and the theming docs: dark settings…”"
+          }
+        ],
+        "hold": 4390,
+        "ids": ["ses_sim0028"]
+      }
+    },
+    {
+      "at": 117200,
+      "caption": {
+        "key": 17,
+        "kind": "complete",
+        "priority": 6,
+        "text": "And so it is done: “Dark mode shipped: PR #128 merged after a contrast fix, CI green…”",
+        "parts": [
+          {
+            "text": "And so it is done: “Dark mode shipped: PR #128 merged after a contrast fix, CI green…”"
+          }
+        ],
+        "hold": 7280,
+        "ids": ["ses_sim0001"]
+      }
+    }
+  ]
+}

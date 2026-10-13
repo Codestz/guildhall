@@ -1,0 +1,334 @@
+{
+  "start": 0,
+  "told": [
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "grep",
+      "call": "call_sim0004",
+      "at": 2372,
+      "live": false,
+      "seq": 1
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "read",
+      "call": "call_sim0005",
+      "at": 3080,
+      "live": false,
+      "seq": 2
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0006",
+      "at": 4749,
+      "live": false,
+      "seq": 3
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed-failed",
+      "tool": "bash",
+      "call": "call_sim0007",
+      "error": "1 failed",
+      "at": 7836,
+      "live": false,
+      "seq": 4
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "edit",
+      "call": "call_sim0009",
+      "at": 10341,
+      "live": false,
+      "seq": 5
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "deed",
+      "tool": "bash",
+      "call": "call_sim0010",
+      "at": 12735,
+      "live": false,
+      "seq": 6
+    },
+    {
+      "id": "ses_sim0001",
+      "agent": "guild-master",
+      "title": "Guildmaster",
+      "color": "#d4ad3a",
+      "master": "ses_sim0001",
+      "kind": "loot",
+      "at": 13899,
+      "live": false,
+      "seq": 7
+    }
+  ],
+  "sessions": ["ses_sim0001"],
+  "legend": {
+    "title": "Fix the timezone bug in formatDate",
+    "party": 1,
+    "span": 13899,
+    "tokens": 21250,
+    "cost": 0.034,
+    "outcome": "complete",
+    "opening": "The Guildmaster took up the quest alone: “Fix the timezone bug in formatDate”.",
+    "chapters": [
+      {
+        "numeral": "I",
+        "id": "ses_sim0001",
+        "who": "Guildmaster",
+        "color": "#d4ad3a",
+        "quest": "Fix the timezone bug in formatDate",
+        "resumed": false,
+        "begin": 0,
+        "end": 13899,
+        "outcome": "done",
+        "deeds": [
+          {
+            "craft": "forge",
+            "count": 2,
+            "label": "2 edits"
+          },
+          {
+            "craft": "test",
+            "count": 2,
+            "label": "2 test runs"
+          },
+          {
+            "craft": "read",
+            "count": 1,
+            "label": "1 read"
+          },
+          {
+            "craft": "search",
+            "count": 1,
+            "label": "1 search"
+          }
+        ],
+        "notables": [
+          {
+            "kind": "flaw",
+            "at": 7836,
+            "text": "Tests failed: `bun test date`, 1 failing."
+          }
+        ],
+        "tokens": 21250,
+        "cost": 0.034
+      }
+    ],
+    "lastWord": "Fixed: formatDate keeps the zone across DST. Regression test added.",
+    "closing": "The quest was done in 14s, though not without cost: one trial failed.",
+    "renown": [],
+    "unsung": [
+      {
+        "kind": "festival",
+        "hint": "When every deed of a long quest comes home clean…"
+      },
+      {
+        "kind": "ghost-ship",
+        "hint": "A sail with no crew, for those who fall…"
+      },
+      {
+        "kind": "rainbow",
+        "hint": "What follows the storm, if the work comes good…"
+      },
+      {
+        "kind": "raid",
+        "hint": "Spend long enough, and someone notices the treasury…"
+      },
+      {
+        "kind": "comet",
+        "hint": "Count the deeds, and look up…"
+      },
+      {
+        "kind": "dragon",
+        "hint": "Fail the same trial three times running…"
+      }
+    ]
+  },
+  "markdown": "# The Legend of “Fix the timezone bug in formatDate”\n\n*A party of one · 14s · 21.3k tokens · $0.034*\n\nThe Guildmaster took up the quest alone: “Fix the timezone bug in formatDate”.\n\n## I. The Guildmaster at the Quest Board\n\n*0:00–0:13 (14s) · 21.3k tokens · $0.034*\n\n- **Deeds:** 2 edits, 2 test runs, 1 read, 1 search\n- **Failure** (0:07): Tests failed: \\`bun test date\\`, 1 failing.\n\n---\n\n> Fixed: formatDate keeps the zone across DST. Regression test added.\n\n*The quest was done in 14s, though not without cost: one trial failed.*\n",
+  "recap": {
+    "title": "Fix the timezone bug in formatDate",
+    "guild": "Codestz/guildhall",
+    "story": "A party",
+    "outcome": "complete",
+    "numbers": [
+      {
+        "value": "1",
+        "label": "adventurer"
+      },
+      {
+        "value": "6",
+        "label": "deeds"
+      },
+      {
+        "value": "0",
+        "label": "quests"
+      },
+      {
+        "value": "21.3k",
+        "label": "tokens"
+      },
+      {
+        "value": "$0.034",
+        "label": "spent"
+      },
+      {
+        "value": "14s",
+        "label": "on the clock"
+      }
+    ],
+    "lines": [
+      {
+        "at": 7836,
+        "kind": "flaw",
+        "parts": [
+          {
+            "text": "The tests turn on "
+          },
+          {
+            "text": "the Guildmaster",
+            "color": "#d4ad3a"
+          },
+          {
+            "text": ": one failing."
+          }
+        ],
+        "text": "The tests turn on the Guildmaster: one failing."
+      },
+      {
+        "at": 13899,
+        "kind": "complete",
+        "parts": [
+          {
+            "text": "The quest is complete: “Fixed: formatDate keeps the zone across DST. Regression test added.”"
+          }
+        ],
+        "text": "The quest is complete: “Fixed: formatDate keeps the zone across DST. Regression test added.”"
+      }
+    ],
+    "hero": {
+      "label": "The quest is done",
+      "at": 13899,
+      "shot": 16000,
+      "subject": {
+        "kind": "adventurer",
+        "id": "ses_sim0001",
+        "title": "Guildmaster",
+        "color": "#d4ad3a"
+      },
+      "score": 9.833333333333334
+    }
+  },
+  "renown": [],
+  "captions": [
+    {
+      "at": 3100,
+      "caption": {
+        "key": 1,
+        "kind": "deed",
+        "priority": 0,
+        "text": "The Guildmaster hunts through the code for formatDate — 4 matches and studies format.ts.",
+        "parts": [
+          {
+            "text": "The Guildmaster",
+            "color": "#d4ad3a"
+          },
+          {
+            "text": " hunts through the code for formatDate — 4 matches and studies format.ts."
+          }
+        ],
+        "hold": 4240,
+        "ids": ["ses_sim0001"]
+      }
+    },
+    {
+      "at": 8300,
+      "caption": {
+        "key": 2,
+        "kind": "deed",
+        "priority": 0,
+        "text": "The Guildmaster sets hammer to format.ts.",
+        "parts": [
+          {
+            "text": "The Guildmaster",
+            "color": "#d4ad3a"
+          },
+          {
+            "text": " sets hammer to format.ts."
+          }
+        ],
+        "hold": 3400,
+        "ids": ["ses_sim0001"]
+      }
+    },
+    {
+      "at": 11700,
+      "caption": {
+        "key": 3,
+        "kind": "flaw",
+        "priority": 3,
+        "text": "The tests turn on the Guildmaster: one failing.",
+        "parts": [
+          {
+            "text": "The tests turn on "
+          },
+          {
+            "text": "the Guildmaster",
+            "color": "#d4ad3a"
+          },
+          {
+            "text": ": one failing."
+          }
+        ],
+        "hold": 3400,
+        "ids": ["ses_sim0001"]
+      }
+    },
+    {
+      "at": 15100,
+      "caption": {
+        "key": 4,
+        "kind": "complete",
+        "priority": 6,
+        "text": "The quest is complete: “Fixed: formatDate keeps the zone across DST. Regression test added.”",
+        "parts": [
+          {
+            "text": "The quest is complete: “Fixed: formatDate keeps the zone across DST. Regression test added.”"
+          }
+        ],
+        "hold": 7460,
+        "ids": ["ses_sim0001"]
+      }
+    }
+  ]
+}

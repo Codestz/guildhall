@@ -85,6 +85,8 @@ export function worldQuery(screen: string, query: URLSearchParams): URLSearchPar
   out.delete("act")
   const slug = screen === "hall" ? hallSlug(query) : null
   if (slug && !out.has("seed")) out.set("seed", String(hallSeed(slug)))
+  // the island's name on its card and loading cover: the repo in a hall, the brand on the site's own island
+  if (!out.has("name")) out.set("name", slug ?? "Guildhall")
   return out
 }
 

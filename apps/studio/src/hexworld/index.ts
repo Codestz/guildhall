@@ -195,13 +195,15 @@ export const hexWorldScreen: Screen = {
       })),
     )
     const catalogLoad = loadCatalog()
+    // `?name=`: the island's own name (the site's `/` is "Guildhall", a hall its repo), else the seed's
+    const name = ctx.query.get("name") || `Island ${roman(seed)}`
     // the chrome: the Viewer's corners and Inspector round the stage (shell/viewer.ts); the seed is the
     // path's on `/town/<seed>`, so its knob writes `town`
     const seedKey = current().screen === "town" ? "town" : "seed"
     const viewQuery = new URLSearchParams(ctx.query)
     viewQuery.set(seedKey, String(seed))
     const viewer = mountViewer(outer, { ...ctx, query: viewQuery }, "town", {
-      title: `Island ${roman(seed)}`,
+      title: name,
       subtitle: `Seed ${seed}, grown for a repo of ${files.toLocaleString("en-US")} files`,
       sections: islandKnobs(seedKey),
     })
@@ -210,7 +212,7 @@ export const hexWorldScreen: Screen = {
     // drawn calm, then lifts once. `?loader=0` lifts at the ground, as before the loader.
     const cover = loaderOn(ctx.query)
     const plan = loadPlan(files)
-    const steps = viewer.loading(`Island ${roman(seed)}`, STEPS, PITCH)
+    const steps = viewer.loading(name, STEPS, PITCH)
     const go = (name: (typeof STEPS)[number], to: number) => {
       steps.step(name)
       steps.line(LINES[name])

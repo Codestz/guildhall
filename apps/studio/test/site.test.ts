@@ -78,7 +78,9 @@ describe("site routes", () => {
     expect(hall.has("repo")).toBe(false)
     expect(worldQuery("hall", q("repo=facebook/react&seed=7")).get("seed")).toBe("7")
     const home = worldQuery("island", q("story=saga&act=2"))
-    expect([...home.keys()]).toEqual([])
+    expect([...home.keys()]).toEqual(["name"])
+    expect(home.get("name")).toBe("Guildhall")
+    expect(hall.get("name")).toBe("facebook/react")
     expect(worldKey("island", q("story=saga"))).toBe(worldKey("demos", q("")))
   })
 

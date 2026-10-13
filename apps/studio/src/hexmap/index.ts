@@ -18,6 +18,7 @@ import {
   useOf as tileUse,
 } from "@guildhall/world"
 import type { Screen } from "../screens.ts"
+import { href } from "../shell/router.ts"
 import { mountViewer } from "../shell/viewer.ts"
 
 /** The map's own lettering: the studio's mono, as the read-outs beside it. */
@@ -551,7 +552,8 @@ export const hexmap: Screen = {
             for (const k of KNOB_KEYS)
               if (view.spec[k] !== HEX_ISLAND_DEFAULTS[k]) q.set(k, String(view.spec[k]))
             q.set("files", String(view.spec.files))
-            window.location.assign(`/town/${view.spec.seed}?${q}`)
+            q.set("town", String(view.spec.seed))
+            window.location.assign(href("town", q))
           },
         },
       ],
@@ -660,7 +662,7 @@ export const hexmap: Screen = {
         }
         if (describe)
           viewer.setInfo({
-            title: `Seeds ${view.spec.seed}–${view.spec.seed + 7}`,
+            title: `Seeds ${roman(view.spec.seed)}–${roman(view.spec.seed + 7)}`,
             figures: [{ label: "Repo files", value: view.spec.files }],
           })
         if (describe) viewer.setReadout([{ title: "Seeds", rows }])

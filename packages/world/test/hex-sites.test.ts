@@ -5,6 +5,9 @@
  *   no building or wall piece stands over water, no two building pieces cut into each other, every
  *   place's heart and every door is on the road network, and the castle's keep and great hall open onto
  *   a yard its gate reaches (site-checks.ts);
+ *   roads are sacred (roads.ts): no solid over a road, street, path, stair or bridge strip but a door's
+ *   threshold and a gate's opening (covered), no road ending in a solid (ends), none under MIN_WIDTH
+ *   clear (narrow), none routed through a building's tile (through);
  *   the castle's site and the town's square stay where they are as the island grows, and no river or
  *   lake lies inside them.
  *
@@ -14,6 +17,7 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import { roadReport } from "../src/hex/roads.ts"
 import {
   hexIsland,
   hexWalk,
@@ -44,7 +48,17 @@ const FULL = process.env.FUZZ === "full"
 
 describe("every place has floor, a way in and room of its own", () => {
   test(`over seeds 1–20 and the knob extremes${FULL ? ", every size" : ""}`, () => {
-    const total = { water: 0, overlap: 0, gap: 0, unreached: 0, castle: 0 }
+    const total = {
+      water: 0,
+      overlap: 0,
+      gap: 0,
+      unreached: 0,
+      castle: 0,
+      covered: 0,
+      ends: 0,
+      narrow: 0,
+      through: 0,
+    }
     const notes: string[] = []
     let n = 0
     for (let seed = 1; seed <= 20; seed++)
@@ -60,12 +74,30 @@ describe("every place has floor, a way in and room of its own", () => {
           total.gap += r.gap
           total.unreached += r.unreached
           total.castle += r.castle
+          // roads are sacred (roads.ts): nothing over a way, no way ending in a solid or squeezed
+          const ways = roadReport(h, z, w)
+          total.covered += ways.covered
+          total.ends += ways.ends
+          total.narrow += ways.narrow
+          total.through += ways.through
+          for (const note of ways.notes.slice(0, 2))
+            notes.push(`${seed} ${JSON.stringify(knobs)} ${files}: ${note}`)
           for (const note of r.notes.slice(0, 2))
             notes.push(`${seed} ${JSON.stringify(knobs)} ${files}: ${note}`)
           n++
         }
     expect(notes.slice(0, 10)).toEqual([])
-    expect(total).toEqual({ water: 0, overlap: 0, gap: 0, unreached: 0, castle: 0 })
+    expect(total).toEqual({
+      water: 0,
+      overlap: 0,
+      gap: 0,
+      unreached: 0,
+      castle: 0,
+      covered: 0,
+      ends: 0,
+      narrow: 0,
+      through: 0,
+    })
     expect(n).toBe(FULL ? 720 : 180)
   }, 300_000)
 })

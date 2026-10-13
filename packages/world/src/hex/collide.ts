@@ -380,6 +380,16 @@ export interface Walkway {
   by: number
   half: number
   steps?: number
+  /**
+   * A deck leg's rails start this far along it from its centre end (where the bridge's other legs meet
+   * it: a bend's mitre, a hub's opening), so no rail crosses the way on (structures.ts `bridgeInto`).
+   */
+  rails?: number
+  /**
+   * A flight's foot left open on its left (side −1) and right (side +1): how many of its lowest steps
+   * have no cheek there, where the road it lands on turns off that way.
+   */
+  open?: [number, number]
 }
 
 /** A stair's cheek stands this far out of its treads' edge, this wide (structures.ts `stairsInto`). */
@@ -421,12 +431,13 @@ export function walkwaySolids(st: Walkway): Solid[] {
   const off = st.kind === "stairs" ? st.half + CHEEK_OUT : st.half + 0.12
   const wid = st.kind === "stairs" ? CHEEK_W : 0.14
   // a deck's rails run its whole leg but its bank end (the road comes on there): stop short of it
-  const from = 0
-  const to = st.kind === "stairs" ? len : len - 0.5
-  if (to <= from) return out
-  const mx = st.ax + ux * ((from + to) / 2)
-  const mz = st.az + uz * ((from + to) / 2)
-  for (const side of [-1, 1])
+  const from = st.kind === "deck" ? Math.min(st.rails ?? 0, len - 0.5) : 0
+  for (const side of [-1, 1]) {
+    const open = st.kind === "stairs" ? (st.open?.[side < 0 ? 0 : 1] ?? 0) : 0
+    const to = st.kind === "stairs" ? (len * (flightSteps(st) - open)) / flightSteps(st) : len - 0.5
+    if (to <= from + 1e-6) continue
+    const mx = st.ax + ux * ((from + to) / 2)
+    const mz = st.az + uz * ((from + to) / 2)
     out.push(
       boxSolid(
         "wall",
@@ -439,6 +450,7 @@ export function walkwaySolids(st: Walkway): Solid[] {
         Math.min(st.ay, st.by),
       ),
     )
+  }
   return out
 }
 

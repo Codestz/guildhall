@@ -5,7 +5,7 @@
  */
 import { hash2 } from "../geom/noise.ts"
 import { courtDressing } from "./castleyard.ts"
-import { fitToTiles, walkwayAt } from "./collide.ts"
+import { fitToTiles, flightSteps, solidKind, walkwayAt, walkwaySolids } from "./collide.ts"
 import { type CurtainBody, curtainWall } from "./curtain.ts"
 import { doorwayOf } from "./doorways.ts"
 import { hexCentre } from "./grid.ts"
@@ -19,6 +19,13 @@ import {
   isDefaultNature,
   natureOdds,
 } from "./nature.ts"
+import { GRAZE, type Strip, StripGrid, stripIntrusion, tileStrips, wayStrip } from "./roads.ts"
+
+/** The castle's curtain wall and its gate (tiles.ts `castleWalls`): laid clear of its ways as it is built. */
+const CURTAIN = /^kaykit-hexagon\/(wall-|building-tower-base)/
+/** How near a strip a building's footprint point may stand (its points sit a little inside its outline). */
+const ROAD_MARGIN = 0.15
+
 import { bodyRadius, footprint, settlePieces } from "./sites.ts"
 import {
   edgeDressing,
@@ -56,6 +63,10 @@ export interface HexWalkway {
   half: number
   /** Stairs only: how many steps the flight has. */
   steps?: number
+  /** Decks only: its rails start this far along from its centre end (a bend's mitre, a hub's opening). */
+  rails?: number
+  /** Stairs only: how many of its lowest steps have no cheek on its left and its right (a turning foot). */
+  open?: [number, number]
 }
 
 /** A bridge over one river tile: its deck legs (centre to bank) and the river bed its posts stand in. */
@@ -225,6 +236,8 @@ const SCENE_FIT: Partial<Record<string, SceneFit>> = {
   [ARENA]: { turn: true, once: true },
   "market-square": { clear: true },
 }
+/** Kinds a place builds once at most (a camp's archery range: two side by side crammed into each other). */
+const ONCE_A_PLACE = new Set(["archery"])
 /** Steps from a town's square out to its ring street (zones.ts). */
 const RING_STEPS = 3
 /** Drinking places: no two stand within DRINK_APART steps of each other (the next kind is picked instead). */
@@ -285,7 +298,6 @@ export function hexWorld(
   const tiles: HexWorldTile[] = []
   const pieces: HexWorld["pieces"] = []
   const paths: number[] = []
-  const bridges: HexBridge[] = []
   const prefabs: Record<string, number> = {}
   const seed = h.spec.seed
   const nature = isDefaultNature(opts.nature) ? undefined : opts.nature
@@ -357,6 +369,184 @@ export function hexWorld(
     }
     return (n ? bank / n : Math.max(0, top(i)) + 0.4) + DECK_LIFT
   }
+  /** The sides of tile i its roads run on through (toward the tiles consecutive with it on a road). */
+  const linkedSides = (i: number): number[] => {
+    const nb = g.neighbours(i)
+    return [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! >= 0 && (links.get(i)?.has(nb[d]!) ?? false))
+  }
+  // ---- the ways first (decisions.md "roads are sacred"): every road's, square's and court's strip, its
+  // stairs and its bridges, laid before anything is placed, so nothing is placed over them ----
+  const bridges: HexBridge[] = []
+  const strips: Strip[] = []
+  {
+    const e = (HEX_TILE_SIZE * Math.sqrt(3)) / 2
+    for (let i = 0; i < g.size; i++) {
+      const u = useOf(z, i)
+      if (kindOf(h, i) === "sea") continue
+      const sides = linkedSides(i)
+      const nb = g.neighbours(i)
+      const x = at(i)[0]
+      const zz = at(i)[1]
+      const t = top(i)
+      const zone = z.zoneOf[i] ? z.zones[z.zoneOf[i]! - 1] : undefined
+      if (u === "road") {
+        const legs = sides.length ? sides : [0, 3]
+        strips.push(...tileStrips(i, [x, zz], legs, (d) => nb[d]!))
+        // stairs down every side where the road steps to a lower road tile: built into the ground from the
+        // shared edge straight out along the lower tile's road strip (never across a hex edge), one stone
+        // step per ~17 cm of drop, about 36° steep
+        for (const d of sides) {
+          const j = nb[d]!
+          const drop = t - top(j)
+          // a bridge's deck meets the bank's road at its own height: no stairs onto it
+          if (drop < 0.3 || useOf(z, j) === "bridge") continue
+          const a = (Math.PI / 180) * (60 * d)
+          const ux = Math.cos(a)
+          const uz = -Math.sin(a)
+          // (a road that must climb three levels at once, zones.ts, gets a longer flight)
+          const run = Math.min(e * (drop > 2 * STEP + 0.01 ? 0.95 : 0.8), drop * 1.35)
+          const flight = (r: number): HexWalkway => ({
+            kind: "stairs",
+            ax: x + ux * e,
+            az: zz + uz * e,
+            ay: t,
+            bx: x + ux * (e + r),
+            bz: zz + uz * (e + r),
+            by: top(j),
+            half: 0.95,
+            steps: Math.max(2, Math.round(drop / 0.17)),
+          })
+          // its cheeks clear of the ways on from its foot (the lower road turning off, another flight
+          // coming down beside it): a shorter, steeper flight where they would cross one
+          const on = tileStrips(j, at(j), linkedSides(j), (k) => g.neighbours(j)[k]!)
+          const crosses = (st: HexWalkway) =>
+            walkwaySolids(st).some((c) => on.some((s) => stripIntrusion(s, c) > GRAZE))
+          let r = run
+          while (r > drop * 0.85 && crosses(flight(r))) r -= 0.05
+          // still: the side the road turns off has its lowest steps open, as few as it takes
+          const st = flight(r)
+          const n = flightSteps(st)
+          for (let k = 1; k < n && crosses(st); k++)
+            st.open = (
+              [
+                [k, 0],
+                [0, k],
+              ] as [number, number][]
+            ).find((o) => !crosses({ ...st, open: o })) ?? [k, k]
+          stairs.push(st)
+        }
+      } else if (u === "bridge") {
+        // a wooden bridge: a plank deck from the centre out through each side its road crosses, from bank to
+        // bank (each leg runs a little onto its bank's road), sloping between the banks' heights; posts and
+        // rails are built with it (ground.ts `hexStructures`)
+        const legs = sides.length ? sides : [0, 3]
+        const mid = deckY(i)
+        const bridge: HexBridge = { tile: i, legs: [], bed: t - 0.6 }
+        for (const d of legs) {
+          const j = nb[d]!
+          const a = (Math.PI / 180) * (60 * d)
+          const ux = Math.cos(a)
+          const uz = -Math.sin(a)
+          const onto = j >= 0 && useOf(z, j) === "bridge"
+          const reach = onto ? e : e + 0.45
+          bridge.legs.push({
+            kind: "deck",
+            ax: x,
+            az: zz,
+            ay: mid,
+            bx: x + ux * reach,
+            bz: zz + uz * reach,
+            by: onto ? (mid + deckY(j)) / 2 : j >= 0 ? Math.max(0, top(j)) + DECK_LIFT : mid,
+            half: 1,
+          })
+        }
+        // the rails clear of the way on: a two-leg bridge's are mitred at its bend, a hub's stand off it
+        // (structures.ts `bridgeInto`)
+        // (a rail stands this far out of the deck's line; legs 60° apart need it 1.94 m out, 120° 0.65 m)
+        const off = (bridge.legs[0]?.half ?? 1) + 0.12
+        for (const [k, d] of legs.entries()) {
+          const apart = Math.min(
+            ...legs.filter((_, m) => m !== k).map((o) => Math.min((o - d + 6) % 6, (d - o + 6) % 6)),
+          )
+          const mitre = apart >= 3 ? 0 : off / Math.tan((apart * Math.PI) / 6)
+          const rails = legs.length !== 2 ? Math.max(1.3, mitre) : mitre
+          if (rails > 0) bridge.legs[k]!.rails = rails
+        }
+        bridges.push(bridge)
+      } else if (sides.length && (u === "square" || (u === "court" && zone?.kind === "castle")))
+        strips.push(...tileStrips(i, [x, zz], sides, (d) => nb[d]!))
+    }
+    for (const s of stairs) strips.push(wayStrip(s))
+    for (const b of bridges) for (const leg of b.legs) strips.push(wayStrip(leg))
+  }
+  const ways = new StripGrid(strips)
+  /** Whether a placed piece keeps off every strip (a building's own doorstep aside: its door's tile `from`). */
+  const offRoad = (q: PlacedPiece, own = -1, from = -1) =>
+    solidKind(q.piece) === "building"
+      ? ways.pieceIntrusion(q, own, from) <= GRAZE
+      : ways.pieceIntrusion(q) <= GRAZE
+  /**
+   * A tile's pieces kept off the roads: a building still over a strip (its outline, exactly) is drawn in
+   * toward the tile's middle and made smaller until it is clear (at most to half its size); anything
+   * else people bump into that stands over one (a fence, a crate, a bench, a lamp) is left out.
+   */
+  const keepOffRoads = (placed: PlacedPiece[], [cx, cz]: [number, number], own: number, from: number) =>
+    placed.filter((q) => {
+      const kind = solidKind(q.piece)
+      if (!kind || offRoad(q, own, from)) return true
+      if (kind !== "building") return false
+      const s0 = q.scale
+      const ox = q.x - cx
+      const oz = q.z - cz
+      for (let k = 1; k <= 8 && !offRoad(q, own, from); k++) {
+        const f = 0.5 ** (k / 8)
+        q.scale = s0 * f
+        q.x = cx + ox * f
+        q.z = cz + oz * f
+      }
+      return offRoad(q, own, from)
+    })
+  /**
+   * A square's well and its lamp, where no way across it runs: each in the widest gap between its
+   * strips it fits in, on its own tile, the well facing the middle (none where neither fits).
+   */
+  const squareWell = (i: number, [x, zz]: [number, number], t: number): PlacedPiece[] => {
+    const out: PlacedPiece[] = []
+    const strip = linkedSides(i).map((d) => (Math.PI / 3) * d)
+    /** How far round from the nearest strip an angle is (radians). */
+    const gap = (a: number) =>
+      Math.min(...strip.map((b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)))))
+    const turns = Array.from({ length: 24 }, (_, k) => (Math.PI / 12) * k).sort(
+      (a, b) => gap(b) - gap(a) || a - b,
+    )
+    const put = (piece: string, scale: number, faceIn: boolean, apart: (q: PlacedPiece) => boolean) => {
+      for (const a of turns)
+        for (const f of [0.55, 0.62, 0.48]) {
+          const e = HEX_TILE_SIZE * f
+          const q: PlacedPiece = {
+            piece,
+            x: x + Math.cos(a) * e,
+            y: t,
+            z: zz - Math.sin(a) * e,
+            rot: faceIn ? Math.atan2(-Math.cos(a), Math.sin(a)) : 0,
+            scale,
+          }
+          if (!apart(q) || !offRoad(q) || tileAt(q.x, q.z) !== i) continue
+          // clear of the buildings standing round the square (and those to come keep clear of it)
+          const r = bodyRadius(q)
+          if (bodies.near(q.x, q.z).some(([bx, bz, br]) => Math.hypot(bx - q.x, bz - q.z) < br + r - 0.05))
+            continue
+          bodies.add(q.x, q.z, r)
+          out.push(q)
+          return
+        }
+    }
+    put(recolour("kaykit-hexagon/building-well-yellow", i), 0.32, true, () => true)
+    put("kaykit-halloween/post-lantern", 0.55, false, (q) =>
+      out.every((o) => Math.hypot(o.x - q.x, o.z - q.z) > 1.1),
+    )
+    return out
+  }
   /** Whether the ground at a point is dry land at a building's base `y` or above (not water, not a step down). */
   const floorAt = (px: number, pz: number, y: number): boolean => {
     const j = tileAt(px, pz)
@@ -395,11 +585,15 @@ export function hexWorld(
   const nearDrink = (tiles: readonly number[], self = -1) =>
     drinks.some((d) => d !== self && tiles.some((t) => steps(t, d) <= DRINK_APART))
   const built = new Map<number, string>()
+  /** Whether place zi has a `kind` already: a tile built as one, or the scene it grows into. */
+  const placeHas = (zi: number, kind: string): boolean =>
+    z.zones[zi]!.tiles.some(
+      (j) => built.get(j) === kind || (!!SCENES[kind] && scenes.get(j) === SCENES[kind]),
+    )
   /** Places whose compound scene landed (a monastery's): their heart is a plain square, no second chapel. */
   const compound = new Set<number>()
-  const buildOf = (i: number): string => {
-    const have = built.get(i)
-    if (have) return have
+  /** The kinds a building tile picks from, and the one its hash picks first. */
+  const choice = (i: number): { list: string[]; at: number } => {
     const zone = zoneAt(i)
     const byWater = [...g.neighbours(i)].some(
       (j) => j >= 0 && (kindOf(h, j) === "river" || kindOf(h, j) === "lake"),
@@ -412,11 +606,20 @@ export function hexWorld(
           : byWater
             ? TOWN_WATER
             : TOWN_EDGE
-    const at = Math.floor(hash2(seed + 5, g.q[i]!, g.r[i]!) * list.length) % list.length
+    return { list, at: Math.floor(hash2(seed + 5, g.q[i]!, g.r[i]!) * list.length) % list.length }
+  }
+  const buildOf = (i: number): string => {
+    const have = built.get(i)
+    if (have) return have
+    const zone = zoneAt(i)
+    const { list, at } = choice(i)
     let kind = list[at]!
     // a place whose own compound stands already builds no second chapel or graveyard: a cottage
     if (zone && compound.has(z.zoneOf[i]! - 1) && (kind === "monastery" || kind === "graveyard"))
       kind = "cottage"
+    // one archery range a place (user: a camp's ranges stacked into each other): the next kind instead
+    if (ONCE_A_PLACE.has(kind) && zone && placeHas(z.zoneOf[i]! - 1, kind))
+      for (let k = 1; k < list.length && ONCE_A_PLACE.has(kind); k++) kind = list[(at + k) % list.length]!
     // a second drinking place too near the first: the next kind on the list that is not one
     if (DRINKS.has(kind) && nearDrink([i]))
       for (let k = 1; k < list.length && DRINKS.has(kind); k++) kind = list[(at + k) % list.length]!
@@ -480,6 +683,11 @@ export function hexWorld(
         if (drink && nearDrink([i, ...cover], i)) return false
         // every building of it on its floor (sites.ts): dry ground at its level
         if (!standsOn(mirror ? mirrorPrefab(p) : p, i, door)) continue
+        // and every piece of it off the roads (decisions.md "roads are sacred")
+        const bad = placeTile(mirror ? mirrorPrefab(p) : p, at(i), top(i), rotOf(door), i, true, odds).filter(
+          (q) => !offRoad(q, i, nb[door]!),
+        )
+        if (bad.length) continue
         scenes.set(i, scene)
         for (const j of cover) claimedBy.set(j, i)
         if (drink) drinks.push(i, ...cover)
@@ -530,11 +738,42 @@ export function hexWorld(
       .sort((a, b) => steps(a, castleAt) - steps(b, castleAt) || a - b)
     near.some((i) => claim(i, ARENA, true)) || near.some((i) => byLane(i) && claim(i, ARENA))
   }
+  // a place's landmark (a camp's archery range, a mine's head, a lumber camp's mill, a market's hall, a
+  // chapel) stood on its heart, where its roads end: the heart is open ground now (decisions.md "roads
+  // are sacred"), the landmark on a building tile beside it, its door onto the square
+  const landmarkDoor = new Map<number, number>()
+  for (const [zi, zone] of z.zones.entries()) {
+    const mark = HEART[zone.kind]
+    if (!mark || mark === "well-square" || compound.has(zi) || !linkedSides(zone.tile).length) continue
+    if (placeHas(zi, mark)) continue
+    const nb = g.neighbours(zone.tile)
+    const prefab = tilePrefab(mark)
+    // (a tile that would grow a scene of its own, a tavern's garden or a smithy's yard, last)
+    const grows = (j: number) => {
+      const { list, at } = choice(j)
+      return SCENES[list[at]!] ? 1 : 0
+    }
+    const order = [...nb.entries()].sort((a, b) => grows(a[1]) - grows(b[1]) || a[0] - b[0])
+    for (const [d, j] of order) {
+      if (j < 0 || useOf(z, j) !== "building" || z.zoneOf[j] !== zi + 1 || scenes.has(j) || claimedBy.has(j))
+        continue
+      if (Math.abs(h.level[j]! - h.level[zone.tile]!) > 1) continue
+      const door = (d + 3) % 6
+      if (prefab && !standsOn(prefab, j, door)) continue
+      built.set(j, mark)
+      landmarkDoor.set(j, door)
+      break
+    }
+  }
   // then every other tavern, smithy and archery range the tiles picked, where there is room
   for (let i = 0; i < g.size; i++) {
     if (useOf(z, i) !== "building" || scenes.has(i)) continue
-    const scene = SCENES[buildOf(i)]
-    if (scene && (onStreet(i) || byLane(i))) claim(i, scene)
+    const kind = buildOf(i)
+    const scene = SCENES[kind]
+    // (one archery range a place: the tile the camp's landmark stands on grows into it, else one other)
+    if (ONCE_A_PLACE.has(kind) && [...scenes].some(([j, sc]) => sc === scene && z.zoneOf[j] === z.zoneOf[i]))
+      continue
+    if (scene && (onStreet(i) || byLane(i)) && claim(i, scene)) landmarkDoor.delete(i)
   }
   /** The first of `ids` the castle's tier has (a castle piece's `tier`: the first tier that uses it). */
   const atTier = (...ids: string[]): string | null =>
@@ -645,7 +884,7 @@ export function hexWorld(
         }
       } else {
         // a court: paved through along its ways (and out of the gate), dressed round them (castleyard.ts)
-        const sides = [0, 1, 2, 3, 4, 5].filter((e) => nb[e]! >= 0 && (links.get(i)?.has(nb[e]!) ?? false))
+        const sides = linkedSides(i)
         if (sides.length) {
           paths.push(...tilePath([x, zz], t + 0.07, sides, 1.1))
           pathSides = sides
@@ -661,7 +900,7 @@ export function hexWorld(
     } else if (u === "building") {
       prefab = scenes.get(i) ?? buildOf(i)
       const turn = turned.get(i)
-      door = turn?.door ?? (scenes.has(i) ? facing(i) : doorFor(prefab, i))
+      door = turn?.door ?? (scenes.has(i) ? facing(i) : (landmarkDoor.get(i) ?? doorFor(prefab, i)))
       rot = rotOf(door)
       if (turn?.mirror) mirror = true
     } else if (zone?.kind === "harbour" && (u === "yard" || u === "garden" || u === "well" || u === "market"))
@@ -669,98 +908,20 @@ export function hexWorld(
     else if (u === "square") {
       prefab = (compound.has(z.zoneOf[i]! - 1) ? null : HEART[zone?.kind ?? "town"]) ?? "well-square"
       ground = "paved"
-      // a square streets meet on: paved through, the well standing in a corner no street runs to
-      const nb = g.neighbours(i)
-      const sides = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! >= 0 && (links.get(i)?.has(nb[d]!) ?? false))
-      if (prefab === "well-square" && sides.length >= 2) {
+      // a square the roads come to: open ground, paved through to each of them, its well and its lamp
+      // standing where no way runs (its place's own landmark fronts it from a tile beside: `landmarks`)
+      const sides = linkedSides(i)
+      if (sides.length) {
         prefab = null
         paths.push(...tilePath([x, zz], t + 0.07, sides, 1.1))
         pathSides = sides
-        const free = [0, 1, 2, 3, 4, 5].filter((d) => !sides.includes(d))
-        // the free side furthest from every street: the middle of the widest gap
-        const d = free.length ? free[Math.floor(free.length / 2)]! : 0
-        const a = (Math.PI / 180) * (60 * d)
-        const e = HEX_TILE_SIZE * 0.55
-        pieces.push(
-          {
-            piece: recolour("kaykit-hexagon/building-well-yellow", i),
-            x: x + Math.cos(a) * e,
-            y: t,
-            z: zz - Math.sin(a) * e,
-            rot: rotOf((d + 3) % 6),
-            scale: 0.32,
-          },
-          {
-            piece: "kaykit-halloween/post-lantern",
-            x: x + Math.cos(a + 0.9) * e,
-            y: t,
-            z: zz - Math.sin(a + 0.9) * e,
-            rot: 0,
-            scale: 0.55,
-          },
-        )
+        pieces.push(...squareWell(i, [x, zz], t))
       }
-    } else if (u === "road" || u === "bridge") {
-      const nb = g.neighbours(i)
-      // a path only toward the tiles its own roads run on to: no web where two roads lie side by side
-      const sides = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! >= 0 && (links.get(i)?.has(nb[d]!) ?? false))
-      const e = (HEX_TILE_SIZE * Math.sqrt(3)) / 2
-      if (u === "road") {
-        const legs = sides.length ? sides : [0, 3]
-        paths.push(...tilePath([x, zz], t + 0.07, legs))
-        pathSides = legs
-        // stairs down every side where the road steps to a lower road tile: built into the ground from the
-        // shared edge straight out along the lower tile's road strip (never across a hex edge), one stone
-        // step per ~17 cm of drop, about 36° steep
-        for (const d of sides) {
-          const j = nb[d]!
-          const drop = t - top(j)
-          // a bridge's deck meets the bank's road at its own height: no stairs onto it
-          if (drop < 0.3 || useOf(z, j) === "bridge") continue
-          const a = (Math.PI / 180) * (60 * d)
-          const ux = Math.cos(a)
-          const uz = -Math.sin(a)
-          // (a road that must climb three levels at once, zones.ts, gets a longer flight)
-          const run = Math.min(e * (drop > 2 * STEP + 0.01 ? 0.95 : 0.8), drop * 1.35)
-          stairs.push({
-            kind: "stairs",
-            ax: x + ux * e,
-            az: zz + uz * e,
-            ay: t,
-            bx: x + ux * (e + run),
-            bz: zz + uz * (e + run),
-            by: top(j),
-            half: 0.95,
-            steps: Math.max(2, Math.round(drop / 0.17)),
-          })
-        }
-      } else {
-        // a wooden bridge: a plank deck from the centre out through each side its road crosses, from bank to
-        // bank (each leg runs a little onto its bank's road), sloping between the banks' heights; posts and
-        // rails are built with it (ground.ts `hexStructures`)
-        const legs = sides.length ? sides : [0, 3]
-        const mid = deckY(i)
-        const bridge: HexBridge = { tile: i, legs: [], bed: t - 0.6 }
-        for (const d of legs) {
-          const j = nb[d]!
-          const a = (Math.PI / 180) * (60 * d)
-          const ux = Math.cos(a)
-          const uz = -Math.sin(a)
-          const onto = j >= 0 && useOf(z, j) === "bridge"
-          const reach = onto ? e : e + 0.45
-          bridge.legs.push({
-            kind: "deck",
-            ax: x,
-            az: zz,
-            ay: mid,
-            bx: x + ux * reach,
-            bz: zz + uz * reach,
-            by: onto ? (mid + deckY(j)) / 2 : j >= 0 ? Math.max(0, top(j)) + DECK_LIFT : mid,
-            half: 1,
-          })
-        }
-        bridges.push(bridge)
-      }
+    } else if (u === "road") {
+      const legs = linkedSides(i)
+      if (!legs.length) legs.push(0, 3)
+      paths.push(...tilePath([x, zz], t + 0.07, legs))
+      pathSides = legs
     } else if (u === "dock" && !quayed.has(i)) {
       prefab = "dock"
       // the pier runs out from the shore: its land end toward the dry tile beside it, a harbour's first
@@ -795,9 +956,17 @@ export function hexWorld(
       // a castle's tiles all take its keep's colour
       const hue = zone?.kind === "castle" ? zone.tile : i
       const placed = placeTile(p, [x, zz], prefab === "dock" ? SEA_TOP : t, rot, i, true, odds)
-      // every building on its floor: dry ground at its own level, clear of the buildings beside it
-      if (prefab !== "dock") settlePieces(placed, [x, zz], (px, pz) => floorAt(px, pz, t), bodies)
-      const own = placed.map((q) => ({ ...q, piece: recolour(q.piece, hue) }))
+      // every building on its floor: dry ground at its own level, off the roads (its doorstep aside),
+      // clear of the buildings beside it
+      const from = door !== undefined ? g.neighbours(i)[door]! : -1
+      if (prefab !== "dock")
+        settlePieces(
+          placed,
+          [x, zz],
+          (px, pz) => floorAt(px, pz, t) && !ways.on(px, pz, ROAD_MARGIN, i, from),
+          bodies,
+        )
+      const own = keepOffRoads(placed, [x, zz], i, from).map((q) => ({ ...q, piece: recolour(q.piece, hue) }))
       pieces.push(...own)
       // a building's front door: its biggest building piece's (its doorway once every piece is fitted)
       if (door !== undefined) {
@@ -924,6 +1093,13 @@ export function hexWorld(
   }
   // every wall and tower on its own tile's seat too: none reaches over a step, water or the shore
   const seats = seatTiles(h, { tiles, pieces })
+  /** The pieces off the roads before the seats are fitted: none is moved onto one. */
+  const doorFrom = (p: PlacedPiece): [number, number] => {
+    const own = tileAt(p.x, p.z)
+    const t = own >= 0 && byTile.has(own) ? tiles[byTile.get(own)!]! : undefined
+    return [own, t?.door !== undefined ? g.neighbours(own)[t.door]! : -1]
+  }
+  const offBefore = new Set(pieces.filter((p) => offRoad(p, ...doorFrom(p))))
   const topOf = (i: number) => tiles[byTile.get(i)!]!.top
   const fit = (only: (p: PlacedPiece) => boolean) =>
     fitToTiles(
@@ -945,6 +1121,7 @@ export function hexWorld(
       // neighbours: what is left is the rest (walls, towers, hedges, a scene's pieces)
       only,
       (p) => {
+        if (offBefore.has(p) && !offRoad(p, ...doorFrom(p))) return false
         const r = bodyRadius(p)
         if (!r) return true
         return pieces.every((o) => {
@@ -996,6 +1173,34 @@ export function hexWorld(
   }
   const walkways = [...stairs, ...bridges.flatMap((b) => b.legs), ...decks]
   const grown = nature ? growNatureOn(nature) : undefined
+  // the last word: nothing left standing over a road (a tree grown to its edge, a piece the seats moved)
+  {
+    const kept: PlacedPiece[] = []
+    const byOwn = new Map<number, PlacedPiece[]>()
+    for (const p of pieces) {
+      const kind = solidKind(p.piece)
+      // (the castle's curtain wall is laid clear of its ways as it is built: `castleWall`)
+      if (!kind || CURTAIN.test(p.piece) || offRoad(p, ...doorFrom(p))) {
+        kept.push(p)
+        continue
+      }
+      if (kind !== "building") continue
+      const [own] = doorFrom(p)
+      if (!byOwn.has(own)) byOwn.set(own, [])
+      byOwn.get(own)!.push(p)
+    }
+    for (const [own, list] of byOwn) {
+      const t = own >= 0 && byTile.has(own) ? tiles[byTile.get(own)!]! : undefined
+      const from = t?.door !== undefined ? g.neighbours(own)[t.door]! : -1
+      kept.push(...keepOffRoads(list, t ? [t.x, t.z] : [list[0]!.x, list[0]!.z], own, from))
+    }
+    if (kept.length !== pieces.length) {
+      const keep = new Set(kept)
+      const left = pieces.filter((p) => keep.has(p))
+      pieces.length = 0
+      pieces.push(...left)
+    }
+  }
   return {
     tiles,
     doorways,

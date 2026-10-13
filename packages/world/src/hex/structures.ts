@@ -118,7 +118,9 @@ function stairsInto(s: Soup, st: HexWalkway) {
     const cx = st.ax + ux * tread * (k + 0.5)
     const cz = st.az + uz * tread * (k + 0.5)
     s.box(cx, cz, ux, uz, tread, st.half * 2, foot, y, k % 2 ? TREAD_ALT : TREAD)
-    for (const side of [-1, 1])
+    for (const side of [-1, 1]) {
+      // (a foot left open where the road it lands on turns off: collide.ts `open`)
+      if (k >= n - (st.open?.[side < 0 ? 0 : 1] ?? 0)) continue
       s.box(
         cx - uz * side * (st.half + CHEEK_OUT),
         cz + ux * side * (st.half + CHEEK_OUT),
@@ -130,6 +132,7 @@ function stairsInto(s: Soup, st: HexWalkway) {
         y + 0.12,
         CHEEK,
       )
+    }
   }
 }
 
@@ -249,7 +252,7 @@ function bridgeInto(s: Soup, b: HexBridge, seed: number) {
         const n = Math.max(1, Math.ceil(l / POST_GAP))
         for (let j = i === 0 ? 0 : 1; j <= n; j++) {
           const f = j / n
-          if (hub && f * l < 1.3) continue
+          if (hub && f * l < (legs[lines.indexOf(line)]?.rails ?? 1.3)) continue
           const e = at(i, f, k * out)
           rail.push(e)
           const bank = (i === 0 && j === 0 && !hub) || (i === last && j === n)

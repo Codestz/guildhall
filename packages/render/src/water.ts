@@ -218,6 +218,10 @@ bool wInland = vInland > 0.5;
 float wD = shoreD / uUnit;
 vec2 wQ = vWorld / uUnit;
 float wFar = length(vViewPosition);
+// The pixel's footprint, in shore distance (wDw) and in V1 units of place (wQw): a pattern finer than
+// it fades to its average, as a texture's mip would, instead of flickering from frame to frame.
+float wDw = fwidth(wD);
+float wQw = length(fwidth(wQ));
 vec2 wSlope = waveSlope(vWorld, uTime) * mix(1.0, 0.5, smoothstep(40.0, 300.0, wFar));
 // V1's broad swell: a slow, large noise that still reads as streaks from the whole-island view.
 vec2 wBroad = vWorld * 0.09 + vec2(0.05, 0.03) * uTime;
@@ -267,14 +271,20 @@ if (wShallow > 0.01) {
 	vec2 cq = wQ * 1.9;
 	float c1 = waterNoise(cq + vec2(0.021, 0.013) * uTime * 6.0);
 	float c2 = waterNoise(cq * 1.31 - vec2(0.017, -0.019) * uTime * 6.0 + vec2(5.0, 2.0));
-	float net = 1.0 - smoothstep(0.0, 0.05, abs(c1 - c2));
+	// the net's lines are ~0.05 of a noise step wide: spread over the pixel's change of c1 - c2, as
+	// bright as their share of it
+	float netFw = 0.05 + 3.8 * wQw;
+	float net = (1.0 - smoothstep(0.0, netFw, abs(c1 - c2))) * sqrt(0.05 / netFw);
 	diffuseColor.rgb += vec3(0.85, 1.0, 0.95) * net * net * wShallow * (wInland ? 0.25 : 0.45) * (1.0 - wNight);
 }
 // Foam: a soft rim where the water meets the land, and wave lines rolling in toward the shore.
-float foam = 1.0 - smoothstep(0.05, wBreak * 0.35 + 0.55, wD);
+// the rim's soft edge is never narrower than a pixel
+float foam = 1.0 - smoothstep(0.05, wBreak * 0.35 + 0.55 + wDw, wD);
 if (!wInland) {
 	float band = fract(wD * 0.42 - uTime * 0.22 + wBreak * 0.9);
 	float lines = smoothstep(0.78, 0.93, band) * (1.0 - smoothstep(0.93, 1.0, band));
+	// a line is ~a seventh of its cycle: once a cycle spans under ~5 pixels the lines melt into their mean
+	lines = mix(lines, 0.1, smoothstep(0.08, 0.22, 0.42 * wDw));
 	foam = max(foam, lines * (1.0 - smoothstep(0.6, 3.2, wD)) * smoothstep(0.35, 0.65, wBreak + 0.25));
 } else {
 	foam *= 0.8;
@@ -323,13 +333,23 @@ if (uReflect > 0.5) {
 	outgoingLight = mix(outgoingLight, uBank * (0.4 + 0.6 * dot(uSkyHorizon, vec3(0.33))), 0.45 * bank * (0.35 + fresnel));
 	// The glint path: a broad sheen toward the sun and sparkles where a wave faces it exactly.
 	float toward = max(dot(r, uSunDirection), 0.0);
-	float glint = 0.18 * pow(toward, 60.0) + 2.4 * pow(toward, 900.0);
+	// Specular anti-aliasing: where the normal turns across the pixel, a lobe sharper than that turn
+	// would light single pixels on and off as the view moves; it widens to the turn and dims to keep
+	// its energy, the glow a supersampled pixel would show.
+	vec3 nTurn = fwidth(n);
+	float nVar = dot(nTurn, nTurn);
+	float glintP = 900.0 / (1.0 + 900.0 * 2.0 * nVar);
+	float sheenP = 60.0 / (1.0 + 60.0 * 2.0 * nVar);
+	float specP = 220.0 / (1.0 + 220.0 * nVar);
+	float glint = 0.18 * (sheenP + 1.0) / 61.0 * pow(toward, sheenP) + 2.4 * (glintP + 1.0) / 901.0 * pow(toward, glintP);
 	// a river's chop faces the sun at every other ripple: inland, only a few glints, or it reads as snow
 	glint *= wInland ? 0.15 : 1.0;
 	outgoingLight += uSunColor * glint * cloudShade() * (1.0 - foam) * smoothstep(0.0, 0.08, uSunDirection.y);
 	// V1's glints: the key light off the ripples, broken up by a fine noise (bright: the bloom takes them).
 	float wSparkle = waterNoise(wQ * 6.0 + wSlope * 4.0);
-	float spec = pow(max(dot(n, normalize(uSunDirection + toEye)), 0.0), 220.0) * (wSparkle * 1.6 + 0.6) * (wInland ? 0.15 : 1.0);
+	// the sparkle noise is ~0.1 m a cell: under a pixel it is its mean
+	wSparkle = mix(wSparkle, 0.5, smoothstep(0.3, 0.7, 6.0 * wQw));
+	float spec = (specP + 1.0) / 221.0 * pow(max(dot(n, normalize(uSunDirection + toEye)), 0.0), specP) * (wSparkle * 1.6 + 0.6) * (wInland ? 0.15 : 1.0);
 	outgoingLight += uSunColor * spec * 1.2 * cloudShade() * (1.0 - foam) * smoothstep(0.0, 0.08, uSunDirection.y);
 } else {
 	float level = clamp(dot(inverseTransformDirection(normal, viewMatrix), toEye), 0.0, 1.0);

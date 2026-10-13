@@ -35,6 +35,7 @@ import {
   type Post,
   type PostAa,
   type StaticBatch,
+  setLod,
   shoreFieldTexture,
   type TerrainMesh,
   type Water,
@@ -171,6 +172,8 @@ export const hexWorldScreen: Screen = {
     // the worker starts first: it builds while the stage, its context and the catalog get ready
     const step = num("step", LEVEL_STEP)
     const detail = ctx.query.get("detail") !== "0"
+    // `?lod=0`: every piece at full detail at any distance, the reference a LOD change is judged against
+    setLod(ctx.query.get("lod") !== "0")
     // the nature knobs (?tree= ?pine= ?bush= ?rock= ?grass= ?flower= ?woods= ?wild=), for side-by-sides
     const nature = natureOf(ctx.query)
     // the hex map's shape knobs (?coast= ?hills= ?rain= ?forest=): `/lab/hexmap`'s island in 3D

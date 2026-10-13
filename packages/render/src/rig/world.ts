@@ -91,6 +91,18 @@ export function floorAt(world: World, x: number, z: number): number {
 }
 
 /**
+ * The near plane for an eye `height` metres over the floor under it: a hundredth of that height, within
+ * [NEAR.min, NEAR.max]. A fixed 5 cm near spends the depth buffer's precision on the first metres: from
+ * the farthest zoom (~240 m up, ~400 m to the ground) one 24-bit depth step was ~0.2 m, so the road
+ * strips, the decks and the ground under them traded places from frame to frame. Nothing stands within a
+ * hundredth of the eye's height of it unless it is about as high as the eye.
+ */
+export const NEAR = { min: 0.05, max: 1.5, share: 0.01 } as const
+export function nearPlane(height: number): number {
+  return Math.min(NEAR.max, Math.max(NEAR.min, height * NEAR.share))
+}
+
+/**
  * How far the frame's top corners reach to meet the floor, metres along the ray, from `height` over it
  * looking `elevation` degrees down; Infinity when they see the horizon.
  */

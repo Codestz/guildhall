@@ -10,6 +10,8 @@ import {
   floorAt,
   type Lens,
   LIMITS,
+  NEAR,
+  nearPlane,
   pitchCeiling,
   restingTilt,
   seesNoCut,
@@ -191,5 +193,21 @@ describe("the leash and the free roam", () => {
     expect(clampEye([700, 50, -700], LEASHED, LENS)[0]).toBe(700)
     expect(clampEye([900, 50, 0], LEASHED, LENS)[0]).toBe(800)
     expect(clampEye([900, 50, 0], ISLAND, LENS)[0]).toBe(500)
+  })
+})
+
+describe("nearPlane", () => {
+  test("a hundredth of the eye's height over the floor, never under 5 cm nor over NEAR.max", () => {
+    expect(nearPlane(1.6)).toBe(NEAR.min)
+    expect(nearPlane(43)).toBeCloseTo(0.43)
+    expect(nearPlane(240)).toBe(NEAR.max)
+    expect(nearPlane(-3)).toBe(NEAR.min)
+  })
+
+  test("from the farthest zoom a 24-bit depth step at the ground is ~30 times finer than with a 5 cm near", () => {
+    // one depth step at distance z: z^2 / (near * 2^24)
+    const step = (near: number, z: number) => (z * z) / (near * 2 ** 24)
+    expect(step(NEAR.min, 400)).toBeGreaterThan(0.18)
+    expect(step(nearPlane(240), 400)).toBeLessThan(0.007)
   })
 })

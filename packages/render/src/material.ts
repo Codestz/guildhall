@@ -1,5 +1,6 @@
 import { MeshStandardMaterial } from "three"
 import { patchCloudShade } from "./atmosphere/shade.ts"
+import { patchLodFade } from "./lodFade.ts"
 import { patchGlow } from "./night/glow.ts"
 import { patchCascades } from "./sun/patch.ts"
 
@@ -22,4 +23,29 @@ export function paletteMaterial(): MeshStandardMaterial {
     }
   }
   return shared
+}
+
+const batched: (MeshStandardMaterial | null)[] = [null, null]
+
+/**
+ * The palette material as the static batch draws it: the same light, plus the batch's LOD
+ * transitions (`lodFade.ts`). `dither`: the one for the draws mid-crossfade, which discards half
+ * their pixels; the batch's other draws use the plain one, so only those few pay for the discard.
+ * Shared.
+ */
+export function batchMaterial(dither = false): MeshStandardMaterial {
+  const k = dither ? 1 : 0
+  let material = batched[k]
+  if (!material) {
+    material = new MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 })
+    material.onBeforeCompile = (shader) => {
+      patchCascades(shader)
+      patchCloudShade(shader)
+      patchGlow(shader)
+      patchLodFade(shader, dither)
+    }
+    material.customProgramCacheKey = () => (dither ? "guildhall-batch-dither" : "guildhall-batch")
+    batched[k] = material
+  }
+  return material
 }

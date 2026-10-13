@@ -18,16 +18,10 @@ import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import { createStaticBatch } from "../src/batch.ts"
 import { batchGeometry } from "../src/batchGeometry.ts"
 import { LodBatchedMesh } from "../src/batchMesh.ts"
+import { DETAIL_FADE_PX, DETAIL_RADIUS, fadeWeight, SHELL, SWAP_PX, screenRadius } from "../src/lod.ts"
+import { FADE_STEPS, ID_BITS, inCode, keeps, outCode, packDraw, shrinkCode } from "../src/lodFade.ts"
 import {
-  DETAIL_PX,
-  DETAIL_RADIUS,
-  PIECE_PX,
-  pickTier,
-  pieceThresholds,
-  SHELL,
-  screenRadius,
-} from "../src/lod.ts"
-import {
+  lodError,
   shellGeometry,
   simplifierReady,
   simplifyGeometry,
@@ -61,18 +55,35 @@ function twoToneSphere(): BufferGeometry {
   return batchGeometry(new Mesh(mergeVertices(sphere)))
 }
 
-describe("pickTier", () => {
-  test("steps coarser as the radius shrinks past each boundary", () => {
-    expect([100, 30, 5].map((px) => pickTier(px, 0, [40, 12], 0))).toEqual([0, 1, 2])
+describe("fadeWeight", () => {
+  test("a weight runs from 0 above the band to 1 below it, linearly between", () => {
+    expect(fadeWeight(2, [0.5, 1])).toBe(0)
+    expect(fadeWeight(0.75, [0.5, 1])).toBe(0.5)
+    expect(fadeWeight(0.2, [0.5, 1])).toBe(1)
+  })
+})
+
+describe("fade codes", () => {
+  test("the two sides of a crossfade cover every pixel exactly once, in the weight's share", () => {
+    for (const w of [0.1, 0.5, 0.9]) {
+      let coarse = 0
+      for (let k = 0; k < 1000; k++) {
+        const d = (k + 0.5) / 1000
+        const a = keeps(inCode(w), d)
+        const b = keeps(outCode(w), d)
+        expect(a !== b).toBe(true)
+        if (a) coarse++
+      }
+      expect(coarse / 1000).toBeCloseTo(w, 1)
+    }
   })
 
-  test("holds its tier inside the band on either side of a boundary", () => {
-    // 38 px is under the 40 px boundary but inside its 15 % band: it stays where it was.
-    expect(pickTier(38, 0, [40, 12])).toBe(0)
-    expect(pickTier(42, 1, [40, 12])).toBe(1)
-    // Past the band it moves.
-    expect(pickTier(33, 0, [40, 12])).toBe(1)
-    expect(pickTier(47, 1, [40, 12])).toBe(0)
+  test("no weight is drawn whole; the instance id survives the packing", () => {
+    expect(outCode(0)).toBe(0)
+    expect(inCode(1)).toBe(FADE_STEPS)
+    expect(shrinkCode(1)).toBe(0)
+    expect(packDraw(12345, outCode(0.5)) & ((1 << ID_BITS) - 1)).toBe(12345)
+    expect(packDraw(12345, shrinkCode(0.5)) >>> ID_BITS).toBe(shrinkCode(0.5))
   })
 })
 
@@ -92,6 +103,14 @@ describe("simplifyGeometry", () => {
     expect(tris(coarse)).toBeLessThan(tris(sphere) * 0.5)
     for (const name of ["position", "normal", "color", "_swatch", "_shade", "_ao"])
       expect(coarse.getAttribute(name)).toBeDefined()
+  })
+
+  test("records how far the coarser copy strays, in the geometry's own metres", () => {
+    const sphere = twoToneSphere()
+    const coarse = simplifyGeometry(sphere, { ratio: 0.1, error: 0.2 })
+    expect(lodError(coarse)).toBeGreaterThan(0)
+    expect(lodError(coarse)).toBeLessThan(0.2 * 2 + 1e-6)
+    expect(lodError(sphere)).toBe(0)
   })
 
   test("never bleeds a swatch: every triangle stays one swatch, and both swatches stay", () => {
@@ -171,6 +190,17 @@ describe("shellGeometry", () => {
     expect(tris(shell)).toBeLessThan(tris(big))
   })
 
+  test("its error counts the parts it leaves out at their whole size", () => {
+    const shell = shellGeometry(
+      [
+        { geometry: big, matrix: at(0) },
+        { geometry: small, matrix: at(3) },
+      ],
+      SHELL,
+    )
+    expect(lodError(shell)).toBeGreaterThanOrEqual(2 * small.boundingSphere!.radius - 1e-6)
+  })
+
   test("keeps every part when all are small", () => {
     const shell = shellGeometry(
       [
@@ -183,28 +213,35 @@ describe("shellGeometry", () => {
   })
 })
 
-/** A batch with tiers: one far-reaching camera pass, counting what it drew. */
+/** A batch with tiers: one camera pass, counting what it drew. */
 describe("LodBatchedMesh", () => {
-  const renderer = {
-    getDrawingBufferSize: (v: { set(x: number, y: number): void }) => v.set(1600, 1000),
-    getPixelRatio: () => 1,
-  }
+  const renderer = (dpr = 1) => ({
+    getDrawingBufferSize: (v: { set(x: number, y: number): void }) => v.set(1600 * dpr, 1000 * dpr),
+    getPixelRatio: () => dpr,
+  })
+  // CSS px a metre covers at 1 m: the fov-40 lens's y scale (2.747) on a 1000 px high view, halved
+  const perMetre = (2.747 * 1000) / 2
+  /** The distance at which `metres` covers `px` CSS pixels. */
+  const at = (metres: number, px: number) => (metres * perMetre) / px
   const camera = (z: number) => {
-    const c = new PerspectiveCamera(40, 1.6, 0.1, 5000)
+    const c = new PerspectiveCamera(40, 1.6, 0.1, 50000)
     c.position.set(0, 0, z)
     c.lookAt(0, 0, 0)
     c.updateMatrixWorld()
     return c
   }
+  const ERROR = 0.05
 
   function mesh() {
     const full = twoToneSphere()
     const coarse = simplifyGeometry(full, { ratio: 0.3, error: 0.2 })
-    const m = new LodBatchedMesh(4, 2000, 6000, new MeshBasicMaterial())
+    const m = new LodBatchedMesh(8, 2000, 6000, new MeshBasicMaterial())
     const base = m.addGeometry(full)
     const tier = m.addGeometry(coarse)
     m.setTiers(base, [tier, tier])
+    m.setLodError(tier, ERROR)
     const shellGeometryId = m.addGeometry(coarse)
+    m.setLodError(shellGeometryId, ERROR)
     const part = m.addInstance(base)
     const shell = m.addInstance(shellGeometryId)
     m.addCluster(shell, [part])
@@ -212,33 +249,86 @@ describe("LodBatchedMesh", () => {
     m.setMatrixAt(loose, new Matrix4().makeTranslation(1.5, 0, 0))
     return { m, part, shell, loose, full: tris(full), coarse: tris(coarse) }
   }
-  const pass = (m: LodBatchedMesh, cam: PerspectiveCamera | OrthographicCamera, shadow = false) => {
-    if (shadow) m.onBeforeShadow(renderer as never, m, cam, cam, m.geometry, m.material as never)
-    else m.onBeforeRender(renderer as never, new Scene(), cam, m.geometry, m.material as never)
-    const internal = m as unknown as { _multiDrawCount: number; _multiDrawCounts: Int32Array }
-    return Array.from(internal._multiDrawCounts.slice(0, internal._multiDrawCount)).map((n) => n / 3)
+  type Draws = { tris: number[]; codes: number[]; ids: number[] }
+  const pass = (
+    m: LodBatchedMesh,
+    cam: PerspectiveCamera | OrthographicCamera,
+    shadow = false,
+    dpr = 1,
+  ): Draws => {
+    const r = renderer(dpr)
+    if (shadow) m.onBeforeShadow(r as never, m, cam, cam, m.geometry, m.material as never)
+    else m.onBeforeRender(r as never, new Scene(), cam, m.geometry, m.material as never)
+    const internal = m as unknown as {
+      _multiDrawCount: number
+      _multiDrawCounts: Int32Array
+      _indirectTexture: { image: { data: Uint32Array } }
+    }
+    const n = internal._multiDrawCount
+    const packed = Array.from(internal._indirectTexture.image.data.slice(0, n))
+    return {
+      tris: Array.from(internal._multiDrawCounts.slice(0, n)).map((k) => k / 3),
+      codes: packed.map((v) => v >>> ID_BITS),
+      ids: packed.map((v) => v & ((1 << ID_BITS) - 1)),
+    }
   }
 
-  test("near: the cluster's parts and every piece at full detail", () => {
+  test("near: the cluster's parts and every piece at full detail, drawn whole", () => {
     const { m, full } = mesh()
-    expect(pass(m, camera(4))).toEqual([full, full])
+    const d = pass(m, camera(4))
+    expect(d.tris).toEqual([full, full])
+    expect(d.codes).toEqual([0, 0])
     expect(m.lod).toEqual({ tiers: [2, 0, 0], near: 1, shells: 0 })
   })
 
-  test("far: the cluster as its shell and pieces at their coarse tier", () => {
+  test("far, once the stand-ins stray less than the band: the shell and the coarse tier", () => {
     const { m, coarse } = mesh()
-    const far = camera(((1 * 2.747 * 1000) / 2 / PIECE_PX[1]!) * 3)
-    expect(pass(m, far)).toEqual([coarse, coarse])
+    const d = pass(m, camera(at(ERROR, SWAP_PX[0] / 2)))
+    expect(d.tris).toEqual([coarse, coarse])
+    expect(d.codes).toEqual([0, 0])
     expect(m.lod).toEqual({ tiers: [0, 1, 0], near: 0, shells: 1 })
   })
 
-  test("a shadow pass draws shells and the coarse tier whatever the distance", () => {
+  test("between: both levels, in complementary halves of the dither, never a swap", () => {
+    const { m, part, shell, loose, full, coarse } = mesh()
+    const d = pass(m, camera(at(ERROR, (SWAP_PX[0] + SWAP_PX[1]) / 2)))
+    const of = (id: number) =>
+      d.ids.flatMap((v, k) => (v === id ? [{ tris: d.tris[k], code: d.codes[k] }] : []))
+    // about halfway (the loose piece stands a little farther off than the cluster)
+    const [fine, rough] = of(loose)
+    const q = rough!.code
+    expect(Math.abs(q - inCode(0.5))).toBeLessThanOrEqual(2)
+    expect([fine!.tris, rough!.tris]).toEqual([full, coarse])
+    expect(fine!.code).toBe(outCode(q / FADE_STEPS))
+    const s = of(shell)[0]!
+    expect(s.tris).toBe(coarse)
+    expect(of(part).map((p) => p.code)).toEqual([outCode(s.code / FADE_STEPS)])
+  })
+
+  test("with a dithering material the crossfading draws leave the main list for their own", () => {
+    const { m } = mesh()
+    m.fadeMaterial = new MeshBasicMaterial()
+    const d = pass(m, camera(at(ERROR, (SWAP_PX[0] + SWAP_PX[1]) / 2)))
+    expect(d.codes.every((code) => code === 0)).toBe(true)
+    const fade = (m as unknown as { fade: { count: number } }).fade
+    expect(fade.count).toBe(4)
+  })
+
+  test("every switch is judged in CSS pixels: the same draws at any DPR", () => {
+    const { m } = mesh()
+    const z = at(ERROR, 0.7)
+    expect(pass(m, camera(z), false, 2)).toEqual(pass(m, camera(z), false, 1))
+  })
+
+  test("a shadow pass draws shells and the coarse tier whatever the distance, whole", () => {
     const { m, coarse } = mesh()
     pass(m, camera(4))
     const sun = new OrthographicCamera(-10, 10, 10, -10, 0.1, 100)
     sun.position.set(0, 0, 20)
     sun.updateMatrixWorld()
-    expect(pass(m, sun, true)).toEqual([coarse, coarse])
+    const d = pass(m, sun, true)
+    expect(d.tris).toEqual([coarse, coarse])
+    expect(d.codes).toEqual([0, 0])
     // The main view's counts are not touched by it.
     expect(m.lod.near).toBe(1)
   })
@@ -253,28 +343,23 @@ describe("LodBatchedMesh", () => {
     m.setMatrixAt(big, new Matrix4().makeTranslation(1, 0, 0).scale(new Vector3().setScalar(DETAIL_RADIUS)))
     return m
   }
-  // where a 0.3 m piece is DETAIL_PX / 2 on screen (1000 px high, DPR 1)
-  const pastDetail = (0.3 * 2.747 * 1000) / 2 / (DETAIL_PX / 2)
+  const [shrunk, whole] = DETAIL_FADE_PX
 
-  test("detail is drawn near, and not at all once it is under DETAIL_PX; bigger pieces stay", () => {
+  test("detail shrinks away as it falls through DETAIL_FADE_PX, never blinking out; bigger pieces stay", () => {
     const m = detail()
-    expect(pass(m, camera(4)).length).toBe(2)
-    expect(pass(m, camera(pastDetail)).length).toBe(1)
+    expect(pass(m, camera(at(0.3, whole * 1.01))).codes).toEqual([0, 0])
+    const half = pass(m, camera(at(0.3, (shrunk + whole) / 2)))
+    expect(half.codes).toEqual([shrinkCode(0.5), 0])
+    expect(pass(m, camera(at(0.3, shrunk * 0.99))).ids).toEqual([1])
   })
 
-  test("a shadow pass still draws the detail the main view dropped", () => {
+  test("a shadow pass still draws the detail the main view dropped, full size", () => {
     const m = detail()
-    pass(m, camera(pastDetail))
+    pass(m, camera(at(0.3, shrunk * 0.5)))
     const sun = new OrthographicCamera(-10, 10, 10, -10, 0.1, 100)
     sun.position.set(0, 0, 20)
     sun.updateMatrixWorld()
-    expect(pass(m, sun, true).length).toBe(2)
-  })
-
-  test("the detail cut is in CSS pixels: the same at any DPR", () => {
-    expect(pieceThresholds(0.3, 1).at(-1)).toBe(DETAIL_PX)
-    expect(pieceThresholds(0.3, 2).at(-1)).toBe(DETAIL_PX * 2)
-    expect(pieceThresholds(DETAIL_RADIUS, 2)).toEqual(PIECE_PX)
+    expect(pass(m, sun, true).codes).toEqual([0, 0])
   })
 
   test("instances out of view are not drawn", () => {
@@ -282,7 +367,7 @@ describe("LodBatchedMesh", () => {
     const away = camera(4)
     away.lookAt(0, 0, 100)
     away.updateMatrixWorld()
-    expect(pass(m, away)).toEqual([])
+    expect(pass(m, away).tris).toEqual([])
   })
 })
 

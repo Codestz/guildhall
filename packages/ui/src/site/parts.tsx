@@ -71,3 +71,8 @@ export const BookGlyph = () =>
   )
 export const CheckGlyph = () => svg(<path d="m3.5 8.4 3 3 6-6.4" />, 14)
 export const AlertGlyph = () => svg(<path d="M8 2 14.2 13H1.8zM8 6.4v3M8 11.4v.1" />, 14)
+export const AnchorGlyph = () =>
+  svg(
+    <path d="M8 2.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM8 5.5v8M5.5 8h5M3 9.5c0 2.2 2.2 4 5 4s5-1.8 5-4" />,
+    18,
+  )

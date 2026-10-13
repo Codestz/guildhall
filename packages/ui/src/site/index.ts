@@ -12,6 +12,7 @@ export {
 } from "./BuiltPage.tsx"
 export { CrestMenu, type CrestMenuProps, type SiteDest } from "./CrestMenu.tsx"
 export { DemoPicker, type DemoPickerProps, type Story, type StoryAct } from "./DemoPicker.tsx"
+export { type HarbourEntry, HarbourPage, type HarbourPageProps } from "./HarbourPage.tsx"
 export {
   parseRepo,
   type RepoParse,
@@ -19,5 +20,7 @@ export {
   WELCOME_KEY,
   writeWelcomeDismissed,
 } from "./repo.ts"
+export { SiteNav, type SiteNavId, type SiteNavProps } from "./SiteNav.tsx"
+export { SourcesCard, type SourcesCardProps } from "./SourcesCard.tsx"
 export { holdSiteStyle, SITE_CSS } from "./style.ts"
 export { WelcomeCard, type WelcomeCardProps } from "./WelcomeCard.tsx"

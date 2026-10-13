@@ -198,6 +198,52 @@ button.site-menu-palette:hover { background: var(--raise-2); color: var(--paper)
 .gh .site-back { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 15px; text-decoration: none; background: none; border: 0; cursor: pointer; color: var(--muted); }
 .gh .site-back:hover { color: var(--paper); }
 .gh .site-back-arrow { display: grid; transform: scaleX(-1); }
+/* the top nav of the long pages, right of the crest */
+.gh .site-topnav ul { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0; padding: 0; list-style: none; }
+.gh .site-topnav-link {
+  position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px;
+  font: 400 14px/1 var(--display); letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none; color: var(--muted);
+}
+.gh .site-page .site-topnav-link { color: var(--muted); text-decoration: none; }
+.gh .site-page .site-topnav-link:hover { color: var(--paper); }
+.gh .site-page .site-topnav-link[aria-current="page"] { color: var(--brass-hi); }
+.gh .site-topnav-link[aria-current="page"]::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 6px; height: 1px; background: var(--brass); }
+.gh .site-topnav-short { display: none; }
+
+/* the Harbour: the demo cards, one repo each */
+.gh .site-article.site-harbour { max-width: 1100px; }
+.gh .site-harbour .site-hero { max-width: 832px; }
+.gh .site-harbour-count { margin: 22px 0 0; font: 14px var(--mono); color: var(--faint); }
+.gh .site-harbour-cards { margin: 28px 0 0; }
+.gh .site-harbour .site-card-title { font-size: 20px; text-transform: none; font-variant: all-small-caps; letter-spacing: 0.05em; }
+.gh .site-harbour-owner { color: var(--muted); }
+.gh .site-harbour-figures { margin: 0; font: 13px/1.5 var(--mono); color: var(--brass); }
+.gh .site-harbour-empty { margin: 28px 0 0; padding: 18px 20px; font-size: 16px; color: var(--muted); }
+
+/* Connect a source */
+.gh .site-sources {
+  position: relative; z-index: 1; display: flex; flex-direction: column;
+  width: min(640px, calc(100% - 32px)); max-height: calc(100% - 48px); padding: 0; overflow: hidden; background: var(--ink-solid);
+}
+.gh .site-sources-scroll { overflow-y: auto; padding: 16px 20px 20px var(--site-pad, 20px); display: grid; gap: 16px; font-size: 15px; line-height: 1.55; color: var(--muted); }
+.gh .site-sources-scroll p { margin: 0; }
+.gh .site-sources-lede { font: 17px/1.5 var(--serif); }
+.gh .site-sources-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.gh .site-sources-list li { display: grid; gap: 1px; padding: 8px 12px; border: 1px solid var(--hair); border-radius: var(--r-sm); background: var(--raise); }
+.gh .site-sources-list b { font: 400 16px/1.2 var(--display); letter-spacing: 0.04em; color: var(--paper); }
+.gh .site-steps { display: grid; gap: 12px; margin: 0; padding-left: 22px; }
+.gh .site-steps b { font-weight: 500; color: var(--paper); }
+.gh .site-sources code { font: 0.86em var(--mono); color: var(--paper); background: var(--raise); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.gh .site-sources-note { padding: 10px 12px; border-left: 2px solid var(--brass); background: var(--brass-wash); }
+.gh .site-sources-note b { font-weight: 500; color: var(--paper); }
+@media (max-width: 560px) {
+  .gh .site-layer:has(.site-sources) { align-items: flex-end; }
+  .gh .site-sources { width: 100%; max-height: calc(100% - 44px); border-radius: 14px 14px 0 0; border-bottom: 0; }
+  .gh .site-topnav-link { padding: 0 8px; font-size: 12px; letter-spacing: 0.06em; }
+  .gh .site-topnav-long { display: none; }
+  .gh .site-topnav-short { display: inline; }
+  .gh .site-topnav-link[aria-current="page"]::after { left: 8px; right: 8px; }
+}
 .gh .site-article { max-width: 832px; margin: 0 auto; padding: 0 16px 56px; outline: none; }
 .gh .site-hero { padding: 24px 0 8px; }
 .gh .site-hero h1 { margin: 6px 0 0; font: 400 clamp(36px, 7vw, 56px)/1.1 var(--display); letter-spacing: 0.02em; color: var(--paper); text-wrap: balance; }

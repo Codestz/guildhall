@@ -8,13 +8,19 @@ import { useId, useRef, useState } from "react"
 import { Kbd } from "../components/controls.tsx"
 import { Crest } from "../hud/glyphs.tsx"
 import { focusables, useDialog } from "./hooks.ts"
-import { BookGlyph, Dest, FlagGlyph, RepoGlyph, StudioGlyph } from "./parts.tsx"
+import { AnchorGlyph, BookGlyph, Dest, FlagGlyph, RepoGlyph, StudioGlyph } from "./parts.tsx"
 
-export type SiteDest = "repo" | "demos" | "studio" | "built"
+export type SiteDest = "repo" | "demos" | "harbour" | "studio" | "built"
 
 const ENTRIES: readonly { id: SiteDest; label: string; hint: string; glyph: () => React.ReactNode }[] = [
   { id: "repo", label: "Your repo", hint: "Grow any public repo into an island", glyph: RepoGlyph },
   { id: "demos", label: "Demos", hint: "Stories, crowds and real repos, one link away", glyph: FlagGlyph },
+  {
+    id: "harbour",
+    label: "Harbour",
+    hint: "Every repo chronicled from its first commit",
+    glyph: AnchorGlyph,
+  },
   { id: "studio", label: "Studio", hint: "The workshop: pieces, tiles, people", glyph: StudioGlyph },
   { id: "built", label: "How it's built", hint: "The engineering, with the journey", glyph: BookGlyph },
 ]
@@ -32,6 +38,8 @@ export interface CrestMenuProps {
   shortcut?: readonly string[]
   /** Makes the hint a button that opens the palette. */
   onPalette?(): void
+  /** Adds "Connect a source" to the foot: how to point the island at your own agents. */
+  onSources?(): void
 }
 
 export function CrestMenu({
@@ -42,6 +50,7 @@ export function CrestMenu({
   onOpenChange,
   shortcut = ["⌘", "K"],
   onPalette,
+  onSources,
 }: CrestMenuProps) {
   const id = useId()
   const [inner, setInner] = useState(false)
@@ -128,6 +137,18 @@ export function CrestMenu({
               </ul>
             </nav>
             <div className="site-menu-foot">
+              {onSources && (
+                <button
+                  type="button"
+                  className="site-menu-palette"
+                  onClick={() => {
+                    set(false)
+                    onSources()
+                  }}
+                >
+                  Connect a source
+                </button>
+              )}
               {onPalette ? (
                 <button
                   type="button"

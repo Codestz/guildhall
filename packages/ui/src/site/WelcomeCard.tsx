@@ -14,6 +14,8 @@ export interface WelcomeCardProps {
   onGenerate(slug: string): void
   onDemo(): void
   onBuilt(): void
+  /** "Connect a source": how to point the island at your own agents (a small third link). */
+  onSources?(): void
   /** The close button or Esc: the caller remembers it (`writeWelcomeDismissed`). */
   onDismiss(): void
   /** Real addresses for the two links, so they open in a new tab like any link. */
@@ -31,6 +33,7 @@ export function WelcomeCard({
   onGenerate,
   onDemo,
   onBuilt,
+  onSources,
   onDismiss,
   demoHref,
   builtHref,
@@ -118,6 +121,14 @@ export function WelcomeCard({
             <Dest href={builtHref} onNavigate={onBuilt} className="site-link">
               How it's built
             </Dest>
+            {onSources && (
+              <>
+                <span aria-hidden="true">·</span>
+                <button type="button" className="site-link" onClick={onSources}>
+                  Connect a source
+                </button>
+              </>
+            )}
           </nav>
           <IconButton label="Dismiss the welcome" onClick={onDismiss}>
             <CloseGlyph size={14} />

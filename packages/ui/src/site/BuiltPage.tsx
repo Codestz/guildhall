@@ -7,6 +7,7 @@
 import { Fragment, type ReactNode, useId } from "react"
 import { roman } from "../components/controls.tsx"
 import { ArrowIcon, Dest } from "./parts.tsx"
+import { SiteNav, type SiteNavProps } from "./SiteNav.tsx"
 
 export type Block =
   | { kind: "p"; text: string }
@@ -62,6 +63,8 @@ export interface BuiltPageProps {
   /** Back to the island. */
   onBack(): void
   backHref?: string
+  /** The top nav (island, demos, harbour, this page); without it the bar is a single link back. */
+  nav?: SiteNavProps
   /** A "Try it" link inside the page, handled by the shell (a story, a repo). */
   onTry?(href: string): void
 }
@@ -209,7 +212,7 @@ function Blocks({ blocks, onTry }: { blocks: readonly Block[]; onTry: BuiltPageP
   )
 }
 
-export function BuiltPage({ content: c, onBack, backHref, onTry }: BuiltPageProps) {
+export function BuiltPage({ content: c, onBack, backHref, nav, onTry }: BuiltPageProps) {
   const toc = [
     ...c.sections.map((s) => ({ id: s.id, title: s.title })),
     { id: "journey", title: c.journey.title },
@@ -220,12 +223,16 @@ export function BuiltPage({ content: c, onBack, backHref, onTry }: BuiltPageProp
         Skip to the article
       </a>
       <header className="site-page-top">
-        <Dest href={backHref} onNavigate={onBack} className="site-back">
-          <span className="site-back-arrow">
-            <ArrowIcon />
-          </span>
-          Back to the island
-        </Dest>
+        {nav ? (
+          <SiteNav {...nav} />
+        ) : (
+          <Dest href={backHref} onNavigate={onBack} className="site-back">
+            <span className="site-back-arrow">
+              <ArrowIcon />
+            </span>
+            Back to the island
+          </Dest>
+        )}
       </header>
       <main id="built-main" className="site-article" tabIndex={-1}>
         <div className="site-hero">

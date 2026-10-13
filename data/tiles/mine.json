@@ -1,14 +1,14 @@
 {
   "blockers": [
     {
-      "r": 1.935,
+      "r": 1.988,
       "x": 0,
-      "z": 0
+      "z": -0.4
     },
     {
-      "r": 0.5,
-      "x": 1.846,
-      "z": 1.111
+      "r": 0.537,
+      "x": 1.95,
+      "z": 1.35
     }
   ],
   "ground": "rock",
@@ -19,29 +19,29 @@
     {
       "piece": "kaykit-hexagon/building-mine-blue",
       "rot": 0,
-      "scale": 0.42,
+      "scale": 0.36,
       "x": 0,
-      "z": 0
+      "z": -0.4
     },
     {
       "piece": "kaykit-resources/stone-chunks-large",
       "rot": 0,
-      "scale": 0.6,
-      "x": 1.846,
-      "z": 1.111
+      "scale": 0.55,
+      "x": 1.95,
+      "z": 1.35
     }
   ],
   "spots": [
     {
       "clip": "Pickaxing",
-      "facing": 1.077,
+      "facing": 2.28,
       "kind": "work",
       "prop": "kaykit-tools/pickaxe",
       "roles": [
         "miner"
       ],
-      "x": 1.35,
-      "z": 0.85
+      "x": 1.25,
+      "z": 1.95
     }
   ]
 }

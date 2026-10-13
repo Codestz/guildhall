@@ -1,59 +1,94 @@
 {
   "blockers": [
     {
-      "r": 1.21,
+      "r": 1.271,
       "x": 0,
-      "z": -0.4
+      "z": 0.9
     },
     {
-      "r": 0.408,
-      "x": -5.25,
-      "z": 2.085
-    },
-    {
-      "r": 0.408,
-      "x": -3.75,
-      "z": 3.485
-    },
-    {
-      "r": 0.408,
-      "x": 5.25,
-      "z": 2.085
-    },
-    {
-      "r": 0.408,
-      "x": 3.75,
-      "z": 3.485
-    },
-    {
-      "r": 0.345,
-      "x": -6.35,
-      "z": 3.085
-    },
-    {
-      "r": 0.345,
-      "x": -6.15,
-      "z": 3.635
-    },
-    {
-      "r": 0.98,
-      "x": 6.2,
-      "z": 3.935
-    },
-    {
-      "r": 0.399,
-      "x": 6.25,
-      "z": 2.085
-    },
-    {
-      "r": 0.275,
-      "x": 1.9,
-      "z": 1.5
-    },
-    {
-      "r": 0.482,
+      "r": 0.858,
       "x": 0,
+      "z": -1.85
+    },
+    {
+      "r": 0.858,
+      "x": -2,
+      "z": -0.6
+    },
+    {
+      "r": 0.858,
+      "x": 2,
+      "z": -0.6
+    },
+    {
+      "r": 0.858,
+      "x": -2.75,
+      "z": 2.45
+    },
+    {
+      "r": 0.858,
+      "x": 2.75,
+      "z": 2.45
+    },
+    {
+      "r": 0.43,
+      "x": -1.35,
+      "z": 2.45
+    },
+    {
+      "r": 0.43,
+      "x": 1.35,
+      "z": 2.45
+    },
+    {
+      "r": 1.033,
+      "x": -5.35,
+      "z": 3.3
+    },
+    {
+      "r": 0.417,
+      "x": -5.9,
+      "z": 2.1
+    },
+    {
+      "r": 0.391,
+      "x": -5.9,
+      "z": 2.1
+    },
+    {
+      "r": 0.417,
+      "x": -5.45,
+      "z": 1.7
+    },
+    {
+      "r": 0.285,
+      "x": -6.3,
+      "z": 2.6
+    },
+    {
+      "r": 1.086,
+      "x": 5.35,
+      "z": 3.3
+    },
+    {
+      "r": 0.299,
+      "x": 5.95,
       "z": 2.2
+    },
+    {
+      "r": 0.299,
+      "x": 6.3,
+      "z": 2.65
+    },
+    {
+      "r": 0.407,
+      "x": 5.6,
+      "z": 1.7
+    },
+    {
+      "r": 0.505,
+      "x": 4.4,
+      "z": 1.25
     }
   ],
   "footprint": [
@@ -66,193 +101,234 @@
   "name": "Market square",
   "pieces": [
     {
-      "piece": "kaykit-hexagon/building-market-red",
+      "piece": "kenney-town/fountain-round-detail",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.36,
+      "x": 0,
+      "z": 0.9
+    },
+    {
+      "piece": "kenney-town/stall-red",
       "rot": 0,
       "scale": 0.42,
       "x": 0,
-      "z": -0.4
-    },
-    {
-      "piece": "kenney-town/stall-red",
-      "rot": 0,
-      "scale": 0.42,
-      "x": -5.25,
-      "z": 2.085
+      "z": -1.85
     },
     {
       "piece": "kenney-town/stall-green",
-      "rot": 3.142,
+      "rot": 0.927,
       "scale": 0.42,
-      "x": -3.75,
-      "z": 3.485
-    },
-    {
-      "piece": "kenney-town/stall-red",
-      "rot": 0,
-      "scale": 0.42,
-      "x": 5.25,
-      "z": 2.085
+      "x": -2,
+      "z": -0.6
     },
     {
       "piece": "kenney-town/stall-green",
-      "rot": 3.142,
+      "rot": -0.927,
       "scale": 0.42,
-      "x": 3.75,
-      "z": 3.485
+      "x": 2,
+      "z": -0.6
+    },
+    {
+      "piece": "kenney-town/stall-red",
+      "rot": 2.084,
+      "scale": 0.42,
+      "x": -2.75,
+      "z": 2.45
+    },
+    {
+      "piece": "kenney-town/stall-red",
+      "rot": -2.084,
+      "scale": 0.42,
+      "x": 2.75,
+      "z": 2.45
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": -0.8,
+      "scale": 0.55,
+      "x": -1.35,
+      "z": 2.45
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0.8,
+      "scale": 0.55,
+      "x": 1.35,
+      "z": 2.45
+    },
+    {
+      "piece": "kenney-town/cart-high",
+      "rot": 0.9,
+      "scale": 0.38,
+      "x": -5.35,
+      "z": 3.3
     },
     {
       "piece": "kenney-pirate/crate",
       "rot": 0.2,
       "scale": 0.45,
-      "x": -6.35,
-      "z": 3.085
+      "x": -5.9,
+      "z": 2.1
+    },
+    {
+      "piece": "kenney-pirate/crate",
+      "pin": true,
+      "rot": 0.6,
+      "scale": 0.42,
+      "x": -5.9,
+      "y": 0.35,
+      "z": 2.1
     },
     {
       "piece": "kenney-pirate/crate-bottles",
       "rot": 0.9,
       "scale": 0.45,
-      "x": -6.15,
-      "z": 3.635
-    },
-    {
-      "piece": "kenney-town/cart",
-      "rot": -1.047,
-      "scale": 0.4,
-      "x": 6.2,
-      "z": 3.935
-    },
-    {
-      "piece": "kaykit-resources/textiles-stack-large-colored",
-      "rot": 0.3,
-      "scale": 0.42,
-      "x": 6.25,
-      "z": 2.085
+      "x": -5.45,
+      "z": 1.7
     },
     {
       "piece": "kaykit-dungeon/barrel-small",
       "rot": 0,
       "scale": 0.45,
-      "x": 1.9,
-      "z": 1.5
+      "x": -6.3,
+      "z": 2.6
     },
     {
-      "piece": "kaykit-halloween/post-lantern",
+      "piece": "kenney-town/cart",
+      "rot": -0.9,
+      "scale": 0.4,
+      "x": 5.35,
+      "z": 3.3
+    },
+    {
+      "piece": "kenney-pirate/barrel",
       "rot": 0,
-      "scale": 0.55,
-      "x": 0,
+      "scale": 0.38,
+      "x": 5.95,
       "z": 2.2
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0.4,
+      "scale": 0.38,
+      "x": 6.3,
+      "z": 2.65
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small-stack",
+      "rot": -0.5,
+      "scale": 0.4,
+      "x": 5.6,
+      "z": 1.7
+    },
+    {
+      "piece": "kaykit-resources/textiles-stack-large-colored",
+      "rot": 0.3,
+      "scale": 0.42,
+      "x": 4.4,
+      "z": 1.25
     }
   ],
   "spots": [
     {
       "clip": "Idle_A",
       "facing": 0,
-      "hours": [
-        7,
-        19
-      ],
-      "kind": "work",
-      "roles": [
-        "merchant"
-      ],
-      "x": -5.25,
-      "z": 1.635
-    },
-    {
-      "clip": "Idle_B",
-      "facing": 3.142,
-      "hours": [
-        8,
-        18
-      ],
-      "kind": "stand",
-      "x": -5,
-      "z": 3.255
-    },
-    {
-      "clip": "Idle_A",
-      "facing": 3.142,
-      "hours": [
-        7,
-        19
-      ],
-      "kind": "work",
-      "roles": [
-        "merchant"
-      ],
-      "x": -3.75,
-      "z": 3.935
-    },
-    {
-      "clip": "Interact",
-      "facing": 6.283,
-      "hours": [
-        8,
-        18
-      ],
-      "kind": "stand",
-      "x": -3.5,
-      "z": 2.315
-    },
-    {
-      "clip": "Idle_A",
-      "facing": 0,
-      "hours": [
-        7,
-        19
-      ],
-      "kind": "work",
-      "roles": [
-        "merchant"
-      ],
-      "x": 5.25,
-      "z": 1.635
-    },
-    {
-      "clip": "Idle_B",
-      "facing": 3.142,
-      "hours": [
-        8,
-        18
-      ],
-      "kind": "stand",
-      "x": 5.5,
-      "z": 3.255
-    },
-    {
-      "clip": "Idle_A",
-      "facing": 3.142,
-      "hours": [
-        7,
-        19
-      ],
-      "kind": "work",
-      "roles": [
-        "merchant"
-      ],
-      "x": 3.75,
-      "z": 3.935
-    },
-    {
-      "clip": "Interact",
-      "facing": 6.283,
-      "hours": [
-        8,
-        18
-      ],
-      "kind": "stand",
-      "x": 4,
-      "z": 2.315
-    },
-    {
-      "clip": "Idle_A",
-      "facing": 0,
       "kind": "work",
       "roles": [
         "merchant"
       ],
       "x": 0,
-      "z": 0.45
+      "z": -2.3
+    },
+    {
+      "clip": "Interact",
+      "facing": 3.142,
+      "kind": "stand",
+      "x": 0,
+      "z": -0.7
+    },
+    {
+      "clip": "Idle_A",
+      "facing": 0.927,
+      "kind": "work",
+      "roles": [
+        "merchant"
+      ],
+      "x": -2.36,
+      "z": -0.87
+    },
+    {
+      "clip": "Idle_B",
+      "facing": -2.214,
+      "kind": "stand",
+      "x": -1.2,
+      "z": 0
+    },
+    {
+      "clip": "Idle_A",
+      "facing": -0.927,
+      "kind": "work",
+      "roles": [
+        "merchant"
+      ],
+      "x": 2.36,
+      "z": -0.87
+    },
+    {
+      "clip": "Interact",
+      "facing": 2.214,
+      "kind": "stand",
+      "x": 1.2,
+      "z": 0
+    },
+    {
+      "clip": "Idle_A",
+      "facing": 2.084,
+      "kind": "work",
+      "roles": [
+        "merchant"
+      ],
+      "x": -3.14,
+      "z": 2.67
+    },
+    {
+      "clip": "Interact",
+      "facing": -1.058,
+      "kind": "stand",
+      "x": -1.88,
+      "z": 1.96
+    },
+    {
+      "clip": "Idle_A",
+      "facing": -2.084,
+      "kind": "work",
+      "roles": [
+        "merchant"
+      ],
+      "x": 3.14,
+      "z": 2.67
+    },
+    {
+      "clip": "Idle_B",
+      "facing": 1.058,
+      "kind": "stand",
+      "x": 1.88,
+      "z": 1.96
+    },
+    {
+      "clip": "Idle_B",
+      "facing": 0.91,
+      "kind": "talk",
+      "x": -4,
+      "z": 3.5
+    },
+    {
+      "clip": "Idle_B",
+      "facing": -2.23,
+      "kind": "talk",
+      "x": -3.55,
+      "z": 3.85
     }
   ]
 }

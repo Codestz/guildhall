@@ -1,12 +1,12 @@
 {
   "blockers": [
     {
-      "r": 0.504,
+      "r": 0.604,
       "x": -0.6,
       "z": -0.4
     },
     {
-      "r": 0.3,
+      "r": 0.313,
       "x": 0.7,
       "z": 0.5
     }
@@ -80,39 +80,39 @@
       "z": -1
     },
     {
-      "piece": "kenney-nature/fence-simple-low",
+      "piece": "kenney-nature/fence-simple",
       "rot": -1.047,
-      "scale": 0.723,
-      "x": 2.255,
-      "z": -1.302
+      "scale": 0.58,
+      "x": 1.819,
+      "z": -1.05
     },
     {
-      "piece": "kenney-nature/fence-simple-low",
+      "piece": "kenney-nature/fence-simple",
       "rot": 0,
-      "scale": 0.723,
+      "scale": 0.58,
       "x": 0,
-      "z": -2.604
+      "z": -2.1
     },
     {
-      "piece": "kenney-nature/fence-simple-low",
+      "piece": "kenney-nature/fence-simple",
       "rot": 1.047,
-      "scale": 0.723,
-      "x": -2.255,
-      "z": -1.302
+      "scale": 0.58,
+      "x": -1.819,
+      "z": -1.05
     },
     {
-      "piece": "kenney-nature/fence-simple-low",
+      "piece": "kenney-nature/fence-gate",
       "rot": 3.142,
-      "scale": 0.723,
+      "scale": 0.6,
       "x": 0,
-      "z": 2.604
+      "z": 2.1
     },
     {
-      "piece": "kenney-nature/fence-simple-low",
+      "piece": "kenney-nature/fence-simple",
       "rot": 4.189,
-      "scale": 0.723,
-      "x": 2.255,
-      "z": 1.302
+      "scale": 0.58,
+      "x": 1.819,
+      "z": 1.05
     }
   ],
   "spots": [

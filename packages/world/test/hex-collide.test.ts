@@ -84,7 +84,10 @@ describe("buildings stand on ground", () => {
           if ((kind !== "building" && kind !== "wall") || /fence|hedge/.test(p.piece)) continue
           // what stands in the water (a quay's blocks, a dock's posts) stands on its bed, not on land
           const { q, r } = hexAt(p.x / HEX_TILE_SIZE, p.z / HEX_TILE_SIZE)
-          if (tileOf.get(h.grid.index(q, r))?.ground === "water") continue
+          const tile = tileOf.get(h.grid.index(q, r))
+          if (tile?.ground === "water") continue
+          // a storey stacked on another (a lighthouse or a lookout built of tower parts) stands on the one below
+          if (tile && p.y - tile.top > 0.5) continue
           const s = pieceFootprint(p)
           if (!s) continue
           checked++

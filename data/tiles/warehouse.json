@@ -1,19 +1,29 @@
 {
   "blockers": [
     {
-      "r": 1.477,
-      "x": 0,
-      "z": -0.3
+      "r": 0.666,
+      "x": -1.65,
+      "z": 1.7
     },
     {
-      "r": 0.378,
-      "x": 1.8,
-      "z": 1.4
+      "r": 0.417,
+      "x": -1,
+      "z": 2.05
     },
     {
-      "r": 0.378,
-      "x": 2.1,
-      "z": 0.6
+      "r": 0.625,
+      "x": 1.55,
+      "z": 1.75
+    },
+    {
+      "r": 0.299,
+      "x": 2.15,
+      "z": 1.2
+    },
+    {
+      "r": 0.454,
+      "x": 1,
+      "z": 2.2
     }
   ],
   "ground": "dirt",
@@ -22,37 +32,195 @@
   "name": "Warehouse",
   "pieces": [
     {
-      "piece": "kaykit-hexagon/building-lumbermill-blue",
-      "rot": 0,
-      "scale": 0.45,
+      "piece": "kenney-town/wall-wood-window-shutters",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.4,
+      "x": -1.388,
+      "z": 0.388
+    },
+    {
+      "piece": "kenney-town/wall-wood-doorway-square-wide",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.4,
       "x": 0,
-      "z": -0.3
+      "z": 0.388
+    },
+    {
+      "piece": "kenney-town/wall-wood-window-shutters",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.4,
+      "x": 1.388,
+      "z": 0.388
+    },
+    {
+      "piece": "kenney-town/wall-wood",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.4,
+      "x": -1.388,
+      "z": -1
+    },
+    {
+      "piece": "kenney-town/wall-wood-window-small",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.4,
+      "x": 0,
+      "z": -1
+    },
+    {
+      "piece": "kenney-town/wall-wood",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.4,
+      "x": 1.388,
+      "z": -1
+    },
+    {
+      "piece": "kenney-town/wall-wood",
+      "pin": true,
+      "rot": 3.142,
+      "scale": 0.4,
+      "x": -1.388,
+      "z": 0.388
+    },
+    {
+      "piece": "kenney-town/wall-wood-window-small",
+      "pin": true,
+      "rot": 3.142,
+      "scale": 0.4,
+      "x": -1.388,
+      "z": -1
+    },
+    {
+      "piece": "kenney-town/wall-wood-door",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.4,
+      "x": 1.388,
+      "z": 0.388
+    },
+    {
+      "piece": "kenney-town/wall-wood",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.4,
+      "x": 1.388,
+      "z": -1
+    },
+    {
+      "piece": "kenney-town/roof",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.4,
+      "x": -1.388,
+      "y": 1.388,
+      "z": 0.388
+    },
+    {
+      "piece": "kenney-town/roof",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.4,
+      "x": 0,
+      "y": 1.388,
+      "z": 0.388
+    },
+    {
+      "piece": "kenney-town/roof",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.4,
+      "x": 1.388,
+      "y": 1.388,
+      "z": 0.388
+    },
+    {
+      "piece": "kenney-town/roof",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.4,
+      "x": -1.388,
+      "y": 1.388,
+      "z": -1
+    },
+    {
+      "piece": "kenney-town/roof",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.4,
+      "x": 0,
+      "y": 1.388,
+      "z": -1
+    },
+    {
+      "piece": "kenney-town/roof",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.4,
+      "x": 1.388,
+      "y": 1.388,
+      "z": -1
+    },
+    {
+      "piece": "kaykit-dungeon/crates-stacked",
+      "rot": 0.2,
+      "scale": 0.45,
+      "x": -1.65,
+      "z": 1.7
     },
     {
       "piece": "kenney-pirate/crate",
-      "rot": 0.3,
-      "scale": 0.5,
-      "x": 1.8,
-      "z": 1.4
+      "rot": 0.5,
+      "scale": 0.45,
+      "x": -1,
+      "z": 2.05
     },
     {
-      "piece": "kenney-pirate/crate",
-      "rot": 1,
-      "scale": 0.5,
-      "x": 2.1,
-      "z": 0.6
+      "piece": "kaykit-resources/pallet-wood-covered-b",
+      "rot": -0.2,
+      "scale": 0.55,
+      "x": 1.55,
+      "z": 1.75
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.38,
+      "x": 2.15,
+      "z": 1.2
+    },
+    {
+      "piece": "kaykit-tools/rope-bundle-a",
+      "rot": 0.9,
+      "scale": 0.6,
+      "x": 1,
+      "z": 2.2
     }
   ],
   "spots": [
     {
       "clip": "PickUp",
-      "facing": 0.844,
+      "facing": -1.57,
       "kind": "work",
       "roles": [
         "merchant"
       ],
-      "x": 1.35,
-      "z": 1
+      "x": -0.75,
+      "z": 1.55
+    },
+    {
+      "clip": "Idle_A",
+      "facing": 0.5,
+      "kind": "stand",
+      "roles": [
+        "merchant"
+      ],
+      "x": 0.8,
+      "z": 1.5
     }
   ],
   "variants": [

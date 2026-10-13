@@ -1,9 +1,9 @@
 {
   "blockers": [
     {
-      "r": 0.482,
-      "x": 0.9,
-      "z": 0.9
+      "r": 0.43,
+      "x": -1.645,
+      "z": 0.95
     }
   ],
   "ground": "grass",
@@ -18,10 +18,10 @@
   "pieces": [
     {
       "piece": "kaykit-halloween/post-lantern",
-      "rot": 0,
+      "rot": 2.094,
       "scale": 0.55,
-      "x": 0.9,
-      "z": 0.9
+      "x": -1.645,
+      "z": 0.95
     }
   ]
 }

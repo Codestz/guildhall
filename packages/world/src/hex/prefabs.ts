@@ -13,6 +13,8 @@ export const SPOT_KINDS = ["sit", "work", "stand", "sleep", "talk"] as const
 /** How far from its tile's centre anything may stand, metres (a tile is 3.1 to its corner; footprints reach further). */
 const REACH = 3.2
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/
+/** How high (or low) a piece may stand off its tile, metres: a lighthouse's lantern on its stacked tower. */
+const PIECE_Y = 8
 const PIECE = /^[a-z0-9-]+\/[a-z0-9-]+$/
 
 type Obj = Record<string, unknown>
@@ -55,7 +57,9 @@ export function validateTilePrefab(json: unknown, file?: string): string[] {
       point(path, q)
       if (!isNum(q.rot)) at(`${path}.rot`, "radians")
       if (!isNum(q.scale) || q.scale <= 0 || q.scale > 4) at(`${path}.scale`, "a scale in (0, 4]")
-      if (q.y !== undefined && (!isNum(q.y) || Math.abs(q.y) > 3)) at(`${path}.y`, "metres within ±3")
+      // a stacked tower's upper storeys and the lantern on its top stand up to PIECE_Y high
+      if (q.y !== undefined && (!isNum(q.y) || Math.abs(q.y) > PIECE_Y))
+        at(`${path}.y`, `metres within ±${PIECE_Y}`)
       if (
         q.tilt !== undefined &&
         (!Array.isArray(q.tilt) ||

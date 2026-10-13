@@ -48,21 +48,11 @@ installTilePrefabs(parseTilePrefabs(data).prefabs)
 afterAll(() => installTilePrefabs(null))
 
 /**
- * Tiles with spots the collision layer finds walled in (reported to their authors): a pasture's shepherd
- * inside its fence ring (no gate), the monastery's garth inside its cloister of stone walls and iron
- * fence, a post in a castle ward behind its curtain, a merchant inside a market's stalls, a builder
- * inside a scaffold.
+ * Tiles with spots the collision layer finds walled in (reported to their authors). None today: the
+ * pasture's ring has a gate and a walk round it, the monastery's garth opens toward its graveyard, and
+ * the market's, the building site's and the castle ward's posts stand in the open.
  */
-const WALLED = new Set([
-  "pasture",
-  "monastery-compound",
-  "castle-ward",
-  "castle-yard",
-  "market",
-  "market-square",
-  "construction",
-  "well-square",
-])
+const WALLED = new Set<string>([])
 
 const build = (seed: number) => {
   const h = hexIsland({ seed, files: 4000 })

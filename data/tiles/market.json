@@ -1,34 +1,39 @@
 {
   "blockers": [
     {
-      "r": 1.094,
+      "r": 1.652,
       "x": 0,
-      "z": -0.35
+      "z": -0.55
     },
     {
-      "r": 0.345,
-      "x": -2.117,
-      "z": 0.952
+      "r": 0.417,
+      "x": -2.15,
+      "z": 0.95
     },
     {
-      "r": 0.345,
-      "x": -1.829,
-      "z": 1.451
+      "r": 0.391,
+      "x": -2.15,
+      "z": 0.95
     },
     {
-      "r": 0.275,
-      "x": 2.122,
-      "z": 1.084
+      "r": 0.417,
+      "x": -1.95,
+      "z": 1.5
     },
     {
-      "r": 0.399,
-      "x": 1.702,
-      "z": 1.564
+      "r": 0.285,
+      "x": 2.2,
+      "z": 1.1
     },
     {
-      "r": 0.482,
-      "x": 0,
-      "z": 2.173
+      "r": 0.505,
+      "x": 2.05,
+      "z": 0.45
+    },
+    {
+      "r": 0.43,
+      "x": -1.6,
+      "z": 2.15
     }
   ],
   "ground": "paved",
@@ -39,44 +44,53 @@
     {
       "piece": "kaykit-hexagon/building-market-red",
       "rot": 0,
-      "scale": 0.38,
+      "scale": 0.36,
       "x": 0,
-      "z": -0.35
+      "z": -0.55
     },
     {
       "piece": "kenney-pirate/crate",
       "rot": 0.2,
       "scale": 0.45,
-      "x": -2.117,
-      "z": 0.952
+      "x": -2.15,
+      "z": 0.95
+    },
+    {
+      "piece": "kenney-pirate/crate",
+      "pin": true,
+      "rot": 0.7,
+      "scale": 0.42,
+      "x": -2.15,
+      "y": 0.35,
+      "z": 0.95
     },
     {
       "piece": "kenney-pirate/crate-bottles",
       "rot": 0.6,
       "scale": 0.45,
-      "x": -1.829,
-      "z": 1.451
+      "x": -1.95,
+      "z": 1.5
     },
     {
       "piece": "kaykit-dungeon/barrel-small",
       "rot": 0,
       "scale": 0.45,
-      "x": 2.122,
-      "z": 1.084
+      "x": 2.2,
+      "z": 1.1
     },
     {
       "piece": "kaykit-resources/textiles-stack-large-colored",
       "rot": 0.4,
       "scale": 0.42,
-      "x": 1.702,
-      "z": 1.564
+      "x": 2.05,
+      "z": 0.45
     },
     {
       "piece": "kaykit-halloween/post-lantern",
-      "rot": 0,
+      "rot": -0.6,
       "scale": 0.55,
-      "x": 0,
-      "z": 2.173
+      "x": -1.6,
+      "z": 2.15
     }
   ],
   "spots": [
@@ -87,8 +101,8 @@
       "roles": [
         "merchant"
       ],
-      "x": -1,
-      "z": 0.2
+      "x": -0.95,
+      "z": 1.7
     },
     {
       "clip": "Idle_A",
@@ -97,30 +111,22 @@
       "roles": [
         "merchant"
       ],
-      "x": 1,
-      "z": 0.2
+      "x": 0.95,
+      "z": 1.7
     },
     {
       "clip": "Idle_B",
       "facing": 3.142,
-      "hours": [
-        8,
-        18
-      ],
       "kind": "stand",
-      "x": -1,
-      "z": 1.45
+      "x": -0.95,
+      "z": 2.4
     },
     {
       "clip": "Interact",
       "facing": 3.142,
-      "hours": [
-        8,
-        18
-      ],
       "kind": "stand",
-      "x": 1,
-      "z": 1.45
+      "x": 0.95,
+      "z": 2.4
     }
   ],
   "variants": [

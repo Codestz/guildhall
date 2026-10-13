@@ -1,9 +1,34 @@
 {
   "blockers": [
     {
-      "r": 1.484,
-      "x": 0,
-      "z": 0
+      "r": 1.157,
+      "x": 0.65,
+      "z": -0.95
+    },
+    {
+      "r": 1.187,
+      "x": -1.55,
+      "z": -0.1
+    },
+    {
+      "r": 0.53,
+      "x": 1.5,
+      "z": 1.6
+    },
+    {
+      "r": 0.53,
+      "x": 2,
+      "z": 1.1
+    },
+    {
+      "r": 0.571,
+      "x": 0.85,
+      "z": 2.15
+    },
+    {
+      "r": 0.268,
+      "x": 2.3,
+      "z": 0.45
     }
   ],
   "ground": "grass",
@@ -14,18 +39,86 @@
     {
       "piece": "kaykit-hexagon/building-watermill-red",
       "rot": 0,
+      "scale": 0.34,
+      "x": 0.65,
+      "z": -0.95
+    },
+    {
+      "piece": "kenney-nature/ground-river-straight",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.36,
+      "x": -1.6,
+      "y": 0.1,
+      "z": -0.72
+    },
+    {
+      "piece": "kenney-nature/ground-river-straight",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.36,
+      "x": -1.6,
+      "y": 0.1,
+      "z": 0.72
+    },
+    {
+      "piece": "kenney-town/watermill",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.45,
+      "x": -1.55,
+      "y": -0.3,
+      "z": -0.1
+    },
+    {
+      "piece": "kaykit-resources/textiles-stack-small",
+      "rot": 0.3,
       "scale": 0.5,
-      "x": 0,
-      "z": 0
+      "x": 1.5,
+      "z": 1.6
+    },
+    {
+      "piece": "kaykit-resources/textiles-stack-small",
+      "rot": 1.2,
+      "scale": 0.5,
+      "x": 2,
+      "z": 1.1
+    },
+    {
+      "piece": "kaykit-resources/pallet-wood-covered-a",
+      "rot": 0.1,
+      "scale": 0.5,
+      "x": 0.85,
+      "z": 2.15
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.42,
+      "x": 2.3,
+      "z": 0.45
     }
   ],
   "spots": [
     {
       "clip": "PickUp",
-      "facing": 0,
+      "facing": 2.2,
       "kind": "work",
-      "x": 1.5,
-      "z": 1.6
+      "roles": [
+        "farmer"
+      ],
+      "x": 1.15,
+      "z": 1.35
+    },
+    {
+      "clip": "Interact",
+      "facing": -1.57,
+      "kind": "work",
+      "roles": [
+        "farmer"
+      ],
+      "x": -0.4,
+      "z": 1.5
     }
   ]
 }

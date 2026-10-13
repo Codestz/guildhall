@@ -77,5 +77,7 @@ try {
   process.exit(2)
 }
 const errors = await shoot(options)
+// a shader that did not compile draws nothing: the loudest failure there is, first and in capitals
+if (errors.some((e) => e.startsWith("shader: "))) console.error("SHADER ERROR: a shader did not compile")
 for (const error of errors) console.error(error)
 process.exit(errors.length > 0 ? 1 : 0)

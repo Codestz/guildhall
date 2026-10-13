@@ -30,7 +30,21 @@ export interface AppPage {
   close(): Promise<void>
 }
 
-/** A new page whose uncaught errors and console errors land in `errors`. */
+/**
+ * A shader that did not compile, from a console line of any level: three's dump ("THREE.WebGLProgram:
+ * Shader Error … Program Info Log: …"), its warning form, or the GPU's own. A broken shader draws
+ * nothing and the page carries on, so a shot must fail on it however it was logged (a `grep -v info`
+ * over the log hides the dump: it contains "Program Info Log"). Returns the line to report, or null.
+ */
+export function shaderError(text: string): string | null {
+  if (!/Shader Error|Program Info Log|shader (?:compile|link)|ERROR: \d+:\d+/i.test(text)) return null
+  const lines = text.split("\n").map((l) => l.trim())
+  // the GLSL error itself (ERROR: 0:123: …) says what broke; else the first line
+  const detail = lines.find((l) => /^ERROR: /.test(l)) ?? lines.find((l) => l.length > 0) ?? text
+  return `shader: ${detail.slice(0, 300)}`
+}
+
+/** A new page whose uncaught errors, console errors and shader errors (at any level) land in `errors`. */
 export async function openPage(browser: Browser, options: PageOptions = {}): Promise<AppPage> {
   const context = await browser.newContext({
     viewport: options.size ?? DEFAULTS.size,
@@ -40,7 +54,9 @@ export async function openPage(browser: Browser, options: PageOptions = {}): Pro
   const errors: string[] = []
   page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`))
   page.on("console", (message) => {
-    if (message.type() === "error") errors.push(`console: ${message.text()}`)
+    const shader = shaderError(message.text())
+    if (shader) errors.unshift(shader)
+    else if (message.type() === "error") errors.push(`console: ${message.text()}`)
   })
   return { page, errors, close: () => context.close() }
 }

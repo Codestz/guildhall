@@ -92,6 +92,7 @@
         "@gltf-transform/functions": "^4.5.1",
         "@guildhall/assets": "workspace:*",
         "@guildhall/core": "workspace:*",
+        "@guildhall/world": "workspace:*",
         "jpeg-js": "^0.4.4",
         "meshoptimizer": "^1.3.0",
         "three": "^0.186.1",

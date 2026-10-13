@@ -19,11 +19,12 @@
  * of errands (scripted for now; repo events drive it later).
  */
 import { hash2 } from "../geom/noise.ts"
+import { discSolid, type Solid, SolidGrid } from "./collide.ts"
 import { hexAt } from "./grid.ts"
 import { type HexIsland, kindOf } from "./island.ts"
-import { type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
+import { HARD, type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
 import { HEX_TILE_SIZE, opensEvening, type SpotHours, spotWindows } from "./tiles.ts"
-import { clearWay, type HexWalk, type HexWalkNode } from "./walk.ts"
+import { clearWay, type HexWalk, type HexWalkNode, type WalkBlocker, walledIn } from "./walk.ts"
 import type { HexWorld } from "./world.ts"
 import { type HexZones, useOf, type ZoneKind } from "./zones.ts"
 
@@ -73,6 +74,9 @@ export interface LifePose extends SpotDoing {
   act: LifeAct
   indoors: boolean
   ground: boolean
+  /** Walking: where the walk starts and ends (the spots or doors it goes from and to). */
+  from?: Vec3
+  to?: Vec3
 }
 
 export interface Folk {
@@ -176,8 +180,8 @@ export function laneLine(walk: HexWalk, path: readonly number[], lane: number): 
   })
 }
 
-/** Blockers near a point, for keeping walks clear of them (TileFurniture's `near`). */
-export type NearBlockers = TileFurniture["near"]
+/** Blockers near a point, for keeping walks clear of them (TileFurniture's `solidsNear`). */
+export type NearBlockers = (x: number, z: number, r: number) => readonly WalkBlocker[]
 
 /** Builds a loop of steps in some time unit (hours for a day, seconds for an agent). */
 export class LoopBuilder {
@@ -195,6 +199,8 @@ export class LoopBuilder {
     as: { act: "work" | "idle"; indoors?: boolean },
     /** Blockers the walks keep clear of. */
     private readonly near?: NearBlockers,
+    /** Look as far as it takes for a clean way round them (an agent's few walks). */
+    private readonly thorough = false,
   ) {
     this.here = start
     this.since = 0
@@ -225,7 +231,12 @@ export class LoopBuilder {
         const fb = flags[Math.min(flags.length - 1, k)]!
         ground.push(fa && fb)
       }
-      if (this.near) ({ pts, ground } = clearWay(pts, ground, this.near))
+      if (this.near)
+        ({ pts, ground } = clearWay(pts, ground, this.near, {
+          from: this.indoors,
+          to: !!as.indoors,
+          thorough: this.thorough,
+        }))
       const times = [t]
       for (let k = 1; k < pts.length; k++) {
         const a = pts[k - 1]!
@@ -299,6 +310,8 @@ export function lifePose(steps: readonly LifeStep[], t: number, period: number):
     act: "walk",
     indoors: false,
     ground: s.ground[k] ?? true,
+    from: s.pts[0]!,
+    to: s.pts[s.pts.length - 1]!,
   }
 }
 
@@ -390,6 +403,11 @@ export interface LifePlaces {
   furniture: TileFurniture
   /** The node a spot is reached from (−1: unreachable). */
   nodeOf(spot: number): number
+  /**
+   * Whether a spot is left out for being walled in (collide.ts: buildings, walls and fences close it off
+   * from the ground round it, e.g. a yard with no gap a body passes): nobody is sent there.
+   */
+  walled(spot: number): boolean
   /** A spot as a stay. */
   lifeSpot(spot: number): LifeSpot
   /** Reserved spots (indices into `furniture.spots`). */
@@ -414,7 +432,15 @@ export interface LifePlaces {
   takeSlot(zone: number): LifeSpot | undefined
   /** The prefab standing on a tile (none: bare, or a scene's other part). */
   prefabOf(tile: number): string | undefined
+  /**
+   * What a walk keeps clear of: the solids, and every place people stand a while (a spot, a slot round a
+   * square), so nobody's way runs through someone standing at theirs.
+   */
+  walkNear(x: number, z: number, r: number): readonly WalkBlocker[]
 }
+
+/** The room a person standing at a spot or a slot takes, as far as walks are concerned, metres. */
+const STANDING_R = 0.3
 
 /**
  * Whether a spot open `hours` (a window [from, to), wrapping past midnight when to < from, or several) is
@@ -471,6 +497,20 @@ export function lifePlaces(
     }
     return n
   }
+  const walled = new Set<number>()
+  /** The buildings, walls and fences near a point (what walls a place in; props are stepped round). */
+  const hardNear = (x: number, zz: number, r: number) =>
+    furniture.solidsNear(x, zz, r).filter((o) => HARD(o.kind))
+  /** Whether a wall, a building or a fence stands across the straight way from a node to a spot. */
+  const cutOff = (a: { x: number; z: number }, b: { x: number; z: number }): boolean => {
+    const len = Math.hypot(b.x - a.x, b.z - a.z)
+    for (let k = 1; k < len / 0.2; k++) {
+      const x = a.x + ((b.x - a.x) * k * 0.2) / len
+      const zz = a.z + ((b.z - a.z) * k * 0.2) / len
+      if (furniture.blocked(x, zz, 0.2, HARD)) return true
+    }
+    return false
+  }
   const nodeOf = (spot: number): number => {
     let n = nodes.get(spot)
     if (n !== undefined) return n
@@ -508,6 +548,12 @@ export function lifePlaces(
           }
         }
       }
+    }
+    // a spot walled in (a seat in a closed yard, a post behind a gate too narrow to pass) is offered
+    // to nobody
+    if (n >= 0 && cutOff(walk.nodes[n]!, s) && walledIn(s.x, s.z, hardNear, 12, walk.nodes[n]!)) {
+      walled.add(spot)
+      n = -1
     }
     nodes.set(spot, n)
     return n
@@ -605,13 +651,21 @@ export function lifePlaces(
         const zz = cz + Math.sin(a) * r
         const node = walkable(x, zz)
         if (node < 0) continue
-        if (furniture.near(x, zz, 0.3).length) continue
+        if (furniture.near(x, zz, 0.3).length || furniture.blocked(x, zz, 0.3)) continue
+        // nobody's slot on someone's spot
+        if (spotGrid().near(x, zz, 0).length) continue
         if (w.stairAt?.(x, zz) != null) continue
         if (out.some((s) => Math.hypot(s.at[0] - x, s.at[2] - zz) < SLOT_GAP * 0.9)) continue
         out.push({ node, at: [x, walk.nodes[node]!.y, zz], facing: headingTo(x, zz, cx, cz), ground: true })
       }
     }
     return out
+  }
+  let spots: SolidGrid | null = null
+  /** Every spot as a disc as wide as a slot's room. */
+  const spotGrid = () => {
+    spots ??= new SolidGrid(furniture.spots.map((sp) => discSolid("blocker", sp.x, sp.z, SLOT_GAP * 0.9, 0)))
+    return spots
   }
   const slotTaken = new Map<number, Map<number, number>>()
   const takeSlot = (zi: number): LifeSpot | undefined => {
@@ -628,7 +682,39 @@ export function lifePlaces(
     return list[best]
   }
   const prefabOf = (tile: number) => tileOf.get(tile)?.prefab ?? undefined
-  return { furniture, nodeOf, lifeSpot, taken, slots, slotTaken, free, book, takeSlot, prefabOf }
+  let standing: SolidGrid | null = null
+  const walkNear = (x: number, zz: number, r: number): readonly WalkBlocker[] => {
+    if (!standing) {
+      const discs: Solid[] = []
+      for (const sp of furniture.spots)
+        if (sp.kind !== "sleep") discs.push(discSolid("blocker", sp.x, sp.z, STANDING_R, 0))
+      for (const zi of z.zones.keys())
+        for (const sl of slots(zi)) discs.push(discSolid("blocker", sl.at[0], sl.at[2], STANDING_R, 0))
+      for (const d of discs) d.soft = true
+      standing = new SolidGrid(discs)
+    }
+    const a = furniture.solidsNear(x, zz, r)
+    const b = standing.near(x, zz, r)
+    return b.length ? [...a, ...b] : a
+  }
+  const isWalled = (spot: number) => {
+    nodeOf(spot)
+    return walled.has(spot)
+  }
+  return {
+    furniture,
+    nodeOf,
+    walled: isWalled,
+    lifeSpot,
+    taken,
+    slots,
+    slotTaken,
+    free,
+    book,
+    takeSlot,
+    prefabOf,
+    walkNear,
+  }
 }
 /** Where someone goes for a break: home, a seat, a stall's customer side, a neighbour's door, a square, the tavern. */
 export type Outing = "home" | "sit" | "market" | "talk" | "square" | "tavern"
@@ -701,7 +787,7 @@ export function planFolk(
 ): Folk[] {
   const { seed, pace } = opts
   const places = opts.places ?? lifePlaces(h, z, w, walk)
-  const near = places.furniture.near
+  const near = places.walkNear
   const spots = places.furniture.spots
   const folk: Folk[] = []
   // the places round each place, nearest first (by heart): where people go out to
@@ -975,6 +1061,8 @@ export function guildhallZone(walk: HexWalk, z: HexZones): number {
   )
 }
 
+/** Agents rest at least this far apart at the great hall, metres. */
+const AGENTS_APART = 1.3
 /** The castle's heart tile (from tier 3): where the agents rest between errands. */
 export const GREAT_HALL = "great-hall"
 
@@ -996,17 +1084,22 @@ export function agentLoop(
   const home = guildhallZone(walk, z)
   // in the great hall itself: a seat or a talking place of its own there (not the guards' posts), else
   // a slot round the heart
+  // (one each, and none right beside another agent's: who leaves would brush past who stays)
+  const spots = places?.furniture.spots
+  const beside = (k: number) =>
+    [...(places?.taken ?? [])].some(
+      (o) =>
+        places!.prefabOf(spots![o]!.tile) === GREAT_HALL &&
+        Math.hypot(spots![o]!.x - spots![k]!.x, spots![o]!.z - spots![k]!.z) < AGENTS_APART,
+    )
   const inHall = places
     ?.free(home, null, ["sit", "talk", "stand"])
-    .find(
-      (k) =>
-        !places.furniture.spots[k]!.roles && places.prefabOf(places.furniture.spots[k]!.tile) === GREAT_HALL,
-    )
+    .find((k) => !spots![k]!.roles && places.prefabOf(spots![k]!.tile) === GREAT_HALL && !beside(k))
   if (inHall !== undefined) places!.taken.add(inHall)
   const hall =
     (inHall !== undefined ? places!.lifeSpot(inHall) : places?.takeSlot(home)) ??
     spotAt(walk, walk.hearts[home]!, opts.slot, 1.3)
-  const b = new LoopBuilder(walk, mps, 0.3, hall, { act: "idle" }, places?.furniture.near)
+  const b = new LoopBuilder(walk, mps, 0.3, hall, { act: "idle" }, places?.walkNear, true)
   let t = 0
   for (const [k, e] of errands.entries()) {
     const zi =

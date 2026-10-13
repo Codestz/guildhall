@@ -5,6 +5,7 @@
  * and a rail either side. One vertex-coloured triangle soup, drawn with the ground.
  */
 import { hash2 } from "../geom/noise.ts"
+import { CHEEK_OUT, CHEEK_W, flightSteps } from "./collide.ts"
 import type { HexGroundMesh } from "./ground.ts"
 import type { HexBridge, HexWalkway } from "./world.ts"
 
@@ -107,7 +108,8 @@ function stairsInto(s: Soup, st: HexWalkway) {
   const len = Math.hypot(st.bx - st.ax, st.bz - st.az)
   const ux = (st.bx - st.ax) / len
   const uz = (st.bz - st.az) / len
-  const n = st.steps ?? Math.max(2, Math.round((st.ay - st.by) / 0.17))
+  // the walker's height (collide.ts `walkwayAt`) reads the same flight: these steps, these treads
+  const n = flightSteps(st)
   const rise = (st.ay - st.by) / n
   const tread = len / n
   const foot = st.by - 0.12
@@ -118,12 +120,12 @@ function stairsInto(s: Soup, st: HexWalkway) {
     s.box(cx, cz, ux, uz, tread, st.half * 2, foot, y, k % 2 ? TREAD_ALT : TREAD)
     for (const side of [-1, 1])
       s.box(
-        cx - uz * side * (st.half + 0.08),
-        cz + ux * side * (st.half + 0.08),
+        cx - uz * side * (st.half + CHEEK_OUT),
+        cz + ux * side * (st.half + CHEEK_OUT),
         ux,
         uz,
         tread,
-        0.16,
+        CHEEK_W,
         foot,
         y + 0.12,
         CHEEK,

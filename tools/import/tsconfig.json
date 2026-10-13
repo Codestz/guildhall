@@ -2,5 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "rootDir": "src", "outDir": "types" },
   "include": ["src"],
-  "references": [{ "path": "../../packages/core" }, { "path": "../../packages/assets" }]
+  "references": [
+    { "path": "../../packages/core" },
+    { "path": "../../packages/assets" },
+    { "path": "../../packages/world" }
+  ]
 }

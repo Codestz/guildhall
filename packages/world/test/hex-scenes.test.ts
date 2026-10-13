@@ -118,7 +118,9 @@ describe("scenes bigger than a tile", () => {
         if (!SCENES.includes(t.prefab ?? "") && !TURNING.includes(t.prefab ?? "")) continue
         const mine = new Set([t.i, ...coverOf(h, t)])
         const spots = furniture.spots.filter((s) => s.tile === t.i)
-        expect(spots.length).toBe(tilePrefab(t.prefab!)!.spots!.length)
+        // (a spot set inside a building or a wall beyond moving out of it is left out: collide.ts)
+        const dropped = furniture.dropped.filter((s) => s.tile === t.i).length
+        expect(spots.length + dropped).toBe(tilePrefab(t.prefab!)!.spots!.length)
         for (const s of spots) expect(mine.has(tileAt(s.x, s.z))).toBe(true)
       }
       expect(furniture.spots.filter((s) => parts.has(s.tile))).toEqual([])

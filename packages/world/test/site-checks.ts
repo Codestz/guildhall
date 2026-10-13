@@ -11,7 +11,7 @@
  * A footprint is the piece's catalog size (`pieceSize`) as placed (scaled and turned); its body for
  * overlaps is the ellipse inside it, a little shrunk (KayKit hex buildings are hexagons, not boxes).
  */
-import { pieceSize } from "../src/hex/sites.ts"
+import { bodyRadius, footprint, pieceSize } from "../src/hex/sites.ts"
 import {
   HEX_TILE_SIZE,
   type HexIsland,
@@ -40,49 +40,11 @@ export interface SiteReport {
   notes: string[]
 }
 
-/**
- * Points over a piece's footprint: its centre and its outline, shrunk a little. A KayKit hex building
- * stands on a hexagon its width across the corners (corners on its own ±x, as a tile's are; a porch may
- * reach past it); a wall is its box.
- */
-function samples(p: PlacedPiece): [number, number][] {
-  const s = pieceSize(p.piece)
-  if (!s) return [[p.x, p.z]]
-  const c = Math.cos(p.rot)
-  const n = Math.sin(p.rot)
-  const local: [number, number][] = []
-  if (isWall(p.piece)) {
-    const hw = (s[0] / 2) * p.scale * 0.9
-    const hd = (s[1] / 2) * p.scale * 0.8
-    for (const [a, b] of [
-      [1, 1],
-      [1, -1],
-      [-1, 1],
-      [-1, -1],
-      [0, 1],
-      [0, -1],
-    ] as const)
-      local.push([a * hw, b * hd])
-  } else {
-    const r = (s[0] / 2) * p.scale * 0.92
-    for (let k = 0; k < 12; k++) {
-      const a = (k * Math.PI) / 6
-      // the hexagon's corners (even k) and its sides' middles (odd k)
-      const m = k % 2 ? r * (Math.sqrt(3) / 2) : r
-      local.push([Math.cos(a) * m, Math.sin(a) * m])
-    }
-  }
-  return [
-    [p.x, p.z],
-    ...local.map(([lx, lz]): [number, number] => [p.x + lx * c + lz * n, p.z - lx * n + lz * c]),
-  ]
-}
+/** Points over a piece's footprint: the world's own (sites.ts `footprint`, the collision layer's outline). */
+const samples = (p: PlacedPiece): [number, number][] => footprint(p) ?? [[p.x, p.z]]
 
-/** The body's radius for overlaps: the circle inside its hexagon, shrunk. */
-const bodyR = (p: PlacedPiece) => {
-  const s = pieceSize(p.piece)
-  return s ? (s[0] / 2) * p.scale * (Math.sqrt(3) / 2) * 0.9 : 0
-}
+/** The body's radius for overlaps (sites.ts `bodyRadius`). */
+const bodyR = (p: PlacedPiece) => bodyRadius(p)
 
 /** Distance from a point to a wall's box (its length shrunk a little: walls overlap at their joints). */
 function toWall(px: number, pz: number, w: PlacedPiece): number {

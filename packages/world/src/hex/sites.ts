@@ -8,6 +8,7 @@
  */
 
 import { hash2 } from "../geom/noise.ts"
+import { pieceFootprint, pieceOutline, solidDistance, solidKind } from "./collide.ts"
 import type { HexGrid } from "./grid.ts"
 
 /** The island's reserved sites: tile lists, the first tile the heart (the town's square, the castle's keep). */
@@ -373,45 +374,30 @@ export function composeCastle(
 }
 
 /**
- * Footprints of the solid pieces, metres as the library imports them (catalog `size`, x by z), by name
- * without its colour: what a placed piece covers, scaled and turned (`pieceSize`).
+ * The solid pieces whose footprint a site settles: KayKit hex buildings and walls. Their outlines are the
+ * collision layer's (collide.ts, read off each model): the one footprint table the world has.
  */
-const SIZES: Record<string, [number, number]> = {
-  "kaykit-hexagon/building-archeryrange": [13.36, 12.41],
-  "kaykit-hexagon/building-barracks": [11.52, 12.53],
-  "kaykit-hexagon/building-blacksmith": [10.3, 9.96],
-  "kaykit-hexagon/building-castle": [15.8, 18.05],
-  "kaykit-hexagon/building-church": [8.23, 9.24],
-  "kaykit-hexagon/building-destroyed": [12.31, 10.45],
-  "kaykit-hexagon/building-home-a": [6.34, 6.83],
-  "kaykit-hexagon/building-home-b": [7, 8.79],
-  "kaykit-hexagon/building-lumbermill": [10.94, 9.51],
-  "kaykit-hexagon/building-market": [14.4, 10.53],
-  "kaykit-hexagon/building-mine": [12.85, 15.36],
-  "kaykit-hexagon/building-scaffolding": [15.2, 16.87],
-  "kaykit-hexagon/building-stage-a": [8.37, 7],
-  "kaykit-hexagon/building-stage-b": [8.16, 9.04],
-  "kaykit-hexagon/building-stage-c": [9.28, 9.02],
-  "kaykit-hexagon/building-tavern": [9.37, 10.66],
-  "kaykit-hexagon/building-tower-a": [7.95, 9.23],
-  "kaykit-hexagon/building-tower-b": [9.58, 11.06],
-  "kaykit-hexagon/building-tower-base": [7.44, 8.89],
-  "kaykit-hexagon/building-tower-catapult": [7.44, 10.43],
-  "kaykit-hexagon/building-watermill": [8.4, 9.89],
-  "kaykit-hexagon/building-well": [5.21, 6.01],
-  "kaykit-hexagon/building-windmill": [9.01, 6.53],
-  "kaykit-hexagon/wall-corner-a-gate": [7.39, 6.44],
-  "kaykit-hexagon/wall-corner-a-inside": [7.75, 5.95],
-  "kaykit-hexagon/wall-corner-a-outside": [7.39, 6.01],
-  "kaykit-hexagon/wall-corner-b-inside": [4.04, 6.16],
-  "kaykit-hexagon/wall-corner-b-outside": [4.05, 5.67],
-  "kaykit-hexagon/wall-straight": [8.4, 3.36],
-  "kaykit-hexagon/wall-straight-gate": [8.4, 3.76],
+const settled = (piece: string) => {
+  const kind = solidKind(piece)
+  return (kind === "building" || kind === "wall") && piece.startsWith("kaykit-hexagon/")
 }
 
-/** A solid piece's footprint as imported (x by z, metres), or undefined for one not listed. */
+/** A solid piece's footprint as imported (x by z, metres: its outline's box), or undefined for none. */
 export function pieceSize(piece: string): [number, number] | undefined {
-  return SIZES[piece] ?? SIZES[piece.replace(/-(red|blue|green|yellow)$/, "")]
+  if (!settled(piece)) return undefined
+  const o = pieceOutline(piece)
+  if (!o) return undefined
+  let x0 = Number.POSITIVE_INFINITY
+  let x1 = Number.NEGATIVE_INFINITY
+  let z0 = Number.POSITIVE_INFINITY
+  let z1 = Number.NEGATIVE_INFINITY
+  for (let k = 0; k < o.foot.length; k += 2) {
+    x0 = Math.min(x0, o.foot[k]!)
+    x1 = Math.max(x1, o.foot[k]!)
+    z0 = Math.min(z0, o.foot[k + 1]!)
+    z1 = Math.max(z1, o.foot[k + 1]!)
+  }
+  return [x1 - x0, z1 - z0]
 }
 
 /** A placed piece, as much of it as its footprint needs. */
@@ -426,44 +412,33 @@ interface Placed {
 const isWallPiece = (piece: string) => piece.startsWith("kaykit-hexagon/wall-")
 
 /**
- * The ground a solid piece needs, as points (metres): its centre and its outline a little inside. A KayKit
- * hex building stands on a hexagon its width across the corners (corners on its own ±x, as a tile's);
- * a wall on its box. Null for a piece with no listed size (props, nature).
+ * The ground a solid piece needs, as points (metres): its centre and its outline's corners and sides'
+ * middles a little inside (the collision layer's outline, as placed). Null for a piece not settled
+ * (props, nature, a bridge).
  */
 export function footprint(p: Placed): [number, number][] | null {
-  const s = pieceSize(p.piece)
-  if (!s || p.piece.startsWith("kaykit-hexagon/building-bridge")) return null
-  const c = Math.cos(p.rot)
-  const n = Math.sin(p.rot)
-  const local: [number, number][] = []
-  if (isWallPiece(p.piece)) {
-    const hw = (s[0] / 2) * p.scale * 0.9
-    const hd = (s[1] / 2) * p.scale * 0.8
-    for (const [a, b] of [
-      [1, 1],
-      [1, -1],
-      [-1, 1],
-      [-1, -1],
-      [0, 1],
-      [0, -1],
+  if (!pieceSize(p.piece) || p.piece.startsWith("kaykit-hexagon/building-bridge")) return null
+  const s = pieceFootprint({ ...p, y: 0 })
+  if (!s) return null
+  const out: [number, number][] = [[p.x, p.z]]
+  const n = s.pts.length / 2
+  for (let k = 0; k < n; k++) {
+    const ax = s.pts[k * 2]!
+    const az = s.pts[k * 2 + 1]!
+    const bx = s.pts[((k + 1) % n) * 2]!
+    const bz = s.pts[((k + 1) % n) * 2 + 1]!
+    for (const [x, z] of [
+      [ax, az],
+      [(ax + bx) / 2, (az + bz) / 2],
     ] as const)
-      local.push([a * hw, b * hd])
-  } else {
-    const r = (s[0] / 2) * p.scale * 0.92
-    for (let k = 0; k < 12; k++) {
-      const a = (k * Math.PI) / 6
-      // the hexagon's corners (even k) and the middles of its sides (odd k)
-      const m = k % 2 ? r * (Math.sqrt(3) / 2) : r
-      local.push([Math.cos(a) * m, Math.sin(a) * m])
-    }
+      out.push([p.x + (x - p.x) * INSET, p.z + (z - p.z) * INSET])
   }
-  return [
-    [p.x, p.z],
-    ...local.map(([lx, lz]): [number, number] => [p.x + lx * c + lz * n, p.z - lx * n + lz * c]),
-  ]
+  return out
 }
+/** A footprint's points stand this share of the way out to its outline (rounding, a porch's lip). */
+const INSET = 0.9
 
-/** A solid piece's body for overlaps: the circle inside its hexagon, a little shrunk (0 for none). */
+/** A solid piece's body for overlaps: the circle inside its hexagon (its outline's width), a little shrunk. */
 export function bodyRadius(p: Placed): number {
   const s = pieceSize(p.piece)
   return s && !isWallPiece(p.piece) ? (s[0] / 2) * p.scale * (Math.sqrt(3) / 2) * 0.9 : 0

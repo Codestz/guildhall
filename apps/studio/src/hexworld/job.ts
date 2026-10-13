@@ -15,6 +15,7 @@ import {
   type HexIslandSpec,
   type HexNature,
   type HexWorld,
+  heightsReader,
   hexCentre,
   hexGroundFine,
   hexGroundMesh,
@@ -211,13 +212,8 @@ export function axialAt(x: number, z: number, size: number): [number, number] {
 
 /** The ground height at a point, read from `heights` (0 off it). */
 export function heightsAt(heights: HexHeights): (x: number, z: number) => number {
-  const { size, q0, r0, cols, rows, y } = heights
-  return (x, z) => {
-    const [q, r] = axialAt(x, z, size)
-    const c = q - q0
-    const w = r - r0
-    return c < 0 || w < 0 || c >= cols || w >= rows ? 0 : (y[w * cols + c] as number)
-  }
+  // the fine ground's own reader (world ground.ts): seats and cut small hexes as the mesh is built
+  return heightsReader(heights)
 }
 
 /** The world's tile heights as a grid at tile size (what `HexWorld.heightAt` answers). */

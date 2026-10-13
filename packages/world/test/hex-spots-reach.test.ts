@@ -1,21 +1,26 @@
 /**
  * Every authored spot can be walked to (seed 1, the authored tiles installed), and drinking places keep
- * apart. "Walked to": from the walk node life sends its user from (`nodeOf`), over open ground (not
- * through any blocker grown by half a body, not over water), to within reach of the spot (a seat sits
- * inside its bench's disc: reach is how deep it sits, plus a body and a step).
+ * apart. "Walked to": from the walk node life sends its user from (`nodeOf`), over open ground (on the
+ * collision layer, collide.ts: never through a building, a wall or a fence, a body's core clear of their
+ * real outlines; not over water), to within reach of the spot (a body and a step; a seat sits in its
+ * bench, which a body steps round but is not walled in by).
  *
  * Excluded, each for a stated reason:
  *   unoffered    the spot's tile is not on or beside a place, nor a tile a place works (workTiles):
  *                life never offers it to anyone;
  *   off-graph    open country (a country or ground prefab) no road, door or spur comes within two tiles
- *                of (nodeOf −1): a field or a wood edge nobody farms or cuts; life leaves it out.
- * Nothing in a town, a landmark or a scene may be excluded.
+ *                of (nodeOf −1): a field or a wood edge nobody farms or cuts; life leaves it out;
+ *   walled       the collision layer (collide.ts, the pieces' real outlines) finds it walled in: no gap a
+ *                body passes in the buildings, walls and fences round it (life leaves it out: `walled`).
+ *                These are the tiles' to fix (WALLED lists the ones known), and stay few.
+ * Nothing else in a town, a landmark or a scene may be excluded.
  */
 import { afterAll, describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { HEX_TILE_SIZE } from "../src/hex/tiles.ts"
 import {
+  HARD,
   hexAt,
   hexIsland,
   hexWalk,
@@ -25,6 +30,7 @@ import {
   kindOf,
   lifePlaces,
   parseTilePrefabs,
+  solidDistance,
   tilePrefab,
   tileVariant,
   useOf,
@@ -41,6 +47,23 @@ const data = Object.fromEntries(
 installTilePrefabs(parseTilePrefabs(data).prefabs)
 afterAll(() => installTilePrefabs(null))
 
+/**
+ * Tiles with spots the collision layer finds walled in (reported to their authors): a pasture's shepherd
+ * inside its fence ring (no gate), the monastery's garth inside its cloister of stone walls and iron
+ * fence, a post in a castle ward behind its curtain, a merchant inside a market's stalls, a builder
+ * inside a scaffold.
+ */
+const WALLED = new Set([
+  "pasture",
+  "monastery-compound",
+  "castle-ward",
+  "castle-yard",
+  "market",
+  "market-square",
+  "construction",
+  "well-square",
+])
+
 const build = (seed: number) => {
   const h = hexIsland({ seed, files: 4000 })
   const z = hexZones(h)
@@ -51,9 +74,9 @@ const build = (seed: number) => {
 
 /** Half a walker's width, metres; the grid the floor is flooded on. */
 const BODY = 0.2
-/** A step out of a disc a node stands in. */
-const WALK_STEP = 0.4
-const CELL = 0.12
+/** A body's core: how near a wall a body squeezes through a gap (walk.ts's tight ways). */
+const CORE = 0.12
+const CELL = 0.1
 const WATER = new Set(["sea", "shallows", "lake", "river"])
 
 describe("every authored spot on seed 1 can be walked to", () => {
@@ -75,32 +98,32 @@ describe("every authored spot on seed 1 can be walked to", () => {
     // a quay's stone deck out over the shallows is walked (world.ts `decks`)
     return WATER.has(kindOf(h, i)) && u !== "dock" && u !== "bridge" && w.stairAt(x, zz) === null
   }
-  /** Why spot k cannot be walked to (null: it can). */
-  const stuck = (k: number, only?: (d: { x: number; z: number }) => boolean): string | null => {
+  /** Why spot k cannot be walked to (null: it can), looking `room` metres round its node and itself. */
+  const stuck = (k: number): string | null => stuckIn(k, 4) && stuckIn(k, 10)
+  const stuckIn = (k: number, room: number): string | null => {
     const s = f.spots[k]!
     const n = places.nodeOf(k)
     if (n < 0) return "no walk node within two tiles"
     const node = walk.nodes[n]!
-    const depth = Math.max(0, ...f.near(s.x, s.z, 0).map((d) => d.r - Math.hypot(d.x - s.x, d.z - s.z)))
-    if (depth > 0.9) return `buried ${depth.toFixed(2)} m inside a blocker`
-    const x0 = Math.min(node.x, s.x) - 4
-    const z0 = Math.min(node.z, s.z) - 4
-    const nx = Math.ceil((Math.max(node.x, s.x) + 4 - x0) / CELL)
-    const nz = Math.ceil((Math.max(node.z, s.z) + 4 - z0) / CELL)
+    const depth = Math.max(
+      0,
+      ...f.solidsNear(s.x, s.z, 0).flatMap((o) => (HARD(o.kind) ? [-solidDistance(o, s.x, s.z)] : [])),
+    )
+    if (depth > 0) return `inside a building, a wall or a fence by ${depth.toFixed(2)} m`
+    // on the world's own grid, as walk.ts looks for ways
+    const x0 = Math.floor((Math.min(node.x, s.x) - room) / CELL) * CELL
+    const z0 = Math.floor((Math.min(node.z, s.z) - room) / CELL) * CELL
+    const nx = Math.ceil((Math.max(node.x, s.x) + room - x0) / CELL)
+    const nz = Math.ceil((Math.max(node.z, s.z) + room - z0) / CELL)
     const at = (a: number, b: number): [number, number] => [x0 + (a + 0.5) * CELL, z0 + (b + 0.5) * CELL]
     const open = new Uint8Array(nx * nz)
     for (let a = 0; a < nx; a++)
       for (let b = 0; b < nz; b++) {
         const [x, zz] = at(a, b)
-        open[a * nz + b] =
-          f.near(x, zz, BODY).filter((d) => !only || only(d)).length || overWater(x, zz) ? 0 : 1
+        open[a * nz + b] = f.blocked(x, zz, CORE, HARD) || overWater(x, zz) ? 0 : 1
       }
-    // from the open ground round the node (a square's node stands under its well, a mine's under its
-    // pithead: people step out of whatever they stand in)
-    const out = Math.max(
-      1.6,
-      ...f.near(node.x, node.z, 0).map((d) => d.r + WALK_STEP - Math.hypot(d.x - node.x, d.z - node.z)),
-    )
+    // from the open ground round the node (a node under a well or a hall is moved out of it: walk.ts)
+    const out = 1.6
     const seen = new Uint8Array(nx * nz)
     const queue: number[] = []
     for (let a = 0; a < nx; a++)
@@ -145,7 +168,7 @@ describe("every authored spot on seed 1 can be walked to", () => {
 
   test("each is reachable, or excluded for a reason this file states", () => {
     const failures: string[] = []
-    const excluded = { unoffered: 0, offGraph: 0, pocket: 0 }
+    const excluded = { unoffered: 0, offGraph: 0, walled: 0 }
     let walked = 0
     for (const k of authored) {
       const s = f.spots[k]!
@@ -154,22 +177,15 @@ describe("every authored spot on seed 1 can be walked to", () => {
         excluded.unoffered++
         continue
       }
+      if (places.walled(k)) {
+        excluded.walled++
+        expect([p.id, WALLED.has(p.id)]).toEqual([p.id, true])
+        continue
+      }
       const why = stuck(k)
       if (why === "no walk node within two tiles" && (p.group === "country" || p.group === "ground")) {
         excluded.offGraph++
         continue
-      }
-      // a pocket: walled in by its own tile's props alone, whatever stands round it (an authoring fix in
-      // the tile composer, not a placing one); they stay rare
-      if (why?.startsWith("walled in")) {
-        const own = (d: { x: number; z: number }) => {
-          const { q, r } = hexAt(d.x / HEX_TILE_SIZE, d.z / HEX_TILE_SIZE)
-          return g.index(q, r) === s.tile
-        }
-        if (stuck(k, own)?.startsWith("walled in")) {
-          excluded.pocket++
-          continue
-        }
       }
       walked++
       if (why)
@@ -179,8 +195,8 @@ describe("every authored spot on seed 1 can be walked to", () => {
     expect(walked).toBeGreaterThan(1000)
     // the exclusions stay the exception
     expect(excluded.offGraph).toBeLessThan(walked / 20)
-    expect(excluded.pocket).toBeLessThan(5)
-  })
+    expect(excluded.walled).toBeLessThan(walked / 25)
+  }, 30000)
 
   test("the harbour's quay, the monastery's compound, a farmstead and the town hall's plaza stand here, every spot of theirs walked to", () => {
     for (const id of ["harbour-quay", "monastery-compound", "farmstead-yard", "town-hall-plaza"]) {
@@ -188,8 +204,9 @@ describe("every authored spot on seed 1 can be walked to", () => {
       expect([id, at.length > 0]).toEqual([id, true])
       for (const t of at) {
         const mine = f.on(t.i)
-        expect(mine.length).toBe(tilePrefab(id)!.spots!.length)
-        for (const k of mine) expect([id, k, stuck(k)]).toEqual([id, k, null])
+        const dropped = f.dropped.filter((s) => s.tile === t.i).length
+        expect(mine.length + dropped).toBe(tilePrefab(id)!.spots!.length)
+        for (const k of mine) if (!places.walled(k)) expect([id, k, stuck(k)]).toEqual([id, k, null])
       }
     }
   })

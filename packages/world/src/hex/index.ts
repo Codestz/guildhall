@@ -1,10 +1,35 @@
+export {
+  boxSolid,
+  type CollideInputs,
+  fitToTiles,
+  flightSteps,
+  type HexCollide,
+  hexCollide,
+  pieceFootprint,
+  pieceOutline,
+  pieceSolids,
+  type Solid,
+  SolidGrid,
+  type SolidKind,
+  solidDistance,
+  solidKind,
+  solidToFoot,
+  type Walkway,
+  walkwayAt,
+  walkwaySolids,
+} from "./collide.ts"
 export { DIRS, type Hex, type HexGrid, hexAt, hexCentre, hexDistance, hexGrid } from "./grid.ts"
 export {
   type GroundPalette,
   type HexFineGround,
+  type HexGroundHeights,
   type HexGroundMesh,
+  type HexHeights,
+  heightsReader,
   hexGroundFine,
+  hexGroundHeights,
   hexGroundMesh,
+  seatTiles,
 } from "./ground.ts"
 export {
   HEX_ISLAND_DEFAULTS,
@@ -66,7 +91,15 @@ export {
   type IslandSites,
   pieceSize,
 } from "./sites.ts"
-export { type Disc, type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
+export {
+  type Disc,
+  HARD,
+  type PlacedSpot,
+  SPOT_CLEAR,
+  type TileFurniture,
+  tileFurniture,
+  WORK_CLEAR,
+} from "./spots.ts"
 export { hexStructures } from "./structures.ts"
 export {
   CHARACTER_SCALE,
@@ -110,6 +143,8 @@ export {
   type HexWalkNode,
   hexWalk,
   WALK_CLEAR,
+  type WalkBlocker,
+  walledIn,
 } from "./walk.ts"
 export {
   type HexBridge,

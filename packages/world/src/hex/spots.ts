@@ -11,6 +11,18 @@
  *
  * Every building also blocks its footprint, authored or not, so nobody cuts through a house.
  */
+import {
+  discSolid,
+  pieceOutline,
+  pieceSolids,
+  type Solid,
+  SolidGrid,
+  type SolidKind,
+  solidDistance,
+  solidKind,
+  walkwayAt,
+  walkwaySolids,
+} from "./collide.ts"
 import { type HexGrid, hexAt } from "./grid.ts"
 import {
   HEX_TILE_SIZE,
@@ -42,7 +54,27 @@ export interface TileFurniture {
   on(tile: number): readonly number[]
   /** The blockers within `r` of a point. */
   near(x: number, z: number, r: number): Disc[]
+  /**
+   * The collision layer's solids (collide.ts): every piece's real outline, the authored blockers, the
+   * stairs' cheeks and the bridges' rails. Walks keep clear of these.
+   */
+  solids: readonly Solid[]
+  /** The solids near a point (their round within `r`). */
+  solidsNear(x: number, z: number, r: number): Solid[]
+  /** Whether a body of radius `r` at (x, z) stands in a solid (of the kinds `kinds` lets in). */
+  blocked(x: number, z: number, r: number, kinds?: (k: SolidKind) => boolean): boolean
+  /** Spots left out: set inside a building, a wall or a fence too deep to move out of. */
+  dropped: PlacedSpot[]
 }
+
+/** A body's half-width at a spot, metres: no spot stands nearer a building, a wall or a fence. */
+export const SPOT_CLEAR = 0.22
+/** A body's core: nearer a wall than this a spot is moved (and no gap narrower lets a body through). */
+export const BODY_CORE = 0.12
+/** A work spot's (a body at arm's length from what it works at, chest to the wall). */
+export const WORK_CLEAR = 0.1
+/** What no spot stands in: buildings, walls, towers, fences. */
+export const HARD = (k: SolidKind): boolean => k === "building" || k === "wall"
 
 /** A spot in a piece's (or a tile's) own frame: metres at the reference scale, facing relative to it. */
 type LocalSpot = Omit<TileSpot, "kind"> & { kind?: TileSpot["kind"] }
@@ -248,7 +280,10 @@ const placeSpot = (tile: number, l: LocalSpot, at: [number, number], facing: num
 })
 
 /** The spots and blockers of a built island. */
-export function tileFurniture(g: HexGrid, w: Pick<HexWorld, "tiles" | "pieces">): TileFurniture {
+export function tileFurniture(
+  g: HexGrid,
+  w: Pick<HexWorld, "tiles" | "pieces"> & Partial<Pick<HexWorld, "stairs" | "bridges" | "decks">>,
+): TileFurniture {
   const R = HEX_TILE_SIZE
   const tileAt = (x: number, z: number) => {
     const { q, r } = hexAt(x / R, z / R)
@@ -276,7 +311,34 @@ export function tileFurniture(g: HexGrid, w: Pick<HexWorld, "tiles" | "pieces">)
       }
     }
   }
+  // the collision layer: every piece's outline, the authored blockers, the stairs' cheeks, the rails
+  const solids: Solid[] = []
+  // the composer's blocker discs: kept clear of where there is room, but the pieces' own outlines are
+  // the walls (a lantern's disc is far rounder than its post)
+  for (const b of blockers) {
+    const d = discSolid("blocker", b.x, b.z, b.r, 0)
+    d.soft = true
+    solids.push(d)
+  }
+  for (const st of w.stairs ?? []) solids.push(...walkwaySolids(st))
+  for (const b of w.bridges ?? []) for (const leg of b.legs) solids.push(...walkwaySolids(leg))
+  const ways = [...(w.stairs ?? []), ...(w.bridges ?? []).flatMap((b) => b.legs), ...(w.decks ?? [])]
+  const wayAt = (x: number, z: number) => {
+    for (const st of ways) {
+      const y = walkwayAt(st, x, z)
+      if (y !== null) return y
+    }
+    return null
+  }
+  /** A piece under a walkway's surface (a quay's stone blocks): stood on, not bumped into. */
+  const floor = (p: PlacedPiece) => {
+    const deck = wayAt(p.x, p.z)
+    const o = pieceOutline(p.piece)
+    return deck !== null && !!o && p.y + o.top * p.scale <= deck + 0.12
+  }
   for (const p of w.pieces as readonly PlacedPiece[]) {
+    const own = floor(p) ? [] : pieceSolids(p)
+    solids.push(...own)
     const rule = ruleOf(p.piece)
     if (!rule) continue
     const tile = tileAt(p.x, p.z)
@@ -284,12 +346,64 @@ export function tileFurniture(g: HexGrid, w: Pick<HexWorld, "tiles" | "pieces">)
     if (rule.r > 0 && (building || !authoredBlockers.has(tile))) {
       const [x, z] = turn(p.x, p.z, p.rot, rule.at?.[0] ?? 0, rule.at?.[1] ?? 0, p.scale)
       blockers.push({ x, z, r: rule.r * p.scale })
+      // a piece the library has no outline of blocks by its rule's disc
+      if (!own.length && solidKind(p.piece)) solids.push(discSolid("blocker", x, z, rule.r * p.scale, p.y))
     }
     if (!rule.spots || authoredSpots.has(tile)) continue
     const k = p.scale / (rule.ref ?? 1)
     for (const s of rule.spots)
       spots.push(placeSpot(tile, s, turn(p.x, p.z, p.rot, s.x, s.z, k), s.facing + p.rot))
   }
+  // every spot clear of buildings, walls and fences by a body (a standing one of props too): one set
+  // into a wall is moved out the shortest way, and one that cannot be is left out
+  const grid = new SolidGrid(solids)
+  const all = () => true
+  const blocked = (x: number, z: number, r: number, kinds: (k: SolidKind) => boolean = all) => {
+    for (const o of grid.near(x, z, r)) if (kinds(o.kind) && solidDistance(o, x, z) < r) return true
+    return false
+  }
+  const dir: [number, number] = [0, 0]
+  const onWay = (x: number, z: number) => wayAt(x, z) !== null
+  const kept: PlacedSpot[] = []
+  const dropped: PlacedSpot[] = []
+  for (const sp of spots) {
+    if (sp.kind === "sleep") {
+      kept.push(sp)
+      continue
+    }
+    // at work, face to the wall it works at (a smith at his forge, a builder in the scaffold)
+    const clear = sp.kind === "work" ? WORK_CLEAR : SPOT_CLEAR
+    let x = sp.x
+    let z = sp.z
+    // only one set in or against a building, a wall or a fence (nearer than a body's core) moves, out to
+    // a body's room from it: the rest stand where their tile put them
+    const inside = grid.near(x, z, BODY_CORE).some((o) => HARD(o.kind) && solidDistance(o, x, z) < BODY_CORE)
+    for (let round = 0; round < 4 && inside; round++) {
+      let moved = false
+      for (const o of grid.near(x, z, SPOT_CLEAR)) {
+        const r = HARD(o.kind) ? clear : 0
+        if (r <= 0) continue
+        const d = solidDistance(o, x, z, dir)
+        if (d >= r) continue
+        x += dir[0] * (r - d + 1e-3)
+        z += dir[1] * (r - d + 1e-3)
+        moved = true
+      }
+      if (!moved) break
+    }
+    // a spot on a deck or a flight (a fisher at the quay's edge) stays on it
+    if (onWay(sp.x, sp.z) && !onWay(x, z)) {
+      x = sp.x
+      z = sp.z
+    }
+    if (Math.hypot(x - sp.x, z - sp.z) > 1.2 || blocked(x, z, 0.02, HARD)) {
+      dropped.push(sp)
+      continue
+    }
+    kept.push(x === sp.x && z === sp.z ? sp : { ...sp, x, z })
+  }
+  spots.length = 0
+  spots.push(...kept)
   const onTile = new Map<number, number[]>()
   for (const [k, s] of spots.entries()) {
     const list = onTile.get(s.tile)
@@ -313,6 +427,10 @@ export function tileFurniture(g: HexGrid, w: Pick<HexWorld, "tiles" | "pieces">)
   return {
     spots,
     blockers,
+    solids,
+    solidsNear: (x, z, r) => grid.near(x, z, r),
+    blocked,
+    dropped,
     on: (tile) => onTile.get(tile) ?? [],
     near(x, z, r) {
       let out = none

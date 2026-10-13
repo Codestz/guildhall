@@ -18,9 +18,14 @@ describe("hex stairs and bridges", () => {
         // the flight's direction is one of the six road directions (multiples of 60°)
         const a = (Math.atan2(-(st.bz - st.az), st.bx - st.ax) * 180) / Math.PI
         expect(Math.abs(a / 60 - Math.round(a / 60))).toBeLessThan(1e-6)
-        // the walker's height follows the flight from top to bottom
+        // the walker stands on the treads: the first flush with the upper road, the last a step over the
+        // lower one, and past the flight on the lower road
+        const n = st.steps ?? 2
+        const ux = (st.bx - st.ax) / len
+        const uz = (st.bz - st.az) / len
         expect(w.stairAt(st.ax, st.az)).toBeCloseTo(st.ay, 5)
-        expect(w.stairAt(st.bx, st.bz)).toBeCloseTo(st.by, 5)
+        expect(w.stairAt(st.bx - ux * 0.01, st.bz - uz * 0.01)).toBeCloseTo(st.by + (st.ay - st.by) / n, 5)
+        expect(w.stairAt(st.bx + ux * 0.2, st.bz + uz * 0.2)).toBeNull()
       }
     }
   })

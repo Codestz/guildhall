@@ -4,7 +4,9 @@
  * ground prisms, the path strips, the water tiles and the pieces, for the 3D screen to draw.
  */
 import { hash2 } from "../geom/noise.ts"
+import { fitToTiles, walkwayAt } from "./collide.ts"
 import { hexCentre } from "./grid.ts"
+import { seatTiles } from "./ground.ts"
 import { type HexIsland, kindOf } from "./island.ts"
 import {
   BUILDING_REACH,
@@ -14,7 +16,7 @@ import {
   isDefaultNature,
   natureOdds,
 } from "./nature.ts"
-import { footprint, settlePieces } from "./sites.ts"
+import { bodyRadius, footprint, settlePieces } from "./sites.ts"
 import {
   castleWalls,
   edgeDressing,
@@ -824,6 +826,37 @@ export function hexWorld(
       },
     })
   }
+  // every wall and tower on its own tile's seat too: none reaches over a step, water or the shore
+  const seats = seatTiles(h, { tiles, pieces })
+  const topOf = (i: number) => tiles[byTile.get(i)!]!.top
+  fitToTiles(
+    pieces,
+    {
+      R,
+      tileAt: (x, zz) => {
+        const i = tileAt(x, zz)
+        return i >= 0 && byTile.has(i) ? i : -1
+      },
+      centre: (i) => {
+        const t = tiles[byTile.get(i)!]!
+        return [t.x, t.z]
+      },
+      neighbour: (i, d) => g.neighbours(i)[d]!,
+      shares: (i, j) => seats.has(j) && byTile.has(j) && Math.abs(topOf(j) - topOf(i)) <= 0.05,
+    },
+    // a building the site settled (sites.ts settlePieces) already stands on its floor, clear of its
+    // neighbours: what is left is the rest (walls, towers, hedges, a scene's pieces)
+    () => true,
+    (p) => {
+      const r = bodyRadius(p)
+      if (!r) return true
+      return pieces.every((o) => {
+        if (o === p) return true
+        const ro = bodyRadius(o)
+        return !ro || Math.hypot(o.x - p.x, o.z - p.z) >= r + ro - 0.05
+      })
+    },
+  )
   const heightAt = (x: number, zz: number): number => {
     const i = tileAt(x, zz)
     const k = i >= 0 ? byTile.get(i) : undefined
@@ -841,17 +874,10 @@ export function hexWorld(
     step: STEP,
     heightAt,
     stairAt(px: number, pz: number) {
+      // the tread a foot stands on (collide.ts: the numbers structures.ts builds the steps from)
       for (const st of walkways) {
-        const lx = st.bx - st.ax
-        const lz = st.bz - st.az
-        const len = Math.hypot(lx, lz)
-        const dx = px - st.ax
-        const dz = pz - st.az
-        const along = (dx * lx + dz * lz) / len
-        if (along < -0.05 || along > len + 0.05) continue
-        if (Math.abs((dx * -lz + dz * lx) / len) > st.half + (st.kind === "stairs" ? 0.4 : 0.05)) continue
-        const f = Math.min(1, Math.max(0, along / len))
-        return st.ay + (st.by - st.ay) * f
+        const y = walkwayAt(st, px, pz)
+        if (y !== null) return y
       }
       return null
     },

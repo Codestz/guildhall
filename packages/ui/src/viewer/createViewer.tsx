@@ -10,6 +10,7 @@ import { holdUiStyle } from "../theme/hold.ts"
 import {
   allKnobs,
   applyOf,
+  changed,
   type Knob,
   type KnobValue,
   type KnobValues,
@@ -180,10 +181,12 @@ export function createViewer(host: HTMLElement, opts: ViewerOptions): Viewer {
     committed: layout,
     setKnob: (key, value) => setValues({ [key]: value }, false),
     rebuild() {
-      const values = store.get().values
+      // only what moved: a key the link carries in a form no knob reads (`?props=a,b,c`) is left alone
+      const { values, built } = store.get()
+      const moved = changed(knobs, built, values)
       opts.reload?.(
-        withKnobs(query, knobs, values),
-        knobs.map((k) => k.key),
+        withKnobs(query, moved, values),
+        moved.map((k) => k.key),
       )
     },
     discard() {
@@ -325,6 +328,17 @@ export function createViewer(host: HTMLElement, opts: ViewerOptions): Viewer {
       // a bottom sheet (narrow) covers no right edge
       if (!panel || panel.offsetLeft < root.clientWidth / 2) return 0
       return root.clientWidth - panel.offsetLeft + 8
+    },
+    coveredLeft() {
+      if (root.dataset.chrome === "off") return 0
+      const card = root.querySelector<HTMLElement>(".ui-titlecard")
+      if (!card) return 0
+      return card.getBoundingClientRect().right - root.getBoundingClientRect().left + 8
+    },
+    coveredTop() {
+      if (root.dataset.chrome === "off") return 0
+      const tools = root.querySelector<HTMLElement>(".ui-tools")
+      return tools ? tools.getBoundingClientRect().bottom - root.getBoundingClientRect().top + 8 : 0
     },
     onLayout(fn) {
       layoutFns.add(fn)

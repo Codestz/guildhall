@@ -123,6 +123,10 @@ export interface Viewer {
   toast(text: string, detail?: string): void
   /** How much of the viewer's right edge the open Inspector covers (CSS px), so a 2D map can centre beside it. */
   coveredRight(): number
+  /** How much of the viewer's left edge the title card covers (CSS px), so a framing can leave it room. */
+  coveredLeft(): number
+  /** How much of the viewer's top edge the tools row covers (CSS px). */
+  coveredTop(): number
   /** Called when the Inspector opens or closes, or the viewer resizes. */
   onLayout(fn: () => void): () => void
   dispose(): void

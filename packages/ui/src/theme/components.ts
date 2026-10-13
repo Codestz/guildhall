@@ -271,7 +271,8 @@ export const COMPONENTS_CSS = /* css */ `
 
 /* ── read-outs ──────────────────────────────────────────────────── */
 .ui-stats { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 14px; margin: 0; }
-.ui-stats dt { min-width: 0; font: 400 var(--t-sm)/1.35 var(--display); letter-spacing: 0.08em; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* labels in small caps of the body face: the display face's "1" reads as a roman I */
+.ui-stats dt { min-width: 0; font: 500 var(--t-md)/1.3 var(--body); font-variant: all-small-caps; letter-spacing: 0.08em; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ui-stats dd { margin: 0; text-align: right; font: 500 var(--t-sm)/1.35 var(--mono); color: var(--paper); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ui-stats dd small { margin-left: 3px; font-weight: 400; color: var(--faint); }
 .ui-stats dd[data-tone="warn"] { color: var(--warn); }
@@ -281,7 +282,7 @@ export const COMPONENTS_CSS = /* css */ `
 /* headline numbers: big mono over a small-caps label (the home page's stat strip) */
 .ui-figures { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; }
 .ui-figures div { display: flex; flex-direction: column-reverse; min-width: 0; }
-.ui-figures dt { font: 400 var(--t-xs)/1.2 var(--display); letter-spacing: 0.12em; color: var(--faint); white-space: nowrap; }
+.ui-figures dt { font: 500 var(--t-sm)/1.2 var(--body); font-variant: all-small-caps; letter-spacing: 0.1em; color: var(--faint); white-space: nowrap; }
 .ui-figures dd { margin: 0; font: 500 var(--t-lg)/1.25 var(--mono); color: var(--paper); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ui-figures dd small { margin-left: 2px; font-size: var(--t-xs); color: var(--faint); }
 
@@ -313,6 +314,7 @@ export const COMPONENTS_CSS = /* css */ `
 @keyframes ui-rise { from { opacity: 0; transform: translateY(8px); } }
 
 /* ── in-world label (a plate pinned to a point in the scene) ────── */
+/* small caps of the body face, not the display face: names carry digits ("sword-1handed") */
 .ui-plate {
   position: absolute;
   z-index: 1;
@@ -330,7 +332,11 @@ export const COMPONENTS_CSS = /* css */ `
   text-overflow: ellipsis;
   pointer-events: none;
 }
-.ui-plate b { font: 400 var(--t-md)/1.2 var(--display); letter-spacing: 0.06em; color: var(--brass-hi); }
+.ui-plate b { font: 500 var(--t-lg)/1.15 var(--body); font-variant: all-small-caps; letter-spacing: 0.06em; color: var(--brass-hi); }
+.ui-plate[data-size="sm"] { padding: 2px 6px 3px; }
+.ui-plate[data-size="sm"] b { font-size: var(--t-md); letter-spacing: 0.03em; }
+/* a heading too tight for its box: bare text, full width, shadowed to read over the scene */
+.ui-plate[data-size="sm"][data-kind="head"] { max-width: none; overflow: visible; padding: 0; border: 0; background: none; box-shadow: none; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.8); }
 .ui-plate small { display: block; font: var(--t-xs)/1.35 var(--mono); color: var(--muted); }
 .ui-plate[data-tone="ok"] { border-color: rgba(166, 221, 143, 0.35); }
 .ui-plate[data-tone="ok"] small { color: var(--ok); }

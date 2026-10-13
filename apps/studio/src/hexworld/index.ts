@@ -305,8 +305,10 @@ const world = {
     const nature = natureOf(ctx.query)
     // the hex map's shape knobs (?coast= ?hills= ?rain= ?forest=): `/lab/hexmap`'s island in 3D
     const shape = shapeOf(ctx.query)
-    // the collision overlay (`?collide=1`, `?spots=1`) builds the map again on this thread for its walk graph
-    const overlay = ctx.query.get("collide") === "1" || ctx.query.get("spots") === "1"
+    // the collision overlay (`?collide=1`, `?spots=1`) builds the map again on this thread for its walk graph;
+    // `?heroSpots=1` marks the heroes' spots (world heroes.ts) over the scene, alone
+    const heroSpots = ctx.query.get("heroSpots") === "1"
+    const overlay = ctx.query.get("collide") === "1" || ctx.query.get("spots") === "1" || heroSpots
     const lifeOn = ctx.query.get("life") !== "0"
     const catalogLoad = loadCatalog()
     // `?name=`: the island's own name (the site's `/` is "Guildhall", a hall its repo), else the seed's
@@ -603,6 +605,7 @@ const world = {
           seed,
           agentT: num("lifeT", 0),
           overlay,
+          heroSpots,
         })
         await life.ready
       }

@@ -7,9 +7,13 @@
  *            shades, a bridge's deck as a band over the water);
  *   blue     every person's round, live, where they are drawn;
  *   amber    the spots, a tick the way each faces, and the line from the walk node it is reached from.
+ *
+ * With `heroes` (`?heroSpots=1`) it marks only the heroes' spots (world heroes.ts): a green diamond at
+ * work (gold at the Guildhall's gathering), a tick the way it faces, the line from its walk node, and
+ * what it reads as (its pose).
  */
 import { type Stage, toScreen } from "@guildhall/render"
-import type { HexCollide, HexWalk, TileFurniture } from "@guildhall/world"
+import type { HeroSpot, HexCollide, HexWalk, TileFurniture } from "@guildhall/world"
 
 const REACH = 40
 /** The height dots: this far apart, out to this far from the target, metres. */
@@ -24,7 +28,13 @@ export interface CollideView {
 export function collideView(
   stage: Stage,
   host: HTMLElement,
-  layer: { collide: HexCollide; furniture: TileFurniture; walk: HexWalk; nodeOf(spot: number): number },
+  layer: {
+    collide: HexCollide
+    furniture: TileFurniture
+    walk: HexWalk
+    nodeOf(spot: number): number
+    heroes?: readonly HeroSpot[]
+  },
 ): CollideView {
   const canvas = document.createElement("canvas")
   canvas.style.cssText = "position:absolute;inset:0;z-index:1;pointer-events:none;width:100%;height:100%"
@@ -54,6 +64,10 @@ export function collideView(
       g.clearRect(0, 0, w, h)
       const t = stage.getCamera().target
       const close = (x: number, z: number, r = REACH) => Math.hypot(x - t[0], z - t[2]) < r
+      if (layer.heroes) {
+        drawHeroes(g, layer.heroes, close)
+        return
+      }
       // the walkable height: a ramp of shades round the target's own height
       const base = collide.heightAt(t[0], t[2])
       for (let x = t[0] - DOT_REACH; x <= t[0] + DOT_REACH; x += DOT)
@@ -128,5 +142,57 @@ export function collideView(
       }
     },
     dispose: () => canvas.remove(),
+  }
+
+  function drawHeroes(
+    g: CanvasRenderingContext2D,
+    heroes: readonly HeroSpot[],
+    close: (x: number, z: number) => boolean,
+  ) {
+    g.font = "600 11px ui-monospace, monospace"
+    g.textAlign = "center"
+    for (const s of heroes) {
+      const [x, , z] = s.at
+      if (!close(x, z)) continue
+      const y = collide.heightAt(x, z) + 0.05
+      const p = toScreen(stage, [x, y, z])
+      const q = toScreen(stage, [x + Math.sin(s.facing) * 0.6, y, z + Math.cos(s.facing) * 0.6])
+      if (!p || !q) continue
+      const colour = s.kind === "gather" ? "#ffd23c" : "#3cff78"
+      const node = walk.nodes[s.node]
+      const a = node && toScreen(stage, [node.x, collide.heightAt(node.x, node.z) + 0.05, node.z])
+      if (a) {
+        g.strokeStyle = s.kind === "gather" ? "rgba(255,210,60,0.6)" : "rgba(60,255,120,0.6)"
+        g.lineWidth = 1.5
+        g.setLineDash([4, 3])
+        g.beginPath()
+        g.moveTo(a[0], a[1])
+        g.lineTo(p[0], p[1])
+        g.stroke()
+        g.setLineDash([])
+      }
+      g.fillStyle = colour
+      g.strokeStyle = "#0b0b0b"
+      g.lineWidth = 1.5
+      g.beginPath()
+      g.moveTo(p[0], p[1] - 7)
+      g.lineTo(p[0] + 7, p[1])
+      g.lineTo(p[0], p[1] + 7)
+      g.lineTo(p[0] - 7, p[1])
+      g.closePath()
+      g.fill()
+      g.stroke()
+      g.strokeStyle = colour
+      g.lineWidth = 2.5
+      g.beginPath()
+      g.moveTo(p[0], p[1])
+      g.lineTo(q[0], q[1])
+      g.stroke()
+      g.fillStyle = "rgba(0,0,0,0.65)"
+      const w = g.measureText(s.pose).width + 8
+      g.fillRect(p[0] - w / 2, p[1] - 24, w, 14)
+      g.fillStyle = colour
+      g.fillText(s.pose, p[0], p[1] - 13)
+    }
   }
 }

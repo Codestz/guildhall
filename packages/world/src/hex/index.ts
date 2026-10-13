@@ -51,6 +51,14 @@ export {
   seatTiles,
 } from "./ground.ts"
 export {
+  GATHER_PER_SPOT,
+  HERO_SPOTS_MIN,
+  type HeroPoolInputs,
+  type HeroPose,
+  type HeroSpot,
+  heroSpotPool,
+} from "./heroes.ts"
+export {
   HEX_ISLAND_DEFAULTS,
   HEX_KINDS,
   HEX_LAND_MAX,
@@ -73,6 +81,8 @@ export {
   doorSpot,
   type Folk,
   guildhallZone,
+  heroFrom,
+  heroRoute,
   type LifeAct,
   type LifePlaces,
   type LifePose,

@@ -22,6 +22,7 @@ import { hash2 } from "../geom/noise.ts"
 import { discSolid, type Solid, SolidGrid } from "./collide.ts"
 import { DRILLS, pairedDrill } from "./drills.ts"
 import { hexAt } from "./grid.ts"
+import { type HeroSpot, heroSpotPool } from "./heroes.ts"
 import { type HexIsland, kindOf } from "./island.ts"
 import { HARD, type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
 import { HEX_TILE_SIZE, opensEvening, type SpotHours, spotWindows } from "./tiles.ts"
@@ -407,6 +408,61 @@ export function lifePose(steps: readonly LifeStep[], t: number, period: number):
   }
 }
 
+/**
+ * A hero's walk (plan-hud-events.md L1): from where it is (`from`: a stay, or `heroFrom` for a point
+ * mid-walk) to a spot (a hero spot, the Guildhall's gathering), leaving at `leave` and walking `mps` in
+ * the loop's time unit, on the walk graph and round the blockers `near` gives (LifePlaces `walkNear`). The
+ * walk as a step `lifePose` samples; null when it is there already.
+ */
+export function heroRoute(
+  walk: HexWalk,
+  from: LifeSpot,
+  to: LifeSpot,
+  opts: { leave?: number; mps?: number; lane?: number; near?: NearBlockers } = {},
+): LifeWalk | null {
+  const b = new LoopBuilder(
+    walk,
+    opts.mps ?? WALK_MPS * 1.1,
+    opts.lane ?? 0.3,
+    from,
+    { act: "idle" },
+    opts.near,
+    true,
+  )
+  b.go(opts.leave ?? 0, to, { act: "work" })
+  const step = b.steps.find((s) => s.kind === "walk")
+  return step?.kind === "walk" ? step : null
+}
+
+/**
+ * A point as a start for `heroRoute` (a pose sampled mid-walk, when a hero is sent elsewhere): on the
+ * walk node nearest it, its own tile's or a neighbour's first, else any. Facing kept.
+ */
+export function heroFrom(walk: HexWalk, h: HexIsland, at: Vec3, facing = 0): LifeSpot {
+  const g = h.grid
+  const { q, r } = hexAt(at[0] / HEX_TILE_SIZE, at[2] / HEX_TILE_SIZE)
+  const i = g.index(q, r)
+  const round = i < 0 ? [] : [i, ...g.neighbours(i).filter((j) => j >= 0)]
+  let node = -1
+  let best = Number.POSITIVE_INFINITY
+  const consider = (c: number) => {
+    if (c < 0) return
+    const n = walk.nodes[c]!
+    const d = Math.hypot(n.x - at[0], n.z - at[2])
+    if (d < best - 1e-9) {
+      best = d
+      node = c
+    }
+  }
+  for (const j of round) {
+    consider(walk.at(j))
+    consider(walk.door(j))
+  }
+  if (node < 0) for (let c = 0; c < walk.nodes.length; c++) consider(c)
+  const n = node >= 0 ? walk.nodes[node] : undefined
+  return { node, at, facing, ground: n ? !onDeck(n) : true }
+}
+
 const BUILT = new Set<string>(["building", "farmstead", "homestead", "landmark"])
 const roadLike = (z: HexZones, i: number) => {
   const u = useOf(z, i)
@@ -531,6 +587,12 @@ export interface LifePlaces {
    * square), so nobody's way runs through someone standing at theirs.
    */
   walkNear(x: number, z: number, r: number): readonly WalkBlocker[]
+  /**
+   * A place's hero spots (heroes.ts): the pool set aside for the agents, new spots no townsfolk is ever
+   * given (none of `furniture.spots`), so the townsfolk's days are the same with or without it. Empty
+   * unless `lifePlaces` was asked for some (`heroSpots`); at the Guildhall, the gathering before its hall.
+   */
+  heroSpots(zone: number): readonly HeroSpot[]
 }
 
 /** The room a person standing at a spot or a slot takes, as far as walks are concerned, metres. */
@@ -549,12 +611,18 @@ export function openFor(hours: SpotHours | undefined, a: number, b: number): boo
   })
 }
 
-/** The places of an island: its furniture, slots and the reservation book (empty). */
+/**
+ * The places of an island: its furniture, slots and the reservation book (empty). `heroSpots`: how many
+ * hero spots each place sets aside for the agents (heroes.ts; at least two when asked for any, up to twice
+ * as many at the Guildhall's gathering), worked out per place when first asked for.
+ */
 export function lifePlaces(
   h: HexIsland,
   z: HexZones,
-  w: Pick<HexWorld, "tiles" | "pieces"> & Partial<Pick<HexWorld, "stairAt">>,
+  w: Pick<HexWorld, "tiles" | "pieces"> &
+    Partial<Pick<HexWorld, "stairAt" | "stairs" | "bridges" | "doorways">>,
   walk: HexWalk,
+  opts: { heroSpots?: number } = {},
 ): LifePlaces {
   const g = h.grid
   const furniture = tileFurniture(g, w)
@@ -828,6 +896,10 @@ export function lifePlaces(
     nodeOf(spot)
     return walled.has(spot)
   }
+  const heroSpots = heroSpotPool(
+    { h, z, w, walk, furniture, slots, stands: () => folkStands(h, z, walk), home: guildhallZone(walk, z) },
+    opts.heroSpots ?? 0,
+  )
   return {
     furniture,
     nodeOf,
@@ -842,6 +914,7 @@ export function lifePlaces(
     prefabOf,
     partner,
     walkNear,
+    heroSpots,
   }
 }
 /** Where someone goes for a break: home, a seat, a stall's customer side, a neighbour's door, a square, the tavern. */
@@ -981,40 +1054,11 @@ export function planFolk(
     }
     return undefined
   }
-  /**
-   * A castle's rounds: points just inside its curtain wall (its walled court and yard tiles' nodes, a
-   * step toward the wall), in order round the castle, from a start of each guard's own.
-   */
+  /** A castle's rounds (castleRounds), from a start of each guard's own. */
   const rounds = (zi: number, pick: number): LifeSpot[] => {
-    const zone = z.zones[zi]!
-    const inZone = new Set(zone.tiles)
-    const heart = walk.nodes[walk.hearts[zi]!]!
-    const out: { spot: LifeSpot; a: number }[] = []
-    for (const i of zone.tiles) {
-      const n = walk.at(i)
-      if (n < 0) continue
-      const nb = h.grid.neighbours(i)
-      const walled = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! < 0 || !inZone.has(nb[d]!))
-      if (!walled.length) continue
-      const node = walk.nodes[n]!
-      // toward the middle of its walled sides, short of the wall
-      let sx = 0
-      let sz = 0
-      for (const d of walled) {
-        sx += Math.cos((Math.PI / 3) * d)
-        sz -= Math.sin((Math.PI / 3) * d)
-      }
-      const l = Math.hypot(sx, sz) || 1
-      const x = node.x + (sx / l) * 0.9
-      const zz = node.z + (sz / l) * 0.9
-      out.push({
-        spot: { node: n, at: [x, node.y, zz], facing: Math.atan2(sx, sz), ground: true },
-        a: Math.atan2(zz - heart.z, x - heart.x),
-      })
-    }
-    out.sort((p, q) => p.a - q.a)
+    const out = castleRounds(h, z, walk, zi)
     const k0 = Math.floor(pick * out.length)
-    return [...out.slice(k0), ...out.slice(0, k0)].map((o) => o.spot)
+    return [...out.slice(k0), ...out.slice(0, k0)]
   }
   for (const [zi, zone] of z.zones.entries()) {
     const heart = walk.hearts[zi]!
@@ -1103,7 +1147,7 @@ export function planFolk(
       const homeNode = homes.length ? homes[Math.floor(r(1) * homes.length)]! : heart
       const homeSpot: LifeSpot = homes.length
         ? doorSpot(walk, homeNode, doorways)
-        : spotAt(walk, heart, Math.floor(r(1) * 6), 2.4)
+        : spotAt(walk, heart, Math.floor(r(1) * 6), HOMELESS_R)
       const indoors = homes.length > 0
       const work = spot !== undefined ? places.lifeSpot(spot) : (places.takeSlot(zi) ?? homeSpot)
       const workAct = spot !== undefined ? "work" : "idle"
@@ -1221,6 +1265,64 @@ export function planFolk(
     }
   }
   return folk
+}
+
+/**
+ * A castle's rounds: points just inside its curtain wall (its walled court and yard tiles' nodes, a step
+ * toward the wall), in order round the castle.
+ */
+function castleRounds(h: HexIsland, z: HexZones, walk: HexWalk, zi: number): LifeSpot[] {
+  const zone = z.zones[zi]!
+  const inZone = new Set(zone.tiles)
+  const heart = walk.nodes[walk.hearts[zi]!]!
+  const out: { spot: LifeSpot; a: number }[] = []
+  for (const i of zone.tiles) {
+    const n = walk.at(i)
+    if (n < 0) continue
+    const nb = h.grid.neighbours(i)
+    const walled = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! < 0 || !inZone.has(nb[d]!))
+    if (!walled.length) continue
+    const node = walk.nodes[n]!
+    // toward the middle of its walled sides, short of the wall
+    let sx = 0
+    let sz = 0
+    for (const d of walled) {
+      sx += Math.cos((Math.PI / 3) * d)
+      sz -= Math.sin((Math.PI / 3) * d)
+    }
+    const l = Math.hypot(sx, sz) || 1
+    const x = node.x + (sx / l) * 0.9
+    const zz = node.z + (sz / l) * 0.9
+    out.push({
+      spot: { node: n, at: [x, node.y, zz], facing: Math.atan2(sx, sz), ground: true },
+      a: Math.atan2(zz - heart.z, x - heart.x),
+    })
+  }
+  out.sort((p, q) => p.a - q.a)
+  return out.map((o) => o.spot)
+}
+
+/** Where a place with no doors puts its people's homes: round its heart (`planFolk`), 2.4 m out. */
+const HOMELESS_R = 2.4
+
+/**
+ * Every point townsfolk stand at that is no spot and no slot (planFolk): the castles' rounds, and the
+ * homes round the heart of a place with no doors. The hero spots keep off them too.
+ */
+function folkStands(h: HexIsland, z: HexZones, walk: HexWalk): { x: number; z: number }[] {
+  const out: { x: number; z: number }[] = []
+  for (const [zi, zone] of z.zones.entries()) {
+    const heart = walk.hearts[zi]!
+    if (heart < 0 || !zone.tiles.length) continue
+    if (zone.kind === "castle")
+      for (const s of castleRounds(h, z, walk, zi)) out.push({ x: s.at[0], z: s.at[2] })
+    if (!zone.tiles.some((i) => walk.door(i) >= 0))
+      for (let k = 0; k < 6; k++) {
+        const s = spotAt(walk, heart, k, HOMELESS_R)
+        out.push({ x: s.at[0], z: s.at[2] })
+      }
+  }
+  return out
 }
 
 /** A round of the town's streets for the night watch: a few road nodes out from the heart. */

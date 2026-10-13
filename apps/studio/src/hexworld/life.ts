@@ -85,6 +85,8 @@ export interface LifeOpts {
   seed: number
   /** Draw the collision layer over the scene (`?collide=1`, `?spots=1`: collideView.ts). */
   overlay?: boolean
+  /** Mark the heroes' spots (`?heroSpots=1`, world heroes.ts) instead of the collision layer. */
+  heroSpots?: boolean
   /** Seconds into the agents' script at the start (`?lifeT=` for shots). */
   agentT?: number
 }
@@ -421,12 +423,13 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     if (opts.overlay && opts.debug) {
       const { island: h, zones: z, world: w } = opts.debug()
       const walk = hexWalk(h, z, w, { reach: workTiles(h, z) })
-      const places = lifePlaces(h, z, w, walk)
+      const places = lifePlaces(h, z, w, walk, { heroSpots: opts.heroSpots ? 3 : 0 })
       overlay = collideView(stage, opts.host, {
         collide,
         furniture: places.furniture,
         walk,
         nodeOf: places.nodeOf,
+        ...(opts.heroSpots ? { heroes: z.zones.flatMap((_, zi) => places.heroSpots(zi)) } : {}),
       })
       cleanup.push(overlay.dispose)
     }

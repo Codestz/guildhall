@@ -36,9 +36,12 @@ import {
   type TerrainMesh,
   type Water,
 } from "@guildhall/render"
+import { roman } from "@guildhall/ui"
 import { HEX_TILE_SIZE, hexIsland, hexWorld, hexZones, LEVEL_STEP } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
+import { current } from "../shell/router.ts"
+import { mountViewer } from "../shell/viewer.ts"
 import { islandWorld, worldCamera } from "../shell/worldCamera.ts"
 import { loadTiles } from "../tiles.ts"
 import { atmoKnobs, createIslandAir, type IslandAir } from "./atmo.ts"
@@ -58,6 +61,7 @@ import {
   shapeOf,
   type ToWorker,
 } from "./job.ts"
+import { clock, islandKnobs } from "./knobs.ts"
 import { createLife, type Life } from "./life.ts"
 
 const logger = log("studio:hexworld")
@@ -151,7 +155,7 @@ function startJob(spec: Promise<HexJobSpec>): Stages {
 export const hexWorldScreen: Screen = {
   id: "hexworld",
   title: "Hex island",
-  mount(host, ctx) {
+  mount(outer, ctx) {
     const t0 = performance.now()
     const since = () => Math.round(performance.now() - t0)
     const num = (k: string, d: number) => {
@@ -182,9 +186,22 @@ export const hexWorldScreen: Screen = {
       })),
     )
     const catalogLoad = loadCatalog()
+    // the chrome: the Viewer's corners and Inspector round the stage (shell/viewer.ts); the seed is the
+    // path's on `/town/<seed>`, so its knob writes `town`
+    const seedKey = current().screen === "town" ? "town" : "seed"
+    const viewQuery = new URLSearchParams(ctx.query)
+    viewQuery.set(seedKey, String(seed))
+    const viewer = mountViewer(outer, { ...ctx, query: viewQuery }, "town", {
+      title: `Island ${roman(seed)}`,
+      subtitle: `Seed ${seed}, grown for a repo of ${files.toLocaleString("en-US")} files`,
+      sections: islandKnobs(seedKey),
+    })
+    const host = viewer.stage
+    const steps = viewer.loading(`Island ${seed}`, ["Map", "Ground", "Water", "Pieces", "Townsfolk"])
     const stage = createStage(host)
     ctx.attach(stage)
-    const cam = worldCamera(stage, host, ctx.query)
+    viewer.attachStage(stage)
+    const cam = worldCamera(stage, viewer.camera, ctx.query)
     let disposed = false
     let batch: StaticBatch | null = null
     let water: Water | null = null
@@ -195,16 +212,13 @@ export const hexWorldScreen: Screen = {
     let disposeField = () => {}
     let life: Life | null = null
     const meshes: TerrainMesh[] = []
-    const info = document.createElement("div")
-    info.style.cssText =
-      "position:absolute;left:12px;top:12px;z-index:2;padding:8px 12px;border-radius:4px;background:rgba(21,17,13,0.82);color:#f3e9d4;font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre"
-    host.append(info)
 
     const build = async () => {
       // The map: the sky, the sun, the night, the post and the camera are set up (and their shaders
       // compiled by the frames drawn meanwhile) while the worker still builds the ground.
       const m = await job.map
       if (disposed) return
+      steps.step("Ground")
       const R = HEX_TILE_SIZE
       if (m.paths.length) meshes.push(createSurface(stage, m.paths, "#d9c08c"))
       // stone stairs where roads step down, plank bridges over the rivers: built like the ground
@@ -222,42 +236,25 @@ export const hexWorldScreen: Screen = {
       // the night: a light in every lantern the tiles hold
       const lamps = m.lamps.map((at) => ({ kind: "street" as const, at, radius: 6 }))
       night = createNight(stage, { points: lamps, windows: [] }, { sky, hour })
-      // a clock: drag to set the hour, ▶ plays the day
-      const clock = document.createElement("div")
-      clock.style.cssText =
-        "position:absolute;left:12px;bottom:12px;z-index:2;padding:6px 10px;border-radius:4px;background:rgba(21,17,13,0.82);color:#f3e9d4;font:12px ui-monospace,Menlo,monospace;display:flex;gap:8px;align-items:center;min-width:300px"
-      const play = document.createElement("button")
-      play.textContent = "▶"
-      play.style.cssText =
-        "font:inherit;color:inherit;background:#3a2f22;border:1px solid #6b5636;border-radius:3px;padding:1px 8px;cursor:pointer"
-      const slider = document.createElement("input")
-      slider.type = "range"
-      slider.min = "0"
-      slider.max = "24"
-      slider.step = "0.05"
-      slider.value = String(hour)
-      slider.style.flex = "1"
-      const label = document.createElement("span")
+      // the clock: the Viewer's transport; drag to set the hour, play runs the day at half an hour a second
       let now = hour
-      let playing = false
       const show = (h: number) => {
         now = (h + 24) % 24
-        label.textContent = `${String(Math.floor(now)).padStart(2, "0")}:${String(Math.floor((now % 1) * 60)).padStart(2, "0")}`
         night?.setHour(now)
       }
       show(hour)
-      slider.oninput = () => show(Number(slider.value))
-      play.onclick = () => {
-        playing = !playing
-        play.textContent = playing ? "❚❚" : "▶"
-      }
-      unTick = stage.onFrame((dt) => {
-        if (!playing) return
-        show(now + dt * 0.5)
-        slider.value = String(now)
+      const day = viewer.transport({
+        label: "Time of day",
+        value: hour,
+        min: 0,
+        max: 24,
+        step: 0.05,
+        rate: 0.5,
+        wrap: true,
+        format: clock,
+        onChange: show,
       })
-      clock.append(play, label, slider)
-      host.append(clock)
+      unTick = () => day.dispose()
       air = createIslandAir(stage, {
         light: () => sky.light(),
         span,
@@ -289,7 +286,9 @@ export const hexWorldScreen: Screen = {
       })
       const first = await firstFrame
       if (disposed) return
-      info.textContent = `hex island · seed ${seed} · ${files} files\nfirst frame ${first} ms · building…`
+      // the ground is in view: the veil lifts and the rest builds in sight, its step on the title card
+      steps.step("Water")
+      steps.lift()
       const shoreDone = job.shore.then((s) => {
         if (disposed) return
         const field = shoreFieldTexture(s)
@@ -304,6 +303,7 @@ export const hexWorldScreen: Screen = {
       })
       const catalog = await catalogLoad
       if (!catalog || disposed) return
+      steps.step("Pieces")
       // the crop rows of each field as one cluster: its pieces near, one merged shell far
       const { loose, clusters } = batchSets(await job.pieces, (p) => catalog.get(p.piece) !== undefined)
       const placed = loose.length + clusters.reduce((n, c) => n + c.parts.length, 0)
@@ -325,6 +325,7 @@ export const hexWorldScreen: Screen = {
       sun.markDirty()
       // ---- life (track B): townsfolk and agents on the walk graph; `?life=0` turns it off ----
       if (ctx.query.get("life") !== "0") {
+        steps.step("Townsfolk")
         // Life plans on the map itself: its pure parts built again here (~0.1 s), once the island is drawn.
         const island = hexIsland({ ...shape, seed, files })
         const zones = hexZones(island, { wild: nature.wild })
@@ -341,23 +342,46 @@ export const hexWorldScreen: Screen = {
         })
         await life.ready
       }
-      const top = Object.entries(m.stats.prefabs)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 8)
-        .map(([k, n]) => `${k} ${n}`)
-        .join(" · ")
-      const knobs = Object.entries(nature)
-        .map(([k, v]) => `${k} ×${v}`)
-        .join(" · ")
       const grown = m.stats.nature
-      info.textContent = [
-        `hex island · seed ${seed} · ${files} files`,
-        `${m.stats.land} land tiles · ${placed} pieces · first frame ${first} ms · all ${since()} ms`,
-        top,
-        ...(knobs
-          ? [`nature ${knobs}${grown ? ` · ${grown.grown} grown, ${grown.held} held back` : ""}`]
-          : []),
-      ].join("\n")
+      viewer.setInfo({
+        figures: [
+          { label: "Land tiles", value: m.stats.land },
+          { label: "Pieces", value: placed },
+          { label: "Built in", value: (since() / 1000).toFixed(1), unit: "s" },
+        ],
+      })
+      viewer.setReadout([
+        {
+          title: "Build",
+          rows: [
+            { label: "Seed", value: seed },
+            { label: "Repo files", value: files },
+            { label: "Land tiles", value: m.stats.land },
+            { label: "Pieces placed", value: placed },
+            { label: "First frame", value: first, unit: "ms" },
+            { label: "Whole build", value: since(), unit: "ms" },
+            ...(grown
+              ? [
+                  { label: "Nature grown", value: grown.grown },
+                  {
+                    label: "Held back",
+                    value: grown.held,
+                    tone: grown.held > 0 ? ("warn" as const) : undefined,
+                  },
+                ]
+              : []),
+          ],
+        },
+        {
+          title: "Tiles",
+          meta: `${Object.keys(m.stats.prefabs).length} kinds`,
+          folded: true,
+          rows: Object.entries(m.stats.prefabs)
+            .sort((a, b) => b[1] - a[1])
+            .map(([label, value]) => ({ label, value })),
+        },
+      ])
+      steps.done()
       logger.info("built", {
         tiles: m.stats.tiles,
         pieces: placed,
@@ -368,9 +392,11 @@ export const hexWorldScreen: Screen = {
         times: g.times,
       })
     }
-    ctx
-      .load(build())
-      .catch((error: unknown) => disposed || logger.error("build failed", { error: String(error) }))
+    ctx.load(build()).catch((error: unknown) => {
+      if (disposed) return
+      steps.fail(`The island did not build: ${String(error)}`)
+      logger.error("build failed", { error: String(error) })
+    })
     return () => {
       disposed = true
       job.dispose()
@@ -386,6 +412,7 @@ export const hexWorldScreen: Screen = {
       for (const m of meshes) m.dispose()
       stage.dispose()
       host.replaceChildren()
+      viewer.dispose()
     }
   },
 }

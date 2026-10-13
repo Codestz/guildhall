@@ -335,6 +335,8 @@ if (uReflect > 0.5) {
 	float level = clamp(dot(inverseTransformDirection(normal, viewMatrix), toEye), 0.0, 1.0);
 	outgoingLight = mix(outgoingLight, uSky, 0.45 * pow(1.0 - level, 5.0) * (1.0 - foam));
 }
+// A cloud's shadow dims the water itself, mirror and all, not only the sun on it: from far off it reads.
+outgoingLight *= 1.0 - 0.5 * (1.0 - cloudShade());
 #include <opaque_fragment>`,
     )
 }
@@ -360,7 +362,7 @@ export interface FieldWaterOpts {
   field: ShoreField
   /**
    * The open sea: a disc of radius `half` metres round `centre`, at `level`. Make it reach the far
-   * plane: its rim then never shows (the mist's fog ring, atmosphere/mist.ts, melts it into the sky).
+   * plane: its rim then never shows (the horizon haze, atmosphere/horizon.ts, melts it into the sky).
    */
   sea: { level: number; half: number; centre?: [number, number] }
   /** Inland water (lakes, rivers): flat hexes of corner radius `size`, drawn as V1 drew its rivers. */

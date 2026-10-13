@@ -24,7 +24,7 @@ import {
   Vector4,
   WebGLRenderTarget,
 } from "three"
-import { AIR, GRADE_GLSL, RING_GLSL, SKY_GLSL } from "./air.ts"
+import { AIR, GRADE_GLSL, HORIZON_GLSL, SKY_GLSL } from "./air.ts"
 import type { Cloud } from "./field.ts"
 import { ATMOSPHERE } from "./shade.ts"
 
@@ -118,7 +118,7 @@ void main() {
 const MESH_FRAGMENT = /* glsl */ `
 ${SKY_GLSL}
 ${GRADE_GLSL}
-${RING_GLSL}
+${HORIZON_GLSL}
 uniform vec3 uLit;
 uniform vec3 uShade;
 uniform vec3 uSun;
@@ -136,8 +136,8 @@ void main() {
 	colour = mix( colour, uShade * 0.94, smoothstep( -0.8, -0.95, n.y ) );
 	// Far clouds sink into the sky behind them (the dome's own colour, air.ts), as the land does.
 	colour = mix( colour, skyAt( normalize( -toEye ) ), 0.55 * smoothstep( uHazeRange.x, uHazeRange.y, length( toEye ) ) );
-	// and into the sea mist round the island, a little less than the sea under them (they stand above it)
-	colour = mix( colour, mistColour( normalize( -toEye ) ), 0.85 * fogRing( vWorld ) );
+	// and into the horizon, a little less than the sea under them (they stand above it)
+	colour = mix( colour, skyAt( normalize( -toEye ) ), 0.85 * horizonHaze( length( toEye ) ) );
 	gl_FragColor = vec4( colour, vFade );
 	#include <tonemapping_fragment>
 	#include <colorspace_fragment>
@@ -235,13 +235,18 @@ export function cloudMesh(a: ReturnType<typeof puffAttributes>, field: FieldUnif
   return { mesh, uniforms }
 }
 
-/** The mask's two layers (shadow R, footprint G), max-blended into a small target. */
-export function cloudMask(a: ReturnType<typeof puffAttributes>, field: FieldUniforms) {
-  const target = new WebGLRenderTarget(MASK_SIZE, MASK_SIZE, {
+/** The small target the clouds' shadows and footprint are drawn into. */
+export function maskTarget(): WebGLRenderTarget {
+  return new WebGLRenderTarget(MASK_SIZE, MASK_SIZE, {
     minFilter: LinearFilter,
     magFilter: LinearFilter,
     depthBuffer: false,
   })
+}
+
+/** The mask's two layers (shadow R, footprint G), max-blended into a small target. */
+export function cloudMask(a: ReturnType<typeof puffAttributes>, field: FieldUniforms) {
+  const target = maskTarget()
   const shared = {
     uSlant: { value: new Vector2() },
     uHeading: { value: new Vector2(1, 0) },

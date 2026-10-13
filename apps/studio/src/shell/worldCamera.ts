@@ -17,10 +17,10 @@ export interface WorldCamera {
 
 /**
  * The camera's limits on an island of half side `span` (metres, the farthest land from the middle plus
- * a margin): the farthest zoom frames the island with a band of mist round it (no empty sea, no sea
+ * a margin): the farthest zoom frames the island with a band of sea round it (no empty sea, no sea
  * edge, `maxReach` of the island's own box seen from above), the tilt far out stays above `highFloor` (38°, near V1's angle) (the rig's
  * `highFloor`), and the target is leashed near the middle as the view pulls back (`hold`). Free flight
- * roams a wider box; the sea mist hides the sea's end from anywhere in it.
+ * roams a wider box; the horizon haze hides the sea's end from anywhere in it.
  */
 export const ISLAND_CAMERA = {
   /** The orbit's target box, as a share of `span`. */

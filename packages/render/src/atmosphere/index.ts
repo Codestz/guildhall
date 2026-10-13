@@ -1,21 +1,23 @@
 /**
- * The atmosphere (part 1): drifting low-poly clouds, their soft shadows moving over land and water,
- * and the sky the water mirrors. It follows the light through `light()` (the sky's `light`, light.ts),
+ * The atmosphere (part 1): drifting clouds (low-poly puffs, or a high broken deck, deck.ts), their soft
+ * shadows moving over land and water, and the sky the water mirrors. It follows the light through `light()` (the sky's `light`, light.ts),
  * read every frame, so whoever moves the hour moves the clouds' colours, the shadows' strength and the
  * reflections with it. Cost: the clouds are one draw, the shadow/reflection mask two small ones.
  */
-import { Color, Fog, Vector3 } from "three"
+import { Color, Fog, type Object3D, Vector3 } from "three"
 import type { DayLight } from "../light.ts"
 import type { Stage } from "../stage.ts"
 import { AIR } from "./air.ts"
-import { cloudMask, cloudMesh, fieldUniforms, puffAttributes } from "./clouds.ts"
+import { cloudMask, cloudMesh, fieldUniforms, maskTarget, puffAttributes } from "./clouds.ts"
+import { createDeck, DECK_WRAP, type DeckOpts } from "./deck.ts"
 import { cloudField, focusWeight, smoothstep, swell, VIEW_REACH } from "./field.ts"
 import { cloudLook } from "./look.ts"
 import { ATMOSPHERE } from "./shade.ts"
 
+export { cloudNoise, type Deck, type DeckOpts, deckFocus, deckGapFade, deckHeight } from "./deck.ts"
 export { cloudField, presence, viewFade, wrap } from "./field.ts"
+export { createHorizon, type Horizon, type HorizonBand, type HorizonOpts, horizonBand } from "./horizon.ts"
 export { type CloudLook, cloudLook } from "./look.ts"
-export { createMist, DEFAULT_MIST, fogRing, type Mist, type MistOpts, type MistParams } from "./mist.ts"
 export { ATMOSPHERE, patchCloudShade } from "./shade.ts"
 
 export interface AtmosphereParams {
@@ -44,6 +46,11 @@ export interface AtmosphereOpts {
    * Everywhere by default; round an island, a ring over the sea (their shadows still cross the land).
    */
   ring?: [number, number, number, number]
+  /**
+   * A high broken cloud deck in place of the puffs (deck.ts): the clouds, their shadows and what the
+   * water mirrors all come from it. `height` is ignored then.
+   */
+  deck?: DeckOpts
 }
 
 export interface Atmosphere {
@@ -79,15 +86,18 @@ export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere
   let params: AtmosphereParams = { ...DEFAULT_ATMOSPHERE, ...opts.params }
   const span = FIELD_REACH * opts.reach
   const height = opts.height ?? HEIGHT
-  const clouds = cloudField({ seed: opts.seed ?? 1, count: COUNT, span, height })
-  const attributes = puffAttributes(clouds)
+  const deck = opts.deck ? createDeck(opts.deck) : null
   const field = fieldUniforms()
   field.uSpan.value = span
   field.uCentre.value.set(...opts.centre)
   if (opts.ring) field.uRing.value.set(...opts.ring)
-  const mesh = cloudMesh(attributes, field)
-  const mask = cloudMask(attributes, field)
-  stage.scene.add(mesh.mesh)
+  const puffs = deck ? null : puffAttributes(cloudField({ seed: opts.seed ?? 1, count: COUNT, span, height }))
+  const mesh = puffs ? cloudMesh(puffs, field) : null
+  const mask = puffs ? cloudMask(puffs, field) : null
+  const target = mask?.target ?? maskTarget()
+  const layers: readonly Object3D[] = deck ? [deck.mask] : (mask?.layers ?? [])
+  if (deck) stage.scene.add(deck.mesh)
+  if (mesh) stage.scene.add(mesh.mesh)
 
   // The mask covers the land and a margin, so shadows cast from clouds offshore still land on it.
   const half = 2 * opts.reach
@@ -97,41 +107,55 @@ export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere
     1 / (2 * half),
     1 / (2 * half),
   )
-  ATMOSPHERE.uCloudMap.value = mask.target.texture
-  ATMOSPHERE.uCloudHeight.value = (height[0] + height[1]) / 2 + 0.4 * swell(params.coverage)
+  ATMOSPHERE.uCloudMap.value = target.texture
+  ATMOSPHERE.uCloudHeight.value = opts.deck
+    ? opts.deck.height
+    : (height[0] + height[1]) / 2 + 0.4 * swell(params.coverage)
 
   const sun = new Vector3()
   const clearColour = new Color()
   let hour = Number.NaN
   let coverage = Number.NaN
+  let veil = 1
   const applyLook = (light: DayLight) => {
     const look = cloudLook(light, params.coverage)
-    mesh.uniforms.uLit.value.copy(look.lit)
-    mesh.uniforms.uShade.value.copy(look.shade)
     // by night only a veil: the clouds' dark undersides read as rocks hanging in the sky
-    field.uVeil.value = 0.45 + 0.55 * smoothstep(-10, 2, light.elevation)
+    veil = 0.45 + 0.55 * smoothstep(-10, 2, light.elevation)
     ATMOSPHERE.uCloudLit.value.copy(look.lit)
     AIR.uCirrusLit.value.copy(look.lit)
     trueSun(light, sun)
     ATMOSPHERE.uSunDirection.value.copy(sun)
     // The clouds are lit from whichever is up and brighter: by night the moon catches their tops.
-    if (light.moonIntensity > light.sunIntensity) mesh.uniforms.uSun.value.set(...light.moonTrue)
-    else mesh.uniforms.uSun.value.copy(sun)
+    const key = light.moonIntensity > light.sunIntensity ? new Vector3(...light.moonTrue) : sun
+    if (mesh) {
+      mesh.uniforms.uLit.value.copy(look.lit)
+      mesh.uniforms.uShade.value.copy(look.shade)
+      mesh.uniforms.uSun.value.copy(key)
+      field.uVeil.value = veil
+    }
+    if (deck) {
+      deck.uniforms.uLit.value.copy(look.lit)
+      deck.uniforms.uShade.value.copy(look.shade)
+      deck.sun(key.x, key.z)
+    }
     ATMOSPHERE.uSunColor.value.copy(light.sun).multiplyScalar(light.sunIntensity / 3)
     ATMOSPHERE.uSkyZenith.value.copy(light.zenith)
     ATMOSPHERE.uSkyHorizon.value.copy(light.horizon)
     ATMOSPHERE.uSkyGlow.value.copy(light.glow)
     // Shadows fall along the clamped key light, the one the cascades cast along.
     const [x, y, z] = light.sunDir
-    mask.uniforms.uSlant.value.set(x / y, z / y)
     ATMOSPHERE.uCloudSlant.value.set(x / y, z / y)
-    const flat = Math.hypot(x, z) || 1
-    mask.uniforms.uHeading.value.set(x / flat, z / flat)
-    mask.uniforms.uStretch.value = Math.min(2.2, 1 / Math.max(y, 0.2))
+    if (mask) {
+      mask.uniforms.uSlant.value.set(x / y, z / y)
+      const flat = Math.hypot(x, z) || 1
+      mask.uniforms.uHeading.value.set(x / flat, z / flat)
+      mask.uniforms.uStretch.value = Math.min(2.2, 1 / Math.max(y, 0.2))
+    }
     ATMOSPHERE.uCloudShadow.value = params.shadows ? look.shadow : 0
   }
 
   const drift = { x: 0, z: 0 }
+  const deckDrift = { x: 0, z: 0 }
   const unsubscribe = stage.onFrame((dt) => {
     const light = opts.light()
     if (light.hour !== hour || params.coverage !== coverage) {
@@ -139,6 +163,7 @@ export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere
       coverage = params.coverage
       field.uCoverage.value = params.coverage
       field.uSwell.value = swell(params.coverage)
+      if (deck) deck.uniforms.uDeckCover.value = params.coverage
       applyLook(light)
     }
     const step = params.windSpeed * Math.min(dt, 0.1)
@@ -149,17 +174,30 @@ export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere
     AIR.uCirrusDrift.value.set(drift.x * 0.5, drift.z * 0.5)
     AIR.uCirrus.value = params.clouds ? 0.4 + 0.6 * params.coverage : 0
     const pose = stage.getCamera()
-    field.uEye.value.copy(stage.camera.position)
-    field.uTarget.value.set(...pose.target)
-    field.uEyeDistance.value = Math.min(pose.distance, VIEW_REACH)
-    field.uFocus.value = focusWeight(pose.distance)
-    const fog = stage.scene.fog
-    if (fog instanceof Fog) {
-      mesh.uniforms.uHazeRange.value.set(fog.near, fog.far * 1.6)
+    const visible = params.clouds && params.coverage > 0
+    if (mesh) {
+      field.uEye.value.copy(stage.camera.position)
+      field.uTarget.value.set(...pose.target)
+      field.uEyeDistance.value = Math.min(pose.distance, VIEW_REACH)
+      field.uFocus.value = focusWeight(pose.distance)
+      const fog = stage.scene.fog
+      if (fog instanceof Fog) mesh.uniforms.uHazeRange.value.set(fog.near, fog.far * 1.6)
+      mesh.mesh.visible = visible
     }
-    mesh.mesh.visible = params.clouds && params.coverage > 0
+    if (deck) {
+      // The noise moves against the drift, so the clouds go with the wind; it wraps on a whole number
+      // of the noise's tiles, so it never jumps.
+      deckDrift.x = (deckDrift.x + Math.cos(params.windHeading * RAD) * step) % DECK_WRAP
+      deckDrift.z = (deckDrift.z + Math.sin(params.windHeading * RAD) * step) % DECK_WRAP
+      deck.uniforms.uDeckDrift.value.set(-deckDrift.x, -deckDrift.z)
+      deck.view(stage.camera.position, pose.target, veil)
+      deck.mesh.visible = visible
+    }
     ATMOSPHERE.uReflect.value = params.reflections ? 1 : 0
-    ATMOSPHERE.uCloudReflect.value = params.reflections && params.clouds ? 1 : 0
+    // A deck mirrors faintly (a whole sheet of white in the water reads as mist on it), and only as
+    // much as it shows: level with the eye it is gone, and so is its reflection.
+    const mirrored = deck ? 0.4 * deck.uniforms.uDeckFade.value.x : 1
+    ATMOSPHERE.uCloudReflect.value = params.reflections && params.clouds ? mirrored : 0
     if ((params.shadows || params.reflections) && params.coverage > 0) renderMask()
   })
 
@@ -169,12 +207,12 @@ export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere
     const autoClear = renderer.autoClear
     renderer.getClearColor(clearColour)
     const clearAlpha = renderer.getClearAlpha()
-    renderer.setRenderTarget(mask.target)
+    renderer.setRenderTarget(target)
     renderer.setClearColor(0x000000, 1)
     renderer.clear(true, false, false)
-    // Both layers into one target: the second must not clear the first.
+    // Every layer into one target: the second must not clear the first.
     renderer.autoClear = false
-    for (const layer of mask.layers) renderer.render(layer, stage.camera)
+    for (const layer of layers) renderer.render(layer, stage.camera)
     renderer.autoClear = autoClear
     renderer.setClearColor(clearColour, clearAlpha)
     renderer.setRenderTarget(before)
@@ -189,14 +227,17 @@ export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere
     params: () => ({ ...params }),
     dispose() {
       unsubscribe()
-      mesh.mesh.removeFromParent()
-      mesh.mesh.geometry.dispose()
-      mesh.mesh.material.dispose()
-      for (const layer of mask.layers) {
+      if (mesh) {
+        mesh.mesh.removeFromParent()
+        mesh.mesh.geometry.dispose()
+        mesh.mesh.material.dispose()
+      }
+      for (const layer of mask?.layers ?? []) {
         layer.geometry.dispose()
         layer.material.dispose()
       }
-      mask.target.dispose()
+      deck?.dispose()
+      target.dispose()
       ATMOSPHERE.uCloudShadow.value = 0
       AIR.uCirrus.value = 0
       ATMOSPHERE.uReflect.value = 0

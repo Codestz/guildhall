@@ -255,13 +255,9 @@ export const hexWorldScreen: Screen = {
         onChange: show,
       })
       unTick = () => day.dispose()
-      air = createIslandAir(stage, {
-        light: () => sky.light(),
-        span,
-        seed,
-        level: SEA_LEVEL,
-        knobs: atmoKnobs(ctx.query),
-      })
+      // the sea reaches the far plane: the horizon haze (atmo.ts) melts its rim into the sky
+      const sea = Math.max(span * 3, stage.camera.far * 0.95)
+      air = createIslandAir(stage, { light: () => sky.light(), span, seed, sea, knobs: atmoKnobs(ctx.query) })
       if (ctx.query.get("post") !== "0")
         post = createPost(stage, { light: () => sky.light(), aa: aaOf(ctx.query.get("aa")) })
       const azimuth = num("az", sideLit(sky.light().sunDir))
@@ -294,10 +290,9 @@ export const hexWorldScreen: Screen = {
         const field = shoreFieldTexture(s)
         water = createFieldWater(stage, {
           field,
-          sea: { level: SEA_LEVEL, half: Math.max(span * 3, stage.camera.far * 0.95) },
+          sea: { level: SEA_LEVEL, half: sea },
           pools: { size: R * 1.01, tiles: m.pools },
         })
-        air?.setShore(field)
         disposeField = () => field.dispose()
         logger.info("shore field", { ms: s.ms, at: since() })
       })

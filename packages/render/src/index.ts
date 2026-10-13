@@ -5,12 +5,11 @@ export {
   type AtmosphereParams,
   cloudLook,
   createAtmosphere,
-  createMist,
+  createHorizon,
   DEFAULT_ATMOSPHERE,
-  DEFAULT_MIST,
-  fogRing,
-  type Mist,
-  type MistParams,
+  type DeckOpts,
+  deckHeight,
+  type Horizon,
   patchCloudShade,
 } from "./atmosphere/index.ts"
 export {

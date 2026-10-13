@@ -47,8 +47,8 @@ export const LAB_CSS = /* css */ `
 .kit-grid b { font: 400 12px var(--display); letter-spacing: 0.08em; color: var(--faint); justify-self: start; }
 .kit-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .kit-bottom { display: flex; align-items: flex-end; min-height: 150px; }
-.kit-captions { display: grid; gap: 14px; justify-items: center; }
-.kit-caption { width: min(100%, 576px); display: flex; justify-content: center; }
+.kit-captions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; justify-items: center; }
+.kit-caption { width: min(100%, 576px); min-width: 0; display: flex; justify-content: center; }
 .kit-caption .st-captions { width: 100%; }
 .kit-corner { position: relative; height: 330px; }
 .kit-corner .st-chapter-chip { position: absolute; right: 0; bottom: 0; }

@@ -26,6 +26,7 @@ import {
   Toasts,
 } from "@guildhall/ui"
 import { type CSSProperties, Fragment, type ReactNode, useEffect, useState } from "react"
+import { SoundSettings } from "../audio/ui.tsx"
 import { fixture, PARTY, REDIS } from "./fixtures.ts"
 import { usePortraits } from "./portraits.ts"
 import { captionOf, type Told, tell } from "./story.ts"
@@ -403,7 +404,7 @@ export function KitLab({ section, phone }: { section: KitSection; phone: boolean
               onRepo={() => undefined}
               weatherNow="Cloudy · 14°C"
               hourNow={14.1}
-              sound={<p className="ui-hint">The sound agent's levers go here.</p>}
+              sound={<SoundSettings />}
             />
           </div>
         </Card>

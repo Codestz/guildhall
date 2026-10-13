@@ -26,6 +26,7 @@ import {
   Toasts,
 } from "@guildhall/ui"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { SoundSettings } from "../audio/ui.tsx"
 import { type DossierFixture, fixture, HISTORY, HISTORY_MARKERS, type LabState, STATES } from "./fixtures.ts"
 import { usePortraits } from "./portraits.ts"
 import { StoryLab, type StoryOptions } from "./StoryLab.tsx"
@@ -332,6 +333,7 @@ export function HudLab(opts: LabOptions) {
               onClose={closeSettings}
               onRepo={() => undefined}
               weatherNow="Cloudy · 14°C"
+              sound={<SoundSettings />}
               hourNow={14.1}
               dev={
                 opts.dev ? (

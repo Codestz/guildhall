@@ -298,6 +298,8 @@ h3 .st-code { font-size: 0.8em; letter-spacing: 0; }
 .st-captions[data-visible="false"] { display: none; }
 .st-caption {
   margin: 0;
+  min-width: 0;
+  min-width: 0;
   max-width: min(100%, 576px);
   padding: 8px 20px 9px;
   border-radius: 10px;

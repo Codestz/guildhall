@@ -1,13 +1,12 @@
 /**
- * The first-visit card over the live island: the line, "Your repo as an island" (owner/repo or a pasted
- * GitHub address), Generate, and the two ways in for someone with no repo to hand (a demo, how it's built).
+ * The first-visit bar over the live island: the repo field and Generate on one row, "Watch a demo" and
+ * "How it's built" under it. The island is the pitch, so there is no copy beyond a visually hidden h1.
  * Not modal: the world stays visible and alive behind it. Esc or the close button dismisses it; the
- * caller remembers that (`onDismiss`, see `writeWelcomeDismissed`). On a phone it is a bottom sheet.
+ * caller remembers that (`onDismiss`, see `writeWelcomeDismissed`). It is `data-keepout`: plates stay off it.
  */
 import { type FormEvent, useId, useRef, useState } from "react"
 import { Button, IconButton } from "../components/controls.tsx"
-import { Crest } from "../hud/glyphs.tsx"
-import { AlertGlyph, ArrowIcon, CheckGlyph, CloseGlyph, Dest } from "./parts.tsx"
+import { AlertGlyph, CheckGlyph, CloseGlyph, Dest } from "./parts.tsx"
 import { parseRepo } from "./repo.ts"
 
 export interface WelcomeCardProps {
@@ -55,38 +54,17 @@ export function WelcomeCard({
 
   return (
     <div className="site-welcome" data-busy={busy ? "" : undefined}>
+      <h1 className="site-sr">Guildhall: events in, a living world out</h1>
       <section
         ref={root}
         className="ui-panel site-welcome-card"
-        aria-labelledby={`${id}-h`}
+        aria-label="Your repo as an island"
+        data-keepout=""
         onKeyDown={(e) => {
           if (e.key === "Escape") onDismiss()
         }}
       >
-        <div className="site-welcome-close">
-          <IconButton label="Dismiss the welcome" onClick={onDismiss}>
-            <CloseGlyph size={16} />
-          </IconButton>
-        </div>
-        <div className="site-welcome-head">
-          <span className="site-welcome-crest" aria-hidden="true">
-            <Crest size={26} />
-          </span>
-          <div>
-            <p className="ui-eyebrow">Guildhall</p>
-            <h2 className="site-welcome-line" id={`${id}-h`}>
-              Events in. A living world out.
-            </h2>
-          </div>
-        </div>
-        <p className="site-welcome-sub">
-          Agents, GitHub and a repo's history, grown into a living hex island.
-        </p>
-
         <form className="site-welcome-form" onSubmit={submit} noValidate>
-          <label className="site-welcome-label" htmlFor={`${id}-repo`}>
-            Your repo as an island
-          </label>
           <div className="site-welcome-row">
             <input
               id={`${id}-repo`}
@@ -97,7 +75,8 @@ export function WelcomeCard({
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              placeholder="owner/repo or a GitHub link"
+              placeholder="owner/repo or GitHub link"
+              aria-label="Your repo as an island: owner/repo or GitHub link"
               value={text}
               aria-invalid={problem ? true : undefined}
               data-ok={good ? "" : undefined}
@@ -124,24 +103,26 @@ export function WelcomeCard({
             ) : good && parsed.ok ? (
               <>
                 <CheckGlyph />
-                {parsed.slug}: read from the public file tree, never the code.
+                Public file tree only, never the code.
               </>
-            ) : (
-              "Any public GitHub repo. The same tree always grows the same island."
-            )}
+            ) : null}
           </p>
         </form>
 
-        <nav className="site-welcome-links" aria-label="Or look around first">
-          <Dest href={demoHref} onNavigate={onDemo} className="site-link">
-            Watch a demo
-            <ArrowIcon />
-          </Dest>
-          <Dest href={builtHref} onNavigate={onBuilt} className="site-link">
-            How it's built
-            <ArrowIcon />
-          </Dest>
-        </nav>
+        <div className="site-welcome-foot">
+          <nav className="site-welcome-links" aria-label="Or look around first">
+            <Dest href={demoHref} onNavigate={onDemo} className="site-link">
+              Watch a demo
+            </Dest>
+            <span aria-hidden="true">·</span>
+            <Dest href={builtHref} onNavigate={onBuilt} className="site-link">
+              How it's built
+            </Dest>
+          </nav>
+          <IconButton label="Dismiss the welcome" onClick={onDismiss}>
+            <CloseGlyph size={14} />
+          </IconButton>
+        </div>
       </section>
     </div>
   )

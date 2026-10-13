@@ -25,22 +25,13 @@ export const SITE_CSS = /* css */ `
 .gh .site-scrim[data-soft] { background: rgba(10, 7, 5, 0.28); }
 .gh .site-keys { display: inline-flex; gap: 4px; }
 
-/* ── welcome card ───────────────────────────────────────────────── */
-.gh .site-welcome { position: absolute; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; justify-content: center; padding: 0 16px 24px; pointer-events: none; }
+/* ── welcome bar ────────────────────────────────────────────────── */
+.gh .site-welcome { position: absolute; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; justify-content: center; padding: 0 16px 20px; pointer-events: none; }
+.gh .site-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .gh .site-welcome-card {
-  pointer-events: auto; width: min(640px, 100%); padding: 20px var(--site-pad) 10px; background: rgba(21, 17, 13, 0.95);
+  pointer-events: auto; width: min(560px, 100%); padding: 10px 12px 2px; background: rgba(21, 17, 13, 0.95);
 }
-.gh .site-welcome-close { position: absolute; top: 8px; right: 8px; }
-.gh .site-welcome-head { display: flex; align-items: center; gap: 14px; padding-right: 36px; }
-.gh .site-welcome-crest {
-  flex: none; display: grid; place-items: center; width: 44px; height: 44px; color: var(--brass-hi);
-  border: 1px solid var(--brass-line); border-radius: 50%;
-  background: radial-gradient(circle at 50% 35%, rgba(220, 182, 98, 0.2), transparent 70%);
-}
-.gh .site-welcome-line { margin: 2px 0 0; font: 400 var(--site-h1)/1.15 var(--display); letter-spacing: 0.03em; color: var(--paper); text-wrap: balance; }
-.gh .site-welcome-sub { margin: 8px 0 0; font: var(--site-lede)/1.45 var(--serif); color: var(--muted); }
-.gh .site-welcome-form { display: grid; gap: 6px; margin-top: 14px; }
-.gh .site-welcome-label { font: 400 var(--t-md)/1.2 var(--display); letter-spacing: 0.14em; color: var(--brass); }
+.gh .site-welcome-form { display: grid; gap: 4px; }
 .gh .site-input:focus-visible { outline: none; border-color: var(--brass-hi); box-shadow: var(--ring); }
 .gh .site-input[aria-invalid="true"]:focus-visible { border-color: var(--fail); }
 .gh .site-input[data-ok] { border-color: rgba(166, 221, 143, 0.55); }
@@ -53,21 +44,16 @@ export const SITE_CSS = /* css */ `
 .gh .site-input::placeholder { color: var(--faint); font-family: var(--body); }
 .gh .site-input:hover { border-color: var(--brass-line); }
 .gh .site-input[aria-invalid="true"] { border-color: var(--fail); }
-.gh .site-welcome-links { display: flex; flex-wrap: wrap; gap: 0 20px; margin-top: 2px; padding-top: 4px; border-top: 1px solid var(--hair); }
+.gh .site-welcome-card .site-msg { min-height: 0; }
+.gh .site-welcome-card .site-msg:empty { display: none; }
+.gh .site-welcome-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.gh .site-welcome-links .site-link { min-height: 36px; font-size: 14px; }
+.gh .site-welcome-links { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; color: var(--faint); font-size: 13px; }
 
 @media (max-width: 560px) {
-  .gh .site-welcome { padding: 0; }
-  .gh .site-welcome-card {
-    width: 100%; padding: 18px var(--site-edge) calc(6px + env(safe-area-inset-bottom)); border-radius: var(--site-sheet) var(--site-sheet) 0 0; border-bottom: 0;
-  }
-  .gh .site-welcome-card::before { border-radius: var(--site-sheet) var(--site-sheet) 0 0; }
-  .gh .site-welcome-card::after { content: ""; position: absolute; top: 7px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--hair-2); }
-  .gh .site-welcome-close { top: 10px; right: 6px; }
-  .gh .site-welcome-crest { display: none; }
-  .gh .site-welcome-line { font-size: 21px; }
-  .gh .site-welcome-sub { display: none; }
-  .gh .site-welcome-form { margin-top: 10px; }
-  .gh .site-welcome-links { justify-content: space-between; gap: 0; }
+  .gh .site-welcome { padding: 0 16px calc(12px + env(safe-area-inset-bottom)); }
+  .gh .site-welcome-card { width: 100%; padding: 10px 10px 2px; }
+  .gh .site-welcome-links .site-link { min-height: 44px; font-size: 15px; }
 }
 
 /* ── crest menu ─────────────────────────────────────────────────── */

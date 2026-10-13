@@ -17,8 +17,8 @@
     },
     {
       "r": 0.482,
-      "x": 0.4,
-      "z": 1.9
+      "x": -0.138,
+      "z": 2.194
     }
   ],
   "ground": "grass",
@@ -37,8 +37,8 @@
       "piece": "kenney-survival/signpost",
       "rot": 0.4,
       "scale": 0.9,
-      "x": 1.6,
-      "z": 1.6
+      "x": 1.767,
+      "z": 1.509
     },
     {
       "piece": "kenney-graveyard/bench",
@@ -58,8 +58,8 @@
       "piece": "kaykit-halloween/post-lantern",
       "rot": 0,
       "scale": 0.55,
-      "x": 0.4,
-      "z": 1.9
+      "x": -0.138,
+      "z": 2.194
     }
   ],
   "spots": [

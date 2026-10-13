@@ -41,6 +41,11 @@ export interface TilePiece {
   tone?: boolean
   /** The chance it stands on a given tile (default 1): woods thin out, a stall is sometimes packed away. */
   odds?: number
+  /**
+   * Stands exactly where it is written, without the hair of jitter repeated tiles get: the parts of
+   * something built from several pieces (papers pinned on a board, a dummy's straw on its post).
+   */
+  pin?: boolean
 }
 
 /** A tile piece in the world. */
@@ -169,6 +174,16 @@ export interface TileSpot {
    * (a canteen's seats at lunch and in the evening); any time when left out.
    */
   hours?: SpotHours
+  /**
+   * A routine played here in place of `clip` (drills.ts DRILLS: "duel", "dummy", "drill", "cheer"): a
+   * loop of clips on one clock, so a line drills in step and a duel's two sides interlock.
+   */
+  drill?: string
+  /**
+   * The two spots of a duel share a pair name on their tile: the first written is its side 0, the other
+   * side 1, whoever stands there (a soldier, a hero, later a skeleton raider).
+   */
+  pair?: string
 }
 
 /** One opening window [from, to) in day hours, or a list of them. */
@@ -1217,9 +1232,9 @@ export function placeTile(
     if (m !== 1) {
       if (hash2(seed, k, 9) >= (q.odds ?? 1) * m) return
     } else if (q.odds !== undefined && hash2(seed, k, 9) >= q.odds) return
-    // a hair of jitter so repeated tiles are not identical
-    const jx = (hash2(seed, k, 1) - 0.5) * 0.15
-    const jz = (hash2(seed, k, 2) - 0.5) * 0.15
+    // a hair of jitter so repeated tiles are not identical (none for a pinned part of something built)
+    const jx = q.pin ? 0 : (hash2(seed, k, 1) - 0.5) * 0.15
+    const jz = q.pin ? 0 : (hash2(seed, k, 2) - 0.5) * 0.15
     const x = q.x + jx
     const z = q.z + jz
     const map = {

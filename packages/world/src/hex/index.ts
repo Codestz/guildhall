@@ -1,3 +1,4 @@
+export { blockedDoors, DOOR_HALF, DOOR_RUN, type DoorWay, doorWays, spotsInPieces } from "./checks.ts"
 export {
   boxSolid,
   type CollideInputs,
@@ -18,6 +19,15 @@ export {
   walkwayAt,
   walkwaySolids,
 } from "./collide.ts"
+export {
+  CLIP_SECONDS,
+  DRILLS,
+  type Drill,
+  type DrillMove,
+  drillClips,
+  drillFrame,
+  pairedDrill,
+} from "./drills.ts"
 export { DIRS, type Hex, type HexGrid, hexAt, hexCentre, hexDistance, hexGrid } from "./grid.ts"
 export {
   type GroundPalette,
@@ -48,6 +58,7 @@ export {
   type AgentErrand,
   type AgentSpec,
   agentLoop,
+  type DrillAt,
   type Folk,
   guildhallZone,
   type LifeAct,
@@ -62,6 +73,7 @@ export {
   PLACE_ROLES,
   peopleFor,
   planFolk,
+  SCENE_FOLK,
   WALK_MPS,
   workTiles,
 } from "./life.ts"

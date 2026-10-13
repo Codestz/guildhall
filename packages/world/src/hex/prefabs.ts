@@ -3,6 +3,7 @@
  * passes before the world builds from it (the studio's `/data/` endpoint refuses a write that fails it),
  * and the parse that turns a set of files into prefabs for `installTilePrefabs`.
  */
+import { DRILLS, pairedDrill } from "./drills.ts"
 import type { TileGround, TilePrefab } from "./tiles.ts"
 
 export const TILE_GROUNDS: readonly TileGround[] = ["grass", "soil", "dirt", "paved", "sand", "rock", "water"]
@@ -65,6 +66,7 @@ export function validateTilePrefab(json: unknown, file?: string): string[] {
       if (q.odds !== undefined && (!isNum(q.odds) || q.odds <= 0 || q.odds > 1))
         at(`${path}.odds`, "in (0, 1]")
       if (q.tone !== undefined && typeof q.tone !== "boolean") at(`${path}.tone`, "true or false")
+      if (q.pin !== undefined && typeof q.pin !== "boolean") at(`${path}.pin`, "true or false")
       if (q.swatchMap !== undefined && !swatchMap(q.swatchMap)) at(`${path}.swatchMap`, "swatch → swatch")
     })
   if (t.tones !== undefined && (!Array.isArray(t.tones) || !t.tones.every(swatchMap)))
@@ -97,7 +99,20 @@ export function validateTilePrefab(json: unknown, file?: string): string[] {
         if (s.y !== undefined && (!isNum(s.y) || Math.abs(s.y) > 3)) at(`${path}.y`, "metres within ±3")
         if (s.hours !== undefined && !hoursOk(s.hours))
           at(`${path}.hours`, "[from, to] day hours 0–24, or a list of such windows")
+        if (s.drill !== undefined && (typeof s.drill !== "string" || !DRILLS[s.drill]))
+          at(`${path}.drill`, `one of ${Object.keys(DRILLS).join(", ")}`)
+        if (s.pair !== undefined && (typeof s.pair !== "string" || !ID.test(s.pair)))
+          at(`${path}.pair`, "a pair name (kebab-case)")
       })
+    // a duel's two sides: each pair name twice, both playing a two-sided drill
+    const pairs = new Map<string, Obj[]>()
+    for (const s of Array.isArray(t.spots) ? t.spots : [])
+      if (isObj(s) && typeof s.pair === "string") pairs.set(s.pair, [...(pairs.get(s.pair) ?? []), s])
+    for (const [name, list] of pairs) {
+      if (list.length !== 2) at("spots", `pair "${name}" has ${list.length} spots, not 2`)
+      if (list.some((s) => typeof s.drill !== "string" || !pairedDrill(s.drill)))
+        at("spots", `pair "${name}" plays no two-sided drill`)
+    }
   }
   if (t.blockers !== undefined) {
     if (!Array.isArray(t.blockers)) at("blockers", "a list")

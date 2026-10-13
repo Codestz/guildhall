@@ -39,16 +39,16 @@
       "piece": "kenney-nature/pot-small",
       "rot": 0,
       "scale": 0.32,
-      "x": 0.2,
-      "z": 1.4
+      "x": -0.25,
+      "z": 2.2
     },
     {
       "piece": "kenney-nature/flower-purple-a",
       "rot": 0,
       "scale": 0.7,
-      "x": 0.2,
+      "x": -0.25,
       "y": 0.3,
-      "z": 1.4
+      "z": 2.2
     },
     {
       "piece": "kaykit-dungeon/barrel-small",

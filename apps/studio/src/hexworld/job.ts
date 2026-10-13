@@ -466,11 +466,13 @@ export function runHexJob(
       times,
     },
   })
-  // the pieces: nature stands on the fine ground as built
+  // the pieces: nature stands on the fine ground as built, each kept as far over it as its tile put it
+  // (a shield hung on a straw bale, papers pinned on a board, a flower in its pot)
   if (groundAt)
     for (const p of w.pieces) {
       const y = groundAt(p.x, p.z)
-      if (y > 0 && Math.abs(y - p.y) < 3) p.y = y
+      const shift = y - w.heightAt(p.x, p.z)
+      if (y > 0 && Math.abs(shift) < 3) p.y += shift
     }
   post({ type: "pieces", pieces: pack(w.pieces, clusterTiles(h, w)) })
   // The shore field: how far every point of the water is from land (anything but a water tile).

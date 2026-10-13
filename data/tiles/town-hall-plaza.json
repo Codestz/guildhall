@@ -51,14 +51,9 @@
       "z": 2
     },
     {
-      "r": 0.35,
-      "x": -0.75,
-      "z": -2.35
-    },
-    {
-      "r": 0.3,
-      "x": 0.8,
-      "z": -2.35
+      "r": 0.4,
+      "x": -2.35,
+      "z": -0.35
     }
   ],
   "footprint": [
@@ -147,25 +142,54 @@
     },
     {
       "piece": "kenney-nature/sign",
-      "rot": 0,
+      "pin": true,
+      "rot": 1.571,
       "scale": 0.75,
-      "x": -0.75,
-      "z": -2.35
+      "swatchMap": {
+        "52": 22,
+        "53": 23
+      },
+      "x": -2.35,
+      "z": -0.35
     },
     {
-      "piece": "kenney-nature/pot-small",
-      "rot": 0,
-      "scale": 0.5,
-      "x": 0.8,
-      "z": -2.35
+      "piece": "kaykit-tools/map-empty",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.2,
+      "tilt": [
+        1.571,
+        0.08
+      ],
+      "x": -2.26,
+      "y": 0.95,
+      "z": -0.15
     },
     {
-      "piece": "kenney-nature/flower-red-a",
-      "rot": 0,
-      "scale": 0.8,
-      "x": 0.8,
-      "y": 0.35,
-      "z": -2.35
+      "piece": "kaykit-tools/map-empty",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.18,
+      "tilt": [
+        1.571,
+        -0.06
+      ],
+      "x": -2.26,
+      "y": 0.98,
+      "z": -0.55
+    },
+    {
+      "piece": "kaykit-tools/map",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.16,
+      "tilt": [
+        1.571,
+        0.03
+      ],
+      "x": -2.26,
+      "y": 0.76,
+      "z": -0.37
     }
   ],
   "spots": [

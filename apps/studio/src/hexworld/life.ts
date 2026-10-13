@@ -30,8 +30,10 @@ import {
 import {
   agentLoop,
   CHARACTER_SCALE,
+  type DoorPass,
   DRILLS,
   type DrillAt,
+  doorPasses,
   drillClips,
   drillFrame,
   type HexIsland,
@@ -86,6 +88,12 @@ export interface LifeOpts {
 export interface Life {
   /** Resolves once everyone is drawn (heroes loaded). */
   ready: Promise<void>
+  /** The day's clock life runs on, hours (it follows the screen's clock). */
+  clock(): number
+  /** Whether anyone outdoors is within r metres of (x, z), as last drawn. */
+  near(x: number, z: number, r: number): boolean
+  /** Every townsfolk's passes through a door over the day (world `doorPasses`), in time order. */
+  passes(): readonly DoorPass[]
   dispose(): void
 }
 
@@ -198,6 +206,9 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
   let unFrame = () => {}
   const banners: HTMLElement[] = []
   const cleanup: (() => void)[] = []
+  let passes: DoorPass[] = []
+  let clockNow = opts.hour()
+  let nearAt: (x: number, z: number, r: number) => boolean = () => false
 
   const ready = (async () => {
     const t0 = performance.now()
@@ -216,6 +227,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       walkways: [...w.stairs, ...w.bridges.flatMap((b) => b.legs), ...w.decks],
       ground: opts.groundAt,
     })
+    passes = folk.flatMap((f) => doorPasses(f.day)).sort((a, b) => a.t - b.t)
     const planned = performance.now() - t0
     const [catalog, recipes] = await Promise.all([mountedCatalog(), npcRecipes()])
     if (disposed || !catalog || recipes.size === 0) {
@@ -359,6 +371,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       } else day = (day + (step * SPEEDUP) / 3600) % 24
       secs += step
       place(step)
+      clockNow = day
       crowd?.update(step, sample)
       // banners over their agents, nudged up off each other where they would overlap
       const placed: [number, number][] = []
@@ -389,6 +402,13 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       : null
     if (overlay) cleanup.push(overlay.dispose)
     const drawn = { x: space.x, z: space.z, r: radii, hidden: (id: number) => !!poses[id]?.indoors }
+    nearAt = (x, zz, r) => {
+      for (let id = 0; id < n; id++) {
+        if (poses[id]?.indoors) continue
+        if (Math.hypot(space.x[id]! - x, space.z[id]! - zz) < r) return true
+      }
+      return false
+    }
     unFrame = stage.onFrame(tick)
     tick(0)
     // heroes load as the crowd first updates: let them settle before `ready` resolves
@@ -413,6 +433,9 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     ready: ready.catch((error: unknown) => {
       logger.error("life failed", { error: (error as Error).stack ?? String(error) })
     }),
+    clock: () => clockNow,
+    near: (x, zz, r) => nearAt(x, zz, r),
+    passes: () => passes,
     dispose() {
       disposed = true
       unFrame()

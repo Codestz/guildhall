@@ -19,6 +19,8 @@ export {
   walkwayAt,
   walkwaySolids,
 } from "./collide.ts"
+export { CORNER_TOWER, type CurtainPiece, curtainWall, WALL_INSET, WALL_SCALE } from "./curtain.ts"
+export { DOORWAYS, type Doorway, doorwayOf } from "./doorways.ts"
 export {
   CLIP_SECONDS,
   DRILLS,
@@ -58,7 +60,10 @@ export {
   type AgentErrand,
   type AgentSpec,
   agentLoop,
+  type DoorPass,
   type DrillAt,
+  doorPasses,
+  doorSpot,
   type Folk,
   guildhallZone,
   type LifeAct,
@@ -115,7 +120,6 @@ export {
 export { hexStructures } from "./structures.ts"
 export {
   CHARACTER_SCALE,
-  castleWalls,
   edgeDressing,
   FRONT_SIDE,
   HEX_TILE_SIZE,
@@ -160,6 +164,7 @@ export {
 } from "./walk.ts"
 export {
   type HexBridge,
+  type HexDoorway,
   type HexWalkway,
   type HexWorld,
   type HexWorldTile,

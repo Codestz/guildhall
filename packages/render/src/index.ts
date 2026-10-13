@@ -33,6 +33,17 @@ export {
   type CrowdStats,
   createCrowd,
 } from "./crowd/index.ts"
+export {
+  createDoorways,
+  createGates,
+  type DoorwayRect,
+  type Doorways,
+  FRAME,
+  GATE_PIECES,
+  GATE_SWING,
+  type Gates,
+  gateFrame,
+} from "./doors.ts"
 export { createGizmo, type Gizmo, type GizmoMode, type GizmoOpts, type GizmoPose } from "./gizmo.ts"
 export { createGrid, type Disposable } from "./grid.ts"
 export { createGround, type Ground, type GroundDraw } from "./ground.ts"

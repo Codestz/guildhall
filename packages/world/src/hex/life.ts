@@ -26,7 +26,7 @@ import { type HexIsland, kindOf } from "./island.ts"
 import { HARD, type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
 import { HEX_TILE_SIZE, opensEvening, type SpotHours, spotWindows } from "./tiles.ts"
 import { clearWay, type HexWalk, type HexWalkNode, type WalkBlocker, walledIn } from "./walk.ts"
-import type { HexWorld } from "./world.ts"
+import type { HexDoorway, HexWorld } from "./world.ts"
 import { type HexZones, useOf, type ZoneKind } from "./zones.ts"
 
 export type LifeAct = "walk" | "work" | "idle"
@@ -166,12 +166,15 @@ export const SCENE_FOLK: Readonly<Record<string, readonly [string, number][]>> =
 
 /** People a place holds: a couple, plus most of a person per building, capped. */
 export const peopleFor = (kind: ZoneKind, buildings: number): number =>
-  kind === "castle" || kind === "camp"
-    ? Math.min(8, 3 + buildings)
-    : // a monastery keeps a few brothers however few its buildings: its cloister, graves and bell
-      kind === "monastery"
-      ? Math.max(5, Math.round(1.5 + buildings * 0.7))
-      : Math.max(2, Math.min(36, Math.round(1.5 + buildings * 0.7)))
+  kind === "castle"
+    ? // the Guildhall's garrison grows with it: posts, rounds, drill and the yard's work (curtain.ts, castleyard.ts)
+      Math.min(12, 3 + buildings * 2)
+    : kind === "camp"
+      ? Math.min(8, 3 + buildings)
+      : // a monastery keeps a few brothers however few its buildings: its cloister, graves and bell
+        kind === "monastery"
+        ? Math.max(5, Math.round(1.5 + buildings * 0.7))
+        : Math.max(2, Math.min(36, Math.round(1.5 + buildings * 0.7)))
 
 /** Where a stay is: a point on a node's tile, the way to face, on the ground or a deck; what it does there. */
 export interface LifeSpot extends SpotDoing {
@@ -194,6 +197,63 @@ export function spotAt(walk: HexWalk, node: number, k: number, r = 1.4, face?: n
   const x = n.x + Math.cos(a) * rr
   const z = n.z + Math.sin(a) * rr
   return { node, at: [x, n.y, z], facing: face ?? headingTo(x, z, n.x, n.z), ground: !onDeck(n) }
+}
+
+/** Metres along the walk graph from one node to another (straight across when no route joins them). */
+function routeLength(walk: HexWalk, a: number, b: number): number {
+  const path = walk.route(a, b) ?? [a, b]
+  let m = 0
+  for (let k = 1; k < path.length; k++) {
+    const p = walk.nodes[path[k - 1]!]!
+    const q = walk.nodes[path[k]!]!
+    m += Math.hypot(q.x - p.x, q.z - p.z)
+  }
+  return m
+}
+
+/** Hours a castle guard stands at a post between rounds of the wall. */
+const ROUND_EVERY = 0.7
+
+/** How far inside its face a doorway's spot is: someone going in is through the door when they vanish. */
+const IN_DOOR = 0.2
+
+/**
+ * Home, at a door node: in the building's doorway (world doorways, from its mesh), facing in, so whoever
+ * goes home walks up to the door and through it; the node itself when the building has none.
+ */
+export function doorSpot(walk: HexWalk, node: number, doorways: ReadonlyMap<number, HexDoorway>): LifeSpot {
+  const n = walk.nodes[node]!
+  const d = doorways.get(n.tile)
+  if (!d) return spotAt(walk, node, 0, 0)
+  const x = d.x - Math.sin(d.facing) * IN_DOOR
+  const z = d.z - Math.cos(d.facing) * IN_DOOR
+  return { node, at: [x, n.y, z], facing: d.facing + Math.PI, ground: true }
+}
+
+/** A step through a door: someone goes in (`enter`) or comes out at time `t` (the loop's unit), at `at`. */
+export interface DoorPass {
+  t: number
+  at: Vec3
+  enter: boolean
+}
+
+/**
+ * The times a loop goes through a door (decisions.md "doors are dynamic"): a walk that ends in a stay
+ * indoors goes in when it arrives, a stay indoors that a walk follows comes out when it ends (a loop's
+ * last stay and its first step are one, across the loop's end). In time order.
+ */
+export function doorPasses(steps: readonly LifeStep[]): DoorPass[] {
+  const out: DoorPass[] = []
+  const n = steps.length
+  for (let k = 0; k < n; k++) {
+    const s = steps[k]!
+    const next = steps[(k + 1) % n]!
+    if (s.kind === "walk" && next.kind === "stay" && next.indoors)
+      out.push({ t: s.to, at: next.at, enter: true })
+    else if (s.kind === "stay" && s.indoors && next.kind === "walk")
+      out.push({ t: k === n - 1 ? next.from : s.to, at: s.at, enter: false })
+  }
+  return out.sort((a, b) => a.t - b.t)
 }
 
 /** The way through the nodes of `path`, each point pushed `lane` metres to the walker's right. */
@@ -849,12 +909,13 @@ function outingOrder(
 export function planFolk(
   h: HexIsland,
   z: HexZones,
-  w: Pick<HexWorld, "tiles" | "pieces"> & Partial<Pick<HexWorld, "stairAt">>,
+  w: Pick<HexWorld, "tiles" | "pieces"> & Partial<Pick<HexWorld, "stairAt" | "doorways">>,
   walk: HexWalk,
   opts: { seed: number; pace: number; places?: LifePlaces },
 ): Folk[] {
   const { seed, pace } = opts
   const places = opts.places ?? lifePlaces(h, z, w, walk)
+  const doorways = new Map((w.doorways ?? []).map((d) => [d.tile, d]))
   const near = places.walkNear
   const spots = places.furniture.spots
   const folk: Folk[] = []
@@ -919,6 +980,41 @@ export function planFolk(
       return places.takeSlot(zj)
     }
     return undefined
+  }
+  /**
+   * A castle's rounds: points just inside its curtain wall (its walled court and yard tiles' nodes, a
+   * step toward the wall), in order round the castle, from a start of each guard's own.
+   */
+  const rounds = (zi: number, pick: number): LifeSpot[] => {
+    const zone = z.zones[zi]!
+    const inZone = new Set(zone.tiles)
+    const heart = walk.nodes[walk.hearts[zi]!]!
+    const out: { spot: LifeSpot; a: number }[] = []
+    for (const i of zone.tiles) {
+      const n = walk.at(i)
+      if (n < 0) continue
+      const nb = h.grid.neighbours(i)
+      const walled = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! < 0 || !inZone.has(nb[d]!))
+      if (!walled.length) continue
+      const node = walk.nodes[n]!
+      // toward the middle of its walled sides, short of the wall
+      let sx = 0
+      let sz = 0
+      for (const d of walled) {
+        sx += Math.cos((Math.PI / 3) * d)
+        sz -= Math.sin((Math.PI / 3) * d)
+      }
+      const l = Math.hypot(sx, sz) || 1
+      const x = node.x + (sx / l) * 0.9
+      const zz = node.z + (sz / l) * 0.9
+      out.push({
+        spot: { node: n, at: [x, node.y, zz], facing: Math.atan2(sx, sz), ground: true },
+        a: Math.atan2(zz - heart.z, x - heart.x),
+      })
+    }
+    out.sort((p, q) => p.a - q.a)
+    const k0 = Math.floor(pick * out.length)
+    return [...out.slice(k0), ...out.slice(0, k0)].map((o) => o.spot)
   }
   for (const [zi, zone] of z.zones.entries()) {
     const heart = walk.hearts[zi]!
@@ -996,7 +1092,7 @@ export function planFolk(
       const night = nightly(role)
       const homeNode = homes.length ? homes[Math.floor(r(1) * homes.length)]! : heart
       const homeSpot: LifeSpot = homes.length
-        ? spotAt(walk, homeNode, 0, 0)
+        ? doorSpot(walk, homeNode, doorways)
         : spotAt(walk, heart, Math.floor(r(1) * 6), 2.4)
       const indoors = homes.length > 0
       const work = spot !== undefined ? places.lifeSpot(spot) : (places.takeSlot(zi) ?? homeSpot)
@@ -1061,13 +1157,26 @@ export function planFolk(
         open && open[0] < 6 ? open[0] + 0.3 + r(10) * 0.9 : Math.max(6 + r(10) * 1.2, open?.[0] ?? 0)
       let t = b.go(start, work, { act: workAct })
       const close = open && open[1] > open[0] ? open[1] - 0.1 : 24
+      // a castle guard at a post walks the wall now and then (rounds), back to the post between
+      const post = spot !== undefined && spots[spot]!.kind === "stand"
+      const walks = zone.kind === "castle" && role === "guard" && post ? rounds(zi, r(18)) : []
+      const round = (until: number) => {
+        for (let k = 0; walks.length > 1 && t + ROUND_EVERY + 1 < until; k += 2) {
+          t = b.go(t + ROUND_EVERY, walks[k % walks.length]!, { act: "idle" })
+          t = b.go(t + 0.05, walks[(k + 1) % walks.length]!, { act: "idle" })
+          t = b.go(t + 0.05, work, { act: workAct })
+        }
+      }
+      round(Math.min(11.2 + r(11) * 1.5, close))
       const lunch0 = Math.max(t + 1, Math.min(11.2 + r(11) * 1.5, close))
       const lunch1 = lunch0 + 0.8 + r(12) * 0.5
       const noon = outing(outingOrder(LUNCH, r, 20), lunch0, lunch1 + 0.4, "lunch", 30)
       t = b.go(lunch0, noon.at, { act: "idle", indoors: noon.indoors })
       // back to work (a late arrival from a long way off stays no longer than its seat was booked)
-      if (close > lunch1 + 0.5)
+      if (close > lunch1 + 0.5) {
         t = b.go(Math.max(lunch1, Math.min(t + 0.3, lunch1 + 0.4)), work, { act: workAct })
+        round(Math.min(16.5 + r(13) * 1.2, close))
+      }
       // (an hour's work at least once back, but never past the spot's closing)
       const eve0 = Math.max(Math.min(t + 1, close), Math.min(16.5 + r(13) * 1.2, close))
       // the tavern keeps people late (lit by the lanterns); elsewhere home by dusk, a few later
@@ -1092,8 +1201,12 @@ export function planFolk(
       }
       eve ??= { at: homeSpot, indoors }
       t = b.go(eve0, eve.at, { act: "idle", indoors: eve.indoors })
-      // home when the booking ends (one who got there late does not stay past it)
-      if (!eve.indoors) t = b.go(eve1, homeSpot, { act: "idle", indoors })
+      // home when the booking ends (one who got there late does not stay past it), and before midnight
+      // however far the evening took them (the day loops at 24)
+      if (!eve.indoors) {
+        const back = (routeLength(walk, eve.at.node, homeSpot.node) * 1.15 + 2) / (pace * 0.9)
+        t = b.go(Math.min(eve1, 23.8 - back), homeSpot, { act: "idle", indoors })
+      }
       folk.push({ id, role, zone: zi, day: b.close(24), ...(prop ? { prop } : {}) })
     }
   }

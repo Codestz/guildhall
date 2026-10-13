@@ -1,0 +1,102 @@
+{
+  "blockers": [
+    {
+      "r": 0.55,
+      "x": -0.75,
+      "z": -0.9
+    },
+    {
+      "r": 0.55,
+      "x": 0.45,
+      "z": -0.85
+    },
+    {
+      "r": 0.6,
+      "x": 1.45,
+      "z": -0.2
+    },
+    {
+      "r": 0.3,
+      "x": -1.55,
+      "z": 0.05
+    },
+    {
+      "r": 0.3,
+      "x": -1.25,
+      "z": 0.95
+    }
+  ],
+  "ground": "paved",
+  "group": "landmark",
+  "id": "castle-stores",
+  "name": "Castle stores",
+  "pieces": [
+    {
+      "piece": "kaykit-dungeon/crates-stacked",
+      "rot": 0.2,
+      "scale": 0.45,
+      "x": -0.75,
+      "z": -0.9
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.45,
+      "x": 0.25,
+      "z": -1.1
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.45,
+      "x": 0.7,
+      "z": -0.85
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.45,
+      "x": 0.45,
+      "y": 0,
+      "z": -0.55
+    },
+    {
+      "piece": "kaykit-resources/wood-log-stack",
+      "rot": 1.1,
+      "scale": 0.45,
+      "x": 1.45,
+      "z": -0.2
+    },
+    {
+      "piece": "kaykit-dungeon/box-small",
+      "rot": 0.3,
+      "scale": 0.42,
+      "x": -1.55,
+      "z": 0.05
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": -1.25,
+      "z": 0.95
+    }
+  ],
+  "spots": [
+    {
+      "clip": "PickUp",
+      "facing": 2.985,
+      "hours": [
+        7,
+        19
+      ],
+      "kind": "work",
+      "roles": [
+        "guard"
+      ],
+      "x": 0.1,
+      "z": 0.05
+    }
+  ],
+  "tier": 2
+}

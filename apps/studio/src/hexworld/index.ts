@@ -27,6 +27,9 @@ import {
   createSun,
   createSurface,
   createVertexMesh,
+  FRAME,
+  GATE_PIECES,
+  gateFrame,
   loadPiece,
   type Night,
   type Post,
@@ -45,6 +48,7 @@ import { mountViewer } from "../shell/viewer.ts"
 import { islandWorld, worldCamera } from "../shell/worldCamera.ts"
 import { loadTiles } from "../tiles.ts"
 import { atmoKnobs, createIslandAir, type IslandAir } from "./atmo.ts"
+import { createDoors, type Doors } from "./doors.ts"
 import {
   batchSets,
   type FromWorker,
@@ -211,6 +215,7 @@ export const hexWorldScreen: Screen = {
     let post: Post | null = null
     let disposeField = () => {}
     let life: Life | null = null
+    let doors: Doors | null = null
     const meshes: TerrainMesh[] = []
 
     const build = async () => {
@@ -255,6 +260,16 @@ export const hexWorldScreen: Screen = {
         onChange: show,
       })
       unTick = () => day.dispose()
+      // for shots: set the clock as a drag would
+      const ext = window.guildhall?.ext
+      if (ext)
+        ext.clock = {
+          get: () => now,
+          set: (h: number) => {
+            day.set(h)
+            show(h)
+          },
+        }
       // the sea reaches the far plane: the horizon haze (atmo.ts) melts its rim into the sky
       const sea = Math.max(span * 3, stage.camera.far * 0.95)
       air = createIslandAir(stage, { light: () => sky.light(), span, seed, sea, knobs: atmoKnobs(ctx.query) })
@@ -302,14 +317,17 @@ export const hexWorldScreen: Screen = {
       // the crop rows of each field as one cluster: its pieces near, one merged shell far
       const { loose, clusters } = batchSets(await job.pieces, (p) => catalog.get(p.piece) !== undefined)
       const placed = loose.length + clusters.reduce((n, c) => n + c.parts.length, 0)
+      const load = (id: string) => {
+        const entry = catalog.get(id)
+        if (!entry) throw new Error(`hexworld: unknown piece "${id}"`)
+        return loadPiece(libraryUrl(entry.files.glb))
+      }
+      // a gate's leaves swing (doors.ts): the batch draws its frame, the gates its leaves
+      const gates = loose.filter((p) => GATE_PIECES.has(p.piece))
       batch = await createStaticBatch(
         stage,
-        loose,
-        async (id) => {
-          const entry = catalog.get(id)
-          if (!entry) throw new Error(`hexworld: unknown piece "${id}"`)
-          return loadPiece(libraryUrl(entry.files.glb))
-        },
+        loose.map((p) => (GATE_PIECES.has(p.piece) ? { ...p, piece: p.piece + FRAME } : p)),
+        async (id) => (id.endsWith(FRAME) ? gateFrame(await load(id.slice(0, -FRAME.length))) : load(id)),
         clusters,
       )
       await shoreDone
@@ -319,17 +337,19 @@ export const hexWorldScreen: Screen = {
       }
       sun.markDirty()
       // ---- life (track B): townsfolk and agents on the walk graph; `?life=0` turns it off ----
+      let world: ReturnType<typeof hexWorld> | null = null
       if (ctx.query.get("life") !== "0") {
         steps.step("Townsfolk")
         // Life plans on the map itself: its pure parts built again here (~0.1 s), once the island is drawn.
         const island = hexIsland({ ...shape, seed, files })
         const zones = hexZones(island, { wild: nature.wild })
-        const world = hexWorld(island, zones, { step, nature })
+        const built = hexWorld(island, zones, { step, nature })
+        world = built
         life = createLife(stage, {
           host,
           island,
           zones,
-          world,
+          world: built,
           groundAt,
           hour: () => now,
           seed,
@@ -338,6 +358,32 @@ export const hexWorldScreen: Screen = {
         })
         await life.ready
       }
+      // doors that open: the gates by day and for whoever comes, the buildings' doors for whoever goes in
+      if (disposed) return
+      doors = await createDoors(stage, {
+        gates,
+        load,
+        doorways: world?.doorways ?? [],
+        life,
+        all: ctx.query.get("doors") === "open",
+        hour: () => now,
+      })
+      if (disposed) {
+        doors.dispose()
+        return
+      }
+      const made = doors
+      if (window.guildhall?.ext)
+        window.guildhall.ext.doors = {
+          stats: () => ({
+            open: made.open,
+            gates: made.gates?.count ?? 0,
+            gate: made.gates?.opening(0) ?? null,
+          }),
+          // for shots: the doorways and the passes through them (a burst frames a door as someone goes in)
+          doorways: () => world?.doorways ?? [],
+          passes: () => life?.passes() ?? [],
+        }
       const grown = m.stats.nature
       viewer.setInfo({
         figures: [
@@ -403,6 +449,7 @@ export const hexWorldScreen: Screen = {
       air?.dispose()
       night?.dispose()
       life?.dispose()
+      doors?.dispose()
       unTick()
       post?.dispose()
       for (const m of meshes) m.dispose()

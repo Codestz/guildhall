@@ -407,6 +407,8 @@ interface Placed {
   z: number
   rot: number
   scale: number
+  /** Stretch along the piece's own x (a curtain wall piece fitted to its run). */
+  stretch?: number
 }
 
 const isWallPiece = (piece: string) => piece.startsWith("kaykit-hexagon/wall-")

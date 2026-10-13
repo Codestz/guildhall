@@ -205,7 +205,7 @@ export function pieceSolids(p: PlacedPiece): Solid[] {
   if (solidToFoot(p.piece)) {
     const c: number[] = []
     for (let k = 0; k < o.foot.length; k += 2)
-      c.push(...turn(p.x, p.z, p.rot, o.foot[k]!, o.foot[k + 1]!, p.scale))
+      c.push(...turn(p.x, p.z, p.rot, o.foot[k]! * (p.stretch ?? 1), o.foot[k + 1]!, p.scale))
     return [solidFrom(kind, c, p.y, p.piece)]
   }
   const out: Solid[] = []
@@ -225,7 +225,8 @@ export function pieceSolids(p: PlacedPiece): Solid[] {
   }
   for (const hull of o.hulls) {
     const c: number[] = []
-    for (let k = 0; k < hull.length; k += 2) c.push(...turn(p.x, p.z, p.rot, hull[k]!, hull[k + 1]!, p.scale))
+    for (let k = 0; k < hull.length; k += 2)
+      c.push(...turn(p.x, p.z, p.rot, hull[k]! * (p.stretch ?? 1), hull[k + 1]!, p.scale))
     const s = solidFrom(kind, c, p.y, p.piece)
     if (gate) s.gate = gate
     if (s.r >= TINY) out.push(s)
@@ -240,7 +241,7 @@ export function pieceFootprint(p: PlacedPiece): Solid | null {
   if (!kind || !o) return null
   const c: number[] = []
   for (let k = 0; k < o.foot.length; k += 2)
-    c.push(...turn(p.x, p.z, p.rot, o.foot[k]!, o.foot[k + 1]!, p.scale))
+    c.push(...turn(p.x, p.z, p.rot, o.foot[k]! * (p.stretch ?? 1), o.foot[k + 1]!, p.scale))
   return solidFrom(kind, c, p.y, p.piece)
 }
 

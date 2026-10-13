@@ -174,6 +174,37 @@ const PIECE_RULES: PieceRule[] = [
     spots: [{ x: 0, z: -0.45, facing: 0, roles: ["merchant"] }],
   },
   { test: /^kenney-town\/stall-bench$/, r: 0.9 },
+  // ---- the castle's (curtain.ts, castleyard.ts) ----
+  {
+    // a guard either side of the gate, inside it, looking out through it
+    test: /^kaykit-hexagon\/wall-straight-gate$/,
+    r: 0,
+    ref: 0.38,
+    spots: [
+      { kind: "stand", x: -1.3, z: -1.0, facing: 0, roles: ["guard"], hours: [6, 21] },
+      { kind: "stand", x: 1.3, z: -1.0, facing: 0, roles: ["guard"], hours: [6, 21] },
+    ],
+  },
+  {
+    // a practice target (a shield on a straw bale): sword drill in front of it
+    test: /^kaykit-adventurers\/shield-round-color$/,
+    r: 0,
+    ref: 0.9,
+    spots: [
+      {
+        x: 0,
+        z: 0.95,
+        facing: Math.PI,
+        roles: ["guard"],
+        clip: "Melee_2H_Attack_Chop",
+        prop: "kaykit-weapons/sword-a",
+        hours: [8, 18],
+      },
+    ],
+  },
+  { test: /^kenney-graveyard\/hay-bale/, r: 0.5 },
+  { test: /^kaykit-dungeon\/sword-shield$/, r: 0.45 },
+  { test: /^kaykit-dungeon\/banner-/, r: 0.3 },
   { test: /^kenney-town\/cart/, r: 2.2 },
   {
     test: /^kenney-survival\/workbench-anvil$/,

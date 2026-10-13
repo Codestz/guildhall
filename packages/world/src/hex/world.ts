@@ -4,7 +4,10 @@
  * ground prisms, the path strips, the water tiles and the pieces, for the 3D screen to draw.
  */
 import { hash2 } from "../geom/noise.ts"
+import { courtDressing } from "./castleyard.ts"
 import { fitToTiles, walkwayAt } from "./collide.ts"
+import { type CurtainBody, curtainWall } from "./curtain.ts"
+import { doorwayOf } from "./doorways.ts"
 import { hexCentre } from "./grid.ts"
 import { seatTiles } from "./ground.ts"
 import { type HexIsland, kindOf } from "./island.ts"
@@ -18,7 +21,6 @@ import {
 } from "./nature.ts"
 import { bodyRadius, footprint, settlePieces } from "./sites.ts"
 import {
-  castleWalls,
   edgeDressing,
   HEX_TILE_SIZE,
   mirrorPrefab,
@@ -85,8 +87,24 @@ export interface HexWorldTile {
   mirror?: boolean
 }
 
+/**
+ * A building's front door in the world (doorways.ts, from its mesh): the middle of its foot on the
+ * door's face, its width and height, the way it looks out (radians about +y, 0 = +z), on `tile`.
+ */
+export interface HexDoorway {
+  tile: number
+  x: number
+  y: number
+  z: number
+  w: number
+  h: number
+  facing: number
+}
+
 export interface HexWorld {
   tiles: HexWorldTile[]
+  /** Every building's front door (a building tile's main building, as placed). */
+  doorways: HexDoorway[]
   pieces: PlacedPiece[]
   /** Path strips (triangle positions) over road tiles. */
   paths: number[]
@@ -110,6 +128,9 @@ export interface HexWorld {
     nature?: { grown: number; held: number }
   }
 }
+
+/** The castle's yards in the order they are given out, nearest its heart first. */
+const YARD_THEMES = ["castle-well", "castle-drill", "castle-stables", "castle-stores"]
 
 /** What a building tile of each place builds (picked by the tile's hash). */
 const BUILDS: Record<string, string[]> = {
@@ -522,6 +543,29 @@ export function hexWorld(
       return p !== undefined && (p.tier ?? 1) <= tier
     }) ?? null
 
+  /**
+   * The castle's yards, each composed for what it is (decisions.md backlog "castle yards"): the one
+   * nearest its heart the well with benches, then the drill yard, the stables, the stores, by turns.
+   */
+  const yards = new Map<number, string>()
+  if (z.castle) {
+    const plan = z.castle
+    const list = plan.tiles
+      .filter((i) => plan.role.get(i) === "yard")
+      .sort((a, b) => steps(a, plan.heart) - steps(b, plan.heart) || a - b)
+    list.forEach((i, k) => {
+      const id = YARD_THEMES[k % YARD_THEMES.length]!
+      if (atTier(id)) yards.set(i, id)
+    })
+  }
+  /** The castle's colour: its keep's (every castle tile takes it). */
+  const castleZone = z.zones.find((q) => q.kind === "castle")
+  const castleColour = recolour(
+    "kaykit-hexagon/building-castle-blue",
+    castleZone?.tile ?? z.castle?.keep ?? 0,
+  )
+    .split("-")
+    .pop()!
   /** The buildings standing so far, by tile: their bodies (sites.ts bodyRadius). */
   const standing = new Map<number, [number, number, number][]>()
   const bodies = {
@@ -538,6 +582,10 @@ export function hexWorld(
     },
   }
   const byTile = new Map<number, number>()
+  /** Each building tile's door piece (its doorway is read once every piece is fitted). */
+  const doorPieces: [number, PlacedPiece][] = []
+  /** The buildings standing on the castle's tiles, as settled: its curtain wall meets them. */
+  const castleBodies: CurtainBody[] = []
   for (let i = 0; i < g.size; i++) {
     const k = kindOf(h, i)
     if (k === "sea") continue
@@ -581,28 +629,34 @@ export function hexWorld(
       else if (role === "hall") prefab = atTier("great-hall", "castle-ward")
       else if (role === "tower") prefab = atTier("castle-tower", "castle-ward")
       else if (role === "barracks") prefab = "barracks"
-      else if (role === "yard") prefab = atTier("castle-ward", "castle-yard")
-      else {
-        // a court: paved through along its ways (and out of the gate)
+      else if (role === "yard") {
+        // a yard composed for its place in the castle (yardThemes), its back to the curtain wall
+        prefab = yards.get(i) ?? atTier("castle-ward", "castle-yard")
+        const out = [0, 1, 2, 3, 4, 5].filter((e) => nb[e]! < 0 || !plan.role.has(nb[e]!))
+        if (out.length) {
+          let sx = 0
+          let sz = 0
+          for (const e of out) {
+            sx += Math.cos((Math.PI / 3) * e)
+            sz += Math.sin((Math.PI / 3) * e)
+          }
+          const back = Math.atan2(sz, sx)
+          rot = rotOf(((Math.round((back + Math.PI) / (Math.PI / 3)) % 6) + 6) % 6)
+        }
+      } else {
+        // a court: paved through along its ways (and out of the gate), dressed round them (castleyard.ts)
         const sides = [0, 1, 2, 3, 4, 5].filter((e) => nb[e]! >= 0 && (links.get(i)?.has(nb[e]!) ?? false))
         if (sides.length) {
           paths.push(...tilePath([x, zz], t + 0.07, sides, 1.1))
           pathSides = sides
         }
-      }
-      const sides = plan.walls.get(i)
-      if (sides && tier >= 2) {
-        const gate = i === plan.gate && sides.includes(plan.gateSide) ? [plan.gateSide] : []
-        const colour = recolour("kaykit-hexagon/building-castle-blue", zone.tile).split("-").pop()!
-        pieces.push(
-          ...castleWalls(
-            [x, zz],
-            t,
-            sides.filter((e) => !gate.includes(e)),
-            gate,
-            colour,
-          ),
-        )
+        const walled =
+          plan.tier >= 2 ? [0, 1, 2, 3, 4, 5].filter((e) => nb[e]! < 0 || !plan.role.has(nb[e]!)) : []
+        const kind = i === plan.gate ? "gate" : i === plan.heart ? "heart" : "plain"
+        // a building whose door opens onto this court keeps its way to it clear, as a path does
+        const doors = [0, 1, 2, 3, 4, 5].filter((e) => nb[e]! >= 0 && plan.door.get(nb[e]!) === (e + 3) % 6)
+        const clear = [...new Set([...sides, ...doors])]
+        pieces.push(...courtDressing([x, zz], t, clear, walled, kind, castleColour, seed + i))
       }
     } else if (u === "building") {
       prefab = scenes.get(i) ?? buildOf(i)
@@ -715,8 +769,12 @@ export function hexWorld(
       let d = [0, 1, 2, 3, 4, 5].find((e) => dry(nb[e]!) && z.zoneOf[nb[e]!]! > 0)
       if (d === undefined) d = [0, 1, 2, 3, 4, 5].find((e) => dry(nb[e]!))
       rot = rotOf(d ?? 4)
-    } else if (grounds.has(i) && u === "meadow") {
-      // the castle's ground its next tiers take: kept open, its approach clear
+    } else if (
+      (u === "meadow" || BY_USE[u] === "meadow") &&
+      (grounds.has(i) || [...g.neighbours(i)].some((j) => j >= 0 && zoneAt(j)?.kind === "castle"))
+    ) {
+      // the castle's ground its next tiers take, and the foot of its curtain wall: kept open, its
+      // approach clear (a bench there would have only the castle's ways, behind the wall, to reach it)
       prefab = null
     } else if (BY_USE[u] && !quayed.has(i)) {
       prefab = BY_USE[u]!
@@ -739,7 +797,20 @@ export function hexWorld(
       const placed = placeTile(p, [x, zz], prefab === "dock" ? SEA_TOP : t, rot, i, true, odds)
       // every building on its floor: dry ground at its own level, clear of the buildings beside it
       if (prefab !== "dock") settlePieces(placed, [x, zz], (px, pz) => floorAt(px, pz, t), bodies)
-      for (const q of placed) pieces.push({ ...q, piece: recolour(q.piece, hue) })
+      const own = placed.map((q) => ({ ...q, piece: recolour(q.piece, hue) }))
+      pieces.push(...own)
+      // a building's front door: its biggest building piece's (its doorway once every piece is fitted)
+      if (door !== undefined) {
+        let best: PlacedPiece | undefined
+        for (const q of own) {
+          const d = doorwayOf(q.piece)
+          if (d && (!best || q.scale * d.w > best.scale * doorwayOf(best.piece)!.w)) best = q
+        }
+        if (best) doorPieces.push([i, best])
+      }
+      // the castle's buildings: what its curtain wall runs up to
+      if (zone?.kind === "castle")
+        for (const q of own) if (q.piece.startsWith("kaykit-hexagon/building-")) castleBodies.push(q)
       prefabs[prefab!] = (prefabs[prefab!] ?? 0) + 1
       // a quay's deck out over the water: walked at the tile's top, like a bridge's
       const cr = Math.cos(rot)
@@ -854,34 +925,70 @@ export function hexWorld(
   // every wall and tower on its own tile's seat too: none reaches over a step, water or the shore
   const seats = seatTiles(h, { tiles, pieces })
   const topOf = (i: number) => tiles[byTile.get(i)!]!.top
-  fitToTiles(
-    pieces,
-    {
+  const fit = (only: (p: PlacedPiece) => boolean) =>
+    fitToTiles(
+      pieces,
+      {
+        R,
+        tileAt: (x, zz) => {
+          const i = tileAt(x, zz)
+          return i >= 0 && byTile.has(i) ? i : -1
+        },
+        centre: (i) => {
+          const t = tiles[byTile.get(i)!]!
+          return [t.x, t.z]
+        },
+        neighbour: (i, d) => g.neighbours(i)[d]!,
+        shares: (i, j) => seats.has(j) && byTile.has(j) && Math.abs(topOf(j) - topOf(i)) <= 0.05,
+      },
+      // a building the site settled (sites.ts settlePieces) already stands on its floor, clear of its
+      // neighbours: what is left is the rest (walls, towers, hedges, a scene's pieces)
+      only,
+      (p) => {
+        const r = bodyRadius(p)
+        if (!r) return true
+        return pieces.every((o) => {
+          if (o === p) return true
+          const ro = bodyRadius(o)
+          return !ro || Math.hypot(o.x - p.x, o.z - p.z) >= r + ro - 0.05
+        })
+      },
+    )
+  fit(() => true)
+  // ---- the Guildhall's curtain wall (tier 2 up): one line round its site, meeting its buildings ----
+  const plan = z.castle
+  if (plan && plan.tier >= 2 && tier >= 2) {
+    const colour = castleColour
+    const wall = curtainWall({
+      grid: g,
+      tiles: plan.tiles,
+      centre: at,
       R,
-      tileAt: (x, zz) => {
-        const i = tileAt(x, zz)
-        return i >= 0 && byTile.has(i) ? i : -1
-      },
-      centre: (i) => {
-        const t = tiles[byTile.get(i)!]!
-        return [t.x, t.z]
-      },
-      neighbour: (i, d) => g.neighbours(i)[d]!,
-      shares: (i, j) => seats.has(j) && byTile.has(j) && Math.abs(topOf(j) - topOf(i)) <= 0.05,
-    },
-    // a building the site settled (sites.ts settlePieces) already stands on its floor, clear of its
-    // neighbours: what is left is the rest (walls, towers, hedges, a scene's pieces)
-    () => true,
-    (p) => {
-      const r = bodyRadius(p)
-      if (!r) return true
-      return pieces.every((o) => {
-        if (o === p) return true
-        const ro = bodyRadius(o)
-        return !ro || Math.hypot(o.x - p.x, o.z - p.z) >= r + ro - 0.05
-      })
-    },
-  )
+      y: top(plan.keep),
+      gate: plan.gate !== plan.keep ? { tile: plan.gate, side: plan.gateSide } : null,
+      bodies: castleBodies,
+      colour,
+    })
+    pieces.push(...wall.pieces)
+    // its corner towers on their seats as well (the wall's runs already keep to the site)
+    const towers = new Set<PlacedPiece>(wall.pieces.filter((q) => q.piece.includes("building-tower-base")))
+    fit((q) => towers.has(q))
+  }
+  // ---- every building's front door, as its building finally stands ----
+  const doorways: HexDoorway[] = doorPieces.map(([tile, best]) => {
+    const d = doorwayOf(best.piece)!
+    const c = Math.cos(best.rot)
+    const n = Math.sin(best.rot)
+    return {
+      tile,
+      x: best.x + (d.x * c + d.z * n) * best.scale,
+      y: best.y + d.y * best.scale,
+      z: best.z + (-d.x * n + d.z * c) * best.scale,
+      w: d.w * best.scale,
+      h: d.h * best.scale,
+      facing: best.rot + d.facing,
+    }
+  })
   const heightAt = (x: number, zz: number): number => {
     const i = tileAt(x, zz)
     const k = i >= 0 ? byTile.get(i) : undefined
@@ -891,6 +998,7 @@ export function hexWorld(
   const grown = nature ? growNatureOn(nature) : undefined
   return {
     tiles,
+    doorways,
     pieces,
     paths,
     stairs,

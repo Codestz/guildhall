@@ -1,0 +1,146 @@
+{
+  "blockers": [
+    {
+      "r": 1.0,
+      "x": 0,
+      "z": -0.45
+    },
+    {
+      "r": 0.55,
+      "x": -1.45,
+      "z": 0.75
+    },
+    {
+      "r": 0.55,
+      "x": 1.45,
+      "z": 0.75
+    },
+    {
+      "r": 0.3,
+      "x": -1.3,
+      "z": -0.95
+    },
+    {
+      "r": 0.3,
+      "x": 1.35,
+      "z": -0.9
+    }
+  ],
+  "ground": "paved",
+  "group": "landmark",
+  "id": "castle-well",
+  "name": "Castle well",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-well-blue",
+      "rot": 0,
+      "scale": 0.34,
+      "x": 0,
+      "z": -0.45
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": 0.6,
+      "scale": 0.5,
+      "x": -1.45,
+      "z": 0.75
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": -0.6,
+      "scale": 0.5,
+      "x": 1.45,
+      "z": 0.75
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.55,
+      "x": -1.3,
+      "z": -0.95
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small",
+      "rot": 0,
+      "scale": 0.45,
+      "x": 1.35,
+      "z": -0.9
+    },
+    {
+      "piece": "kenney-survival/bucket",
+      "rot": 0.4,
+      "scale": 0.8,
+      "x": 0.55,
+      "z": 0.55
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Interact",
+      "facing": 3.142,
+      "hours": [
+        6,
+        20
+      ],
+      "kind": "work",
+      "prop": "kaykit-tools/bucket-metal",
+      "x": -0.15,
+      "z": 0.6
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0.6,
+      "kind": "sit",
+      "x": -1.569,
+      "y": -0.06,
+      "z": 0.965
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0.6,
+      "kind": "sit",
+      "x": -1.206,
+      "y": -0.06,
+      "z": 0.717
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": -0.6,
+      "kind": "sit",
+      "x": 1.206,
+      "y": -0.06,
+      "z": 0.717
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": -0.6,
+      "kind": "sit",
+      "x": 1.569,
+      "y": -0.06,
+      "z": 0.965
+    },
+    {
+      "clip": "Idle_B",
+      "facing": 2.67,
+      "hours": [
+        9,
+        20
+      ],
+      "kind": "talk",
+      "x": -0.45,
+      "z": 1.6
+    },
+    {
+      "clip": "Idle_B",
+      "facing": -2.513,
+      "hours": [
+        9,
+        20
+      ],
+      "kind": "talk",
+      "x": 0.35,
+      "z": 1.75
+    }
+  ],
+  "tier": 2
+}

@@ -127,7 +127,7 @@ export type HexHeights = HexFineGround["heights"]
  */
 export interface PackedPieces {
   /** Each distinct piece as placed: its re-tint and its lean (a few bows in racks) travel with the kind. */
-  kinds: Pick<PlacedPiece, "piece" | "swatchMap" | "tilt">[]
+  kinds: Pick<PlacedPiece, "piece" | "swatchMap" | "tilt" | "stretch">[]
   index: Uint16Array
   place: Float32Array
   /** Per piece, the tile cluster it belongs to (`clusters`), or -1 for a loose piece. */
@@ -307,7 +307,7 @@ function pack(pieces: HexWorld["pieces"], grouped: Pick<PackedPieces, "cluster" 
   const index = new Uint16Array(pieces.length)
   const place = new Float32Array(pieces.length * 5)
   pieces.forEach((p, k) => {
-    const key = `${p.piece}|${p.swatchMap ? JSON.stringify(p.swatchMap) : ""}|${p.tilt ?? ""}`
+    const key = `${p.piece}|${p.swatchMap ? JSON.stringify(p.swatchMap) : ""}|${p.tilt ?? ""}|${p.stretch ?? ""}`
     let s = slot.get(key)
     if (s === undefined) {
       s = kinds.length
@@ -315,6 +315,7 @@ function pack(pieces: HexWorld["pieces"], grouped: Pick<PackedPieces, "cluster" 
         piece: p.piece,
         ...(p.swatchMap ? { swatchMap: p.swatchMap } : {}),
         ...(p.tilt ? { tilt: p.tilt } : {}),
+        ...(p.stretch !== undefined ? { stretch: p.stretch } : {}),
       })
       slot.set(key, s)
     }

@@ -27,7 +27,10 @@ const logger = log("render:batch")
 export type BatchInstance = Pick<
   RecipeInstance,
   "piece" | "x" | "y" | "z" | "rot" | "scale" | "swatchMap" | "rampMap" | "tilt"
->
+> & {
+  /** Stretch along the piece's own x on top of `scale` (a wall piece fitted to its run). */
+  stretch?: number
+}
 
 /**
  * A group of pieces drawn as one when far away (a compiled house): `parts` in cluster space, placed by
@@ -100,13 +103,14 @@ const lean = new Euler(0, 0, 0, "YXZ")
 
 /** The placement of `instance` as a world matrix, as `placeInstance` would pose a scene node. */
 export function instanceMatrix(
-  instance: Pick<BatchInstance, "x" | "y" | "z" | "rot" | "scale" | "tilt">,
+  instance: Pick<BatchInstance, "x" | "y" | "z" | "rot" | "scale" | "tilt" | "stretch">,
   out = new Matrix4(),
 ): Matrix4 {
   position.set(instance.x, instance.y, instance.z)
   if (instance.tilt) turn.setFromEuler(lean.set(instance.tilt[0], instance.rot, instance.tilt[1], "YXZ"))
   else turn.setFromAxisAngle(up, instance.rot)
   size.setScalar(instance.scale)
+  if (instance.stretch !== undefined) size.x *= instance.stretch
   return out.compose(position, turn, size)
 }
 

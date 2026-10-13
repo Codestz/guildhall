@@ -58,6 +58,8 @@ export interface PlacedPiece {
   scale: number
   /** As TilePiece's `tilt`. */
   tilt?: [number, number]
+  /** Stretch along the piece's own x on top of `scale` (a curtain wall piece fitted to its run). */
+  stretch?: number
   swatchMap?: Record<number, number>
 }
 
@@ -906,7 +908,7 @@ TILE_PREFABS.push(
     name: "Castle",
     group: "landmark",
     ground: "rock",
-    // the keep: the castle's other tiles are its wards, and walls run round all of them (castleWalls)
+    // the keep: the castle's other tiles are its wards, and walls run round all of them (curtain.ts)
     pieces: [p(H("castle", "blue"), 0, -0.2, 0, 0.36), p("kaykit-halloween/post-lantern", 1.9, 1.3, 0, 0.55)],
   },
   {
@@ -1256,78 +1258,6 @@ export function placeTile(
   })
   return out
 }
-
-/** Which way, as a piece's `rot`, faces local +z out through the direction at angle `a` (radians, toward -z). */
-const facingOut = (a: number) => Math.atan2(Math.cos(a), -Math.sin(a))
-
-/**
- * A castle tile's curtain wall: a KayKit wall along each side in `walls` (sides 0–5 as in tilePath), a
- * gatehouse with banners on each side in `gates`, and a tower with a flag on every outer corner (where
- * two of its walled sides meet), all in the keep's `colour`. The tiles of a castle each pass the sides
- * that face out of it, so the walls run round the whole cluster.
- */
-export function castleWalls(
-  at: [number, number],
-  y: number,
-  walls: readonly number[],
-  gates: readonly number[],
-  colour: string,
-): PlacedPiece[] {
-  const out: PlacedPiece[] = []
-  // the wall's line, inset so its outer face stays on its own tile (a castle's wall never stands over the
-  // moat or the land beyond: sites.ts), and its towers on the line's corners, inside the tile's corner
-  const A = R * (Math.sqrt(3) / 2) - WALL_SCALE * WALL_DEPTH * 0.5 - 0.05
-  const put = (piece: string, a: number, r: number, along: number, rot: number, scale: number, dy = 0) => {
-    const ux = Math.cos(a)
-    const uz = -Math.sin(a)
-    // `along` runs on the side, perpendicular to the way out
-    const q: PlacedPiece = {
-      piece,
-      x: at[0] + ux * r - uz * along,
-      y: y + dy,
-      z: at[1] + uz * r + ux * along,
-      rot,
-      scale,
-    }
-    if (piece.startsWith("kenney-")) q.swatchMap = KENNEY_WOOD
-    out.push(q)
-  }
-  const walled = new Set([...walls, ...gates])
-  for (const d of walled) {
-    const a = (Math.PI / 180) * 60 * d
-    const gate = gates.includes(d)
-    put(
-      gate ? "kaykit-hexagon/wall-straight-gate" : "kaykit-hexagon/wall-straight",
-      a,
-      A,
-      0,
-      a + Math.PI / 2,
-      WALL_SCALE,
-    )
-    if (gate)
-      for (const s of [-1, 1])
-        put(`kaykit-dungeon/banner-${colour}`, a, A + 0.42, s * 1.05, facingOut(a), 0.42, 0.35)
-  }
-  // towers where the wall turns outward (two walled sides of the tile meet): along a run of such corners
-  // on every other one from the run's start, so the wall shows between them
-  const corner = A / (Math.sqrt(3) / 2) - 0.2
-  const convex = (v: number) => walled.has(((v % 6) + 6) % 6) && walled.has((v + 1) % 6)
-  const start = [0, 1, 2, 3, 4, 5].find((v) => convex(v) && !convex(v - 1)) ?? 0
-  for (let k = 0, last = -2; k < 6; k++) {
-    const v = (start + k) % 6
-    if (!convex(v) || k - last < 2) continue
-    last = k
-    const b = (Math.PI / 180) * (60 * v + 30)
-    put(`kaykit-hexagon/building-tower-base-${colour}`, b, corner, 0, facingOut(b), CORNER_TOWER)
-    put("kenney-castle/flag", b, corner, 0, facingOut(b), 0.45, 12 * CORNER_TOWER - 0.1)
-  }
-  return out
-}
-
-/** The curtain wall's scale (a wall piece then spans a tile's side), its depth as imported, its corner towers' scale. */
-const WALL_SCALE = 0.38
-const WALL_DEPTH = 3.36
-const CORNER_TOWER = 0.21
 
 /**
  * What gathers at a land tile's edges: reeds and pebbles along each side in `banks` (toward a river or

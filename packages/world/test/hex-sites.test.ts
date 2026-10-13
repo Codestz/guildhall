@@ -44,7 +44,7 @@ const FULL = process.env.FUZZ === "full"
 
 describe("every place has floor, a way in and room of its own", () => {
   test(`over seeds 1–20 and the knob extremes${FULL ? ", every size" : ""}`, () => {
-    const total = { water: 0, overlap: 0, unreached: 0, castle: 0 }
+    const total = { water: 0, overlap: 0, gap: 0, unreached: 0, castle: 0 }
     const notes: string[] = []
     let n = 0
     for (let seed = 1; seed <= 20; seed++)
@@ -57,6 +57,7 @@ describe("every place has floor, a way in and room of its own", () => {
           const r = siteReport(h, z, w, hexWalk(h, z, w, { reach: workTiles(h, z) }))
           total.water += r.water
           total.overlap += r.overlap
+          total.gap += r.gap
           total.unreached += r.unreached
           total.castle += r.castle
           for (const note of r.notes.slice(0, 2))
@@ -64,7 +65,7 @@ describe("every place has floor, a way in and room of its own", () => {
           n++
         }
     expect(notes.slice(0, 10)).toEqual([])
-    expect(total).toEqual({ water: 0, overlap: 0, unreached: 0, castle: 0 })
+    expect(total).toEqual({ water: 0, overlap: 0, gap: 0, unreached: 0, castle: 0 })
     expect(n).toBe(FULL ? 720 : 180)
   }, 300_000)
 })

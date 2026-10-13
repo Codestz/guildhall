@@ -30,6 +30,7 @@ import {
 } from "@guildhall/ui"
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import { createPortal } from "react-dom"
+import { SoundButton, SoundSettings } from "../../audio/ui.tsx"
 import type { HudParts } from "../../hexworld/index.ts"
 import type { BuiltPlace } from "../../hexworld/job.ts"
 import { clock as hourOf } from "../../hexworld/knobs.ts"
@@ -292,6 +293,7 @@ function Settings({
             }}
           />
         </section>
+        <SoundSettings />
         <section className="hud-set-section">
           <h3 className="ui-section-head">Quality</h3>
           <Segmented
@@ -611,6 +613,7 @@ export function HallHud(props: HallHudProps) {
                 <StoryGlyphs.card size={18} />
               </RailButton>
             )}
+            <SoundButton />
             <RailButton
               id="settings"
               label="Settings"

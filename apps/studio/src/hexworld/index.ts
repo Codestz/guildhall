@@ -62,6 +62,7 @@ import {
   LEVEL_STEP,
   type PlaceSpec,
 } from "@guildhall/world"
+import { mountSound } from "../audio/mount.ts"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen, ScreenCtx } from "../screens.ts"
 import { current } from "../shell/router.ts"
@@ -430,6 +431,7 @@ const world = {
     let unHud = () => {}
     let fx: Fx | null = null
     let unAgents = () => {}
+    let unSound = () => {}
     let pick: ((index: number) => void) | null = null
     let dayClock: HudParts["clock"] = { get: () => 0, set: () => {} }
     const meshes: TerrainMesh[] = []
@@ -776,6 +778,18 @@ const world = {
         },
       ])
       logger.info("settled", ready)
+      // the island's sound (audio/): muted by default, nothing of it runs until the viewer turns it on
+      unSound = mountSound({
+        stage,
+        life,
+        plan: job.life,
+        light: () => sky.light(),
+        sites: m.sites,
+        pools: m.pools,
+        shore: job.shore,
+        fx: () => fx,
+        session,
+      })
       if (extra.hud)
         unHud = extra.hud({
           viewer,
@@ -844,6 +858,7 @@ const world = {
       air?.dispose()
       night?.dispose()
       unAgents()
+      unSound()
       life?.dispose()
       doors?.dispose()
       fx?.dispose()

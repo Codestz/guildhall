@@ -18,7 +18,17 @@ export {
   type ToolState,
   taskText,
 } from "./changes.ts"
-export { CRAFTS, type Craft, craftOf, declaredCraft, deedCraft, isCraft } from "./craft.ts"
+export {
+  type CommandGist,
+  CRAFTS,
+  type Craft,
+  commandGist,
+  craftOf,
+  declaredCraft,
+  deedCraft,
+  isCraft,
+  plainPattern,
+} from "./craft.ts"
 export { createdSession } from "./created.ts"
 export { endOf, finishedAt } from "./ends.ts"
 export { type Deed, failedDeed, isCheck } from "./outcome.ts"

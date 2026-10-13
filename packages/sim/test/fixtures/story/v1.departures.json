@@ -1,0 +1,32 @@
+[
+  {
+    "at": ["captions", 1, "caption", "text"],
+    "v1": "The Wanderer reads session.ts and middleware.ts and hunts through the code for \\brequireSession\\b — 1 match.",
+    "v2": "The Wanderer reads session.ts and middleware.ts and hunts through the code for requireSession — 1 match."
+  },
+  {
+    "at": ["captions", 1, "caption", "parts", 1, "text"],
+    "v1": " reads session.ts and middleware.ts and hunts through the code for \\brequireSession\\b — 1 match.",
+    "v2": " reads session.ts and middleware.ts and hunts through the code for requireSession — 1 match."
+  },
+  {
+    "at": ["captions", 1, "caption", "hold"],
+    "v1": 4840,
+    "v2": 4720
+  },
+  {
+    "at": ["captions", 2, "caption", "text"],
+    "v1": "The Wanderer hunts through the code for \\b(requireSession|createSession|readSession)\\b — 5 matches.",
+    "v2": "The Wanderer hunts through the code for requireSession — 5 matches."
+  },
+  {
+    "at": ["captions", 2, "caption", "parts", 1, "text"],
+    "v1": " hunts through the code for \\b(requireSession|createSession|readSession)\\b — 5 matches.",
+    "v2": " hunts through the code for requireSession — 5 matches."
+  },
+  {
+    "at": ["captions", 2, "caption", "hold"],
+    "v1": 4570,
+    "v2": 3610
+  }
+]

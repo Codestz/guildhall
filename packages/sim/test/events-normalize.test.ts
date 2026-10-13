@@ -57,7 +57,10 @@ describe("normalize: the guild", () => {
     expect(heroes(feed.log.head).map((h) => h.id)).toEqual(["q"])
     // nothing leaves twice
     feed.log.append(...flush(feed.ctx, T0 + 1000 + GONE_MS * 2))
-    expect(feed.log.events.filter((e) => e.kind === "actor.leave").map((e) => "id" in e && e.id)).toEqual(["r", "s"])
+    expect(feed.log.events.filter((e) => e.kind === "actor.leave").map((e) => "id" in e && e.id)).toEqual([
+      "r",
+      "s",
+    ])
   })
 
   test("a parent learned later is an info, not a second join", () => {

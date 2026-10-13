@@ -54,20 +54,58 @@ function told(source: { changes: Change[]; sea: SeaEvent[] }) {
   )
 }
 
+/** One place the port says something else than V1 did, on purpose: the path, V1's value, V2's. */
+interface Departure {
+  at: (string | number)[]
+  v1: unknown
+  v2: unknown
+}
+
+type Json = Record<string | number, unknown>
+
+const valueAt = (root: unknown, at: readonly (string | number)[]): unknown =>
+  at.reduce<unknown>((node, key) => (node as Json | undefined)?.[key], root)
+
+function setAt(root: unknown, at: readonly (string | number)[], value: unknown): void {
+  const parent = valueAt(root, at.slice(0, -1)) as Json
+  parent[at[at.length - 1] as string | number] = value
+}
+
+/** Every leaf where `ours` differs from `v1` (a list of another length, or another kind, whole). */
+function departuresOf(v1: unknown, ours: unknown, at: (string | number)[] = []): Departure[] {
+  if (JSON.stringify(v1) === JSON.stringify(ours)) return []
+  const both = (x: unknown) => typeof x === "object" && x !== null
+  if (both(v1) && both(ours) && Array.isArray(v1) === Array.isArray(ours)) {
+    if (Array.isArray(v1) && v1.length !== (ours as unknown[]).length) return [{ at, v1, v2: ours }]
+    const keys = new Set([...Object.keys(v1 as object), ...Object.keys(ours as object)])
+    if ([...keys].some((k) => !(k in (v1 as object)) || !(k in (ours as object))))
+      return [{ at, v1, v2: ours }]
+    return [...keys].flatMap((k) =>
+      departuresOf((v1 as Json)[k], (ours as Json)[k], [...at, Array.isArray(v1) ? Number(k) : k]),
+    )
+  }
+  return [{ at, v1, v2: ours }]
+}
+
 describe("the story tells V1's sessions as V1 told them", () => {
   for (const name of NAMES) {
     test(name, async () => {
-      const golden = await Bun.file(join(STORY_DIR, `${name}.story.json`)).json()
-      // The one departure from V1 (user, 10-13): a second guildmaster is numbered (`Guildmaster II`),
-      // where V1 called every root session `Guildmaster`. The saga has one; nothing else differs.
-      // A caption holds 30 ms longer per character, so the numeral's three hold it 90 ms longer.
-      const raw = told(await input(name))
-      for (const { caption: c } of raw.captions as { caption: { hold: number; parts: { text: string }[] } }[]) {
-        const extra = c.parts.reduce((n, p) => n + (p.text.match(/Guildmaster [IVX]+\b/g)?.length ?? 0), 0)
-        // (within the narrator's 3.4–8 s: a hold at the cap was at it before)
-        if (extra && c.hold < 8000) c.hold = Math.max(3400, c.hold - extra * 90)
+      const v1 = await Bun.file(join(STORY_DIR, `${name}.story.json`)).json()
+      const ours = told(await input(name))
+      // V2's chosen departures from what V1 said (`<name>.departures.json`, fixtures/story/README.md):
+      // each names a place in the golden, what V1 said there and what V2 says instead.
+      const file = Bun.file(join(STORY_DIR, `${name}.departures.json`))
+      if (process.env.GOLDEN_DEPARTURES === "write") {
+        const found = departuresOf(v1, ours)
+        if (found.length) await Bun.write(file, `${JSON.stringify(found, null, 1)}\n`)
       }
-      const ours = JSON.parse(JSON.stringify(raw).replaceAll(/Guildmaster [IVX]+\b/g, "Guildmaster"))
+      const departures: Departure[] = (await file.exists()) ? await file.json() : []
+      const golden = structuredClone(v1)
+      for (const d of departures) {
+        // the golden still says what the departure says V1 said: a departure never hides a drift
+        expect({ at: d.at, v1: valueAt(golden, d.at) }).toEqual({ at: d.at, v1: d.v1 })
+        setAt(golden, d.at, d.v2)
+      }
       // Piece by piece, so a mismatch names what drifted.
       for (const key of ["start", "told", "sessions", "legend", "markdown", "recap", "renown", "captions"])
         expect({ [key]: ours[key] }).toEqual({ [key]: golden[key] })

@@ -1,0 +1,617 @@
+[
+  {
+    "at": ["told", 85, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 94, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 95, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 111, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 112, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 121, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 126, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 128, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 130, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 131, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 136, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 137, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 144, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 145, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 152, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 156, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 168, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 169, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 172, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 173, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 174, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 176, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 178, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 232, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 233, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["told", 234, "title"],
+    "v1": "Guildmaster",
+    "v2": "Guildmaster II"
+  },
+  {
+    "at": ["captions", 4, "caption", "text"],
+    "v1": "The Scout scours the code for fetch\\(|/api/notes — 17 matches.",
+    "v2": "The Scout scours the code for fetch — 17 matches."
+  },
+  {
+    "at": ["captions", 4, "caption", "parts", 1, "text"],
+    "v1": " scours the code for fetch\\(|/api/notes — 17 matches.",
+    "v2": " scours the code for fetch — 17 matches."
+  },
+  {
+    "at": ["captions", 4, "caption", "hold"],
+    "v1": 3460,
+    "v2": 3400
+  },
+  {
+    "at": ["captions", 11, "caption", "text"],
+    "v1": "The Scout scours the code for addEventListener\\(\"(online|focus)\" — 2 matches.",
+    "v2": "The Scout scours the code for addEventListener — 2 matches."
+  },
+  {
+    "at": ["captions", 11, "caption", "parts", 1, "text"],
+    "v1": " scours the code for addEventListener\\(\"(online|focus)\" — 2 matches.",
+    "v2": " scours the code for addEventListener — 2 matches."
+  },
+  {
+    "at": ["captions", 11, "caption", "hold"],
+    "v1": 3910,
+    "v2": 3400
+  },
+  {
+    "at": ["captions", 43, "caption", "text"],
+    "v1": "The Guildmaster sends the Scout to find where search tokenizes note titles.",
+    "v2": "The Guildmaster II sends the Scout to find where search tokenizes note titles."
+  },
+  {
+    "at": ["captions", 43, "caption", "parts", 0, "text"],
+    "v1": "The Guildmaster",
+    "v2": "The Guildmaster II"
+  },
+  {
+    "at": ["captions", 43, "caption", "hold"],
+    "v1": 3850,
+    "v2": 3940
+  },
+  {
+    "at": ["captions", 44, "caption", "text"],
+    "v1": "The Scout hunts through the code for tokenize\\( — 5 matches.",
+    "v2": "The Scout hunts through the code for tokenize — 5 matches."
+  },
+  {
+    "at": ["captions", 44, "caption", "parts", 1, "text"],
+    "v1": " hunts through the code for tokenize\\( — 5 matches.",
+    "v2": " hunts through the code for tokenize — 5 matches."
+  },
+  {
+    "at": ["captions", 48, "caption", "text"],
+    "v1": "The Guildmaster sends the Artisan out: “Reproduce with a failing test, then make tokenize()…”",
+    "v2": "The Guildmaster II sends the Artisan out: “Reproduce with a failing test, then make tokenize()…”"
+  },
+  {
+    "at": ["captions", 48, "caption", "parts", 0, "text"],
+    "v1": "The Guildmaster",
+    "v2": "The Guildmaster II"
+  },
+  {
+    "at": ["captions", 48, "caption", "hold"],
+    "v1": 4390,
+    "v2": 4480
+  },
+  {
+    "at": ["captions", 66, "caption", "text"],
+    "v1": "The Guildmaster runs git commit -am \"fix(search)… — 2 files changed.",
+    "v2": "The Guildmaster II runs git commit — 2 files changed."
+  },
+  {
+    "at": ["captions", 66, "caption", "parts", 0, "text"],
+    "v1": "The Guildmaster",
+    "v2": "The Guildmaster II"
+  },
+  {
+    "at": ["captions", 66, "caption", "parts", 1, "text"],
+    "v1": " runs git commit -am \"fix(search)… — 2 files changed.",
+    "v2": " runs git commit — 2 files changed."
+  },
+  {
+    "at": ["captions", 66, "caption", "hold"],
+    "v1": 3640,
+    "v2": 3400
+  },
+  {
+    "at": ["captions", 68, "caption", "text"],
+    "v1": "The Guildmaster runs git push -u origin fix/emoji-search — pushed.",
+    "v2": "The Guildmaster II runs git push — pushed."
+  },
+  {
+    "at": ["captions", 68, "caption", "parts", 0, "text"],
+    "v1": "The Guildmaster",
+    "v2": "The Guildmaster II"
+  },
+  {
+    "at": ["captions", 68, "caption", "parts", 1, "text"],
+    "v1": " runs git push -u origin fix/emoji-search — pushed.",
+    "v2": " runs git push — pushed."
+  },
+  {
+    "at": ["captions", 68, "caption", "hold"],
+    "v1": 3580,
+    "v2": 3400
+  },
+  {
+    "at": ["captions", 70, "caption", "text"],
+    "v1": "The Guildmaster runs gh pr create --base release/2.4… — https://github.com/quill-notes/quill/pull/418.",
+    "v2": "The Guildmaster II runs gh pr create — https://github.com/quill-notes/quill/pull/418."
+  },
+  {
+    "at": ["captions", 70, "caption", "parts", 0, "text"],
+    "v1": "The Guildmaster",
+    "v2": "The Guildmaster II"
+  },
+  {
+    "at": ["captions", 70, "caption", "parts", 1, "text"],
+    "v1": " runs gh pr create --base release/2.4… — https://github.com/quill-notes/quill/pull/418.",
+    "v2": " runs gh pr create — https://github.com/quill-notes/quill/pull/418."
+  },
+  {
+    "at": ["captions", 70, "caption", "hold"],
+    "v1": 4660,
+    "v2": 4150
+  },
+  {
+    "at": ["captions", 76, "caption", "text"],
+    "v1": "The Guildmaster asks the Warden to find why #418 fails on the Node 18 runner.",
+    "v2": "The Guildmaster II asks the Warden to find why #418 fails on the Node 18 runner."
+  },
+  {
+    "at": ["captions", 76, "caption", "parts", 0, "text"],
+    "v1": "The Guildmaster",
+    "v2": "The Guildmaster II"
+  },
+  {
+    "at": ["captions", 76, "caption", "hold"],
+    "v1": 3910,
+    "v2": 4000
+  },
+  {
+    "at": ["captions", 78, "caption", "text"],
+    "v1": "The Warden runs gh run view --log-failed — 1 failing job.",
+    "v2": "The Warden runs gh run view — 1 failing job."
+  },
+  {
+    "at": ["captions", 78, "caption", "parts", 1, "text"],
+    "v1": " runs gh run view --log-failed — 1 failing job.",
+    "v2": " runs gh run view — 1 failing job."
+  },
+  {
+    "at": ["captions", 81, "caption", "text"],
+    "v1": "The Guildmaster calls the Artisan back: “Drop Intl.Segmenter from indexer.ts: split words on…”",
+    "v2": "The Guildmaster II calls the Artisan back: “Drop Intl.Segmenter from indexer.ts: split words on…”"
+  },
+  {
+    "at": ["captions", 81, "caption", "parts", 0, "text"],
+    "v1": "The Guildmaster",
+    "v2": "The Guildmaster II"
+  },
+  {
+    "at": ["captions", 81, "caption", "hold"],
+    "v1": 4420,
+    "v2": 4510
+  },
+  {
+    "at": ["captions", 96, "caption", "text"],
+    "v1": "The Artisan runs rm -rf .quill-data && bun run… — dropped quill_dev · migrated 14 · seeded 120 notes.",
+    "v2": "The Artisan runs bun run db:reset — dropped quill_dev · migrated 14 · seeded 120 notes."
+  },
+  {
+    "at": ["captions", 96, "caption", "parts", 1, "text"],
+    "v1": " runs rm -rf .quill-data && bun run… — dropped quill_dev · migrated 14 · seeded 120 notes.",
+    "v2": " runs bun run db:reset — dropped quill_dev · migrated 14 · seeded 120 notes."
+  },
+  {
+    "at": ["captions", 96, "caption", "hold"],
+    "v1": 4630,
+    "v2": 4210
+  },
+  {
+    "at": ["captions", 99, "caption", "text"],
+    "v1": "The Guildmaster runs gh pr checks 418 --watch — all checks passed.",
+    "v2": "The Guildmaster II runs gh pr checks — all checks passed."
+  },
+  {
+    "at": ["captions", 99, "caption", "parts", 0, "text"],
+    "v1": "The Guildmaster",
+    "v2": "The Guildmaster II"
+  },
+  {
+    "at": ["captions", 99, "caption", "parts", 1, "text"],
+    "v1": " runs gh pr checks 418 --watch — all checks passed.",
+    "v2": " runs gh pr checks — all checks passed."
+  },
+  {
+    "at": ["captions", 99, "caption", "hold"],
+    "v1": 3580,
+    "v2": 3400
+  },
+  {
+    "at": ["captions", 100, "caption", "text"],
+    "v1": "The quest is complete. the Guildmaster has the last word: “Backported in #421 (green), changelog updated, #412 closed.”",
+    "v2": "The quest is complete. the Guildmaster II has the last word: “Backported in #421 (green), changelog updated, #412 closed.”"
+  },
+  {
+    "at": ["captions", 100, "caption", "parts", 1, "text"],
+    "v1": "the Guildmaster",
+    "v2": "the Guildmaster II"
+  },
+  {
+    "at": ["captions", 102, "caption", "text"],
+    "v1": "The Guildmaster runs git switch release/2.3 && git… — Switched to a new branch.",
+    "v2": "The Guildmaster II runs git switch — Switched to a new branch."
+  },
+  {
+    "at": ["captions", 102, "caption", "parts", 0, "text"],
+    "v1": "The Guildmaster",
+    "v2": "The Guildmaster II"
+  },
+  {
+    "at": ["captions", 102, "caption", "parts", 1, "text"],
+    "v1": " runs git switch release/2.3 && git… — Switched to a new branch.",
+    "v2": " runs git switch — Switched to a new branch."
+  },
+  {
+    "at": ["captions", 102, "caption", "hold"],
+    "v1": 3970,
+    "v2": 3460
+  },
+  {
+    "at": ["captions", 103, "caption", "text"],
+    "v1": "The Guildmaster runs git cherry-pick 3f9c2e1 a71d0b4 — 2 commits applied.",
+    "v2": "The Guildmaster II runs git cherry-pick — 2 commits applied."
+  },
+  {
+    "at": ["captions", 103, "caption", "parts", 0, "text"],
+    "v1": "The Guildmaster",
+    "v2": "The Guildmaster II"
+  },
+  {
+    "at": ["captions", 103, "caption", "parts", 1, "text"],
+    "v1": " runs git cherry-pick 3f9c2e1 a71d0b4 — 2 commits applied.",
+    "v2": " runs git cherry-pick — 2 commits applied."
+  },
+  {
+    "at": ["captions", 103, "caption", "hold"],
+    "v1": 3790,
+    "v2": 3400
+  },
+  {
+    "at": ["captions", 104, "caption", "text"],
+    "v1": "The Guildmaster runs the tests — 24 pass.",
+    "v2": "The Guildmaster II runs the tests — 24 pass."
+  },
+  {
+    "at": ["captions", 104, "caption", "parts", 0, "text"],
+    "v1": "The Guildmaster",
+    "v2": "The Guildmaster II"
+  },
+  {
+    "at": ["captions", 106, "caption", "text"],
+    "v1": "The Guildmaster reworks CHANGELOG.md, 1 line.",
+    "v2": "The Guildmaster II reworks CHANGELOG.md, 1 line."
+  },
+  {
+    "at": ["captions", 106, "caption", "parts", 0, "text"],
+    "v1": "The Guildmaster",
+    "v2": "The Guildmaster II"
+  },
+  {
+    "at": ["captions", 108, "caption", "text"],
+    "v1": "The Guildmaster runs git push -u origin fix/emoji-search… — https://github.com/quill-notes/quill/pull/421.",
+    "v2": "The Guildmaster II runs git push — https://github.com/quill-notes/quill/pull/421."
+  },
+  {
+    "at": ["captions", 108, "caption", "parts", 0, "text"],
+    "v1": "The Guildmaster",
+    "v2": "The Guildmaster II"
+  },
+  {
+    "at": ["captions", 108, "caption", "parts", 1, "text"],
+    "v1": " runs git push -u origin fix/emoji-search… — https://github.com/quill-notes/quill/pull/421.",
+    "v2": " runs git push — https://github.com/quill-notes/quill/pull/421."
+  },
+  {
+    "at": ["captions", 108, "caption", "hold"],
+    "v1": 4780,
+    "v2": 4030
+  },
+  {
+    "at": ["captions", 133, "caption", "text"],
+    "v1": "The Scout II scours the code for api\\.put\\( — 0 matches.",
+    "v2": "The Scout II scours the code for api.put — 0 matches."
+  },
+  {
+    "at": ["captions", 133, "caption", "parts", 1, "text"],
+    "v1": " scours the code for api\\.put\\( — 0 matches.",
+    "v2": " scours the code for api.put — 0 matches."
+  },
+  {
+    "at": ["captions", 134, "caption", "text"],
+    "v1": "The Scout II hunts through the code for fetch\\(\"/api/notes — 1 match.",
+    "v2": "The Scout II hunts through the code for fetch — 1 match."
+  },
+  {
+    "at": ["captions", 134, "caption", "parts", 1, "text"],
+    "v1": " hunts through the code for fetch\\(\"/api/notes — 1 match.",
+    "v2": " hunts through the code for fetch — 1 match."
+  },
+  {
+    "at": ["captions", 134, "caption", "hold"],
+    "v1": 3670,
+    "v2": 3400
+  },
+  {
+    "at": ["captions", 144, "caption", "text"],
+    "v1": "The Guildmaster runs git status --short — 21 files.",
+    "v2": "The Guildmaster runs git status — 21 files."
+  },
+  {
+    "at": ["captions", 144, "caption", "parts", 1, "text"],
+    "v1": " runs git status --short — 21 files.",
+    "v2": " runs git status — 21 files."
+  },
+  {
+    "at": ["captions", 145, "caption", "text"],
+    "v1": "The Guildmaster runs gh pr checks 421 --watch — all checks passed.",
+    "v2": "The Guildmaster II runs gh pr checks — all checks passed."
+  },
+  {
+    "at": ["captions", 145, "caption", "parts", 0, "text"],
+    "v1": "The Guildmaster",
+    "v2": "The Guildmaster II"
+  },
+  {
+    "at": ["captions", 145, "caption", "parts", 1, "text"],
+    "v1": " runs gh pr checks 421 --watch — all checks passed.",
+    "v2": " runs gh pr checks — all checks passed."
+  },
+  {
+    "at": ["captions", 145, "caption", "hold"],
+    "v1": 3580,
+    "v2": 3400
+  },
+  {
+    "at": ["captions", 146, "caption", "text"],
+    "v1": "The Guildmaster runs gh issue close 412 --comment… — closed #412.",
+    "v2": "The Guildmaster II runs gh issue close — closed #412."
+  },
+  {
+    "at": ["captions", 146, "caption", "parts", 0, "text"],
+    "v1": "The Guildmaster",
+    "v2": "The Guildmaster II"
+  },
+  {
+    "at": ["captions", 146, "caption", "parts", 1, "text"],
+    "v1": " runs gh issue close 412 --comment… — closed #412.",
+    "v2": " runs gh issue close — closed #412."
+  },
+  {
+    "at": ["captions", 146, "caption", "hold"],
+    "v1": 3550,
+    "v2": 3400
+  },
+  {
+    "at": ["captions", 147, "caption", "text"],
+    "v1": "The quest is complete. the Guildmaster has the last word: “Backported in #421 (green), changelog updated, #412 closed.”",
+    "v2": "The quest is complete. the Guildmaster II has the last word: “Backported in #421 (green), changelog updated, #412 closed.”"
+  },
+  {
+    "at": ["captions", 147, "caption", "parts", 1, "text"],
+    "v1": "the Guildmaster",
+    "v2": "the Guildmaster II"
+  },
+  {
+    "at": ["captions", 154, "caption", "text"],
+    "v1": "The Herald II runs git log --oneline main..HEAD — 14 commits.",
+    "v2": "The Herald II runs git log — 14 commits."
+  },
+  {
+    "at": ["captions", 154, "caption", "parts", 1, "text"],
+    "v1": " runs git log --oneline main..HEAD — 14 commits.",
+    "v2": " runs git log — 14 commits."
+  },
+  {
+    "at": ["captions", 154, "caption", "hold"],
+    "v1": 3430,
+    "v2": 3400
+  },
+  {
+    "at": ["captions", 163, "caption", "text"],
+    "v1": "The Warden runs bun run smoke:offline… — 20 reconnects · 0 duplicates · 0 lost edits.",
+    "v2": "The Warden runs bun run smoke:offline — 20 reconnects · 0 duplicates · 0 lost edits."
+  },
+  {
+    "at": ["captions", 163, "caption", "parts", 1, "text"],
+    "v1": " runs bun run smoke:offline… — 20 reconnects · 0 duplicates · 0 lost edits.",
+    "v2": " runs bun run smoke:offline — 20 reconnects · 0 duplicates · 0 lost edits."
+  },
+  {
+    "at": ["captions", 163, "caption", "hold"],
+    "v1": 4150,
+    "v2": 4120
+  },
+  {
+    "at": ["captions", 165, "caption", "text"],
+    "v1": "The Warden hunts through the code for TODO|FIXME — 0 matches.",
+    "v2": "The Warden hunts through the code for TODO — 0 matches."
+  },
+  {
+    "at": ["captions", 165, "caption", "parts", 1, "text"],
+    "v1": " hunts through the code for TODO|FIXME — 0 matches.",
+    "v2": " hunts through the code for TODO — 0 matches."
+  },
+  {
+    "at": ["captions", 165, "caption", "hold"],
+    "v1": 3430,
+    "v2": 3400
+  },
+  {
+    "at": ["captions", 169, "caption", "text"],
+    "v1": "The Guildmaster runs git diff --stat — 19 files changed, 1146 insertions(+), 38 deletions(-).",
+    "v2": "The Guildmaster runs git diff — 19 files changed, 1146 insertions(+), 38 deletions(-)."
+  },
+  {
+    "at": ["captions", 169, "caption", "parts", 1, "text"],
+    "v1": " runs git diff --stat — 19 files changed, 1146 insertions(+), 38 deletions(-).",
+    "v2": " runs git diff — 19 files changed, 1146 insertions(+), 38 deletions(-)."
+  },
+  {
+    "at": ["captions", 169, "caption", "hold"],
+    "v1": 4390,
+    "v2": 4180
+  },
+  {
+    "at": ["captions", 170, "caption", "text"],
+    "v1": "The Guildmaster runs gh pr create --fill --body-file… — https://github.com/quill-notes/quill/pull/424.",
+    "v2": "The Guildmaster runs gh pr create — https://github.com/quill-notes/quill/pull/424."
+  },
+  {
+    "at": ["captions", 170, "caption", "parts", 1, "text"],
+    "v1": " runs gh pr create --fill --body-file… — https://github.com/quill-notes/quill/pull/424.",
+    "v2": " runs gh pr create — https://github.com/quill-notes/quill/pull/424."
+  },
+  {
+    "at": ["captions", 170, "caption", "hold"],
+    "v1": 4660,
+    "v2": 4060
+  },
+  {
+    "at": ["captions", 172, "caption", "text"],
+    "v1": "The Guildmaster runs gh pr merge 424 --squash… — merged into main.",
+    "v2": "The Guildmaster runs gh pr merge — merged into main."
+  },
+  {
+    "at": ["captions", 172, "caption", "parts", 1, "text"],
+    "v1": " runs gh pr merge 424 --squash… — merged into main.",
+    "v2": " runs gh pr merge — merged into main."
+  },
+  {
+    "at": ["captions", 172, "caption", "hold"],
+    "v1": 3580,
+    "v2": 3400
+  },
+  {
+    "at": ["captions", 174, "caption", "text"],
+    "v1": "The Guildmaster runs gh issue close 398 --comment… — closed #398.",
+    "v2": "The Guildmaster runs gh issue close — closed #398."
+  },
+  {
+    "at": ["captions", 174, "caption", "parts", 1, "text"],
+    "v1": " runs gh issue close 398 --comment… — closed #398.",
+    "v2": " runs gh issue close — closed #398."
+  },
+  {
+    "at": ["captions", 174, "caption", "hold"],
+    "v1": 3550,
+    "v2": 3400
+  }
+]

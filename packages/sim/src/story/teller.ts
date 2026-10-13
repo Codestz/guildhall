@@ -117,8 +117,7 @@ export function ordinalOf(model: Model, s: Session, names: Names = "world"): num
  */
 export function masterOrdinalOf(model: Model, s: Session): number {
   let n = 1
-  for (const other of model.sessions.values())
-    if (other !== s && !other.parentID && byJoin(other, s) < 0) n++
+  for (const other of model.sessions.values()) if (other !== s && !other.parentID && byJoin(other, s) < 0) n++
   return n
 }
 

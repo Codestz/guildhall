@@ -113,6 +113,33 @@ describe("story: the phrase grammar", () => {
     }
   })
 
+  test("a shell command is told in craft words, never as its raw line with escapes", () => {
+    const told = (command: string) => {
+      const entry = {
+        kind: "tool",
+        call: "c",
+        state: "completed",
+        output: "",
+        at: 0,
+        name: "Bash",
+        input: { command },
+      }
+      const lookup = { session: () => session("x", { entries: [entry] as Session["entries"] }) }
+      return lineOf("deed", [moment("deed", "Guildmaster", { tool: "Bash", call: "c" })], lookup)
+        .map((p) => p.text)
+        .join("")
+    }
+    // the live hall's line (user, 10-13): `runs grep -rn "yardThemes\|yards\.set\|c…`
+    const grep = told('grep -rn "yardThemes\\|yards\\.set\\|castleYard" packages/world/src')
+    expect(grep).toMatch(/^The Guildmaster (searches|hunts through|scours) the code for yardThemes\.$/)
+    expect(told("sed -n 1,80p packages/world/src/hex/life.ts")).toMatch(
+      /(reads|pores over|studies) life\.ts\.$/,
+    )
+    expect(told("bun test packages/sim")).toMatch(/(puts the work to the test|runs the tests)\.$/)
+    expect(told("git status --short")).toBe("The Guildmaster runs git status.")
+    for (const line of [grep, told("rg -n 'fetch\\(|/api' apps")]) expect(line).not.toMatch(/[\\|"]/)
+  })
+
   test("a failing test run quotes how many failed", () => {
     const lookup = {
       session: () =>

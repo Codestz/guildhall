@@ -1,5 +1,5 @@
 // From V1 hall (main:packages/hall/src/guild/story.ts): the phrase grammar and the narrator.
-import { type Craft, deedCraft } from "@guildhall/core"
+import { type Craft, commandGist, deedCraft, plainPattern } from "@guildhall/core"
 import type { Entry, Session } from "../guild/model.ts"
 import type { Renown } from "./renown.ts"
 import type { StoryMoment as Moment } from "./teller.ts"
@@ -139,8 +139,13 @@ export const TARGET_MAX = 48
 /** The thing a deed worked on, short: a file's name, a pattern, a command, a site. */
 export function targetOf(input: Record<string, unknown> = {}): string | undefined {
   if (typeof input.filePath === "string" && input.filePath) return clip(basename(input.filePath), TARGET_MAX)
-  if (typeof input.pattern === "string") return clip(input.pattern, TARGET_MAX)
-  if (typeof input.command === "string") return clip(input.command, 36)
+  // a regex reads as its plain term (`yardThemes\|yards\.set` → `yardThemes`); a glob as it is
+  if (typeof input.pattern === "string")
+    return /[\\|]/.test(input.pattern)
+      ? plainPattern(input.pattern)
+      : clip(input.pattern, TARGET_MAX) || undefined
+  // a command as what it is about (core `commandGist`), never its raw line
+  if (typeof input.command === "string") return commandGist(input.command).target
   if (typeof input.url === "string") {
     try {
       const url = new URL(input.url)
@@ -445,7 +450,9 @@ function deedPhrase(craft: Told, deeds: readonly Deed[], seed: number): string {
     case "search":
       return named
         ? `${pick(["searches the code for", "hunts through the code for", "scours the code for"], seed)} ${named}${tail}`
-        : `searches the code ${spell(n)} times${tail}`
+        : n === 1
+          ? `searches the code${tail}`
+          : `searches the code ${spell(n)} times${tail}`
     case "forge": {
       const lines = deeds.reduce((sum, d) => sum + (d.size ?? 0), 0)
       const weight = lines > 0 && n === 1 ? `, ${lines} ${lines === 1 ? "line" : "lines"}` : ""
@@ -458,7 +465,11 @@ function deedPhrase(craft: Told, deeds: readonly Deed[], seed: number): string {
         ? pick([`puts the work to the test${tail}`, `runs the tests${tail}`, `tries the work${tail}`], seed)
         : pick(["puts the work to the test", "runs the tests"], seed)
     case "run":
-      return named ? `runs ${named}${tail}` : `runs ${spell(n)} commands${tail}`
+      return named
+        ? `runs ${named}${tail}`
+        : n === 1
+          ? `runs a command${tail}`
+          : `runs ${spell(n)} commands${tail}`
     case "consult":
       return named
         ? `${pick(["consults distant scrolls on", "sends for word on", "asks the archives about"], seed)} ${named}`

@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test"
-import { CRAFTS, craftOf, declaredCraft, deedCraft, isCraft } from "../../src/index.ts"
+import {
+  CRAFTS,
+  commandGist,
+  craftOf,
+  declaredCraft,
+  deedCraft,
+  isCraft,
+  plainPattern,
+} from "../../src/index.ts"
 
 describe("craftOf: one meaning for every host's tool names", () => {
   test("OpenCode 1 and 2 spellings of the same deed are one craft", () => {
@@ -79,5 +87,50 @@ describe("deedCraft: a declared craft wins when it is one the hall knows", () =>
   test("unknown or absent: read off the name", () => {
     expect(deedCraft({ name: "read", craft: "a-craft-from-a-newer-hall" })).toBe("read")
     expect(deedCraft({ name: "bash", input: { command: "bun test" } })).toBe("test")
+  })
+
+  test("a shell call an older adapter declared a plain run: its command says more", () => {
+    expect(deedCraft({ name: "Bash", craft: "run", input: { command: 'grep -rn "x" src' } })).toBe("search")
+    expect(deedCraft({ name: "Bash", craft: "run", input: { command: "git status" } })).toBe("run")
+  })
+})
+
+describe("commandGist: a shell command told as a deed, never as its raw line", () => {
+  test("the live hall's caption: a grep with escapes searches the code for its plain term", () => {
+    expect(commandGist('grep -rn "yardThemes\\|yards\\.set\\|castleYard" packages/world/src')).toEqual({
+      craft: "search",
+      target: "yardThemes",
+    })
+  })
+
+  test("searches, reads, edits, tests, lints and runs", () => {
+    const cases: [string, ReturnType<typeof commandGist>][] = [
+      ["rg -n 'fetch\\(' apps", { craft: "search", target: "fetch" }],
+      ["grep -A 3 -e tokenize src/a.ts", { craft: "search", target: "tokenize" }],
+      [
+        'cd packages/world && grep -rn "\\b(requireSession|x)\\b" .',
+        { craft: "search", target: "requireSession" },
+      ],
+      ["find . -name '*.test.ts'", { craft: "search", target: ".test.ts" }],
+      ["ls packages/sim/src", { craft: "search", target: "src" }],
+      ["sed -n 1,80p packages/world/src/hex/life.ts", { craft: "read", target: "life.ts" }],
+      ["cat apps/studio/src/hexworld/places.ts | head -40", { craft: "read", target: "places.ts" }],
+      ["sed -i '' 's/a/b/' src/x.ts", { craft: "edit", target: "x.ts" }],
+      ["bun test packages/sim", { craft: "test" }],
+      ["bun run typecheck", { craft: "lint", target: "bun run typecheck" }],
+      ["git status --short", { craft: "run", target: "git status" }],
+      ['git commit -am "fix(search): emoji"', { craft: "run", target: "git commit" }],
+      ["rm -rf .data && bun run db:reset", { craft: "run", target: "bun run db:reset" }],
+      ["FOO=1 timeout 30 bun install", { craft: "run", target: "bun install" }],
+      ["", { craft: "run" }],
+    ]
+    for (const [command, gist] of cases)
+      expect({ command, gist: commandGist(command) }).toEqual({ command, gist })
+  })
+
+  test("a pattern that is all regex has no plain term", () => {
+    expect(plainPattern("\\d+\\s*$")).toBeUndefined()
+    expect(plainPattern("^import")).toBe("import")
+    expect(plainPattern("api\\.put\\(")).toBe("api.put")
   })
 })

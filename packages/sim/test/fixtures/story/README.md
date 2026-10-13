@@ -6,6 +6,14 @@ What V1's own code (branch `main`) said about seven sessions; `test/story-golden
 | --- | --- |
 | `<name>.story.json` | V1's told moments, the party, `legendOf`, `legendMarkdown`, `recapOf` (guild `Codestz/guildhall`, story `A party`), `renownOf` and a Narrator run |
 | `<name>.input.json` | a told story's changes, GitHub sea and chapters (main:packages/sim `party`, `sagaTale`, `seas`, `rush`, `solo`) |
+| `<name>.departures.json` | where V2 says something else on purpose: each entry's path in the golden, what V1 said there (checked, so a departure never hides a drift) and what V2 says instead |
+
+## Departures (user, 2026-10-13)
+
+- A second guildmaster is numbered by join order (`Guildmaster II`); V1 called every root session `Guildmaster`.
+- A shell command is told by its gist (core `commandGist`): `runs git status`, `hunts through the code for requireSession`, never its raw line (`runs git status --short`, `\b(requireSession|…)\b`). A caption's hold follows its length, so those holds move too.
+
+After a deliberate change, `GOLDEN_DEPARTURES=write bun test packages/sim/test/story-golden.test.ts` rewrites the departure files; read their diff before committing.
 
 `v1` and `v2` are core's recorded runs (`packages/core/test/events/fixtures`), so they have no input file here.
 

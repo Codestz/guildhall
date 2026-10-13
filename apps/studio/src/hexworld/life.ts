@@ -8,6 +8,9 @@
  * Time: the day moves on SPEEDUP times faster than real time and people walk slower per day-hour by as
  * much, so they walk at a natural pace while their routine visibly moves on. When the screen's clock is
  * moved (dragged or played) the day follows it. Agents run on real seconds.
+ *
+ * The plan itself (everyone's day, the agents' rounds, the solids: lifePlan.ts) is made in the build
+ * worker and arrives as data; this thread builds the collision layer on it and draws.
  */
 import {
   applyOverlay,
@@ -28,7 +31,6 @@ import {
   toScreen,
 } from "@guildhall/render"
 import {
-  agentLoop,
   CHARACTER_SCALE,
   type DoorPass,
   DRILLS,
@@ -36,6 +38,7 @@ import {
   doorPasses,
   drillClips,
   drillFrame,
+  type HexDoorway,
   type HexIsland,
   type HexWorld,
   type HexZones,
@@ -45,7 +48,6 @@ import {
   type LifeStep,
   lifePlaces,
   lifePose,
-  planFolk,
   solidDistance,
   workTiles,
 } from "@guildhall/world"
@@ -53,14 +55,12 @@ import { libraryUrl, loadCatalog } from "../catalog.ts"
 import * as data from "../data.ts"
 import { collideView } from "./collideView.ts"
 import { DEMO_AGENTS } from "./lifeAgents.ts"
+import { type LifePlan, SPEEDUP } from "./lifePlan.ts"
 import { createSpace } from "./space.ts"
 
-const logger = log("studio:hexworld:life")
+export { LIFE_MPS, SPEEDUP } from "./lifePlan.ts"
 
-/** Day-hours per real hour. */
-export const SPEEDUP = 20
-/** Walking pace, metres a second: a toy-scale person's natural walk. */
-export const LIFE_MPS = 0.8
+const logger = log("studio:hexworld:life")
 /** Metres one walk-clip cycle covers at look scale 1 (crowd/sim STRIDE). */
 const STRIDE = 1.3
 /** A banner floats this far over an agent's feet, metres. */
@@ -71,9 +71,13 @@ const BANNER_H = 24
 
 export interface LifeOpts {
   host: HTMLElement
-  island: HexIsland
-  zones: HexZones
-  world: HexWorld
+  /** The plan the build worker made (job.ts's `life` stage). */
+  plan: Promise<LifePlan>
+  /**
+   * The map built again on this thread, for the collision overlay only (`?collide=1`, `?spots=1`: it
+   * draws the walk graph and the spots, which the plan does not carry).
+   */
+  debug?: () => { island: HexIsland; zones: HexZones; world: HexWorld }
   /** The fine ground under a point, as the worker built it (job.ts `heightsAt`), metres. */
   groundAt(x: number, z: number): number
   /** The screen's clock, hours. */
@@ -96,6 +100,8 @@ export interface Life {
   passes(): readonly DoorPass[]
   /** Keeps anyone standing where `at` says out of the draw (a history replay: the tiles not yet revealed). */
   hide(at: ((x: number, z: number) => boolean) | null): void
+  /** Where each building's door is (the plan's), once `ready`. */
+  doorways(): readonly HexDoorway[]
   dispose(): void
 }
 
@@ -202,37 +208,34 @@ function banner(name: string, colour: string): HTMLElement {
 }
 
 export function createLife(stage: Stage, opts: LifeOpts): Life {
-  const { island: h, zones: z, world: w } = opts
   let disposed = false
   let crowd: Crowd | null = null
   let unFrame = () => {}
   const banners: HTMLElement[] = []
   const cleanup: (() => void)[] = []
   let passes: DoorPass[] = []
+  let doorways: HexDoorway[] = []
   let clockNow = opts.hour()
   let nearAt: (x: number, z: number, r: number) => boolean = () => false
   let hiddenAt: ((x: number, z: number) => boolean) | null = null
 
   const ready = (async () => {
     const t0 = performance.now()
-    const walk = hexWalk(h, z, w, { reach: workTiles(h, z) })
-    // one reservation book: the agents take their spots and slots first, then the townsfolk
-    const places = lifePlaces(h, z, w, walk)
-    const agents = DEMO_AGENTS.map((a, slot) => ({
-      spec: a,
-      ...agentLoop(walk, z, a.errands, { slot: slot * 2, mps: LIFE_MPS * 1.15, role: a.recipe, places }),
-    }))
-    const folk = planFolk(h, z, w, walk, { seed: opts.seed, pace: (LIFE_MPS * 3600) / SPEEDUP, places })
-    // the collision layer: the furniture's solids, the walkways, and the fine ground as the worker built
-    // it (its heights data: the numbers the ground mesh is built from)
-    const collide = hexCollide({
-      solids: places.furniture.solids,
-      walkways: [...w.stairs, ...w.bridges.flatMap((b) => b.legs), ...w.decks],
-      ground: opts.groundAt,
+    // the plan, made in the worker: the catalog and the recipes load meanwhile
+    const [plan, catalog, recipes] = await Promise.all([opts.plan, mountedCatalog(), npcRecipes()])
+    if (disposed) return
+    const { folk } = plan
+    const agents = DEMO_AGENTS.flatMap((a, k) => {
+      const loop = plan.agents[k]
+      return loop ? [{ spec: a, ...loop }] : []
     })
+    doorways = plan.doorways
+    const t1 = performance.now()
+    // the collision layer: the plan's solids and walkways on the fine ground as the worker built it
+    // (its heights data: the numbers the ground mesh is built from)
+    const collide = hexCollide({ solids: plan.solids, walkways: plan.walkways, ground: opts.groundAt })
     passes = folk.flatMap((f) => doorPasses(f.day)).sort((a, b) => a.t - b.t)
-    const planned = performance.now() - t0
-    const [catalog, recipes] = await Promise.all([mountedCatalog(), npcRecipes()])
+    const layerMs = performance.now() - t1
     if (disposed || !catalog || recipes.size === 0) {
       if (!disposed) logger.warn("no library or no NPC recipes: nobody to draw")
       return
@@ -381,7 +384,11 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       secs += step
       place(step)
       clockNow = day
+      const t2 = performance.now()
+      stage.timing.cpu.add("life", t2 - t1)
       crowd?.update(step, sample)
+      const t3 = performance.now()
+      stage.timing.cpu.add("crowd", t3 - t2)
       // banners over their agents, nudged up off each other where they would overlap
       const placed: [number, number][] = []
       const shown = banners
@@ -402,14 +409,25 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         placed.push([x, y])
         el.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`
       }
+      stage.timing.cpu.add("banners", performance.now() - t3)
       cpuMs += (performance.now() - t1 - cpuMs) * 0.05
       overlay?.draw(drawn)
     }
-    // `?collide=1` (or `?spots=1`): the collision layer drawn over the scene, to check it against what stands there
-    const overlay = opts.overlay
-      ? collideView(stage, opts.host, { collide, furniture: places.furniture, walk, nodeOf: places.nodeOf })
-      : null
-    if (overlay) cleanup.push(overlay.dispose)
+    // `?collide=1` (or `?spots=1`): the collision layer drawn over the scene, to check it against what
+    // stands there. Its walk graph and spots are built again here (a debug view: it may take its time).
+    let overlay: ReturnType<typeof collideView> | null = null
+    if (opts.overlay && opts.debug) {
+      const { island: h, zones: z, world: w } = opts.debug()
+      const walk = hexWalk(h, z, w, { reach: workTiles(h, z) })
+      const places = lifePlaces(h, z, w, walk)
+      overlay = collideView(stage, opts.host, {
+        collide,
+        furniture: places.furniture,
+        walk,
+        nodeOf: places.nodeOf,
+      })
+      cleanup.push(overlay.dispose)
+    }
     const drawn = { x: space.x, z: space.z, r: radii, hidden: (id: number) => !!poses[id]?.indoors }
     nearAt = (x, zz, r) => {
       for (let id = 0; id < n; id++) {
@@ -427,13 +445,15 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     if (ext)
       ext.life = {
         stats: () => ({ folk: folk.length, agents: agentIds.length, cpuMs, ...crowd?.stats() }),
-        walk: { nodes: walk.nodes.length, edges: walk.edges.length },
+        walk: { nodes: plan.stats.nodes, edges: plan.stats.edges },
       }
     logger.info("life", {
       folk: folk.length,
       agents: agentIds.length,
-      nodes: walk.nodes.length,
-      planMs: Math.round(planned),
+      nodes: plan.stats.nodes,
+      // the worker's planning, this thread's collision layer, and the whole from the start to everyone drawn
+      planMs: plan.stats.planMs,
+      layerMs: Math.round(layerMs),
       ms: Math.round(performance.now() - t0),
     })
   })()
@@ -448,6 +468,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     hide(at) {
       hiddenAt = at
     },
+    doorways: () => doorways,
     dispose() {
       disposed = true
       unFrame()

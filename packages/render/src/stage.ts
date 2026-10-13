@@ -9,10 +9,12 @@ import {
   SRGBColorSpace,
   Vector3,
   WebGLRenderer,
+  type WebGLRenderTarget,
 } from "three"
 import { createGovernor, parseDprPin } from "./governor.ts"
 import { createRig, type Rig } from "./rig/index.ts"
 import { type FrameCounters, FrameRing, NO_COUNTERS, summarize } from "./stats.ts"
+import { createTiming, type Timing } from "./timing.ts"
 
 export interface Stage {
   scene: Scene
@@ -32,13 +34,18 @@ export interface Stage {
   getCamera(): CameraPose
   /** The camera rig: orbit and free flight, eased, held inside a world (rig/index.ts). */
   rig: Rig
+  /** Where the frame's time goes, per pass (timing.ts): modules scope or tag their draws, hooks add CPU buckets. */
+  timing: Timing
   /** Calls `fn(dt seconds)` every frame before drawing; returns the unsubscribe. */
   onFrame(fn: (dt: number) => void): () => void
   /**
    * Draws the frame with `draw` in place of a plain `renderer.render(scene, camera)` (a post pipeline,
-   * `post/`); null puts the plain draw back.
+   * `post/`); null puts the plain draw back. `target` is the render target `draw` renders the scene
+   * into (null: the canvas): programs compiled ahead of a draw are keyed by it (warm.ts).
    */
-  setDraw(draw: (() => void) | null): void
+  setDraw(draw: (() => void) | null, target?: WebGLRenderTarget | null): void
+  /** The render target the scene is drawn into (null: the canvas). */
+  readonly drawTarget: WebGLRenderTarget | null
   dispose(): void
 }
 
@@ -91,14 +98,23 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
   const observer = new ResizeObserver(resize)
   observer.observe(host)
 
-  // three counts shadow-map draws into the same `info.render` as the main pass; tally them apart.
+  // GPU timer queries on `?timers=1` only: on ANGLE/Metal they cost ~1.3 ms a frame (they split the
+  // command buffers) and read command-buffer wall time rather than pass cost. The CPU buckets always run.
+  const timing = createTiming(renderer, {
+    gpu: new URLSearchParams(globalThis.location?.search ?? "").get("timers") === "1",
+  })
+
+  // three counts shadow-map draws into the same `info.render` as the main pass; tally them apart, and
+  // time them as their own GPU pass (they run inside `renderer.render`, so the scene's scope pauses).
   let shadowCalls = 0
   let shadowTris = 0
   const shadowMap = renderer.shadowMap
   const renderShadows = shadowMap.render.bind(shadowMap)
   shadowMap.render = (...args) => {
     const { calls, triangles } = renderer.info.render
+    timing.gpu.begin("shadows")
     renderShadows(...args)
+    timing.gpu.end()
     shadowCalls += renderer.info.render.calls - calls
     shadowTris += renderer.info.render.triangles - triangles
   }
@@ -111,6 +127,8 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
   let last: number | null = null
   let raf = 0
   let draw: (() => void) | null = null
+  let drawTarget: WebGLRenderTarget | null = null
+  let knownPrograms = 0
 
   const frame = (now: number) => {
     const start = performance.now()
@@ -120,14 +138,33 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
     renderer.info.reset()
     shadowCalls = 0
     shadowTris = 0
+    timing.frameStart()
     // The camera moves first: every hook (the sky's dome, the cascades, the haze) reads where it is now.
     rig.update(ms / 1000)
     for (const fn of frameFns) fn(ms / 1000)
+    // The scene's draws are "opaque" unless a module tags or scopes them (water, sky, crowd, post).
+    timing.gpu.begin("opaque")
     if (draw) draw()
     else renderer.render(scene, camera)
+    timing.gpu.end()
     // The CPU side of the frame: hooks plus render. Headless Chrome has no vsync, so this, not the
     // rAF gap, is what the budget holds.
     const cost = performance.now() - start
+    timing.frameEnd(cost)
+    // Programs built in this frame (their link is waited for here unless warmed first, warm.ts): named,
+    // so a long frame on load can be laid at the right material's door (tools/shots/trace.ts reads the log).
+    const programs = renderer.info.programs
+    if (programs && programs.length > knownPrograms) {
+      logger.info("programs", {
+        ms: Math.round(cost),
+        made: programs.slice(knownPrograms).map((p) => {
+          const key = (p as { cacheKey?: string }).cacheKey ?? ""
+          const own = /guildhall-[\w-]+/.exec(key)?.[0]
+          return own ? `${p.name}#${own}` : p.name
+        }),
+      })
+      knownPrograms = programs.length
+    }
     costs.push(cost)
     if (ms > 0) intervals.push(ms)
     for (const s of samplers) {
@@ -152,14 +189,15 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
     camera,
     renderer,
     sun,
-    stats: () => summarize(intervals.values(), costs.values(), counters, dpr),
+    stats: () => summarize(intervals.values(), costs.values(), counters, dpr, timing.read()),
     sample(ms) {
       const s = { intervals: [] as number[], costs: [] as number[] }
       samplers.add(s)
+      const split = timing.sample()
       return new Promise((done) =>
         setTimeout(() => {
           samplers.delete(s)
-          done(summarize(s.intervals, s.costs, counters, dpr))
+          done(summarize(s.intervals, s.costs, counters, dpr, split.stop()))
         }, ms),
       )
     },
@@ -170,18 +208,24 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
     setCamera: (p) => rig.set(p),
     getCamera: () => rig.get(),
     rig,
+    timing,
     onFrame(fn) {
       frameFns.add(fn)
       return () => frameFns.delete(fn)
     },
-    setDraw(next) {
+    setDraw(next, target = null) {
       draw = next
+      drawTarget = next ? target : null
+    },
+    get drawTarget() {
+      return drawTarget
     },
     dispose() {
       governor.dispose()
       cancelAnimationFrame(raf)
       observer.disconnect()
       rig.dispose()
+      timing.dispose()
       renderer.dispose()
       renderer.domElement.remove()
       logger.info("disposed")

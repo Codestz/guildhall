@@ -5,7 +5,8 @@
  * the post pipeline grades it (bloom, ink, mood LUT, vignette, SMAA), and the opening camera sees the sun
  * from the side so the shadows read.
  * The island is built in a worker (job.ts) and arrives in stages: the ground first (drawn at once), the
- * shore field and the water next, the pieces last, while their models load. This thread only uploads.
+ * shore field and the water next, the pieces, while their models load, and last the life plan (everyone's
+ * day: a second of path searches that never blocks this thread). This thread only uploads and draws.
  * `?files=` sizes the island like a repo of that many files; `?hour=`, `?az=`, `?shadow=`, `?fill=`,
  * `?post=0`, `?aa=msaa|none` and `?ground=hex|soft` are for comparisons; `?step=` tries another height per
  * level (metres, default LEVEL_STEP) and `?detail=0` shows the ground without its painted small hexes and
@@ -83,6 +84,7 @@ import {
 } from "./job.ts"
 import { clock, islandKnobs } from "./knobs.ts"
 import { createLife, type Life } from "./life.ts"
+import type { LifePlan } from "./lifePlan.ts"
 import { HALL_STEPS, LINES, loadPlan, PITCH, STEPS, type Step } from "./loading.ts"
 import { createPlaceLabels, kindWord, labelsOn, type PlaceLabels } from "./places.ts"
 import { loaderOn, publishWorld, settle } from "./ready.ts"
@@ -110,6 +112,8 @@ interface Stages {
   ground: Promise<GroundStage>
   pieces: Promise<PackedPieces>
   shore: Promise<ShoreStage>
+  /** Settles only when the spec asked for life (`?life=0` leaves it pending; disposing fails it). */
+  life: Promise<LifePlan>
   dispose(): void
 }
 
@@ -124,7 +128,9 @@ function startJob(spec: Promise<HexJobSpec>): Stages {
   const ground = stage<GroundStage>()
   const pieces = stage<PackedPieces>()
   const shore = stage<ShoreStage>()
-  const [onMap, onGround, onPieces, onShore] = waiting as [
+  const life = stage<LifePlan>()
+  const [onMap, onGround, onPieces, onShore, onLife] = waiting as [
+    (typeof waiting)[0],
     (typeof waiting)[0],
     (typeof waiting)[0],
     (typeof waiting)[0],
@@ -134,12 +140,13 @@ function startJob(spec: Promise<HexJobSpec>): Stages {
     for (const w of waiting) w.fail(e)
   }
   // a screen torn down mid-build drops the stages it no longer waits on quietly
-  for (const p of [map, ground, pieces, shore]) p.catch(() => {})
+  for (const p of [map, ground, pieces, shore, life]) p.catch(() => {})
   const take = (msg: FromWorker) => {
     if (msg.type === "map") onMap.take(msg.map)
     else if (msg.type === "ground") onGround.take(msg.ground)
     else if (msg.type === "pieces") onPieces.take(msg.pieces)
     else if (msg.type === "shore") onShore.take(msg.shore)
+    else if (msg.type === "life") onLife.take(msg.life)
     else fail(new Error(msg.message))
   }
   let worker: Worker | null = null
@@ -167,6 +174,7 @@ function startJob(spec: Promise<HexJobSpec>): Stages {
     ground,
     pieces,
     shore,
+    life,
     dispose() {
       worker?.terminate()
       // a stage still awaited settles (a settled one ignores this), so nothing waits on a dead job
@@ -263,6 +271,9 @@ const world = {
     const nature = natureOf(ctx.query)
     // the hex map's shape knobs (?coast= ?hills= ?rain= ?forest=): `/lab/hexmap`'s island in 3D
     const shape = shapeOf(ctx.query)
+    // the collision overlay (`?collide=1`, `?spots=1`) builds the map again on this thread for its walk graph
+    const overlay = ctx.query.get("collide") === "1" || ctx.query.get("spots") === "1"
+    const lifeOn = ctx.query.get("life") !== "0"
     const catalogLoad = loadCatalog()
     // `?name=`: the island's own name (the site's `/` is "Guildhall", a hall its repo), else the seed's
     const name = ctx.query.get("name") || `Island ${roman(seed)}`
@@ -302,8 +313,7 @@ const world = {
       if (repo) viewer.setInfo({ subtitle: hallSubtitle(repo) })
       go("Map", 0.07)
     })
-    // the authored tile prefabs (data/tiles) before anything is built from them: here (life builds on
-    // this thread too) and in the worker
+    // the authored tile prefabs (data/tiles) before anything is built from them in the worker
     const job = startJob(
       Promise.all([read, loadTiles()]).then(([, tiles]) => ({
         seed,
@@ -314,6 +324,7 @@ const world = {
         tiles: tiles.length ? tiles : null,
         nature,
         shape,
+        life: lifeOn,
         ...(places ? { places } : {}),
       })),
     )
@@ -434,6 +445,9 @@ const world = {
       })
       const first = await firstFrame
       if (disposed) return
+      // for the bench: when the first frame landed (ms from navigation), so long tasks after it can be told apart
+      if (window.guildhall?.ext)
+        window.guildhall.ext.build = { first, firstAt: Math.round(performance.now()) }
       // With the cover the island stays hidden until all of it is built (below). Without (`?loader=0`) the
       // ground is in view: the veil lifts and the rest builds in sight, its step on the title card.
       steps.progress(0.3, 150)
@@ -497,27 +511,31 @@ const world = {
       // ---- life (track B): townsfolk and agents on the walk graph; `?life=0` turns it off ----
       let world: ReturnType<typeof hexWorld> | null = null
       let island: HexIsland | null = null
-      const alive = ctx.query.get("life") !== "0"
-      if (alive || hooks) {
-        // Life plans on the map itself: its pure parts built again here (~0.1 s), once the island is drawn.
+      if (hooks) {
+        // Another screen drives parts of the island (a history replay): the map's pure parts built again
+        // here (~0.1 s) for it. Life itself takes its plan from the worker (below).
         island = hexIsland({ ...shape, seed, files })
         const zones = hexZones(island, { wild: nature.wild, ...(places ? { places } : {}) })
         world = hexWorld(island, zones, { step, nature })
       }
-      if (alive && island && world) {
+      if (lifeOn) {
         go("Townsfolk", 0.92)
-        const zones = hexZones(island, { wild: nature.wild, ...(places ? { places } : {}) })
-        const built = world
+        // the plan arrives from the worker (job.life); the overlay alone rebuilds the map here
         life = createLife(stage, {
           host,
-          island,
-          zones,
-          world: built,
+          plan: job.life,
+          debug: overlay
+            ? () => {
+                const island = hexIsland({ ...shape, seed, files })
+                const zones = hexZones(island, { wild: nature.wild, ...(places ? { places } : {}) })
+                return { island, zones, world: hexWorld(island, zones, { step, nature }) }
+              }
+            : undefined,
           groundAt,
           hour: () => now,
           seed,
           agentT: num("lifeT", 0),
-          overlay: ctx.query.get("collide") === "1" || ctx.query.get("spots") === "1",
+          overlay,
         })
         await life.ready
       }
@@ -527,7 +545,7 @@ const world = {
       doors = await createDoors(stage, {
         gates,
         load,
-        doorways: world?.doorways ?? [],
+        doorways: life?.doorways() ?? [],
         life,
         all: ctx.query.get("doors") === "open",
         hour: () => now,
@@ -566,7 +584,7 @@ const world = {
             gate: made.gates?.opening(0) ?? null,
           }),
           // for shots: the doorways and the passes through them (a burst frames a door as someone goes in)
-          doorways: () => world?.doorways ?? [],
+          doorways: () => life?.doorways() ?? [],
           passes: () => life?.passes() ?? [],
         }
       const grown = m.stats.nature

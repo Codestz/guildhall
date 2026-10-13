@@ -5,8 +5,10 @@ import {
   fitBox,
   fitCascade,
   fitCascades,
+  innerUv,
   lightAxes,
   MIN_NEAR,
+  reaimNeeded,
   type Vec3,
 } from "../src/sun/fit.ts"
 
@@ -100,6 +102,46 @@ describe("fitCascade", () => {
           expect(depth).toBeGreaterThanOrEqual(fit.near - 1e-6)
           expect(depth).toBeLessThanOrEqual(fit.far + 1e-6)
         }
+  })
+})
+
+describe("fitCascade with a margin", () => {
+  test("widens the box, keeps the texel and snaps to the same lattice", () => {
+    const plain = fitCascade([12.3, 0, -4.7], SUN, 24, MAP, SPAN)
+    const wide = fitCascade([12.3, 0, -4.7], SUN, 24, MAP, SPAN, 1.25)
+    expect(wide.half).toBeCloseTo(30, 12)
+    expect(wide.texel).toBe(plain.texel)
+    expect(wide.target).toEqual(plain.target)
+    expect(wide.key).toBe(plain.key)
+    // the wider box reaches further along the light: its depth range grows with it
+    expect(wide.far).toBeGreaterThan(plain.far)
+  })
+
+  test("re-aims only once the target has left the inner square", () => {
+    const [x, y] = lightAxes(SUN)
+    const aimed = fitCascade([0, 0, 0], SUN, 24, MAP, SPAN, 1.25).target
+    const slack = 24 * 0.25
+    for (const axis of [x, y]) {
+      expect(reaimNeeded(aimed, along(aimed, axis, slack * 0.99), SUN, slack)).toBe(false)
+      expect(reaimNeeded(aimed, along(aimed, axis, -slack * 0.99), SUN, slack)).toBe(false)
+      expect(reaimNeeded(aimed, along(aimed, axis, slack * 1.01), SUN, slack)).toBe(true)
+    }
+    // a move along the light itself (the target's height) never re-aims
+    const [, , z] = lightAxes(SUN)
+    expect(reaimNeeded(aimed, along(aimed, z, 100), SUN, slack)).toBe(false)
+  })
+
+  test("places the inner square in the map's uv as the target moves off the aim", () => {
+    const [x, y] = lightAxes(SUN)
+    const aimed: Vec3 = [3, 0, 5]
+    expect(innerUv(aimed, aimed, SUN, 30)).toEqual([0.5, 0.5])
+    // 6 m along the light's x in a 60 m box: a tenth of the map
+    const [u, v] = innerUv(aimed, along(aimed, x, 6), SUN, 30)
+    expect(u).toBeCloseTo(0.6, 9)
+    expect(v).toBeCloseTo(0.5, 9)
+    const [u2, v2] = innerUv(aimed, along(aimed, y, -3), SUN, 30)
+    expect(u2).toBeCloseTo(0.5, 9)
+    expect(v2).toBeCloseTo(0.45, 9)
   })
 })
 

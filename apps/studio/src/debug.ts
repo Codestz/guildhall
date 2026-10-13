@@ -31,6 +31,17 @@ export function createDebug(): DebugHost {
   const pending = new Set<Promise<unknown>>()
   const mountWaiters = new Set<() => void>()
   const frameWaiters = new Set<{ left: number; done: () => void }>()
+  // every main-thread task over 50 ms since the page loaded (the perf2 "no task over 100 ms" rule)
+  const longTasks: { start: number; duration: number }[] = []
+  if (typeof PerformanceObserver !== "undefined")
+    try {
+      new PerformanceObserver((list) => {
+        for (const e of list.getEntries())
+          longTasks.push({ start: Math.round(e.startTime), duration: Math.round(e.duration) })
+      }).observe({ type: "longtask", buffered: true })
+    } catch {
+      // no Long Tasks API here: `longTasks()` stays empty
+    }
 
   const load = <T>(work: Promise<T>): Promise<T> => {
     pending.add(work)
@@ -86,6 +97,7 @@ export function createDebug(): DebugHost {
     perf: {
       now: () => requireStage().stats(),
       sample: (ms) => requireStage().sample(ms),
+      longTasks: () => [...longTasks],
     },
     camera: {
       get: () => requireStage().getCamera(),

@@ -40,6 +40,7 @@ import { paletteMaterial } from "../material.ts"
 import { loadPiece } from "../pieces.ts"
 import { createSlicer } from "../slice.ts"
 import type { Stage } from "../stage.ts"
+import { warmPrograms } from "../warm.ts"
 import { type BakePose, type BoneBake, bakeBytes, bakeClipsSliced, boneMap, frameAt } from "./bake.ts"
 import { createBlobs } from "./blobs.ts"
 import {
@@ -197,7 +198,7 @@ export function advance(playing: Playing, clip: string, phase: number, dt: numbe
 }
 
 export async function createCrowd(
-  stage: Pick<Stage, "scene" | "camera" | "renderer">,
+  stage: Pick<Stage, "scene" | "camera" | "renderer"> & Partial<Pick<Stage, "timing" | "drawTarget">>,
   actors: readonly CrowdActor[],
   library: CrowdLibrary,
   opts: CrowdOpts = {},
@@ -301,7 +302,12 @@ export async function createCrowd(
   }
 
   const blobs = createBlobs(actors.length)
+  // their programs link in the background before the first draw, which would otherwise wait for them (warm.ts)
+  for (const o of [bodies, props, blobs.mesh]) o.visible = false
   stage.scene.add(bodies, props, blobs.mesh)
+  for (const o of [bodies, props, blobs.mesh]) stage.timing?.gpu.tag(o, "crowd")
+  await Promise.all([bodies, props, blobs.mesh].map((o) => warmPrograms(stage, o)))
+  for (const o of [bodies, props, blobs.mesh]) o.visible = true
 
   // Per person: an instance, an outfit row, a hide mask, its props.
   const outfits = outfitTable(actors.map((a) => a.look.rampMap))
@@ -381,35 +387,48 @@ export async function createCrowd(
   const forward = new Vector3()
   let last = { crowd: 0, props: 0 }
 
+  /**
+   * Heroes are made one after another, a slice at a time (slice.ts): a dozen wanted in the same frame
+   * (the first update) would otherwise be built in one task (measured 230–500 ms: the bodies cloned
+   * and merged, their programs linked). Each one's programs link in the background before it is shown.
+   */
+  let heroTurn: Promise<unknown> = Promise.resolve()
   const makeHeroFor = (person: Person) => {
     const { look } = person.actor
-    person.pending = createNpc(look, catalog, url)
-      .then((npc) => {
-        if (disposed) {
-          npc.dispose()
-          return null
-        }
-        return makeHero(
-          npc,
-          look.mounts.map((m) => m.piece),
-        )
-      })
-      .catch((error: unknown) => {
-        logger.warn("hero failed; stays in the crowd", { id: person.actor.id, error: String(error) })
-        person.failed = true
+    const made = heroTurn.then(async () => {
+      await slicer.yield()
+      // no longer wanted while it waited its turn (walked off, or the crowd went): nothing to make
+      if (disposed || !wantHero.has(person.actor.id)) return null
+      const npc = await createNpc(look, catalog, url)
+      if (disposed) {
+        npc.dispose()
         return null
-      })
+      }
+      const hero = makeHero(
+        npc,
+        look.mounts.map((m) => m.piece),
+      )
+      await warmPrograms(stage, hero.npc.root)
+      return hero
+    })
+    heroTurn = made.catch(() => {})
+    person.pending = made.catch((error: unknown) => {
+      logger.warn("hero failed; stays in the crowd", { id: person.actor.id, error: String(error) })
+      person.failed = true
+      return null
+    })
     void person.pending.then((hero) => {
       person.pending = null
       if (!hero) return
       // Given up while it loaded: let it go. Otherwise it waits, hidden, for update to swap it in.
-      if (!wantHero.has(person.actor.id)) {
+      if (disposed || !wantHero.has(person.actor.id)) {
         hero.dispose()
         return
       }
       person.hero = hero
       hero.npc.root.visible = false
       stage.scene.add(hero.npc.root)
+      stage.timing?.gpu.tag(hero.npc.root, "crowd")
     })
   }
   let wantHero = new Set<number>()

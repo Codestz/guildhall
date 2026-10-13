@@ -297,14 +297,17 @@ export function createPost(stage: Stage, opts: PostOpts): Post {
     AIR.uGrade.value = grade
     const autoClear = renderer.autoClear
     renderer.autoClear = false
+    // bloom, the composite and SMAA are the "post" pass; the scene above stays the stage's "opaque"
+    stage.timing.gpu.begin("post")
     if (look.bloom) drawBloom()
     if (smaa && finished) {
       run(composite, finished)
       smaa.render(renderer, null as unknown as WebGLRenderTarget, finished, 0, false)
     } else run(composite, null)
+    stage.timing.gpu.end()
     renderer.autoClear = autoClear
   }
-  stage.setDraw(draw)
+  stage.setDraw(draw, sceneTarget)
   logger.info("post", { aa, look, mood })
 
   return {

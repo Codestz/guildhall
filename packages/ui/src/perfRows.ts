@@ -34,8 +34,21 @@ export function perfRows(s: FrameStats): PerfRow[] {
           { label: "draw calls", value: count(s.calls), unit: "" },
           { label: "triangles", value: count(s.tris), unit: "" },
         ]
+  // the GPU passes and the CPU buckets, when the stage has timers (render timing.ts)
+  const passes: PerfRow[] = Object.entries(s.passes ?? {}).map(([name, v]) => ({
+    label: `gpu ${name}`,
+    value: ms(v),
+    unit: "ms",
+  }))
+  const cpu: PerfRow[] = Object.entries(s.cpu ?? {}).map(([name, v]) => ({
+    label: `cpu ${name}`,
+    value: ms(v),
+    unit: "ms",
+  }))
   return [
     ...cost,
+    ...passes,
+    ...cpu,
     { label: "rAF fps", value: count(s.fps), unit: "" },
     { label: "rAF p50", value: ms(s.frameMs.p50), unit: "ms" },
     { label: "rAF p95", value: ms(s.frameMs.p95), unit: "ms" },

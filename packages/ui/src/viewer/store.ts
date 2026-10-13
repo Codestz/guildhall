@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react"
 import type { LoaderState } from "../components/display.tsx"
 import type { KnobSection, KnobValues } from "./knobs.ts"
-import type { HelpEntry, Readout, TitleInfo, TransportSpec } from "./types.ts"
+import type { HelpEntry, PerfReading, Readout, TitleInfo, TransportSpec } from "./types.ts"
 
 export interface ViewState {
   info: TitleInfo
@@ -16,7 +16,7 @@ export interface ViewState {
   helpOpen: boolean
   transport: (TransportSpec & { playing: boolean }) | null
   loader: LoaderState | null
-  perf: { fps: number; p95: number } | null
+  perf: PerfReading | null
   canCapture: boolean
   toasts: readonly { id: number; text: string; detail?: string }[]
 }

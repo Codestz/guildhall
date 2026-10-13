@@ -55,6 +55,16 @@ export const VIEWER_CSS = /* css */ `
   white-space: nowrap;
   backdrop-filter: blur(14px);
 }
+.ui-perf-wrap { position: relative; display: inline-flex; }
+.ui-perf { cursor: pointer; appearance: none; }
+.ui-perf:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+.ui-perf-detail { position: absolute; top: calc(100% + 6px); right: 0; min-width: 168px; padding: 8px 12px 9px; display: grid; gap: 6px; font: 500 var(--t-sm)/1.45 var(--mono); font-variant-numeric: tabular-nums; color: var(--paper); }
+.ui-perf-detail dl { margin: 0; display: grid; grid-template-columns: 1fr auto; column-gap: 14px; }
+.ui-perf-detail dl + dl { padding-top: 6px; border-top: 1px solid var(--hair); }
+.ui-perf-detail dt { color: var(--faint); font-weight: 400; }
+.ui-perf-detail dd { margin: 0; text-align: right; }
+.ui-perf-detail .head { color: var(--brass); font-weight: 500; }
+.ui-perf-detail .none { margin: 0; color: var(--faint); }
 .ui-perf small { color: var(--faint); font-weight: 400; }
 .ui-perf .led { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 6px rgba(166, 221, 143, 0.6); }
 .ui-perf[data-tone="warn"] .led { background: var(--warn); box-shadow: 0 0 6px rgba(255, 196, 81, 0.6); }

@@ -98,6 +98,9 @@ export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere
   const layers: readonly Object3D[] = deck ? [deck.mask] : (mask?.layers ?? [])
   if (deck) stage.scene.add(deck.mesh)
   if (mesh) stage.scene.add(mesh.mesh)
+  // the clouds and their shadow mask are the "sky" pass, with the dome
+  if (deck) stage.timing.gpu.tag(deck.mesh, "sky")
+  if (mesh) stage.timing.gpu.tag(mesh.mesh, "sky")
 
   // The mask covers the land and a margin, so shadows cast from clouds offshore still land on it.
   const half = 2 * opts.reach
@@ -212,7 +215,9 @@ export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere
     renderer.clear(true, false, false)
     // Every layer into one target: the second must not clear the first.
     renderer.autoClear = false
+    stage.timing.gpu.begin("sky")
     for (const layer of layers) renderer.render(layer, stage.camera)
+    stage.timing.gpu.end()
     renderer.autoClear = autoClear
     renderer.setClearColor(clearColour, clearAlpha)
     renderer.setRenderTarget(before)

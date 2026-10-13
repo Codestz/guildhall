@@ -140,6 +140,7 @@ export {
   type TerrainMesh,
 } from "./terrain.ts"
 export { boundingSphere, fitSphere, renderThumbnail, type ThumbnailOpts } from "./thumbnail.ts"
+export type { Split, Timing, TimingSample } from "./timing.ts"
 export { recolour, recolourPiece, swatchMapKey } from "./tint.ts"
 export {
   createViewer,
@@ -151,6 +152,7 @@ export {
 } from "./viewer.ts"
 export { createVertexMesh, groundMaterial } from "./vmesh.ts"
 export { srgbToLinear, type VertexMeshData, vertexMeshData } from "./vmeshData.ts"
+export { depthMaterialFor, warmPrograms } from "./warm.ts"
 export {
   createFieldWater,
   type FieldWaterOpts,

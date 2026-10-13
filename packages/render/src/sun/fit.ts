@@ -65,16 +65,29 @@ export function lightAxes(sunDir: Vec3): [Vec3, Vec3, Vec3] {
   return [x, cross(z, x), z]
 }
 
-/** One cascade of `radius` round `centre`, snapped to whole texels of a `mapSize` map in light space. */
-export function fitCascade(centre: Vec3, sunDir: Vec3, radius: number, mapSize: number, span = DEFAULT_SPAN) {
+/**
+ * One cascade of `radius` round `centre`, snapped to whole texels of a `mapSize` map in light space.
+ * `margin` renders the box that much wider than `radius` (its map then needs `mapSize * margin`
+ * texels to keep the texel): the snap lattice is the same, so the map's texels fall where they would
+ * without it, wherever the box stands.
+ */
+export function fitCascade(
+  centre: Vec3,
+  sunDir: Vec3,
+  radius: number,
+  mapSize: number,
+  span = DEFAULT_SPAN,
+  margin = 1,
+) {
   const [x, y, z] = lightAxes(sunDir)
   const texel = (2 * radius) / mapSize
+  const half = radius * margin
   const steps: Vec3 = [x, y, z].map((axis) => Math.round(dot(centre, axis) / texel)) as Vec3
   const target = add(add(scale(x, steps[0] * texel), scale(y, steps[1] * texel)), scale(z, steps[2] * texel))
   // How far along z, from the centre, the slab floor..ceiling reaches inside the box: a point at light
   // y = b and height h sits at z = (h - centre.y - b * y.y) / z.y.
   const sine = Math.max(z[1], MIN_SINE)
-  const tall = radius * Math.abs(y[1])
+  const tall = half * Math.abs(y[1])
   const toward = (span.ceiling - target[1] + tall) / sine
   const away = (span.floor - target[1] - tall) / sine
   // Back the light off so the nearest caster is MIN_NEAR in front of it.
@@ -82,13 +95,32 @@ export function fitCascade(centre: Vec3, sunDir: Vec3, radius: number, mapSize: 
   const fit: CascadeFit = {
     position: add(target, scale(z, back)),
     target,
-    half: radius,
+    half,
     near: MIN_NEAR,
     far: back - Math.min(away, 0) + MIN_NEAR,
     texel,
     key: steps.join(","),
   }
   return fit
+}
+
+const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+
+/**
+ * Whether a cascade aimed at `aimed` must be re-aimed for a target snapped at `now`: the target has
+ * left the inner square by more than `slack` metres along either light axis (the box's margin).
+ */
+export function reaimNeeded(aimed: Vec3, now: Vec3, sunDir: Vec3, slack: number): boolean {
+  const [x, y] = lightAxes(sunDir)
+  const d = sub(now, aimed)
+  return Math.abs(dot(d, x)) > slack + 1e-9 || Math.abs(dot(d, y)) > slack + 1e-9
+}
+
+/** Where `now` sits in the map of a cascade aimed at `aimed` with a box of `half` metres: uv, (0.5, 0.5) when they coincide. */
+export function innerUv(aimed: Vec3, now: Vec3, sunDir: Vec3, half: number): [number, number] {
+  const [x, y] = lightAxes(sunDir)
+  const d = sub(now, aimed)
+  return [0.5 + dot(d, x) / (2 * half), 0.5 + dot(d, y) / (2 * half)]
 }
 
 /** The cascades of fixed `radii` (smallest first) round the camera target. Zoom never changes them. */

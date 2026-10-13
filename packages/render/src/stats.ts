@@ -36,13 +36,15 @@ const percentiles = (values: readonly number[]) => ({
 
 /**
  * `FrameStats` for a stretch of frames: the gaps between them (`intervalMs`, which give the rate), the
- * work each one took (`costMs`), and the last frame's counters split into main and shadow passes.
+ * work each one took (`costMs`), the last frame's counters split into main and shadow passes, and the
+ * GPU and CPU split by pass when the stage's timing has it (timing.ts).
  */
 export function summarize(
   intervalMs: readonly number[],
   costMs: readonly number[],
   counters: FrameCounters,
   dpr: number,
+  timing?: { passes: Record<string, number>; cpu: Record<string, number> },
 ): FrameStats {
   const total = intervalMs.reduce((sum, ms) => sum + ms, 0)
   const { calls, tris, shadowCalls, shadowTris, geometries, textures } = counters
@@ -59,6 +61,7 @@ export function summarize(
     geometries,
     textures,
     dpr,
+    ...(timing ? { passes: timing.passes, cpu: timing.cpu } : {}),
   }
 }
 

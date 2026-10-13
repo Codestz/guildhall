@@ -55,6 +55,7 @@ export type {
   CardAction,
   HelpEntry,
   Loading,
+  PerfReading,
   Readout,
   TitleInfo,
   Transport,

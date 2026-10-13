@@ -1,6 +1,8 @@
 /**
  * Burst of frames at one pose (flicker hunting): bun tools/shots/frames.ts <url> <outdir> [n] [w] [h].
- * EVAL sets the pose, STEP (deg) turns the azimuth between frames. CLOCK=<ms> takes the page's clock over
+ * EVAL sets the pose, STEP (deg) turns the azimuth between frames, PAN (m) slides the target along the
+ * view (the one motion that re-aims the near shadow cascades), HOUR moves the world's clock (the sun)
+ * between frames. CLOCK=<ms> takes the page's clock over
  * once the pose has settled and moves it exactly that much between frames (16.7: consecutive 60 fps
  * frames, whatever the screenshots cost; 0: animation held still, so only what is unstable from frame
  * to frame still changes). DSF sets the device scale factor (2: a Retina screen,
@@ -26,27 +28,52 @@ if (process.env.CHROME !== "1")
   })
 const clock = process.env.CLOCK === undefined ? null : Number(process.env.CLOCK)
 type Clocked = { __t: number }
+// The clock is taken over at a fixed time (AT, ms, default 20 s), not at whatever the load took, so two
+// bursts on different builds see the same clouds and the same sky and can be diffed frame for frame.
 if (clock !== null)
-  await page.evaluate(() => {
-    const w = window as unknown as Clocked
-    w.__t = performance.now()
-    performance.now = () => w.__t
-    Date.now = () => w.__t
-    const raf = window.requestAnimationFrame.bind(window)
-    window.requestAnimationFrame = (fn) => raf(() => fn(w.__t))
-  })
+  await page.evaluate(
+    (at) => {
+      const w = window as unknown as Clocked
+      w.__t = at
+      performance.now = () => w.__t
+      Date.now = () => w.__t
+      const raf = window.requestAnimationFrame.bind(window)
+      window.requestAnimationFrame = (fn) => raf(() => fn(w.__t))
+    },
+    Number(process.env.AT ?? 20000),
+  )
 await page.waitForTimeout(500)
 const step = Number(process.env.STEP ?? 0)
+const pan = Number(process.env.PAN ?? 0)
+const hour = Number(process.env.HOUR ?? 0)
 const dprs: string[] = []
+type Driven = {
+  guildhall: {
+    camera: { get(): { azimuth: number; target: [number, number, number] }; set(p: object): void }
+    ext: { clock?: { get(): number; set(h: number): void } }
+  }
+}
 for (let k = 0; k < Number(n); k++) {
   if (step)
     await page.evaluate((s) => {
-      const g = (
-        window as unknown as { guildhall: { camera: { get(): { azimuth: number }; set(p: object): void } } }
-      ).guildhall
+      const g = (window as unknown as Driven).guildhall
       const p = g.camera.get()
       g.camera.set({ ...p, azimuth: p.azimuth + s })
     }, step)
+  if (pan)
+    await page.evaluate((m) => {
+      const g = (window as unknown as Driven).guildhall
+      const p = g.camera.get()
+      // the rig looks along (-sin az, -cos az): the target walks away from the eye
+      const rad = (p.azimuth * Math.PI) / 180
+      const [x, y, z] = p.target
+      g.camera.set({ ...p, target: [x - Math.sin(rad) * m, y, z - Math.cos(rad) * m] })
+    }, pan)
+  if (hour)
+    await page.evaluate((h) => {
+      const clock = (window as unknown as Driven).guildhall.ext.clock
+      clock?.set(clock.get() + h)
+    }, hour)
   if (clock)
     await page.evaluate((ms) => {
       ;(window as unknown as Clocked).__t += ms

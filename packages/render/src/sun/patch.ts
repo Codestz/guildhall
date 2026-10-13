@@ -1,5 +1,5 @@
 import { log } from "@guildhall/core"
-import { ShaderChunk, type WebGLProgramParametersWithUniforms } from "three"
+import { ShaderChunk, Vector4, type WebGLProgramParametersWithUniforms } from "three"
 
 /**
  * The shader half of the sun's cascades (ADR 009), patched into the palette material only. The sun is
@@ -13,11 +13,21 @@ import { ShaderChunk, type WebGLProgramParametersWithUniforms } from "three"
  * the material then keeps three's stock per-light shadows (cascade 0 only).
  */
 
-/** How much of a cascade's box, from its edge (in map uv), fades into the next one out. */
+/** How much of a cascade's selection square, from its edge (in map uv), fades into the next one out. */
 export const CASCADE_FADE = 0.1
+
+/**
+ * The square of each cascade's map the shader selects it for, in the map's uv: centre, half-width,
+ * fade width. The whole map (0.5, 0.5, 0.5, CASCADE_FADE) unless the sun says otherwise: a near
+ * cascade's map is rendered wider than its square and re-aimed only as the target leaves it
+ * (`sun/cascades.ts` MARGIN), so the square moves across the map while the box stands. Shared by
+ * every patched material; the sun replaces the array with one entry per cascade.
+ */
+export const CASCADE_INNER: { value: Vector4[] } = { value: [new Vector4(0.5, 0.5, 0.5, CASCADE_FADE)] }
 
 const FUNCTION = /* glsl */ `
 #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 1 && defined( SHADOWMAP_TYPE_PCF )
+uniform vec4 cascadeInner[ NUM_DIR_LIGHT_SHADOWS ];
 // A fixed 3x3 kernel of hardware-filtered taps, spaced shadowRadius texels apart. The stock kernel
 // turns per screen pixel, so a soft edge crawls as the view pans; this one answers the same for the
 // same world point from any camera.
@@ -38,8 +48,9 @@ float cascadeShadow() {
 	for ( int i = 0; i < NUM_DIR_LIGHT_SHADOWS; i ++ ) {
 		{
 			vec3 box = vDirectionalShadowCoord[ i ].xyz / vDirectionalShadowCoord[ i ].w;
-			vec2 edge = min( box.xy, 1.0 - box.xy );
-			float weight = ( box.z >= 0.0 && box.z <= 1.0 ) ? smoothstep( 0.0, ${CASCADE_FADE.toFixed(2)}, min( edge.x, edge.y ) ) : 0.0;
+			vec4 inner = cascadeInner[ i ];
+			vec2 edge = inner.z - abs( box.xy - inner.xy );
+			float weight = ( box.z >= 0.0 && box.z <= 1.0 ) ? smoothstep( 0.0, inner.w, min( edge.x, edge.y ) ) : 0.0;
 			if ( weight > 0.0 && rest > 0.0 ) {
 				DirectionalLightShadow s = directionalLightShadows[ i ];
 				lit += rest * weight * cascadeTaps( directionalShadowMap[ i ], s.shadowMapSize, s.shadowIntensity, s.shadowBias, s.shadowRadius, vDirectionalShadowCoord[ i ] );
@@ -83,4 +94,5 @@ export function patchCascades(shader: WebGLProgramParametersWithUniforms): void 
   shader.fragmentShader = fragment
     .replace(PARS, () => `${PARS}\n${FUNCTION}`)
     .replace(LIGHTS, () => lighting.replace(STOCK, () => CASCADED))
+  shader.uniforms.cascadeInner = CASCADE_INNER
 }

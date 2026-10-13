@@ -9,12 +9,13 @@ import type { DayLight } from "../light.ts"
 import type { Stage } from "../stage.ts"
 import { AIR } from "./air.ts"
 import { cloudMask, cloudMesh, fieldUniforms, puffAttributes } from "./clouds.ts"
-import { cloudField, focusWeight, swell, VIEW_REACH } from "./field.ts"
+import { cloudField, focusWeight, smoothstep, swell, VIEW_REACH } from "./field.ts"
 import { cloudLook } from "./look.ts"
 import { ATMOSPHERE } from "./shade.ts"
 
 export { cloudField, presence, viewFade, wrap } from "./field.ts"
 export { type CloudLook, cloudLook } from "./look.ts"
+export { createMist, DEFAULT_MIST, fogRing, type Mist, type MistOpts, type MistParams } from "./mist.ts"
 export { ATMOSPHERE, patchCloudShade } from "./shade.ts"
 
 export interface AtmosphereParams {
@@ -36,6 +37,13 @@ export interface AtmosphereOpts {
   reach: number
   seed?: number
   params?: Partial<AtmosphereParams>
+  /** The clouds' base heights, metres (60–95 by default). */
+  height?: [number, number]
+  /**
+   * Where the clouds' meshes show, metres from `centre`: faded in from [0] to [1], out from [2] to [3].
+   * Everywhere by default; round an island, a ring over the sea (their shadows still cross the land).
+   */
+  ring?: [number, number, number, number]
 }
 
 export interface Atmosphere {
@@ -70,11 +78,13 @@ export function trueSun(light: DayLight, out = new Vector3()): Vector3 {
 export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere {
   let params: AtmosphereParams = { ...DEFAULT_ATMOSPHERE, ...opts.params }
   const span = FIELD_REACH * opts.reach
-  const clouds = cloudField({ seed: opts.seed ?? 1, count: COUNT, span, height: HEIGHT })
+  const height = opts.height ?? HEIGHT
+  const clouds = cloudField({ seed: opts.seed ?? 1, count: COUNT, span, height })
   const attributes = puffAttributes(clouds)
   const field = fieldUniforms()
   field.uSpan.value = span
   field.uCentre.value.set(...opts.centre)
+  if (opts.ring) field.uRing.value.set(...opts.ring)
   const mesh = cloudMesh(attributes, field)
   const mask = cloudMask(attributes, field)
   stage.scene.add(mesh.mesh)
@@ -88,7 +98,7 @@ export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere
     1 / (2 * half),
   )
   ATMOSPHERE.uCloudMap.value = mask.target.texture
-  ATMOSPHERE.uCloudHeight.value = (HEIGHT[0] + HEIGHT[1]) / 2 + 0.4 * swell(params.coverage)
+  ATMOSPHERE.uCloudHeight.value = (height[0] + height[1]) / 2 + 0.4 * swell(params.coverage)
 
   const sun = new Vector3()
   const clearColour = new Color()
@@ -98,6 +108,8 @@ export function createAtmosphere(stage: Stage, opts: AtmosphereOpts): Atmosphere
     const look = cloudLook(light, params.coverage)
     mesh.uniforms.uLit.value.copy(look.lit)
     mesh.uniforms.uShade.value.copy(look.shade)
+    // by night only a veil: the clouds' dark undersides read as rocks hanging in the sky
+    field.uVeil.value = 0.45 + 0.55 * smoothstep(-10, 2, light.elevation)
     ATMOSPHERE.uCloudLit.value.copy(look.lit)
     AIR.uCirrusLit.value.copy(look.lit)
     trueSun(light, sun)

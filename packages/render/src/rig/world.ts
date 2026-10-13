@@ -27,6 +27,15 @@ export interface World {
   maxReach?: number
   /** Free flight (the F key) on this screen. */
   free?: boolean
+  /**
+   * How far the orbit's target may stray from the centre at the farthest zoom, as a share of `half`
+   * (1, the default: the whole site box at every zoom). Below 1 the leash tightens as the view pulls
+   * back, round (not square), so a wide view stays centred on the island and the eased orbit drifts
+   * home rather than hitting a wall.
+   */
+  hold?: number
+  /** The free camera's half side, metres (`half` by default): looser than the orbit's. */
+  roam?: number
 }
 
 type Vec3 = [number, number, number]
@@ -161,6 +170,16 @@ export function insideSite(world: World, x: number, z: number, slack = 0): [numb
   return [clamp(x, cx - r, cx + r), clamp(z, cz - r, cz + r)]
 }
 
+/** The target (x, z) on the leash `World.hold` sets at zoom fraction `t`: a circle that tightens far out. */
+export function leash(world: World, [x, z]: [number, number], t: number): [number, number] {
+  if (world.hold === undefined || world.hold >= 1) return [x, z]
+  const r = world.half * (1 - (1 - world.hold) * smoothstep(0.3, 1, t))
+  const [cx, cz] = world.centre
+  const d = Math.hypot(x - cx, z - cz)
+  if (d <= r) return [x, z]
+  return [cx + ((x - cx) * r) / d, cz + ((z - cz) * r) / d]
+}
+
 /**
  * An orbit pose held inside the world: the target in the site box (riding the floor as it pans), the
  * distance in the zoom range, the elevation in the band for that zoom and high enough that the eye
@@ -169,7 +188,8 @@ export function insideSite(world: World, x: number, z: number, slack = 0): [numb
 export function clampOrbit(pose: CameraPose, world: World, lens: Lens): CameraPose {
   const range = distanceRange(world, lens)
   const distance = clamp(pose.distance, range[0], range[1])
-  const [tx, tz] = insideSite(world, pose.target[0], pose.target[2])
+  const t = zoomFraction(distance, range)
+  const [tx, tz] = leash(world, insideSite(world, pose.target[0], pose.target[2]), t)
   // The target keeps its height over the floor (a preset's look point sits above the street).
   const lift = Math.max(0, pose.target[1] - floorAt(world, pose.target[0], pose.target[2]))
   const ty = floorAt(world, tx, tz) + lift
@@ -214,7 +234,7 @@ export function ceilingOf(world: World, lens: Lens): number {
 
 /** A free eye held inside the world: inside the site box, over the floor, under the ceiling. */
 export function clampEye(eye: Vec3, world: World, lens: Lens): Vec3 {
-  const [x, z] = insideSite(world, eye[0], eye[2])
+  const [x, z] = insideSite(world, eye[0], eye[2], Math.max(0, (world.roam ?? world.half) - world.half))
   const floor = floorAt(world, x, z) + LIMITS.clearance
   return [x, clamp(eye[1], floor, Math.max(floor, ceilingOf(world, lens))), z]
 }

@@ -21,9 +21,10 @@ import {
   ShaderMaterial,
   Vector2,
   Vector3,
+  Vector4,
   WebGLRenderTarget,
 } from "three"
-import { AIR, GRADE_GLSL, SKY_GLSL } from "./air.ts"
+import { AIR, GRADE_GLSL, RING_GLSL, SKY_GLSL } from "./air.ts"
 import type { Cloud } from "./field.ts"
 import { ATMOSPHERE } from "./shade.ts"
 
@@ -46,6 +47,13 @@ export function fieldUniforms() {
     uTarget: { value: new Vector3() },
     uEyeDistance: { value: 200 },
     uFocus: { value: 1 },
+    /**
+     * Where the clouds' meshes show, by distance from the field's centre: in from x to y, out from z
+     * to w (metres). The default shows them everywhere; a ring round an island keeps them over the sea
+     * (V1's), while their shadows still cross the land.
+     */
+    uRing: { value: new Vector4(-2, -1, 1e6, 2e6) },
+    uVeil: { value: 1 },
   }
 }
 export type FieldUniforms = ReturnType<typeof fieldUniforms>
@@ -60,6 +68,9 @@ uniform vec3 uEye;
 uniform vec3 uTarget;
 uniform float uEyeDistance;
 uniform float uFocus;
+uniform vec4 uRing;
+// How solid the meshes are (by night a veil: dark lumps read as rocks in the sky).
+uniform float uVeil;
 attribute vec4 aPuff;
 attribute vec4 aCloud;
 // The cloud's centre relative to the field's, after drifting and wrapping.
@@ -78,7 +89,9 @@ vec3 cloudCentre( vec2 local ) {
 float cloudView( vec3 centre ) {
 	float near = smoothstep( 0.55 * uEyeDistance, 0.95 * uEyeDistance, distance( centre, uEye ) );
 	float clear = smoothstep( 0.35 * uEyeDistance, 0.75 * uEyeDistance, distance( centre.xz, uTarget.xz ) );
-	return near * mix( 1.0, clear, uFocus );
+	float r = distance( centre.xz, uCentre );
+	float ring = smoothstep( uRing.x, uRing.y, r ) * ( 1.0 - smoothstep( uRing.z, uRing.w, r ) );
+	return ring * near * mix( 1.0, clear, uFocus );
 }
 `
 
@@ -95,7 +108,7 @@ void main() {
 	float grow = smoothstep( 0.0, 1.0, presence );
 	vec3 world = centre + ( aPuff.xyz * uSwell + position * vec3( 1.15, SQUASH, 1.0 ) * aPuff.w * uSwell ) * grow;
 	world.y = max( world.y, aCloud.z );
-	vFade = step( 0.02, grow ) * cloudView( centre );
+	vFade = step( 0.02, grow ) * cloudView( centre ) * uVeil;
 	vWorld = world;
 	gl_Position = projectionMatrix * viewMatrix * vec4( world, 1.0 );
 	if ( vFade < 0.01 ) gl_Position = vec4( 2.0, 2.0, 2.0, 1.0 );
@@ -105,6 +118,7 @@ void main() {
 const MESH_FRAGMENT = /* glsl */ `
 ${SKY_GLSL}
 ${GRADE_GLSL}
+${RING_GLSL}
 uniform vec3 uLit;
 uniform vec3 uShade;
 uniform vec3 uSun;
@@ -122,6 +136,8 @@ void main() {
 	colour = mix( colour, uShade * 0.94, smoothstep( -0.8, -0.95, n.y ) );
 	// Far clouds sink into the sky behind them (the dome's own colour, air.ts), as the land does.
 	colour = mix( colour, skyAt( normalize( -toEye ) ), 0.55 * smoothstep( uHazeRange.x, uHazeRange.y, length( toEye ) ) );
+	// and into the sea mist round the island, a little less than the sea under them (they stand above it)
+	colour = mix( colour, mistColour( normalize( -toEye ) ), 0.85 * fogRing( vWorld ) );
 	gl_FragColor = vec4( colour, vFade );
 	#include <tonemapping_fragment>
 	#include <colorspace_fragment>

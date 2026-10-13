@@ -14,7 +14,7 @@
  * it). Unpatched programs keep three's hemisphere and linear fog, which the sky still sets.
  */
 import { log } from "@guildhall/core"
-import { Color, Vector2, Vector3, type WebGLProgramParametersWithUniforms } from "three"
+import { Color, Vector2, Vector3, Vector4, type WebGLProgramParametersWithUniforms } from "three"
 
 /** The air's uniforms, one object shared by every program that reads them. */
 export const AIR = {
@@ -39,6 +39,15 @@ export const AIR = {
   uHazeMax: { value: 0.5 },
   uHazeClear: { value: 1e4 },
   uHazeFar: { value: 2000 },
+  /**
+   * The sea mist round the island (mist.ts sets it): by distance across the ground from the island's
+   * middle, not from the eye, so whatever the view the sea melts into the sky before its end shows.
+   * x, z: the middle; z, w: where it starts and where it is whole (metres). Its most: 0 is off.
+   */
+  uFogRing: { value: new Vector4(0, 0, 1e5, 2e5) },
+  uFogRingMax: { value: 0 },
+  /** How much the mist takes the glow's warmth looking down on it (0: the sky's own colour). */
+  uMistWarm: { value: 0 },
   /** Grade: split-tone multipliers, saturation, S curve, and 0/1 for off/on. */
   uGradeShadows: { value: new Color(1, 1, 1) },
   uGradeHighlights: { value: new Color(1, 1, 1) },
@@ -67,11 +76,10 @@ vec3 skyAt( vec3 d ) {
 	// The horizon is warm toward the sun and cooler away from it, more so the lower the sun.
 	vec3 horizon = mix( uAirHorizon, uAirAway, uAirSplit * side * side );
 	// Above: a soft blend into the zenith with a finite slope at the horizon (a square root there drew a
-	// line); below: the horizon, a touch deeper.
+	// line); below: the horizon itself, so the sea mist (which fades toward it along the true ray) is one
+	// colour from the coast to wherever the sea plane or the far plane ends.
 	float rise = 1.0 - pow( 1.0 - clamp( up, 0.0, 1.0 ), 3.0 );
-	vec3 colour = up >= 0.0
-		? mix( horizon, uAirZenith, rise )
-		: mix( horizon, mix( horizon, uAirZenith, 0.25 ), smoothstep( 0.0, -0.5, up ) );
+	vec3 colour = mix( horizon, uAirZenith, rise );
 	float toward = max( dot( normalize( vec3( d.x, max( up, 0.0 ), d.z ) ), uAirSun ), 0.0 );
 	float low = 1.0 - smoothstep( 0.1, 0.7, up );
 	// toward^6 and toward^48 by squaring (every lit fragment hazes through here).
@@ -81,6 +89,26 @@ vec3 skyAt( vec3 d ) {
 	float t24 = t12 * t12;
 	colour += uAirGlow * ( 0.35 * t6 + 0.25 * t24 * t24 ) * low * smoothstep( -0.25, 0.02, uAirSun.y );
 	return colour;
+}
+`
+
+/**
+ * The sea mist's share at a world point (needs SKY_GLSL's uniforms in scope for the colour): for the
+ * unlit programs (the mist layers, the clouds) that fade into it as the lit ones do in `airHaze`.
+ */
+export const RING_GLSL = /* glsl */ `
+uniform vec4 uFogRing;
+uniform float uFogRingMax;
+float fogRing( vec3 world ) {
+	return uFogRingMax * smoothstep( uFogRing.z, uFogRing.w, length( world.xz - uFogRing.xy ) );
+}
+uniform float uMistWarm;
+// The mist's colour along a ray: the sky behind it, warmed by the glow round the sun (V1's painterly
+// sea of mist) looking down; at the horizon exactly the dome, so where the sea ends nothing shows.
+vec3 mistColour( vec3 d ) {
+	vec3 c = skyAt( d );
+	vec3 tint = uAirGlow / max( dot( uAirGlow, vec3( 0.3333 ) ), 1e-3 );
+	return mix( c, c * mix( vec3( 1.0 ), tint, 0.6 ), uMistWarm * smoothstep( -0.03, -0.3, d.y ) );
 }
 `
 
@@ -119,6 +147,7 @@ uniform float uHazeFalloff;
 uniform float uHazeMax;
 uniform float uHazeClear;
 uniform float uHazeFar;
+${RING_GLSL}
 // The sky's light on a face with world normal n.
 vec3 skyLight( vec3 n ) {
 	float up = n.y;
@@ -139,8 +168,12 @@ vec3 airHaze( vec3 colour ) {
 	float amount = uHazeMax * ( 1.0 - exp( -past * uHazeDensity * thin ) );
 	amount = max( amount, smoothstep( 0.75 * uHazeFar, 0.97 * uHazeFar, dist ) );
 	// The focus (most of the screen) is clear: no sky to look up there.
-	if ( amount < 0.002 ) return colour;
-	return mix( colour, skyAt( normalize( vec3( v.x, max( v.y, 0.0 ), v.z ) ) ), amount );
+	if ( amount >= 0.002 ) colour = mix( colour, skyAt( normalize( vec3( v.x, max( v.y, 0.0 ), v.z ) ) ), amount );
+	// The sea mist: toward the dome's own colour along the true ray, so where the sea ends (or the far
+	// plane cuts it) the sky behind is the same colour and no edge shows.
+	float ring = fogRing( vCloudWorld );
+	if ( ring >= 0.002 ) colour = mix( colour, mistColour( v / dist ), ring );
+	return colour;
 }
 `
 

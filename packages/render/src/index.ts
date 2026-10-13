@@ -5,7 +5,12 @@ export {
   type AtmosphereParams,
   cloudLook,
   createAtmosphere,
+  createMist,
   DEFAULT_ATMOSPHERE,
+  DEFAULT_MIST,
+  fogRing,
+  type Mist,
+  type MistParams,
   patchCloudShade,
 } from "./atmosphere/index.ts"
 export {

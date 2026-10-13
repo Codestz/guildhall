@@ -17,8 +17,6 @@
 import type { CameraPose } from "@guildhall/core"
 import { log } from "@guildhall/core"
 import {
-  type Atmosphere,
-  createAtmosphere,
   createFieldWater,
   createHexGround,
   createNight,
@@ -41,8 +39,9 @@ import {
 import { HEX_TILE_SIZE, hexIsland, hexWorld, hexZones, LEVEL_STEP } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
-import { worldCamera } from "../shell/worldCamera.ts"
+import { islandWorld, worldCamera } from "../shell/worldCamera.ts"
 import { loadTiles } from "../tiles.ts"
+import { atmoKnobs, createIslandAir, type IslandAir } from "./atmo.ts"
 import {
   batchSets,
   type FromWorker,
@@ -189,7 +188,7 @@ export const hexWorldScreen: Screen = {
     let disposed = false
     let batch: StaticBatch | null = null
     let water: Water | null = null
-    let atmosphere: Atmosphere | null = null
+    let air: IslandAir | null = null
     let night: Night | null = null
     let unTick = () => {}
     let post: Post | null = null
@@ -259,7 +258,13 @@ export const hexWorldScreen: Screen = {
       })
       clock.append(play, label, slider)
       host.append(clock)
-      atmosphere = createAtmosphere(stage, { light: () => sky.light(), centre: [0, 0], reach: span, seed })
+      air = createIslandAir(stage, {
+        light: () => sky.light(),
+        span,
+        seed,
+        level: SEA_LEVEL,
+        knobs: atmoKnobs(ctx.query),
+      })
       if (ctx.query.get("post") !== "0")
         post = createPost(stage, { light: () => sky.light(), aa: aaOf(ctx.query.get("aa")) })
       const azimuth = num("az", sideLit(sky.light().sunDir))
@@ -274,13 +279,7 @@ export const hexWorldScreen: Screen = {
       const groundAt = heightsAt(g.heights)
       if (g.prisms) meshes.push(createHexGround(stage, { size: R, base: -2.5, tiles: g.prisms }))
       else if (g.mesh) meshes.push(createVertexMesh(stage, g.mesh, undefined, { speckle: detail }))
-      cam.start({
-        centre: [0, 0],
-        half: span * 1.2,
-        heightAt: (x, zz) => groundAt(x, zz),
-        water: 0,
-        free: true,
-      })
+      cam.start(islandWorld(span, (x, zz) => groundAt(x, zz), 0))
       // The first frame with the ground in it: timed once it has been drawn (a task after the frame).
       const firstFrame = new Promise<number>((done) => {
         const off = stage.onFrame(() => {
@@ -296,9 +295,10 @@ export const hexWorldScreen: Screen = {
         const field = shoreFieldTexture(s)
         water = createFieldWater(stage, {
           field,
-          sea: { level: SEA_LEVEL, half: span * 3 },
+          sea: { level: SEA_LEVEL, half: Math.max(span * 3, stage.camera.far * 0.95) },
           pools: { size: R * 1.01, tiles: m.pools },
         })
+        air?.setShore(field)
         disposeField = () => field.dispose()
         logger.info("shore field", { ms: s.ms, at: since() })
       })
@@ -378,7 +378,7 @@ export const hexWorldScreen: Screen = {
       batch?.dispose()
       water?.dispose()
       disposeField()
-      atmosphere?.dispose()
+      air?.dispose()
       night?.dispose()
       life?.dispose()
       unTick()

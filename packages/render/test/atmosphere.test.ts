@@ -10,6 +10,7 @@ import {
 } from "../src/atmosphere/field.ts"
 import { trueSun } from "../src/atmosphere/index.ts"
 import { cloudLook } from "../src/atmosphere/look.ts"
+import { fogRing, mistBand, mistNoise } from "../src/atmosphere/mist.ts"
 import { lightAt } from "../src/light.ts"
 
 const FIELD = { seed: 1, count: 60, span: 400, height: [60, 95] as [number, number] }
@@ -114,4 +115,42 @@ test("trueSun points where the sun really is, below the shadow clamp at dusk", (
   expect(sun.length()).toBeCloseTo(1, 6)
   expect(sun.y).toBeLessThan(0)
   expect(dusk.sunDir[1]).toBeGreaterThan(0)
+})
+
+describe("the sea mist", () => {
+  test("the fog ring starts past the coast, is whole before the sea's end, and closes in as the haze thickens", () => {
+    const one = fogRing(200, 1)
+    expect(one.start).toBeGreaterThan(180)
+    expect(one.whole).toBeGreaterThan(one.start)
+    expect(one.max).toBe(1)
+    const two = fogRing(200, 2)
+    expect(two.start).toBeLessThan(one.start)
+    expect(two.whole).toBeLessThan(one.whole)
+    expect(fogRing(200, 0).max).toBe(0)
+  })
+
+  test("thicker mist gathers nearer the coast", () => {
+    const [a0, a1] = mistBand(200, 1)
+    const [b0, b1] = mistBand(200, 2)
+    expect(a1).toBeGreaterThan(a0)
+    expect(b0).toBeLessThan(a0)
+    expect(b1).toBeLessThan(a1)
+  })
+
+  test("the noise tiles: its opposite edges meet, and it spans most of 0..255", () => {
+    const size = 64
+    const n = mistNoise(size, 3)
+    let lo = 255
+    let hi = 0
+    for (let y = 0; y < size; y++) {
+      const left = n[4 * (y * size)] as number
+      const right = n[4 * (y * size + size - 1)] as number
+      expect(Math.abs(left - right)).toBeLessThan(40)
+      for (let x = 0; x < size; x++) {
+        lo = Math.min(lo, n[4 * (y * size + x)] as number)
+        hi = Math.max(hi, n[4 * (y * size + x)] as number)
+      }
+    }
+    expect(hi - lo).toBeGreaterThan(150)
+  })
 })

@@ -15,6 +15,37 @@ export interface WorldCamera {
   dispose(): void
 }
 
+/**
+ * The camera's limits on an island of half side `span` (metres, the farthest land from the middle plus
+ * a margin): the farthest zoom frames the island with a band of mist round it (no empty sea, no sea
+ * edge, `maxReach` of the island's own box seen from above), the tilt far out stays high (the rig's
+ * `highFloor`), and the target is leashed near the middle as the view pulls back (`hold`). Free flight
+ * roams a wider box; the sea mist hides the sea's end from anywhere in it.
+ */
+export const ISLAND_CAMERA = {
+  /** The orbit's target box, as a share of `span`. */
+  half: 0.9,
+  /** The farthest zoom, as a share of the box filling the frame from above. */
+  maxReach: 0.85,
+  /** At the farthest zoom the target stays within this share of the box's half side of the middle. */
+  hold: 0.35,
+  /** Free flight's box, as a share of `span`. */
+  roam: 1.6,
+} as const
+
+export function islandWorld(span: number, heightAt: (x: number, z: number) => number, water: number): World {
+  return {
+    centre: [0, 0],
+    half: span * ISLAND_CAMERA.half,
+    maxReach: ISLAND_CAMERA.maxReach,
+    hold: ISLAND_CAMERA.hold,
+    roam: span * ISLAND_CAMERA.roam,
+    heightAt,
+    water,
+    free: true,
+  }
+}
+
 export function worldCamera(stage: Stage, host: HTMLElement, query: URLSearchParams): WorldCamera {
   let chip: CamKeys | null = null
   let started = false

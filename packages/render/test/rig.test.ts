@@ -168,3 +168,28 @@ describe("the glide and the free camera's heading", () => {
     for (let i = 0; i < 3; i++) expect(eye[i] + dir[i] * p.distance).toBeCloseTo(p.target[i] as number, 9)
   })
 })
+
+describe("the leash and the free roam", () => {
+  const LEASHED: World = { ...ISLAND, hold: 0.3, roam: 800 }
+  test("close in the target pans the whole box; far out it is held near the middle, on a circle", () => {
+    const [, far] = distanceRange(LEASHED, LENS)
+    const near = clampOrbit(pose({ target: [400, 0, 0], distance: 20 }), LEASHED, LENS)
+    expect(near.target[0]).toBeCloseTo(400, 6)
+    const wide = clampOrbit(pose({ target: [400, 0, 400], distance: far }), LEASHED, LENS)
+    expect(Math.hypot(wide.target[0], wide.target[2])).toBeCloseTo(150, 3)
+    // straight toward the middle, not to a box corner
+    expect(wide.target[0]).toBeCloseTo(wide.target[2], 6)
+  })
+
+  test("without a hold the orbit keeps the square box at every zoom", () => {
+    const [, far] = distanceRange(ISLAND, LENS)
+    const wide = clampOrbit(pose({ target: [400, 0, 400], distance: far }), ISLAND, LENS)
+    expect(wide.target[0]).toBeCloseTo(400, 6)
+  })
+
+  test("free flight roams past the orbit's box, as far as `roam`", () => {
+    expect(clampEye([700, 50, -700], LEASHED, LENS)[0]).toBe(700)
+    expect(clampEye([900, 50, 0], LEASHED, LENS)[0]).toBe(800)
+    expect(clampEye([900, 50, 0], ISLAND, LENS)[0]).toBe(500)
+  })
+})

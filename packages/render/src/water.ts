@@ -35,6 +35,9 @@ const swatch = (name: string): Color => {
   return new Color(s.hex)
 }
 
+/** The sea disc's rim segments. */
+const SEA_SEGMENTS = 48
+
 /** Boats' wakes the water draws at once (`Water.setWakes`). */
 export const MAX_WAKES = 8
 
@@ -355,7 +358,10 @@ export interface WaterPool {
 export interface FieldWaterOpts {
   /** How far each point is from the land (`bakeShoreField`): depth, foam and waves read it. */
   field: ShoreField
-  /** The open sea: a square of `half` metres round `centre`, at `level`. */
+  /**
+   * The open sea: a disc of radius `half` metres round `centre`, at `level`. Make it reach the far
+   * plane: its rim then never shows (the mist's fog ring, atmosphere/mist.ts, melts it into the sky).
+   */
   sea: { level: number; half: number; centre?: [number, number] }
   /** Inland water (lakes, rivers): flat hexes of corner radius `size`, drawn as V1 drew its rivers. */
   pools?: { size: number; tiles: readonly WaterPool[] }
@@ -370,7 +376,7 @@ export function createFieldWater(stage: Stage, opts: FieldWaterOpts): Water {
   const { sea, pools } = opts
   const [cx, cz] = sea.centre ?? [0, 0]
   const hexes = pools?.tiles ?? []
-  const n = 4 + hexes.length * 7
+  const n = 1 + SEA_SEGMENTS + hexes.length * 7
   const position = new Float32Array(n * 3)
   const inland = new Float32Array(n)
   const flow = new Float32Array(n * 2)
@@ -393,22 +399,14 @@ export function createFieldWater(stage: Stage, opts: FieldWaterOpts): Water {
     }
   const index: number[] = []
   const h = sea.half
-  position.set([
-    cx - h,
-    sea.level,
-    cz - h,
-    cx + h,
-    sea.level,
-    cz - h,
-    cx + h,
-    sea.level,
-    cz + h,
-    cx - h,
-    sea.level,
-    cz + h,
-  ])
-  index.push(0, 2, 1, 0, 3, 2)
-  let v = 4
+  // a fan round the centre: one draw, no corners
+  position.set([cx, sea.level, cz], 0)
+  for (let k = 0; k < SEA_SEGMENTS; k++) {
+    const a = (k / SEA_SEGMENTS) * Math.PI * 2
+    position.set([cx + Math.cos(a) * h, sea.level, cz + Math.sin(a) * h], (1 + k) * 3)
+    index.push(0, 1 + ((k + 1) % SEA_SEGMENTS), 1 + k)
+  }
+  let v = 1 + SEA_SEGMENTS
   for (const t of hexes) {
     const c = v
     position.set([t.x, t.y, t.z], v * 3)

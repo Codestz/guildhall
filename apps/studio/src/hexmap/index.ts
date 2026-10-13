@@ -2,8 +2,10 @@
  * Hex map (`/lab/hexmap`): step 1 of the hex world seen from above (decisions.md "Clean restart on hex"):
  * every tile drawn as a hexagon in its ground's colour, lighter the higher it stands, with a dark rim
  * where it drops to a lower neighbour (so the steps read), rivers as lines from tile to tile. One
- * island large, or eight seeds; sliders for every knob; everything in the query.
+ * island large, or eight seeds, or one seed growing; every knob in the Viewer's Inspector and the query.
  */
+
+import { type KnobSection, type KnobValues, roman, type Stat } from "@guildhall/ui"
 import {
   HEX_ISLAND_DEFAULTS,
   type HexIsland,
@@ -16,31 +18,10 @@ import {
   useOf as tileUse,
 } from "@guildhall/world"
 import type { Screen } from "../screens.ts"
-import { replaceQuery } from "../shell/router.ts"
+import { mountViewer } from "../shell/viewer.ts"
 
-const PANEL = [
-  "position:absolute",
-  "left:12px",
-  "top:12px",
-  "padding:10px 12px",
-  "border-radius:4px",
-  "background:rgba(21,17,13,0.85)",
-  "color:#f3e9d4",
-  "font:12px/1.5 ui-monospace,Menlo,monospace",
-  "display:grid",
-  "gap:6px",
-  "width:260px",
-  "z-index:2",
-].join(";")
-
-type Knob = Exclude<keyof HexIslandSpec, "seed">
-const KNOBS: { key: Knob; label: string; min: number; max: number; step: number }[] = [
-  { key: "files", label: "repo files", min: 0, max: 30000, step: 100 },
-  { key: "coast", label: "coast shape", min: 0, max: 2, step: 0.05 },
-  { key: "hills", label: "hill levels", min: 0, max: 9, step: 1 },
-  { key: "rain", label: "rivers", min: 0.3, max: 3, step: 0.05 },
-  { key: "forest", label: "forest", min: 0, max: 0.7, step: 0.01 },
-]
+/** The map's own lettering: the studio's mono, as the read-outs beside it. */
+const MAP_FONT = '"JetBrains Mono", ui-monospace, Menlo, monospace'
 
 /** Rings shown: the biggest island fits, so every size is drawn at one scale and growth reads. */
 const FIT = 40
@@ -66,25 +47,6 @@ interface View {
   growth: boolean
   /** Step 2 on top: zones, buildings, roads (on unless `zones=0`). */
   zones: boolean
-}
-
-function parse(q: URLSearchParams): View {
-  const num = (k: string, d: number) => {
-    const v = Number(q.get(k))
-    return q.has(k) && Number.isFinite(v) ? v : d
-  }
-  const spec = { ...HEX_ISLAND_DEFAULTS, seed: num("seed", 1) }
-  for (const k of KNOBS) spec[k.key] = num(k.key, HEX_ISLAND_DEFAULTS[k.key])
-  return { spec, grid: q.get("grid") === "1", growth: q.get("growth") === "1", zones: q.get("zones") !== "0" }
-}
-
-function params(v: View): URLSearchParams {
-  const q = new URLSearchParams({ seed: String(v.spec.seed) })
-  for (const k of KNOBS) if (v.spec[k.key] !== HEX_ISLAND_DEFAULTS[k.key]) q.set(k.key, String(v.spec[k.key]))
-  if (v.grid) q.set("grid", "1")
-  if (v.growth) q.set("growth", "1")
-  if (!v.zones) q.set("zones", "0")
-  return q
 }
 
 /** Draws island `h` centred at (cx, cy), fitted to `size` pixels across. */
@@ -433,8 +395,12 @@ function drawZones(
     g.lineWidth = 0.8
     g.strokeRect(px - w / 2, py - w / 2, w, w)
   }
-  // names at the hearts
-  g.font = `bold ${12 / zoomNow}px ui-monospace,Menlo,monospace`
+  // names at the hearts, once a hex is big enough on screen to carry one (a phone zooms in to read them)
+  if (s * zoomNow < 3.5) {
+    g.textAlign = "start"
+    return
+  }
+  g.font = `600 ${12 / zoomNow}px ${MAP_FONT}`
   g.textAlign = "center"
   for (const zone of z.zones) {
     const [px, py] = centre(zone.tile)
@@ -448,19 +414,155 @@ function drawZones(
   g.textAlign = "start"
 }
 
+/** The hex map's knobs: the island spec live (a map regenerates in milliseconds), the view, the zones. */
+const SECTIONS: KnobSection[] = [
+  {
+    title: "View",
+    knobs: [
+      {
+        kind: "segment",
+        key: "view",
+        label: "Show",
+        default: "one",
+        options: [
+          { value: "one", label: "One island" },
+          { value: "grid", label: "Eight seeds" },
+          { value: "growth", label: "Growth" },
+        ],
+      },
+      { kind: "stepper", key: "seed", label: "Seed", min: 1, default: 1 },
+      {
+        kind: "toggle",
+        key: "zones",
+        label: "Zones and roads",
+        hint: "Places, buildings, fields",
+        default: true,
+      },
+    ],
+  },
+  {
+    title: "Island",
+    knobs: [
+      {
+        kind: "range",
+        key: "files",
+        label: "Repo files",
+        min: 0,
+        max: 30000,
+        step: 100,
+        default: HEX_ISLAND_DEFAULTS.files,
+      },
+      {
+        kind: "range",
+        key: "coast",
+        label: "Coast shape",
+        min: 0,
+        max: 2,
+        step: 0.05,
+        default: HEX_ISLAND_DEFAULTS.coast,
+      },
+      {
+        kind: "range",
+        key: "hills",
+        label: "Hill levels",
+        min: 0,
+        max: 9,
+        step: 1,
+        default: HEX_ISLAND_DEFAULTS.hills,
+      },
+      {
+        kind: "range",
+        key: "rain",
+        label: "Rivers",
+        min: 0.3,
+        max: 3,
+        step: 0.05,
+        default: HEX_ISLAND_DEFAULTS.rain,
+      },
+      {
+        kind: "range",
+        key: "forest",
+        label: "Forest",
+        min: 0,
+        max: 0.7,
+        step: 0.01,
+        default: HEX_ISLAND_DEFAULTS.forest,
+      },
+    ],
+  },
+]
+
+const HELP = [
+  { gesture: "Drag", does: "pan" },
+  { gesture: "Wheel", does: "zoom" },
+  { keys: ["[", "]"], does: "seed" },
+]
+
+const rgb = ([r, g, b]: [number, number, number]) => `rgb(${r},${g},${b})`
+
+/** Old links: `?grid=1` and `?growth=1` were two buttons; they are the view knob now. */
+function migrate(q: URLSearchParams): URLSearchParams {
+  const out = new URLSearchParams(q)
+  if (!out.has("view")) {
+    if (out.get("growth") === "1") out.set("view", "growth")
+    else if (out.get("grid") === "1") out.set("view", "grid")
+  }
+  out.delete("grid")
+  out.delete("growth")
+  return out
+}
+
+function viewOf(values: KnobValues): View {
+  const spec = { ...HEX_ISLAND_DEFAULTS, seed: values.seed as number }
+  for (const k of KNOB_KEYS) spec[k] = values[k] as number
+  return {
+    spec,
+    grid: values.view === "grid",
+    growth: values.view === "growth",
+    zones: values.zones as boolean,
+  }
+}
+
+const KNOB_KEYS = ["files", "coast", "hills", "rain", "forest"] as const
+
 export const hexmap: Screen = {
   id: "hexmap",
   title: "Hex map",
   mount(host, ctx) {
+    const query = migrate(ctx.query)
+    const viewer = mountViewer(host, { ...ctx, query }, "hexmap", {
+      title: "The island from above",
+      subtitle:
+        "Heights in steps, sand, cliffs, rivers, lakes and forest; places, roads and fields over them.",
+      sections: SECTIONS,
+      help: HELP,
+      inspector: true,
+      onKnobs: (values) => {
+        view = viewOf(values)
+        render()
+      },
+      actions: [
+        {
+          label: "Open in 3D",
+          primary: true,
+          // this island in 3D: the town screen builds the same spec (seed, files and the shape knobs)
+          run: () => {
+            const q = new URLSearchParams()
+            for (const k of KNOB_KEYS)
+              if (view.spec[k] !== HEX_ISLAND_DEFAULTS[k]) q.set(k, String(view.spec[k]))
+            q.set("files", String(view.spec.files))
+            window.location.assign(`/town/${view.spec.seed}?${q}`)
+          },
+        },
+      ],
+    })
     const canvas = document.createElement("canvas")
-    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block"
-    host.append(canvas)
-    const panel = document.createElement("div")
-    panel.style.cssText = PANEL
-    host.append(panel)
-    const view = parse(ctx.query)
-    const stats = document.createElement("div")
-    stats.style.cssText = "opacity:.85;white-space:pre"
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab"
+    canvas.setAttribute("role", "img")
+    canvas.setAttribute("aria-label", "The hex island seen from above")
+    viewer.stage.append(canvas)
+    viewer.attachCanvas(canvas)
+    let view = viewOf(viewer.values())
 
     const cam = { x: 0, y: 0, zoom: 1 }
     canvas.addEventListener(
@@ -485,6 +587,7 @@ export const hexmap: Screen = {
     canvas.addEventListener("pointerdown", (e) => {
       drag = { x: e.clientX, y: e.clientY }
       canvas.setPointerCapture(e.pointerId)
+      canvas.style.cursor = "grabbing"
     })
     canvas.addEventListener("pointermove", (e) => {
       if (!drag) return
@@ -495,47 +598,72 @@ export const hexmap: Screen = {
     })
     canvas.addEventListener("pointerup", () => {
       drag = null
+      canvas.style.cursor = "grab"
     })
+
+    let described = ""
     const render = (): void => {
+      const key = JSON.stringify(view)
+      const describe = key !== described
+      described = key
       const dpr = Math.min(2, window.devicePixelRatio || 1)
-      const W = host.clientWidth
-      const H = host.clientHeight
+      const W = viewer.stage.clientWidth
+      const H = viewer.stage.clientHeight
       canvas.width = W * dpr
       canvas.height = H * dpr
-      const g = canvas.getContext("2d")!
+      const g = canvas.getContext("2d")
+      if (!g) return
       g.setTransform(dpr, 0, 0, dpr, 0, 0)
       g.fillStyle = "rgb(52,120,170)"
       g.fillRect(0, 0, W, H)
-      const left = 284
-      const aw = W - left - 8
+      // the map centres in what the Inspector leaves free
+      const left = 8
+      const aw = W - left - 8 - viewer.coveredRight()
+      const label = (text: string, x: number, y: number) => {
+        g.font = `500 12px ${MAP_FONT}`
+        g.lineWidth = 3
+        g.strokeStyle = "rgba(20,16,12,0.85)"
+        g.strokeText(text, x, y)
+        g.fillStyle = "#f3e9d4"
+        g.fillText(text, x, y)
+      }
       if (view.growth) {
         // one seed at growing repo sizes: the land already there never moves
         const sizes = [100, 600, 2000, 6000, 14000, 30000]
         const size = Math.min(aw / 3, (H - 16) / 2)
+        const rows: Stat[] = []
         sizes.forEach((files, k) => {
           const h = hexIsland({ ...view.spec, files })
           const x = left + (k % 3) * size + size / 2
           const y = 8 + Math.floor(k / 3) * size + size / 2
           draw(g, h, x, y, size, FIT)
-          g.fillStyle = "#f3e9d4"
-          g.font = "12px ui-monospace,Menlo,monospace"
-          g.fillText(`${files} files · ${h.stats.land} tiles`, x - size / 2 + 8, y - size / 2 + 18)
+          label(`${files.toLocaleString("en-US")} files`, x - size / 2 + 12, y - size / 2 + 22)
+          rows.push({ label: `${files.toLocaleString("en-US")} files`, value: h.stats.land, unit: "tiles" })
         })
-        stats.textContent = "growth: same seed, more files"
+        if (describe)
+          viewer.setInfo({
+            title: `Island ${roman(view.spec.seed)} growing`,
+            figures: [{ label: "Seed", value: view.spec.seed }],
+          })
+        if (describe) viewer.setReadout([{ title: "Growth", meta: "same seed, more files", rows }])
       } else if (view.grid) {
         const size = Math.min(aw / 4, (H - 16) / 2)
-        const lines: string[] = []
+        const rows: Stat[] = []
         for (let k = 0; k < 8; k++) {
-          const h = hexIsland({ ...view.spec, seed: view.spec.seed + k })
+          const seed = view.spec.seed + k
+          const h = hexIsland({ ...view.spec, seed })
           const x = left + (k % 4) * size + size / 2
           const y = 8 + Math.floor(k / 4) * size + size / 2
           draw(g, h, x, y, size, FIT)
-          g.fillStyle = "#f3e9d4"
-          g.font = "12px ui-monospace,Menlo,monospace"
-          g.fillText(`seed ${view.spec.seed + k}`, x - size / 2 + 8, y - size / 2 + 18)
-          lines.push(`${view.spec.seed + k}: ${h.stats.rivers} rivers · ${h.stats.lakes} lakes`)
+          label(`Seed ${seed}`, x - size / 2 + 12, y - size / 2 + 22)
+          rows.push({ label: `Seed ${seed}`, value: `${h.stats.rivers} rivers · ${h.stats.lakes} lakes` })
         }
-        stats.textContent = lines.join("\n")
+        if (describe)
+          viewer.setInfo({
+            title: `Seeds ${view.spec.seed}–${view.spec.seed + 7}`,
+            figures: [{ label: "Repo files", value: view.spec.files }],
+          })
+        if (describe) viewer.setReadout([{ title: "Seeds", rows }])
       } else {
         const h = hexIsland(view.spec)
         const zones = view.zones ? hexZones(h) : undefined
@@ -547,124 +675,87 @@ export const hexmap: Screen = {
         g.scale(cam.zoom, cam.zoom)
         draw(g, h, left + aw / 2, H / 2, size, FIT, zones)
         g.restore()
+        if (!describe) return
         const count: Record<string, number> = {}
         for (let i = 0; i < h.grid.size; i++) count[kindOf(h, i)] = (count[kindOf(h, i)] ?? 0) + 1
-        stats.textContent = [
-          `land tiles ${h.stats.land} (${view.spec.files} files)`,
-          `rivers ${h.stats.rivers} · lakes ${h.stats.lakes}`,
+        viewer.setInfo({
+          title: `Island ${roman(view.spec.seed)}`,
+          figures: [
+            { label: "Land tiles", value: h.stats.land },
+            ...(zones
+              ? [
+                  { label: "Places", value: zones.zones.length },
+                  { label: "Buildings", value: zones.stats.buildings },
+                ]
+              : [{ label: "Rivers", value: h.stats.rivers }]),
+          ],
+        })
+        viewer.setReadout([
+          {
+            title: "Summary",
+            rows: [
+              { label: "Repo files", value: view.spec.files },
+              { label: "Land tiles", value: h.stats.land },
+              { label: "Rivers", value: h.stats.rivers },
+              { label: "Lakes", value: h.stats.lakes },
+              ...(zones
+                ? [
+                    { label: "Buildings", value: zones.stats.buildings },
+                    { label: "Fields", value: zones.stats.fields },
+                    { label: "Road tiles", value: zones.stats.roadTiles },
+                    { label: "Bridges", value: zones.stats.bridges },
+                  ]
+                : []),
+              { label: "Generated in", value: h.stats.ms, unit: "ms" },
+            ],
+          },
           ...(zones
             ? [
-                `buildings ${zones.stats.buildings} · fields ${zones.stats.fields}`,
-                `road tiles ${zones.stats.roadTiles} · bridges ${zones.stats.bridges}`,
-                ...zones.zones.map(
-                  (q) =>
-                    `  ${q.kind.padEnd(8)} ${String(q.tiles.length).padStart(3)} tiles · ${q.buildings} bldg`,
-                ),
+                {
+                  title: "Places",
+                  meta: `${zones.zones.length}`,
+                  folded: true,
+                  legend: zones.zones.map((q) => ({
+                    colour: ZONE_COLOUR[q.kind] ?? "#f3e9d4",
+                    label: q.kind,
+                    value: q.tiles.length,
+                    note: `tiles · ${q.buildings} bldg`,
+                  })),
+                },
               ]
             : []),
-          ...Object.entries(count)
-            .filter(([k]) => k !== "sea")
-            .sort((a, b) => b[1] - a[1])
-            .map(([k, n]) => `${k.padEnd(9)} ${n}`),
-          `generated ${h.stats.ms} ms`,
-        ].join("\n")
+          {
+            title: "Ground",
+            folded: true,
+            legend: Object.entries(count)
+              .filter(([k]) => k !== "sea")
+              .sort((a, b) => b[1] - a[1])
+              .map(([k, n]) => ({ colour: rgb(COLOUR[k] ?? [255, 0, 255]), label: k, value: n })),
+          },
+        ])
       }
-      replaceQuery(params(view))
     }
 
-    const title = document.createElement("div")
-    title.innerHTML = "<b>Hex world</b> · 1 land + water · 2 zones + roads"
-    const btn = (label: string, on: () => void): HTMLButtonElement => {
-      const b = document.createElement("button")
-      b.textContent = label
-      b.style.cssText =
-        "background:#3b3127;color:#f3e9d4;border:1px solid #6b5a46;border-radius:3px;padding:2px 8px;font:inherit;cursor:pointer"
-      b.onclick = () => {
-        on()
-        render()
-      }
-      return b
-    }
-    const seedLabel = document.createElement("span")
-    const sync = () => {
-      seedLabel.textContent = `seed ${view.spec.seed}`
-    }
-    sync()
-    const row = document.createElement("div")
-    row.style.cssText = "display:flex;gap:6px;align-items:center"
-    row.append(
-      btn("◀", () => {
-        view.spec.seed = Math.max(1, view.spec.seed - (view.grid ? 8 : 1))
-        sync()
-      }),
-      seedLabel,
-      btn("▶", () => {
-        view.spec.seed += view.grid ? 8 : 1
-        sync()
-      }),
-    )
-    const gridBtn = btn(view.grid ? "one island" : "8 seeds", () => {
-      view.grid = !view.grid
-      gridBtn.textContent = view.grid ? "one island" : "8 seeds"
-    })
-    const growBtn = btn(view.growth ? "hide growth" : "growth", () => {
-      view.growth = !view.growth
-      growBtn.textContent = view.growth ? "hide growth" : "growth"
-    })
-    const zoneBtn = btn(view.zones ? "land only" : "zones", () => {
-      view.zones = !view.zones
-      zoneBtn.textContent = view.zones ? "land only" : "zones"
-    })
-    // this island in 3D: the town screen builds the same spec (seed, files and the shape knobs)
-    const open3d = btn("open in 3D", () => {
-      const q = params(view)
-      q.delete("grid")
-      q.delete("growth")
-      q.delete("zones")
-      q.delete("seed")
-      q.set("files", String(view.spec.files))
-      window.location.assign(`/town/${view.spec.seed}?${q}`)
-    })
-    row.append(gridBtn, growBtn, zoneBtn, open3d)
-    row.style.flexWrap = "wrap"
-    panel.append(title, row)
-    for (const k of KNOBS) {
-      const label = document.createElement("label")
-      label.style.cssText = "display:grid;grid-template-columns:96px 1fr 38px;gap:6px;align-items:center"
-      const name = document.createElement("span")
-      name.textContent = k.label
-      const input = document.createElement("input")
-      input.type = "range"
-      input.min = String(k.min)
-      input.max = String(k.max)
-      input.step = String(k.step)
-      input.value = String(view.spec[k.key])
-      const val = document.createElement("span")
-      val.textContent = String(view.spec[k.key])
-      input.oninput = () => {
-        view.spec[k.key] = Number(input.value)
-        val.textContent = input.value
-        render()
-      }
-      label.append(name, input, val)
-      panel.append(label)
-    }
-    panel.append(stats)
     const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA")) return
       if (e.key === "]" || e.key === "[") {
-        view.spec.seed = Math.max(1, view.spec.seed + (e.key === "]" ? 1 : -1))
-        sync()
+        const step = view.grid ? 8 : 1
+        viewer.setValues({ seed: Math.max(1, view.spec.seed + (e.key === "]" ? step : -step)) })
+        view = viewOf(viewer.values())
         render()
       }
     }
     window.addEventListener("keydown", onKey)
     const ro = new ResizeObserver(() => render())
-    ro.observe(host)
+    ro.observe(viewer.stage)
+    const offLayout = viewer.onLayout(render)
     render()
     return () => {
       ro.disconnect()
+      offLayout()
       window.removeEventListener("keydown", onKey)
-      host.replaceChildren()
+      viewer.dispose()
     }
   },
 }

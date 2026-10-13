@@ -126,7 +126,7 @@ const ROMAN: [number, string][] = [
   [1, "I"],
 ]
 
-function numeral(n: number): string {
+export function numeral(n: number): string {
   let rest = n
   let out = ""
   for (const [value, letters] of ROMAN) {

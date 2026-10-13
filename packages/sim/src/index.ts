@@ -4,7 +4,9 @@
  *
  *   guild/   the session model built from changes, its views, and the moments a change makes
  *   roster/  who an adventurer is (archetype, body), how seasoned (rank), how interesting a change is
- *   story/   what the moments mean in words: captions, the Legends book, the Chronicle card's recap
+ *   story/   what the moments mean in words: captions, the Legends book, the Chronicle card's recap,
+ *            and a repository's story by era (story/repo)
+ *   repo/    the Repo Chronicle: a repository's history (V1's format), read at a day
  */
 
 export { GuildModel } from "./guild/guildModel.ts"
@@ -50,5 +52,6 @@ export {
   titleOf,
   toolTarget,
 } from "./guild/views.ts"
+export * from "./repo/index.ts"
 export * from "./roster/index.ts"
 export * from "./story/index.ts"

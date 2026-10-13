@@ -60,6 +60,7 @@ export {
   type Sky,
   skyAt,
 } from "./renown.ts"
+export * from "./repo/index.ts"
 export {
   type BeatKind,
   beatOf,

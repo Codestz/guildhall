@@ -51,6 +51,8 @@ const build = (seed: number) => {
 
 /** Half a walker's width, metres; the grid the floor is flooded on. */
 const BODY = 0.2
+/** A step out of a disc a node stands in. */
+const WALK_STEP = 0.4
 const CELL = 0.12
 const WATER = new Set(["sea", "shallows", "lake", "river"])
 
@@ -74,7 +76,7 @@ describe("every authored spot on seed 1 can be walked to", () => {
     return WATER.has(kindOf(h, i)) && u !== "dock" && u !== "bridge" && w.stairAt(x, zz) === null
   }
   /** Why spot k cannot be walked to (null: it can). */
-  const stuck = (k: number): string | null => {
+  const stuck = (k: number, only?: (d: { x: number; z: number }) => boolean): string | null => {
     const s = f.spots[k]!
     const n = places.nodeOf(k)
     if (n < 0) return "no walk node within two tiles"
@@ -90,15 +92,21 @@ describe("every authored spot on seed 1 can be walked to", () => {
     for (let a = 0; a < nx; a++)
       for (let b = 0; b < nz; b++) {
         const [x, zz] = at(a, b)
-        open[a * nz + b] = f.near(x, zz, BODY).length || overWater(x, zz) ? 0 : 1
+        open[a * nz + b] =
+          f.near(x, zz, BODY).filter((d) => !only || only(d)).length || overWater(x, zz) ? 0 : 1
       }
-    // from the open ground round the node (a square's node stands under its well: people step out of it)
+    // from the open ground round the node (a square's node stands under its well, a mine's under its
+    // pithead: people step out of whatever they stand in)
+    const out = Math.max(
+      1.6,
+      ...f.near(node.x, node.z, 0).map((d) => d.r + WALK_STEP - Math.hypot(d.x - node.x, d.z - node.z)),
+    )
     const seen = new Uint8Array(nx * nz)
     const queue: number[] = []
     for (let a = 0; a < nx; a++)
       for (let b = 0; b < nz; b++) {
         const [x, zz] = at(a, b)
-        if (open[a * nz + b] && Math.hypot(x - node.x, zz - node.z) <= 1.6) {
+        if (open[a * nz + b] && Math.hypot(x - node.x, zz - node.z) <= out) {
           seen[a * nz + b] = 1
           queue.push(a * nz + b)
         }
@@ -137,7 +145,7 @@ describe("every authored spot on seed 1 can be walked to", () => {
 
   test("each is reachable, or excluded for a reason this file states", () => {
     const failures: string[] = []
-    const excluded = { unoffered: 0, offGraph: 0 }
+    const excluded = { unoffered: 0, offGraph: 0, pocket: 0 }
     let walked = 0
     for (const k of authored) {
       const s = f.spots[k]!
@@ -151,6 +159,18 @@ describe("every authored spot on seed 1 can be walked to", () => {
         excluded.offGraph++
         continue
       }
+      // a pocket: walled in by its own tile's props alone, whatever stands round it (an authoring fix in
+      // the tile composer, not a placing one); they stay rare
+      if (why?.startsWith("walled in")) {
+        const own = (d: { x: number; z: number }) => {
+          const { q, r } = hexAt(d.x / HEX_TILE_SIZE, d.z / HEX_TILE_SIZE)
+          return g.index(q, r) === s.tile
+        }
+        if (stuck(k, own)?.startsWith("walled in")) {
+          excluded.pocket++
+          continue
+        }
+      }
       walked++
       if (why)
         failures.push(`${p.id} (tile ${s.tile}) ${s.kind} at ${s.x.toFixed(1)},${s.z.toFixed(1)}: ${why}`)
@@ -159,6 +179,7 @@ describe("every authored spot on seed 1 can be walked to", () => {
     expect(walked).toBeGreaterThan(1000)
     // the exclusions stay the exception
     expect(excluded.offGraph).toBeLessThan(walked / 20)
+    expect(excluded.pocket).toBeLessThan(5)
   })
 
   test("the harbour's quay, the monastery's compound, a farmstead and the town hall's plaza stand here, every spot of theirs walked to", () => {

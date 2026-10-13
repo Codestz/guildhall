@@ -1259,7 +1259,9 @@ export function castleWalls(
   colour: string,
 ): PlacedPiece[] {
   const out: PlacedPiece[] = []
-  const A = R * (Math.sqrt(3) / 2) * 0.86
+  // the wall's line, inset so its outer face stays on its own tile (a castle's wall never stands over the
+  // moat or the land beyond: sites.ts), and its towers on the line's corners, inside the tile's corner
+  const A = R * (Math.sqrt(3) / 2) - WALL_SCALE * WALL_DEPTH * 0.5 - 0.05
   const put = (piece: string, a: number, r: number, along: number, rot: number, scale: number, dy = 0) => {
     const ux = Math.cos(a)
     const uz = -Math.sin(a)
@@ -1285,21 +1287,32 @@ export function castleWalls(
       A,
       0,
       a + Math.PI / 2,
-      0.42,
+      WALL_SCALE,
     )
     if (gate)
       for (const s of [-1, 1])
-        put(`kaykit-dungeon/banner-${colour}`, a, A + 0.75, s * 1.05, facingOut(a), 0.42, 0.35)
+        put(`kaykit-dungeon/banner-${colour}`, a, A + 0.42, s * 1.05, facingOut(a), 0.42, 0.35)
   }
-  // towers on every other outer corner: enough to read as a castle, few enough that the wall shows
-  for (let v = 0; v < 6; v += 2) {
-    if (!walled.has(v) || !walled.has((v + 1) % 6)) continue
+  // towers where the wall turns outward (two walled sides of the tile meet): along a run of such corners
+  // on every other one from the run's start, so the wall shows between them
+  const corner = A / (Math.sqrt(3) / 2) - 0.2
+  const convex = (v: number) => walled.has(((v % 6) + 6) % 6) && walled.has((v + 1) % 6)
+  const start = [0, 1, 2, 3, 4, 5].find((v) => convex(v) && !convex(v - 1)) ?? 0
+  for (let k = 0, last = -2; k < 6; k++) {
+    const v = (start + k) % 6
+    if (!convex(v) || k - last < 2) continue
+    last = k
     const b = (Math.PI / 180) * (60 * v + 30)
-    put(`kaykit-hexagon/building-tower-base-${colour}`, b, R * 0.86, 0, facingOut(b), 0.26)
-    put("kenney-castle/flag", b, R * 0.86, 0, facingOut(b), 0.45, 12 * 0.26 - 0.1)
+    put(`kaykit-hexagon/building-tower-base-${colour}`, b, corner, 0, facingOut(b), CORNER_TOWER)
+    put("kenney-castle/flag", b, corner, 0, facingOut(b), 0.45, 12 * CORNER_TOWER - 0.1)
   }
   return out
 }
+
+/** The curtain wall's scale (a wall piece then spans a tile's side), its depth as imported, its corner towers' scale. */
+const WALL_SCALE = 0.38
+const WALL_DEPTH = 3.36
+const CORNER_TOWER = 0.21
 
 /**
  * What gathers at a land tile's edges: reeds and pebbles along each side in `banks` (toward a river or

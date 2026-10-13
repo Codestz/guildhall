@@ -16,6 +16,7 @@
  */
 import { fbm, hash2, ridged, smoothstep } from "../geom/noise.ts"
 import { type HexGrid, hexCentre, hexGrid } from "./grid.ts"
+import { type IslandSites, levelSites, reserveSites } from "./sites.ts"
 
 export const HEX_KINDS = [
   "sea",
@@ -95,6 +96,8 @@ export interface HexIsland {
   moisture: Float32Array
   /** The nature lake's tiles (every island has one; a bigger island keeps it). */
   lake: number[]
+  /** The reserved sites (sites.ts `reserveSites`): the town's core and the castle's site, dry and level, fixed as the island grows. */
+  sites: IslandSites
   stats: { land: number; rivers: number; lakes: number; ms: number }
 }
 
@@ -268,12 +271,9 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
   const coast = steps(g, isSea)
 
   // ---- 2. height in levels ----
-  const level = new Int8Array(N).fill(-1)
-  for (let i = 0; i < N; i++) {
-    if (isSea(i)) continue
+  // the massifs' pull at a tile, 0–1: the same at every island size
+  const hillAt = (i: number): number => {
     const [x, y] = at(i)
-    const D = coast[i]!
-    const low = Math.min(2, Math.floor(D / 3)) + (fbm(seed + 23, x / 9, y / 9, 2) > 0.25 ? 1 : 0)
     const m =
       1 -
       smoothstep(
@@ -289,13 +289,32 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
           R * 0.3,
           Math.hypot(x - massif2[0], y - massif2[1]) * (1 + 0.35 * fbm(seed + 33, x / 7, y / 7, 2)),
         ))
+    return Math.max(m, m2)
+  }
+  const level = new Int8Array(N).fill(-1)
+  for (let i = 0; i < N; i++) {
+    if (isSea(i)) continue
+    const [x, y] = at(i)
+    const D = coast[i]!
+    const low = Math.min(2, Math.floor(D / 3)) + (fbm(seed + 23, x / 9, y / 9, 2) > 0.25 ? 1 : 0)
+    const mm = hillAt(i)
     const hill = Math.round(
-      Math.max(m, m2) * spec.hills * (0.75 + 0.5 * ridged(seed + 31, x / 8, y / 8, 2)) * Math.min(1, D / 2),
+      mm * spec.hills * (0.75 + 0.5 * ridged(seed + 31, x / 8, y / 8, 2)) * Math.min(1, D / 2),
     )
     // bluffs: stretches of the coast stand high (more of them near the hills)
-    const bluff = D <= 2 && fbm(seed + 37, x / 9, y / 9, 2) + 0.6 * Math.max(m, m2) > 0.32 ? 2 : 0
+    const bluff = D <= 2 && fbm(seed + 37, x / 9, y / 9, 2) + 0.6 * mm > 0.32 ? 2 : 0
     level[i] = Math.max(D <= 1 ? 0 : 1, Math.min(low, D)) + hill + bluff
   }
+  // ---- 2b. the reserved sites (sites.ts): the town's core and the castle's site, levelled ----
+  const sites = reserveSites(g, rank, seed, hillAt, (i) => {
+    // the level a tile has once it is well inland (the coast's pull gone): the same at every size
+    const [x, y] = at(i)
+    const bump = fbm(seed + 23, x / 9, y / 9, 2) > 0.25 ? 1 : 0
+    return 2 + bump + Math.round(hillAt(i) * spec.hills * (0.75 + 0.5 * ridged(seed + 31, x / 8, y / 8, 2)))
+  })
+  const reserved = new Uint8Array(N)
+  for (const list of [sites.town, sites.castle]) for (const i of list) if (!isSea(i)) reserved[i] = 1
+  levelSites(g, level, [sites.town, sites.castle], isSea)
 
   // ---- 3. water: drain every tile to the sea (priority flood), fill hollows as lakes ----
   const down = new Int32Array(N).fill(-1)
@@ -342,11 +361,31 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
         down[i] = [...g.neighbours(i)].find((j) => j >= 0 && isSea(j))!
         push(filled[i]!, i)
       }
-    while (heap.length) {
+    // the reserved sites drain last: water runs round them, through them only where it has no other way
+    for (;;) {
+      if (!heap.length) {
+        // the flood is held at the sites: let in the reserved tile it reached at its lowest
+        let lo = -1
+        let from = -1
+        for (let k = 0; k < N; k++)
+          if (reserved[k] && !seen[k])
+            for (const j of g.neighbours(k))
+              if (j >= 0 && seen[j] && (from < 0 || filled[j]! < filled[from]!)) {
+                lo = k
+                from = j
+              }
+        if (lo < 0) break
+        seen[lo] = 1
+        down[lo] = from
+        filled[lo] = Math.max(level[lo]!, filled[from]! + 0.001)
+        push(filled[lo]!, lo)
+        continue
+      }
       const [, i] = pop()
       order.push(i)
       for (const j of g.neighbours(i)) {
         if (j < 0 || seen[j] || isSea(j)) continue
+        if (reserved[j] && !reserved[i]) continue
         seen[j] = 1
         filled[j] = Math.max(level[j]!, filled[i]! + 0.001)
         down[j] = i
@@ -357,7 +396,7 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
   // lakes: hollows the flood filled at least a level deep, two tiles or more
   let lakes = 0
   {
-    const { label, sizes } = pieces(g, (i) => !isSea(i) && filled[i]! - level[i]! >= 0.999)
+    const { label, sizes } = pieces(g, (i) => !isSea(i) && !reserved[i] && filled[i]! - level[i]! >= 0.999)
     for (let i = 0; i < N; i++)
       if (label[i] && sizes[label[i]!]! >= 2) {
         kind[i] = K.lake
@@ -376,7 +415,7 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
   let landCount = 0
   for (let i = 0; i < N; i++) if (!isSea(i)) landCount++
   const thr = Math.max(6, (landCount * 0.03) / spec.rain)
-  const wet = (i: number) => !isSea(i) && kind[i] !== K.lake && flow[i]! >= thr
+  const wet = (i: number) => !isSea(i) && !reserved[i] && kind[i] !== K.lake && flow[i]! >= thr
   const fed = new Uint8Array(N)
   for (let i = 0; i < N; i++) if (wet(i) && down[i]! >= 0) fed[down[i]!] = 1
   const heads = [...Array(N).keys()]
@@ -387,7 +426,8 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
   for (const head of heads) {
     const tiles: number[] = []
     let i = head
-    while (i >= 0) {
+    // a river meets a reserved site at its edge and ends there (the castle's moat): it never runs through
+    while (i >= 0 && !reserved[i]) {
       tiles.push(i)
       if (isSea(i) || kind[i] === K.lake || (taken[i] && i !== head)) break
       taken[i] = 1
@@ -406,7 +446,7 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
     let made = 0
     while (queue.length && made < n) {
       const i = queue.shift()!
-      if (isSea(i) || Math.abs(level[i]! - lvl) > 0) continue
+      if (isSea(i) || reserved[i] || Math.abs(level[i]! - lvl) > 0) continue
       kind[i] = K.lake
       made++
       for (const j of g.neighbours(i))
@@ -448,12 +488,17 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
     if (k === K.river || k === K.lake) continue
     const [x, y] = at(i)
     const L = level[i]!
+    // a reserved site is open ground to build on: no wood, no bare rock, no shore
+    if (reserved[i]) {
+      kind[i] = L >= 3 ? K.hill : K.grass
+      continue
+    }
     const nearSea = coast[i]! <= 1
     if (nearSea) {
       kind[i] = L >= 2 ? K.cliff : K.sand
       continue
     }
-    if (L >= maxLevel - 1 && L >= 4) {
+    if (L >= maxLevel - 1 && L >= 4 && ![...g.neighbours(i)].some((j) => j >= 0 && reserved[j])) {
       kind[i] = K.rock
       continue
     }
@@ -475,7 +520,12 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
       const [x, y] = at(i)
       return fbm(seed + 41, x / 13, y / 13, 2)
     }
-    const fit = (i: number) => rank[i]! >= 0 && rank[i]! < ref * 0.8 && g.ring(i) >= 6
+    // never on a reserved site, nor crowding the town's core (two steps clear)
+    const crowd = new Set<number>(sites.town)
+    for (let k = 0; k < 2; k++)
+      for (const i of [...crowd]) for (const j of g.neighbours(i)) if (j >= 0) crowd.add(j)
+    const fit = (i: number) =>
+      rank[i]! >= 0 && rank[i]! < ref * 0.8 && g.ring(i) >= 6 && !reserved[i] && !crowd.has(i)
     let site = -1
     let best = -1e9
     for (let i = 0; i < N; i++) {
@@ -533,6 +583,7 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
     coast,
     moisture,
     lake: natureLake,
+    sites,
     stats: { land: landCount, rivers: rivers.length, lakes, ms: Math.round(performance.now() - t0) },
   }
 }

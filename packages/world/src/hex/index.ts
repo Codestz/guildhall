@@ -58,6 +58,14 @@ export {
   WOODED,
 } from "./nature.ts"
 export { parseTilePrefabs, SPOT_KINDS, TILE_GROUNDS, TILE_GROUPS, validateTilePrefab } from "./prefabs.ts"
+export {
+  CASTLE_TILES,
+  type CastlePlan,
+  type CastleRole,
+  footprint,
+  type IslandSites,
+  pieceSize,
+} from "./sites.ts"
 export { type Disc, type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
 export { hexStructures } from "./structures.ts"
 export {

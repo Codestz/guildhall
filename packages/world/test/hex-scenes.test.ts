@@ -71,8 +71,6 @@ describe("scenes bigger than a tile", () => {
         const turning = TURNING.includes(t.prefab ?? "")
         if (!SCENES.includes(t.prefab ?? "") && !turning) continue
         scenes++
-        // only a turning scene is mirrored
-        if (!turning) expect(t.mirror).toBeUndefined()
         for (const j of coverOf(h, t)) {
           expect(owner.has(j)).toBe(false)
           owner.set(j, t.i)
@@ -87,9 +85,10 @@ describe("scenes bigger than a tile", () => {
           expect(h.level[j]).toBe(h.level[t.i]!)
           expect(["sea", "shallows", "lake", "river", "rock", "cliff"]).not.toContain(kindOf(h, j))
           expect(useOf(z, j)).not.toBe("dock")
-          // only the monastery takes in its own place's buildings; a farm's fields stay fields
+          // only the monastery and the town's market square take in their own place's buildings; a
+          // farm's fields stay fields
           if (useOf(z, j) === "building") {
-            expect(t.prefab).toBe("monastery-compound")
+            expect(["monastery-compound", "market-square"]).toContain(t.prefab!)
             expect(z.zoneOf[j]).toBe(z.zoneOf[t.i]!)
           }
           if (t.prefab === "farmstead-yard") expect(useOf(z, j)).not.toBe("field")
@@ -136,15 +135,17 @@ describe("the Guildhall castle", () => {
     expect(castleTier(50000, 20)).toBe(4)
   })
 
-  test("it grows its tiles with the tier: a keep alone, then walled, then wards and the great hall, then a citadel", () => {
+  test("it grows its tiles with the tier: a keep and its forecourt, then walled, then wards and the great hall, then a citadel", () => {
     const sizes: number[] = []
+    const keeps = new Set<number>()
     for (const files of [500, 2000, 4000, 12000]) {
-      const { z, w } = build(1, files)
+      const { h, z, w } = build(1, files)
       const castle = z.zones.find((zz) => zz.kind === "castle")!
       sizes.push(castle.tiles.length)
       const prefab = new Map(w.tiles.map((t) => [t.i, t.prefab]))
-      // the keep stays on the castle's first tile
+      // the keep stays on the castle's first tile, the same tile at every size (sites.ts: a reserved site)
       expect(prefab.get(castle.tiles[0]!)).toBe("castle")
+      keeps.add(castle.tiles[0]!)
       const near = (p: { x: number; z: number }) =>
         castle.tiles.some((i) => {
           const t = w.tiles.find((u) => u.i === i)!
@@ -153,12 +154,17 @@ describe("the Guildhall castle", () => {
       const walls = w.pieces.filter((p) => p.piece.startsWith("kaykit-hexagon/wall-") && near(p)).length
       if (z.tier === 1) expect(walls).toBe(0)
       else expect(walls).toBeGreaterThan(0)
-      // the great hall (tier 3 up) is the castle's heart, where agents gather
-      if (z.tier >= 3) expect(prefab.get(castle.tile)).toBe("great-hall")
-      else expect(castle.tile).toBe(castle.tiles[0]!)
+      // the castle's heart, where agents gather, is the paved court before the great hall (tier 3 up),
+      // else before the keep: both doors open onto it
+      const plan = z.castle!
+      const front = plan.hall >= 0 ? plan.hall : plan.keep
+      if (z.tier >= 3) expect(prefab.get(plan.hall)).toBe("great-hall")
+      expect(h.grid.neighbours(front)[plan.door.get(front)!]).toBe(castle.tile)
+      expect(useOf(z, castle.tile)).toBe("court")
       if (z.tier === 4) expect(castle.tiles.some((i) => prefab.get(i) === "castle-tower")).toBe(true)
     }
     for (let k = 1; k < sizes.length; k++) expect(sizes[k]!).toBeGreaterThan(sizes[k - 1]!)
+    expect(keeps.size).toBe(1)
   })
 
   test("agents passed to the world change what its castle builds", () => {

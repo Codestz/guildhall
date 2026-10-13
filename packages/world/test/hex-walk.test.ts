@@ -65,7 +65,7 @@ describe("hex walk graph", () => {
         const d = walk.door(i)
         if (d < 0) continue
         doors++
-        expect(useOf(z, i)).toMatch(/building|farmstead|homestead/)
+        expect(useOf(z, i)).toMatch(/building|farmstead|homestead|landmark/)
         const door = walk.nodes[d]!
         const [e] = walk.out[d]!
         const street = walk.nodes[walk.edges[e!]!.a === d ? walk.edges[e!]!.b : walk.edges[e!]!.a]!
@@ -80,11 +80,18 @@ describe("hex walk graph", () => {
     }
   })
 
-  test("no walk edge climbs more than one level step (bridge and dock decks aside)", () => {
-    for (const { walk } of islands)
+  test("no walk edge climbs more than one level step (bridge and dock decks aside), but by a flight of stairs", () => {
+    for (const { w, walk } of islands)
       for (const e of walk.edges) {
         if (e.kind === "dock" || e.kind === "bridge") continue
-        expect(Math.abs(walk.nodes[e.a]!.y - walk.nodes[e.b]!.y)).toBeLessThanOrEqual(LEVEL_STEP + 1e-6)
+        const a = walk.nodes[e.a]!
+        const b = walk.nodes[e.b]!
+        const climb = Math.abs(a.y - b.y)
+        // a road that must climb two or three steps at once (zones.ts: no gentler way joins its place) has stairs
+        if (climb > LEVEL_STEP + 1e-6) {
+          expect(climb).toBeLessThanOrEqual(3 * LEVEL_STEP + 1e-6)
+          expect(w.stairAt((a.x + b.x) / 2, (a.z + b.z) / 2)).not.toBeNull()
+        }
       }
   })
 

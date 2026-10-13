@@ -14,6 +14,7 @@ import {
   isDefaultNature,
   natureOdds,
 } from "./nature.ts"
+import { footprint, settlePieces } from "./sites.ts"
 import {
   castleWalls,
   edgeDressing,
@@ -23,6 +24,7 @@ import {
   type PlacedPiece,
   placeTile,
   type TileGround,
+  type TilePrefab,
   tilePath,
   tilePrefab,
   worldSide,
@@ -173,6 +175,8 @@ interface SceneFit {
   spare?: TileUse[]
   /** It takes in its own place's other buildings (a monastery's chapel and graveyard become its compound). */
   absorb?: boolean
+  /** It clears its own place's houses for its ground (the town's market square, where the town has no open ground left). */
+  clear?: boolean
   /** It may turn to any street its tile fronts, and be mirrored, to fit. */
   turn?: boolean
   /** Which of its place's buildings it tries first (default: nearest the heart). */
@@ -184,6 +188,7 @@ const SCENE_FIT: Partial<Record<string, SceneFit>> = {
   "farmstead-yard": { spare: ["field"], turn: true },
   // on the ring street round the town's square, the hall facing its plaza
   "town-hall-plaza": { turn: true, near: "ring" },
+  "market-square": { clear: true },
 }
 /** Steps from a town's square out to its ring street (zones.ts). */
 const RING_STEPS = 3
@@ -317,6 +322,32 @@ export function hexWorld(
     }
     return (n ? bank / n : Math.max(0, top(i)) + 0.4) + DECK_LIFT
   }
+  /** Whether the ground at a point is dry land at a building's base `y` or above (not water, not a step down). */
+  const floorAt = (px: number, pz: number, y: number): boolean => {
+    const j = tileAt(px, pz)
+    if (j < 0) return false
+    const k = kindOf(h, j)
+    if (k === "sea" || k === "shallows" || k === "lake" || k === "river") return false
+    return top(j) >= y - 0.05
+  }
+  /** Whether every solid piece of `prefab` on tile i, its front turned to side `door`, stands on its floor. */
+  const standsOn = (prefab: TilePrefab, i: number, door: number): boolean =>
+    placeTile(prefab, at(i), top(i), rotOf(door), i, true, odds).every((q) =>
+      (footprint(q) ?? []).every(([px, pz]) => floorAt(px, pz, top(i))),
+    )
+  /** The sides a building on tile i can have its door on: toward a street a step up or down at most. */
+  const streetSides = (i: number): number[] => {
+    const nb = g.neighbours(i)
+    return [0, 1, 2, 3, 4, 5].filter(
+      (d) => nb[d]! >= 0 && roadLike(nb[d]!) && Math.abs(h.level[nb[d]!]! - h.level[i]!) <= 1,
+    )
+  }
+  /** The door side for `prefab` on building tile i: the first street side it stands on its floor facing, else the first street side. */
+  const doorFor = (prefab: string, i: number): number => {
+    const p = tilePrefab(prefab)
+    if (p) for (const d of streetSides(i)) if (standsOn(p, i, d)) return d
+    return facing(i)
+  }
   const dryLand = (i: number) => {
     const k = kindOf(h, i)
     return k !== "sea" && k !== "shallows" && k !== "lake" && k !== "river" && k !== "rock" && k !== "cliff"
@@ -374,7 +405,7 @@ export function hexWorld(
     if (z.zoneOf[j] === 0)
       return (OPEN_COUNTRY.has(u) || !!fit.country?.includes(u)) && !fit.spare?.includes(u)
     if (z.zoneOf[j] !== z.zoneOf[i] || zoneAt(j)!.kind === "castle") return false
-    return OPEN_IN_PLACE.has(u) || (!!fit.absorb && u === "building")
+    return OPEN_IN_PLACE.has(u) || ((!!fit.absorb || !!fit.clear) && u === "building")
   }
   /** The street sides a building may turn to: its first (where it faces anyway), then the others a door reaches. */
   const streets = (i: number): number[] => {
@@ -394,6 +425,8 @@ export function hexWorld(
   const turned = new Map<number, { door: number; mirror: boolean }>()
   /** A quay's place's dock tiles: left open water. */
   const quayed = new Set<number>()
+  /** The castle's reserved ground outside its walls (island.ts sites): open, nothing grows on it. */
+  const grounds = new Set(h.sites.castle.filter((i) => z.zones[z.zoneOf[i]! - 1]?.kind !== "castle"))
   /** Puts `scene` on building tile i if its footprint fits there (with `street`, only on one fronting a street). */
   const claim = (i: number, scene: string, street = false): boolean => {
     const p = tilePrefab(scene)
@@ -404,12 +437,14 @@ export function hexWorld(
     if (fit.sea && h.level[i] !== 0) return false
     // the side the building turns to (walk.ts puts its door there too); a scene that may turn tries
     // every street it fronts, as authored and mirrored
-    for (const door of fit.turn ? streets(i) : [facing(i)])
-      for (const mirror of fit.turn ? [false, true] : [false]) {
+    for (const door of streets(i))
+      for (const mirror of [false, true]) {
         const cover = p.footprint.map((k) => nb[worldSide(mirror ? mirrorSide(k) : k, door)]!)
         if (!cover.every((j) => claimable(i, j, fit))) continue
         const drink = DRINKS.has(scene)
         if (drink && nearDrink([i, ...cover], i)) return false
+        // every building of it on its floor (sites.ts): dry ground at its level
+        if (!standsOn(mirror ? mirrorPrefab(p) : p, i, door)) continue
         scenes.set(i, scene)
         for (const j of cover) claimedBy.set(j, i)
         if (drink) drinks.push(i, ...cover)
@@ -429,19 +464,29 @@ export function hexWorld(
       near === "ring" ? Math.abs(steps(i, zone.tile) - RING_STEPS) : steps(i, zone.tile)
     return zone.tiles.filter((i) => useOf(z, i) === "building").sort((a, b) => d(a) - d(b) || a - b)
   }
+  /** A building a short lane reaches: a street within two steps, over open ground on its level. */
+  const byLane = (i: number) =>
+    [...g.neighbours(i)].some(
+      (j) =>
+        j >= 0 &&
+        useOf(z, j) !== "building" &&
+        dryLand(j) &&
+        Math.abs(h.level[j]! - h.level[i]!) <= 1 &&
+        [...g.neighbours(j)].some((k) => k >= 0 && roadLike(k)),
+    )
   // each place's own scenes first, on the building nearest its heart they fit beside: one with a door
   // onto a street people come in by first, else one a lane reaches (life.ts workTiles)
   for (const [zi, zone] of z.zones.entries())
     for (const scene of PLACE_SCENES[zone.kind] ?? []) {
       const near = SCENE_FIT[scene]?.near
       buildings(zi, near).some((i) => claim(i, scene, true)) ||
-        buildings(zi, near).some((i) => claim(i, scene))
+        buildings(zi, near).some((i) => byLane(i) && claim(i, scene))
     }
   // then every other tavern, smithy and archery range the tiles picked, where there is room
   for (let i = 0; i < g.size; i++) {
     if (useOf(z, i) !== "building" || scenes.has(i)) continue
     const scene = SCENES[buildOf(i)]
-    if (scene) claim(i, scene)
+    if (scene && (onStreet(i) || byLane(i))) claim(i, scene)
   }
   /** The first of `ids` the castle's tier has (a castle piece's `tier`: the first tier that uses it). */
   const atTier = (...ids: string[]): string | null =>
@@ -450,6 +495,21 @@ export function hexWorld(
       return p !== undefined && (p.tier ?? 1) <= tier
     }) ?? null
 
+  /** The buildings standing so far, by tile: their bodies (sites.ts bodyRadius). */
+  const standing = new Map<number, [number, number, number][]>()
+  const bodies = {
+    near(px: number, pz: number) {
+      const own = tileAt(px, pz)
+      if (own < 0) return []
+      return [own, ...g.neighbours(own)].flatMap((j) => (j >= 0 ? (standing.get(j) ?? []) : []))
+    },
+    add(px: number, pz: number, r: number) {
+      const own = tileAt(px, pz)
+      if (own < 0 || r <= 0) return
+      if (!standing.has(own)) standing.set(own, [])
+      standing.get(own)!.push([px, pz, r])
+    },
+  }
   const byTile = new Map<number, number>()
   for (let i = 0; i < g.size; i++) {
     const k = kindOf(h, i)
@@ -475,39 +535,54 @@ export function hexWorld(
       prefab = SCENE_PART
       const p = tilePrefab(scenes.get(origin)!)!
       if ((p.ground === "dirt" || p.ground === "paved") && dryLand(i)) ground = p.ground
+    } else if (zone?.kind === "castle" && z.castle) {
+      // the Guildhall, as composed for its site (sites.ts composeCastle): each tile its role, the doors
+      // onto the paved ways, the curtain wall round the yard with its gatehouse where the road comes in
+      const plan = z.castle
+      const role = plan.role.get(i)
+      const d = plan.door.get(i)
+      const nb = g.neighbours(i)
+      if (d !== undefined) {
+        door = d
+        rot = rotOf(d)
+      } else {
+        const toHeart = nb.indexOf(plan.heart)
+        if (toHeart >= 0) rot = rotOf(toHeart)
+      }
+      ground = "paved"
+      if (role === "keep") prefab = "castle"
+      else if (role === "hall") prefab = atTier("great-hall", "castle-ward")
+      else if (role === "tower") prefab = atTier("castle-tower", "castle-ward")
+      else if (role === "barracks") prefab = "barracks"
+      else if (role === "yard") prefab = atTier("castle-ward", "castle-yard")
+      else {
+        // a court: paved through along its ways (and out of the gate)
+        const sides = [0, 1, 2, 3, 4, 5].filter((e) => nb[e]! >= 0 && (links.get(i)?.has(nb[e]!) ?? false))
+        if (sides.length) {
+          paths.push(...tilePath([x, zz], t + 0.07, sides, 1.1))
+          pathSides = sides
+        }
+      }
+      const sides = plan.walls.get(i)
+      if (sides && tier >= 2) {
+        const gate = i === plan.gate && sides.includes(plan.gateSide) ? [plan.gateSide] : []
+        const colour = recolour("kaykit-hexagon/building-castle-blue", zone.tile).split("-").pop()!
+        pieces.push(
+          ...castleWalls(
+            [x, zz],
+            t,
+            sides.filter((e) => !gate.includes(e)),
+            gate,
+            colour,
+          ),
+        )
+      }
     } else if (u === "building") {
       prefab = scenes.get(i) ?? buildOf(i)
       const turn = turned.get(i)
-      door = turn?.door ?? facing(i)
+      door = turn?.door ?? (scenes.has(i) ? facing(i) : doorFor(prefab, i))
       rot = rotOf(door)
       if (turn?.mirror) mirror = true
-    } else if (u === "landmark" && zone) {
-      // the Guildhall: its keep on the castle's first tile, its great hall (tier 3 up) at its heart
-      const nb = g.neighbours(i)
-      if (i === zone.tiles[0]) {
-        prefab = "castle"
-        const d = nb.indexOf(zone.tile)
-        if (d >= 0) rot = rotOf(d)
-      } else {
-        prefab = atTier("great-hall", "castle-yard", "castle-ward")
-        // its door toward the road coming in, its back to the keep
-        const d = [0, 1, 2, 3, 4, 5].find((e) => nb[e]! >= 0 && roadLike(nb[e]!))
-        door = d ?? (nb.indexOf(zone.tiles[0]!) + 3) % 6
-        rot = rotOf(door)
-      }
-    } else if (
-      zone?.kind === "castle" &&
-      (u === "yard" || u === "garden" || u === "well" || u === "market")
-    ) {
-      // the castle's other tiles: its bailey (tier 2), its wards (3), towers on the citadel's ring (4)
-      const nb = g.neighbours(i)
-      const out = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! < 0 || z.zoneOf[nb[d]!] !== z.zoneOf[i])
-      const ring = out.length >= 2 && hash2(seed + 43, g.q[i]!, g.r[i]!) < 0.65
-      prefab = ring
-        ? atTier("castle-tower", "castle-ward", "castle-yard")
-        : atTier("castle-ward", "castle-yard")
-      const d = nb.indexOf(zone.tile)
-      rot = rotOf(d >= 0 ? d : 4)
     } else if (zone?.kind === "harbour" && (u === "yard" || u === "garden" || u === "well" || u === "market"))
       prefab = "quay"
     else if (u === "square") {
@@ -564,7 +639,8 @@ export function hexWorld(
           const a = (Math.PI / 180) * (60 * d)
           const ux = Math.cos(a)
           const uz = -Math.sin(a)
-          const run = Math.min(e * 0.8, drop * 1.35)
+          // (a road that must climb three levels at once, zones.ts, gets a longer flight)
+          const run = Math.min(e * (drop > 2 * STEP + 0.01 ? 0.95 : 0.8), drop * 1.35)
           stairs.push({
             kind: "stairs",
             ax: x + ux * e,
@@ -612,6 +688,9 @@ export function hexWorld(
       let d = [0, 1, 2, 3, 4, 5].find((e) => dry(nb[e]!) && z.zoneOf[nb[e]!]! > 0)
       if (d === undefined) d = [0, 1, 2, 3, 4, 5].find((e) => dry(nb[e]!))
       rot = rotOf(d ?? 4)
+    } else if (grounds.has(i) && u === "meadow") {
+      // the castle's ground its next tiers take: kept open, its approach clear
+      prefab = null
     } else if (BY_USE[u] && !quayed.has(i)) {
       prefab = BY_USE[u]!
       if (prefab === "farmstead" || prefab === "market" || prefab === "windmill") {
@@ -630,8 +709,10 @@ export function hexWorld(
       // a prefab's own pieces, minus those that would float on water tiles it was not made for
       // a castle's tiles all take its keep's colour
       const hue = zone?.kind === "castle" ? zone.tile : i
-      for (const q of placeTile(p, [x, zz], prefab === "dock" ? SEA_TOP : t, rot, i, true, odds))
-        pieces.push({ ...q, piece: recolour(q.piece, hue) })
+      const placed = placeTile(p, [x, zz], prefab === "dock" ? SEA_TOP : t, rot, i, true, odds)
+      // every building on its floor: dry ground at its own level, clear of the buildings beside it
+      if (prefab !== "dock") settlePieces(placed, [x, zz], (px, pz) => floorAt(px, pz, t), bodies)
+      for (const q of placed) pieces.push({ ...q, piece: recolour(q.piece, hue) })
       prefabs[prefab!] = (prefabs[prefab!] ?? 0) + 1
       // a quay's deck out over the water: walked at the tile's top, like a bridge's
       const cr = Math.cos(rot)
@@ -663,23 +744,6 @@ export function hexWorld(
         (d) => nb[d]! >= 0 && !wet(nb[d]!) && h.level[nb[d]!]! - h.level[i]! >= 2,
       )
       if (banks.length || feet.length) pieces.push(...edgeDressing([x, zz], t, banks, feet, i))
-    }
-    if (zone?.kind === "castle" && tier >= 2) {
-      // the curtain wall (a walled keep up): along every side that faces out of the castle, a gate where a road comes in: along every side that faces out of the castle, a gate where a road comes in
-      const nb = g.neighbours(i)
-      const out = [0, 1, 2, 3, 4, 5].filter((d) => nb[d]! < 0 || z.zoneOf[nb[d]!] !== z.zoneOf[i])
-      const gates = out.filter((d) => nb[d]! >= 0 && roadLike(nb[d]!))
-      const colour = recolour("kaykit-hexagon/building-castle-blue", zone.tile).split("-").pop()!
-      pieces.push(
-        ...castleWalls(
-          [x, zz],
-          t,
-          out.filter((d) => !gates.includes(d)),
-          gates,
-          colour,
-        ),
-      )
-      if (u === "road") ground = "paved"
     }
     byTile.set(i, tiles.length)
     tiles.push({
@@ -727,7 +791,8 @@ export function hexWorld(
         u === "landmark" ||
         u === "dock" ||
         claimedBy.has(t.i) ||
-        zoneAt(t.i)?.kind === "castle"
+        zoneAt(t.i)?.kind === "castle" ||
+        grounds.has(t.i)
       )
         hard[t.i] = 1
     }

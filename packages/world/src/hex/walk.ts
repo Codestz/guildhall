@@ -216,7 +216,7 @@ export function hexWalk(
     }
   const tileKind = (i: number): HexWalkKind => {
     const u = useOf(z, i)
-    return u === "bridge" ? "bridge" : u === "square" || u === "landmark" ? "square" : "road"
+    return u === "bridge" ? "bridge" : u === "square" || u === "landmark" || u === "court" ? "square" : "road"
   }
   const ground = (i: number) => (Number.isNaN(top[i]!) ? 0 : Math.max(0, top[i]!))
   const centreNode = (i: number, kind: HexWalkKind): number => {
@@ -255,9 +255,11 @@ export function hexWalk(
   }
   for (let i = 0; i < g.size; i++) {
     const u = useOf(z, i)
-    if ((u !== "building" && u !== "farmstead" && u !== "homestead") || parts.has(i)) continue
+    if ((u !== "building" && u !== "farmstead" && u !== "homestead" && u !== "landmark") || parts.has(i))
+      continue
     const nb = g.neighbours(i)
-    // the side hexWorld turns a building to: its first road-like neighbour (or the street a scene turned to)
+    // the side hexWorld turns a building to: its first road-like neighbour (or the street a scene turned
+    // to, or the court a castle's building opens onto)
     let d = -1
     for (let k = 0; k < 6; k++)
       if (nb[k]! >= 0 && roadLike(nb[k]!)) {
@@ -265,7 +267,8 @@ export function hexWalk(
         break
       }
     const turned = turnedTo.get(i)
-    if (turned !== undefined && nb[turned]! >= 0 && roadLike(nb[turned]!)) d = turned
+    if (turned !== undefined && nb[turned]! >= 0 && (roadLike(nb[turned]!) || byTile.has(nb[turned]!)))
+      d = turned
     if (d < 0) continue
     const street = byTile.get(nb[d]!)
     // a building over a street more than a step below it has no way down: no door

@@ -9,7 +9,7 @@ import { HEX_ISLAND_DEFAULTS, LEVEL_STEP, NATURE_CHOSEN } from "@guildhall/world
 
 const times = (v: number) => `×${v.toFixed(2)}`
 
-const nature = (key: keyof typeof NATURE_CHOSEN | "pine" | "rock", label: string) => ({
+export const nature = (key: keyof typeof NATURE_CHOSEN | "pine" | "rock", label: string) => ({
   kind: "range" as const,
   key,
   label,
@@ -20,6 +20,16 @@ const nature = (key: keyof typeof NATURE_CHOSEN | "pine" | "rock", label: string
   format: times,
   apply: "reload" as const,
 })
+
+/** The nature families' sizes, multipliers on what the tile prefabs author (`?tree=` … `?flower=`). */
+export const NATURE_SIZES = [
+  nature("tree", "Leaf trees"),
+  nature("pine", "Pines"),
+  nature("bush", "Bushes"),
+  nature("rock", "Rocks"),
+  nature("grass", "Grass"),
+  nature("flower", "Flowers"),
+]
 
 /** The island's sections; `seedKey` is `town` on `/town/<seed>` (the path) and `seed` on the lab path. */
 export function islandKnobs(seedKey: string): KnobSection[] {
@@ -84,16 +94,7 @@ export function islandKnobs(seedKey: string): KnobSection[] {
     {
       title: "Nature",
       open: false,
-      knobs: [
-        nature("tree", "Leaf trees"),
-        nature("pine", "Pines"),
-        nature("bush", "Bushes"),
-        nature("rock", "Rocks"),
-        nature("grass", "Grass"),
-        nature("flower", "Flowers"),
-        nature("woods", "Woods density"),
-        nature("wild", "Wild share"),
-      ],
+      knobs: [...NATURE_SIZES, nature("woods", "Woods density"), nature("wild", "Wild share")],
     },
     {
       title: "Ground",

@@ -93,7 +93,8 @@ export interface PlateLaid {
 
 /**
  * Where the plates go this frame: in `order` (indices, first placed first), each at its anchor, full
- * size if that lies clear of every plate placed so far, else compact, else not drawn. Pure.
+ * size if that lies clear of every plate placed so far, else compact, else not drawn. With `view` (the
+ * layer's width and height) a plate whose heart is on screen slides in from the edge rather than be cut. Pure.
  */
 export function layoutPlates(
   anchors: readonly ([number, number] | null)[],
@@ -101,6 +102,7 @@ export function layoutPlates(
   order: readonly number[],
   /** Screen rects the plates keep clear of (left, top, right, bottom): the site's crest. */
   keepOut: readonly Rect[] = [],
+  view?: readonly [number, number],
 ): PlateLaid[] {
   const out: PlateLaid[] = anchors.map(() => ({ at: null, size: "full" }))
   const taken: Rect[] = keepOut.map((r) => [...r] as Rect)
@@ -111,19 +113,30 @@ export function layoutPlates(
     for (const [L, T, R, B] of taken) if (l < R && r > L && t < B && y > T) return false
     return true
   }
+  /** The anchor `a` moved just enough for a `w` × `h` plate to lie inside the view. */
+  const inside = (a: readonly [number, number], w: number, h: number): [number, number] => {
+    if (!view) return [a[0], a[1]]
+    const x = Math.min(Math.max(a[0], w / 2 + GAP), view[0] - w / 2 - GAP)
+    const y = Math.min(Math.max(a[1], h + GAP), view[1] - GAP)
+    return [Math.round(x), Math.round(y)]
+  }
   for (const k of order) {
     const a = anchors[k]
     const box = boxes[k]
     if (!a || !box) continue
-    const size: PlateSize | null = clear(a[0], a[1], ...box.full)
+    if (view && (a[0] < 0 || a[0] > view[0] || a[1] < 0 || a[1] > view[1])) continue
+    const full = inside(a, ...box.full)
+    const sm = inside(a, ...box.sm)
+    const size: PlateSize | null = clear(full[0], full[1], ...box.full)
       ? "full"
-      : clear(a[0], a[1], ...box.sm)
+      : clear(sm[0], sm[1], ...box.sm)
         ? "sm"
         : null
     if (!size) continue
     const [w, h] = box[size]
-    taken.push([a[0] - w / 2, a[1] - h, a[0] + w / 2, a[1]])
-    out[k] = { at: a, size }
+    const at = size === "full" ? full : sm
+    taken.push([at[0] - w / 2, at[1] - h, at[0] + w / 2, at[1]])
+    out[k] = { at, size }
   }
   return out
 }
@@ -198,9 +211,11 @@ export function createPlaceLabels(
   // the crest (and anything else marked `data-keepout`) keeps its corner: its box in the layer's pixels,
   // re-read every half second and on a resize
   let keep: Rect[] = []
+  let view: [number, number] = [0, 0]
   let frame = 0
   const readKeep = () => {
     const at = layer.getBoundingClientRect()
+    view = [at.width, at.height]
     keep = [...document.querySelectorAll("[data-keepout]")].map((el) => {
       const r = el.getBoundingClientRect()
       return [r.left - at.left - 8, r.top - at.top - 8, r.right - at.left + 8, r.bottom - at.top + 8] as Rect
@@ -224,7 +239,7 @@ export function createPlaceLabels(
       // a plate the zoom leaves out gives up its room at once (it fades out where it stands)
       anchors[k] = wanted(k) ? screen[k]! : null
     }
-    const laid = layoutPlates(anchors, boxes, order, keep)
+    const laid = layoutPlates(anchors, boxes, order, keep, view[0] > 0 ? view : undefined)
     for (let k = 0; k < els.length; k++) {
       const el = els[k] as HTMLElement
       const was = shown[k]!

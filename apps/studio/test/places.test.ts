@@ -21,6 +21,23 @@ describe("layoutPlates", () => {
     expect(laid[2]).toEqual({ at: [600, 100], size: "full" })
   })
 
+  test("with the view's size, a plate whose heart is on screen slides in from the edge; one off screen is not drawn", () => {
+    const laid = layoutPlates(
+      [
+        [20, 100],
+        [790, 30],
+        [-5, 100],
+      ],
+      [box, box, box],
+      [0, 1, 2],
+      [],
+      [800, 600],
+    )
+    expect(laid[0]).toEqual({ at: [104, 100], size: "full" })
+    expect(laid[1]).toEqual({ at: [696, 48], size: "full" })
+    expect(laid[2]?.at).toBeNull()
+  })
+
   test("a plate never lies over a kept-out rect (the crest): hidden where even compact would touch it", () => {
     const crest: [number, number, number, number] = [8, 8, 160, 60]
     const laid = layoutPlates(

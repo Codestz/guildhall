@@ -1,47 +1,88 @@
 /**
- * The studio panels' look, carried over from V1's HUD (legacy/packages/hall/src/hall.css): warm ink
- * plaques with brass hairlines, JetBrains Mono for every number. Injected while a screen that uses it
- * is mounted.
+ * The studio's base sheet: `@guildhall/ui`'s tokens (V1's HUD, legacy/packages/hall/src/hall.css) and the
+ * controls every tool screen shares (tool buttons, pill toggles, selects, ranges, chips), then the piece
+ * browser's layout. The top bar holds it, so it is on every screen; a screen's own sheet adds layout,
+ * never a second copy of a control.
  */
+import { FACES, FONTS_URL as FONTS, TOKENS_CSS } from "@guildhall/ui"
 
-/** V1's faces: Marcellus SC for titles, Alegreya Sans for text, JetBrains Mono for numbers. */
-const FONTS =
-  "https://fonts.googleapis.com/css2?family=Marcellus+SC&family=Alegreya+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+/** The shared controls on V1's look: words in the body face, numbers and ids in mono, brass when on. */
+const CONTROLS = /* css */ `
+.gh-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--hair-2);
+  background: var(--raise);
+  color: var(--paper);
+  font: 500 13px/1 var(--body);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.gh-tool:hover:not(:disabled) { background: var(--raise-2); border-color: var(--brass-line); }
+.gh-tool[aria-pressed="true"] { border-color: var(--brass-line); background: var(--brass-wash); color: var(--brass-hi); }
+.gh-tool:disabled { opacity: 0.4; cursor: default; }
+.gh-tool:focus-visible, .gh-toggle:focus-visible, .gh-select:focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 2px; }
+
+.gh-chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+fieldset.gh-seg, fieldset.gh-chips { margin: 0; min-width: 0; }
+fieldset.gh-chips { padding: 0; border: 0; }
+.gh-toggle {
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--hair-2);
+  background: transparent;
+  color: var(--muted);
+  font: 13px/1 var(--body);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.gh-toggle:hover { color: var(--paper); border-color: var(--brass-line); }
+.gh-toggle[aria-pressed="true"] { border-color: var(--brass-line); background: var(--brass-wash); color: var(--brass-hi); }
+
+.gh-select {
+  width: 100%;
+  height: 30px;
+  padding: 0 28px 0 9px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--hair-2);
+  background: var(--ink-deep) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16' fill='none' stroke='%23ab9e85' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E") no-repeat right 9px center;
+  color: var(--paper);
+  font: 13.5px/1 var(--body);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+.gh-select:hover { border-color: var(--brass-line); }
+.gh-select option { background: var(--ink-solid); color: var(--paper); }
+.gh-select.mini { width: auto; height: 24px; padding: 0 22px 0 6px; font-size: 12px; background-position: right 6px center; }
+.gh-bar .gh-select { width: auto; }
+
+.gh-range { display: flex; align-items: center; gap: 8px; }
+.gh-range input { flex: 1; }
+.gh-range span { width: 38px; text-align: right; font: 12px var(--mono); color: var(--paper); }
+
+/* every studio range on V1's track: a thin rail, a brass-hi thumb in an ink ring, a glow on focus */
+.gh input[type="range"]:not(.ui-range) { height: 20px; margin: 0; background: transparent; appearance: none; -webkit-appearance: none; cursor: pointer; }
+.gh input[type="range"]:not(.ui-range):focus-visible { outline: none; }
+.gh input[type="range"]:not(.ui-range)::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: rgba(243, 233, 212, 0.18); }
+.gh input[type="range"]:not(.ui-range)::-moz-range-track { height: 4px; border-radius: 2px; background: rgba(243, 233, 212, 0.18); }
+.gh input[type="range"]:not(.ui-range)::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--brass); }
+.gh input[type="range"]:not(.ui-range)::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: var(--brass-hi); border: 3px solid var(--ink-solid); box-shadow: 0 0 0 1px var(--brass); }
+.gh input[type="range"]:not(.ui-range)::-moz-range-thumb { width: 8px; height: 8px; border-radius: 50%; background: var(--brass-hi); border: 3px solid var(--ink-solid); box-shadow: 0 0 0 1px var(--brass); }
+.gh input[type="range"]:not(.ui-range):focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--brass), 0 0 0 5px rgba(241, 213, 144, 0.5); }
+`
 
 const CSS = /* css */ `
-.gh {
-  --ink: rgba(20, 15, 11, 0.86);
-  --ink-solid: #15110d;
-  --raise: rgba(255, 238, 205, 0.05);
-  --raise-2: rgba(255, 238, 205, 0.09);
-  --hair: rgba(243, 233, 212, 0.1);
-  --hair-2: rgba(243, 233, 212, 0.16);
-  --paper: #f3e9d4;
-  --muted: #cdbfa3;
-  --faint: #ab9e85;
-  --brass: #dcb662;
-  --brass-hi: #f1d590;
-  --brass-line: rgba(220, 182, 98, 0.34);
-  --brass-wash: rgba(220, 182, 98, 0.16);
-  --warn: #ffc451;
-  --fail: #ff8b7b;
-  --display: "Marcellus SC", "Cormorant SC", Georgia, serif;
-  --body: "Alegreya Sans", "Gill Sans", "Trebuchet MS", sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --r: 7px;
-  --r-sm: 5px;
-  --shadow: 0 1px 0 rgba(255, 240, 210, 0.06) inset, 0 18px 40px -18px rgba(0, 0, 0, 0.7),
-    0 2px 8px rgba(0, 0, 0, 0.28);
-  font: 14px/1.4 var(--body);
-  color: var(--paper);
-  -webkit-font-smoothing: antialiased;
-}
-.gh *, .gh *::before, .gh *::after { box-sizing: border-box; }
-.gh button, .gh input { font: inherit; color: inherit; }
-.gh ::-webkit-scrollbar { width: 8px; height: 8px; }
-.gh ::-webkit-scrollbar-thumb { background: var(--hair-2); border-radius: 4px; }
-.gh ::-webkit-scrollbar-track { background: transparent; }
-.gh .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+${TOKENS_CSS}
+${CONTROLS}
 
 .gh-panel {
   background: var(--ink);
@@ -192,26 +233,17 @@ const CSS = /* css */ `
 .gh-stage { position: relative; flex: none; height: 340px; margin: 10px 10px 0; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--hair-2); }
 .gh-stage-host { position: absolute; inset: 0; }
 .gh-tools { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; }
-.gh-tool {
-  padding: 3px 9px;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--hair-2);
-  background: rgba(20, 15, 11, 0.8);
-  color: var(--muted);
-  font: 11px/1.5 var(--mono) !important;
-  cursor: pointer;
-}
-.gh-tool:hover { color: var(--paper); }
-.gh-tool[aria-pressed="true"] { border-color: var(--brass-line); color: var(--brass-hi); background: rgba(48, 36, 18, 0.88); }
+.gh-tools .gh-tool { background: rgba(20, 15, 11, 0.82); border-color: var(--hair-2); }
+.gh-tools .gh-tool[aria-pressed="true"] { background: rgba(48, 36, 18, 0.9); border-color: var(--brass-line); }
 .gh-hint {
   position: absolute;
   left: 8px;
   bottom: 8px;
   padding: 3px 8px;
   border-radius: var(--r-sm);
-  background: rgba(20, 15, 11, 0.72);
+  background: rgba(20, 15, 11, 0.78);
   color: var(--muted);
-  font: 11px var(--mono);
+  font: 12px/1.4 var(--body);
 }
 .gh-stats { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 14px 12px; }
 .gh-sec { padding: 9px 0 8px; }
@@ -251,7 +283,7 @@ const CSS = /* css */ `
 .gh-now { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 12.5px var(--mono); color: var(--brass-hi); }
 .gh-time { font-size: 11px; color: var(--faint); white-space: nowrap; }
 .gh-slider { display: grid; grid-template-columns: 44px minmax(0, 1fr) 48px; align-items: center; gap: 8px; font-size: 11.5px; color: var(--faint); }
-.gh-slider input { width: 100%; accent-color: var(--brass); }
+.gh-slider input { width: 100%; }
 .gh-slider .num { text-align: right; font-size: 11.5px; color: var(--paper); }
 .gh-player .gh-search { margin-top: 6px; }
 .gh-clips { max-height: 230px; overflow-y: auto; margin-top: 4px; }
@@ -276,9 +308,6 @@ const CSS = /* css */ `
 let users = 0
 let nodes: HTMLElement[] = []
 let loaded: Promise<void> = Promise.resolve()
-
-/** Faces the panels use, loaded before a screen reports ready so shots never catch the fallback. */
-const FACES = ['400 17px "Marcellus SC"', '400 14px "Alegreya Sans"', '500 13px "JetBrains Mono"']
 
 /**
  * Adds the stylesheet and fonts while at least one screen holds them. `ready` settles once the fonts

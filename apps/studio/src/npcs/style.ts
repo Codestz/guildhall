@@ -52,10 +52,9 @@ const CSS = /* css */ `
 
 .gh-npc .gh-main { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 .gh-npc .gh-view { position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: 0 0 var(--r) var(--r); }
-.gh-npc .gh-tool { font-size: 12px !important; padding: 4px 10px; }
 .gh-npc .gh-range span { width: 44px; }
-.gh-time-ctl { display: inline-flex; align-items: center; gap: 6px; font: 11.5px var(--mono); color: var(--faint); }
-.gh-time-ctl input[type="range"] { width: 110px; accent-color: var(--brass); }
+.gh-time-ctl { display: inline-flex; align-items: center; gap: 6px; font: 12px var(--body); color: var(--faint); }
+.gh-time-ctl input[type="range"] { width: 110px; }
 
 .gh-big { display: flex; flex-direction: column; overflow: hidden; }
 .gh-big-view { position: relative; flex: 1; min-height: 240px; margin: 0 10px; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--hair-2); }

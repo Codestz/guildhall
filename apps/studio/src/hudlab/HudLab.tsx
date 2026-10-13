@@ -24,6 +24,7 @@ import {
 } from "@guildhall/ui"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { type DossierFixture, fixture, HISTORY, HISTORY_MARKERS, type LabState, STATES } from "./fixtures.ts"
+import { StoryLab, type StoryOptions } from "./StoryLab.tsx"
 
 const MODES: readonly HudMode[] = ["detailed", "minimal", "hidden"]
 const PHONE = "(max-width: 720px)"
@@ -41,6 +42,8 @@ export interface LabOptions {
   still: boolean
   /** On a phone, open the roster or the chronicle as a sheet. */
   sheet: "roster" | "chronicle" | null
+  /** The story layer (U3): the rail, the overlays and what the query opens. */
+  story: Omit<StoryOptions, "phone" | "cast" | "still">
   onState(state: LabState): void
 }
 
@@ -362,6 +365,8 @@ export function HudLab(opts: LabOptions) {
           )}
         </div>
       )}
+
+      {!hidden && <StoryLab {...opts.story} phone={phone} cast={fx.heroes} still={opts.still} />}
 
       {!hidden && (
         <div className="lab-bottom">

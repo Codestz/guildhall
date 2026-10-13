@@ -4,8 +4,33 @@ import { createRoot } from "react-dom/client"
 import type { Screen } from "../screens.ts"
 import { replaceQuery } from "../shell/router.ts"
 import { type LabState, STATES } from "./fixtures.ts"
-import { HudLab } from "./HudLab.tsx"
+import { HudLab, type LabOptions } from "./HudLab.tsx"
+import { TALES, type TaleName } from "./story.ts"
+
+type StoryOptions_ = LabOptions["story"]
+
 import { LAB_CSS } from "./style.ts"
+
+const TALE = (v: string | null): TaleName | null => (TALES.includes(v as TaleName) ? (v as TaleName) : null)
+
+function storyOf(q: URLSearchParams): StoryOptions_ {
+  const legends = q.get("legends")
+  const card = q.get("card")
+  const chapter = q.get("chapter")
+  const badge = q.get("badge")
+  return {
+    legends: legends === "history" ? "history" : legends ? "session" : null,
+    card: card ? (TALE(card) ?? "saga") : null,
+    format: q.get("format") === "portrait" ? "portrait" : "landscape",
+    noframe: q.get("noframe") === "1",
+    captions: q.get("captions"),
+    chapter: chapter === "open" ? "open" : chapter ? "chip" : null,
+    place: q.get("place"),
+    fold: q.get("fold") === "1",
+    badge: badge === "open" ? "open" : badge ? "chip" : null,
+    tale: TALE(q.get("tale")) ?? "saga",
+  }
+}
 
 const pickOf = (q: URLSearchParams): string | boolean => {
   const v = q.get("pick")
@@ -17,6 +42,8 @@ const pickOf = (q: URLSearchParams): string | boolean => {
  * `party` story. Query: `state` empty | busy | plea | error | crowd, `hud` detailed | minimal | hidden,
  * `pick=1` (or a hero id) opens a dossier, `settings=1`, `scale` history | session, `by=family`,
  * `still=1` holds the toasts for shots, `sheet` roster | chronicle opens one as a phone sheet, `dev=1` puts the fixture switch in Settings.
+ * The story layer (U3, StoryLab.tsx): `legends=1|history`, `card=1|seas` (`format=portrait`, `noframe=1`),
+ * `captions=1|<kind>|long`, `chapter=1|open`, `place=world|ui` (`fold=1`), `badge=1|open`, `tale=<story>`.
  */
 export const hudLab: Screen = {
   id: "hudlab",
@@ -53,6 +80,7 @@ export const hudLab: Screen = {
           by={q.get("by") === "family" ? "family" : "party"}
           still={q.get("still") === "1"}
           sheet={q.get("sheet") === "roster" ? "roster" : q.get("sheet") === "chronicle" ? "chronicle" : null}
+          story={storyOf(q)}
           onState={onState}
         />,
       )

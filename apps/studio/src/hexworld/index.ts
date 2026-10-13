@@ -197,7 +197,7 @@ export const hexWorldScreen: Screen = {
       sections: islandKnobs(seedKey),
     })
     const host = viewer.stage
-    const steps = viewer.loading(`Island ${seed}`, ["Map", "Ground", "Water", "Pieces", "Townsfolk"])
+    const steps = viewer.loading(`Island ${roman(seed)}`, ["Map", "Ground", "Water", "Pieces", "Townsfolk"])
     const stage = createStage(host)
     ctx.attach(stage)
     viewer.attachStage(stage)

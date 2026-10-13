@@ -84,6 +84,28 @@ describe("the day spreads the crowd", () => {
     expect(at(15.5, ["tavern-garden", "tavern", "tavern-yard"])).toBe(0)
   })
 
+  test("the new scenes are lived in at their hours: fishers on the quay from dawn, monks at work by day, the plaza at midday and in the evening", () => {
+    /** Who stands at a spot of prefab `id` at `hour` (and of which kind and role). */
+    const at = (hour: number, id: string) =>
+      folk.flatMap((f) => {
+        const p = lifePose(f.day, hour, 24)
+        const s = spotAt.get(key(p.at[0], p.at[2]))
+        return p.act !== "walk" && s && places.prefabOf(s.tile) === id ? [{ role: f.role, kind: s.kind }] : []
+      })
+    const fishers = (hour: number) => at(hour, "harbour-quay").filter((p) => p.role === "fisher").length
+    expect(fishers(6.5)).toBeGreaterThan(0)
+    expect(Math.max(fishers(8), fishers(10))).toBeGreaterThanOrEqual(2)
+    // the quay's fishing spots close at noon: the afternoon and the night are the dockhands' alone
+    for (const hour of [13.5, 15, 20, 2]) expect(fishers(hour)).toBe(0)
+    const monks = (hour: number) => at(hour, "monastery-compound").filter((p) => p.role === "monk").length
+    expect(Math.max(monks(10), monks(15))).toBeGreaterThanOrEqual(3)
+    for (const hour of [23, 3]) expect(monks(hour)).toBe(0)
+    const plaza = (hour: number) => at(hour, "town-hall-plaza").filter((p) => p.kind !== "work").length
+    expect(Math.max(...[12, 12.5, 13].map(plaza))).toBeGreaterThanOrEqual(3)
+    expect(Math.max(...[18, 18.5, 19].map(plaza))).toBeGreaterThanOrEqual(3)
+    expect(plaza(3)).toBe(0)
+  })
+
   test("every spot is used in its open hours, by one person at a time", () => {
     const uses = new Map<string, [number, number, number][]>()
     let checked = 0

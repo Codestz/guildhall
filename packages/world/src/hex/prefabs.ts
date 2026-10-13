@@ -112,6 +112,20 @@ export function validateTilePrefab(json: unknown, file?: string): string[] {
         if (!isNum(b.r) || b.r <= 0 || b.r > 3) at(`${path}.r`, "a radius in (0, 3] m")
       })
   }
+  if (t.decks !== undefined) {
+    if (!Array.isArray(t.decks)) at("decks", "a list")
+    else
+      t.decks.forEach((d, k) => {
+        const path = `decks[${k}]`
+        if (!isObj(d)) {
+          at(path, "an object")
+          return
+        }
+        point(`${path}.a`, { x: d.ax, z: d.az })
+        point(`${path}.b`, { x: d.bx, z: d.bz })
+        if (!isNum(d.half) || d.half <= 0 || d.half > 3) at(`${path}.half`, "a half width in (0, 3] m")
+      })
+  }
   if (t.tier !== undefined && (!Number.isInteger(t.tier) || (t.tier as number) < 1 || (t.tier as number) > 4))
     at("tier", "a castle tier 1–4")
   if (t.footprint !== undefined) {

@@ -81,6 +81,11 @@ export interface TilePrefab {
    */
   footprint?: number[]
   /**
+   * Ground people walk on that the tile's pieces build over water (a quay's stone deck out over the
+   * shallows): straight strips at the tile's top, tile space. The world walks them like a bridge's deck.
+   */
+  decks?: TileDeck[]
+  /**
    * For the Guildhall's castle pieces (decisions.md: the castle is the Guildhall, growing keep → walled
    * keep → castle with wards → citadel): the first tier, 1–4, whose castle uses this tile.
    */
@@ -102,6 +107,43 @@ export function sideDir(k: number): [number, number] {
 }
 /** The world side (tilePath / grid DIRS order) tile side `k` faces on a tile whose front faces world side `d`. */
 export const worldSide = (k: number, d: number): number => (((k + d + 2) % 6) + 6) % 6
+/** Tile side `k` once the tile is mirrored left for right (x → −x): the front and back stay. */
+export const mirrorSide = (k: number): number => (((2 - k) % 6) + 6) % 6
+
+/** A strip of walked deck: from (ax, az) to (bx, bz), `half` metres either side of its line, tile space. */
+export interface TileDeck {
+  ax: number
+  az: number
+  bx: number
+  bz: number
+  half: number
+}
+
+const mirrored = new WeakMap<TilePrefab, TilePrefab>()
+/**
+ * A prefab mirrored left for right (x → −x), so a scene fits a footprint on the other side of its
+ * street: its pieces, spots, blockers, decks and footprint. Pieces turn the other way rather than
+ * flip (a model is never turned inside out).
+ */
+export function mirrorPrefab(p: TilePrefab): TilePrefab {
+  const have = mirrored.get(p)
+  if (have) return have
+  const m: TilePrefab = {
+    ...p,
+    pieces: p.pieces.map((q) => ({
+      ...q,
+      x: -q.x,
+      rot: -q.rot,
+      ...(q.tilt ? { tilt: [q.tilt[0], -q.tilt[1]] as [number, number] } : {}),
+    })),
+  }
+  if (p.spots) m.spots = p.spots.map((s) => ({ ...s, x: -s.x, facing: -s.facing }))
+  if (p.blockers) m.blockers = p.blockers.map((b) => ({ ...b, x: -b.x }))
+  if (p.decks) m.decks = p.decks.map((d) => ({ ...d, ax: -d.ax, bx: -d.bx }))
+  if (p.footprint) m.footprint = p.footprint.map(mirrorSide)
+  mirrored.set(p, m)
+  return m
+}
 
 /**
  * An activity spot (decisions.md "Activity spots"): where one person stands to do something on a tile,

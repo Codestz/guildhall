@@ -1,0 +1,668 @@
+{
+  "blockers": [
+    {
+      "r": 1.55,
+      "x": 0.35,
+      "z": -0.35
+    },
+    {
+      "r": 1,
+      "x": -2.75,
+      "z": -3.05
+    },
+    {
+      "r": 0.3,
+      "x": 1.95,
+      "z": 1.75
+    },
+    {
+      "r": 0.5,
+      "x": -1.65,
+      "z": 1.15
+    },
+    {
+      "r": 0.45,
+      "x": 1.462,
+      "z": -7.137
+    },
+    {
+      "r": 0.45,
+      "x": 2.262,
+      "z": -5.751
+    },
+    {
+      "r": 0.45,
+      "x": -0.8,
+      "z": -7.519
+    },
+    {
+      "r": 0.45,
+      "x": 0.8,
+      "z": -7.519
+    },
+    {
+      "r": 0.45,
+      "x": -2.262,
+      "z": -5.751
+    },
+    {
+      "r": 0.45,
+      "x": -1.462,
+      "z": -7.137
+    },
+    {
+      "r": 0.45,
+      "x": -1.462,
+      "z": -3.601
+    },
+    {
+      "r": 0.45,
+      "x": -2.262,
+      "z": -4.987
+    },
+    {
+      "r": 0.45,
+      "x": 2.262,
+      "z": -4.987
+    },
+    {
+      "r": 0.45,
+      "x": 1.462,
+      "z": -3.601
+    },
+    {
+      "r": 0.55,
+      "x": -1.25,
+      "z": -5.719
+    },
+    {
+      "r": 0.55,
+      "x": 1.25,
+      "z": -5.719
+    },
+    {
+      "r": 0.55,
+      "x": 0,
+      "z": -6.819
+    },
+    {
+      "r": 0.3,
+      "x": 1.55,
+      "z": -4.019
+    },
+    {
+      "r": 0.3,
+      "x": -1.55,
+      "z": -4.019
+    },
+    {
+      "r": 0.198,
+      "x": -6.05,
+      "z": -3.884
+    },
+    {
+      "r": 0.198,
+      "x": -5.85,
+      "z": -2.384
+    },
+    {
+      "r": 0.198,
+      "x": -4.65,
+      "z": -3.884
+    },
+    {
+      "r": 0.224,
+      "x": -4.45,
+      "z": -2.384
+    },
+    {
+      "r": 0.214,
+      "x": -3.25,
+      "z": -3.884
+    },
+    {
+      "r": 0.198,
+      "x": -3.05,
+      "z": -2.384
+    },
+    {
+      "r": 0.35,
+      "x": -6.65,
+      "z": -1.784
+    }
+  ],
+  "footprint": [
+    1,
+    2
+  ],
+  "ground": "grass",
+  "group": "landmark",
+  "id": "monastery-compound",
+  "name": "Monastery with its cloister garth and graveyard",
+  "pieces": [
+    {
+      "piece": "kaykit-hexagon/building-church-yellow",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0.35,
+      "z": -0.35
+    },
+    {
+      "piece": "kaykit-hexagon/building-tower-a-yellow",
+      "rot": 0.5,
+      "scale": 0.26,
+      "x": -2.75,
+      "z": -3.05
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 1.95,
+      "z": 1.75
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": 0.35,
+      "scale": 0.55,
+      "x": -1.65,
+      "z": 1.15
+    },
+    {
+      "piece": "kenney-graveyard/stone-wall",
+      "rot": -1.047,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62
+      },
+      "x": 1.462,
+      "z": -7.137
+    },
+    {
+      "piece": "kenney-graveyard/stone-wall",
+      "rot": -1.047,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62
+      },
+      "x": 2.262,
+      "z": -5.751
+    },
+    {
+      "piece": "kenney-graveyard/stone-wall",
+      "rot": 0,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62
+      },
+      "x": -0.8,
+      "z": -7.519
+    },
+    {
+      "piece": "kenney-graveyard/stone-wall",
+      "rot": 0,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62
+      },
+      "x": 0.8,
+      "z": -7.519
+    },
+    {
+      "piece": "kenney-graveyard/stone-wall",
+      "rot": 1.047,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62
+      },
+      "x": -2.262,
+      "z": -5.751
+    },
+    {
+      "piece": "kenney-graveyard/stone-wall",
+      "rot": 1.047,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62
+      },
+      "x": -1.462,
+      "z": -7.137
+    },
+    {
+      "piece": "kenney-graveyard/stone-wall",
+      "rot": 2.094,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62
+      },
+      "x": -1.462,
+      "z": -3.601
+    },
+    {
+      "piece": "kenney-graveyard/stone-wall",
+      "rot": 2.094,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62
+      },
+      "x": -2.262,
+      "z": -4.987
+    },
+    {
+      "piece": "kenney-graveyard/stone-wall",
+      "rot": 4.189,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62
+      },
+      "x": 2.262,
+      "z": -4.987
+    },
+    {
+      "piece": "kenney-graveyard/stone-wall",
+      "rot": 4.189,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62
+      },
+      "x": 1.462,
+      "z": -3.601
+    },
+    {
+      "piece": "kenney-nature/crops-dirt-row",
+      "rot": 1.571,
+      "scale": 0.5,
+      "x": -1.25,
+      "z": -5.719
+    },
+    {
+      "piece": "kenney-nature/crop-carrot",
+      "rot": 0,
+      "scale": 0.5,
+      "x": -1.4,
+      "z": -6.469
+    },
+    {
+      "piece": "kenney-nature/crop-carrot",
+      "rot": 1.3,
+      "scale": 0.5,
+      "x": -1.1,
+      "z": -5.719
+    },
+    {
+      "piece": "kenney-nature/crop-carrot",
+      "rot": 2.6,
+      "scale": 0.5,
+      "x": -1.4,
+      "z": -4.969
+    },
+    {
+      "piece": "kenney-nature/crops-dirt-row",
+      "rot": 1.571,
+      "scale": 0.5,
+      "x": 1.25,
+      "z": -5.719
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 1.1,
+      "z": -6.469
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 1.3,
+      "scale": 0.5,
+      "x": 1.4,
+      "z": -5.719
+    },
+    {
+      "piece": "kenney-nature/crops-leafs-stage-b",
+      "rot": 2.6,
+      "scale": 0.5,
+      "x": 1.1,
+      "z": -4.969
+    },
+    {
+      "piece": "kenney-graveyard/altar-stone",
+      "rot": 0,
+      "scale": 0.6,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62
+      },
+      "x": 0,
+      "z": -6.819
+    },
+    {
+      "piece": "kenney-graveyard/candle-multiple",
+      "rot": 0,
+      "scale": 0.9,
+      "x": -0.25,
+      "y": 0.66,
+      "z": -6.819
+    },
+    {
+      "piece": "kaykit-forest/bush-2-c-color1",
+      "rot": 0,
+      "scale": 0.45,
+      "x": 1.55,
+      "z": -4.019
+    },
+    {
+      "piece": "kaykit-forest/bush-2-c-color1",
+      "rot": 1,
+      "scale": 0.45,
+      "x": -1.55,
+      "z": -4.019
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-cross",
+      "rot": -0.12,
+      "scale": 0.5,
+      "x": -6.05,
+      "z": -3.884
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-round",
+      "rot": 0,
+      "scale": 0.5,
+      "x": -5.85,
+      "z": -2.384
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-bevel",
+      "rot": 0.12,
+      "scale": 0.5,
+      "x": -4.65,
+      "z": -3.884
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-decorative",
+      "rot": -0.12,
+      "scale": 0.5,
+      "x": -4.45,
+      "z": -2.384
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-roof",
+      "rot": 0,
+      "scale": 0.5,
+      "x": -3.25,
+      "z": -3.884
+    },
+    {
+      "piece": "kenney-graveyard/gravestone-cross-large",
+      "rot": 0.12,
+      "scale": 0.5,
+      "x": -3.05,
+      "z": -2.384
+    },
+    {
+      "piece": "kaykit-forest/tree-bare-1-c-color1",
+      "rot": 0.4,
+      "scale": 0.42,
+      "x": -6.65,
+      "z": -1.784
+    },
+    {
+      "piece": "kenney-graveyard/lantern-candle",
+      "rot": 0,
+      "scale": 0.8,
+      "x": -3.95,
+      "z": -3.134
+    },
+    {
+      "piece": "kenney-graveyard/iron-fence",
+      "rot": 0,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62,
+        "48": 42,
+        "49": 42
+      },
+      "x": -5.47,
+      "z": -5.184
+    },
+    {
+      "piece": "kenney-graveyard/iron-fence",
+      "rot": 0,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62,
+        "48": 42,
+        "49": 42
+      },
+      "x": -3.83,
+      "z": -5.184
+    },
+    {
+      "piece": "kenney-graveyard/iron-fence",
+      "rot": 1.047,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62,
+        "48": 42,
+        "49": 42
+      },
+      "x": -7.225,
+      "z": -3.224
+    },
+    {
+      "piece": "kenney-graveyard/iron-fence",
+      "rot": 1.047,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62,
+        "48": 42,
+        "49": 42
+      },
+      "x": -6.405,
+      "z": -4.645
+    },
+    {
+      "piece": "kenney-graveyard/iron-fence",
+      "rot": 2.094,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62,
+        "48": 42,
+        "49": 42
+      },
+      "x": -6.405,
+      "z": -0.724
+    },
+    {
+      "piece": "kenney-graveyard/iron-fence",
+      "rot": 2.094,
+      "scale": 1,
+      "swatchMap": {
+        "20": 61,
+        "30": 60,
+        "31": 61,
+        "32": 62,
+        "48": 42,
+        "49": 42
+      },
+      "x": -7.225,
+      "z": -2.145
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Sit_Floor_Idle",
+      "facing": 3.142,
+      "hours": [
+        7,
+        18
+      ],
+      "kind": "work",
+      "roles": [
+        "monk"
+      ],
+      "x": -0.45,
+      "z": -6.119
+    },
+    {
+      "clip": "Sit_Floor_Idle",
+      "facing": 3.142,
+      "hours": [
+        7,
+        18
+      ],
+      "kind": "work",
+      "roles": [
+        "monk"
+      ],
+      "x": 0.45,
+      "z": -6.119
+    },
+    {
+      "clip": "Digging",
+      "facing": 3.142,
+      "hours": [
+        7,
+        17
+      ],
+      "kind": "work",
+      "prop": "kaykit-tools/shovel",
+      "roles": [
+        "monk"
+      ],
+      "x": -1.25,
+      "z": -4.719
+    },
+    {
+      "clip": "PickUp",
+      "facing": 3.142,
+      "hours": [
+        7,
+        17
+      ],
+      "kind": "work",
+      "roles": [
+        "monk"
+      ],
+      "x": 1.25,
+      "z": -4.719
+    },
+    {
+      "clip": "Interact",
+      "facing": 3.142,
+      "hours": [
+        8,
+        17
+      ],
+      "kind": "work",
+      "roles": [
+        "monk"
+      ],
+      "x": -4.65,
+      "z": -1.634
+    },
+    {
+      "clip": "Interact",
+      "facing": -2.356,
+      "hours": [
+        6,
+        19
+      ],
+      "kind": "work",
+      "roles": [
+        "monk"
+      ],
+      "x": -2.05,
+      "z": -2.35
+    },
+    {
+      "clip": "Holding_A",
+      "facing": 3.142,
+      "hours": [
+        8,
+        17
+      ],
+      "kind": "stand",
+      "prop": "kaykit-adventurers/spellbook-open",
+      "roles": [
+        "monk"
+      ],
+      "x": 0,
+      "z": -4.019
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0.35,
+      "kind": "sit",
+      "x": -1.85,
+      "y": -0.06,
+      "z": 1.3
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 0.35,
+      "kind": "sit",
+      "x": -1.4,
+      "y": -0.06,
+      "z": 1
+    },
+    {
+      "clip": "Idle_B",
+      "facing": -0.983,
+      "hours": [
+        9,
+        19
+      ],
+      "kind": "talk",
+      "x": 1.6,
+      "z": 1.25
+    }
+  ]
+}

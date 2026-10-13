@@ -134,7 +134,10 @@ export const PLACE_ROLES: Readonly<Record<ZoneKind, readonly [string, number][]>
 export const peopleFor = (kind: ZoneKind, buildings: number): number =>
   kind === "castle" || kind === "camp"
     ? Math.min(8, 3 + buildings)
-    : Math.max(2, Math.min(36, Math.round(1.5 + buildings * 0.7)))
+    : // a monastery keeps a few brothers however few its buildings: its cloister, graves and bell
+      kind === "monastery"
+      ? Math.max(5, Math.round(1.5 + buildings * 0.7))
+      : Math.max(2, Math.min(36, Math.round(1.5 + buildings * 0.7)))
 
 /** Where a stay is: a point on a node's tile, the way to face, on the ground or a deck; what it does there. */
 export interface LifeSpot extends SpotDoing {
@@ -362,6 +365,16 @@ function fieldsNear(h: HexIsland, z: HexZones, tile: number, r: number): number[
   return out.sort((a, b) => steps(h, a, tile) - steps(h, b, tile) || a - b).slice(0, 8)
 }
 
+/** Scenes people go out of their way to for a chat or a seat at midday and in the evening, and by how far (m). */
+const GATHERING = new Set(["town-hall-plaza"])
+const GATHER_PULL = 45
+
+/** How much further from its place's heart a spot made for a role may be and still come before anyone's (m). */
+const OWN_SPOT_REACH = 10
+
+/** Roles whose work is from dawn to late morning (fishers on the quay): a spot open then will do. */
+const DAWN_ROLES = new Set(["fisher"])
+
 /** Seeded number in [0, 1). */
 const rnd = (seed: number, a: number, b: number) => hash2(seed, a, b)
 
@@ -431,14 +444,15 @@ export function lifePlaces(
   const wet = (a: { x: number; z: number }, b: { x: number; z: number }): boolean => {
     const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.5)
     for (let k = 1; k < n; k++) {
-      const { q, r } = hexAt(
-        (a.x + ((b.x - a.x) * k) / n) / HEX_TILE_SIZE,
-        (a.z + ((b.z - a.z) * k) / n) / HEX_TILE_SIZE,
-      )
+      const x = a.x + ((b.x - a.x) * k) / n
+      const zz = a.z + ((b.z - a.z) * k) / n
+      const { q, r } = hexAt(x / HEX_TILE_SIZE, zz / HEX_TILE_SIZE)
       const i = g.index(q, r)
       if (i < 0) return true
       const u = useOf(z, i)
-      if (WATER_KINDS.has(kindOf(h, i)) && u !== "dock" && u !== "bridge") return true
+      // a quay's deck over the shallows is walked like a dock
+      if (WATER_KINDS.has(kindOf(h, i)) && u !== "dock" && u !== "bridge" && w.stairAt?.(x, zz) == null)
+        return true
     }
     return false
   }
@@ -730,7 +744,12 @@ export function planFolk(
         found.push(k)
       }
     if (!found.length) return undefined
-    const d = (k: number) => Math.hypot(spots[k]!.x - x, spots[k]!.z - zz)
+    // a gathering place of their own (the town hall's plaza) draws its people from further off than a doorstep
+    const d = (k: number) =>
+      Math.hypot(spots[k]!.x - x, spots[k]!.z - zz) -
+      (z.zoneOf[spots[k]!.tile] === zi + 1 && GATHERING.has(places.prefabOf(spots[k]!.tile) ?? "")
+        ? GATHER_PULL
+        : 0)
     found.sort((p, q) => d(p) - d(q) || p - q)
     // one of the nearest few, so neighbours do not all crowd the first bench
     const k = found[Math.floor(pick * Math.min(4, found.length))]!
@@ -768,15 +787,45 @@ export function planFolk(
       const id = folk.length
       const r = (salt: number) => rnd(seed + 900 + salt, id, zi)
       const nightly = (role: string) => role === "night-watch" || (role === "guard" && r(5) < 0.4)
-      // the hours they are at work (the night shift's run past midnight)
-      const shift: [number, number] = nightly(wanted) ? [18, 30] : [9, 16]
+      // the hours they are at work (the night shift's run past midnight; fishers' from dawn to late morning)
+      const shift = (role: string): [number, number] =>
+        nightly(role) ? [18, 30] : DAWN_ROLES.has(role) ? [5.5, 11.5] : [9, 16]
       // their work spot: a free one open on their shift for the role, else for another role the place
       // has; none: no work
+      // (a spot made for the role before one anyone may use a few steps nearer: a monk to the cloister
+      // before the well)
+      /** How far a spot is walked to from the place's heart, metres (its node by the walk graph, then straight). */
+      const out = (k: number) => {
+        const path = walk.route(heart, places.nodeOf(k))
+        if (!path) return Infinity
+        let m = 0
+        for (let j = 1; j < path.length; j++) {
+          const a = walk.nodes[path[j - 1]!]!
+          const b = walk.nodes[path[j]!]!
+          m += Math.hypot(b.x - a.x, b.z - a.z)
+        }
+        const n = walk.nodes[path.at(-1)!]!
+        return m + Math.hypot(spots[k]!.x - n.x, spots[k]!.z - n.z)
+      }
+      const workFor = (rr: string): number | undefined => {
+        const list = places.free(zi, rr, ["work"], shift(rr))
+        // a dawn role (a fisher) to a spot that opens at dawn for it first: the quay's edge, wherever it is
+        if (DAWN_ROLES.has(rr)) {
+          const dawn = list.find(
+            (k) => spots[k]!.roles?.includes(rr) && (spotWindows(spots[k]!.hours)[0]?.[0] ?? 9) < 7,
+          )
+          if (dawn !== undefined) return dawn
+        }
+        const own = list.find((k) => spots[k]!.roles?.includes(rr))
+        return own !== undefined && list[0] !== undefined && out(own) - out(list[0]) < OWN_SPOT_REACH
+          ? own
+          : list[0]
+      }
       let role = wanted
-      let spot = places.free(zi, role, ["work"], shift)[0]
+      let spot = workFor(role)
       for (const [rr] of roles) {
         if (spot !== undefined) break
-        const other = places.free(zi, rr, ["work"], shift)[0]
+        const other = workFor(rr)
         if (other !== undefined) {
           role = rr
           spot = other
@@ -844,14 +893,17 @@ export function planFolk(
         { act: "idle", indoors },
         near,
       )
-      // to work (not before their spot opens), lunch out somewhere of their own, back, the evening out
-      let t = b.go(Math.max(6 + r(10) * 1.2, open?.[0] ?? 0), work, { act: workAct })
-      const lunch0 = Math.max(t + 1, 11.2 + r(11) * 1.5)
+      // to work (not before their spot opens; a dawn spot at its opening), lunch out somewhere of their
+      // own, back unless their spot has closed by then (a fisher's morning), the evening out
+      const start =
+        open && open[0] < 6 ? open[0] + 0.3 + r(10) * 0.9 : Math.max(6 + r(10) * 1.2, open?.[0] ?? 0)
+      let t = b.go(start, work, { act: workAct })
+      const close = open && open[1] > open[0] ? open[1] - 0.1 : 24
+      const lunch0 = Math.max(t + 1, Math.min(11.2 + r(11) * 1.5, close))
       const lunch1 = lunch0 + 0.8 + r(12) * 0.5
       const noon = outing(outingOrder(LUNCH, r, 20), lunch0, lunch1 + 0.4, "lunch", 30)
       t = b.go(lunch0, noon.at, { act: "idle", indoors: noon.indoors })
-      t = b.go(Math.max(t + 0.3, lunch1), work, { act: workAct })
-      const close = open && open[1] > open[0] ? open[1] - 0.1 : 24
+      if (close > lunch1 + 0.5) t = b.go(Math.max(t + 0.3, lunch1), work, { act: workAct })
       const eve0 = Math.max(t + 1, Math.min(16.5 + r(13) * 1.2, close))
       // the tavern keeps people late (lit by the lanterns); elsewhere home by dusk, a few later
       const order = outingOrder(EVENING, r, 60)

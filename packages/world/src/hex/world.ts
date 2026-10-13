@@ -18,6 +18,8 @@ import {
   castleWalls,
   edgeDressing,
   HEX_TILE_SIZE,
+  mirrorPrefab,
+  mirrorSide,
   type PlacedPiece,
   placeTile,
   type TileGround,
@@ -75,6 +77,8 @@ export interface HexWorldTile {
   door?: number
   /** The prefab's turn about +y, radians (placeTile's `rot`): its spots and blockers turn with it. */
   rot: number
+  /** The prefab stands mirrored left for right (tiles.ts `mirrorPrefab`) to fit its footprint. */
+  mirror?: boolean
 }
 
 export interface HexWorld {
@@ -86,6 +90,8 @@ export interface HexWorld {
   stairs: HexWalkway[]
   /** Bridges over the rivers: built as ground (ground.ts `hexStructures`). */
   bridges: HexBridge[]
+  /** Decks a scene's own pieces build out over the water (a quay's stone deck): walked, not built here. */
+  decks: HexWalkway[]
   /** Metres per height level this world was built with. */
   step: number
   /** The island's ground height at a point (the top of the tile under it; 0 off the island). */
@@ -149,12 +155,38 @@ const SCENES: Record<string, string> = {
 }
 /** The scenes each kind of place has once, wherever a building of it has room for one. */
 const PLACE_SCENES: Partial<Record<string, string[]>> = {
-  town: ["market-square", "tavern-garden", "smithy-works"],
+  town: ["market-square", "town-hall-plaza", "tavern-garden", "smithy-works"],
   market: ["tavern-garden"],
-  harbour: ["tavern-garden"],
+  harbour: ["harbour-quay", "tavern-garden"],
   camp: ["archery-range"],
   mine: ["smithy-works"],
+  monastery: ["monastery-compound"],
+  farm: ["farmstead-yard"],
 }
+/** How a scene may fit beyond the plain rule (`claimable`: its place's open ground or the open country). */
+interface SceneFit {
+  /** Its footprint is the shallows off the coast (a quay over the sea), from a tile at sea level. */
+  sea?: boolean
+  /** Country uses it may also cover. */
+  country?: TileUse[]
+  /** Country uses it leaves alone (a farm's fields stay fields round it). */
+  spare?: TileUse[]
+  /** It takes in its own place's other buildings (a monastery's chapel and graveyard become its compound). */
+  absorb?: boolean
+  /** It may turn to any street its tile fronts, and be mirrored, to fit. */
+  turn?: boolean
+  /** Which of its place's buildings it tries first (default: nearest the heart). */
+  near?: "ring"
+}
+const SCENE_FIT: Partial<Record<string, SceneFit>> = {
+  "harbour-quay": { sea: true, turn: true },
+  "monastery-compound": { country: ["hillside", "woods"], absorb: true, turn: true },
+  "farmstead-yard": { spare: ["field"], turn: true },
+  // on the ring street round the town's square, the hall facing its plaza
+  "town-hall-plaza": { turn: true, near: "ring" },
+}
+/** Steps from a town's square out to its ring street (zones.ts). */
+const RING_STEPS = 3
 /** Drinking places: no two stand within DRINK_APART steps of each other (the next kind is picked instead). */
 const DRINKS = new Set(["tavern", "tavern-yard", "tavern-garden"])
 const DRINK_APART = 2
@@ -273,6 +305,7 @@ export function hexWorld(
       link(r.tiles[k]!, r.tiles[k - 1]!)
     }
   const stairs: HexWalkway[] = []
+  const decks: HexWalkway[] = []
   /** A bridge tile's deck at its centre: its banks' road height, as the walk graph lays it (walk.ts). */
   const deckY = (i: number): number => {
     let bank = 0
@@ -296,6 +329,8 @@ export function hexWorld(
   const nearDrink = (tiles: readonly number[], self = -1) =>
     drinks.some((d) => d !== self && tiles.some((t) => steps(t, d) <= DRINK_APART))
   const built = new Map<number, string>()
+  /** Places whose compound scene landed (a monastery's): their heart is a plain square, no second chapel. */
+  const compound = new Set<number>()
   const buildOf = (i: number): string => {
     const have = built.get(i)
     if (have) return have
@@ -313,6 +348,9 @@ export function hexWorld(
             : TOWN_EDGE
     const at = Math.floor(hash2(seed + 5, g.q[i]!, g.r[i]!) * list.length) % list.length
     let kind = list[at]!
+    // a place whose own compound stands already builds no second chapel or graveyard: a cottage
+    if (zone && compound.has(z.zoneOf[i]! - 1) && (kind === "monastery" || kind === "graveyard"))
+      kind = "cottage"
     // a second drinking place too near the first: the next kind on the list that is not one
     if (DRINKS.has(kind) && nearDrink([i]))
       for (let k = 1; k < list.length && DRINKS.has(kind); k++) kind = list[(at + k) % list.length]!
@@ -328,39 +366,77 @@ export function hexWorld(
   // its one-tile self ----
   const scenes = new Map<number, string>()
   const claimedBy = new Map<number, number>()
-  const claimable = (i: number, j: number) => {
-    if (j < 0 || claimedBy.has(j) || scenes.has(j) || !dryLand(j) || h.level[j] !== h.level[i]) return false
+  const claimable = (i: number, j: number, fit: SceneFit = {}) => {
+    if (j < 0 || claimedBy.has(j) || scenes.has(j)) return false
     const u = useOf(z, j)
-    return z.zoneOf[j] === 0
-      ? OPEN_COUNTRY.has(u)
-      : z.zoneOf[j] === z.zoneOf[i] && OPEN_IN_PLACE.has(u) && zoneAt(j)!.kind !== "castle"
+    if (fit.sea) return kindOf(h, j) === "shallows" && (u === "none" || u === "dock")
+    if (!dryLand(j) || h.level[j] !== h.level[i]) return false
+    if (z.zoneOf[j] === 0)
+      return (OPEN_COUNTRY.has(u) || !!fit.country?.includes(u)) && !fit.spare?.includes(u)
+    if (z.zoneOf[j] !== z.zoneOf[i] || zoneAt(j)!.kind === "castle") return false
+    return OPEN_IN_PLACE.has(u) || (!!fit.absorb && u === "building")
   }
+  /** The street sides a building may turn to: its first (where it faces anyway), then the others a door reaches. */
+  const streets = (i: number): number[] => {
+    const nb = g.neighbours(i)
+    const out = [facing(i)]
+    for (let d = 0; d < 6; d++)
+      if (
+        !out.includes(d) &&
+        nb[d]! >= 0 &&
+        roadLike(nb[d]!) &&
+        Math.abs(h.level[nb[d]!]! - h.level[i]!) <= 1
+      )
+        out.push(d)
+    return out
+  }
+  /** A scene's turn when it is not its tile's own: the street it faces and whether it is mirrored. */
+  const turned = new Map<number, { door: number; mirror: boolean }>()
+  /** A quay's place's dock tiles: left open water. */
+  const quayed = new Set<number>()
   /** Puts `scene` on building tile i if its footprint fits there (with `street`, only on one fronting a street). */
   const claim = (i: number, scene: string, street = false): boolean => {
     const p = tilePrefab(scene)
     if (!p?.footprint?.length || !tilePrefab(SCENE_PART) || scenes.has(i) || claimedBy.has(i)) return false
     const nb = g.neighbours(i)
     if (street && !onStreet(i)) return false
-    // the side the building turns to (walk.ts puts its door there too)
-    const door = facing(i)
-    const cover = p.footprint.map((k) => nb[worldSide(k, door)]!)
-    if (!cover.every((j) => claimable(i, j))) return false
-    const drink = DRINKS.has(scene)
-    if (drink && nearDrink([i, ...cover], i)) return false
-    scenes.set(i, scene)
-    for (const j of cover) claimedBy.set(j, i)
-    if (drink) drinks.push(i, ...cover)
-    return true
+    const fit = SCENE_FIT[scene] ?? {}
+    if (fit.sea && h.level[i] !== 0) return false
+    // the side the building turns to (walk.ts puts its door there too); a scene that may turn tries
+    // every street it fronts, as authored and mirrored
+    for (const door of fit.turn ? streets(i) : [facing(i)])
+      for (const mirror of fit.turn ? [false, true] : [false]) {
+        const cover = p.footprint.map((k) => nb[worldSide(mirror ? mirrorSide(k) : k, door)]!)
+        if (!cover.every((j) => claimable(i, j, fit))) continue
+        const drink = DRINKS.has(scene)
+        if (drink && nearDrink([i, ...cover], i)) return false
+        scenes.set(i, scene)
+        for (const j of cover) claimedBy.set(j, i)
+        if (drink) drinks.push(i, ...cover)
+        if (door !== facing(i) || mirror) turned.set(i, { door, mirror })
+        if (fit.absorb && z.zoneOf[i]) compound.add(z.zoneOf[i]! - 1)
+        // the place's docks give way to its quay: open water round its boats, its fishers on its stone
+        if (fit.sea)
+          for (const j of [...cover, ...(zoneAt(i)?.tiles ?? [])])
+            for (const k of g.neighbours(j)) if (k >= 0 && useOf(z, k) === "dock") quayed.add(k)
+        return true
+      }
+    return false
   }
-  const buildings = (zi: number) =>
-    z.zones[zi]!.tiles.filter((i) => useOf(z, i) === "building").sort(
-      (a, b) => steps(a, z.zones[zi]!.tile) - steps(b, z.zones[zi]!.tile) || a - b,
-    )
+  const buildings = (zi: number, near?: SceneFit["near"]) => {
+    const zone = z.zones[zi]!
+    const d = (i: number) =>
+      near === "ring" ? Math.abs(steps(i, zone.tile) - RING_STEPS) : steps(i, zone.tile)
+    return zone.tiles.filter((i) => useOf(z, i) === "building").sort((a, b) => d(a) - d(b) || a - b)
+  }
   // each place's own scenes first, on the building nearest its heart they fit beside: one with a door
   // onto a street people come in by first, else one a lane reaches (life.ts workTiles)
   for (const [zi, zone] of z.zones.entries())
-    for (const scene of PLACE_SCENES[zone.kind] ?? [])
-      buildings(zi).some((i) => claim(i, scene, true)) || buildings(zi).some((i) => claim(i, scene))
+    for (const scene of PLACE_SCENES[zone.kind] ?? []) {
+      const near = SCENE_FIT[scene]?.near
+      buildings(zi, near).some((i) => claim(i, scene, true)) ||
+        buildings(zi, near).some((i) => claim(i, scene))
+    }
   // then every other tavern, smithy and archery range the tiles picked, where there is room
   for (let i = 0; i < g.size; i++) {
     if (useOf(z, i) !== "building" || scenes.has(i)) continue
@@ -391,17 +467,20 @@ export function hexWorld(
     let prefab: string | null = null
     let pathSides: number[] | undefined
     let door: number | undefined
+    let mirror = false
     let rot = rotOf(Math.floor(hash2(seed + 3, g.q[i]!, g.r[i]!) * 6))
     const origin = claimedBy.get(i)
     if (origin !== undefined) {
       // under a neighbour's scene: its ground, nothing of its own
       prefab = SCENE_PART
       const p = tilePrefab(scenes.get(origin)!)!
-      if (p.ground === "dirt" || p.ground === "paved") ground = p.ground
+      if ((p.ground === "dirt" || p.ground === "paved") && dryLand(i)) ground = p.ground
     } else if (u === "building") {
       prefab = scenes.get(i) ?? buildOf(i)
-      door = facing(i)
+      const turn = turned.get(i)
+      door = turn?.door ?? facing(i)
       rot = rotOf(door)
+      if (turn?.mirror) mirror = true
     } else if (u === "landmark" && zone) {
       // the Guildhall: its keep on the castle's first tile, its great hall (tier 3 up) at its heart
       const nb = g.neighbours(i)
@@ -432,7 +511,7 @@ export function hexWorld(
     } else if (zone?.kind === "harbour" && (u === "yard" || u === "garden" || u === "well" || u === "market"))
       prefab = "quay"
     else if (u === "square") {
-      prefab = HEART[zone?.kind ?? "town"] ?? "well-square"
+      prefab = (compound.has(z.zoneOf[i]! - 1) ? null : HEART[zone?.kind ?? "town"]) ?? "well-square"
       ground = "paved"
       // a square streets meet on: paved through, the well standing in a corner no street runs to
       const nb = g.neighbours(i)
@@ -525,7 +604,7 @@ export function hexWorld(
         }
         bridges.push(bridge)
       }
-    } else if (u === "dock") {
+    } else if (u === "dock" && !quayed.has(i)) {
       prefab = "dock"
       // the pier runs out from the shore: its land end toward the dry tile beside it, a harbour's first
       const nb = g.neighbours(i)
@@ -533,7 +612,7 @@ export function hexWorld(
       let d = [0, 1, 2, 3, 4, 5].find((e) => dry(nb[e]!) && z.zoneOf[nb[e]!]! > 0)
       if (d === undefined) d = [0, 1, 2, 3, 4, 5].find((e) => dry(nb[e]!))
       rot = rotOf(d ?? 4)
-    } else if (BY_USE[u]) {
+    } else if (BY_USE[u] && !quayed.has(i)) {
       prefab = BY_USE[u]!
       if (prefab === "farmstead" || prefab === "market" || prefab === "windmill") {
         door = facing(i)
@@ -544,7 +623,8 @@ export function hexWorld(
     else if (k === "sand") prefab = "beach"
     else if (k === "lake" && hash2(seed + 7, g.q[i]!, g.r[i]!) < 0.15) prefab = null
     if (prefab === "dock" || prefab === "field") ground = prefab === "dock" ? "water" : "soil"
-    const p = prefab ? tilePrefab(prefab) : undefined
+    const authored = prefab ? tilePrefab(prefab) : undefined
+    const p = authored && mirror ? mirrorPrefab(authored) : authored
     if (p) {
       if (p.ground === "dirt" || p.ground === "paved") ground = p.ground
       // a prefab's own pieces, minus those that would float on water tiles it was not made for
@@ -553,6 +633,18 @@ export function hexWorld(
       for (const q of placeTile(p, [x, zz], prefab === "dock" ? SEA_TOP : t, rot, i, true, odds))
         pieces.push({ ...q, piece: recolour(q.piece, hue) })
       prefabs[prefab!] = (prefabs[prefab!] ?? 0) + 1
+      // a quay's deck out over the water: walked at the tile's top, like a bridge's
+      const cr = Math.cos(rot)
+      const sr = Math.sin(rot)
+      const out = (px: number, pz: number): [number, number] => [
+        x + px * cr + pz * sr,
+        zz - px * sr + pz * cr,
+      ]
+      for (const d of p.decks ?? []) {
+        const [ax, az] = out(d.ax, d.az)
+        const [bx, bz] = out(d.bx, d.bz)
+        decks.push({ kind: "deck", ax, az, ay: t, bx, bz, by: t, half: d.half })
+      }
     }
     if (
       ground !== "water" &&
@@ -600,6 +692,7 @@ export function hexWorld(
       rot,
       ...(pathSides ? { paths: pathSides } : {}),
       ...(door !== undefined ? { door } : {}),
+      ...(mirror ? { mirror } : {}),
     })
   }
   /** The tile under a point (pixel → axial, pointy top, cube rounding), or -1 off the grid. */
@@ -671,7 +764,7 @@ export function hexWorld(
     const k = i >= 0 ? byTile.get(i) : undefined
     return k === undefined ? 0 : Math.max(0, tiles[k]!.top)
   }
-  const walkways = [...stairs, ...bridges.flatMap((b) => b.legs)]
+  const walkways = [...stairs, ...bridges.flatMap((b) => b.legs), ...decks]
   const grown = nature ? growNatureOn(nature) : undefined
   return {
     tiles,
@@ -679,6 +772,7 @@ export function hexWorld(
     paths,
     stairs,
     bridges,
+    decks,
     step: STEP,
     heightAt,
     stairAt(px: number, pz: number) {

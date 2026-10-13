@@ -171,7 +171,15 @@ export function hexWalk(
   const g = h.grid
   const R = HEX_TILE_SIZE
   const top = new Float64Array(g.size).fill(Number.NaN)
-  for (const t of w.tiles) top[t.i] = t.top
+  /** Where the world turned each building (a scene may turn to another street than its first). */
+  const turnedTo = new Map<number, number>()
+  /** Tiles under a neighbour's scene: no door, no spur of their own. */
+  const parts = new Set<number>()
+  for (const t of w.tiles) {
+    top[t.i] = t.top
+    if (t.door !== undefined) turnedTo.set(t.i, t.door)
+    if (t.prefab === "scene-part") parts.add(t.i)
+  }
   const centre = (i: number): [number, number] => {
     const [x, y] = hexCentre({ q: g.q[i]!, r: g.r[i]! })
     return [x * R, y * R]
@@ -247,15 +255,17 @@ export function hexWalk(
   }
   for (let i = 0; i < g.size; i++) {
     const u = useOf(z, i)
-    if (u !== "building" && u !== "farmstead" && u !== "homestead") continue
+    if ((u !== "building" && u !== "farmstead" && u !== "homestead") || parts.has(i)) continue
     const nb = g.neighbours(i)
-    // the side hexWorld turns a building to: its first road-like neighbour
+    // the side hexWorld turns a building to: its first road-like neighbour (or the street a scene turned to)
     let d = -1
     for (let k = 0; k < 6; k++)
       if (nb[k]! >= 0 && roadLike(nb[k]!)) {
         d = k
         break
       }
+    const turned = turnedTo.get(i)
+    if (turned !== undefined && nb[turned]! >= 0 && roadLike(nb[turned]!)) d = turned
     if (d < 0) continue
     const street = byTile.get(nb[d]!)
     // a building over a street more than a step below it has no way down: no door
@@ -275,7 +285,7 @@ export function hexWalk(
   }
   const level = (i: number) => (useOf(z, i) === "dock" ? 0 : h.level[i]!)
   for (const start of opts.reach ?? []) {
-    if (byTile.has(start) || !open(start)) continue
+    if (byTile.has(start) || !open(start) || parts.has(start)) continue
     // breadth first (a few steps) to the nearest tile with a node, round buildings where it can
     const prev = new Map<number, number>([[start, -1]])
     let frontier = [start]

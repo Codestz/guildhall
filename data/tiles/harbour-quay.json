@@ -1,0 +1,421 @@
+{
+  "blockers": [
+    {
+      "r": 1.75,
+      "x": 1.05,
+      "z": -0.45
+    },
+    {
+      "r": 0.3,
+      "x": 1.05,
+      "z": -4.86
+    },
+    {
+      "r": 0.413,
+      "x": 1.1,
+      "z": -3.91
+    },
+    {
+      "r": 0.236,
+      "x": -1.05,
+      "z": -3.86
+    },
+    {
+      "r": 0.236,
+      "x": -1.2,
+      "z": -4.61
+    },
+    {
+      "r": 0.204,
+      "x": -2.879,
+      "z": -2.933
+    },
+    {
+      "r": 0.204,
+      "x": -2.963,
+      "z": -2.288
+    },
+    {
+      "r": 0.3,
+      "x": -5.378,
+      "z": -1.604
+    },
+    {
+      "r": 0.296,
+      "x": -2.967,
+      "z": -1.482
+    },
+    {
+      "r": 0.299,
+      "x": -0.15,
+      "z": -3.21
+    },
+    {
+      "r": 0.378,
+      "x": 2,
+      "z": 1.2
+    },
+    {
+      "r": 0.8,
+      "x": -1.55,
+      "z": 1.25
+    },
+    {
+      "r": 0.332,
+      "x": 2.1,
+      "z": -1.65
+    },
+    {
+      "r": 0.193,
+      "x": -0.95,
+      "z": -1.75
+    }
+  ],
+  "decks": [
+    {
+      "ax": -1.4,
+      "az": -4.26,
+      "bx": 1.4,
+      "bz": -4.26,
+      "half": 1.5
+    },
+    {
+      "ax": -4.389,
+      "az": -0.918,
+      "bx": -2.989,
+      "bz": -3.342,
+      "half": 1.5
+    },
+    {
+      "ax": -1.65,
+      "az": -2.858,
+      "bx": -2.85,
+      "bz": -4.937,
+      "half": 1.3
+    },
+    {
+      "ax": 0.35,
+      "az": -5.6,
+      "bx": 0.35,
+      "bz": -7.7,
+      "half": 0.95
+    }
+  ],
+  "footprint": [
+    1,
+    2
+  ],
+  "ground": "dirt",
+  "group": "town",
+  "id": "harbour-quay",
+  "name": "Harbour quay with its warehouse",
+  "pieces": [
+    {
+      "piece": "kenney-town/wall-block-half",
+      "rot": 3.142,
+      "scale": 0.9,
+      "swatchMap": {
+        "20": 61,
+        "32": 62
+      },
+      "x": 0,
+      "y": -1.53,
+      "z": -4.26
+    },
+    {
+      "piece": "kenney-town/wall-block-half",
+      "rot": -2.094,
+      "scale": 0.9,
+      "swatchMap": {
+        "20": 61,
+        "32": 62
+      },
+      "x": -3.689,
+      "y": -1.53,
+      "z": -2.13
+    },
+    {
+      "piece": "kenney-town/wall-block-half",
+      "rot": -2.618,
+      "scale": 0.86,
+      "swatchMap": {
+        "20": 61,
+        "32": 62
+      },
+      "x": -2.3,
+      "y": -1.45,
+      "z": -3.984
+    },
+    {
+      "piece": "kenney-pirate/structure-platform",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 0.35,
+      "y": -0.75,
+      "z": -6.75
+    },
+    {
+      "piece": "kenney-castle/wall-stud",
+      "rot": 0,
+      "scale": 0.32,
+      "x": -0.55,
+      "y": -0.05,
+      "z": -7.65
+    },
+    {
+      "piece": "kenney-castle/wall-stud",
+      "rot": 0,
+      "scale": 0.32,
+      "x": 1.25,
+      "y": -0.05,
+      "z": -7.65
+    },
+    {
+      "piece": "kenney-pirate/boat-row-small",
+      "rot": 0.08,
+      "scale": 0.36,
+      "x": -1.25,
+      "y": -0.55,
+      "z": -6.85
+    },
+    {
+      "piece": "kenney-pirate/boat-row-large",
+      "rot": -0.12,
+      "scale": 0.34,
+      "x": 2.2,
+      "y": -0.55,
+      "z": -6.25
+    },
+    {
+      "piece": "kenney-pirate/ship-small",
+      "rot": -0.524,
+      "scale": 0.21,
+      "x": -6.071,
+      "y": -0.6,
+      "z": -3.505
+    },
+    {
+      "piece": "kaykit-hexagon/building-lumbermill-blue",
+      "rot": 0,
+      "scale": 0.38,
+      "x": 1.05,
+      "z": -0.45
+    },
+    {
+      "piece": "kenney-pirate/mast-ropes",
+      "rot": 3.142,
+      "scale": 0.26,
+      "x": 1.05,
+      "z": -4.86
+    },
+    {
+      "piece": "kaykit-resources/pallet-wood-covered-a",
+      "rot": 3.342,
+      "scale": 0.6,
+      "x": 1.1,
+      "z": -3.91
+    },
+    {
+      "piece": "kenney-pirate/crate",
+      "rot": 3.442,
+      "scale": 0.45,
+      "x": -1.05,
+      "z": -3.86
+    },
+    {
+      "piece": "kenney-pirate/crate-bottles",
+      "rot": 2.742,
+      "scale": 0.45,
+      "x": -1.2,
+      "z": -4.61
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.38,
+      "x": -2.879,
+      "z": -2.933
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0.5,
+      "scale": 0.38,
+      "x": -2.963,
+      "z": -2.288
+    },
+    {
+      "piece": "kaykit-tools/rope-bundle-b",
+      "rot": 0.4,
+      "scale": 0.8,
+      "x": -4.812,
+      "z": -2.085
+    },
+    {
+      "piece": "kaykit-halloween/post-lantern",
+      "rot": -2.094,
+      "scale": 0.5,
+      "x": -5.378,
+      "z": -1.604
+    },
+    {
+      "piece": "kenney-survival/fish-large",
+      "rot": 0.7,
+      "scale": 0.9,
+      "x": -3.541,
+      "z": -3.488
+    },
+    {
+      "piece": "kenney-survival/bucket",
+      "rot": 0,
+      "scale": 0.8,
+      "x": -3.112,
+      "z": -3.529
+    },
+    {
+      "piece": "kaykit-dungeon/barrel-small-stack",
+      "rot": -2.094,
+      "scale": 0.4,
+      "x": -2.967,
+      "z": -1.482
+    },
+    {
+      "piece": "kaykit-resources/textiles-stack-small",
+      "rot": 3.142,
+      "scale": 0.45,
+      "x": -0.15,
+      "z": -3.21
+    },
+    {
+      "piece": "kaykit-dungeon/crates-stacked",
+      "rot": 0.25,
+      "scale": 0.42,
+      "x": 2,
+      "z": 1.2
+    },
+    {
+      "piece": "kenney-town/cart",
+      "rot": 0.9,
+      "scale": 0.38,
+      "x": -1.55,
+      "z": 1.25
+    },
+    {
+      "piece": "kaykit-resources/textiles-stack-large-colored",
+      "rot": 0.3,
+      "scale": 0.5,
+      "x": 2.1,
+      "z": -1.65
+    },
+    {
+      "piece": "kenney-pirate/barrel",
+      "rot": 0,
+      "scale": 0.36,
+      "x": -0.95,
+      "z": -1.75
+    }
+  ],
+  "spots": [
+    {
+      "clip": "Fishing_Idle",
+      "facing": 3.142,
+      "hours": [
+        5,
+        12
+      ],
+      "kind": "work",
+      "prop": "kaykit-weapons/staff-a",
+      "roles": [
+        "fisher"
+      ],
+      "x": 0.35,
+      "z": -7.45
+    },
+    {
+      "clip": "Fishing_Idle",
+      "facing": -1.571,
+      "hours": [
+        5,
+        12
+      ],
+      "kind": "work",
+      "prop": "kaykit-weapons/staff-a",
+      "roles": [
+        "fisher"
+      ],
+      "x": -0.4,
+      "z": -6.75
+    },
+    {
+      "clip": "Fishing_Idle",
+      "facing": -2.094,
+      "hours": [
+        5,
+        12
+      ],
+      "kind": "work",
+      "prop": "kaykit-weapons/staff-a",
+      "roles": [
+        "fisher"
+      ],
+      "x": -5.147,
+      "z": -2.105
+    },
+    {
+      "clip": "Fishing_Idle",
+      "facing": -2.094,
+      "hours": [
+        5,
+        12
+      ],
+      "kind": "work",
+      "prop": "kaykit-weapons/staff-a",
+      "roles": [
+        "fisher"
+      ],
+      "x": -4.547,
+      "z": -3.145
+    },
+    {
+      "clip": "PickUp",
+      "facing": 1.571,
+      "kind": "work",
+      "roles": [
+        "merchant"
+      ],
+      "x": 0.25,
+      "z": -4.06
+    },
+    {
+      "clip": "Holding_A",
+      "facing": 1.768,
+      "kind": "work",
+      "roles": [
+        "merchant"
+      ],
+      "x": 1.2,
+      "z": 1.45
+    },
+    {
+      "clip": "Idle_B",
+      "facing": 2.266,
+      "hours": [
+        8,
+        19
+      ],
+      "kind": "talk",
+      "x": -1.9,
+      "z": -2.6
+    },
+    {
+      "clip": "Waving",
+      "facing": -0.876,
+      "hours": [
+        8,
+        19
+      ],
+      "kind": "talk",
+      "x": -1.1,
+      "z": -3.25
+    }
+  ]
+}

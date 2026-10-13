@@ -12,7 +12,14 @@
  * Every building also blocks its footprint, authored or not, so nobody cuts through a house.
  */
 import { type HexGrid, hexAt } from "./grid.ts"
-import { HEX_TILE_SIZE, type PlacedPiece, type TileSpot, tilePrefab, tileVariant } from "./tiles.ts"
+import {
+  HEX_TILE_SIZE,
+  mirrorPrefab,
+  type PlacedPiece,
+  type TileSpot,
+  tilePrefab,
+  tileVariant,
+} from "./tiles.ts"
 import type { HexWorld } from "./world.ts"
 
 /** A spot in the world (facing in world radians, 0 = +z). */
@@ -255,7 +262,8 @@ export function tileFurniture(g: HexGrid, w: Pick<HexWorld, "tiles" | "pieces">)
   for (const t of w.tiles) {
     const base = t.prefab ? tilePrefab(t.prefab) : undefined
     if (!base) continue
-    const prefab = tileVariant(base, t.i)
+    const variant = tileVariant(base, t.i)
+    const prefab = t.mirror ? mirrorPrefab(variant) : variant
     const local = prefab.spots ?? PREFAB_SPOTS[prefab.id]
     if (prefab.spots) authoredSpots.add(t.i)
     for (const s of local ?? [])

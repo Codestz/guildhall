@@ -70,7 +70,8 @@ describe("every authored spot on seed 1 can be walked to", () => {
     const i = g.index(q, r)
     if (i < 0) return true
     const u = useOf(z, i)
-    return WATER.has(kindOf(h, i)) && u !== "dock" && u !== "bridge"
+    // a quay's stone deck out over the shallows is walked (world.ts `decks`)
+    return WATER.has(kindOf(h, i)) && u !== "dock" && u !== "bridge" && w.stairAt(x, zz) === null
   }
   /** Why spot k cannot be walked to (null: it can). */
   const stuck = (k: number): string | null => {
@@ -158,6 +159,30 @@ describe("every authored spot on seed 1 can be walked to", () => {
     expect(walked).toBeGreaterThan(1000)
     // the exclusions stay the exception
     expect(excluded.offGraph).toBeLessThan(walked / 20)
+  })
+
+  test("the harbour's quay, the monastery's compound, a farmstead and the town hall's plaza stand here, every spot of theirs walked to", () => {
+    for (const id of ["harbour-quay", "monastery-compound", "farmstead-yard", "town-hall-plaza"]) {
+      const at = w.tiles.filter((t) => t.prefab === id)
+      expect([id, at.length > 0]).toEqual([id, true])
+      for (const t of at) {
+        const mine = f.on(t.i)
+        expect(mine.length).toBe(tilePrefab(id)!.spots!.length)
+        for (const k of mine) expect([id, k, stuck(k)]).toEqual([id, k, null])
+      }
+    }
+  })
+
+  test("the quay's fishers stand on its deck, over the water, at the deck's height", () => {
+    const quay = w.tiles.find((t) => t.prefab === "harbour-quay")!
+    const fishers = f.on(quay.i).filter((k) => f.spots[k]!.roles?.includes("fisher"))
+    expect(fishers.length).toBeGreaterThanOrEqual(3)
+    for (const k of fishers) {
+      const s = f.spots[k]!
+      const { q, r } = hexAt(s.x / HEX_TILE_SIZE, s.z / HEX_TILE_SIZE)
+      expect(kindOf(h, g.index(q, r))).toBe("shallows")
+      expect(w.stairAt(s.x, s.z)).toBeCloseTo(quay.top, 5)
+    }
   })
 
   test("all fourteen garden seats of the town's canteen are reachable, and open at its hours", () => {

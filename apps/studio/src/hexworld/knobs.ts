@@ -180,6 +180,47 @@ export function islandKnobs(seedKey: string): KnobSection[] {
       ],
     },
     {
+      // atmo.ts `atmoKnobs`: the sea mist, the warm haze and the cloud ring, each 0–2
+      title: "Air",
+      open: false,
+      knobs: [
+        { kind: "toggle", key: "atmo", label: "Mist, haze and clouds", default: true, apply: "reload" },
+        {
+          kind: "range",
+          key: "mist",
+          label: "Sea mist",
+          min: 0,
+          max: 2,
+          step: 0.05,
+          default: 1,
+          format: times,
+          apply: "reload",
+        },
+        {
+          kind: "range",
+          key: "haze",
+          label: "Haze",
+          min: 0,
+          max: 2,
+          step: 0.05,
+          default: 1,
+          format: times,
+          apply: "reload",
+        },
+        {
+          kind: "range",
+          key: "clouds",
+          label: "Clouds",
+          min: 0,
+          max: 2,
+          step: 0.05,
+          default: 1,
+          format: times,
+          apply: "reload",
+        },
+      ],
+    },
+    {
       title: "Life & overlays",
       knobs: [
         {

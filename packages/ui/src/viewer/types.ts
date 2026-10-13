@@ -125,8 +125,11 @@ export interface Viewer {
   coveredRight(): number
   /** How much of the viewer's left edge the title card covers (CSS px), so a framing can leave it room. */
   coveredLeft(): number
-  /** How much of the viewer's top edge the tools row covers (CSS px). */
-  coveredTop(): number
+  /**
+   * How far down the viewer's top edge is covered (CSS px): on the `right` by the tools row, on the
+   * `left` by the title card.
+   */
+  coveredTop(side: "left" | "right"): number
   /** Called when the Inspector opens or closes, or the viewer resizes. */
   onLayout(fn: () => void): () => void
   dispose(): void

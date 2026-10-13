@@ -276,7 +276,10 @@ export const grips: Screen = {
           },
         )
       }
-      aim(stage, params.columns.length, rows.length, { left: viewer.coveredLeft(), top: viewer.coveredTop() })
+      aim(stage, params.columns.length, rows.length, {
+        left: viewer.coveredLeft(),
+        top: viewer.coveredTop("right"),
+      })
       const count = (m: Row["mount"]) => rows.filter((row) => row.mount === m).length
       viewer.setInfo({
         figures: [

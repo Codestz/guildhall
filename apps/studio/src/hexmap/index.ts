@@ -632,12 +632,14 @@ export const hexmap: Screen = {
       if (view.growth) {
         // one seed at growing repo sizes: the land already there never moves
         const sizes = [100, 600, 2000, 6000, 14000, 30000]
-        const size = Math.min(aw / 3, (H - 16) / 2)
+        // the sheet starts below the title card
+        const top = Math.max(8, viewer.coveredTop("left"))
+        const size = Math.min(aw / 3, (H - top - 8) / 2)
         const rows: Stat[] = []
         sizes.forEach((files, k) => {
           const h = hexIsland({ ...view.spec, files })
           const x = left + (k % 3) * size + size / 2
-          const y = 8 + Math.floor(k / 3) * size + size / 2
+          const y = top + Math.floor(k / 3) * size + size / 2
           draw(g, h, x, y, size, FIT)
           label(`${files.toLocaleString("en-US")} files`, x - size / 2 + 12, y - size / 2 + 22)
           rows.push({ label: `${files.toLocaleString("en-US")} files`, value: h.stats.land, unit: "tiles" })
@@ -649,13 +651,14 @@ export const hexmap: Screen = {
           })
         if (describe) viewer.setReadout([{ title: "Growth", meta: "same seed, more files", rows }])
       } else if (view.grid) {
-        const size = Math.min(aw / 4, (H - 16) / 2)
+        const top = Math.max(8, viewer.coveredTop("left"))
+        const size = Math.min(aw / 4, (H - top - 8) / 2)
         const rows: Stat[] = []
         for (let k = 0; k < 8; k++) {
           const seed = view.spec.seed + k
           const h = hexIsland({ ...view.spec, seed })
           const x = left + (k % 4) * size + size / 2
-          const y = 8 + Math.floor(k / 4) * size + size / 2
+          const y = top + Math.floor(k / 4) * size + size / 2
           draw(g, h, x, y, size, FIT)
           label(`Seed ${seed}`, x - size / 2 + 12, y - size / 2 + 22)
           rows.push({ label: `Seed ${seed}`, value: `${h.stats.rivers} rivers · ${h.stats.lakes} lakes` })

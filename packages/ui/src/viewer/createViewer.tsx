@@ -178,7 +178,12 @@ export function createViewer(host: HTMLElement, opts: ViewerOptions): Viewer {
   }
 
   const act: Actions = {
-    committed: layout,
+    committed() {
+      // the title card grows when its figures arrive: what it covers changes with it
+      const card = root.querySelector(".ui-titlecard")
+      if (card) ro.observe(card)
+      layout()
+    },
     setKnob: (key, value) => setValues({ [key]: value }, false),
     rebuild() {
       // only what moved: a key the link carries in a form no knob reads (`?props=a,b,c`) is left alone
@@ -335,10 +340,10 @@ export function createViewer(host: HTMLElement, opts: ViewerOptions): Viewer {
       if (!card) return 0
       return card.getBoundingClientRect().right - root.getBoundingClientRect().left + 8
     },
-    coveredTop() {
+    coveredTop(side) {
       if (root.dataset.chrome === "off") return 0
-      const tools = root.querySelector<HTMLElement>(".ui-tools")
-      return tools ? tools.getBoundingClientRect().bottom - root.getBoundingClientRect().top + 8 : 0
+      const el = root.querySelector<HTMLElement>(side === "left" ? ".ui-titlecard" : ".ui-tools")
+      return el ? el.getBoundingClientRect().bottom - root.getBoundingClientRect().top + 8 : 0
     },
     onLayout(fn) {
       layoutFns.add(fn)

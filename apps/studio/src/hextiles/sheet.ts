@@ -131,6 +131,16 @@ export function mountSheet(host: HTMLElement, ctx: ScreenCtx, id: string): () =>
       return loadPiece(libraryUrl(entry.files.glb))
     })
     if (disposed) return
+    // a tall tile (a castle, a lighthouse) pulls the same camera back and up until its top is in frame
+    batch.mesh.computeBoundingBox()
+    const tall = (batch.mesh.boundingBox?.max.y ?? 0) - 5.5
+    if (tall > 0)
+      stage.setCamera({
+        target: [cx, 1.1 + tall * 0.45, cz],
+        azimuth: AZIMUTH,
+        elevation: ELEVATION,
+        distance: (DISTANCE * extent) / R + tall * 1.6,
+      })
     // the knight on the ring hex in front of the tile, off to its left, facing the camera
     const knight = catalog.get(CHARACTER)
     if (knight) {

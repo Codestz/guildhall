@@ -10,6 +10,7 @@ import { createRoot } from "react-dom/client"
 import type { HudParts } from "../../hexworld/index.ts"
 import { kindWord } from "../../hexworld/places.ts"
 import { hallChronicle } from "../../site/chronicle.ts"
+import { createHallCamera } from "../camera.ts"
 import type { HallTime } from "../clock.ts"
 import { createSession, feedKindOf, type HallSession, openFeed } from "../feeds/index.ts"
 import { sessionPlaces } from "../feeds/places.ts"
@@ -91,6 +92,19 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
     }
     raf = requestAnimationFrame(frame)
   }
+  // the camera: follow a hero (the roster, a badge, a chip), the director on a session (B; on for a story)
+  const camera = createHallCamera({
+    stage: parts.stage,
+    hud: viewer.hud,
+    host: viewer.stage,
+    places: parts.places,
+    heroAt: parts.heroAt,
+    session: live?.session ?? null,
+    sessionPlaces: live?.places ?? null,
+    ships: () => parts.fx?.ships?.ships() ?? null,
+    query: opts.query ?? new URLSearchParams(),
+  })
+  if (ext) ext.camera = camera
   // the island's event FX (weather, ships, scaffolds) read the session, twice a second
   const offFx = live && parts.fx ? driveFx(parts.fx, live.session) : () => {}
   void hallChronicle(opts.slug).then((found) => {
@@ -109,7 +123,7 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
       <HallHud
         hud={viewer.hud}
         modals={modals}
-        parts={rest}
+        parts={{ ...rest, camera }}
         slug={opts.slug}
         chronicle={chronicle}
         legend={legend}
@@ -127,6 +141,8 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
   return () => {
     gone = true
     offFx()
+    camera.dispose()
+    if (ext?.camera === camera) delete ext.camera
     if (live) {
       cancelAnimationFrame(raf)
       live.session.stop()

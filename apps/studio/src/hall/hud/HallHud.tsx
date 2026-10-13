@@ -397,10 +397,12 @@ export function HallHud(props: HallHudProps) {
     hud.dispatch({ type: "open", id: "dossier", ...(from ? { from } : {}) })
     parts.stage.rig.glide(poseFor(p, parts.stage.rig.get(), hud.phone() ? "bottom" : "right"), 1100)
   }
-  // a hero: its dossier in the sheet, the camera over where it stands (its place, or the hall's)
+  // a hero: its dossier in the sheet, the camera flying to them and following (hall/camera.ts), or
+  // without one over where they stand (their place, or the hall's)
   const openHero = (id: string, from?: string) => {
     setHero(id)
     hud.dispatch({ type: "open", id: "hero", ...(from ? { from } : {}) })
+    if (parts.camera) return parts.camera.follow(id)
     const a = snap?.world.actors.get(id)
     const p = live?.places.placeAt(a?.place)
     if (p) parts.stage.rig.glide(poseFor(p, parts.stage.rig.get(), hud.phone() ? "bottom" : "right"), 1100)

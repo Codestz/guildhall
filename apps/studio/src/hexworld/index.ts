@@ -64,6 +64,7 @@ import {
 } from "@guildhall/world"
 import { mountSound } from "../audio/mount.ts"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
+import type { HallCamera } from "../hall/camera.ts"
 import type { HallSession } from "../hall/feeds/session.ts"
 import type { Screen, ScreenCtx } from "../screens.ts"
 import { current } from "../shell/router.ts"
@@ -294,6 +295,8 @@ export interface HudParts {
   heroAt(id: string): [number, number, number] | null
   /** The heroes' chips (null: no life, no agents, or `?chips=0`): the one followed, a plea mark tapped. */
   chips: Pick<Chips, "select" | "onPlea"> | null
+  /** The hall's camera (hall/camera.ts: follow a hero, the director), set by the hall's HUD as it mounts. */
+  camera?: HallCamera
 }
 
 /** What `window.guildhall.ext.hall` tells the shots: how long each part took, and the places built. */

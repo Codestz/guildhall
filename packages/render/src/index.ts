@@ -47,6 +47,7 @@ export {
   type Gates,
   gateFrame,
 } from "./doors.ts"
+export * from "./events/index.ts"
 export { createGizmo, type Gizmo, type GizmoMode, type GizmoOpts, type GizmoPose } from "./gizmo.ts"
 export { createGrid, type Disposable } from "./grid.ts"
 export { createGround, type Ground, type GroundDraw } from "./ground.ts"

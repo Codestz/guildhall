@@ -1,0 +1,832 @@
+[
+  {
+    "type": "session",
+    "id": "ses_sim0001",
+    "agent": "guild-master",
+    "title": "Add cursor pagination to GET /users",
+    "at": 0
+  },
+  {
+    "type": "prompt",
+    "id": "ses_sim0001",
+    "key": "msg_sim0002",
+    "text": "Add cursor pagination to GET /users",
+    "at": 0
+  },
+  { "type": "status", "id": "ses_sim0001", "status": "busy", "at": 0 },
+  {
+    "type": "thinking",
+    "id": "ses_sim0001",
+    "key": "prt_sim0003",
+    "text": "API, service and query layers all move. Map it, plan it, then split the work.",
+    "at": 0
+  },
+  {
+    "type": "thinking",
+    "id": "ses_sim0001",
+    "key": "prt_sim0003",
+    "text": "API, service and query layers all move. Map it, plan it, then split the work.",
+    "done": true,
+    "at": 3678
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0004",
+    "name": "todowrite",
+    "state": "running",
+    "input": { "todos": ["map", "plan", "build", "verify"] },
+    "started": 3678,
+    "at": 3678
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0004",
+    "state": "completed",
+    "ended": 4319,
+    "at": 4319
+  },
+  { "type": "usage", "id": "ses_sim0001", "tokens": 2000, "cost": 0.0031999999999999997, "at": 4319 },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0005",
+    "name": "task",
+    "state": "running",
+    "input": {
+      "description": "Map how GET /users flows from route to query",
+      "subagent_type": "guild-explorer"
+    },
+    "started": 4319,
+    "at": 4319
+  },
+  {
+    "type": "session",
+    "id": "ses_sim0006",
+    "agent": "guild-explorer",
+    "title": "Map how GET /users flows from route to query (@guild-explorer subagent)",
+    "at": 4723,
+    "parentID": "ses_sim0001"
+  },
+  {
+    "type": "prompt",
+    "id": "ses_sim0006",
+    "key": "msg_sim0007",
+    "text": "Map how GET /users flows from route to query",
+    "at": 4723
+  },
+  { "type": "status", "id": "ses_sim0006", "status": "busy", "at": 4723 },
+  {
+    "type": "tool",
+    "id": "ses_sim0006",
+    "call": "call_sim0008",
+    "name": "glob",
+    "state": "running",
+    "input": { "pattern": "src/users/**" },
+    "started": 4723,
+    "at": 4723
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0006",
+    "call": "call_sim0008",
+    "state": "completed",
+    "ended": 5915,
+    "at": 5915,
+    "summary": "7 files"
+  },
+  { "type": "usage", "id": "ses_sim0006", "tokens": 2500, "cost": 0.004, "at": 5915 },
+  {
+    "type": "tool",
+    "id": "ses_sim0006",
+    "call": "call_sim0009",
+    "name": "grep",
+    "state": "running",
+    "input": { "pattern": "findUsers", "path": "src" },
+    "started": 5915,
+    "at": 5915
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0006",
+    "call": "call_sim0009",
+    "state": "completed",
+    "ended": 7221,
+    "at": 7221,
+    "summary": "3 matches"
+  },
+  { "type": "usage", "id": "ses_sim0006", "tokens": 5250, "cost": 0.0084, "at": 7221 },
+  {
+    "type": "tool",
+    "id": "ses_sim0006",
+    "call": "call_sim0010",
+    "name": "read",
+    "state": "running",
+    "input": { "filePath": "src/users/routes.ts" },
+    "started": 7221,
+    "at": 7221
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0006",
+    "call": "call_sim0010",
+    "state": "completed",
+    "ended": 8498,
+    "at": 8498
+  },
+  { "type": "usage", "id": "ses_sim0006", "tokens": 8750, "cost": 0.013999999999999999, "at": 8498 },
+  {
+    "type": "tool",
+    "id": "ses_sim0006",
+    "call": "call_sim0011",
+    "name": "read",
+    "state": "running",
+    "input": { "filePath": "src/users/queries.ts" },
+    "started": 8498,
+    "at": 8498
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0006",
+    "call": "call_sim0011",
+    "state": "completed",
+    "ended": 9961,
+    "at": 9961
+  },
+  { "type": "usage", "id": "ses_sim0006", "tokens": 12250, "cost": 0.0196, "at": 9961 },
+  { "type": "reply", "id": "ses_sim0006", "key": "prt_sim0012", "text": "", "at": 9961 },
+  {
+    "type": "reply",
+    "id": "ses_sim0006",
+    "key": "prt_sim0012",
+    "text": "routes.ts → service.ts → queries.ts; findUsers returns every row.",
+    "done": true,
+    "at": 11267
+  },
+  { "type": "status", "id": "ses_sim0006", "status": "idle", "at": 11267 },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0005",
+    "state": "completed",
+    "ended": 11558,
+    "at": 11558
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0013",
+    "name": "task",
+    "state": "running",
+    "input": { "description": "Design the pagination contract", "subagent_type": "guild-architect" },
+    "started": 11558,
+    "at": 11558
+  },
+  {
+    "type": "session",
+    "id": "ses_sim0014",
+    "agent": "guild-architect",
+    "title": "Design the pagination contract (@guild-architect subagent)",
+    "at": 12037,
+    "parentID": "ses_sim0001"
+  },
+  {
+    "type": "prompt",
+    "id": "ses_sim0014",
+    "key": "msg_sim0015",
+    "text": "Design the pagination contract",
+    "at": 12037
+  },
+  { "type": "status", "id": "ses_sim0014", "status": "busy", "at": 12037 },
+  {
+    "type": "tool",
+    "id": "ses_sim0014",
+    "call": "call_sim0016",
+    "name": "webfetch",
+    "state": "running",
+    "input": { "url": "https://example.com/cursor-vs-offset" },
+    "started": 12037,
+    "at": 12037
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0014",
+    "call": "call_sim0016",
+    "state": "completed",
+    "ended": 15769,
+    "at": 15769
+  },
+  { "type": "usage", "id": "ses_sim0014", "tokens": 9500, "cost": 0.0152, "at": 15769 },
+  {
+    "type": "thinking",
+    "id": "ses_sim0014",
+    "key": "prt_sim0017",
+    "text": "Offset breaks under inserts. Opaque cursor on (created_at, id), limit ≤ 100.",
+    "at": 15769
+  },
+  {
+    "type": "thinking",
+    "id": "ses_sim0014",
+    "key": "prt_sim0017",
+    "text": "Offset breaks under inserts. Opaque cursor on (created_at, id), limit ≤ 100.",
+    "done": true,
+    "at": 19950
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0014",
+    "call": "call_sim0018",
+    "name": "write",
+    "state": "running",
+    "input": { "filePath": "docs/plan/pagination.md" },
+    "started": 19950,
+    "at": 19950
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0014",
+    "call": "call_sim0018",
+    "state": "completed",
+    "ended": 21832,
+    "at": 21832
+  },
+  { "type": "usage", "id": "ses_sim0014", "tokens": 15000, "cost": 0.024, "at": 21832 },
+  { "type": "reply", "id": "ses_sim0014", "key": "prt_sim0019", "text": "", "at": 21832 },
+  {
+    "type": "reply",
+    "id": "ses_sim0014",
+    "key": "prt_sim0019",
+    "text": "Contract: ?cursor&limit → { items, nextCursor }. Two tasks: API, query.",
+    "done": true,
+    "at": 22986
+  },
+  { "type": "status", "id": "ses_sim0014", "status": "idle", "at": 22986 },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0013",
+    "state": "completed",
+    "ended": 23256,
+    "at": 23256
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0020",
+    "name": "task",
+    "state": "running",
+    "input": {
+      "description": "API: parse cursor + limit, return nextCursor",
+      "subagent_type": "guild-implementer"
+    },
+    "started": 23256,
+    "at": 23256
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0028",
+    "name": "task",
+    "state": "running",
+    "input": {
+      "description": "Query: keyset pagination on (created_at, id)",
+      "subagent_type": "guild-implementer"
+    },
+    "started": 23256,
+    "at": 23256
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0036",
+    "name": "task",
+    "state": "running",
+    "input": { "description": "Check the ORM's keyset API", "subagent_type": "guild-librarian" },
+    "started": 23256,
+    "at": 23256
+  },
+  {
+    "type": "session",
+    "id": "ses_sim0029",
+    "agent": "guild-implementer",
+    "title": "Query: keyset pagination on (created_at, id) (@guild-implementer subagent)",
+    "at": 23583,
+    "parentID": "ses_sim0001"
+  },
+  {
+    "type": "prompt",
+    "id": "ses_sim0029",
+    "key": "msg_sim0030",
+    "text": "Query: keyset pagination on (created_at, id)",
+    "at": 23583
+  },
+  { "type": "status", "id": "ses_sim0029", "status": "busy", "at": 23583 },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0031",
+    "name": "read",
+    "state": "running",
+    "input": { "filePath": "src/users/queries.ts" },
+    "started": 23583,
+    "at": 23583
+  },
+  {
+    "type": "session",
+    "id": "ses_sim0021",
+    "agent": "guild-implementer",
+    "title": "API: parse cursor + limit, return nextCursor (@guild-implementer subagent)",
+    "at": 23601,
+    "parentID": "ses_sim0001"
+  },
+  {
+    "type": "prompt",
+    "id": "ses_sim0021",
+    "key": "msg_sim0022",
+    "text": "API: parse cursor + limit, return nextCursor",
+    "at": 23601
+  },
+  { "type": "status", "id": "ses_sim0021", "status": "busy", "at": 23601 },
+  {
+    "type": "tool",
+    "id": "ses_sim0021",
+    "call": "call_sim0023",
+    "name": "read",
+    "state": "running",
+    "input": { "filePath": "src/users/routes.ts" },
+    "started": 23601,
+    "at": 23601
+  },
+  {
+    "type": "session",
+    "id": "ses_sim0037",
+    "agent": "guild-librarian",
+    "title": "Check the ORM's keyset API (@guild-librarian subagent)",
+    "at": 23697,
+    "parentID": "ses_sim0001"
+  },
+  {
+    "type": "prompt",
+    "id": "ses_sim0037",
+    "key": "msg_sim0038",
+    "text": "Check the ORM's keyset API",
+    "at": 23697
+  },
+  { "type": "status", "id": "ses_sim0037", "status": "busy", "at": 23697 },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0039",
+    "name": "context7_query-docs",
+    "state": "running",
+    "input": { "query": "keyset pagination where tuple" },
+    "started": 23697,
+    "at": 23697
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0031",
+    "state": "completed",
+    "ended": 24651,
+    "at": 24651
+  },
+  { "type": "usage", "id": "ses_sim0029", "tokens": 2750, "cost": 0.004399999999999999, "at": 24651 },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0032",
+    "name": "edit",
+    "state": "running",
+    "input": { "filePath": "src/users/queries.ts" },
+    "started": 24651,
+    "at": 24651
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0021",
+    "call": "call_sim0023",
+    "state": "completed",
+    "ended": 24696,
+    "at": 24696
+  },
+  { "type": "usage", "id": "ses_sim0021", "tokens": 2750, "cost": 0.004399999999999999, "at": 24696 },
+  {
+    "type": "tool",
+    "id": "ses_sim0021",
+    "call": "call_sim0024",
+    "name": "edit",
+    "state": "running",
+    "input": { "filePath": "src/users/routes.ts" },
+    "started": 24696,
+    "at": 24696
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0039",
+    "state": "completed",
+    "ended": 27381,
+    "at": 27381
+  },
+  { "type": "usage", "id": "ses_sim0037", "tokens": 10500, "cost": 0.0168, "at": 27381 },
+  { "type": "reply", "id": "ses_sim0037", "key": "prt_sim0040", "text": "", "at": 27381 },
+  {
+    "type": "tool",
+    "id": "ses_sim0021",
+    "call": "call_sim0024",
+    "state": "completed",
+    "ended": 27590,
+    "at": 27590
+  },
+  { "type": "usage", "id": "ses_sim0021", "tokens": 11500, "cost": 0.0184, "at": 27590 },
+  {
+    "type": "tool",
+    "id": "ses_sim0021",
+    "call": "call_sim0025",
+    "name": "edit",
+    "state": "running",
+    "input": { "filePath": "src/users/service.ts" },
+    "started": 27590,
+    "at": 27590
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0032",
+    "state": "completed",
+    "ended": 27967,
+    "at": 27967
+  },
+  { "type": "usage", "id": "ses_sim0029", "tokens": 10750, "cost": 0.0172, "at": 27967 },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0033",
+    "name": "write",
+    "state": "running",
+    "input": { "filePath": "migrations/0042_users_created_at_idx.sql" },
+    "started": 27967,
+    "at": 27967
+  },
+  {
+    "type": "reply",
+    "id": "ses_sim0037",
+    "key": "prt_sim0040",
+    "text": "Use a row-value comparison: (created_at, id) > ($1, $2).",
+    "done": true,
+    "at": 28687
+  },
+  { "type": "status", "id": "ses_sim0037", "status": "idle", "at": 28687 },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0036",
+    "state": "completed",
+    "ended": 28981,
+    "at": 28981
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0033",
+    "state": "completed",
+    "ended": 30094,
+    "at": 30094
+  },
+  { "type": "usage", "id": "ses_sim0029", "tokens": 15500, "cost": 0.0248, "at": 30094 },
+  { "type": "status", "id": "ses_sim0029", "status": "waiting", "at": 30094 },
+  {
+    "type": "tool",
+    "id": "ses_sim0021",
+    "call": "call_sim0025",
+    "state": "completed",
+    "ended": 30368,
+    "at": 30368
+  },
+  { "type": "usage", "id": "ses_sim0021", "tokens": 18750, "cost": 0.03, "at": 30368 },
+  {
+    "type": "tool",
+    "id": "ses_sim0021",
+    "call": "call_sim0026",
+    "name": "bash",
+    "state": "running",
+    "input": { "command": "bun run typecheck" },
+    "started": 30368,
+    "at": 30368
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0021",
+    "call": "call_sim0026",
+    "state": "completed",
+    "ended": 34574,
+    "at": 34574,
+    "summary": "ok"
+  },
+  { "type": "usage", "id": "ses_sim0021", "tokens": 28250, "cost": 0.0452, "at": 34574 },
+  { "type": "reply", "id": "ses_sim0021", "key": "prt_sim0027", "text": "", "at": 34574 },
+  {
+    "type": "reply",
+    "id": "ses_sim0021",
+    "key": "prt_sim0027",
+    "text": "Route takes cursor & limit, encodes nextCursor.",
+    "done": true,
+    "at": 35671
+  },
+  { "type": "status", "id": "ses_sim0021", "status": "idle", "at": 35671 },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0020",
+    "state": "completed",
+    "ended": 35934,
+    "at": 35934
+  },
+  { "type": "status", "id": "ses_sim0029", "status": "busy", "at": 36703 },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0034",
+    "name": "bash",
+    "state": "running",
+    "input": { "command": "bun run migrate" },
+    "started": 36703,
+    "at": 36703
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0034",
+    "state": "completed",
+    "ended": 39526,
+    "at": 39526,
+    "summary": "1 applied"
+  },
+  { "type": "usage", "id": "ses_sim0029", "tokens": 23500, "cost": 0.037599999999999995, "at": 39526 },
+  { "type": "reply", "id": "ses_sim0029", "key": "prt_sim0035", "text": "", "at": 39526 },
+  {
+    "type": "reply",
+    "id": "ses_sim0029",
+    "key": "prt_sim0035",
+    "text": "findUsers(cursor, limit) with an index on (created_at, id).",
+    "done": true,
+    "at": 40802
+  },
+  { "type": "status", "id": "ses_sim0029", "status": "idle", "at": 40802 },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0028",
+    "state": "completed",
+    "ended": 41108,
+    "at": 41108
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0041",
+    "name": "task",
+    "state": "running",
+    "input": { "description": "Verify against the contract", "subagent_type": "guild-verifier" },
+    "started": 41202,
+    "at": 41202
+  },
+  {
+    "type": "session",
+    "id": "ses_sim0042",
+    "agent": "guild-verifier",
+    "title": "Verify against the contract (@guild-verifier subagent)",
+    "at": 41645,
+    "parentID": "ses_sim0001"
+  },
+  {
+    "type": "prompt",
+    "id": "ses_sim0042",
+    "key": "msg_sim0043",
+    "text": "Verify against the contract",
+    "at": 41645
+  },
+  { "type": "status", "id": "ses_sim0042", "status": "busy", "at": 41645 },
+  {
+    "type": "tool",
+    "id": "ses_sim0042",
+    "call": "call_sim0044",
+    "name": "read",
+    "state": "running",
+    "input": { "filePath": "docs/plan/pagination.md" },
+    "started": 41645,
+    "at": 41645
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0042",
+    "call": "call_sim0044",
+    "state": "completed",
+    "ended": 43202,
+    "at": 43202
+  },
+  { "type": "usage", "id": "ses_sim0042", "tokens": 3250, "cost": 0.0052, "at": 43202 },
+  {
+    "type": "tool",
+    "id": "ses_sim0042",
+    "call": "call_sim0045",
+    "name": "bash",
+    "state": "running",
+    "input": { "command": "bun test users" },
+    "started": 43202,
+    "at": 43202
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0042",
+    "call": "call_sim0045",
+    "state": "failed",
+    "ended": 47502,
+    "at": 47502,
+    "error": "1 failed",
+    "summary": "exit 1"
+  },
+  { "type": "usage", "id": "ses_sim0042", "tokens": 15250, "cost": 0.024399999999999998, "at": 47502 },
+  {
+    "type": "thinking",
+    "id": "ses_sim0042",
+    "key": "prt_sim0046",
+    "text": "Last page drops a row: limit + 1 lookahead is missing.",
+    "at": 47502
+  },
+  {
+    "type": "thinking",
+    "id": "ses_sim0042",
+    "key": "prt_sim0046",
+    "text": "Last page drops a row: limit + 1 lookahead is missing.",
+    "done": true,
+    "at": 50700
+  },
+  { "type": "reply", "id": "ses_sim0042", "key": "prt_sim0047", "text": "", "at": 50700 },
+  {
+    "type": "reply",
+    "id": "ses_sim0042",
+    "key": "prt_sim0047",
+    "text": "FAIL: nextCursor skips the final row on exact page boundaries.",
+    "done": true,
+    "at": 51734
+  },
+  { "type": "status", "id": "ses_sim0042", "status": "idle", "at": 51734 },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0041",
+    "state": "completed",
+    "ended": 52013,
+    "at": 52013
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0048",
+    "name": "task",
+    "state": "running",
+    "input": {
+      "description": "Fix: fetch limit + 1 to detect the next page",
+      "subagent_type": "guild-implementer",
+      "task_id": "ses_sim0029"
+    },
+    "started": 52013,
+    "at": 52013
+  },
+  {
+    "type": "prompt",
+    "id": "ses_sim0029",
+    "key": "msg_sim0049",
+    "text": "Fix: fetch limit + 1 to detect the next page",
+    "at": 52399
+  },
+  { "type": "status", "id": "ses_sim0029", "status": "busy", "at": 52399 },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0050",
+    "name": "edit",
+    "state": "running",
+    "input": { "filePath": "src/users/queries.ts" },
+    "started": 52399,
+    "at": 52399
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0050",
+    "state": "completed",
+    "ended": 54738,
+    "at": 54738
+  },
+  { "type": "usage", "id": "ses_sim0029", "tokens": 30000, "cost": 0.047999999999999994, "at": 54738 },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0051",
+    "name": "bash",
+    "state": "running",
+    "input": { "command": "bun test users" },
+    "started": 54738,
+    "at": 54738
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0051",
+    "state": "completed",
+    "ended": 58009,
+    "at": 58009,
+    "summary": "18 pass"
+  },
+  { "type": "usage", "id": "ses_sim0029", "tokens": 39500, "cost": 0.06319999999999999, "at": 58009 },
+  { "type": "reply", "id": "ses_sim0029", "key": "prt_sim0052", "text": "", "at": 58009 },
+  {
+    "type": "reply",
+    "id": "ses_sim0029",
+    "key": "prt_sim0052",
+    "text": "Lookahead row added; boundary test passes.",
+    "done": true,
+    "at": 59318
+  },
+  { "type": "status", "id": "ses_sim0029", "status": "idle", "at": 59318 },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0048",
+    "state": "completed",
+    "ended": 59627,
+    "at": 59627
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0053",
+    "name": "task",
+    "state": "running",
+    "input": { "description": "Re-verify", "subagent_type": "guild-verifier" },
+    "started": 59627,
+    "at": 59627
+  },
+  {
+    "type": "session",
+    "id": "ses_sim0054",
+    "agent": "guild-verifier",
+    "title": "Re-verify (@guild-verifier subagent)",
+    "at": 59967,
+    "parentID": "ses_sim0001"
+  },
+  { "type": "prompt", "id": "ses_sim0054", "key": "msg_sim0055", "text": "Re-verify", "at": 59967 },
+  { "type": "status", "id": "ses_sim0054", "status": "busy", "at": 59967 },
+  {
+    "type": "tool",
+    "id": "ses_sim0054",
+    "call": "call_sim0056",
+    "name": "bash",
+    "state": "running",
+    "input": { "command": "bun test" },
+    "started": 59967,
+    "at": 59967
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0054",
+    "call": "call_sim0056",
+    "state": "completed",
+    "ended": 64587,
+    "at": 64587,
+    "summary": "214 pass"
+  },
+  { "type": "usage", "id": "ses_sim0054", "tokens": 12750, "cost": 0.020399999999999998, "at": 64587 },
+  { "type": "reply", "id": "ses_sim0054", "key": "prt_sim0057", "text": "", "at": 64587 },
+  {
+    "type": "reply",
+    "id": "ses_sim0054",
+    "key": "prt_sim0057",
+    "text": "PASS: contract holds, boundaries covered.",
+    "done": true,
+    "at": 65570
+  },
+  { "type": "status", "id": "ses_sim0054", "status": "idle", "at": 65570 },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0053",
+    "state": "completed",
+    "ended": 65885,
+    "at": 65885
+  },
+  { "type": "reply", "id": "ses_sim0001", "key": "prt_sim0058", "text": "", "at": 65885 },
+  {
+    "type": "reply",
+    "id": "ses_sim0001",
+    "key": "prt_sim0058",
+    "text": "GET /users now pages by cursor: ?cursor&limit → { items, nextCursor }. All 214 tests pass.",
+    "done": true,
+    "at": 67261
+  },
+  { "type": "status", "id": "ses_sim0001", "status": "idle", "at": 67261 }
+]

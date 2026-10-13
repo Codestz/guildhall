@@ -8,6 +8,7 @@
  *            and a repository's story by era (story/repo)
  *   repo/    the Repo Chronicle: a repository's history (V1's format), read at a day
  *   events/  the wire normalised into world events, folded into the guild's world, logged with checkpoints
+ *   stories/ told guild runs for the demos: V1's Script DSL and stories, and the saga for the hex island
  */
 
 export * from "./events/index.ts"
@@ -56,4 +57,5 @@ export {
 } from "./guild/views.ts"
 export * from "./repo/index.ts"
 export * from "./roster/index.ts"
+export * from "./stories/index.ts"
 export * from "./story/index.ts"

@@ -1,0 +1,218 @@
+{
+  "changes": [
+    { "type": "session", "id": "ses_sim0001", "agent": "guild-master", "title": "t", "at": 100 },
+    { "type": "prompt", "id": "ses_sim0001", "key": "msg_sim0002", "text": "t", "at": 100 },
+    { "type": "status", "id": "ses_sim0001", "status": "busy", "at": 100 },
+    { "type": "thinking", "id": "ses_sim0001", "key": "prt_sim0003", "text": "x", "at": 638 },
+    { "type": "thinking", "id": "ses_sim0001", "key": "prt_sim0003", "text": "x", "done": true, "at": 1636 },
+    {
+      "type": "tool",
+      "id": "ses_sim0001",
+      "call": "call_sim0004",
+      "name": "read",
+      "state": "running",
+      "input": { "filePath": "a.ts" },
+      "started": 1636,
+      "at": 1636
+    },
+    {
+      "type": "tool",
+      "id": "ses_sim0001",
+      "call": "call_sim0004",
+      "state": "completed",
+      "ended": 1991,
+      "at": 1991
+    },
+    {
+      "type": "tool",
+      "id": "ses_sim0001",
+      "call": "call_sim0005",
+      "name": "read",
+      "state": "running",
+      "input": { "filePath": "b.ts" },
+      "started": 1991,
+      "at": 1991
+    },
+    {
+      "type": "tool",
+      "id": "ses_sim0001",
+      "call": "call_sim0005",
+      "state": "completed",
+      "ended": 2411,
+      "at": 2411
+    },
+    {
+      "type": "tool",
+      "id": "ses_sim0001",
+      "call": "call_sim0006",
+      "name": "bash",
+      "state": "running",
+      "input": { "command": "bun test" },
+      "started": 4913,
+      "at": 4913
+    },
+    {
+      "type": "tool",
+      "id": "ses_sim0001",
+      "call": "call_sim0006",
+      "state": "failed",
+      "ended": 6157,
+      "at": 6157,
+      "error": "1 failed",
+      "summary": "exit 1",
+      "output": "✗ a"
+    },
+    { "type": "usage", "id": "ses_sim0001", "tokens": 1000, "cost": 0.0012, "at": 6157 },
+    {
+      "type": "tool",
+      "id": "ses_sim0001",
+      "call": "call_sim0007",
+      "name": "task",
+      "state": "running",
+      "input": { "description": "map", "subagent_type": "guild-explorer" },
+      "started": 6157,
+      "at": 6157
+    },
+    {
+      "type": "session",
+      "id": "ses_sim0008",
+      "agent": "guild-explorer",
+      "title": "map (@guild-explorer subagent)",
+      "at": 6592,
+      "parentID": "ses_sim0001"
+    },
+    { "type": "prompt", "id": "ses_sim0008", "key": "msg_sim0009", "text": "map", "at": 6592 },
+    { "type": "status", "id": "ses_sim0008", "status": "busy", "at": 6592 },
+    {
+      "type": "tool",
+      "id": "ses_sim0008",
+      "call": "call_sim0010",
+      "name": "grep",
+      "state": "running",
+      "input": { "pattern": "p" },
+      "started": 9542,
+      "at": 9542
+    },
+    {
+      "type": "tool",
+      "id": "ses_sim0008",
+      "call": "call_sim0010",
+      "state": "completed",
+      "ended": 9891,
+      "at": 9891
+    },
+    { "type": "usage", "id": "ses_sim0008", "tokens": 1000, "cost": 0.0003, "at": 9891 },
+    { "type": "status", "id": "ses_sim0008", "status": "waiting", "at": 9891 },
+    { "type": "status", "id": "ses_sim0008", "status": "busy", "at": 11675 },
+    { "type": "reply", "id": "ses_sim0008", "key": "prt_sim0011", "text": "", "at": 11675 },
+    { "type": "reply", "id": "ses_sim0008", "key": "prt_sim0011", "text": "ok", "done": true, "at": 12120 },
+    { "type": "status", "id": "ses_sim0008", "status": "idle", "at": 12120 },
+    {
+      "type": "tool",
+      "id": "ses_sim0001",
+      "call": "call_sim0007",
+      "state": "completed",
+      "ended": 12449,
+      "at": 12449
+    },
+    {
+      "type": "tool",
+      "id": "ses_sim0001",
+      "call": "call_sim0012",
+      "name": "task",
+      "state": "running",
+      "input": { "description": "bg", "subagent_type": "guild-implementer" },
+      "started": 12449,
+      "at": 12449
+    },
+    {
+      "type": "session",
+      "id": "ses_sim0013",
+      "agent": "guild-implementer",
+      "title": "bg (@guild-implementer subagent)",
+      "at": 12875,
+      "parentID": "ses_sim0001"
+    },
+    { "type": "prompt", "id": "ses_sim0013", "key": "msg_sim0014", "text": "bg", "at": 12875 },
+    { "type": "status", "id": "ses_sim0013", "status": "busy", "at": 12875 },
+    {
+      "type": "tool",
+      "id": "ses_sim0013",
+      "call": "call_sim0015",
+      "name": "edit",
+      "state": "running",
+      "input": { "filePath": "c.ts" },
+      "started": 15292,
+      "at": 15292
+    },
+    {
+      "type": "tool",
+      "id": "ses_sim0013",
+      "call": "call_sim0015",
+      "state": "completed",
+      "ended": 16180,
+      "at": 16180
+    },
+    { "type": "usage", "id": "ses_sim0013", "tokens": 1000, "cost": 0.0009, "at": 16180 },
+    { "type": "status", "id": "ses_sim0013", "status": "failed", "error": "nope", "at": 16180 },
+    {
+      "type": "tool",
+      "id": "ses_sim0001",
+      "call": "call_sim0012",
+      "state": "completed",
+      "ended": 16456,
+      "at": 16456
+    },
+    {
+      "type": "tool",
+      "id": "ses_sim0001",
+      "call": "call_sim0016",
+      "name": "task",
+      "state": "running",
+      "input": { "description": "again", "subagent_type": "guild-explorer", "task_id": "ses_sim0008" },
+      "started": 16580,
+      "at": 16580
+    },
+    { "type": "prompt", "id": "ses_sim0008", "key": "msg_sim0017", "text": "again", "at": 17043 },
+    { "type": "status", "id": "ses_sim0008", "status": "busy", "at": 17043 },
+    {
+      "type": "tool",
+      "id": "ses_sim0008",
+      "call": "call_sim0018",
+      "name": "read",
+      "state": "running",
+      "input": { "filePath": "d.ts" },
+      "started": 19789,
+      "at": 19789
+    },
+    {
+      "type": "tool",
+      "id": "ses_sim0008",
+      "call": "call_sim0018",
+      "state": "completed",
+      "ended": 20671,
+      "at": 20671
+    },
+    { "type": "usage", "id": "ses_sim0008", "tokens": 2010, "cost": 0.0011, "at": 20671 },
+    { "type": "reply", "id": "ses_sim0008", "key": "prt_sim0019", "text": "", "at": 20671 },
+    { "type": "reply", "id": "ses_sim0008", "key": "prt_sim0019", "text": "ok2", "done": true, "at": 21978 },
+    { "type": "status", "id": "ses_sim0008", "status": "idle", "at": 21978 },
+    {
+      "type": "tool",
+      "id": "ses_sim0001",
+      "call": "call_sim0016",
+      "state": "completed",
+      "ended": 22248,
+      "at": 22248
+    },
+    { "type": "prompt", "id": "ses_sim0001", "key": "msg_sim0020", "text": "more", "at": 22248 },
+    { "type": "status", "id": "ses_sim0001", "status": "busy", "at": 22248 },
+    { "type": "status", "id": "ses_sim0001", "status": "waiting", "at": 22248 },
+    { "type": "status", "id": "ses_sim0001", "status": "busy", "at": 25478 },
+    { "type": "reply", "id": "ses_sim0001", "key": "prt_sim0021", "text": "", "at": 25478 },
+    { "type": "reply", "id": "ses_sim0001", "key": "prt_sim0021", "text": "done", "done": true, "at": 26819 },
+    { "type": "status", "id": "ses_sim0001", "status": "idle", "at": 26819 }
+  ],
+  "chapters": [{ "at": 0, "numeral": "I", "title": "A", "tagline": "b", "hour": 6 }],
+  "picks": [1, 909]
+}

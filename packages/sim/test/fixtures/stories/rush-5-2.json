@@ -1,0 +1,934 @@
+[
+  {
+    "type": "session",
+    "id": "ses_sim0001",
+    "agent": "guild-master",
+    "title": "Sweep the repo: 5 parallel quests",
+    "at": 0
+  },
+  {
+    "type": "prompt",
+    "id": "ses_sim0001",
+    "key": "msg_sim0002",
+    "text": "Sweep the repo: 5 parallel quests",
+    "at": 0
+  },
+  { "type": "status", "id": "ses_sim0001", "status": "busy", "at": 0 },
+  {
+    "type": "thinking",
+    "id": "ses_sim0001",
+    "key": "prt_sim0003",
+    "text": "Fan out. Everyone takes a module.",
+    "at": 0
+  },
+  {
+    "type": "thinking",
+    "id": "ses_sim0001",
+    "key": "prt_sim0003",
+    "text": "Fan out. Everyone takes a module.",
+    "done": true,
+    "at": 1312
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0004",
+    "name": "task",
+    "state": "running",
+    "input": { "description": "Module 1", "subagent_type": "guild-implementer" },
+    "started": 1312,
+    "at": 1312
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0016",
+    "name": "task",
+    "state": "running",
+    "input": { "description": "Module 2", "subagent_type": "guild-explorer" },
+    "started": 1312,
+    "at": 1312
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0024",
+    "name": "task",
+    "state": "running",
+    "input": { "description": "Module 3", "subagent_type": "guild-verifier" },
+    "started": 1312,
+    "at": 1312
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0036",
+    "name": "task",
+    "state": "running",
+    "input": { "description": "Module 4", "subagent_type": "guild-librarian" },
+    "started": 1312,
+    "at": 1312
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0048",
+    "name": "task",
+    "state": "running",
+    "input": { "description": "Module 5", "subagent_type": "guild-researcher" },
+    "started": 1312,
+    "at": 1312
+  },
+  {
+    "type": "session",
+    "id": "ses_sim0017",
+    "agent": "guild-explorer",
+    "title": "Module 2 (@guild-explorer subagent)",
+    "at": 1642,
+    "parentID": "ses_sim0001"
+  },
+  { "type": "prompt", "id": "ses_sim0017", "key": "msg_sim0018", "text": "Module 2", "at": 1642 },
+  { "type": "status", "id": "ses_sim0017", "status": "busy", "at": 1642 },
+  {
+    "type": "session",
+    "id": "ses_sim0005",
+    "agent": "guild-implementer",
+    "title": "Module 1 (@guild-implementer subagent)",
+    "at": 1684,
+    "parentID": "ses_sim0001"
+  },
+  { "type": "prompt", "id": "ses_sim0005", "key": "msg_sim0006", "text": "Module 1", "at": 1684 },
+  { "type": "status", "id": "ses_sim0005", "status": "busy", "at": 1684 },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0007",
+    "name": "bash",
+    "state": "running",
+    "input": { "path": "src/mod1" },
+    "started": 1685,
+    "at": 1685
+  },
+  {
+    "type": "session",
+    "id": "ses_sim0049",
+    "agent": "guild-researcher",
+    "title": "Module 5 (@guild-researcher subagent)",
+    "at": 1701,
+    "parentID": "ses_sim0001"
+  },
+  { "type": "prompt", "id": "ses_sim0049", "key": "msg_sim0050", "text": "Module 5", "at": 1701 },
+  { "type": "status", "id": "ses_sim0049", "status": "busy", "at": 1701 },
+  {
+    "type": "session",
+    "id": "ses_sim0025",
+    "agent": "guild-verifier",
+    "title": "Module 3 (@guild-verifier subagent)",
+    "at": 1715,
+    "parentID": "ses_sim0001"
+  },
+  { "type": "prompt", "id": "ses_sim0025", "key": "msg_sim0026", "text": "Module 3", "at": 1715 },
+  { "type": "status", "id": "ses_sim0025", "status": "busy", "at": 1715 },
+  {
+    "type": "tool",
+    "id": "ses_sim0017",
+    "call": "call_sim0019",
+    "name": "grep",
+    "state": "running",
+    "input": { "path": "src/mod2" },
+    "started": 1770,
+    "at": 1770
+  },
+  {
+    "type": "session",
+    "id": "ses_sim0037",
+    "agent": "guild-librarian",
+    "title": "Module 4 (@guild-librarian subagent)",
+    "at": 1789,
+    "parentID": "ses_sim0001"
+  },
+  { "type": "prompt", "id": "ses_sim0037", "key": "msg_sim0038", "text": "Module 4", "at": 1789 },
+  { "type": "status", "id": "ses_sim0037", "status": "busy", "at": 1789 },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0027",
+    "name": "read",
+    "state": "running",
+    "input": { "path": "src/mod3" },
+    "started": 1966,
+    "at": 1966
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0051",
+    "name": "glob",
+    "state": "running",
+    "input": { "path": "src/mod5" },
+    "started": 2231,
+    "at": 2231
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0039",
+    "name": "glob",
+    "state": "running",
+    "input": { "path": "src/mod4" },
+    "started": 2300,
+    "at": 2300
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0017",
+    "call": "call_sim0019",
+    "state": "completed",
+    "ended": 3857,
+    "at": 3857
+  },
+  { "type": "usage", "id": "ses_sim0017", "tokens": 6500, "cost": 0.0104, "at": 3857 },
+  {
+    "type": "tool",
+    "id": "ses_sim0017",
+    "call": "call_sim0020",
+    "name": "context7_query-docs",
+    "state": "running",
+    "input": { "path": "src/mod2" },
+    "started": 3857,
+    "at": 3857
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0007",
+    "state": "completed",
+    "ended": 4675,
+    "at": 4675
+  },
+  { "type": "usage", "id": "ses_sim0005", "tokens": 6500, "cost": 0.0104, "at": 4675 },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0008",
+    "name": "glob",
+    "state": "running",
+    "input": { "path": "src/mod1" },
+    "started": 4675,
+    "at": 4675
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0039",
+    "state": "completed",
+    "ended": 4925,
+    "at": 4925
+  },
+  { "type": "usage", "id": "ses_sim0037", "tokens": 6500, "cost": 0.0104, "at": 4925 },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0040",
+    "name": "read",
+    "state": "running",
+    "input": { "path": "src/mod4" },
+    "started": 4925,
+    "at": 4925
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0051",
+    "state": "completed",
+    "ended": 4960,
+    "at": 4960
+  },
+  { "type": "usage", "id": "ses_sim0049", "tokens": 6500, "cost": 0.0104, "at": 4960 },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0052",
+    "name": "glob",
+    "state": "running",
+    "input": { "path": "src/mod5" },
+    "started": 4960,
+    "at": 4960
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0027",
+    "state": "completed",
+    "ended": 5045,
+    "at": 5045
+  },
+  { "type": "usage", "id": "ses_sim0025", "tokens": 6500, "cost": 0.0104, "at": 5045 },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0028",
+    "name": "webfetch",
+    "state": "running",
+    "input": { "path": "src/mod3" },
+    "started": 5045,
+    "at": 5045
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0017",
+    "call": "call_sim0020",
+    "state": "completed",
+    "ended": 6407,
+    "at": 6407
+  },
+  { "type": "usage", "id": "ses_sim0017", "tokens": 13000, "cost": 0.0208, "at": 6407 },
+  {
+    "type": "tool",
+    "id": "ses_sim0017",
+    "call": "call_sim0021",
+    "name": "glob",
+    "state": "running",
+    "input": { "path": "src/mod2" },
+    "started": 6407,
+    "at": 6407
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0028",
+    "state": "completed",
+    "ended": 7126,
+    "at": 7126
+  },
+  { "type": "usage", "id": "ses_sim0025", "tokens": 13000, "cost": 0.0208, "at": 7126 },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0029",
+    "name": "context7_query-docs",
+    "state": "running",
+    "input": { "path": "src/mod3" },
+    "started": 7126,
+    "at": 7126
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0008",
+    "state": "completed",
+    "ended": 7274,
+    "at": 7274
+  },
+  { "type": "usage", "id": "ses_sim0005", "tokens": 13000, "cost": 0.0208, "at": 7274 },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0009",
+    "name": "edit",
+    "state": "running",
+    "input": { "path": "src/mod1" },
+    "started": 7274,
+    "at": 7274
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0040",
+    "state": "completed",
+    "ended": 7888,
+    "at": 7888
+  },
+  { "type": "usage", "id": "ses_sim0037", "tokens": 13000, "cost": 0.0208, "at": 7888 },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0041",
+    "name": "webfetch",
+    "state": "running",
+    "input": { "path": "src/mod4" },
+    "started": 7888,
+    "at": 7888
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0052",
+    "state": "completed",
+    "ended": 8016,
+    "at": 8016
+  },
+  { "type": "usage", "id": "ses_sim0049", "tokens": 13000, "cost": 0.0208, "at": 8016 },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0053",
+    "name": "grep",
+    "state": "running",
+    "input": { "path": "src/mod5" },
+    "started": 8016,
+    "at": 8016
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0029",
+    "state": "completed",
+    "ended": 9281,
+    "at": 9281
+  },
+  { "type": "usage", "id": "ses_sim0025", "tokens": 19500, "cost": 0.0312, "at": 9281 },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0030",
+    "name": "context7_query-docs",
+    "state": "running",
+    "input": { "path": "src/mod3" },
+    "started": 9281,
+    "at": 9281
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0017",
+    "call": "call_sim0021",
+    "state": "completed",
+    "ended": 9515,
+    "at": 9515
+  },
+  { "type": "usage", "id": "ses_sim0017", "tokens": 19500, "cost": 0.0312, "at": 9515 },
+  {
+    "type": "tool",
+    "id": "ses_sim0017",
+    "call": "call_sim0022",
+    "name": "grep",
+    "state": "running",
+    "input": { "path": "src/mod2" },
+    "started": 9515,
+    "at": 9515
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0009",
+    "state": "completed",
+    "ended": 10167,
+    "at": 10167
+  },
+  { "type": "usage", "id": "ses_sim0005", "tokens": 19500, "cost": 0.0312, "at": 10167 },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0010",
+    "name": "read",
+    "state": "running",
+    "input": { "path": "src/mod1" },
+    "started": 10167,
+    "at": 10167
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0053",
+    "state": "completed",
+    "ended": 10386,
+    "at": 10386
+  },
+  { "type": "usage", "id": "ses_sim0049", "tokens": 19500, "cost": 0.0312, "at": 10386 },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0054",
+    "name": "edit",
+    "state": "running",
+    "input": { "path": "src/mod5" },
+    "started": 10386,
+    "at": 10386
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0041",
+    "state": "completed",
+    "ended": 10538,
+    "at": 10538
+  },
+  { "type": "usage", "id": "ses_sim0037", "tokens": 19500, "cost": 0.0312, "at": 10538 },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0042",
+    "name": "edit",
+    "state": "running",
+    "input": { "path": "src/mod4" },
+    "started": 10538,
+    "at": 10538
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0030",
+    "state": "completed",
+    "ended": 11909,
+    "at": 11909
+  },
+  { "type": "usage", "id": "ses_sim0025", "tokens": 26000, "cost": 0.0416, "at": 11909 },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0031",
+    "name": "grep",
+    "state": "running",
+    "input": { "path": "src/mod3" },
+    "started": 11909,
+    "at": 11909
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0017",
+    "call": "call_sim0022",
+    "state": "completed",
+    "ended": 12082,
+    "at": 12082
+  },
+  { "type": "usage", "id": "ses_sim0017", "tokens": 26000, "cost": 0.0416, "at": 12082 },
+  {
+    "type": "tool",
+    "id": "ses_sim0017",
+    "call": "call_sim0023",
+    "name": "bash",
+    "state": "running",
+    "input": { "command": "bun test mod2" },
+    "started": 12082,
+    "at": 12082
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0054",
+    "state": "completed",
+    "ended": 13025,
+    "at": 13025
+  },
+  { "type": "usage", "id": "ses_sim0049", "tokens": 26000, "cost": 0.0416, "at": 13025 },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0055",
+    "name": "read",
+    "state": "running",
+    "input": { "path": "src/mod5" },
+    "started": 13025,
+    "at": 13025
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0010",
+    "state": "completed",
+    "ended": 13064,
+    "at": 13064
+  },
+  { "type": "usage", "id": "ses_sim0005", "tokens": 26000, "cost": 0.0416, "at": 13064 },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0011",
+    "name": "grep",
+    "state": "running",
+    "input": { "path": "src/mod1" },
+    "started": 13064,
+    "at": 13064
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0042",
+    "state": "completed",
+    "ended": 13557,
+    "at": 13557
+  },
+  { "type": "usage", "id": "ses_sim0037", "tokens": 26000, "cost": 0.0416, "at": 13557 },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0043",
+    "name": "context7_query-docs",
+    "state": "running",
+    "input": { "path": "src/mod4" },
+    "started": 13557,
+    "at": 13557
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0017",
+    "call": "call_sim0023",
+    "state": "failed",
+    "ended": 14148,
+    "at": 14148,
+    "error": "3 failed",
+    "summary": "exit 1"
+  },
+  { "type": "usage", "id": "ses_sim0017", "tokens": 31500, "cost": 0.0504, "at": 14148 },
+  {
+    "type": "status",
+    "id": "ses_sim0017",
+    "status": "failed",
+    "error": "Gave up: the module's tests keep failing",
+    "at": 14148
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0016",
+    "state": "completed",
+    "ended": 14394,
+    "at": 14394
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0031",
+    "state": "completed",
+    "ended": 14694,
+    "at": 14694
+  },
+  { "type": "usage", "id": "ses_sim0025", "tokens": 32500, "cost": 0.052, "at": 14694 },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0032",
+    "name": "read",
+    "state": "running",
+    "input": { "path": "src/mod3" },
+    "started": 14694,
+    "at": 14694
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0055",
+    "state": "completed",
+    "ended": 15405,
+    "at": 15405
+  },
+  { "type": "usage", "id": "ses_sim0049", "tokens": 32500, "cost": 0.052, "at": 15405 },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0056",
+    "name": "webfetch",
+    "state": "running",
+    "input": { "path": "src/mod5" },
+    "started": 15405,
+    "at": 15405
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0011",
+    "state": "completed",
+    "ended": 15585,
+    "at": 15585
+  },
+  { "type": "usage", "id": "ses_sim0005", "tokens": 32500, "cost": 0.052, "at": 15585 },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0012",
+    "name": "webfetch",
+    "state": "running",
+    "input": { "path": "src/mod1" },
+    "started": 15585,
+    "at": 15585
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0043",
+    "state": "completed",
+    "ended": 16102,
+    "at": 16102
+  },
+  { "type": "usage", "id": "ses_sim0037", "tokens": 32500, "cost": 0.052, "at": 16102 },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0044",
+    "name": "edit",
+    "state": "running",
+    "input": { "path": "src/mod4" },
+    "started": 16102,
+    "at": 16102
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0032",
+    "state": "completed",
+    "ended": 17583,
+    "at": 17583
+  },
+  { "type": "usage", "id": "ses_sim0025", "tokens": 39000, "cost": 0.0624, "at": 17583 },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0033",
+    "name": "context7_query-docs",
+    "state": "running",
+    "input": { "path": "src/mod3" },
+    "started": 17583,
+    "at": 17583
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0056",
+    "state": "completed",
+    "ended": 17659,
+    "at": 17659
+  },
+  { "type": "usage", "id": "ses_sim0049", "tokens": 39000, "cost": 0.0624, "at": 17659 },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0057",
+    "name": "webfetch",
+    "state": "running",
+    "input": { "path": "src/mod5" },
+    "started": 17659,
+    "at": 17659
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0044",
+    "state": "completed",
+    "ended": 18201,
+    "at": 18201
+  },
+  { "type": "usage", "id": "ses_sim0037", "tokens": 39000, "cost": 0.0624, "at": 18201 },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0045",
+    "name": "context7_query-docs",
+    "state": "running",
+    "input": { "path": "src/mod4" },
+    "started": 18201,
+    "at": 18201
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0012",
+    "state": "completed",
+    "ended": 18270,
+    "at": 18270
+  },
+  { "type": "usage", "id": "ses_sim0005", "tokens": 39000, "cost": 0.0624, "at": 18270 },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0013",
+    "name": "read",
+    "state": "running",
+    "input": { "path": "src/mod1" },
+    "started": 18270,
+    "at": 18270
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0057",
+    "state": "completed",
+    "ended": 20149,
+    "at": 20149
+  },
+  { "type": "usage", "id": "ses_sim0049", "tokens": 45500, "cost": 0.0728, "at": 20149 },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0058",
+    "name": "edit",
+    "state": "running",
+    "input": { "path": "src/mod5" },
+    "started": 20149,
+    "at": 20149
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0033",
+    "state": "completed",
+    "ended": 20523,
+    "at": 20523
+  },
+  { "type": "usage", "id": "ses_sim0025", "tokens": 45500, "cost": 0.0728, "at": 20523 },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0034",
+    "name": "bash",
+    "state": "running",
+    "input": { "path": "src/mod3" },
+    "started": 20523,
+    "at": 20523
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0045",
+    "state": "completed",
+    "ended": 20607,
+    "at": 20607
+  },
+  { "type": "usage", "id": "ses_sim0037", "tokens": 45500, "cost": 0.0728, "at": 20607 },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0046",
+    "name": "bash",
+    "state": "running",
+    "input": { "path": "src/mod4" },
+    "started": 20607,
+    "at": 20607
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0013",
+    "state": "completed",
+    "ended": 21049,
+    "at": 21049
+  },
+  { "type": "usage", "id": "ses_sim0005", "tokens": 45500, "cost": 0.0728, "at": 21049 },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0014",
+    "name": "edit",
+    "state": "running",
+    "input": { "path": "src/mod1" },
+    "started": 21049,
+    "at": 21049
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0049",
+    "call": "call_sim0058",
+    "state": "completed",
+    "ended": 22640,
+    "at": 22640
+  },
+  { "type": "usage", "id": "ses_sim0049", "tokens": 52000, "cost": 0.0832, "at": 22640 },
+  { "type": "reply", "id": "ses_sim0049", "key": "prt_sim0059", "text": "", "at": 22640 },
+  {
+    "type": "tool",
+    "id": "ses_sim0037",
+    "call": "call_sim0046",
+    "state": "completed",
+    "ended": 23518,
+    "at": 23518
+  },
+  { "type": "usage", "id": "ses_sim0037", "tokens": 52000, "cost": 0.0832, "at": 23518 },
+  { "type": "reply", "id": "ses_sim0037", "key": "prt_sim0047", "text": "", "at": 23518 },
+  {
+    "type": "tool",
+    "id": "ses_sim0025",
+    "call": "call_sim0034",
+    "state": "completed",
+    "ended": 23590,
+    "at": 23590
+  },
+  { "type": "usage", "id": "ses_sim0025", "tokens": 52000, "cost": 0.0832, "at": 23590 },
+  { "type": "reply", "id": "ses_sim0025", "key": "prt_sim0035", "text": "", "at": 23590 },
+  {
+    "type": "reply",
+    "id": "ses_sim0049",
+    "key": "prt_sim0059",
+    "text": "Module 5 done.",
+    "done": true,
+    "at": 24005
+  },
+  { "type": "status", "id": "ses_sim0049", "status": "idle", "at": 24005 },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0014",
+    "state": "completed",
+    "ended": 24139,
+    "at": 24139
+  },
+  { "type": "usage", "id": "ses_sim0005", "tokens": 52000, "cost": 0.0832, "at": 24139 },
+  { "type": "reply", "id": "ses_sim0005", "key": "prt_sim0015", "text": "", "at": 24139 },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0048",
+    "state": "completed",
+    "ended": 24302,
+    "at": 24302
+  },
+  {
+    "type": "reply",
+    "id": "ses_sim0025",
+    "key": "prt_sim0035",
+    "text": "Module 3 done.",
+    "done": true,
+    "at": 24584
+  },
+  { "type": "status", "id": "ses_sim0025", "status": "idle", "at": 24584 },
+  {
+    "type": "reply",
+    "id": "ses_sim0037",
+    "key": "prt_sim0047",
+    "text": "Module 4 done.",
+    "done": true,
+    "at": 24894
+  },
+  { "type": "status", "id": "ses_sim0037", "status": "idle", "at": 24894 },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0024",
+    "state": "completed",
+    "ended": 24910,
+    "at": 24910
+  },
+  {
+    "type": "reply",
+    "id": "ses_sim0005",
+    "key": "prt_sim0015",
+    "text": "Module 1 done.",
+    "done": true,
+    "at": 25118
+  },
+  { "type": "status", "id": "ses_sim0005", "status": "idle", "at": 25118 },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0036",
+    "state": "completed",
+    "ended": 25244,
+    "at": 25244
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0004",
+    "state": "completed",
+    "ended": 25468,
+    "at": 25468
+  },
+  { "type": "reply", "id": "ses_sim0001", "key": "prt_sim0060", "text": "", "at": 25518 },
+  {
+    "type": "reply",
+    "id": "ses_sim0001",
+    "key": "prt_sim0060",
+    "text": "All 5 modules swept.",
+    "done": true,
+    "at": 26953
+  },
+  { "type": "status", "id": "ses_sim0001", "status": "idle", "at": 26953 }
+]

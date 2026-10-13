@@ -1,0 +1,516 @@
+[
+  {
+    "type": "session",
+    "id": "ses_sim0001",
+    "agent": "guild-master",
+    "title": "Add rate limiting to the public API",
+    "at": 0
+  },
+  {
+    "type": "prompt",
+    "id": "ses_sim0001",
+    "key": "msg_sim0002",
+    "text": "Add rate limiting to the public API",
+    "at": 0
+  },
+  { "type": "status", "id": "ses_sim0001", "status": "busy", "at": 0 },
+  {
+    "type": "thinking",
+    "id": "ses_sim0001",
+    "key": "prt_sim0003",
+    "text": "One limiter in front of every route. Map the routes, then build it.",
+    "at": 0
+  },
+  {
+    "type": "thinking",
+    "id": "ses_sim0001",
+    "key": "prt_sim0003",
+    "text": "One limiter in front of every route. Map the routes, then build it.",
+    "done": true,
+    "at": 2312
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0004",
+    "name": "task",
+    "state": "running",
+    "input": { "description": "Find every public route", "subagent_type": "guild-explorer" },
+    "started": 2312,
+    "at": 2312
+  },
+  {
+    "type": "session",
+    "id": "ses_sim0018",
+    "agent": "agent",
+    "title": "Why does the nightly export time out?",
+    "at": 2500
+  },
+  {
+    "type": "prompt",
+    "id": "ses_sim0018",
+    "key": "msg_sim0019",
+    "text": "Why does the nightly export time out?",
+    "at": 2500
+  },
+  { "type": "status", "id": "ses_sim0018", "status": "busy", "at": 2500 },
+  {
+    "type": "thinking",
+    "id": "ses_sim0018",
+    "key": "prt_sim0020",
+    "text": "Find where the export runs, then measure it.",
+    "at": 2500
+  },
+  {
+    "type": "session",
+    "id": "ses_sim0005",
+    "agent": "guild-explorer",
+    "title": "Find every public route (@guild-explorer subagent)",
+    "at": 2632,
+    "parentID": "ses_sim0001"
+  },
+  {
+    "type": "prompt",
+    "id": "ses_sim0005",
+    "key": "msg_sim0006",
+    "text": "Find every public route",
+    "at": 2632
+  },
+  { "type": "status", "id": "ses_sim0005", "status": "busy", "at": 2632 },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0007",
+    "name": "glob",
+    "state": "running",
+    "input": { "pattern": "src/routes/**" },
+    "started": 2632,
+    "at": 2632
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0007",
+    "state": "completed",
+    "ended": 3744,
+    "at": 3744,
+    "summary": "9 files"
+  },
+  { "type": "usage", "id": "ses_sim0005", "tokens": 2750, "cost": 0.004399999999999999, "at": 3744 },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0008",
+    "name": "read",
+    "state": "running",
+    "input": { "filePath": "src/routes/index.ts" },
+    "started": 3744,
+    "at": 3744
+  },
+  {
+    "type": "thinking",
+    "id": "ses_sim0018",
+    "key": "prt_sim0020",
+    "text": "Find where the export runs, then measure it.",
+    "done": true,
+    "at": 4231
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0018",
+    "call": "call_sim0021",
+    "name": "task",
+    "state": "running",
+    "input": { "description": "Trace the nightly export job", "subagent_type": "Explore" },
+    "started": 4231,
+    "at": 4231
+  },
+  {
+    "type": "session",
+    "id": "ses_sim0022",
+    "agent": "Explore",
+    "title": "Trace the nightly export job (@Explore subagent)",
+    "at": 4591,
+    "parentID": "ses_sim0018"
+  },
+  {
+    "type": "prompt",
+    "id": "ses_sim0022",
+    "key": "msg_sim0023",
+    "text": "Trace the nightly export job",
+    "at": 4591
+  },
+  { "type": "status", "id": "ses_sim0022", "status": "busy", "at": 4591 },
+  {
+    "type": "tool",
+    "id": "ses_sim0022",
+    "call": "call_sim0024",
+    "name": "grep",
+    "state": "running",
+    "input": { "pattern": "exportNightly", "path": "src" },
+    "started": 4591,
+    "at": 4591
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0022",
+    "call": "call_sim0024",
+    "state": "completed",
+    "ended": 5367,
+    "at": 5367,
+    "summary": "2 matches"
+  },
+  { "type": "usage", "id": "ses_sim0022", "tokens": 2250, "cost": 0.0036, "at": 5367 },
+  {
+    "type": "tool",
+    "id": "ses_sim0022",
+    "call": "call_sim0025",
+    "name": "read",
+    "state": "running",
+    "input": { "filePath": "src/jobs/export.ts" },
+    "started": 5367,
+    "at": 5367
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0005",
+    "call": "call_sim0008",
+    "state": "completed",
+    "ended": 5413,
+    "at": 5413
+  },
+  { "type": "usage", "id": "ses_sim0005", "tokens": 6250, "cost": 0.009999999999999998, "at": 5413 },
+  { "type": "reply", "id": "ses_sim0005", "key": "prt_sim0009", "text": "", "at": 5413 },
+  {
+    "type": "reply",
+    "id": "ses_sim0005",
+    "key": "prt_sim0009",
+    "text": "Nine routes, all mounted in src/routes/index.ts.",
+    "done": true,
+    "at": 6838
+  },
+  { "type": "status", "id": "ses_sim0005", "status": "idle", "at": 6838 },
+  {
+    "type": "tool",
+    "id": "ses_sim0022",
+    "call": "call_sim0025",
+    "state": "completed",
+    "ended": 6960,
+    "at": 6960
+  },
+  { "type": "usage", "id": "ses_sim0022", "tokens": 6250, "cost": 0.009999999999999998, "at": 6960 },
+  { "type": "reply", "id": "ses_sim0022", "key": "prt_sim0026", "text": "", "at": 6960 },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0004",
+    "state": "completed",
+    "ended": 7112,
+    "at": 7112
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0010",
+    "name": "task",
+    "state": "running",
+    "input": { "description": "Add a token-bucket limiter middleware", "subagent_type": "guild-implementer" },
+    "started": 7112,
+    "at": 7112
+  },
+  {
+    "type": "session",
+    "id": "ses_sim0011",
+    "agent": "guild-implementer",
+    "title": "Add a token-bucket limiter middleware (@guild-implementer subagent)",
+    "at": 7530,
+    "parentID": "ses_sim0001"
+  },
+  {
+    "type": "prompt",
+    "id": "ses_sim0011",
+    "key": "msg_sim0012",
+    "text": "Add a token-bucket limiter middleware",
+    "at": 7530
+  },
+  { "type": "status", "id": "ses_sim0011", "status": "busy", "at": 7530 },
+  {
+    "type": "tool",
+    "id": "ses_sim0011",
+    "call": "call_sim0013",
+    "name": "write",
+    "state": "running",
+    "input": { "filePath": "src/middleware/limit.ts" },
+    "started": 7530,
+    "at": 7530
+  },
+  {
+    "type": "reply",
+    "id": "ses_sim0022",
+    "key": "prt_sim0026",
+    "text": "export.ts loads every order into memory before writing the CSV.",
+    "done": true,
+    "at": 7952
+  },
+  { "type": "status", "id": "ses_sim0022", "status": "idle", "at": 7952 },
+  {
+    "type": "tool",
+    "id": "ses_sim0018",
+    "call": "call_sim0021",
+    "state": "completed",
+    "ended": 8239,
+    "at": 8239
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0018",
+    "call": "call_sim0027",
+    "name": "mcp__context7__query-docs",
+    "state": "running",
+    "input": { "query": "postgres cursor streaming node" },
+    "started": 8239,
+    "at": 8239
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0018",
+    "call": "call_sim0027",
+    "state": "completed",
+    "ended": 11117,
+    "at": 11117
+  },
+  { "type": "usage", "id": "ses_sim0018", "tokens": 6500, "cost": 0.0104, "at": 11117 },
+  {
+    "type": "tool",
+    "id": "ses_sim0018",
+    "call": "call_sim0028",
+    "name": "task",
+    "state": "running",
+    "input": {
+      "description": "Stream the export instead of loading it whole",
+      "subagent_type": "guild-implementer"
+    },
+    "started": 11117,
+    "at": 11117
+  },
+  {
+    "type": "session",
+    "id": "ses_sim0029",
+    "agent": "guild-implementer",
+    "title": "Stream the export instead of loading it whole (@guild-implementer subagent)",
+    "at": 11483,
+    "parentID": "ses_sim0018"
+  },
+  {
+    "type": "prompt",
+    "id": "ses_sim0029",
+    "key": "msg_sim0030",
+    "text": "Stream the export instead of loading it whole",
+    "at": 11483
+  },
+  { "type": "status", "id": "ses_sim0029", "status": "busy", "at": 11483 },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0031",
+    "name": "edit",
+    "state": "running",
+    "input": { "filePath": "src/jobs/export.ts" },
+    "started": 11483,
+    "at": 11483
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0011",
+    "call": "call_sim0013",
+    "state": "completed",
+    "ended": 12101,
+    "at": 12101
+  },
+  { "type": "usage", "id": "ses_sim0011", "tokens": 10500, "cost": 0.0168, "at": 12101 },
+  {
+    "type": "tool",
+    "id": "ses_sim0011",
+    "call": "call_sim0014",
+    "name": "edit",
+    "state": "running",
+    "input": { "filePath": "src/routes/index.ts" },
+    "started": 12101,
+    "at": 12101
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0011",
+    "call": "call_sim0014",
+    "state": "completed",
+    "ended": 13848,
+    "at": 13848
+  },
+  { "type": "usage", "id": "ses_sim0011", "tokens": 15000, "cost": 0.024, "at": 13848 },
+  {
+    "type": "tool",
+    "id": "ses_sim0011",
+    "call": "call_sim0015",
+    "name": "bash",
+    "state": "running",
+    "input": { "command": "bun test limit" },
+    "started": 13848,
+    "at": 13848
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0031",
+    "state": "completed",
+    "ended": 14813,
+    "at": 14813
+  },
+  { "type": "usage", "id": "ses_sim0029", "tokens": 9500, "cost": 0.0152, "at": 14813 },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0032",
+    "name": "bash",
+    "state": "running",
+    "input": { "command": "bun test export" },
+    "started": 14813,
+    "at": 14813
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0011",
+    "call": "call_sim0015",
+    "state": "completed",
+    "ended": 18161,
+    "at": 18161,
+    "summary": "12 pass"
+  },
+  { "type": "usage", "id": "ses_sim0011", "tokens": 24000, "cost": 0.038400000000000004, "at": 18161 },
+  { "type": "reply", "id": "ses_sim0011", "key": "prt_sim0016", "text": "", "at": 18161 },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0032",
+    "state": "failed",
+    "ended": 18408,
+    "at": 18408,
+    "error": "Exit code 1",
+    "summary": "exit 1"
+  },
+  { "type": "usage", "id": "ses_sim0029", "tokens": 20500, "cost": 0.032799999999999996, "at": 18408 },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0033",
+    "name": "edit",
+    "state": "running",
+    "input": { "filePath": "src/jobs/export.ts" },
+    "started": 18408,
+    "at": 18408
+  },
+  {
+    "type": "reply",
+    "id": "ses_sim0011",
+    "key": "prt_sim0016",
+    "text": "Limiter mounted on every public route: 60 requests a minute per key.",
+    "done": true,
+    "at": 19340
+  },
+  { "type": "status", "id": "ses_sim0011", "status": "idle", "at": 19340 },
+  {
+    "type": "tool",
+    "id": "ses_sim0001",
+    "call": "call_sim0010",
+    "state": "completed",
+    "ended": 19639,
+    "at": 19639
+  },
+  { "type": "reply", "id": "ses_sim0001", "key": "prt_sim0017", "text": "", "at": 19639 },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0033",
+    "state": "completed",
+    "ended": 20350,
+    "at": 20350
+  },
+  { "type": "usage", "id": "ses_sim0029", "tokens": 25500, "cost": 0.040799999999999996, "at": 20350 },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0034",
+    "name": "bash",
+    "state": "running",
+    "input": { "command": "bun test export" },
+    "started": 20350,
+    "at": 20350
+  },
+  {
+    "type": "reply",
+    "id": "ses_sim0001",
+    "key": "prt_sim0017",
+    "text": "Rate limiting is on: 60/min per API key, 429 with Retry-After.",
+    "done": true,
+    "at": 20666
+  },
+  { "type": "status", "id": "ses_sim0001", "status": "idle", "at": 20666 },
+  {
+    "type": "tool",
+    "id": "ses_sim0029",
+    "call": "call_sim0034",
+    "state": "completed",
+    "ended": 24391,
+    "at": 24391,
+    "summary": "8 pass"
+  },
+  { "type": "usage", "id": "ses_sim0029", "tokens": 35250, "cost": 0.05639999999999999, "at": 24391 },
+  { "type": "reply", "id": "ses_sim0029", "key": "prt_sim0035", "text": "", "at": 24391 },
+  {
+    "type": "reply",
+    "id": "ses_sim0029",
+    "key": "prt_sim0035",
+    "text": "Export streams rows through a cursor; memory flat at 40 MB.",
+    "done": true,
+    "at": 25734
+  },
+  { "type": "status", "id": "ses_sim0029", "status": "idle", "at": 25734 },
+  {
+    "type": "tool",
+    "id": "ses_sim0018",
+    "call": "call_sim0028",
+    "state": "completed",
+    "ended": 26009,
+    "at": 26009
+  },
+  { "type": "status", "id": "ses_sim0018", "status": "waiting", "at": 26009 },
+  { "type": "status", "id": "ses_sim0018", "status": "busy", "at": 29097 },
+  {
+    "type": "tool",
+    "id": "ses_sim0018",
+    "call": "call_sim0036",
+    "name": "bash",
+    "state": "running",
+    "input": { "command": "git push origin fix/export-stream" },
+    "started": 29097,
+    "at": 29097
+  },
+  {
+    "type": "tool",
+    "id": "ses_sim0018",
+    "call": "call_sim0036",
+    "state": "completed",
+    "ended": 30692,
+    "at": 30692
+  },
+  { "type": "usage", "id": "ses_sim0018", "tokens": 10250, "cost": 0.016399999999999998, "at": 30692 },
+  { "type": "reply", "id": "ses_sim0018", "key": "prt_sim0037", "text": "", "at": 30692 },
+  {
+    "type": "reply",
+    "id": "ses_sim0018",
+    "key": "prt_sim0037",
+    "text": "The export streams now; it finishes in 3 minutes instead of timing out.",
+    "done": true,
+    "at": 31914
+  },
+  { "type": "status", "id": "ses_sim0018", "status": "idle", "at": 31914 }
+]

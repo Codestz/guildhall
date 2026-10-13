@@ -134,18 +134,34 @@ export function placeSpecs(
 export interface PlaceBinding {
   /** The zone index of a unit by name (a pooled unit's members included), or undefined. */
   zoneOfUnit(name: string): number | undefined
-  /** The zone a file path leads to: its deepest unit's place, else the capital's (the town). */
-  placeOf(path: string): number
+  /**
+   * The zone a file path leads to: its deepest unit's place; a file of the repo no unit holds (a root
+   * file: `README.md`, `package.json`) the root's place ("/", named after the repo; the capital's when
+   * the repo has none); a path outside the repo (`/tmp/x`, `~/.claude/…`) none: it leaves no mark.
+   */
+  placeOf(path: string): number | undefined
   /** The zone index of the capital (the town). */
   capital: number
+  /** The zone index of the root's place ("/"), when the repo has one. */
+  root: number | undefined
 }
+
+/** A path from the file system's root, a drive's, or home: one that may lie outside the repo. */
+const ABSOLUTE = /^(?:[\\/]|[A-Za-z]:[\\/]|~)/
 
 /**
  * Binds the units to the zones `hexZones(h, {places})` made from them. A path is matched by its segments:
  * the unit "packages/world" owns "…/guildhall/packages/world/src/hex/life.ts" (suffix-contained, so
- * absolute paths bind with no repo root on the wire); the deepest unit wins; no match goes to the capital.
+ * absolute paths bind with no repo root on the wire); the deepest unit wins. A path no unit holds is the
+ * repo's when it is relative (`README.md`) or passes through the repo's folder (`…/guildhall/README.md`,
+ * a git worktree inside it too): the root's place. Any other absolute path is outside the repo: no place.
+ * `repo` ("owner/name" or "name") names the repo's folder; by default the root's plate does (`placeSpecs`).
  */
-export function bindPlaces(specs: readonly PlaceSpec[], zones: Pick<HexZones, "zones">): PlaceBinding {
+export function bindPlaces(
+  specs: readonly PlaceSpec[],
+  zones: Pick<HexZones, "zones">,
+  opts: { repo?: string } = {},
+): PlaceBinding {
   const zoneOf = new Map<string, number>()
   zones.zones.forEach((z, zi) => {
     if (!z.place) return
@@ -154,6 +170,12 @@ export function bindPlaces(specs: readonly PlaceSpec[], zones: Pick<HexZones, "z
   })
   const capitalId = specs.find((s) => s.capital)?.id
   const capital = (capitalId !== undefined ? zoneOf.get(capitalId) : undefined) ?? 0
+  const root = zoneOf.get("/")
+  const folder = (opts.repo ?? specs.find((s) => s.id === "/")?.label)
+    ?.split("/")
+    .filter(Boolean)
+    .pop()
+    ?.toLowerCase()
   // the units' names as segment lists, deepest first, so the first match is the deepest
   const units = [...zoneOf.keys()]
     .filter((name) => name !== "/" && !name.endsWith("*"))
@@ -161,9 +183,11 @@ export function bindPlaces(specs: readonly PlaceSpec[], zones: Pick<HexZones, "z
     .sort((a, b) => b.parts.length - a.parts.length || (a.name < b.name ? -1 : 1))
   return {
     capital,
+    root,
     zoneOfUnit: (name) => zoneOf.get(name),
     placeOf(path) {
       const parts = path.split(/[\\/]+/).filter(Boolean)
+      if (!parts.length) return undefined
       for (const u of units) {
         for (let at = 0; at + u.parts.length < parts.length; at++) {
           let same = true
@@ -171,7 +195,11 @@ export function bindPlaces(specs: readonly PlaceSpec[], zones: Pick<HexZones, "z
           if (same) return zoneOf.get(u.name) ?? capital
         }
       }
-      return capital
+      // no unit holds it: the repo's own (the root's place) when it is the repo's, else nobody's
+      const ours =
+        !ABSOLUTE.test(path) ||
+        (folder !== undefined && parts.slice(0, -1).some((p) => p.toLowerCase() === folder))
+      return ours ? (root ?? capital) : undefined
     },
   }
 }

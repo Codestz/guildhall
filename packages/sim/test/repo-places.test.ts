@@ -156,13 +156,15 @@ describe("bindPlaces", () => {
     unit("test", 70, 2),
     unit("packages/*", 9, 4, "packages"),
   ]
-  const specs = placeSpecs(units, 800)
+  const specs = placeSpecs(units, 800, undefined, "me/guildhall")
   const h = hexIsland({ seed: 1, files: 629 })
   const z = hexZones(h, { places: specs })
   const b = bindPlaces(specs, z)
 
-  test("a unit's zone, the capital's for the biggest", () => {
+  test("a unit's zone, the capital's for the biggest, the root's for /", () => {
     expect(b.capital).toBe(0)
+    expect(b.root).toBe(z.zones.findIndex((zz) => zz.place?.id === "/"))
+    expect(b.root).not.toBe(b.capital)
     expect(b.zoneOfUnit("packages/hall")).toBe(0)
     expect(b.zoneOfUnit("test")).toBe(z.zones.findIndex((zz) => zz.place?.id === "test"))
     expect(b.zoneOfUnit("nope")).toBeUndefined()
@@ -177,10 +179,43 @@ describe("bindPlaces", () => {
     expect(b.placeOf("/Users/me/guildhall/packages/world/legacy/a.ts")).toBe(legacy)
     expect(b.placeOf("/Users/me/guildhall/test/a.test.ts")).toBe(b.zoneOfUnit("test") as number)
     // a word inside a segment is not the unit; the unit must be whole segments
-    expect(b.placeOf("/x/packages/worldly/a.ts")).toBe(b.capital)
-    // no unit on the path: the capital
-    expect(b.placeOf("/Users/me/guildhall/README.md")).toBe(b.capital)
-    expect(b.placeOf("")).toBe(b.capital)
+    expect(b.placeOf("/x/guildhall/packages/worldly/a.ts")).toBe(b.root)
+  })
+
+  test("a root file is the root's place (named after the repo), not the capital's", () => {
+    expect(b.root).toBeDefined()
+    expect(b.placeOf("/Users/me/guildhall/README.md")).toBe(b.root)
+    expect(b.placeOf("/Users/me/Guildhall/package.json")).toBe(b.root)
+    expect(b.placeOf("README.md")).toBe(b.root)
+    expect(b.placeOf("./biome.json")).toBe(b.root)
+    expect(b.placeOf("C:\\code\\guildhall\\tsconfig.json")).toBe(b.root)
+    // a worktree inside the repo is the repo's too; its units still bind
+    expect(b.placeOf("/Users/me/guildhall/.claude/worktrees/agent-1/README.md")).toBe(b.root)
+    expect(b.placeOf("/Users/me/guildhall/.claude/worktrees/agent-1/packages/world/a.ts")).toBe(
+      b.zoneOfUnit("packages/world") as number,
+    )
+  })
+
+  test("a path outside the repo has no place: it leaves no mark", () => {
+    expect(b.placeOf("/tmp/scratch.ts")).toBeUndefined()
+    expect(b.placeOf("/Users/me/.claude/settings.json")).toBeUndefined()
+    expect(b.placeOf("~/notes.md")).toBeUndefined()
+    // the repo's folder as the file itself is not inside it
+    expect(b.placeOf("/Users/me/guildhall")).toBeUndefined()
+    expect(b.placeOf("")).toBeUndefined()
+    expect(b.placeOf("/x/packages/worldly/a.ts")).toBeUndefined()
+  })
+
+  test("a repo with no root unit sends its root files to the capital; `repo` names its folder", () => {
+    const specs2 = placeSpecs(
+      units.filter((u) => u.name !== "/"),
+      800,
+    )
+    const z2 = hexZones(h, { places: specs2 })
+    const b2 = bindPlaces(specs2, z2, { repo: "me/guildhall" })
+    expect(b2.root).toBeUndefined()
+    expect(b2.placeOf("/Users/me/guildhall/README.md")).toBe(b2.capital)
+    expect(b2.placeOf("/Users/me/elsewhere/README.md")).toBeUndefined()
   })
 
   test("the bundled chronicles bind: every unit at their last day has a place", async () => {

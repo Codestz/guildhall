@@ -96,8 +96,11 @@ describe("the day spreads the crowd", () => {
     const fishers = (hour: number) => at(hour, "harbour-quay").filter((p) => p.role === "fisher").length
     expect(fishers(6.5)).toBeGreaterThan(0)
     expect(Math.max(fishers(8), fishers(10))).toBeGreaterThanOrEqual(2)
-    // the quay's fishing spots close at noon: the afternoon and the night are the dockhands' alone
-    for (const hour of [13.5, 15, 20, 2]) expect(fishers(hour)).toBe(0)
+    // the quay's fishing spots close at noon: the afternoon and the night are the dockhands' alone (a
+    // fisher may still stop at its open talking spots)
+    const fishing = (hour: number) =>
+      at(hour, "harbour-quay").filter((p) => p.role === "fisher" && p.kind === "work").length
+    for (const hour of [13.5, 15, 20, 2]) expect(fishing(hour)).toBe(0)
     const monks = (hour: number) => at(hour, "monastery-compound").filter((p) => p.role === "monk").length
     // (the garth inside the cloister is walled in on the collision layer, hex-spots-reach's WALLED: its
     // spots wait for a gap in the cloister, the rest of the compound is worked)

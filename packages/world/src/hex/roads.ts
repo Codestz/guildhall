@@ -12,14 +12,18 @@
  *            between the solids) is under MIN_WIDTH;
  *   through  a road routed over a building's tile on its way (zones.ts routes before tiles get jobs).
  *
- * The castle's courts (its paved ways inside the curtain wall) are counted apart (`court*`): the
- * curtain's inner corner at every inward turn of its line reaches the middle of the side a court's way
- * crosses there (curtain.ts), which is the castle's composition to change.
+ * The castle's courts (its paved ways inside the curtain wall) are counted apart (`court*`), held to the
+ * same: where the curtain's line turns inward at the end of a side a way crosses, the wall stands out
+ * over the castle's foot (curtain.ts OUTER_INSET, sites.ts castleFoot), a gate between two outward turns
+ * stands back between its flanks (GATE_RECESS), and the gatehouse's opening is a way like any (its leaves
+ * swing back, collide.ts). Nothing stands before a castle building's door either (`doorSqueeze`).
  *
  * A strip here is the walked width (ROAD_HALF either side of its line), the path mesh's middle: a
  * square's paving is drawn wider, its edges are the plaza's. The world keeps its pieces off the strips
  * as it places them (world.ts); the tests and the probes read `roadReport`.
  */
+
+import { DOOR_HALF, DOOR_RUN } from "./checks.ts"
 import {
   pieceFootprint,
   pieceSolids,
@@ -42,6 +46,8 @@ export const ROAD_HALF = 0.85
 export const GRAZE = 0.05
 /** A gate (a castle's gatehouse, a gate in a wall): its opening is the way through, as wide as it is made. */
 const GATE = /gate/
+/** A gate whose leaves swing back for whoever comes (collide.ts): its opening is a way as wide as any. */
+const swungOpen = (piece: string) => piece === "kaykit-hexagon/wall-straight-gate"
 /** How far round a gate's outline its passage reaches (its leaves swing in it), metres. */
 const GATEHOUSE = 0.6
 /** A doorstep: the last stretch of a strip into a building's door, metres. */
@@ -239,9 +245,15 @@ export interface RoadReport {
   narrow: number
   /** Roads run over a building's (a landmark's) tile on their way. */
   through: number
-  /** The castle's courts, apart (its curtain wall's inner corners over its ways): pieces, strips. */
+  /** The castle's courts, apart: pieces over a court's strip (the gatehouse's posts too), strips narrowed. */
   courtCovered: number
   courtNarrow: number
+  /**
+   * The castle's doors whose approach (checks.ts: DOOR_RUN out from the door, DOOR_HALF either side of
+   * its middle) something stands in, the building's own pieces aside: the curtain wall passing a hall's,
+   * a barracks' or a tower's door where the site turns.
+   */
+  doorSqueeze: number
   notes: string[]
 }
 
@@ -297,7 +309,8 @@ export function roadReport(h: HexIsland, z: HexZones, w: HexWorld): RoadReport {
   const deepest = new Map<PlacedPiece | Solid, { deep: number; tile: number; solid: Solid }>()
   const courtHit = new Set<PlacedPiece | Solid>()
   for (const { solid, tile, piece } of solids) {
-    if (piece && GATE.test(piece.piece)) continue
+    // (a gate that swings open, the castle's, is its posts: its opening is checked as any way's)
+    if (piece && GATE.test(piece.piece) && !swungOpen(piece.piece)) continue
     const own = solid.kind === "building" ? tile : -1
     const from = own >= 0 ? doorOnto(own) : -1
     if (yard.intrusion(solid, own, from) > GRAZE) courtHit.add(piece ?? solid)
@@ -313,7 +326,9 @@ export function roadReport(h: HexIsland, z: HexZones, w: HexWorld): RoadReport {
       `covered: ${"piece" in key ? key.piece : solid.kind} (tile ${tile}) ${deep.toFixed(2)} m into a strip at ${solid.cx.toFixed(1)},${solid.cz.toFixed(1)}`,
     )
   }
-  const gates = w.pieces.filter((p) => GATE.test(p.piece)).flatMap((p) => pieceFootprint(p) ?? [])
+  const gates = w.pieces
+    .filter((p) => GATE.test(p.piece) && !swungOpen(p.piece))
+    .flatMap((p) => pieceFootprint(p) ?? [])
   // ---- ends: each road's two ends ----
   let ends = 0
   for (const road of z.roads) {
@@ -400,5 +415,25 @@ export function roadReport(h: HexIsland, z: HexZones, w: HexWorld): RoadReport {
       }
     }
   }
-  return { covered, ends, narrow, through, courtCovered, courtNarrow, notes }
+  // ---- the castle's doors: their approaches clear ----
+  let doorSqueeze = 0
+  for (const d of w.doorways) {
+    if (z.zones[z.zoneOf[d.tile]! - 1]?.kind !== "castle") continue
+    const ux = Math.sin(d.facing)
+    const uz = Math.cos(d.facing)
+    const hit = solids.find(({ solid, tile, piece }) => {
+      if (tile === d.tile && solid.kind === "building") return false
+      if (Math.hypot(solid.cx - d.x, solid.cz - d.z) > solid.r + DOOR_RUN + DOOR_HALF) return false
+      void piece
+      for (let a = 0.15; a <= DOOR_RUN + 1e-9; a += 0.15)
+        for (const b of [-DOOR_HALF, -DOOR_HALF / 2, 0, DOOR_HALF / 2, DOOR_HALF])
+          if (solidDistance(solid, d.x + ux * a - uz * b, d.z + uz * a + ux * b) < 0) return true
+      return false
+    })
+    if (hit) {
+      doorSqueeze++
+      notes.push(`doorSqueeze: ${hit.piece?.piece ?? hit.solid.kind} before the door on ${d.tile}`)
+    }
+  }
+  return { covered, ends, narrow, through, courtCovered, courtNarrow, doorSqueeze, notes }
 }

@@ -17,8 +17,8 @@ import { HEX_TILE_SIZE, KENNEY_WOOD, type PlacedPiece } from "./tiles.ts"
 
 type P = [number, number]
 
-/** What a court is for. */
-export type CourtKind = "gate" | "heart" | "plain"
+/** What a court is for: by the gate, the heart, before the barracks' door (drill), a tower's (stores). */
+export type CourtKind = "gate" | "heart" | "drill" | "stores" | "plain"
 
 /** One thing a court may hold: its pieces round a point (local: +z away from the court's middle), its size. */
 interface Item {
@@ -101,6 +101,31 @@ const ITEMS: Record<string, Item> = {
     // firewood for the hall's hearths
     pieces: () => [{ piece: "kaykit-resources/wood-log-stack", x: 0, z: 0, rot: Math.PI / 2, scale: 0.45 }],
   },
+  barrel: {
+    r: 0.3,
+    wall: true,
+    pieces: () => [{ piece: "kaykit-dungeon/barrel-small", x: 0, z: 0, rot: 0.4, scale: 0.45 }],
+  },
+  keg: {
+    r: 0.4,
+    wall: true,
+    pieces: () => [{ piece: "kaykit-dungeon/barrel-large", x: 0, z: 0, rot: 0, scale: 0.4 }],
+  },
+  box: {
+    r: 0.3,
+    wall: true,
+    pieces: () => [{ piece: "kaykit-dungeon/box-small", x: 0, z: 0, rot: 0.6, scale: 0.45 }],
+  },
+  chest: {
+    r: 0.4,
+    wall: true,
+    pieces: () => [{ piece: "kaykit-dungeon/chest", x: 0, z: 0, rot: Math.PI, scale: 0.4 }],
+  },
+  bucket: {
+    r: 0.25,
+    wall: false,
+    pieces: () => [{ piece: "kenney-survival/bucket", x: 0, z: 0, rot: 0, scale: 0.6 }],
+  },
   barrels: {
     r: 0.5,
     wall: true,
@@ -113,20 +138,34 @@ const ITEMS: Record<string, Item> = {
 
 /** What each kind of court holds, in the order it tries them. */
 const PLANS: Record<CourtKind, string[][]> = {
-  gate: [["torch", "torch", "rack", "cart", "barrels"]],
-  heart: [["banner", "banner", "bench", "bench", "barrels"]],
+  gate: [["torch", "torch", "rack", "cart", "barrels", "barrel"]],
+  heart: [["banner", "banner", "bench", "bench", "barrels", "bucket"]],
+  // before the barracks: a drill court, targets and the arms between them
+  drill: [
+    ["target", "rack", "target", "barrel", "bucket"],
+    ["target", "target", "rack", "box"],
+  ],
+  // before a tower: its stores against the wall
+  stores: [
+    ["stores", "chest", "keg", "barrel", "box"],
+    ["keg", "stores", "box", "chest", "barrel"],
+  ],
+  // (each with small things last, for what room is left)
   plain: [
-    ["target", "bench", "hay", "barrels"],
-    ["bench", "stores", "logs", "flag"],
-    ["cart", "hay", "bench", "barrels"],
-    ["stores", "bench", "flag", "logs"],
+    ["target", "bench", "hay", "barrels", "barrel", "bucket"],
+    ["bench", "stores", "logs", "flag", "box"],
+    ["cart", "hay", "bench", "barrels", "bucket"],
+    ["stores", "bench", "flag", "logs", "barrel"],
   ],
 }
 
 const R = HEX_TILE_SIZE
-/** Half a court's path strip (world.ts paves them 1.1 m either side), and the stride kept clear of it. */
-const STRIP = 1.1
-const CLEAR = 0.2
+/**
+ * Half a court's walked strip (roads.ts ROAD_HALF; world.ts paves 1.1 m either side, so a cart or a
+ * bench may stand on the paving's edge), and the hand's width kept clear of it.
+ */
+const STRIP = 0.85
+const CLEAR = 0.15
 /** How close to a walled side's inner face an item may stand (the wall's inner face is ~1.36 m in). */
 const WALL_FACE = R * (Math.sqrt(3) / 2) - 1.33
 
@@ -152,6 +191,12 @@ export function courtDressing(
   kind: CourtKind,
   colour: string,
   seed: number,
+  /**
+   * Whether a disc (world x, z, radius) runs into what stands (the curtain wall as built, its towers,
+   * the buildings): given, items keep clear of the real wall and not of its usual line, so they use
+   * the room a wall standing out over the castle's foot leaves (curtain.ts OUTER_INSET).
+   */
+  blocked?: (x: number, z: number, r: number) => boolean,
 ): PlacedPiece[] {
   const plans = PLANS[kind]
   const plan = plans[Math.floor(hash2(seed, 71, 3) * plans.length) % plans.length]!
@@ -164,8 +209,9 @@ export function courtDressing(
     for (let d = 0; d < 6; d++) {
       const [ux, uz] = dir(d)
       const out = p[0] * ux + p[1] * uz + r
-      if (out > (walls.includes(d) ? WALL_FACE : reach - 0.25)) return false
+      if (out > (walls.includes(d) && !blocked ? WALL_FACE : reach - 0.25)) return false
     }
+    if (blocked?.(at[0] + p[0], at[1] + p[1], r + 0.1)) return false
     return taken.every(([x, z, rr]) => Math.hypot(x - p[0], z - p[1]) >= rr + r + 0.1)
   }
   // the places items may go: out toward each side, a little either way along it
@@ -175,6 +221,10 @@ export function courtDressing(
     for (const out of [1.95, 1.7, 1.45, 1.2, 1.0])
       for (const side of [0, -0.6, 0.6, -1.1, 1.1])
         spots.push({ p: [ux * out - uz * side, uz * out + ux * side], d, wall: walls.includes(d) })
+    // and out in the corner between two sides, where two ways leave the most room
+    const [vx, vz] = [Math.cos((Math.PI / 3) * d + Math.PI / 6), -Math.sin((Math.PI / 3) * d + Math.PI / 6)]
+    for (const out of [2.25, 2.0, 1.75])
+      spots.push({ p: [vx * out, vz * out], d, wall: walls.includes(d) || walls.includes((d + 1) % 6) })
   }
   const out: PlacedPiece[] = []
   for (const [k, name] of plan.entries()) {

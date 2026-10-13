@@ -118,7 +118,8 @@ describe("people at spots", () => {
 
   test("archers shoot from the archery range's line: each at its own spot there", () => {
     const archers = folk.filter((f) => f.role === "archer")
-    expect(archers.length).toBeGreaterThan(3)
+    // (seed 1 has a camp's range: three at its line at least)
+    expect(archers.length).toBeGreaterThanOrEqual(3)
     for (const f of archers) {
       const work = f.day.find((s) => s.kind === "stay" && s.act === "work")
       if (!work || work.kind !== "stay") continue

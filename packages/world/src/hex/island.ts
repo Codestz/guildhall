@@ -16,7 +16,7 @@
  */
 import { fbm, hash2, ridged, smoothstep } from "../geom/noise.ts"
 import { type HexGrid, hexCentre, hexGrid } from "./grid.ts"
-import { type IslandSites, levelSites, reserveSites } from "./sites.ts"
+import { castleFoot, type IslandSites, levelSites, reserveSites } from "./sites.ts"
 
 export const HEX_KINDS = [
   "sea",
@@ -312,9 +312,11 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
     const bump = fbm(seed + 23, x / 9, y / 9, 2) > 0.25 ? 1 : 0
     return 2 + bump + Math.round(hillAt(i) * spec.hills * (0.75 + 0.5 * ridged(seed + 31, x / 8, y / 8, 2)))
   })
+  // (and the castle's foot: the notches of its outline, open ground at its level the water runs round)
+  const foot = castleFoot(g, sites.castle)
   const reserved = new Uint8Array(N)
-  for (const list of [sites.town, sites.castle]) for (const i of list) if (!isSea(i)) reserved[i] = 1
-  levelSites(g, level, [sites.town, sites.castle], isSea)
+  for (const list of [sites.town, sites.castle, foot]) for (const i of list) if (!isSea(i)) reserved[i] = 1
+  levelSites(g, level, [sites.town, sites.castle], isSea, foot)
 
   // ---- 3. water: drain every tile to the sea (priority flood), fill hollows as lakes ----
   const down = new Int32Array(N).fill(-1)

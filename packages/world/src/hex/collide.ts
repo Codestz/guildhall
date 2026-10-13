@@ -193,6 +193,18 @@ export function boxSolid(
   return solidFrom(kind, c, base)
 }
 
+/**
+ * Gates whose leaves swing open for whoever comes (decisions.md "doors are dynamic"; render doors.ts):
+ * the half-width of the opening between their posts, along their length (units at scale 1). A hull
+ * reaching into it is a leaf, and the way through is the whole opening.
+ */
+const SWUNG: Readonly<Record<string, number>> = { "kaykit-hexagon/wall-straight-gate": 2 }
+const leafOf = (hull: Float64Array, half: number): boolean => {
+  let lo = Number.POSITIVE_INFINITY
+  for (let k = 0; k < hull.length; k += 2) lo = Math.min(lo, Math.abs(hull[k]!))
+  return lo < half - 0.05
+}
+
 /** A placed piece's solids (a gate's two sides), none when nobody bumps into it or it has no outline. */
 export function pieceSolids(p: PlacedPiece): Solid[] {
   const kind = solidKind(p.piece)
@@ -223,7 +235,10 @@ export function pieceSolids(p: PlacedPiece): Solid[] {
     const sn = Math.sin(p.rot)
     gate = [p.x, p.z, ax * c + az * sn, -ax * sn + az * c]
   }
+  const swung = SWUNG[p.piece]
   for (const hull of o.hulls) {
+    // a leaf that swings back against its post (render doors.ts) is no solid: the opening is open
+    if (swung !== undefined && leafOf(hull, swung)) continue
     const c: number[] = []
     for (let k = 0; k < hull.length; k += 2)
       c.push(...turn(p.x, p.z, p.rot, hull[k]! * (p.stretch ?? 1), hull[k + 1]!, p.scale))

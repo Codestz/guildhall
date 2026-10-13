@@ -7,7 +7,9 @@
  *   a yard its gate reaches (site-checks.ts);
  *   roads are sacred (roads.ts): no solid over a road, street, path, stair or bridge strip but a door's
  *   threshold and a gate's opening (covered), no road ending in a solid (ends), none under MIN_WIDTH
- *   clear (narrow), none routed through a building's tile (through);
+ *   clear (narrow), none routed through a building's tile (through); the castle's courts the same inside
+ *   its curtain wall (courtCovered, courtNarrow), the gate's opening a way as wide, and nothing before
+ *   a castle building's door (doorSqueeze); every road tile on a road zones.ts registered (loose);
  *   the castle's site and the town's square stay where they are as the island grows, and no river or
  *   lake lies inside them.
  *
@@ -58,6 +60,10 @@ describe("every place has floor, a way in and room of its own", () => {
       ends: 0,
       narrow: 0,
       through: 0,
+      courtCovered: 0,
+      courtNarrow: 0,
+      doorSqueeze: 0,
+      loose: 0,
     }
     const notes: string[] = []
     let n = 0
@@ -80,6 +86,13 @@ describe("every place has floor, a way in and room of its own", () => {
           total.ends += ways.ends
           total.narrow += ways.narrow
           total.through += ways.through
+          total.courtCovered += ways.courtCovered
+          total.courtNarrow += ways.courtNarrow
+          total.doorSqueeze += ways.doorSqueeze
+          // every road tile is on a road (zones.ts registers each street it marks, a short ring's too)
+          const on = new Set(z.roads.flatMap((road) => road.tiles))
+          for (let i = 0; i < h.grid.size; i++)
+            if ((useOf(z, i) === "road" || useOf(z, i) === "bridge") && !on.has(i)) total.loose++
           for (const note of ways.notes.slice(0, 2))
             notes.push(`${seed} ${JSON.stringify(knobs)} ${files}: ${note}`)
           for (const note of r.notes.slice(0, 2))
@@ -97,6 +110,10 @@ describe("every place has floor, a way in and room of its own", () => {
       ends: 0,
       narrow: 0,
       through: 0,
+      courtCovered: 0,
+      courtNarrow: 0,
+      doorSqueeze: 0,
+      loose: 0,
     })
     expect(n).toBe(FULL ? 720 : 180)
   }, 300_000)

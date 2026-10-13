@@ -19,7 +19,14 @@ export {
   walkwayAt,
   walkwaySolids,
 } from "./collide.ts"
-export { CORNER_TOWER, type CurtainPiece, curtainWall, WALL_INSET, WALL_SCALE } from "./curtain.ts"
+export {
+  CORNER_TOWER,
+  type CurtainPiece,
+  curtainWall,
+  GATE_OPENING,
+  WALL_INSET,
+  WALL_SCALE,
+} from "./curtain.ts"
 export { DOORWAYS, type Doorway, doorwayOf } from "./doorways.ts"
 export {
   CLIP_SECONDS,

@@ -28,6 +28,12 @@ export const SITE_REF = 330
 /** The castle's tiles at each tier (castleTier): a keep and its forecourt, a walled keep, wards and the great hall, a citadel. */
 export const CASTLE_TILES = [2, 5, 9, 15] as const
 export const CASTLE_SITE = 15
+/** What a way pays to cross a side with a notch of the site's outline at its end, in steps. */
+const NOTCHED = 0.5
+/** ...and where the curtain cannot stand out over the notch: only where there is no other way. */
+const CLOSED = 1000
+/** How far below the best gate's score (steps) another gate is tried for a castle with no closed notch. */
+const GATE_SLACK = 3
 
 const steps = (g: HexGrid, a: number, b: number) => {
   const dq = g.q[a]! - g.q[b]!
@@ -156,6 +162,7 @@ export function levelSites(
   level: Int8Array,
   sites: readonly (readonly number[])[],
   isSea: (i: number) => boolean,
+  foot: readonly number[] = [],
 ): void {
   const inSite = new Set(sites.flat())
   for (const site of sites) {
@@ -177,6 +184,28 @@ export function levelSites(
       frontier = next
     }
   }
+  // the castle's foot at its level, so its curtain may stand out over it (castleFoot)
+  const castle = sites[sites.length - 1]
+  const L = castle?.find((i) => !isSea(i))
+  if (L !== undefined) for (const i of foot) if (!isSea(i) && !inSite.has(i)) level[i] = level[L]!
+}
+
+/**
+ * The castle's foot: the tiles off its site in the notches of its outline, where two of their
+ * neighbours side by side stand on it. The curtain's line turns inward at such a notch; where a way
+ * crosses the site's side there, the wall stands out over the foot (curtain.ts OUTER_INSET), so the
+ * foot is kept open ground at the castle's level (island.ts, zones.ts).
+ */
+export function castleFoot(g: HexGrid, site: readonly number[]): number[] {
+  const S = new Set(site)
+  const out = new Set<number>()
+  for (const i of site)
+    for (const j of g.neighbours(i)) {
+      if (j < 0 || S.has(j) || out.has(j)) continue
+      const nb = g.neighbours(j)
+      if ([0, 1, 2, 3, 4, 5].some((d) => S.has(nb[d]!) && S.has(nb[(d + 1) % 6]!))) out.add(j)
+    }
+  return [...out].sort((a, b) => a - b)
 }
 
 /** What a castle tile is (composeCastle): its keep, its great hall, a tower, the barracks, open yard or the paved way. */
@@ -205,6 +234,11 @@ export interface CastlePlan {
   ways: number[][]
   /** The curtain wall (tier 2 up): per yard or court tile, the sides that face out of the site. */
   walls: Map<number, number[]>
+  /**
+   * The tiles off the site the curtain stands out over (castleFoot): the notches at the ends of the
+   * sides a way or a door crosses. Kept open: no road over them.
+   */
+  foot: number[]
 }
 
 /**
@@ -232,10 +266,13 @@ export function composeCastle(
     seed: number
     usable: (i: number) => boolean
     open: (from: number, to: number) => boolean
+    /** Whether a tile off the site may take the curtain's outer half (its foot, open at its level). */
+    foot?: (j: number) => boolean
   },
 ): CastlePlan | null {
-  const keep = site[0]
-  if (keep === undefined || !opts.usable(keep)) return null
+  const first = site[0]
+  if (first === undefined || !opts.usable(first)) return null
+  const keep: number = first
   // the tier's tiles, dry and joined to the keep
   const want = new Set(site.slice(0, CASTLE_TILES[Math.max(0, Math.min(3, tier - 1))]).filter(opts.usable))
   const tiles = [keep]
@@ -250,127 +287,188 @@ export function composeCastle(
   const nb = (i: number) => g.neighbours(i)
   const outside = (i: number) => [0, 1, 2, 3, 4, 5].filter((d) => nb(i)[d]! < 0 || !S.has(nb(i)[d]!))
   const hh = (k: number, i: number) => hash2(opts.seed + 950 + k, g.q[i]!, g.r[i]!)
-  // ---- the gate: furthest from the keep, nearest the town, where a road can come in ----
-  let gate = -1
-  let gateSide = -1
-  let bs = -Infinity
+  // ---- the gate: furthest from the keep, nearest the town, where a road can come in (the best
+  // that composes with no way across a notch the curtain cannot stand out over) ----
+  let gates: { t: number; d: number; s: number }[] = []
   for (const strict of [true, false]) {
     for (const t of tiles) {
       if (t === keep && tiles.length > 1) continue
       for (const d of outside(t)) {
         const o = nb(t)[d]!
         if (o < 0 || (strict && !opts.open(t, o))) continue
-        const s = steps(g, t, keep) * 2 - steps(g, o, opts.town) + hh(1, o) * 0.2
-        if (s > bs) {
-          bs = s
-          gate = t
-          gateSide = d
+        gates.push({ t, d, s: steps(g, t, keep) * 2 - steps(g, o, opts.town) + hh(1, o) * 0.2 })
+      }
+    }
+    if (gates.length) break
+  }
+  if (!gates.length) return null
+  gates.sort((a, b) => b.s - a.s || a.t - b.t || a.d - b.d)
+  // (a gate scoring more than GATE_SLACK below the best is not tried)
+  gates = gates.filter((q) => q.s >= gates[0]!.s - GATE_SLACK)
+  let best: { plan: CastlePlan; closed: number } | null = null
+  for (const q of gates) {
+    const made = composeAt(q.t, q.d)
+    if (!best || made.closed < best.closed) best = made
+    if (made.closed === 0) break
+  }
+  return best!.plan
+
+  /** The castle with its gate on side `gateSide` of `gate`, and how many of its ways cross a closed notch. */
+  function composeAt(gate: number, gateSide: number): { plan: CastlePlan; closed: number } {
+    const entry = nb(gate)[gateSide]!
+    const role = new Map<number, CastleRole>(tiles.map((i) => [i, "yard"]))
+    role.set(keep, "keep")
+    // ---- buildings, never cutting the yard ----
+    const isBuilt = (r: CastleRole | undefined) =>
+      r === "keep" || r === "hall" || r === "tower" || r === "barracks"
+    /** Whether the open tiles stay one piece with the gate in it and every building keeps an open tile beside it. */
+    const sound = (): boolean => {
+      const open = tiles.filter((i) => !isBuilt(role.get(i)))
+      if (!open.includes(gate)) return false
+      const seen = new Set([gate])
+      const queue = [gate]
+      for (let k = 0; k < queue.length; k++)
+        for (const j of nb(queue[k]!))
+          if (j >= 0 && S.has(j) && !seen.has(j) && !isBuilt(role.get(j))) {
+            seen.add(j)
+            queue.push(j)
+          }
+      if (seen.size !== open.length) return false
+      return tiles.every(
+        (i) => !isBuilt(role.get(i)) || nb(i).some((j) => j >= 0 && S.has(j) && !isBuilt(role.get(j))),
+      )
+    }
+    const place = (r: CastleRole, score: (i: number) => number): number => {
+      const free = tiles
+        .filter((i) => role.get(i) === "yard" && i !== gate)
+        .sort((a, b) => score(b) - score(a) || a - b)
+      for (const i of free) {
+        if (score(i) === -Infinity) break
+        role.set(i, r)
+        if (sound()) return i
+        role.set(i, "yard")
+      }
+      return -1
+    }
+    const edge = (i: number) => outside(i).length
+    let hall = -1
+    if (tier >= 3)
+      hall = place("hall", (i) =>
+        steps(g, i, keep) <= 2 ? -steps(g, i, keep) * 2 + edge(i) * 0.5 : -Infinity,
+      )
+    if (tier >= 3)
+      place("barracks", (i) => (edge(i) ? edge(i) - steps(g, i, gate) * 0.2 + hh(2, i) : -Infinity))
+    if (tier >= 4)
+      for (let k = 0; k < 2; k++)
+        place("tower", (i) => (edge(i) >= 3 ? edge(i) + steps(g, i, gate) * 0.3 + hh(3 + k, i) : -Infinity))
+    // ---- doors and the ways: cheapest first over the open tiles from the gate ----
+    // A side whose end is a notch in the site's outline (the tile at that corner off the site) has the
+    // curtain's inward corner at it, which would reach the middle of the side: a way crosses it where
+    // the wall can stand out over the notch (its foot), else only where it has no other way (CLOSED)
+    const notches = (i: number, d: number) =>
+      [d + 5, d + 1].map((e) => nb(i)[e % 6]!).filter((k) => k < 0 || !S.has(k))
+    const footed = (k: number) => k >= 0 && k !== entry && !!opts.foot?.(k)
+    const step = (i: number, d: number) => {
+      if (tier < 2) return 1
+      const n = notches(i, d)
+      return n.length === 0 ? 1 : n.every(footed) ? 1 + NOTCHED : CLOSED
+    }
+    const prev = new Map<number, number>([[gate, -1]])
+    const cost = new Map<number, number>([[gate, 0]])
+    const done = new Set<number>()
+    for (;;) {
+      let at = -1
+      for (const [i, c] of cost)
+        if (!done.has(i) && (at < 0 || c < cost.get(at)! || (c === cost.get(at)! && i < at))) at = i
+      if (at < 0) break
+      done.add(at)
+      for (let d = 0; d < 6; d++) {
+        const j = nb(at)[d]!
+        if (j < 0 || !S.has(j) || done.has(j) || isBuilt(role.get(j))) continue
+        const c = cost.get(at)! + step(at, d)
+        if (!cost.has(j) || c < cost.get(j)!) {
+          cost.set(j, c)
+          prev.set(j, at)
         }
       }
     }
-    if (gate >= 0) break
-  }
-  if (gate < 0) return null
-  const entry = nb(gate)[gateSide]!
-  const role = new Map<number, CastleRole>(tiles.map((i) => [i, "yard"]))
-  role.set(keep, "keep")
-  // ---- buildings, never cutting the yard ----
-  const isBuilt = (r: CastleRole | undefined) =>
-    r === "keep" || r === "hall" || r === "tower" || r === "barracks"
-  /** Whether the open tiles stay one piece with the gate in it and every building keeps an open tile beside it. */
-  const sound = (): boolean => {
-    const open = tiles.filter((i) => !isBuilt(role.get(i)))
-    if (!open.includes(gate)) return false
-    const seen = new Set([gate])
-    const queue = [gate]
-    for (let k = 0; k < queue.length; k++)
-      for (const j of nb(queue[k]!))
-        if (j >= 0 && S.has(j) && !seen.has(j) && !isBuilt(role.get(j))) {
-          seen.add(j)
-          queue.push(j)
-        }
-    if (seen.size !== open.length) return false
-    return tiles.every(
-      (i) => !isBuilt(role.get(i)) || nb(i).some((j) => j >= 0 && S.has(j) && !isBuilt(role.get(j))),
-    )
-  }
-  const place = (r: CastleRole, score: (i: number) => number): number => {
-    const free = tiles
-      .filter((i) => role.get(i) === "yard" && i !== gate)
-      .sort((a, b) => score(b) - score(a) || a - b)
-    for (const i of free) {
-      if (score(i) === -Infinity) break
-      role.set(i, r)
-      if (sound()) return i
-      role.set(i, "yard")
-    }
-    return -1
-  }
-  const edge = (i: number) => outside(i).length
-  let hall = -1
-  if (tier >= 3)
-    hall = place("hall", (i) => (steps(g, i, keep) <= 2 ? -steps(g, i, keep) * 2 + edge(i) * 0.5 : -Infinity))
-  if (tier >= 3)
-    place("barracks", (i) => (edge(i) ? edge(i) - steps(g, i, gate) * 0.2 + hh(2, i) : -Infinity))
-  if (tier >= 4)
-    for (let k = 0; k < 2; k++)
-      place("tower", (i) => (edge(i) >= 3 ? edge(i) + steps(g, i, gate) * 0.3 + hh(3 + k, i) : -Infinity))
-  // ---- doors and the ways: breadth first over the open tiles from the gate ----
-  const prev = new Map<number, number>([[gate, -1]])
-  const queue = [gate]
-  for (let k = 0; k < queue.length; k++)
-    for (const j of nb(queue[k]!))
-      if (j >= 0 && S.has(j) && !prev.has(j) && !isBuilt(role.get(j))) {
-        prev.set(j, queue[k]!)
-        queue.push(j)
-      }
-  const depth = (i: number) => {
-    let n = 0
-    for (let k = i; prev.get(k)! >= 0; k = prev.get(k)!) n++
-    return n
-  }
-  const door = new Map<number, number>()
-  for (const i of tiles) {
-    if (!isBuilt(role.get(i))) continue
-    // the open side nearest the gate
-    let best = -1
-    for (let d = 0; d < 6; d++) {
-      const j = nb(i)[d]!
-      if (j < 0 || !prev.has(j)) continue
-      if (best < 0 || depth(j) < depth(nb(i)[best]!)) best = d
-    }
-    if (best >= 0) door.set(i, best)
-  }
-  const front = (i: number) => (door.has(i) ? nb(i)[door.get(i)!]! : gate)
-  const heart = front(hall >= 0 ? hall : keep)
-  const wayTo = (t: number) => {
-    const out = [t]
-    for (let k = t; prev.get(k)! >= 0; k = prev.get(k)!) out.push(prev.get(k)!)
-    return out.reverse()
-  }
-  const ways: number[][] = []
-  // a way to the heart, then on to every door's court (a way only adds what the ones before lack)
-  const paved = new Set<number>()
-  for (const t of [heart, ...tiles.filter((i) => door.has(i)).map(front)]) {
-    const w = wayTo(t)
-    let k = w.length - 1
-    while (k > 0 && !paved.has(w[k]!)) k--
-    const add = w.slice(k)
-    if (add.length > 1) ways.push(add)
-    for (const i of w) paved.add(i)
-  }
-  if (gate === keep) door.set(keep, gateSide)
-  else paved.add(gate)
-  for (const i of paved) if (!isBuilt(role.get(i))) role.set(i, "court")
-  // ---- the curtain wall (tier 2 up) ----
-  const walls = new Map<number, number[]>()
-  if (tier >= 2)
+    const door = new Map<number, number>()
     for (const i of tiles) {
-      if (isBuilt(role.get(i))) continue
-      const out = outside(i)
-      if (out.length) walls.set(i, out)
+      if (!isBuilt(role.get(i))) continue
+      // the open side nearest the gate (a notched one only where it must)
+      let best = -1
+      let bc = Infinity
+      for (let d = 0; d < 6; d++) {
+        const j = nb(i)[d]!
+        if (j < 0 || !prev.has(j)) continue
+        const c = cost.get(j)! + step(i, d)
+        if (c < bc) {
+          bc = c
+          best = d
+        }
+      }
+      if (best >= 0) door.set(i, best)
     }
-  return { tier, tiles, keep, hall, gate, gateSide, entry, heart, role, door, ways, walls }
+    const front = (i: number) => (door.has(i) ? nb(i)[door.get(i)!]! : gate)
+    const heart = front(hall >= 0 ? hall : keep)
+    const wayTo = (t: number) => {
+      const out = [t]
+      for (let k = t; prev.get(k)! >= 0; k = prev.get(k)!) out.push(prev.get(k)!)
+      return out.reverse()
+    }
+    const ways: number[][] = []
+    // a way to the heart, then on to every door's court (a way only adds what the ones before lack)
+    const paved = new Set<number>()
+    for (const t of [heart, ...tiles.filter((i) => door.has(i)).map(front)]) {
+      const w = wayTo(t)
+      let k = w.length - 1
+      while (k > 0 && !paved.has(w[k]!)) k--
+      const add = w.slice(k)
+      if (add.length > 1) ways.push(add)
+      for (const i of w) paved.add(i)
+    }
+    if (gate === keep) door.set(keep, gateSide)
+    else paved.add(gate)
+    for (const i of paved) if (!isBuilt(role.get(i))) role.set(i, "court")
+    // ---- the curtain wall (tier 2 up) ----
+    const walls = new Map<number, number[]>()
+    const foot = new Set<number>()
+    // a gate side the line turns outward at one end and inward at the other: neither does its flank
+    // keep clear of the way through standing level with it, nor set back (curtain.ts GATE_RECESS)
+    let closed = tier >= 2 && gate !== keep && notches(gate, gateSide).length === 1 ? 1 : 0
+    if (tier >= 2) {
+      for (const i of tiles) {
+        if (isBuilt(role.get(i))) continue
+        const out = outside(i)
+        if (out.length) walls.set(i, out)
+      }
+      // the notches at the ends of the sides the ways and the doors cross
+      const cross = (i: number, d: number) => {
+        for (const k of notches(i, d)) {
+          if (k >= 0) foot.add(k)
+          if (!footed(k)) closed++
+        }
+      }
+      for (const w of ways) for (let k = 1; k < w.length; k++) cross(w[k - 1]!, nb(w[k - 1]!).indexOf(w[k]!))
+      for (const [i, d] of door) if (i !== gate) cross(i, d)
+    }
+    const plan: CastlePlan = {
+      tier,
+      tiles,
+      keep,
+      hall,
+      gate,
+      gateSide,
+      entry,
+      heart,
+      role,
+      door,
+      ways,
+      walls,
+      foot: [...foot].sort((a, b) => a - b),
+    }
+    return { plan, closed }
+  }
 }
 
 /**

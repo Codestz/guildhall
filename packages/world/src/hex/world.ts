@@ -5,7 +5,17 @@
  */
 import { hash2 } from "../geom/noise.ts"
 import { courtDressing } from "./castleyard.ts"
-import { fitToTiles, flightSteps, solidKind, walkwayAt, walkwaySolids } from "./collide.ts"
+import { DOOR_HALF, DOOR_RUN } from "./checks.ts"
+import {
+  fitToTiles,
+  flightSteps,
+  pieceSolids,
+  SolidGrid,
+  solidDistance,
+  solidKind,
+  walkwayAt,
+  walkwaySolids,
+} from "./collide.ts"
 import { type CurtainBody, curtainWall } from "./curtain.ts"
 import { doorwayOf } from "./doorways.ts"
 import { hexCentre } from "./grid.ts"
@@ -26,7 +36,7 @@ const CURTAIN = /^kaykit-hexagon\/(wall-|building-tower-base)/
 /** How near a strip a building's footprint point may stand (its points sit a little inside its outline). */
 const ROAD_MARGIN = 0.15
 
-import { bodyRadius, footprint, settlePieces } from "./sites.ts"
+import { bodyRadius, castleFoot, footprint, settlePieces } from "./sites.ts"
 import {
   edgeDressing,
   HEX_TILE_SIZE,
@@ -635,8 +645,10 @@ export function hexWorld(
   // its one-tile self ----
   const scenes = new Map<number, string>()
   const claimedBy = new Map<number, number>()
+  /** The castle's site and foot (sites.ts castleFoot): no scene spreads over them. */
+  const castleGround = new Set([...h.sites.castle, ...castleFoot(g, h.sites.castle)])
   const claimable = (i: number, j: number, fit: SceneFit = {}) => {
-    if (j < 0 || claimedBy.has(j) || scenes.has(j)) return false
+    if (j < 0 || claimedBy.has(j) || scenes.has(j) || castleGround.has(j)) return false
     const u = useOf(z, j)
     if (fit.sea) return kindOf(h, j) === "shallows" && (u === "none" || u === "dock")
     if (!dryLand(j) || h.level[j] !== h.level[i]) return false
@@ -825,6 +837,8 @@ export function hexWorld(
   const doorPieces: [number, PlacedPiece][] = []
   /** The buildings standing on the castle's tiles, as settled: its curtain wall meets them. */
   const castleBodies: CurtainBody[] = []
+  /** The castle's courts' dressing (castleyard.ts), made once its curtain wall stands. */
+  const courts: ((blocked: (x: number, z: number, r: number) => boolean) => PlacedPiece[])[] = []
   for (let i = 0; i < g.size; i++) {
     const k = kindOf(h, i)
     if (k === "sea") continue
@@ -891,11 +905,28 @@ export function hexWorld(
         }
         const walled =
           plan.tier >= 2 ? [0, 1, 2, 3, 4, 5].filter((e) => nb[e]! < 0 || !plan.role.has(nb[e]!)) : []
-        const kind = i === plan.gate ? "gate" : i === plan.heart ? "heart" : "plain"
+        // (a court before the barracks' door drills, before a tower's keeps its stores)
+        const fronts = (r: string) =>
+          [0, 1, 2, 3, 4, 5].some(
+            (e) => nb[e]! >= 0 && plan.role.get(nb[e]!) === r && plan.door.get(nb[e]!) === (e + 3) % 6,
+          )
+        const kind =
+          i === plan.gate
+            ? "gate"
+            : i === plan.heart
+              ? "heart"
+              : fronts("barracks")
+                ? "drill"
+                : fronts("tower")
+                  ? "stores"
+                  : "plain"
         // a building whose door opens onto this court keeps its way to it clear, as a path does
         const doors = [0, 1, 2, 3, 4, 5].filter((e) => nb[e]! >= 0 && plan.door.get(nb[e]!) === (e + 3) % 6)
         const clear = [...new Set([...sides, ...doors])]
-        pieces.push(...courtDressing([x, zz], t, clear, walled, kind, castleColour, seed + i))
+        // (once the curtain wall stands, clear of it as built: below)
+        courts.push((blocked) =>
+          courtDressing([x, zz], t, clear, walled, kind, castleColour, seed + i, blocked),
+        )
       }
     } else if (u === "building") {
       prefab = scenes.get(i) ?? buildOf(i)
@@ -1145,6 +1176,33 @@ export function hexWorld(
       gate: plan.gate !== plan.keep ? { tile: plan.gate, side: plan.gateSide } : null,
       bodies: castleBodies,
       colour,
+      // a court's way or a door's approach across the side between two of its tiles
+      crossed: (a, b) => {
+        const d = g.neighbours(a).indexOf(b)
+        const ta = byTile.has(a) ? tiles[byTile.get(a)!] : undefined
+        const tb = byTile.has(b) ? tiles[byTile.get(b)!] : undefined
+        return (
+          d >= 0 &&
+          (!!ta?.paths?.includes(d) ||
+            !!tb?.paths?.includes((d + 3) % 6) ||
+            plan.door.get(a) === d ||
+            plan.door.get(b) === (d + 3) % 6)
+        )
+      },
+      // open dry ground outside, at the castle's level or above, nothing on it, no way over it
+      spill: (j) => {
+        const t = byTile.has(j) ? tiles[byTile.get(j)!] : undefined
+        return (
+          !!t &&
+          t.prefab === null &&
+          !t.paths?.length &&
+          (t.ground === "grass" || t.ground === "paved" || t.ground === "dirt" || t.ground === "sand") &&
+          !claimedBy.has(j) &&
+          useOf(z, j) !== "road" &&
+          useOf(z, j) !== "bridge" &&
+          t.top >= top(plan.keep) - 0.01
+        )
+      },
     })
     pieces.push(...wall.pieces)
     // its corner towers on their seats as well (the wall's runs already keep to the site)
@@ -1166,6 +1224,35 @@ export function hexWorld(
       facing: best.rot + d.facing,
     }
   })
+  // ---- the castle's courts dressed round its ways, clear of its wall and buildings as they stand ----
+  if (courts.length) {
+    const built = new SolidGrid(
+      pieces
+        .filter(
+          (q) =>
+            CURTAIN.test(q.piece) ||
+            (q.piece.startsWith("kaykit-hexagon/building-") && zoneAt(tileAt(q.x, q.z))?.kind === "castle"),
+        )
+        .flatMap((q) => pieceSolids(q)),
+    )
+    // and the castle's doors' approaches (checks.ts DOOR_RUN, DOOR_HALF)
+    const fronts = doorways
+      .filter((d) => zoneAt(d.tile)?.kind === "castle")
+      .map((d): [number, number, number, number] => [
+        d.x,
+        d.z,
+        d.x + Math.sin(d.facing) * DOOR_RUN,
+        d.z + Math.cos(d.facing) * DOOR_RUN,
+      ])
+    const blocked = (px: number, pz: number, r: number) =>
+      built.near(px, pz, r).some((so) => solidDistance(so, px, pz) < r) ||
+      fronts.some(([ax, az, bx, bz]) => {
+        const l2 = (bx - ax) ** 2 + (bz - az) ** 2
+        const t = Math.max(0, Math.min(1, ((px - ax) * (bx - ax) + (pz - az) * (bz - az)) / l2))
+        return Math.hypot(px - ax - (bx - ax) * t, pz - az - (bz - az) * t) < DOOR_HALF + r
+      })
+    for (const make of courts) pieces.push(...make(blocked))
+  }
   const heightAt = (x: number, zz: number): number => {
     const i = tileAt(x, zz)
     const k = i >= 0 ? byTile.get(i) : undefined

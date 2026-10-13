@@ -9,11 +9,13 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import { MIN_WIDTH } from "../src/hex/roads.ts"
 import {
   DOOR_HALF,
   DOOR_RUN,
   DOORWAYS,
   doorPasses,
+  GATE_OPENING,
   hexIsland,
   hexWalk,
   hexWorld,
@@ -61,11 +63,11 @@ describe("the curtain wall meets what it abuts", () => {
           continue
         }
         expect(walls.length).toBeGreaterThan(6)
-        // one gatehouse, at its own size
+        // one gatehouse, at its own size drawn out to its opening's width (GATE_OPENING between its posts)
         const gates = walls.filter((p) => p.piece === "kaykit-hexagon/wall-straight-gate")
         expect(gates.length).toBe(1)
-        expect(gates[0]!.stretch).toBeUndefined()
         expect(gates[0]!.scale).toBe(WALL_SCALE)
+        expect(4 * WALL_SCALE * gates[0]!.stretch!).toBeCloseTo(GATE_OPENING, 5)
         // every piece fitted to its run, never drawn out past a third (a stub against a building is short)
         for (const p of walls) if (p.stretch !== undefined) expect(p.stretch).toBeLessThan(1.31)
         const r = siteReport(h, z, w, hexWalk(h, z, w, { reach: workTiles(h, z) }))
@@ -131,21 +133,14 @@ describe("the castle's doors and gate have clear approaches", () => {
           const own = w.tiles.find((u) => u.i === d.tile)!
           const mine = (q: string, at?: { x: number; z: number }) =>
             q.startsWith("kaykit-hexagon/building-") && !!at && Math.hypot(at.x - own.x, at.z - own.z) < 1.5
-          // nothing in the strip a doorway and a shoulder wide (checks.ts). The keep's is clear of the
-          // curtain wall too; a hall, barracks or tower on the site's edge may have the wall pass its door's
-          // shoulder where the site turns, never its middle line (KNOWN: a squeeze, not a block)
-          const keep = d.tile === plan.keep
+          // nothing in the strip a doorway and a shoulder wide (checks.ts), the curtain wall included:
+          // where the site turns at a door's side the wall stands out over the castle's foot (curtain.ts)
           const pts = strip(d.x, d.z, d.facing, 0.15, DOOR_RUN)
-          const line = strip(d.x, d.z, d.facing, 0.15, DOOR_RUN, 0)
           const hit = near
             .filter((p) => !mine(p.piece, p))
-            .flatMap((p) => pieceSolids(p).map((sol) => ({ sol, wall: p.piece.includes("/wall-") })))
-            .filter(({ sol, wall }) =>
-              wall && !keep
-                ? line.some(([x, zz]) => solidDistance(sol, x, zz) < 0.1)
-                : pts.some(([x, zz]) => solidDistance(sol, x, zz) < 0),
-            )
-            .map(({ sol }) => sol.piece)
+            .flatMap((p) => pieceSolids(p))
+            .filter((sol) => pts.some(([x, zz]) => solidDistance(sol, x, zz) < 0))
+            .map((sol) => sol.piece)
           expect([seed, files, d.tile, hit]).toEqual([seed, files, d.tile, []])
         }
         const gate = w.pieces.find((p) => p.piece === "kaykit-hexagon/wall-straight-gate")!
@@ -155,8 +150,44 @@ describe("the castle's doors and gate have clear approaches", () => {
           return Math.abs(ox * Math.sin(gate.rot) + oz * Math.cos(gate.rot)) > 0.75
         })
         expect([seed, files, blocked(pts, (q) => q.includes("/wall-"))]).toEqual([seed, files, []])
+        // and the opening itself, its leaves swung back: nothing (its posts, the walls) within MIN_WIDTH/2 of
+        // its middle line, from a metre out to a metre in
+        const through = strip(gate.x, gate.z, gate.rot, -1, 1, MIN_WIDTH / 2)
+        expect([seed, files, blocked(through, () => false)]).toEqual([seed, files, []])
       }
     }, 60_000)
+})
+
+describe("the gate lets the road through", () => {
+  test("walks cross the gatehouse's line only through its opening, the leaves swung back", () => {
+    const h = hexIsland({ seed: 2, files: 4000 })
+    const z = hexZones(h)
+    const w = hexWorld(h, z)
+    const walk = hexWalk(h, z, w, { reach: workTiles(h, z) })
+    const folk = planFolk(h, z, w, walk, { seed: 2, pace: 144, places: lifePlaces(h, z, w, walk) })
+    const gate = w.pieces.find((p) => p.piece === "kaykit-hexagon/wall-straight-gate")!
+    const ux = Math.cos(gate.rot)
+    const uz = -Math.sin(gate.rot)
+    const half = (8.4 / 2) * gate.scale * gate.stretch!
+    let through = 0
+    for (const f of folk)
+      for (const s of f.day) {
+        if (s.kind !== "walk") continue
+        for (let k = 1; k < s.pts.length; k++) {
+          const [a, b] = [s.pts[k - 1]!, s.pts[k]!]
+          const da = (a[0] - gate.x) * -uz + (a[2] - gate.z) * ux
+          const db = (b[0] - gate.x) * -uz + (b[2] - gate.z) * ux
+          if (da * db > 0 || da === db) continue
+          const t = da / (da - db)
+          const along = (a[0] + (b[0] - a[0]) * t - gate.x) * ux + (a[2] + (b[2] - a[2]) * t - gate.z) * uz
+          if (Math.abs(along) > half) continue
+          // through the opening, a shoulder clear of its posts
+          expect(Math.abs(along)).toBeLessThan(GATE_OPENING / 2 - 0.2)
+          through++
+        }
+      }
+    expect(through).toBeGreaterThan(3)
+  }, 60_000)
 })
 
 describe("doors", () => {

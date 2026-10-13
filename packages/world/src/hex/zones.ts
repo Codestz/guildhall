@@ -23,7 +23,7 @@
 import { hash2 } from "../geom/noise.ts"
 import type { HexIsland, HexKind } from "./island.ts"
 import { forestLine, kindOf } from "./island.ts"
-import { CASTLE_TILES, type CastlePlan, composeCastle } from "./sites.ts"
+import { CASTLE_TILES, type CastlePlan, castleFoot, composeCastle } from "./sites.ts"
 
 export { CASTLE_TILES }
 
@@ -290,6 +290,8 @@ export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } 
   }
   // the castle's reserved site (island.ts): no other place is put or grows on it, at any tier
   const site = new Set(h.sites.castle)
+  // and its foot (sites.ts castleFoot): the notches of its outline, open ground its curtain may stand out over
+  const foot = new Set(castleFoot(g, h.sites.castle))
   /**
    * Whether a dry tile at sea level, facing its street through side `front`, has the two shallows its
    * quay stands out over: straight behind it and one beside that (world.ts harbour-quay, as authored or mirrored).
@@ -391,6 +393,11 @@ export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } 
             return [...g.neighbours(to)].some((j) => j >= 0 && j !== from && dry(j) && !site.has(j))
           return true
         },
+        foot: (j) =>
+          (site.has(j) || foot.has(j)) &&
+          dry(j) &&
+          kind(j) !== "cliff" &&
+          h.level[j] === h.level[h.sites.castle[0]!],
       })
       if (plan) zones.push({ kind: k, tile: plan.heart, tiles: [...plan.tiles], buildings: 0 })
       continue
@@ -412,7 +419,7 @@ export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } 
     let best = -1
     let bd = 0
     for (let i = 0; i < N; i++) {
-      if (!dry(i) || kind(i) === "cliff" || flatness(i) < 0.5 || site.has(i)) continue
+      if (!dry(i) || kind(i) === "cliff" || flatness(i) < 0.5 || site.has(i) || foot.has(i)) continue
       let d = 1e9
       for (const zz of zones) d = Math.min(d, dist(i, zz.tile))
       // a little seeded preference so pockets don't fill in a grid
@@ -458,7 +465,7 @@ export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } 
     const seen = new Set(queue)
     for (let k = 0; k < queue.length && z.tiles.length < want; k++) {
       const i = queue[k]!
-      if (zoneOf[i] || !dry(i) || kind(i) === "cliff" || site.has(i)) continue
+      if (zoneOf[i] || !dry(i) || kind(i) === "cliff" || site.has(i) || foot.has(i)) continue
       // a place keeps to its own level or one step off it
       if (Math.abs(h.level[i]! - lvl) > 1) continue
       zoneOf[i] = zi + 1
@@ -481,6 +488,7 @@ export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } 
   const hearts = new Set(zones.map((zz) => zz.tile))
   const routeEnds: [number, number] = [-1, -1]
   const walled = new Set(plan?.tiles ?? [])
+  const footed = new Set(plan?.foot ?? [])
   // a road comes to the castle at its gate: from the tile outside it (over the moat's bridge), never over its walls
   const entryOk = !!plan && plan.entry >= 0 && plan.entry !== plan.gate && !walled.has(plan.entry)
   const endOf = (zi: number) => (zi === ci && plan ? (entryOk ? plan.entry : plan.gate) : zones[zi]!.tile)
@@ -489,6 +497,8 @@ export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } 
     const k = kind(b)
     if (k === "sea" || k === "shallows" || k === "rock" || k === "lake") return Infinity
     if (walled.has(b) && b !== routeEnds[0] && b !== routeEnds[1]) return Infinity
+    // nor over the castle's foot where its curtain stands out over it
+    if (footed.has(b) && b !== routeEnds[0] && b !== routeEnds[1]) return Infinity
     // never through another place's heart: its square holds its well, market or chapel
     if (hearts.has(b) && b !== routeEnds[0] && b !== routeEnds[1]) return Infinity
     const climb = Math.abs(h.level[b]! - h.level[a]!)
@@ -604,8 +614,12 @@ export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } 
         ring.push(next)
         cur = next
       }
-      for (const i of ring) if (use[i] !== U.bridge) use[i] = U.road
-      if (ring.length > 2) roads.push({ a: ti - 1, b: ti - 1, tiles: ring })
+      // (a stretch of two is a street like any, joined on below; a lone tile is no street: it is left
+      // to what the town builds, unless a spoke already runs over it)
+      if (ring.length >= 2) {
+        for (const i of ring) if (use[i] !== U.bridge) use[i] = U.road
+        roads.push({ a: ti - 1, b: ti - 1, tiles: ring })
+      }
     }
     // a street the spokes never meet (a broken ring) gets a lane to the nearest street that is joined
     for (let n = 0; n < 8; n++) {
@@ -697,7 +711,8 @@ export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } 
     z.buildings = z.tiles.filter((i) => use[i] === U.building).length
   }
   // the castle's ground its next tiers take: open meadow until then
-  for (const i of site) if (!use[i] && !zoneOf[i] && dry(i)) use[i] = U.meadow
+  // (and its foot, open)
+  for (const i of [...site, ...foot]) if (!use[i] && !zoneOf[i] && dry(i)) use[i] = U.meadow
   // fields round the farm villages and the town's edge
   for (const z of zones) {
     if (z.kind !== "farm" && z.kind !== "town") continue

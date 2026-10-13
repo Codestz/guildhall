@@ -18,6 +18,8 @@ export interface PlaceLabel {
   label: string
   /** The mono line under it ("227 files · village"). */
   detail: string
+  /** What it is in plain words ("village"): with it, `files` can rewrite the detail line for another day. */
+  kind?: string
   /** The unit it names ("packages/react-dom", "/"): what a history asks whether it was born yet. */
   id?: string
   /** Where it hangs: the heart tile's top, metres. */
@@ -132,6 +134,11 @@ export interface PlaceLabels {
    * there); they fade like a hamlet's at the map view. Null shows them all again.
    */
   hide(at: ((x: number, z: number, id: string | undefined) => boolean) | null): void
+  /**
+   * The file count each plate's line reads, by unit (a history at its day): a place `files` has no count
+   * for, or with no `kind`, keeps its own line. Null puts back today's lines.
+   */
+  files(count: ((id: string | undefined) => number | undefined) | null): void
   /** Shows or hides every plate (the HUD's "Name plates"). */
   show(on: boolean): void
   shown(): boolean
@@ -258,7 +265,20 @@ export function createPlaceLabels(
     }
   })
   let picked: number | null = null
+  const lines = els.map((el) => el.querySelector("small"))
   return {
+    files(count) {
+      for (let k = 0; k < places.length; k++) {
+        const p = places[k]!
+        const line = lines[k]
+        if (!line) continue
+        const n = p.kind ? count?.(p.id) : undefined
+        const text = n === undefined ? p.detail : `${n.toLocaleString("en-US")} files · ${p.kind}`
+        if (line.textContent === text) continue
+        line.textContent = text
+        els[k]!.title = `${p.label} · ${text}`
+      }
+    },
     hide(at) {
       for (let k = 0; k < places.length; k++) {
         const p = places[k]!.at

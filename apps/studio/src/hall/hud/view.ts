@@ -98,8 +98,9 @@ export function brandOf(
   stats.push({ label: places === 1 ? "place" : "places", value: places })
   const day = repo.generatedAt.slice(0, 10)
   const description = chronicle?.repo.description
+  // the name the visitor's link gives (facebook/react), not the one the chronicle recorded (react/react)
   return {
-    name: repo.name,
+    name: slug,
     source: { kind: "history" },
     status: years,
     stats,

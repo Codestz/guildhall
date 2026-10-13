@@ -540,6 +540,7 @@ const world = {
             id: p.id,
             label: p.label,
             detail: `${p.files.toLocaleString("en-US")} files · ${kindWord(p.kind)}`,
+            kind: kindWord(p.kind),
             at: p.at,
             weight: p.files,
             tier: p.tier,

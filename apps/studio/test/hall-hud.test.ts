@@ -51,7 +51,7 @@ describe("the hall's HUD, told from a chronicle", async () => {
   test("the brand's figures are the chronicle's: files, commits, hands, years, places", () => {
     if (reactRepo.kind !== "chronicled") throw new Error("react should be chronicled")
     const b = brandOf(reactRepo, "facebook/react", 37, react)
-    expect(b.name).toBe(react.repo.name)
+    expect(b.name).toBe("facebook/react")
     expect(b.source.kind).toBe("history")
     const by = Object.fromEntries(b.stats.map((s) => [s.label, s.value]))
     expect(by.files).toBe(short(reactRepo.files))

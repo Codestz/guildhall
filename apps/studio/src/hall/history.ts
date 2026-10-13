@@ -29,7 +29,17 @@ import {
   type RevealLook,
   surfaceMaterial,
 } from "@guildhall/render"
-import { type Chronicle, DAY_MS, type Day, dayOf, erasOf, filesAt, isoOf, majorsOf } from "@guildhall/sim"
+import {
+  type Chronicle,
+  DAY_MS,
+  type Day,
+  dayOf,
+  erasOf,
+  filesAt,
+  isoOf,
+  majorsOf,
+  unitsAt,
+} from "@guildhall/sim"
 import { HEX_TILE_SIZE, landTiles } from "@guildhall/world"
 import { ROAD_COLOR, type WorldHooks } from "../hexworld/index.ts"
 import { type HallTime, HISTORY_SECONDS, type HistoryRange, MAX_DT } from "./clock.ts"
@@ -282,6 +292,21 @@ export function createHistory(opts: HistoryOpts): History {
       }
       step(0)
       offs.push(parts.stage.onFrame(step))
+      // the plates' file counts are the day's once the clock rests (today's at the end of the history)
+      const labels = parts.labels
+      if (labels) {
+        let counted = Number.NaN
+        const count = () => {
+          const s = clock.get()
+          if (s.playing || s.t === counted) return
+          counted = s.t
+          if (s.t >= 1) return labels.files(null)
+          const files = new Map(unitsAt(chronicle, dayAt(chronicle, s.t)).map((u) => [u.name, u.files]))
+          labels.files((id) => (id === undefined ? undefined : files.get(id)))
+        }
+        count()
+        offs.push(clock.subscribe(count))
+      }
       // the link follows the clock at rest
       const onRest = opts.onRest
       if (onRest) {

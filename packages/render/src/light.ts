@@ -112,8 +112,8 @@ const STOPS: readonly Stop[] = [
   { at: 0,   zenith: "#33589a", horizon: "#eea070", glow: "#ff8a4c", sun: "#ff9c5c", sunIntensity: 1.2, sky: "#a2acd4", ground: "#6a5444", hemiIntensity: 1.22, exposure: 1.2 },
   { at: 12,  zenith: "#4474b6", horizon: "#f2c49a", glow: "#ffb070", sun: "#ffbf86", sunIntensity: 2.4, sky: "#b8c6e4", ground: "#9c7c58", hemiIntensity: 1.35, exposure: 1.14 },
   { at: 24,  zenith: "#4a82c4", horizon: "#f1d4ae", glow: "#ffcf98", sun: "#ffcc94", sunIntensity: 2.9, sky: "#c4d6ee", ground: "#aa8c64", hemiIntensity: 1.45, exposure: 1.12 },
-  { at: 40,  zenith: "#3f84d0", horizon: "#cfe0ee", glow: "#fff0d8", sun: "#fff0d8", sunIntensity: 3.0, sky: "#d0e2f6", ground: "#ac9670", hemiIntensity: 1.35, exposure: 1.04 },
-  { at: 90,  zenith: "#377ccf", horizon: "#cde2f6", glow: "#fff8ea", sun: "#fff6e8", sunIntensity: 3.0, sky: "#d6e6fa", ground: "#b09c78", hemiIntensity: 1.35, exposure: 1.02 },
+  { at: 40,  zenith: "#3f84d0", horizon: "#ecd8c0", glow: "#fff0d8", sun: "#fff0d8", sunIntensity: 3.0, sky: "#d0e2f6", ground: "#ac9670", hemiIntensity: 1.35, exposure: 1.04 },
+  { at: 90,  zenith: "#377ccf", horizon: "#e8dac8", glow: "#fff8ea", sun: "#fff6e8", sunIntensity: 3.0, sky: "#d6e6fa", ground: "#b09c78", hemiIntensity: 1.35, exposure: 1.02 },
 ]
 
 const RAD = Math.PI / 180

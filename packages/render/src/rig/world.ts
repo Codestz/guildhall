@@ -65,7 +65,7 @@ export const LIMITS = {
    * sink no lower than HIGH_FLOOR (a view from far off and low only shows haze and the sea's end).
    */
   lowCeiling: 32,
-  highFloor: 52,
+  highFloor: 38,
   /**
    * Below this height over the floor the haze thickens to the sky before the far plane, so the view
    * may run out to the horizon; above it the far plane would cut the sea off in a hard line, so the

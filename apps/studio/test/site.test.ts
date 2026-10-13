@@ -71,15 +71,14 @@ describe("site routes", () => {
     }
   })
 
-  test("the world is built bare, from the repo's seed unless the link names one", () => {
+  test("the world is built from the repo's seed unless the link names one", () => {
     const hall = worldQuery("hall", q("repo=facebook/react&hour=9"))
-    expect(hall.get("ui")).toBe("0")
     expect(hall.get("seed")).toBe(String(hallSeed("facebook/react")))
     expect(hall.get("hour")).toBe("9")
     expect(hall.has("repo")).toBe(false)
     expect(worldQuery("hall", q("repo=facebook/react&seed=7")).get("seed")).toBe("7")
     const home = worldQuery("island", q("story=saga&act=2"))
-    expect([...home.keys()]).toEqual(["ui"])
+    expect([...home.keys()]).toEqual([])
     expect(worldKey("island", q("story=saga"))).toBe(worldKey("demos", q("")))
   })
 

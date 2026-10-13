@@ -8,6 +8,11 @@ const CSS = /* css */ `
 .site-root { position: absolute; inset: 0; overflow: hidden; background: #1b2418; }
 .site-world { position: absolute; inset: 0; }
 .site-pieces { display: contents; }
+/* the world's loading cover (the Viewer's loader) is the only chrome the site keeps from the Viewer: the
+   island has no HUD yet, and the site's own pieces sit over it */
+.site-world .ui-viewer-chrome > :not(.ui-loader) { display: none; }
+/* the cover is the whole screen: the crest and the card wait for the reveal */
+.site-root[data-cover] .site-pieces { visibility: hidden; }
 
 .gh .site-note, .gh .site-chip {
   position: absolute; z-index: 20; background: rgba(21, 17, 13, 0.95);

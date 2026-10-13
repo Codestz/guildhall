@@ -83,8 +83,6 @@ export function worldQuery(screen: string, query: URLSearchParams): URLSearchPar
   out.delete("repo")
   out.delete("story")
   out.delete("act")
-  // the site shows the island bare: its HUD is not built yet, and the crest sits where the card did
-  out.set("ui", "0")
   const slug = screen === "hall" ? hallSlug(query) : null
   if (slug && !out.has("seed")) out.set("seed", String(hallSeed(slug)))
   return out

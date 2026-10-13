@@ -11,6 +11,33 @@ import { holdSiteShellStyle } from "./style.ts"
 
 const logger = log("studio:site")
 
+/** The cover gives way after this long even if the world never says it is revealed (no WebGL, a failed build). */
+const COVER_MAX_MS = 60_000
+
+/**
+ * Keeps the site's pieces out of sight while the world's loading cover is up, so the cover is the whole
+ * screen: `data-cover` on `root` until `<html data-world>` reads "revealed" (after it has read "loading").
+ * Returns the stop.
+ */
+function coverUntilReveal(root: HTMLElement, on: boolean): () => void {
+  if (!on) return () => {}
+  const html = document.documentElement
+  root.dataset.cover = ""
+  let loaded = false
+  const open = () => {
+    watch.disconnect()
+    clearTimeout(cap)
+    delete root.dataset.cover
+  }
+  const watch = new MutationObserver(() => {
+    if (html.dataset.world === "loading") loaded = true
+    else if (html.dataset.world === "revealed" && loaded) open()
+  })
+  watch.observe(html, { attributes: true, attributeFilter: ["data-world"] })
+  const cap = window.setTimeout(open, COVER_MAX_MS)
+  return open
+}
+
 /**
  * Builds a site screen: the island's world with the site's pieces over it. The island is the hex world,
  * imported when the screen mounts so the page and its card are drawn first and the 3D code streams in
@@ -43,7 +70,9 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
       })
 
       let offWorld = () => {}
+      let stopCover = () => {}
       if (withWorld) {
+        stopCover = coverUntilReveal(root, ctx.query.get("loader") !== "0")
         const inner: ScreenCtx = { ...ctx, query: worldQuery(id, ctx.query) }
         ctx
           .load(
@@ -59,6 +88,7 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
       return () => {
         gone = true
         offWorld()
+        stopCover()
         root.style.display = "none"
         setTimeout(() => {
           react.unmount()

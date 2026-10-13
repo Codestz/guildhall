@@ -8,7 +8,7 @@
   "trailingSlash": false,
   "redirects": [
     { "source": "/(how|how\\.html)", "destination": "/built", "permanent": false },
-    { "source": "/(harbour|harbour\\.html)", "destination": "/hall", "permanent": false },
+    { "source": "/(harbour|harbour\\.html)", "destination": "/demos", "permanent": false },
     { "source": "/demos\\.html", "destination": "/demos", "permanent": false }
   ],
   "rewrites": [

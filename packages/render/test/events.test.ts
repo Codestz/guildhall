@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test"
 import { HEX_KINDS, HEX_TILE_SIZE, hexAt, hexIsland, hexWorld, hexZones, TILE_USES } from "@guildhall/world"
 import { boltPath, flashAt, nextStrike } from "../src/events/bolt.ts"
 import { random, transition } from "../src/events/ease.ts"
-import { FLEET, harbourChanges, planFleet, type ShipLog, voyagePose } from "../src/events/fleet.ts"
-import { scaffoldGeometry } from "../src/events/scaffold.ts"
-import { along, laneLengths } from "../src/events/ships.ts"
-import { eventSites } from "../src/events/sites.ts"
+import { FLEET, harbourChanges, planFleet, type ShipLog, sinkPose, voyagePose } from "../src/events/fleet.ts"
+import { SCAFFOLD_NOMINAL, scaffoldGeometry, scaffoldSize } from "../src/events/scaffold.ts"
+import { along, flareGeometry, laneLengths } from "../src/events/ships.ts"
+import { eventSites, footing, HEART_REACH } from "../src/events/sites.ts"
 import { BASE_COVER, BASE_WIND, isClear, mixOf, weathered, weatherLook } from "../src/events/weather.ts"
 import { lightAt } from "../src/light.ts"
 
@@ -140,7 +140,7 @@ const log = (key: string, opened: number, ended?: ShipLog["ended"], docked?: boo
 })
 
 describe("fleet", () => {
-  test("a ship sails in, docks, and on merge casts off with its pennant glinting, then is gone", () => {
+  test("a ship sails in, docks, salutes its merge at the berth, casts off glinting, then is gone", () => {
     const [v] = planFleet([log("#1", 0, { at: 30, how: "merged" })], 3)
     if (!v) throw new Error("no voyage")
     expect(v.arrive).toBe(FLEET.ARRIVE_S)
@@ -148,11 +148,36 @@ describe("fleet", () => {
     expect(voyagePose(v, 0.3).seen).toBeLessThan(1)
     expect(voyagePose(v, 20).phase).toBe("docked")
     expect(voyagePose(v, 20).along).toBe(1)
-    const off = voyagePose(v, 30.5)
+    expect(voyagePose(v, 20).flare).toBe(0)
+    // the salute: still at the berth, the flare bursting and the pennant dipped
+    const salute = voyagePose(v, 30.5)
+    expect(salute.phase).toBe("docked")
+    expect(salute.along).toBe(1)
+    expect(salute.flare).toBeGreaterThan(0)
+    expect(salute.flare).toBeLessThan(1)
+    expect(salute.dip).toBeGreaterThan(0.5)
+    expect(salute.glint).toBeGreaterThan(0.5)
+    expect(v.leave).toBe(30 + FLEET.SALUTE_S)
+    const off = voyagePose(v, v.leave + 0.5)
     expect(off.phase).toBe("leaving")
-    expect(off.glint).toBeGreaterThan(0.5)
-    expect(voyagePose(v, 30 + FLEET.LEAVE_S * 0.5).turn).toBe(1)
-    expect(voyagePose(v, 30 + FLEET.LEAVE_S).phase).toBe("gone")
+    expect(off.flare).toBe(0)
+    expect(off.dip).toBe(0)
+    expect(voyagePose(v, v.leave + FLEET.LEAVE_S * 0.5).turn).toBe(1)
+    expect(voyagePose(v, v.leave + FLEET.LEAVE_S).phase).toBe("gone")
+  })
+
+  test("the flare runs about a second from the merge and is off before and after it", () => {
+    const [v] = planFleet([log("#1", 0, { at: 30, how: "merged" })], 1)
+    if (!v) throw new Error("no voyage")
+    expect(FLEET.FLARE_S).toBeGreaterThanOrEqual(0.8)
+    expect(FLEET.FLARE_S).toBeLessThanOrEqual(1.5)
+    expect(voyagePose(v, 29.9).flare).toBe(0)
+    expect(voyagePose(v, 30 + FLEET.FLARE_S * 0.5).flare).toBeCloseTo(0.5, 6)
+    expect(voyagePose(v, 30 + FLEET.FLARE_S + 0.01).flare).toBe(0)
+    expect(voyagePose(v, 30 + FLEET.DIP_S + 0.01).dip).toBe(0)
+    // merged before it docked: the salute comes once it is there
+    const [early] = planFleet([log("#1", 0, { at: 5, how: "merged" })], 1)
+    expect(early?.salute).toBe(FLEET.ARRIVE_S)
   })
 
   test("merged before it docked: it docks first, stays a moment, then leaves", () => {
@@ -164,7 +189,7 @@ describe("fleet", () => {
     const [sunk] = planFleet([log("#1", 0, { at: 20, how: "closed" })], 1)
     if (!sunk) throw new Error("no voyage")
     expect(voyagePose(sunk, 20 + FLEET.SINK_S * 0.5).phase).toBe("sinking")
-    expect(voyagePose(sunk, 20 + FLEET.SINK_S * 0.5).sink).toBeGreaterThan(0.3)
+    expect(voyagePose(sunk, 20 + FLEET.SINK_S * 0.5).sink).toBeGreaterThan(0.15)
     expect(voyagePose(sunk, 20 + FLEET.SINK_S).phase).toBe("gone")
     const [sailed] = planFleet([log("#1", 0, { at: 20, how: "closed" })], 1, { close: "sail" })
     if (!sailed) throw new Error("no voyage")
@@ -177,6 +202,25 @@ describe("fleet", () => {
     const p = voyagePose(back, 6)
     expect(p.phase).toBe("turning-back")
     expect(p.along).toBeLessThanOrEqual(back.back as number)
+  })
+
+  test("sinking is slow enough to read: it lists first, settles, then goes down, and fades last", () => {
+    expect(FLEET.SINK_S).toBeGreaterThanOrEqual(18)
+    const early = sinkPose(0.3)
+    expect(early.list).toBe(1)
+    expect(early.sink).toBeLessThan(0.15)
+    expect(early.seen).toBe(1)
+    let last = sinkPose(0)
+    expect(last).toEqual({ sink: 0, list: 0, seen: 1 })
+    for (let u = 0.05; u <= 1.0001; u += 0.05) {
+      const p = sinkPose(u)
+      expect(p.sink).toBeGreaterThanOrEqual(last.sink)
+      expect(p.seen).toBeLessThanOrEqual(last.seen)
+      last = p
+    }
+    expect(sinkPose(0.8).seen).toBe(1)
+    expect(sinkPose(1).seen).toBe(0)
+    expect(sinkPose(1).sink).toBe(1)
   })
 
   test("never more ships than berths (and never over six); the rest wait for a berth", () => {
@@ -312,14 +356,123 @@ describe("sites", () => {
 })
 
 describe("scaffold", () => {
-  test("stands on the ground (foot at 0), a crane over it, tint 0 everywhere", () => {
+  test("stands on the ground (foot at 0) round its building, a crane over it, tint 0 everywhere", () => {
     const g = scaffoldGeometry()
     g.computeBoundingBox()
     const box = g.boundingBox
+    const [hx, top, hz] = SCAFFOLD_NOMINAL
     expect(box?.min.y).toBeGreaterThanOrEqual(-0.05)
-    expect(box?.max.y).toBeGreaterThan(7)
-    expect(box?.max.x).toBeLessThan(4.5)
+    // the crane's jib is over the roof
+    expect(box?.max.y).toBeGreaterThan(top + 1.5)
+    // the frame stands outside the walls, never far off them
+    expect(box?.max.x).toBeGreaterThan(hx)
+    expect(box?.max.x).toBeLessThan(hx + 4)
+    expect(box?.min.z).toBeLessThan(-hz)
     const tint = g.getAttribute("tint")
     for (let i = 0; i < tint.count; i++) expect(tint.getX(i)).toBe(0)
+  })
+
+  test("fits any building: each vertex moves with its anchor, so a timber keeps its section", () => {
+    const g = scaffoldGeometry()
+    const pos = g.getAttribute("position")
+    const anchor = g.getAttribute("anchor")
+    const fit = (size: readonly number[], i: number) =>
+      [0, 1, 2].map(
+        (c) =>
+          pos.getComponent(i, c) +
+          anchor.getComponent(i, c) * ((size[c] as number) - (SCAFFOLD_NOMINAL[c] as number)),
+      )
+    // the first timber is a pole: its foot's four corners stay 0.24 m apart whatever the size
+    const big = [3.5, 7.5, 3.8]
+    const a = fit(big, 0)
+    const b = fit(big, 1)
+    expect(Math.hypot((a[0] as number) - (b[0] as number), (a[2] as number) - (b[2] as number))).toBeCloseTo(
+      0.24,
+      5,
+    )
+    // and the poles stand outside the bigger building's walls
+    let maxX = 0
+    for (let i = 0; i < pos.count; i++)
+      if (anchor.getY(i) === 0) maxX = Math.max(maxX, fit(big, i)[0] as number)
+    expect(maxX).toBeGreaterThan(3.5)
+  })
+
+  test("a frame's size: its building's, kept sane; a bare frame without one", () => {
+    expect(scaffoldSize({ half: [2, 2.5], top: 5 })).toEqual([2, 5, 2.5])
+    expect(scaffoldSize({ half: [9, 0.9], top: 30 })).toEqual([4, 8, 1.1])
+    const bare = scaffoldSize({})
+    expect(scaffoldSize({ half: [0, 0], top: 0 })).toEqual(bare)
+  })
+
+  test("a building's foot is a box in its door's frame; stalls and trees have none", () => {
+    const house = footing({ piece: "kaykit-hexagon/building-home-a-red", x: 10, z: -4, rot: 0, scale: 1 }, 0)
+    expect(house).not.toBeNull()
+    const turned = footing(
+      { piece: "kaykit-hexagon/building-home-a-red", x: 10, z: -4, rot: Math.PI / 2, scale: 1 },
+      Math.PI / 2,
+    )
+    // the same house turned with its door: the same box
+    expect(turned?.half[0]).toBeCloseTo(house?.half[0] as number, 5)
+    expect(turned?.half[1]).toBeCloseTo(house?.half[1] as number, 5)
+    expect(
+      footing({ piece: "kaykit-hexagon/building-market-red", x: 0, z: 0, rot: 0, scale: 1 }, 0),
+    ).toBeNull()
+    expect(footing({ piece: "kaykit-forest/tree-1", x: 0, z: 0, rot: 0, scale: 1 }, 0)).toBeNull()
+  })
+})
+
+describe("scaffold sites", () => {
+  for (const seed of [1, 2]) {
+    test(`seed ${seed}: each place's scaffold goes round the biggest closed building near its heart`, () => {
+      const island = hexIsland({ seed, files: 4000 })
+      const zones = hexZones(island, {})
+      const world = hexWorld(island, zones, {})
+      const sites = eventSites(island, zones, world, { sea: -0.05 })
+      const R = HEX_TILE_SIZE
+      let fitted = 0
+      for (const p of sites.places) {
+        if (p.top === 0) continue
+        fitted++
+        // a real building (not a stall): a foot and a height
+        expect(p.half[0]).toBeGreaterThan(0.8)
+        expect(p.half[1]).toBeGreaterThan(0.8)
+        expect(p.top).toBeGreaterThan(2.5)
+        // near the heart
+        expect(Math.hypot(p.build[0] - p.at[0], p.build[2] - p.at[2])).toBeLessThan(R * 2 * (HEART_REACH + 1))
+        // none bigger within HEART_REACH tiles: its bulk is the most of those round the heart
+        const near = (q: (typeof world.pieces)[number]) => {
+          const f = footing(q, p.yaw)
+          return f && Math.hypot(f.at[0] - p.build[0], f.at[1] - p.build[2]) < 1e-6 ? f.bulk : 0
+        }
+        const bulk = Math.max(...world.pieces.map(near))
+        expect(bulk).toBeGreaterThan(0)
+        for (const q of world.pieces) {
+          const f = footing(q, 0)
+          if (!f) continue
+          const h = hexAt(q.x / R, q.z / R)
+          const i = island.grid.index(h.q, h.r)
+          if (i < 0 || zones.zoneOf[i] !== p.zone + 1 || TILE_USES[zones.use[i] ?? 0] !== "building") continue
+          const heart = zones.zones[p.zone]?.tile as number
+          const dq = (island.grid.q[i] ?? 0) - (island.grid.q[heart] ?? 0)
+          const dr = (island.grid.r[i] ?? 0) - (island.grid.r[heart] ?? 0)
+          if ((Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2 > HEART_REACH) continue
+          expect(f.bulk).toBeLessThanOrEqual(bulk * 1.0001)
+        }
+      }
+      expect(fitted).toBeGreaterThan(sites.places.length / 2)
+    })
+  }
+})
+
+describe("flare", () => {
+  test("every flare vertex lies on the masthead (nothing drawn at rest) and is a core, ray or sparkle", () => {
+    const g = flareGeometry([1, 9, -2])
+    const pos = g.getAttribute("position")
+    const kind = g.getAttribute("burstKind")
+    for (let i = 0; i < pos.count; i++) {
+      expect([pos.getX(i), pos.getY(i), pos.getZ(i)]).toEqual([1, 9, -2])
+      expect([1, 2, 3]).toContain(kind.getX(i))
+    }
+    expect(pos.count % 3).toBe(0)
   })
 })

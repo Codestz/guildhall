@@ -3,8 +3,11 @@
  * pennant"): the fleet's plan (fleet.ts) drawn as one instanced mesh, a library ship (Kenney's small
  * ship, in the house style) with a pennant at its masthead in the pull request's colour. Every ship is
  * one draw together; they fade in from the open sea and out to it with a dither (no pop at any
- * distance), bob at their berths, leave wakes on the water while they move, and a merged ship's pennant
- * glints as it casts off. They cast no shadows (as the crowd and the doors).
+ * distance), bob at their berths and leave wakes on the water while they move. A merged ship dips its
+ * pennant and a gold flare bursts over its masthead at the berth (in the same draw: its vertices lie
+ * on one point until the flare spreads them), then its pennant glints as it casts off; a closed one
+ * lists, settles and sinks, churning the water. Voyages run at the session clock's rate (`setRate`).
+ * They cast no shadows (as the crowd and the doors).
  */
 
 import { PALETTE } from "@guildhall/assets"
@@ -19,6 +22,7 @@ import {
   Matrix3,
   Matrix4,
   Mesh,
+  type MeshStandardMaterial,
   type Object3D,
   Quaternion,
   Vector3,
@@ -77,6 +81,12 @@ export interface HarbourShips {
   end(key: string, how: ShipEnd): void
   /** The ships on the water now. */
   ships(): ShipView[]
+  /**
+   * How fast the fleet's voyages run against real time: the session clock's rate (a replay at 4× sails
+   * them 4× as fast; paused, 0, they hold where they are). The swell always runs at 1.
+   */
+  setRate(rate: number): void
+  rate(): number
   /** The fleet's clock, seconds (shots: jump ahead to see a voyage's end). */
   advance(seconds: number): void
   stats(): { afloat: number; waiting: number; ms: number }
@@ -153,16 +163,93 @@ export function plainHull(): BufferGeometry {
   return g
 }
 
-/** Adds a pennant (a long thin triangle off the masthead, streaming aft) whose vertices take the instance colour. */
-export function withPennant(geometry: BufferGeometry, length: number): BufferGeometry {
+/** The flare's rays (long and short in turn) and sparkles, metres on the screen's plane. */
+const RAYS = 8
+const RAY_LONG = 2.6
+const RAY_SHORT = 1.5
+const SPARKS = 7
+
+/**
+ * The merge's flare, all its vertices at the masthead `at` (model units): a gold star of rays round a
+ * hexagonal core, and sparkles round it. `burst` (offset x, y and, for a sparkle, its centre's way x,
+ * y; metres on the screen's plane) and `burstKind` (1 core, 2 a ray, 3 a sparkle) say where the vertex
+ * shader spreads each one while the instance's flare runs; at rest they all lie on one point (nothing
+ * drawn).
+ */
+export function flareGeometry(at: readonly [number, number, number]): BufferGeometry {
+  const burst: number[] = []
+  const kind: number[] = []
+  const tri = (k: number, ...corners: [number, number, number, number][]) => {
+    for (const c of corners) {
+      burst.push(...c)
+      kind.push(k)
+    }
+  }
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2
+    const b = ((i + 1) / 6) * Math.PI * 2
+    tri(
+      1,
+      [0, 0, 0, 0],
+      [Math.cos(a) * 0.6, Math.sin(a) * 0.6, 0, 0],
+      [Math.cos(b) * 0.6, Math.sin(b) * 0.6, 0, 0],
+    )
+  }
+  for (let i = 0; i < RAYS; i++) {
+    const a = (i / RAYS) * Math.PI * 2 + Math.PI / RAYS
+    const length = i % 2 ? RAY_SHORT : RAY_LONG
+    const w = i % 2 ? 0.14 : 0.2
+    const [dx, dy] = [Math.cos(a), Math.sin(a)]
+    tri(2, [-dy * w, dx * w, 0, 0], [dy * w, -dx * w, 0, 0], [dx * length, dy * length, 0, 0])
+  }
+  for (let i = 0; i < SPARKS; i++) {
+    const a = (i / SPARKS) * Math.PI * 2 + 0.4
+    const [cx, cy] = [Math.cos(a), Math.sin(a)]
+    const s = 0.32
+    tri(3, [0, s, cx, cy], [-s * 0.6, 0, cx, cy], [s * 0.6, 0, cx, cy])
+    tri(3, [0, -s, cx, cy], [s * 0.6, 0, cx, cy], [-s * 0.6, 0, cx, cy])
+  }
+  const n = kind.length
+  const g = new BufferGeometry()
+  const pos = new Float32Array(n * 3)
+  for (let i = 0; i < n; i++) pos.set(at, i * 3)
+  g.setAttribute("position", new BufferAttribute(pos, 3))
+  g.setAttribute(
+    "normal",
+    new BufferAttribute(
+      new Float32Array(n * 3).map((_, i) => (i % 3 === 1 ? 1 : 0)),
+      3,
+    ),
+  )
+  const [r, gr, b] = swatch("glow")
+  g.setAttribute(
+    "color",
+    new BufferAttribute(
+      new Float32Array(n * 3).map((_, i) => [r, gr, b][i % 3] as number),
+      3,
+    ),
+  )
+  g.setAttribute("tint", new BufferAttribute(new Float32Array(n), 1))
+  g.setAttribute("burst", new BufferAttribute(new Float32Array(burst), 4))
+  g.setAttribute("burstKind", new BufferAttribute(new Float32Array(kind), 1))
+  return g
+}
+
+/** The highest point of a geometry (a ship's masthead), in its own units. */
+export function mastheadOf(geometry: BufferGeometry): [number, number, number] {
   const position = geometry.getAttribute("position")
-  geometry.computeBoundingBox()
-  // the masthead: the highest point
   let top = 0
   for (let i = 1; i < position.count; i++) if (position.getY(i) > position.getY(top)) top = i
-  const x = position.getX(top)
-  const y = position.getY(top)
-  const z = position.getZ(top)
+  return [position.getX(top), position.getY(top), position.getZ(top)]
+}
+
+/**
+ * Adds a pennant (a long thin triangle off the masthead, streaming aft) whose vertices take the instance
+ * colour, and the merge's flare over the masthead (`flareGeometry`).
+ */
+export function withPennant(geometry: BufferGeometry, length: number): BufferGeometry {
+  const position = geometry.getAttribute("position")
+  const [x, y, z] = mastheadOf(geometry)
   const h = length * 0.22
   const tri = new Float32Array([x, y, z, x, y - h, z, x, y - h * 0.5, z - length])
   const pennant = new BufferGeometry()
@@ -179,7 +266,74 @@ export function withPennant(geometry: BufferGeometry, length: number): BufferGeo
   const body = geometry.clone()
   body.setAttribute("tint", new BufferAttribute(new Float32Array(position.count), 1))
   pennant.setAttribute("tint", new BufferAttribute(new Float32Array(6).fill(1), 1))
-  return mergeGeometries([body, pennant]) as BufferGeometry
+  for (const part of [body, pennant]) {
+    const count = part.getAttribute("position").count
+    part.setAttribute("burst", new BufferAttribute(new Float32Array(count * 4), 4))
+    part.setAttribute("burstKind", new BufferAttribute(new Float32Array(count), 1))
+  }
+  return mergeGeometries([body, pennant, flareGeometry([x, y, z])]) as BufferGeometry
+}
+
+/**
+ * The ships' shader parts (fxMaterial `patch`): the pennant dips by `instanceGlint.y` of `dip` model
+ * units, and the flare's vertices spread on the screen's plane over the masthead while
+ * `instanceGlint.x` (its progress) runs, glowing gold.
+ */
+export function shipPatch(dip: number) {
+  return (shader: { vertexShader: string; fragmentShader: string }) => {
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+attribute vec2 instanceGlint;
+attribute vec4 burst;
+attribute float burstKind;
+varying float vBurst;`,
+      )
+      .replace(
+        "#include <begin_vertex>",
+        `vec3 transformed = vec3( position );
+transformed.y -= tint * instanceGlint.y * ${dip.toFixed(4)};`,
+      )
+      .replace(
+        "#include <project_vertex>",
+        `vec4 mvPosition = vec4( transformed, 1.0 );
+#ifdef USE_INSTANCING
+mvPosition = instanceMatrix * mvPosition;
+#endif
+mvPosition = modelViewMatrix * mvPosition;
+vBurst = 0.0;
+if ( burstKind > 0.5 ) {
+  float u = instanceGlint.x;
+  float on = step( 0.0001, u ) * step( u, 0.9999 );
+  float grow = smoothstep( 0.0, 0.14, u ) * ( 1.0 - smoothstep( 0.45, 1.0, u ) ) * on;
+  vec2 o = burst.xy;
+  if ( burstKind < 2.5 ) {
+    // the core and the rays: out at once, turning a little, then shrinking away
+    float a = u * 0.7;
+    o = mat2( cos( a ), sin( a ), -sin( a ), cos( a ) ) * o * ( burstKind > 1.5 ? 1.0 + 0.35 * u : 1.0 );
+    o *= grow;
+  } else {
+    // the sparkles: thrown out and up, twinkling as they go
+    float tw = 0.6 + 0.4 * sin( u * 26.0 + burst.z * 5.0 + burst.w * 3.0 );
+    o = burst.zw * ( 1.0 + 3.0 * u ) + vec2( 0.0, 1.4 * u ) + o * tw * ( 1.0 - u ) * on * 1.6;
+    o *= on;
+  }
+  // farther off it grows (to 2.5× at 175 m), so it still reads at the map's mid zoom
+  float far = clamp( -mvPosition.z / 70.0, 1.0, 2.5 );
+  mvPosition.xy += ( o + vec2( 0.0, 1.0 ) * on ) * far;
+  mvPosition.z += 2.5 * on;
+  vBurst = on;
+}
+gl_Position = projectionMatrix * mvPosition;`,
+      )
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying float vBurst;")
+      .replace(
+        "#include <emissivemap_fragment>",
+        "#include <emissivemap_fragment>\ntotalEmissiveRadiance += vBurst * vec3( 3.2, 2.3, 0.8 );",
+      )
+  }
 }
 
 /** A point along a polyline at fraction `f` of its length, and the way it runs there (radians from +x toward +z). */
@@ -216,23 +370,32 @@ export function createHarbourShips(stage: Stage, opts: HarbourShipsOpts): Harbou
   const logs = new Map<string, ShipLog>()
   const colours = new Map<string, Color>()
   let voyages: Voyage[] = []
+  /** The fleet's clock (the voyages), which runs at `rate`; `wall` (the swell) always runs at 1. */
   let t = 0
+  let wall = 0
+  let rate = 1
   let seenKeys: string[] = []
   let merged: number | null = null
   let mesh: InstancedMesh | null = null
   let disposed = false
   let wakes = 0
   const costs: number[] = []
-  const material = fxMaterial("ships")
+  let material: MeshStandardMaterial | null = null
   const replan = () => {
     voyages = planFleet([...logs.values()], berths.length, { close: opts.close ?? "sink" })
   }
 
   const build = (geometry: BufferGeometry) => {
+    // the pennant dips a third of the way down the mast
+    const dip = mastheadOf(geometry)[1] * 0.35
     const g = withPennant(geometry, 6)
     const seen = new InstancedBufferAttribute(new Float32Array(FLEET.MAX), 1)
     seen.setUsage(DynamicDrawUsage)
     g.setAttribute("instanceSeen", seen)
+    const glint = new InstancedBufferAttribute(new Float32Array(FLEET.MAX * 2), 2)
+    glint.setUsage(DynamicDrawUsage)
+    g.setAttribute("instanceGlint", glint)
+    material = fxMaterial(`ships-${dip.toFixed(3)}`, { patch: shipPatch(dip) })
     const m = new InstancedMesh(g, material, FLEET.MAX)
     m.name = "harbour ships"
     m.instanceMatrix.setUsage(DynamicDrawUsage)
@@ -276,6 +439,7 @@ export function createHarbourShips(stage: Stage, opts: HarbourShipsOpts): Harbou
   const draw = () => {
     if (!mesh) return
     const seen = mesh.geometry.getAttribute("instanceSeen") as InstancedBufferAttribute
+    const glint = mesh.geometry.getAttribute("instanceGlint") as InstancedBufferAttribute
     let k = 0
     flow.length = 0
     for (const v of voyages) {
@@ -285,12 +449,15 @@ export function createHarbourShips(stage: Stage, opts: HarbourShipsOpts): Harbou
       const [x, z, inbound] = along(berth.lane, lengths[v.berth] as number[], pose.along)
       const heading = inbound + Math.PI * pose.turn
       const phase = (hashKey(v.key) % 628) / 100
-      const bob = 0.07 * Math.sin(t * 1.3 + phase) - pose.sink * SINK_DEPTH
+      const bob = 0.07 * Math.sin(wall * 1.3 + phase) - pose.sink * SINK_DEPTH
       p.set(x, berth.at[1] + bob, z)
-      // bow along the model's +z, turned to the heading
+      // bow along the model's +z, turned to the heading; sinking, it lists to one side, then the bow goes
       q.setFromAxisAngle(up, Math.PI / 2 - heading)
-      roll.setFromAxisAngle(e.set(0, 0, 1), 0.035 * Math.sin(t * 0.9 + phase) + 0.55 * pose.sink)
-      pitch.setFromAxisAngle(e.set(1, 0, 0), 0.02 * Math.sin(t * 1.1 + phase * 1.7) + 0.2 * pose.sink)
+      roll.setFromAxisAngle(
+        e.set(0, 0, 1),
+        0.035 * Math.sin(wall * 0.9 + phase) + 0.45 * pose.list + 0.25 * pose.sink,
+      )
+      pitch.setFromAxisAngle(e.set(1, 0, 0), 0.02 * Math.sin(wall * 1.1 + phase * 1.7) + 0.35 * pose.sink)
       q.multiply(roll).multiply(pitch)
       s.setScalar(scale)
       matrix.compose(p, q, s)
@@ -298,21 +465,28 @@ export function createHarbourShips(stage: Stage, opts: HarbourShipsOpts): Harbou
       colour.copy(colours.get(v.key) ?? pennantOf(v.key)).multiplyScalar(1 + 2.5 * pose.glint)
       mesh.setColorAt(k, colour)
       seen.setX(k, pose.seen)
+      glint.setXY(k, pose.flare, pose.dip)
       if (pose.way > 0.05 && flow.length < 8)
         flow.push({ x, z, heading: pose.turn > 0.5 ? inbound + Math.PI : inbound, speed: 0.8 * pose.way })
+      // a sinking ship churns the water round it as it goes down
+      else if (pose.phase === "sinking" && pose.sink > 0.05 && pose.seen > 0.2 && flow.length < 8)
+        flow.push({ x, z, heading: inbound + wall * 0.6, speed: 0.35 })
       k++
     }
     mesh.count = k
     mesh.instanceMatrix.needsUpdate = true
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     seen.needsUpdate = true
+    glint.needsUpdate = true
     if (opts.water && (flow.length || wakes)) opts.water.setWakes(flow)
     wakes = flow.length
   }
 
   const off = stage.onFrame((dt) => {
     const t0 = performance.now()
-    t += Math.min(dt, 0.1)
+    const step = Math.min(dt, 0.1)
+    t += step * rate
+    wall += step
     draw()
     costs.push(performance.now() - t0)
     if (costs.length > 60) costs.shift()
@@ -367,6 +541,10 @@ export function createHarbourShips(stage: Stage, opts: HarbourShipsOpts): Harbou
             at: [x, berth.at[1], z] as [number, number, number],
           }
         }),
+    setRate(next) {
+      rate = Math.max(0, Number.isFinite(next) ? next : 1)
+    },
+    rate: () => rate,
     advance(seconds) {
       t += seconds
       draw()
@@ -385,7 +563,7 @@ export function createHarbourShips(stage: Stage, opts: HarbourShipsOpts): Harbou
         mesh.geometry.dispose()
         mesh.dispose()
       }
-      material.dispose()
+      material?.dispose()
     },
   }
 }

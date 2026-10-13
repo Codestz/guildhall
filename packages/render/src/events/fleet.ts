@@ -1,7 +1,8 @@
 /**
  * The pull-request fleet as a pure function of what happened and when (plan-hud-events §2 "PRs"): a
- * ship per open pull request sails in along its berth's lane and docks; merged, it turns and sails out
- * with its pennant glinting; closed, it sinks at its berth (or sails off, `close: "sail"`; closed
+ * ship per open pull request sails in along its berth's lane and docks; merged, it dips its pennant and
+ * a gold flare bursts over its masthead at the berth, then it turns and sails out with its pennant
+ * glinting; closed, it lists, settles and sinks at its berth (or sails off, `close: "sail"`; closed
  * before it docked, it turns back).
  * At most one ship per berth (six at most): a pull request opened while every berth is taken waits,
  * unseen, until one is free again, and ships set out at least `GAP_S` apart, so two never share the
@@ -28,10 +29,16 @@ export const FLEET = {
   ARRIVE_S: 14,
   /** A merged ship's stay at the berth before it casts off, at least. */
   STAY_S: 2.5,
+  /** A merged ship stays at its berth this long after its merge (its flare and its pennant's dip). */
+  SALUTE_S: 1.8,
+  /** The gold flare over the masthead at the merge. */
+  FLARE_S: 1.2,
+  /** The pennant's dip at the merge: down and up again. */
+  DIP_S: 1.6,
   /** Turning about and sailing out. */
   LEAVE_S: 16,
-  /** Sinking at the berth. */
-  SINK_S: 7,
+  /** Sinking at the berth: it lists, settles, then goes down (slow enough to read). */
+  SINK_S: 21,
   /** Ships set out at least this far apart (the lane in is one). */
   GAP_S: 4,
   /** How long the merged pennant glints as it casts off. */
@@ -48,6 +55,8 @@ export interface Voyage {
   /** Casts off, sinks or turns back from this time (Infinity while open). */
   leave: number
   how?: ShipEnd
+  /** Merged: when it salutes at its berth (its flare and its pennant's dip). */
+  salute?: number
   /** Turned back before it docked: how far along the lane it had come (0 … 1). */
   back?: number
   /** Closed at its berth: it sinks there (else it sails off as a merged one does, without the glint). */
@@ -106,7 +115,9 @@ export function planFleet(
         v.leave = at
         v.gone = at + FLEET.LEAVE_S
       } else {
-        v.leave = Math.max(at, arrive + FLEET.STAY_S)
+        // merged: it salutes at its berth (once there), then casts off
+        v.salute = Math.max(at, arrive)
+        v.leave = Math.max(v.salute + FLEET.SALUTE_S, arrive + FLEET.STAY_S)
         v.gone = v.leave + FLEET.LEAVE_S
       }
     }
@@ -122,12 +133,18 @@ export interface VoyagePose {
   along: number
   /** 0 bow toward the berth (sailing in) … 1 turned about (sailing out). */
   turn: number
-  /** Sinking, 0 … 1. */
+  /** How far down it has gone, sinking, 0 … 1. */
   sink: number
+  /** Its list (roll) as it sinks, 0 … 1. */
+  list: number
   /** Seen, 0 … 1 (fades in from and out to the open sea, and as it sinks). */
   seen: number
-  /** The pennant's glint, 0 … 1 (merged, casting off). */
+  /** The pennant's glint, 0 … 1 (merged: from its salute, fading as it casts off). */
   glint: number
+  /** The merge's flare over the masthead: its progress 0 … 1 while it bursts, else 0. */
+  flare: number
+  /** The pennant dipped, 0 … 1 (the merge's salute). */
+  dip: number
   /** Moving on the water (a wake), m/s-ish 0 … 1. */
   way: number
   phase: "waiting" | "arriving" | "docked" | "leaving" | "sinking" | "turning-back" | "gone"
@@ -135,8 +152,26 @@ export interface VoyagePose {
 
 const fadeEnds = (along: number) => smooth01(along / 0.12)
 
+/** A merged ship's salute at `t`: the pennant's glint, the flare's progress and the dip. */
+export function salute(v: Voyage, t: number): { glint: number; flare: number; dip: number } {
+  if (v.salute === undefined || t < v.salute) return { glint: 0, flare: 0, dip: 0 }
+  const s = t - v.salute
+  return {
+    glint: clamp01(1 - s / FLEET.GLINT_S),
+    flare: s < FLEET.FLARE_S ? s / FLEET.FLARE_S : 0,
+    dip: s < FLEET.DIP_S ? Math.sin((Math.PI * s) / FLEET.DIP_S) : 0,
+  }
+}
+
+/** A sinking ship at `u` (0 … 1 of `SINK_S`): it lists, settles low, then goes down and fades. */
+export function sinkPose(u: number): { sink: number; list: number; seen: number } {
+  const list = smooth01(u / 0.3)
+  const sink = 0.12 * list + 0.88 * easeIn(clamp01((u - 0.3) / 0.7))
+  return { sink, list, seen: 1 - smooth01((u - 0.82) / 0.18) }
+}
+
 export function voyagePose(v: Voyage, t: number): VoyagePose {
-  const still = { along: 1, turn: 0, sink: 0, seen: 1, glint: 0, way: 0 }
+  const still = { along: 1, turn: 0, sink: 0, list: 0, seen: 1, glint: 0, flare: 0, dip: 0, way: 0 }
   if (t < v.start) return { ...still, seen: 0, along: 0, phase: "waiting" }
   if (t >= v.gone) return { ...still, seen: 0, phase: "gone" }
   if (t < v.arrive && t < v.leave) {
@@ -144,23 +179,19 @@ export function voyagePose(v: Voyage, t: number): VoyagePose {
     const along = easeOut(u)
     return { ...still, along, seen: fadeEnds(along), way: 1 - u, phase: "arriving" }
   }
-  if (t < v.leave) return { ...still, phase: "docked" }
+  if (t < v.leave) return { ...still, ...salute(v, t), phase: "docked" }
   const u = clamp01((t - v.leave) / (v.gone - v.leave))
-  if (v.sinks) {
-    const sink = smooth01(u)
-    return { ...still, sink, seen: 1 - smooth01((u - 0.55) / 0.45), phase: "sinking" }
-  }
+  if (v.sinks) return { ...still, ...sinkPose(u), phase: "sinking" }
   // turning about where it lies, then out along the lane
   const from = v.back ?? 1
   const turn = smooth01(u / 0.3)
   const along = from * (1 - easeIn(u))
-  const glint = v.how === "merged" ? clamp01(1 - (t - v.leave) / FLEET.GLINT_S) : 0
   return {
+    ...still,
+    ...salute(v, t),
     along,
     turn,
-    sink: 0,
     seen: fadeEnds(along),
-    glint,
     way: Math.min(1, u * 2),
     phase: v.back !== undefined ? "turning-back" : "leaving",
   }

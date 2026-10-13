@@ -16,6 +16,8 @@ import {
   type HexZones,
   hexAt,
   hexCentre,
+  pieceOutline,
+  solidToFoot,
   TILE_USES,
 } from "@guildhall/world"
 
@@ -43,8 +45,17 @@ export interface PlaceSite {
   id?: string
   /** Its heart tile's centre, on top. */
   at: Vec3
-  /** The building nearest its heart (where a scaffold goes up), on its tile's top; the heart without one. */
+  /**
+   * The building a scaffold goes up round: the biggest near its heart (`HEART_REACH` tiles), the middle
+   * of its foot on the ground; the heart without one.
+   */
   build: Vec3
+  /** That building's front (its door's way, radians about +y, 0 = +z): the scaffold's frame. */
+  yaw: number
+  /** Its foot's half size in that frame (x across the front, z front to back), metres; 0 without one. */
+  half: [number, number]
+  /** Its height, metres (0 without one). */
+  top: number
 }
 
 export interface EventSites {
@@ -66,6 +77,71 @@ export interface SiteOpts {
 /** The keep's height over its tile (the castle prefab's keep, scale B): lightning strikes its top. */
 const KEEP_TOP = 9
 const R = HEX_TILE_SIZE
+/** How far from a place's heart (tiles) its scaffold looks for the biggest building. */
+export const HEART_REACH = 3
+
+/** A closed building's foot (an open one, a market's stalls or a range, is none) in a frame turned `yaw`. */
+export interface Footing {
+  /** The middle of its foot, xz. */
+  at: [number, number]
+  half: [number, number]
+  top: number
+  /** Its bulk (its foot's box in its own frame × its height, whatever `yaw`): the biggest has the most. */
+  bulk: number
+}
+
+/**
+ * A placed piece's foot as a box in the frame turned `yaw` (its front +z), or null when it is not a
+ * closed building (stalls, props, trees). Pure.
+ */
+export function footing(
+  p: { piece: string; x: number; z: number; rot: number; scale: number; stretch?: number },
+  yaw: number,
+): Footing | null {
+  if (!solidToFoot(p.piece)) return null
+  const o = pieceOutline(p.piece)
+  if (!o) return null
+  const c = Math.cos(p.rot)
+  const s = Math.sin(p.rot)
+  const cy = Math.cos(yaw)
+  const sy = Math.sin(yaw)
+  let x0 = Infinity
+  let x1 = -Infinity
+  let z0 = Infinity
+  let z1 = -Infinity
+  let own = [Infinity, -Infinity, Infinity, -Infinity]
+  for (let k = 0; k + 1 < o.foot.length; k += 2) {
+    const fx = (o.foot[k] as number) * (p.stretch ?? 1) * p.scale
+    const fz = (o.foot[k + 1] as number) * p.scale
+    own = [
+      Math.min(own[0] as number, fx),
+      Math.max(own[1] as number, fx),
+      Math.min(own[2] as number, fz),
+      Math.max(own[3] as number, fz),
+    ]
+    // the piece's frame to the world's (as doorways), then into the frame turned `yaw`
+    const wx = fx * c + fz * s
+    const wz = -fx * s + fz * c
+    const lx = wx * cy - wz * sy
+    const lz = wx * sy + wz * cy
+    x0 = Math.min(x0, lx)
+    x1 = Math.max(x1, lx)
+    z0 = Math.min(z0, lz)
+    z1 = Math.max(z1, lz)
+  }
+  if (!(x1 > x0 && z1 > z0)) return null
+  const mx = (x0 + x1) / 2
+  const mz = (z0 + z1) / 2
+  const half: [number, number] = [(x1 - x0) / 2, (z1 - z0) / 2]
+  const top = o.top * p.scale
+  return {
+    // the frame's middle back in the world
+    at: [p.x + mx * cy + mz * sy, p.z - mx * sy + mz * cy],
+    half,
+    top,
+    bulk: ((own[1] as number) - (own[0] as number)) * ((own[3] as number) - (own[2] as number)) * top,
+  }
+}
 
 export function eventSites(island: HexIsland, zones: HexZones, world: HexWorld, opts: SiteOpts): EventSites {
   const g = island.grid
@@ -225,6 +301,18 @@ export function eventSites(island: HexIsland, zones: HexZones, world: HexWorld, 
     for (const kind of ["fishing", null])
       if (zones.zones.some((zone, zi) => (kind === null || zone.kind === kind) && moor(zone, zi))) break
 
+  // the buildings by tile (closed ones, for their foot) and each building's door
+  const piecesOn = new Map<number, HexWorld["pieces"]>()
+  for (const p of world.pieces) {
+    if (!solidToFoot(p.piece)) continue
+    const h = hexAt(p.x / R, p.z / R)
+    const i = g.index(h.q, h.r)
+    if (i < 0) continue
+    const list = piecesOn.get(i)
+    if (list) list.push(p)
+    else piecesOn.set(i, [p])
+  }
+  const doors = new Map(world.doorways.map((d) => [d.tile, d]))
   const plan = zones.castle
   const keep = plan ? top(plan.keep) : null
   return {
@@ -232,18 +320,53 @@ export function eventSites(island: HexIsland, zones: HexZones, world: HexWorld, 
     harbours,
     places: zones.zones.map((zone, zi) => {
       const at = top(zone.tile)
-      let build = at
-      let best = Number.POSITIVE_INFINITY
+      const heart = { q: g.q[zone.tile] ?? 0, r: g.r[zone.tile] ?? 0 }
+      let best: { tile: number; f: Footing | null; yaw: number; score: number } | null = null
       for (const i of zone.tiles) {
         if (TILE_USES[zones.use[i] ?? 0] !== "building") continue
+        const dq = (g.q[i] ?? 0) - heart.q
+        const dr = (g.r[i] ?? 0) - heart.r
+        const steps = (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2
         const b = top(i)
-        const d = Math.hypot(b[0] - at[0], b[2] - at[2])
-        if (d < best) {
-          best = d
-          build = b
+        const dist = Math.hypot(b[0] - at[0], b[2] - at[2])
+        const door = doors.get(i)
+        let f: Footing | null = null
+        let yaw = 0
+        for (const p of piecesOn.get(i) ?? []) {
+          const turn = door?.facing ?? p.rot
+          const here = footing(p, turn)
+          if (here && (!f || here.bulk > f.bulk)) {
+            f = here
+            yaw = turn
+          }
         }
+        // the biggest closed building near the heart; failing any, the nearest building
+        const score = steps <= HEART_REACH && f ? 1e6 + f.bulk : -dist
+        if (!best || score > best.score) best = { tile: i, f, yaw, score }
       }
-      return { zone: zi, kind: zone.kind, ...(zone.place ? { id: zone.place.id } : {}), at, build }
+      if (!best)
+        return {
+          zone: zi,
+          kind: zone.kind,
+          ...(zone.place ? { id: zone.place.id } : {}),
+          at,
+          build: at,
+          yaw: 0,
+          half: [0, 0] as [number, number],
+          top: 0,
+        }
+      const ground = top(best.tile)
+      const f = best.f
+      return {
+        zone: zi,
+        kind: zone.kind,
+        ...(zone.place ? { id: zone.place.id } : {}),
+        at,
+        build: f ? ([f.at[0], ground[1], f.at[1]] as Vec3) : ground,
+        yaw: f ? best.yaw : 0,
+        half: f ? f.half : ([0, 0] as [number, number]),
+        top: f ? f.top : 0,
+      }
     }),
   }
 }

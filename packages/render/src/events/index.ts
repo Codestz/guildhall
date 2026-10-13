@@ -23,10 +23,12 @@ export {
 export { RAIN_FAR, RAIN_STREAKS } from "./rain.ts"
 export {
   createScaffolds,
+  SCAFFOLD_NOMINAL,
   SCAFFOLD_S,
   type ScaffoldPlace,
   type Scaffolds,
   scaffoldGeometry,
+  scaffoldSize,
 } from "./scaffold.ts"
 export {
   createHarbourShips,
@@ -40,7 +42,10 @@ export {
   type Berth,
   type EventSites,
   eventSites,
+  type Footing,
+  footing,
   type HarbourSite,
+  HEART_REACH,
   type PlaceSite,
   type SiteOpts,
 } from "./sites.ts"

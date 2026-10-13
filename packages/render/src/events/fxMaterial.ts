@@ -43,18 +43,43 @@ if ( vSeen < 0.999 ) {
 }
 `
 
+/**
+ * A geometry fitted per instance (`anchored`): each vertex's `anchor` (x, y, z multipliers) says how
+ * far it moves as the instance's `instanceSize` differs from the size the geometry was built at, so a
+ * frame stretches round a bigger building and its members keep their thickness.
+ */
+const anchoredVertex = ([x, y, z]: readonly [number, number, number]) => /* glsl */ `
+vec3 transformed = vec3( position ) + anchor * ( instanceSize - vec3( ${x.toFixed(4)}, ${y.toFixed(4)}, ${z.toFixed(4)} ) );
+`
+
+export interface FxMaterialOpts {
+  /** The size the geometry was built at: it takes `anchor` and `instanceSize` (a scaffold's frame). */
+  anchored?: readonly [number, number, number]
+  /** Extra vertex and fragment patches (a ship's flare): GLSL chunks replaced, after the FX's own. */
+  patch?: (shader: WebGLProgramParametersWithUniforms) => void
+}
+
 /** The FX's instanced palette material (one per kind, `key` names its program). */
-export function fxMaterial(key: string): MeshStandardMaterial {
+export function fxMaterial(key: string, opts: FxMaterialOpts = {}): MeshStandardMaterial {
   const material = new MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 })
   material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     patchCascades(shader)
     patchCloudShade(shader)
     shader.vertexShader = shader.vertexShader
-      .replace("#include <common>", `#include <common>\n${VERTEX_PARS}`)
+      .replace(
+        "#include <common>",
+        `#include <common>\n${VERTEX_PARS}${opts.anchored ? "attribute vec3 anchor;\nattribute vec3 instanceSize;\n" : ""}`,
+      )
       .replace("#include <color_vertex>", COLOUR_VERTEX)
+    if (opts.anchored)
+      shader.vertexShader = shader.vertexShader.replace(
+        "#include <begin_vertex>",
+        anchoredVertex(opts.anchored),
+      )
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>\n${FRAGMENT_PARS}`)
       .replace("#include <clipping_planes_fragment>", DISCARD)
+    opts.patch?.(shader)
   }
   material.customProgramCacheKey = () => `guildhall-fx-${key}`
   return material

@@ -12,7 +12,7 @@
  *   ?fx=storm,ships=3,busy=market     together (`,` or `;` between them); `?fx=1` mounts them at rest
  *
  * `window.guildhall.ext.fx` drives them for shots: `weather(kind, now)`, `strike(hold?)`, `open(n)`,
- * `merge(key)`, `close(key)`, `busy(ids)`, `advance(s)`, `ships()`, `stats()`.
+ * `merge(key)`, `close(key)`, `busy(ids)`, `advance(s)`, `rate(r?)` (the voyages' speed; no `r`: read it), `ships()`, `stats()`.
  */
 import {
   createHarbourShips,
@@ -89,7 +89,7 @@ export function mountFx(parts: {
   const scaffolds = sites.places.length
     ? createScaffolds(
         stage,
-        sites.places.map((p) => ({ id: idOf(p), at: p.build })),
+        sites.places.map((p) => ({ id: idOf(p), at: p.build, yaw: p.yaw, half: p.half, top: p.top })),
       )
     : null
   const placeId = (name: string): string | null => {
@@ -146,6 +146,7 @@ export function mountFx(parts: {
           now,
         ),
       advance: (s: number) => ships?.advance(s),
+      rate: (r?: number) => (r === undefined ? ships?.rate() : ships?.setRate(r)),
       ships: () => ships?.ships() ?? [],
       ready: () => Promise.all([ships?.ready, scaffolds?.ready]),
       stats: () => ({ ...fx.stats(), drive: drive.stats() }),

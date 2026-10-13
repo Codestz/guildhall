@@ -1,6 +1,16 @@
 import { describe, expect, test } from "bun:test"
 import { lightAt } from "@guildhall/render"
-import { hexGroundFine, hexIsland, hexWorld, hexZones, LEVEL_STEP } from "@guildhall/world"
+import {
+  hexGroundFine,
+  hexIsland,
+  hexWalk,
+  hexWorld,
+  hexZones,
+  LEVEL_STEP,
+  lifePlaces,
+  planFolk,
+  workTiles,
+} from "@guildhall/world"
 import { sideLit } from "../src/hexworld/index.ts"
 import {
   type FromWorker,
@@ -107,5 +117,52 @@ describe("runHexJob", () => {
     const g = out[1]?.type === "ground" ? out[1].ground : null
     expect(g?.mesh).toBeNull()
     expect(g?.prisms?.length).toBe(tiles)
+  })
+})
+
+/** The life plan, made in the worker as the last stage: the same plan the main thread used to make. */
+describe("runHexJob life stage", () => {
+  const spec = {
+    seed: 1,
+    files: 600,
+    ground: "fine" as const,
+    step: LEVEL_STEP,
+    paint: true,
+    tiles: null,
+    life: true,
+  }
+  const msgs: FromWorker[] = []
+  runHexJob(spec, (m) => msgs.push(m))
+  const life = msgs[4]?.type === "life" ? msgs[4].life : null
+
+  test("comes after the shore, and only when asked for", () => {
+    expect(msgs.map((m) => m.type)).toEqual(["map", "ground", "pieces", "shore", "life"])
+    expect(life).not.toBeNull()
+  })
+
+  test("carries everyone's day, the agents' rounds, the solids, the walkways and the doorways", () => {
+    expect(life!.folk.length).toBeGreaterThan(10)
+    expect(life!.agents.length).toBe(3)
+    for (const a of life!.agents) expect(a.period).toBeGreaterThan(0)
+    expect(life!.solids.length).toBeGreaterThan(50)
+    expect(life!.doorways.length).toBeGreaterThan(0)
+    expect(life!.stats.nodes).toBeGreaterThan(0)
+  })
+
+  test("is the plan of the world as placed (pieces at their tile heights, not the fine ground's)", () => {
+    const h = hexIsland({ seed: 1, files: 600 })
+    const z = hexZones(h)
+    const w = hexWorld(h, z)
+    const walk = hexWalk(h, z, w, { reach: workTiles(h, z) })
+    const places = lifePlaces(h, z, w, walk)
+    const folk = planFolk(h, z, w, walk, { seed: 1, pace: (0.8 * 3600) / 20, places })
+    expect(life!.folk.map((f) => f.role)).toEqual(folk.map((f) => f.role))
+    expect(life!.folk[0]!.day.length).toBe(folk[0]!.day.length)
+    expect(life!.solids.map((s) => s.base)).toEqual([...places.furniture.solids].map((s) => s.base))
+    expect(life!.doorways).toEqual(w.doorways)
+  })
+
+  test("is plain data a worker can post", () => {
+    expect(() => structuredClone(life)).not.toThrow()
   })
 })

@@ -4,8 +4,10 @@
  * the placed pieces and the shore field's bytes. It arrives in stages, each posted as soon as it is
  * ready: `map` (the island's extent, its paths and pools: the sky, the sun and the post are set up and
  * their shaders compiled while the ground is still being built), `ground` (the ground mesh), `pieces`
- * (their models start loading), then `shore` (the water's field, the slowest part). Everything posted is plain data, typed arrays
- * handed over, not copied. Pure.
+ * (their models start loading), `shore` (the water's field), then, when the spec asks for life, `life`
+ * (everyone's day on the walk graph, lifePlan.ts: the slowest part, a second or more of path searches
+ * that would otherwise block the main thread). Everything posted is plain data, typed arrays handed
+ * over, not copied. Pure.
  */
 import { shoreBytes, type VertexMeshData, vertexMeshData } from "@guildhall/render/worker"
 import {
@@ -29,6 +31,7 @@ import {
   type PlacedPiece,
   type TilePrefab,
 } from "@guildhall/world"
+import { type LifePlan, planLife } from "./lifePlan.ts"
 
 type RGB = [number, number, number]
 const TOP: Record<string, RGB> = {
@@ -78,6 +81,8 @@ export interface HexJobSpec {
   nature?: HexNature
   /** The island's shape knobs, as on the hex map (`?coast= ?hills= ?rain= ?forest=`); left out: the defaults. */
   shape?: IslandShape
+  /** Plan the island's life as the last stage (lifePlan.ts); left out or false: no `life` stage (`?life=0`). */
+  life?: boolean
 }
 
 /** The hex map's shape knobs (world `HexIslandSpec`), so the 3D island can show what `/lab/hexmap` drew. */
@@ -191,6 +196,7 @@ export type FromWorker =
   | { type: "ground"; ground: GroundStage }
   | { type: "pieces"; pieces: PackedPieces }
   | { type: "shore"; shore: ShoreStage }
+  | { type: "life"; life: LifePlan }
   | { type: "fail"; message: string }
 
 const SQ3 = Math.sqrt(3)
@@ -468,7 +474,9 @@ export function runHexJob(
     },
   })
   // the pieces: nature stands on the fine ground as built, each kept as far over it as its tile put it
-  // (a shield hung on a straw bale, papers pinned on a board, a flower in its pot)
+  // (a shield hung on a straw bale, papers pinned on a board, a flower in its pot). Life plans on the
+  // pieces as the world placed them (their solids stand on the tile), so their heights are kept.
+  const placedY = w.pieces.map((p) => p.y)
   if (groundAt)
     for (const p of w.pieces) {
       const y = groundAt(p.x, p.z)
@@ -496,4 +504,8 @@ export function runHexJob(
     },
   })
   post({ type: "shore", shore: { min, size, res, reach: SHORE_REACH, data, ms: Math.round(now() - t0) } })
+  if (spec.life) {
+    const placed = { ...w, pieces: w.pieces.map((p, k) => ({ ...p, y: placedY[k] as number })) }
+    post({ type: "life", life: planLife(h, z, placed, spec.seed, now) })
+  }
 }

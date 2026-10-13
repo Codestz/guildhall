@@ -8,6 +8,7 @@ import {
   distanceRange,
   floorAt,
   type Lens,
+  nearPlane,
   pitchCeiling,
   type World,
   zoomFraction,
@@ -144,15 +145,26 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
     return cameraToPose([...fly.eye], target)
   }
 
+  /** Inside a world the near plane follows the eye's height over the floor (world.ts `nearPlane`). */
+  const fitNear = () => {
+    if (!world) return
+    const { x, y, z } = camera.position
+    const near = nearPlane(y - floorAt(world, x, z))
+    if (Math.abs(near - camera.near) <= camera.near * 0.01) return
+    camera.near = near
+    camera.updateProjectionMatrix()
+  }
+
   const write = () => {
     if (mode === "free" && !glide) {
       const dir = lookVector(fly.yaw, fly.pitch)
       camera.position.set(...fly.eye)
       camera.lookAt(fly.eye[0] + dir[0], fly.eye[1] + dir[1], fly.eye[2] + dir[2])
-      return
+    } else {
+      camera.position.set(...poseToCamera(pose))
+      camera.lookAt(...pose.target)
     }
-    camera.position.set(...poseToCamera(pose))
-    camera.lookAt(...pose.target)
+    fitNear()
   }
 
   const enterFree = (state?: FreeState) => {

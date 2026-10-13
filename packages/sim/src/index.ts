@@ -7,8 +7,10 @@
  *   story/   what the moments mean in words: captions, the Legends book, the Chronicle card's recap,
  *            and a repository's story by era (story/repo)
  *   repo/    the Repo Chronicle: a repository's history (V1's format), read at a day
+ *   events/  the wire normalised into world events, folded into the guild's world, logged with checkpoints
  */
 
+export * from "./events/index.ts"
 export { GuildModel } from "./guild/guildModel.ts"
 export {
   apply,

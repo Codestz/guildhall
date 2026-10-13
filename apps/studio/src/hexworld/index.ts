@@ -54,6 +54,7 @@ import {
   hexWorld,
   hexZones,
   LEVEL_STEP,
+  type PlaceSpec,
 } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen, ScreenCtx } from "../screens.ts"
@@ -63,6 +64,7 @@ import { islandWorld, worldCamera } from "../shell/worldCamera.ts"
 import { loadTiles } from "../tiles.ts"
 import { atmoKnobs, createIslandAir, type IslandAir } from "./atmo.ts"
 import { createDoors, type Doors } from "./doors.ts"
+import { type HallRepo, hallBuild, hallSubtitle, placeRows } from "./hall.ts"
 import {
   batchSets,
   type FromWorker,
@@ -81,7 +83,8 @@ import {
 } from "./job.ts"
 import { clock, islandKnobs } from "./knobs.ts"
 import { createLife, type Life } from "./life.ts"
-import { LINES, loadPlan, PITCH, STEPS } from "./loading.ts"
+import { HALL_STEPS, LINES, loadPlan, PITCH, STEPS, type Step } from "./loading.ts"
+import { createPlaceLabels, kindWord, labelsOn, type PlaceLabels } from "./places.ts"
 import { loaderOn, publishWorld, settle } from "./ready.ts"
 
 const logger = log("studio:hexworld")
@@ -200,19 +203,45 @@ export interface WorldHooks {
   }): void
 }
 
+/** What a hall adds to the island (hall.ts): the repo whose chronicle sizes it and names its places. */
+export interface HexWorldExtra {
+  /** Resolves to the repo once its chronicle is read (null: the island's own, as `/town`); the build waits for it. */
+  repo?: Promise<HallRepo | null>
+}
+
+/** What `window.guildhall.ext.hall` tells the shots: how long each part took, and the places built. */
+export interface HallStats {
+  repo: HallRepo | null
+  /** ms to fetch and decode the chronicle (0 off a hall). */
+  chronicleMs: number
+  /** ms from the mount to the island settled (built, compiled, drawn calm). */
+  buildMs: number
+  /** ms from the mount to the cover gone. */
+  revealMs: number
+  places: MapStage["places"]
+}
+
 export const hexWorldScreen: Screen = {
   id: "hexworld",
   title: "Hex island",
   mount: (outer, ctx) => mountHexWorld(outer, ctx),
 }
 
-/** The hex island screen; `hooks` lets another screen draw and drive parts of it (`WorldHooks`). */
-export const mountHexWorld = (outer: HTMLElement, ctx: ScreenCtx, hooks?: WorldHooks): (() => void) =>
-  world.mount(outer, ctx, hooks)
+/**
+ * The hex island screen; `hooks` lets another screen draw and drive parts of it (`WorldHooks`), and a
+ * hall (`extra.repo`) reads the repo's chronicle first and builds from it: the island's size is the
+ * repo's files, its places the repo's units, named on their plates.
+ */
+export const mountHexWorld = (
+  outer: HTMLElement,
+  ctx: ScreenCtx,
+  hooks?: WorldHooks,
+  extra: HexWorldExtra = {},
+): (() => void) => world.mount(outer, ctx, hooks, extra)
 
 // A method, so the mount's body keeps the depth it had as the screen's own `mount` (its diffs stay small).
 const world = {
-  mount(outer: HTMLElement, ctx: ScreenCtx, hooks?: WorldHooks): () => void {
+  mount(outer: HTMLElement, ctx: ScreenCtx, hooks?: WorldHooks, extra: HexWorldExtra = {}): () => void {
     const t0 = performance.now()
     const since = () => Math.round(performance.now() - t0)
     const num = (k: string, d: number) => {
@@ -220,7 +249,11 @@ const world = {
       return ctx.query.has(k) && Number.isFinite(v) ? v : d
     }
     const seed = num("seed", Number(ctx.query.get("town")) || 1)
-    const files = num("files", 4000)
+    // the island's size: the query's (`?files=`, default 4,000), or, in a hall, the repo's once its chronicle is read
+    let files = num("files", 4000)
+    let places: PlaceSpec[] | undefined
+    const hall = extra.repo !== undefined
+    const stats: HallStats = { repo: null, chronicleMs: 0, buildMs: 0, revealMs: 0, places: [] }
     // the worker starts first: it builds while the stage, its context and the catalog get ready
     const step = num("step", LEVEL_STEP)
     const detail = ctx.query.get("detail") !== "0"
@@ -230,20 +263,6 @@ const world = {
     const nature = natureOf(ctx.query)
     // the hex map's shape knobs (?coast= ?hills= ?rain= ?forest=): `/lab/hexmap`'s island in 3D
     const shape = shapeOf(ctx.query)
-    // the authored tile prefabs (data/tiles) before anything is built from them: here (life builds on
-    // this thread too) and in the worker
-    const job = startJob(
-      loadTiles().then((tiles) => ({
-        seed,
-        files,
-        ground: groundOf(ctx.query.get("ground")),
-        step,
-        paint: detail,
-        tiles: tiles.length ? tiles : null,
-        nature,
-        shape,
-      })),
-    )
     const catalogLoad = loadCatalog()
     // `?name=`: the island's own name (the site's `/` is "Guildhall", a hall its repo), else the seed's
     const name = ctx.query.get("name") || `Island ${roman(seed)}`
@@ -254,22 +273,50 @@ const world = {
     viewQuery.set(seedKey, String(seed))
     const viewer = mountViewer(outer, { ...ctx, query: viewQuery }, "town", {
       title: name,
-      subtitle: `Seed ${seed}, grown for a repo of ${files.toLocaleString("en-US")} files`,
+      subtitle: hall
+        ? "Reading the chronicle…"
+        : `Seed ${seed}, grown for a repo of ${files.toLocaleString("en-US")} files`,
       sections: islandKnobs(seedKey),
     })
     const host = viewer.stage
     // The loading screen (loading.ts, ready.ts): the cover stays until the whole island is built, compiled and
     // drawn calm, then lifts once. `?loader=0` lifts at the ground, as before the loader.
     const cover = loaderOn(ctx.query)
-    const plan = loadPlan(files)
-    const steps = viewer.loading(name, STEPS, PITCH)
-    const go = (name: (typeof STEPS)[number], to: number) => {
+    const steps = viewer.loading(name, hall ? HALL_STEPS : STEPS, PITCH)
+    const go = (name: Step, to: number) => {
       steps.step(name)
       steps.line(LINES[name])
-      steps.progress(to, plan[name])
+      steps.progress(to, loadPlan(files)[name])
     }
     publishWorld("loading")
-    go("Map", 0.07)
+    // A hall: the chronicle first, and only then the island from it (its size and its places). The
+    // island's own (`/town`) has nothing to wait for.
+    if (hall) go("Chronicle", 0.04)
+    const tChronicle = performance.now()
+    const read = (extra.repo ?? Promise.resolve(null)).then((repo) => {
+      stats.chronicleMs = Math.round(performance.now() - tChronicle)
+      stats.repo = repo
+      const built = hallBuild(repo, files)
+      files = built.files
+      places = built.places
+      if (repo) viewer.setInfo({ subtitle: hallSubtitle(repo) })
+      go("Map", 0.07)
+    })
+    // the authored tile prefabs (data/tiles) before anything is built from them: here (life builds on
+    // this thread too) and in the worker
+    const job = startJob(
+      Promise.all([read, loadTiles()]).then(([, tiles]) => ({
+        seed,
+        files,
+        ground: groundOf(ctx.query.get("ground")),
+        step,
+        paint: detail,
+        tiles: tiles.length ? tiles : null,
+        nature,
+        shape,
+        ...(places ? { places } : {}),
+      })),
+    )
     // a screen torn down mid-settle: no frame will come, so the wait ends here
     let tornDown = () => {}
     const torn = new Promise<void>((done) => {
@@ -289,6 +336,7 @@ const world = {
     let disposeField = () => {}
     let life: Life | null = null
     let doors: Doors | null = null
+    let labels: PlaceLabels | null = null
     const meshes: TerrainMesh[] = []
 
     const build = async () => {
@@ -433,6 +481,19 @@ const world = {
       }
       steps.progress(0.8, 150)
       sun.markDirty()
+      // the repo's places, named on their plates (places.ts); `?labels=0` leaves them off
+      stats.places = m.places
+      if (m.places.length && labelsOn(ctx.query))
+        labels = createPlaceLabels(
+          stage,
+          viewer.labels,
+          m.places.map((p) => ({
+            label: p.label,
+            detail: `${p.files.toLocaleString("en-US")} files · ${kindWord(p.kind)}`,
+            at: p.at,
+            weight: p.files,
+          })),
+        )
       // ---- life (track B): townsfolk and agents on the walk graph; `?life=0` turns it off ----
       let world: ReturnType<typeof hexWorld> | null = null
       let island: HexIsland | null = null
@@ -440,12 +501,12 @@ const world = {
       if (alive || hooks) {
         // Life plans on the map itself: its pure parts built again here (~0.1 s), once the island is drawn.
         island = hexIsland({ ...shape, seed, files })
-        const zones = hexZones(island, { wild: nature.wild })
+        const zones = hexZones(island, { wild: nature.wild, ...(places ? { places } : {}) })
         world = hexWorld(island, zones, { step, nature })
       }
       if (alive && island && world) {
         go("Townsfolk", 0.92)
-        const zones = hexZones(island, { wild: nature.wild })
+        const zones = hexZones(island, { wild: nature.wild, ...(places ? { places } : {}) })
         const built = world
         life = createLife(stage, {
           host,
@@ -509,9 +570,12 @@ const world = {
           passes: () => life?.passes() ?? [],
         }
       const grown = m.stats.nature
+      stats.buildMs = since()
+      if (window.guildhall?.ext) window.guildhall.ext.hall = stats
       viewer.setInfo({
         figures: [
           { label: "Land tiles", value: m.stats.land },
+          ...(m.places.length ? [{ label: "Places", value: m.places.length }] : []),
           { label: "Pieces", value: placed },
           { label: "Built in", value: (since() / 1000).toFixed(1), unit: "s" },
         ],
@@ -524,6 +588,7 @@ const world = {
             { label: "Repo files", value: files },
             { label: "Land tiles", value: m.stats.land },
             { label: "Pieces placed", value: placed },
+            ...(hall ? [{ label: "Chronicle read", value: stats.chronicleMs, unit: "ms" }] : []),
             { label: "First frame", value: first, unit: "ms" },
             { label: "Whole build", value: since(), unit: "ms" },
             { label: "Shaders compiled", value: ready.compileMs, unit: "ms" },
@@ -540,6 +605,16 @@ const world = {
               : []),
           ],
         },
+        ...(m.places.length
+          ? [
+              {
+                title: "Places",
+                meta: `${m.places.length} of the repo`,
+                folded: true,
+                rows: placeRows(m.places),
+              },
+            ]
+          : []),
         {
           title: "Tiles",
           meta: `${Object.keys(m.stats.prefabs).length} kinds`,
@@ -554,8 +629,12 @@ const world = {
         publishWorld("ready")
         // the one reveal: the cover fades, and the island under it has been drawn calm for a while
         await steps.done()
+        stats.revealMs = since()
         publishWorld("revealed")
-      } else void steps.done()
+      } else {
+        stats.revealMs = since()
+        void steps.done()
+      }
       logger.info("built", {
         tiles: m.stats.tiles,
         pieces: placed,
@@ -584,6 +663,7 @@ const world = {
       night?.dispose()
       life?.dispose()
       doors?.dispose()
+      labels?.dispose()
       unTick()
       post?.dispose()
       for (const m of meshes) m.dispose()

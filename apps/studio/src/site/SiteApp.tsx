@@ -163,27 +163,51 @@ export function SiteApp() {
   )
 }
 
+const n = (v: number) => v.toLocaleString("en-US")
+
 /**
- * A repo's hall, until the hall screen exists: the island this name grows, and where the HUD (roster,
- * chronicle, history) will sit. Says plainly that the island is the generator's own for now.
+ * A repo's hall, until the hall screen exists: what the island was grown from (the repo's chronicle: its
+ * size, its figures, its folders and packages as named places), or, with no chronicle, that the island
+ * is a sketch and how to ask for one. Where the HUD (roster, chronicle, history) will sit.
  */
 function HallNote({ slug, onGo }: { slug: string; onGo(url: string): void }) {
-  const { state, retry } = useChronicle(slug)
+  const { state } = useChronicle(slug)
+  // a retry opens the hall again with a fresh try, so the island is rebuilt from what the retry finds
+  const retry = () => onGo(href("hall", { repo: slug, try: String(Date.now() % 100000) }))
+  const repo = state.status === "ok" ? state.repo : null
   return (
     <section className="ui-panel site-note" aria-label={`The hall of ${slug}`}>
       <p className="ui-eyebrow">Your repo</p>
       <h2>{slug}</h2>
-      <p>
-        An island grown from this name: the same name always grows the same island. Reading the repo's own
-        file tree is the next step.
-      </p>
+      {state.status === "loading" && <p>Reading this repo's chronicle…</p>}
+      {repo && (
+        <p>
+          {n(repo.files)} files, {repo.commits !== undefined ? `${n(repo.commits)} commits, ` : ""}
+          {n(repo.contributors)} contributor{repo.contributors === 1 ? "" : "s"},{" "}
+          {repo.years[0] === repo.years[1] ? repo.years[0] : `${repo.years[0]} – ${repo.years[1]}`}. The
+          island is sized by its files; its {repo.places.length} places are its folders and packages, named on
+          their plates.
+        </p>
+      )}
+      {state.status === "not-chronicled" && (
+        <p>
+          A sketch, not this repo's island: there is no chronicle for it yet, so the land below is the
+          generator's own at a default size.
+        </p>
+      )}
+      {state.status === "unavailable" && (
+        <p>
+          A sketch, not this repo's island: its chronicle could not be read ({state.reason}), so the land
+          below is the generator's own at a default size.
+        </p>
+      )}
       <div className="site-note-hud" role="status">
         {state.status === "loading" && "Looking for this repo's chronicle…"}
-        {state.status === "ok" &&
-          `Chronicle found, built ${state.generatedAt.slice(0, 10)}${state.source === "local" ? " (the studio's copy)" : ""}.`}
+        {repo &&
+          `Chronicle built ${repo.generatedAt.slice(0, 10)}${repo.source === "local" ? " (the studio's copy)" : ""}.`}
         {state.status === "not-chronicled" && (
           <>
-            No chronicle for this repo yet, so there is no history to replay.{" "}
+            No chronicle for this repo yet.{" "}
             <a className="site-link" href={state.request} target="_blank" rel="noreferrer">
               Request a chronicle
             </a>
@@ -191,7 +215,7 @@ function HallNote({ slug, onGo }: { slug: string; onGo(url: string): void }) {
         )}
         {state.status === "unavailable" && (
           <>
-            The chronicles could not be reached ({state.reason}).{" "}
+            The chronicles could not be reached.{" "}
             <button type="button" className="site-link" onClick={retry}>
               Try again
             </button>

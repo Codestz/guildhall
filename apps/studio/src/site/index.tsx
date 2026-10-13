@@ -5,7 +5,8 @@ import { createRoot } from "react-dom/client"
 import { holdStudioStyle } from "../browser/style.ts"
 import type { Screen, ScreenCtx } from "../screens.ts"
 import { addShellStyle } from "../shell/style.ts"
-import { worldQuery } from "./routes.ts"
+import { hallRepo } from "./chronicle.ts"
+import { hallSlug, worldQuery } from "./routes.ts"
 import { SiteApp } from "./SiteApp.tsx"
 import { holdSiteShellStyle } from "./style.ts"
 
@@ -74,10 +75,13 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
       if (withWorld) {
         stopCover = coverUntilReveal(root, ctx.query.get("loader") !== "0")
         const inner: ScreenCtx = { ...ctx, query: worldQuery(id, ctx.query) }
+        // a repo's hall builds from the repo's chronicle (hexworld/hall.ts), read while the 3D code streams in
+        const slug = id === "hall" ? hallSlug(ctx.query) : null
+        const repo = slug ? hallRepo(slug) : undefined
         ctx
           .load(
-            import("../hexworld/index.ts").then(({ hexWorldScreen }) => {
-              if (!gone) offWorld = hexWorldScreen.mount(world, inner)
+            import("../hexworld/index.ts").then(({ mountHexWorld }) => {
+              if (!gone) offWorld = mountHexWorld(world, inner, undefined, repo ? { repo } : {})
             }),
           )
           .catch((error: unknown) => {

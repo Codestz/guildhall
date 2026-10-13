@@ -1,23 +1,62 @@
 /**
  * The seam between the site and the chronicles backend (packages/sim/src/repo/catalog.ts): a repo's
- * chronicle as the hall asks for it, and the live catalog as extra demo cards. Nothing here reads the
- * chronicle's contents yet; the hall note says whether there is one, how fresh, and how to ask for one.
+ * chronicle as the hall asks for it, read once per repo and shared by the world (which builds the island
+ * from it: hexworld/hall.ts) and the hall note (which says what was found), and the live catalog as
+ * extra demo cards.
  */
-import { type Catalog, chronicleFor, loadCatalog, requestChronicleUrl } from "@guildhall/sim"
+import {
+  type Catalog,
+  type ChronicleResult,
+  chronicleFor,
+  loadCatalog,
+  requestChronicleUrl,
+} from "@guildhall/sim"
 import type { Story } from "@guildhall/ui"
 import { useCallback, useEffect, useState } from "react"
+import { type HallRepo, repoOf } from "../hexworld/hall.ts"
 
 export type Chronicled =
   | { status: "loading" }
-  | { status: "ok"; generatedAt: string; source: "cdn" | "local"; commits?: number }
+  | { status: "ok"; repo: HallRepo & { kind: "chronicled" } }
   | { status: "not-chronicled"; request: string }
   | { status: "unavailable"; reason: string }
 
-/** The one call the hall makes: a repo's chronicle, as a state to draw. Never rejects. */
-export async function chronicleOf(owner: string, repo: string): Promise<Chronicled> {
-  const found = await chronicleFor(owner, repo)
-  if (found.status === "ok")
-    return { status: "ok", generatedAt: found.chronicle.generatedAt, source: found.source }
+/** One fetch per repo while the page lives: the world and the note read the same answer. A failed read is forgotten, so a retry asks again. */
+const reads = new Map<string, Promise<ChronicleResult>>()
+
+/** A repo's chronicle, fetched once (`chronicleFor`); never rejects. */
+export function hallChronicle(slug: string): Promise<ChronicleResult> {
+  const key = slug.toLowerCase()
+  let read = reads.get(key)
+  if (!read) {
+    const [owner = "", repo = ""] = slug.split("/")
+    read = chronicleFor(owner, repo).then((found) => {
+      if (found.status !== "ok") reads.delete(key)
+      return found
+    })
+    reads.set(key, read)
+  }
+  return read
+}
+
+/** The repo as the island builds it (hexworld/hall.ts `HallRepo`): read from its chronicle, else a sketch. */
+export async function hallRepo(slug: string): Promise<HallRepo> {
+  const found = await hallChronicle(slug)
+  if (found.status === "ok") return repoOf(found.chronicle, found.source)
+  if (found.status === "not-chronicled") return { kind: "sketch", name: slug, why: "not-chronicled" }
+  return { kind: "sketch", name: slug, why: "unavailable", reason: found.reason }
+}
+
+/** The one call the hall note makes: a repo's chronicle, as a state to draw. Never rejects. */
+export async function chronicleOf(slug: string): Promise<Chronicled> {
+  const found = await hallChronicle(slug)
+  if (found.status === "ok") {
+    const repo = repoOf(found.chronicle, found.source)
+    return repo.kind === "chronicled"
+      ? { status: "ok", repo }
+      : { status: "unavailable", reason: "unreadable" }
+  }
+  const [owner = "", repo = ""] = slug.split("/")
   if (found.status === "not-chronicled")
     return { status: "not-chronicled", request: requestChronicleUrl(owner, repo) }
   return { status: "unavailable", reason: found.reason }
@@ -30,9 +69,8 @@ export function useChronicle(slug: string): { state: Chronicled; retry(): void }
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is the retry trigger
   useEffect(() => {
     let live = true
-    const [owner = "", repo = ""] = slug.split("/")
     setState({ status: "loading" })
-    void chronicleOf(owner, repo).then((s) => live && setState(s))
+    void chronicleOf(slug).then((s) => live && setState(s))
     return () => {
       live = false
     }

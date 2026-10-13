@@ -27,6 +27,7 @@ import {
   kindOf,
   NATURE_CHOSEN,
   type PlacedPiece,
+  type PlaceSpec,
   type TilePrefab,
 } from "@guildhall/world"
 
@@ -78,6 +79,18 @@ export interface HexJobSpec {
   nature?: HexNature
   /** The island's shape knobs, as on the hex map (`?coast= ?hills= ?rain= ?forest=`); left out: the defaults. */
   shape?: IslandShape
+  /** A repo's units as places (hall.ts, sim `placeSpecs`); left out: the island's own places. */
+  places?: PlaceSpec[]
+}
+
+/** A repo's place as built: its spec, the zone's kind, its tiles, and where its heart is (x, top, z). */
+export interface BuiltPlace {
+  id: string
+  label: string
+  kind: string
+  files: number
+  tiles: number
+  at: [number, number, number]
 }
 
 /** The hex map's shape knobs (world `HexIslandSpec`), so the 3D island can show what `/lab/hexmap` drew. */
@@ -158,6 +171,8 @@ export interface MapStage {
   pools: { x: number; z: number; y: number; flow?: [number, number] }[]
   /** Where each lantern's light hangs (lanterns stand on flat tiles: the ground built under them keeps them there). */
   lamps: [number, number, number][]
+  /** The repo's places as built (none without `places`), in zone order. */
+  places: BuiltPlace[]
   stats: {
     land: number
     tiles: number
@@ -399,7 +414,7 @@ export function runHexJob(
   if (spec.tiles) installTilePrefabs(spec.tiles)
   const h = hexIsland({ ...spec.shape, seed: spec.seed, files: spec.files })
   lap("island")
-  const z = hexZones(h, { wild: spec.nature?.wild })
+  const z = hexZones(h, { wild: spec.nature?.wild, ...(spec.places ? { places: spec.places } : {}) })
   lap("zones")
   const w = hexWorld(h, z, { step: spec.step, nature: spec.nature })
   lap("world")
@@ -422,6 +437,14 @@ export function runHexJob(
       lamps: w.pieces
         .filter((p) => p.piece === LANTERN)
         .map((p) => [p.x, p.y + 2.03 * p.scale, p.z] as [number, number, number]),
+      places: z.zones.flatMap((zone) => {
+        const heart = zone.place ? w.tiles.find((t) => t.i === zone.tile) : undefined
+        if (!zone.place || !heart) return []
+        const { id, label, files } = zone.place
+        return [
+          { id, label, kind: zone.kind, files, tiles: zone.tiles.length, at: [heart.x, heart.top, heart.z] },
+        ]
+      }),
       stats: {
         land: h.stats.land,
         tiles: w.tiles.length,

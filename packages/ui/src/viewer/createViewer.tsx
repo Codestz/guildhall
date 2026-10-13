@@ -19,7 +19,16 @@ import {
 } from "./knobs.ts"
 import { createStore, type ViewState } from "./store.ts"
 import { VIEWER_CSS } from "./style.ts"
-import type { Loading, Transport, TransportSpec, Viewer, ViewerHooks, ViewerOptions } from "./types.ts"
+import {
+  LOADER_FADE_MS,
+  LOADER_FADE_QUICK_MS,
+  type Loading,
+  type Transport,
+  type TransportSpec,
+  type Viewer,
+  type ViewerHooks,
+  type ViewerOptions,
+} from "./types.ts"
 import { type Actions, View } from "./View.tsx"
 
 let sheetUsers = 0
@@ -284,28 +293,45 @@ export function createViewer(host: HTMLElement, opts: ViewerOptions): Viewer {
         },
       }
     },
-    loading(title, steps): Loading {
-      store.set({ loader: { title, steps, at: 0 } })
+    loading(title, steps, pitch): Loading {
+      store.set({ loader: { title, steps, at: 0, progress: 0.02, pitch } })
       const indexOf = (s: string | number) => (typeof s === "number" ? s : Math.max(0, steps.indexOf(s)))
       const status = (at: number) => (at < steps.length ? `${steps[at]}…` : null)
+      const fade = () =>
+        new Promise<void>((done) => {
+          const quick =
+            typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches
+          setTimeout(done, quick ? LOADER_FADE_QUICK_MS : LOADER_FADE_MS)
+        })
       return {
         step(s) {
           const at = indexOf(s)
           const l = store.get().loader
-          if (l) store.set({ loader: { ...l, at } })
+          if (l) store.set({ loader: { ...l, at, line: undefined } })
           if (!l || l.out) store.set((st) => ({ info: { ...st.info, status: status(at) } }))
+        },
+        progress(to, eta = 300) {
+          const l = store.get().loader
+          if (!l) return
+          store.set({ loader: { ...l, progress: Math.max(l.progress ?? 0, Math.min(1, to)), eta } })
+        },
+        line(text) {
+          const l = store.get().loader
+          if (l) store.set({ loader: { ...l, line: text } })
         },
         lift() {
           const l = store.get().loader
-          if (!l) return
+          if (!l) return Promise.resolve()
           store.set((st) => ({ loader: { ...l, out: true }, info: { ...st.info, status: status(l.at) } }))
+          return fade()
         },
         done() {
           const l = store.get().loader
           store.set((st) => ({
-            loader: l ? { ...l, at: steps.length, out: true } : null,
+            loader: l ? { ...l, at: steps.length, out: true, progress: 1, eta: 200 } : null,
             info: { ...st.info, status: null },
           }))
+          return l ? fade() : Promise.resolve()
         },
         fail(message) {
           const l = store.get().loader

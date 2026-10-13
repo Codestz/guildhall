@@ -64,12 +64,27 @@ export interface Transport {
   dispose(): void
 }
 
+/** How long the veil takes to fade, ms (CSS `--ui-loader-fade`; quicker with reduced motion). */
+export const LOADER_FADE_MS = 600
+export const LOADER_FADE_QUICK_MS = 150
+
 export interface Loading {
   /** Marks `step` (a name from the list, or its index) as the one being worked on. */
   step(step: string | number): void
-  /** Lifts the veil while the rest builds in view; the card's status line carries the step. */
-  lift(): void
-  done(): void
+  /**
+   * Moves the bar to `to` (0..1, never backwards) over `eta` ms. The bar is a CSS transition: it keeps
+   * easing toward `to` while the main thread is busy, so aim a little short of the step's end and
+   * report the real end when it arrives.
+   */
+  progress(to: number, eta?: number): void
+  /** Changes the line of flavour under the title. */
+  line(text: string): void
+  /**
+   * Lifts the veil (it fades out); with steps still to go the card's status line carries them. Resolves
+   * once the fade has finished, so a screenshot taken after it never catches the veil.
+   */
+  lift(): Promise<void>
+  done(): Promise<void>
   fail(message: string): void
 }
 
@@ -118,7 +133,7 @@ export interface Viewer {
   setInfo(info: Partial<TitleInfo>): void
   setReadout(readout: readonly Readout[]): void
   transport(spec: TransportSpec): Transport
-  loading(title: string, steps: readonly string[]): Loading
+  loading(title: string, steps: readonly string[], pitch?: string): Loading
   attach(hooks: ViewerHooks): void
   toast(text: string, detail?: string): void
   /** How much of the viewer's right edge the open Inspector covers (CSS px), so a 2D map can centre beside it. */

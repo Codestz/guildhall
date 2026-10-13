@@ -361,7 +361,7 @@ export const COMPONENTS_CSS = /* css */ `
   background:
     radial-gradient(ellipse 70% 60% at 50% 40%, rgba(220, 182, 98, 0.1), transparent 70%),
     radial-gradient(ellipse at 50% 45%, #241b13 0%, var(--ink-solid) 55%, #0c0907 100%);
-  transition: opacity 0.45s ease-in-out, visibility 0s linear 0.45s;
+  transition: opacity var(--ui-loader-fade, 0.6s) ease-in-out, visibility 0s linear var(--ui-loader-fade, 0.6s);
 }
 .ui-loader[data-state="out"] { opacity: 0; visibility: hidden; pointer-events: none; }
 .ui-loader-inner { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 520px; text-align: center; }
@@ -369,7 +369,10 @@ export const COMPONENTS_CSS = /* css */ `
 .ui-loader-name { margin: 0; font: 400 clamp(26px, 4vw, 40px)/1.05 var(--display); letter-spacing: 0.07em; color: var(--brass-hi); overflow-wrap: anywhere; }
 .ui-loader-rule { width: 120px; height: 1px; background: linear-gradient(90deg, transparent, var(--brass), transparent); opacity: 0.6; }
 .ui-loader-bar { display: block; width: 168px; height: 2px; border-radius: 2px; background: var(--hair-2); overflow: hidden; }
-.ui-loader-bar i { display: block; height: 100%; background: var(--brass); transform-origin: left center; transition: transform 0.3s ease-out; }
+.ui-loader-bar i { display: block; height: 100%; background: var(--brass); transform-origin: left center; transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.25, 1); will-change: transform; }
+.ui-loader-line { margin: 0; min-height: 1.5em; max-width: 34ch; font: italic 400 clamp(15px, 1.9vw, 18px)/1.5 var(--serif, Georgia, serif); text-wrap: balance; color: var(--brass-hi); animation: ui-line-in 0.5s ease-out both; }
+.ui-loader-pitch { margin: 10px 0 0; font: 400 var(--t-sm)/1.4 var(--display); letter-spacing: 0.18em; color: var(--faint); }
+@keyframes ui-line-in { from { opacity: 0; transform: translateY(4px); } }
 .ui-loader-steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin: 0; padding: 0; list-style: none; font: 400 var(--t-sm)/1.2 var(--display); letter-spacing: 0.14em; color: var(--faint); }
 .ui-loader-steps li { display: flex; align-items: center; gap: 7px; }
 .ui-loader-steps li::before { content: ""; width: 5px; height: 5px; border-radius: 50%; border: 1px solid currentColor; }
@@ -383,6 +386,8 @@ export const COMPONENTS_CSS = /* css */ `
 @media (prefers-reduced-motion: reduce) {
   .ui-crest { animation: none; }
   .ui-card { animation: none; }
-  .ui-loader { transition-duration: 0.15s; }
+  .ui-loader { --ui-loader-fade: 0.15s; }
+  .ui-loader-line { animation: none; }
+  .ui-loader-bar i { transition: none; }
 }
 `

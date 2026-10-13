@@ -68,6 +68,8 @@ import {
 } from "./job.ts"
 import { clock, islandKnobs } from "./knobs.ts"
 import { createLife, type Life } from "./life.ts"
+import { LINES, loadPlan, PITCH, STEPS } from "./loading.ts"
+import { loaderOn, publishWorld, settle } from "./ready.ts"
 
 const logger = log("studio:hexworld")
 
@@ -204,7 +206,23 @@ export const hexWorldScreen: Screen = {
       sections: islandKnobs(seedKey),
     })
     const host = viewer.stage
-    const steps = viewer.loading(`Island ${roman(seed)}`, ["Map", "Ground", "Water", "Pieces", "Townsfolk"])
+    // The loading screen (loading.ts, ready.ts): the cover stays until the whole island is built, compiled and
+    // drawn calm, then lifts once. `?loader=0` lifts at the ground, as before the loader.
+    const cover = loaderOn(ctx.query)
+    const plan = loadPlan(files)
+    const steps = viewer.loading(`Island ${roman(seed)}`, STEPS, PITCH)
+    const go = (name: (typeof STEPS)[number], to: number) => {
+      steps.step(name)
+      steps.line(LINES[name])
+      steps.progress(to, plan[name])
+    }
+    publishWorld("loading")
+    go("Map", 0.07)
+    // a screen torn down mid-settle: no frame will come, so the wait ends here
+    let tornDown = () => {}
+    const torn = new Promise<void>((done) => {
+      tornDown = done
+    })
     const stage = createStage(host)
     ctx.attach(stage)
     viewer.attachStage(stage)
@@ -226,7 +244,8 @@ export const hexWorldScreen: Screen = {
       // compiled by the frames drawn meanwhile) while the worker still builds the ground.
       const m = await job.map
       if (disposed) return
-      steps.step("Ground")
+      steps.progress(0.08, 150)
+      go("Ground", 0.28)
       const R = HEX_TILE_SIZE
       if (m.paths.length) meshes.push(createSurface(stage, m.paths, "#d9c08c"))
       // stone stairs where roads step down, plank bridges over the rivers: built like the ground
@@ -300,9 +319,14 @@ export const hexWorldScreen: Screen = {
       })
       const first = await firstFrame
       if (disposed) return
-      // the ground is in view: the veil lifts and the rest builds in sight, its step on the title card
-      steps.step("Water")
-      steps.lift()
+      // With the cover the island stays hidden until all of it is built (below). Without (`?loader=0`) the
+      // ground is in view: the veil lifts and the rest builds in sight, its step on the title card.
+      steps.progress(0.3, 150)
+      if (!cover) {
+        steps.step("Water")
+        void steps.lift()
+        publishWorld("revealed")
+      }
       const shoreDone = job.shore.then((s) => {
         if (disposed) return
         const field = shoreFieldTexture(s)
@@ -316,7 +340,7 @@ export const hexWorldScreen: Screen = {
       })
       const catalog = await catalogLoad
       if (!catalog || disposed) return
-      steps.step("Pieces")
+      go("Pieces", 0.7)
       // the crop rows of each field as one cluster: its pieces near, one merged shell far
       const { loose, clusters } = batchSets(await job.pieces, (p) => catalog.get(p.piece) !== undefined)
       const placed = loose.length + clusters.reduce((n, c) => n + c.parts.length, 0)
@@ -333,16 +357,19 @@ export const hexWorldScreen: Screen = {
         async (id) => (id.endsWith(FRAME) ? gateFrame(await load(id.slice(0, -FRAME.length))) : load(id)),
         clusters,
       )
+      steps.progress(0.74, 150)
+      go("Water", 0.8)
       await shoreDone
       if (disposed) {
         batch.dispose()
         return
       }
+      steps.progress(0.8, 150)
       sun.markDirty()
       // ---- life (track B): townsfolk and agents on the walk graph; `?life=0` turns it off ----
       let world: ReturnType<typeof hexWorld> | null = null
       if (ctx.query.get("life") !== "0") {
-        steps.step("Townsfolk")
+        go("Townsfolk", 0.92)
         // Life plans on the map itself: its pure parts built again here (~0.1 s), once the island is drawn.
         const island = hexIsland({ ...shape, seed, files })
         const zones = hexZones(island, { wild: nature.wild })
@@ -361,6 +388,7 @@ export const hexWorldScreen: Screen = {
         })
         await life.ready
       }
+      steps.progress(0.93, 150)
       // doors that open: the gates by day and for whoever comes, the buildings' doors for whoever goes in
       if (disposed) return
       doors = await createDoors(stage, {
@@ -375,6 +403,13 @@ export const hexWorldScreen: Screen = {
         doors.dispose()
         return
       }
+      // The light: shaders compiled and a calm run of frames drawn with all of it in, behind the cover.
+      go("Light", 0.99)
+      const ready = await settle(stage, {
+        until: torn,
+        onCalm: (share) => steps.progress(0.93 + 0.06 * share, 200),
+      })
+      if (disposed) return
       const made = doors
       if (window.guildhall?.ext)
         window.guildhall.ext.doors = {
@@ -405,6 +440,8 @@ export const hexWorldScreen: Screen = {
             { label: "Pieces placed", value: placed },
             { label: "First frame", value: first, unit: "ms" },
             { label: "Whole build", value: since(), unit: "ms" },
+            { label: "Shaders compiled", value: ready.compileMs, unit: "ms" },
+            { label: "Settled", value: ready.ms, unit: "ms" },
             ...(grown
               ? [
                   { label: "Nature grown", value: grown.grown },
@@ -426,7 +463,13 @@ export const hexWorldScreen: Screen = {
             .map(([label, value]) => ({ label, value })),
         },
       ])
-      steps.done()
+      logger.info("settled", ready)
+      if (cover) {
+        publishWorld("ready")
+        // the one reveal: the cover fades, and the island under it has been drawn calm for a while
+        await steps.done()
+        publishWorld("revealed")
+      } else void steps.done()
       logger.info("built", {
         tiles: m.stats.tiles,
         pieces: placed,
@@ -444,6 +487,8 @@ export const hexWorldScreen: Screen = {
     })
     return () => {
       disposed = true
+      tornDown()
+      publishWorld(null)
       job.dispose()
       cam.dispose()
       batch?.dispose()

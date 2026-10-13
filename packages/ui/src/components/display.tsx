@@ -146,12 +146,22 @@ export interface LoaderState {
   /** Lifted: the veil fades out. */
   out?: boolean
   error?: string
+  /**
+   * The bar's target, 0..1, and the ms it takes to get there: the bar is a CSS transition, so it keeps
+   * moving (compositor-side) while the main thread is busy building. Without it, the bar follows `at`.
+   */
+  progress?: number
+  eta?: number
+  /** The flavour line under the title, and the brand line at the foot. */
+  line?: string
+  pitch?: string
 }
 
-/** V1's boot card as a veil over a stage: crest, name, bar, and the steps with now / done marks. */
+/** V1's boot card as a veil over a stage: crest, name, a line of flavour, bar, and the steps with now / done marks. */
 export function Loader({ state }: { state: LoaderState }) {
-  const { title, steps, at, out, error } = state
-  const p = steps.length ? Math.min(1, (at + 0.35) / steps.length) : 0
+  const { title, steps, at, out, error, line, pitch } = state
+  const p = state.progress ?? (steps.length ? Math.min(1, (at + 0.35) / steps.length) : 0)
+  const eta = state.eta ?? 300
   return (
     <div className="ui-loader" data-state={out ? "out" : "in"} aria-hidden={out ? true : undefined}>
       <div className="ui-loader-inner" role="status" aria-live="polite">
@@ -163,9 +173,14 @@ export function Loader({ state }: { state: LoaderState }) {
         {error ? (
           <p className="ui-loader-error">{error}</p>
         ) : (
-          <span className="ui-loader-bar">
-            <i style={{ transform: `scaleX(${p})` }} />
-          </span>
+          <>
+            <p className="ui-loader-line" key={line ?? at}>
+              {line ?? steps[at] ?? ""}
+            </p>
+            <span className="ui-loader-bar">
+              <i style={{ transform: `scaleX(${p})`, transitionDuration: `${eta}ms` }} />
+            </span>
+          </>
         )}
         <ol className="ui-loader-steps">
           {steps.map((s, k) => (
@@ -174,6 +189,7 @@ export function Loader({ state }: { state: LoaderState }) {
             </li>
           ))}
         </ol>
+        {pitch && <p className="ui-loader-pitch">{pitch}</p>}
       </div>
     </div>
   )

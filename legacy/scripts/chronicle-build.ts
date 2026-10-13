@@ -1,6 +1,6 @@
 /**
  * The deep chronicle builder (scripts/chronicle.ts) as one self-contained file, for the chronicles
- * repo's Action (docs/adr/0019-chronicles-backend.md): it runs `bun builder/chronicle.js deep …` and
+ * repo's Action (docs/archive/v1/adr/0019-chronicles-backend.md): it runs `bun builder/chronicle.js deep …` and
  * `… index …` there, with no checkout of this repo and no install.
  *
  *   bun scripts/chronicle-build.ts [--out ../guildhall-chronicles/builder/chronicle.js]
@@ -21,6 +21,8 @@ const out = resolve(
 )
 
 const sha = (await Bun.$`git -C ${ROOT} rev-parse HEAD`.text()).trim()
+// This tree is the repo's legacy/ folder: the source URL in the banner must carry that prefix.
+const prefix = (await Bun.$`git -C ${ROOT} rev-parse --show-prefix`.text()).trim()
 const dirty = (
   await Bun.$`git -C ${ROOT} status --porcelain -- scripts/chronicle.ts packages/hall/src/world`.text()
 ).trim()
@@ -36,7 +38,7 @@ if (!code) throw new Error("the bundle came out empty")
 const banner = [
   "// @bun",
   "// Guildhall's deep chronicle builder, bundled by scripts/chronicle-build.ts. Do not edit: rebuild it.",
-  `// Source: https://github.com/Codestz/guildhall/blob/${sha}/scripts/chronicle.ts${dirty ? " (plus uncommitted changes)" : ""}`,
+  `// Source: https://github.com/Codestz/guildhall/blob/${sha}/${prefix}scripts/chronicle.ts${dirty ? " (plus uncommitted changes)" : ""}`,
   `// Built: ${new Date().toISOString()}`,
   "",
 ].join("\n")

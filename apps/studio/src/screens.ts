@@ -7,6 +7,7 @@ import { hexmap } from "./hexmap/index.ts"
 import { hexScale } from "./hexscale/index.ts"
 import { hexTiles } from "./hextiles/index.ts"
 import { home } from "./home/index.tsx"
+import { hudLab } from "./hudlab/index.tsx"
 import { npc } from "./npcs/index.tsx"
 import { palette } from "./palette/index.ts"
 import { placeOf } from "./shell/directory.ts"
@@ -42,6 +43,7 @@ export const SCREENS: readonly Screen[] = [
   town,
   hexmap,
   hexScale,
+  hudLab,
 ]
 
 export const DEFAULT_SCREEN = "home"

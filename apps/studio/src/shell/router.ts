@@ -28,6 +28,7 @@ export const ROUTES: readonly Route[] = [
   { screen: "hexmap", path: "lab/hexmap" },
   { screen: "hexscale", path: "lab/hexscale" },
   { screen: "hextiles", path: "lab/hextiles" },
+  { screen: "hudlab", path: "lab/hud" },
 ]
 
 /**

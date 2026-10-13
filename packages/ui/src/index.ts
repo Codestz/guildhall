@@ -25,6 +25,7 @@ export {
   StatRows,
 } from "./components/display.tsx"
 export * as icons from "./components/icons.tsx"
+export * from "./hud/index.ts"
 export { PerfHud } from "./PerfHud.tsx"
 export { type PerfRow, perfRows } from "./perfRows.ts"
 export { type PlateSpec, placePlate, plate } from "./plate.ts"

@@ -58,6 +58,13 @@ const ALL_GROUPS: readonly ToolGroup[] = [
           "The hex world's proportions side by side: tile, buildings, trees and characters at three scales.",
         dev: true,
       },
+      {
+        id: "hudlab",
+        name: "HUD lab",
+        purpose:
+          "Every HUD panel (roster, chronicle, dossier, pleas, settings, timeline) in V1's layout, on fixtures.",
+        dev: true,
+      },
     ],
   },
   {

@@ -6,6 +6,7 @@
  * panel at a time, H cycles the mode; on a phone every panel is the one bottom sheet.
  */
 import type { CameraPose } from "@guildhall/core"
+import { type QualityPick, qualityDpr, qualityOf } from "@guildhall/render"
 import type { Chronicle, RepoLegend, RepoRecap } from "@guildhall/sim"
 import {
   BrandCard,
@@ -117,8 +118,29 @@ export function poseFor(
   }
 }
 
-/** The DPR each quality tier pins (Auto: the governor's own, from where the stage started). */
-const QUALITY: Record<string, number | null> = { auto: null, low: 1, medium: 1.5, high: 2 }
+/** Where the hall keeps the viewer's quality pick (Settings, Quality) between visits. */
+const QUALITY_KEY = "gh.hall.quality"
+
+/** The remembered quality pick; Auto when there is none (or storage is blocked). */
+function storedQuality(): QualityPick {
+  try {
+    return qualityOf(localStorage.getItem(QUALITY_KEY))
+  } catch {
+    return "auto"
+  }
+}
+
+function storeQuality(pick: QualityPick): void {
+  try {
+    if (pick === "auto") localStorage.removeItem(QUALITY_KEY)
+    else localStorage.setItem(QUALITY_KEY, pick)
+  } catch {}
+}
+
+/** Puts a pick in force: a tier holds the DPR (the governor stands aside); Auto hands it back. */
+function applyQuality(stage: HudParts["stage"], pick: QualityPick): void {
+  stage.pickDpr(qualityDpr(pick, devicePixelRatio || 1))
+}
 
 function RailButton({
   id,
@@ -218,7 +240,7 @@ function Settings({
   const head = useRef<HTMLHeadingElement>(null)
   const [plates, setPlates] = useState(() => parts.labels?.shown() ?? false)
   const [hour, setHour] = useState(() => parts.clock.get())
-  const [quality, setQuality] = useState(() => sessionQuality)
+  const [quality, setQuality] = useState(storedQuality)
   useEffect(() => head.current?.focus(), [])
   return (
     <aside className="ui-panel hud-settings" role="dialog" aria-labelledby="hall-settings-h">
@@ -282,16 +304,16 @@ function Settings({
               { value: "high", label: "High" },
             ]}
             onChange={(v) => {
-              sessionQuality = v
-              setQuality(v)
-              const dpr = QUALITY[v] ?? startDpr
-              if (dpr) parts.stage.setDpr(Math.min(dpr, devicePixelRatio || 1) || dpr)
+              const pick = qualityOf(v)
+              setQuality(pick)
+              storeQuality(pick)
+              applyQuality(parts.stage, pick)
             }}
           />
           <p className="ui-hint">
             {quality === "auto"
               ? "Trades sharpness for a smooth frame rate as it goes."
-              : "Pinned for this visit. Low is lightest on a phone or an old laptop."}
+              : "Kept for your next visits. Low is lightest on a phone or an old laptop."}
           </p>
         </section>
         <section className="hud-set-section">
@@ -321,9 +343,6 @@ const KEYS: readonly (readonly [string, string])[] = [
   ["Esc", "Fold the open panel"],
 ]
 
-let sessionQuality = "auto"
-let startDpr: number | null = null
-
 export function HallHud(props: HallHudProps) {
   const { hud, parts, slug, chronicle, legend, recap } = props
   const state = useHud(hud)
@@ -332,7 +351,11 @@ export function HallHud(props: HallHudProps) {
   const [brandOpen, setBrandOpen] = useState(false)
   const [frame, setFrame] = useState<string | undefined>()
   const sheetRef = useRef<HTMLDivElement>(null)
-  startDpr ??= parts.stage.stats().dpr
+  // the remembered quality pick, in force from the start (Auto leaves the governor alone)
+  useEffect(() => {
+    const pick = storedQuality()
+    if (pick !== "auto") applyQuality(parts.stage, pick)
+  }, [parts.stage])
   // the session, if the hall has one: its 10 Hz snapshot, and the hero opened in the sheet
   const live = props.session
   const snap = useSyncExternalStore(

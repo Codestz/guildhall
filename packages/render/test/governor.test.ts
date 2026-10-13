@@ -2,10 +2,14 @@ import { describe, expect, test } from "bun:test"
 import {
   type GovernorState,
   governorStep,
+  governWindow,
   initialGovernor,
   MAX_UP_WINDOWS,
   nextDpr,
   parseDprPin,
+  QUALITY_DPR,
+  qualityDpr,
+  qualityOf,
   UP_WINDOWS,
 } from "../src/governor.ts"
 
@@ -133,4 +137,56 @@ describe("parseDprPin", () => {
       expect(parseDprPin(search)).toBeUndefined()
     },
   )
+})
+
+describe("the viewer's quality pick", () => {
+  test("a pick holds the DPR however far over budget the frames run (the governor never overrides it)", () => {
+    let state = initialGovernor(2)
+    for (let i = 0; i < 30; i++) {
+      state = governWindow(state, OVER * 3, RANGE, BUDGET, 2)
+      expect(state.dpr).toBe(2)
+      expect(state.history).toEqual([])
+    }
+    // nor does it raise a low pick when the frames are easy
+    let low = initialGovernor(1)
+    for (let i = 0; i < 90; i++) low = governWindow(low, EASY, RANGE, BUDGET, 1)
+    expect(low.dpr).toBe(1)
+  })
+
+  test("Auto (no pick) is the governor's own step, and after a pick it starts afresh", () => {
+    const fed = [OVER, OVER, BAND, OVER, OVER]
+    let auto = initialGovernor(2)
+    let plain = initialGovernor(2)
+    for (const p95 of fed) {
+      auto = governWindow(auto, p95, RANGE, BUDGET, null)
+      plain = governorStep(plain, p95, RANGE, BUDGET)
+    }
+    expect(auto).toEqual(plain)
+    // over budget while pinned: none of it counts once Auto is back
+    let state = initialGovernor(2)
+    state = governWindow(state, OVER, RANGE, BUDGET, 2)
+    state = governWindow(state, OVER, RANGE, BUDGET, null)
+    expect(state.dpr).toBe(2)
+    state = governWindow(state, OVER, RANGE, BUDGET, null)
+    expect(state.dpr).toBe(1.75)
+  })
+
+  test("a pick keeps how long a raise must wait (a pinned stretch does not reset the anti-oscillation)", () => {
+    const waited: GovernorState = { ...initialGovernor(2), upWindows: 20 }
+    expect(governWindow(waited, EASY, RANGE, BUDGET, 1.5).upWindows).toBe(20)
+  })
+
+  test("the tiers' DPRs, never sharper than the screen; Auto pins none; unknown or missing reads Auto", () => {
+    expect(qualityDpr("auto", 2)).toBeNull()
+    expect(qualityDpr("low", 2)).toBe(1)
+    expect(qualityDpr("medium", 2)).toBe(1.5)
+    expect(qualityDpr("high", 2)).toBe(2)
+    expect(qualityDpr("high", 1)).toBe(1)
+    expect(qualityDpr("medium", 0)).toBe(1)
+    expect(Object.keys(QUALITY_DPR)).toEqual(["auto", "low", "medium", "high"])
+    expect(qualityOf("high")).toBe("high")
+    expect(qualityOf(null)).toBe("auto")
+    expect(qualityOf("ultra")).toBe("auto")
+    expect(qualityOf("toString")).toBe("auto")
+  })
 })

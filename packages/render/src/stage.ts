@@ -28,6 +28,11 @@ export interface Stage {
   sample(ms: number): Promise<FrameStats>
   /** Draws at this device pixel ratio from the next frame on (the governor's lever). */
   setDpr(dpr: number): void
+  /**
+   * The viewer's quality pick: holds the DPR at `dpr`, the governor standing aside (it never overrides
+   * an explicit pick); null (Auto) hands the DPR back to the governor, from where the stage started.
+   */
+  pickDpr(dpr: number | null): void
   /** Puts the camera at a pose at once (the rig holds it inside its world, when it has one). */
   setCamera(p: CameraPose): void
   /** The pose being drawn (in free flight: the eye and the point it looks at). */
@@ -214,6 +219,7 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
       dpr = next
       renderer.setPixelRatio(dpr)
     },
+    pickDpr: (next) => governor.pick(next),
     setCamera: (p) => rig.set(p),
     getCamera: () => rig.get(),
     rig,

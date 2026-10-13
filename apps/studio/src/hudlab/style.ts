@@ -13,6 +13,7 @@ export const LAB_CSS = /* css */ `
 .lab-left .lab-roster { flex: 0 1 auto; }
 .lab-pleas { top: var(--gut); left: 50%; translate: -50% 0; width: min(460px, calc(100% - 2 * 340px)); }
 .lab-tools { top: var(--gut); right: var(--gut); display: flex; gap: 8px; z-index: 3; }
+.lab-ffwd { top: calc(var(--gut) + 4px); left: 50%; translate: -50% 0; z-index: 2; }
 .lab-right { top: calc(var(--gut) + var(--bar) + 10px); right: var(--gut); bottom: var(--gut); width: 372px; display: flex; flex-direction: column; align-items: stretch; min-height: 0; }
 .lab-right > * { flex: 0 1 auto; }
 .lab-bottom-left { left: var(--gut); bottom: var(--gut); max-height: 38%; width: 400px; display: flex; flex-direction: column; justify-content: flex-end; min-height: 0; }
@@ -34,7 +35,34 @@ export const LAB_CSS = /* css */ `
 .lab-place { top: calc(var(--gut) + var(--bar) + 10px); right: var(--gut); bottom: var(--gut); width: 372px; display: flex; flex-direction: column; z-index: 3; }
 .lab-place[data-fold="true"] { bottom: auto; width: auto; align-items: flex-end; }
 
+/* the kit board (KitLab.tsx): each piece alone, cards over the island still */
+.kit { position: absolute; inset: 0; overflow: auto; padding: 20px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 16px; background: rgba(12, 9, 7, 0.55); }
+.kit-card { position: relative; flex: 1 1 420px; min-width: 0; padding: 14px 16px 16px; border: 1px solid var(--hair); border-radius: 8px; background: rgba(20, 15, 11, 0.6); }
+.kit-card[data-wide="true"] { flex-basis: 100%; }
+.kit-card h2 { margin: 0 0 4px; font: 400 19px/1.2 var(--display); letter-spacing: 0.06em; color: var(--brass); }
+.kit-note { margin: 0 0 12px; max-width: 760px; font-size: 13px; color: var(--muted); }
+.kit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
+.kit-row figure { margin: 0; display: grid; justify-items: center; gap: 6px; text-align: center; font-size: 12px; color: var(--muted); }
+.kit-grid { display: grid; grid-template-columns: 80px repeat(calc(var(--cols) - 1), max-content); align-items: center; justify-items: center; gap: 8px 14px; margin-top: 16px; }
+.kit-grid b { font: 400 12px var(--display); letter-spacing: 0.08em; color: var(--faint); justify-self: start; }
+.kit-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.kit-bottom { display: flex; align-items: flex-end; min-height: 150px; }
+.kit-captions { display: grid; gap: 14px; justify-items: center; }
+.kit-caption { width: min(100%, 576px); display: flex; justify-content: center; }
+.kit-caption .st-captions { width: 100%; }
+.kit-corner { position: relative; height: 330px; }
+.kit-corner .st-chapter-chip { position: absolute; right: 0; bottom: 0; }
+.kit-tl { position: relative; display: flex; justify-content: center; height: 64px; margin-top: 10px; }
+.kit-tl .hud-timeline { width: min(680px, 100%); }
+.kit-settings { display: flex; height: 760px; }
+.kit-settings .hud-settings { animation: none; }
+
 @media (max-width: 720px) {
+  .kit { padding: 10px; gap: 10px; }
+  .kit-card { flex-basis: 100%; padding: 12px; }
+  .kit-row { gap: 10px; }
+  .kit-grid { grid-template-columns: 56px repeat(calc(var(--cols) - 1), max-content); gap: 6px 6px; }
+  .kit-settings { height: 640px; }
   .lab-story-rail { top: calc(var(--gut) + var(--bar) + 8px); right: var(--gut); flex-direction: column; }
   .lab-captions { left: var(--gut); right: var(--gut); width: auto; translate: none; bottom: calc(var(--gut) + 116px); }
   /* one voice at the bottom (V1): with captions on, the toasts fold to their button */

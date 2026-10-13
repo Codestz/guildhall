@@ -8,9 +8,11 @@ import {
   BrandCard,
   ChronicleFeed,
   Dossier,
+  FastForwardChip,
   Glyphs,
   type HeroView,
   type HudMode,
+  PartyTabs,
   Pleas,
   pickToasts,
   Roster,
@@ -18,12 +20,14 @@ import {
   Segmented,
   SettingsPanel,
   type SettingsValues,
+  ShowHudPill,
   Timeline,
   type TimeScale,
   Toasts,
 } from "@guildhall/ui"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { type DossierFixture, fixture, HISTORY, HISTORY_MARKERS, type LabState, STATES } from "./fixtures.ts"
+import { usePortraits } from "./portraits.ts"
 import { StoryLab, type StoryOptions } from "./StoryLab.tsx"
 
 const MODES: readonly HudMode[] = ["detailed", "minimal", "hidden"]
@@ -40,6 +44,8 @@ export interface LabOptions {
   by: "party" | "family"
   /** Hold the toasts (no fading) and the clock: what a shot needs. */
   still: boolean
+  /** The replay's fast-forward multiple (`ffwd=3`): the chip top centre while it is above 1. */
+  ffwd: number
   /** On a phone, open the roster or the chronicle as a sheet. */
   sheet: "roster" | "chronicle" | null
   /** The story layer (U3): the rail, the overlays and what the query opens. */
@@ -95,7 +101,12 @@ export function HudLab(opts: LabOptions) {
     qualityNow: "high",
     hud: opts.hud,
     captions: false,
+    directorStyle: "cinematic",
+    time: "story",
+    weather: "auto",
   })
+  const [following, setFollowing] = useState<string | null>(null)
+  const { portraitOf } = usePortraits()
   const gear = useRef<HTMLButtonElement>(null)
   const seen = useRef(new Map<string, number>())
   const [, tick] = useState(0)
@@ -206,7 +217,9 @@ export function HudLab(opts: LabOptions) {
               heroes={fx.heroes}
               parties={fx.parties}
               by={opts.by}
+              following={following}
               selected={selected}
+              portraitOf={portraitOf}
               onCamera={fx.heroes[0]?.id ?? null}
               open
               compact
@@ -215,17 +228,27 @@ export function HudLab(opts: LabOptions) {
               className="lab-roster"
             />
           ) : (
-            <RosterBadges
-              heroes={fx.heroes}
-              parties={fx.parties}
-              selected={selected}
-              onPick={pick}
-              onExpand={() => {
-                if (phone) return setPhoneSheet("roster")
-                setRoster(true)
-                if (!detailed) setMode("detailed")
-              }}
-            />
+            <>
+              <PartyTabs
+                parties={fx.parties}
+                heroes={fx.heroes}
+                following={following}
+                onFollow={setFollowing}
+                compact={phone}
+              />
+              <RosterBadges
+                heroes={fx.heroes}
+                parties={fx.parties}
+                following={following}
+                selected={selected}
+                onPick={pick}
+                onExpand={() => {
+                  if (phone) return setPhoneSheet("roster")
+                  setRoster(true)
+                  if (!detailed) setMode("detailed")
+                }}
+              />
+            </>
           )}
         </div>
       )}
@@ -236,23 +259,27 @@ export function HudLab(opts: LabOptions) {
         </div>
       )}
 
+      {opts.ffwd > 1 && (
+        <div className="lab-ffwd">
+          <FastForwardChip rate={opts.ffwd * values.pace} skip={opts.ffwd} />
+        </div>
+      )}
+
       <div className="lab-tools">
-        <button
-          type="button"
-          className="ui-icon-btn"
-          data-plaque=""
-          onClick={cycle}
-          aria-label={`HUD: ${shown}. Switch (H)`}
-          title={`HUD: ${shown} · H`}
-        >
-          {shown === "hidden" ? (
-            <Glyphs.hidden size={18} />
-          ) : shown === "minimal" ? (
-            <Glyphs.minimal size={18} />
-          ) : (
-            <Glyphs.detailed size={18} />
-          )}
-        </button>
+        {hidden ? (
+          <ShowHudPill onShow={cycle} pleas={pleas} />
+        ) : (
+          <button
+            type="button"
+            className="ui-icon-btn"
+            data-plaque=""
+            onClick={cycle}
+            aria-label={`HUD: ${shown}. Switch (H)`}
+            title={`HUD: ${shown} · H`}
+          >
+            {shown === "minimal" ? <Glyphs.minimal size={18} /> : <Glyphs.detailed size={18} />}
+          </button>
+        )}
         {!hidden && (
           <button
             ref={gear}
@@ -303,6 +330,9 @@ export function HudLab(opts: LabOptions) {
                 if (patch.hud) setMode(patch.hud)
               }}
               onClose={closeSettings}
+              onRepo={() => undefined}
+              weatherNow="Cloudy · 14°C"
+              hourNow={14.1}
               dev={
                 opts.dev ? (
                   <Segmented
@@ -329,6 +359,7 @@ export function HudLab(opts: LabOptions) {
                 model={story.model}
                 files={story.files}
                 transcript={story.transcript}
+                portrait={portraitOf(hero)}
                 onClose={() => setSelected(null)}
               />
             )

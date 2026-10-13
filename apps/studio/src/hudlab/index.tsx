@@ -5,6 +5,7 @@ import type { Screen } from "../screens.ts"
 import { replaceQuery } from "../shell/router.ts"
 import { type LabState, STATES } from "./fixtures.ts"
 import { HudLab, type LabOptions } from "./HudLab.tsx"
+import { KIT_SECTIONS, KitLab } from "./KitLab.tsx"
 import { REPO_NAMES, type RepoName, TALES, type TaleName } from "./story.ts"
 
 type StoryOptions_ = LabOptions["story"]
@@ -71,21 +72,29 @@ export const hudLab: Screen = {
       next.set("state", s)
       replaceQuery(next)
     }
+    const kit = KIT_SECTIONS.find((s) => s === q.get("kit")) ?? (q.get("kit") === "all" ? "all" : null)
     const render = () =>
       root.render(
-        <HudLab
-          state={state}
-          hud={hud as HudMode}
-          pick={pickOf(q)}
-          settings={q.get("settings") === "1"}
-          dev={q.get("dev") === "1"}
-          scale={q.get("scale") === "history" ? "history" : "session"}
-          by={q.get("by") === "family" ? "family" : "party"}
-          still={q.get("still") === "1"}
-          sheet={q.get("sheet") === "roster" ? "roster" : q.get("sheet") === "chronicle" ? "chronicle" : null}
-          story={storyOf(q)}
-          onState={onState}
-        />,
+        kit ? (
+          <KitLab section={kit} phone={matchMedia("(max-width: 720px)").matches} />
+        ) : (
+          <HudLab
+            state={state}
+            hud={hud as HudMode}
+            pick={pickOf(q)}
+            settings={q.get("settings") === "1"}
+            dev={q.get("dev") === "1"}
+            scale={q.get("scale") === "history" ? "history" : "session"}
+            by={q.get("by") === "family" ? "family" : "party"}
+            still={q.get("still") === "1"}
+            ffwd={Number(q.get("ffwd")) || 1}
+            sheet={
+              q.get("sheet") === "roster" ? "roster" : q.get("sheet") === "chronicle" ? "chronicle" : null
+            }
+            story={storyOf(q)}
+            onState={onState}
+          />
+        ),
       )
     // the faces first, so shots never catch the fallback
     ctx.load(ui.ready.then(() => flushSync(render))).catch(() => undefined)

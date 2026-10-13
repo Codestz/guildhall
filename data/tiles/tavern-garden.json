@@ -307,8 +307,14 @@
       "clip": "Sit_Chair_Idle",
       "facing": 1.571,
       "hours": [
-        17,
-        1
+        [
+          11.5,
+          14
+        ],
+        [
+          17,
+          1
+        ]
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
@@ -319,8 +325,14 @@
       "clip": "Sit_Chair_Idle",
       "facing": -1.571,
       "hours": [
-        17,
-        1
+        [
+          11.5,
+          14
+        ],
+        [
+          17,
+          1
+        ]
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
@@ -331,8 +343,14 @@
       "clip": "Sit_Chair_Idle",
       "facing": 0,
       "hours": [
-        17,
-        1
+        [
+          11.5,
+          14
+        ],
+        [
+          17,
+          1
+        ]
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
@@ -343,8 +361,14 @@
       "clip": "Sit_Chair_Idle",
       "facing": 3.142,
       "hours": [
-        17,
-        1
+        [
+          11.5,
+          14
+        ],
+        [
+          17,
+          1
+        ]
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
@@ -355,8 +379,14 @@
       "clip": "Sit_Chair_Idle",
       "facing": 1.571,
       "hours": [
-        17,
-        1
+        [
+          11.5,
+          14
+        ],
+        [
+          17,
+          1
+        ]
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
@@ -367,8 +397,14 @@
       "clip": "Sit_Chair_Idle",
       "facing": -1.571,
       "hours": [
-        17,
-        1
+        [
+          11.5,
+          14
+        ],
+        [
+          17,
+          1
+        ]
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
@@ -379,8 +415,14 @@
       "clip": "Sit_Chair_Idle",
       "facing": 0,
       "hours": [
-        17,
-        1
+        [
+          11.5,
+          14
+        ],
+        [
+          17,
+          1
+        ]
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
@@ -391,8 +433,14 @@
       "clip": "Sit_Chair_Idle",
       "facing": 3.142,
       "hours": [
-        17,
-        1
+        [
+          11.5,
+          14
+        ],
+        [
+          17,
+          1
+        ]
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
@@ -403,8 +451,14 @@
       "clip": "Sit_Chair_Idle",
       "facing": 1.571,
       "hours": [
-        17,
-        1
+        [
+          11.5,
+          14
+        ],
+        [
+          17,
+          1
+        ]
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
@@ -415,8 +469,14 @@
       "clip": "Sit_Chair_Idle",
       "facing": -1.571,
       "hours": [
-        17,
-        1
+        [
+          11.5,
+          14
+        ],
+        [
+          17,
+          1
+        ]
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
@@ -427,8 +487,14 @@
       "clip": "Sit_Chair_Idle",
       "facing": 0,
       "hours": [
-        17,
-        1
+        [
+          11.5,
+          14
+        ],
+        [
+          17,
+          1
+        ]
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
@@ -439,8 +505,14 @@
       "clip": "Sit_Chair_Idle",
       "facing": 3.142,
       "hours": [
-        17,
-        1
+        [
+          11.5,
+          14
+        ],
+        [
+          17,
+          1
+        ]
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
@@ -451,8 +523,14 @@
       "clip": "Idle_B",
       "facing": 2.2,
       "hours": [
-        17,
-        1
+        [
+          11.5,
+          14
+        ],
+        [
+          17,
+          1
+        ]
       ],
       "kind": "talk",
       "prop": "kaykit-adventurers/mug-full",
@@ -463,8 +541,14 @@
       "clip": "Idle_B",
       "facing": -0.942,
       "hours": [
-        17,
-        1
+        [
+          11.5,
+          14
+        ],
+        [
+          17,
+          1
+        ]
       ],
       "kind": "talk",
       "prop": "kaykit-adventurers/mug-full",
@@ -473,13 +557,13 @@
     },
     {
       "clip": "Interact",
-      "facing": 1.997,
+      "facing": 1.9,
       "kind": "work",
       "roles": [
         "tavern-keeper"
       ],
-      "x": 1.6,
-      "z": -0.1
+      "x": 1.5,
+      "z": 0.3
     }
   ]
 }

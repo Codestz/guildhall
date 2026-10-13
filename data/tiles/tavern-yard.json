@@ -7,18 +7,18 @@
     },
     {
       "r": 0.95,
-      "x": -1.15,
-      "z": 1.3
+      "x": -1.3,
+      "z": 1.6
     },
     {
       "r": 0.602,
-      "x": -1.15,
-      "z": 0.6
+      "x": -1.3,
+      "z": 0.9
     },
     {
       "r": 0.602,
-      "x": -1.15,
-      "z": 2
+      "x": -1.3,
+      "z": 2.3
     },
     {
       "r": 0.331,
@@ -47,8 +47,8 @@
     },
     {
       "r": 0.482,
-      "x": -2.126,
-      "z": 0.663
+      "x": -2.35,
+      "z": 0.05
     }
   ],
   "ground": "grass",
@@ -67,22 +67,22 @@
       "piece": "kaykit-dungeon/table-long",
       "rot": 1.571,
       "scale": 0.45,
-      "x": -1.15,
-      "z": 1.3
+      "x": -1.3,
+      "z": 1.6
     },
     {
       "piece": "kenney-graveyard/bench",
       "rot": 0,
       "scale": 0.62,
-      "x": -1.15,
-      "z": 0.6
+      "x": -1.3,
+      "z": 0.9
     },
     {
       "piece": "kenney-graveyard/bench",
       "rot": 3.142,
       "scale": 0.62,
-      "x": -1.15,
-      "z": 2
+      "x": -1.3,
+      "z": 2.3
     },
     {
       "piece": "kenney-pirate/barrel",
@@ -130,8 +130,8 @@
       "piece": "kaykit-halloween/post-lantern",
       "rot": 0,
       "scale": 0.55,
-      "x": -2.126,
-      "z": 0.663
+      "x": -2.35,
+      "z": 0.05
     }
   ],
   "spots": [
@@ -144,8 +144,8 @@
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
-      "x": -1.4,
-      "z": 0.66
+      "x": -1.55,
+      "z": 0.96
     },
     {
       "clip": "Sit_Chair_Idle",
@@ -156,8 +156,8 @@
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
-      "x": -0.9,
-      "z": 0.66
+      "x": -1.05,
+      "z": 0.96
     },
     {
       "clip": "Sit_Chair_Idle",
@@ -168,8 +168,8 @@
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
-      "x": -0.9,
-      "z": 1.94
+      "x": -1.05,
+      "z": 2.24
     },
     {
       "clip": "Sit_Chair_Idle",
@@ -180,8 +180,8 @@
       ],
       "kind": "sit",
       "prop": "kaykit-adventurers/mug-full",
-      "x": -1.4,
-      "z": 1.94
+      "x": -1.55,
+      "z": 2.24
     },
     {
       "clip": "Sit_Chair_Idle",

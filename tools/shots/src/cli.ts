@@ -14,6 +14,7 @@ import type { CameraPose, FrameStats } from "@guildhall/core"
 import { openPage, waitReady } from "./app.ts"
 import { parseArgs, report, type ShotOptions, USAGE } from "./args.ts"
 import { launchChrome } from "./chrome.ts"
+import { runPrefabs } from "./prefabs.ts"
 import { type Server, serveStudio } from "./server.ts"
 import { runSet } from "./set.ts"
 
@@ -56,6 +57,8 @@ async function shoot(options: ShotOptions): Promise<string[]> {
 
 // `bun shots set <name>`: a regression set (set.ts).
 if (process.argv[2] === "set") process.exit(await runSet(process.argv.slice(3)))
+// `bun shots prefabs`: every tile prefab alone, composed into review sheets (prefabs.ts).
+if (process.argv[2] === "prefabs") process.exit(await runPrefabs(process.argv.slice(3)))
 
 let options: ShotOptions
 try {

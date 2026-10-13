@@ -30,6 +30,11 @@ export interface TilePiece {
   scale: number
   /** Metres above (or under) the tile's top: a dock's posts stand in the water, a boat floats. */
   y?: number
+  /**
+   * A lean before its turn: radians about the piece's own x, then its own z (a bow stood on end and
+   * leaned in its rack, a plank against a wall). None: as the piece stands.
+   */
+  tilt?: [number, number]
   /** A re-tint of this piece (palette swatch id → swatch id). */
   swatchMap?: Record<number, number>
   /** Foliage: takes the tile's tone (one of its prefab's `tones`, picked per tile). */
@@ -46,6 +51,8 @@ export interface PlacedPiece {
   z: number
   rot: number
   scale: number
+  /** As TilePiece's `tilt`. */
+  tilt?: [number, number]
   swatchMap?: Record<number, number>
 }
 
@@ -115,9 +122,25 @@ export interface TileSpot {
   roles?: string[]
   /** Ground height offset (a bench seat, a dock deck), metres. */
   y?: number
-  /** When the spot is used, day hours [from, to) (to < from wraps past midnight); any time when left out. */
-  hours?: [number, number]
+  /**
+   * When the spot is used, day hours [from, to) (to < from wraps past midnight), or several such windows
+   * (a canteen's seats at lunch and in the evening); any time when left out.
+   */
+  hours?: SpotHours
 }
+
+/** One opening window [from, to) in day hours, or a list of them. */
+export type SpotHours = [number, number] | [number, number][]
+
+/** A spot's opening windows as a list (none: open any time). */
+export function spotWindows(hours: SpotHours | undefined): [number, number][] {
+  if (!hours) return []
+  return typeof hours[0] === "number" ? [hours as [number, number]] : (hours as [number, number][])
+}
+
+/** Whether a spot's windows include an evening one (from five on): a drinking place's seats. */
+export const opensEvening = (hours: SpotHours | undefined): boolean =>
+  spotWindows(hours).some(([from]) => from >= 16)
 
 /** A disc nobody walks through (a cart, a stall, a well), tile space. */
 export interface TileBlocker {
@@ -1170,6 +1193,7 @@ export function placeTile(
       rot: q.rot + rot,
       scale: q.scale,
     }
+    if (q.tilt) placed.tilt = q.tilt
     if (Object.keys(map).length) placed.swatchMap = map
     out.push(placed)
   })

@@ -155,6 +155,9 @@ const PLACE_SCENES: Partial<Record<string, string[]>> = {
   camp: ["archery-range"],
   mine: ["smithy-works"],
 }
+/** Drinking places: no two stand within DRINK_APART steps of each other (the next kind is picked instead). */
+const DRINKS = new Set(["tavern", "tavern-yard", "tavern-garden"])
+const DRINK_APART = 2
 /** The prefab a tile a neighbour's scene covers takes: nothing of its own, no spots, no blockers. */
 const SCENE_PART = "scene-part"
 /** What a scene may spread over: its own place's open ground, or the open country. */
@@ -230,6 +233,13 @@ export function hexWorld(
     const u = useOf(z, i)
     return u === "road" || u === "bridge" || u === "square"
   }
+  /** Whether a building tile fronts a street it has a door onto (walk.ts: a step up or down at most). */
+  const onStreet = (i: number): boolean => {
+    const nb = g.neighbours(i)
+    for (let d = 0; d < 6; d++)
+      if (nb[d]! >= 0 && roadLike(nb[d]!)) return Math.abs(h.level[nb[d]!]! - h.level[i]!) <= 1
+    return false
+  }
   /** The side (0–5) toward the nearest street, else toward the place's heart, else south. */
   const facing = (i: number): number => {
     const nb = g.neighbours(i)
@@ -280,15 +290,38 @@ export function hexWorld(
   }
   const zoneAt = (i: number) => (z.zoneOf[i] ? z.zones[z.zoneOf[i]! - 1] : undefined)
   /** What a building tile builds: by district in the town, by the place's kind elsewhere. */
+  // ---- drinking places (a tavern, a canteen with its garden) keep DRINK_APART steps from each other:
+  // every tile one stands on, a scene's footprint included ----
+  const drinks: number[] = []
+  const nearDrink = (tiles: readonly number[], self = -1) =>
+    drinks.some((d) => d !== self && tiles.some((t) => steps(t, d) <= DRINK_APART))
+  const built = new Map<number, string>()
   const buildOf = (i: number): string => {
+    const have = built.get(i)
+    if (have) return have
     const zone = zoneAt(i)
-    const pick = (list: string[]) =>
-      list[Math.floor(hash2(seed + 5, g.q[i]!, g.r[i]!) * list.length) % list.length]!
-    if (zone?.kind !== "town") return pick(BUILDS[zone?.kind ?? "town"] ?? BUILDS.town!)
     const byWater = [...g.neighbours(i)].some(
       (j) => j >= 0 && (kindOf(h, j) === "river" || kindOf(h, j) === "lake"),
     )
-    return pick(steps(i, zone.tile) <= 3 ? TOWN_HEART : byWater ? TOWN_WATER : TOWN_EDGE)
+    const list =
+      zone?.kind !== "town"
+        ? (BUILDS[zone?.kind ?? "town"] ?? BUILDS.town!)
+        : steps(i, zone.tile) <= 3
+          ? TOWN_HEART
+          : byWater
+            ? TOWN_WATER
+            : TOWN_EDGE
+    const at = Math.floor(hash2(seed + 5, g.q[i]!, g.r[i]!) * list.length) % list.length
+    let kind = list[at]!
+    // a second drinking place too near the first: the next kind on the list that is not one
+    if (DRINKS.has(kind) && nearDrink([i]))
+      for (let k = 1; k < list.length && DRINKS.has(kind); k++) kind = list[(at + k) % list.length]!
+    if (DRINKS.has(kind)) {
+      if (nearDrink([i])) kind = "house"
+      else drinks.push(i)
+    }
+    built.set(i, kind)
+    return kind
   }
   // ---- scenes bigger than a tile: each claims the neighbours across its footprint's sides, when they
   // are free open ground on its own level (never a road, water or another building), else it stays
@@ -302,29 +335,35 @@ export function hexWorld(
       ? OPEN_COUNTRY.has(u)
       : z.zoneOf[j] === z.zoneOf[i] && OPEN_IN_PLACE.has(u) && zoneAt(j)!.kind !== "castle"
   }
-  /** Puts `scene` on building tile i if its footprint fits there. */
-  const claim = (i: number, scene: string): boolean => {
+  /** Puts `scene` on building tile i if its footprint fits there (with `street`, only on one fronting a street). */
+  const claim = (i: number, scene: string, street = false): boolean => {
     const p = tilePrefab(scene)
     if (!p?.footprint?.length || !tilePrefab(SCENE_PART) || scenes.has(i) || claimedBy.has(i)) return false
     const nb = g.neighbours(i)
+    if (street && !onStreet(i)) return false
     // the side the building turns to (walk.ts puts its door there too)
     const door = facing(i)
     const cover = p.footprint.map((k) => nb[worldSide(k, door)]!)
     if (!cover.every((j) => claimable(i, j))) return false
+    const drink = DRINKS.has(scene)
+    if (drink && nearDrink([i, ...cover], i)) return false
     scenes.set(i, scene)
     for (const j of cover) claimedBy.set(j, i)
+    if (drink) drinks.push(i, ...cover)
     return true
   }
   const buildings = (zi: number) =>
     z.zones[zi]!.tiles.filter((i) => useOf(z, i) === "building").sort(
       (a, b) => steps(a, z.zones[zi]!.tile) - steps(b, z.zones[zi]!.tile) || a - b,
     )
-  // each place's own scenes first, on the building nearest its heart they fit beside
+  // each place's own scenes first, on the building nearest its heart they fit beside: one with a door
+  // onto a street people come in by first, else one a lane reaches (life.ts workTiles)
   for (const [zi, zone] of z.zones.entries())
-    for (const scene of PLACE_SCENES[zone.kind] ?? []) buildings(zi).some((i) => claim(i, scene))
+    for (const scene of PLACE_SCENES[zone.kind] ?? [])
+      buildings(zi).some((i) => claim(i, scene, true)) || buildings(zi).some((i) => claim(i, scene))
   // then every other tavern, smithy and archery range the tiles picked, where there is room
   for (let i = 0; i < g.size; i++) {
-    if (useOf(z, i) !== "building") continue
+    if (useOf(z, i) !== "building" || scenes.has(i)) continue
     const scene = SCENES[buildOf(i)]
     if (scene) claim(i, scene)
   }

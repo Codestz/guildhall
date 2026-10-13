@@ -190,7 +190,8 @@ const PIECE_RULES: PieceRule[] = [
   },
 ]
 
-const DOCK_END = { clip: "Fishing_Idle", roles: ["fisher"] }
+/** Fishing off a pier: the rod is a plain staff held out over the water (data/mounts.json tilts it). */
+const DOCK_END = { clip: "Fishing_Idle", roles: ["fisher"], prop: "kaykit-weapons/staff-a" }
 /** The fallback, by prefab (tile frame): what no single piece says. */
 const PREFAB_SPOTS: Record<string, LocalSpot[]> = {
   // between the crop rows (rows at z = 0, ±0.8, ±1.6), working along them

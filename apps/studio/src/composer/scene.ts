@@ -413,8 +413,11 @@ export function createTileScene(
             n.castShadow = true
             n.receiveShadow = true
           })
-          // the wrapper carries the placement: it is what the gizmo moves
-          const g = group(q.piece, node)
+          // the wrapper carries the placement: it is what the gizmo moves (and turns about +y only); a
+          // piece's lean sits inside it
+          const leaned = q.tilt ? group(`${q.piece}-tilt`, node) : node
+          if (q.tilt) leaned.rotation.set(q.tilt[0], 0, q.tilt[1])
+          const g = group(q.piece, leaned)
           g.position.set(q.x, baseOf(t) + (q.y ?? 0), q.z)
           g.rotation.set(0, q.rot, 0)
           g.scale.setScalar(q.scale)

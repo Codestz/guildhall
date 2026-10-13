@@ -55,6 +55,7 @@
       "clip": "Fishing_Idle",
       "facing": 3.142,
       "kind": "work",
+      "prop": "kaykit-weapons/staff-a",
       "roles": [
         "fisher"
       ],
@@ -66,6 +67,7 @@
       "clip": "Fishing_Idle",
       "facing": 2.443,
       "kind": "work",
+      "prop": "kaykit-weapons/staff-a",
       "roles": [
         "fisher"
       ],

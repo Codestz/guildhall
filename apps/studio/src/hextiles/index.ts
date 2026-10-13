@@ -1,6 +1,8 @@
 /**
  * Tile gallery (`/lab/hextiles`): every hex tile prefab at scale B, each on its own hex with a KayKit
- * character beside it for scale and its name under it; `?tile=<id>` shows one large, `?group=` one group.
+ * character beside it for scale and its name under it; `?tile=<id>` shows one large, `?group=` one group,
+ * and `?tile=<id>&sheet=1` the review shot of one tile (sheet.ts: alone, its whole footprint, a fixed
+ * 3/4 camera, its name burned in), which `bun shots prefabs` composes into contact sheets.
  * The prefabs are the authored data (data/tiles, edited in the tile composer at `/composer/<id>`).
  */
 import type { CameraPose } from "@guildhall/core"
@@ -19,40 +21,22 @@ import {
   type TerrainMesh,
   toScreen,
 } from "@guildhall/render"
-import {
-  CHARACTER_SCALE,
-  HEX_TILE_SIZE,
-  placeTile,
-  type TileGround,
-  tilePrefabs,
-  worldSide,
-} from "@guildhall/world"
+import { CHARACTER_SCALE, HEX_TILE_SIZE, placeTile, tilePrefabs } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { Screen } from "../screens.ts"
 import { worldCamera } from "../shell/worldCamera.ts"
 import { loadTiles } from "../tiles.ts"
+import { CHARACTER, GROUND, pathStrips, SIDE, TURN } from "./look.ts"
+import { mountSheet } from "./sheet.ts"
 
 const logger = log("studio:hextiles")
-
-const GROUND: Record<TileGround, [number, number, number]> = {
-  grass: [143, 195, 86],
-  soil: [150, 112, 70],
-  dirt: [196, 160, 108],
-  paved: [196, 186, 166],
-  sand: [232, 210, 150],
-  rock: [150, 140, 128],
-  water: [79, 154, 214],
-}
-const SIDE: [number, number, number] = [122, 90, 60]
-const CHARACTER = "kaykit-adventurers/knight"
-/** Every tile turned as the island turns one fronting world side FACE (world.ts rotOf), toward the camera. */
-const FACE = 5
-const TURN = (Math.PI / 180) * (90 + 60 * FACE)
 
 export const hexTiles: Screen = {
   id: "hextiles",
   title: "Tile prefabs",
   mount(host, ctx) {
+    const sheet = ctx.query.get("tile")
+    if (sheet && ctx.query.get("sheet") === "1") return mountSheet(host, ctx, sheet)
     const stage = createStage(host)
     ctx.attach(stage)
     const cam = worldCamera(stage, host, ctx.query)
@@ -79,59 +63,7 @@ export const hexTiles: Screen = {
         const [x, z] = at(k)
         tiles.push({ x, z, top: t.ground === "water" ? 0.15 : 0.5, color: GROUND[t.ground], side: SIDE })
         pieces.push(...placeTile(t, [x, z], 0.5, TURN, k + 1, false).filter((q) => catalog.get(q.piece)))
-        // a dirt path from the centre out through each side the tile names (side d's middle sits at
-        // 30° + 60°·d on a pointy-top hex), a round patch where they meet
-        if (t.path) {
-          const y = 0.53
-          const w = 0.85
-          const reach = R * (Math.sqrt(3) / 2) + 0.05
-          for (const d of t.path.map((k) => worldSide(k, FACE))) {
-            const a = (Math.PI / 180) * (60 * d)
-            const ex = Math.cos(a) * reach
-            const ez = -Math.sin(a) * reach
-            const nx = -ez / reach
-            const nz = ex / reach
-            const q = [
-              [x + nx * w, z + nz * w],
-              [x - nx * w, z - nz * w],
-              [x + ex - nx * w, z + ez - nz * w],
-              [x + ex + nx * w, z + ez + nz * w],
-            ] as const
-            for (const [a0, b0, c0] of [
-              [0, 2, 1],
-              [0, 3, 2],
-              [0, 1, 2],
-              [0, 2, 3],
-            ] as const)
-              paths.push(q[a0][0], y, q[a0][1], q[b0][0], y, q[b0][1], q[c0][0], y, q[c0][1])
-          }
-          for (let k = 0; k < 8; k++) {
-            const a0 = (k / 8) * Math.PI * 2
-            const a1 = ((k + 1) / 8) * Math.PI * 2
-            paths.push(
-              x,
-              y,
-              z,
-              x + Math.cos(a1) * w,
-              y,
-              z + Math.sin(a1) * w,
-              x + Math.cos(a0) * w,
-              y,
-              z + Math.sin(a0) * w,
-            )
-            paths.push(
-              x,
-              y,
-              z,
-              x + Math.cos(a0) * w,
-              y,
-              z + Math.sin(a0) * w,
-              x + Math.cos(a1) * w,
-              y,
-              z + Math.sin(a1) * w,
-            )
-          }
-        }
+        pathStrips(t, x, z, paths)
       })
       meshes.push(createHexGround(stage, { size: R, base: -0.5, tiles }))
       if (paths.length) meshes.push(createSurface(stage, new Float32Array(paths), "#d9c08c"))

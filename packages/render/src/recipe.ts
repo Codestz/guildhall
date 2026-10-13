@@ -15,10 +15,10 @@ export function instanceSwatchMap(instance: RecipeInstance): Record<number, numb
   return { ...ramps, ...instance.swatchMap }
 }
 
-/** Puts `object` where `instance` says: metres, `rot` radians about +y, uniform `scale`. */
+/** Puts `object` where `instance` says: metres, `rot` radians about +y (after its `tilt`), uniform `scale`. */
 export function placeInstance(object: Object3D, instance: RecipeInstance): Object3D {
   object.position.set(instance.x, instance.y, instance.z)
-  object.rotation.set(0, instance.rot, 0)
+  object.rotation.set(instance.tilt?.[0] ?? 0, instance.rot, instance.tilt?.[1] ?? 0, "YXZ")
   object.scale.setScalar(instance.scale)
   return object
 }

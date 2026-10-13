@@ -14,6 +14,11 @@ export interface RecipeInstance {
   z: number
   rot: number
   scale: number
+  /**
+   * A lean before the turn: radians about the piece's own x, then its own z (Euler YXZ with `rot`), for
+   * a piece stood on end or leaned (a bow in a rack). None: upright.
+   */
+  tilt?: [number, number]
   /** Swatch id → swatch id, a per-instance re-tint. */
   swatchMap?: Record<number, number>
   /** Ramp name → ramp name, tone for tone (ADR 008); what composers and NPC recipes author. */

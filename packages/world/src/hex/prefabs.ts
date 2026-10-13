@@ -55,6 +55,13 @@ export function validateTilePrefab(json: unknown, file?: string): string[] {
       if (!isNum(q.rot)) at(`${path}.rot`, "radians")
       if (!isNum(q.scale) || q.scale <= 0 || q.scale > 4) at(`${path}.scale`, "a scale in (0, 4]")
       if (q.y !== undefined && (!isNum(q.y) || Math.abs(q.y) > 3)) at(`${path}.y`, "metres within ±3")
+      if (
+        q.tilt !== undefined &&
+        (!Array.isArray(q.tilt) ||
+          q.tilt.length !== 2 ||
+          !q.tilt.every((a) => isNum(a) && Math.abs(a) <= Math.PI))
+      )
+        at(`${path}.tilt`, "[about x, about z] radians within ±π")
       if (q.odds !== undefined && (!isNum(q.odds) || q.odds <= 0 || q.odds > 1))
         at(`${path}.odds`, "in (0, 1]")
       if (q.tone !== undefined && typeof q.tone !== "boolean") at(`${path}.tone`, "true or false")
@@ -88,13 +95,8 @@ export function validateTilePrefab(json: unknown, file?: string): string[] {
         )
           at(`${path}.roles`, "a list of npc role ids")
         if (s.y !== undefined && (!isNum(s.y) || Math.abs(s.y) > 3)) at(`${path}.y`, "metres within ±3")
-        if (
-          s.hours !== undefined &&
-          (!Array.isArray(s.hours) ||
-            s.hours.length !== 2 ||
-            !s.hours.every((h) => isNum(h) && h >= 0 && h <= 24))
-        )
-          at(`${path}.hours`, "[from, to] day hours 0–24")
+        if (s.hours !== undefined && !hoursOk(s.hours))
+          at(`${path}.hours`, "[from, to] day hours 0–24, or a list of such windows")
       })
   }
   if (t.blockers !== undefined) {
@@ -119,6 +121,13 @@ export function validateTilePrefab(json: unknown, file?: string): string[] {
   }
   return out
 }
+
+/** One window [from, to] in day hours 0–24. */
+const windowOk = (v: unknown): boolean =>
+  Array.isArray(v) && v.length === 2 && v.every((h) => isNum(h) && h >= 0 && h <= 24)
+/** A window, or a non-empty list of windows. */
+const hoursOk = (v: unknown): boolean =>
+  windowOk(v) || (Array.isArray(v) && v.length > 0 && v.every(windowOk))
 
 const swatchMap = (v: unknown): boolean =>
   isObj(v) &&

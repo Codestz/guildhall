@@ -83,7 +83,7 @@ describe("weather", () => {
 
   test("the weather never moves the hour: the sun stays where the clock put it", () => {
     const light = lightAt(15)
-    const w = weathered(light, weatherLook(mixOf("storm")))
+    const w = weathered(light, weatherLook(mixOf("storm"), undefined, { lamps: true }))
     expect(w.hour).toBe(light.hour)
     expect(w.sunDir).toEqual(light.sunDir)
     expect(w.elevation).toBe(light.elevation)

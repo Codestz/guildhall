@@ -52,6 +52,8 @@ export interface SkyDriveOpts {
   /** The weather to start in, already settled (clear by default). */
   weather?: WeatherKind
   seed?: number
+  /** A storm lights the lanterns and windows by day too (the night's lamp pools: two more draws then). */
+  lamps?: boolean
 }
 
 export interface SkyDriveStats {
@@ -93,7 +95,8 @@ export function createSkyDrive(stage: Stage, opts: SkyDriveOpts): SkyDrive {
   let atmosphere: Atmosphere | null = null
   let cover = { coverage: BASE_COVER, wind: BASE_WIND }
   let applied: WeatherMix = { ...start }
-  let look: WeatherLook = weatherLook(applied, cover)
+  const lamps = { lamps: opts.lamps === true }
+  let look: WeatherLook = weatherLook(applied, cover, lamps)
   let light: DayLight = base.light()
   let exposure = stage.renderer.toneMappingExposure
   let rain: ReturnType<typeof createRain> | null = null
@@ -111,7 +114,7 @@ export function createSkyDrive(stage: Stage, opts: SkyDriveOpts): SkyDrive {
 
   /** Lays the weather over what the sky has just written for the hour (only ever right after it). */
   const lay = () => {
-    look = weatherLook(applied, cover)
+    look = weatherLook(applied, cover, lamps)
     const clear = applied.cloud === 0 && applied.storm === 0
     light = clear ? base.light() : weathered(base.light(), look)
     if (atmosphere) {

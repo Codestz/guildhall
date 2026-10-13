@@ -51,8 +51,13 @@ export interface WeatherLook {
   discs: number
   /** The clouds' own colour, darkened toward a storm's (1 = as the hour paints them). */
   cloudTone: number
-  /** Lanterns and windows lit by day under a dark sky (0 … 1, a floor on the hour's own). */
+  /**
+   * Lanterns and windows lit by day under a dark sky (0 … 1, a floor on the hour's own). Off unless
+   * asked (`weatherLook(…, { lamps: true })`): by day it shows the night's lamp pools, two more draws.
+   */
   lamps: number
+  /** The flames' own glow under a dark sky (a floor on the hour's): no draws of its own. */
+  fire: number
   /** Rain, 0 … 1. */
   rain: number
   /** Whether lightning strikes. */
@@ -66,7 +71,12 @@ export const BASE_WIND = 4
 export function weatherLook(
   mix: WeatherMix,
   base: { coverage: number; wind: number } = { coverage: BASE_COVER, wind: BASE_WIND },
+  opts: { lamps?: boolean } = {},
 ): WeatherLook {
+  return lookOf(mix, base, opts.lamps === true)
+}
+
+function lookOf(mix: WeatherMix, base: { coverage: number; wind: number }, lamps: boolean): WeatherLook {
   const c = clamp01(mix.cloud)
   const s = clamp01(mix.storm)
   // a cloudy step, then a storm on top of it
@@ -84,7 +94,8 @@ export function weatherLook(
     haze: step(1, 1.15, 1.6),
     discs: step(1, 0.25, 0),
     cloudTone: step(1, 0.95, 0.7),
-    lamps: step(0, 0, 0.6),
+    lamps: lamps ? step(0, 0, 0.6) : 0,
+    fire: step(0, 0.1, 0.5),
     rain: smoothstep(0.35, 1, s),
     lightning: s > 0.85,
   }
@@ -101,7 +112,8 @@ export function isClear(
     look.grey === 0 &&
     look.exposure === 1 &&
     look.rain === 0 &&
-    look.lamps === 0
+    look.lamps === 0 &&
+    look.fire === 0
   )
 }
 
@@ -120,7 +132,14 @@ export function slateOf(colour: Color, grey: number, slate: number, out = new Co
  * `light` itself.
  */
 export function weathered(light: DayLight, look: WeatherLook): DayLight {
-  if (look.sun === 1 && look.grey === 0 && look.exposure === 1 && look.lamps === 0 && look.fill === 1)
+  if (
+    look.sun === 1 &&
+    look.grey === 0 &&
+    look.exposure === 1 &&
+    look.lamps === 0 &&
+    look.fire === 0 &&
+    look.fill === 1
+  )
     return light
   return {
     ...light,
@@ -137,6 +156,6 @@ export function weathered(light: DayLight, look: WeatherLook): DayLight {
     exposure: light.exposure * look.exposure,
     golden: light.golden * (1 - look.grey),
     lamps: Math.max(light.lamps, look.lamps),
-    fire: Math.max(light.fire, look.lamps),
+    fire: Math.max(light.fire, look.fire),
   }
 }

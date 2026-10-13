@@ -8,6 +8,7 @@
  *   ?fx=busy=<place>                  a scaffold at a place: its id (a hall's `packages/sim`), its kind
  *                                     (`market`, the first of that kind) or its zone's index; `+` for more
  *   ?fx=close=sail                    a closed pull request's ship sails off (default: it sinks)
+ *   ?fx=lamps=1                       a storm lights the lanterns by day too (default: only the flames glow)
  *   ?fx=storm,ships=3,busy=market     together (`,` or `;` between them); `?fx=1` mounts them at rest
  *
  * `window.guildhall.ext.fx` drives them for shots: `weather(kind, now)`, `strike(hold?)`, `open(n)`,
@@ -34,16 +35,19 @@ export interface FxSpec {
   busy: string[]
   /** `close=sail`: a closed pull request's ship sails off instead of sinking. */
   close: "sink" | "sail"
+  /** `lamps=1`: a storm lights the lanterns and windows by day too (two more draws then). */
+  lamps: boolean
 }
 
 /** `?fx=`: null when absent or `0`. */
 export function fxOf(query: Pick<URLSearchParams, "get">): FxSpec | null {
   const raw = query.get("fx")
   if (raw === null || raw === "0") return null
-  const spec: FxSpec = { weather: null, ships: 0, busy: [], close: "sink" }
+  const spec: FxSpec = { weather: null, ships: 0, busy: [], close: "sink", lamps: false }
   for (const part of raw.split(/[,;]/)) {
     const [k, v = ""] = part.split("=") as [string, string?]
     if (k === "storm" || k === "cloudy" || k === "clear") spec.weather = k
+    else if (k === "lamps") spec.lamps = v === "1"
     else if (k === "close") spec.close = v === "sail" ? "sail" : "sink"
     else if (k === "ships") spec.ships = Math.max(0, Math.min(12, Math.floor(Number(v) || 0)))
     else if (k === "busy") spec.busy.push(...v.split("+").filter(Boolean))

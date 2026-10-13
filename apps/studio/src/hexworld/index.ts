@@ -438,6 +438,7 @@ const world = {
             retint: () => night?.setHour(now),
             strikeAt: m.sites.castle,
             seed,
+            lamps: fxSpec?.lamps === true,
           })
         : null
       const sky = drive?.sky ?? daySky

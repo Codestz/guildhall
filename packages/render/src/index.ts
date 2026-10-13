@@ -85,6 +85,17 @@ export {
   type PostOpts,
 } from "./post/index.ts"
 export { instanceSwatchMap, placeInstance, recipeObject } from "./recipe.ts"
+export {
+  createReveal,
+  DEFAULT_SPAN as REVEAL_SPAN,
+  NEVER as REVEAL_NEVER,
+  type PlaceAt,
+  placesTexture,
+  type Reveal,
+  type RevealLook,
+  type RevealMesh,
+  RISE_METRES,
+} from "./reveal.ts"
 export { blendPose, type FreeState, lookVector, type Rig, type RigMode } from "./rig/index.ts"
 export {
   clampEye,
@@ -125,6 +136,7 @@ export {
   createHexGround,
   createSurface,
   type HexPrism,
+  surfaceMaterial,
   type TerrainMesh,
 } from "./terrain.ts"
 export { boundingSphere, fitSphere, renderThumbnail, type ThumbnailOpts } from "./thumbnail.ts"
@@ -137,7 +149,7 @@ export {
   type ViewerOpts,
   type ViewerStats,
 } from "./viewer.ts"
-export { createVertexMesh } from "./vmesh.ts"
+export { createVertexMesh, groundMaterial } from "./vmesh.ts"
 export { srgbToLinear, type VertexMeshData, vertexMeshData } from "./vmeshData.ts"
 export {
   createFieldWater,
@@ -146,4 +158,5 @@ export {
   type Wake,
   type Water,
   type WaterPool,
+  type WaterReveal,
 } from "./water.ts"

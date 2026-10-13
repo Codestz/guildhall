@@ -98,6 +98,11 @@ export interface HexIsland {
   lake: number[]
   /** The reserved sites (sites.ts `reserveSites`): the town's core and the castle's site, dry and level, fixed as the island grows. */
   sites: IslandSites
+  /**
+   * Each grown tile's place in the growth order (-1 for sea, and for the few inland seas filled in after
+   * the growth): the island of n tiles is the tiles ranked under n, so a history replay reveals tiles by rank.
+   */
+  rank: Int32Array
   stats: { land: number; rivers: number; lakes: number; ms: number }
 }
 
@@ -586,6 +591,7 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
     moisture,
     lake: natureLake,
     sites,
+    rank,
     stats: { land: landCount, rivers: rivers.length, lakes, ms: Math.round(performance.now() - t0) },
   }
 }

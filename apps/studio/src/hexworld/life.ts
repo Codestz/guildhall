@@ -94,6 +94,8 @@ export interface Life {
   near(x: number, z: number, r: number): boolean
   /** Every townsfolk's passes through a door over the day (world `doorPasses`), in time order. */
   passes(): readonly DoorPass[]
+  /** Keeps anyone standing where `at` says out of the draw (a history replay: the tiles not yet revealed). */
+  hide(at: ((x: number, z: number) => boolean) | null): void
   dispose(): void
 }
 
@@ -209,6 +211,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
   let passes: DoorPass[] = []
   let clockNow = opts.hour()
   let nearAt: (x: number, z: number, r: number) => boolean = () => false
+  let hiddenAt: ((x: number, z: number) => boolean) | null = null
 
   const ready = (async () => {
     const t0 = performance.now()
@@ -345,7 +348,13 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       // always the walk
       if (p.act !== "walk" && p.drill) {
         const f = drilled(p.drill)
-        return { position: [x, y, zz], heading: p.facing, clip: f.clip, phase: f.phase, hidden: p.indoors }
+        return {
+          position: [x, y, zz],
+          heading: p.facing,
+          clip: f.clip,
+          phase: f.phase,
+          hidden: p.indoors || (hiddenAt !== null && hiddenAt(x, zz)),
+        }
       }
       const clip = (p.act !== "walk" && p.clip) || look.clips[p.act]
       // walking: the feet keep pace with the ground covered; standing: the clip's own time
@@ -356,7 +365,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         heading: p.facing,
         clip,
         phase: phase[id]! - Math.floor(phase[id]!),
-        hidden: p.indoors,
+        hidden: p.indoors || (hiddenAt !== null && hiddenAt(x, zz)),
       }
     }
     // the CPU a frame of life costs (sampling, the crowd's update, the banners), smoothed
@@ -436,6 +445,9 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     clock: () => clockNow,
     near: (x, zz, r) => nearAt(x, zz, r),
     passes: () => passes,
+    hide(at) {
+      hiddenAt = at
+    },
     dispose() {
       disposed = true
       unFrame()

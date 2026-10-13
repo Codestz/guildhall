@@ -119,6 +119,8 @@ export interface Gates {
   update(dt: number, want: (i: number) => boolean): void
   /** Each gate's opening, 0 shut to 1 open. */
   opening(i: number): number
+  /** Keeps the gates standing where `at` says out of the draw (a history replay: tiles not yet there). */
+  hide(at: ((x: number, z: number) => boolean) | null): void
   dispose(): void
 }
 
@@ -156,17 +158,21 @@ export async function createGates(
   }
   const base = gates.map((g) => instanceMatrix(g))
   const value = gates.map(() => 1)
+  const hidden = gates.map(() => false)
   const turn = new Quaternion()
   const up = new Vector3(0, 1, 0)
   const m = new Matrix4()
   const local = new Matrix4()
   const one = new Vector3(1, 1, 1)
+  const zero = new Vector3(0, 0, 0)
   const pose = (k: number) => {
     const a = ease(value[k]!)
     for (const s of slots[k]!) {
       turn.setFromAxisAngle(up, s.leaf.open * a)
       local.compose(s.leaf.hinge, turn, one)
       m.multiplyMatrices(base[k]!, local)
+      // a hidden gate's leaves collapse to a point
+      if (hidden[k]) m.scale(zero)
       meshes[s.mesh]!.mesh.setMatrixAt(s.slot, m)
     }
   }
@@ -193,6 +199,17 @@ export async function createGates(
       for (const i of moved) meshes[i]!.mesh.instanceMatrix.needsUpdate = true
     },
     opening: (k) => value[k] ?? 0,
+    hide(at) {
+      const moved = new Set<number>()
+      gates.forEach((g, k) => {
+        const h = at !== null && at(g.x, g.z)
+        if (h === hidden[k]) return
+        hidden[k] = h
+        pose(k)
+        for (const s of slots[k]!) moved.add(s.mesh)
+      })
+      for (const i of moved) meshes[i]!.mesh.instanceMatrix.needsUpdate = true
+    },
     dispose() {
       for (const { mesh, leaf } of meshes) {
         mesh.removeFromParent()

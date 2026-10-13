@@ -102,6 +102,37 @@ interface Booked {
 
 /** How far out round a place's heart a hero stands when its every spot is held, metres. */
 const RING = 1.6
+/** Rings further out step by this, metres. */
+const RING_STEP = 1.1
+/** A ring place keeps this far from the place's spots and from the other ring places, metres (two bodies). */
+const RING_APART = 1.1
+
+/**
+ * The ring places round a place's heart (where heroes stand when its every spot is held), the first `n`:
+ * rings of RING, RING + RING_STEP… metres, as many to a ring as fit RING_APART apart, every one
+ * RING_APART from the place's own spots and from each other. Pure and in a fixed order.
+ */
+export function ringPlaces(
+  heart: { x: number; z: number },
+  spots: readonly { at: readonly number[] }[],
+  n: number,
+): [number, number][] {
+  const out: [number, number][] = []
+  const clear = (x: number, z: number) =>
+    spots.every((s) => Math.hypot((s.at[0] ?? 0) - x, (s.at[2] ?? 0) - z) >= RING_APART) &&
+    out.every(([px, pz]) => Math.hypot(px - x, pz - z) >= RING_APART)
+  for (let j = 0; out.length < n && j < 64; j++) {
+    const r = RING + j * RING_STEP
+    const count = Math.max(6, Math.floor((2 * Math.PI * r) / RING_APART))
+    for (let a = 0; a < count && out.length < n; a++) {
+      const ang = ((a + (j % 2) * 0.5) / count) * Math.PI * 2 + Math.PI / 8
+      const x = heart.x + Math.cos(ang) * r
+      const z = heart.z + Math.sin(ang) * r
+      if (clear(x, z)) out.push([x, z])
+    }
+  }
+  return out
+}
 
 /**
  * The planner: push the world's events in log order (and `advance` the clock between them, live) and
@@ -344,12 +375,17 @@ export class LifePlanner {
     const k = Number(tail.slice(4))
     const node = this.kit.walk.hearts[zone]!
     const n = this.kit.walk.nodes[node]!
-    const a = (k * Math.PI) / 4 + Math.PI / 8
-    const r = RING * (1 + 0.4 * Math.floor(k / 8))
-    const x = n.x + Math.cos(a) * r
-    const z = n.z + Math.sin(a) * r
+    let ring = this.rings.get(zone)
+    if (!ring || ring.length <= k) {
+      ring = ringPlaces(n, this.kit.spots(zone), Math.max(16, (k + 1) * 2))
+      this.rings.set(zone, ring)
+    }
+    const [x, z] = ring[k] ?? [n.x, n.z]
     return { node, at: [x, n.y, z], facing: Math.atan2(n.x - x, n.z - z), ground: true }
   }
+
+  /** Each place's ring places so far (`ringPlaces`, grown as more are asked for). */
+  private readonly rings = new Map<number, [number, number][]>()
 }
 
 /** A stay at a spot from `t` on. */

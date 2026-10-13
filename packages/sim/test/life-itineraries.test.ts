@@ -417,3 +417,24 @@ describe("cost", () => {
     expect(ms).toBeLessThan(0.05)
   })
 })
+
+describe("a crowded gathering", () => {
+  test("more guildmasters than the Guildhall has spots: nobody stands within 0.9 m of another", () => {
+    const spots = kit.spots(home).length
+    const feed = new Feed(64, normalizer({ placeOf: binding.placeOf }))
+    const n = spots + 10
+    for (let k = 0; k < n; k++) feed.start(`root${k}`, T0 + k * 1000)
+    const its = itineraries(feed.log, kit)
+    const t = T0 + n * 1000 + 120_000
+    const at = [...its.values()].flatMap((it) => {
+      const p = poseAt(it, t)
+      return p ? [p.at] : []
+    })
+    expect(at.length).toBe(n)
+    let closest = Number.POSITIVE_INFINITY
+    for (let i = 0; i < at.length; i++)
+      for (let j = i + 1; j < at.length; j++)
+        closest = Math.min(closest, Math.hypot(at[i]![0] - at[j]![0], at[i]![2] - at[j]![2]))
+    expect(closest).toBeGreaterThanOrEqual(0.9)
+  })
+})

@@ -159,7 +159,7 @@ export const PLACE_ROLES: Readonly<Record<ZoneKind, readonly [string, number][]>
  */
 export const SCENE_FOLK: Readonly<Record<string, readonly [string, number][]>> = {
   "training-arena": [
-    ["soldier", 10],
+    ["soldier", 13],
     ["knight", 3],
   ],
 }
@@ -1062,7 +1062,12 @@ export function planFolk(
         return m + Math.hypot(spots[k]!.x - n.x, spots[k]!.z - n.z)
       }
       const workFor = (rr: string): number | undefined => {
-        const list = places.free(zi, rr, ["work"], shift(rr))
+        // (a bench of a scene, made for a role, to watch from: last, once the rings and the line are full)
+        const sits = (k: number) => (spots[k]!.kind === "sit" ? 1 : 0)
+        const list = places
+          .free(zi, rr, ["work", "sit"], shift(rr))
+          .filter((k) => spots[k]!.kind === "work" || !!spots[k]!.roles)
+          .sort((a, b) => sits(a) - sits(b))
         // a dawn role (a fisher) to a spot that opens at dawn for it first: the quay's edge, wherever it is
         if (DAWN_ROLES.has(rr)) {
           const dawn = list.find(
@@ -1090,6 +1095,11 @@ export function planFolk(
       }
       if (spot !== undefined) places.taken.add(spot)
       const night = nightly(role)
+      // a duel's two sides keep one day between them (start, lunch and where, the evening), so the
+      // partner is there whenever they are, and a pair is never left to shadow-box
+      const mate = spot !== undefined && spots[spot]!.pair ? places.partner(spot) : -1
+      const sr = (salt: number) =>
+        mate >= 0 ? rnd(seed + 900 + salt, 100000 + Math.min(spot!, mate), zi) : r(salt)
       const homeNode = homes.length ? homes[Math.floor(r(1) * homes.length)]! : heart
       const homeSpot: LifeSpot = homes.length
         ? doorSpot(walk, homeNode, doorways)
@@ -1145,7 +1155,7 @@ export function planFolk(
       }
       const b = new LoopBuilder(
         walk,
-        pace * (0.9 + r(4) * 0.2),
+        pace * (0.9 + sr(4) * 0.2),
         lane,
         homeSpot,
         { act: "idle", indoors },
@@ -1154,7 +1164,7 @@ export function planFolk(
       // to work (not before their spot opens; a dawn spot at its opening), lunch out somewhere of their
       // own, back unless their spot has closed by then (a fisher's morning), the evening out
       const start =
-        open && open[0] < 6 ? open[0] + 0.3 + r(10) * 0.9 : Math.max(6 + r(10) * 1.2, open?.[0] ?? 0)
+        open && open[0] < 6 ? open[0] + 0.3 + sr(10) * 0.9 : Math.max(6 + sr(10) * 1.2, open?.[0] ?? 0)
       let t = b.go(start, work, { act: workAct })
       const close = open && open[1] > open[0] ? open[1] - 0.1 : 24
       // a castle guard at a post walks the wall now and then (rounds), back to the post between
@@ -1167,18 +1177,18 @@ export function planFolk(
           t = b.go(t + 0.05, work, { act: workAct })
         }
       }
-      round(Math.min(11.2 + r(11) * 1.5, close))
-      const lunch0 = Math.max(t + 1, Math.min(11.2 + r(11) * 1.5, close))
-      const lunch1 = lunch0 + 0.8 + r(12) * 0.5
+      round(Math.min(11.2 + sr(11) * 1.5, close))
+      const lunch0 = Math.max(t + 1, Math.min(11.2 + sr(11) * 1.5, close))
+      const lunch1 = lunch0 + 0.8 + sr(12) * 0.5
       const noon = outing(outingOrder(LUNCH, r, 20), lunch0, lunch1 + 0.4, "lunch", 30)
       t = b.go(lunch0, noon.at, { act: "idle", indoors: noon.indoors })
       // back to work (a late arrival from a long way off stays no longer than its seat was booked)
       if (close > lunch1 + 0.5) {
         t = b.go(Math.max(lunch1, Math.min(t + 0.3, lunch1 + 0.4)), work, { act: workAct })
-        round(Math.min(16.5 + r(13) * 1.2, close))
+        round(Math.min(16.5 + sr(13) * 1.2, close))
       }
       // (an hour's work at least once back, but never past the spot's closing)
-      const eve0 = Math.max(Math.min(t + 1, close), Math.min(16.5 + r(13) * 1.2, close))
+      const eve0 = Math.max(Math.min(t + 1, close), Math.min(16.5 + sr(13) * 1.2, close))
       // the tavern keeps people late (lit by the lanterns); elsewhere home by dusk, a few later
       const order = outingOrder(EVENING, r, 60)
       const late = r(14) < 0.25 ? 21 + r(15) : 18.8 + r(16) * 1.2

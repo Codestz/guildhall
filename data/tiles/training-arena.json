@@ -80,7 +80,7 @@
     0,
     5
   ],
-  "ground": "dirt",
+  "ground": "sand",
   "group": "landmark",
   "id": "training-arena",
   "name": "Training arena",
@@ -632,6 +632,11 @@
         18
       ],
       "kind": "sit",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
       "x": 1.12,
       "y": -0.06,
       "z": -1.31
@@ -644,6 +649,11 @@
         18
       ],
       "kind": "sit",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
       "x": 1.12,
       "y": -0.06,
       "z": -1.79
@@ -656,6 +666,11 @@
         18
       ],
       "kind": "sit",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
       "x": 1.12,
       "y": -0.06,
       "z": 1.84
@@ -668,6 +683,11 @@
         18
       ],
       "kind": "sit",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
       "x": 1.12,
       "y": -0.06,
       "z": 1.36

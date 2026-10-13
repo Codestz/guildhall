@@ -91,6 +91,30 @@ describe("the training arena", () => {
       for (const hour of [2, 22]) expect(at(hour).filter(Boolean)).toEqual([])
     })
 
+    test(`seed ${seed}: a duel is never left with one side (nobody shadow-boxes), and some watch from the benches`, () => {
+      let seated = 0
+      // (the island without a visiting hero, who takes a duel side for his errand)
+      const bare = planFolk(h, z, w, walk, { seed, pace: 144, places: lifePlaces(h, z, w, walk) })
+      const bareSpots = lifePlaces(h, z, w, walk)
+        .furniture.spots.map((s, k) => ({ s, k }))
+        .filter(({ s }) => s.tile === arena.i)
+      for (let hour = 9.5; hour <= 17.5; hour += 0.25) {
+        const who = bareSpots.map(({ s }) =>
+          bare.find((f) =>
+            f.day.some((st) => st.kind === "stay" && st.from <= hour && hour < st.to && here(st, s)),
+          ),
+        )
+        const pairs = new Map<string, number>()
+        for (const [i, { s }] of bareSpots.entries())
+          if (s.pair && who[i]) pairs.set(s.pair, (pairs.get(s.pair) ?? 0) + 1)
+        // (a minute or two either side of lunch, one may be a step ahead of the other)
+        const lone = [...pairs.values()].filter((n) => n === 1).length
+        expect(lone).toBeLessThanOrEqual(hour > 11 && hour < 14.5 ? 2 : 0)
+        for (const [i, { s }] of bareSpots.entries()) if (s.clip?.startsWith("Sit") && who[i]) seated++
+      }
+      expect(seated).toBeGreaterThan(8)
+    })
+
     test(`seed ${seed}: a duel's stay carries its routine, its side and its pair; the Warden spars there`, () => {
       const duels = folk.flatMap((f) =>
         f.day.filter((st): st is LifeStay => st.kind === "stay" && st.drill?.id === "duel"),

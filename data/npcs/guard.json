@@ -8,8 +8,7 @@
     "work": "Melee_Blocking"
   },
   "body": [
-    "kaykit-adventurers/knight",
-    "kaykit-adventurers/barbarian"
+    "kaykit-adventurers/knight"
   ],
   "hands": {
     "l": [
@@ -22,9 +21,6 @@
       "kaykit-weapons/sword-a"
     ]
   },
-  "hide": [
-    "Barbarian_BearHat"
-  ],
   "id": "guard",
   "outfit": {
     "stone": [

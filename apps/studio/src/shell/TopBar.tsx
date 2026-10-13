@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { holdStudioStyle } from "../browser/style.ts"
-import { BASE, READ_ONLY, READ_ONLY_NOTICE, SHOWCASE } from "../env.ts"
+import { BASE, READ_ONLY, READ_ONLY_NOTICE } from "../env.ts"
 import { HOME_ID, linkTo, placeOf } from "./directory.ts"
 import { Mark, MOD_KEY, SearchIcon } from "./icons.tsx"
 import { follow, go } from "./nav.ts"
@@ -84,7 +84,7 @@ export function TopBar({
         <span className="spacer" />
         {READ_ONLY && (
           <span className="gh-showcase" title="Edit modes work, but nothing is saved off localhost.">
-            {SHOWCASE ? "Showcase · read-only" : READ_ONLY_NOTICE}
+            {READ_ONLY_NOTICE}
           </span>
         )}
         <button

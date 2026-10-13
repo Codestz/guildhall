@@ -5,6 +5,7 @@ import { save, saveMounts } from "../src/data.ts"
 import { isLocalHost, READ_ONLY_NOTICE, viewOnly } from "../src/env.ts"
 import { jumpable } from "../src/shell/directory.ts"
 import { resolve } from "../src/shell/router.ts"
+import { liveStories } from "../src/site/chronicle.ts"
 import {
   hallSeed,
   hallSlug,
@@ -148,5 +149,27 @@ describe("the view-only gate", () => {
     const bar = readFileSync(join(import.meta.dir, "../src/shell/TopBar.tsx"), "utf8")
     expect(bar).toMatch(/\{READ_ONLY && \(/)
     expect(bar).toContain("READ_ONLY_NOTICE")
+  })
+})
+
+describe("live chronicles in the demo picker", () => {
+  test("each catalog repo is a card on its own shelf that opens its hall", () => {
+    const cards = liveStories({
+      v: 1,
+      updated: "2026-10-13",
+      repos: [
+        {
+          repo: "react/react",
+          languages: ["JavaScript"],
+          years: [2013, 2026],
+          files: 6500,
+          bytes: 1,
+          built: "2026-10-01",
+        },
+      ],
+    })
+    expect(cards).toHaveLength(1)
+    expect(cards[0]?.shelf).toBe("Live chronicles")
+    expect(cards[0] && storyHref(cards[0].link)).toBe("/hall/react/react")
   })
 })

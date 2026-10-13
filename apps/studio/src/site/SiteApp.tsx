@@ -19,6 +19,7 @@ import { useEffect, useState } from "react"
 import { current, href } from "../shell/router.ts"
 import { Switcher } from "../shell/Switcher.tsx"
 import { BUILT } from "./built.ts"
+import { useChronicle, useLiveStories } from "./chronicle.ts"
 import { openUrl } from "./nav.ts"
 import { destHref, hallSlug, openedStory, storyHref } from "./routes.ts"
 import { STORIES } from "./stories.ts"
@@ -42,6 +43,7 @@ export function SiteApp() {
   const [palette, setPalette] = useState(false)
   const [welcome, setWelcome] = useState(() => !readWelcomeDismissed())
   const [busy, setBusy] = useState(false)
+  const live = useLiveStories()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -119,7 +121,7 @@ export function SiteApp() {
 
       {screen === "demos" && (
         <DemoPicker
-          stories={STORIES}
+          stories={[...STORIES, ...live]}
           hrefFor={hrefFor}
           onOpen={(s, act) => {
             seen()
@@ -162,22 +164,11 @@ export function SiteApp() {
 }
 
 /**
- * The seam where a repo's chronicle plugs in (packages/sim/src/repo: `chronicleFor(owner/repo)`): one call
- * that says whether the repo has one. Nothing is read yet, so every repo is "without a chronicle".
- */
-export function chronicleOf(_slug: string): null {
-  return null
-}
-
-/** Where to ask for a repo's chronicle to be built. */
-export const REQUEST_CHRONICLE = "https://github.com/Codestz/guildhall-chronicles/issues/new/choose"
-
-/**
  * A repo's hall, until the hall screen exists: the island this name grows, and where the HUD (roster,
  * chronicle, history) will sit. Says plainly that the island is the generator's own for now.
  */
 function HallNote({ slug, onGo }: { slug: string; onGo(url: string): void }) {
-  const chronicle = chronicleOf(slug)
+  const { state, retry } = useChronicle(slug)
   return (
     <section className="ui-panel site-note" aria-label={`The hall of ${slug}`}>
       <p className="ui-eyebrow">Your repo</p>
@@ -186,14 +177,27 @@ function HallNote({ slug, onGo }: { slug: string; onGo(url: string): void }) {
         An island grown from this name: the same name always grows the same island. Reading the repo's own
         file tree is the next step.
       </p>
-      {chronicle === null && (
-        <div className="site-note-hud">
-          No chronicle for this repo yet, so there is no history to replay.{" "}
-          <a className="site-link" href={REQUEST_CHRONICLE} target="_blank" rel="noreferrer">
-            Request a chronicle
-          </a>
-        </div>
-      )}
+      <div className="site-note-hud" role="status">
+        {state.status === "loading" && "Looking for this repo's chronicle…"}
+        {state.status === "ok" &&
+          `Chronicle found, built ${state.generatedAt.slice(0, 10)}${state.source === "local" ? " (the studio's copy)" : ""}.`}
+        {state.status === "not-chronicled" && (
+          <>
+            No chronicle for this repo yet, so there is no history to replay.{" "}
+            <a className="site-link" href={state.request} target="_blank" rel="noreferrer">
+              Request a chronicle
+            </a>
+          </>
+        )}
+        {state.status === "unavailable" && (
+          <>
+            The chronicles could not be reached ({state.reason}).{" "}
+            <button type="button" className="site-link" onClick={retry}>
+              Try again
+            </button>
+          </>
+        )}
+      </div>
       <div className="site-note-hud">
         HUD · roster, chronicle and history open here once the hall screen is built.
       </div>

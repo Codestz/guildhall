@@ -2,6 +2,7 @@
 // here they are told whole from their changes (story-fixtures.ts). V1's seek tests (the book after a
 // seek equals the book played through) are the store's to keep and come back with H1's hall.
 import { describe, expect, test } from "bun:test"
+import type { Change } from "@guildhall/core"
 import {
   clip,
   legendMarkdown,
@@ -11,6 +12,7 @@ import {
   quote,
   type Session,
   type StoryMoment,
+  tellAll,
   toldOf,
 } from "../src/index.ts"
 import { bookOf, captionsOf, played } from "./story-fixtures.ts"
@@ -177,6 +179,52 @@ describe("story: the phrase grammar", () => {
     const second = captionsOf(await played("party"), 40_000).map((c) => c.caption.text)
     expect(first.length).toBeGreaterThan(5)
     expect(second).toEqual(first)
+  })
+})
+
+describe("story: the narrator on a live Claude Code party", () => {
+  test("its shell calls are batched into V1's summary lines, in craft words, never raw commands", () => {
+    // a guildmaster and two subagents greping, reading and running at once, as the hook sends them
+    const T = 1_700_000_000_000
+    const changes: Change[] = [
+      { type: "session", id: "m", agent: "build", at: T },
+      { type: "status", id: "m", status: "busy", at: T },
+      { type: "session", id: "a", agent: "Explore", parentID: "m", at: T + 100 },
+      { type: "session", id: "b", agent: "general-purpose", parentID: "m", at: T + 150 },
+    ]
+    const cmds = [
+      'grep -rn "yardThemes\\|yards\\.set\\|castleYard" packages/world/src',
+      "sed -n 1,80p packages/world/src/hex/castleyard.ts",
+      "rg -n 'spotOf\\(' packages/world",
+      "git status --short",
+    ]
+    let k = 0
+    for (let round = 0; round < 6; round++)
+      for (const id of ["a", "b"]) {
+        const at = T + 2000 + round * 900 + (id === "b" ? 300 : 0)
+        const command = cmds[k++ % cmds.length] as string
+        const call = `c${k}`
+        changes.push(
+          { type: "tool", id, call, name: "Bash", craft: "run", state: "running", input: { command }, at },
+          {
+            type: "tool",
+            id,
+            call,
+            name: "Bash",
+            craft: "run",
+            state: "completed",
+            input: { command },
+            at: at + 200,
+          },
+        )
+      }
+    const lines = captionsOf(tellAll(changes), 40_000).map((c) => c.caption.text)
+    expect(lines.length).toBeGreaterThan(0)
+    // two heroes at once: one line for both of them (V1's "Busy hands — …, by the Scout and the …")
+    expect(lines.some((l) => /Busy hands|Across the guild|all at once|All over the island/.test(l))).toBe(
+      true,
+    )
+    for (const l of lines) expect(l).not.toMatch(/\\|grep -|sed -n|rg -n|--short/)
   })
 })
 

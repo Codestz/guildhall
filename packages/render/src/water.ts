@@ -4,6 +4,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  type DataTexture,
   Fog,
   Mesh,
   MeshStandardMaterial,
@@ -176,6 +177,77 @@ vec3 mirroredSky( vec3 r ) {
  * shore, a darker band where the coast would mirror, and a glint path of sparkles toward the sun.
  * Without them, the old lean toward the haze at grazing angles.
  */
+/**
+ * A history replay's reveal over the water (reveal.ts): the hex under a pixel is read off a texture of
+ * the tiles' places; land not yet revealed is open sea with a shore along the tiles that are, and an
+ * inland pool comes in with its tile (dithered, like the ground).
+ */
+const REVEAL_PARS = /* glsl */ `
+#ifdef REVEAL
+uniform sampler2D uRevealPlaces;
+uniform float uRevealCount;
+uniform float uRevealSpan;
+uniform float uRevealTile;
+uniform int uRevealRadius;
+const float REVEAL_DQ[6] = float[6](1.0, 0.0, -1.0, -1.0, 0.0, 1.0);
+const float REVEAL_DR[6] = float[6](0.0, 1.0, 1.0, 0.0, -1.0, -1.0);
+vec3 revealHexAt(float q, float r) {
+	int x = int(q) + uRevealRadius;
+	int y = int(r) + uRevealRadius;
+	int side = 2 * uRevealRadius + 1;
+	if (x < 0 || y < 0 || x >= side || y >= side) return vec3(-1.0);
+	return texelFetch(uRevealPlaces, ivec2(x, y), 0).rgb;
+}
+#endif`
+
+const REVEAL_FRAGMENT = /* glsl */ `
+#ifdef REVEAL
+{
+	// the hex under the pixel (world grid.ts hexAt) and its place in the reveal order (-1: the sea)
+	vec2 revealTu = vWorld / uRevealTile;
+	float revealQf = 0.5773502692 * revealTu.x - revealTu.y / 3.0;
+	float revealRf = 0.6666666667 * revealTu.y;
+	float revealSf = -revealQf - revealRf;
+	float revealQ = floor(revealQf + 0.5);
+	float revealR = floor(revealRf + 0.5);
+	float revealS = floor(revealSf + 0.5);
+	float revealDq = abs(revealQ - revealQf);
+	float revealDr = abs(revealR - revealRf);
+	float revealDs = abs(revealS - revealSf);
+	if (revealDq > revealDr && revealDq > revealDs) revealQ = -revealR - revealS;
+	else if (revealDr > revealDs) revealR = -revealQ - revealS;
+	vec3 revealHex = revealHexAt(revealQ, revealR);
+	float revealHere = revealHex.r;
+	float revealW = revealHere < 0.0 ? 1.0 : clamp((uRevealCount - revealHere) / uRevealSpan, 0.0, 1.0);
+	if (wInland) {
+		// a pool comes in with its tile: whole as soon as the tile rises (it covers the sea under the
+		// bed), dithered in with it when nothing rises (the dither look)
+		if (revealW <= 0.0) discard;
+		if (revealW < 1.0 && uRevealSink <= 0.0) {
+			float revealD = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+			if (revealD >= revealW) discard;
+		}
+	} else if (revealHere >= 0.0 && revealW < 1.0 && uRevealCount > revealHere) {
+		// a tile on its way in rises through shallows, not through the foam of a shore that is not there
+		shoreD = max(shoreD, 2.0 * uUnit);
+	} else if (revealHere >= 0.0 ? uRevealCount <= revealHere : (revealHex.b >= 0.0 && uRevealCount <= revealHex.b)) {
+		// land not yet there, or sea with land near it not all in yet: the baked shore is tomorrow's
+		float revealShore = uFieldReach;
+		if (revealHere >= 0.0 || uRevealCount > revealHex.g)
+			// a shore along the tiles round it that are in
+			for (int k = 0; k < 6; k++) {
+				float nq = revealQ + REVEAL_DQ[k];
+				float nr = revealR + REVEAL_DR[k];
+				float place = revealHexAt(nq, nr).r;
+				if (place < 0.0 || uRevealCount <= place) continue;
+				vec2 centre = vec2(1.7320508 * (nq + nr * 0.5), 1.5 * nr) * uRevealTile;
+				revealShore = min(revealShore, max(0.0, length(vWorld - centre) - 0.8660254 * uRevealTile));
+			}
+		shoreD = revealShore;
+	}
+}
+#endif`
+
 function patchWater(
   shader: WebGLProgramParametersWithUniforms,
   uniforms: Record<string, { value: unknown }>,
@@ -201,7 +273,10 @@ transformed.y += (inland > 0.5 ? 0.018 : 0.05) * (0.6 * sin(uTime * 1.1 + bobPha
 vWater = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
     )
   shader.fragmentShader = shader.fragmentShader
-    .replace("#include <dithering_pars_fragment>", () => `#include <dithering_pars_fragment>\n${PARS}`)
+    .replace(
+      "#include <dithering_pars_fragment>",
+      () => `#include <dithering_pars_fragment>\n${PARS}\n${REVEAL_PARS}`,
+    )
     .replace(
       "#include <color_fragment>",
       /* glsl */ `#include <color_fragment>
@@ -214,6 +289,7 @@ shoreD = all(greaterThan(fieldUv, vec2(0.0))) && all(lessThan(fieldUv, vec2(1.0)
 	: uFieldReach;
 #endif
 bool wInland = vInland > 0.5;
+${REVEAL_FRAGMENT}
 // V1 (waterNodes.ts waterColour), in V1's units: wD is the distance to the shore, wQ the place.
 float wD = shoreD / uUnit;
 vec2 wQ = vWorld / uUnit;
@@ -361,10 +437,23 @@ outgoingLight *= 1.0 - 0.5 * (1.0 - cloudShade());
     )
 }
 
+/** A reveal's view of the island for the water (reveal.ts `placesTexture`, and its shared count and span). */
+export interface WaterReveal {
+  /** Per hex (q + radius, r + radius): its place in the reveal order, -1 for the sea. */
+  places: DataTexture
+  radius: number
+  /** The hex grid's tile size, metres (corner radius). */
+  tile: number
+  count: { value: number }
+  span: { value: number }
+}
+
 export interface Water {
   mesh: Mesh
   /** The wakes of the boats moving now (at most MAX_WAKES; more are dropped). */
   setWakes(wakes: readonly Wake[]): void
+  /** Reveals the water with an island's reveal (null: the whole island). */
+  setReveal(reveal: WaterReveal | null): void
   dispose(): void
 }
 
@@ -471,11 +560,18 @@ function waterMesh(stage: Stage, geometry: BufferGeometry, field: ShoreField | n
     uField: { value: field?.texture ?? null },
     uFieldWindow: { value: field?.window ?? new Vector4() },
     uFieldReach: { value: field?.reach ?? 1 },
+    uRevealPlaces: { value: null as DataTexture | null },
+    uRevealCount: { value: Number.POSITIVE_INFINITY },
+    uRevealSpan: { value: 1 },
+    uRevealTile: { value: 1 },
+    uRevealRadius: { value: 0 },
   }
   const material = new MeshStandardMaterial({ roughness: 0.28, metalness: 0 })
-  if (field) material.defines = { SHORE_FIELD: "" }
+  material.defines = field ? { SHORE_FIELD: "" } : {}
+  let revealed = false
   material.onBeforeCompile = (shader) => patchWater(shader, uniforms)
-  material.customProgramCacheKey = () => (field ? "guildhall-water-field" : "guildhall-water")
+  material.customProgramCacheKey = () =>
+    `${field ? "guildhall-water-field" : "guildhall-water"}${revealed ? "-reveal" : ""}`
   const mesh = new Mesh(geometry, material)
   mesh.name = "water"
   mesh.receiveShadow = true
@@ -496,6 +592,22 @@ function waterMesh(stage: Stage, geometry: BufferGeometry, field: ShoreField | n
         uniforms.uWakes.value[i]?.set(w.x, w.z, w.heading, w.speed)
       }
       uniforms.uWakeCount.value = count
+    },
+    setReveal(reveal) {
+      revealed = reveal !== null
+      if (reveal) {
+        uniforms.uRevealPlaces.value = reveal.places
+        uniforms.uRevealTile.value = reveal.tile
+        uniforms.uRevealRadius.value = reveal.radius
+        // shared with the reveal's meshes: one count moves everything
+        uniforms.uRevealCount = reveal.count
+        uniforms.uRevealSpan = reveal.span
+        material.defines = { ...material.defines, REVEAL: "" }
+      } else {
+        const { REVEAL: _, ...rest } = material.defines ?? {}
+        material.defines = rest
+      }
+      material.needsUpdate = true
     },
     dispose() {
       unsubscribe()

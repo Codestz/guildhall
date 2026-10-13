@@ -46,7 +46,7 @@ const SPECKLE_FRAGMENT = /* glsl */ `#include <color_fragment>
 let ground: MeshStandardMaterial | null = null
 
 /** The ground's material: the palette material's light and shadows plus the speckle. Shared. */
-function groundMaterial(): MeshStandardMaterial {
+export function groundMaterial(): MeshStandardMaterial {
   if (!ground) {
     ground = new MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 })
     ground.onBeforeCompile = (shader) => {

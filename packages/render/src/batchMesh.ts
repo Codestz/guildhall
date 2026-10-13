@@ -8,6 +8,10 @@
  * (lodFade.ts), and a small piece leaving is listed shrunk. The walk runs anyway, so LOD costs a
  * distance and a few compares per visible instance. World bounding spheres are cached per instance,
  * not rebuilt from the matrix texture every pass.
+ *
+ * The same walk reveals the batch in an order (reveal.ts, a history replay): an instance past the
+ * reveal's count is left out of every pass, and one on the frontier is listed with a fade code (grown
+ * from its origin, or dithered in), so a scrub never rebuilds the batch and nothing snaps.
  */
 import {
   BatchedMesh,
@@ -85,6 +89,15 @@ export class LodBatchedMesh extends BatchedMesh {
    * right after the main one; null lists them with the rest (they then need a dithering material).
    */
   fadeMaterial: Material | null = null
+  /**
+   * The reveal (reveal.ts): per instance, its place in the reveal order (-1: always drawn). Null draws
+   * everything. An instance whose place is at or past `revealCount` is not drawn; one within
+   * `revealSpan` places under it comes in by `revealLook`: grown from its origin, or dithered in.
+   */
+  reveal: Int32Array | null = null
+  revealCount = Number.POSITIVE_INFINITY
+  revealSpan = 1
+  revealLook: "grow" | "dither" = "grow"
   /** The second multi-draw's list: the draws mid-crossfade. */
   private fade = {
     starts: new Int32Array(0),
@@ -316,9 +329,27 @@ export class LodBatchedMesh extends BatchedMesh {
       drawn++
     }
 
+    const reveal = this.reveal
+    const grow = this.revealLook === "grow"
     for (let i = 0; i < info.length; i++) {
       const instance = info[i] as Internals["_instanceInfo"][number]
       if (!instance.visible || !instance.active) continue
+      // the reveal: left out past the frontier; on it, how far in (1: whole)
+      let revealed = 1
+      if (reveal !== null) {
+        const place = reveal[i] as number
+        if (place >= 0) {
+          revealed = (this.revealCount - place) / this.revealSpan
+          if (revealed <= 0) continue
+          if (revealed > 1) revealed = 1
+        }
+      }
+      // shadow and other coarse passes carry no code: a piece half in casts whole, under that not yet
+      if (revealed < 1 && !sized) {
+        if (revealed < 0.5) continue
+        revealed = 1
+      }
+      const revealCode = revealed < 1 ? (grow ? shrinkCode(revealed) : inCode(revealed)) : 0
       const c = this.clusterOf[i] as number
       const isShell = c !== NONE && this.clusters[c]?.shell === i
       // the cluster's crossfade: the shell comes in as its parts go out
@@ -335,7 +366,7 @@ export class LodBatchedMesh extends BatchedMesh {
       const ids = this.tierIds[geometryId] ?? [geometryId]
       if (isShell) {
         shells++
-        emit(i, geometryId, clusterCode)
+        emit(i, geometryId, revealCode !== 0 ? revealCode : clusterCode)
         continue
       }
       if (!sized) {
@@ -370,7 +401,10 @@ export class LodBatchedMesh extends BatchedMesh {
         bounds.radius < DETAIL_RADIUS ? 1 - fadeWeight(bounds.radius * perMetre, DETAIL_FADE_PX) : 1
       if (shrink <= 0) continue
       tiers[tier] = (tiers[tier] as number) + 1
-      if (clusterCode !== 0) {
+      if (revealCode !== 0) {
+        // one fade per draw: a piece coming in with its tile keeps one tier
+        emit(i, ids[w >= 0.5 ? next : tier] as number, revealCode)
+      } else if (clusterCode !== 0) {
         // one fade per draw: a part fading out with its cluster keeps one tier
         emit(i, ids[w >= 0.5 ? next : tier] as number, clusterCode)
       } else if (shrink < 1) {

@@ -10,6 +10,18 @@ export interface TerrainMesh {
   dispose(): void
 }
 
+/** A draped surface's material: one colour, pulled a hair toward the camera so it sits over the ground. */
+export function surfaceMaterial(color: string, roughness = 1): MeshStandardMaterial {
+  return new MeshStandardMaterial({
+    color,
+    roughness,
+    metalness: 0,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4,
+  })
+}
+
 /** A draped surface (roads, water) from triangle positions in one colour. */
 export function createSurface(
   stage: Pick<Stage, "scene">,
@@ -20,14 +32,7 @@ export function createSurface(
   const geometry = new BufferGeometry()
   geometry.setAttribute("position", new BufferAttribute(positions, 3))
   geometry.computeVertexNormals()
-  const material = new MeshStandardMaterial({
-    color,
-    roughness,
-    metalness: 0,
-    polygonOffset: true,
-    polygonOffsetFactor: -4,
-    polygonOffsetUnits: -4,
-  })
+  const material = surfaceMaterial(color, roughness)
   const mesh = new Mesh(geometry, material)
   mesh.receiveShadow = true
   stage.scene.add(mesh)

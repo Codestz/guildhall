@@ -187,15 +187,21 @@ function startJob(spec: Promise<HexJobSpec>): Stages {
 export const ROAD_COLOR = "#d9c08c"
 
 /**
- * What another screen lays over the island as it is built (the history replay, `replay/`): it draws the
- * island's triangle soups its own way, is handed the built parts, and may take the transport.
+ * What another screen lays over the island as it is built (a hall's history, `hall/history.ts`): it
+ * sees the island's pure map first, draws the island's triangle soups its own way, is handed the built
+ * parts, and may take the transport.
  */
 export interface WorldHooks {
-  /** Draws the ground, the stairs and bridges, or the road strips (their normals and linear colours ready). */
-  mesh(stage: Stage, data: VertexMeshData, kind: "ground" | "structures" | "roads"): TerrainMesh
+  /** The island's pure map (the one the worker builds from), before anything of it is drawn. */
+  prepare?(island: HexIsland): void
+  /**
+   * Draws the ground, the stairs and bridges, or the road strips (their normals and linear colours
+   * ready); null leaves it to the island's own drawing.
+   */
+  mesh(stage: Stage, data: VertexMeshData, kind: "ground" | "structures" | "roads"): TerrainMesh | null
   /** The transport is the hook's (the day's clock is still set by `ext.clock`). */
   transport?: boolean
-  /** Once the island is drawn and its pure parts are built on this thread. */
+  /** Once the island is drawn and its pure parts are built on this thread (behind the cover, before it settles). */
   built(parts: {
     island: HexIsland
     world: HexWorld
@@ -203,6 +209,7 @@ export interface WorldHooks {
     life: Life | null
     doors: Doors
     water: Water | null
+    night: Night | null
     sun: Sun
     stage: Stage
     viewer: Viewer
@@ -348,6 +355,7 @@ const world = {
     let life: Life | null = null
     let doors: Doors | null = null
     let labels: PlaceLabels | null = null
+    let island: HexIsland | null = null
     const meshes: TerrainMesh[] = []
 
     const build = async () => {
@@ -355,20 +363,22 @@ const world = {
       // compiled by the frames drawn meanwhile) while the worker still builds the ground.
       const m = await job.map
       if (disposed) return
+      // a hook sees the pure map first (~0.1 s, behind the cover): life plans on the same one below
+      if (hooks) {
+        island = hexIsland({ ...shape, seed, files })
+        hooks.prepare?.(island)
+      }
       steps.progress(0.08, 150)
       go("Ground", 0.28)
       const R = HEX_TILE_SIZE
       if (m.paths.length)
         meshes.push(
-          hooks
-            ? hooks.mesh(stage, vertexMeshData(m.paths, new Float32Array(m.paths.length)), "roads")
-            : createSurface(stage, m.paths, ROAD_COLOR),
+          hooks?.mesh(stage, vertexMeshData(m.paths, new Float32Array(m.paths.length)), "roads") ??
+            createSurface(stage, m.paths, ROAD_COLOR),
         )
       // stone stairs where roads step down, plank bridges over the rivers: built like the ground
       if (m.structures)
-        meshes.push(
-          hooks ? hooks.mesh(stage, m.structures, "structures") : createVertexMesh(stage, m.structures),
-        )
+        meshes.push(hooks?.mesh(stage, m.structures, "structures") ?? createVertexMesh(stage, m.structures))
       const span = m.span
       const hour = num("hour", 15.5)
       const sun = createSun(stage, { town: { min: [-span, -3, -span], max: [span, 20, span] } })
@@ -431,9 +441,8 @@ const world = {
       if (g.prisms) meshes.push(createHexGround(stage, { size: R, base: -2.5, tiles: g.prisms }))
       else if (g.mesh)
         meshes.push(
-          hooks
-            ? hooks.mesh(stage, g.mesh, "ground")
-            : createVertexMesh(stage, g.mesh, undefined, { speckle: detail }),
+          hooks?.mesh(stage, g.mesh, "ground") ??
+            createVertexMesh(stage, g.mesh, undefined, { speckle: detail }),
         )
       cam.start(islandWorld(span, (x, zz) => groundAt(x, zz), 0))
       // The first frame with the ground in it: timed once it has been drawn (a task after the frame).
@@ -506,15 +515,15 @@ const world = {
             detail: `${p.files.toLocaleString("en-US")} files · ${kindWord(p.kind)}`,
             at: p.at,
             weight: p.files,
+            tier: p.tier,
           })),
         )
       // ---- life (track B): townsfolk and agents on the walk graph; `?life=0` turns it off ----
       let world: ReturnType<typeof hexWorld> | null = null
-      let island: HexIsland | null = null
       if (hooks) {
-        // Another screen drives parts of the island (a history replay): the map's pure parts built again
-        // here (~0.1 s) for it. Life itself takes its plan from the worker (below).
-        island = hexIsland({ ...shape, seed, files })
+        // Another screen drives parts of the island (a hall's history): the map's pure parts, built once
+        // for it (~0.1 s, at the map stage). Life itself takes its plan from the worker (below).
+        island ??= hexIsland({ ...shape, seed, files })
         const zones = hexZones(island, { wild: nature.wild, ...(places ? { places } : {}) })
         world = hexWorld(island, zones, { step, nature })
       }
@@ -554,14 +563,7 @@ const world = {
         doors.dispose()
         return
       }
-      // The light: shaders compiled and a calm run of frames drawn with all of it in, behind the cover.
-      go("Light", 0.99)
-      const ready = await settle(stage, {
-        until: torn,
-        onCalm: (share) => steps.progress(0.93 + 0.06 * share, 200),
-      })
-      if (disposed) return
-      const made = doors
+      // a hook's parts (a hall's history reveal) go in before the light, so their shaders compile behind the cover
       if (hooks && island && world)
         hooks.built({
           island,
@@ -570,12 +572,21 @@ const world = {
           life,
           doors,
           water,
+          night,
           sun,
           stage,
           viewer,
           groundAt,
           land: m.stats.land,
         })
+      // The light: shaders compiled and a calm run of frames drawn with all of it in, behind the cover.
+      go("Light", 0.99)
+      const ready = await settle(stage, {
+        until: torn,
+        onCalm: (share) => steps.progress(0.93 + 0.06 * share, 200),
+      })
+      if (disposed) return
+      const made = doors
       if (window.guildhall?.ext)
         window.guildhall.ext.doors = {
           stats: () => ({

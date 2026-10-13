@@ -30,6 +30,11 @@ export interface TimelineProps {
   historyUnavailable?: string
   /** False: a hairline of progress that opens into the bar on hover or keyboard focus (V1's Minimal). */
   pinned?: boolean
+  /** The scrub's step in the scale's units (default: a day of history, a second of session). */
+  step?: number
+  /** The playback speed (1 = the caller's own pace); with `onRate`, a chip that steps through the speeds. */
+  rate?: number
+  onRate?: () => void
 }
 
 const MARKER_LABEL: Record<TimelineMarker["kind"], string> = {
@@ -39,6 +44,16 @@ const MARKER_LABEL: Record<TimelineMarker["kind"], string> = {
   fail: "Deed failed",
   release: "Release",
   born: "A package is born",
+}
+
+/** The history's span under the date: its years, or its months (or month) when it is younger than a year. */
+export function historySpan(start: number, end: number): string {
+  const a = new Date(start).getUTCFullYear()
+  const b = new Date(end).getUTCFullYear()
+  if (a !== b) return `${a} – ${b}`
+  const m0 = month(start)
+  const m1 = month(end)
+  return m0 === m1 ? m0 : `${m0.split(" ")[0]} – ${m1}`
 }
 
 export function Timeline({
@@ -55,14 +70,15 @@ export function Timeline({
   onLive,
   historyUnavailable,
   pinned = true,
+  step,
+  rate,
+  onRate,
 }: TimelineProps) {
   const history = scale === "history"
   const len = Math.max(1, end - start)
   const p = Math.max(0, Math.min(1, (at - start) / len))
   const now = history ? day(at) : clock(at - start)
-  const total = history
-    ? `${new Date(start).getUTCFullYear()} – ${new Date(end).getUTCFullYear()}`
-    : clock(len)
+  const total = history ? historySpan(start, end) : clock(len)
   const what = history ? "Repo history" : "Session"
   const behind = live && end - at > 1500
   const say = (t: number) => (history ? month(t) : clock(t - start))
@@ -117,13 +133,24 @@ export function Timeline({
             type="range"
             min={start}
             max={end}
-            step={history ? DAY_MS : 1000}
+            step={step ?? (history ? DAY_MS : 1000)}
             value={Math.max(start, Math.min(end, at))}
             aria-label={history ? "Repo history: day" : "Session time"}
             aria-valuetext={history ? day(at) : `${clock(at - start)} of ${clock(len)}`}
             onChange={(event) => onSeek(Number(event.currentTarget.value))}
           />
         </div>
+        {rate !== undefined && onRate && (
+          <button
+            type="button"
+            className="hud-rate num"
+            onClick={onRate}
+            aria-label={`Speed ${rate} times; change the speed`}
+            title="Speed"
+          >
+            {rate}×
+          </button>
+        )}
         {live && !history && (
           <button
             type="button"

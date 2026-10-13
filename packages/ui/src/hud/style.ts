@@ -442,6 +442,8 @@ button.hud-toast-btn:hover { color: var(--paper); border-color: var(--brass-line
 .hud-track input:focus-visible { outline: none; }
 .hud-track input:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--brass), 0 0 0 5px rgba(241, 213, 144, 0.55); }
 .hud-track input:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 1px var(--brass), 0 0 0 5px rgba(241, 213, 144, 0.55); }
+.hud-rate { flex: none; min-width: 40px; height: 30px; padding: 0 8px; border: 1px solid var(--hair-2); border-radius: 999px; background: var(--ink-deep); color: var(--paper); font: 500 var(--t-sm)/1 var(--mono); cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.hud-rate:hover { border-color: var(--brass-line); background: var(--raise); }
 .hud-live { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(166, 221, 143, 0.4); background: rgba(166, 221, 143, 0.08); color: var(--ok); font: 700 var(--t-sm)/1 var(--body); letter-spacing: 0.06em; cursor: pointer; }
 .hud-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 6px var(--ok); }
 .hud-live:disabled { cursor: default; }
@@ -478,6 +480,7 @@ button.hud-toast-btn:hover { color: var(--paper); border-color: var(--brass-line
   .hud-beat { margin-top: -14px; }
   .hud-scale-word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .hud-scale button { min-width: 40px; min-height: 36px; justify-content: center; padding: 0 8px; }
+  .hud-rate { min-width: 44px; height: 36px; }
   .hud-timeline[data-pinned="false"] .hud-tape { opacity: 1; transform: none; pointer-events: auto; }
   .hud-timeline-hint { display: none; }
   .hud-ledger div { padding: 6px 8px; }

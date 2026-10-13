@@ -3,9 +3,10 @@ import { holdSiteStyle } from "@guildhall/ui"
 import { flushSync } from "react-dom"
 import { createRoot } from "react-dom/client"
 import { holdStudioStyle } from "../browser/style.ts"
+import { createClock, createHallTime, type HallTime } from "../hall/clock.ts"
 import type { Screen, ScreenCtx } from "../screens.ts"
 import { addShellStyle } from "../shell/style.ts"
-import { hallRepo } from "./chronicle.ts"
+import { hallChronicle, hallRepo } from "./chronicle.ts"
 import { hallSlug, worldQuery } from "./routes.ts"
 import { SiteApp } from "./SiteApp.tsx"
 import { holdSiteShellStyle } from "./style.ts"
@@ -64,10 +65,14 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
       host.append(root)
       const react = createRoot(pieces)
       let gone = false
+      // a repo's hall owns its clock (hall/clock.ts): the timeline bar reads it, the history reveal follows it
+      const slug = id === "hall" ? hallSlug(ctx.query) : null
+      const history = withWorld && slug && ctx.query.get("history") !== "0"
+      const time: HallTime | null = history ? createHallTime(createClock()) : null
 
       // The pieces first: fonts permitting (they settle within 3 s), the card is the first paint.
       void studio.ready.then(() => {
-        if (!gone) flushSync(() => react.render(<SiteApp />))
+        if (!gone) flushSync(() => react.render(<SiteApp time={time} />))
       })
 
       let offWorld = () => {}
@@ -76,12 +81,29 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
         stopCover = coverUntilReveal(root, ctx.query.get("loader") !== "0")
         const inner: ScreenCtx = { ...ctx, query: worldQuery(id, ctx.query) }
         // a repo's hall builds from the repo's chronicle (hexworld/hall.ts), read while the 3D code streams in
-        const slug = id === "hall" ? hallSlug(ctx.query) : null
         const repo = slug ? hallRepo(slug) : undefined
         ctx
           .load(
-            import("../hexworld/index.ts").then(({ mountHexWorld }) => {
-              if (!gone) offWorld = mountHexWorld(world, inner, undefined, repo ? { repo } : {})
+            Promise.all([
+              import("../hexworld/index.ts"),
+              time && slug ? import("../hall/history.ts") : null,
+            ]).then(([{ mountHexWorld }, hall]) => {
+              if (gone) return
+              // the history: the island revealed as it was on the clock's day (`?t=`, today by default)
+              const past =
+                hall && time && slug
+                  ? hall.createHistory({
+                      time,
+                      chronicle: hallChronicle(slug).then((r) => (r.status === "ok" ? r.chronicle : null)),
+                      at: hall.readT(ctx.query.get("t")),
+                      onRest: writeT,
+                    })
+                  : null
+              const offMap = mountHexWorld(world, inner, past?.hooks, repo ? { repo } : {})
+              offWorld = () => {
+                offMap()
+                past?.dispose()
+              }
             }),
           )
           .catch((error: unknown) => {
@@ -104,6 +126,14 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
       }
     },
   }
+}
+
+/** The hall's `?t=` follows its clock at rest, in place (no history entry, no remount): a link opens on that day. */
+function writeT(t: string | null): void {
+  const url = new URL(location.href)
+  if (t === null) url.searchParams.delete("t")
+  else url.searchParams.set("t", t)
+  if (url.href !== location.href) history.replaceState(history.state, "", url)
 }
 
 /** `/`: the live island, with the first-visit welcome card. */

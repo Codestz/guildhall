@@ -61,6 +61,12 @@ describe("the hall's loading order", () => {
     expect(map?.places[0]?.label).toBe("hall")
     expect(map?.places[0]?.kind).toBe("town")
     for (const p of map?.places ?? []) expect(p.tiles).toBeGreaterThan(0)
+    // the capital is a town on the map view's plates; the root's place is named after the repo
+    expect(map?.places[0]?.tier).toBe(3)
+    for (const p of map?.places ?? []) expect([1, 2, 3]).toContain(p.tier)
+    const root = map?.places.find((p) => p.id === "/")
+    if (root) expect(root.label).toBe("guildhall")
+    expect(map?.places.some((p) => p.label === "root")).toBe(false)
     // the island's own build has none
     const own: FromWorker[] = []
     runHexJob({ seed: 3, files: 600, ground: "fine", step: 0.8, paint: false, tiles: null }, (m) =>

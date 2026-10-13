@@ -95,6 +95,8 @@ export interface BuiltPlace {
   kind: string
   files: number
   tiles: number
+  /** The settlement's tier (1 hamlet, 2 village, 3 town; the capital 3): which plates the map view shows. */
+  tier: 1 | 2 | 3
   at: [number, number, number]
 }
 
@@ -447,8 +449,17 @@ export function runHexJob(
         const heart = zone.place ? w.tiles.find((t) => t.i === zone.tile) : undefined
         if (!zone.place || !heart) return []
         const { id, label, files } = zone.place
+        const tier = zone.place.capital ? 3 : (zone.place.tier ?? 1)
         return [
-          { id, label, kind: zone.kind, files, tiles: zone.tiles.length, at: [heart.x, heart.top, heart.z] },
+          {
+            id,
+            label,
+            kind: zone.kind,
+            files,
+            tiles: zone.tiles.length,
+            tier,
+            at: [heart.x, heart.top, heart.z],
+          },
         ]
       }),
       stats: {

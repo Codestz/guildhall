@@ -16,6 +16,8 @@ import {
   writeWelcomeDismissed,
 } from "@guildhall/ui"
 import { useEffect, useState } from "react"
+import type { HallTime } from "../hall/clock.ts"
+import { HallTimeline } from "../hall/timeline.tsx"
 import { current, href } from "../shell/router.ts"
 import { Switcher } from "../shell/Switcher.tsx"
 import { BUILT } from "./built.ts"
@@ -37,7 +39,8 @@ function useLocationNow() {
 
 const HERE: Record<string, SiteDest | undefined> = { demos: "demos", built: "built", hall: "repo" }
 
-export function SiteApp() {
+/** `time`: a repo's hall's clock, for its timeline bar (null off a hall, or a hall with no history). */
+export function SiteApp({ time = null }: { time?: HallTime | null } = {}) {
   const { screen, query } = useLocationNow()
   const [menu, setMenu] = useState(false)
   const [palette, setPalette] = useState(false)
@@ -132,6 +135,7 @@ export function SiteApp() {
       )}
 
       {screen === "hall" && slug && <HallNote slug={slug} onGo={go} />}
+      {screen === "hall" && slug && time && <HallTimeline time={time} />}
 
       {world && story && screen !== "demos" && (
         <section className="ui-panel site-chip" aria-label="Story">

@@ -3,7 +3,10 @@
  * unit's name and what it is, drawn in the Viewer's labels layer and moved every frame to follow the
  * camera. Plates keep out of each other's way (`layoutPlates`, pure): the biggest places come first, and
  * a plate that would lie over one already placed is drawn compact, or not at all, so a phone shows the
- * few that fit and a close view shows them all. `?labels=0` turns them off.
+ * few that fit and a close view shows them all. At the map view only the villages and towns (tier 2 and
+ * up) carry plates; zoomed close, every place does (`plateMode`, with a gap between the two distances so
+ * a zoom resting near one never flickers), and the hamlets' plates fade in and out rather than pop.
+ * `?labels=0` turns them off.
  */
 import type { Stage } from "@guildhall/render"
 import { toScreen } from "@guildhall/render"
@@ -18,6 +21,8 @@ export interface PlaceLabel {
   at: [number, number, number]
   /** Its claim to the screen: a bigger place's plate is placed first (files). */
   weight: number
+  /** 1 a hamlet, 2 a village, 3 a town or the capital: under 2 it shows only zoomed close. */
+  tier: number
 }
 
 /** How the detail line reads a zone: its tier and kind in plain words. */
@@ -40,11 +45,34 @@ export const kindWord = (kind: string): string => KIND_WORDS[kind] ?? kind
 const UP = 2.2
 /** Plates further than this from the camera are not drawn (metres): the far side of a big island at the map view. */
 const FAR = 420
+/** How long a plate takes to fade in or out as the zoom crosses between the map view and close, ms. */
+const FADE_MS = 280
 /** The gap kept between plates, CSS px. */
 const GAP = 4
 
 /** left, top, right, bottom, CSS px. */
 export type Rect = [number, number, number, number]
+
+/**
+ * The camera distances (the rig's, metres) between the map view and a close one: closer than `in` it is
+ * close, further than `out` it is the map again; between the two it stays what it was.
+ */
+export const PLATE_ZOOM = { in: 90, out: 120 } as const
+/** The lowest tier whose plate the map view shows. */
+export const MAP_TIER = 2
+
+export type PlateMode = "map" | "close"
+
+/** Map view or close, from the camera's distance and what it was (hysteresis). Pure. */
+export function plateMode(was: PlateMode, distance: number, zoom = PLATE_ZOOM): PlateMode {
+  if (distance < zoom.in) return "close"
+  if (distance > zoom.out) return "map"
+  return was
+}
+
+/** Whether a place of `tier` carries its plate in `mode`. */
+export const plateOn = (tier: number, mode: PlateMode): boolean => mode === "close" || tier >= MAP_TIER
+
 export type PlateSize = "full" | "sm"
 export interface PlateBox {
   /** Width and height at each size, CSS px. */
@@ -122,7 +150,17 @@ export function createPlaceLabels(
   const points = places.map((p) => [p.at[0], p.at[1] + UP, p.at[2]] as [number, number, number])
   const anchors: ([number, number] | null)[] = new Array(places.length).fill(null)
   // what each plate was last set to, so the DOM is only written when something moved
-  const shown = els.map(() => ({ x: Number.NaN, y: Number.NaN, size: "" as string, on: true }))
+  const shown = els.map(() => ({
+    x: Number.NaN,
+    y: Number.NaN,
+    size: "" as string,
+    on: true,
+    off: false,
+    since: 0,
+  }))
+  const screen: ([number, number] | null)[] = new Array(places.length).fill(null)
+  for (const el of els) el.style.transition = `opacity ${FADE_MS}ms ease`
+  let mode: PlateMode = plateMode("map", stage.getCamera().distance)
   // the crest (and anything else marked `data-keepout`) keeps its corner: its box in the layer's pixels,
   // re-read every half second and on a resize
   let keep: Rect[] = []
@@ -139,17 +177,29 @@ export function createPlaceLabels(
   const off = stage.onFrame(() => {
     if (++frame % 30 === 0) readKeep()
     const cam = stage.camera.position
+    mode = plateMode(mode, stage.getCamera().distance)
+    const now = performance.now()
     for (let k = 0; k < points.length; k++) {
       const p = points[k] as [number, number, number]
       const d = Math.hypot(p[0] - cam.x, p[1] - cam.y, p[2] - cam.z)
       const s = d > FAR ? null : toScreen(stage, p)
-      anchors[k] = s ? [Math.round(s[0]), Math.round(s[1])] : null
+      screen[k] = s ? [Math.round(s[0]), Math.round(s[1])] : null
+      // a plate the zoom leaves out gives up its room at once (it fades out where it stands)
+      anchors[k] = plateOn(places[k]!.tier, mode) ? screen[k]! : null
     }
     const laid = layoutPlates(anchors, boxes, order, keep)
     for (let k = 0; k < els.length; k++) {
       const el = els[k] as HTMLElement
       const was = shown[k]!
-      const { at, size } = laid[k]!
+      const out = !plateOn(places[k]!.tier, mode)
+      const { size } = laid[k]!
+      if (out !== was.off) {
+        was.off = out
+        was.since = now
+        if (out) el.style.opacity = "0"
+      }
+      // fading out: it follows its heart until it is gone
+      const at = out ? (was.on && now - was.since < FADE_MS ? screen[k]! : null) : laid[k]!.at
       if (!at) {
         if (was.on) {
           el.style.display = "none"
@@ -160,13 +210,17 @@ export function createPlaceLabels(
       if (!was.on) {
         el.style.display = ""
         was.on = true
-      }
+        // in from nothing: from transparent, so it fades in rather than pops
+        el.style.opacity = "0"
+        void el.offsetWidth
+        el.style.opacity = ""
+      } else if (!out && el.style.opacity === "0") el.style.opacity = ""
       if (was.x !== at[0] || was.y !== at[1]) {
         el.style.translate = `${at[0]}px ${at[1]}px`
         was.x = at[0]
         was.y = at[1]
       }
-      if (was.size !== size) {
+      if (!out && was.size !== size) {
         if (size === "sm") el.dataset.size = "sm"
         else delete el.dataset.size
         was.size = size

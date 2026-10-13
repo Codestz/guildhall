@@ -1,6 +1,15 @@
 /** The place plates keep out of each other's way (hexworld/places.ts `layoutPlates`): biggest first, compact or hidden when crowded. */
 import { describe, expect, test } from "bun:test"
-import { kindWord, labelsOn, layoutPlates, type PlateBox } from "../src/hexworld/places.ts"
+import {
+  kindWord,
+  labelsOn,
+  layoutPlates,
+  MAP_TIER,
+  PLATE_ZOOM,
+  type PlateBox,
+  plateMode,
+  plateOn,
+} from "../src/hexworld/places.ts"
 
 const box: PlateBox = { full: [200, 44], sm: [120, 30] }
 
@@ -75,5 +84,30 @@ describe("layoutPlates", () => {
     expect(kindWord("harbour")).toBe("harbour")
     expect(labelsOn(new URLSearchParams(""))).toBe(true)
     expect(labelsOn(new URLSearchParams("labels=0"))).toBe(false)
+  })
+})
+
+describe("plate tiers by zoom", () => {
+  test("the map view shows villages and towns; close, every place", () => {
+    expect(MAP_TIER).toBe(2)
+    expect(plateOn(1, "map")).toBe(false)
+    expect(plateOn(2, "map")).toBe(true)
+    expect(plateOn(3, "map")).toBe(true)
+    expect(plateOn(1, "close")).toBe(true)
+  })
+
+  test("between the two distances the mode stays what it was (no flicker on a resting zoom)", () => {
+    const { in: near, out: far } = PLATE_ZOOM
+    expect(near).toBeLessThan(far)
+    expect(plateMode("map", near - 1)).toBe("close")
+    expect(plateMode("close", far + 1)).toBe("map")
+    const mid = (near + far) / 2
+    expect(plateMode("map", mid)).toBe("map")
+    expect(plateMode("close", mid)).toBe("close")
+    // a zoom in and back out across the gap: close only once under `in`, map only once over `out`
+    let mode = plateMode("map", far + 50)
+    const path = [far + 10, mid, near + 1, near - 1, mid, far - 1, far + 1]
+    const seen = path.map((d) => (mode = plateMode(mode, d)))
+    expect(seen).toEqual(["map", "map", "map", "close", "close", "close", "map"])
   })
 })

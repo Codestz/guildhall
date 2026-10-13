@@ -52,7 +52,7 @@ export function hallSeed(slug: string): number {
 }
 
 /** The query keys that say what the visitor is looking at, not how the world is built. */
-const VIEW_ONLY = new Set(["story", "act", "ui", "bar", "hud", "log"])
+const VIEW_ONLY = new Set(["story", "act", "ui", "bar", "hud", "log", "t"])
 
 /**
  * What the island's world is made from: the keys that change the map (seed, files, hour, weather…), in a

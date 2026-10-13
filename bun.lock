@@ -60,6 +60,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@guildhall/core": "workspace:*",
+        "@guildhall/world": "workspace:*",
       },
     },
     "packages/ui": {

@@ -2,5 +2,5 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "rootDir": "src", "outDir": "types" },
   "include": ["src"],
-  "references": [{ "path": "../core" }]
+  "references": [{ "path": "../core" }, { "path": "../world" }]
 }

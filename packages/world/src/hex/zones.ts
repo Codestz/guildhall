@@ -86,6 +86,32 @@ export const TILE_USES = [
 ] as const
 export type TileUse = (typeof TILE_USES)[number]
 
+/**
+ * A place the repo asks for (plan-hud-events.md E3 / W1: a unit of the Repo Chronicle, a top-level folder
+ * or a workspace package, as sim's `placeSpecs` turns it into one). `hexZones` gives each its own zone,
+ * sized by its share of the repo's files, in the order given: the capital first (the town on the
+ * reserved square), then the rest, so a spec list that only grows keeps every earlier heart where it was.
+ */
+export interface PlaceSpec {
+  /** The unit it stands for, as the chronicle names it ("packages/react-dom", "src", "/"). */
+  id: string
+  /** The name on its plate. */
+  label: string
+  /**
+   * What it is built as. `settlement` is sized by `tier` (hamlet, village, town) and finds its heart by
+   * one rule whatever the tier, so a unit that grows keeps its place and builds it up.
+   */
+  kind: ZoneKind | "settlement"
+  /** The settlement's tier: 1 a hamlet, 2 a village (with fields), 3 a market town. */
+  tier?: 1 | 2 | 3
+  /** Files in the unit now: its size relative to the others. */
+  files: number
+  /** The capital: the town on the reserved square, the Guildhall's. One spec at most, the first. */
+  capital?: true
+  /** The units a pooled place stands for (several small ones as one hamlet). */
+  pooled?: string[]
+}
+
 export interface HexZone {
   kind: ZoneKind
   /** The heart tile. */
@@ -93,6 +119,8 @@ export interface HexZone {
   /** Tiles it holds. */
   tiles: number[]
   buildings: number
+  /** The repo unit this place stands for (`hexZones` with `places`); none for the island's own places. */
+  place?: PlaceSpec
 }
 
 export interface HexRoad {
@@ -144,6 +172,44 @@ const PLAN: Record<ZoneKind, { per1k: number; min: number; density: number; apar
 }
 
 const U = Object.fromEntries(TILE_USES.map((k, i) => [k, i])) as Record<TileUse, number>
+
+/** The share of the land tiles the repo's places take between them (the island's own kinds take about this). */
+const PLACE_SHARE = 0.3
+/** The capital's biggest size: the town's own (`PLAN.town.per1k`); no other place grows past this share of it. */
+const CAPITAL_CAP = 0.6
+/** How far a repo's settlement keeps from the places before it (its tier never moves it). */
+const SETTLEMENT_APART = 8
+
+/** What a settlement of `tier` is built as: a hamlet, a farm village with fields, a market town. */
+export const settlementKind = (tier: PlaceSpec["tier"]): ZoneKind =>
+  tier === 3 ? "market" : tier === 2 ? "farm" : "hamlet"
+
+/**
+ * The tiles each repo place grows to, by its share of the files: the capital at most the town's own
+ * size, the others their share of what is left, never past CAPITAL_CAP of the capital, never under
+ * their kind's least. The island's own places (none of `specs`) keep `PLAN`.
+ */
+export function placeSizes(specs: readonly PlaceSpec[], land: number): Map<string, number> {
+  const out = new Map<string, number>()
+  const budget = PLACE_SHARE * land
+  const capital = specs.find((s) => s.capital)
+  const total = specs.reduce((n, s) => n + Math.max(0, s.files), 0)
+  const townMost = Math.max(PLAN.town.min, Math.round((PLAN.town.per1k * land) / 1000))
+  const capitalTiles = capital
+    ? Math.min(townMost, Math.max(PLAN.town.min, Math.round((budget * capital.files) / Math.max(1, total))))
+    : 0
+  if (capital) out.set(capital.id, capitalTiles)
+  const rest = Math.max(0, budget - capitalTiles)
+  const others = total - (capital?.files ?? 0)
+  const cap = Math.max(PLAN.hamlet.min, Math.round((capitalTiles || townMost) * CAPITAL_CAP))
+  for (const s of specs) {
+    if (s.capital) continue
+    const kind = s.kind === "settlement" ? settlementKind(s.tier) : s.kind
+    const want = Math.round((rest * Math.max(0, s.files)) / Math.max(1, others))
+    out.set(s.id, Math.min(cap, Math.max(PLAN[kind].min, want)))
+  }
+  return out
+}
 
 /** Cheapest tile path from `from` to any tile `goal` accepts; null if none. */
 function path(
@@ -217,8 +283,17 @@ function path(
  * `wild` (default 1, nature.ts `HexNature.wild`) moves the open country's woods line: the island's forest
  * share times `wild` decides which of the leftover country tiles (the ones no place, farm or work site took)
  * are woods, by the same moisture field that grew the island's forest. Places and roads never move.
+ *
+ * `places` (a repo's units, sim `placeSpecs`) replaces the island's own list of places: the capital is the
+ * town on the reserved square, then each place in the order given takes the best tile for its kind (a
+ * settlement by one rule whatever its tier, so growing never moves it), sized by its share of the files
+ * (`placeSizes`); a kind the land has no site for (no shore, no rock) settles as a hamlet would. The
+ * countryside's pockets fill as before. Without `places` nothing changes.
  */
-export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } = {}): HexZones {
+export function hexZones(
+  h: HexIsland,
+  opts: { agents?: number; wild?: number; places?: readonly PlaceSpec[] } = {},
+): HexZones {
   const t0 = performance.now()
   const tier = castleTier(h.spec.files, opts.agents)
   const g = h.grid
@@ -353,29 +428,78 @@ export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } 
     }
   }
   const h1z = (k: number, i: number) => hash2(seed + 600 + k, g.q[i]!, g.r[i]!)
-  const order: ZoneKind[] = [
-    "town",
-    "harbour",
-    "castle",
-    "market",
-    "farm",
-    "fishing",
-    "mine",
-    "lumber",
-    "monastery",
-    "camp",
-  ]
-  // hamlets fill the open country: more of them the bigger the island
-  for (let k = 0; k < Math.round(land / 450); k++) order.push("hamlet")
-  // a bigger island gets a second farm and fishing village
-  if (land > 1400) order.push("farm", "fishing")
-  if (land > 2200) order.push("farm", "lumber")
+  /** A place to put: its kind, and the repo unit it stands for when the repo asked for it. */
+  interface Slot {
+    kind: ZoneKind
+    spec?: PlaceSpec
+  }
+  const slots: Slot[] = []
+  if (opts.places) {
+    // the repo's places: the capital on the square, the castle, then each unit in the order given
+    const capital = opts.places.find((s) => s.capital)
+    slots.push({ kind: "town", ...(capital ? { spec: capital } : {}) }, { kind: "castle" })
+    for (const s of opts.places)
+      if (!s.capital) slots.push({ kind: s.kind === "settlement" ? settlementKind(s.tier) : s.kind, spec: s })
+  } else {
+    const order: ZoneKind[] = [
+      "town",
+      "harbour",
+      "castle",
+      "market",
+      "farm",
+      "fishing",
+      "mine",
+      "lumber",
+      "monastery",
+      "camp",
+    ]
+    // hamlets fill the open country: more of them the bigger the island
+    for (let k = 0; k < Math.round(land / 450); k++) order.push("hamlet")
+    // a bigger island gets a second farm and fishing village
+    if (land > 1400) order.push("farm", "fishing")
+    if (land > 2200) order.push("farm", "lumber")
+    for (const kind of order) slots.push({ kind })
+  }
+  /** The best tile for a place of kind `rule`, at least `apart` steps from every place so far (-1: none). */
+  // (a repo's place never settles on a cliff or the castle's foot: its heart could not grow there)
+  const grows = (i: number) => !opts.places || (!foot.has(i) && kind(i) !== "cliff")
+  /**
+   * A repo's settlement: flat low ground, not the shore, as near the capital as the places before it
+   * allow (decisions.md "centre-out growth": the units come oldest first, so the oldest settle round the
+   * capital and the newer ones ring outward); nothing of its size in the rule, so growing never moves it.
+   */
+  const settlementScore = (i: number): number => {
+    if (!dry(i) || site.has(i) || kind(i) === "sand" || h.level[i]! > 3) return -1
+    const f = flatness(i)
+    if (f < 0.7) return -1
+    const town = zones[0]?.tile
+    return f + (town === undefined ? 0 : -dist(i, town) / 10) + h1z(3, i) * 0.5
+  }
+  const pickTile = (rule: ZoneKind | "settlement" | "any", apart: number): number => {
+    let best = -1
+    let bs = -1e9
+    for (let i = 0; i < N; i++) {
+      // any: open dry ground, when no rule's site is left for a repo's place
+      const s =
+        rule === "any"
+          ? dry(i) && !site.has(i) && !foot.has(i) && kind(i) !== "cliff"
+            ? flatness(i) + h1z(5, i) * 0.3
+            : -1
+          : rule === "settlement"
+            ? settlementScore(i)
+            : score(rule, i)
+      if (s < -0.5 || s <= bs || !far(i, apart) || !grows(i)) continue
+      best = i
+      bs = s
+    }
+    return best
+  }
   // the town's square and the castle are the reserved sites (island.ts), the castle composed for its own
   let plan: CastlePlan | null = null
-  for (const k of order) {
+  for (const { kind: k, spec } of slots) {
     const square = h.sites.town[0]
     if (k === "town" && square !== undefined && dry(square)) {
-      zones.push({ kind: k, tile: square, tiles: [], buildings: 0 })
+      zones.push({ kind: k, tile: square, tiles: [], buildings: 0, ...(spec ? { place: spec } : {}) })
       continue
     }
     if (k === "castle") {
@@ -403,15 +527,18 @@ export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } 
       if (plan) zones.push({ kind: k, tile: plan.heart, tiles: [...plan.tiles], buildings: 0 })
       continue
     }
-    let best = -1
-    let bs = -1e9
-    for (let i = 0; i < N; i++) {
-      const s = score(k, i)
-      if (s < -0.5 || s <= bs || !far(i, PLAN[k].apart || 6)) continue
-      best = i
-      bs = s
-    }
-    if (best >= 0) zones.push({ kind: k, tile: best, tiles: [], buildings: 0 })
+    let best: number
+    if (spec) {
+      // a repo's place: its kind's best site; a settlement by one rule whatever its tier (so a unit that
+      // grows keeps its heart); and a kind the land has no site for (no shore for a harbour, no rock for
+      // a mine) settles as a settlement would, nearer the others when it must
+      const settlement = spec.kind === "settlement"
+      best = pickTile(settlement ? "settlement" : k, settlement ? SETTLEMENT_APART : PLAN[k].apart || 6)
+      for (const apart of [SETTLEMENT_APART, 5, 4, 3]) if (best < 0) best = pickTile("settlement", apart)
+      if (best < 0) best = pickTile("any", 2)
+    } else best = pickTile(k, PLAN[k].apart || 6)
+    if (best >= 0)
+      zones.push({ kind: k, tile: best, tiles: [], buildings: 0, ...(spec ? { place: spec } : {}) })
   }
   // coverage: no stretch of land is left far from every place. The tile furthest from all of them gets
   // a new one, of the kind its ground suits, until every dry tile is within POCKET steps of a place.
@@ -433,8 +560,13 @@ export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } 
     if (best < 0) break
     const k = kind(best)
     const u = hash2(seed + 701, g.q[best]!, g.r[best]!)
-    const pick: ZoneKind =
-      k === "forest"
+    // (a repo's island fills its pockets with hamlets, a fishing one on the shore: a camp or a monastery
+    // there would read as a unit of the repo)
+    const pick: ZoneKind = opts.places
+      ? k === "sand"
+        ? "fishing"
+        : "hamlet"
+      : k === "forest"
         ? u < 0.6
           ? "lumber"
           : "hamlet"
@@ -456,17 +588,25 @@ export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } 
 
   // ---- each place grows over easy tiles round its heart ----
   const zoneOf = new Int16Array(N)
+  // (a place never grows over another's heart: that place would be left with no tiles of its own)
+  const hearts = new Set(zones.map((zz) => zz.tile))
   const ci = zones.findIndex((zz) => zz.kind === "castle")
   if (ci >= 0) for (const i of zones[ci]!.tiles) zoneOf[i] = ci + 1
+  // a repo's places are sized by their share of its files; the island's own by their kind
+  const sizes = placeSizes(opts.places ?? [], land)
   for (const [zi, z] of zones.entries()) {
     if (zi === ci) continue
-    const want = Math.max(PLAN[z.kind].min, Math.round((PLAN[z.kind].per1k * land) / 1000))
+    // (on a repo's island the pockets stay hamlet-sized, so no unnamed place outgrows a named one)
+    const own = opts.places ? PLAN.hamlet : PLAN[z.kind]
+    const want =
+      (z.place && sizes.get(z.place.id)) ?? Math.max(own.min, Math.round((own.per1k * land) / 1000))
     const lvl = h.level[z.tile]!
     const queue = [z.tile]
     const seen = new Set(queue)
     for (let k = 0; k < queue.length && z.tiles.length < want; k++) {
       const i = queue[k]!
       if (zoneOf[i] || !dry(i) || kind(i) === "cliff" || site.has(i) || foot.has(i)) continue
+      if (i !== z.tile && hearts.has(i)) continue
       // a place keeps to its own level or one step off it
       if (Math.abs(h.level[i]! - lvl) > 1) continue
       zoneOf[i] = zi + 1
@@ -486,7 +626,6 @@ export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } 
 
   // ---- roads: spanning tree + one loop, cheapest tile paths ----
   const use = new Uint8Array(N)
-  const hearts = new Set(zones.map((zz) => zz.tile))
   const routeEnds: [number, number] = [-1, -1]
   const walled = new Set(plan?.tiles ?? [])
   const footed = new Set(plan?.foot ?? [])

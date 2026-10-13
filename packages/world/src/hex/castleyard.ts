@@ -93,6 +93,53 @@ const ITEMS: Record<string, Item> = {
     wall: false,
     pieces: () => [{ piece: "kenney-castle/flag", x: 0, z: 0, rot: 0, scale: 0.4 }],
   },
+  shed: {
+    r: 1.0,
+    wall: true,
+    // the smithy's roof on four posts, the anvil under it (its smith's place before it, toward the court)
+    pieces: () => [
+      { piece: "kenney-survival/structure-roof", x: 0, z: 0, rot: 0, scale: 0.5 },
+      { piece: "kenney-survival/workbench-anvil", x: 0, z: -0.1, rot: Math.PI, scale: 0.9 },
+    ],
+  },
+  stall: {
+    r: 1.0,
+    wall: true,
+    // the stables' canvas roof on its posts, hay under it
+    pieces: () => [
+      { piece: "kenney-survival/structure-canvas", x: 0, z: 0, rot: 0, scale: 0.5 },
+      { piece: "kenney-graveyard/hay-bale-bundled", x: -0.3, z: 0.15, rot: 0.2, scale: 0.55 },
+      { piece: "kenney-graveyard/hay-bale", x: 0.35, z: 0.1, rot: 1.4, scale: 0.5 },
+    ],
+  },
+  wagon: {
+    r: 0.85,
+    wall: false,
+    // the stables' high-sided cart, along the yard
+    pieces: () => [{ piece: "kenney-town/cart-high", x: 0, z: 0, rot: Math.PI / 2, scale: 0.3 }],
+  },
+  workbench: {
+    r: 0.65,
+    wall: true,
+    pieces: () => [{ piece: "kenney-survival/workbench", x: 0, z: 0, rot: Math.PI, scale: 0.9 }],
+  },
+  grinder: {
+    r: 0.62,
+    wall: true,
+    pieces: () => [{ piece: "kenney-survival/workbench-grind", x: 0, z: 0, rot: Math.PI, scale: 0.9 }],
+  },
+  bars: {
+    r: 0.45,
+    wall: true,
+    // the smith's iron
+    pieces: () => [{ piece: "kaykit-resources/iron-bars-stack-medium", x: 0, z: 0, rot: 0.3, scale: 0.6 }],
+  },
+  tub: {
+    r: 0.5,
+    wall: false,
+    // a water tub: the horses' trough, the smith's quench
+    pieces: () => [{ piece: "kenney-survival/barrel-open", x: 0, z: 0, rot: 0, scale: 0.9 }],
+  },
   bale: {
     r: 0.35,
     wall: true,
@@ -147,12 +194,12 @@ const ITEMS: Record<string, Item> = {
     pieces: () => [{ piece: "kenney-survival/workbench-anvil", x: 0, z: 0, rot: Math.PI, scale: 0.9 }],
   },
   grindstone: {
-    r: 0.4,
+    r: 0.55,
     wall: true,
     pieces: () => [{ piece: "kaykit-tools/grindstone", x: 0, z: 0, rot: 0.4, scale: 0.35 }],
   },
   wheel: {
-    r: 0.35,
+    r: 0.4,
     wall: true,
     // a spare cart wheel leant on the wall
     pieces: () => [{ piece: "kenney-town/wheel", x: -0.48, z: 0, rot: 0.3, scale: 0.42 }],
@@ -183,19 +230,29 @@ const PLANS: Record<CourtKind, string[][]> = {
   ],
   // before a tower: its stores against the wall
   stores: [
-    ["stores", "chest", "keg", "barrel", "box"],
-    ["keg", "stores", "box", "chest", "barrel"],
+    ["stores", "chest", "keg", "barrel", "box", "barrels", "stores", "box"],
+    ["keg", "stores", "box", "chest", "barrel", "stores", "barrels"],
   ],
   // yards of one trade along the wall (COURT_THEMES)
+  // (a yard of two or three courts has room for the whole list; a single court for its first few)
   stables: [
-    ["hay|bale", "cart|wheel", "hay|bale", "bucket", "barrel"],
-    ["cart|hay|bale", "hay|bale", "bucket", "bale", "wheel"],
+    [
+      "stall|wagon|cart|hay|bale",
+      "wagon|hay|bale",
+      "tub|bucket",
+      "hay|bale",
+      "wheel",
+      "bale",
+      "barrel",
+      "bucket",
+    ],
+    ["stall|wagon|cart|hay|bale", "wagon|hay|bale", "hay|bale", "tub|bucket", "wheel", "barrel", "bale"],
   ],
   smithy: [
-    ["anvil|grindstone", "logs", "grindstone", "barrel", "box"],
-    ["anvil|grindstone", "grindstone", "keg", "logs", "bucket"],
+    ["shed|anvil|grindstone", "workbench|grindstone", "bars", "tub", "grinder", "logs", "barrel", "box"],
+    ["shed|anvil|grindstone", "grinder|grindstone", "workbench", "logs", "tub", "bars", "keg", "bucket"],
   ],
-  well: [["well|bucket", "bench", "bucket", "bench", "barrel"]],
+  well: [["well|bucket", "bench", "bucket", "bench", "torch", "barrel", "tub"]],
   // (each with small things last, for what room is left)
   plain: [
     ["target", "bench", "hay", "barrels", "barrel", "bucket"],
@@ -224,16 +281,25 @@ function toRay(p: P, b: P): number {
   return Math.hypot(p[0] - b[0] * t, p[1] - b[1] * t)
 }
 
+/** One tile of a court, or of a yard of courts dressed together: its centre, height, ways and walls. */
+export interface CourtTile {
+  at: P
+  y: number
+  /** The sides its path strips (and the doors onto it) run out through: kept clear. */
+  paths: readonly number[]
+  /** The sides the curtain wall stands on. */
+  walls: readonly number[]
+}
+
 /**
- * A court tile's dressing at `at` (its centre) and height `y`: `paths` the sides its path strips run
- * out through, `walls` the sides the curtain wall stands on, `kind` what the court is for, in the keep's
- * `colour`. Pieces stand only where they clear every strip and the wall.
+ * A court's dressing: one tile, or two or three neighbouring courts of one trade dressed as one yard
+ * (world.ts), its things free to stand across the side they share where no way crosses it (the most
+ * room a court has: a cart fits there, not in a single court's corner). `kind` what the court is for,
+ * in the keep's `colour`. Pieces stand only where they clear every strip and the wall, inside the
+ * court's own tiles.
  */
 export function courtDressing(
-  at: P,
-  y: number,
-  paths: readonly number[],
-  walls: readonly number[],
+  tiles: readonly CourtTile[],
   kind: CourtKind,
   colour: string,
   seed: number,
@@ -247,40 +313,95 @@ export function courtDressing(
   const plans = PLANS[kind]
   const plan = plans[Math.floor(hash2(seed, 71, 3) * plans.length) % plans.length]!
   const reach = (R * Math.sqrt(3)) / 2
-  const strips = paths.map((d): P => [dir(d)[0] * reach, dir(d)[1] * reach])
+  // each tile's strips (world: from its centre to its sides' middles), and the sides it shares with another
+  const strips = tiles.flatMap((t) =>
+    t.paths.map((d): [P, P] => [t.at, [dir(d)[0] * reach, dir(d)[1] * reach]]),
+  )
+  const shared = tiles.map((t) =>
+    [0, 1, 2, 3, 4, 5].filter((d) =>
+      tiles.some(
+        (o) =>
+          Math.hypot(t.at[0] + dir(d)[0] * 2 * reach - o.at[0], t.at[1] + dir(d)[1] * 2 * reach - o.at[1]) <
+          0.5,
+      ),
+    ),
+  )
+  const home = (p: P): number => {
+    let best = 0
+    for (let m = 1; m < tiles.length; m++)
+      if (
+        Math.hypot(p[0] - tiles[m]!.at[0], p[1] - tiles[m]!.at[1]) <
+        Math.hypot(p[0] - tiles[best]!.at[0], p[1] - tiles[best]!.at[1])
+      )
+        best = m
+    return best
+  }
+  /** Whether a point stands inside its tile, kept off every side but a shared one (by `r`). */
+  const inside = (q: P, r: number): boolean => {
+    const m = home(q)
+    const t = tiles[m]!
+    for (let d = 0; d < 6; d++) {
+      if (shared[m]!.includes(d)) continue
+      const [ux, uz] = dir(d)
+      const out = (q[0] - t.at[0]) * ux + (q[1] - t.at[1]) * uz + r
+      if (out > (t.walls.includes(d) && !blocked ? WALL_FACE : reach - 0.25)) return false
+    }
+    return true
+  }
+  const lone = tiles.length === 1 && tiles[0]!.paths.length === 0
   const taken: [number, number, number][] = []
   const fits = (p: P, r: number): boolean => {
-    if (strips.some((s) => toRay(p, s) < STRIP + r + CLEAR)) return false
-    if (paths.length === 0 && Math.hypot(p[0], p[1]) < STRIP + r) return false
-    for (let d = 0; d < 6; d++) {
-      const [ux, uz] = dir(d)
-      const out = p[0] * ux + p[1] * uz + r
-      if (out > (walls.includes(d) && !blocked ? WALL_FACE : reach - 0.25)) return false
+    if (strips.some(([o, s]) => toRay([p[0] - o[0], p[1] - o[1]], s) < STRIP + r + CLEAR)) return false
+    if (lone && Math.hypot(p[0] - tiles[0]!.at[0], p[1] - tiles[0]!.at[1]) < STRIP + r) return false
+    // the disc's rim, every 30° (a hex side's outward normal among them), in the court's tiles
+    if (!inside(p, r)) return false
+    for (let a = 0; a < 12; a++) {
+      const q: P = [p[0] + Math.cos((Math.PI / 6) * a) * r, p[1] + Math.sin((Math.PI / 6) * a) * r]
+      if (!inside(q, 0)) return false
     }
-    if (blocked?.(at[0] + p[0], at[1] + p[1], r + 0.1)) return false
+    if (blocked?.(p[0], p[1], r + 0.1)) return false
     return taken.every(([x, z, rr]) => Math.hypot(x - p[0], z - p[1]) >= rr + r + 0.1)
   }
-  // the places items may go: out toward each side, a little either way along it
+  // the places items may go: out toward each side of each tile, a little either way along it
   const spots: { p: P; d: number; wall: boolean }[] = []
-  for (let d = 0; d < 6; d++) {
-    const [ux, uz] = dir(d)
-    for (const out of [2.2, 1.95, 1.7, 1.45, 1.2, 1.0, 0.8])
-      for (const side of [0, -0.3, 0.3, -0.6, 0.6, -0.85, 0.85, -1.1, 1.1, -1.35, 1.35])
-        spots.push({ p: [ux * out - uz * side, uz * out + ux * side], d, wall: walls.includes(d) })
-    // and out in the corner between two sides, where two ways leave the most room
-    const [vx, vz] = [Math.cos((Math.PI / 3) * d + Math.PI / 6), -Math.sin((Math.PI / 3) * d + Math.PI / 6)]
-    for (const out of [2.4, 2.25, 2.0, 1.75, 1.5])
-      spots.push({ p: [vx * out, vz * out], d, wall: walls.includes(d) || walls.includes((d + 1) % 6) })
+  for (const [m, t] of tiles.entries()) {
+    for (let d = 0; d < 6; d++) {
+      const [ux, uz] = dir(d)
+      const wall = t.walls.includes(d)
+      for (const out of [2.2, 1.95, 1.7, 1.45, 1.2, 1.0, 0.8])
+        for (const side of [0, -0.3, 0.3, -0.6, 0.6, -0.85, 0.85, -1.1, 1.1, -1.35, 1.35])
+          spots.push({ p: [t.at[0] + ux * out - uz * side, t.at[1] + uz * out + ux * side], d, wall })
+      // and out in the corner between two sides, where two ways leave the most room
+      const [vx, vz] = [Math.cos((Math.PI / 3) * d + Math.PI / 6), -Math.sin((Math.PI / 3) * d + Math.PI / 6)]
+      for (const out of [2.4, 2.25, 2.0, 1.75, 1.5])
+        spots.push({
+          p: [t.at[0] + vx * out, t.at[1] + vz * out],
+          d,
+          wall: wall || t.walls.includes((d + 1) % 6),
+        })
+      // and across a side shared with the next tile of the yard
+      if (shared[m]!.includes(d))
+        for (const along of [0, -0.5, 0.5, -1.0, 1.0, -1.4, 1.4])
+          for (const across of [0, -0.4, 0.4, -0.8, 0.8])
+            spots.push({
+              p: [t.at[0] + ux * (reach + across) - uz * along, t.at[1] + uz * (reach + across) + ux * along],
+              d,
+              wall: false,
+            })
+    }
   }
   // how far a spot stands from the court's ways (from its middle, if none run through)
   const room = (p: P): number =>
-    strips.length ? Math.min(...strips.map((s) => toRay(p, s))) : Math.hypot(p[0], p[1])
+    strips.length
+      ? Math.min(...strips.map(([o, s]) => toRay([p[0] - o[0], p[1] - o[1]], s)))
+      : Math.hypot(p[0] - tiles[0]!.at[0], p[1] - tiles[0]!.at[1])
   // by the gate and before the hall a pair stands either side; elsewhere the court's things gather
   const grouped = kind !== "gate" && kind !== "heart"
   let group: P | undefined
   const out: PlacedPiece[] = []
   for (const [k, names] of plan.entries()) {
-    const jitter = (s: { p: P; d: number }) => hash2(seed, k, s.d * 31 + Math.round(s.p[0] * 10))
+    const jitter = (s: { p: P; d: number }) =>
+      hash2(seed, k, s.d * 31 + Math.round((s.p[0] - tiles[0]!.at[0]) * 10))
     // the first against the wall where it belongs there, else where the court opens: scattered by the
     // seed, or (grouped) in the corner farthest from the ways; the rest as near it as they fit, a wall
     // thing by the wall a little before the nearest spot
@@ -311,16 +432,17 @@ export function courtDressing(
     if (!item || !spot) continue
     taken.push([spot.p[0], spot.p[1], item.r])
     group ??= spot.p
-    // the item's +z looks out from the court's middle: its front (−z) toward it
-    const face = Math.atan2(spot.p[0], spot.p[1])
+    // the item's +z looks out from its tile's middle: its front (−z) toward it
+    const t = tiles[home(spot.p)]!
+    const face = Math.atan2(spot.p[0] - t.at[0], spot.p[1] - t.at[1])
     const c = Math.cos(face)
     const s = Math.sin(face)
     for (const q of item.pieces(colour)) {
       const placed: PlacedPiece = {
         piece: q.piece,
-        x: at[0] + spot.p[0] + q.x * c + q.z * s,
-        y: y + (q.y ?? 0),
-        z: at[1] + spot.p[1] - q.x * s + q.z * c,
+        x: spot.p[0] + q.x * c + q.z * s,
+        y: t.y + (q.y ?? 0),
+        z: spot.p[1] - q.x * s + q.z * c,
         rot: face + q.rot,
         scale: q.scale,
       }

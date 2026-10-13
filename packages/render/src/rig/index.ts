@@ -25,6 +25,12 @@ import {
 
 export type RigMode = "orbit" | "free"
 
+/**
+ * What moved the camera (`Rig.onMove`): the viewer's input (`orbit`, `pan`, `zoom`, `free` for free
+ * flight's looks and moves) or code (`glide`, `set`, `mode`). A pinch's small drift counts as `zoom`.
+ */
+export type RigMove = "orbit" | "pan" | "zoom" | "free" | "glide" | "set" | "mode"
+
 /** The free camera's eye and heading: yaw as an orbit's azimuth, pitch up from level (degrees). */
 export interface FreeState {
   eye: [number, number, number]
@@ -54,6 +60,20 @@ export interface Rig {
   free(): FreeState
   /** True while a glide runs. */
   gliding(): boolean
+  /**
+   * The orbit's target follows `target` (eased at the orbit's rate; a running glide lands on it) while
+   * the viewer still turns and zooms, and a zoom closes in on it rather than on the cursor. Called each
+   * frame by a follow camera; null lets go. Not a move (`onMove` does not hear it).
+   */
+  aim(target: Vec3 | null): void
+  /** Eases the orbit's angles and distance toward `change` (a director's drift, a framing). Not a move. */
+  steer(change: Partial<Omit<CameraPose, "target">>): void
+  /** Where the orbit is easing to (its goal; the pose being drawn is `get`). */
+  goal(): CameraPose
+  /** Hears every move: the viewer's input, and code's glides and sets (see `RigMove`). */
+  onMove(fn: (move: RigMove) => void): () => void
+  /** Runs at the start of each `update`, before the easing (a follow camera aims here). */
+  drive(fn: ((dt: number) => void) | null): void
   /** Called on a mode or speed change. */
   subscribe(fn: () => void): () => void
   /** Steps the easing and writes the camera; the stage calls it each frame before drawing. */
@@ -120,9 +140,16 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
     speed: SPEED.start as number,
   }
   let glide: { from: CameraPose; to: CameraPose; t: number; ms: number } | null = null
+  /** The target a follow camera holds the orbit on (`aim`), and the driver run before each step. */
+  let aimed: Vec3 | null = null
+  let driver: ((dt: number) => void) | null = null
   const listeners = new Set<() => void>()
   const notify = () => {
     for (const fn of listeners) fn()
+  }
+  const movers = new Set<(move: RigMove) => void>()
+  const moved = (move: RigMove) => {
+    for (const fn of movers) fn(move)
   }
 
   const lens = (): Lens => ({ fov: camera.fov, aspect: camera.aspect, far: camera.far })
@@ -213,8 +240,12 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
     busy: () => glide !== null,
     orbit(dAz, dEl) {
       goal = held({ ...goal, azimuth: goal.azimuth + dAz, elevation: goal.elevation + dEl })
+      moved("orbit")
     },
-    pan(dx, dy) {
+    pan(dx, dy, soft) {
+      moved(soft ? "zoom" : "pan")
+      // held on a followed target, a pinch's drift does not slide the view off it
+      if (soft && aimed) return
       // Across the ground, faster the farther out the camera stands.
       const k = goal.distance * 0.0015
       const az = goal.azimuth * RAD
@@ -223,7 +254,10 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
       const z = tz + Math.sin(az) * dx * k - Math.cos(az) * dy * k
       goal = held({ ...goal, target: [x, ty, z] })
     },
-    zoom(factor, ray) {
+    zoom(factor, cursor) {
+      moved("zoom")
+      // following a target, the zoom closes in on it, not on the cursor
+      const ray = aimed ? null : cursor
       const distance = goal.distance * factor
       if (!world) {
         goal = { ...goal, distance: Math.max(0.1, distance) }
@@ -245,10 +279,12 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
       goal = held({ target: [tx, ty, tz], azimuth: goal.azimuth, elevation: tilt, distance: next })
     },
     look(dYaw, dPitch) {
+      moved("free")
       fly.goalYaw += dYaw
       fly.goalPitch = pitchHeld(fly.goalPitch + dPitch)
     },
     nudge(forward, right, up) {
+      moved("free")
       const dir = lookVector(fly.yaw, fly.pitch)
       const r: Vec3 = [Math.cos(fly.yaw * RAD), 0, -Math.sin(fly.yaw * RAD)]
       const eye: Vec3 = [
@@ -264,10 +300,12 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
       notify()
     },
     toggle() {
+      moved("mode")
       if (mode === "free") startGlide(home ?? held(freePose()), GLIDE_MS)
       else enterFree()
     },
     leave() {
+      if (mode === "free") moved("mode")
       if (mode === "free") startGlide(home ?? held(freePose()), GLIDE_MS)
     },
     ray(ndcX, ndcY) {
@@ -281,6 +319,7 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
   const rig: Rig = {
     get: () => (mode === "free" && !glide ? freePose() : copy(pose)),
     set(p) {
+      moved("set")
       const changed = mode !== "orbit"
       mode = "orbit"
       glide = null
@@ -290,9 +329,13 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
       write()
       if (changed) notify()
     },
-    glide: (p, ms = GLIDE_MS) => startGlide(p, ms),
+    glide(p, ms = GLIDE_MS) {
+      moved("glide")
+      startGlide(p, ms)
+    },
     mode: () => mode,
     setMode(next, to) {
+      moved("mode")
       if (next === "free") {
         if (mode !== "free" || glide) enterFree()
         return
@@ -315,9 +358,27 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
     },
     world: () => world,
     speed: () => fly.speed,
-    fly: (state) => enterFree(state),
+    fly(state) {
+      moved("mode")
+      enterFree(state)
+    },
     free: () => ({ eye: [...fly.eye], yaw: fly.yaw, pitch: fly.pitch }),
     gliding: () => glide !== null,
+    aim(target) {
+      aimed = target ? [target[0], target[1], target[2]] : null
+    },
+    steer(change) {
+      if (mode !== "orbit") return
+      goal = held({ ...goal, ...change, target: goal.target })
+    },
+    goal: () => copy(goal),
+    onMove(fn) {
+      movers.add(fn)
+      return () => movers.delete(fn)
+    },
+    drive(fn) {
+      driver = fn
+    },
     subscribe(fn) {
       listeners.add(fn)
       return () => listeners.delete(fn)
@@ -325,6 +386,12 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
     update(seconds) {
       // A frame after a hidden tab is long: step as if it were short, rather than leap.
       const dt = Math.min(0.1, seconds)
+      driver?.(dt)
+      // a followed target: the glide lands on where it is now, then the goal rides it
+      if (aimed && mode === "orbit") {
+        if (glide) glide.to = held({ ...glide.to, target: aimed })
+        else goal = held({ ...goal, target: aimed })
+      }
       if (glide) {
         glide.t = Math.min(1, glide.t + (dt * 1000) / glide.ms)
         pose = blendPose(glide.from, glide.to, smooth(glide.t))
@@ -373,6 +440,8 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
     dispose() {
       handle.detach()
       listeners.clear()
+      movers.clear()
+      driver = null
     },
   }
   write()

@@ -27,8 +27,8 @@ export interface RigHandlers {
   busy(): boolean
   /** Orbit by degrees. */
   orbit(dAzimuth: number, dElevation: number): void
-  /** Pan by screen pixels. */
-  pan(dx: number, dy: number): void
+  /** Pan by screen pixels; `soft`: a pinch's small drift (its spread changing is the gesture), not a pan. */
+  pan(dx: number, dy: number, soft?: boolean): void
   /** Zoom by a distance factor toward the point `ray` meets (null: toward the target). */
   zoom(factor: number, ray: Ray | null): void
   /** Turn the free camera by degrees. */
@@ -63,6 +63,8 @@ const LOOK_DEG_PX = 0.22
 const LOCKED_DEG_PX = 0.12
 const ZOOM_PER_PX = 0.001
 const SPEED_PER_PX = 0.0015
+/** A two-finger gesture whose midpoint has moved less than this (px) is a pinch, not a pan. */
+const PINCH_DRIFT = 28
 
 const MOVES: Record<string, keyof Omit<Keys, "fast">> = {
   KeyW: "forward",
@@ -95,6 +97,8 @@ export function attachRigInput(el: HTMLElement, rig: RigHandlers): RigInputHandl
   let drag: { pan: boolean } | null = null
   /** The two-finger gesture's last midpoint and spread. */
   let pinch: { x: number; y: number; spread: number } | null = null
+  /** How far the two-finger gesture's midpoint has travelled, px: under PINCH_DRIFT it is a pinch. */
+  let drift = 0
   const held = new Set<string>()
   let shift = false
 
@@ -124,6 +128,7 @@ export function attachRigInput(el: HTMLElement, rig: RigHandlers): RigInputHandl
     el.setPointerCapture?.(e.pointerId)
     drag = { pan: e.button === 2 || e.shiftKey }
     pinch = pointers.size === 2 ? twoFinger() : null
+    drift = 0
   }
   const move = (e: PointerEvent) => {
     if (document.pointerLockElement === el && rig.mode() === "free") {
@@ -152,8 +157,9 @@ export function attachRigInput(el: HTMLElement, rig: RigHandlers): RigInputHandl
         const k = rig.speed() * 0.02
         rig.nudge(my * k + (grow - 1) * rig.speed() * 1.5, -mx * k, 0)
       } else {
+        drift += Math.hypot(mx, my)
         rig.zoom(1 / grow, rayAt(now.x, now.y))
-        rig.pan(mx, my)
+        rig.pan(mx, my, drift < PINCH_DRIFT)
       }
       return
     }

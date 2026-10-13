@@ -109,7 +109,7 @@ export {
   type RevealMesh,
   RISE_METRES,
 } from "./reveal.ts"
-export { blendPose, type FreeState, lookVector, type Rig, type RigMode } from "./rig/index.ts"
+export { blendPose, type FreeState, lookVector, type Rig, type RigMode, type RigMove } from "./rig/index.ts"
 export {
   clampEye,
   clampOrbit,

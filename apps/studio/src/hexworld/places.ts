@@ -190,10 +190,12 @@ export function createPlaceLabels(
     const cam = stage.camera.position
     mode = plateMode(mode, stage.getCamera().distance)
     const now = performance.now()
+    // plates past FAR are left out, or past half again the view's own distance when it stands further back (a whole big island)
+    const far = Math.max(FAR, stage.getCamera().distance * 1.5)
     for (let k = 0; k < points.length; k++) {
       const p = points[k] as [number, number, number]
       const d = Math.hypot(p[0] - cam.x, p[1] - cam.y, p[2] - cam.z)
-      const s = d > FAR ? null : toScreen(stage, p)
+      const s = d > far ? null : toScreen(stage, p)
       screen[k] = s ? [Math.round(s[0]), Math.round(s[1])] : null
       // a plate the zoom leaves out gives up its room at once (it fades out where it stands)
       anchors[k] = wanted(k) ? screen[k]! : null

@@ -82,6 +82,26 @@ describe("the card's layout", () => {
       "Portrait Chronicle card: “Add cursor pagination”, Codestz/guildhall, A party. Pictured: The quest is done. 6 adventurers. The quest is complete.",
     )
   })
+
+  test("a repo's card: named by the repo alone, its own line under the title", () => {
+    const recap: RecapView = {
+      kind: "repo",
+      title: "react/react",
+      guild: "react/react",
+      story: "Since May 2013 · 13 years",
+      subtitle: "Since May 2013 · 13 years",
+      outcome: "underway",
+      numbers: [{ value: "19.1k", label: "commits" }],
+      lines: [{ at: 1, kind: "busiest", parts: [{ text: "April 2019 was its busiest month." }], text: "" }],
+      hero: { label: "The island today", at: 0, mark: "7,252 files" },
+      site: "guildhall.codestz.dev/hall/react/react",
+    }
+    expect(cardFileName(recap, "landscape")).toBe("guildhall-chronicle-react-react.png")
+    expect(cardFileName(recap, "portrait")).toBe("guildhall-chronicle-react-react-portrait.png")
+    expect(altOf({ ...recap, lines: [] }, "landscape")).toBe(
+      "Landscape Chronicle card: “react/react”, Since May 2013 · 13 years. Pictured: The island today. 19.1k commits. ",
+    )
+  })
 })
 
 describe("the book's words read as the sim's Markdown", () => {

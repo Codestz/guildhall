@@ -56,6 +56,12 @@ export function dayOf(epoch: number): string {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`
 }
 
+/** `Apr 2016`: a long era's lines are dated by the month. */
+export function monthOf(epoch: number): string {
+  const d = new Date(epoch)
+  return `${MONTHS[d.getUTCMonth()]?.slice(0, 3)} ${d.getUTCFullYear()}`
+}
+
 export function yearOf(epoch: number): number {
   return new Date(epoch).getUTCFullYear()
 }

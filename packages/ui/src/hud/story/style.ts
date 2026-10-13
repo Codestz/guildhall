@@ -197,6 +197,35 @@ export const STORY_CSS = /* css */ `
 .st-annal-text { margin: 1px 0 0; font: 14px/1.45 var(--body); color: var(--ink-soft); }
 .st-annal-open { margin-top: 4px; padding: 2px 0; border: 0; background: none; font: 500 13.5px/1.4 var(--body); color: var(--umber); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .st-annal-open:hover { color: var(--ink-text); }
+/* a repo's eras: the island as it was, a lede, the annals */
+.st-era > .st-era-island { margin: 12px 0 4px; }
+.st-era-island {
+  position: relative;
+  aspect-ratio: 16 / 7;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #22394a;
+  box-shadow: 0 0 0 1px rgba(90, 62, 26, 0.5), 0 0 0 4px var(--vellum-edge), 0 0 0 5px rgba(90, 62, 26, 0.35);
+}
+/* a still that fails to load leaves the sea-blue frame, not its alt text */
+.st-era-island img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 55%; color: transparent; }
+.st-era-island[data-empty="true"] { aspect-ratio: 16 / 4; display: grid; place-items: center; background: rgba(110, 78, 34, 0.08); color: var(--umber); }
+.st-era-island figcaption {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(244, 234, 211, 0.92);
+  font: 12.5px/1.5 var(--body);
+  color: var(--ink-soft);
+}
+.st-era-island figcaption .num { font: inherit; font-variant-numeric: lining-nums tabular-nums; color: var(--ink-text); }
+.st-era-lede { margin-top: 8px; margin-bottom: 4px; font-size: 16.5px; font-style: italic; text-wrap: pretty; }
+.st-era .st-ch-meta { margin-top: 2px; }
+.st-era .st-annal { grid-template-columns: 70px 22px 1fr; }
+.st-code { padding: 0 3px; border-radius: 3px; background: rgba(110, 78, 34, 0.1); font: 0.84em/1.3 var(--mono); color: #3d2b14; overflow-wrap: anywhere; }
+h3 .st-code { font-size: 0.8em; letter-spacing: 0; }
 
 /* the footer: turning pages */
 .st-book-foot { display: flex; align-items: center; gap: 10px; padding: 8px 18px 10px; border-top: 1px solid var(--rule); }
@@ -397,6 +426,8 @@ button.st-place-hero:hover { background: var(--raise-2); }
   .st-book-body { padding: 12px 18px 22px; }
   .st-ch-num { min-width: 24px; font-size: 17px; }
   .st-chapter > :not(.st-ch-head), .st-ch-loot { margin-left: 38px; }
+  .st-era > .st-era-island { margin: 10px 0 4px; aspect-ratio: 16 / 9; }
+  .st-era .st-annal { grid-template-columns: 1fr; }
   .st-annal { grid-template-columns: 1fr; }
   .st-annal-day { text-align: left; }
   .st-annal-mark { display: none; }

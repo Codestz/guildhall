@@ -1,6 +1,8 @@
 /**
  * The Legends book (V1's hud/Legends.tsx), fed by props: the session's story as chapters on parchment
- * (sim `legendOf`), and, when given, the repo's History: its past sessions and milestones. A modal:
+ * (sim `legendOf`), and, when given, the repo's History: its past sessions and milestones, or, when the
+ * history carries the repo's own legend (sim `repoLegendOf`), the repo told by era, each chapter with
+ * the island as it was at its end and the past sessions that fell in it. A modal:
  * focus starts on the title and stays inside, Esc (the close button, a click on the scrim) closes it
  * and focus goes back to whatever opened it. ← and → turn the page: chapter to chapter (a year to the
  * next in History), Home and End to the first and last; the footer's buttons too. "Copy as text" puts the sim's Markdown on the clipboard.
@@ -10,8 +12,18 @@ import { Glyphs } from "../glyphs.tsx"
 import { copyText } from "./clipboard.ts"
 import { trapTab, useModalFocus } from "./focus.ts"
 import { RenownGlyph, StoryGlyphs } from "./glyphs.tsx"
-import type { LegendChapter, LegendView, Milestone, NotableKind, PastSession, RepoHistory } from "./types.ts"
-import { clockOf, costOf, dayOf, duration, isoDay, spell, tokensOf, yearOf } from "./words.ts"
+import type {
+  LegendChapter,
+  LegendView,
+  Milestone,
+  NotableKind,
+  PastSession,
+  RepoEraView,
+  RepoHistory,
+  RepoLegendView,
+  RepoMilestoneView,
+} from "./types.ts"
+import { clockOf, costOf, dayOf, duration, isoDay, monthOf, spell, tokensOf, yearOf } from "./words.ts"
 
 export type BookView = "session" | "history"
 
@@ -22,10 +34,15 @@ export interface LegendsBookProps {
   markdown?: string
   /** The repo's past sessions and milestones: a History tab when given. */
   history?: RepoHistory
+  /** The repo's legend as Markdown (sim `repoLegendMarkdown`): "Copy as text" on History. */
+  historyMarkdown?: string
   /** Which book opens. */
   view?: BookView
-  /** Opens the Chronicle card (the sharing picture); no button without it. */
-  onCard?: () => void
+  /**
+   * Opens the Chronicle card (the sharing picture); no button without it. Called with the book being
+   * read: `history` (with a repo legend) asks for the repo's card, `session` for the session's.
+   */
+  onCard?: (view: BookView) => void
   /** Opens a past session's own book, from History. */
   onSession?: (id: string) => void
   onClose: () => void
@@ -63,6 +80,7 @@ export function LegendsBook({
   legend,
   markdown,
   history,
+  historyMarkdown,
   view: initial = "session",
   onCard,
   onSession,
@@ -82,6 +100,11 @@ export function LegendsBook({
   useModalFocus(head)
 
   const pages = useMemo<Page[]>(() => {
+    if (view === "history" && history?.legend)
+      return [
+        ...history.legend.eras.map((e) => ({ id: e.id, label: `${e.numeral} · ${unmarked(e.title)}` })),
+        { id: "end", label: "The end" },
+      ]
     if (view === "history")
       return history ? yearsOf(history).map(([year]) => ({ id: `y${year}`, label: String(year) })) : []
     if (!legend) return []
@@ -174,14 +197,24 @@ export function LegendsBook({
   }
 
   async function copy() {
-    if (!markdown) return
-    setCopied((await copyText(markdown)) ? "done" : "failed")
+    const text = view === "history" && history?.legend ? historyMarkdown : markdown
+    if (!text) return
+    setCopied((await copyText(text)) ? "done" : "failed")
   }
 
   const reading = view === "history" && history
+  const repoLegend = reading ? history.legend : undefined
   const title = reading ? history.repo : legend ? legend.title : "No legend yet"
   const eyebrow = reading ? "The Chronicle of" : legend ? "The Legend of" : "Legends"
-  const meta = reading ? historyMeta(history) : legend ? metaOf(legend) : undefined
+  const meta = repoLegend
+    ? repoLegend.meta
+    : reading
+      ? historyMeta(history)
+      : legend
+        ? metaOf(legend)
+        : undefined
+  const cardable = repoLegend ? true : Boolean(legend) && !reading
+  const copyable = repoLegend ? historyMarkdown !== undefined : Boolean(legend) && markdown !== undefined
   const current = pages[page]
 
   return (
@@ -214,21 +247,21 @@ export function LegendsBook({
               <button
                 type="button"
                 className="st-book-btn"
-                onClick={onCard}
-                disabled={!legend}
+                onClick={() => onCard(repoLegend ? "history" : "session")}
+                disabled={!cardable}
                 aria-haspopup="dialog"
-                title="A picture of this session to share"
+                title={repoLegend ? "A picture of this repo to share" : "A picture of this session to share"}
               >
                 <StoryGlyphs.card />
                 <span>Chronicle card</span>
               </button>
             )}
-            {markdown !== undefined && (
+            {(markdown !== undefined || historyMarkdown !== undefined) && (
               <button
                 type="button"
                 className="st-book-btn"
                 onClick={copy}
-                disabled={!legend}
+                disabled={!copyable}
                 aria-describedby={`${id}-copy`}
               >
                 {copied === "done" ? <StoryGlyphs.check /> : <StoryGlyphs.copy />}
@@ -238,7 +271,7 @@ export function LegendsBook({
               </button>
             )}
             <span id={`${id}-copy`} className="ui-visually-hidden">
-              Copies the legend as Markdown
+              {repoLegend ? "Copies the chronicle as Markdown" : "Copies the legend as Markdown"}
             </span>
             <button
               type="button"
@@ -291,7 +324,14 @@ export function LegendsBook({
           // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling region must be reachable by keyboard
           tabIndex={0}
         >
-          {reading ? (
+          {repoLegend ? (
+            <RepoPages
+              legend={repoLegend}
+              sessions={history?.sessions ?? []}
+              onSession={onSession}
+              onCard={onCard ? () => onCard("history") : undefined}
+            />
+          ) : reading ? (
             <HistoryPages history={history} onSession={onSession} />
           ) : !legend ? (
             <p className="st-book-empty">
@@ -324,7 +364,7 @@ export function LegendsBook({
                   <button
                     type="button"
                     className="st-book-btn st-book-btn-end"
-                    onClick={onCard}
+                    onClick={() => onCard("session")}
                     aria-haspopup="dialog"
                   >
                     <StoryGlyphs.card />
@@ -592,6 +632,191 @@ function SessionLine({ session: s, onSession }: { session: PastSession; onSessio
             <span className="ui-visually-hidden">: {s.title}</span>
           </button>
         )}
+      </div>
+    </li>
+  )
+}
+
+/** Text with code marks (`packages/ui`) as words and code. */
+function Marked({ text }: { text: string }) {
+  const parts = text.split(/(`[^`]+`)/)
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.startsWith("`") && part.endsWith("`") && part.length > 1 ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: a fixed split of one string
+          <code key={i} className="st-code">
+            {part.slice(1, -1)}
+          </code>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  )
+}
+
+/** A title's words without their code marks: for the footer's page names and alt texts. */
+function unmarked(text: string): string {
+  return text.replace(/`/g, "")
+}
+
+const ERA_GLYPH: Record<string, (p: { size?: number }) => React.ReactNode> = {
+  "first-commit": StoryGlyphs.island,
+  release: StoryGlyphs.sail,
+  founded: StoryGlyphs.born,
+  grew: StoryGlyphs.born,
+  renamed: Glyphs.quest,
+  gone: Glyphs.fail,
+  joined: Glyphs.join,
+  busiest: Glyphs.work,
+  reshaped: Glyphs.work,
+  besides: Glyphs.place,
+}
+
+const ERA_LABEL: Record<string, string> = {
+  "first-commit": "First stone",
+  release: "Release",
+  founded: "Founded",
+  grew: "Growth",
+  renamed: "Renamed",
+  gone: "Gone",
+  joined: "New hands",
+  busiest: "Busiest",
+  reshaped: "Reshaped",
+  besides: "Besides",
+}
+
+/** The repo told by era: an opening, one page per era with its island, and the close. */
+function RepoPages({
+  legend,
+  sessions,
+  onSession,
+  onCard,
+}: {
+  legend: RepoLegendView
+  sessions: readonly PastSession[]
+  onSession?: (id: string) => void
+  onCard?: () => void
+}) {
+  return (
+    <>
+      <p className="st-book-opening">{legend.opening}</p>
+      <ol className="st-chapters st-eras">
+        {legend.eras.map((era) => (
+          <EraPage
+            key={era.id}
+            era={era}
+            sessions={sessions.filter((s) => s.at >= era.begin && s.at <= era.end)}
+            onSession={onSession}
+          />
+        ))}
+      </ol>
+      <footer className="st-book-end" data-page="end">
+        <span className="st-fleuron" aria-hidden="true">
+          ❦
+        </span>
+        <h3 className="ui-visually-hidden" data-page-head tabIndex={-1}>
+          The end
+        </h3>
+        <p className="st-book-closing">{legend.closing}</p>
+        {onCard && (
+          <button
+            type="button"
+            className="st-book-btn st-book-btn-end"
+            onClick={onCard}
+            aria-haspopup="dialog"
+          >
+            <StoryGlyphs.card />
+            <span>Make the Chronicle card</span>
+          </button>
+        )}
+      </footer>
+    </>
+  )
+}
+
+function EraPage({
+  era,
+  sessions,
+  onSession,
+}: {
+  era: RepoEraView
+  sessions: readonly PastSession[]
+  onSession?: (id: string) => void
+}) {
+  // A long era dates its lines by the month; a short one by the day.
+  const long = era.end - era.begin > 300 * 86_400_000
+  const count = era.files.toLocaleString("en")
+  const facts = [
+    era.span,
+    era.release,
+    era.commits !== undefined ? `${era.commits.toLocaleString("en")} commits` : "",
+  ]
+  return (
+    <li className="st-chapter st-era" data-page={era.id}>
+      <header className="st-ch-head">
+        <span className="st-ch-num" aria-hidden="true">
+          {era.numeral}
+        </span>
+        <div className="st-ch-titles">
+          <h3 data-page-head tabIndex={-1}>
+            <span className="ui-visually-hidden">Chapter {era.numeral}: </span>
+            <span>
+              <Marked text={era.title} />
+            </span>
+          </h3>
+          <p className="st-ch-meta">{facts.filter(Boolean).join(" · ")}</p>
+        </div>
+      </header>
+      <figure className="st-era-island" data-empty={!era.image}>
+        {era.image ? (
+          <img
+            src={era.image}
+            alt={`The island at the end of ${unmarked(era.title)}: ${count} files.`}
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          <StoryGlyphs.island size={28} />
+        )}
+        <figcaption>
+          The island at its end: <span className="num">{count}</span> files
+        </figcaption>
+      </figure>
+      <p className="st-era-lede">{era.lede}</p>
+      <ol className="st-annals">
+        {era.milestones.map((m) => (
+          <EraLine key={`${m.kind}-${m.at}-${m.text}`} line={m} long={long} />
+        ))}
+        {sessions.map((s) => (
+          <SessionLine key={`s${s.id}`} session={s} onSession={onSession} />
+        ))}
+      </ol>
+    </li>
+  )
+}
+
+function EraLine({ line: m, long }: { line: RepoMilestoneView; long: boolean }) {
+  const Glyph = ERA_GLYPH[m.kind] ?? StoryGlyphs.born
+  const dated = m.kind !== "besides"
+  return (
+    <li className="st-annal" data-kind={m.kind}>
+      {dated ? (
+        <time className="st-annal-day" dateTime={isoDay(m.at)}>
+          {long ? monthOf(m.at) : dayOf(m.at)}
+        </time>
+      ) : (
+        <span className="st-annal-day" />
+      )}
+      <span className="st-annal-mark" aria-hidden="true">
+        <Glyph />
+      </span>
+      <div className="st-annal-words">
+        <p className="st-annal-title">
+          <span className="ui-visually-hidden">{ERA_LABEL[m.kind] ?? m.kind}: </span>
+          <Marked text={m.text} />
+        </p>
       </div>
     </li>
   )

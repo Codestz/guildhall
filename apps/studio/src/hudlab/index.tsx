@@ -5,7 +5,7 @@ import type { Screen } from "../screens.ts"
 import { replaceQuery } from "../shell/router.ts"
 import { type LabState, STATES } from "./fixtures.ts"
 import { HudLab, type LabOptions } from "./HudLab.tsx"
-import { TALES, type TaleName } from "./story.ts"
+import { REPO_NAMES, type RepoName, TALES, type TaleName } from "./story.ts"
 
 type StoryOptions_ = LabOptions["story"]
 
@@ -18,8 +18,10 @@ function storyOf(q: URLSearchParams): StoryOptions_ {
   const card = q.get("card")
   const chapter = q.get("chapter")
   const badge = q.get("badge")
+  const repo = REPO_NAMES.find((r) => r === q.get("repo")) ?? null
   return {
-    legends: legends === "history" ? "history" : legends ? "session" : null,
+    repo: repo as RepoName | null,
+    legends: legends === "history" || (repo && legends) ? "history" : legends ? "session" : null,
     card: card ? (TALE(card) ?? "saga") : null,
     format: q.get("format") === "portrait" ? "portrait" : "landscape",
     noframe: q.get("noframe") === "1",
@@ -43,7 +45,8 @@ const pickOf = (q: URLSearchParams): string | boolean => {
  * `pick=1` (or a hero id) opens a dossier, `settings=1`, `scale` history | session, `by=family`,
  * `still=1` holds the toasts for shots, `sheet` roster | chronicle opens one as a phone sheet, `dev=1` puts the fixture switch in Settings.
  * The story layer (U3, StoryLab.tsx): `legends=1|history`, `card=1|seas` (`format=portrait`, `noframe=1`),
- * `captions=1|<kind>|long`, `chapter=1|open`, `place=world|ui` (`fold=1`), `badge=1|open`, `tale=<story>`.
+ * `captions=1|<kind>|long`, `chapter=1|open`, `place=world|ui` (`fold=1`), `badge=1|open`, `tale=<story>`;
+ * `repo=guildhall|react` tells a repository by era (`legends=1` its History, `card=1` its card).
  */
 export const hudLab: Screen = {
   id: "hudlab",

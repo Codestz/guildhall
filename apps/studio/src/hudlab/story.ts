@@ -2,7 +2,8 @@
  * The story fixtures (U3): V1's told stories (public/lab/story/<name>.input.json, from main:packages/sim:
  * the Saga, the Seas, the party, the rush, the solo run) told by the sim's story port, exactly as the hall
  * will: `tellAll` → `legendOf` / `legendMarkdown` / `recapOf`, the Narrator's captions, the Saga's acts.
- * The repo's History is those five as past sessions plus Guildhall's own milestones. The place dossier's
+ * The repo's History is those five as past sessions plus Guildhall's own milestones; with `?repo=` it is
+ * a repository told by era from V1's bundled Repo Chronicles (`tellRepo`). The place dossier's
  * fixtures are the hex island's places for this repo's packages, with the party story's heroes.
  */
 import type { Change, SeaEvent } from "@guildhall/core"
@@ -13,11 +14,23 @@ import {
   legendOf,
   Narrator,
   type Recap,
+  readChronicle,
   recapOf,
+  repoLegendMarkdown,
+  repoLegendOf,
+  repoRecapOf,
   type StoryMoment,
   tellAll,
 } from "@guildhall/sim"
-import type { ChapterView, HeroView, PlaceDeed, PlaceView, RecapView, RepoHistory } from "@guildhall/ui"
+import type {
+  ChapterView,
+  HeroView,
+  PlaceDeed,
+  PlaceView,
+  RecapView,
+  RepoHistory,
+  RepoLegendView,
+} from "@guildhall/ui"
 import { HISTORY_MARKERS } from "./fixtures.ts"
 
 export const TALES = ["saga", "seas", "party", "rush", "solo"] as const
@@ -208,4 +221,56 @@ export function heroesAt(fixture: PlaceFixture, cast: readonly HeroView[]): Hero
 export function captionOf(told: Told, kind: string): Caption | undefined {
   if (kind === "long") return [...told.captions].sort((a, b) => b.text.length - a.text.length)[0]
   return told.captions.find((c) => c.kind === kind) ?? told.captions[0]
+}
+
+// ── a repository's story (sim story/repo) ──────────────────────────
+
+/** V1's bundled Repo Chronicles the lab tells (public/lab/repo/<name>.json.gz). */
+export const REPO_NAMES = ["guildhall", "react"] as const
+export type RepoName = (typeof REPO_NAMES)[number]
+
+export interface ToldRepo {
+  name: RepoName
+  legend: RepoLegendView
+  markdown: string
+  recap: RecapView
+  /** The island today: the last era's picture (the same `files(t)`). */
+  image: string
+}
+
+/**
+ * The island at each era's end, until the hall films it live (H1): stills of `/town/1?files=<files at
+ * the era's end>&life=0` at the rig's farthest framing, made by `tools/shots` into
+ * public/lab/repo/<name>/era-<n>.jpg. Seed 1 stands in for the repo's own island and its places (W1).
+ */
+const eraImage = (name: RepoName, n: number) => `/lab/repo/${name}/era-${n}.jpg`
+
+export async function tellRepo(name: RepoName): Promise<ToldRepo> {
+  const bytes = new Uint8Array(await (await fetch(`/lab/repo/${name}.json.gz`)).arrayBuffer())
+  const chronicle = await readChronicle(bytes)
+  const legend = repoLegendOf(chronicle)
+  const recap = repoRecapOf(chronicle)
+  return {
+    name,
+    legend: { ...legend, eras: legend.eras.map((era, i) => ({ ...era, image: eraImage(name, i + 1) })) },
+    markdown: repoLegendMarkdown(legend),
+    recap: {
+      kind: "repo",
+      title: recap.title,
+      guild: recap.repo,
+      story: recap.subtitle,
+      subtitle: recap.subtitle,
+      outcome: "underway",
+      numbers: recap.numbers,
+      lines: recap.lines.map((l) => ({
+        at: l.at,
+        kind: l.kind,
+        parts: l.parts,
+        text: l.parts[0]?.text ?? "",
+      })),
+      hero: recap.hero,
+      site: recap.link,
+    },
+    image: eraImage(name, legend.eras.length),
+  }
 }

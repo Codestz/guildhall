@@ -118,6 +118,60 @@ export interface RepoHistory {
   repo: string
   sessions: readonly PastSession[]
   milestones: readonly Milestone[]
+  /**
+   * The repo's own story by era (sim `repoLegendOf`): when given, History tells it chapter by chapter,
+   * each with the island as it was, and the past sessions fall into the eras they belong to.
+   */
+  legend?: RepoLegendView
+}
+
+// ── a repository's story by era (sim `repoLegendOf`) ───────────────
+
+/** `first-commit`, `release`, `founded`, `renamed`, `gone`, `joined`, `busiest`, `reshaped`, `grew`, `besides`. */
+export type RepoMilestoneKind = string
+
+/** One line of an era's annals. Text may hold code marks: `packages/ui` is drawn as code. */
+export interface RepoMilestoneView {
+  /** Epoch ms. */
+  at: number
+  kind: RepoMilestoneKind
+  text: string
+  unit?: string
+}
+
+export interface RepoEraView {
+  /** `I`, `II`, … */
+  numeral: string
+  id: string
+  title: string
+  /** `May 2013 – April 2016`. */
+  span: string
+  /** The major release that opened it: `v16.0.0`. */
+  release?: string
+  /** Epoch ms. */
+  begin: number
+  end: number
+  lede: string
+  /** The island at the era's end: its file count. */
+  files: number
+  commits?: number
+  milestones: readonly RepoMilestoneView[]
+  /**
+   * The island as it was at the era's end (`files(t)`): an image URL. The hall films it live (H1);
+   * without one the page shows the count alone.
+   */
+  image?: string
+}
+
+export interface RepoLegendView {
+  repo: string
+  /** How the eras were cut: `release`, `year`, `quarter`, `month`, `week`, `day`. */
+  rule: string
+  /** `13 years · 19,117 commits · 1,952 contributors · 130 releases`. */
+  meta: string
+  opening: string
+  eras: readonly RepoEraView[]
+  closing: string
 }
 
 // ── the Chronicle card (sim `recapOf`) ─────────────────────────────
@@ -129,15 +183,25 @@ export interface StoryPart {
 }
 
 export interface RecapView {
+  /**
+   * `session` (the default): a session's card, its hero moment tagged with its run time. `repo`: the
+   * Repo Chronicle card (sim `repoRecapOf`), "The Chronicle of owner/repo" over the island today.
+   */
+  kind?: "session" | "repo"
   title: string
   /** The guild's name: the repo (`Codestz/guildhall`). */
   guild: string
   /** `The Saga · Act V`, `Live`. */
   story: string
+  /** The line under the title, in place of `guild · story`: `Since May 2013 · 13 years`. */
+  subtitle?: string
   outcome: LegendView["outcome"]
   numbers: readonly { value: string; label: string }[]
   lines: readonly { at: number; kind: string; parts: readonly StoryPart[]; text: string }[]
-  hero?: { label: string; at: number }
+  /** The picture's tag. `mark` replaces the run-time clock: `7,252 files`. */
+  hero?: { label: string; at: number; mark?: string }
+  /** The footer's link, in place of the site's bare name: `guildhall.codestz.dev/hall/react/react`. */
+  site?: string
 }
 
 // ── captions and chapters (sim `Narrator`) ─────────────────────────

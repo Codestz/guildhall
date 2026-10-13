@@ -4,6 +4,8 @@
  * by V1's told stories through the sim's story port (story.ts). Query: `legends=1|history`, `card=1|seas`
  * (`format=portrait`, `noframe=1`), `captions=1|quest|plea|chapter|renown|complete|long`, `chapter=1|open`,
  * `place=world|ui` (`fold=1`), `badge=1|open`, `tale=saga|seas|party|rush|solo` (the book's story).
+ * `repo=guildhall|react` tells a repository instead (story/repo): `legends=1` opens its History by era,
+ * `card=1` its Repo Chronicle card (`format=portrait`).
  */
 import {
   type BookView,
@@ -23,11 +25,14 @@ import {
   heroesAt,
   historyOf,
   PLACES,
+  type RepoName,
   recapView,
   TALES,
   type TaleName,
   type Told,
+  type ToldRepo,
   tell,
+  tellRepo,
 } from "./story.ts"
 
 export interface StoryOptions {
@@ -41,6 +46,8 @@ export interface StoryOptions {
   fold: boolean
   badge: "chip" | "open" | null
   tale: TaleName
+  /** A repository told by era instead of the sessions' history. */
+  repo: RepoName | null
   still: boolean
   phone: boolean
   /** The lab's cast, for the place's heroes. */
@@ -53,7 +60,8 @@ const FRAME = "/lab/story/hero.jpg"
 export function StoryLab(opts: StoryOptions) {
   const [told, setTold] = useState<Partial<Record<TaleName, Told>>>({})
   const [book, setBook] = useState<BookView | null>(opts.legends)
-  const [card, setCard] = useState<TaleName | null>(opts.card)
+  const [card, setCard] = useState<TaleName | "repo" | null>(opts.repo && opts.card ? "repo" : opts.card)
+  const [repo, setRepo] = useState<ToldRepo | undefined>()
   const [placeOpen, setPlaceOpen] = useState(opts.place !== null)
   const [fold, setFold] = useState(opts.fold)
   const [act, setAct] = useState(2)
@@ -70,12 +78,27 @@ export function StoryLab(opts: StoryOptions) {
     }
   }, [])
 
+  useEffect(() => {
+    if (!opts.repo) return
+    let live = true
+    void tellRepo(opts.repo).then((told) => {
+      if (live) setRepo(told)
+    })
+    return () => {
+      live = false
+    }
+  }, [opts.repo])
+
   const tale = told[opts.tale]
   const saga = told.saga
   const history = useMemo(() => {
+    if (opts.repo)
+      return repo ? { repo: repo.legend.repo, sessions: [], milestones: [], legend: repo.legend } : undefined
     const all = TALES.flatMap((n) => told[n] ?? [])
     return all.length === TALES.length ? historyOf(all) : undefined
-  }, [told])
+  }, [told, repo, opts.repo])
+  // A repo of its own has no session of the guild's in the lab, but Guildhall's tales are its own.
+  const sessionTale = opts.repo && opts.repo !== "guildhall" ? undefined : tale
 
   // The strip: a still caption of a kind, or the Saga's captions told one after another.
   useEffect(() => {
@@ -94,7 +117,7 @@ export function StoryLab(opts: StoryOptions) {
     return () => clearTimeout(timer)
   }, [saga, opts.captions])
 
-  const cardTale = card ? told[card] : undefined
+  const cardTale = card && card !== "repo" ? told[card] : undefined
   const place = opts.place ? PLACES[opts.place] : undefined
 
   return (
@@ -121,7 +144,7 @@ export function StoryLab(opts: StoryOptions) {
           aria-haspopup="dialog"
           aria-expanded={card !== null}
           title="Chronicle card"
-          onClick={() => setCard(opts.tale)}
+          onClick={() => setCard(opts.repo ? "repo" : opts.tale)}
         >
           <StoryGlyphs.card size={18} />
         </button>
@@ -161,19 +184,31 @@ export function StoryLab(opts: StoryOptions) {
         </div>
       )}
 
-      {book && tale && (
+      {book && tale && (!opts.repo || history) && (
         <LegendsBook
-          legend={tale.legend}
-          markdown={tale.markdown}
+          legend={sessionTale?.legend}
+          markdown={sessionTale?.markdown}
           history={history}
+          historyMarkdown={repo?.markdown}
           view={book}
-          onCard={() => setCard(opts.tale)}
+          onCard={(view) => setCard(view === "history" && opts.repo ? "repo" : opts.tale)}
           onSession={() => setBook("session")}
           onClose={() => setBook(null)}
         />
       )}
 
-      {card && cardTale?.recap && (
+      {card === "repo" && repo && (
+        <ChronicleCard
+          recap={repo.recap}
+          image={opts.noframe ? undefined : repo.image}
+          focus={{ x: 0.5, y: 0.52 }}
+          format={opts.format}
+          link={`https://${repo.recap.site}`}
+          onClose={() => setCard(null)}
+        />
+      )}
+
+      {card && card !== "repo" && cardTale?.recap && (
         <ChronicleCard
           recap={recapView(cardTale.recap)}
           image={opts.noframe ? undefined : FRAME}

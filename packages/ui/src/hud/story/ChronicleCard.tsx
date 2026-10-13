@@ -1,6 +1,8 @@
 /**
  * The Chronicle card (V1's hud/Recap.tsx), fed by props: the session as one shareable picture, the
- * recap (sim `recapOf`) set over a hero frame in the ink wash with brass corner ticks. Two shapes,
+ * recap (sim `recapOf`) set over a hero frame in the ink wash with brass corner ticks. The same card
+ * tells a repository (`recap.kind` `repo`, sim `repoRecapOf`): "The Chronicle of owner/repo" over the
+ * island as it stands today, its figures, three highlights and its hall's link in the footer. Two shapes,
  * Open Graph's 1200 × 630 and a feed's 1080 × 1350, drawn to a canvas (cardDraw.ts); download the PNG,
  * copy the picture, or hand it to the share sheet where the browser can (phones).
  *
@@ -119,6 +121,7 @@ export function ChronicleCard({
   const shareable = useShareable()
   const copyable = useMemo(canCopyImage, [])
   const hero = recap.hero
+  const repo = recap.kind === "repo"
 
   async function onCopyImage() {
     const card = cards?.[format]
@@ -176,10 +179,20 @@ export function ChronicleCard({
           <div>
             <p className="ui-eyebrow">Chronicle card</p>
             <h2 id={`${id}-h`} ref={head} tabIndex={-1}>
-              Share this session
+              {repo ? "Share this repo" : "Share this session"}
             </h2>
             <p id={`${id}-d`} className="st-card-sub">
-              {hero ? (
+              {repo ? (
+                <>
+                  {recap.title} as one picture: the island as it stands today
+                  {hero?.mark ? (
+                    <>
+                      , at <span className="st-card-at num">{hero.mark}</span>
+                    </>
+                  ) : null}
+                  .
+                </>
+              ) : hero ? (
                 <>
                   The session as one picture, at <span className="st-card-at num">{clockOf(hero.at)}</span>:{" "}
                   {hero.label.charAt(0).toLowerCase() + hero.label.slice(1)}.
@@ -350,7 +363,8 @@ function useShareable(): boolean {
 export function altOf(recap: RecapView, format: Format): string {
   const numbers = recap.numbers.map((n) => `${n.value} ${n.label}`).join(", ")
   const lines = recap.lines.map((l) => l.text).join(" ")
-  return `${format === "landscape" ? "Landscape" : "Portrait"} Chronicle card: “${recap.title}”, ${recap.guild}, ${recap.story}. ${
+  const under = recap.subtitle ?? `${recap.guild}, ${recap.story}`
+  return `${format === "landscape" ? "Landscape" : "Portrait"} Chronicle card: “${recap.title}”, ${under}. ${
     recap.hero ? `Pictured: ${recap.hero.label}. ` : ""
   }${numbers}. ${lines}`
 }

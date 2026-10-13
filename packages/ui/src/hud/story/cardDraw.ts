@@ -2,8 +2,9 @@
 import type { StoryPart as CaptionPart, RecapView as Recap } from "./types.ts"
 
 /**
- * The Chronicle card, drawn: the hero frame (the hall films it, H1) with the recap (sim `recapOf`)
- * set over it in the hall's own voice — the og card's ink wash, brass corner ticks and hairline,
+ * The Chronicle card, drawn: the hero frame (the hall films it, H1) with the recap (sim `recapOf`, or
+ * for a repository `repoRecapOf`: the island today, its figures and three highlights) set over it in
+ * the hall's own voice — the og card's ink wash, brass corner ticks and hairline,
  * Marcellus SC for the marks, Alegreya for the tale, JetBrains Mono for the numbers (as /how sets
  * them). Two shapes: landscape 1200×630 (Open Graph's) and portrait 1080×1350 (a feed's).
  *
@@ -351,10 +352,12 @@ function tale(
 function tag(ctx: Ctx, recap: Recap, right: number, bottom: number, size: number) {
   const hero = recap.hero
   if (!hero) return
-  const clock = (() => {
-    const s = Math.floor(hero.at / 1000)
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
-  })()
+  const clock =
+    hero.mark ??
+    (() => {
+      const s = Math.floor(hero.at / 1000)
+      return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
+    })()
   ctx.font = `500 ${size}px ${F.body}`
   const words = hero.label
   const clockFont = `400 ${size - 2}px ${F.mono}`
@@ -382,13 +385,20 @@ function tag(ctx: Ctx, recap: Recap, right: number, bottom: number, size: number
   ctx.fillText(words, x + padX + cw + size * 0.8, base)
 }
 
-function footer(ctx: Ctx, x: number, y: number, size: number) {
+/** The crest, the name and the link: the site, or the repo's hall on it (`guildhall.codestz.dev/hall/…`). */
+function footer(ctx: Ctx, recap: Recap, x: number, y: number, size: number, width: number) {
   crest(ctx, x, y - size * 1.05, size * 1.3)
   const w = caps(ctx, "Guildhall", x + size * 1.9, y, size, C.brass, 0.14)
   ctx.font = `400 ${size * 0.88}px ${F.body}`
   ctx.fillStyle = C.faint
-  ctx.fillText("guildhall.codestz.dev", x + size * 1.9 + w + size * 1.1, y)
+  const at = x + size * 1.9 + w + size * 1.1
+  ctx.fillText(clipTo(ctx, recap.site ?? SITE, width - (at - x)), at, y)
 }
+
+const SITE = "guildhall.codestz.dev"
+
+/** The line under the title: the repo card's own, or `guild · story`. */
+const subtitleOf = (recap: Recap) => recap.subtitle ?? `${recap.guild}  ·  ${recap.story}`
 
 function landscape(
   ctx: Ctx,
@@ -422,13 +432,13 @@ function landscape(
   ctx.font = `400 17px ${F.body}`
   ctx.fillStyle = C.muted
   y += 32
-  ctx.fillText(clipTo(ctx, `${recap.guild}  ·  ${recap.story}`, w), x, y)
+  ctx.fillText(clipTo(ctx, subtitleOf(recap), w), x, y)
   y += 22
   ctx.fillStyle = C.brassLine
   ctx.fillRect(x, y, 220, 1)
   y = numbers(ctx, recap, { x, y: y + 20, w }, 3, { value: 26, label: 14, row: 58 })
   tale(ctx, recap, { x, y: y + 28, w }, 16.5, 21, 10, H - 84)
-  footer(ctx, x, H - 46, 14)
+  footer(ctx, recap, x, H - 46, 14, 600)
   tag(ctx, recap, W - 52, H - 44, 15)
 }
 
@@ -471,13 +481,13 @@ function portrait(
   ctx.font = `400 25px ${F.body}`
   ctx.fillStyle = C.muted
   y += 48
-  ctx.fillText(clipTo(ctx, `${recap.guild}  ·  ${recap.story}`, w), x, y)
+  ctx.fillText(clipTo(ctx, subtitleOf(recap), w), x, y)
   y += 30
   ctx.fillStyle = C.brassLine
   ctx.fillRect(x, y, 300, 1.5)
   y = numbers(ctx, recap, { x, y: y + 30, w }, 3, { value: 40, label: 20, row: 78 })
   tale(ctx, recap, { x, y: y + 44, w }, 25, 32, 16, H - 90)
-  footer(ctx, x, H - 60, 21)
+  footer(ctx, recap, x, H - 60, 21, w)
 }
 
 /** `text` shortened with `…` to fit `width` in the context's font. */
@@ -498,9 +508,12 @@ export function cardBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   )
 }
 
-/** The PNG's file name: `guildhall-chronicle-codestz-guildhall-make-quill-work-offline.png` (sim `fileNameOf`). */
-export function cardFileName(recap: Pick<Recap, "guild" | "title">, format: Format): string {
-  const full = `${recap.guild} ${recap.title}`
+/**
+ * The PNG's file name: `guildhall-chronicle-codestz-guildhall-make-quill-work-offline.png` (sim
+ * `fileNameOf`); a repo's is its name alone, `guildhall-chronicle-react-react.png` (sim `repoCardName`).
+ */
+export function cardFileName(recap: Pick<Recap, "guild" | "title" | "kind">, format: Format): string {
+  const full = (recap.kind === "repo" ? recap.title : `${recap.guild} ${recap.title}`)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")

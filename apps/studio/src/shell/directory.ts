@@ -60,6 +60,13 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         dev: true,
       },
       {
+        id: "replay",
+        name: "History replay",
+        purpose:
+          "A repository's island grown from its first commit: scrub the history and the tiles come in, no rebuild.",
+        dev: true,
+      },
+      {
         id: "hudlab",
         name: "HUD lab",
         purpose:

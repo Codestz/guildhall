@@ -34,16 +34,29 @@ import {
   type Night,
   type Post,
   type PostAa,
+  type Stage,
   type StaticBatch,
+  type Sun,
   setLod,
   shoreFieldTexture,
   type TerrainMesh,
+  type VertexMeshData,
+  vertexMeshData,
   type Water,
 } from "@guildhall/render"
+import type { Viewer } from "@guildhall/ui"
 import { roman } from "@guildhall/ui"
-import { HEX_TILE_SIZE, hexIsland, hexWorld, hexZones, LEVEL_STEP } from "@guildhall/world"
+import {
+  HEX_TILE_SIZE,
+  type HexIsland,
+  type HexWorld,
+  hexIsland,
+  hexWorld,
+  hexZones,
+  LEVEL_STEP,
+} from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
-import type { Screen } from "../screens.ts"
+import type { Screen, ScreenCtx } from "../screens.ts"
 import { current } from "../shell/router.ts"
 import { mountViewer } from "../shell/viewer.ts"
 import { islandWorld, worldCamera } from "../shell/worldCamera.ts"
@@ -159,10 +172,47 @@ function startJob(spec: Promise<HexJobSpec>): Stages {
   }
 }
 
+/** The road strips' colour (`createSurface`). */
+export const ROAD_COLOR = "#d9c08c"
+
+/**
+ * What another screen lays over the island as it is built (the history replay, `replay/`): it draws the
+ * island's triangle soups its own way, is handed the built parts, and may take the transport.
+ */
+export interface WorldHooks {
+  /** Draws the ground, the stairs and bridges, or the road strips (their normals and linear colours ready). */
+  mesh(stage: Stage, data: VertexMeshData, kind: "ground" | "structures" | "roads"): TerrainMesh
+  /** The transport is the hook's (the day's clock is still set by `ext.clock`). */
+  transport?: boolean
+  /** Once the island is drawn and its pure parts are built on this thread. */
+  built(parts: {
+    island: HexIsland
+    world: HexWorld
+    batch: StaticBatch
+    life: Life | null
+    doors: Doors
+    water: Water | null
+    sun: Sun
+    stage: Stage
+    viewer: Viewer
+    groundAt(x: number, z: number): number
+    land: number
+  }): void
+}
+
 export const hexWorldScreen: Screen = {
   id: "hexworld",
   title: "Hex island",
-  mount(outer, ctx) {
+  mount: (outer, ctx) => mountHexWorld(outer, ctx),
+}
+
+/** The hex island screen; `hooks` lets another screen draw and drive parts of it (`WorldHooks`). */
+export const mountHexWorld = (outer: HTMLElement, ctx: ScreenCtx, hooks?: WorldHooks): (() => void) =>
+  world.mount(outer, ctx, hooks)
+
+// A method, so the mount's body keeps the depth it had as the screen's own `mount` (its diffs stay small).
+const world = {
+  mount(outer: HTMLElement, ctx: ScreenCtx, hooks?: WorldHooks): () => void {
     const t0 = performance.now()
     const since = () => Math.round(performance.now() - t0)
     const num = (k: string, d: number) => {
@@ -249,9 +299,17 @@ export const hexWorldScreen: Screen = {
       steps.progress(0.08, 150)
       go("Ground", 0.28)
       const R = HEX_TILE_SIZE
-      if (m.paths.length) meshes.push(createSurface(stage, m.paths, "#d9c08c"))
+      if (m.paths.length)
+        meshes.push(
+          hooks
+            ? hooks.mesh(stage, vertexMeshData(m.paths, new Float32Array(m.paths.length)), "roads")
+            : createSurface(stage, m.paths, ROAD_COLOR),
+        )
       // stone stairs where roads step down, plank bridges over the rivers: built like the ground
-      if (m.structures) meshes.push(createVertexMesh(stage, m.structures))
+      if (m.structures)
+        meshes.push(
+          hooks ? hooks.mesh(stage, m.structures, "structures") : createVertexMesh(stage, m.structures),
+        )
       const span = m.span
       const hour = num("hour", 15.5)
       const sun = createSun(stage, { town: { min: [-span, -3, -span], max: [span, 20, span] } })
@@ -272,25 +330,27 @@ export const hexWorldScreen: Screen = {
         night?.setHour(now)
       }
       show(hour)
-      const day = viewer.transport({
-        label: "Time of day",
-        value: hour,
-        min: 0,
-        max: 24,
-        step: 0.05,
-        rate: 0.5,
-        wrap: true,
-        format: clock,
-        onChange: show,
-      })
-      unTick = () => day.dispose()
+      const day = hooks?.transport
+        ? null
+        : viewer.transport({
+            label: "Time of day",
+            value: hour,
+            min: 0,
+            max: 24,
+            step: 0.05,
+            rate: 0.5,
+            wrap: true,
+            format: clock,
+            onChange: show,
+          })
+      unTick = () => day?.dispose()
       // for shots: set the clock as a drag would
       const ext = window.guildhall?.ext
       if (ext)
         ext.clock = {
           get: () => now,
           set: (h: number) => {
-            day.set(h)
+            day?.set(h)
             show(h)
           },
         }
@@ -310,7 +370,12 @@ export const hexWorldScreen: Screen = {
       const arrived = since()
       const groundAt = heightsAt(g.heights)
       if (g.prisms) meshes.push(createHexGround(stage, { size: R, base: -2.5, tiles: g.prisms }))
-      else if (g.mesh) meshes.push(createVertexMesh(stage, g.mesh, undefined, { speckle: detail }))
+      else if (g.mesh)
+        meshes.push(
+          hooks
+            ? hooks.mesh(stage, g.mesh, "ground")
+            : createVertexMesh(stage, g.mesh, undefined, { speckle: detail }),
+        )
       cam.start(islandWorld(span, (x, zz) => groundAt(x, zz), 0))
       // The first frame with the ground in it: timed once it has been drawn (a task after the frame).
       const firstFrame = new Promise<number>((done) => {
@@ -370,13 +435,18 @@ export const hexWorldScreen: Screen = {
       sun.markDirty()
       // ---- life (track B): townsfolk and agents on the walk graph; `?life=0` turns it off ----
       let world: ReturnType<typeof hexWorld> | null = null
-      if (ctx.query.get("life") !== "0") {
-        go("Townsfolk", 0.92)
+      let island: HexIsland | null = null
+      const alive = ctx.query.get("life") !== "0"
+      if (alive || hooks) {
         // Life plans on the map itself: its pure parts built again here (~0.1 s), once the island is drawn.
-        const island = hexIsland({ ...shape, seed, files })
+        island = hexIsland({ ...shape, seed, files })
         const zones = hexZones(island, { wild: nature.wild })
-        const built = hexWorld(island, zones, { step, nature })
-        world = built
+        world = hexWorld(island, zones, { step, nature })
+      }
+      if (alive && island && world) {
+        go("Townsfolk", 0.92)
+        const zones = hexZones(island, { wild: nature.wild })
+        const built = world
         life = createLife(stage, {
           host,
           island,
@@ -413,6 +483,20 @@ export const hexWorldScreen: Screen = {
       })
       if (disposed) return
       const made = doors
+      if (hooks && island && world)
+        hooks.built({
+          island,
+          world,
+          batch,
+          life,
+          doors,
+          water,
+          sun,
+          stage,
+          viewer,
+          groundAt,
+          land: m.stats.land,
+        })
       if (window.guildhall?.ext)
         window.guildhall.ext.doors = {
           stats: () => ({

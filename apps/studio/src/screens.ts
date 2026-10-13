@@ -68,6 +68,7 @@ export const SCREENS: readonly Screen[] = [
   lazy("hexscale", "Scale board", () => import("./hexscale/index.ts").then((m) => m.hexScale)),
   lazy("hudlab", "HUD lab", () => import("./hudlab/index.tsx").then((m) => m.hudLab)),
   lazy("sitelab", "Site lab", () => import("./sitelab/index.tsx").then((m) => m.siteLab)),
+  lazy("replay", "History replay", () => import("./replay/index.ts").then((m) => m.replayLab)),
 ]
 
 export const DEFAULT_SCREEN = "island"

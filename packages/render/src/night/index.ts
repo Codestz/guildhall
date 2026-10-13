@@ -53,6 +53,11 @@ export interface Night {
   hour(): number
   /** Runs the clock at `speed` hours per second (0 stops it). */
   cycle(speed: number): void
+  /**
+   * Leaves dark what stands where `at(x, z)` says (a history replay's land not yet risen): its lamps'
+   * pools, halos and real lights, and its lit windows. Null lights the whole town again.
+   */
+  hide(at: ((x: number, z: number) => boolean) | null): void
   stats(): NightStats
   dispose(): void
 }
@@ -88,6 +93,10 @@ export function createNight(
     hour: () => hour,
     cycle(next) {
       speed = next
+    },
+    hide(at) {
+      lamps.hide(at)
+      windows.hide(at)
     },
     stats: () => ({
       hour,

@@ -159,6 +159,11 @@ export interface Lamps {
   update(level: number, dt: number): void
   /** Real lights lit last frame. */
   lit(): number
+  /**
+   * Puts out the lamps standing where `at(x, z)` says (a history replay's land not yet risen): no pool,
+   * no halo, no real light. Null lights them all again.
+   */
+  hide(at: ((x: number, z: number) => boolean) | null): void
   dispose(): void
 }
 
@@ -201,11 +206,20 @@ export function createLamps(stage: Pick<Stage, "scene" | "getCamera">, points: r
   halos.renderOrder = 10
 
   const m = new Matrix4()
-  points.forEach((p, i) => {
+  const NONE = new Matrix4().makeScale(0, 0, 0)
+  const hidden = new Uint8Array(points.length)
+  const place = (i: number) => {
+    const p = points[i] as LightPoint
     const r = p.radius
+    if (hidden[i]) {
+      pools.setMatrixAt(i, NONE)
+      halos.setMatrixAt(i, NONE)
+      return
+    }
     pools.setMatrixAt(i, m.makeScale(2 * r, 1, 2 * r).setPosition(p.at[0], POOL_Y, p.at[2]))
     halos.setMatrixAt(i, m.makeTranslation(p.at[0], p.at[1], p.at[2]))
-  })
+  }
+  for (let i = 0; i < points.length; i++) place(i)
   for (const mesh of [pools, halos]) {
     mesh.instanceMatrix.needsUpdate = true
     // Spread over the whole town: always drawn (one call each), never culled as one box.
@@ -231,14 +245,17 @@ export function createLamps(stage: Pick<Stage, "scene" | "getCamera">, points: r
   const assign = () => {
     target.set(...stage.getCamera().target)
     points.forEach((p, i) => {
-      distance[i] = Math.hypot(p.at[0] - target.x, p.at[1] - target.y, p.at[2] - target.z)
+      // a lamp put out is never handed a light
+      distance[i] = hidden[i]
+        ? Number.POSITIVE_INFINITY
+        : Math.hypot(p.at[0] - target.x, p.at[1] - target.y, p.at[2] - target.z)
     })
     order.sort((a, b) => (distance[a] as number) - (distance[b] as number))
     const next = order.length > MAX_LIGHTS ? (distance[order[MAX_LIGHTS] as number] as number) : Infinity
     lit = 0
     lights.forEach((light, k) => {
       const i = order[k]
-      if (i === undefined || level <= 0) {
+      if (i === undefined || level <= 0 || hidden[i]) {
         light.intensity = 0
         return
       }
@@ -266,6 +283,19 @@ export function createLamps(stage: Pick<Stage, "scene" | "getCamera">, points: r
       assign()
     },
     lit: () => lit,
+    hide(at) {
+      let moved = false
+      points.forEach((p, i) => {
+        const h = at?.(p.at[0], p.at[2]) ? 1 : 0
+        if (h === hidden[i]) return
+        hidden[i] = h
+        place(i)
+        moved = true
+      })
+      if (!moved) return
+      pools.instanceMatrix.needsUpdate = true
+      halos.instanceMatrix.needsUpdate = true
+    },
     dispose() {
       for (const mesh of [pools, halos]) {
         mesh.removeFromParent()

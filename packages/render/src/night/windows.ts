@@ -133,6 +133,8 @@ export interface Windows {
   /** `level` the lamplight (0 day, 1 night), `night` how dark the sky is, `hour` for who is asleep. */
   update(level: number, night: number, hour: number): void
   readonly count: number
+  /** Leaves out the panes standing where `at(x, z)` says (land not yet risen); null puts them all back. */
+  hide(at: ((x: number, z: number) => boolean) | null): void
   dispose(): void
 }
 
@@ -190,11 +192,16 @@ export function createWindows(stage: Pick<Stage, "scene">, windows: readonly Win
   const up = new Vector3(0, 1, 0)
   const p = new Vector3()
   const s = new Vector3()
-  windows.forEach((w, i) => {
-    q.setFromAxisAngle(up, w.rot)
-    mesh.setMatrixAt(i, m.compose(p.set(...w.at), q, s.set(1, w.h, w.w)))
+  const NONE = new Matrix4().makeScale(0, 0, 0)
+  const hidden = new Uint8Array(windows.length)
+  const place = (i: number) => {
+    const w = windows[i] as WindowLight
+    if (hidden[i]) m.copy(NONE)
+    else m.compose(p.set(...w.at), q.setFromAxisAngle(up, w.rot), s.set(1, w.h, w.w))
+    mesh.setMatrixAt(i, m)
     spill.setMatrixAt(i, m)
-  })
+  }
+  for (let i = 0; i < windows.length; i++) place(i)
   for (const each of [mesh, spill]) {
     each.instanceMatrix.needsUpdate = true
     each.computeBoundingSphere()
@@ -209,6 +216,19 @@ export function createWindows(stage: Pick<Stage, "scene">, windows: readonly Win
       spill.visible = level > 0.001
     },
     count: windows.length,
+    hide(at) {
+      let moved = false
+      windows.forEach((w, i) => {
+        const h = at?.(w.at[0], w.at[2]) ? 1 : 0
+        if (h === hidden[i]) return
+        hidden[i] = h
+        place(i)
+        moved = true
+      })
+      if (!moved) return
+      mesh.instanceMatrix.needsUpdate = true
+      spill.instanceMatrix.needsUpdate = true
+    },
     dispose() {
       for (const each of [mesh, spill]) {
         each.removeFromParent()

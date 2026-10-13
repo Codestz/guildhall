@@ -181,7 +181,8 @@ vec3 mirroredSky( vec3 r ) {
 /**
  * A history replay's reveal over the water (reveal.ts): the hex under a pixel is read off a texture of
  * the tiles' places; land not yet revealed is open sea with a shore along the tiles that are, and an
- * inland pool comes in with its tile (dithered, like the ground).
+ * inland pool comes in with its tile: it sinks and rises with it (`REVEAL_VERTEX`, by the pool's own hex),
+ * or dithers in with it when nothing rises.
  */
 const REVEAL_PARS = /* glsl */ `
 #ifdef REVEAL
@@ -199,6 +200,22 @@ vec3 revealHexAt(float q, float r) {
 	int side = 2 * uRevealRadius + 1;
 	if (x < 0 || y < 0 || x >= side || y >= side) return vec3(-1.0);
 	return texelFetch(uRevealPlaces, ivec2(x, y), 0).rgb;
+}
+#endif`
+
+/**
+ * A pool sinks with its tile (the grow look): its hex's place is read at its centre (`poolAt`, the same
+ * for its seven vertices), so the surface rises in its bed with the ground round it instead of standing
+ * whole over a tile still under the sea.
+ */
+const REVEAL_VERTEX = /* glsl */ `
+#ifdef REVEAL
+if (inland > 0.5) {
+	float poolR = floor(poolAt.y / (1.5 * uRevealTile) + 0.5);
+	float poolQ = floor(poolAt.x / (1.7320508 * uRevealTile) - poolR * 0.5 + 0.5);
+	float poolPlace = revealHexAt(poolQ, poolR).r;
+	float poolW = poolPlace < 0.0 ? 1.0 : clamp((uRevealCount - poolPlace) / uRevealSpan, 0.0, 1.0);
+	transformed.y -= uRevealSink * (1.0 - poolW);
 }
 #endif`
 
@@ -222,8 +239,8 @@ const REVEAL_FRAGMENT = /* glsl */ `
 	float revealHere = revealHex.r;
 	float revealW = revealHere < 0.0 ? 1.0 : clamp((uRevealCount - revealHere) / uRevealSpan, 0.0, 1.0);
 	if (wInland) {
-		// a pool comes in with its tile: whole as soon as the tile rises (it covers the sea under the
-		// bed), dithered in with it when nothing rises (the dither look)
+		// a pool comes in with its tile: it rises in its bed with it (REVEAL_VERTEX), or dithers in
+		// with it when nothing rises (the dither look)
 		if (revealW <= 0.0) discard;
 		if (revealW < 1.0 && uRevealSink <= 0.0) {
 			float revealD = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
@@ -260,7 +277,8 @@ function patchWater(
   shader.vertexShader = shader.vertexShader
     .replace(
       "#include <common>",
-      `#include <common>\nattribute float shore;\nattribute float inland;\nattribute vec2 flow;\nuniform float uTime;\nvarying float vShore;\nvarying float vInland;\nvarying vec3 vWater;\nvarying vec2 vFlow;`,
+      () =>
+        `#include <common>\nattribute float shore;\nattribute float inland;\nattribute vec2 flow;\nuniform float uTime;\nvarying float vShore;\nvarying float vInland;\nvarying vec3 vWater;\nvarying vec2 vFlow;\n${REVEAL_PARS}\n#ifdef REVEAL\nattribute vec2 poolAt;\n#endif`,
     )
     .replace(
       "#include <begin_vertex>",
@@ -272,6 +290,7 @@ vFlow = flow;
 // across its surface (the same at a shared corner, so pools never crack apart)
 float bobPhase = inland > 0.5 ? dot(position.xz, vec2(0.37, 0.23)) : 0.0;
 transformed.y += (inland > 0.5 ? 0.018 : 0.05) * (0.6 * sin(uTime * 1.1 + bobPhase) + 0.4 * sin(uTime * 0.7 - bobPhase * 1.7));
+${REVEAL_VERTEX}
 vWater = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
     )
   shader.fragmentShader = shader.fragmentShader
@@ -495,6 +514,8 @@ export function createFieldWater(stage: Stage, opts: FieldWaterOpts): Water {
   const position = new Float32Array(n * 3)
   const inland = new Float32Array(n)
   const flow = new Float32Array(n * 2)
+  // each pool vertex's hex centre: a history replay sinks the pool with its tile (REVEAL_VERTEX)
+  const poolAt = new Float32Array(n * 2)
   // a corner's flow is the mean of the pools that share it, so the current turns smoothly between hexes
   const cornerFlow = new Map<string, [number, number, number]>()
   const key = (x: number, z: number) => `${Math.round(x * 20)},${Math.round(z * 20)}`
@@ -526,6 +547,7 @@ export function createFieldWater(stage: Stage, opts: FieldWaterOpts): Water {
     const c = v
     position.set([t.x, t.y, t.z], v * 3)
     flow.set(t.flow ?? [0, 0], v * 2)
+    for (let k = 0; k < 7; k++) poolAt.set([t.x, t.z], (v + k) * 2)
     inland[v++] = 1
     for (let k = 0; k < 6; k++) {
       const [x, z] = cornerAt(t, k)
@@ -544,6 +566,7 @@ export function createFieldWater(stage: Stage, opts: FieldWaterOpts): Water {
   geometry.setAttribute("shore", new BufferAttribute(new Float32Array(n), 1))
   geometry.setAttribute("inland", new BufferAttribute(inland, 1))
   geometry.setAttribute("flow", new BufferAttribute(flow, 2))
+  geometry.setAttribute("poolAt", new BufferAttribute(poolAt, 2))
   geometry.setIndex(index)
   geometry.computeBoundingSphere()
   logger.info("field water", { pools: hexes.length, half: h })

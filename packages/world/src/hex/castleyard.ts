@@ -7,10 +7,15 @@
  *   the heart        the court before the great hall (or the keep): banners and benches for whoever waits;
  *   the others       by turns: a practice target (a straw bale with a shield, a guard's drill spot in
  *                    front of it, spots.ts), benches under a lantern, barrels and crates against the wall,
- *                    a flag on its pole.
+ *                    a flag on its pole;
+ *   by the wall      (tier 2 up, world.ts gives them out by turns) a yard of one trade: the stables (hay,
+ *                    a cart, its wheel), the smithy (an anvil, the grindstone, firewood), a well with
+ *                    benches, the stores, or the barracks' drill.
  *
- * Benches give seats and targets drill spots through spots.ts's piece rules (court tiles carry no
- * authored spots); every piece is placed only where it clears the path strips by a stride.
+ * Benches give seats, targets drill spots and the anvil a smith's place through spots.ts's piece rules
+ * (court tiles carry no authored spots); every piece is placed only where it clears the path strips by
+ * a stride. Away from the gate and the heart a court's things stand as one group: the first in the
+ * corner farthest from its ways (against the wall where it belongs there), the rest gathered round it.
  */
 import { hash2 } from "../geom/noise.ts"
 import { HEX_TILE_SIZE, KENNEY_WOOD, type PlacedPiece } from "./tiles.ts"
@@ -18,7 +23,10 @@ import { HEX_TILE_SIZE, KENNEY_WOOD, type PlacedPiece } from "./tiles.ts"
 type P = [number, number]
 
 /** What a court is for: by the gate, the heart, before the barracks' door (drill), a tower's (stores). */
-export type CourtKind = "gate" | "heart" | "drill" | "stores" | "plain"
+export type CourtKind = "gate" | "heart" | "drill" | "stores" | "plain" | "stables" | "smithy" | "well"
+
+/** The trades a walled court is given by turns (world.ts), each a yard of its own along the wall. */
+export const COURT_THEMES: readonly CourtKind[] = ["stables", "smithy", "well", "stores", "drill"]
 
 /** One thing a court may hold: its pieces round a point (local: +z away from the court's middle), its size. */
 interface Item {
@@ -85,6 +93,11 @@ const ITEMS: Record<string, Item> = {
     wall: false,
     pieces: () => [{ piece: "kenney-castle/flag", x: 0, z: 0, rot: 0, scale: 0.4 }],
   },
+  bale: {
+    r: 0.35,
+    wall: true,
+    pieces: () => [{ piece: "kenney-graveyard/hay-bale-bundled", x: 0, z: 0, rot: 0.2, scale: 0.5 }],
+  },
   hay: {
     r: 0.6,
     wall: true,
@@ -126,6 +139,29 @@ const ITEMS: Record<string, Item> = {
     wall: false,
     pieces: () => [{ piece: "kenney-survival/bucket", x: 0, z: 0, rot: 0, scale: 0.6 }],
   },
+  anvil: {
+    // (with room for the smith in front of it)
+    r: 0.75,
+    wall: true,
+    // its smith's place on the court's side (spots.ts): the anvil turned so it stands in front of it
+    pieces: () => [{ piece: "kenney-survival/workbench-anvil", x: 0, z: 0, rot: Math.PI, scale: 0.9 }],
+  },
+  grindstone: {
+    r: 0.4,
+    wall: true,
+    pieces: () => [{ piece: "kaykit-tools/grindstone", x: 0, z: 0, rot: 0.4, scale: 0.35 }],
+  },
+  wheel: {
+    r: 0.35,
+    wall: true,
+    // a spare cart wheel leant on the wall
+    pieces: () => [{ piece: "kenney-town/wheel", x: -0.48, z: 0, rot: 0.3, scale: 0.42 }],
+  },
+  well: {
+    r: 0.85,
+    wall: true,
+    pieces: (c) => [{ piece: `kaykit-hexagon/building-well-${c}`, x: 0, z: 0, rot: 0, scale: 0.28 }],
+  },
   barrels: {
     r: 0.5,
     wall: true,
@@ -150,6 +186,16 @@ const PLANS: Record<CourtKind, string[][]> = {
     ["stores", "chest", "keg", "barrel", "box"],
     ["keg", "stores", "box", "chest", "barrel"],
   ],
+  // yards of one trade along the wall (COURT_THEMES)
+  stables: [
+    ["hay|bale", "cart|wheel", "hay|bale", "bucket", "barrel"],
+    ["cart|hay|bale", "hay|bale", "bucket", "bale", "wheel"],
+  ],
+  smithy: [
+    ["anvil|grindstone", "logs", "grindstone", "barrel", "box"],
+    ["anvil|grindstone", "grindstone", "keg", "logs", "bucket"],
+  ],
+  well: [["well|bucket", "bench", "bucket", "bench", "barrel"]],
   // (each with small things last, for what room is left)
   plain: [
     ["target", "bench", "hay", "barrels", "barrel", "bucket"],
@@ -218,27 +264,53 @@ export function courtDressing(
   const spots: { p: P; d: number; wall: boolean }[] = []
   for (let d = 0; d < 6; d++) {
     const [ux, uz] = dir(d)
-    for (const out of [1.95, 1.7, 1.45, 1.2, 1.0])
-      for (const side of [0, -0.6, 0.6, -1.1, 1.1])
+    for (const out of [2.2, 1.95, 1.7, 1.45, 1.2, 1.0, 0.8])
+      for (const side of [0, -0.3, 0.3, -0.6, 0.6, -0.85, 0.85, -1.1, 1.1, -1.35, 1.35])
         spots.push({ p: [ux * out - uz * side, uz * out + ux * side], d, wall: walls.includes(d) })
     // and out in the corner between two sides, where two ways leave the most room
     const [vx, vz] = [Math.cos((Math.PI / 3) * d + Math.PI / 6), -Math.sin((Math.PI / 3) * d + Math.PI / 6)]
-    for (const out of [2.25, 2.0, 1.75])
+    for (const out of [2.4, 2.25, 2.0, 1.75, 1.5])
       spots.push({ p: [vx * out, vz * out], d, wall: walls.includes(d) || walls.includes((d + 1) % 6) })
   }
+  // how far a spot stands from the court's ways (from its middle, if none run through)
+  const room = (p: P): number =>
+    strips.length ? Math.min(...strips.map((s) => toRay(p, s))) : Math.hypot(p[0], p[1])
+  // by the gate and before the hall a pair stands either side; elsewhere the court's things gather
+  const grouped = kind !== "gate" && kind !== "heart"
+  let group: P | undefined
   const out: PlacedPiece[] = []
-  for (const [k, name] of plan.entries()) {
-    const item = ITEMS[name]!
-    // against the wall where it belongs there, else where the court opens; a pair stands either side
-    const order = [...spots].sort(
-      (a, b) =>
-        Number(b.wall === item.wall) - Number(a.wall === item.wall) ||
-        hash2(seed, k, a.d * 31 + Math.round(a.p[0] * 10)) -
-          hash2(seed, k, b.d * 31 + Math.round(b.p[0] * 10)),
-    )
-    const spot = order.find((s) => fits(s.p, item.r))
-    if (!spot) continue
+  for (const [k, names] of plan.entries()) {
+    const jitter = (s: { p: P; d: number }) => hash2(seed, k, s.d * 31 + Math.round(s.p[0] * 10))
+    // the first against the wall where it belongs there, else where the court opens: scattered by the
+    // seed, or (grouped) in the corner farthest from the ways; the rest as near it as they fit, a wall
+    // thing by the wall a little before the nearest spot
+    const key = (item: Item, s: { p: P; d: number; wall: boolean }) =>
+      !grouped
+        ? jitter(s)
+        : group
+          ? Math.hypot(s.p[0] - group[0], s.p[1] - group[1]) +
+            (s.wall === item.wall ? 0 : 0.6) +
+            jitter(s) * 0.2
+          : -room(s.p) + jitter(s) * 0.4
+    const find = (item: Item) =>
+      [...spots]
+        .sort(
+          (a, b) =>
+            (grouped && group ? 0 : Number(b.wall === item.wall) - Number(a.wall === item.wall)) ||
+            key(item, a) - key(item, b),
+        )
+        .find((s) => fits(s.p, item.r))
+    // ("hay|bale": the first of them that fits, so a tight court keeps its trade in something smaller)
+    let item: Item | undefined
+    let spot: ReturnType<typeof find>
+    for (const name of names.split("|")) {
+      item = ITEMS[name]!
+      spot = find(item)
+      if (spot) break
+    }
+    if (!item || !spot) continue
     taken.push([spot.p[0], spot.p[1], item.r])
+    group ??= spot.p
     // the item's +z looks out from the court's middle: its front (−z) toward it
     const face = Math.atan2(spot.p[0], spot.p[1])
     const c = Math.cos(face)

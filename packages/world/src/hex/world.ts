@@ -4,7 +4,7 @@
  * ground prisms, the path strips, the water tiles and the pieces, for the 3D screen to draw.
  */
 import { hash2 } from "../geom/noise.ts"
-import { courtDressing } from "./castleyard.ts"
+import { COURT_THEMES, type CourtKind, courtDressing } from "./castleyard.ts"
 import { DOOR_HALF, DOOR_RUN } from "./checks.ts"
 import {
   fitToTiles,
@@ -826,6 +826,60 @@ export function hexWorld(
       if (atTier(id)) yards.set(i, id)
     })
   }
+  /** The sides of a castle tile the curtain wall stands on (tier 2 up): those leaving the castle. */
+  const walledSides = (i: number): number[] => {
+    const plan = z.castle!
+    const nb = g.neighbours(i)
+    return plan.tier >= 2 ? [0, 1, 2, 3, 4, 5].filter((e) => nb[e]! < 0 || !plan.role.has(nb[e]!)) : []
+  }
+  /** The sides of a castle tile a building's door opens through onto it (that building's role). */
+  const doorSides = (i: number, role?: string): number[] => {
+    const plan = z.castle!
+    const nb = g.neighbours(i)
+    return [0, 1, 2, 3, 4, 5].filter(
+      (e) =>
+        nb[e]! >= 0 &&
+        plan.door.get(nb[e]!) === (e + 3) % 6 &&
+        (role === undefined || plan.role.get(nb[e]!) === role),
+    )
+  }
+  /**
+   * What each castle court is for (castleyard.ts), so its things read as one yard of one trade along
+   * the wall: by the gate, the heart, the drill before the barracks' door; every other court against
+   * the curtain wall, nearest the heart first, a trade no yard tile or court has yet (a court before a
+   * tower its stores while they are still to give), then by turns; an open court inside, plain.
+   */
+  const courtKinds = new Map<number, CourtKind>()
+  if (z.castle) {
+    const plan = z.castle
+    const given = new Set<CourtKind>(COURT_THEMES.filter((k) => [...yards.values()].includes(`castle-${k}`)))
+    const courts = plan.tiles
+      .filter((i) => plan.role.get(i) === "court")
+      .sort((a, b) => steps(a, plan.heart) - steps(b, plan.heart) || a - b)
+    for (const i of courts) {
+      const kind: CourtKind | undefined =
+        i === plan.gate
+          ? "gate"
+          : i === plan.heart
+            ? "heart"
+            : doorSides(i, "barracks").length
+              ? "drill"
+              : undefined
+      if (kind) courtKinds.set(i, kind)
+      if (kind === "drill") given.add(kind)
+    }
+    let turn = 0
+    for (const i of courts) {
+      if (courtKinds.has(i) || !walledSides(i).length) continue
+      const fresh = COURT_THEMES.filter((k) => !given.has(k))
+      const kind =
+        doorSides(i, "tower").length && fresh.includes("stores")
+          ? "stores"
+          : (fresh[0] ?? COURT_THEMES[turn++ % COURT_THEMES.length]!)
+      courtKinds.set(i, kind)
+      given.add(kind)
+    }
+  }
   /** The castle's colour: its keep's (every castle tile takes it). */
   const castleZone = z.zones.find((q) => q.kind === "castle")
   const castleColour = recolour(
@@ -921,26 +975,10 @@ export function hexWorld(
           paths.push(...tilePath([x, zz], t + 0.07, sides, 1.1))
           pathSides = sides
         }
-        const walled =
-          plan.tier >= 2 ? [0, 1, 2, 3, 4, 5].filter((e) => nb[e]! < 0 || !plan.role.has(nb[e]!)) : []
-        // (a court before the barracks' door drills, before a tower's keeps its stores)
-        const fronts = (r: string) =>
-          [0, 1, 2, 3, 4, 5].some(
-            (e) => nb[e]! >= 0 && plan.role.get(nb[e]!) === r && plan.door.get(nb[e]!) === (e + 3) % 6,
-          )
-        const kind =
-          i === plan.gate
-            ? "gate"
-            : i === plan.heart
-              ? "heart"
-              : fronts("barracks")
-                ? "drill"
-                : fronts("tower")
-                  ? "stores"
-                  : "plain"
+        const walled = walledSides(i)
+        const kind = courtKinds.get(i) ?? "plain"
         // a building whose door opens onto this court keeps its way to it clear, as a path does
-        const doors = [0, 1, 2, 3, 4, 5].filter((e) => nb[e]! >= 0 && plan.door.get(nb[e]!) === (e + 3) % 6)
-        const clear = [...new Set([...sides, ...doors])]
+        const clear = [...new Set([...sides, ...doorSides(i)])]
         // (once the curtain wall stands, clear of it as built: below)
         courts.push((blocked) =>
           courtDressing([x, zz], t, clear, walled, kind, castleColour, seed + i, blocked),

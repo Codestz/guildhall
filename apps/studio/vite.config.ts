@@ -536,7 +536,7 @@ export const SITE_URL = (process.env.STUDIO_SITE_URL ?? "https://studio.guildhal
 )
 
 /** The public pages a crawler is pointed at (the Studio's tools and the labs are reachable from them). */
-export const SITEMAP_PATHS = ["/", "/demos", "/built", "/studio", "/hall/facebook/react"]
+export const SITEMAP_PATHS = ["/", "/demos", "/harbour", "/built", "/studio", "/hall/facebook/react"]
 
 export function sitemap(site: string, paths: readonly string[] = SITEMAP_PATHS): string {
   const urls = paths.map((p) => `  <url><loc>${site}${p}</loc></url>`).join("\n")

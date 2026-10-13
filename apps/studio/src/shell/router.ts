@@ -20,6 +20,7 @@ export const ROUTES: readonly Route[] = [
   // the site: the live island is the home; the Studio is a section of it at /studio
   { screen: "island", path: "" },
   { screen: "demos", path: "demos" },
+  { screen: "harbour", path: "harbour" },
   { screen: "built", path: "built" },
   { screen: "hall", path: "hall", param: { key: "repo", parts: 2 } },
   { screen: "home", path: "studio" },

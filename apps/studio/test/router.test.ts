@@ -87,6 +87,7 @@ describe("router", () => {
     for (const url of [
       "/",
       "/demos",
+      "/harbour",
       "/built",
       "/hall/facebook/react",
       "/studio",

@@ -82,6 +82,12 @@ export interface HallHudProps {
   session?: HudSession
   /** The hall's time: which scale the bar shows (the Chronicle follows it). */
   time?: HallTime | null
+  /**
+   * The site's home, not a repo's hall: the island has no places to list (its zones are not a repo's units),
+   * no history to tell, and its Brand is the guild at work. `story` names what plays; `leave` is the way
+   * out of a told story.
+   */
+  home?: { title: string; leave?: { label: string; href: string } }
 }
 
 const nothing = () => () => {}
@@ -367,9 +373,13 @@ export function HallHud(props: HallHudProps) {
   const scale = useSyncExternalStore(props.time?.subscribe ?? nothing, props.time?.scale ?? historyScale)
   const [hero, setHero] = useState<string | null>(null)
 
+  const home = props.home
   const brand = useMemo(
-    () => brandOf(parts.repo, slug, parts.places.length, chronicle),
-    [parts, slug, chronicle],
+    () =>
+      home
+        ? { name: home.title, source: { kind: "history" as const }, status: "", stats: [] }
+        : brandOf(parts.repo, slug, parts.places.length, chronicle),
+    [parts, slug, chronicle, home],
   )
   const rows = useMemo(() => placeRows(parts.places, parts.repo), [parts])
   const unitAt = useMemo(() => placeOfUnit(parts.places, parts.repo), [parts])
@@ -462,9 +472,15 @@ export function HallHud(props: HallHudProps) {
 
   const about = (
     <>
+      {home && (
+        <p>
+          Events in, a living world out: every tool call a coding agent makes is a deed on this island. What
+          plays now is told for the demo; point it at your own sessions on your machine.
+        </p>
+      )}
       {brand.description && <p>{brand.description}</p>}
       {brand.built && <p className="hall-about-quiet">{brand.built}.</p>}
-      {brand.sketch && (
+      {!home && brand.sketch && (
         <p>
           {brand.sketch.why === "not-chronicled"
             ? "A sketch, not this repo's island: there is no chronicle for it yet, so the land is the generator's own at a default size."
@@ -472,6 +488,11 @@ export function HallHud(props: HallHudProps) {
         </p>
       )}
       <p className="hall-about-links">
+        {home?.leave && (
+          <Link href={home.leave.href} go={props.go}>
+            {home.leave.label}
+          </Link>
+        )}
         {props.request && (
           <a className="site-link" href={props.request} target="_blank" rel="noreferrer">
             Request a chronicle
@@ -582,9 +603,11 @@ export function HallHud(props: HallHudProps) {
                 )}
               </RailButton>
             )}
-            <RailButton id="places" label="Places" open={placesOpen} onClick={() => toggle("places")}>
-              <Glyphs.place size={18} />
-            </RailButton>
+            {!home && (
+              <RailButton id="places" label="Places" open={placesOpen} onClick={() => toggle("places")}>
+                <Glyphs.place size={18} />
+              </RailButton>
+            )}
             <RailButton
               id="chronicle"
               label="Chronicle"

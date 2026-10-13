@@ -26,8 +26,8 @@ const at = (url: string) => {
 }
 
 describe("site routes", () => {
-  test("the site's four screens are the site; the Studio's are not", () => {
-    for (const id of ["island", "demos", "built", "hall"]) expect(isSiteScreen(id)).toBe(true)
+  test("the site's five screens are the site; the Studio's are not", () => {
+    for (const id of ["island", "demos", "harbour", "built", "hall"]) expect(isSiteScreen(id)).toBe(true)
     for (const id of ["home", "pieces", "town", "sitelab"]) expect(isSiteScreen(id)).toBe(false)
     expect(isSiteScreen(null)).toBe(false)
   })
@@ -50,6 +50,7 @@ describe("site routes", () => {
     expect(key("/hall/facebook/react")).not.toBe(key("/hall/vitejs/vite"))
     expect(key("/?seed=4")).not.toBe(key("/"))
     expect(key("/built")).toBe("built")
+    expect(key("/harbour")).toBe("harbour")
     // a Studio screen remounts on any URL change
     expect(key("/pieces?q=a")).not.toBe(key("/pieces?q=b"))
   })
@@ -104,7 +105,7 @@ describe("site routes", () => {
 
   test("the palette lists the site's places before the Studio's tools", () => {
     const ids = jumpable().map((p) => p.tool.id)
-    expect(ids.slice(0, 4)).toEqual(["island", "hall", "demos", "built"])
+    expect(ids.slice(0, 5)).toEqual(["island", "hall", "demos", "harbour", "built"])
     expect(ids).toContain("home")
     expect(ids).toContain("pieces")
   })

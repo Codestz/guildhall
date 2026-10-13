@@ -111,6 +111,19 @@ describe("the host config (deploy/vercel.v2.json)", () => {
     }
     expect(rules.rewrite("/lab/hexworld")).toBe("/index.html")
     expect(rules.rewrite("/hall/vercel/next.js")).toBe("/index.html")
+    expect(rules.rewrite("/harbour")).toBe("/index.html")
+  })
+
+  test("V1's old pages go to their V2 homes: /harbour.html is the harbour, /how is How it's built", () => {
+    const { redirects } = JSON.parse(readFileSync(HOST_CONFIG, "utf8")) as {
+      redirects: { source: string; destination: string }[]
+    }
+    const go = (path: string) => redirects.find((r) => new RegExp(`^${r.source}$`).test(path))?.destination
+    expect(go("/harbour.html")).toBe("/harbour")
+    expect(go("/harbour")).toBeUndefined()
+    expect(go("/how")).toBe("/built")
+    expect(go("/how.html")).toBe("/built")
+    expect(go("/demos.html")).toBe("/demos")
   })
 
   test("files and unknown paths are not the app (the host answers 404 for a missing one)", () => {
@@ -137,7 +150,7 @@ describe("the host config (deploy/vercel.v2.json)", () => {
   test("robots points at the sitemap, which lists the public pages", () => {
     expect(robots("https://x.dev")).toContain("Sitemap: https://x.dev/sitemap.xml")
     const xml = sitemap("https://x.dev")
-    for (const p of ["/", "/demos", "/built", "/studio"])
+    for (const p of ["/", "/demos", "/harbour", "/built", "/studio"])
       expect(xml).toContain(`<loc>https://x.dev${p}</loc>`)
   })
 })

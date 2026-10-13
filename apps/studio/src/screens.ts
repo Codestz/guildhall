@@ -47,12 +47,13 @@ function lazy(id: string, title: string, load: () => Promise<Screen>): Screen {
 
 /**
  * Every screen the app can open (paths in `shell/router.ts`). New screens register here, one line each:
- * `lazy("<id>", "<title>", () => import("<file>").then((m) => m.<screen>))`. The site's four (the island,
- * the demos over it, How it's built, a repo's hall) share one chunk, `site/index.tsx`.
+ * `lazy("<id>", "<title>", () => import("<file>").then((m) => m.<screen>))`. The site's five (the island,
+ * the demos over it, the harbour, How it's built, a repo's hall) share one chunk, `site/index.tsx`.
  */
 export const SCREENS: readonly Screen[] = [
   lazy("island", "Island", () => import("./site/index.tsx").then((m) => m.island)),
   lazy("demos", "Demos", () => import("./site/index.tsx").then((m) => m.demos)),
+  lazy("harbour", "Harbour", () => import("./site/index.tsx").then((m) => m.harbour)),
   lazy("built", "How it's built", () => import("./site/index.tsx").then((m) => m.built)),
   lazy("hall", "Your repo", () => import("./site/index.tsx").then((m) => m.hall)),
   lazy("home", "Home", () => import("./home/index.tsx").then((m) => m.home)),

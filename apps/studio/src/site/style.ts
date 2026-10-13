@@ -18,19 +18,11 @@ const CSS = /* css */ `
 .site-world .ui-viewer[data-phone] { --hud-top: 64px; --gut: 12px; }
 .site-root[data-dev] .site-world .ui-hud-rail { top: 60px; }
 
-.gh .site-chip { position: absolute; z-index: 20; background: rgba(21, 17, 13, 0.95); }
-.gh .site-chip {
-  left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px;
-  max-width: calc(100% - 32px); padding: 8px 8px 8px 16px; border-radius: 999px;
-}
-.gh .site-chip b { font: 400 15px/1.2 var(--display); letter-spacing: 0.05em; color: var(--paper); white-space: nowrap; }
-.gh .site-chip span { font: 13px/1.3 var(--body); color: var(--muted); }
-.gh .site-chip .ui-btn { flex: none; }
-
-@media (max-width: 560px) {
-  .gh .site-chip { bottom: 12px; border-radius: 14px; align-items: flex-start; flex-wrap: wrap; }
-  .gh .site-chip span { display: none; }
-}
+/* the welcome bar owns the foot of the screen while it is up: the HUD's bottom row rides above it (SiteApp sets
+   --welcome-h to the bar's height); on a phone the Chronicle chip rides up with it */
+.site-root[data-welcome] .ui-hud-bottom { bottom: calc(var(--gut) + var(--welcome-h, 0px) + 12px); }
+.site-root[data-welcome] .ui-viewer[data-phone] .ui-hud-bottom { bottom: calc(var(--welcome-h, 0px) + 24px + env(safe-area-inset-bottom)); }
+.site-root[data-welcome] .ui-viewer[data-phone] .ui-hud-feed { bottom: calc(var(--welcome-h, 0px) + 24px + 64px + env(safe-area-inset-bottom)); }
 `
 
 let users = 0

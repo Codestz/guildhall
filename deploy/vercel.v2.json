@@ -8,12 +8,12 @@
   "trailingSlash": false,
   "redirects": [
     { "source": "/(how|how\\.html)", "destination": "/built", "permanent": false },
-    { "source": "/(harbour|harbour\\.html)", "destination": "/demos", "permanent": false },
+    { "source": "/harbour\\.html", "destination": "/harbour", "permanent": false },
     { "source": "/demos\\.html", "destination": "/demos", "permanent": false }
   ],
   "rewrites": [
     {
-      "source": "/(demos|built|hall|studio|pieces|palette|composer|npcs|grips|town)",
+      "source": "/(demos|harbour|built|hall|studio|pieces|palette|composer|npcs|grips|town)",
       "destination": "/index.html"
     },
     {

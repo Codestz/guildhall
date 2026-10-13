@@ -199,6 +199,8 @@ export interface MapStage {
   lamps: [number, number, number][]
   /** The repo's places as built (none without `places`), in zone order. */
   places: BuiltPlace[]
+  /** What each zone is (by its index): a story told on an island with no repo binds its folders by these. */
+  zoneKinds: string[]
   /** Where the event FX happen (render events/sites.ts): the castle's keep, the harbours' berths, the places' hearts. */
   sites: EventSites
   stats: {
@@ -469,6 +471,7 @@ export function runHexJob(
       lamps: w.pieces
         .filter((p) => p.piece === LANTERN)
         .map((p) => [p.x, p.y + 2.03 * p.scale, p.z] as [number, number, number]),
+      zoneKinds: z.zones.map((zone) => zone.kind),
       places: z.zones.flatMap((zone, zi) => {
         const heart = zone.place ? w.tiles.find((t) => t.i === zone.tile) : undefined
         if (!zone.place || !heart) return []

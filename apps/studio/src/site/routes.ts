@@ -3,6 +3,7 @@
  *
  * - `/`            the live island, with the first-visit welcome card
  * - `/demos`       the demo picker over the island (a story opens as `/?story=<id>`)
+ * - `/harbour`     the live chronicles: every repo with its whole history read
  * - `/built`       How it's built, with the journey
  * - `/hall/<o>/<r>` a repo's island; `/hall` alone asks for the repo
  * - `/studio`, `/pieces`, …  the Studio, public and view-only off localhost
@@ -14,7 +15,7 @@ import { parseRepo, type SiteDest, type Story } from "@guildhall/ui"
 import { canonical, href } from "../shell/router.ts"
 
 /** The screen ids that belong to the site (everything else is the Studio). */
-export const SITE_SCREENS: readonly string[] = ["island", "demos", "built", "hall"]
+export const SITE_SCREENS: readonly string[] = ["island", "demos", "harbour", "built", "hall"]
 
 export const isSiteScreen = (id: string | null): id is string => id !== null && SITE_SCREENS.includes(id)
 
@@ -22,6 +23,7 @@ export const isSiteScreen = (id: string | null): id is string => id !== null && 
 export const DEST_SCREEN: Record<SiteDest, string> = {
   repo: "hall",
   demos: "demos",
+  harbour: "harbour",
   studio: "home",
   built: "built",
 }
@@ -74,7 +76,7 @@ export function worldKey(screen: string, query: URLSearchParams): string {
  */
 export function mountKey(screen: string, query: URLSearchParams, url: string): string {
   if (!isSiteScreen(screen)) return url
-  return screen === "built" ? "built" : worldKey(screen, query)
+  return screen === "built" || screen === "harbour" ? screen : worldKey(screen, query)
 }
 
 /** The query the island's world is built with: the repo's seed in a hall, the URL's own otherwise. */

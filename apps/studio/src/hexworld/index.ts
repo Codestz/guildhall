@@ -64,6 +64,7 @@ import {
 } from "@guildhall/world"
 import { mountSound } from "../audio/mount.ts"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
+import type { HallSession } from "../hall/feeds/session.ts"
 import type { Screen, ScreenCtx } from "../screens.ts"
 import { current } from "../shell/router.ts"
 import { mountViewer } from "../shell/viewer.ts"
@@ -264,6 +265,11 @@ export interface HexWorldExtra {
    * cover (it shows as the cover lifts). Returns its unmount.
    */
   hud?: (parts: HudParts) => () => void
+  /**
+   * The island has no repo but plays a session (the site's home: a demo guild or a told story): its
+   * heroes are that session's, planned as its log grows. Returns the session once its HUD has started it.
+   */
+  session?: () => HallSession | null
 }
 
 /** What the island hands a hall's HUD. */
@@ -279,6 +285,8 @@ export interface HudParts {
   onPick(fn: (index: number) => void): void
   /** The day's clock, hours: as the time-of-day drag sets it. */
   clock: { get(): number; set(hour: number): void }
+  /** What each zone is, by index (`job.ts` `zoneKinds`): where a story's folders go on an island with no repo. */
+  zoneKinds: readonly string[]
   /** The event FX (with `extra.fx` or `?fx=`), else null. */
   fx: Fx | null
   /** Where a session's hero is drawn now (its feet, metres; null: not on the island, or no life). */
@@ -389,7 +397,7 @@ const world = {
     // the authored tile prefabs (data/tiles) before anything is built from them in the worker
     // the agents life plans with (lifeAgents.ts): the demo story; `?agents=0` none; a hall playing a
     // session (`?feed=`) none at first, then its session's heroes (sessionAgents.ts, once its HUD is up)
-    const session = hall && ctx.query.has("feed")
+    const session = extra.session !== undefined || (hall && ctx.query.has("feed"))
     const agentsFeed = lifeOn && !session ? agentFeedOf(ctx.query.get("agents")) : Promise.resolve(null)
     const job = startJob(
       Promise.all([read, loadTiles(), agentsFeed]).then(([, tiles, agents]) => ({
@@ -796,6 +804,7 @@ const world = {
           stage,
           repo: stats.repo,
           places: m.places,
+          zoneKinds: m.zoneKinds,
           labels,
           onPick: (fn) => {
             pick = fn
@@ -807,7 +816,11 @@ const world = {
       // a hall's session drives its heroes: planned in the worker as its log grows (the HUD starts the
       // session as it mounts, which may be a moment after this: looked for until it is there)
       if (session && life)
-        void import("../hall/hud/mount.tsx").then(({ hallSession }) => {
+        void (
+          extra.session
+            ? Promise.resolve(extra.session)
+            : import("../hall/hud/mount.tsx").then((m) => m.hallSession)
+        ).then((hallSession) => {
           const look = (tries: number) => {
             const playing = hallSession()
             if (disposed || !life) return

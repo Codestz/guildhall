@@ -4,9 +4,9 @@
  * from it: hexworld/hall.ts) and the hall's HUD (hall/hud, which tells it), and the live catalog as
  * extra demo cards.
  */
-import { type Catalog, type ChronicleResult, chronicleFor, loadCatalog } from "@guildhall/sim"
+import { type CatalogEntry, type ChronicleResult, chronicleFor, loadCatalog } from "@guildhall/sim"
 import type { Story } from "@guildhall/ui"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { type HallRepo, repoOf } from "../hexworld/hall.ts"
 
 /** One fetch per repo while the page lives: the world and the note read the same answer. A failed read is forgotten, so a retry asks again. */
@@ -35,17 +35,39 @@ export async function hallRepo(slug: string): Promise<HallRepo> {
   return { kind: "sketch", name: slug, why: "unavailable", reason: found.reason }
 }
 
-/** The live catalog's repos as demo cards on their own shelf (none while it cannot be read). */
-export function useLiveStories(): readonly Story[] {
-  const [stories, setStories] = useState<readonly Story[]>([])
+/** The live catalog as the site reads it: loading, its repos, or why it could not be read. */
+export type CatalogState =
+  | { status: "loading" }
+  | { status: "ok"; repos: readonly CatalogEntry[] }
+  | { status: "unavailable"; reason: string }
+
+/** The chronicles catalog, read once per page (the demo picker's live shelf and the harbour share it). */
+let catalogRead: Promise<CatalogState> | null = null
+function readCatalog(): Promise<CatalogState> {
+  catalogRead ??= loadCatalog().then((r): CatalogState => {
+    if (r.status === "ok") return { status: "ok", repos: r.catalog.repos }
+    catalogRead = null
+    return { status: "unavailable", reason: r.reason }
+  })
+  return catalogRead
+}
+
+export function useCatalog(): CatalogState {
+  const [state, setState] = useState<CatalogState>({ status: "loading" })
   useEffect(() => {
     let live = true
-    void loadCatalog().then((r) => live && r.status === "ok" && setStories(liveStories(r.catalog)))
+    void readCatalog().then((s) => live && setState(s))
     return () => {
       live = false
     }
   }, [])
-  return stories
+  return state
+}
+
+/** The live catalog's repos as demo cards on their own shelf (none while it cannot be read). */
+export function useLiveStories(): readonly Story[] {
+  const catalog = useCatalog()
+  return useMemo(() => (catalog.status === "ok" ? liveStories(catalog) : []), [catalog])
 }
 
 const FALLBACK_ART = "/site/demos/island.webp"
@@ -53,7 +75,7 @@ const FALLBACK_ART = "/site/demos/island.webp"
 export const repoArt = (repo: string): string => `/site/repos/${repo.replace("/", "__").toLowerCase()}.webp`
 
 /** One card per repo the backend has read. */
-export function liveStories(catalog: Catalog): Story[] {
+export function liveStories(catalog: { repos: readonly CatalogEntry[] }): Story[] {
   return catalog.repos.map((r) => ({
     id: `live-${r.repo}`,
     shelf: "Live chronicles",

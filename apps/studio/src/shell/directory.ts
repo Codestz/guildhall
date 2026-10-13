@@ -176,6 +176,11 @@ export const SITE_GROUP: ToolGroup = {
     { id: "island", name: "The island", purpose: "The live island: the first thing the site shows." },
     { id: "hall", name: "Your repo", purpose: "Grow any public GitHub repo into an island: owner/repo." },
     { id: "demos", name: "Demos", purpose: "Stories, crowds and real repos, one link away." },
+    {
+      id: "harbour",
+      name: "Harbour",
+      purpose: "Every repo chronicled from its first commit, one island each.",
+    },
     { id: "built", name: "How it's built", purpose: "The engineering, with the journey, in plain words." },
   ],
 }

@@ -6,9 +6,10 @@ import { holdStudioStyle } from "../browser/style.ts"
 import { createClock, createHallTime, type HallTime } from "../hall/clock.ts"
 import type { HudParts } from "../hexworld/index.ts"
 import type { Screen, ScreenCtx } from "../screens.ts"
-import { href } from "../shell/router.ts"
+import { current, href } from "../shell/router.ts"
 import { addShellStyle } from "../shell/style.ts"
 import { hallChronicle, hallRepo } from "./chronicle.ts"
+import { homeSession } from "./homeHud.tsx"
 import { setHudBottom } from "./hudSlot.ts"
 import { openUrl } from "./nav.ts"
 import { destHref, hallSlug, worldQuery } from "./routes.ts"
@@ -76,7 +77,9 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
       const history = withWorld && slug && ctx.query.get("history") !== "0"
       // `?feed=live|replay|story`: the hall's session (hall/feeds), started by its HUD, on the bar's Session scale
       const feed = withWorld && slug ? ctx.query.get("feed") : null
-      const time: HallTime | null = history || feed ? createHallTime(createClock()) : null
+      // the home (the island, the demos over it, a bare /hall) plays a session of its own: its bar is the Session scale
+      const home = withWorld && !slug
+      const time: HallTime | null = history || feed || home ? createHallTime(createClock()) : null
 
       // The pieces first: fonts permitting (they settle within 3 s), the card is the first paint.
       void studio.ready.then(() => {
@@ -91,19 +94,17 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
         // a repo's hall builds from the repo's chronicle (hexworld/hall.ts), read while the 3D code streams in
         const repo = slug ? hallRepo(slug) : undefined
         // the hall's HUD (hall/hud) goes up on the island's Viewer once the island is built
-        const hud = slug
+        const hud = home
           ? (parts: HudParts) => {
               let off = () => {}
               let done = false
               setHudBottom(parts.viewer.hud.bottom)
-              void import("../hall/hud/mount.tsx").then(({ mountHallHud }) => {
-                if (done || gone) return
-                off = mountHallHud(parts, {
-                  slug,
+              void import("./homeHud.tsx").then(({ mountHomeHud }) => {
+                if (done || gone || !time) return
+                off = mountHomeHud(parts, {
                   go: openUrl,
-                  hrefs: { another: href("hall"), demos: destHref("demos") },
-                  retry: () => openUrl(href("hall", { repo: slug, try: String(Date.now() % 100000) })),
-                  query: ctx.query,
+                  hrefs: { another: href("hall"), demos: destHref("demos"), island: href("island") },
+                  query: current().query,
                   time,
                 })
               })
@@ -113,7 +114,29 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
                 off()
               }
             }
-          : undefined
+          : slug
+            ? (parts: HudParts) => {
+                let off = () => {}
+                let done = false
+                setHudBottom(parts.viewer.hud.bottom)
+                void import("../hall/hud/mount.tsx").then(({ mountHallHud }) => {
+                  if (done || gone) return
+                  off = mountHallHud(parts, {
+                    slug,
+                    go: openUrl,
+                    hrefs: { another: href("hall"), demos: destHref("demos") },
+                    retry: () => openUrl(href("hall", { repo: slug, try: String(Date.now() % 100000) })),
+                    query: ctx.query,
+                    time,
+                  })
+                })
+                return () => {
+                  done = true
+                  setHudBottom(null)
+                  off()
+                }
+              }
+            : undefined
         ctx
           .load(
             Promise.all([
@@ -133,7 +156,8 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
                   : null
               // a hall with a session (`?feed=`) shows its events on the island: CI weather, PR ships, scaffolds
               const fx = ctx.query.has("feed")
-              const offMap = mountHexWorld(world, inner, past?.hooks, repo ? { repo, hud, fx } : {})
+              const extra = repo ? { repo, hud, fx } : home ? { hud, fx: true, session: homeSession } : {}
+              const offMap = mountHexWorld(world, inner, past?.hooks, extra)
               offWorld = () => {
                 offMap()
                 past?.dispose()
@@ -170,11 +194,13 @@ function writeT(t: string | null): void {
   if (url.href !== location.href) history.replaceState(history.state, "", url)
 }
 
-/** `/`: the live island, with the first-visit welcome card. */
+/** `/`: the live island with its HUD and the demo guild at work, and the first-visit welcome bar. */
 export const island = siteScreen("island", "Island", true)
 /** `/demos`: the demo picker over the island. */
 export const demos = siteScreen("demos", "Demos", true)
 /** `/hall/<owner>/<repo>`: a repo's island (and, bare, the card that asks for the repo). */
 export const hall = siteScreen("hall", "Your repo", true)
+/** `/harbour`: the repos chronicled from their first commit. */
+export const harbour = siteScreen("harbour", "Harbour", false)
 /** `/built`: How it's built, with the journey. */
 export const built = siteScreen("built", "How it's built", false)

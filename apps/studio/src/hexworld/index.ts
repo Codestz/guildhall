@@ -67,6 +67,7 @@ import { atmoKnobs, createIslandAir, type IslandAir } from "./atmo.ts"
 import { createDoors, type Doors } from "./doors.ts"
 import { type HallRepo, hallBuild, hallSubtitle, placeRows } from "./hall.ts"
 import {
+  type BuiltPlace,
   batchSets,
   type FromWorker,
   type GroundMode,
@@ -224,6 +225,26 @@ export interface WorldHooks {
 export interface HexWorldExtra {
   /** Resolves to the repo once its chronicle is read (null: the island's own, as `/town`); the build waits for it. */
   repo?: Promise<HallRepo | null>
+  /**
+   * A hall's HUD (hall/hud), mounted into the Viewer's HUD regions once the island is built, under the
+   * cover (it shows as the cover lifts). Returns its unmount.
+   */
+  hud?: (parts: HudParts) => () => void
+}
+
+/** What the island hands a hall's HUD. */
+export interface HudParts {
+  viewer: Viewer
+  stage: Stage
+  repo: HallRepo | null
+  /** The repo's places as built, in zone order (none on a sketch). */
+  places: BuiltPlace[]
+  /** Their plates (null with `?labels=0`): shown or hidden, one marked open. */
+  labels: PlaceLabels | null
+  /** A plate was clicked or tapped: its place's index in `places`. */
+  onPick(fn: (index: number) => void): void
+  /** The day's clock, hours: as the time-of-day drag sets it. */
+  clock: { get(): number; set(hour: number): void }
 }
 
 /** What `window.guildhall.ext.hall` tells the shots: how long each part took, and the places built. */
@@ -358,6 +379,9 @@ const world = {
     let doors: Doors | null = null
     let labels: PlaceLabels | null = null
     let island: HexIsland | null = null
+    let unHud = () => {}
+    let pick: ((index: number) => void) | null = null
+    let dayClock: HudParts["clock"] = { get: () => 0, set: () => {} }
     const meshes: TerrainMesh[] = []
 
     const build = async () => {
@@ -416,15 +440,15 @@ const world = {
           })
       unTick = () => day?.dispose()
       // for shots: set the clock as a drag would
+      dayClock = {
+        get: () => now,
+        set: (h: number) => {
+          day?.set(h)
+          show(h)
+        },
+      }
       const ext = window.guildhall?.ext
-      if (ext)
-        ext.clock = {
-          get: () => now,
-          set: (h: number) => {
-            day?.set(h)
-            show(h)
-          },
-        }
+      if (ext) ext.clock = dayClock
       // the sea reaches the far plane: the horizon haze (atmo.ts) melts its rim into the sky
       const sea = Math.max(span * 3, stage.camera.far * 0.95)
       air = createIslandAir(stage, { light: () => sky.light(), span, seed, sea, knobs: atmoKnobs(ctx.query) })
@@ -520,6 +544,7 @@ const world = {
             weight: p.files,
             tier: p.tier,
           })),
+          extra.hud ? (k) => pick?.(k) : undefined,
         )
       // ---- life (track B): townsfolk and agents on the walk graph; `?life=0` turns it off ----
       let world: ReturnType<typeof hexWorld> | null = null
@@ -658,6 +683,18 @@ const world = {
         },
       ])
       logger.info("settled", ready)
+      if (extra.hud)
+        unHud = extra.hud({
+          viewer,
+          stage,
+          repo: stats.repo,
+          places: m.places,
+          labels,
+          onPick: (fn) => {
+            pick = fn
+          },
+          clock: dayClock,
+        })
       if (cover) {
         publishWorld("ready")
         // the one reveal: the cover fades, and the island under it has been drawn calm for a while
@@ -697,6 +734,7 @@ const world = {
       life?.dispose()
       doors?.dispose()
       labels?.dispose()
+      unHud()
       unTick()
       post?.dispose()
       for (const m of meshes) m.dispose()

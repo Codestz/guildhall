@@ -4,10 +4,14 @@ import { flushSync } from "react-dom"
 import { createRoot } from "react-dom/client"
 import { holdStudioStyle } from "../browser/style.ts"
 import { createClock, createHallTime, type HallTime } from "../hall/clock.ts"
+import type { HudParts } from "../hexworld/index.ts"
 import type { Screen, ScreenCtx } from "../screens.ts"
+import { href } from "../shell/router.ts"
 import { addShellStyle } from "../shell/style.ts"
 import { hallChronicle, hallRepo } from "./chronicle.ts"
-import { hallSlug, worldQuery } from "./routes.ts"
+import { setHudBottom } from "./hudSlot.ts"
+import { openUrl } from "./nav.ts"
+import { destHref, hallSlug, worldQuery } from "./routes.ts"
 import { SiteApp } from "./SiteApp.tsx"
 import { holdSiteShellStyle } from "./style.ts"
 
@@ -57,6 +61,8 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
 
       const root = document.createElement("div")
       root.className = "gh site-root"
+      // `?dev=1`: the Viewer's tools and Inspector over the site's world, for the studio's own checks
+      if (ctx.query.get("dev") === "1") root.dataset.dev = ""
       const world = document.createElement("div")
       world.className = "site-world"
       const pieces = document.createElement("div")
@@ -82,6 +88,28 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
         const inner: ScreenCtx = { ...ctx, query: worldQuery(id, ctx.query) }
         // a repo's hall builds from the repo's chronicle (hexworld/hall.ts), read while the 3D code streams in
         const repo = slug ? hallRepo(slug) : undefined
+        // the hall's HUD (hall/hud) goes up on the island's Viewer once the island is built
+        const hud = slug
+          ? (parts: HudParts) => {
+              let off = () => {}
+              let done = false
+              setHudBottom(parts.viewer.hud.bottom)
+              void import("../hall/hud/mount.tsx").then(({ mountHallHud }) => {
+                if (done || gone) return
+                off = mountHallHud(parts, {
+                  slug,
+                  go: openUrl,
+                  hrefs: { another: href("hall"), demos: destHref("demos") },
+                  retry: () => openUrl(href("hall", { repo: slug, try: String(Date.now() % 100000) })),
+                })
+              })
+              return () => {
+                done = true
+                setHudBottom(null)
+                off()
+              }
+            }
+          : undefined
         ctx
           .load(
             Promise.all([
@@ -99,7 +127,7 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
                       onRest: writeT,
                     })
                   : null
-              const offMap = mountHexWorld(world, inner, past?.hooks, repo ? { repo } : {})
+              const offMap = mountHexWorld(world, inner, past?.hooks, repo ? { repo, hud } : {})
               offWorld = () => {
                 offMap()
                 past?.dispose()

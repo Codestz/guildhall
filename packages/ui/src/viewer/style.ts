@@ -167,6 +167,49 @@ export const VIEWER_CSS = /* css */ `
 /* toasts sit bottom centre */
 .ui-toasts { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 
+/* ── HUD regions (hud.ts): empty and inert until a screen uses them ─ */
+.ui-viewer-hud { position: absolute; inset: 0; z-index: 2; pointer-events: none; display: none; }
+.ui-viewer[data-hud="on"] .ui-viewer-hud { display: block; animation: ui-hud-in 0.4s ease-out both; }
+.ui-viewer[data-hud-veil] .ui-viewer-hud, .ui-viewer[data-chrome="off"] .ui-viewer-hud { display: none; }
+@keyframes ui-hud-in { from { opacity: 0; } }
+.ui-hud-region { position: absolute; display: flex; flex-direction: column; gap: 8px; max-width: calc(100% - 2 * var(--gut)); }
+.ui-hud-region > * { pointer-events: auto; }
+.ui-hud-region:empty { display: none; }
+.ui-hud-corner { top: var(--hud-top, var(--gut)); left: var(--gut); align-items: flex-start; max-height: calc(100% - var(--hud-top, var(--gut)) - var(--gut) - 64px); }
+.ui-hud-rail { top: var(--gut); right: var(--gut); flex-direction: row; align-items: center; gap: 6px; }
+.ui-hud-feed { bottom: var(--gut); left: var(--gut); align-items: flex-start; max-height: calc(100% - var(--hud-top, var(--gut)) - 160px); }
+.ui-hud-bottom { bottom: var(--gut); left: 50%; translate: -50% 0; align-items: center; max-width: min(720px, calc(100% - 2 * var(--gut) - 2 * 260px)); }
+.ui-hud-sheet {
+  top: calc(var(--gut) + 52px);
+  right: var(--gut);
+  bottom: var(--gut);
+  width: min(380px, calc(100% - 2 * var(--gut)));
+  align-items: stretch;
+}
+.ui-hud-sheet > * { max-height: 100%; min-height: 0; }
+/* hidden: only the rail's way back stays */
+.ui-viewer[data-hud-mode="hidden"] .ui-hud-region:not(.ui-hud-rail) { display: none; }
+/* with the sheet open the bottom bar keeps clear of it */
+.ui-viewer[data-hud-open] .ui-hud-sheet:not(:empty) ~ .ui-hud-bottom { translate: calc(-50% - 190px) 0; }
+
+/* a phone: the rail stays top-right, the feed is a chip, the one open panel is a bottom sheet */
+.ui-viewer[data-phone] { --gut: 8px; }
+.ui-viewer[data-phone] .ui-hud-bottom { left: var(--gut); right: var(--gut); translate: none; max-width: none; bottom: calc(var(--gut) + env(safe-area-inset-bottom)); }
+.ui-viewer[data-phone] .ui-hud-sheet {
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  max-width: none;
+  max-height: min(64%, 620px);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.ui-viewer[data-phone] .ui-hud-sheet > * { border-radius: 14px 14px 0 0; border-bottom: 0; width: 100%; }
+.ui-viewer[data-phone][data-hud-open] .ui-hud-sheet:not(:empty) ~ .ui-hud-bottom,
+.ui-viewer[data-phone][data-hud-open] .ui-hud-feed { display: none; }
+@media (prefers-reduced-motion: reduce) { .ui-viewer[data-hud="on"] .ui-viewer-hud { animation: none; } }
+
 /* ── narrow (a phone, or a viewer inset in a panel) ─────────────── */
 @container viewer (max-width: 760px) {
   .ui-viewer { --gut: 8px; }

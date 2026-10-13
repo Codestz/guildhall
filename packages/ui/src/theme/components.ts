@@ -348,6 +348,11 @@ export const COMPONENTS_CSS = /* css */ `
 .ui-plate[data-tone="warn"] small { color: var(--warn); }
 .ui-plate[data-tone="fail"] { border-color: rgba(255, 139, 123, 0.5); }
 .ui-plate[data-tone="fail"] small { color: var(--fail); }
+/* a plate that opens what it names (a hall's place): a button, its own focus ring, brass when open */
+.ui-plate[data-pick] { pointer-events: auto; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.ui-plate[data-pick]:hover { border-color: var(--brass-line); background: rgba(28, 21, 14, 0.92); }
+.ui-plate[data-pick]:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+.ui-plate[data-selected] { border-color: var(--brass); background: rgba(38, 29, 19, 0.95); box-shadow: 0 0 0 1px var(--brass-line), 0 6px 18px -6px rgba(220, 182, 98, 0.45); }
 .ui-plate[data-kind="head"] { padding: 4px 12px 5px; border-color: var(--brass-line); }
 
 /* ── loader (V1's boot card, as a veil over a stage) ────────────── */

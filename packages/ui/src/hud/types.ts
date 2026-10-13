@@ -108,7 +108,8 @@ export interface PleaView {
 
 /** Where the HUD's events come from, for the brand's status line. */
 export interface SourceState {
-  kind: "live" | "replay" | "story"
+  /** `history`: a repo's past, told from its chronicle; `sketch`: no chronicle, the generator's own island. */
+  kind: "live" | "replay" | "story" | "history" | "sketch"
   /** Live only: whether the hub answers. */
   link?: "connecting" | "connected" | "lost"
   /** What is being shown: `Codestz/guildhall`, `pagination.jsonl`. */

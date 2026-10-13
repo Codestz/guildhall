@@ -6,7 +6,8 @@
  * few that fit and a close view shows them all. At the map view only the villages and towns (tier 2 and
  * up) carry plates; zoomed close, every place does (`plateMode`, with a gap between the two distances so
  * a zoom resting near one never flickers), and the hamlets' plates fade in and out rather than pop.
- * `?labels=0` turns them off.
+ * `?labels=0` turns them off. With `onPick` a plate is a button for a pointer: a click or a tap picks
+ * its place (a hall opens its dossier).
  */
 import type { Stage } from "@guildhall/render"
 import { toScreen } from "@guildhall/render"
@@ -131,6 +132,11 @@ export interface PlaceLabels {
    * there); they fade like a hamlet's at the map view. Null shows them all again.
    */
   hide(at: ((x: number, z: number, id: string | undefined) => boolean) | null): void
+  /** Shows or hides every plate (the HUD's "Name plates"). */
+  show(on: boolean): void
+  shown(): boolean
+  /** Marks one place's plate as the one open (by index), or none. */
+  select(index: number | null): void
   dispose(): void
 }
 
@@ -148,10 +154,20 @@ export function createPlaceLabels(
   stage: Stage,
   layer: HTMLElement,
   places: readonly PlaceLabel[],
+  onPick?: (index: number) => void,
 ): PlaceLabels {
-  const els = places.map((p) =>
-    plate({ title: p.label, detail: p.detail, width: 220, anchor: "translate(-50%, -100%)" }),
-  )
+  const els = places.map((p, k) => {
+    const el = plate({ title: p.label, detail: p.detail, width: 220, anchor: "translate(-50%, -100%)" })
+    if (onPick) {
+      // a pointer's way in: the keyboard and screen readers have the same places as a list (the HUD's
+      // Places), so the plates stay out of the tab order rather than put 40 stops before the HUD
+      el.dataset.pick = ""
+      el.setAttribute("aria-hidden", "true")
+      el.addEventListener("click", () => onPick(k))
+    }
+    return el
+  })
+  let on = true
   layer.append(...els)
   const boxes = els.map(measure)
   const order = places.map((_, k) => k).sort((a, b) => places[b]!.weight - places[a]!.weight || a - b)
@@ -186,6 +202,7 @@ export function createPlaceLabels(
   readKeep()
   addEventListener("resize", readKeep)
   const off = stage.onFrame(() => {
+    if (!on) return
     if (++frame % 30 === 0) readKeep()
     const cam = stage.camera.position
     mode = plateMode(mode, stage.getCamera().distance)
@@ -240,11 +257,28 @@ export function createPlaceLabels(
       }
     }
   })
+  let picked: number | null = null
   return {
     hide(at) {
       for (let k = 0; k < places.length; k++) {
         const p = places[k]!.at
         hidden[k] = at?.(p[0], p[2], places[k]!.id) ? 1 : 0
+      }
+    },
+    show(next) {
+      if (next === on) return
+      on = next
+      for (const [k, el] of els.entries()) {
+        el.style.display = on && shown[k]?.on ? "" : "none"
+      }
+    },
+    shown: () => on,
+    select(index) {
+      if (picked !== null) delete els[picked]?.dataset.selected
+      picked = index
+      if (index !== null) {
+        const el = els[index]
+        if (el) el.dataset.selected = ""
       }
     },
     dispose() {

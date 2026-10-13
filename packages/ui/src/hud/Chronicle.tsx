@@ -3,7 +3,7 @@
  * failures carry a band; ordinary deeds stay quiet. Folded, it is a few toasts over a "Chronicle"
  * button, bottom-left.
  */
-import type { CSSProperties } from "react"
+import type { CSSProperties, ReactNode } from "react"
 import { clock } from "./format.ts"
 import { Glyphs, KIND_GLYPH, Pennant } from "./glyphs.tsx"
 import { Empty, FoldPanel } from "./parts.tsx"
@@ -24,7 +24,12 @@ function Line({ entry, parties }: { entry: ChronicleEntry; parties: readonly Par
   return (
     <>
       <Banner entry={entry} parties={parties} />
-      <b style={{ "--banner": entry.banner } as CSSProperties}>{entry.who}</b> {entry.text}
+      {entry.who && (
+        <>
+          <b style={{ "--banner": entry.banner } as CSSProperties}>{entry.who}</b>{" "}
+        </>
+      )}
+      {entry.text}
     </>
   )
 }
@@ -40,6 +45,14 @@ export interface ChronicleFeedProps {
   compact?: boolean
   /** A line was pressed: the hero it is about. */
   onPick?: (hero: string) => void
+  /** How a line's time reads (default: session time, `clock`); a history passes dates. */
+  when?: (at: number) => string
+  /** The head's stamp, in place of `clock(time)`. */
+  stamp?: string
+  /** Under the list: links onward (the Legends, the card). */
+  foot?: ReactNode
+  /** The line for an empty log. */
+  empty?: string
   className?: string
 }
 
@@ -51,13 +64,17 @@ export function ChronicleFeed({
   onToggle,
   compact,
   onPick,
+  when = clock,
+  stamp,
+  foot,
+  empty = "Nothing written yet. The first deed will appear here.",
   className,
 }: ChronicleFeedProps) {
   const shown = entries.slice(-CHRONICLE_SHOWN).reverse()
   return (
     <FoldPanel
       label="Chronicle"
-      meta={<span className="num">{clock(time)}</span>}
+      meta={<span className="num">{stamp ?? clock(time)}</span>}
       open={open}
       onToggle={onToggle}
       compact={compact}
@@ -72,7 +89,7 @@ export function ChronicleFeed({
       >
         {shown.length === 0 && (
           <li>
-            <Empty>Nothing written yet. The first deed will appear here.</Empty>
+            <Empty>{empty}</Empty>
           </li>
         )}
         {shown.map((e) => {
@@ -85,7 +102,7 @@ export function ChronicleFeed({
               <span className="hud-chron-text">
                 <Line entry={e} parties={parties} />
               </span>
-              <time className="hud-chron-at num">{clock(e.at)}</time>
+              <time className="hud-chron-at num">{when(e.at)}</time>
             </>
           )
           return (
@@ -95,7 +112,7 @@ export function ChronicleFeed({
                   type="button"
                   className="hud-chron-row"
                   onClick={() => e.hero && onPick(e.hero)}
-                  aria-label={`${clock(e.at)} ${e.who} ${e.text}. Open dossier.`}
+                  aria-label={`${when(e.at)} ${e.who} ${e.text}. Open.`}
                 >
                   {text}
                 </button>
@@ -106,6 +123,7 @@ export function ChronicleFeed({
           )
         })}
       </ol>
+      {foot && <div className="hud-chron-foot">{foot}</div>}
     </FoldPanel>
   )
 }
@@ -120,10 +138,23 @@ export interface ToastsProps {
   onPick?: (hero: string) => void
   /** Captions already speak these beats: show them, but don't announce them twice. */
   quiet?: boolean
+  /** The chip's stamp, in place of `clock(time)`. */
+  stamp?: string
+  /** The chip's word (default "Chronicle"). */
+  label?: string
 }
 
 /** The chronicle folded away: the last moments that matter, fading on their own. */
-export function Toasts({ items, time, parties = [], onExpand, onPick, quiet = false }: ToastsProps) {
+export function Toasts({
+  items,
+  time,
+  parties = [],
+  onExpand,
+  onPick,
+  quiet = false,
+  stamp,
+  label = "Chronicle",
+}: ToastsProps) {
   return (
     <section className="hud-toasts" aria-label="Latest in the chronicle">
       <ol
@@ -166,11 +197,11 @@ export function Toasts({ items, time, parties = [], onExpand, onPick, quiet = fa
         type="button"
         className="ui-panel hud-chron-open"
         onClick={onExpand}
-        aria-label="Expand the chronicle"
+        aria-label={`Expand the ${label.toLowerCase()}`}
       >
         <Glyphs.quest size={14} />
-        <span>Chronicle</span>
-        <span className="num">{clock(time)}</span>
+        <span>{label}</span>
+        <span className="num">{stamp ?? clock(time)}</span>
       </button>
     </section>
   )

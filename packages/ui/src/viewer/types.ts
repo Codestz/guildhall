@@ -1,5 +1,6 @@
 import type { Tone } from "../components/controls.tsx"
 import type { LegendItem, LoaderState, Stat } from "../components/display.tsx"
+import type { HudAction, HudState } from "./hud.ts"
 import type { Knob, KnobSection, KnobValues } from "./knobs.ts"
 
 export type { LegendItem, Stat, Tone }
@@ -131,7 +132,37 @@ export interface ViewerOptions extends TitleInfo {
   name?: string
 }
 
+/**
+ * The HUD's regions (plan-hud-events U2): mount points a screen's HUD draws its panels into, in V1's
+ * layout, and the state they share (hud.ts). Empty and inert until `use` is called, so a screen without
+ * a HUD looks as it always did. On a phone (`phone()`, viewer ≤ 600 px) `sheet` is a bottom sheet.
+ */
+export interface ViewerHud {
+  /** Top-left, under whatever the page keeps there: the brand, and a list folded under it. */
+  corner: HTMLElement
+  /** Top-right: the icon rail whose icons open and fold the panels. */
+  rail: HTMLElement
+  /** Bottom-left: the feed, folded to a chip. */
+  feed: HTMLElement
+  /** Bottom-centre: a timeline bar. */
+  bottom: HTMLElement
+  /** The right-hand sheet (a bottom sheet on a phone): the one large panel open. */
+  sheet: HTMLElement
+  /**
+   * Turns the HUD on: the regions show, H cycles the mode, Esc folds the open panel, and the state is
+   * remembered under `key` (`remember`: the panel ids whose open/folded state is kept).
+   */
+  use(key: string, remember?: readonly string[]): void
+  state(): HudState
+  dispatch(action: HudAction): void
+  subscribe(fn: () => void): () => void
+  /** True on a phone-sized viewer: one bottom sheet, no side panels. */
+  phone(): boolean
+}
+
 export interface Viewer {
+  /** The HUD's regions and state. */
+  hud: ViewerHud
   /** The viewer's root, inside the host it was given. */
   root: HTMLElement
   /** The screen draws here: its canvas (a 3D stage, or a 2D canvas). Fills the viewer. */

@@ -1,11 +1,12 @@
 /**
  * The brand (V1's crest + status line, as the Viewer's title card): the guild's name, where its events
  * come from (a live, replay or story dot that says it in words too), and its headline figures. The crest
- * folds an "about" card open under it; a plea waiting shows as a dot on the crest.
+ * folds an "about" card open under it; a plea waiting shows as a dot on the crest. Where the page shows
+ * its own crest (the site's crest menu), `crest={false}` drops it and the name folds the card instead.
  */
 import { type ReactNode, useId } from "react"
 import { Button } from "../components/controls.tsx"
-import { Figures } from "../components/display.tsx"
+import { Figures, type Stat } from "../components/display.tsx"
 import { count } from "./format.ts"
 import { Crest, Glyphs } from "./glyphs.tsx"
 import type { SourceState } from "./types.ts"
@@ -20,7 +21,16 @@ export interface BrandCardProps {
   /** The guild: `Codestz/guildhall`. */
   name: string
   source: SourceState
-  figures: BrandFigures
+  /** The guild's figures (heroes, places, deeds); `stats` draws others in their place. */
+  figures?: BrandFigures
+  /** Figures of the caller's own (a repo's files, commits, years…), in place of `figures`. */
+  stats?: readonly Stat[]
+  /** No figures: the name and the status line alone (the HUD's minimal mode). */
+  compact?: boolean
+  /** The crest (default on). Off where the page already shows one: the name then folds the about card. */
+  crest?: boolean
+  /** A word after the source in the status line (`chronicle 2026-10-12`). */
+  status?: string
   /** Waiting on a human: a dot on the crest and a word in the status line. */
   pleas?: number
   /** The about card under the crest (folded unless `open`). */
@@ -34,10 +44,12 @@ export interface BrandCardProps {
 /** What the source dot says, in words (never the dot's colour alone). */
 export function sourceWords(source: SourceState): {
   label: string
-  tone: "live" | "wait" | "lost" | "replay" | "story"
+  tone: "live" | "wait" | "lost" | "replay" | "story" | "history" | "sketch"
 } {
   if (source.kind === "replay") return { label: "Replay", tone: "replay" }
   if (source.kind === "story") return { label: "Story", tone: "story" }
+  if (source.kind === "history") return { label: "History", tone: "history" }
+  if (source.kind === "sketch") return { label: "Sketch", tone: "sketch" }
   if (source.link === "lost") return { label: "Live · link lost", tone: "lost" }
   if (source.link === "connecting") return { label: "Live · connecting…", tone: "wait" }
   return { label: "Live", tone: "live" }
@@ -47,6 +59,10 @@ export function BrandCard({
   name,
   source,
   figures,
+  stats,
+  compact = false,
+  crest: withCrest = true,
+  status,
   pleas = 0,
   about,
   open = false,
@@ -55,16 +71,30 @@ export function BrandCard({
 }: BrandCardProps) {
   const id = useId()
   const words = sourceWords(source)
+  const rows: readonly Stat[] =
+    stats ??
+    (figures
+      ? [
+          { label: figures.heroes === 1 ? "hero" : "heroes", value: figures.heroes },
+          { label: figures.places === 1 ? "place" : "places", value: figures.places },
+          { label: figures.deeds === 1 ? "deed" : "deeds", value: figures.deeds },
+        ]
+      : [])
   const crest = (
     <>
       <Crest />
       {pleas > 0 && <i className="hud-tab-dot" aria-hidden="true" />}
     </>
   )
+  const title = (
+    <h1 className="hud-brand-name" title={name}>
+      {name}
+    </h1>
+  )
   return (
-    <header className="ui-panel hud-brand" data-open={open}>
+    <header className="ui-panel hud-brand" data-open={open} data-crest={withCrest} data-compact={compact}>
       <div className="hud-brand-head">
-        {about && onToggle ? (
+        {!withCrest ? null : about && onToggle ? (
           <button
             type="button"
             className="hud-crest"
@@ -82,15 +112,30 @@ export function BrandCard({
           </span>
         )}
         <div className="hud-brand-id">
-          <h1 className="hud-brand-name" title={name}>
-            {name}
-          </h1>
+          {!withCrest && about && onToggle ? (
+            <button
+              type="button"
+              className="hud-brand-toggle"
+              aria-expanded={open}
+              aria-controls={`${id}-about`}
+              title={open ? "Fold" : "More about it"}
+              onClick={onToggle}
+            >
+              {title}
+              <span className="hud-fold" aria-hidden="true">
+                <Glyphs.chevron size={14} />
+              </span>
+            </button>
+          ) : (
+            title
+          )}
           <p className="hud-status-line" role="status">
             <i className="hud-source-dot" data-tone={words.tone} aria-hidden="true" />
             <span className="hud-source" data-tone={words.tone}>
               {words.label}
             </span>
             {source.name && <span className="hud-sl-part hud-sl-name">{source.name}</span>}
+            {status && <span className="hud-sl-part">{status}</span>}
             {pleas > 0 && <span className="hud-sl-part hud-sl-plea">{count(pleas, "plea")}</span>}
           </p>
         </div>
@@ -106,15 +151,9 @@ export function BrandCard({
           </Button>
         </div>
       )}
-      <Figures
-        rows={[
-          { label: figures.heroes === 1 ? "hero" : "heroes", value: figures.heroes },
-          { label: figures.places === 1 ? "place" : "places", value: figures.places },
-          { label: figures.deeds === 1 ? "deed" : "deeds", value: figures.deeds },
-        ]}
-      />
+      {!compact && rows.length > 0 && <Figures rows={rows} />}
       {about && (
-        <section className="hud-about" id={`${id}-about`} aria-label="About Guildhall" hidden={!open}>
+        <section className="hud-about" id={`${id}-about`} aria-label="About" hidden={!open}>
           {about}
         </section>
       )}

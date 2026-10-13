@@ -1,6 +1,6 @@
 /**
  * The site's pieces over the island (or, on `/built`, alone): the crest menu everywhere, ⌘K, the
- * first-visit welcome card, the demo picker on `/demos`, a repo's hall note on `/hall/<owner>/<repo>`,
+ * first-visit welcome card, the demo picker on `/demos`, the repo field on a bare `/hall`,
  * the story chip on `?story=`, and How it's built. It reads the URL itself (so a move between `/`,
  * `/demos` and a bare `/hall` keeps the island that is already built) and moves by `openUrl`.
  */
@@ -16,12 +16,14 @@ import {
   writeWelcomeDismissed,
 } from "@guildhall/ui"
 import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import type { HallTime } from "../hall/clock.ts"
 import { HallTimeline } from "../hall/timeline.tsx"
 import { current, href } from "../shell/router.ts"
 import { Switcher } from "../shell/Switcher.tsx"
 import { BUILT } from "./built.ts"
-import { useChronicle, useLiveStories } from "./chronicle.ts"
+import { useLiveStories } from "./chronicle.ts"
+import { useHudBottom } from "./hudSlot.ts"
 import { openUrl } from "./nav.ts"
 import { destHref, hallSlug, openedStory, storyHref } from "./routes.ts"
 import { STORIES } from "./stories.ts"
@@ -47,6 +49,7 @@ export function SiteApp({ time = null }: { time?: HallTime | null } = {}) {
   const [welcome, setWelcome] = useState(() => !readWelcomeDismissed())
   const [busy, setBusy] = useState(false)
   const live = useLiveStories()
+  const bottom = useHudBottom()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -134,8 +137,9 @@ export function SiteApp({ time = null }: { time?: HallTime | null } = {}) {
         />
       )}
 
-      {screen === "hall" && slug && <HallNote slug={slug} onGo={go} />}
-      {screen === "hall" && slug && time && <HallTimeline time={time} />}
+      {/* a repo's hall: its HUD is drawn on the island's Viewer (hall/hud); the timeline bar goes in the
+          HUD's bottom-centre slot */}
+      {screen === "hall" && slug && time && bottom && createPortal(<HallTimeline time={time} />, bottom)}
 
       {world && story && screen !== "demos" && (
         <section className="ui-panel site-chip" aria-label="Story">
@@ -164,95 +168,5 @@ export function SiteApp({ time = null }: { time?: HallTime | null } = {}) {
         />
       )}
     </div>
-  )
-}
-
-const n = (v: number) => v.toLocaleString("en-US")
-
-/**
- * A repo's hall, until the hall screen exists: what the island was grown from (the repo's chronicle: its
- * size, its figures, its folders and packages as named places), or, with no chronicle, that the island
- * is a sketch and how to ask for one. Where the HUD (roster, chronicle, history) will sit.
- */
-function HallNote({ slug, onGo }: { slug: string; onGo(url: string): void }) {
-  const { state } = useChronicle(slug)
-  // a retry opens the hall again with a fresh try, so the island is rebuilt from what the retry finds
-  const retry = () => onGo(href("hall", { repo: slug, try: String(Date.now() % 100000) }))
-  const repo = state.status === "ok" ? state.repo : null
-  return (
-    <section className="ui-panel site-note" aria-label={`The hall of ${slug}`}>
-      <p className="ui-eyebrow">Your repo</p>
-      <h2>{slug}</h2>
-      {state.status === "loading" && <p>Reading this repo's chronicle…</p>}
-      {repo && (
-        <p>
-          {n(repo.files)} files, {repo.commits !== undefined ? `${n(repo.commits)} commits, ` : ""}
-          {n(repo.contributors)} contributor{repo.contributors === 1 ? "" : "s"},{" "}
-          {repo.years[0] === repo.years[1] ? repo.years[0] : `${repo.years[0]} – ${repo.years[1]}`}. The
-          island is sized by its files; its {repo.places.length} places are its folders and packages, named on
-          their plates.
-        </p>
-      )}
-      {state.status === "not-chronicled" && (
-        <p>
-          A sketch, not this repo's island: there is no chronicle for it yet, so the land below is the
-          generator's own at a default size.
-        </p>
-      )}
-      {state.status === "unavailable" && (
-        <p>
-          A sketch, not this repo's island: its chronicle could not be read ({state.reason}), so the land
-          below is the generator's own at a default size.
-        </p>
-      )}
-      <div className="site-note-hud" role="status">
-        {state.status === "loading" && "Looking for this repo's chronicle…"}
-        {repo &&
-          `Chronicle built ${repo.generatedAt.slice(0, 10)}${repo.source === "local" ? " (the studio's copy)" : ""}.`}
-        {state.status === "not-chronicled" && (
-          <>
-            No chronicle for this repo yet.{" "}
-            <a className="site-link" href={state.request} target="_blank" rel="noreferrer">
-              Request a chronicle
-            </a>
-          </>
-        )}
-        {state.status === "unavailable" && (
-          <>
-            The chronicles could not be reached.{" "}
-            <button type="button" className="site-link" onClick={retry}>
-              Try again
-            </button>
-          </>
-        )}
-      </div>
-      <div className="site-note-hud">
-        HUD · roster, chronicle and history open here once the hall screen is built.
-      </div>
-      <div className="site-note-links">
-        <a
-          className="site-link"
-          href={href("hall")}
-          onClick={(e) => {
-            if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return
-            e.preventDefault()
-            onGo(href("hall"))
-          }}
-        >
-          Another repo
-        </a>
-        <a
-          className="site-link"
-          href={href("demos")}
-          onClick={(e) => {
-            if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return
-            e.preventDefault()
-            onGo(href("demos"))
-          }}
-        >
-          Watch a demo
-        </a>
-      </div>
-    </section>
   )
 }

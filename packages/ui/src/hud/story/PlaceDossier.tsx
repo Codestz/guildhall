@@ -6,6 +6,7 @@
  * stays the hero. Esc inside it closes it.
  */
 import type { CSSProperties } from "react"
+import { type Stat, StatRows } from "../../components/display.tsx"
 import { clock, heroTitle, phaseOf } from "../format.ts"
 import { Glyphs } from "../glyphs.tsx"
 import { Sigil, Status } from "../parts.tsx"
@@ -22,12 +23,23 @@ export interface PlaceDossierProps {
   activity: readonly number[]
   /** What the sparkline spans: `This session, 0:00–1:07`. */
   activityLabel?: string
-  /** Heroes at the place now. */
-  heroes: readonly HeroView[]
-  /** Its deeds, newest last. */
-  deeds: readonly PlaceDeed[]
+  /** What the activity adds up to, in place of `N deeds` (a history's files are not a sum). */
+  activityNote?: string
+  /** Heroes at the place now; left out, the section is too (a history has no one there). */
+  heroes?: readonly HeroView[]
+  /** Its deeds, newest last; left out, the section is too. */
+  deeds?: readonly PlaceDeed[]
   /** Files of its package touched this session, with how many deeds each. */
   files: readonly { path: string; deeds: number }[]
+  /** What the files list is called (default "Files touched"); its counts are left out when all are 0. */
+  filesLabel?: string
+  /** Headline rows under the head (a history's size, birth, language). */
+  facts?: readonly Stat[]
+  /** What happened to the place, dated in words, newest last (a history's milestones). */
+  annals?: readonly { key: string; when: string; text: string }[]
+  /** On a phone sheet opened from a list: the way back to it. */
+  onBack?: () => void
+  backLabel?: string
   /** Folded to its chip. */
   collapsed?: boolean
   onCollapse?: () => void
@@ -42,9 +54,15 @@ export function PlaceDossier({
   place,
   activity,
   activityLabel = "This session",
+  activityNote,
   heroes,
   deeds,
   files,
+  filesLabel = "Files touched",
+  facts,
+  annals,
+  onBack,
+  backLabel = "Back",
   collapsed = false,
   onCollapse,
   onExpand,
@@ -53,28 +71,31 @@ export function PlaceDossier({
   className,
 }: PlaceDossierProps) {
   const total = activity.reduce((a, b) => a + b, 0)
+  const note = activityNote ?? `${total} ${total === 1 ? "deed" : "deeds"}`
+  const here = heroes ?? []
   if (collapsed)
     return (
       <button
         type="button"
         className={`ui-panel st-place-chip${className ? ` ${className}` : ""}`}
         onClick={onExpand}
-        aria-label={`${place.name}: ${heroes.length} ${heroes.length === 1 ? "hero" : "heroes"} here. Open the place`}
+        aria-label={`${place.name}: ${here.length} ${here.length === 1 ? "hero" : "heroes"} here. Open the place`}
       >
         <Glyphs.place size={15} />
         <span className="st-place-chip-name">{place.name}</span>
-        {heroes.length > 0 && (
+        {here.length > 0 && (
           <span className="st-place-chip-heroes" aria-hidden="true">
-            {heroes.slice(0, 3).map((h) => (
+            {here.slice(0, 3).map((h) => (
               <Sigil key={h.id} family={h.family} banner={h.banner} size="sm" />
             ))}
-            {heroes.length > 3 && <span className="num">+{heroes.length - 3}</span>}
+            {here.length > 3 && <span className="num">+{here.length - 3}</span>}
           </span>
         )}
       </button>
     )
 
-  const shown = deeds.slice(-PLACE_DEEDS_SHOWN).reverse()
+  const shown = (deeds ?? []).slice(-PLACE_DEEDS_SHOWN).reverse()
+  const counted = files.some((f) => f.deeds > 0)
   return (
     <aside
       className={`ui-panel st-place${className ? ` ${className}` : ""}`}
@@ -86,6 +107,11 @@ export function PlaceDossier({
         }
       }}
     >
+      {onBack && (
+        <button type="button" className="st-place-back" onClick={onBack}>
+          <span aria-hidden="true">‹</span> {backLabel}
+        </button>
+      )}
       <header className="st-place-head">
         <span className="st-place-mark" aria-hidden="true">
           <Glyphs.place size={20} />
@@ -117,97 +143,133 @@ export function PlaceDossier({
         </button>
       </header>
       {place.about && <p className="st-place-about">{place.about}</p>}
+      {facts && facts.length > 0 && (
+        <div className="st-place-facts">
+          <StatRows rows={facts} />
+        </div>
+      )}
 
-      <section
-        className="st-place-spark"
-        aria-label={`Activity: ${total} ${total === 1 ? "deed" : "deeds"}, ${activityLabel}`}
-      >
+      <section className="st-place-spark" aria-label={`Activity: ${note}, ${activityLabel}`}>
         <div className="hud-sub-head">
           <span className="hud-eyebrow">Activity</span>
           <span className="hud-faint">
-            {activityLabel} · <span className="num">{total}</span> {total === 1 ? "deed" : "deeds"}
+            {activityLabel}
+            {activityNote === undefined ? (
+              <>
+                {" "}
+                · <span className="num">{total}</span> {total === 1 ? "deed" : "deeds"}
+              </>
+            ) : (
+              activityNote && ` · ${activityNote}`
+            )}
           </span>
         </div>
         <Sparkline values={activity} />
       </section>
 
-      <section aria-labelledby="st-place-heroes">
-        <div className="hud-sub-head">
-          <span className="hud-eyebrow" id="st-place-heroes">
-            Here now
-          </span>
-          <span className="hud-faint num">{heroes.length}</span>
-        </div>
-        {heroes.length === 0 ? (
-          <p className="hud-empty">Nobody is here now.</p>
-        ) : (
-          <ul className="st-place-heroes">
-            {heroes.map((h) => {
-              const state = phaseOf(h.phase)
-              const body = (
-                <>
-                  <Sigil family={h.family} banner={h.banner} ordinal={h.ordinal} size="md" />
-                  <span className="st-place-hero-id">
-                    <b>{heroTitle(h)}</b>
-                    {h.doing && <span className="num">{h.doing}</span>}
-                  </span>
-                  <Status tone={state.tone} label={state.label} />
-                </>
-              )
-              return (
-                <li key={h.id}>
-                  {onHero ? (
-                    <button type="button" className="st-place-hero" onClick={() => onHero(h.id)}>
-                      {body}
-                    </button>
-                  ) : (
-                    <span className="st-place-hero">{body}</span>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
-
-      <section aria-labelledby="st-place-deeds">
-        <div className="hud-sub-head">
-          <span className="hud-eyebrow" id="st-place-deeds">
-            Recent deeds
-          </span>
-          {deeds.length > PLACE_DEEDS_SHOWN && <span className="hud-faint">{deeds.length} in all</span>}
-        </div>
-        {shown.length === 0 ? (
-          <p className="hud-empty">No deeds here yet.</p>
-        ) : (
-          <ol className="st-place-deeds">
-            {shown.map((d) => (
-              <li key={d.key} data-failed={d.failed ?? false}>
-                <span className="st-place-at num">{clock(d.at)}</span>
-                <i
-                  className="st-place-pip"
-                  style={{ "--banner": d.banner } as CSSProperties}
-                  aria-hidden="true"
-                />
-                <span className="st-place-deed">
-                  <b>{d.who}</b> <span className="num">{d.text}</span>
-                  {d.failed && (
-                    <span className="st-place-fail">
-                      <Glyphs.fail size={12} /> failed
+      {heroes && (
+        <section aria-labelledby="st-place-heroes">
+          <div className="hud-sub-head">
+            <span className="hud-eyebrow" id="st-place-heroes">
+              Here now
+            </span>
+            <span className="hud-faint num">{heroes.length}</span>
+          </div>
+          {heroes.length === 0 ? (
+            <p className="hud-empty">Nobody is here now.</p>
+          ) : (
+            <ul className="st-place-heroes">
+              {heroes.map((h) => {
+                const state = phaseOf(h.phase)
+                const body = (
+                  <>
+                    <Sigil family={h.family} banner={h.banner} ordinal={h.ordinal} size="md" />
+                    <span className="st-place-hero-id">
+                      <b>{heroTitle(h)}</b>
+                      {h.doing && <span className="num">{h.doing}</span>}
                     </span>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+                    <Status tone={state.tone} label={state.label} />
+                  </>
+                )
+                return (
+                  <li key={h.id}>
+                    {onHero ? (
+                      <button type="button" className="st-place-hero" onClick={() => onHero(h.id)}>
+                        {body}
+                      </button>
+                    ) : (
+                      <span className="st-place-hero">{body}</span>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {annals && (
+        <section aria-labelledby="st-place-annals">
+          <div className="hud-sub-head">
+            <span className="hud-eyebrow" id="st-place-annals">
+              Annals
+            </span>
+          </div>
+          {annals.length === 0 ? (
+            <p className="hud-empty">Nothing told of it yet.</p>
+          ) : (
+            <ol className="st-place-deeds st-place-annals">
+              {[...annals].reverse().map((a) => (
+                <li key={a.key}>
+                  <span className="st-place-at num">{a.when}</span>
+                  <span className="st-place-deed">{a.text}</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      )}
+
+      {deeds && (
+        <section aria-labelledby="st-place-deeds">
+          <div className="hud-sub-head">
+            <span className="hud-eyebrow" id="st-place-deeds">
+              Recent deeds
+            </span>
+            {deeds.length > PLACE_DEEDS_SHOWN && <span className="hud-faint">{deeds.length} in all</span>}
+          </div>
+          {shown.length === 0 ? (
+            <p className="hud-empty">No deeds here yet.</p>
+          ) : (
+            <ol className="st-place-deeds">
+              {shown.map((d) => (
+                <li key={d.key} data-failed={d.failed ?? false}>
+                  <span className="st-place-at num">{clock(d.at)}</span>
+                  <i
+                    className="st-place-pip"
+                    style={{ "--banner": d.banner } as CSSProperties}
+                    aria-hidden="true"
+                  />
+                  <span className="st-place-deed">
+                    <b>{d.who}</b> <span className="num">{d.text}</span>
+                    {d.failed && (
+                      <span className="st-place-fail">
+                        <Glyphs.fail size={12} /> failed
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      )}
 
       {files.length > 0 && (
         <section aria-labelledby="st-place-files">
           <div className="hud-sub-head">
             <span className="hud-eyebrow" id="st-place-files">
-              Files touched
+              {filesLabel}
             </span>
             <span className="hud-faint num">{files.length}</span>
           </div>
@@ -217,9 +279,11 @@ export function PlaceDossier({
                 <span className="num st-place-file" title={f.path}>
                   {f.path}
                 </span>
-                <span className="num hud-faint">
-                  {f.deeds} <span className="ui-visually-hidden">{f.deeds === 1 ? "deed" : "deeds"}</span>
-                </span>
+                {counted && (
+                  <span className="num hud-faint">
+                    {f.deeds} <span className="ui-visually-hidden">{f.deeds === 1 ? "deed" : "deeds"}</span>
+                  </span>
+                )}
               </li>
             ))}
           </ul>

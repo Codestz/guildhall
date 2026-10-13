@@ -391,6 +391,10 @@ button.st-place-hero:hover { background: var(--raise-2); }
 .st-place-deed b { font-weight: 500; color: var(--paper); }
 .st-place-deed .num { font-size: 12px; }
 .st-place-fail { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; color: var(--fail); font-size: var(--t-sm); }
+.st-place-annals li { grid-template-columns: 64px 1fr; }
+.st-place-facts .ui-stat-rows, .st-place-facts dl { margin: 0; }
+.st-place-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; margin: -6px 0 -4px -4px; padding: 0 8px; border: 0; border-radius: var(--r-sm); background: none; color: var(--brass-hi); font: 400 var(--t-md)/1 var(--display); letter-spacing: 0.08em; cursor: pointer; }
+.st-place-back:hover { background: var(--raise-2); }
 .st-place-files li { display: flex; justify-content: space-between; gap: 10px; padding: 3px 4px; font-size: 12px; }
 .st-place-file { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .st-place-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 12px 0 10px; color: var(--brass-hi); cursor: pointer; }

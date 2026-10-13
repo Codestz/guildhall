@@ -132,6 +132,19 @@ button.hud-crest:focus-visible { border-radius: 50%; }
 .hud-brand-alert > span { display: flex; gap: 7px; align-items: flex-start; }
 .hud-brand-alert > span .hud-glyph { margin-top: 2px; color: var(--fail); }
 .hud-brand-alert .ui-btn { justify-self: start; }
+.hud-brand[data-crest="false"] { padding: 9px 12px 10px 14px; gap: 8px; }
+.hud-brand[data-compact="true"]:not([data-open="true"]) { width: auto; min-width: 220px; }
+.hud-brand-toggle {
+  display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 28px; margin: -2px -4px; padding: 2px 4px;
+  border: 0; border-radius: var(--r-sm); background: none; color: inherit; text-align: left; cursor: pointer;
+}
+.hud-brand-toggle:hover .hud-brand-name { color: var(--paper); }
+.hud-brand-toggle .hud-fold { color: var(--faint); transition: transform 0.2s; }
+.hud-brand-toggle[aria-expanded="false"] .hud-fold { transform: rotate(-90deg); }
+.hud-source-dot[data-tone="history"] { background: var(--brass); border-color: var(--brass); box-shadow: 0 0 6px rgba(220, 182, 98, 0.55); }
+.hud-source-dot[data-tone="sketch"] { border-style: dashed; border-color: var(--muted); }
+.hud-source[data-tone="sketch"] { color: var(--muted); }
+.hud-chron-foot { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px var(--s3) 10px var(--s4); border-top: 1px solid var(--hair); }
 .hud-about { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--hair); font-size: var(--t-md); color: var(--muted); }
 .hud-about[hidden] { display: none; }
 .hud-about p { margin: 0; }

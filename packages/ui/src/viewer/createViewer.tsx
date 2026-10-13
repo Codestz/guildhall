@@ -7,6 +7,7 @@
  */
 import { createRoot } from "react-dom/client"
 import { holdUiStyle } from "../theme/hold.ts"
+import { createHudRegions } from "./hudRegions.ts"
 import {
   allKnobs,
   applyOf,
@@ -82,7 +83,8 @@ export function createViewer(host: HTMLElement, opts: ViewerOptions): Viewer {
   const chrome = div("ui-viewer-chrome")
   const camera = div("ui-viewer-camera")
   camera.style.display = "contents"
-  root.append(stage, labels, chrome)
+  const hud = createHudRegions(root)
+  root.append(stage, labels, hud.layer, chrome)
   host.append(root)
 
   const sections = opts.sections ?? []
@@ -249,6 +251,10 @@ export function createViewer(host: HTMLElement, opts: ViewerOptions): Viewer {
   }
 
   const onKey = (e: KeyboardEvent) => {
+    if (hud.key(e)) {
+      e.preventDefault()
+      return
+    }
     if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || typing(e.target)) return
     if (e.code === "KeyI" && store.get().sections.length + store.get().readout.length > 0) {
       e.preventDefault()
@@ -257,8 +263,19 @@ export function createViewer(host: HTMLElement, opts: ViewerOptions): Viewer {
   }
   addEventListener("keydown", onKey)
 
-  const ro = new ResizeObserver(layout)
+  const ro = new ResizeObserver(() => {
+    hud.resize(root.clientWidth)
+    layout()
+  })
   ro.observe(root)
+  hud.resize(root.clientWidth || host.clientWidth || window.innerWidth)
+  // the HUD waits under the loading cover: it shows once the veil starts to lift
+  const veil = () => {
+    const l = store.get().loader
+    if (l && !l.out && !l.error) root.dataset.hudVeil = ""
+    else delete root.dataset.hudVeil
+  }
+  const offVeil = store.subscribe(veil)
 
   let perfTimer: ReturnType<typeof setInterval> | null = null
 
@@ -267,6 +284,7 @@ export function createViewer(host: HTMLElement, opts: ViewerOptions): Viewer {
   reactRoot.render(<View store={store} act={act} slot={camera} />)
 
   return {
+    hud: hud.api,
     root,
     stage,
     labels,
@@ -378,6 +396,8 @@ export function createViewer(host: HTMLElement, opts: ViewerOptions): Viewer {
     dispose() {
       removeEventListener("keydown", onKey)
       ro.disconnect()
+      offVeil()
+      hud.dispose()
       cancelAnimationFrame(playRaf)
       if (urlTimer) clearTimeout(urlTimer)
       if (perfTimer) clearInterval(perfTimer)

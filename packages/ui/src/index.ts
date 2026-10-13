@@ -35,6 +35,20 @@ export { holdUiStyle, type StyleHold } from "./theme/hold.ts"
 export { FACES, FONTS_URL, TOKENS_CSS } from "./theme/tokens.ts"
 export { createViewer } from "./viewer/createViewer.tsx"
 export {
+  HUD_INITIAL,
+  HUD_MODES,
+  type HudAction,
+  type HudMemory,
+  type HudState,
+  type HudStorage,
+  hudMemory,
+  hudReduce,
+  loadHud,
+  nextMode,
+  PHONE_MAX,
+  saveHud,
+} from "./viewer/hud.ts"
+export {
   type Apply,
   allKnobs,
   type ChoiceKnob,
@@ -62,5 +76,6 @@ export type {
   TransportSpec,
   Viewer,
   ViewerHooks,
+  ViewerHud,
   ViewerOptions,
 } from "./viewer/types.ts"

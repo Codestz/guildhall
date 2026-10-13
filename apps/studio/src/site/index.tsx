@@ -74,7 +74,9 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
       // a repo's hall owns its clock (hall/clock.ts): the timeline bar reads it, the history reveal follows it
       const slug = id === "hall" ? hallSlug(ctx.query) : null
       const history = withWorld && slug && ctx.query.get("history") !== "0"
-      const time: HallTime | null = history ? createHallTime(createClock()) : null
+      // `?feed=live|replay|story`: the hall's session (hall/feeds), started by its HUD, on the bar's Session scale
+      const feed = withWorld && slug ? ctx.query.get("feed") : null
+      const time: HallTime | null = history || feed ? createHallTime(createClock()) : null
 
       // The pieces first: fonts permitting (they settle within 3 s), the card is the first paint.
       void studio.ready.then(() => {
@@ -101,6 +103,8 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
                   go: openUrl,
                   hrefs: { another: href("hall"), demos: destHref("demos") },
                   retry: () => openUrl(href("hall", { repo: slug, try: String(Date.now() % 100000) })),
+                  query: ctx.query,
+                  time,
                 })
               })
               return () => {
@@ -114,7 +118,7 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
           .load(
             Promise.all([
               import("../hexworld/index.ts"),
-              time && slug ? import("../hall/history.ts") : null,
+              history && time && slug ? import("../hall/history.ts") : null,
             ]).then(([{ mountHexWorld }, hall]) => {
               if (gone) return
               // the history: the island revealed as it was on the clock's day (`?t=`, today by default)

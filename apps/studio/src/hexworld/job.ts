@@ -98,6 +98,8 @@ export interface BuiltPlace {
   /** The settlement's tier (1 hamlet, 2 village, 3 town; the capital 3): which plates the map view shows. */
   tier: 1 | 2 | 3
   at: [number, number, number]
+  /** Its zone's index (what `bindPlaces` and the world's events call a place). */
+  zone: number
 }
 
 /** The hex map's shape knobs (world `HexIslandSpec`), so the 3D island can show what `/lab/hexmap` drew. */
@@ -445,7 +447,7 @@ export function runHexJob(
       lamps: w.pieces
         .filter((p) => p.piece === LANTERN)
         .map((p) => [p.x, p.y + 2.03 * p.scale, p.z] as [number, number, number]),
-      places: z.zones.flatMap((zone) => {
+      places: z.zones.flatMap((zone, zi) => {
         const heart = zone.place ? w.tiles.find((t) => t.i === zone.tile) : undefined
         if (!zone.place || !heart) return []
         const { id, label, files } = zone.place
@@ -459,6 +461,7 @@ export function runHexJob(
             tiles: zone.tiles.length,
             tier,
             at: [heart.x, heart.top, heart.z],
+            zone: zi,
           },
         ]
       }),

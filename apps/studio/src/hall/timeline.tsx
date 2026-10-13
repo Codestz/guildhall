@@ -5,18 +5,26 @@
  * clock still, "Watch it grow" plays the history from the first commit. It shows once the island can be
  * revealed by it (`HallTime.range`), never for a repo without a chronicle.
  */
-import { holdHudStyle, Timeline } from "@guildhall/ui"
-import { useEffect, useSyncExternalStore } from "react"
+import { Captions, ChapterChip, holdHudStyle, Timeline, type TimeScale } from "@guildhall/ui"
+import { useEffect, useMemo, useSyncExternalStore } from "react"
 import { createRoot } from "react-dom/client"
-import { type HallTime, nextRate } from "./clock.ts"
+import { type HallTime, type HistoryRange, nextRate } from "./clock.ts"
+import { SESSION_RATES } from "./feeds/clock.ts"
+import type { HallSession } from "./feeds/session.ts"
+import { markersOf } from "./feeds/view.ts"
 
 /** How fine a scrub is: the history in this many steps (a 3-day history is no 3-stop slider). */
 const STEPS = 1000
 
+/**
+ * The one bar with V1's two scales (plan §2): History (the island grows) and, with a `?feed=`, Session
+ * (the heroes replay; hall/feeds). The switch shows when both can be shown; the session's captions and
+ * a told story's chapter chip sit over the bar.
+ */
 export function HallTimeline({ time }: { time: HallTime }) {
   const range = useSyncExternalStore(time.subscribe, time.range)
-  const clock = time.clock
-  const state = useSyncExternalStore(clock.subscribe, clock.get)
+  const session = useSyncExternalStore(time.subscribe, time.session)
+  const scale = useSyncExternalStore(time.subscribe, time.scale)
   useEffect(() => {
     const releaseHud = holdHudStyle()
     const releaseHall = holdHallStyle()
@@ -25,12 +33,32 @@ export function HallTimeline({ time }: { time: HallTime }) {
       releaseHall()
     }
   }, [])
+  const onScale = range && session ? (s: TimeScale) => time.setScale(s) : undefined
+  if (session && (scale === "session" || !range))
+    return <SessionBar session={session} onScale={onScale} historyless={!range} />
   if (!range) return null
+  return <HistoryBar time={time} range={range} onScale={onScale} session={session} />
+}
+
+function HistoryBar({
+  time,
+  range,
+  onScale,
+  session,
+}: {
+  time: HallTime
+  range: HistoryRange
+  onScale: ((s: TimeScale) => void) | undefined
+  session: HallSession | null
+}) {
+  const clock = time.clock
+  const state = useSyncExternalStore(clock.subscribe, clock.get)
   const len = Math.max(1, range.end - range.start)
   const at = range.start + state.t * len
   const idle = state.t >= 1 && !state.playing
   return (
     <div className="hall-timeline">
+      {session && <SessionCaptions session={session} />}
       {idle && (
         <button type="button" className="hall-grow" onClick={() => clock.play(true)}>
           Watch it grow
@@ -38,6 +66,7 @@ export function HallTimeline({ time }: { time: HallTime }) {
       )}
       <Timeline
         scale="history"
+        {...(onScale ? { onScale } : {})}
         start={range.start}
         end={range.end}
         at={at}
@@ -48,6 +77,61 @@ export function HallTimeline({ time }: { time: HallTime }) {
         step={len / STEPS}
         rate={state.rate}
         onRate={() => clock.setRate(nextRate(state.rate))}
+      />
+    </div>
+  )
+}
+
+/** The narrated line over the bar (sim Narrator, through the session's snapshot). */
+function SessionCaptions({ session }: { session: HallSession }) {
+  const snap = useSyncExternalStore(session.subscribe, session.snapshot)
+  return <Captions {...(snap.caption ? { caption: snap.caption } : {})} />
+}
+
+/** The Session scale: the log's minutes, its beats, live's way back to now, a told story's acts. */
+function SessionBar({
+  session,
+  onScale,
+  historyless,
+}: {
+  session: HallSession
+  onScale: ((s: TimeScale) => void) | undefined
+  historyless: boolean
+}) {
+  const snap = useSyncExternalStore(session.subscribe, session.snapshot)
+  const { clock } = session
+  const c = snap.clock
+  const events = snap.events
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the beats change when the log grows
+  const markers = useMemo(() => markersOf(session.log().events, c.start), [events, c.start, session])
+  if (events === 0) return null
+  const len = Math.max(1000, c.end - c.start)
+  return (
+    <div className="hall-timeline" data-scale="session">
+      <Captions {...(snap.caption ? { caption: snap.caption } : {})} />
+      {snap.chapters.length > 0 && (
+        <ChapterChip
+          chapters={snap.chapters}
+          current={Math.max(0, snap.chapter)}
+          onJump={(k) => clock.seek(c.start + (snap.chapters[k]?.at ?? 0), { jump: true })}
+          className="hall-chapter"
+        />
+      )}
+      <Timeline
+        scale="session"
+        {...(onScale ? { onScale } : {})}
+        {...(historyless ? { historyUnavailable: "No history for this repo" } : {})}
+        start={0}
+        end={len}
+        at={c.at - c.start}
+        markers={markers}
+        playing={c.mode === "live" || c.playing}
+        onPlay={(on) => clock.play(on)}
+        onSeek={(v) => clock.seek(c.start + v)}
+        live={c.canLive}
+        onLive={() => clock.goLive()}
+        rate={c.rate}
+        onRate={() => clock.setRate(nextRate(c.rate, SESSION_RATES))}
       />
     </div>
   )

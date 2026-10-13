@@ -10,7 +10,11 @@ import { createRoot } from "react-dom/client"
 import type { HudParts } from "../../hexworld/index.ts"
 import { kindWord } from "../../hexworld/places.ts"
 import { hallChronicle } from "../../site/chronicle.ts"
+import type { HallTime } from "../clock.ts"
+import { createSession, feedKindOf, type HallSession, openFeed } from "../feeds/index.ts"
+import { sessionPlaces } from "../feeds/places.ts"
 import { HallHud, REMEMBERED } from "./HallHud.tsx"
+import type { HudSession } from "./SessionHud.tsx"
 import { holdHallHudStyle } from "./style.ts"
 
 export interface HallHudOptions {
@@ -19,6 +23,33 @@ export interface HallHudOptions {
   hrefs: { another: string; demos: string }
   /** Opens the hall again for a fresh read of its chronicle. */
   retry(): void
+  /** The hall's link: `?feed=live|replay|story` starts its session (hall/feeds), and its knobs. */
+  query?: URLSearchParams
+  /** The hall's time, which the session's clock joins (the bar's Session scale). */
+  time?: HallTime | null
+}
+
+let current: HallSession | null = null
+
+/**
+ * The hall's session while a hall with a `?feed=` is up (null otherwise): for life (L1/L2), which poses
+ * the heroes from `session.log()` at `session.clock.get().at`, and listens to `onReset` for a new log.
+ */
+export const hallSession = (): HallSession | null => current
+
+/** Starts the session a link asks for, its places bound to the island's; null without a `?feed=`. */
+function startSession(parts: HudParts, opts: HallHudOptions): HudSession | null {
+  const query = opts.query
+  const kind = query ? feedKindOf(query) : null
+  if (!query || !kind) return null
+  const st = Number(query.get("st"))
+  const session = createSession(openFeed(kind, opts.slug, query), {
+    autoplay: query.get("play") !== "0",
+    ...(query.has("st") && Number.isFinite(st) ? { openAt: Math.max(0, st) } : {}),
+  })
+  const places = sessionPlaces(parts.repo, parts.places)
+  session.start(places.placeOf)
+  return { session, places, repo: opts.slug.split("/").pop() || opts.slug }
 }
 
 export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void {
@@ -38,6 +69,21 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
   document.body.append(modals)
   const root = createRoot(host)
   let gone = false
+  // the session (`?feed=`): started now, its clock run by the frames, joined to the bar's scales
+  const live = startSession(parts, opts)
+  let raf = 0
+  if (live) {
+    current = live.session
+    opts.time?.setSession(live.session)
+    if (ext) ext.session = live.session
+    let last = performance.now()
+    const frame = (now: number) => {
+      live.session.frame(Math.max(0, (now - last) / 1000))
+      last = now
+      raf = requestAnimationFrame(frame)
+    }
+    raf = requestAnimationFrame(frame)
+  }
   void hallChronicle(opts.slug).then((found) => {
     if (gone) return
     const chronicle = found.status === "ok" ? found.chronicle : null
@@ -64,11 +110,19 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
         hrefs={opts.hrefs}
         {...(found.status === "not-chronicled" ? { request: requestChronicleUrl(owner, repo) } : {})}
         {...(found.status === "unavailable" ? { onRetry: opts.retry } : {})}
+        {...(live ? { session: live } : {})}
+        time={opts.time ?? null}
       />,
     )
   })
   return () => {
     gone = true
+    if (live) {
+      cancelAnimationFrame(raf)
+      live.session.stop()
+      opts.time?.setSession(null)
+      if (current === live.session) current = null
+    }
     setTimeout(() => {
       root.unmount()
       host.remove()

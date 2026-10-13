@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto"
 import { createReadStream, readFileSync, statSync } from "node:fs"
 import { cp, lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises"
 import type { IncomingMessage, ServerResponse } from "node:http"
+import { homedir } from "node:os"
 import { dirname, extname, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import {
@@ -58,6 +59,68 @@ function folder(name: string, root: string): Plugin {
     name: `guildhall-${name}`,
     configureServer: (server) => void server.middlewares.use(serve),
     configurePreviewServer: (server) => void server.middlewares.use(serve),
+  }
+}
+
+/** Where the legacy hub writes its guild chronicles (V1 ADR 0003; GUILDHALL_HOME as the hub reads it). */
+const CHRONICLES = join(process.env.GUILDHALL_HOME ?? join(homedir(), ".cache", "guildhall"), "chronicles")
+
+/**
+ * `/chronicles/`, the dev server only (never a build, the preview or the showcase): the hub's recorded
+ * sessions for the hall's replay feed (hall/feeds/replay.ts). They hold the user's prompts, so only a
+ * page on this machine may read them: a loopback socket AND a loopback Host (a tunnel connects from
+ * loopback too, under its own name). `/chronicles/<guild>/` lists the guild's event chronicles, newest
+ * first; `/chronicles/<guild>/latest.jsonl` is the newest; `/chronicles/<guild>/<boot>.jsonl` one boot's.
+ */
+function chronicles(root: string): Plugin {
+  const local = (req: IncomingMessage) => {
+    const host = (req.headers.host ?? "").replace(/:\d+$/, "")
+    return LOOPBACK.has(req.socket.remoteAddress ?? "") && LOCAL_HOSTS.has(host) && isLocal(req)
+  }
+  const handle: Connect.NextHandleFunction = (req, res, next) => {
+    const url = (req.url ?? "").split("?")[0] ?? ""
+    if (!url.startsWith("/chronicles/")) return next()
+    if (!local(req)) return reply(res, 403, { error: "chronicles are for this machine only" })
+    let parts: string[]
+    try {
+      parts = url.slice("/chronicles/".length).split("/").map(decodeURIComponent)
+    } catch {
+      return reply(res, 400, { error: "bad path" })
+    }
+    const [guild = "", file = ""] = parts
+    if (parts.length !== 2 || !guild || /[/\\\0]/.test(guild) || guild.startsWith("."))
+      return reply(res, 404, {})
+    const dir = resolve(root, guild)
+    if (!dir.startsWith(root + sep)) return reply(res, 404, {})
+    const boots = () =>
+      readdir(dir)
+        .then((all) =>
+          all.filter((f) => f.endsWith(".jsonl") && !f.endsWith(".raw.jsonl") && !f.endsWith(".sea.jsonl")),
+        )
+        .then((all) => all.sort().reverse())
+        .catch(() => [] as string[])
+    void (async () => {
+      if (file === "") {
+        const list = await boots()
+        const sized = await Promise.all(
+          list.map(async (f) => ({ file: f, bytes: (await stat(join(dir, f))).size })),
+        )
+        return reply(res, 200, { guild, chronicles: sized })
+      }
+      const pick = file === "latest.jsonl" ? (await boots())[0] : file
+      if (!pick || !/^[A-Za-z0-9._-]+\.jsonl$/.test(pick) || pick.endsWith(".raw.jsonl"))
+        return reply(res, 404, {})
+      const path = join(dir, pick)
+      if (!statSync(path, { throwIfNoEntry: false })?.isFile()) return reply(res, 404, {})
+      res.setHeader("Content-Type", "application/x-ndjson")
+      res.setHeader("Cache-Control", "no-store")
+      createReadStream(path).pipe(res)
+    })().catch((error: unknown) => reply(res, 500, { error: String(error) }))
+  }
+  return {
+    name: "guildhall-chronicles",
+    apply: "serve",
+    configureServer: (server) => void server.middlewares.use(handle),
   }
 }
 
@@ -526,7 +589,7 @@ export default defineConfig(async ({ command }) => {
       siteUrl(SITE_URL),
       ...(SHOWCASE
         ? [showcase(plan, mode, DATA), publicFiles(SITE_URL), hostLike()]
-        : [folder("library", LIBRARY), data(DATA)]),
+        : [folder("library", LIBRARY), data(DATA), chronicles(CHRONICLES)]),
     ],
     // a Cloudflare quick tunnel may serve the dev Studio to a phone (writes stay local: `isLocal`)
     server: { port: 5300, strictPort: true, allowedHosts: [".trycloudflare.com"] },

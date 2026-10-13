@@ -60,6 +60,19 @@ const CSS = /* css */ `
 .ui-viewer[data-phone] .hall-sheet > * { width: 100%; max-width: none; border-radius: 14px 14px 0 0; }
 .ui-viewer[data-phone] .hall-sheet .hud-panel { max-height: min(64cqh, 620px); }
 
+/* the session (?feed=): the Guild under the brand like the Places, the pleas pinned between, a hero's
+   dossier in the sheet, a plea's dot on the Guild's icon */
+.gh .hall-roster { width: 304px; max-width: 100%; min-height: 0; flex: 0 1 auto; }
+.gh .ui-hud-corner .hud-pleas { width: 304px; max-width: 100%; }
+.gh .hall-rail-btn { position: relative; }
+.gh .hall-rail-btn .hud-tab-dot { position: absolute; top: 5px; right: 5px; }
+.hall-hero-sheet { display: flex; flex-direction: column; gap: 6px; min-height: 0; max-height: 100%; }
+.hall-hero-sheet > .hud-dossier { min-height: 0; }
+.gh .hall-back { align-self: flex-start; padding: 4px 2px; }
+.ui-viewer[data-phone] .hall-sheet .hud-dossier, .ui-viewer[data-phone] .hall-sheet .hud-roster { max-height: min(64cqh, 620px); }
+.ui-viewer[data-phone] .ui-hud-corner .hud-pleas { width: calc(100cqw - 16px); }
+.gh .ui-hud-bottom .hall-timeline .st-captions { width: 100%; }
+
 .hall-keys { margin: 0; display: grid; gap: 6px; }
 .hall-keys div { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--t-sm); color: var(--muted); }
 .hall-keys dd { margin: 0; text-align: right; }

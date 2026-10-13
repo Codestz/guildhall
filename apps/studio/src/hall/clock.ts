@@ -5,6 +5,7 @@
  * a replay plays at `rate`, the whole scale in `duration / rate` seconds. Pure: it moves only by `tick(dt)`
  * and the calls below, so the same calls give the same `t`.
  */
+import type { HallSession } from "./feeds/session.ts"
 
 export type ClockMode = "live" | "replay"
 export type ClockScale = "history" | "session"
@@ -117,19 +118,42 @@ export interface HallTime {
   clock: Clock
   range(): HistoryRange | null
   setRange(range: HistoryRange | null): void
-  /** Called when the range is set; returns the unsubscribe. */
+  /** The hall's session (hall/feeds, `?feed=`), once its HUD has started it: the bar's Session scale. */
+  session(): HallSession | null
+  setSession(session: HallSession | null): void
+  /** Which scale the bar shows: Session while a session is up, unless History is picked. */
+  scale(): ClockScale
+  setScale(scale: ClockScale): void
+  /** Called when the range, the session or the scale is set; returns the unsubscribe. */
   subscribe(fn: () => void): () => void
 }
 
 export function createHallTime(clock: Clock): HallTime {
   let range: HistoryRange | null = null
+  let session: HallSession | null = null
+  let scale: ClockScale = "history"
   const listeners = new Set<() => void>()
+  const tell = () => {
+    for (const fn of [...listeners]) fn()
+  }
   return {
     clock,
     range: () => range,
     setRange(next) {
       range = next
-      for (const fn of [...listeners]) fn()
+      tell()
+    },
+    session: () => session,
+    setSession(next) {
+      session = next
+      scale = next ? "session" : "history"
+      tell()
+    },
+    scale: () => scale,
+    setScale(next) {
+      if (next === scale || (next === "session" && !session)) return
+      scale = next
+      tell()
     },
     subscribe(fn) {
       listeners.add(fn)

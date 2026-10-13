@@ -25,7 +25,7 @@ export interface SessionAgents extends AgentSource {
 }
 
 export function sessionAgents(
-  session: Pick<HallSession, "log" | "clock" | "feed" | "onReset">,
+  session: Pick<HallSession, "log" | "clock" | "feed" | "onReset"> & Partial<Pick<HallSession, "snapshot">>,
   plan: (req: AgentDeskRequest) => Promise<AgentDeskReply | null>,
   now: () => number = Date.now,
 ): SessionAgents {
@@ -51,6 +51,11 @@ export function sessionAgents(
     poseAt(id) {
       const it = byId.get(id)
       return it ? poseAt(it, session.clock.get().at) : null
+    },
+    // the HUD's 10 Hz snapshot: the world at the session clock (no fold of its own)
+    worldAt() {
+      const snap = session.snapshot?.()
+      return snap ? { world: snap.world, t: snap.clock.at } : null
     },
     tick() {
       const current = session.log()

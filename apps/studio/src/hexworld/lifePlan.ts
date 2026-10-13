@@ -224,5 +224,5 @@ export function planGuild(
     if (last) end = Math.max(end, last.from)
     for (const [, to] of it.shown) if (Number.isFinite(to)) end = Math.max(end, to)
   }
-  return { ...planned, feed: feed.kind, period: end - planned.span[0] + ROUND_REST }
+  return { ...planned, feed: feed.kind, period: end - planned.span[0] + ROUND_REST, events: [...log.events] }
 }

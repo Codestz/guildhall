@@ -3,8 +3,8 @@
  * day (world `planFolk`) and the agents, wherever their source puts them (an `AgentSource`,
  * lifeAgents.ts: a guild's events planned on the walk graph, sim life), all on the island's walk
  * graph, drawn by the R5 crowd in one go (the nearest few as full heroes, everyone else the baked
- * crowd: three draws), at CHARACTER_SCALE with their feet on the ground. Each agent has its name on a
- * coloured banner above its head, readable from the map view.
+ * crowd: three draws), at CHARACTER_SCALE with their feet on the ground. Each agent wears V1's chip over
+ * its head (chips.ts): its name and rank, what it is doing, its deed's sigil, what it says, decluttered.
  *
  * Time: the day moves on SPEEDUP times faster than real time and people walk slower per day-hour by as
  * much, so they walk at a natural pace while their routine visibly moves on. When the screen's clock is
@@ -23,15 +23,9 @@ import {
   validateNpc,
 } from "@guildhall/assets"
 import { hash, log } from "@guildhall/core"
-import {
-  type ActorSample,
-  type Crowd,
-  createCrowd,
-  loadCharacter,
-  type Stage,
-  toScreen,
-} from "@guildhall/render"
+import { type ActorSample, type Crowd, createCrowd, loadCharacter, type Stage } from "@guildhall/render"
 import { RUN_CLIP } from "@guildhall/sim"
+import { PHONE_MAX } from "@guildhall/ui"
 import {
   CHARACTER_SCALE,
   type DoorPass,
@@ -55,6 +49,7 @@ import {
 } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import * as data from "../data.ts"
+import { type ChipMode, type Chips, chipViews, createChips } from "./chips.ts"
 import { collideView } from "./collideView.ts"
 import { type AgentSource, recipeOf } from "./lifeAgents.ts"
 import { type LifePlan, SPEEDUP } from "./lifePlan.ts"
@@ -67,11 +62,10 @@ const logger = log("studio:hexworld:life")
 const STRIDE = 1.3
 /** Metres one run-clip cycle covers at look scale 1 (a hero running a long way). */
 const RUN_STRIDE = 2.4
-/** A banner floats this far over an agent's feet, metres. */
-const BANNER_UP = 1.35
-/** A banner's footprint on screen for keeping them apart, CSS px. */
-const BANNER_W = 84
-const BANNER_H = 24
+/** A chip stands this far over an agent's feet, metres: just over its head. */
+const CHIP_UP = 1.3
+/** How often the chips' words are read again from the source's world when it has not changed, ms. */
+const WORDS_MS = 250
 /** Where an agent not on the island yet is kept (undrawn) before its first pose. */
 const OFF_ISLAND: LifePose = { at: [0, 0, 0], facing: 0, act: "idle", indoors: true, ground: true }
 
@@ -103,6 +97,8 @@ export interface LifeOpts {
   agents?: AgentSource | Promise<AgentSource | null> | null
   /** Keep spare hero figures, `AGENT_POOL` of each body, for heroes a source adds later (a hall's session). */
   agentPool?: boolean
+  /** Where the heroes' chips go (the Viewer's labels layer); none: no chips. */
+  chips?: HTMLElement
 }
 
 export interface Life {
@@ -122,6 +118,8 @@ export interface Life {
   setAgents(source: AgentSource | null): void
   /** Where hero `id` is drawn now (its feet, metres), or null when it is not on the island. */
   heroAt(id: string): [number, number, number] | null
+  /** The heroes' chips (chips.ts), once everyone is drawn; null without them. */
+  chips(): Chips | null
   dispose(): void
 }
 
@@ -195,47 +193,18 @@ function heroLook(recipe: NpcRecipe, body: string, seed: number, catalog: Catalo
   return scaled({ ...look, body, hide, scale: 1.06 })
 }
 
-const BANNER_STYLE = [
-  "position:absolute",
-  "left:0",
-  "top:0",
-  "z-index:1",
-  "pointer-events:none",
-  "display:flex",
-  "flex-direction:column",
-  "align-items:center",
-  "will-change:transform",
-].join(";")
-
-function banner(name: string, colour: string): HTMLElement {
-  const el = document.createElement("div")
-  el.style.cssText = BANNER_STYLE
-  el.dataset.heroBanner = ""
-  const flag = document.createElement("div")
-  flag.textContent = name
-  flag.style.cssText = [
-    `background:${colour}`,
-    "color:#fff8ec",
-    "font:600 12px/1.2 ui-sans-serif,system-ui,sans-serif",
-    "letter-spacing:0.02em",
-    "padding:3px 9px 4px",
-    "border-radius:3px 3px 0 0",
-    "box-shadow:0 1px 3px rgba(0,0,0,0.35)",
-    "text-shadow:0 1px 1px rgba(0,0,0,0.35)",
-    "white-space:nowrap",
-  ].join(";")
-  // the banner's swallow-tail and its pole down to the head
-  const tail = document.createElement("div")
-  tail.style.cssText = `width:0;height:0;border-left:8px solid ${colour};border-right:8px solid ${colour};border-bottom:5px solid transparent`
-  const pole = document.createElement("div")
-  pole.style.cssText = "width:2px;height:10px;background:rgba(40,28,18,0.8)"
-  el.append(flag, tail, pole)
-  return el
+/** The HUD's mode and whether the view is a phone, off the Viewer's root (attributes: no layout). */
+function chipField(host: HTMLElement, width: number): { mode: ChipMode; phone: boolean } {
+  const root = host.closest<HTMLElement>(".ui-viewer")
+  const set = root?.dataset.hud === "on" ? root.dataset.hudMode : undefined
+  const mode: ChipMode = set === "detailed" || set === "hidden" ? set : "minimal"
+  return { mode, phone: root?.dataset.phone !== undefined || width <= PHONE_MAX }
 }
 
 export function createLife(stage: Stage, opts: LifeOpts): Life {
   let disposed = false
   let crowd: Crowd | null = null
+  let chips: Chips | null = null
   let unFrame = () => {}
   const cleanup: (() => void)[] = []
   let passes: DoorPass[] = []
@@ -294,11 +263,11 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
      * The heroes' figures: one for each hero the source has now (its look), and with `agentPool` spares
      * of every body for those it adds; `agent` is the hero a figure draws, and its banner says who.
      */
-    const figures: { crowd: number; hero: string; agent: string | null; el: HTMLElement | null }[] = []
+    const figures: { crowd: number; hero: string; agent: string | null }[] = []
     const figure = (hero: string, recipeId: string, seed: string, agent: string | null) => {
       const recipe = usableOf(recipeId)
       if (!recipe || !catalog.get(hero)) return
-      figures.push({ crowd: looks.length, hero, agent, el: null })
+      figures.push({ crowd: looks.length, hero, agent })
       looks.push(heroLook(recipe, hero, hash(seed), catalog))
       loops.push({ figure: figures.length - 1 })
     }
@@ -320,20 +289,14 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       const wanted = new Map(list.map((a) => [a.id, a]))
       for (const f of figures)
         if (f.agent !== null && !wanted.has(f.agent)) {
+          chips?.place(f.agent, null)
           f.agent = null
-          f.el?.remove()
-          f.el = null
         }
       for (const a of list) {
         let f = figures.find((g) => g.agent === a.id)
         f ??= figures.find((g) => g.agent === null && g.hero === a.hero)
         if (!f) continue
-        if (f.agent !== a.id || !f.el) {
-          f.el?.remove()
-          f.agent = a.id
-          f.el = banner(a.name, a.colour)
-          opts.host.append(f.el)
-        }
+        if (f.agent !== a.id) f.agent = a.id
       }
     }
     const made = await createCrowd(
@@ -348,6 +311,18 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     }
     crowd = made
     crowd.setHeroes(agentIds)
+    // the canvas's CSS size, kept by an observer (never read in a frame)
+    const canvas = stage.renderer.domElement
+    const view = { width: canvas.clientWidth, height: canvas.clientHeight }
+    const sized = new ResizeObserver(() => {
+      view.width = canvas.clientWidth
+      view.height = canvas.clientHeight
+    })
+    sized.observe(canvas)
+    cleanup.push(() => sized.disconnect())
+    const chipHost = opts.chips
+    if (figures.length && chipHost)
+      chips = createChips(chipHost, () => ({ ...view, ...chipField(chipHost, view.width) }))
 
     // the day's clock: follows the screen's when it moves, else runs SPEEDUP× real time
     let seen = opts.hour()
@@ -455,7 +430,70 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         hidden: p.indoors || (hiddenAt !== null && hiddenAt(x, zz)),
       }
     }
-    // the CPU a frame of life costs (sampling, the crowd's update, the banners), smoothed
+    /** The chips' words: read again when the source's world changed, or every WORDS_MS (speech ends, walks end). */
+    let wordsWorld: unknown = null
+    let wordsAt = Number.NEGATIVE_INFINITY
+    const walkingId = (id: string) => {
+      const f = figures.find((g) => g.agent === id)
+      return f !== undefined && poses[f.crowd]?.act === "walk"
+    }
+    /** One scratch for the chip's anchor: no allocation per figure per frame. */
+    const anchor = { x: 0, y: 0, z: 0, perUnit: 0 }
+    const placeChips = () => {
+      if (!chips) return
+      const now = performance.now()
+      const w = source?.worldAt?.(secs) ?? null
+      if (w && (w.world !== wordsWorld || now - wordsAt >= WORDS_MS)) {
+        wordsWorld = w.world
+        wordsAt = now
+        const named = source?.ownNames ? new Map(source.list().map((l) => [l.id, l])) : null
+        chips.set(chipViews(w.world, w.t, walkingId, named ? (id) => named.get(id) : undefined))
+      }
+      const cam = stage.camera
+      cam.updateMatrixWorld()
+      const v = cam.matrixWorldInverse.elements
+      const pm = cam.projectionMatrix.elements
+      for (const f of figures) {
+        if (f.agent === null) continue
+        const id = f.crowd
+        const p = poses[id]
+        const x = space.x[id]!
+        const zz = space.z[id]!
+        // an agent not on the island, or on land not yet there (a history replay), has no chip either
+        if (!p || p.indoors || hiddenAt?.(x, zz)) {
+          chips.place(f.agent, null)
+          continue
+        }
+        const y = footAt(x, zz, p) + CHIP_UP
+        // the anchor in view space, then on screen (the camera's own matrices: no Vector3, no layout)
+        const vx = v[0]! * x + v[4]! * y + v[8]! * zz + v[12]!
+        const vy = v[1]! * x + v[5]! * y + v[9]! * zz + v[13]!
+        const vz = v[2]! * x + v[6]! * y + v[10]! * zz + v[14]!
+        const depth = -vz
+        if (depth <= cam.near) {
+          chips.place(f.agent, null)
+          continue
+        }
+        const cx = pm[0]! * vx + pm[4]! * vy + pm[8]! * vz + pm[12]!
+        const cy = pm[1]! * vx + pm[5]! * vy + pm[9]! * vz + pm[13]!
+        const cw = pm[3]! * vx + pm[7]! * vy + pm[11]! * vz + pm[15]!
+        anchor.x = ((cx / cw + 1) / 2) * view.width
+        anchor.y = ((1 - cy / cw) / 2) * view.height
+        if (
+          anchor.x < -300 ||
+          anchor.x > view.width + 300 ||
+          anchor.y < -300 ||
+          anchor.y > view.height + 300
+        ) {
+          chips.place(f.agent, null)
+          continue
+        }
+        anchor.z = depth
+        anchor.perUnit = (pm[5]! * view.height * 0.5) / depth
+        chips.place(f.agent, anchor)
+      }
+    }
+    // the CPU a frame of life costs (sampling, the crowd's update, the chips), smoothed
     let cpuMs = 0
     // of which the agents' poses (their source's samples), smoothed
     let agentCpu = 0
@@ -479,30 +517,12 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       crowd?.update(step, sample)
       const t3 = performance.now()
       stage.timing.cpu.add("crowd", t3 - t2)
-      // banners over their agents, nudged up off each other where they would overlap
-      const placed: [number, number][] = []
-      const shown = figures
-        .flatMap((f) => (f.el ? [{ el: f.el, id: f.crowd }] : []))
-        .map(({ el, id }) => {
-          const x = space.x[id]!
-          const zz = space.z[id]!
-          const p = poses[id] ?? pose(id)
-          const y = footAt(x, zz, p)
-          // an agent not on the island, or on land not yet there (a history replay), has no banner either
-          if (p.indoors || hiddenAt?.(x, zz)) return { el, at: null }
-          return { el, at: toScreen(stage, [x, y + BANNER_UP, zz]) }
-        })
-        .sort((a, b) => (b.at?.[1] ?? 0) - (a.at?.[1] ?? 0))
-      for (const { el, at } of shown) {
-        el.style.display = at ? "flex" : "none"
-        if (!at) continue
-        let [x, y] = at
-        while (placed.some(([px, py]) => Math.abs(px - x) < BANNER_W && Math.abs(py - y) < BANNER_H))
-          y -= BANNER_H
-        placed.push([x, y])
-        el.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`
+      // the chips over their agents: placed every frame, their words and the declutter at most 10 times a second
+      if (chips) {
+        placeChips()
+        chips.frame(t3)
       }
-      stage.timing.cpu.add("banners", performance.now() - t3)
+      stage.timing.cpu.add("chips", performance.now() - t3)
       cpuMs += (performance.now() - t1 - cpuMs) * 0.05
       overlay?.draw(drawn)
     }
@@ -568,6 +588,15 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
                 ],
           ),
         heroAt: (id: string) => heroAt(id),
+        // the chips as the declutter left them (shots, the perf probe)
+        chips: () => chips?.declutter.slots.map((s) => ({ ...s })) ?? [],
+        // everyone drawn now (x, z, a hero's id or null), for the spacing probe
+        people: () =>
+          Array.from({ length: n }, (_, id) =>
+            poses[id]?.indoors
+              ? null
+              : [space.x[id], space.z[id], figures.find((f) => f.crowd === id)?.agent ?? null],
+          ).filter(Boolean),
         walk: { nodes: plan.stats.nodes, edges: plan.stats.edges },
       }
     logger.info("life", {
@@ -597,11 +626,12 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       swapped = true
     },
     heroAt: (id) => heroAt(id),
+    chips: () => chips,
     dispose() {
       disposed = true
       unFrame()
       crowd?.dispose()
-      for (const el of opts.host.querySelectorAll("[data-hero-banner]")) el.remove()
+      chips?.dispose()
       for (const done of cleanup) done()
       const ext = window.guildhall?.ext
       if (ext) delete ext.life

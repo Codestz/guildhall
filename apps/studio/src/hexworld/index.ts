@@ -71,6 +71,7 @@ import { mountViewer } from "../shell/viewer.ts"
 import { islandWorld, worldCamera } from "../shell/worldCamera.ts"
 import { loadTiles } from "../tiles.ts"
 import { atmoKnobs, createIslandAir, type IslandAir } from "./atmo.ts"
+import type { Chips } from "./chips.ts"
 import { createDoors, type Doors } from "./doors.ts"
 import { type Fx, fxOf, mountFx } from "./fx.ts"
 import { type HallRepo, hallBuild, hallSubtitle, placeRows } from "./hall.ts"
@@ -291,6 +292,8 @@ export interface HudParts {
   fx: Fx | null
   /** Where a session's hero is drawn now (its feet, metres; null: not on the island, or no life). */
   heroAt(id: string): [number, number, number] | null
+  /** The heroes' chips (null: no life, no agents, or `?chips=0`): the one followed, a plea mark tapped. */
+  chips: Pick<Chips, "select" | "onPlea"> | null
 }
 
 /** What `window.guildhall.ext.hall` tells the shots: how long each part took, and the places built. */
@@ -643,6 +646,8 @@ const world = {
             tier: p.tier,
           })),
           extra.hud ? (k) => pick?.(k) : undefined,
+          // heroes before hamlets: the chips' boxes as the declutter last laid them
+          () => life?.chips()?.boxes() ?? [],
         )
       // ---- life (track B): townsfolk and agents on the walk graph; `?life=0` turns it off ----
       let world: ReturnType<typeof hexWorld> | null = null
@@ -662,6 +667,8 @@ const world = {
           // the agents: the guild the worker planned (the demo story); a session's come later
           agents: job.life.then((plan) => (plan.agents ? agentSource(plan.agents) : null)),
           agentPool: session,
+          // the heroes' chips, in the labels layer with the plates (`?chips=0`: none)
+          ...(ctx.query.get("chips") !== "0" ? { chips: viewer.labels } : {}),
           debug: overlay
             ? () => {
                 const island = hexIsland({ ...shape, seed, files })
@@ -812,6 +819,7 @@ const world = {
           clock: dayClock,
           fx,
           heroAt: (id) => life?.heroAt(id) ?? null,
+          chips: life?.chips() ?? null,
         })
       // a hall's session drives its heroes: planned in the worker as its log grows (the HUD starts the
       // session as it mounts, which may be a moment after this: looked for until it is there)

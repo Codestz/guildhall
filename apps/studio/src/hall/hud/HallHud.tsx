@@ -408,6 +408,15 @@ export function HallHud(props: HallHudProps) {
   // a plate clicked or tapped in the world opens its place
   // biome-ignore lint/correctness/useExhaustiveDependencies: `open` only reads what is stable (the HUD, the parts)
   useEffect(() => parts.onPick((k) => open(k)), [parts])
+  // the hero open in the sheet is the one its chip follows; a chip's plea mark opens its hero
+  const heroOpen = state.open === "hero" ? hero : null
+  useEffect(() => parts.chips?.select(heroOpen), [parts.chips, heroOpen])
+  const openHeroRef = useRef(openHero)
+  openHeroRef.current = openHero
+  useEffect(() => {
+    parts.chips?.onPlea((id) => openHeroRef.current(id, hud.phone() ? undefined : "roster"))
+    return () => parts.chips?.onPlea(null)
+  }, [parts.chips, hud])
   // the open place's plate is marked
   useEffect(() => {
     parts.labels?.select(state.open === "dossier" ? picked : null)

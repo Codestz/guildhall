@@ -6,7 +6,8 @@
  * few that fit and a close view shows them all. At the map view only the villages and towns (tier 2 and
  * up) carry plates; zoomed close, every place does (`plateMode`, with a gap between the two distances so
  * a zoom resting near one never flickers), and the hamlets' plates fade in and out rather than pop.
- * `?labels=0` turns them off. With `onPick` a plate is a button for a pointer: a click or a tap picks
+ * Heroes come before hamlets: a plate under tier 3 that would lie over a hero's chip is drawn compact or
+ * not at all (`HERO_TIER`). `?labels=0` turns them off. With `onPick` a plate is a button for a pointer: a click or a tap picks
  * its place (a hall opens its dossier).
  */
 import type { Stage } from "@guildhall/render"
@@ -52,6 +53,8 @@ const UP = 2.2
 const FAR = 420
 /** How long a plate takes to fade in or out as the zoom crosses between the map view and close, ms. */
 const FADE_MS = 280
+/** Plates of places under this tier make way for a hero's chip (a town's or the capital's stays). */
+export const HERO_TIER = 3
 /** The gap kept between plates, CSS px. */
 const GAP = 4
 
@@ -103,14 +106,18 @@ export function layoutPlates(
   /** Screen rects the plates keep clear of (left, top, right, bottom): the site's crest. */
   keepOut: readonly Rect[] = [],
   view?: readonly [number, number],
+  /** Rects only the plates `yields(k)` keep clear of: the heroes' chips, over a hamlet's plate. */
+  soft?: { rects: readonly Rect[]; yields(k: number): boolean },
 ): PlateLaid[] {
   const out: PlateLaid[] = anchors.map(() => ({ at: null, size: "full" }))
   const taken: Rect[] = keepOut.map((r) => [...r] as Rect)
-  const clear = (x: number, y: number, w: number, h: number) => {
+  const clear = (x: number, y: number, w: number, h: number, k: number) => {
     const l = x - w / 2 - GAP
     const r = x + w / 2 + GAP
     const t = y - h - GAP
     for (const [L, T, R, B] of taken) if (l < R && r > L && t < B && y > T) return false
+    if (soft?.yields(k))
+      for (const [L, T, R, B] of soft.rects) if (l < R && r > L && t < B && y > T) return false
     return true
   }
   /** The anchor `a` moved just enough for a `w` × `h` plate to lie inside the view. */
@@ -127,9 +134,9 @@ export function layoutPlates(
     if (view && (a[0] < 0 || a[0] > view[0] || a[1] < 0 || a[1] > view[1])) continue
     const full = inside(a, ...box.full)
     const sm = inside(a, ...box.sm)
-    const size: PlateSize | null = clear(full[0], full[1], ...box.full)
+    const size: PlateSize | null = clear(full[0], full[1], ...box.full, k)
       ? "full"
-      : clear(sm[0], sm[1], ...box.sm)
+      : clear(sm[0], sm[1], ...box.sm, k)
         ? "sm"
         : null
     if (!size) continue
@@ -175,6 +182,8 @@ export function createPlaceLabels(
   layer: HTMLElement,
   places: readonly PlaceLabel[],
   onPick?: (index: number) => void,
+  /** The heroes' chips on screen now (layer px): a plate under tier 3 makes way for a hero. */
+  heroes?: () => readonly Rect[],
 ): PlaceLabels {
   const els = places.map((p, k) => {
     const el = plate({ title: p.label, detail: p.detail, width: 220, anchor: "translate(-50%, -100%)" })
@@ -239,7 +248,14 @@ export function createPlaceLabels(
       // a plate the zoom leaves out gives up its room at once (it fades out where it stands)
       anchors[k] = wanted(k) ? screen[k]! : null
     }
-    const laid = layoutPlates(anchors, boxes, order, keep, view[0] > 0 ? view : undefined)
+    const laid = layoutPlates(
+      anchors,
+      boxes,
+      order,
+      keep,
+      view[0] > 0 ? view : undefined,
+      heroes ? { rects: heroes(), yields: (k) => (places[k]?.tier ?? 0) < HERO_TIER } : undefined,
+    )
     for (let k = 0; k < els.length; k++) {
       const el = els[k] as HTMLElement
       const was = shown[k]!

@@ -12,7 +12,17 @@
  * The script is told with sim's Script DSL (D1); a saga can stand in for it, the pipe stays.
  */
 import type { GuildEvent } from "@guildhall/core"
-import { type Adventurer, type AgentInfo, type PlannedAgents, poseAt, Script, toEvents } from "@guildhall/sim"
+import {
+  type Adventurer,
+  type AgentInfo,
+  EventLog,
+  type GuildWorld,
+  type PlannedAgents,
+  poseAt,
+  Script,
+  toEvents,
+  type WorldEvent,
+} from "@guildhall/sim"
 import type { HexWalk, HexZones, LifePose, ZoneKind } from "@guildhall/world"
 
 /** How a hero is drawn: its banner and its body. */
@@ -37,13 +47,23 @@ export interface AgentSource {
   version?(): number
   /** Once a frame, before any pose (a source that plans as its session's log grows). */
   tick?(): void
+  /**
+   * The guild's world where the heroes are at `secs` and its clock there (ms), for their chips
+   * (chips.ts: who they are, what they do and say); null when there is none yet.
+   */
+  worldAt?(secs: number): { world: GuildWorld; t: number } | null
+  /** Its looks name and colour the heroes over the world (the demo's Claude, Warden and Scout). */
+  ownNames?: boolean
 }
 
 /** Which agents the island shows (the job's spec): the demo story, or a recorded guild's wire. */
 export type AgentFeed = { kind: "story" } | { kind: "wire"; name: string; wire: GuildEvent[] }
 
-/** A guild planned for life (lifePlan.ts): the cast, their itineraries, and how long a round is (ms). */
-export type AgentPlan = PlannedAgents & { feed: AgentFeed["kind"]; period: number }
+/**
+ * A guild planned for life (lifePlan.ts): the cast, their itineraries, how long a round is (ms), and the
+ * world events they were planned from (what the heroes' chips read).
+ */
+export type AgentPlan = PlannedAgents & { feed: AgentFeed["kind"]; period: number; events: WorldEvent[] }
 
 /** The demo's heroes, in the story's join order: the bodies and banners they always had. */
 export const DEMO_AGENTS: readonly HeroLook[] = [
@@ -173,11 +193,32 @@ export function agentSource(plan: AgentPlan): AgentSource {
   const byId = new Map(plan.itineraries.map((it) => [it.id, it]))
   const [start] = plan.span
   const p = plan.period
+  const at = (secs: number) => start + ((((secs * 1000) % p) + p) % p)
+  // the log the plan was made from, folded here the first time a chip asks (checkpoints: a seek is cheap)
+  let log: EventLog | null = null
+  let folded = -1
+  let world: GuildWorld | null = null
   return {
     list: () => looks,
+    ownNames: plan.feed === "story",
     poseAt(id, secs) {
       const it = byId.get(id)
-      return it ? poseAt(it, start + ((((secs * 1000) % p) + p) % p)) : null
+      return it ? poseAt(it, at(secs)) : null
+    },
+    worldAt(secs) {
+      if (!plan.events?.length) return null
+      if (!log) {
+        log = new EventLog()
+        log.append(...plan.events)
+      }
+      const t = at(secs)
+      // the same events folded: the same world (so its readers know nothing changed)
+      const n = log.countAt(t)
+      if (n !== folded || !world) {
+        folded = n
+        world = log.stateAt(t)
+      }
+      return { world, t }
     },
   }
 }

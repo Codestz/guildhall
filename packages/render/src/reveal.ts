@@ -59,7 +59,7 @@ export interface Reveal {
   /** The count last set. */
   readonly count: number
   /** The count and span as shaders outside the reveal's own meshes read them (the water). */
-  readonly uniforms: { count: { value: number }; span: { value: number } }
+  readonly uniforms: { count: { value: number }; span: { value: number }; sink: { value: number } }
   /**
    * A triangle soup (positions, linear colours, normals, as `vertexMeshData` makes them) revealed by place:
    * `placeAt` gives each triangle's from its centroid and normal.
@@ -226,7 +226,7 @@ export function createReveal(look: RevealLook): Reveal {
     get count() {
       return count
     },
-    uniforms: { count: uniforms.uRevealCount, span: uniforms.uRevealSpan },
+    uniforms: { count: uniforms.uRevealCount, span: uniforms.uRevealSpan, sink: uniforms.uRevealSink },
     mesh(stage, data, placeAt, opts) {
       const n = data.position.length / 9
       const place = new Float32Array(n)

@@ -259,6 +259,7 @@ export const replayLab: Screen = {
             tile: HEX_TILE_SIZE,
             count: reveal.uniforms.count,
             span: reveal.uniforms.span,
+            sink: reveal.uniforms.sink,
           })
           const gates = parts.doors.gates
           moved = (n) => {

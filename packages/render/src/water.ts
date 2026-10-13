@@ -187,6 +187,7 @@ const REVEAL_PARS = /* glsl */ `
 uniform sampler2D uRevealPlaces;
 uniform float uRevealCount;
 uniform float uRevealSpan;
+uniform float uRevealSink;
 uniform float uRevealTile;
 uniform int uRevealRadius;
 const float REVEAL_DQ[6] = float[6](1.0, 0.0, -1.0, -1.0, 0.0, 1.0);
@@ -446,6 +447,8 @@ export interface WaterReveal {
   tile: number
   count: { value: number }
   span: { value: number }
+  /** How far a tile sinks before it rises (0: nothing rises, the dither look). */
+  sink: { value: number }
 }
 
 export interface Water {
@@ -563,6 +566,7 @@ function waterMesh(stage: Stage, geometry: BufferGeometry, field: ShoreField | n
     uRevealPlaces: { value: null as DataTexture | null },
     uRevealCount: { value: Number.POSITIVE_INFINITY },
     uRevealSpan: { value: 1 },
+    uRevealSink: { value: 0 },
     uRevealTile: { value: 1 },
     uRevealRadius: { value: 0 },
   }
@@ -602,6 +606,7 @@ function waterMesh(stage: Stage, geometry: BufferGeometry, field: ShoreField | n
         // shared with the reveal's meshes: one count moves everything
         uniforms.uRevealCount = reveal.count
         uniforms.uRevealSpan = reveal.span
+        uniforms.uRevealSink = reveal.sink
         material.defines = { ...material.defines, REVEAL: "" }
       } else {
         const { REVEAL: _, ...rest } = material.defines ?? {}

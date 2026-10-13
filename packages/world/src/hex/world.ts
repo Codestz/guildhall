@@ -157,12 +157,20 @@ const SCENES: Record<string, string> = {
   smithy: "smithy-works",
   archery: "archery-range",
 }
+/**
+ * The training arena (decisions.md "training arena"): where knights and guards spar, drill and practise.
+ * One an island: at the first camp with room for it, else beside the castle (the building nearest it of
+ * a place within CASTLE_REACH steps).
+ */
+const ARENA = "training-arena"
+const BESIDE_CASTLE = new Set(["town", "camp", "hamlet", "market"])
+const CASTLE_REACH = 8
 /** The scenes each kind of place has once, wherever a building of it has room for one. */
 const PLACE_SCENES: Partial<Record<string, string[]>> = {
   town: ["market-square", "town-hall-plaza", "tavern-garden", "smithy-works"],
   market: ["tavern-garden"],
   harbour: ["harbour-quay", "tavern-garden"],
-  camp: ["archery-range"],
+  camp: [ARENA, "archery-range"],
   mine: ["smithy-works"],
   monastery: ["monastery-compound"],
   farm: ["farmstead-yard"],
@@ -183,6 +191,8 @@ interface SceneFit {
   turn?: boolean
   /** Which of its place's buildings it tries first (default: nearest the heart). */
   near?: "ring"
+  /** One an island, at the first place that has room (the training arena). */
+  once?: boolean
 }
 const SCENE_FIT: Partial<Record<string, SceneFit>> = {
   "harbour-quay": { sea: true, turn: true },
@@ -190,6 +200,8 @@ const SCENE_FIT: Partial<Record<string, SceneFit>> = {
   "farmstead-yard": { spare: ["field"], turn: true },
   // on the ring street round the town's square, the hall facing its plaza
   "town-hall-plaza": { turn: true, near: "ring" },
+  // the training arena: once an island, at any street its building fronts, either way round
+  [ARENA]: { turn: true, once: true },
   "market-square": { clear: true },
 }
 /** Steps from a town's square out to its ring street (zones.ts). */
@@ -478,12 +490,25 @@ export function hexWorld(
     )
   // each place's own scenes first, on the building nearest its heart they fit beside: one with a door
   // onto a street people come in by first, else one a lane reaches (life.ts workTiles)
+  const placed = (scene: string) => [...scenes.values()].includes(scene)
   for (const [zi, zone] of z.zones.entries())
     for (const scene of PLACE_SCENES[zone.kind] ?? []) {
+      if (SCENE_FIT[scene]?.once && placed(scene)) continue
       const near = SCENE_FIT[scene]?.near
       buildings(zi, near).some((i) => claim(i, scene, true)) ||
         buildings(zi, near).some((i) => byLane(i) && claim(i, scene))
     }
+  // an island's one training arena where no camp had room for it (or there is no camp): beside the
+  // castle, on the building nearest it of a place round it
+  const castleAt = z.zones.find((zz) => zz.kind === "castle")?.tile
+  if (castleAt !== undefined && !placed(ARENA)) {
+    const near = z.zones
+      .flatMap((zone, zi) =>
+        BESIDE_CASTLE.has(zone.kind) ? buildings(zi).filter((i) => steps(i, castleAt) <= CASTLE_REACH) : [],
+      )
+      .sort((a, b) => steps(a, castleAt) - steps(b, castleAt) || a - b)
+    near.some((i) => claim(i, ARENA, true)) || near.some((i) => byLane(i) && claim(i, ARENA))
+  }
   // then every other tavern, smithy and archery range the tiles picked, where there is room
   for (let i = 0; i < g.size; i++) {
     if (useOf(z, i) !== "building" || scenes.has(i)) continue

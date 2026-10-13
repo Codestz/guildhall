@@ -1,0 +1,708 @@
+{
+  "blockers": [
+    {
+      "r": 0.18,
+      "x": 1.419,
+      "z": 0.779
+    },
+    {
+      "r": 0.18,
+      "x": 1.419,
+      "z": -0.779
+    },
+    {
+      "r": 0.3,
+      "x": 3.55,
+      "z": -4.3
+    },
+    {
+      "r": 0.3,
+      "x": 4.75,
+      "z": -4.3
+    },
+    {
+      "r": 0.3,
+      "x": 5.95,
+      "z": -4.3
+    },
+    {
+      "r": 0.3,
+      "x": 4.1,
+      "z": -5.05
+    },
+    {
+      "r": 0.3,
+      "x": 5.37,
+      "z": -5.05
+    },
+    {
+      "r": 0.45,
+      "x": 1.0,
+      "z": -1.55
+    },
+    {
+      "r": 0.45,
+      "x": 1.0,
+      "z": 1.6
+    },
+    {
+      "r": 0.45,
+      "x": -1.1,
+      "z": -1.9
+    },
+    {
+      "r": 0.45,
+      "x": -1.9,
+      "z": -0.55
+    },
+    {
+      "r": 0.2,
+      "x": -0.2,
+      "z": -2.2
+    },
+    {
+      "r": 0.2,
+      "x": 0.75,
+      "z": -2.35
+    },
+    {
+      "r": 0.3,
+      "x": 6.6,
+      "z": -1.4
+    },
+    {
+      "r": 0.2,
+      "x": 2.0,
+      "z": 2.3
+    }
+  ],
+  "footprint": [
+    0,
+    5
+  ],
+  "ground": "dirt",
+  "group": "landmark",
+  "id": "training-arena",
+  "name": "Training arena",
+  "pieces": [
+    {
+      "piece": "kenney-nature/fence-simple",
+      "rot": -1.571,
+      "scale": 0.38,
+      "x": 5.135,
+      "z": 0.0
+    },
+    {
+      "piece": "kenney-nature/fence-simple",
+      "rot": -2.356,
+      "scale": 0.38,
+      "x": 4.597,
+      "z": 1.297
+    },
+    {
+      "piece": "kenney-nature/fence-simple",
+      "rot": -3.142,
+      "scale": 0.38,
+      "x": 3.3,
+      "z": 1.835
+    },
+    {
+      "piece": "kenney-nature/fence-simple",
+      "rot": -3.927,
+      "scale": 0.38,
+      "x": 2.003,
+      "z": 1.297
+    },
+    {
+      "piece": "kenney-nature/fence-simple",
+      "rot": -5.498,
+      "scale": 0.38,
+      "x": 2.003,
+      "z": -1.297
+    },
+    {
+      "piece": "kenney-nature/fence-simple",
+      "rot": -6.283,
+      "scale": 0.38,
+      "x": 3.3,
+      "z": -1.835
+    },
+    {
+      "piece": "kenney-nature/fence-simple",
+      "rot": -7.069,
+      "scale": 0.38,
+      "x": 4.597,
+      "z": -1.297
+    },
+    {
+      "piece": "kenney-castle/flag-pennant",
+      "rot": 1.571,
+      "scale": 0.42,
+      "x": 1.419,
+      "z": 0.779
+    },
+    {
+      "piece": "kenney-castle/flag-pennant",
+      "rot": 1.571,
+      "scale": 0.42,
+      "x": 1.419,
+      "z": -0.779
+    },
+    {
+      "piece": "kenney-town/pillar-wood",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.3,
+      "x": 3.55,
+      "z": -4.3
+    },
+    {
+      "piece": "kenney-graveyard/hay-bale-bundled",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.36,
+      "x": 3.55,
+      "y": 0.62,
+      "z": -4.3
+    },
+    {
+      "piece": "kaykit-adventurers/shield-round-color",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.55,
+      "x": 3.55,
+      "y": 0.36,
+      "z": -4.14
+    },
+    {
+      "piece": "kenney-town/pillar-wood",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.3,
+      "x": 4.75,
+      "z": -4.3
+    },
+    {
+      "piece": "kenney-graveyard/hay-bale-bundled",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.36,
+      "x": 4.75,
+      "y": 0.62,
+      "z": -4.3
+    },
+    {
+      "piece": "kaykit-adventurers/shield-round-color",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.55,
+      "x": 4.75,
+      "y": 0.36,
+      "z": -4.14
+    },
+    {
+      "piece": "kenney-town/pillar-wood",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.3,
+      "x": 5.95,
+      "z": -4.3
+    },
+    {
+      "piece": "kenney-graveyard/hay-bale-bundled",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.36,
+      "x": 5.95,
+      "y": 0.62,
+      "z": -4.3
+    },
+    {
+      "piece": "kaykit-adventurers/shield-round-color",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.55,
+      "x": 5.95,
+      "y": 0.36,
+      "z": -4.14
+    },
+    {
+      "piece": "kaykit-hexagon/fence-wood-straight",
+      "rot": 1.571,
+      "scale": 0.55,
+      "x": 4.1,
+      "z": -5.05
+    },
+    {
+      "piece": "kaykit-hexagon/fence-wood-straight",
+      "rot": 1.571,
+      "scale": 0.55,
+      "x": 5.37,
+      "z": -5.05
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": 1.571,
+      "scale": 0.55,
+      "x": 1.0,
+      "z": -1.55
+    },
+    {
+      "piece": "kenney-graveyard/bench",
+      "rot": 1.571,
+      "scale": 0.55,
+      "x": 1.0,
+      "z": 1.6
+    },
+    {
+      "piece": "kenney-survival/campfire-stand",
+      "pin": true,
+      "rot": 0.0,
+      "scale": 0.85,
+      "x": -1.1,
+      "z": -1.9
+    },
+    {
+      "piece": "kaykit-weapons/spear-a",
+      "pin": true,
+      "rot": 0.0,
+      "scale": 0.45,
+      "tilt": [
+        -0.22,
+        -0.06
+      ],
+      "x": -1.42,
+      "z": -1.78
+    },
+    {
+      "piece": "kaykit-weapons/sword-a",
+      "pin": true,
+      "rot": 0.0,
+      "scale": 0.47,
+      "tilt": [
+        -0.22,
+        -0.02
+      ],
+      "x": -1.22,
+      "z": -1.78
+    },
+    {
+      "piece": "kaykit-weapons/sword-b",
+      "pin": true,
+      "rot": 0.0,
+      "scale": 0.47,
+      "tilt": [
+        -0.22,
+        0.02
+      ],
+      "x": -1.02,
+      "z": -1.78
+    },
+    {
+      "piece": "kaykit-weapons/spear-a",
+      "pin": true,
+      "rot": 0.0,
+      "scale": 0.45,
+      "tilt": [
+        -0.22,
+        0.06
+      ],
+      "x": -0.82,
+      "z": -1.78
+    },
+    {
+      "piece": "kenney-survival/campfire-stand",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.85,
+      "x": -1.9,
+      "z": -0.55
+    },
+    {
+      "piece": "kaykit-weapons/spear-a",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.45,
+      "tilt": [
+        -0.22,
+        -0.06
+      ],
+      "x": -1.78,
+      "z": -0.23
+    },
+    {
+      "piece": "kaykit-weapons/sword-a",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.47,
+      "tilt": [
+        -0.22,
+        -0.02
+      ],
+      "x": -1.78,
+      "z": -0.43
+    },
+    {
+      "piece": "kaykit-weapons/sword-b",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.47,
+      "tilt": [
+        -0.22,
+        0.02
+      ],
+      "x": -1.78,
+      "z": -0.63
+    },
+    {
+      "piece": "kaykit-weapons/spear-a",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.45,
+      "tilt": [
+        -0.22,
+        0.06
+      ],
+      "x": -1.78,
+      "z": -0.83
+    },
+    {
+      "piece": "kenney-town/pillar-wood",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.24,
+      "x": -0.2,
+      "z": -2.2
+    },
+    {
+      "piece": "kaykit-adventurers/shield-round-color",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.6,
+      "x": -0.2,
+      "y": 0.3,
+      "z": -2.08
+    },
+    {
+      "piece": "kenney-town/pillar-wood",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.24,
+      "x": 0.75,
+      "z": -2.35
+    },
+    {
+      "piece": "kaykit-adventurers/shield-round-color",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.6,
+      "x": 0.75,
+      "y": 0.3,
+      "z": -2.23
+    },
+    {
+      "piece": "kenney-survival/barrel-open",
+      "rot": 0.4,
+      "scale": 0.55,
+      "x": 6.6,
+      "z": -1.4
+    },
+    {
+      "piece": "kenney-survival/bucket",
+      "rot": 0.0,
+      "scale": 0.5,
+      "x": 6.95,
+      "z": -1.0
+    },
+    {
+      "piece": "kaykit-dungeon/banner-shield-blue",
+      "rot": 0,
+      "scale": 0.3,
+      "x": 6.3,
+      "z": -4.85
+    },
+    {
+      "piece": "kenney-castle/flag",
+      "rot": 0,
+      "scale": 0.5,
+      "x": 2.0,
+      "z": 2.3
+    }
+  ],
+  "spots": [
+    {
+      "drill": "duel",
+      "facing": 1.571,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "work",
+      "pair": "a",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
+      "x": 2.8,
+      "z": -0.62
+    },
+    {
+      "drill": "duel",
+      "facing": -1.571,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "work",
+      "pair": "a",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
+      "x": 3.8,
+      "z": -0.62
+    },
+    {
+      "drill": "duel",
+      "facing": 1.571,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "work",
+      "pair": "b",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
+      "x": 2.8,
+      "z": 0.62
+    },
+    {
+      "drill": "duel",
+      "facing": -1.571,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "work",
+      "pair": "b",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
+      "x": 3.8,
+      "z": 0.62
+    },
+    {
+      "drill": "dummy",
+      "facing": 3.142,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "work",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
+      "x": 3.55,
+      "z": -3.52
+    },
+    {
+      "drill": "dummy",
+      "facing": 3.142,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "work",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
+      "x": 4.75,
+      "z": -3.52
+    },
+    {
+      "drill": "dummy",
+      "facing": 3.142,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "work",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
+      "x": 5.95,
+      "z": -3.52
+    },
+    {
+      "drill": "drill",
+      "facing": 3.142,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "work",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
+      "x": 3.3,
+      "z": 3.75
+    },
+    {
+      "drill": "drill",
+      "facing": 3.142,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "work",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
+      "x": 4.25,
+      "z": 3.75
+    },
+    {
+      "drill": "drill",
+      "facing": 3.142,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "work",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
+      "x": 5.2,
+      "z": 3.75
+    },
+    {
+      "drill": "drill",
+      "facing": 3.142,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "work",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
+      "x": 6.15,
+      "z": 3.75
+    },
+    {
+      "drill": "drill",
+      "facing": 0,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "work",
+      "roles": [
+        "knight"
+      ],
+      "x": 4.72,
+      "z": 2.55
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 1.571,
+      "hours": [
+        9,
+        18
+      ],
+      "kind": "sit",
+      "x": 1.12,
+      "y": -0.06,
+      "z": -1.31
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 1.571,
+      "hours": [
+        9,
+        18
+      ],
+      "kind": "sit",
+      "x": 1.12,
+      "y": -0.06,
+      "z": -1.79
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 1.571,
+      "hours": [
+        9,
+        18
+      ],
+      "kind": "sit",
+      "x": 1.12,
+      "y": -0.06,
+      "z": 1.84
+    },
+    {
+      "clip": "Sit_Chair_Idle",
+      "facing": 1.571,
+      "hours": [
+        9,
+        18
+      ],
+      "kind": "sit",
+      "x": 1.12,
+      "y": -0.06,
+      "z": 1.36
+    },
+    {
+      "drill": "cheer",
+      "facing": -1.571,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "work",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
+      "x": 5.615,
+      "z": -0.65
+    },
+    {
+      "drill": "cheer",
+      "facing": -1.571,
+      "hours": [
+        8,
+        18
+      ],
+      "kind": "work",
+      "roles": [
+        "guard",
+        "knight",
+        "soldier"
+      ],
+      "x": 5.615,
+      "z": 0.65
+    }
+  ]
+}

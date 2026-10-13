@@ -20,6 +20,7 @@
  */
 import { hash2 } from "../geom/noise.ts"
 import { discSolid, type Solid, SolidGrid } from "./collide.ts"
+import { DRILLS, pairedDrill } from "./drills.ts"
 import { hexAt } from "./grid.ts"
 import { type HexIsland, kindOf } from "./island.ts"
 import { HARD, type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
@@ -39,6 +40,23 @@ interface SpotDoing {
   prop?: string
   /** Metres over the ground (or deck) the feet are: a seat. */
   lift?: number
+  /** A routine played there in place of a clip (drills.ts): a duel's side, a dummy, a drill line. */
+  drill?: DrillAt
+}
+
+/** Which routine a spot plays, which side of it, and where on the shared clock. */
+export interface DrillAt {
+  /** A routine of DRILLS. */
+  id: string
+  /** Its side (a duel's 0 or 1; 0 for one-sided routines). */
+  side: number
+  /** Seconds added to the shared clock: one per duel pair, per drill line, or per spot. */
+  at: number
+  /**
+   * A duel's pair, the same for both its sides (the lower spot's index): whether both are there now is
+   * the renderer's to see (alone, a side plays the routine's `solo`).
+   */
+  pair?: number
 }
 
 /** Standing at one spot from `from` to `to`. */
@@ -132,6 +150,18 @@ export const PLACE_ROLES: Readonly<Record<ZoneKind, readonly [string, number][]>
     ["archer", 2],
   ],
   hamlet: [["farmer", 1]],
+}
+
+/**
+ * The people a scene brings to the place it stands in, beyond what the place's buildings hold: a
+ * training arena its soldiers and knights, enough with the place's guards to fill its rings, dummies
+ * and drill line by day.
+ */
+export const SCENE_FOLK: Readonly<Record<string, readonly [string, number][]>> = {
+  "training-arena": [
+    ["soldier", 10],
+    ["knight", 3],
+  ],
 }
 
 /** People a place holds: a couple, plus most of a person per building, capped. */
@@ -261,7 +291,7 @@ export class LoopBuilder {
 
   private flush(to: number) {
     if (to <= this.since) return
-    const { clip, prop, lift } = this.here
+    const { clip, prop, lift, drill } = this.here
     this.steps.push({
       kind: "stay",
       from: this.since,
@@ -274,6 +304,7 @@ export class LoopBuilder {
       ...(clip ? { clip } : {}),
       ...(prop ? { prop } : {}),
       ...(lift ? { lift } : {}),
+      ...(drill ? { drill } : {}),
     })
     this.since = to
   }
@@ -295,6 +326,7 @@ export function lifePose(steps: readonly LifeStep[], t: number, period: number):
     if (s.clip) pose.clip = s.clip
     if (s.prop) pose.prop = s.prop
     if (s.lift) pose.lift = s.lift
+    if (s.drill) pose.drill = s.drill
     return pose
   }
   let k = 0
@@ -432,6 +464,8 @@ export interface LifePlaces {
   takeSlot(zone: number): LifeSpot | undefined
   /** The prefab standing on a tile (none: bare, or a scene's other part). */
   prefabOf(tile: number): string | undefined
+  /** A duel spot's other side (its tile's spot of the same `pair`), −1 for none. */
+  partner(spot: number): number
   /**
    * What a walk keeps clear of: the solids, and every place people stand a while (a spot, a slot round a
    * square), so nobody's way runs through someone standing at theirs.
@@ -567,7 +601,40 @@ export function lifePlaces(
     if (s.prop) out.prop = s.prop
     // a deck's spot stands on the deck (its height is the node's); elsewhere `y` lifts off the ground
     if (s.y && !deck) out.lift = s.y
+    const drill = s.drill ? drillAt(spot, s.drill) : undefined
+    if (drill) out.drill = drill
     return out
+  }
+  // ---- drills: a duel's two sides found by their pair name on the tile ----
+  const mates = new Map<number, number>()
+  {
+    const first = new Map<string, number>()
+    for (const [k, s] of furniture.spots.entries()) {
+      if (!s.pair) continue
+      const key = `${s.tile}:${s.pair}`
+      const other = first.get(key)
+      if (other === undefined) first.set(key, k)
+      else {
+        mates.set(k, other)
+        mates.set(other, k)
+      }
+    }
+  }
+  const partner = (spot: number) => mates.get(spot) ?? -1
+  /** Where a spot's routine is on the shared clock: a pair's or a line's one offset, else its own. */
+  const drillAt = (spot: number, id: string): DrillAt | undefined => {
+    const d = DRILLS[id]
+    if (!d) return undefined
+    const s = furniture.spots[spot]!
+    const off = (a: number, b: number) => rnd(h.spec.seed + 77, a, b) * d.period
+    if (pairedDrill(id)) {
+      const mate = partner(spot)
+      // a duel with its other side left out (walled in, dropped): its solo
+      if (mate < 0) return { id: d.solo ?? id, side: 0, at: off(spot, 1) }
+      const pair = Math.min(spot, mate)
+      return { id, side: spot < mate ? 0 : 1, at: off(pair, 2), pair }
+    }
+    return { id, side: 0, at: d.sync === "tile" ? off(s.tile, 3) : off(spot, 4) }
   }
   const taken = new Set<number>()
   const near = (zi: number): number[] => {
@@ -713,6 +780,7 @@ export function lifePlaces(
     book,
     takeSlot,
     prefabOf,
+    partner,
     walkNear,
   }
 }
@@ -859,11 +927,15 @@ export function planFolk(
     const roles = PLACE_ROLES[zone.kind]
     const total = roles.reduce((s, [, n]) => s + n, 0)
     const n = peopleFor(zone.kind, zone.buildings)
-    for (let p = 0; p < n; p++) {
+    // the people a scene of the place brings with it (a training arena's soldiers and knights)
+    const extra = zone.tiles.flatMap((i) =>
+      (SCENE_FOLK[places.prefabOf(i) ?? ""] ?? []).flatMap(([role, k]) => Array<string>(k).fill(role)),
+    )
+    for (let p = 0; p < n + extra.length; p++) {
       // roles in proportion to their weights, the first of each kind always present
       let pick = (p + 0.5) * (total / n)
-      let wanted = roles[0]![0]
-      for (const [r, wt] of roles) {
+      let wanted = extra[p - n] ?? roles[0]![0]
+      for (const [r, wt] of p < n ? roles : []) {
         if (pick < wt) {
           wanted = r
           break
@@ -902,7 +974,10 @@ export function planFolk(
           )
           if (dawn !== undefined) return dawn
         }
-        const own = list.find((k) => spots[k]!.roles?.includes(rr))
+        // a duel's side whose other side is held already before any other: pairs fill two by two
+        const mine = (k: number) => !!spots[k]!.roles?.includes(rr)
+        const own =
+          list.find((k) => mine(k) && places.taken.has(places.partner(k))) ?? list.find((k) => mine(k))
         return own !== undefined && list[0] !== undefined && out(own) - out(list[0]) < OWN_SPOT_REACH
           ? own
           : list[0]
@@ -963,7 +1038,8 @@ export function planFolk(
           50,
         )
         t = b.go(out0, away.at, { act: "idle", indoors: away.indoors })
-        t = b.go(Math.max(t + 0.3, out1), work, { act: workAct })
+        // back on watch when the outing's booking ends (a late arrival does not stay past it)
+        t = b.go(out1, work, { act: workAct })
         // a round of the streets now and then until dawn
         for (let k = 0; t < 22 && patrol.length > 1; k++)
           t = b.go(t + 0.4, patrol[k % patrol.length]!, { act: "idle" })
@@ -989,8 +1065,11 @@ export function planFolk(
       const lunch1 = lunch0 + 0.8 + r(12) * 0.5
       const noon = outing(outingOrder(LUNCH, r, 20), lunch0, lunch1 + 0.4, "lunch", 30)
       t = b.go(lunch0, noon.at, { act: "idle", indoors: noon.indoors })
-      if (close > lunch1 + 0.5) t = b.go(Math.max(t + 0.3, lunch1), work, { act: workAct })
-      const eve0 = Math.max(t + 1, Math.min(16.5 + r(13) * 1.2, close))
+      // back to work (a late arrival from a long way off stays no longer than its seat was booked)
+      if (close > lunch1 + 0.5)
+        t = b.go(Math.max(lunch1, Math.min(t + 0.3, lunch1 + 0.4)), work, { act: workAct })
+      // (an hour's work at least once back, but never past the spot's closing)
+      const eve0 = Math.max(Math.min(t + 1, close), Math.min(16.5 + r(13) * 1.2, close))
       // the tavern keeps people late (lit by the lanterns); elsewhere home by dusk, a few later
       const order = outingOrder(EVENING, r, 60)
       const late = r(14) < 0.25 ? 21 + r(15) : 18.8 + r(16) * 1.2
@@ -1013,7 +1092,8 @@ export function planFolk(
       }
       eve ??= { at: homeSpot, indoors }
       t = b.go(eve0, eve.at, { act: "idle", indoors: eve.indoors })
-      if (!eve.indoors) t = b.go(Math.max(t + 0.3, eve1), homeSpot, { act: "idle", indoors })
+      // home when the booking ends (one who got there late does not stay past it)
+      if (!eve.indoors) t = b.go(eve1, homeSpot, { act: "idle", indoors })
       folk.push({ id, role, zone: zi, day: b.close(24), ...(prop ? { prop } : {}) })
     }
   }
@@ -1049,6 +1129,11 @@ export interface AgentErrand {
   work: number
   /** Seconds idling at the Guildhall before setting off. */
   idle: number
+  /**
+   * A scene to work at (a knight hero sparring at the training arena): the place that has one, at one
+   * of its spots (a duel's side first), wherever it landed; else the errand's place as usual.
+   */
+  scene?: string
 }
 
 /** The zone agents call home: the castle (the Guildhall), else the town. */
@@ -1102,14 +1187,21 @@ export function agentLoop(
   const b = new LoopBuilder(walk, mps, 0.3, hall, { act: "idle" }, places?.walkNear, true)
   let t = 0
   for (const [k, e] of errands.entries()) {
-    const zi =
-      typeof e.place === "number"
-        ? e.place
-        : z.zones.findIndex((zz, i) => zz.kind === e.place && walk.hearts[i]! >= 0)
+    const hasScene = (i: number) =>
+      !!e.scene && !!places && z.zones[i]!.tiles.some((j) => places.prefabOf(j) === e.scene)
+    let zi = typeof e.place === "number" ? e.place : -1
+    if (zi < 0 && e.scene) zi = z.zones.findIndex((_, i) => walk.hearts[i]! >= 0 && hasScene(i))
+    if (zi < 0 && typeof e.place !== "number")
+      zi = z.zones.findIndex((zz, i) => zz.kind === e.place && walk.hearts[i]! >= 0)
     if (zi < 0 || walk.hearts[zi]! < 0) continue
     let station: LifeSpot | undefined
     if (places) {
+      const atScene = e.scene
+        ? places.free(zi, opts.role ?? null).filter((s) => places.prefabOf(spots![s]!.tile) === e.scene)
+        : []
       const spot =
+        atScene.find((s) => places.partner(s) >= 0) ??
+        atScene[0] ??
         places.free(zi, opts.role ?? null)[0] ??
         places.free(zi, null, ["stand", "talk"])[0] ??
         places.free(zi, null)[0]

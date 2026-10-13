@@ -1,0 +1,41 @@
+{
+  "activity": {
+    "idle": [
+      "Idle_B",
+      "Melee_2H_Idle"
+    ],
+    "walk": "Walking_A",
+    "work": "Melee_Blocking"
+  },
+  "body": [
+    "kaykit-adventurers/knight"
+  ],
+  "hands": {
+    "l": [
+      "kaykit-adventurers/shield-round-color"
+    ],
+    "r": [
+      "kaykit-adventurers/sword-1handed"
+    ]
+  },
+  "id": "knight",
+  "outfit": {
+    "stone": [
+      "metal",
+      "slate",
+      "roof-blue"
+    ]
+  },
+  "role": "knight",
+  "vary": {
+    "height": [
+      0.98,
+      1.06
+    ],
+    "speed": [
+      0.95,
+      1.05
+    ]
+  },
+  "version": 1
+}

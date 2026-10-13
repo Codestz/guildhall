@@ -39,7 +39,7 @@ const SCENES = ["tavern-garden", "market-square", "smithy-works", "archery-range
  * out over the shallows), the monastery's compound (it takes in its place's other buildings), the
  * farmstead (its fields stay fields) and the town hall's plaza.
  */
-const TURNING = ["harbour-quay", "monastery-compound", "farmstead-yard", "town-hall-plaza"]
+const TURNING = ["harbour-quay", "monastery-compound", "farmstead-yard", "town-hall-plaza", "training-arena"]
 /** The tiles scene tile `t` covers: its footprint's sides, mirrored when it is, turned to its door. */
 const coverOf = (
   h: ReturnType<typeof hexIsland>,

@@ -1,0 +1,47 @@
+{
+  "activity": {
+    "idle": [
+      "Idle_A",
+      "Melee_2H_Idle"
+    ],
+    "walk": "Walking_C",
+    "work": "Melee_Blocking"
+  },
+  "body": [
+    "kaykit-adventurers/knight",
+    "kaykit-adventurers/barbarian"
+  ],
+  "hands": {
+    "l": [
+      "kaykit-adventurers/shield-round",
+      "kaykit-adventurers/shield-round-color"
+    ],
+    "r": [
+      "kaykit-adventurers/sword-1handed",
+      "kaykit-weapons/sword-a"
+    ]
+  },
+  "hide": [
+    "Barbarian_BearHat"
+  ],
+  "id": "soldier",
+  "outfit": {
+    "stone": [
+      "terracotta",
+      "stone",
+      "timber"
+    ]
+  },
+  "role": "soldier",
+  "vary": {
+    "height": [
+      0.95,
+      1.05
+    ],
+    "speed": [
+      0.9,
+      1.1
+    ]
+  },
+  "version": 1
+}

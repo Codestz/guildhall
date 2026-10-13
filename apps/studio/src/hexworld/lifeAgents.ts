@@ -30,7 +30,8 @@ export const DEMO_AGENTS: readonly DemoAgent[] = [
     hero: "kaykit-adventurers/knight",
     recipe: "guard",
     colour: "#4f7cc9",
-    errands: [{ place: "camp", work: 45, idle: 10 }],
+    // tests → the camp; a knight spars at the training arena (wherever it landed), else works the camp
+    errands: [{ place: "camp", scene: "training-arena", work: 45, idle: 10 }],
   },
   {
     id: "scout",

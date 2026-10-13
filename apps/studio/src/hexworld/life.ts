@@ -30,6 +30,10 @@ import {
 import {
   agentLoop,
   CHARACTER_SCALE,
+  DRILLS,
+  type DrillAt,
+  drillClips,
+  drillFrame,
   type HexIsland,
   type HexWorld,
   type HexZones,
@@ -129,7 +133,13 @@ function holding(look: NpcLook, prop: string | undefined, catalog: Catalog): Npc
 /** The clips spots ask for (sitting, sawing…), for the crowd to bake besides the looks' own. */
 function spotClips(loops: readonly (readonly LifeStep[])[]): string[] {
   const out = new Set<string>()
-  for (const steps of loops) for (const s of steps) if (s.kind === "stay" && s.clip) out.add(s.clip)
+  for (const steps of loops)
+    for (const s of steps) {
+      if (s.kind !== "stay") continue
+      if (s.clip) out.add(s.clip)
+      // a routine's every clip (its solo's too: a duellist alone)
+      if (s.drill) for (const c of drillClips(s.drill.id)) out.add(c)
+    }
   return [...out].sort()
 }
 
@@ -288,9 +298,23 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       const late = space.delay[id]!
       return lifePose(l.steps, l.real ? secs - late : day - (late * SPEEDUP) / 3600, l.period)
     }
+    /** People at each duel now, by pair (drills.ts): a side alone plays its routine's solo. */
+    const duelling = new Map<number, number>()
     const place = (step: number) => {
-      for (let id = 0; id < n; id++) poses[id] = pose(id)
+      duelling.clear()
+      for (let id = 0; id < n; id++) {
+        const p = pose(id)
+        poses[id] = p
+        const pair = p.act !== "walk" ? p.drill?.pair : undefined
+        if (pair !== undefined) duelling.set(pair, (duelling.get(pair) ?? 0) + 1)
+      }
       space.step(poses, step)
+    }
+    /** A drilling person's clip and how far into it, on the shared clock (the agents' seconds). */
+    const drilled = (d: DrillAt): { clip: string; phase: number } => {
+      const alone = d.pair !== undefined && (duelling.get(d.pair) ?? 0) < 2
+      const solo = DRILLS[d.id]?.solo
+      return alone && solo ? drillFrame(solo, 0, secs + d.at) : drillFrame(d.id, d.side, secs + d.at)
     }
     /** Where feet stand: a stair's tread, a deck's planks, the ground (a dock's deck: the way's own height). */
     const footAt = (x: number, zz: number, p: LifePose) =>
@@ -305,7 +329,12 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       const moved = Number.isNaN(prev[0]) ? 0 : Math.hypot(x - prev[0], zz - prev[1])
       prev[0] = x
       prev[1] = zz
-      // at a spot, its clip; walking, always the walk
+      // at a spot, its routine (a duel's side, a drill line: on the shared clock) or its clip; walking,
+      // always the walk
+      if (p.act !== "walk" && p.drill) {
+        const f = drilled(p.drill)
+        return { position: [x, y, zz], heading: p.facing, clip: f.clip, phase: f.phase, hidden: p.indoors }
+      }
       const clip = (p.act !== "walk" && p.clip) || look.clips[p.act]
       // walking: the feet keep pace with the ground covered; standing: the clip's own time
       phase[id] =

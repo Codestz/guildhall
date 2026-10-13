@@ -24,6 +24,7 @@ import {
   createNight,
   createPost,
   createSky,
+  createSkyDrive,
   createStage,
   createStaticBatch,
   createSun,
@@ -69,6 +70,7 @@ import { islandWorld, worldCamera } from "../shell/worldCamera.ts"
 import { loadTiles } from "../tiles.ts"
 import { atmoKnobs, createIslandAir, type IslandAir } from "./atmo.ts"
 import { createDoors, type Doors } from "./doors.ts"
+import { type Fx, fxOf, mountFx } from "./fx.ts"
 import { type HallRepo, hallBuild, hallSubtitle, placeRows } from "./hall.ts"
 import {
   type BuiltPlace,
@@ -229,6 +231,8 @@ export interface WorldHooks {
 export interface HexWorldExtra {
   /** Resolves to the repo once its chronicle is read (null: the island's own, as `/town`); the build waits for it. */
   repo?: Promise<HallRepo | null>
+  /** The event FX (fx.ts: weather, ships, scaffolds) for the hall to drive; on with `?fx=` too. */
+  fx?: boolean
   /**
    * A hall's HUD (hall/hud), mounted into the Viewer's HUD regions once the island is built, under the
    * cover (it shows as the cover lifts). Returns its unmount.
@@ -249,6 +253,8 @@ export interface HudParts {
   onPick(fn: (index: number) => void): void
   /** The day's clock, hours: as the time-of-day drag sets it. */
   clock: { get(): number; set(hour: number): void }
+  /** The event FX (with `extra.fx` or `?fx=`), else null. */
+  fx: Fx | null
 }
 
 /** What `window.guildhall.ext.hall` tells the shots: how long each part took, and the places built. */
@@ -310,6 +316,9 @@ const world = {
     const heroSpots = ctx.query.get("heroSpots") === "1"
     const overlay = ctx.query.get("collide") === "1" || ctx.query.get("spots") === "1" || heroSpots
     const lifeOn = ctx.query.get("life") !== "0"
+    // the event FX (fx.ts): off unless a hall asks for them or `?fx=` shows them; off, nothing of them exists
+    const fxSpec = fxOf(ctx.query)
+    const fxOn = extra.fx === true || fxSpec !== null
     const catalogLoad = loadCatalog()
     // `?name=`: the island's own name (the site's `/` is "Guildhall", a hall its repo), else the seed's
     const name = ctx.query.get("name") || `Island ${roman(seed)}`
@@ -386,6 +395,7 @@ const world = {
     let labels: PlaceLabels | null = null
     let island: HexIsland | null = null
     let unHud = () => {}
+    let fx: Fx | null = null
     let pick: ((index: number) => void) | null = null
     let dayClock: HudParts["clock"] = { get: () => 0, set: () => {} }
     const meshes: TerrainMesh[] = []
@@ -414,13 +424,23 @@ const world = {
       const span = m.span
       const hour = num("hour", 15.5)
       const sun = createSun(stage, { town: { min: [-span, -3, -span], max: [span, 20, span] } })
-      const sky = createSky(stage, {
+      const daySky = createSky(stage, {
         sun,
         hour,
         reach: span * 1.4,
         shadow: num("shadow", 1),
         fill: num("fill", 0.75),
       })
+      // with the FX, the weather lays itself over the sky: everything that reads the light reads it through the drive
+      const drive = fxOn
+        ? createSkyDrive(stage, {
+            sky: daySky,
+            retint: () => night?.setHour(now),
+            strikeAt: m.sites.castle,
+            seed,
+          })
+        : null
+      const sky = drive?.sky ?? daySky
       // the night: a light in every lantern the tiles hold
       const lamps = m.lamps.map((at) => ({ kind: "street" as const, at, radius: 6 }))
       night = createNight(stage, { points: lamps, windows: [] }, { sky, hour })
@@ -462,6 +482,7 @@ const world = {
       // the sea reaches the far plane: the horizon haze (atmo.ts) melts its rim into the sky
       const sea = Math.max(span * 3, stage.camera.far * 0.95)
       air = createIslandAir(stage, { light: () => sky.light(), span, seed, sea, knobs: atmoKnobs(ctx.query) })
+      drive?.attach(air.atmosphere)
       if (ctx.query.get("post") !== "0")
         post = createPost(stage, { light: () => sky.light(), aa: aaOf(ctx.query.get("aa")) })
       // The programs of all that (the dome, the clouds, the lamps, the post passes) link in the
@@ -624,6 +645,7 @@ const world = {
         doors.dispose()
         return
       }
+      if (drive) fx = mountFx({ stage, drive, sites: m.sites, water, load, spec: fxSpec })
       // a hook's parts (a hall's history reveal) go in before the light, so their shaders compile behind the cover
       if (hooks && island && world)
         hooks.built({
@@ -727,6 +749,7 @@ const world = {
             pick = fn
           },
           clock: dayClock,
+          fx,
         })
       if (cover) {
         publishWorld("ready")
@@ -766,6 +789,7 @@ const world = {
       night?.dispose()
       life?.dispose()
       doors?.dispose()
+      fx?.dispose()
       labels?.dispose()
       unHud()
       unTick()

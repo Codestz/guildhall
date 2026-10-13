@@ -9,7 +9,13 @@
  * that would otherwise block the main thread). Everything posted is plain data, typed arrays handed
  * over, not copied. Pure.
  */
-import { shoreBytes, type VertexMeshData, vertexMeshData } from "@guildhall/render/worker"
+import {
+  type EventSites,
+  eventSites,
+  shoreBytes,
+  type VertexMeshData,
+  vertexMeshData,
+} from "@guildhall/render/worker"
 import {
   HEX_TILE_SIZE,
   type HexFineGround,
@@ -182,6 +188,8 @@ export interface MapStage {
   lamps: [number, number, number][]
   /** The repo's places as built (none without `places`), in zone order. */
   places: BuiltPlace[]
+  /** Where the event FX happen (render events/sites.ts): the castle's keep, the harbours' berths, the places' hearts. */
+  sites: EventSites
   stats: {
     land: number
     tiles: number
@@ -465,6 +473,7 @@ export function runHexJob(
           },
         ]
       }),
+      sites: eventSites(h, z, w, { sea: SEA_LEVEL }),
       stats: {
         land: h.stats.land,
         tiles: w.tiles.length,

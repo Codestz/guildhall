@@ -40,6 +40,8 @@ export function atmoKnobs(query: URLSearchParams): AtmoKnobs {
 }
 
 export interface IslandAir {
+  /** The cloud deck's atmosphere (null with `?atmo=0`): the weather drive covers it. */
+  atmosphere: Atmosphere | null
   dispose(): void
 }
 
@@ -62,7 +64,7 @@ export function createIslandAir(
   opts: { light: () => DayLight; span: number; seed: number; sea: number; knobs: AtmoKnobs },
 ): IslandAir {
   const { span, knobs } = opts
-  if (!knobs.on) return { dispose() {} }
+  if (!knobs.on) return { atmosphere: null, dispose() {} }
   const horizon: Horizon = createHorizon(stage, { centre: [0, 0], sea: opts.sea, span, haze: knobs.haze })
   const coverage = Math.min(1, DEFAULT_ATMOSPHERE.coverage * knobs.clouds)
   const atmosphere: Atmosphere = createAtmosphere(stage, {
@@ -79,6 +81,7 @@ export function createIslandAir(
     params: { coverage, clouds: coverage > 0, shadows: coverage > 0 },
   })
   return {
+    atmosphere,
     dispose() {
       atmosphere.dispose()
       horizon.dispose()

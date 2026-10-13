@@ -21,6 +21,7 @@ import {
   type TerrainMesh,
   toScreen,
 } from "@guildhall/render"
+import { placePlate, plate } from "@guildhall/ui"
 import {
   CHARACTER_SCALE,
   HEX_TILE_SIZE,
@@ -35,6 +36,7 @@ import {
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import { natureOf } from "../hexworld/job.ts"
 import type { ScreenCtx } from "../screens.ts"
+import type { StudioViewer } from "../shell/viewer.ts"
 import { worldCamera } from "../shell/worldCamera.ts"
 
 const logger = log("studio:hexscale")
@@ -107,19 +109,21 @@ const STEP = HEX_TILE_SIZE * Math.sqrt(3)
 const ROW = 11
 const GAP = 5
 
-const LABEL =
-  "position:absolute;z-index:2;padding:4px 8px;border-radius:4px;background:rgba(21,17,13,0.85);color:#f3e9d4;font:11px/1.35 ui-monospace,Menlo,monospace;transform:translate(-50%,0);white-space:nowrap;text-align:center;pointer-events:none"
+/** Plates hang below their point: under a cell, under a column's head. */
+const BELOW = "translate(-50%, 0)"
 
-/** Mounts the nature board into `host`; returns its teardown. */
-export function mountNatureBoard(host: HTMLElement, ctx: ScreenCtx): () => void {
+/** Mounts the nature board into the viewer's stage; returns its teardown. */
+export function mountNatureBoard(viewer: StudioViewer, ctx: ScreenCtx): () => void {
+  const host = viewer.stage
   const stage = createStage(host)
   ctx.attach(stage)
+  viewer.attachStage(stage)
   let disposed = false
   let batch: StaticBatch | null = null
   const meshes: TerrainMesh[] = []
   const extras: { removeFromParent(): void }[] = []
   const labels: { el: HTMLElement; at: [number, number, number] }[] = []
-  const cam = worldCamera(stage, host, ctx.query)
+  const cam = worldCamera(stage, viewer.camera, ctx.query)
   let unFrame = () => {}
 
   const query: HexNature = natureOf(ctx.query)
@@ -175,22 +179,27 @@ export function mountNatureBoard(host: HTMLElement, ctx: ScreenCtx): () => void 
         chars.push([x0 + STEP * 1.2, z + 1.9, 0], [x0 + STEP * 2.2, z + 1.9, 1])
         const hs = items.map((it) => height(it.piece, it.scale * m).toFixed(1)).join(" / ")
         labels.push({
-          el: label(`<b>${col.key}</b> ${NAMES[fam]} ×${m}<br>${hs} m`),
+          el: plate({ title: `${col.key} · ${NAMES[fam]}`, detail: `×${m} · ${hs} m`, anchor: BELOW }),
           at: [x0 + STEP * 1.5, 0.5, z + 3.2],
         })
       })
     })
     // the headers: what each column is, the buildings' and the character's heights
-    const ref = `cottage ${height(COTTAGE, SCALE_B.building).toFixed(1)} m · house ${height(HOUSE, SCALE_B.building).toFixed(1)} m · character ${height(CHARACTERS[0]!, CHARACTER_SCALE).toFixed(2)} m`
+    viewer.setInfo({
+      figures: [
+        { label: "Cottage", value: height(COTTAGE, SCALE_B.building).toFixed(1), unit: "m" },
+        { label: "House", value: height(HOUSE, SCALE_B.building).toFixed(1), unit: "m" },
+        { label: "Character", value: height(CHARACTERS[0]!, CHARACTER_SCALE).toFixed(2), unit: "m" },
+      ],
+    })
     columns.forEach((col, c) => {
       const x = c * cellW - width / 2 + STEP * 2
       const tag = col.key === "?" ? "the query's sizes" : col.key === "A" ? "today" : "candidate"
-      labels.push({ el: label(`<b>${col.key}</b> · ${tag}`), at: [x, 9, -(rows - 1) * ROW - 2] })
+      labels.push({
+        el: plate({ title: `${col.key} · ${tag}`, kind: "head", anchor: BELOW }),
+        at: [x, 9, -(rows - 1) * ROW - 2],
+      })
     })
-    const head = document.createElement("div")
-    head.style.cssText = `${LABEL};left:50%;top:10px`
-    head.innerHTML = `<b>Nature scale board</b> · scale B · ${ref}`
-    host.append(head)
 
     const depth = (rows - 1) * ROW
     meshes.push(createHexGround(stage, { size: HEX_TILE_SIZE, base: -1.5, tiles }))
@@ -230,16 +239,9 @@ export function mountNatureBoard(host: HTMLElement, ctx: ScreenCtx): () => void 
       stage.scene.add(root)
       extras.push(root)
     }
-    for (const l of labels) host.append(l.el)
+    for (const l of labels) viewer.labels.append(l.el)
     const place = () => {
-      for (const l of labels) {
-        const p = toScreen(stage, l.at)
-        l.el.style.display = p ? "" : "none"
-        if (p) {
-          l.el.style.left = `${p[0]}px`
-          l.el.style.top = `${p[1]}px`
-        }
-      }
+      for (const l of labels) placePlate(l.el, toScreen(stage, l.at))
     }
     unFrame = stage.onFrame(place)
     sun.markDirty()
@@ -253,14 +255,8 @@ export function mountNatureBoard(host: HTMLElement, ctx: ScreenCtx): () => void 
     batch?.dispose()
     for (const m of meshes) m.dispose()
     for (const e of extras) e.removeFromParent()
+    for (const l of labels) l.el.remove()
     stage.dispose()
     host.replaceChildren()
   }
-}
-
-function label(html: string): HTMLElement {
-  const el = document.createElement("div")
-  el.style.cssText = LABEL
-  el.innerHTML = html
-  return el
 }

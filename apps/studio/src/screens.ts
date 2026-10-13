@@ -6,7 +6,6 @@ import { grips } from "./grips/matrix/index.ts"
 import { hexmap } from "./hexmap/index.ts"
 import { hexScale } from "./hexscale/index.ts"
 import { hexTiles } from "./hextiles/index.ts"
-import { hexWorldScreen } from "./hexworld/index.ts"
 import { home } from "./home/index.tsx"
 import { npc } from "./npcs/index.tsx"
 import { palette } from "./palette/index.ts"
@@ -43,7 +42,6 @@ export const SCREENS: readonly Screen[] = [
   town,
   hexmap,
   hexScale,
-  hexWorldScreen,
 ]
 
 export const DEFAULT_SCREEN = "home"

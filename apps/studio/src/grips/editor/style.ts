@@ -116,9 +116,10 @@ const CSS = /* css */ `
   height: 300px;
   overflow: hidden;
 }
-.gh-grip-bench > .gh-eyebrow { position: absolute; z-index: 1; top: 8px; left: 10px; pointer-events: none; }
+/* the inset's words sit on ink, never straight on the bench's pale floor (they failed contrast there) */
+.gh-grip-bench > .gh-eyebrow { position: absolute; z-index: 1; top: 8px; left: 8px; padding: 3px 7px; border-radius: var(--r-sm); background: rgba(20, 15, 11, 0.84); pointer-events: none; }
 .gh-grip-bench-host { position: absolute; inset: 0; }
-.gh-grip-legend { position: absolute; z-index: 1; bottom: 8px; left: 10px; display: flex; gap: 10px; font: 10.5px/1 var(--mono); color: var(--muted); pointer-events: none; }
+.gh-grip-legend { position: absolute; z-index: 1; bottom: 8px; left: 8px; display: flex; gap: 10px; padding: 5px 8px; border-radius: var(--r-sm); background: rgba(20, 15, 11, 0.84); font: 11px/1 var(--mono); color: var(--paper); pointer-events: none; }
 .gh-grip-legend i { display: inline-block; width: 9px; height: 9px; margin-right: 4px; border-radius: 2px; vertical-align: -1px; }
 .gh-grip-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .gh-grip-tile { position: relative; height: 214px; overflow: hidden; }

@@ -40,11 +40,14 @@ const CSS = /* css */ `
   border-radius: 4px;
   background: transparent;
   color: var(--muted);
-  font: 11.5px/1.4 var(--mono) !important;
+  font: 13px/1.4 var(--body);
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
 .gh-seg button:hover { color: var(--paper); background: var(--raise-2); }
-.gh-seg button[aria-pressed="true"] { background: var(--brass-wash); color: var(--brass-hi); box-shadow: 0 0 0 1px var(--brass-line) inset; }
+/* V1's segmented control: the pressed one in brass (@guildhall/ui .ui-seg) */
+.gh-seg button[aria-pressed="true"] { background: var(--brass); color: var(--on-brass); font-weight: 700; }
+.gh-seg button:focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 1px; }
 
 .gh-step { display: inline-flex; align-items: center; border-radius: var(--r-sm); border: 1px solid var(--hair-2); background: rgba(0, 0, 0, 0.26); }
 .gh-step button { width: 26px; height: 26px; border: 0; background: transparent; color: var(--brass); cursor: pointer; font: 500 14px var(--mono) !important; }
@@ -53,38 +56,7 @@ const CSS = /* css */ `
 .gh-step span { min-width: 30px; padding: 0 4px; text-align: center; font: 500 13px var(--mono); color: var(--paper); }
 .gh-step span small { color: var(--faint); font-weight: 400; }
 
-.gh-select {
-  width: 100%;
-  padding: 5px 7px;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--hair-2);
-  background: rgba(0, 0, 0, 0.32);
-  color: var(--paper);
-  font: 12px/1.3 var(--mono);
-  outline: none;
-}
-.gh-select:focus { border-color: var(--brass-line); }
-.gh-select.mini { width: auto; padding: 1px 4px; font-size: 11px; }
-.gh-bar .gh-select { width: auto; }
-
-.gh-range { display: flex; align-items: center; gap: 8px; }
-.gh-range input { flex: 1; accent-color: var(--brass); }
-.gh-range span { width: 38px; text-align: right; font: 12px var(--mono); color: var(--paper); }
-
-fieldset.gh-seg, fieldset.gh-chips { margin: 0; min-width: 0; }
-fieldset.gh-chips { padding: 0; border: 0; }
-.gh-chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.gh-toggle {
-  padding: 2px 9px;
-  border-radius: 999px;
-  border: 1px solid var(--hair-2);
-  background: transparent;
-  color: var(--muted);
-  font: 11.5px/1.5 var(--mono) !important;
-  cursor: pointer;
-}
-.gh-toggle:hover { color: var(--paper); }
-.gh-toggle[aria-pressed="true"] { border-color: var(--brass-line); background: var(--brass-wash); color: var(--brass-hi); }
+/* selects, ranges, chips and toggles: the studio's shared controls (browser/style.ts) */
 
 .gh-hint-line { margin: 0 0 6px; font-size: 12px; color: var(--faint); }
 .gh-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
@@ -118,7 +90,6 @@ fieldset.gh-chips { padding: 0; border: 0; }
 
 .gh-composer .gh-main { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 .gh-bar-gap { flex: 1; }
-.gh-composer .gh-tool { font-size: 12px !important; padding: 4px 10px; }
 .gh-save { border-color: var(--brass-line) !important; color: var(--brass-hi) !important; }
 .gh-save:disabled { opacity: 0.4; cursor: default; }
 .gh-view { position: relative; flex: 1; min-height: 0; overflow: hidden; border-radius: 0 0 var(--r) var(--r); }
@@ -170,7 +141,6 @@ fieldset.gh-chips { padding: 0; border: 0; }
 .gh-bar-2 { flex-wrap: wrap; gap: 6px 14px; min-height: 40px; padding: 6px 12px; }
 .gh-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint); }
 .gh-inline .gh-seg button { flex: 0 0 auto; }
-.gh-tool:disabled { opacity: 0.4; cursor: default; }
 .gh-sep { width: 1px; height: 20px; background: var(--hair-2); }
 .gh-try[aria-pressed="true"] { box-shadow: 0 0 0 1px var(--brass) inset; }
 .gh-stage-host { position: absolute; inset: 0; }

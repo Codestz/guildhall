@@ -58,12 +58,6 @@ const ALL_GROUPS: readonly ToolGroup[] = [
           "The hex world's proportions side by side: tile, buildings, trees and characters at three scales.",
         dev: true,
       },
-      {
-        id: "hexworld",
-        name: "Hex island",
-        purpose: "The town's hex island on its own lab path, for probes and shots.",
-        dev: true,
-      },
     ],
   },
   {

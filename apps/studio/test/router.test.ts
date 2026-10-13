@@ -113,4 +113,11 @@ describe("router", () => {
     expect(canonical("/studio/pieces", "/studio/")).toBe("/studio/pieces")
     expect(canonical("?screen=palette&hour=6", "/studio/")).toBe("/studio/palette?hour=6")
   })
+
+  test("the old lab path for the island opens the town, its seed in the path", () => {
+    expect(resolve("/lab/hexworld", "?seed=3&collide=1").screen).toBe("town")
+    expect(resolve("/lab/hexworld", "?seed=3&collide=1").query.get("town")).toBe("3")
+    expect(canonical("/lab/hexworld?seed=3&collide=1")).toBe("/town/3?collide=1")
+    expect(canonical("/lab/hexworld")).toBe("/town")
+  })
 })

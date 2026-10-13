@@ -28,7 +28,14 @@ export const ROUTES: readonly Route[] = [
   { screen: "hexmap", path: "lab/hexmap" },
   { screen: "hexscale", path: "lab/hexscale" },
   { screen: "hextiles", path: "lab/hextiles" },
-  { screen: "hexworld", path: "lab/hexworld" },
+]
+
+/**
+ * Paths that were screens of their own and now open another: `/lab/hexworld?seed=3` was the town's
+ * island on a lab path, and is `/town/3`. The query key named `from` moves to the screen's id key.
+ */
+const ALIASES: readonly { path: string; screen: string; from: string; to: string }[] = [
+  { path: "lab/hexworld", screen: "town", from: "seed", to: "town" },
 ]
 
 /** Longest path first, so `/grips/editor` is never read as `/grips` plus an id. */
@@ -58,6 +65,13 @@ export function resolve(pathname: string, search: string, base = BASE): Resolved
     parts = segments(pathname.slice(root.length)).map(decodeURIComponent)
   } catch {
     return { screen: null, query }
+  }
+  const alias = ALIASES.find((a) => parts.join("/") === a.path)
+  if (alias) {
+    const id = query.get(alias.from)
+    query.delete(alias.from)
+    if (id !== null) query.set(alias.to, id)
+    return { screen: alias.screen, query }
   }
   for (const route of BY_LENGTH) {
     const head = segments(route.path)

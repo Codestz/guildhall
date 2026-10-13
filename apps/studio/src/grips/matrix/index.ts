@@ -19,11 +19,13 @@ import {
   testBox,
   toScreen,
 } from "@guildhall/render"
+import { type KnobSection, placePlate, plate } from "@guildhall/ui"
 import { libraryUrl, loadCatalog } from "../../catalog.ts"
 import { loadOverlay } from "../../data.ts"
 import type { Screen } from "../../screens.ts"
+import { mountViewer } from "../../shell/viewer.ts"
 import { defaultMount } from "./defaults.ts"
-import { type Column, type MatrixParams, parseParams } from "./params.ts"
+import { type Column, DEFAULT_BODY, type MatrixParams, parseParams } from "./params.ts"
 
 const logger = log("studio:grips")
 
@@ -43,20 +45,63 @@ const AXES_MOUNT: Mount = { slot: "hand.r", hands: 1, handle: [0, 0, 0], axis: [
 const AXIS_LENGTH = 0.7
 const AXIS_THICKNESS = 0.05
 
+/** Below this row pitch on screen (CSS px) a row label shows its name alone, compact. */
+const ROW_TIGHT_PX = 40
+
 /** Label anchors: column heads hang above their point, row labels end left of theirs. */
 const HEAD = "translate(-50%,-100%)"
 const ROW = "translate(-100%,-50%)"
 
-const LABEL_STYLE = [
-  "position:absolute",
-  "padding:2px 6px",
-  "border-radius:4px",
-  "background:rgba(21,17,13,0.78)",
-  "color:#f3e9d4",
-  "font:11px/1.35 ui-monospace,Menlo,monospace",
-  "white-space:pre",
-  "pointer-events:none",
-].join(";")
+/** A warm ink backdrop: the studio's dark, light enough that a grey knight and a dark blade both read. */
+const BACKDROP = "#3a3027"
+
+const BODIES = ["knight", "barbarian", "mage", "ranger", "rogue", "rogue-hooded"].map((b) => ({
+  value: `kaykit-adventurers/${b}`,
+  label: b.replace("-", " ").replace(/^./, (c) => c.toUpperCase()),
+}))
+
+/** The matrix's knobs: who holds the props, which props, frozen or playing, the axes row. */
+const SECTIONS: KnobSection[] = [
+  {
+    title: "Matrix",
+    knobs: [
+      { kind: "select", key: "body", label: "Body", default: DEFAULT_BODY, options: BODIES, apply: "reload" },
+      {
+        kind: "segment",
+        key: "props",
+        label: "Rows",
+        default: "",
+        options: [
+          { value: "", label: "Everyday props" },
+          { value: "held", label: "Every held prop" },
+        ],
+        apply: "reload",
+      },
+      {
+        kind: "segment",
+        key: "t",
+        label: "Clips",
+        default: "",
+        options: [
+          { value: "", label: "Playing" },
+          { value: "0.3,0.7", label: "Frozen at 0.3 and 0.7" },
+        ],
+        apply: "reload",
+      },
+      {
+        kind: "toggle",
+        key: "axes",
+        label: "Slot axes row",
+        hint: "Bare frames on both hands",
+        default: false,
+        apply: "reload",
+      },
+    ],
+  },
+]
+
+/** How a row's mount status reads: a word and a tone, never the colour alone. */
+const TONE = { authored: "ok", default: "warn", missing: "fail", axes: undefined } as const
 
 /** One row of the matrix: a prop with its mount (authored or derived), or the slot-axes witness. */
 interface Row {
@@ -103,15 +148,28 @@ function rowsOf(params: MatrixParams, byId: ReadonlyMap<string, CatalogEntry>): 
 const cellAt = (r: number, c: number, rows: number): Vec3 => [c * DX, (rows - 1 - r) * DY, 0]
 
 /** Frames the whole grid, gutters included, straight on. */
-function aim(stage: Stage, cols: number, rows: number): void {
+function aim(stage: Stage, cols: number, rows: number, inset = { left: 0, top: 0 }): void {
   const canvas = stage.renderer.domElement
-  const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight)
+  const W = Math.max(1, canvas.clientWidth)
+  const H = Math.max(1, canvas.clientHeight)
+  // the grid fits in what the chrome leaves free: right of the title card, below the tools row
+  const freeW = Math.max(W / 3, W - inset.left)
+  const freeH = Math.max(H / 2, H - inset.top)
   const [left, right] = [-DX / 2 - GUTTER.left, (cols - 0.5) * DX]
   const [bottom, top] = [-GUTTER.bottom, rows * DY + GUTTER.top]
-  const half = (stage.camera.fov / 2) * (Math.PI / 180)
-  const fit = Math.max((top - bottom) / 2, (right - left) / 2 / aspect) / Math.tan(half)
-  const target: Vec3 = [(left + right) / 2, (bottom + top) / 2, 0]
-  stage.setCamera({ target, azimuth: 0, elevation: 0, distance: fit * MARGIN })
+  const tan = Math.tan((stage.camera.fov / 2) * (Math.PI / 180))
+  // at distance d the view spans 2·d·tan metres over H px, the same metres per px across
+  const fitH = (top - bottom) / 2 / tan / (freeH / H)
+  const fitW = (right - left) / 2 / tan / (freeW / H)
+  const distance = Math.max(fitH, fitW) * MARGIN
+  const perPx = (2 * distance * tan) / H
+  // the camera looks off the grid's centre by half of each inset, so the grid centres in the free part
+  const target: Vec3 = [
+    (left + right) / 2 - ((W - freeW) / 2) * perPx,
+    (bottom + top) / 2 + ((H - freeH) / 2) * perPx,
+    0,
+  ]
+  stage.setCamera({ target, azimuth: 0, elevation: 0, distance })
 }
 
 /**
@@ -124,25 +182,38 @@ function aim(stage: Stage, cols: number, rows: number): void {
 export const grips: Screen = {
   id: "grips",
   title: "Grip matrix",
-  mount(host, ctx) {
+  mount(outer, ctx) {
     const params = parseParams(ctx.query)
+    const viewer = mountViewer(outer, ctx, "grips", {
+      title: "Every grip, every clip",
+      subtitle: `One character per prop and clip, holding it by its mount; clips ${
+        params.columns.some((c) => c.t !== null) ? "frozen at the times under each head" : "playing live"
+      }. Amber rows use a derived grip.`,
+      sections: SECTIONS,
+    })
+    const host = viewer.stage
     const stage = createStage(host)
     ctx.attach(stage)
-    const overlay = document.createElement("div")
-    overlay.style.cssText = "position:absolute;inset:0;overflow:hidden;pointer-events:none"
-    host.append(overlay)
+    viewer.attachStage(stage)
+    const bg = stage.scene.background as { set?(colour: string): void } | null
+    bg?.set?.(BACKDROP)
+    const overlay = viewer.labels
     const characters: Character[] = []
-    const labels: { el: HTMLElement; at: Vec3 }[] = []
+    /** `head`: a column head, kept to the column's width on screen. */
+    const labels: { el: HTMLElement; at: Vec3; head?: boolean }[] = []
     let disposed = false
 
-    /** A DOM label pinned to `at`; `anchor` is the CSS translate that hangs it off the point. */
-    const label = (text: string, at: Vec3, anchor: string, data: Record<string, string>) => {
-      const el = document.createElement("div")
-      el.style.cssText = `${LABEL_STYLE};transform:${anchor}`
-      el.textContent = text
+    /** A plate pinned to `at`; `anchor` is the CSS translate that hangs it off the point. */
+    const label = (
+      text: { title: string; detail?: string; tone?: "ok" | "warn" | "fail"; kind?: "head" },
+      at: Vec3,
+      anchor: string,
+      data: Record<string, string>,
+    ) => {
+      const el = plate({ ...text, anchor })
       Object.assign(el.dataset, data)
       overlay.append(el)
-      labels.push({ el, at })
+      labels.push({ el, at, head: anchor === HEAD })
     }
 
     const cell = async (body: CatalogEntry, rig: RigEntry, row: Row, column: Column, at: Vec3) => {
@@ -167,7 +238,7 @@ export const grips: Screen = {
       const [catalog, data] = await Promise.all([loadCatalog(), loadOverlay()])
       if (disposed) return
       if (!catalog) {
-        label("No library yet: run `bun import` first.", [0, 0, 0], "none", {})
+        label({ title: "No library yet", detail: "run `bun import` first" }, [0, 0, 0], "none", {})
         return
       }
       const byId = new Map(applyOverlay(catalog.all(), data).map((e) => [e.id, e]))
@@ -179,7 +250,10 @@ export const grips: Screen = {
       for (const [c, column] of params.columns.entries()) {
         const missing = !clips.has(column.clip)
         const time = column.t === null ? "live" : String(column.t)
-        label(missing ? `${column.key}\nNO CLIP` : `${column.key}\n${time}`, [c * DX, top, 0], HEAD, {
+        const head = missing
+          ? { title: column.key, detail: "no clip", tone: "fail" as const }
+          : { title: column.key, detail: column.t === null ? undefined : time, kind: "head" as const }
+        label(head, [c * DX, top, 0], HEAD, {
           column: column.key,
           clip: column.clip,
           ...(missing ? { missing: "true" } : {}),
@@ -187,12 +261,65 @@ export const grips: Screen = {
       }
       for (const [r, row] of rows.entries()) {
         const y = cellAt(r, 0, rows.length)[1] + ROW_LABEL_Y
-        label(`${row.label}\n${row.mount}`, [-DX / 2, y, 0], ROW, {
-          prop: row.entry?.id ?? row.label,
-          mount: row.mount,
-        })
+        const [pack, name] = row.label.includes("/") ? row.label.split("/") : ["", row.label]
+        label(
+          {
+            title: (name ?? row.label).replace(/\n.*/s, ""),
+            detail: pack ? `${pack} · ${row.mount}` : row.mount,
+            tone: TONE[row.mount],
+          },
+          [-DX / 2, y, 0],
+          ROW,
+          {
+            prop: row.entry?.id ?? row.label,
+            mount: row.mount,
+          },
+        )
       }
-      aim(stage, params.columns.length, rows.length)
+      aim(stage, params.columns.length, rows.length, {
+        left: viewer.coveredLeft(),
+        top: viewer.coveredTop("right"),
+      })
+      const count = (m: Row["mount"]) => rows.filter((row) => row.mount === m).length
+      viewer.setInfo({
+        figures: [
+          { label: "Props", value: rows.filter((row) => row.mount !== "axes").length },
+          { label: "Columns", value: params.columns.length },
+          { label: "Derived", value: count("default"), tone: count("default") ? "warn" : undefined },
+        ],
+      })
+      viewer.setReadout([
+        {
+          title: "Mounts",
+          rows: [
+            { label: "Authored", value: count("authored"), tone: "ok" },
+            {
+              label: "Derived (to author)",
+              value: count("default"),
+              tone: count("default") ? "warn" : undefined,
+            },
+            {
+              label: "Missing from the catalog",
+              value: count("missing"),
+              tone: count("missing") ? "fail" : undefined,
+            },
+          ],
+        },
+        ...(count("default")
+          ? [
+              {
+                title: "Authoring queue",
+                rows: rows
+                  .filter((row) => row.mount === "default")
+                  .map((row) => ({
+                    label: row.label.split("/").pop() ?? row.label,
+                    value: "derived",
+                    tone: "warn" as const,
+                  })),
+              },
+            ]
+          : []),
+      ])
       if (!body || !rig) {
         logger.error("no body", { body: params.body })
         return
@@ -213,10 +340,15 @@ export const grips: Screen = {
 
     const unsubscribe = stage.onFrame((dt) => {
       for (const ch of characters) ch.update(dt)
-      for (const { el, at } of labels) {
+      for (const { el, at, head } of labels) {
         const point = toScreen(stage, at)
-        el.style.display = point ? "" : "none"
-        if (point) el.style.translate = `${point[0]}px ${point[1]}px`
+        const next = head && point ? toScreen(stage, [at[0] + DX, at[1], at[2]]) : null
+        placePlate(el, point, point && next ? next[0] - point[0] : undefined)
+        if (head || !point) continue
+        // a row label taller than its row's pitch on screen (a phone) keeps its name and drops its line
+        const below = toScreen(stage, [at[0], at[1] - DY, at[2]])
+        if (below && below[1] - point[1] < ROW_TIGHT_PX) el.dataset.size = "xs"
+        else delete el.dataset.size
       }
     })
 
@@ -228,8 +360,9 @@ export const grips: Screen = {
         ch.mixer.stopAllAction()
         ch.root.removeFromParent()
       }
-      overlay.remove()
+      for (const { el } of labels) el.remove()
       stage.dispose()
+      viewer.dispose()
     }
   },
 }

@@ -89,7 +89,7 @@ const CSS = /* css */ `
   font: 500 10.5px/1 var(--mono);
 }
 
-.gh-toggle {
+.gh-led {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -103,10 +103,10 @@ const CSS = /* css */ `
   letter-spacing: 0.06em;
   cursor: pointer;
 }
-.gh-toggle:hover { border-color: var(--brass-line); color: var(--paper); }
-.gh-toggle .led { width: 7px; height: 7px; border-radius: 50%; background: var(--hair-2); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.4); }
-.gh-toggle[aria-pressed="true"] { background: var(--brass-wash); border-color: var(--brass-line); color: var(--brass-hi); }
-.gh-toggle[aria-pressed="true"] .led { background: #8fdc7a; box-shadow: 0 0 6px rgba(143, 220, 122, 0.7); }
+.gh-led:hover { border-color: var(--brass-line); color: var(--paper); }
+.gh-led .led { width: 7px; height: 7px; border-radius: 50%; background: var(--hair-2); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.4); }
+.gh-led[aria-pressed="true"] { background: var(--brass-wash); border-color: var(--brass-line); color: var(--brass-hi); }
+.gh-led[aria-pressed="true"] .led { background: #8fdc7a; box-shadow: 0 0 6px rgba(143, 220, 122, 0.7); }
 
 /* The showcase build's marker: nothing saves here. */
 .gh-showcase {

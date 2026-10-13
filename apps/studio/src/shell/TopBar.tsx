@@ -102,7 +102,7 @@ export function TopBar({
         </button>
         <button
           type="button"
-          className="gh-toggle"
+          className="gh-led"
           aria-pressed={hud}
           onClick={() => onHud(!hud)}
           title="Frame stats (` key)"

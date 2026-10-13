@@ -22,6 +22,9 @@ const NO_STATS: FrameStats = {
   dpr: 1,
 }
 
+/** The Viewer's top-right tools row (40 px buttons and a 12 px gutter) the perf HUD keeps clear of. */
+const VIEWER_TOOLS_PX = 52
+
 const fill: CSSProperties = { position: "fixed", inset: 0, overflow: "hidden" }
 /** Below the top bar: screens fill what is left, so the bar never covers them. */
 const belowBar: CSSProperties = { ...fill, top: BAR_PX }
@@ -70,6 +73,8 @@ export function App({ debug }: { debug: DebugHost }) {
   const { screen: id, query } = resolve(pathname, search)
   const screen = id ? screenFor(id) : undefined
   const [hud, setHud] = useState(query.get("hud") === "perf")
+  // a Viewer screen has its tools top-right: the perf HUD hangs below them
+  const [viewer, setViewer] = useState(false)
   // `?bar=0` hides the top bar: bare screens, for shots and embeds.
   const bar = query.get("bar") !== "0"
 
@@ -92,6 +97,7 @@ export function App({ debug }: { debug: DebugHost }) {
     }
     logger.info("mount", { screen: target.id })
     const dispose = target.mount(host.current, { query: params, attach: debug.attach, load: debug.load })
+    setViewer(host.current.querySelector("[data-gh-viewer]") !== null)
     debug.mounted()
     return () => {
       dispose()
@@ -130,7 +136,7 @@ export function App({ debug }: { debug: DebugHost }) {
       {bar && <TopBar screen={screen.id} title={screen.title} hud={hud} onHud={setHud} />}
       <div ref={host} style={bar ? belowBar : fill} data-screen={screen.id} />
       {hud && (
-        <div style={hudFrame(bar ? BAR_PX : 0)}>
+        <div style={hudFrame((bar ? BAR_PX : 0) + (viewer ? VIEWER_TOOLS_PX : 0))}>
           <PerfHud stats={stats} />
         </div>
       )}

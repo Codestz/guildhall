@@ -143,7 +143,7 @@
     {
       "piece": "kenney-nature/sign",
       "pin": true,
-      "rot": 1.571,
+      "rot": -1.571,
       "scale": 0.75,
       "swatchMap": {
         "52": 22,

@@ -39,6 +39,7 @@ import { SMAAPass } from "three/examples/jsm/postprocessing/SMAAPass.js"
 import { AIR } from "../atmosphere/air.ts"
 import type { DayLight } from "../light.ts"
 import type { Stage } from "../stage.ts"
+import { warmPrograms } from "../warm.ts"
 import { bakeLut, copyLook, createLook, lookDistance, lookFor, type MoodId } from "./lut.ts"
 import {
   COMPOSITE_FRAGMENT,
@@ -77,6 +78,11 @@ export interface Post {
   setLook(look: Partial<PostLook>): void
   look(): PostLook
   setMood(mood: MoodId): void
+  /**
+   * Links every pass's program in the background (warm.ts), each against the target it draws into,
+   * and resolves when they are ready: the first frame through the pipeline then compiles nothing.
+   */
+  warm(): Promise<void>
   dispose(): void
 }
 
@@ -319,6 +325,34 @@ export function createPost(stage: Stage, opts: PostOpts): Post {
     setMood(next) {
       mood = next
       first = true
+    },
+    async warm() {
+      resize()
+      const into = (material: ShaderMaterial, target: WebGLRenderTarget | null) =>
+        warmPrograms(stage, quad, [material], { into: target })
+      const first = levels[0] as WebGLRenderTarget
+      // SMAA's three materials and the two targets between them are the pass's own (three keeps them
+      // private); each program is keyed by the target it draws into, the blend's by the canvas
+      const s = smaa as unknown as {
+        _materialEdges: ShaderMaterial
+        _materialWeights: ShaderMaterial
+        _materialBlend: ShaderMaterial
+        _edgesRT: WebGLRenderTarget
+        _weightsRT: WebGLRenderTarget
+      } | null
+      await Promise.all([
+        into(prefilter, first),
+        into(down, levels[1] ?? first),
+        into(up, first),
+        into(composite, finished),
+        ...(s
+          ? [
+              into(s._materialEdges, s._edgesRT),
+              into(s._materialWeights, s._weightsRT),
+              into(s._materialBlend, null),
+            ]
+          : []),
+      ])
     },
     dispose() {
       stage.setDraw(null)

@@ -7,7 +7,16 @@
  */
 import type { RecipeInstance } from "@guildhall/assets"
 import { log } from "@guildhall/core"
-import { type BufferGeometry, Euler, Matrix4, type Object3D, Quaternion, Vector3 } from "three"
+import {
+  BufferAttribute,
+  BufferGeometry,
+  Euler,
+  type Material,
+  Matrix4,
+  type Object3D,
+  Quaternion,
+  Vector3,
+} from "three"
 import { batchGeometry } from "./batchGeometry.ts"
 import { LodBatchedMesh } from "./batchMesh.ts"
 import { type LodCounts, PIECE_TIERS, SHELL, TIER_MIN_AREA, TIER_MIN_SAVING } from "./lod.ts"
@@ -70,6 +79,74 @@ export interface StaticBatch {
 
 /** How much more than asked the buffers grow by when an add overflows them. */
 const GROWTH = 1.5
+
+/** The batch's three programs' materials: the main draw, the crossfade's, the shadow pass's. */
+const BATCH_PROGRAMS = (): Material[] => [
+  batchMaterial(),
+  batchMaterial(true),
+  depthMaterialFor(batchMaterial()),
+]
+
+/** An attribute of a stand-in geometry: name, item size, normalized, and float (else bytes; `u16`: 16-bit ints). */
+export type StandInAttribute = [
+  name: string,
+  itemSize: number,
+  normalized: boolean,
+  floats: boolean,
+  u16?: boolean,
+]
+
+/** The attributes a baked batch geometry carries (batchGeometry.ts), for a stand-in that compiles the same program. */
+const BATCH_ATTRIBUTES: StandInAttribute[] = [
+  ["position", 3, false, true],
+  ["normal", 3, false, true],
+  ["color", 3, true, false],
+  ["_swatch", 1, false, false],
+  ["_shade", 1, true, false],
+  ["_ao", 1, true, false],
+  ["_glow", 1, true, false],
+]
+
+/**
+ * One triangle with a baked geometry's attributes: a batch mesh holding it compiles the programs the
+ * real pieces draw with (a BatchedMesh takes its attributes from its first geometry; with none, three
+ * compiles a flat-shaded variant that is never drawn).
+ */
+export function standInGeometry(attributes = BATCH_ATTRIBUTES): BufferGeometry {
+  const geometry = new BufferGeometry()
+  for (const [name, itemSize, normalized, floats, u16] of attributes) {
+    const n = 3 * itemSize
+    const array = floats ? new Float32Array(n) : u16 ? new Uint16Array(n) : new Uint8Array(n)
+    geometry.setAttribute(name, new BufferAttribute(array, itemSize, normalized))
+  }
+  geometry.setIndex([0, 1, 2])
+  return geometry
+}
+
+/**
+ * Starts linking the batch's programs now, on a one-triangle stand-in with the baked geometry's
+ * attributes, and resolves when the links are ready; the batch built later finds them made. On
+ * ANGLE/Metal the batch's three programs take ~1.4 s to compile in the GPU process, and the first
+ * call that reads one waits for it: started at the map stage, under the loading cover, that compile
+ * runs while the pieces load and bake instead of after them.
+ */
+export async function warmBatchPrograms(
+  stage: Pick<Stage, "scene" | "renderer" | "camera"> & Partial<Pick<Stage, "drawTarget">>,
+): Promise<void> {
+  const geometry = standInGeometry()
+  const mesh = new LodBatchedMesh(1, 3, 3, batchMaterial())
+  mesh.addInstance(mesh.addGeometry(geometry))
+  // the program's key takes in whether the object casts and receives shadows: as the batch does
+  mesh.castShadow = true
+  mesh.receiveShadow = true
+  mesh.visible = false
+  try {
+    await warmPrograms(stage, mesh, BATCH_PROGRAMS(), { prefetch: false })
+  } finally {
+    mesh.dispose()
+    geometry.dispose()
+  }
+}
 
 /** An instance's key is asked for twice per add (baking, placing): kept, since it is a string of its re-tint. */
 const keys = new WeakMap<BatchInstance, string>()
@@ -215,13 +292,23 @@ export async function createStaticBatch(
       }
     const needInstances = live + clustered + adding
     if (!mesh) {
+      // three more vertices and indices: the stand-in triangle that sets the mesh's attributes (below)
       mesh = new LodBatchedMesh(
         Math.max(1, needInstances),
-        Math.max(1, needVertices),
-        Math.max(1, needIndices),
+        Math.max(1, needVertices) + 3,
+        Math.max(1, needIndices) + 3,
         batchMaterial(),
       )
       mesh.name = "static-batch"
+      // Its attributes come from its first geometry, and its programs' keys from its attributes: the
+      // stand-in (no instance, never drawn) makes the warm-up below compile the programs the pieces draw with.
+      const standIn = standInGeometry()
+      mesh.addGeometry(standIn)
+      standIn.dispose()
+      vertices += 3
+      indices += 3
+      needVertices += 3
+      needIndices += 3
       mesh.fadeMaterial = batchMaterial(true)
       mesh.perObjectFrustumCulled = true
       // The island is always partly in view, so the whole-mesh test never culls; off, three also draws
@@ -233,16 +320,12 @@ export async function createStaticBatch(
       mesh.castShadow = true
       mesh.receiveShadow = true
       // Its three programs (the main draw, the crossfade's, the shadow pass's) link in the background
-      // before the first draw; drawn before they are done, that draw would wait for them (warm.ts).
+      // before the first draw (warm.ts; `warmBatchPrograms` may have started them long before); it
+      // is shown once its geometry is all in (below).
       mesh.visible = false
       stage.scene.add(mesh)
       capacity = { vertices: Math.max(1, needVertices), indices: Math.max(1, needIndices) }
-      await warmPrograms(stage, mesh, [
-        batchMaterial(),
-        batchMaterial(true),
-        depthMaterialFor(batchMaterial()),
-      ])
-      mesh.visible = true
+      await warmPrograms(stage, mesh, BATCH_PROGRAMS())
     } else {
       if (needVertices > capacity.vertices || needIndices > capacity.indices) {
         capacity = {
@@ -312,6 +395,10 @@ export async function createStaticBatch(
 
   const ids = await add(instances, clusters)
   const built = mesh as unknown as LodBatchedMesh
+  // Shown now, with every geometry in, so its buffers go up once (~30 ms for 130 MB): drawn while the
+  // sliced copies landed, each copy into a buffer the frame before was still reading made ANGLE/Metal
+  // copy the whole buffer again, and the GPU process fell seconds behind (every GL call then waited).
+  built.visible = true
   logger.info("built", {
     instances: live,
     clusters: clustered,

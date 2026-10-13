@@ -266,5 +266,11 @@ for (const task of long) {
 }
 const md = lines.join("\n")
 writeFileSync(`${path}.md`, `${md}\n`)
+// the page's whole log, to read the tasks against what was being built and compiled when they struck
+if (pageLog.length)
+  writeFileSync(
+    `${path}.log.md`,
+    `${pageLog.map((l) => `${String(l.t).padStart(7)} ms  ${l.line}`).join("\n")}\n`,
+  )
 console.log(md)
-console.log(`written: ${path}.json, ${path}.md`)
+console.log(`written: ${path}.json, ${path}.md${pageLog.length ? `, ${path}.log.md` : ""}`)

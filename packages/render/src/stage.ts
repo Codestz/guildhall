@@ -46,6 +46,12 @@ export interface Stage {
   setDraw(draw: (() => void) | null, target?: WebGLRenderTarget | null): void
   /** The render target the scene is drawn into (null: the canvas). */
   readonly drawTarget: WebGLRenderTarget | null
+  /**
+   * Draws nothing (and runs no frame hook) until `until` settles: for a loading screen's cover, while
+   * the programs of what was just added link in the background (warm.ts), so no frame pays for a
+   * synchronous link. Holds nest; the first frame after the last one is the next drawn.
+   */
+  hold(until: Promise<unknown>): void
   dispose(): void
 }
 
@@ -129,12 +135,15 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
   let draw: (() => void) | null = null
   let drawTarget: WebGLRenderTarget | null = null
   let knownPrograms = 0
+  let holds = 0
 
   const frame = (now: number) => {
     const start = performance.now()
     raf = requestAnimationFrame(frame)
     const ms = last === null ? 0 : now - last
     last = now
+    // held: nothing drawn, no hook run, and the frame after the hold is a fresh start (no dt owed)
+    if (holds > 0) return
     renderer.info.reset()
     shadowCalls = 0
     shadowTris = 0
@@ -219,6 +228,13 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
     },
     get drawTarget() {
       return drawTarget
+    },
+    hold(until) {
+      holds++
+      const release = () => {
+        holds--
+      }
+      until.then(release, release)
     },
     dispose() {
       governor.dispose()

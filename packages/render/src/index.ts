@@ -18,6 +18,7 @@ export {
   createStaticBatch,
   instanceMatrix,
   type StaticBatch,
+  warmBatchPrograms,
 } from "./batch.ts"
 export { setLod } from "./batchMesh.ts"
 export { cameraToPose, poseToCamera } from "./camera.ts"
@@ -33,6 +34,7 @@ export {
   type CrowdOpts,
   type CrowdStats,
   createCrowd,
+  warmCrowdPrograms,
 } from "./crowd/index.ts"
 export {
   createDoorways,
@@ -152,7 +154,7 @@ export {
 } from "./viewer.ts"
 export { createVertexMesh, groundMaterial } from "./vmesh.ts"
 export { srgbToLinear, type VertexMeshData, vertexMeshData } from "./vmeshData.ts"
-export { depthMaterialFor, warmPrograms } from "./warm.ts"
+export { depthMaterialFor, type WarmOptions, type WarmStage, warmPrograms, warmScene } from "./warm.ts"
 export {
   createFieldWater,
   type FieldWaterOpts,

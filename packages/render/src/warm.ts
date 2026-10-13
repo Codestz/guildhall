@@ -18,6 +18,7 @@
  * caster warms its shadow program too. Where the extension is missing three reports every program
  * ready at once and the link waits stay where they were.
  */
+import { log } from "@guildhall/core"
 import {
   BackSide,
   DoubleSide,
@@ -34,10 +35,16 @@ const POLL_MS = 10
 /** A link not done after this is drawn anyway (the wait then lands in that frame, as before). */
 const GIVE_UP_MS = 4000
 
-/** A linked (or linking) program as three keeps it per material; `isReady` polls KHR_parallel_shader_compile. */
+/**
+ * A linked (or linking) program as three keeps it per material; `isReady` polls KHR_parallel_shader_compile,
+ * `getUniforms` and `getAttributes` read the linked program's layout (sync GL calls) the first time.
+ */
 interface Program {
   isReady(): boolean
+  getUniforms(): unknown
+  getAttributes(): unknown
 }
+const logger = log("render:warm")
 type Props = { programs?: Map<string, Program> }
 
 /** The side the shadow pass draws a caster of `material` with (three's `shadowSide` table). */
@@ -63,26 +70,32 @@ export function depthMaterialFor(material: Material): MeshDepthMaterial {
  * its own materials; it need not be visible, nor in the scene.
  */
 export async function warmPrograms(
-  stage: Pick<Stage, "renderer" | "scene" | "camera"> & Partial<Pick<Stage, "drawTarget">>,
+  stage: WarmStage,
   object: Object3D,
   materials?: readonly Material[],
+  options: WarmOptions = {},
 ): Promise<void> {
   const { renderer, scene, camera } = stage
   // a bare renderer (the tests' stand-ins) has nothing to link
   if (typeof renderer.compile !== "function" || !renderer.properties) return
+  const start = performance.now()
   const programs = new Set<Program>()
   const collect = (material: Material) => {
     const held = (renderer.properties.get(material) as Props).programs
     if (held) for (const p of held.values()) programs.add(p)
   }
   // A program's key takes in the render target it draws into (its colour space, its tone mapping), so
-  // the compile binds the one the scene is drawn into: the post pipeline's target, or the canvas. A
-  // depth material draws into a shadow map: any target but the canvas keys it the same.
+  // the compile binds the one the scene is drawn into: the post pipeline's target, or the canvas (or
+  // `options.into`, for a pass that draws into its own target). A depth material draws into a shadow
+  // map: any target but the canvas keys it the same.
   const compile = (material?: Material) => {
     const was = renderer.getRenderTarget()
-    const into = (material as { isMeshDepthMaterial?: boolean } | undefined)?.isMeshDepthMaterial
-      ? (stage.drawTarget ?? offscreen())
-      : (stage.drawTarget ?? null)
+    const into =
+      options.into !== undefined
+        ? options.into
+        : (material as { isMeshDepthMaterial?: boolean } | undefined)?.isMeshDepthMaterial
+          ? (stage.drawTarget ?? offscreen())
+          : (stage.drawTarget ?? null)
     renderer.setRenderTarget(into)
     try {
       renderer.compile(object, camera, scene)
@@ -116,10 +129,62 @@ export async function warmPrograms(
       collect(material)
     }
   }
-  const start = performance.now()
+  const count = programs.size
+  let ready = 0
   while (performance.now() - start < GIVE_UP_MS) {
-    for (const p of programs) if (p.isReady()) programs.delete(p)
-    if (programs.size === 0) return
+    for (const p of programs) {
+      if (!p.isReady()) continue
+      // The layout reads (active uniforms and attributes) are sync GL calls that wait for the link to
+      // be really done (on ANGLE/Metal `isReady` turns true before the shaders are compiled, 0.3–1.4 s
+      // for the big ones): made here, the wait is this task's and the first draw's frame is spared;
+      // a stand-in compiled ahead (`prefetch: false`) leaves it to whoever draws the program first.
+      if (options.prefetch !== false) {
+        p.getUniforms()
+        p.getAttributes()
+      }
+      programs.delete(p)
+      ready++
+    }
+    if (programs.size === 0) break
     await new Promise<void>((done) => setTimeout(done, POLL_MS))
   }
+  logger.debug("warmed", {
+    object: object.name || object.type,
+    programs: count,
+    ready,
+    ms: Math.round(performance.now() - start),
+  })
+}
+
+export interface WarmOptions {
+  /** The render target the programs will draw into (null: the canvas); default the stage's draw target. */
+  into?: WebGLRenderTarget | null
+  /** Read the programs' layouts once ready (default), which waits for the real compile; false resolves at `isReady`. */
+  prefetch?: boolean
+}
+
+/** The slice of a Stage the warm-up needs (a bare renderer in the tests). */
+export type WarmStage = Pick<Stage, "renderer" | "scene" | "camera"> & Partial<Pick<Stage, "drawTarget">>
+
+/**
+ * Links the programs of everything in the scene now (every material, with the scene's lights) against
+ * the target the scene is drawn into, in the background, and resolves when they are ready: for what a
+ * world adds before its first frame (the sky, the clouds, the lamps), so the first draw links nothing.
+ * The caller holds the stage meanwhile (`stage.hold`): a frame drawn before would wait for the links.
+ */
+export async function warmScene(stage: WarmStage): Promise<void> {
+  const { renderer, scene, camera } = stage
+  const compile = renderer.compileAsync
+  if (typeof compile !== "function") return
+  const start = performance.now()
+  const was = renderer.getRenderTarget()
+  renderer.setRenderTarget(stage.drawTarget ?? null)
+  let run: Promise<unknown>
+  try {
+    run = compile.call(renderer, scene, camera)
+  } finally {
+    renderer.setRenderTarget(was)
+  }
+  await run.catch(() => undefined)
+  logger.debug("warmed scene", { ms: Math.round(performance.now() - start) })
 }

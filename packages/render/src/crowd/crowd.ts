@@ -28,8 +28,10 @@ import {
   PropertyBinding,
   Quaternion,
   RGBAFormat,
+  type Texture,
   Vector3,
 } from "three"
+import { type StandInAttribute, standInGeometry } from "../batch.ts"
 import { batchGeometry } from "../batchGeometry.ts"
 import { LodBatchedMesh } from "../batchMesh.ts"
 import { loadCharacter } from "../character/load.ts"
@@ -41,7 +43,15 @@ import { loadPiece } from "../pieces.ts"
 import { createSlicer } from "../slice.ts"
 import type { Stage } from "../stage.ts"
 import { warmPrograms } from "../warm.ts"
-import { type BakePose, type BoneBake, bakeBytes, bakeClipsSliced, boneMap, frameAt } from "./bake.ts"
+import {
+  type BakePose,
+  type BoneBake,
+  bakeBytes,
+  bakeClipsSliced,
+  boneMap,
+  firstSkinned,
+  frameAt,
+} from "./bake.ts"
 import { createBlobs } from "./blobs.ts"
 import {
   chooseHeroes,
@@ -52,7 +62,13 @@ import {
   type Playing,
   poseHero,
 } from "./heroes.ts"
-import { crowdMaterial, crowdUniforms, PEOPLE_ROW, TEXELS_PER_PERSON } from "./material.ts"
+import {
+  type CrowdUniforms,
+  crowdMaterial,
+  crowdUniforms,
+  PEOPLE_ROW,
+  TEXELS_PER_PERSON,
+} from "./material.ts"
 import { outfitTable, tintTable } from "./outfit.ts"
 import { mergeParts, type PartsTier, simplifyParts, skinnedParts } from "./parts.ts"
 import { type HeldProp, propMatrix } from "./props.ts"
@@ -157,6 +173,60 @@ interface Person {
   shown: boolean
 }
 
+/** The attributes a merged crowd body carries (parts.ts `mergeParts`), for a stand-in that compiles the same program. */
+const BODY_ATTRIBUTES: StandInAttribute[] = [
+  ["position", 3, false, true],
+  ["normal", 3, false, true],
+  ["color", 3, true, false],
+  ["skinIndex", 4, false, false, true],
+  ["skinWeight", 4, false, true],
+  ["_swatch", 1, false, false],
+  ["_shade", 1, true, false],
+  ["_part", 1, false, false],
+]
+
+/**
+ * Starts linking the crowd's programs (the bodies' skinned one for a rig of `bones` bones, the props'
+ * palette one) on one-triangle stand-ins, and resolves when they are ready: compiled ahead, the real
+ * meshes' warm-up finds them made (three shares a program between materials with the same key).
+ */
+export async function warmCrowdPrograms(
+  stage: Pick<Stage, "scene" | "camera" | "renderer"> & Partial<Pick<Stage, "drawTarget">>,
+  bones: number,
+): Promise<void> {
+  if (bones <= 0) return
+  const uniforms: CrowdUniforms = {
+    crowdBones: { value: null as unknown as Texture },
+    crowdPeople: { value: null },
+    crowdTint: { value: null as unknown as Texture },
+    crowdOutfits: { value: null },
+    crowdPivots: { value: Array.from({ length: bones }, () => new Vector3()) },
+  }
+  const material = crowdMaterial(uniforms)
+  const body = new LodBatchedMesh(1, 3, 3, material)
+  const bodyGeometry = standInGeometry(BODY_ATTRIBUTES)
+  body.addInstance(body.addGeometry(bodyGeometry))
+  const held = new BatchedMesh(1, 3, 3, paletteMaterial())
+  const heldGeometry = standInGeometry()
+  held.addInstance(held.addGeometry(heldGeometry))
+  for (const mesh of [body, held]) {
+    mesh.receiveShadow = true
+    mesh.visible = false
+  }
+  try {
+    await Promise.all([
+      warmPrograms(stage, body, undefined, { prefetch: false }),
+      warmPrograms(stage, held, undefined, { prefetch: false }),
+    ])
+  } finally {
+    body.dispose()
+    held.dispose()
+    bodyGeometry.dispose()
+    heldGeometry.dispose()
+    material.dispose()
+  }
+}
+
 /** Every clip name the looks play. */
 export function lookClips(looks: readonly NpcLook[]): string[] {
   const names = new Set<string>()
@@ -220,6 +290,10 @@ export async function createCrowd(
   const rig = firstEntry?.character && catalog.rig(firstEntry.character.rig)
   if (!firstEntry || !rig) throw new Error("createCrowd: no actors, or the first body has no rig")
   const rigBody = await loadCharacter(firstEntry, rig, url)
+  // The bodies' and the props' programs take ~1 s to compile in the GPU process (ANGLE/Metal): started
+  // now, on stand-ins, that runs while the clips bake and the bodies merge, and the real meshes below
+  // find the programs made (three shares a program between materials with the same key).
+  const early = warmCrowdPrograms(stage, firstSkinned(rigBody.root)?.skeleton.bones.length ?? 0)
   const wanted = [...new Set([...lookClips(actors.map((a) => a.look)), ...(opts.clips ?? [])])].sort()
   const clips = wanted.flatMap((name) => rigBody.clips.filter((c) => c.name === name))
   for (const name of wanted)
@@ -306,6 +380,7 @@ export async function createCrowd(
   for (const o of [bodies, props, blobs.mesh]) o.visible = false
   stage.scene.add(bodies, props, blobs.mesh)
   for (const o of [bodies, props, blobs.mesh]) stage.timing?.gpu.tag(o, "crowd")
+  await early
   await Promise.all([bodies, props, blobs.mesh].map((o) => warmPrograms(stage, o)))
   for (const o of [bodies, props, blobs.mesh]) o.visible = true
 

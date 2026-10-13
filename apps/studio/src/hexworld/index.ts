@@ -15,6 +15,7 @@
  * a road or a building), `?woods=` thins or fills the trees of wooded tiles, `?wild=` moves the open
  * country's share of woods.
  */
+import { inStyle } from "@guildhall/assets"
 import type { CameraPose } from "@guildhall/core"
 import { log } from "@guildhall/core"
 import {
@@ -44,6 +45,9 @@ import {
   type VertexMeshData,
   vertexMeshData,
   type Water,
+  warmBatchPrograms,
+  warmCrowdPrograms,
+  warmScene,
 } from "@guildhall/render"
 import type { Viewer } from "@guildhall/ui"
 import { roman } from "@guildhall/ui"
@@ -448,12 +452,37 @@ const world = {
         },
       }
       const ext = window.guildhall?.ext
-      if (ext) ext.clock = dayClock
+      if (ext) {
+        ext.clock = dayClock
+        // for probes (tools/shots): the stage itself, its scene and renderer
+        ext.stage = stage
+      }
       // the sea reaches the far plane: the horizon haze (atmo.ts) melts its rim into the sky
       const sea = Math.max(span * 3, stage.camera.far * 0.95)
       air = createIslandAir(stage, { light: () => sky.light(), span, seed, sea, knobs: atmoKnobs(ctx.query) })
       if (ctx.query.get("post") !== "0")
         post = createPost(stage, { light: () => sky.light(), aa: aaOf(ctx.query.get("aa")) })
+      // The programs of all that (the dome, the clouds, the lamps, the post passes) link in the
+      // background while the worker still builds the ground, and nothing is drawn until they have (the
+      // cover is up): drawn before, that frame linked them one by one, 0.1–1.1 s on the main thread.
+      // The batch's programs start now too (~1.4 s in the GPU process): they compile while the pieces
+      // load and bake, and the batch finds them made.
+      stage.hold(Promise.all([warmScene(stage), post?.warm()]))
+      void warmBatchPrograms(stage)
+      // the crowd's as well (~1 s), for the rigs the house style's bodies ride, once the catalog is in
+      if (lifeOn)
+        void catalogLoad.then((catalog) => {
+          if (!catalog || disposed) return
+          const bones = new Set<number>()
+          for (const entry of catalog.all()) {
+            const rig =
+              entry.character && inStyle(entry.id.split("/")[0] ?? "")
+                ? catalog.rig(entry.character.rig)
+                : null
+            if (rig) bones.add(rig.bones)
+          }
+          for (const count of bones) void warmCrowdPrograms(stage, count)
+        })
       const azimuth = num("az", sideLit(sky.light().sunDir))
       const pose: CameraPose = m.heart
         ? { target: m.heart, azimuth, elevation: 38, distance: 70 }

@@ -1,6 +1,6 @@
 import type { BuiltContent } from "@guildhall/ui"
 
-const J = "/lab/site/journey"
+const J = "/site/journey"
 
 /**
  * "How it's built", V2 edition: V1's page (how.html: crowds, WebGL against WebGPU, repos as islands…)
@@ -240,7 +240,7 @@ export const BUILT: BuiltContent = {
         },
         {
           kind: "image",
-          src: `/lab/site/island-hero.webp`,
+          src: `/site/island-hero.webp`,
           alt: "The island from above at midday: roads, rivers, a castle and houses.",
           caption: "The island at midday, as the world draws it.",
           wide: true,

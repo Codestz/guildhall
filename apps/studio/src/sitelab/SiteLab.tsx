@@ -5,8 +5,8 @@
  */
 import { BuiltPage, CrestMenu, DemoPicker, type SiteDest, type Story, WelcomeCard } from "@guildhall/ui"
 import { useState } from "react"
-import { BUILT } from "./built.ts"
-import { STORIES } from "./stories.ts"
+import { BUILT } from "../site/built.ts"
+import { STORIES } from "../site/stories.ts"
 
 export type SiteView = "welcome" | "menu" | "demos" | "built"
 export const VIEWS: readonly SiteView[] = ["welcome", "menu", "demos", "built"]

@@ -27,6 +27,23 @@ export async function loadCatalog(
   base = LIBRARY,
   all = allPacks(),
 ): Promise<Catalog | null> {
+  // The page's own library is read once: the island, the studio's screens and a move between them share it.
+  if (fetcher !== fetch || base !== LIBRARY) return readCatalog(fetcher, base, all)
+  const held = shared.get(all)
+  if (held) return held
+  const read = readCatalog(fetcher, base, all)
+  shared.set(all, read)
+  // a library that is not there yet, or a failed read, is asked for again next time
+  void read.then(
+    (c) => c ?? shared.delete(all),
+    () => shared.delete(all),
+  )
+  return read
+}
+
+const shared = new Map<boolean, Promise<Catalog | null>>()
+
+async function readCatalog(fetcher: Fetch, base: string, all: boolean): Promise<Catalog | null> {
   const response = await fetcher(`${base}/catalog/index.json`).catch(() => null)
   if (!response?.ok) {
     logger.info("no library", { status: response?.status ?? "unreachable" })

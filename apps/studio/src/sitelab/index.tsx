@@ -5,7 +5,7 @@ import type { Screen } from "../screens.ts"
 import { SiteLab, type SiteView, VIEWS } from "./SiteLab.tsx"
 
 const CSS = /* css */ `
-.lab-site-root { position: absolute; inset: 0; overflow: hidden; background: #2d3b2a url("/lab/site/island-hero.webp") center / cover no-repeat; }
+.lab-site-root { position: absolute; inset: 0; overflow: hidden; background: #2d3b2a url("/site/island-hero.webp") center / cover no-repeat; }
 .lab-site { position: absolute; inset: 0; }
 .lab-note { position: absolute; top: 16px; right: 16px; z-index: 60; max-width: 60%; margin: 0; padding: 8px 12px; border-radius: 5px; background: rgba(21, 17, 13, 0.95); border: 1px solid var(--brass-line); color: var(--paper); font: 13px/1.4 var(--mono); }
 @media (max-width: 560px) { .lab-note { top: auto; right: 12px; left: 12px; bottom: 12px; max-width: none; } }

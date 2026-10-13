@@ -42,6 +42,22 @@ const CSS = /* css */ `
 .gh-mark b { font: 400 16px/1 var(--display); letter-spacing: 0.09em; color: var(--paper); }
 .gh-mark b span { color: var(--brass); }
 
+/* Back to the site: the island is the home, the Studio a section of it. */
+.gh-sitelink {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  margin-left: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--hair-2);
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  font: 500 12px/1 var(--mono);
+  letter-spacing: 0.06em;
+  text-decoration: none;
+}
+.gh-sitelink:hover { border-color: var(--brass-line); color: var(--paper); }
+
 .gh-crumb {
   display: flex;
   align-items: baseline;
@@ -190,9 +206,15 @@ const CSS = /* css */ `
 }
 .gh-switch-foot span { display: inline-flex; align-items: center; gap: 6px; }
 
+@media (max-width: 1100px) {
+  .gh-showcase { display: none; }
+}
 @media (max-width: 900px) {
   .gh-jump { width: auto; }
   .gh-jump .label, .gh-crumb .group, .gh-crumb .sep { display: none; }
+}
+@media (max-width: 560px) {
+  .gh-crumb { display: none; }
 }
 @media (max-width: 560px) {
   .gh-mark b { display: none; }

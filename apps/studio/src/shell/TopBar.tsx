@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { holdStudioStyle } from "../browser/style.ts"
-import { SHOWCASE } from "../env.ts"
+import { BASE, READ_ONLY, READ_ONLY_NOTICE, SHOWCASE } from "../env.ts"
 import { HOME_ID, linkTo, placeOf } from "./directory.ts"
 import { Mark, MOD_KEY, SearchIcon } from "./icons.tsx"
 import { follow, go } from "./nav.ts"
@@ -63,6 +63,9 @@ export function TopBar({
             Guildhall <span>Studio</span>
           </b>
         </a>
+        <a className="gh-sitelink" href={BASE} onClick={follow("island")} title="Back to the island">
+          Island
+        </a>
         {screen !== HOME_ID && (
           <div className="gh-crumb">
             {place?.group && (
@@ -79,12 +82,9 @@ export function TopBar({
           </div>
         )}
         <span className="spacer" />
-        {SHOWCASE && (
-          <span
-            className="gh-showcase"
-            title="A public build: nothing saves here; saves download JSON instead."
-          >
-            Showcase · read-only
+        {READ_ONLY && (
+          <span className="gh-showcase" title="Edit modes work, but nothing is saved off localhost.">
+            {SHOWCASE ? "Showcase · read-only" : READ_ONLY_NOTICE}
           </span>
         )}
         <button
@@ -93,11 +93,11 @@ export function TopBar({
           className="gh-jump"
           onClick={() => setOpen(true)}
           aria-haspopup="dialog"
-          aria-label="Jump to a tool"
+          aria-label="Jump to a place or a tool"
           aria-keyshortcuts="Meta+K Control+K"
         >
           <SearchIcon />
-          <span className="label">Jump to a tool…</span>
+          <span className="label">Jump to…</span>
           <span className="gh-kbd">{MOD_KEY} K</span>
         </button>
         {screen !== HOME_ID && (

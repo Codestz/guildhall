@@ -1,6 +1,6 @@
 import type { Story } from "@guildhall/ui"
 
-const ART = "/lab/site/demos"
+const ART = "/site/demos"
 
 /**
  * V1's Demos page ("Every scene, one link away", packages/hall/demos.html on main) as fixture data: the same
@@ -54,7 +54,7 @@ export const STORIES: readonly Story[] = [
     blurb:
       "A single hero with no party: one task from the board, walked to its place and finished, with the island going about its day around it.",
     shows: ["The smallest story: one hero, one quest", "Follow it and read its dossier as it works"],
-    art: "/lab/site/journey/tavern-night.webp",
+    art: "/site/journey/tavern-night.webp",
     alt: "A tavern yard at night: lit windows, tables and a few figures round a glowing lamp.",
     link: "?story=solo",
   },

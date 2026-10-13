@@ -9,6 +9,7 @@ import { follow } from "./shell/nav.ts"
 import { canonical, here, resolve } from "./shell/router.ts"
 import { BAR_PX } from "./shell/style.ts"
 import { TopBar } from "./shell/TopBar.tsx"
+import { isSiteScreen, mountKey } from "./site/routes.ts"
 
 const logger = log("studio:shell")
 
@@ -60,6 +61,8 @@ function useUrl(): string {
 
 /** The tab's title for a screen: its directory name, "Not found" for a path no screen answers. */
 function titleOf(id: string | null, fallback: string): string {
+  if (id === "island") return "Guildhall"
+  if (isSiteScreen(id)) return `${fallback} · Guildhall`
   if (id === HOME_ID) return "Guildhall Studio"
   const name = id ? (placeOf(id)?.tool.name ?? fallback) : "Not found"
   return `${name} · Guildhall Studio`
@@ -82,7 +85,10 @@ export function App({ debug }: { debug: DebugHost }) {
     document.title = titleOf(screen ? screen.id : null, screen?.title ?? "")
   }, [screen])
 
-  // A deep link is a fresh load: any change to the URL remounts the screen.
+  // A deep link is a fresh load: any change to the URL remounts a Studio screen. A site screen remounts
+  // only when its world or section changes (`/` to `/demos` keeps the island it has built).
+  const key = mountKey(id ?? "", query, url)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `url` is read for what `key` says changed
   useEffect(() => {
     const at = new URL(url, location.origin)
     const { screen: id, query: params } = resolve(at.pathname, at.search)
@@ -97,12 +103,23 @@ export function App({ debug }: { debug: DebugHost }) {
     }
     logger.info("mount", { screen: target.id })
     const dispose = target.mount(host.current, { query: params, attach: debug.attach, load: debug.load })
-    setViewer(host.current.querySelector("[data-gh-viewer]") !== null)
+    // screens load as their own chunks, so the Viewer may arrive after the mount: watch for it
+    const el = host.current
+    const seen = () => setViewer(el.querySelector("[data-gh-viewer]") !== null)
+    seen()
+    const watch = new MutationObserver(seen)
+    watch.observe(el, { childList: true, subtree: true })
     debug.mounted()
     return () => {
+      watch.disconnect()
       dispose()
       debug.attach(null)
     }
+  }, [key, debug])
+
+  // a move inside one site screen's mount (`/` to `/demos`) is still a navigation `open()` waits for
+  useEffect(() => {
+    if (url) debug.mounted()
   }, [url, debug])
 
   useEffect(() => {
@@ -131,12 +148,13 @@ export function App({ debug }: { debug: DebugHost }) {
       </div>
     )
   }
+  const site = isSiteScreen(screen.id)
   return (
     <>
-      {bar && <TopBar screen={screen.id} title={screen.title} hud={hud} onHud={setHud} />}
-      <div ref={host} style={bar ? belowBar : fill} data-screen={screen.id} />
+      {bar && !site && <TopBar screen={screen.id} title={screen.title} hud={hud} onHud={setHud} />}
+      <div ref={host} style={bar && !site ? belowBar : fill} data-screen={screen.id} />
       {hud && screen.id !== HOME_ID && (
-        <div style={hudFrame((bar ? BAR_PX : 0) + (viewer ? VIEWER_TOOLS_PX : 0))}>
+        <div style={hudFrame((bar && !site ? BAR_PX : 0) + (viewer ? VIEWER_TOOLS_PX : 0))}>
           <PerfHud stats={stats} />
         </div>
       )}

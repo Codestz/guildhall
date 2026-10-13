@@ -5,6 +5,7 @@ import { createCatalog } from "@guildhall/assets"
 import { POSE, TILES, tileAt } from "../src/home/diorama.ts"
 import { formatCount, studioStats, TILE_KINDS } from "../src/home/stats.ts"
 import { GROUPS, HOME_ID, linkTo, openable, placeOf, search } from "../src/shell/directory.ts"
+import { SITE_SCREENS } from "../src/site/routes.ts"
 import { entry, index } from "./entries.ts"
 
 const STUDIO = join(import.meta.dir, "..")
@@ -12,19 +13,8 @@ const STUDIO = join(import.meta.dir, "..")
 /** The ids `screens.ts` registers and its default, read from the source (importing it would load every screen). */
 function registered(): { ids: string[]; fallback: string } {
   const source = readFileSync(join(STUDIO, "src/screens.ts"), "utf8")
-  const list = /SCREENS: readonly Screen\[\] = \[([^\]]*)\]/.exec(source)?.[1] ?? ""
-  const names = list
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-  const ids = names.map((name) => {
-    const imported = new RegExp(`import \\{ (?:\\w+ as )?${name} \\} from "\\./([^"]+)"`).exec(source)?.[1]
-    if (!imported) throw new Error(`no import for ${name}`)
-    const file = readFileSync(join(STUDIO, "src", imported), "utf8")
-    const id = /\bid: (?:"([^"]+)"|HOME_ID)/.exec(file)
-    if (!id) throw new Error(`no id in ${imported}`)
-    return id[1] ?? HOME_ID
-  })
+  // `lazy("<id>", …)`: the studio's tools (and the site's four, which the directory does not list)
+  const ids = [...source.matchAll(/^\s+lazy\("([a-z]+)"/gm)].map((m) => m[1] as string)
   const fallback = /DEFAULT_SCREEN = "([^"]+)"/.exec(source)?.[1] ?? ""
   return { ids, fallback }
 }
@@ -32,9 +22,9 @@ function registered(): { ids: string[]; fallback: string } {
 describe("directory", () => {
   test("every registered screen has one place in the directory, and home is the default", () => {
     const { ids, fallback } = registered()
-    expect(fallback).toBe(HOME_ID)
+    expect(fallback).toBe("island")
     expect(ids).toContain(HOME_ID)
-    for (const id of ids) expect(placeOf(id)).not.toBeNull()
+    for (const id of ids.filter((i) => !SITE_SCREENS.includes(i))) expect(placeOf(id)).not.toBeNull()
     const listed = GROUPS.flatMap((g) => g.tools.map((t) => t.id))
     expect(new Set(listed).size).toBe(listed.length)
   })
@@ -77,7 +67,7 @@ describe("directory", () => {
 
   test("deep links are paths", () => {
     expect(linkTo("pieces")).toBe("/pieces")
-    expect(linkTo(HOME_ID)).toBe("/")
+    expect(linkTo(HOME_ID)).toBe("/studio")
     expect(linkTo("grip")).toBe("/grips/editor")
   })
 })

@@ -4,7 +4,7 @@
  * build ships `data/` as static files with one `index.json` of every folder's ids, and never writes.
  */
 import type { DataOverlay, MountsFile } from "@guildhall/assets"
-import { BASE, SHOWCASE } from "./env.ts"
+import { BASE, READ_ONLY, SHOWCASE } from "./env.ts"
 
 /** Where vite serves `data/` (vite.config.ts). */
 export const DATA = `${BASE}data`
@@ -37,8 +37,10 @@ async function getJson(url: string, fetcher: Fetch): Promise<unknown | null> {
   return response.json()
 }
 
-async function put(url: string, json: unknown, fetcher: Fetch): Promise<SaveResult> {
+async function put(url: string, json: unknown, fetcher: Fetch, readOnly = READ_ONLY): Promise<SaveResult> {
   if (SHOWCASE) return { ok: false, status: 405, problems: ["the showcase is read-only"] }
+  // off localhost every edit mode works but nothing is saved: the save is a no-op that reports success
+  if (readOnly) return { ok: true }
   const response = await fetcher(url, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -86,8 +88,9 @@ export async function save(
   json: unknown,
   fetcher: Fetch = fetch,
   base = DATA,
+  readOnly = READ_ONLY,
 ): Promise<SaveResult> {
-  return put(fileUrl(base, kind, id), json, fetcher)
+  return put(fileUrl(base, kind, id), json, fetcher, readOnly)
 }
 
 /** What `data/mounts.json` lays over the catalog (feed it to `applyOverlay`); empty when there is none. */
@@ -97,6 +100,11 @@ export async function loadOverlay(fetcher: Fetch = fetch, base = DATA): Promise<
 }
 
 /** Replaces `data/mounts.json` whole: merge into what `loadOverlay` returned, never save a partial set. */
-export async function saveMounts(file: MountsFile, fetcher: Fetch = fetch, base = DATA): Promise<SaveResult> {
-  return put(`${base}/mounts.json`, file, fetcher)
+export async function saveMounts(
+  file: MountsFile,
+  fetcher: Fetch = fetch,
+  base = DATA,
+  readOnly = READ_ONLY,
+): Promise<SaveResult> {
+  return put(`${base}/mounts.json`, file, fetcher, readOnly)
 }

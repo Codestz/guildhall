@@ -1,5 +1,5 @@
 import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react"
-import { type Placed, search } from "./directory.ts"
+import { jumpable, type Placed, search } from "./directory.ts"
 import { SearchIcon } from "./icons.tsx"
 
 /**
@@ -17,7 +17,7 @@ export function Switcher({
   onClose(): void
 }) {
   const [text, setText] = useState("")
-  const results = useMemo(() => search(text), [text])
+  const results = useMemo(() => search(text, jumpable()), [text])
   const [active, setActive] = useState(0)
   const input = useRef<HTMLInputElement>(null)
   const list = useRef<HTMLDivElement>(null)
@@ -69,7 +69,7 @@ export function Switcher({
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="gh-switch" role="dialog" aria-modal="true" aria-label="Open a tool">
+      <div className="gh-switch" role="dialog" aria-modal="true" aria-label="Jump to a place">
         <div className="gh-switch-head">
           <SearchIcon size={16} />
           <input
@@ -77,7 +77,7 @@ export function Switcher({
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKey}
-            placeholder="Open a tool…"
+            placeholder="Jump to a place or a tool…"
             role="combobox"
             aria-expanded="true"
             aria-controls={`${base}-list`}
@@ -89,9 +89,9 @@ export function Switcher({
           <span className="gh-kbd">esc</span>
         </div>
         {results.length === 0 ? (
-          <p className="gh-switch-empty">No tool matches “{text}”.</p>
+          <p className="gh-switch-empty">Nothing matches “{text}”.</p>
         ) : (
-          <div ref={list} id={`${base}-list`} className="gh-switch-list" role="listbox" aria-label="Tools">
+          <div ref={list} id={`${base}-list`} className="gh-switch-list" role="listbox" aria-label="Places">
             {results.map((p, i) => {
               const groupName = p.group?.name ?? "Studio"
               const heading = text === "" && groupName !== lastGroup

@@ -20,3 +20,27 @@ export const BASE: string = import.meta.env.BASE_URL ?? "/"
 
 /** The read-only public build: no writes, saves become downloads, dev-only screens hidden. */
 export const SHOWCASE: boolean = import.meta.env.VITE_STUDIO_SHOWCASE === "1"
+
+/** True for the machine's own addresses: `localhost` (and `*.localhost`), 127.0.0.1, ::1. */
+export function isLocalHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/^\[|\]$/g, "")
+  return h === "localhost" || h.endsWith(".localhost") || h === "127.0.0.1" || h === "::1"
+}
+
+/**
+ * Whether the studio is view-only: the public build, or any page not served from this machine. Saving
+ * is for localhost alone: elsewhere every edit mode still works but a save is a no-op (see data.ts), and the
+ * top bar says so. The dev server's own endpoint refuses non-local writes as well. With no `hostname` (a test, a worker) the page is local.
+ */
+export function viewOnly(showcase: boolean, hostname: string | undefined): boolean {
+  return showcase || (hostname !== undefined && !isLocalHost(hostname))
+}
+
+/** What the top bar says when the page is read-only: every edit mode works, nothing is kept. */
+export const READ_ONLY_NOTICE = "Read-only: explore freely, nothing is saved"
+
+/** This page's view-only state: the one gate every save and edit control reads. */
+export const READ_ONLY: boolean = viewOnly(
+  SHOWCASE,
+  typeof location === "undefined" ? undefined : location.hostname,
+)

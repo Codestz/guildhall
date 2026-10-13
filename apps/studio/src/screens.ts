@@ -1,18 +1,6 @@
 import type { Stage } from "@guildhall/render"
-import { pieces } from "./browser/index.tsx"
-import { composer } from "./composer/index.tsx"
-import { grip } from "./grips/editor/index.ts"
-import { grips } from "./grips/matrix/index.ts"
-import { hexmap } from "./hexmap/index.ts"
-import { hexScale } from "./hexscale/index.ts"
-import { hexTiles } from "./hextiles/index.ts"
-import { home } from "./home/index.tsx"
-import { hudLab } from "./hudlab/index.tsx"
-import { npc } from "./npcs/index.tsx"
-import { palette } from "./palette/index.ts"
 import { placeOf } from "./shell/directory.ts"
-import { siteLab } from "./sitelab/index.tsx"
-import { town } from "./town/index.ts"
+import { SITE_SCREENS } from "./site/routes.ts"
 
 /** What the shell hands a screen when it mounts it. */
 export interface ScreenCtx {
@@ -31,26 +19,60 @@ export interface Screen {
   mount(host: HTMLElement, ctx: ScreenCtx): () => void
 }
 
-/** Every screen the studio can open (paths in `shell/router.ts`). New screens register here, one line each. */
+/**
+ * A screen loaded when it is first opened: each section is its own chunk, so the island does not wait for
+ * the Studio's tools and the Studio does not carry the site. The import is a `ctx.load`, so
+ * `guildhall.ready()` waits for it.
+ */
+function lazy(id: string, title: string, load: () => Promise<Screen>): Screen {
+  return {
+    id,
+    title,
+    mount(host, ctx) {
+      let off: (() => void) | undefined
+      let gone = false
+      void ctx
+        .load(load())
+        .then((screen) => {
+          if (!gone) off = screen.mount(host, ctx)
+        })
+        .catch(() => undefined)
+      return () => {
+        gone = true
+        off?.()
+      }
+    },
+  }
+}
+
+/**
+ * Every screen the app can open (paths in `shell/router.ts`). New screens register here, one line each:
+ * `lazy("<id>", "<title>", () => import("<file>").then((m) => m.<screen>))`. The site's four (the island,
+ * the demos over it, How it's built, a repo's hall) share one chunk, `site/index.tsx`.
+ */
 export const SCREENS: readonly Screen[] = [
-  home,
-  pieces,
-  palette,
-  composer,
-  hexTiles,
-  npc,
-  grip,
-  grips,
-  town,
-  hexmap,
-  hexScale,
-  hudLab,
-  siteLab,
+  lazy("island", "Island", () => import("./site/index.tsx").then((m) => m.island)),
+  lazy("demos", "Demos", () => import("./site/index.tsx").then((m) => m.demos)),
+  lazy("built", "How it's built", () => import("./site/index.tsx").then((m) => m.built)),
+  lazy("hall", "Your repo", () => import("./site/index.tsx").then((m) => m.hall)),
+  lazy("home", "Home", () => import("./home/index.tsx").then((m) => m.home)),
+  lazy("pieces", "Pieces", () => import("./browser/index.tsx").then((m) => m.pieces)),
+  lazy("palette", "Palette", () => import("./palette/index.ts").then((m) => m.palette)),
+  lazy("composer", "Tile composer", () => import("./composer/index.tsx").then((m) => m.composer)),
+  lazy("hextiles", "Tile prefabs", () => import("./hextiles/index.ts").then((m) => m.hexTiles)),
+  lazy("npc", "NPC builder", () => import("./npcs/index.tsx").then((m) => m.npc)),
+  lazy("grip", "Grip editor", () => import("./grips/editor/index.ts").then((m) => m.grip)),
+  lazy("grips", "Grip matrix", () => import("./grips/matrix/index.ts").then((m) => m.grips)),
+  lazy("town", "Town", () => import("./town/index.ts").then((m) => m.town)),
+  lazy("hexmap", "Hex map", () => import("./hexmap/index.ts").then((m) => m.hexmap)),
+  lazy("hexscale", "Scale board", () => import("./hexscale/index.ts").then((m) => m.hexScale)),
+  lazy("hudlab", "HUD lab", () => import("./hudlab/index.tsx").then((m) => m.hudLab)),
+  lazy("sitelab", "Site lab", () => import("./sitelab/index.tsx").then((m) => m.siteLab)),
 ]
 
-export const DEFAULT_SCREEN = "home"
+export const DEFAULT_SCREEN = "island"
 
-/** The screen with `id`; undefined for an unknown id, or one this build leaves out of the directory (showcase). */
+/** The screen with `id`; undefined for an unknown id, or a studio tool this build leaves out (showcase). */
 export function screenFor(id: string): Screen | undefined {
-  return placeOf(id) ? SCREENS.find((screen) => screen.id === id) : undefined
+  return SITE_SCREENS.includes(id) || placeOf(id) ? SCREENS.find((screen) => screen.id === id) : undefined
 }

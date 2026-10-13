@@ -17,7 +17,12 @@ export interface Route {
 }
 
 export const ROUTES: readonly Route[] = [
-  { screen: "home", path: "" },
+  // the site: the live island is the home; the Studio is a section of it at /studio
+  { screen: "island", path: "" },
+  { screen: "demos", path: "demos" },
+  { screen: "built", path: "built" },
+  { screen: "hall", path: "hall", param: { key: "repo", parts: 2 } },
+  { screen: "home", path: "studio" },
   { screen: "pieces", path: "pieces", param: { key: "id", parts: 2 } },
   { screen: "palette", path: "palette" },
   { screen: "composer", path: "composer", param: { key: "tile", parts: 1 } },

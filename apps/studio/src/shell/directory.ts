@@ -153,8 +153,29 @@ export const GROUPS: readonly ToolGroup[] = SHOWCASE
 /** The home page itself, for the top bar and the switcher. */
 export const HOME_TOOL: Tool = {
   id: HOME_ID,
-  name: "Home",
-  purpose: "The front door: every tool, live stats.",
+  name: "Studio home",
+  purpose: "The workshop's front door: every tool, live stats.",
+}
+
+/**
+ * The site's own places, for the quick switcher (⌘K): the island, a repo's hall, the demos and How it's
+ * built. They are not Studio tools (no card on the Studio home, no top-bar crumb); ids are screen ids.
+ */
+export const SITE_GROUP: ToolGroup = {
+  id: "site",
+  name: "Site",
+  blurb: "The live island and what is around it.",
+  tools: [
+    { id: "island", name: "The island", purpose: "The live island: the first thing the site shows." },
+    { id: "hall", name: "Your repo", purpose: "Grow any public GitHub repo into an island: owner/repo." },
+    { id: "demos", name: "Demos", purpose: "Stories, crowds and real repos, one link away." },
+    { id: "built", name: "How it's built", purpose: "The engineering, with the journey, in plain words." },
+  ],
+}
+
+/** What the switcher searches: the site's places, then every Studio tool. */
+export function jumpable(): Placed[] {
+  return [...SITE_GROUP.tools.map((tool) => ({ tool, group: SITE_GROUP })), ...openable()]
 }
 
 /** A tool with the group it sits in. */

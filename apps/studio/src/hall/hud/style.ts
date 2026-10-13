@@ -40,7 +40,8 @@ const CSS = /* css */ `
 }
 .gh.site-root .ui-viewer[data-phone] .ui-hud-bottom .hall-timeline, .gh .ui-viewer[data-phone] .ui-hud-bottom .hall-timeline { width: 100%; }
 .ui-viewer[data-phone]:has(.ui-hud-bottom .hall-timeline) .ui-hud-feed { bottom: calc(var(--gut) + 64px + env(safe-area-inset-bottom)); }
-.ui-viewer[data-phone]:has(.ui-hud-bottom .hall-grow) .ui-hud-feed { bottom: calc(var(--gut) + 118px + env(safe-area-inset-bottom)); }
+/* a phone: "Watch it grow" sits right on the Chronicle chip's row (timeline.tsx), not stacked over it */
+.ui-viewer[data-phone] .ui-hud-bottom .hall-grow { align-self: flex-end; }
 
 /* the folded feed is its chip alone (its box is what the plates keep out of) */
 .ui-hud-feed .hud-toasts { width: auto; }

@@ -189,6 +189,8 @@ export const VIEWER_CSS = /* css */ `
 .ui-hud-sheet > * { max-height: 100%; min-height: 0; }
 /* hidden: only the rail's way back stays */
 .ui-viewer[data-hud-mode="hidden"] .ui-hud-region:not(.ui-hud-rail) { display: none; }
+/* the focus H hands back to the viewer when its control hides: no ring round the whole scene */
+.ui-viewer[tabindex="-1"]:focus { outline: none; }
 /* with the sheet open the bottom bar keeps clear of it */
 .ui-viewer[data-hud-open] .ui-hud-sheet:not(:empty) ~ .ui-hud-bottom { translate: calc(-50% - 190px) 0; }
 

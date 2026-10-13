@@ -76,6 +76,14 @@ export function createHudRegions(root: HTMLElement): HudRegions {
     sync()
     if (key) saveHud(viewerStorage(), key, state, remember)
     for (const fn of fns) fn()
+    keepFocus()
+  }
+  /** A mode that hides the control holding the focus (H to Hidden) hands it to the viewer, not to the page. */
+  const keepFocus = () => {
+    const at = document.activeElement
+    if (!(at instanceof HTMLElement) || !layer.contains(at) || at.checkVisibility?.() !== false) return
+    if (!root.hasAttribute("tabindex")) root.tabIndex = -1
+    root.focus({ preventScroll: true })
   }
   let phone = false
 

@@ -1,0 +1,60 @@
+[
+  {
+    "at": 1790299181200,
+    "kind": "join",
+    "id": "ses_f29da6f6fffe3mcDS5pUnh6YA6"
+  },
+  {
+    "at": 1790299181219,
+    "kind": "quest",
+    "id": "ses_f29da85c8ffeXcUL8J0rvdKLbp",
+    "tool": "task",
+    "call": "call_function_v8lxqjuu9sv0_1",
+    "text": "Map session lifecycle"
+  },
+  {
+    "at": 1790299183795,
+    "kind": "deed",
+    "id": "ses_f29da6f6fffe3mcDS5pUnh6YA6",
+    "tool": "read",
+    "call": "call_function_kygszny11cgu_1"
+  },
+  {
+    "at": 1790299184230,
+    "kind": "deed",
+    "id": "ses_f29da6f6fffe3mcDS5pUnh6YA6",
+    "tool": "read",
+    "call": "call_function_kygszny11cgu_2"
+  },
+  {
+    "at": 1790299184390,
+    "kind": "deed",
+    "id": "ses_f29da6f6fffe3mcDS5pUnh6YA6",
+    "tool": "grep",
+    "call": "call_function_kygszny11cgu_3"
+  },
+  {
+    "at": 1790299187428,
+    "kind": "deed",
+    "id": "ses_f29da6f6fffe3mcDS5pUnh6YA6",
+    "tool": "grep",
+    "call": "call_function_3nzw4lmjoog7_1"
+  },
+  {
+    "at": 1790299198368,
+    "kind": "loot",
+    "id": "ses_f29da6f6fffe3mcDS5pUnh6YA6"
+  },
+  {
+    "at": 1790299198368,
+    "kind": "deed",
+    "id": "ses_f29da85c8ffeXcUL8J0rvdKLbp",
+    "tool": "task",
+    "call": "call_function_v8lxqjuu9sv0_1"
+  },
+  {
+    "at": 1790299201774,
+    "kind": "loot",
+    "id": "ses_f29da85c8ffeXcUL8J0rvdKLbp"
+  }
+]

@@ -54,6 +54,13 @@
         "@types/three": "^0.186.0",
       },
     },
+    "packages/sim": {
+      "name": "@guildhall/sim",
+      "version": "0.0.0",
+      "dependencies": {
+        "@guildhall/core": "workspace:*",
+      },
+    },
     "packages/ui": {
       "name": "@guildhall/ui",
       "version": "0.0.0",
@@ -154,6 +161,8 @@
     "@guildhall/render": ["@guildhall/render@workspace:packages/render"],
 
     "@guildhall/shots": ["@guildhall/shots@workspace:tools/shots"],
+
+    "@guildhall/sim": ["@guildhall/sim@workspace:packages/sim"],
 
     "@guildhall/studio": ["@guildhall/studio@workspace:apps/studio"],
 

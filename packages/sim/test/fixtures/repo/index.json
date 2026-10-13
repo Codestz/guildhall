@@ -1,0 +1,85 @@
+{
+  "v": 1,
+  "updated": "2026-10-12",
+  "repos": [
+    {
+      "repo": "react/react",
+      "description": "The library for web and native user interfaces.",
+      "stars": 250901,
+      "languages": ["JavaScript", "Rust", "TypeScript"],
+      "years": [2013, 2026],
+      "files": 7254,
+      "bytes": 40633738,
+      "built": "2026-10-12"
+    },
+    {
+      "repo": "anomalyco/opencode",
+      "description": "The open source coding agent.",
+      "stars": 212844,
+      "languages": ["TypeScript", "MDX", "CSS"],
+      "years": [2025, 2026],
+      "files": 8423,
+      "bytes": 135937712,
+      "built": "2026-10-12"
+    },
+    {
+      "repo": "microsoft/vscode",
+      "description": "Visual Studio Code",
+      "stars": 193605,
+      "languages": ["TypeScript", "CSS", "JavaScript"],
+      "years": [2015, 2026],
+      "files": 20356,
+      "bytes": 297017687,
+      "built": "2026-10-12"
+    },
+    {
+      "repo": "Codestz/claude-hindsight",
+      "description": "Claude Hindsight is a powerful observability tool for Claude Code that transforms raw JSONL transcripts into beautiful, interactive visualizations. Debug sessions, optimize costs, and understand Clau…",
+      "stars": 21,
+      "languages": ["Rust", "TypeScript", "Astro"],
+      "years": [2026, 2026],
+      "files": 352,
+      "bytes": 2446013,
+      "built": "2026-10-12"
+    },
+    {
+      "repo": "Codestz/mcpx",
+      "description": "MCP servers as CLI tools — built for AI agents",
+      "stars": 13,
+      "languages": ["Go", "Vue", "CSS"],
+      "years": [2026, 2026],
+      "files": 147,
+      "bytes": 753993,
+      "built": "2026-10-12"
+    },
+    {
+      "repo": "Codestz/opencode-cockpit",
+      "description": "OpenCode superpowers: background shells the agent can start, wait on and drive, with a docked TUI panel",
+      "stars": 4,
+      "languages": ["TypeScript", "MDX", "CSS"],
+      "years": [2026, 2026],
+      "files": 784,
+      "bytes": 9485417,
+      "built": "2026-10-12"
+    },
+    {
+      "repo": "Codestz/guildhall",
+      "description": "Events in. A living world out. Turn any event stream (coding agents, GitHub, a repo's history) into a living 3D island.",
+      "stars": 0,
+      "languages": ["TypeScript", "CSS", "HTML"],
+      "years": [2026, 2026],
+      "files": 889,
+      "bytes": 25484224,
+      "built": "2026-10-12"
+    },
+    {
+      "repo": "Codestz/Mintroot",
+      "stars": 0,
+      "languages": ["Kotlin"],
+      "years": [2026, 2026],
+      "files": 199,
+      "bytes": 3318678,
+      "built": "2026-10-12"
+    }
+  ]
+}

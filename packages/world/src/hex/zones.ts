@@ -110,6 +110,12 @@ export interface PlaceSpec {
   capital?: true
   /** The units a pooled place stands for (several small ones as one hamlet). */
   pooled?: string[]
+  /**
+   * The land tiles the island had when the unit was born (`landTiles(filesAt(c, born))`): its heart is
+   * ranked under this (island.ts growth order) wherever the land allows, so a history replay that reveals
+   * the island in growth order shows the place from the unit's birth. Left out: no preference.
+   */
+  rankMax?: number
 }
 
 export interface HexZone {
@@ -475,10 +481,12 @@ export function hexZones(
     const town = zones[0]?.tile
     return f + (town === undefined ? 0 : -dist(i, town) / 10) + h1z(3, i) * 0.5
   }
-  const pickTile = (rule: ZoneKind | "settlement" | "any", apart: number): number => {
+  /** With `budget`, only tiles grown before it (island.ts `rank`): the land the island had when the unit was born. */
+  const pickTile = (rule: ZoneKind | "settlement" | "any", apart: number, budget = Infinity): number => {
     let best = -1
     let bs = -1e9
     for (let i = 0; i < N; i++) {
+      if (h.rank[i]! < 0 || h.rank[i]! >= budget) continue
       // any: open dry ground, when no rule's site is left for a repo's place
       const s =
         rule === "any"
@@ -532,13 +540,39 @@ export function hexZones(
       // a repo's place: its kind's best site; a settlement by one rule whatever its tier (so a unit that
       // grows keeps its heart); and a kind the land has no site for (no shore for a harbour, no rock for
       // a mine) settles as a settlement would, nearer the others when it must
+      // (first on the land the island had when the unit was born, so a replay shows it from its birth;
+      // a kind that land has no site for, a harbour before the shore grew, takes the best site there is)
       const settlement = spec.kind === "settlement"
-      best = pickTile(settlement ? "settlement" : k, settlement ? SETTLEMENT_APART : PLAN[k].apart || 6)
-      for (const apart of [SETTLEMENT_APART, 5, 4, 3]) if (best < 0) best = pickTile("settlement", apart)
-      if (best < 0) best = pickTile("any", 2)
-    } else best = pickTile(k, PLAN[k].apart || 6)
-    if (best >= 0)
-      zones.push({ kind: k, tile: best, tiles: [], buildings: 0, ...(spec ? { place: spec } : {}) })
+      best = -1
+      // (a place that had to settle off its kind's site is built as a settlement: no harbour without a shore)
+      let settled = settlement
+      for (const budget of spec.rankMax !== undefined ? [spec.rankMax, Infinity] : [Infinity]) {
+        best = pickTile(
+          settlement ? "settlement" : k,
+          settlement ? SETTLEMENT_APART : PLAN[k].apart || 6,
+          budget,
+        )
+        if (best >= 0) break
+        for (const apart of [SETTLEMENT_APART, 5, 4, 3])
+          if (best < 0) best = pickTile("settlement", apart, budget)
+        if (best < 0) best = pickTile("any", 2, budget)
+        if (best >= 0) {
+          settled = true
+          break
+        }
+      }
+      if (best >= 0)
+        zones.push({
+          kind: settled && !settlement ? settlementKind(spec.tier) : k,
+          tile: best,
+          tiles: [],
+          buildings: 0,
+          place: spec,
+        })
+      continue
+    }
+    best = pickTile(k, PLAN[k].apart || 6)
+    if (best >= 0) zones.push({ kind: k, tile: best, tiles: [], buildings: 0 })
   }
   // coverage: no stretch of land is left far from every place. The tile furthest from all of them gets
   // a new one, of the kind its ground suits, until every dry tile is within POCKET steps of a place.
@@ -613,9 +647,16 @@ export function hexZones(
       z.tiles.push(i)
       const nb = [...g.neighbours(i)].filter((j) => j >= 0 && !seen.has(j))
       // grow round, not in a line: nearer the heart first, with a little noise
+      // (a repo's place grows first over the land its unit was born on, so a replay shows it whole sooner)
+      const late = (i: number) => (z.place?.rankMax !== undefined && h.rank[i]! >= z.place.rankMax ? 3 : 0)
       nb.sort(
         (a, b) =>
-          dist(a, z.tile) + hash2(seed + 3, a, zi) * 0.9 - dist(b, z.tile) - hash2(seed + 3, b, zi) * 0.9,
+          dist(a, z.tile) +
+          hash2(seed + 3, a, zi) * 0.9 +
+          late(a) -
+          dist(b, z.tile) -
+          hash2(seed + 3, b, zi) * 0.9 -
+          late(b),
       )
       for (const j of nb) {
         seen.add(j)

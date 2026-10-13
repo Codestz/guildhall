@@ -4,7 +4,7 @@
  */
 import { describe, expect, test } from "bun:test"
 import { join } from "node:path"
-import { readChronicle } from "@guildhall/sim"
+import { filesAt, readChronicle } from "@guildhall/sim"
 import { landTiles } from "@guildhall/world"
 import {
   type HallRepo,
@@ -36,8 +36,11 @@ describe("the hall's loading order", () => {
     const repo = repoOf(c, "local")
     const built = hallBuild(repo, 4000)
     expect(built.sketch).toBe(false)
-    expect(built.files).toBe(c.repo.files)
+    // the replay's size (replay/: filesAt at the last day), not the query's default
+    expect(built.files).toBe(filesAt(c, c.end))
     expect(built.files).not.toBe(4000)
+    // and every place ranked under the land the island had at its unit's birth
+    for (const p of built.places ?? []) expect(p.rankMax).toBeGreaterThan(0)
     expect(built.places?.length).toBe(c.units.length)
     // a world built from it carries every place, named, with its heart on the map
     const msgs: FromWorker[] = []

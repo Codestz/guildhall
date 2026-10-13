@@ -136,6 +136,22 @@ describe("places from a repo's units", () => {
     for (const zz of named(z)) expect(zz.tiles.length).toBeGreaterThan(0)
   })
 
+  test("a place is ranked under its unit's birth (the growth order) where the land allows", () => {
+    for (const seed of [1, 2, 3]) {
+      const h = hexIsland({ seed, files: FILES })
+      // every unit born when the island had 400 land tiles, but the capital
+      const early = REPO.map((s) => (s.capital ? s : { ...s, rankMax: 400 }))
+      const z = hexZones(h, { places: early })
+      const late = named(z).filter((zz) => !zz.place?.capital && (h.rank[zz.tile] as number) >= 400)
+      // the shore kinds (harbour, fishing) may have no site that old; the settlements and the camp do
+      for (const zz of late) expect(["harbour", "fishing"]).toContain(zz.kind)
+      // and the same specs without the budget may well put them elsewhere: the budget is honoured, not ignored
+      const free = hexZones(h, { places: REPO })
+      const moved = named(z).filter((zz) => zoneOf(free, (zz.place as PlaceSpec).id)?.tile !== zz.tile)
+      expect(moved.length + late.length).toBeGreaterThan(0)
+    }
+  })
+
   test("without places, nothing changes: the island's own kinds in their own order", () => {
     const h = hexIsland({ seed: 1, files: 1500 })
     const z = hexZones(h)

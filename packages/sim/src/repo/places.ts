@@ -64,9 +64,15 @@ const byFiles = (a: UnitAt, b: UnitAt) =>
 /**
  * The places a repo's units ask for on an island of `land` tiles: the capital first (the biggest unit),
  * then the rest oldest first. Beyond what the land has room for, the smallest units pool into one hamlet
- * per group ("other packages", "other folders") with their files added up.
+ * per group ("other packages", "other folders") with their files added up. `landAt(born)`, the land
+ * tiles the island had on a day (`landTiles(filesAt(c, day))`), ranks each place under its unit's birth
+ * so a history replay shows it from then.
  */
-export function placeSpecs(units: readonly UnitAt[], land: number): PlaceSpec[] {
+export function placeSpecs(
+  units: readonly UnitAt[],
+  land: number,
+  landAt?: (born: number) => number,
+): PlaceSpec[] {
   if (units.length === 0) return []
   const total = units.reduce((n, u) => n + u.files, 0)
   const bySize = [...units].sort(byFiles)
@@ -107,6 +113,7 @@ export function placeSpecs(units: readonly UnitAt[], land: number): PlaceSpec[] 
       files: u.files,
       ...(u === capital ? { capital: true as const } : {}),
       ...(pool?.names.length ? { pooled: pool.names } : {}),
+      ...(landAt ? { rankMax: Math.max(1, landAt(u.born)) } : {}),
     }
   }
   const rest = [...single.filter((u) => u !== capital), ...[...pools.values()].map((p) => p.unit)].sort(

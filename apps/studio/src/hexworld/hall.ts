@@ -5,7 +5,15 @@
  * `placeSpecs`), its title the repo's name and its subtitle the repo's figures. A repo with no chronicle
  * gets a sketch: the generator's own island at the default size, marked as such on the card.
  */
-import { bindPlaces, type Chronicle, isoOf, type PlaceBinding, placeSpecs, unitsAt } from "@guildhall/sim"
+import {
+  bindPlaces,
+  type Chronicle,
+  filesAt,
+  isoOf,
+  type PlaceBinding,
+  placeSpecs,
+  unitsAt,
+} from "@guildhall/sim"
 import { type HexZones, landTiles, type PlaceSpec } from "@guildhall/world"
 
 /** A repo as the hall builds it: read from its chronicle, or a sketch when it has none. */
@@ -34,10 +42,14 @@ export type HallRepo =
       reason?: string
     }
 
-/** The hall's read of a chronicle at its last day: the repo's figures and its units as places. */
+/**
+ * The hall's read of a chronicle at its last day: the repo's figures and its units as places. The size is
+ * `filesAt(c, end)`, the same count a history replay builds the island at (replay/), so a hall and its
+ * replay are one island; each place is ranked under the land the island had when its unit was born.
+ */
 export function repoOf(c: Chronicle, source: "cdn" | "local"): HallRepo {
   const day = c.end
-  const files = Math.max(1, c.repo.files)
+  const files = Math.max(1, filesAt(c, day))
   const units = unitsAt(c, day)
   return {
     kind: "chronicled",
@@ -47,7 +59,7 @@ export function repoOf(c: Chronicle, source: "cdn" | "local"): HallRepo {
     contributors: c.repo.contributors,
     years: [Number(isoOf(c.start).slice(0, 4)), Number(isoOf(c.end).slice(0, 4))],
     day,
-    places: placeSpecs(units, landTiles(files)),
+    places: placeSpecs(units, landTiles(files), (born) => landTiles(filesAt(c, born))),
     source,
     generatedAt: c.generatedAt,
   }

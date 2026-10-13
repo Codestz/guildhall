@@ -121,6 +121,13 @@ describe("placeSpecs", () => {
   test("no units, no places", () => {
     expect(placeSpecs([], 800)).toEqual([])
   })
+
+  test("with the land at each birth, every place is ranked under it", () => {
+    const specs = placeSpecs([unit("src", 500, 10), unit("test", 80, 30)], 800, (born) => born * 10)
+    expect(specs.find((s) => s.id === "src")?.rankMax).toBe(100)
+    expect(specs.find((s) => s.id === "test")?.rankMax).toBe(300)
+    expect(placeSpecs([unit("src", 500, 10)], 800)[0]?.rankMax).toBeUndefined()
+  })
 })
 
 describe("bindPlaces", () => {

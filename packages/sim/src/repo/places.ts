@@ -28,9 +28,12 @@ const CONTENT: [RegExp, ZoneKind][] = [
   [/^(vendor|vendors|third[-_]party|deps|dependencies|node_modules|external)$/i, "lumber"],
 ]
 
-/** The name on a place's plate: the folder's own name; the root and the pools say what they are. */
-export function placeLabel(name: string, pooled?: boolean): string {
-  if (name === "/") return "root"
+/**
+ * The name on a place's plate: the folder's own name; the root is the repo's own name (`repo`,
+ * "facebook/react" or "react", gives "react"; "root" without one), and the pools say what they are.
+ */
+export function placeLabel(name: string, pooled?: boolean, repo?: string): string {
+  if (name === "/") return repo?.split("/").filter(Boolean).pop() || "root"
   if (name === "*") return "other folders"
   if (pooled || name.endsWith("/*")) return `other ${name.slice(0, -2).split("/").pop() || "folders"}`
   return name.split("/").pop() || name
@@ -66,12 +69,13 @@ const byFiles = (a: UnitAt, b: UnitAt) =>
  * then the rest oldest first. Beyond what the land has room for, the smallest units pool into one hamlet
  * per group ("other packages", "other folders") with their files added up. `landAt(born)`, the land
  * tiles the island had on a day (`landTiles(filesAt(c, day))`), ranks each place under its unit's birth
- * so a history replay shows it from then.
+ * so a history replay shows it from then. `repo` ("facebook/react") names the root's place.
  */
 export function placeSpecs(
   units: readonly UnitAt[],
   land: number,
   landAt?: (born: number) => number,
+  repo?: string,
 ): PlaceSpec[] {
   if (units.length === 0) return []
   const total = units.reduce((n, u) => n + u.files, 0)
@@ -107,7 +111,7 @@ export function placeSpecs(
     const pool = u.name.endsWith("*") ? pools.get(u.group ?? "") : undefined
     return {
       id: u.name,
-      label: placeLabel(u.name, pool !== undefined),
+      label: placeLabel(u.name, pool !== undefined, repo),
       kind: u === capital ? "settlement" : placeKind(u.name, tier),
       tier,
       files: u.files,

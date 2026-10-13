@@ -59,7 +59,7 @@ export function repoOf(c: Chronicle, source: "cdn" | "local"): HallRepo {
     contributors: c.repo.contributors,
     years: [Number(isoOf(c.start).slice(0, 4)), Number(isoOf(c.end).slice(0, 4))],
     day,
-    places: placeSpecs(units, landTiles(files), (born) => landTiles(filesAt(c, born))),
+    places: placeSpecs(units, landTiles(files), (born) => landTiles(filesAt(c, born)), c.repo.name),
     source,
     generatedAt: c.generatedAt,
   }

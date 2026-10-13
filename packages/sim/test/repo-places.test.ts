@@ -45,6 +45,14 @@ describe("placeSpecs", () => {
     expect(placeLabel("packages/*")).toBe("other packages")
   })
 
+  test("the root's place is named after the repo", () => {
+    expect(placeLabel("/", false, "facebook/react")).toBe("react")
+    expect(placeLabel("/", false, "guildhall")).toBe("guildhall")
+    expect(placeLabel("src", false, "facebook/react")).toBe("src")
+    const specs = placeSpecs([unit("src", 500, 10), unit("/", 5, 10)], 1000, undefined, "Codestz/guildhall")
+    expect(specs.find((s) => s.id === "/")?.label).toBe("guildhall")
+  })
+
   test("what a unit is built as: its content from tier 2 up, the root the harbour, the rest settlements", () => {
     expect(placeKind("/", 1)).toBe("harbour")
     expect(placeKind("test", 2)).toBe("camp")

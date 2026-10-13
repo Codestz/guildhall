@@ -244,7 +244,7 @@ export function BuiltPage({ content: c, onBack, backHref, onTry }: BuiltPageProp
               </li>
             ))}
           </ul>
-          {c.note && <p className="site-note">{rich(c.note)}</p>}
+          {c.note && <p className="site-built-note">{rich(c.note)}</p>}
         </div>
 
         <nav className="site-toc" aria-label="Contents">

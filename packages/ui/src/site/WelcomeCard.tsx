@@ -80,7 +80,7 @@ export function WelcomeCard({
           </div>
         </div>
         <p className="site-welcome-sub">
-          Coding agents, GitHub and a repo's history become townsfolk, roads and weather on a hex island.
+          Agents, GitHub and a repo's history, grown into a living hex island.
         </p>
 
         <form className="site-welcome-form" onSubmit={submit} noValidate>
@@ -100,6 +100,8 @@ export function WelcomeCard({
               placeholder="owner/repo or a GitHub link"
               value={text}
               aria-invalid={problem ? true : undefined}
+              data-ok={good ? "" : undefined}
+              enterKeyHint="go"
               aria-describedby={`${id}-msg`}
               onChange={(e) => setText(e.currentTarget.value)}
               onBlur={() => setTouched(true)}

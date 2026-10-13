@@ -43,6 +43,8 @@ const FAR = 420
 /** The gap kept between plates, CSS px. */
 const GAP = 4
 
+/** left, top, right, bottom, CSS px. */
+export type Rect = [number, number, number, number]
 export type PlateSize = "full" | "sm"
 export interface PlateBox {
   /** Width and height at each size, CSS px. */
@@ -63,9 +65,11 @@ export function layoutPlates(
   anchors: readonly ([number, number] | null)[],
   boxes: readonly PlateBox[],
   order: readonly number[],
+  /** Screen rects the plates keep clear of (left, top, right, bottom): the site's crest. */
+  keepOut: readonly Rect[] = [],
 ): PlateLaid[] {
   const out: PlateLaid[] = anchors.map(() => ({ at: null, size: "full" }))
-  const taken: [number, number, number, number][] = []
+  const taken: Rect[] = keepOut.map((r) => [...r] as Rect)
   const clear = (x: number, y: number, w: number, h: number) => {
     const l = x - w / 2 - GAP
     const r = x + w / 2 + GAP
@@ -119,7 +123,21 @@ export function createPlaceLabels(
   const anchors: ([number, number] | null)[] = new Array(places.length).fill(null)
   // what each plate was last set to, so the DOM is only written when something moved
   const shown = els.map(() => ({ x: Number.NaN, y: Number.NaN, size: "" as string, on: true }))
+  // the crest (and anything else marked `data-keepout`) keeps its corner: its box in the layer's pixels,
+  // re-read every half second and on a resize
+  let keep: Rect[] = []
+  let frame = 0
+  const readKeep = () => {
+    const at = layer.getBoundingClientRect()
+    keep = [...document.querySelectorAll("[data-keepout]")].map((el) => {
+      const r = el.getBoundingClientRect()
+      return [r.left - at.left - 8, r.top - at.top - 8, r.right - at.left + 8, r.bottom - at.top + 8] as Rect
+    })
+  }
+  readKeep()
+  addEventListener("resize", readKeep)
   const off = stage.onFrame(() => {
+    if (++frame % 30 === 0) readKeep()
     const cam = stage.camera.position
     for (let k = 0; k < points.length; k++) {
       const p = points[k] as [number, number, number]
@@ -127,7 +145,7 @@ export function createPlaceLabels(
       const s = d > FAR ? null : toScreen(stage, p)
       anchors[k] = s ? [Math.round(s[0]), Math.round(s[1])] : null
     }
-    const laid = layoutPlates(anchors, boxes, order)
+    const laid = layoutPlates(anchors, boxes, order, keep)
     for (let k = 0; k < els.length; k++) {
       const el = els[k] as HTMLElement
       const was = shown[k]!
@@ -158,6 +176,7 @@ export function createPlaceLabels(
   return {
     dispose() {
       off()
+      removeEventListener("resize", readKeep)
       for (const el of els) el.remove()
     },
   }

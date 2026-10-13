@@ -26,11 +26,15 @@ export interface Story {
   /** "What it shows": two or three short lines. */
   shows: readonly string[]
   art: string
+  /** Shown when `art` cannot be loaded (a live repo with no picture taken yet). */
+  fallbackArt?: string
   alt: string
   /** A story's acts, each opening the story at that act. */
   acts?: readonly StoryAct[]
   /** The deep link, shown in mono for those who share them: `?story=saga`. */
   link: string
+  /** `shows` as short inline tags (a repo's languages) rather than sentences. */
+  chips?: boolean
   /** Wide, across the shelf (the Saga). */
   feature?: boolean
 }
@@ -123,6 +127,10 @@ function StoryCard({
           height={400}
           loading="lazy"
           decoding="async"
+          onError={(e) => {
+            const img = e.currentTarget
+            if (s.fallbackArt && !img.src.endsWith(s.fallbackArt)) img.src = s.fallbackArt
+          }}
         />
         <div className="site-card-body">
           <p className="site-card-kicker">{s.kicker}</p>
@@ -130,7 +138,7 @@ function StoryCard({
             {s.title}
           </h4>
           <p className="site-card-blurb">{s.blurb}</p>
-          <ul className="site-card-shows" aria-label="What it shows">
+          <ul className="site-card-shows" data-chips={s.chips ? "" : undefined} aria-label="What it shows">
             {s.shows.map((line) => (
               <li key={line}>{line}</li>
             ))}

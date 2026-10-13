@@ -82,6 +82,7 @@ export function CrestMenu({
         aria-expanded={open}
         aria-controls={`${id}-menu`}
         aria-label="Guildhall menu"
+        data-keepout=""
         onClick={() => set(!open)}
       >
         <span className="site-crest-mark" aria-hidden="true">

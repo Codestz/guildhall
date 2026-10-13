@@ -91,7 +91,9 @@ export function useLiveStories(): readonly Story[] {
   return stories
 }
 
-const ART = "/site/demos/island.webp"
+const FALLBACK_ART = "/site/demos/island.webp"
+/** A repo's picture: its hall island (`bun shots repos`), named by the catalog stem. */
+export const repoArt = (repo: string): string => `/site/repos/${repo.replace("/", "__").toLowerCase()}.webp`
 
 /** One card per repo the backend has read. */
 export function liveStories(catalog: Catalog): Story[] {
@@ -102,8 +104,10 @@ export function liveStories(catalog: Catalog): Story[] {
     kicker: `${r.years[0]} – ${r.years[1]} · ${r.files.toLocaleString("en-US")} files`,
     blurb: r.description ?? `${r.repo}, read from its public history.`,
     shows: r.languages.slice(0, 3),
-    art: ART,
-    alt: `${r.repo} as an island.`,
+    chips: true,
+    art: repoArt(r.repo),
+    fallbackArt: FALLBACK_ART,
+    alt: `${r.repo} as an island, as its hall draws it.`,
     link: `/hall/${r.repo}`,
   }))
 }

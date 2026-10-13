@@ -12,6 +12,23 @@ describe("layoutPlates", () => {
     expect(laid[2]).toEqual({ at: [600, 100], size: "full" })
   })
 
+  test("a plate never lies over a kept-out rect (the crest): hidden where even compact would touch it", () => {
+    const crest: [number, number, number, number] = [8, 8, 160, 60]
+    const laid = layoutPlates(
+      [
+        [150, 70],
+        [100, 40],
+        [400, 70],
+      ],
+      [box, box, box],
+      [0, 1, 2],
+      [crest],
+    )
+    expect(laid[0]?.at).toBeNull()
+    expect(laid[1]?.at).toBeNull()
+    expect(laid[2]).toEqual({ at: [400, 70], size: "full" })
+  })
+
   test("a plate over one placed before it turns compact, and hides when even that would overlap", () => {
     // the first (biggest) takes its full box; the second, 170 px right, fits only compact; the third, 40 px right, not at all
     const laid = layoutPlates(

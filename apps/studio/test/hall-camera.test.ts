@@ -18,6 +18,7 @@ import {
   framedTarget,
   glideMs,
   insetsOf,
+  isClick,
   MIN_CUT_MS,
   mayCut,
   NO_INSETS,
@@ -135,6 +136,12 @@ describe("tracking a walker", () => {
 })
 
 describe("the rules", () => {
+  test("a click: under 6 px of travel and 600 ms", () => {
+    expect(isClick(2, 3, 150)).toBe(true)
+    expect(isClick(5, 4, 150)).toBe(false)
+    expect(isClick(0, 0, 700)).toBe(false)
+  })
+
   test("a pan, free flight and a glide or set from elsewhere let go; turning and zooming keep the hero", () => {
     const kept: RigMove[] = ["orbit", "zoom"]
     const let_: RigMove[] = ["pan", "free", "glide", "set", "mode"]
@@ -233,11 +240,22 @@ function standIn(world: () => GuildWorld) {
     () => ({ left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0, ...r })
   const el = () => ({ getBoundingClientRect: rect(), children: [] })
   const hud = { corner: el(), feed: el(), bottom: el(), rail: el(), sheet: el() } as unknown as ViewerHud
+  const listeners = new Map<string, (e: unknown) => void>()
+  /** Chips: Ada's stands at (700, 400)–(760, 430). */
+  let selected: string | null = null
+  const chips = {
+    hit: (x: number, y: number) => (x >= 700 && x <= 760 && y >= 400 && y <= 430 ? "ada" : null),
+    select: (id: string | null) => {
+      selected = id
+    },
+  }
   const host = {
     getBoundingClientRect: rect({ width: W, height: H, right: W, bottom: H }),
     clientWidth: W,
     clientHeight: H,
     isConnected: true,
+    addEventListener: (type: string, fn: (e: unknown) => void) => listeners.set(type, fn),
+    removeEventListener: (type: string) => listeners.delete(type),
   } as unknown as HTMLElement
   const session = {
     snapshot: () => ({ events: 3, world: world(), clock: { at: world().at } }),
@@ -253,6 +271,7 @@ function standIn(world: () => GuildWorld) {
     session,
     sessionPlaces: null,
     query: new URLSearchParams("feed=story"),
+    chips,
     now: () => clock,
     reducedMotion: () => false,
   })
@@ -262,6 +281,13 @@ function standIn(world: () => GuildWorld) {
     heroes,
     aimed: () => aimed,
     user: emit,
+    chipSelected: () => selected,
+    /** A press and release on the stage (`travel` px apart, `ms` long). */
+    press(x: number, y: number, travel = 0, ms = 120) {
+      listeners.get("pointerdown")?.({ button: 0, isPrimary: true, clientX: x, clientY: y, pointerId: 1 })
+      clock += ms
+      listeners.get("pointerup")?.({ clientX: x + travel, clientY: y, pointerId: 1 })
+    },
     /** Runs `ms` of frames at 60 fps. */
     run(ms: number) {
       for (let t = 0; t < ms; t += 1000 / 60) {
@@ -281,6 +307,20 @@ function pleading(at: number, id = "ada"): GuildWorld {
 }
 
 describe("the controller", () => {
+  test("a plain click on a hero's chip follows them and pins their chip; a drag over it does not", () => {
+    const s = standIn(() => emptyWorld())
+    s.camera.director(false)
+    s.press(720, 415, 30)
+    expect(s.camera.state().following).toBe(null)
+    s.press(100, 100)
+    expect(s.camera.state().following).toBe(null)
+    s.press(720, 415)
+    expect(s.camera.state().following).toBe("ada")
+    expect(s.chipSelected()).toBe("ada")
+    s.user("pan")
+    expect(s.chipSelected()).toBe(null)
+  })
+
   test("a story's director takes the camera at once and cuts to the plea, close", () => {
     const s = standIn(() => pleading(60_000))
     s.run(300)

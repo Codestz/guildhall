@@ -478,6 +478,25 @@ export class Declutter {
   }
 
   /** The shown chips' boxes now (left, top, right, bottom), for the plates to keep off. */
+  /**
+   * The hero whose shown chip (as the last run laid it) holds the point (layer px, `slop` px round each),
+   * the front-most first: pinned, then nearest. Null: none.
+   */
+  hit(x: number, y: number, slop = 4): string | null {
+    for (const s of this.order) {
+      if (s.folded || s.out || !s.on) continue
+      const top = s.y - s.lift - s.h
+      if (
+        x >= s.x - s.w / 2 - slop &&
+        x <= s.x + s.w / 2 + slop &&
+        y >= top - slop &&
+        y <= s.y - s.lift + slop
+      )
+        return s.id
+    }
+    return null
+  }
+
   boxes(out: Rect[]): Rect[] {
     out.length = 0
     for (const s of this.order) {
@@ -567,6 +586,8 @@ export interface Chips {
   onPlea(fn: ((id: string) => void) | null): void
   /** The shown chips' boxes as of the last run (layer px), for plates to keep off. */
   boxes(): readonly Rect[]
+  /** The hero whose chip is under a point (layer px) as the last run laid them, or null (a click follows them). */
+  hit(x: number, y: number): string | null
   /** The declutter, for shots and tests. */
   readonly declutter: Declutter
   dispose(): void
@@ -798,6 +819,7 @@ export function createChips(
       plea = fn
     },
     boxes: () => shownBoxes,
+    hit: (x, y) => declutter.hit(x, y),
     dispose() {
       clearInterval(timer)
       observer?.disconnect()

@@ -20,6 +20,7 @@ import type { CameraPose } from "@guildhall/core"
 import { distanceRange, type RigMove, type Stage } from "@guildhall/render"
 import { type Shot as DirectorShot, type Distance, director, type Focus } from "@guildhall/sim"
 import type { ViewerHud } from "@guildhall/ui"
+import type { Chips } from "../hexworld/chips.ts"
 import type { HudParts } from "../hexworld/index.ts"
 import type { BuiltPlace } from "../hexworld/job.ts"
 import type { HallSession } from "./feeds/index.ts"
@@ -185,6 +186,15 @@ export function releases(move: RigMove): boolean {
   return move !== "orbit" && move !== "zoom"
 }
 
+/** A press that moved less than this (px) and lasted less than `CLICK_MS` is a click, not a drag. */
+export const CLICK_PX = 6
+export const CLICK_MS = 600
+
+/** True when a press (its travel, px, and length, ms) is a plain click. Pure. */
+export function isClick(dx: number, dy: number, ms: number): boolean {
+  return Math.hypot(dx, dy) < CLICK_PX && ms < CLICK_MS
+}
+
 /** True when the director may run: on, nobody followed, and `USER_WAIT_MS` since the last input. Pure. */
 export function directorFree(on: boolean, following: boolean, now: number, userAt: number | null): boolean {
   return on && !following && (userAt === null || now - userAt >= USER_WAIT_MS)
@@ -297,6 +307,10 @@ export interface HallCameraOptions {
   query: Pick<URLSearchParams, "get">
   /** The director's switch before the link's say (`?director=` still wins): the home's is on. */
   director?: boolean
+  /** The heroes' chips: a plain click on one follows its hero; the followed one is pinned first. */
+  chips?: Pick<Chips, "select" | "hit"> | null
+  /** The layer the chips are laid out in (their boxes' origin; the stage's host by default). */
+  chipsHost?: HTMLElement
   now?: () => number
   reducedMotion?: () => boolean
 }
@@ -456,9 +470,15 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
   }
 
   const mode = (): CameraMode => (followId ? "follow" : shot ? "director" : "free")
+  let chipFollowed: string | null = null
   const changed = () => {
     const m = mode()
     lastMode = m
+    // the chips place the followed hero first, pinned and full
+    if (opts.chips && chipFollowed !== followId) {
+      chipFollowed = followId
+      opts.chips.select(followId)
+    }
     notify()
   }
 
@@ -573,6 +593,24 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
   }
   addEventListener("keydown", key)
 
+  // A plain click on a hero's chip (down and up without a drag) follows them; a drag is the camera's.
+  // The chips take no pointer events, so the click reaches the stage: it is matched to the chips' boxes.
+  let press: { x: number; y: number; at: number; id: number } | null = null
+  const down = (e: PointerEvent) => {
+    press = e.button === 0 && e.isPrimary ? { x: e.clientX, y: e.clientY, at: now(), id: e.pointerId } : null
+  }
+  const up = (e: PointerEvent) => {
+    const p = press
+    press = null
+    if (!p || !opts.chips || e.pointerId !== p.id) return
+    if (!isClick(e.clientX - p.x, e.clientY - p.y, now() - p.at)) return
+    const box = (opts.chipsHost ?? host).getBoundingClientRect()
+    const id = opts.chips.hit(e.clientX - box.left, e.clientY - box.top)
+    if (id) api.follow(id)
+  }
+  host.addEventListener("pointerdown", down)
+  host.addEventListener("pointerup", up)
+
   const api: HallCamera = {
     follow(id) {
       const subject = heroPoint(id)
@@ -643,6 +681,8 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
     },
     dispose() {
       removeEventListener("keydown", key)
+      host.removeEventListener("pointerdown", down)
+      host.removeEventListener("pointerup", up)
       resized?.disconnect()
       panels?.disconnect()
       offMove()
@@ -677,6 +717,8 @@ export function mountHallCamera(
     sessionPlaces: opts.places,
     ships: () => parts.fx?.ships?.ships() ?? null,
     query: opts.query,
+    chips: parts.chips,
+    chipsHost: parts.viewer.labels,
     ...(opts.director !== undefined ? { director: opts.director } : {}),
   })
   const ext = window.guildhall?.ext as Record<string, unknown> | undefined

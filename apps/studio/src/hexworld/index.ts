@@ -294,7 +294,7 @@ export interface HudParts {
   /** Where a session's hero is drawn now (its feet, metres; null: not on the island, or no life). */
   heroAt(id: string): [number, number, number] | null
   /** The heroes' chips (null: no life, no agents, or `?chips=0`): the one followed, a plea mark tapped. */
-  chips: Pick<Chips, "select" | "onPlea"> | null
+  chips: Pick<Chips, "select" | "onPlea" | "hit"> | null
   /** The hall's camera (hall/camera.ts: follow a hero, the director), set by the hall's HUD as it mounts. */
   camera?: HallCamera
 }

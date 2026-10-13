@@ -412,7 +412,11 @@ export function HallHud(props: HallHudProps) {
   useEffect(() => parts.onPick((k) => open(k)), [parts])
   // the hero open in the sheet is the one its chip follows; a chip's plea mark opens its hero
   const heroOpen = state.open === "hero" ? hero : null
-  useEffect(() => parts.chips?.select(heroOpen), [parts.chips, heroOpen])
+  // (with the hall's camera, the chip followed is the hero the camera follows: hall/camera.ts says)
+  const followsChips = Boolean(parts.camera)
+  useEffect(() => {
+    if (!followsChips) parts.chips?.select(heroOpen)
+  }, [parts.chips, heroOpen, followsChips])
   const openHeroRef = useRef(openHero)
   openHeroRef.current = openHero
   useEffect(() => {

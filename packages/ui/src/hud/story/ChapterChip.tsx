@@ -92,7 +92,7 @@ export function ChapterChip({
       <button
         ref={chip}
         type="button"
-        className="st-chapter-btn"
+        className="ui-panel st-chapter-btn"
         aria-expanded={open}
         aria-controls={`${id}-list`}
         aria-label={`Act ${chapter.numeral}, ${chapter.title}. Jump to another act`}
@@ -105,8 +105,7 @@ export function ChapterChip({
       {open && (
         // biome-ignore lint/a11y/noStaticElementInteractions: the list's arrow keys move between its buttons
         <div className="ui-panel st-chapter-pop" id={`${id}-list`} onKeyDown={onListKey}>
-          <p className="ui-eyebrow st-chapter-pop-h">Acts</p>
-          <ol className="st-chapter-list">
+          <ol className="st-chapter-list" aria-label="Acts">
             {chapters.map((c, i) => (
               <li key={c.numeral}>
                 <button

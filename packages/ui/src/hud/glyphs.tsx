@@ -91,6 +91,10 @@ export const Glyphs = {
   close: glyph(<path d="m4 4 8 8M12 4l-8 8" />),
   play: glyph(<path d="M5 3.5v9l7.5-4.5z" fill="currentColor" />),
   pause: glyph(<path d="M5.5 3.5v9M10.5 3.5v9" strokeWidth="2.2" />),
+  island: glyph(
+    <path d="M3 10.5c1-2.6 2.8-4 5-4s4 1.4 5 4M8 6.5V3l2.6 1.2L8 5.4M1.5 13c1.1 0 1.6-.8 2.7-.8s1.6.8 2.7.8 1.6-.8 2.7-.8 1.6.8 2.7.8 1.1-.4 2.2-.8" />,
+  ),
+  fast: glyph(<path d="M2 4.2v7.6L7.4 8zM8.4 4.2v7.6L13.8 8z" fill="currentColor" strokeWidth="1" />),
   retry: glyph(
     <>
       <path d="M12.8 6.2A5 5 0 1 0 13 9.5" />

@@ -1,3 +1,5 @@
+import { AVATAR_CSS } from "./avatar/style.ts"
+import { CHIPS_CSS } from "./chips.style.ts"
 import { STORY_CSS } from "./story/style.ts"
 
 /**
@@ -468,12 +470,14 @@ button.hud-toast-btn:hover { color: var(--paper); border-color: var(--brass-line
 .hud-scale button:hover:not(:disabled) { color: var(--paper); background: var(--raise); }
 .hud-scale button[aria-pressed="true"] { color: var(--on-brass); background: var(--brass); font-weight: 700; }
 .hud-scale button:disabled { opacity: 0.45; cursor: not-allowed; }
-.hud-timeline-hint { position: absolute; left: 50%; bottom: 6px; width: 180px; height: 6px; margin-left: -90px; padding: 1px; border-radius: 4px; background: var(--ink); box-shadow: 0 0 0 1px var(--hair-2); transition: opacity 0.2s; }
+.hud-timeline-hint { position: absolute; left: 50%; bottom: 6px; width: 180px; height: 6px; margin-left: -90px; padding: 1px; border: 0; border-radius: 4px; background: var(--ink); box-shadow: 0 0 0 1px var(--hair-2); cursor: pointer; transition: opacity 0.2s; }
+/* a finger's worth of target round the 6 px line */
+.hud-timeline-hint::after { content: ""; position: absolute; inset: -16px -10px -6px; }
 .hud-timeline-hint i { display: block; height: 100%; width: calc(var(--p) * 100%); border-radius: 3px; background: var(--brass); }
 .hud-timeline[data-pinned="true"] .hud-timeline-hint { display: none; }
 .hud-timeline[data-pinned="false"] .hud-tape { opacity: 0; transform: translateY(8px); pointer-events: none; }
-.hud-timeline[data-pinned="false"]:is(:hover, :focus-within) .hud-tape { opacity: 1; transform: none; pointer-events: auto; }
-.hud-timeline[data-pinned="false"]:is(:hover, :focus-within) .hud-timeline-hint { opacity: 0; }
+.hud-timeline[data-pinned="false"]:is(:hover, :focus-within, [data-open="true"]) .hud-tape { opacity: 1; transform: none; pointer-events: auto; }
+.hud-timeline[data-pinned="false"]:is(:hover, :focus-within, [data-open="true"]) .hud-timeline-hint { opacity: 0; }
 
 /* ── phone: panels become bottom sheets, controls grow to touch size ── */
 @media (max-width: 720px) {
@@ -494,8 +498,6 @@ button.hud-toast-btn:hover { color: var(--paper); border-color: var(--brass-line
   .hud-scale-word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .hud-scale button { min-width: 40px; min-height: 36px; justify-content: center; padding: 0 8px; }
   .hud-rate { min-width: 44px; height: 36px; }
-  .hud-timeline[data-pinned="false"] .hud-tape { opacity: 1; transform: none; pointer-events: auto; }
-  .hud-timeline-hint { display: none; }
   .hud-ledger div { padding: 6px 8px; }
   .gh .ui-seg button { min-height: 38px; }
 }
@@ -518,7 +520,7 @@ export function holdHudStyle(): () => void {
   if (users++ === 0) {
     node = document.createElement("style")
     node.dataset.gh = "hud"
-    node.textContent = HUD_CSS + STORY_CSS
+    node.textContent = HUD_CSS + AVATAR_CSS + CHIPS_CSS + STORY_CSS
     document.head.append(node)
   }
   let released = false

@@ -2,7 +2,33 @@
  * The HUD panels (plan-hud-events.md U1): V1's HUD rebuilt as pure components on the `ui` tokens, fed by
  * props alone. The Viewer's HUD regions (U2) place them; the hall screen (H1) feeds them.
  */
+export { Avatar, type AvatarProps, type AvatarVariant } from "./avatar/Avatar.tsx"
+export {
+  type Beard,
+  type Brows,
+  CHARGE,
+  type Charge,
+  DIVISIONS,
+  type Division,
+  type Expression,
+  expressionOf,
+  type FaceFeatures,
+  faceFeatures,
+  hash32,
+  rimTone,
+  type ShieldArms,
+  shade,
+  shieldOf,
+} from "./avatar/model.ts"
 export { BrandCard, type BrandCardProps, type BrandFigures, sourceWords } from "./Brand.tsx"
+export {
+  FastForwardChip,
+  FFWD_SHOWN_AT,
+  PartyTabs,
+  type PartyTabsProps,
+  partyState,
+  ShowHudPill,
+} from "./Chips.tsx"
 export {
   CHRONICLE_SHOWN,
   ChronicleFeed,
@@ -45,7 +71,7 @@ export {
 export { PLEAS_SHOWN, Pleas, type PleasProps } from "./Pleas.tsx"
 export { BannerChip, FamilyChip, FoldPanel, Sigil, Status } from "./parts.tsx"
 export { Roster, RosterBadges, type RosterProps } from "./Roster.tsx"
-export { SETTINGS_KEYS, SettingsPanel, type SettingsPanelProps } from "./Settings.tsx"
+export { hourWords, SETTINGS_KEYS, SettingsPanel, type SettingsPanelProps } from "./Settings.tsx"
 export * from "./story/index.ts"
 export { HUD_CSS, holdHudStyle } from "./style.ts"
 export { Timeline, type TimelineProps } from "./Timeline.tsx"

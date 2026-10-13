@@ -2,7 +2,8 @@
  * Story and sharing (plan-hud-events.md U3): V1's Legends book, Chronicle card, captions, chapter chip,
  * town dossier (as a place's) and README badge, as props-only pieces on the `ui` tokens.
  */
-export { CAPTION_FADE_MS, Captions, type CaptionsProps } from "./Captions.tsx"
+export { balanceBreak, type CaptionWord, captionLines, splitParts, wordsOf } from "./balance.ts"
+export { CAPTION_FADE_MS, CAPTION_MAX, Captions, type CaptionsProps } from "./Captions.tsx"
 export { ChapterChip, type ChapterChipProps } from "./ChapterChip.tsx"
 export { altOf, ChronicleCard, type ChronicleCardProps } from "./ChronicleCard.tsx"
 export {

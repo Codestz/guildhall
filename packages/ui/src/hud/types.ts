@@ -24,6 +24,10 @@ export interface PartyView {
   name: string
   /** The pennant's colour (CSS). */
   colour: string
+  /** Its heroes are going home (the party tabs say so, in italic). */
+  leaving?: boolean
+  /** Its quest is over and its heroes idle. */
+  done?: boolean
 }
 
 export interface HeroView {
@@ -130,7 +134,14 @@ export type Names = "world" | "source"
 export type HudMode = "detailed" | "minimal" | "hidden"
 export type Quality = "auto" | "low" | "medium" | "high" | "ultra"
 
-/** What Settings tunes. */
+/** How the Bard films: eases and drifts, or cuts like a broadcast (and skips a replay's quiet stretches). */
+export type DirectorStyle = "calm" | "cinematic"
+/** How the hour is chosen: the viewer's clock, a fast cycle, a pinned hour, or the story's own. */
+export type TimeMode = "real" | "cycle" | "fixed" | "story"
+/** The weather: following the guild's health, or pinned. */
+export type WeatherPick = "auto" | "clear" | "rain" | "storm" | "snow"
+
+/** What Settings tunes. A value left out leaves its lever out. */
 export interface SettingsValues {
   names: Names
   /** Story speed: 0.5, 1, 2, 4. */
@@ -142,4 +153,9 @@ export interface SettingsValues {
   qualityNow?: Exclude<Quality, "auto">
   hud: HudMode
   captions: boolean
+  directorStyle?: DirectorStyle
+  time?: TimeMode
+  /** The pinned hour (0–24), for `time: "fixed"`. */
+  hour?: number
+  weather?: WeatherPick
 }

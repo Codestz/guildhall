@@ -293,23 +293,21 @@ h3 .st-code { font-size: 0.8em; letter-spacing: 0; }
 .st-card-note[data-tone="warn"] { color: var(--warn); }
 .st-card-file { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* ── captions: one short line, lower centre ─────────────────────── */
+/* ── captions: V1's pill, two balanced lines at most, lower centre ── */
 .st-captions { display: flex; justify-content: center; max-width: 100%; pointer-events: none; }
 .st-captions[data-visible="false"] { display: none; }
 .st-caption {
   margin: 0;
-  max-width: 100%;
-  padding: 7px 18px 8px;
+  max-width: min(100%, 576px);
+  padding: 8px 20px 9px;
   border-radius: 10px;
   background: rgba(14, 10, 7, 0.8);
   box-shadow: 0 0 0 1px rgba(220, 182, 98, 0.16), 0 12px 32px -14px rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(10px) saturate(1.1);
   -webkit-backdrop-filter: blur(10px) saturate(1.1);
-  font: 18px/1.36 var(--serif);
+  font: 19px/1.36 var(--serif);
   color: var(--paper);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-align: center;
   animation: st-caption-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   transition: opacity 0.65s ease, translate 0.65s ease;
 }
@@ -318,18 +316,21 @@ h3 .st-code { font-size: 0.8em; letter-spacing: 0; }
 .st-caption b { font-weight: 600; color: #fff7e6; text-decoration: underline; text-decoration-color: var(--role, var(--brass)); text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .st-caption q { font-style: italic; quotes: "“" "”" "‘" "’"; }
 /* the beat's tone, a small diamond before the line: decorative, the words say it */
-.st-caption::before { content: ""; display: inline-block; width: 7px; height: 7px; margin: 0 11px 2px 0; transform: rotate(45deg); vertical-align: middle; background: var(--tone, var(--brass)); }
+.st-caption-row { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* a name's underline sits under the row's box: room for it, so the cut never clips it */
+.st-caption-row { padding-bottom: 3px; margin-bottom: -3px; }
+.st-caption-row:first-child::before { content: ""; display: inline-block; width: 7px; height: 7px; margin: 0 11px 2px 0; transform: rotate(45deg); vertical-align: middle; background: var(--tone, var(--brass)); }
 .st-caption[data-kind="plea"] { --tone: var(--warn); }
 .st-caption:is([data-kind="fall"], [data-kind="flaw"]) { --tone: var(--fail); }
 .st-caption:is([data-kind="loot"], [data-kind="complete"], [data-kind="rise"]) { --tone: var(--ok); }
 .st-caption[data-kind="quest"] { --tone: var(--info); }
 .st-caption[data-kind="renown"] { --tone: var(--brass-hi); box-shadow: 0 0 0 1px rgba(241, 213, 144, 0.55), 0 0 26px -6px rgba(241, 213, 144, 0.45), 0 12px 32px -14px rgba(0, 0, 0, 0.75); }
 .st-caption[data-kind="complete"] { box-shadow: 0 0 0 1px rgba(166, 221, 143, 0.32), 0 12px 32px -14px rgba(0, 0, 0, 0.75); }
-/* a chapter's title card, on the same single line */
-.st-caption[data-kind="chapter"] { --tone: var(--brass-hi); box-shadow: 0 0 0 1px rgba(241, 213, 144, 0.5), 0 0 30px -8px rgba(241, 213, 144, 0.4), 0 14px 36px -14px rgba(0, 0, 0, 0.8); }
-.st-caption[data-kind="chapter"] small { margin-right: 10px; font: 400 13px/1 var(--display); letter-spacing: 0.22em; color: var(--brass); }
-.st-caption-title { font: 400 20px/1 var(--display); letter-spacing: 0.04em; color: var(--brass-hi); }
-.st-caption[data-kind="chapter"] em { color: var(--paper); opacity: 0.9; }
+/* a chapter's title card: V1's three lines, the act in small caps, its title large, its tagline in italic */
+.st-caption[data-kind="chapter"] { display: grid; justify-items: center; gap: 2px; padding: 12px 34px 13px; background: rgba(14, 10, 7, 0.86); --tone: var(--brass-hi); box-shadow: 0 0 0 1px rgba(241, 213, 144, 0.5), 0 0 30px -8px rgba(241, 213, 144, 0.4), 0 14px 36px -14px rgba(0, 0, 0, 0.8); }
+.st-caption[data-kind="chapter"] small { font: 400 13px/1.3 var(--display); letter-spacing: 0.22em; color: var(--brass); }
+.st-caption-title { font: 400 30px/1.1 var(--display); letter-spacing: 0.04em; color: var(--brass-hi); }
+.st-caption[data-kind="chapter"] em { font-size: 17px; color: var(--paper); opacity: 0.86; }
 
 /* ── the chapter chip ───────────────────────────────────────────── */
 .st-chapter-chip { position: relative; display: inline-block; }
@@ -337,14 +338,9 @@ h3 .st-code { font-size: 0.8em; letter-spacing: 0; }
   display: inline-flex;
   align-items: baseline;
   gap: 8px;
-  height: 36px;
+  height: 34px;
   padding: 0 14px;
-  border: 1px solid var(--hair);
-  border-radius: 999px;
-  background: var(--ink);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(14px);
-  line-height: 34px;
+  line-height: 32px;
   font-size: 13px;
   color: var(--paper);
   cursor: pointer;
@@ -356,13 +352,13 @@ h3 .st-code { font-size: 0.8em; letter-spacing: 0; }
 .st-chapter-chip[data-compact="true"] .st-chapter-btn { width: 36px; padding: 0; justify-content: center; }
 .st-chapter-chip[data-compact="true"] .st-chapter-btn .st-chapter-title { display: none; }
 .st-chapter-chip[data-compact="true"] .st-chapter-btn .st-chapter-numeral { min-width: 0; }
-.st-chapter-pop { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 5; width: max-content; min-width: 250px; max-width: min(320px, calc(100vw - 32px)); max-height: min(60vh, 420px); overflow-y: auto; padding: 8px 6px 6px; background: rgba(20, 15, 11, 0.96); }
-.st-chapter-pop-h { padding: 0 10px 6px; }
+.st-chapter-pop { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 5; width: max-content; min-width: 250px; max-width: min(320px, calc(100vw - 32px)); max-height: min(60vh, 420px); overflow-y: auto; padding: 6px; background: rgba(20, 15, 11, 0.94); }
 .st-chapter-list { margin: 0; padding: 0; list-style: none; }
 .st-chapter-list button { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; width: 100%; min-height: 40px; padding: 7px 10px; border: 0; border-radius: 6px; background: none; color: inherit; font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; }
-.st-chapter-list button small { grid-column: 2; color: var(--muted); font-style: italic; font-size: 12.5px; }
+.st-chapter-list button .st-chapter-title { font-size: 14px; }
+.st-chapter-list button small { grid-column: 2; color: var(--paper); opacity: 0.72; font-style: italic; font-size: 12.5px; }
 .st-chapter-list button:hover, .st-chapter-list button:focus-visible { background: var(--brass-wash); }
-.st-chapter-list button[aria-current="step"] { box-shadow: inset 2px 0 0 var(--brass-hi); }
+.st-chapter-list button[aria-current="step"] { box-shadow: inset 2px 0 0 var(--brass-hi); background: rgba(220, 182, 98, 0.08); }
 
 /* ── the place dossier ──────────────────────────────────────────── */
 .st-place { display: flex; flex-direction: column; gap: 12px; width: 372px; max-width: 100%; max-height: 100%; overflow-y: auto; padding: 14px 14px 16px; scrollbar-width: thin; scrollbar-color: var(--hair-2) transparent; animation: st-rise 0.22s ease-out both; }
@@ -445,8 +441,8 @@ button.st-place-hero:hover { background: var(--raise-2); }
   .st-card-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .st-card-actions > :first-child { grid-column: 1 / -1; }
   .st-card-actions .ui-btn { min-height: 44px; }
-  .st-caption { font-size: 15px; padding: 6px 12px 7px; }
-  .st-caption-title { font-size: 16px; }
+  .st-caption { font-size: 16px; padding: 7px 14px 8px; }
+  .st-caption-title { font-size: 24px; }
   .st-chapter-btn { height: 40px; line-height: 38px; }
   .st-chapter-chip[data-compact="true"] .st-chapter-btn { width: 40px; }
   .st-place { width: 100%; border-radius: 12px 12px 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }

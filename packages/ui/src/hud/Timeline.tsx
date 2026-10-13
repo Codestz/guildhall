@@ -4,7 +4,7 @@
  * exactly). V1's tape: a brass play disc, the time, a brass rail with the beats on it; plus the scale
  * switch and, live, a way back to now. Props only: the caller owns the clock.
  */
-import type { CSSProperties } from "react"
+import { type CSSProperties, useEffect, useRef, useState } from "react"
 import { clock, day, month, ticks } from "./format.ts"
 import { Glyphs } from "./glyphs.tsx"
 import type { TimelineMarker, TimeScale } from "./types.ts"
@@ -28,7 +28,10 @@ export interface TimelineProps {
   onLive?: () => void
   /** History cannot be shown (no chronicle for this repo): the History switch is off, with this reason. */
   historyUnavailable?: string
-  /** False: a hairline of progress that opens into the bar on hover or keyboard focus (V1's Minimal). */
+  /**
+   * False: V1's hairline, a 180×6 line of progress that opens into the bar on hover, keyboard focus or a
+   * tap (a press elsewhere, or Esc, folds it again). True (the default): the bar stays open.
+   */
   pinned?: boolean
   /** The scrub's step in the scale's units (default: a day of history, a second of session). */
   step?: number
@@ -82,17 +85,45 @@ export function Timeline({
   const what = history ? "Repo history" : "Session"
   const behind = live && end - at > 1500
   const say = (t: number) => (history ? month(t) : clock(t - start))
+  const root = useRef<HTMLDivElement>(null)
+  const [opened, setOpened] = useState(false)
+
+  // a tapped-open hairline folds again on a press anywhere else
+  useEffect(() => {
+    if (!opened) return
+    const away = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpened(false)
+    }
+    document.addEventListener("pointerdown", away)
+    return () => document.removeEventListener("pointerdown", away)
+  }, [opened])
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: Esc folds a tapped-open hairline from inside it
     <div
+      ref={root}
       className="hud-timeline"
       data-pinned={pinned}
+      data-open={!pinned && opened}
       data-scale={scale}
       style={{ "--p": p } as CSSProperties}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape" || !opened) return
+        event.stopPropagation()
+        setOpened(false)
+      }}
     >
-      <div className="hud-timeline-hint" aria-hidden="true">
-        <i />
-      </div>
+      {!pinned && (
+        <button
+          type="button"
+          className="hud-timeline-hint"
+          aria-expanded={opened}
+          aria-label={`${what}: ${history ? day(at) : `${clock(at - start)} of ${clock(len)}`}. Show the timeline`}
+          onClick={() => setOpened(true)}
+        >
+          <i />
+        </button>
+      )}
       <section className="ui-panel hud-tape" aria-label={`Timeline: ${what}`}>
         <button
           type="button"

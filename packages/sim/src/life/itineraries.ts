@@ -58,7 +58,17 @@ export interface ItineraryOptions {
   mps?: number
   /** Metres to the walker's right of the way's middle (so heroes meeting pass each other). */
   lane?: number
+  /**
+   * A long way is run (`RUN_CLIP`): a walk that would take longer than `within` seconds at `mps` goes
+   * as fast as it takes to arrive within them, up to `mps` metres a second. None: every way is walked.
+   */
+  hurry?: { within: number; mps: number }
 }
+
+/** The clip a hero's pose names while it runs (faster than `RUN_FROM` m/s): KayKit's run. */
+export const RUN_CLIP = "Running_A"
+/** From this pace on (metres a second) a hero runs. */
+export const RUN_FROM = 1.6
 
 /** One hero's itinerary: its steps, ms on the events' clock, and when it is on the island. */
 export interface Itinerary {
@@ -106,6 +116,7 @@ export class LifePlanner {
   private readonly booked = new Map<string, { id: string; until: number }>()
   private readonly mps: number
   private readonly lane: number
+  private readonly hurry: { within: number; mps: number } | undefined
 
   constructor(
     private readonly kit: LifeKit,
@@ -113,6 +124,18 @@ export class LifePlanner {
   ) {
     this.mps = (opts.mps ?? WALK_MPS * 1.1) / 1000
     this.lane = opts.lane ?? 0.3
+    this.hurry = opts.hurry && { within: opts.hurry.within * 1000, mps: opts.hurry.mps / 1000 }
+  }
+
+  /** A long way run: its times pressed so it arrives within `hurry.within` (no faster than its run). */
+  private paced(walk: LifeWalk): LifeWalk {
+    const h = this.hurry
+    const took = walk.to - walk.from
+    if (!h || took <= h.within) return walk
+    const scale = Math.max(h.within / took, this.mps / h.mps)
+    if (scale >= 1) return walk
+    const times = walk.times.map((t) => walk.from + (t - walk.from) * scale)
+    return { ...walk, times, to: times[times.length - 1] as number }
   }
 
   /** The world after every event pushed. */
@@ -255,12 +278,13 @@ export class LifePlanner {
     track.own.set(want.zone, to.key)
     track.spot = to
     track.want = want
-    const walk = heroRoute(this.kit.walk, from, to.spot, {
+    const route = heroRoute(this.kit.walk, from, to.spot, {
       leave: t,
       mps: this.mps,
       lane: this.lane,
       ...(this.kit.near ? { near: this.kit.near } : {}),
     })
+    const walk = route && this.paced(route)
     if (walk) steps.push(walk)
     steps.push(stayAt(to.spot, walk ? walk.to : t, want.act))
   }
@@ -422,13 +446,30 @@ export function stepPose(steps: readonly LifeStep[], t: number): LifePose | null
   const k = segmentAt(s, at)
   const a = s.pts[k]!
   const b = s.pts[k + 1] ?? a
-  return {
+  const pose: LifePose = {
     at: walkAt(s, k, at),
     facing: Math.atan2(b[0] - a[0], b[2] - a[2]),
     act: "walk",
     indoors: false,
     ground: s.ground[k] ?? true,
   }
+  // a way run (ItineraryOptions.hurry): the whole walk's pace says so, so a pose never flickers
+  const span = (s.times[s.times.length - 1] as number) - s.from
+  if (span > 0 && (pathLength(s) / span) * 1000 >= RUN_FROM) pose.clip = RUN_CLIP
+  return pose
+}
+
+const lengths = new WeakMap<LifeWalk, number>()
+/** A walk's whole way, metres (kept). */
+function pathLength(s: LifeWalk): number {
+  let m = lengths.get(s)
+  if (m === undefined) {
+    m = 0
+    for (let k = 1; k < s.pts.length; k++)
+      m += Math.hypot(s.pts[k]![0] - s.pts[k - 1]![0], s.pts[k]![2] - s.pts[k - 1]![2])
+    lengths.set(s, m)
+  }
+  return m
 }
 
 /** The segment of a walk that time `t` is on. */

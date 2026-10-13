@@ -35,6 +35,7 @@ import {
   normalizer,
   placeAt,
   poseAt,
+  RUN_CLIP,
   type WorldActor,
   walkEnd,
 } from "../src/index.ts"
@@ -120,13 +121,18 @@ function story(seed: number): Feed {
       const edits = 10 + Math.floor(r() * 15)
       for (let e = 0; e < edits; e++) {
         t += 3000 + r() * 4000
-        if (r() < 0.1) at(t, (when) => PACKAGES.forEach((p, k) => feed.grep(id, p, when + k * 50)))
+        if (r() < 0.1)
+          at(t, (when) => {
+            for (const [k, p] of PACKAGES.entries()) feed.grep(id, p, when + k * 50)
+          })
         else at(t, (when) => feed.edit(id, pkg, when))
       }
       if (r() < 0.3) {
         // it asks a human, and is answered
-        at((t += 2000), (when) => feed.change({ type: "status", id, status: "waiting", at: when }))
-        at((t += 4000), (when) => feed.change({ type: "status", id, status: "busy", at: when }))
+        t += 2000
+        at(t, (when) => feed.change({ type: "status", id, status: "waiting", at: when }))
+        t += 4000
+        at(t, (when) => feed.change({ type: "status", id, status: "busy", at: when }))
       }
       t += 5000 + r() * 20_000
     }
@@ -135,7 +141,10 @@ function story(seed: number): Feed {
   }
   let t = end + 3000
   const pkg = pick()
-  for (let e = 0; e < 25; e++) at((t += 4000), (when) => feed.edit("root", pkg, when))
+  for (let e = 0; e < 25; e++) {
+    t += 4000
+    at(t, (when) => feed.edit("root", pkg, when))
+  }
   t += 30_000
   at(t, (when) => feed.change({ type: "status", id: "root", status: "idle", at: when }))
   acts.sort((a, b) => a.at - b.at)
@@ -354,6 +363,43 @@ describe("spots, the Guildmaster and the leavers", () => {
     expect(subs).toBeGreaterThan(8)
     expect(workers).toBeGreaterThanOrEqual(4)
   })
+})
+
+describe("a long way is run", () => {
+  const hurry = { within: 40, mps: 3 }
+  test("within its time (or at the run's pace), the run's clip on; still the same played or sought", () => {
+    let ran = 0
+    for (const { seed, feed } of plans.slice(0, 2)) {
+      const its = itineraries(feed.log, kit, { hurry })
+      for (const it of its.values())
+        for (const [k, s] of it.steps.entries()) {
+          if (s.kind !== "walk" || it.steps[k + 1]?.kind !== "stay") continue
+          let metres = 0
+          for (let j = 1; j < s.pts.length; j++)
+            metres += Math.hypot(s.pts[j]![0] - s.pts[j - 1]![0], s.pts[j]![2] - s.pts[j - 1]![2])
+          const secs = (s.to - s.from) / 1000
+          const pace = metres / secs
+          expect(pace).toBeGreaterThan(MPS - 1e-6)
+          expect(pace).toBeLessThan(hurry.mps + 1e-3)
+          if (metres / MPS > hurry.within) {
+            expect(secs).toBeLessThanOrEqual(Math.max(hurry.within, metres / hurry.mps) + 1e-3)
+            expect(poseAt(it, (s.from + s.to) / 2)?.clip).toBe(RUN_CLIP)
+            ran++
+          } else expect(poseAt(it, (s.from + s.to) / 2)?.clip).toBeUndefined()
+        }
+      const play = new LifePlanner(kit, { hurry })
+      const r = rng(seed + 300)
+      const end = lastAt(feed)
+      const times = Array.from({ length: 50 }, () => T0 + r() * (end - T0)).sort((a, b) => a - b)
+      let next = 0
+      for (const t of times) {
+        while (next < feed.log.length && feed.log.events[next]!.at <= t) play.push(feed.log.events[next++]!)
+        play.advance(t)
+        for (const id of its.keys()) expect(play.poseAt(id, t)).toEqual(poseAt(its.get(id)!, t))
+      }
+    }
+    expect(ran).toBeGreaterThan(3)
+  }, 60_000)
 })
 
 describe("cost", () => {

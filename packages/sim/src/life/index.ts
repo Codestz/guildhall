@@ -12,6 +12,8 @@ export {
   type LifeKit,
   LifePlanner,
   poseAt,
+  RUN_CLIP,
+  RUN_FROM,
   shownAt,
   stepPose,
   walkEnd,

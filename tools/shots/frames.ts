@@ -12,7 +12,9 @@ const step = Number(process.env.STEP ?? 0)
 for (let k = 0; k < Number(n); k++) {
   if (step)
     await page.evaluate((s) => {
-      const g = (window as unknown as { guildhall: { camera: { get(): { azimuth: number }; set(p: object): void } } }).guildhall
+      const g = (
+        window as unknown as { guildhall: { camera: { get(): { azimuth: number }; set(p: object): void } } }
+      ).guildhall
       const p = g.camera.get()
       g.camera.set({ ...p, azimuth: p.azimuth + s })
     }, step)

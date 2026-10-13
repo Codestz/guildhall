@@ -2,7 +2,8 @@
  * One tile's review shot (`/lab/hextiles?tile=<id>&sheet=1`): the tile alone, with every neighbour its
  * footprint covers, on a muted ring of plain hexes, a knight on the hex in front of it for scale, from
  * one fixed 3/4 camera (pulled back only as far as a bigger footprint needs), its name burned into the
- * corner. `bun shots prefabs` shoots every tile this way and composes the shots into contact sheets.
+ * corner, its nature as the island grows it (NATURE_CHOSEN). `bun shots prefabs` shoots every tile
+ * this way and composes the shots into contact sheets.
  */
 import { log } from "@guildhall/core"
 import {
@@ -18,7 +19,18 @@ import {
   type StaticBatch,
   type TerrainMesh,
 } from "@guildhall/render"
-import { CHARACTER_SCALE, HEX_TILE_SIZE, placeTile, tilePrefabs, worldSide } from "@guildhall/world"
+import {
+  BUILDING_REACH,
+  CHARACTER_SCALE,
+  growNature,
+  HEX_TILE_SIZE,
+  isBuildingPiece,
+  NATURE_CHOSEN,
+  natureOdds,
+  placeTile,
+  tilePrefabs,
+  worldSide,
+} from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { ScreenCtx } from "../screens.ts"
 import { worldCamera } from "../shell/worldCamera.ts"
@@ -86,9 +98,18 @@ export function mountSheet(host: HTMLElement, ctx: ScreenCtx, id: string): () =>
     const paths: number[] = []
     pathStrips(t, 0, 0, paths)
     if (paths.length) meshes.push(createSurface(stage, new Float32Array(paths), "#d9c08c"))
-    const pieces: BatchInstance[] = placeTile(t, [0, 0], 0.5, TURN, 1, false).filter((q) =>
-      catalog.get(q.piece),
-    )
+    // at the island's nature (NATURE_CHOSEN, as the Studio builds it): a wood's trees thinned, every
+    // nature piece grown or shrunk, a grown one held back from the buildings and from a built tile
+    const placed = placeTile(t, [0, 0], 0.5, TURN, 1, false, natureOdds(NATURE_CHOSEN))
+    const built = t.group === "town" || t.group === "landmark" || t.group === "road"
+    const discs = placed
+      .filter((q) => isBuildingPiece(q.piece))
+      .map((q): [number, number, number] => [q.x, q.z, BUILDING_REACH * q.scale])
+    growNature(placed, NATURE_CHOSEN, {
+      hardNear: () => ({ own: built, tiles: [] }),
+      buildingsNear: () => discs,
+    })
+    const pieces: BatchInstance[] = placed.filter((q) => catalog.get(q.piece))
 
     const cx = scene.reduce((s, [x]) => s + x, 0) / scene.length
     const cz = scene.reduce((s, [, z]) => s + z, 0) / scene.length

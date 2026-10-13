@@ -52,6 +52,7 @@ export {
   NATURE_FAMILIES,
   type NatureFamily,
   natureFamily,
+  natureOdds,
   natureReach,
   natureScale,
   WOODED,

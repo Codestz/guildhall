@@ -37,8 +37,9 @@ export function plate(spec: PlateSpec): HTMLDivElement {
   return el
 }
 
-/** Below this pitch (CSS px) a plate draws its compact size. */
+/** Below this pitch (CSS px) a plate draws its compact size; below the second, none at all. */
 const COMPACT = 110
+const HIDDEN = 24
 
 /**
  * Moves a plate to screen point `at` (CSS px in its layer), or hides it when the point is off screen.
@@ -53,6 +54,11 @@ export function placePlate(el: HTMLElement, at: readonly [number, number] | null
   el.style.display = ""
   el.style.translate = `${at[0]}px ${at[1]}px`
   if (pitch === undefined) return
+  // no room for a word: not drawn, rather than printed over its neighbours
+  if (pitch < HIDDEN) {
+    el.style.display = "none"
+    return
+  }
   el.style.setProperty("--plate-w", `${Math.max(40, pitch - 6)}px`)
   if (pitch < COMPACT) el.dataset.size = "sm"
   else delete el.dataset.size

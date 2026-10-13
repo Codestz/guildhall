@@ -335,6 +335,10 @@ export const COMPONENTS_CSS = /* css */ `
 .ui-plate b { font: 500 var(--t-lg)/1.15 var(--body); font-variant: all-small-caps; letter-spacing: 0.06em; color: var(--brass-hi); }
 .ui-plate[data-size="sm"] { padding: 2px 6px 3px; }
 .ui-plate[data-size="sm"] b { font-size: var(--t-md); letter-spacing: 0.03em; }
+/* tighter still: the name alone */
+.ui-plate[data-size="xs"] { padding: 1px 6px 2px; }
+.ui-plate[data-size="xs"] b { font-size: var(--t-sm); letter-spacing: 0.03em; }
+.ui-plate[data-size="xs"] small { display: none; }
 /* a heading too tight for its box: bare text, full width, shadowed to read over the scene */
 .ui-plate[data-size="sm"][data-kind="head"] { max-width: none; overflow: visible; padding: 0; border: 0; background: none; box-shadow: none; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.8); }
 .ui-plate small { display: block; font: var(--t-xs)/1.35 var(--mono); color: var(--muted); }

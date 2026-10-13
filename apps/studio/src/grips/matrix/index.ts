@@ -45,6 +45,9 @@ const AXES_MOUNT: Mount = { slot: "hand.r", hands: 1, handle: [0, 0, 0], axis: [
 const AXIS_LENGTH = 0.7
 const AXIS_THICKNESS = 0.05
 
+/** Below this row pitch on screen (CSS px) a row label shows its name alone, compact. */
+const ROW_TIGHT_PX = 40
+
 /** Label anchors: column heads hang above their point, row labels end left of theirs. */
 const HEAD = "translate(-50%,-100%)"
 const ROW = "translate(-100%,-50%)"
@@ -338,6 +341,11 @@ export const grips: Screen = {
         const point = toScreen(stage, at)
         const next = head && point ? toScreen(stage, [at[0] + DX, at[1], at[2]]) : null
         placePlate(el, point, point && next ? next[0] - point[0] : undefined)
+        if (head || !point) continue
+        // a row label taller than its row's pitch on screen (a phone) keeps its name and drops its line
+        const below = toScreen(stage, [at[0], at[1] - DY, at[2]])
+        if (below && below[1] - point[1] < ROW_TIGHT_PX) el.dataset.size = "xs"
+        else delete el.dataset.size
       }
     })
 

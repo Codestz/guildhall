@@ -397,6 +397,8 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
           const x = space.x[id]!
           const zz = space.z[id]!
           const y = footAt(x, zz, poses[id] ?? pose(id))
+          // an agent on land not yet there (a history replay) has no banner either
+          if (hiddenAt?.(x, zz)) return { el, at: null }
           return { el, at: toScreen(stage, [x, y + BANNER_UP, zz]) }
         })
         .sort((a, b) => (b.at?.[1] ?? 0) - (a.at?.[1] ?? 0))

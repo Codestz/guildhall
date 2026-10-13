@@ -17,6 +17,8 @@ export interface PlaceLabel {
   label: string
   /** The mono line under it ("227 files · village"). */
   detail: string
+  /** The unit it names ("packages/react-dom", "/"): what a history asks whether it was born yet. */
+  id?: string
   /** Where it hangs: the heart tile's top, metres. */
   at: [number, number, number]
   /** Its claim to the screen: a bigger place's plate is placed first (files). */
@@ -55,9 +57,10 @@ export type Rect = [number, number, number, number]
 
 /**
  * The camera distances (the rig's, metres) between the map view and a close one: closer than `in` it is
- * close, further than `out` it is the map again; between the two it stays what it was.
+ * close, further than `out` it is the map again; between the two it stays what it was. The hall opens at
+ * 70 m over its capital, inside the gap: it starts as the map view (villages and towns named).
  */
-export const PLATE_ZOOM = { in: 90, out: 120 } as const
+export const PLATE_ZOOM = { in: 55, out: 80 } as const
 /** The lowest tier whose plate the map view shows. */
 export const MAP_TIER = 2
 
@@ -123,6 +126,11 @@ export function layoutPlates(
 }
 
 export interface PlaceLabels {
+  /**
+   * Leaves out the plates whose heart stands where `at(x, z)` says (a history replay: a place not yet
+   * there); they fade like a hamlet's at the map view. Null shows them all again.
+   */
+  hide(at: ((x: number, z: number, id: string | undefined) => boolean) | null): void
   dispose(): void
 }
 
@@ -161,6 +169,9 @@ export function createPlaceLabels(
   const screen: ([number, number] | null)[] = new Array(places.length).fill(null)
   for (const el of els) el.style.transition = `opacity ${FADE_MS}ms ease`
   let mode: PlateMode = plateMode("map", stage.getCamera().distance)
+  const hidden = new Uint8Array(places.length)
+  /** Whether plate k is wanted now: its tier at this zoom, and its place there at all. */
+  const wanted = (k: number) => !hidden[k] && plateOn(places[k]!.tier, mode)
   // the crest (and anything else marked `data-keepout`) keeps its corner: its box in the layer's pixels,
   // re-read every half second and on a resize
   let keep: Rect[] = []
@@ -185,13 +196,13 @@ export function createPlaceLabels(
       const s = d > FAR ? null : toScreen(stage, p)
       screen[k] = s ? [Math.round(s[0]), Math.round(s[1])] : null
       // a plate the zoom leaves out gives up its room at once (it fades out where it stands)
-      anchors[k] = plateOn(places[k]!.tier, mode) ? screen[k]! : null
+      anchors[k] = wanted(k) ? screen[k]! : null
     }
     const laid = layoutPlates(anchors, boxes, order, keep)
     for (let k = 0; k < els.length; k++) {
       const el = els[k] as HTMLElement
       const was = shown[k]!
-      const out = !plateOn(places[k]!.tier, mode)
+      const out = !wanted(k)
       const { size } = laid[k]!
       if (out !== was.off) {
         was.off = out
@@ -228,6 +239,12 @@ export function createPlaceLabels(
     }
   })
   return {
+    hide(at) {
+      for (let k = 0; k < places.length; k++) {
+        const p = places[k]!.at
+        hidden[k] = at?.(p[0], p[2], places[k]!.id) ? 1 : 0
+      }
+    },
     dispose() {
       off()
       removeEventListener("resize", readKeep)

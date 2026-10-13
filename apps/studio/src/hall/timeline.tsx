@@ -68,7 +68,8 @@ export function mountTimeline(host: HTMLElement, time: HallTime): () => void {
 
 /**
  * The bar's place: bottom centre; on a wide screen it keeps clear of the hall note at the bottom left,
- * on a phone it is the bottom edge (safe area kept) and the note sits above it.
+ * on a phone it is the bottom edge (safe area kept) and the note is only moved up above it (its own look
+ * is the note's; the HUD's bottom slot will take the bar from `mountTimeline`).
  */
 const CSS = /* css */ `
 .hall-timeline-host { position: absolute; inset: auto 0 0 0; height: 0; z-index: 20; }
@@ -88,20 +89,19 @@ const CSS = /* css */ `
 .gh .hall-grow:active { transform: scale(0.97); }
 /* beside the hall note (380 px at the bottom left) where there is room for both */
 @media (min-width: 1100px) {
-  .gh .site-root .hall-timeline { left: calc(50% + 100px); width: min(680px, calc(100% - 444px)); }
+  .gh.site-root .hall-timeline { left: 412px; right: 16px; translate: none; width: auto; max-width: 680px; margin: 0 auto; }
 }
 /* a narrower screen: the bar full width at the bottom, the note above it */
 @media (max-width: 1099px) {
-  .gh .site-root:has(.hall-timeline) .site-note { bottom: 88px; }
+  .gh.site-root:has(.hall-timeline) .site-note { bottom: 88px; }
+  /* "Watch it grow" sits over the bar: the note steps up over it */
+  .gh.site-root:has(.hall-grow) .site-note { bottom: 136px; }
 }
 @media (max-width: 720px) {
   .gh .hall-timeline { bottom: calc(8px + env(safe-area-inset-bottom)); width: calc(100% - 16px); gap: 8px; }
-  .gh .site-root:has(.hall-timeline) .site-note { bottom: calc(68px + env(safe-area-inset-bottom)); }
+  .gh.site-root:has(.hall-timeline) .site-note { bottom: calc(68px + env(safe-area-inset-bottom)); }
+  .gh.site-root:has(.hall-grow) .site-note { bottom: calc(122px + env(safe-area-inset-bottom)); }
   .gh .hall-grow { height: 44px; padding: 0 22px; }
-}
-@media (max-width: 560px) {
-  .gh .site-root:has(.hall-timeline) .site-note { border-radius: 14px; left: 8px; right: 8px; width: auto; padding-bottom: 12px; border-bottom: 1px solid var(--hair); }
-  .gh .site-root:has(.hall-timeline) .site-note p { display: none; }
 }
 `
 

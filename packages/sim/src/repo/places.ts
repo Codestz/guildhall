@@ -123,7 +123,11 @@ export function placeSpecs(
   const rest = [...single.filter((u) => u !== capital), ...[...pools.values()].map((p) => p.unit)].sort(
     byBorn,
   )
-  return [spec(capital), ...rest.map(spec)]
+  const specs = [spec(capital), ...rest.map(spec)]
+  // the root takes the repo's name; a folder of that name (react's packages/react) keeps its path to stay apart
+  const root = specs.find((s) => s.id === "/")
+  if (root) for (const s of specs) if (s !== root && s.label === root.label && !s.pooled) s.label = s.id
+  return specs
 }
 
 /** A repo's places bound to the island's zones: which zone a unit, or a file's path, belongs to. */

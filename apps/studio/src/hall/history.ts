@@ -1,7 +1,8 @@
 /**
  * The hall's history (plan-hud-events T1, spike S4): the island is built once at today's size and the
  * hall's `Clock` (clock.ts, scale history) reveals it as it was on a day, without a rebuild:
- * `t → day → tiles(t) = landTiles(filesAt(c, day))`, eased between days. The reveal look is A, "grow"
+ * `t → day → tiles(t) = landTiles(filesAt(c, day))`, eased between days, and never less than on a day
+ * before (`landByDay`: risen land does not sink again on a dip in the files). The reveal look is A, "grow"
  * (decisions 2026-10-13): a tile rises from the sea, its pieces grow from the ground, over `span` tiles
  * of count, so a scrub moves a smooth frontier instead of popping tiles.
  *
@@ -36,14 +37,37 @@ import { placer, skirt, type TilePlaces, tilePlaces } from "./order.ts"
 
 const logger = log("studio:history")
 
-/** The tiles the island has at `day` (a fractional day eases between two days' counts). */
+/** Per chronicle, the land on each day from its start: never less than any day before (`landByDay`). */
+const lands = new WeakMap<Chronicle, Float64Array>()
+
+/**
+ * The land tiles of each day of the history, from `c.start`: `landTiles(filesAt(c, day))`, but never
+ * less than it was on a day before. Land that has risen does not sink again: a dip in the files (a
+ * sample GitHub cut short, a folder moved out and back) would otherwise sink tiles and raise them again.
+ */
+export function landByDay(c: Chronicle): Float64Array {
+  let out = lands.get(c)
+  if (out) return out
+  const days = Math.max(0, c.end - c.start) + 1
+  out = new Float64Array(days)
+  let most = 0
+  for (let k = 0; k < days; k++) {
+    most = Math.max(most, landTiles(filesAt(c, c.start + k)))
+    out[k] = most
+  }
+  lands.set(c, out)
+  return out
+}
+
+/** The tiles the island has at `day` (a fractional day eases between two days' counts; `landByDay`). */
 export function tilesAt(c: Chronicle, day: number): number {
+  const land = landByDay(c)
+  const at = (d: number) => land[Math.min(land.length - 1, Math.max(0, d - c.start))] as number
   const d0 = Math.floor(day)
   const f = day - d0
-  const a = landTiles(filesAt(c, d0))
+  const a = at(d0)
   if (f <= 0) return a
-  const b = landTiles(filesAt(c, d0 + 1))
-  return a + (b - a) * f
+  return a + (at(d0 + 1) - a) * f
 }
 
 /** The day at `t` (0..1) along the chronicle's history. */
@@ -210,6 +234,8 @@ export function createHistory(opts: HistoryOpts): History {
         sink: reveal.uniforms.sink,
       })
       const gates = parts.doors.gates
+      // each unit's birthday; a pool's ("packages/*") is its first member's, which the chronicle's own pool carries
+      const born = new Map(chronicle.units.map((u) => [u.name, u.born]))
       const tiles0 = tilesAt(chronicle, chronicle.start)
       let shown = Number.NaN
       let jumps = clock.get().jumps
@@ -223,6 +249,11 @@ export function createHistory(opts: HistoryOpts): History {
         parts.sun.markDirty()
         gates?.hide((x, z) => place(x, z, 0, 0) >= n)
         parts.night?.hide((x, z) => place(x, z, 0, 0) >= n)
+        // a place's plate once its unit is born and its heart is whole
+        const today = dayAt(chronicle, clock.get().t)
+        parts.labels?.hide(
+          (x, z, id) => place(x, z, 0, 0) >= n || (id !== undefined && (born.get(id) ?? -Infinity) > today),
+        )
         if (opts.figures)
           parts.viewer.setInfo({
             figures: [
@@ -295,6 +326,10 @@ export function createHistory(opts: HistoryOpts): History {
             step(0)
           },
           tiles: () => shown,
+          /** The clock as the bar drives it. */
+          play: (on: boolean) => clock.play(on),
+          setRate: (rate: number) => clock.setRate(rate),
+          playing: () => clock.get().playing,
           files: () => filesAt(chronicle, Math.floor(dayAt(chronicle, clock.get().t))),
           /** The centre of a tile on the frontier now (mid-way in), for a shot's camera; null at the end. */
           frontier: () => {

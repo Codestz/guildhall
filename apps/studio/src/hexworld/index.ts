@@ -210,6 +210,8 @@ export interface WorldHooks {
     doors: Doors
     water: Water | null
     night: Night | null
+    /** The places' plates (none off a hall, or with `?labels=0`). */
+    labels: PlaceLabels | null
     sun: Sun
     stage: Stage
     viewer: Viewer
@@ -511,6 +513,7 @@ const world = {
           stage,
           viewer.labels,
           m.places.map((p) => ({
+            id: p.id,
             label: p.label,
             detail: `${p.files.toLocaleString("en-US")} files · ${kindWord(p.kind)}`,
             at: p.at,
@@ -573,6 +576,7 @@ const world = {
           doors,
           water,
           night,
+          labels,
           sun,
           stage,
           viewer,

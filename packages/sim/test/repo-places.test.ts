@@ -51,6 +51,15 @@ describe("placeSpecs", () => {
     expect(placeLabel("src", false, "facebook/react")).toBe("src")
     const specs = placeSpecs([unit("src", 500, 10), unit("/", 5, 10)], 1000, undefined, "Codestz/guildhall")
     expect(specs.find((s) => s.id === "/")?.label).toBe("guildhall")
+    // a folder of the repo's own name keeps its path, so the two plates never read the same
+    const react = placeSpecs(
+      [unit("compiler", 500, 10), unit("packages/react", 80, 20, "packages"), unit("/", 5, 10)],
+      1000,
+      undefined,
+      "facebook/react",
+    )
+    expect(react.find((s) => s.id === "/")?.label).toBe("react")
+    expect(react.find((s) => s.id === "packages/react")?.label).toBe("packages/react")
   })
 
   test("what a unit is built as: its content from tier 2 up, the root the harbour, the rest settlements", () => {

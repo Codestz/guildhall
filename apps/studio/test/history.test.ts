@@ -90,13 +90,24 @@ const read = async (name: string) =>
   readChronicle(new Uint8Array(await Bun.file(join(REPO_DIR, `${name}.json.gz`)).arrayBuffer()))
 
 describe("the history's count", () => {
-  test("tiles(t) climbs from the first commit's island to today's, eased between days", async () => {
+  test("tiles(t) climbs from the first commit's island to today's, eased between days, never sinking", async () => {
     const c = await read("react")
     const first = tilesAt(c, c.start)
     const today = tilesAt(c, c.end)
     expect(first).toBe(landTiles(filesAt(c, c.start)))
-    expect(today).toBe(landTiles(filesAt(c, c.end)))
+    expect(today).toBeGreaterThanOrEqual(landTiles(filesAt(c, c.end)))
     expect(first).toBeLessThan(today)
+    // risen land stays: the count never goes down, though the files do (react's history has dips)
+    let dips = 0
+    let was = 0
+    for (let d = c.start; d <= c.end; d++) {
+      const n = tilesAt(c, d)
+      expect(n).toBeGreaterThanOrEqual(was)
+      expect(n).toBeGreaterThanOrEqual(landTiles(filesAt(c, d)))
+      if (d > c.start && filesAt(c, d) < filesAt(c, d - 1)) dips++
+      was = n
+    }
+    expect(dips).toBeGreaterThan(0)
     const d = c.start + 400
     const mid = tilesAt(c, d + 0.5)
     expect(mid).toBeGreaterThanOrEqual(Math.min(tilesAt(c, d), tilesAt(c, d + 1)))

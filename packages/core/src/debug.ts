@@ -22,6 +22,10 @@ export interface FrameStats {
   geometries: number
   textures: number
   dpr: number
+  /** GPU ms per pass (shadows, opaque, water, sky, crowd, post…), means over the stretch; absent without timer queries. */
+  passes?: Record<string, number>
+  /** CPU ms per bucket inside the frame (life, crowd, banners, rest), means over the stretch. */
+  cpu?: Record<string, number>
 }
 
 /** An orbit camera: the point it looks at and where it sits around it (degrees, metres). */
@@ -45,7 +49,12 @@ export interface GuildhallDebug {
   app: string
   ready(): Promise<void>
   log: { records: typeof logRecords; configure: typeof configureLog }
-  perf: { now(): FrameStats; sample(ms: number): Promise<FrameStats> }
+  perf: {
+    now(): FrameStats
+    sample(ms: number): Promise<FrameStats>
+    /** Main-thread tasks over 50 ms since the page loaded (ms from navigation), as the Long Tasks API saw them. */
+    longTasks?(): { start: number; duration: number }[]
+  }
   camera: {
     get(): CameraPose
     set(p: CameraPose): Promise<void>

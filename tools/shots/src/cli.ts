@@ -13,6 +13,7 @@ import { dirname, resolve } from "node:path"
 import type { CameraPose, FrameStats } from "@guildhall/core"
 import { openPage, waitReady } from "./app.ts"
 import { parseArgs, report, type ShotOptions, USAGE } from "./args.ts"
+import { runBench } from "./bench.ts"
 import { launchChrome } from "./chrome.ts"
 import { runPrefabs } from "./prefabs.ts"
 import { type Server, serveStudio } from "./server.ts"
@@ -60,6 +61,8 @@ async function shoot(options: ShotOptions): Promise<string[]> {
 if (process.argv[2] === "set") process.exit(await runSet(process.argv.slice(3)))
 // `bun shots prefabs`: every tile prefab alone, composed into review sheets (prefabs.ts).
 if (process.argv[2] === "prefabs") process.exit(await runPrefabs(process.argv.slice(3)))
+// `bun shots bench`: the perf bench, six poses at two sizes, into .probe/perf2 and its ledger (bench.ts).
+if (process.argv[2] === "bench") process.exit(await runBench(process.argv.slice(3)))
 
 // `bun shots thumbs` / `bun shots stills`: the Studio's committed card previews and lab backdrops (thumbs.ts).
 if (process.argv[2] === "thumbs") process.exit(await runThumbs(process.argv.slice(3)))

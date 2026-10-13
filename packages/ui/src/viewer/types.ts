@@ -88,9 +88,22 @@ export interface Loading {
   fail(message: string): void
 }
 
+/** What the perf chip shows: the rate and p95 at a glance, the split by pass in its detail. */
+export interface PerfReading {
+  fps: number
+  p95: number
+  /** GPU ms per pass (shadows, opaque, water, sky, crowd, post), means over the last frames. */
+  passes?: Record<string, number>
+  /** CPU ms per bucket inside the frame (life, crowd, banners, rest). */
+  cpu?: Record<string, number>
+  calls?: number
+  tris?: number
+  dpr?: number
+}
+
 export interface ViewerHooks {
-  /** The frame rate and the 95th-percentile frame cost, for the perf chip. */
-  stats?: () => { fps: number; p95: number }
+  /** The frame rate and the 95th-percentile frame cost, for the perf chip (and its detail when given). */
+  stats?: () => PerfReading
   /** A PNG data URL of what the stage shows (null when it cannot). */
   capture?: () => Promise<string | null>
 }

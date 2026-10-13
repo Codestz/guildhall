@@ -86,7 +86,15 @@ export function mountViewer(
       viewer.attach({
         stats: () => {
           const s = stage.stats()
-          return { fps: s.fps, p95: s.frameMs.p95 }
+          return {
+            fps: s.fps,
+            p95: s.frameMs.p95,
+            passes: s.passes,
+            cpu: s.cpu,
+            calls: s.calls,
+            tris: s.tris,
+            dpr: s.dpr,
+          }
         },
         capture: () => captureStage(stage),
       })

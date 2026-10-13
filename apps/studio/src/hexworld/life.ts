@@ -381,7 +381,11 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       secs += step
       place(step)
       clockNow = day
+      const t2 = performance.now()
+      stage.timing.cpu.add("life", t2 - t1)
       crowd?.update(step, sample)
+      const t3 = performance.now()
+      stage.timing.cpu.add("crowd", t3 - t2)
       // banners over their agents, nudged up off each other where they would overlap
       const placed: [number, number][] = []
       const shown = banners
@@ -402,6 +406,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         placed.push([x, y])
         el.style.transform = `translate(${x}px,${y}px) translate(-50%,-100%)`
       }
+      stage.timing.cpu.add("banners", performance.now() - t3)
       cpuMs += (performance.now() - t1 - cpuMs) * 0.05
       overlay?.draw(drawn)
     }

@@ -197,7 +197,7 @@ export function advance(playing: Playing, clip: string, phase: number, dt: numbe
 }
 
 export async function createCrowd(
-  stage: Pick<Stage, "scene" | "camera" | "renderer">,
+  stage: Pick<Stage, "scene" | "camera" | "renderer"> & Partial<Pick<Stage, "timing">>,
   actors: readonly CrowdActor[],
   library: CrowdLibrary,
   opts: CrowdOpts = {},
@@ -302,6 +302,7 @@ export async function createCrowd(
 
   const blobs = createBlobs(actors.length)
   stage.scene.add(bodies, props, blobs.mesh)
+  for (const o of [bodies, props, blobs.mesh]) stage.timing?.gpu.tag(o, "crowd")
 
   // Per person: an instance, an outfit row, a hide mask, its props.
   const outfits = outfitTable(actors.map((a) => a.look.rampMap))
@@ -410,6 +411,7 @@ export async function createCrowd(
       person.hero = hero
       hero.npc.root.visible = false
       stage.scene.add(hero.npc.root)
+      stage.timing?.gpu.tag(hero.npc.root, "crowd")
     })
   }
   let wantHero = new Set<number>()

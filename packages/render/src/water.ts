@@ -580,6 +580,7 @@ function waterMesh(stage: Stage, geometry: BufferGeometry, field: ShoreField | n
   mesh.name = "water"
   mesh.receiveShadow = true
   stage.scene.add(mesh)
+  stage.timing.gpu.tag(mesh, "water")
 
   const unsubscribe = stage.onFrame((dt) => {
     uniforms.uTime.value += dt

@@ -165,6 +165,7 @@ export function createSky(stage: Stage, preset: SkyPreset = {}): Sky {
   dome.renderOrder = -1000
   dome.name = "sky"
   stage.scene.add(dome)
+  stage.timing.gpu.tag(dome, "sky")
 
   let current = lightAt(preset.hour ?? GOLDEN_HOUR)
   let air = airAt(current)

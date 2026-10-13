@@ -386,6 +386,9 @@ const world = {
       })
       const first = await firstFrame
       if (disposed) return
+      // for the bench: when the first frame landed (ms from navigation), so long tasks after it can be told apart
+      if (window.guildhall?.ext)
+        window.guildhall.ext.build = { first, firstAt: Math.round(performance.now()) }
       // With the cover the island stays hidden until all of it is built (below). Without (`?loader=0`) the
       // ground is in view: the veil lifts and the rest builds in sight, its step on the title card.
       steps.progress(0.3, 150)

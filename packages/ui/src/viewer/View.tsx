@@ -1,5 +1,5 @@
 /** The Viewer's chrome, drawn from the store: each region subscribes to its own slice. */
-import { type ReactNode, useEffect, useId, useRef } from "react"
+import { type ReactNode, useEffect, useId, useRef, useState } from "react"
 import {
   Button,
   IconButton,
@@ -67,24 +67,87 @@ function TitleCard({ store }: { store: Store }) {
   )
 }
 
+/** The order the passes read in: the frame's own order, then whatever else a screen scoped. */
+const PASS_ORDER = ["shadows", "opaque", "water", "sky", "crowd", "post"]
+const CPU_ORDER = ["life", "crowd", "banners", "rest"]
+
+function ordered(split: Record<string, number>, order: readonly string[]): [string, number][] {
+  const rank = (k: string) => (order.includes(k) ? order.indexOf(k) : order.length)
+  return Object.entries(split).sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]))
+}
+
+/**
+ * The perf chip: the rate and the p95 at a glance; a click folds out where the frame's time goes, pass
+ * by pass (GPU, from timer queries) and bucket by bucket (CPU), with the draw calls and triangles.
+ */
 function Perf({ store }: { store: Store }) {
   const perf = useSlice(store, (s) => s.perf)
+  const [open, setOpen] = useState(false)
   if (!perf) return null
   const tone = perf.p95 > 33 ? "fail" : perf.p95 > 17 ? "warn" : undefined
+  const passes = perf.passes ? ordered(perf.passes, PASS_ORDER) : []
+  const cpu = perf.cpu ? ordered(perf.cpu, CPU_ORDER) : []
+  const gpu = passes.reduce((sum, [, ms]) => sum + ms, 0)
   return (
-    <span
-      className="ui-perf"
-      data-tone={tone}
-      role="status"
-      aria-label={`${Math.round(perf.fps)} frames per second, ${perf.p95.toFixed(1)} ms per frame at the 95th percentile`}
-      title="Frames per second · p95 frame time (` for the full HUD)"
-    >
-      <i className="led" aria-hidden="true" />
-      {Math.round(perf.fps)}
-      <small>fps</small>
-      {perf.p95.toFixed(1)}
-      <small>ms</small>
+    <span className="ui-perf-wrap">
+      <button
+        type="button"
+        className="ui-perf"
+        data-tone={tone}
+        aria-expanded={open}
+        aria-label={`${Math.round(perf.fps)} frames per second, ${perf.p95.toFixed(1)} ms per frame at the 95th percentile`}
+        title="Frames per second · p95 frame time (click for the split by pass, ` for the full HUD)"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <i className="led" aria-hidden="true" />
+        {Math.round(perf.fps)}
+        <small>fps</small>
+        {perf.p95.toFixed(1)}
+        <small>ms</small>
+      </button>
+      {open && (
+        <div className="ui-perf-detail ui-panel" role="status" aria-label="Frame time by pass">
+          {passes.length > 0 ? (
+            <dl>
+              <dt className="head">GPU</dt>
+              <dd className="head">{gpu.toFixed(1)}</dd>
+              {passes.map(([name, ms]) => (
+                <Row key={name} name={name} value={ms.toFixed(2)} />
+              ))}
+            </dl>
+          ) : (
+            <p className="none">No GPU timers here</p>
+          )}
+          {cpu.length > 0 && (
+            <dl>
+              <dt className="head">CPU</dt>
+              <dd className="head">{cpu.reduce((sum, [, ms]) => sum + ms, 0).toFixed(1)}</dd>
+              {cpu.map(([name, ms]) => (
+                <Row key={name} name={name} value={ms.toFixed(2)} />
+              ))}
+            </dl>
+          )}
+          {perf.calls !== undefined && (
+            <dl>
+              <Row name="calls" value={String(perf.calls)} />
+              {perf.tris !== undefined && (
+                <Row name="tris" value={Math.round(perf.tris / 1000).toLocaleString("en-US") + "k"} />
+              )}
+              {perf.dpr !== undefined && <Row name="dpr" value={perf.dpr.toFixed(2)} />}
+            </dl>
+          )}
+        </div>
+      )}
     </span>
+  )
+}
+
+function Row({ name, value }: { name: string; value: string }) {
+  return (
+    <>
+      <dt>{name}</dt>
+      <dd>{value}</dd>
+    </>
   )
 }
 

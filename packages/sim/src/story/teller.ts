@@ -122,15 +122,31 @@ export function masterOrdinalOf(model: Model, s: Session): number {
 }
 
 /** Who a moment is about, named as the log names them. */
-export function actorOf(model: Model, s: Session, names: Names = "world"): Actor {
+/**
+ * A told story's own cast: the name (and colour) of its `k`th session by join order, when the story
+ * names its heroes (the site's demo guild: Claude, Warden, Scout); undefined keeps the hall's name.
+ */
+export type Cast = (k: number) => { name: string; color?: string } | undefined
+
+/** Which session `s` is by join order (0-based). */
+export function joinIndexOf(model: Model, s: Session): number {
+  let n = 0
+  for (const other of model.sessions.values()) if (other !== s && byJoin(other, s) < 0) n++
+  return n
+}
+
+export function actorOf(model: Model, s: Session, names: Names = "world", cast?: Cast): Actor {
   const named = namedOf(s, names)
+  const own = cast?.(joinIndexOf(model, s))
   return {
     id: s.id,
     agent: s.agent,
-    title: s.parentID
-      ? numbered(named.name, ordinalOf(model, s, names))
-      : numbered(named.name, masterOrdinalOf(model, s)),
-    color: named.archetype.color,
+    title:
+      own?.name ??
+      (s.parentID
+        ? numbered(named.name, ordinalOf(model, s, names))
+        : numbered(named.name, masterOrdinalOf(model, s))),
+    color: own?.color ?? named.archetype.color,
     ...(s.parentID ? { parent: s.parentID } : {}),
     master: rootOf(model, s.id),
   }
@@ -156,6 +172,8 @@ export class Teller {
   constructor(
     readonly start: number,
     private readonly names: Names = "world",
+    /** A story's own cast (`Cast`): its heroes' names over the hall's. */
+    private readonly cast?: Cast,
   ) {}
 
   /** One change, applied to the model, and the moments it made. */
@@ -167,7 +185,14 @@ export class Teller {
       const s = this.model.sessions.get(m.id)
       if (!s) continue
       const { id: _, at: __, ...happening } = m
-      out.push(this.add({ ...actorOf(this.model, s, this.names), ...happening, at: m.at - this.start, live }))
+      out.push(
+        this.add({
+          ...actorOf(this.model, s, this.names, this.cast),
+          ...happening,
+          at: m.at - this.start,
+          live,
+        }),
+      )
     }
     return out
   }

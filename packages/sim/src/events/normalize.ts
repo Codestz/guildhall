@@ -5,7 +5,7 @@ import { seaMomentOf, sizeOf } from "../guild/moments.ts"
 import { experienceOf, toolTarget } from "../guild/views.ts"
 import { bodyOf } from "../roster/bodies.ts"
 import { type Rank, rankOf } from "../roster/ranks.ts"
-import { actorOf, namedOf } from "../story/teller.ts"
+import { actorOf, type Cast, namedOf } from "../story/teller.ts"
 import { GONE_MS, type Who, type Work, type WorldEvent, type WorldHappening } from "./world.ts"
 
 /**
@@ -24,6 +24,8 @@ export interface NormalizeOptions {
   placeOf?: (path: string) => number | undefined
   /** How long a finished subagent stays before it leaves; `GONE_MS` by default. */
   goneMs?: number
+  /** A told story's own cast (story `Cast`): its heroes' names and colours over the hall's. */
+  cast?: Cast
 }
 
 /** A normaliser's stream state. Make one with `normalizer`, one per stream. */
@@ -31,6 +33,7 @@ export interface NormalizeContext {
   readonly model: GuildModel
   readonly placeOf: ((path: string) => number | undefined) | undefined
   readonly goneMs: number
+  readonly cast: Cast | undefined
   /** The next event's seq. */
   seq: number
   /** The last event's `at`: no event is made earlier than it. */
@@ -61,6 +64,7 @@ export function normalizer(opts: NormalizeOptions = {}): NormalizeContext {
     model: new GuildModel(),
     placeOf: opts.placeOf,
     goneMs: opts.goneMs ?? GONE_MS,
+    cast: opts.cast,
     seq: 1,
     last: Number.NEGATIVE_INFINITY,
     guilds: new Map(),
@@ -167,8 +171,7 @@ function whoOf(ctx: NormalizeContext, s: Session): Who {
     agent: s.agent,
     archetype,
     body: bodyOf(archetype),
-    name: actorOf(ctx.model, s).title,
-    color: named.archetype.color,
+    ...(({ title, color }) => ({ name: title, color }))(actorOf(ctx.model, s, "world", ctx.cast)),
     title: s.title,
     ...(s.task ? { task: s.task } : {}),
   }

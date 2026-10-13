@@ -13,6 +13,7 @@ import {
   pleas,
   recent,
   reduce,
+  Teller,
   type WorldEvent,
   weatherOf,
 } from "../src/index.ts"
@@ -43,6 +44,23 @@ describe("normalize: the guild", () => {
       "Guildmaster III",
       "Wanderer",
     ])
+  })
+
+  test("a story that names its heroes (the demo guild) names them by join order, in the world and the captions", () => {
+    const names = ["Claude", "Warden"]
+    const cast = (k: number) => (names[k] ? { name: names[k] as string, color: "#d97757" } : undefined)
+    const feed = new Feed(64, normalizer({ cast }))
+    feed.start("m", T0)
+    feed.start("w", T0 + 10, "m", "guild-tester")
+    feed.start("s", T0 + 20, "m", "explore")
+    expect(heroes(feed.log.head).map((h) => [h.name, h.color === "#d97757"])).toEqual([
+      ["Claude", true],
+      ["Warden", true],
+      [heroes(feed.log.head)[2]?.name, false],
+    ])
+    const teller = new Teller(T0, "world", cast)
+    const told = teller.take({ type: "session", id: "m", agent: "build", at: T0 })
+    expect(told.every((m) => m.title === "Claude")).toBe(true)
   })
 
   test("a session its host closed (SessionEnd) leaves with its party; a turn's end keeps its seat", () => {

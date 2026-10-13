@@ -50,4 +50,18 @@ export interface Feed {
   /** End: let go of the source (a socket closes, reconnects stop, a fetch is ignored). */
   stop(): void
   status(): FeedStatus
+  /**
+   * The heroes as this story draws them, by join order (the site's demo guild: Claude the mage, Warden
+   * the knight, Scout the ranger): their names and colours in the world, the captions and the chips, and
+   * their bodies on the island. None: the hall's own names (Guildmaster, Wanderer II…).
+   */
+  readonly cast?: readonly FeedHero[] | undefined
+}
+
+/** A story's hero: its name, banner colour, KayKit body (a catalog id) and NPC recipe. */
+export interface FeedHero {
+  name: string
+  colour: string
+  hero: string
+  recipe: string
 }

@@ -81,7 +81,11 @@ export function sessionAgents(
         if (!reply || asked !== log) return
         ms = reply.ms
         byId = new Map(reply.itineraries.map((it) => [it.id, it]))
-        const next = reply.cast.map((info, k) => lookOf(info, k, "wire"))
+        // a story that names its heroes draws them as it says (the demo guild: Claude the mage…)
+        const next = reply.cast.map((info, k) => {
+          const own = session.feed.cast?.[k]
+          return own ? { ...own, id: info.id, name: info.name } : lookOf(info, k, "wire")
+        })
         if (next.length !== looks.length || next.some((l, k) => l.id !== looks[k]?.id)) version++
         looks = next
       })

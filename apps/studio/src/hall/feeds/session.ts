@@ -12,6 +12,7 @@
 import type { Change, GuildEvent, SeaEvent } from "@guildhall/core"
 import {
   type Caption,
+  type Cast,
   EventLog,
   emptyWorld,
   flush,
@@ -90,7 +91,13 @@ export function createSession(feed: Feed, opts: SessionOptions = {}): HallSessio
   const clock = createSessionClock({ live })
   let placeOf: ((path: string) => number | undefined) | undefined
   let log = new EventLog()
-  let ctx: NormalizeContext = normalizer()
+  // a story that names its heroes (the demo guild): its names over the hall's, in the world and the
+  // captions; read as each hero joins, so a feed that switches stories in place switches casts too
+  const cast: Cast = (k) => {
+    const h = feed.cast?.[k]
+    return h && { name: h.name, color: h.colour }
+  }
+  let ctx: NormalizeContext = normalizer({ cast })
   let teller: Teller | null = null
   let narrator: Narrator | null = null
   /** The next told moment the narrator has not passed. */
@@ -156,7 +163,7 @@ export function createSession(feed: Feed, opts: SessionOptions = {}): HallSessio
   const sink: FeedSink = {
     reset() {
       log = new EventLog()
-      ctx = normalizer(placeOf ? { placeOf } : {})
+      ctx = normalizer({ ...(placeOf ? { placeOf } : {}), cast })
       teller = null
       narrator = null
       cursor = 0
@@ -169,7 +176,7 @@ export function createSession(feed: Feed, opts: SessionOptions = {}): HallSessio
       const isChange = "change" in input
       const at = isChange ? (input as GuildEvent).change.at : (input as SeaEvent).at
       if (!teller) {
-        teller = new Teller(at)
+        teller = new Teller(at, "world", cast)
         narrate()
       }
       if (isChange) teller.take((input as GuildEvent).change as Change, news)
@@ -234,7 +241,7 @@ export function createSession(feed: Feed, opts: SessionOptions = {}): HallSessio
       if (started) return
       started = true
       placeOf = bind
-      ctx = normalizer(placeOf ? { placeOf } : {})
+      ctx = normalizer({ ...(placeOf ? { placeOf } : {}), cast })
       feed.start(sink)
     },
     stop() {

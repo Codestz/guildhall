@@ -5,9 +5,9 @@
  * island (the session starts the log over, and the heroes' desk with it).
  */
 import { STORY_IDS, type StoryId } from "@guildhall/sim"
-import type { Feed, FeedChapter, FeedKind, FeedSink, FeedStatus } from "../hall/feeds/feed.ts"
+import type { Feed, FeedChapter, FeedHero, FeedKind, FeedSink, FeedStatus } from "../hall/feeds/feed.ts"
 import { STORY_EPOCH, StoryFeed } from "../hall/feeds/story.ts"
-import { demoStory } from "../hexworld/lifeAgents.ts"
+import { DEMO_AGENTS, demoStory } from "../hexworld/lifeAgents.ts"
 
 /** The site's own picks: the demo guild, or one of sim's stories. */
 export type HomeStory = "demo" | StoryId
@@ -30,6 +30,11 @@ export class HomeFeed implements Feed {
 
   get name(): string {
     return this.told?.name ?? "The guild"
+  }
+
+  /** The demo guild names its heroes: Claude the mage, Warden the knight, Scout the ranger. */
+  get cast(): readonly FeedHero[] | undefined {
+    return this.pick === "demo" ? DEMO_AGENTS : undefined
   }
 
   status(): FeedStatus {

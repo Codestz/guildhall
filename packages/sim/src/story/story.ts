@@ -245,7 +245,7 @@ function doing(craft: Told, target: string | undefined): string {
 export interface Lookup {
   session(id: string): Session | undefined
   /** How the hall named an adventurer last, when it has heard of them. */
-  actor?(id: string): Pick<Moment, "title" | "color"> | undefined
+  actor?(id: string): Pick<Moment, "title" | "color" | "proper"> | undefined
   /** A party on the island by its guildmaster's id: its short name and banner (V1 guild/parties.ts). */
   party?(master: string): { name: string; color: string } | undefined
   /** How many parties are on the island: captions name the party only when there are several. */
@@ -374,13 +374,14 @@ export interface Caption {
 class Line {
   private names: { text: string; color: string }[] = []
 
-  who(m: Pick<Moment, "title" | "color">): string {
-    this.names.push({ text: `the ${m.title}`, color: m.color })
+  who(m: Pick<Moment, "title" | "color" | "proper">): string {
+    // a name of its own (a story's cast: Claude) is told bare; a role is "the Scout"
+    this.names.push({ text: m.proper ? m.title : `the ${m.title}`, color: m.color })
     return `\u0000${this.names.length - 1}\u0000`
   }
 
   /** `the Explorer and the Architect`, or `the Explorer, the Architect and two others`. */
-  whoAll(actors: readonly Pick<Moment, "title" | "color">[]): string {
+  whoAll(actors: readonly Pick<Moment, "title" | "color" | "proper">[]): string {
     if (actors.length <= 3) return listOf(actors.map((a) => this.who(a)))
     const rest = actors.length - 2
     return `${this.who(actors[0] as Moment)}, ${this.who(actors[1] as Moment)} and ${spell(rest)} others`
@@ -1098,7 +1099,7 @@ interface Heard {
 export class Narrator {
   private heard: Heard[] = []
   /** Every adventurer heard of, as last named: a resumed one is called by their hall name. */
-  private names = new Map<string, Pick<Moment, "title" | "color">>()
+  private names = new Map<string, Pick<Moment, "title" | "color" | "proper">>()
   private last = Number.NEGATIVE_INFINITY
   private key = 0
   private options: Required<NarratorOptions>
@@ -1128,7 +1129,11 @@ export class Narrator {
     // Following one party: the others' stories go untold (they still live on the island).
     const following = this.lookup.following?.() ?? null
     if (following !== null && moment.master !== following) return
-    this.names.set(moment.id, { title: moment.title, color: moment.color })
+    this.names.set(moment.id, {
+      title: moment.title,
+      color: moment.color,
+      ...(moment.proper ? { proper: true as const } : {}),
+    })
     const beat = beatOf(moment)
     if (!beat) return
     const parts = beat === "complete" ? lineOf(beat, [moment], this.lookup) : undefined

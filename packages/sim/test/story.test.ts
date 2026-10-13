@@ -82,6 +82,11 @@ describe("story: the phrase grammar", () => {
     expect(parts.map((p) => p.text).join("")).toMatch(/[.”]$/)
   })
 
+  test("a hero with a name of its own (a story's cast) is told bare: Claude, never the Claude", () => {
+    const parts = lineOf("rise", [moment("recover", "Claude", { color: "#d97757", proper: true })], nobody)
+    expect(parts.find((p) => p.color === "#d97757")?.text).toBe("Claude")
+  })
+
   test("real content is quoted and truncated at a word, never mid-word", () => {
     expect(clip("one two three four five six", 15)).toBe("one two three…")
     expect(quote("short")).toBe("“short”")

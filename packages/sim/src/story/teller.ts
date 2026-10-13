@@ -28,6 +28,8 @@ export interface Actor {
   parent?: string
   /** The guildmaster at the top of their party (themselves, for a guildmaster). */
   master: string
+  /** A name of their own (a story's cast: Claude), told without "the". */
+  proper?: true
 }
 
 /** What happened: the sim's happenings, plus V1's `leave` and the sea's news. */
@@ -147,6 +149,7 @@ export function actorOf(model: Model, s: Session, names: Names = "world", cast?:
         ? numbered(named.name, ordinalOf(model, s, names))
         : numbered(named.name, masterOrdinalOf(model, s))),
     color: own?.color ?? named.archetype.color,
+    ...(own ? { proper: true as const } : {}),
     ...(s.parentID ? { parent: s.parentID } : {}),
     master: rootOf(model, s.id),
   }

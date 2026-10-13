@@ -18,6 +18,7 @@ import { instanceSwatchMap } from "./recipe.ts"
 import { createSlicer } from "./slice.ts"
 import type { Stage } from "./stage.ts"
 import { swatchMapKey } from "./tint.ts"
+import { depthMaterialFor, warmPrograms } from "./warm.ts"
 
 const logger = log("render:batch")
 
@@ -70,8 +71,16 @@ export interface StaticBatch {
 /** How much more than asked the buffers grow by when an add overflows them. */
 const GROWTH = 1.5
 
-const variantKey = (instance: BatchInstance) =>
-  `${instance.piece}|${swatchMapKey(instanceSwatchMap(instance))}`
+/** An instance's key is asked for twice per add (baking, placing): kept, since it is a string of its re-tint. */
+const keys = new WeakMap<BatchInstance, string>()
+const variantKey = (instance: BatchInstance) => {
+  let key = keys.get(instance)
+  if (key === undefined) {
+    key = `${instance.piece}|${swatchMapKey(instanceSwatchMap(instance))}`
+    keys.set(instance, key)
+  }
+  return key
+}
 
 const triangles = (g: BufferGeometry) => (g.index?.count ?? 0) / 3
 
@@ -127,7 +136,7 @@ export function instanceMatrix(
  * geometry lands, but no single task holds the main thread (it was ~330 ms for 18 k pieces).
  */
 export async function createStaticBatch(
-  stage: Pick<Stage, "scene" | "renderer">,
+  stage: Pick<Stage, "scene" | "renderer" | "camera"> & Partial<Pick<Stage, "drawTarget">>,
   instances: readonly BatchInstance[],
   load: (piece: string) => Promise<Object3D>,
   clusters: readonly BatchCluster[] = [],
@@ -215,11 +224,25 @@ export async function createStaticBatch(
       mesh.name = "static-batch"
       mesh.fadeMaterial = batchMaterial(true)
       mesh.perObjectFrustumCulled = true
+      // The island is always partly in view, so the whole-mesh test never culls; off, three also draws
+      // the mesh while it is still empty, which allocates its buffers on the GPU (one upload, ~30 ms
+      // for 130 MB) before the geometry lands: the sliced copies below then go up as ranges, a few MB
+      // a frame, in place of one 100–300 ms upload on the first real draw.
+      mesh.frustumCulled = false
       mesh.sortObjects = false
       mesh.castShadow = true
       mesh.receiveShadow = true
+      // Its three programs (the main draw, the crossfade's, the shadow pass's) link in the background
+      // before the first draw; drawn before they are done, that draw would wait for them (warm.ts).
+      mesh.visible = false
       stage.scene.add(mesh)
       capacity = { vertices: Math.max(1, needVertices), indices: Math.max(1, needIndices) }
+      await warmPrograms(stage, mesh, [
+        batchMaterial(),
+        batchMaterial(true),
+        depthMaterialFor(batchMaterial()),
+      ])
+      mesh.visible = true
     } else {
       if (needVertices > capacity.vertices || needIndices > capacity.indices) {
         capacity = {

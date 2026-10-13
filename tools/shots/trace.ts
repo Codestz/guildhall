@@ -64,6 +64,8 @@ const server =
     : null
 const browser = saved ? null : await launchChrome("trace")
 let json = saved ? readFileSync(saved, "utf8") : ""
+/** The page's own log (ms from its time origin, one line each), read beside the tasks. */
+let pageLog: { t: number; line: string }[] = []
 if (browser)
   try {
     const opened = await openPage(browser, { size: SIZE, dpr: DPR })
@@ -82,13 +84,18 @@ if (browser)
     await page.goto(url)
     await waitReady(page)
     await page.waitForTimeout(SETTLE_MS)
-    // what the page itself saw, to cross-check the trace's tasks
+    // what the page itself saw, to cross-check the trace's tasks, and its log (the stage names the
+    // programs each frame built, the builders say when they finished), to read beside them
     const seen = await page.evaluate(() => ({
       longTasks: window.guildhall?.perf.longTasks?.() ?? [],
       build: window.guildhall?.ext.build as { first?: number; firstAt?: number } | undefined,
-      origin: performance.timeOrigin,
+      log: (window.guildhall?.log.records({ level: "info" }) ?? []).map((r) => ({
+        t: Math.round(r.t),
+        line: `${r.channel} ${r.msg}${r.data === undefined ? "" : ` ${JSON.stringify(r.data)}`}`,
+      })),
     }))
     json = (await browser.stopTracing()).toString()
+    pageLog = seen.log
     if (opened.errors.length) console.error(opened.errors.join("\n"))
     console.error(
       `page: first frame ${seen.build?.first ?? "?"} ms, long tasks ${seen.longTasks.length}` +
@@ -246,6 +253,14 @@ for (const task of long) {
   if (nested.length) {
     lines.push("  trace events inside:")
     lines.push(list(nested))
+  }
+  // the page's log from just before the task to its end (its clock and the trace's share a base)
+  const from = msFromNav(task.ts) - 150
+  const to = msFromNav(task.ts) + ms
+  const logged = pageLog.filter((l) => l.t >= from && l.t <= to)
+  if (logged.length) {
+    lines.push("  page log around it:")
+    for (const l of logged) lines.push(`    ${String(l.t).padStart(7)} ms  ${l.line.slice(0, 160)}`)
   }
   lines.push("")
 }

@@ -9,6 +9,7 @@ import {
   SRGBColorSpace,
   Vector3,
   WebGLRenderer,
+  type WebGLRenderTarget,
 } from "three"
 import { createGovernor, parseDprPin } from "./governor.ts"
 import { createRig, type Rig } from "./rig/index.ts"
@@ -39,9 +40,12 @@ export interface Stage {
   onFrame(fn: (dt: number) => void): () => void
   /**
    * Draws the frame with `draw` in place of a plain `renderer.render(scene, camera)` (a post pipeline,
-   * `post/`); null puts the plain draw back.
+   * `post/`); null puts the plain draw back. `target` is the render target `draw` renders the scene
+   * into (null: the canvas): programs compiled ahead of a draw are keyed by it (warm.ts).
    */
-  setDraw(draw: (() => void) | null): void
+  setDraw(draw: (() => void) | null, target?: WebGLRenderTarget | null): void
+  /** The render target the scene is drawn into (null: the canvas). */
+  readonly drawTarget: WebGLRenderTarget | null
   dispose(): void
 }
 
@@ -123,6 +127,8 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
   let last: number | null = null
   let raf = 0
   let draw: (() => void) | null = null
+  let drawTarget: WebGLRenderTarget | null = null
+  let knownPrograms = 0
 
   const frame = (now: number) => {
     const start = performance.now()
@@ -145,6 +151,20 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
     // rAF gap, is what the budget holds.
     const cost = performance.now() - start
     timing.frameEnd(cost)
+    // Programs built in this frame (their link is waited for here unless warmed first, warm.ts): named,
+    // so a long frame on load can be laid at the right material's door (tools/shots/trace.ts reads the log).
+    const programs = renderer.info.programs
+    if (programs && programs.length > knownPrograms) {
+      logger.info("programs", {
+        ms: Math.round(cost),
+        made: programs.slice(knownPrograms).map((p) => {
+          const key = (p as { cacheKey?: string }).cacheKey ?? ""
+          const own = /guildhall-[\w-]+/.exec(key)?.[0]
+          return own ? `${p.name}#${own}` : p.name
+        }),
+      })
+      knownPrograms = programs.length
+    }
     costs.push(cost)
     if (ms > 0) intervals.push(ms)
     for (const s of samplers) {
@@ -193,8 +213,12 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
       frameFns.add(fn)
       return () => frameFns.delete(fn)
     },
-    setDraw(next) {
+    setDraw(next, target = null) {
       draw = next
+      drawTarget = next ? target : null
+    },
+    get drawTarget() {
+      return drawTarget
     },
     dispose() {
       governor.dispose()

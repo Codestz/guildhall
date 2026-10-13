@@ -65,9 +65,15 @@ export function createGate(options: GateOptions = {}): Gate {
 
 /** The slice of a Stage `settle` needs (a fake in the tests). */
 export interface Settleable {
-  renderer: { compileAsync?: (scene: never, camera: never) => Promise<unknown> }
+  renderer: {
+    compileAsync?: (scene: never, camera: never) => Promise<unknown>
+    getRenderTarget?: () => unknown
+    setRenderTarget?: (target: never) => void
+  }
   scene: unknown
   camera: unknown
+  /** The render target the scene is drawn into (the post pipeline's), null for the canvas (render stage.ts). */
+  drawTarget?: unknown
   onFrame(fn: (dt: number) => void): () => void
 }
 
@@ -110,10 +116,23 @@ export function settle(
       if (open && reason) finish(reason)
     })
     void options.until?.then(() => finish("timeout"))
-    const compile = stage.renderer.compileAsync
-    const run = compile
-      ? compile.call(stage.renderer, stage.scene as never, stage.camera as never)
-      : Promise.resolve()
+    // A program's key takes in the render target it draws into (its colour space, its tone mapping), so
+    // the compile binds the one the scene is drawn into (`stage.drawTarget`): compiled against the
+    // canvas while the post pipeline draws into a target, every material got a second program nobody
+    // draws with (seen as twenty programs made in one frame after the build) and its real one linked
+    // at its first draw after all. The compile itself is the call's synchronous start; the wait is not.
+    const { renderer } = stage
+    const compile = renderer.compileAsync
+    let run: Promise<unknown> = Promise.resolve()
+    if (compile) {
+      const was = renderer.getRenderTarget?.()
+      renderer.setRenderTarget?.((stage.drawTarget ?? null) as never)
+      try {
+        run = compile.call(renderer, stage.scene as never, stage.camera as never)
+      } finally {
+        renderer.setRenderTarget?.((was ?? null) as never)
+      }
+    }
     run
       .catch(() => undefined)
       .then(() => {

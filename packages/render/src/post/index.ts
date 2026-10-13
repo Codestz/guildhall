@@ -307,7 +307,7 @@ export function createPost(stage: Stage, opts: PostOpts): Post {
     stage.timing.gpu.end()
     renderer.autoClear = autoClear
   }
-  stage.setDraw(draw)
+  stage.setDraw(draw, sceneTarget)
   logger.info("post", { aa, look, mood })
 
   return {

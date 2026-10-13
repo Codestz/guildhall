@@ -15,6 +15,7 @@ import { ATMOSPHERE, patchCloudShade } from "./atmosphere/shade.ts"
 import type { ShoreField } from "./shoreField.ts"
 import type { Stage } from "./stage.ts"
 import { patchCascades } from "./sun/patch.ts"
+import { warmPrograms } from "./warm.ts"
 
 /**
  * V1's water (legacy/packages/hall/src/scene/nature/waterNodes.ts) measured its shore distances in its
@@ -579,8 +580,13 @@ function waterMesh(stage: Stage, geometry: BufferGeometry, field: ShoreField | n
   const mesh = new Mesh(geometry, material)
   mesh.name = "water"
   mesh.receiveShadow = true
+  // its program links in the background first: drawn before, that frame would wait ~65 ms for it (warm.ts)
+  mesh.visible = false
   stage.scene.add(mesh)
   stage.timing.gpu.tag(mesh, "water")
+  void warmPrograms(stage, mesh).then(() => {
+    mesh.visible = true
+  })
 
   const unsubscribe = stage.onFrame((dt) => {
     uniforms.uTime.value += dt

@@ -1,16 +1,17 @@
 /**
  * Life on the hex island (track B, `?life=0` turns it off): the townsfolk of every place living their
- * day (world `planFolk`) and the agents walking their errands (world `agentLoop`), all on the island's
- * walk graph, drawn by the R5 crowd in one go (the nearest few as full heroes, everyone else the baked
+ * day (world `planFolk`) and the agents, wherever their source puts them (an `AgentSource`,
+ * lifeAgents.ts: a guild's events planned on the walk graph, sim life), all on the island's walk
+ * graph, drawn by the R5 crowd in one go (the nearest few as full heroes, everyone else the baked
  * crowd: three draws), at CHARACTER_SCALE with their feet on the ground. Each agent has its name on a
  * coloured banner above its head, readable from the map view.
  *
  * Time: the day moves on SPEEDUP times faster than real time and people walk slower per day-hour by as
  * much, so they walk at a natural pace while their routine visibly moves on. When the screen's clock is
- * moved (dragged or played) the day follows it. Agents run on real seconds.
+ * moved (dragged or played) the day follows it. Agents run on real seconds (`?lifeT=` starts them on).
  *
- * The plan itself (everyone's day, the agents' rounds, the solids: lifePlan.ts) is made in the build
- * worker and arrives as data; this thread builds the collision layer on it and draws.
+ * The plan itself (everyone's day, the agents' itineraries, the solids: lifePlan.ts) is made in the
+ * build worker and arrives as data; this thread builds the collision layer on it and draws.
  */
 import {
   applyOverlay,
@@ -30,6 +31,7 @@ import {
   type Stage,
   toScreen,
 } from "@guildhall/render"
+import { RUN_CLIP } from "@guildhall/sim"
 import {
   CHARACTER_SCALE,
   type DoorPass,
@@ -54,7 +56,7 @@ import {
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import * as data from "../data.ts"
 import { collideView } from "./collideView.ts"
-import { DEMO_AGENTS } from "./lifeAgents.ts"
+import { type AgentSource, recipeOf } from "./lifeAgents.ts"
 import { type LifePlan, SPEEDUP } from "./lifePlan.ts"
 import { createSpace } from "./space.ts"
 
@@ -63,11 +65,15 @@ export { LIFE_MPS, SPEEDUP } from "./lifePlan.ts"
 const logger = log("studio:hexworld:life")
 /** Metres one walk-clip cycle covers at look scale 1 (crowd/sim STRIDE). */
 const STRIDE = 1.3
+/** Metres one run-clip cycle covers at look scale 1 (a hero running a long way). */
+const RUN_STRIDE = 2.4
 /** A banner floats this far over an agent's feet, metres. */
 const BANNER_UP = 1.35
 /** A banner's footprint on screen for keeping them apart, CSS px. */
 const BANNER_W = 84
 const BANNER_H = 24
+/** Where an agent not on the island yet is kept (undrawn) before its first pose. */
+const OFF_ISLAND: LifePose = { at: [0, 0, 0], facing: 0, act: "idle", indoors: true, ground: true }
 
 export interface LifeOpts {
   host: HTMLElement
@@ -87,8 +93,16 @@ export interface LifeOpts {
   overlay?: boolean
   /** Mark the heroes' spots (`?heroSpots=1`, world heroes.ts) instead of the collision layer. */
   heroSpots?: boolean
-  /** Seconds into the agents' script at the start (`?lifeT=` for shots). */
+  /** Seconds into the agents' source at the start (`?lifeT=` for shots). */
   agentT?: number
+  /**
+   * Who the agents are and where each is (lifeAgents.ts `AgentSource`, on life's agent seconds). Its
+   * heroes when everyone is drawn get figures of their own; a source that grows (`version`) is drawn on
+   * the spare figures `agentPool` keeps. None: no agents (until `setAgents`).
+   */
+  agents?: AgentSource | Promise<AgentSource | null> | null
+  /** Keep spare hero figures, `AGENT_POOL` of each body, for heroes a source adds later (a hall's session). */
+  agentPool?: boolean
 }
 
 export interface Life {
@@ -104,8 +118,17 @@ export interface Life {
   hide(at: ((x: number, z: number) => boolean) | null): void
   /** Where each building's door is (the plan's), once `ready`. */
   doorways(): readonly HexDoorway[]
+  /** Draws the agents of another source from now on (a hall's session): on the figures life has. */
+  setAgents(source: AgentSource | null): void
+  /** Where hero `id` is drawn now (its feet, metres), or null when it is not on the island. */
+  heroAt(id: string): [number, number, number] | null
   dispose(): void
 }
+
+/** Spare figures of each body a growing source may use (`agentPool`). */
+export const AGENT_POOL = 4
+/** The bodies a hero is drawn with (sim `Body`), as catalog ids. */
+const BODIES = ["mage", "knight", "ranger", "barbarian", "rogue"].map((b) => `kaykit-adventurers/${b}`)
 
 /** The catalog with `data/mounts.json` laid over it, so props carry their authored mounts. */
 async function mountedCatalog(): Promise<Catalog | null> {
@@ -187,6 +210,7 @@ const BANNER_STYLE = [
 function banner(name: string, colour: string): HTMLElement {
   const el = document.createElement("div")
   el.style.cssText = BANNER_STYLE
+  el.dataset.heroBanner = ""
   const flag = document.createElement("div")
   flag.textContent = name
   flag.style.cssText = [
@@ -213,24 +237,30 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
   let disposed = false
   let crowd: Crowd | null = null
   let unFrame = () => {}
-  const banners: HTMLElement[] = []
   const cleanup: (() => void)[] = []
   let passes: DoorPass[] = []
   let doorways: HexDoorway[] = []
   let clockNow = opts.hour()
   let nearAt: (x: number, z: number, r: number) => boolean = () => false
   let hiddenAt: ((x: number, z: number) => boolean) | null = null
+  /** The agents' source, and the figures that draw its heroes (set once everyone is drawn). */
+  let source: AgentSource | null = null
+  let swapped = true
+  let heroAt: (id: string) => [number, number, number] | null = () => null
 
   const ready = (async () => {
     const t0 = performance.now()
     // the plan, made in the worker: the catalog and the recipes load meanwhile
-    const [plan, catalog, recipes] = await Promise.all([opts.plan, mountedCatalog(), npcRecipes()])
+    const [plan, catalog, recipes, first] = await Promise.all([
+      opts.plan,
+      mountedCatalog(),
+      npcRecipes(),
+      opts.agents ?? null,
+    ])
     if (disposed) return
     const { folk } = plan
-    const agents = DEMO_AGENTS.flatMap((a, k) => {
-      const loop = plan.agents[k]
-      return loop ? [{ spec: a, ...loop }] : []
-    })
+    if (swapped) source = first
+    const agents = source?.list() ?? []
     doorways = plan.doorways
     const t1 = performance.now()
     // the collision layer: the plan's solids and walkways on the fine ground as the worker built it
@@ -251,30 +281,66 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       return fixed.get(id)
     }
     const looks: NpcLook[] = []
-    const loops: { steps: LifeStep[]; period: number; real: boolean }[] = []
+    /** A townsfolk's day, or a hero figure (`figures[figure]`). */
+    const loops: ({ steps: LifeStep[]; figure?: undefined } | { figure: number })[] = []
     for (const f of folk) {
       const recipe = usableOf(f.role)
       if (!recipe) continue
       const look = resolveNpc(recipe, hash(`hexfolk:${opts.seed}:${f.id}`), catalog)
       looks.push(scaled(holding(look, f.prop, catalog)))
-      loops.push({ steps: f.day, period: 24, real: false })
+      loops.push({ steps: f.day })
     }
-    const agentIds: number[] = []
-    for (const a of agents) {
-      const recipe = usableOf(a.spec.recipe)
-      if (!recipe || !catalog.get(a.spec.hero)) continue
-      agentIds.push(looks.length)
-      looks.push(heroLook(recipe, a.spec.hero, hash(`agent:${a.spec.id}`), catalog))
-      loops.push({ steps: a.steps, period: a.period, real: true })
-      const el = banner(a.spec.name, a.spec.colour)
-      opts.host.append(el)
-      banners.push(el)
+    /**
+     * The heroes' figures: one for each hero the source has now (its look), and with `agentPool` spares
+     * of every body for those it adds; `agent` is the hero a figure draws, and its banner says who.
+     */
+    const figures: { crowd: number; hero: string; agent: string | null; el: HTMLElement | null }[] = []
+    const figure = (hero: string, recipeId: string, seed: string, agent: string | null) => {
+      const recipe = usableOf(recipeId)
+      if (!recipe || !catalog.get(hero)) return
+      figures.push({ crowd: looks.length, hero, agent, el: null })
+      looks.push(heroLook(recipe, hero, hash(seed), catalog))
+      loops.push({ figure: figures.length - 1 })
+    }
+    for (const a of agents) figure(a.hero, a.recipe, `agent:${a.id}`, a.id)
+    if (opts.agentPool)
+      for (const hero of BODIES)
+        for (let k = 0; k < AGENT_POOL; k++)
+          figure(hero, recipeOf(hero.split("/").pop() ?? ""), `agent:spare:${hero}:${k}`, null)
+    const agentIds = figures.map((f) => f.crowd)
+    /** The source's version the figures were given out for. */
+    let given = Number.NaN
+    /** Gives the source's heroes figures: each keeps its own; a new one takes a free one of its body. */
+    const assign = () => {
+      const list = source?.list() ?? []
+      const version = source?.version?.() ?? 0
+      if (!swapped && version === given) return
+      swapped = false
+      given = version
+      const wanted = new Map(list.map((a) => [a.id, a]))
+      for (const f of figures)
+        if (f.agent !== null && !wanted.has(f.agent)) {
+          f.agent = null
+          f.el?.remove()
+          f.el = null
+        }
+      for (const a of list) {
+        let f = figures.find((g) => g.agent === a.id)
+        f ??= figures.find((g) => g.agent === null && g.hero === a.hero)
+        if (!f) continue
+        if (f.agent !== a.id || !f.el) {
+          f.el?.remove()
+          f.agent = a.id
+          f.el = banner(a.name, a.colour)
+          opts.host.append(f.el)
+        }
+      }
     }
     const made = await createCrowd(
       stage,
       looks.map((look, id) => ({ id, look })),
       { catalog, url: libraryUrl },
-      { heroes: 12, clips: spotClips([...folk.map((f) => f.day), ...agents.map((a) => a.steps)]) },
+      { heroes: 12, clips: [...spotClips(folk.map((f) => f.day)), ...(figures.length ? [RUN_CLIP] : [])] },
     )
     if (disposed) {
       made.dispose()
@@ -312,11 +378,23 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       solidDistance,
     })
     const poses: LifePose[] = new Array(n)
+    /** This frame's ms in the agents' source. */
+    let agentMs = 0
     /** Where person id's way has them now: their clock, less how late queueing has made them. */
     const pose = (id: number): LifePose => {
       const l = loops[id]!
       const late = space.delay[id]!
-      return lifePose(l.steps, l.real ? secs - late : day - (late * SPEEDUP) / 3600, l.period)
+      if (l.figure === undefined) return lifePose(l.steps, day - (late * SPEEDUP) / 3600, 24)
+      const t1 = performance.now()
+      // an agent not on the island (not yet come, or gone), or a spare figure, is drawn nowhere: as
+      // someone indoors
+      const agent = figures[l.figure]?.agent
+      const p = (agent != null ? source?.poseAt(agent, secs - late) : null) ?? {
+        ...(poses[id] ?? OFF_ISLAND),
+        indoors: true,
+      }
+      agentMs += performance.now() - t1
+      return p
     }
     /** People at each duel now, by pair (drills.ts): a side alone plays its routine's solo. */
     const duelling = new Map<number, number>()
@@ -361,10 +439,14 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
           hidden: p.indoors || (hiddenAt !== null && hiddenAt(x, zz)),
         }
       }
-      const clip = (p.act !== "walk" && p.clip) || look.clips[p.act]
+      // walking: the walk, or the run a hero takes on a long way (sim RUN_CLIP); at a spot, its clip
+      const clip = p.clip && (p.act !== "walk" || p.clip === RUN_CLIP) ? p.clip : look.clips[p.act]
       // walking: the feet keep pace with the ground covered; standing: the clip's own time
       phase[id] =
-        phase[id]! + (p.act === "walk" ? moved / (STRIDE * look.scale) : dt / (durations.get(clip) ?? 1.5))
+        phase[id]! +
+        (p.act === "walk"
+          ? moved / ((clip === RUN_CLIP ? RUN_STRIDE : STRIDE) * look.scale)
+          : dt / (durations.get(clip) ?? 1.5))
       return {
         position: [x, y, zz],
         heading: p.facing,
@@ -375,8 +457,13 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     }
     // the CPU a frame of life costs (sampling, the crowd's update, the banners), smoothed
     let cpuMs = 0
+    // of which the agents' poses (their source's samples), smoothed
+    let agentCpu = 0
     const tick = (step: number) => {
       const t1 = performance.now()
+      agentMs = 0
+      source?.tick?.()
+      assign()
       dt = step
       const clock = opts.hour()
       if (Math.abs(clock - seen) > 1e-6) {
@@ -388,19 +475,21 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       clockNow = day
       const t2 = performance.now()
       stage.timing.cpu.add("life", t2 - t1)
+      agentCpu += (agentMs - agentCpu) * 0.05
       crowd?.update(step, sample)
       const t3 = performance.now()
       stage.timing.cpu.add("crowd", t3 - t2)
       // banners over their agents, nudged up off each other where they would overlap
       const placed: [number, number][] = []
-      const shown = banners
-        .map((el, k) => {
-          const id = agentIds[k]!
+      const shown = figures
+        .flatMap((f) => (f.el ? [{ el: f.el, id: f.crowd }] : []))
+        .map(({ el, id }) => {
           const x = space.x[id]!
           const zz = space.z[id]!
-          const y = footAt(x, zz, poses[id] ?? pose(id))
-          // an agent on land not yet there (a history replay) has no banner either
-          if (hiddenAt?.(x, zz)) return { el, at: null }
+          const p = poses[id] ?? pose(id)
+          const y = footAt(x, zz, p)
+          // an agent not on the island, or on land not yet there (a history replay), has no banner either
+          if (p.indoors || hiddenAt?.(x, zz)) return { el, at: null }
           return { el, at: toScreen(stage, [x, y + BANNER_UP, zz]) }
         })
         .sort((a, b) => (b.at?.[1] ?? 0) - (a.at?.[1] ?? 0))
@@ -441,6 +530,14 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       }
       return false
     }
+    heroAt = (id) => {
+      const f = figures.find((g) => g.agent === id)
+      const p = f && poses[f.crowd]
+      if (!f || !p || p.indoors) return null
+      const x = space.x[f.crowd]!
+      const zz = space.z[f.crowd]!
+      return [x, footAt(x, zz, p), zz]
+    }
     unFrame = stage.onFrame(tick)
     tick(0)
     // heroes load as the crowd first updates: let them settle before `ready` resolves
@@ -449,7 +546,28 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     const ext = window.guildhall?.ext
     if (ext)
       ext.life = {
-        stats: () => ({ folk: folk.length, agents: agentIds.length, cpuMs, ...crowd?.stats() }),
+        stats: () => ({
+          folk: folk.length,
+          agents: agentIds.length,
+          cpuMs,
+          agentMs: agentCpu,
+          ...crowd?.stats(),
+        }),
+        // for shots and tests: where each agent is now (null: not on the island)
+        agents: () =>
+          figures.flatMap((f) =>
+            f.agent === null
+              ? []
+              : [
+                  {
+                    id: f.agent,
+                    name: source?.list().find((a) => a.id === f.agent)?.name,
+                    at: poses[f.crowd]?.indoors ? null : [space.x[f.crowd], space.z[f.crowd]],
+                    act: poses[f.crowd]?.act,
+                  },
+                ],
+          ),
+        heroAt: (id: string) => heroAt(id),
         walk: { nodes: plan.stats.nodes, edges: plan.stats.edges },
       }
     logger.info("life", {
@@ -474,11 +592,16 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       hiddenAt = at
     },
     doorways: () => doorways,
+    setAgents(next) {
+      source = next
+      swapped = true
+    },
+    heroAt: (id) => heroAt(id),
     dispose() {
       disposed = true
       unFrame()
       crowd?.dispose()
-      for (const el of banners) el.remove()
+      for (const el of opts.host.querySelectorAll("[data-hero-banner]")) el.remove()
       for (const done of cleanup) done()
       const ext = window.guildhall?.ext
       if (ext) delete ext.life

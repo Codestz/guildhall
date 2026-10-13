@@ -140,10 +140,12 @@ describe("runHexJob life stage", () => {
     expect(life).not.toBeNull()
   })
 
-  test("carries everyone's day, the agents' rounds, the solids, the walkways and the doorways", () => {
+  test("carries everyone's day, the agents' itineraries, the solids, the walkways and the doorways", () => {
     expect(life!.folk.length).toBeGreaterThan(10)
-    expect(life!.agents.length).toBe(3)
-    for (const a of life!.agents) expect(a.period).toBeGreaterThan(0)
+    // the demo story's guild, planned: three heroes with their itineraries, a round that loops
+    expect(life!.agents?.cast).toHaveLength(3)
+    expect(life!.agents?.itineraries).toHaveLength(3)
+    expect(life!.agents!.period).toBeGreaterThan(0)
     expect(life!.solids.length).toBeGreaterThan(50)
     expect(life!.doorways.length).toBeGreaterThan(0)
     expect(life!.stats.nodes).toBeGreaterThan(0)

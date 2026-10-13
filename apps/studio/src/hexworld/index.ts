@@ -91,10 +91,12 @@ import {
 } from "./job.ts"
 import { clock, islandKnobs } from "./knobs.ts"
 import { createLife, type Life } from "./life.ts"
-import type { LifePlan } from "./lifePlan.ts"
+import { agentFeedOf, agentSource } from "./lifeAgents.ts"
+import type { AgentDesk, AgentDeskReply, AgentDeskRequest, LifePlan } from "./lifePlan.ts"
 import { HALL_STEPS, LINES, loadPlan, PITCH, STEPS, type Step } from "./loading.ts"
 import { createPlaceLabels, kindWord, labelsOn, type PlaceLabels } from "./places.ts"
 import { loaderOn, publishWorld, settle } from "./ready.ts"
+import { sessionAgents } from "./sessionAgents.ts"
 
 const logger = log("studio:hexworld")
 
@@ -121,6 +123,11 @@ interface Stages {
   shore: Promise<ShoreStage>
   /** Settles only when the spec asked for life (`?life=0` leaves it pending; disposing fails it). */
   life: Promise<LifePlan>
+  /**
+   * A session's heroes planned where the walk graph is (the worker's life desk, after the `life` stage):
+   * its events since the last call in, every hero's itinerary out (null: no desk, or it failed).
+   */
+  planAgents(req: AgentDeskRequest): Promise<AgentDeskReply | null>
   dispose(): void
 }
 
@@ -148,8 +155,15 @@ function startJob(spec: Promise<HexJobSpec>): Stages {
   }
   // a screen torn down mid-build drops the stages it no longer waits on quietly
   for (const p of [map, ground, pieces, shore, life]) p.catch(() => {})
+  // the agents' planning, after the build: requests answered in turn, by id
+  const asked = new Map<number, (reply: AgentDeskReply | null) => void>()
+  let nextAsk = 1
+  let desk: AgentDesk | null = null
   const take = (msg: FromWorker) => {
-    if (msg.type === "map") onMap.take(msg.map)
+    if (msg.type === "agents") {
+      asked.get(msg.id)?.(msg.reply)
+      asked.delete(msg.id)
+    } else if (msg.type === "map") onMap.take(msg.map)
     else if (msg.type === "ground") onGround.take(msg.ground)
     else if (msg.type === "pieces") onPieces.take(msg.pieces)
     else if (msg.type === "shore") onShore.take(msg.shore)
@@ -171,7 +185,7 @@ function startJob(spec: Promise<HexJobSpec>): Stages {
   } else
     spec.then((s) => {
       try {
-        runHexJob(s, take)
+        desk = runHexJob(s, take)
       } catch (error) {
         fail(error instanceof Error ? error : new Error(String(error)))
       }
@@ -182,7 +196,18 @@ function startJob(spec: Promise<HexJobSpec>): Stages {
     pieces,
     shore,
     life,
+    planAgents(req) {
+      if (!worker) return Promise.resolve(desk?.plan(req) ?? null)
+      const id = nextAsk++
+      const w = worker
+      return new Promise((answer) => {
+        asked.set(id, answer)
+        w.postMessage({ type: "agents", id, req } satisfies ToWorker)
+      })
+    },
     dispose() {
+      for (const answer of asked.values()) answer(null)
+      asked.clear()
       worker?.terminate()
       // a stage still awaited settles (a settled one ignores this), so nothing waits on a dead job
       fail(new Error("disposed"))
@@ -255,6 +280,8 @@ export interface HudParts {
   clock: { get(): number; set(hour: number): void }
   /** The event FX (with `extra.fx` or `?fx=`), else null. */
   fx: Fx | null
+  /** Where a session's hero is drawn now (its feet, metres; null: not on the island, or no life). */
+  heroAt(id: string): [number, number, number] | null
 }
 
 /** What `window.guildhall.ext.hall` tells the shots: how long each part took, and the places built. */
@@ -359,8 +386,14 @@ const world = {
       go("Map", 0.07)
     })
     // the authored tile prefabs (data/tiles) before anything is built from them in the worker
+    // the agents life plans with (lifeAgents.ts): the demo story; `?agents=0` none; a hall playing a
+    // session (`?feed=`) none at first, then its session's heroes (sessionAgents.ts, once its HUD is up)
+    const session = hall && ctx.query.has("feed")
+    const agentsFeed = lifeOn && !session ? agentFeedOf(ctx.query.get("agents")) : Promise.resolve(null)
     const job = startJob(
-      Promise.all([read, loadTiles()]).then(([, tiles]) => ({
+      Promise.all([read, loadTiles(), agentsFeed]).then(([, tiles, agents]) => ({
+        agents,
+        ...(stats.repo?.kind === "chronicled" ? { repo: stats.repo.name } : {}),
         seed,
         files,
         ground: groundOf(ctx.query.get("ground")),
@@ -396,6 +429,7 @@ const world = {
     let island: HexIsland | null = null
     let unHud = () => {}
     let fx: Fx | null = null
+    let unAgents = () => {}
     let pick: ((index: number) => void) | null = null
     let dayClock: HudParts["clock"] = { get: () => 0, set: () => {} }
     const meshes: TerrainMesh[] = []
@@ -615,6 +649,9 @@ const world = {
         life = createLife(stage, {
           host,
           plan: job.life,
+          // the agents: the guild the worker planned (the demo story); a session's come later
+          agents: job.life.then((plan) => (plan.agents ? agentSource(plan.agents) : null)),
+          agentPool: session,
           debug: overlay
             ? () => {
                 const island = hexIsland({ ...shape, seed, files })
@@ -751,6 +788,24 @@ const world = {
           },
           clock: dayClock,
           fx,
+          heroAt: (id) => life?.heroAt(id) ?? null,
+        })
+      // a hall's session drives its heroes: planned in the worker as its log grows (the HUD starts the
+      // session as it mounts, which may be a moment after this: looked for until it is there)
+      if (session && life)
+        void import("../hall/hud/mount.tsx").then(({ hallSession }) => {
+          const look = (tries: number) => {
+            const playing = hallSession()
+            if (disposed || !life) return
+            if (!playing) {
+              if (tries > 0) setTimeout(() => look(tries - 1), 100)
+              return
+            }
+            const agents = sessionAgents(playing, (req) => job.planAgents(req))
+            life.setAgents(agents)
+            unAgents = agents.dispose
+          }
+          look(300)
         })
       if (cover) {
         publishWorld("ready")
@@ -788,6 +843,7 @@ const world = {
       disposeField()
       air?.dispose()
       night?.dispose()
+      unAgents()
       life?.dispose()
       doors?.dispose()
       fx?.dispose()

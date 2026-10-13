@@ -13,8 +13,8 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { DEMO_AGENTS } from "../../../apps/studio/src/hexworld/lifeAgents.ts"
 import {
+  type AgentErrand,
   agentLoop,
   HARD,
   HEX_TILE_SIZE,
@@ -67,6 +67,31 @@ function inside(s: Solid, step: number): [number, number][] {
     for (let z = z0; z <= z1; z += step) if (solidDistance(s, x, z) < -0.01) out.push([x, z])
   return out
 }
+
+/** Three agents' rounds of errands (the Studio's old scripted demo; world `agentLoop` still plans them). */
+const DEMO_AGENTS: readonly { id: string; recipe: string; errands: AgentErrand[] }[] = [
+  {
+    id: "claude",
+    recipe: "mage",
+    errands: [
+      { place: "market", work: 40, idle: 6 },
+      { place: "monastery", work: 35, idle: 12 },
+    ],
+  },
+  {
+    id: "warden",
+    recipe: "guard",
+    errands: [{ place: "camp", scene: "training-arena", work: 45, idle: 10 }],
+  },
+  {
+    id: "scout",
+    recipe: "archer",
+    errands: [
+      { place: "harbour", work: 30, idle: 4 },
+      { place: "mine", work: 30, idle: 8 },
+    ],
+  },
+]
 
 describe("buildings stand on ground", () => {
   for (const seed of [1, 2, 3])

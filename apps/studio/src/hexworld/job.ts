@@ -38,7 +38,14 @@ import {
   type PlaceSpec,
   type TilePrefab,
 } from "@guildhall/world"
-import { type LifePlan, planLife } from "./lifePlan.ts"
+import type { AgentFeed } from "./lifeAgents.ts"
+import {
+  type AgentDesk,
+  type AgentDeskReply,
+  type AgentDeskRequest,
+  type LifePlan,
+  planLifeDesk,
+} from "./lifePlan.ts"
 
 type RGB = [number, number, number]
 const TOP: Record<string, RGB> = {
@@ -92,6 +99,10 @@ export interface HexJobSpec {
   places?: PlaceSpec[]
   /** Plan the island's life as the last stage (lifePlan.ts); left out or false: no `life` stage (`?life=0`). */
   life?: boolean
+  /** The agents life plans with it (lifeAgents.ts): the demo story, a recorded guild, or none (null). */
+  agents?: AgentFeed | null
+  /** The repo's name ("owner/name"), for binding a recording's absolute paths to its places. */
+  repo?: string
 }
 
 /** A repo's place as built: its spec, the zone's kind, its tiles, and where its heart is (x, top, z). */
@@ -217,13 +228,16 @@ export interface ShoreStage {
   ms: number
 }
 
-export type ToWorker = { type: "job"; spec: HexJobSpec }
+export type ToWorker =
+  | { type: "job"; spec: HexJobSpec }
+  | { type: "agents"; id: number; req: AgentDeskRequest }
 export type FromWorker =
   | { type: "map"; map: MapStage }
   | { type: "ground"; ground: GroundStage }
   | { type: "pieces"; pieces: PackedPieces }
   | { type: "shore"; shore: ShoreStage }
   | { type: "life"; life: LifePlan }
+  | { type: "agents"; id: number; reply: AgentDeskReply | null }
   | { type: "fail"; message: string }
 
 const SQ3 = Math.sqrt(3)
@@ -421,7 +435,7 @@ export function runHexJob(
   spec: HexJobSpec,
   post: (msg: FromWorker) => void,
   now: () => number = () => performance.now(),
-): void {
+): AgentDesk | null {
   const times: Record<string, number> = {}
   let t0 = now()
   const lap = (name: string) => {
@@ -552,6 +566,15 @@ export function runHexJob(
   post({ type: "shore", shore: { min, size, res, reach: SHORE_REACH, data, ms: Math.round(now() - t0) } })
   if (spec.life) {
     const placed = { ...w, pieces: w.pieces.map((p, k) => ({ ...p, y: placedY[k] as number })) }
-    post({ type: "life", life: planLife(h, z, placed, spec.seed, now) })
+    const agents = spec.agents === undefined ? ({ kind: "story" } as const) : spec.agents
+    const opts = {
+      agents,
+      ...(spec.places ? { places: spec.places } : {}),
+      ...(spec.repo ? { repo: spec.repo } : {}),
+    }
+    const { plan, desk } = planLifeDesk(h, z, placed, spec.seed, now, opts)
+    post({ type: "life", life: plan })
+    return desk
   }
+  return null
 }

@@ -21,12 +21,21 @@ export interface Readout {
   folded?: boolean
 }
 
+export interface CardAction {
+  label: string
+  run(): void
+  /** The one brass-outlined way on; the rest are plain. */
+  primary?: boolean
+}
+
 export interface TitleInfo {
   eyebrow?: string
   title: string
   subtitle?: string
   /** Headline numbers under the title (keep to four). */
   figures?: readonly Stat[]
+  /** Buttons at the foot of the card: where to go from here ("Open in 3D"). */
+  actions?: readonly CardAction[]
   /** One quiet line at the foot of the card: what is happening now ("Placing pieces…"). */
   status?: string | null
 }

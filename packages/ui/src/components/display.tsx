@@ -52,8 +52,9 @@ const show = (v: string | number) => (typeof v === "number" ? v.toLocaleString("
 export function StatRows({ rows }: { rows: readonly Stat[] }) {
   return (
     <dl className="ui-stats">
-      {rows.map((r) => (
-        <div key={r.label} style={{ display: "contents" }}>
+      {rows.map((r, k) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional and labels may repeat
+        <div key={k} style={{ display: "contents" }}>
           <dt title={r.label}>{r.label}</dt>
           <dd data-tone={r.tone}>
             {show(r.value)}
@@ -95,8 +96,9 @@ export interface LegendItem {
 export function Legend({ items, label }: { items: readonly LegendItem[]; label?: string }) {
   return (
     <ul className="ui-legend" aria-label={label}>
-      {items.map((it) => (
-        <li key={`${it.label}-${it.colour}-${it.value ?? ""}`}>
+      {items.map((it, k) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional and may repeat (two hamlets)
+        <li key={k}>
           <i style={{ background: it.colour }} aria-hidden="true" />
           <span title={it.label}>{it.label}</span>
           {it.value !== undefined && (

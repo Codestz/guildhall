@@ -139,7 +139,13 @@ export function Slider({
         <label className="ui-field-label" htmlFor={id}>
           {label}
         </label>
-        <output className="ui-field-value" htmlFor={id} data-changed={changed ? "" : undefined}>
+        {/* the slider's own aria-valuetext says the value: the readout is for eyes only */}
+        <output
+          className="ui-field-value"
+          htmlFor={id}
+          aria-hidden="true"
+          data-changed={changed ? "" : undefined}
+        >
           {format(value)}
         </output>
       </div>

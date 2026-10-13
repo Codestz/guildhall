@@ -50,6 +50,7 @@ export {
   writeKnob,
 } from "./viewer/knobs.ts"
 export type {
+  CardAction,
   HelpEntry,
   Loading,
   Readout,

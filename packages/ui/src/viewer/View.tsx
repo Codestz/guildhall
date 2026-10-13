@@ -26,6 +26,8 @@ import { type Store, useSlice } from "./store.ts"
 import type { HelpEntry } from "./types.ts"
 
 export interface Actions {
+  /** The chrome is on the page (its first commit): what it covers can be measured. */
+  committed(): void
   setKnob(key: string, value: KnobValue): void
   rebuild(): void
   discard(): void
@@ -46,6 +48,15 @@ function TitleCard({ store }: { store: Store }) {
       <h1 className="ui-title">{info.title}</h1>
       {info.subtitle && <p className="ui-sub">{info.subtitle}</p>}
       {info.figures && info.figures.length > 0 && <Figures rows={info.figures} />}
+      {info.actions && info.actions.length > 0 && (
+        <div className="actions">
+          {info.actions.map((a) => (
+            <Button key={a.label} size="sm" variant={a.primary ? "outline" : "secondary"} onClick={a.run}>
+              {a.label}
+            </Button>
+          ))}
+        </div>
+      )}
       {info.status && (
         <p className="status" role="status">
           <i aria-hidden="true" />
@@ -304,6 +315,11 @@ function Inspector({ store, act, id }: { store: Store; act: Actions; id: string 
   const sections = useSlice(store, (s) => s.sections)
   const readout = useSlice(store, (s) => s.readout)
   const head = useId()
+  // closing from inside hands focus back to the toggle, never to a hidden element
+  const close = () => {
+    act.toggleInspector(false)
+    document.querySelector<HTMLElement>(`[aria-controls="${CSS.escape(id)}"]`)?.focus()
+  }
   return (
     <aside
       id={id}
@@ -313,13 +329,13 @@ function Inspector({ store, act, id }: { store: Store; act: Actions; id: string 
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.stopPropagation()
-          act.toggleInspector(false)
+          close()
         }
       }}
     >
       <div className="ui-inspector-head">
         <h2 id={head}>Inspector</h2>
-        <IconButton label="Close the inspector" onClick={() => act.toggleInspector(false)}>
+        <IconButton label="Close the inspector" onClick={close}>
           <CloseIcon />
         </IconButton>
       </div>
@@ -364,6 +380,7 @@ function Veil({ store }: { store: Store }) {
 
 export function View({ store, act, slot }: { store: Store; act: Actions; slot: HTMLElement }) {
   const inspectorId = useId()
+  useEffect(() => act.committed(), [act])
   return (
     <>
       <div className="ui-corner" data-at="tl">

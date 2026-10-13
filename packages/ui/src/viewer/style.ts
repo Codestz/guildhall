@@ -33,6 +33,7 @@ export const VIEWER_CSS = /* css */ `
 .ui-titlecard { width: max-content; min-width: 220px; max-width: 360px; padding: 11px 14px 12px; display: grid; gap: 7px; }
 .ui-titlecard .ui-sub { max-width: 52ch; }
 .ui-titlecard .ui-figures { padding-top: 8px; border-top: 1px solid var(--hair); }
+.ui-titlecard .actions { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 2px; }
 .ui-titlecard .status { display: flex; align-items: center; gap: 8px; margin: 0; font-size: var(--t-sm); color: var(--muted); }
 .ui-titlecard .status i { width: 6px; height: 6px; border-radius: 50%; background: var(--brass); animation: ui-pulse 1.4s ease-in-out infinite; }
 @keyframes ui-pulse { 50% { opacity: 0.35; } }
@@ -171,7 +172,9 @@ export const VIEWER_CSS = /* css */ `
   }
   .ui-viewer[data-inspector="open"] .ui-corner[data-at="br"], .ui-viewer[data-inspector="open"] .ui-corner[data-at="bl"] { display: none; }
   .ui-corner[data-at="br"] { right: var(--gut); }
-  .ui-corner[data-at="bl"] { right: calc(var(--gut) + 48px); }
+  /* the transport takes the whole bottom edge; the camera pills stand above it */
+  .ui-corner[data-at="bl"] { right: var(--gut); }
+  .ui-viewer:has(.ui-transport) .ui-corner[data-at="br"] { bottom: calc(var(--gut) + 56px); }
   .ui-transport { width: 100%; height: 48px; gap: 10px; padding: 0 12px 0 8px; }
 }
 @container viewer (max-height: 460px) {

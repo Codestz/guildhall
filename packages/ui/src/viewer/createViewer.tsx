@@ -85,6 +85,7 @@ export function createViewer(host: HTMLElement, opts: ViewerOptions): Viewer {
       title: opts.title,
       subtitle: opts.subtitle,
       figures: opts.figures,
+      actions: opts.actions,
       status: opts.status ?? null,
     },
     readout: [],
@@ -176,6 +177,7 @@ export function createViewer(host: HTMLElement, opts: ViewerOptions): Viewer {
   }
 
   const act: Actions = {
+    committed: layout,
     setKnob: (key, value) => setValues({ [key]: value }, false),
     rebuild() {
       const values = store.get().values

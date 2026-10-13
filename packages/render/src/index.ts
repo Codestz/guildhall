@@ -110,6 +110,7 @@ export {
   shoreFieldTexture,
 } from "./shoreField.ts"
 export { createSky, type Sky, type SkyPreset } from "./sky.ts"
+export { createSlicer, NO_SLICE, type Slicer } from "./slice.ts"
 export { createStage, type Stage, toScreen } from "./stage.ts"
 export {
   type Box,

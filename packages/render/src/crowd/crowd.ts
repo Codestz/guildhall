@@ -38,8 +38,9 @@ import type { LodCounts } from "../lod.ts"
 import { simplifierReady } from "../lodGeometry.ts"
 import { paletteMaterial } from "../material.ts"
 import { loadPiece } from "../pieces.ts"
+import { createSlicer } from "../slice.ts"
 import type { Stage } from "../stage.ts"
-import { type BakePose, type BoneBake, bakeBytes, bakeClips, boneMap, frameAt } from "./bake.ts"
+import { type BakePose, type BoneBake, bakeBytes, bakeClipsSliced, boneMap, frameAt } from "./bake.ts"
 import { createBlobs } from "./blobs.ts"
 import {
   chooseHeroes,
@@ -222,7 +223,9 @@ export async function createCrowd(
   const clips = wanted.flatMap((name) => rigBody.clips.filter((c) => c.name === name))
   for (const name of wanted)
     if (!clips.some((c) => c.name === name)) logger.warn("clip not in the rig", { clip: name })
-  const bake = bakeClips(rigBody.root, clips, opts.fps ?? 30)
+  // the build is sliced across frames (slice.ts): the same bake and bodies, no long task on this thread
+  const slicer = createSlicer()
+  const bake = await bakeClipsSliced(rigBody.root, clips, opts.fps ?? 30, slicer)
   const tint = tintTable()
   const uniforms = crowdUniforms(bake, tint)
 
@@ -238,6 +241,7 @@ export async function createCrowd(
     const base = mergeParts(parts, joints)
     geometries.push([base, ...BODY_TIERS.map((tier) => simplifyParts(base, tier))])
     partNames.push(parts.map((p) => p.name))
+    await slicer.yield()
   }
   const vertices = geometries.flat().reduce((n, g) => n + g.getAttribute("position").count, 0)
   const indices = geometries.flat().reduce((n, g) => n + (g.index?.count ?? 0), 0)

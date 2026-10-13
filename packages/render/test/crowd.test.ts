@@ -21,12 +21,13 @@ import {
 import { createCharacter } from "../src/character/load.ts"
 import { attachMount } from "../src/character/mount.ts"
 import { dressNpc } from "../src/character/npc.ts"
-import { type BakePose, bakeClips, boneAt, boneMap, frameAt } from "../src/crowd/bake.ts"
+import { type BakePose, bakeClips, bakeClipsSliced, boneAt, boneMap, frameAt } from "../src/crowd/bake.ts"
 import { advance, bakePose, FADE, lookClips } from "../src/crowd/crowd.ts"
 import { chooseHeroes, heroShown, type Playing, poseHero, SHORT, TALL } from "../src/crowd/heroes.ts"
 import { outfitTable, tintTable } from "../src/crowd/outfit.ts"
 import { mergeBody, mergeParts, skinnedParts } from "../src/crowd/parts.ts"
 import { propMatrix } from "../src/crowd/props.ts"
+import { createSlicer } from "../src/slice.ts"
 
 const ramp = (name: string) => PALETTE.ramps.find((r) => r.name === name)!.tones
 const TIMBER = ramp("timber")
@@ -350,5 +351,22 @@ describe("parts", () => {
     expect(skinnedParts(root)).toEqual([mesh])
     expect(mesh.geometry.getAttribute("position").count).toBe(3)
     expect(mesh.skeleton).toBe(parts[0]!.skeleton)
+  })
+})
+
+describe("bakeClipsSliced", () => {
+  test("writes the bytes bakeClips writes, a clip a slice", async () => {
+    const whole = bakeClips(body().root, CLIPS, 30)
+    let clock = 0
+    // a budget of 0: every step yields, so each clip is its own slice
+    const sliced = await bakeClipsSliced(
+      body().root,
+      CLIPS,
+      30,
+      createSlicer(0, () => clock++),
+    )
+    expect(sliced.data).toEqual(whole.data)
+    expect(sliced.clips).toEqual(whole.clips)
+    expect(sliced.bones).toEqual(whole.bones)
   })
 })

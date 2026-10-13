@@ -37,6 +37,7 @@ import {
   type SkinnedMesh,
   Vector3,
 } from "three"
+import type { Slicer } from "../slice.ts"
 
 export interface BakedClip {
   name: string
@@ -88,6 +89,33 @@ export function firstSkinned(root: Object3D): SkinnedMesh | undefined {
  * the clips need more rows than a texture may have.
  */
 export function bakeClips(body: Object3D, clips: readonly AnimationClip[], fps: number): BoneBake {
+  const steps = bakeSteps(body, clips, fps)
+  for (;;) {
+    const next = steps.next()
+    if (next.done) return next.value
+  }
+}
+
+/**
+ * The same bake, one clip a step, yielding to `slicer` between clips (slice.ts) so a crowd built on
+ * the main thread never holds it for long: the bytes are the ones `bakeClips` writes.
+ */
+export async function bakeClipsSliced(
+  body: Object3D,
+  clips: readonly AnimationClip[],
+  fps: number,
+  slicer: Slicer,
+): Promise<BoneBake> {
+  const steps = bakeSteps(body, clips, fps)
+  for (;;) {
+    const next = steps.next()
+    if (next.done) return next.value
+    await slicer.yield()
+  }
+}
+
+/** The bake as steps: the setup, then one clip per step, then the texture. */
+function* bakeSteps(body: Object3D, clips: readonly AnimationClip[], fps: number): Generator<void, BoneBake> {
   body.position.set(0, 0, 0)
   body.quaternion.identity()
   body.scale.set(1, 1, 1)
@@ -140,6 +168,7 @@ export function bakeClips(body: Object3D, clips: readonly AnimationClip[], fps: 
         if (!((data[at + 7] as number) > EMPTY)) data.copyWithin(at, at + rowFloats, at + rowFloats + 4)
       }
     mixer.uncacheAction(clip)
+    yield
   }
   mixer.uncacheRoot(body)
 

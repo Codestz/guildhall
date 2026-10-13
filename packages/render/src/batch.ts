@@ -15,6 +15,7 @@ import { lodError, shellGeometry, simplifierReady, simplifyGeometry, surfaceArea
 import { batchMaterial } from "./material.ts"
 import { GLOW_SWATCHES } from "./night/glow.ts"
 import { instanceSwatchMap } from "./recipe.ts"
+import { createSlicer } from "./slice.ts"
 import type { Stage } from "./stage.ts"
 import { swatchMapKey } from "./tint.ts"
 
@@ -121,6 +122,9 @@ export function instanceMatrix(
  * called once per piece; a failed load rejects. Per-instance frustum culling runs for the camera and
  * each shadow camera; instances are not sorted (one opaque material). Without `WEBGL_multi_draw` three
  * draws one call per instance, so that is logged as an error.
+ *
+ * The baking (LOD tiers, shells, the copies into the mesh) is sliced across frames (slice.ts): the same
+ * geometry lands, but no single task holds the main thread (it was ~330 ms for 18 k pieces).
  */
 export async function createStaticBatch(
   stage: Pick<Stage, "scene" | "renderer">,
@@ -137,6 +141,7 @@ export async function createStaticBatch(
   const baked = new Map<string, Promise<BufferGeometry[]>>()
   /** Variant key, or `shell:` + cluster key → geometry id in the mesh. */
   const geometryIds = new Map<string, number>()
+  const slicer = createSlicer()
   let mesh: LodBatchedMesh | null = null
   let vertices = 0
   let indices = 0
@@ -154,9 +159,11 @@ export async function createStaticBatch(
         piece = load(instance.piece)
         pieces.set(instance.piece, piece)
       }
-      geometry = Promise.all([piece, simplifierReady]).then(([root]) =>
-        withTiers(batchGeometry(root, instanceSwatchMap(instance), GLOW_SWATCHES[instance.piece])),
-      )
+      geometry = Promise.all([piece, simplifierReady]).then(async ([root]) => {
+        // many pieces resolve in one tick: their bakes are spread over frames
+        await slicer.yield()
+        return withTiers(batchGeometry(root, instanceSwatchMap(instance), GLOW_SWATCHES[instance.piece]))
+      })
       baked.set(key, geometry)
     }
     return geometry
@@ -185,6 +192,7 @@ export async function createStaticBatch(
           return { geometry: tiers[tiers.length - 1] as BufferGeometry, matrix: instanceMatrix(part) }
         }),
       )
+      await slicer.yield()
       missing.set(key, [shellGeometry(parts, SHELL)])
     }
     // Another add may have put some in while this one waited.
@@ -224,6 +232,8 @@ export async function createStaticBatch(
         mesh.setInstanceCount(Math.max(needInstances, Math.ceil(mesh.maxInstanceCount * GROWTH)))
     }
     for (const [key, tiers] of missing) {
+      // the copies into the mesh, a few a slice (a frame drawn meanwhile has no instance of them yet)
+      await slicer.yield()
       const ids = new Map<BufferGeometry, number>()
       for (const g of tiers) {
         if (ids.has(g)) continue

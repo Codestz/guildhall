@@ -39,7 +39,9 @@ const UNCAPPED_ARGS = ["--disable-gpu-vsync", "--disable-frame-rate-limit"]
 
 export function chromeArgs(): string[] {
   const capped = process.env.GUILDHALL_UNCAPPED !== "1" && onBattery()
-  return ["--use-angle=metal", "--enable-gpu", ...(capped ? [] : UNCAPPED_ARGS)]
+  // GUILDHALL_ANGLE=gl tries the OpenGL backend (its GPU timer queries read differently from Metal's)
+  const angle = process.env.GUILDHALL_ANGLE || "metal"
+  return [`--use-angle=${angle}`, "--enable-gpu", ...(capped ? [] : UNCAPPED_ARGS)]
 }
 
 function onBattery(): boolean {

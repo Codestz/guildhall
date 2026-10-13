@@ -94,7 +94,11 @@ export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } 
   const observer = new ResizeObserver(resize)
   observer.observe(host)
 
-  const timing = createTiming(renderer)
+  // GPU timer queries on `?timers=1` only: on ANGLE/Metal they cost ~1.3 ms a frame (they split the
+  // command buffers) and read command-buffer wall time rather than pass cost. The CPU buckets always run.
+  const timing = createTiming(renderer, {
+    gpu: new URLSearchParams(globalThis.location?.search ?? "").get("timers") === "1",
+  })
 
   // three counts shadow-map draws into the same `info.render` as the main pass; tally them apart, and
   // time them as their own GPU pass (they run inside `renderer.render`, so the scene's scope pauses).

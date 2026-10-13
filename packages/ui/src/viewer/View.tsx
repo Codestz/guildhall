@@ -116,7 +116,7 @@ function Perf({ store }: { store: Store }) {
               ))}
             </dl>
           ) : (
-            <p className="none">No GPU timers here</p>
+            <p className="none">GPU timers off (?timers=1)</p>
           )}
           {cpu.length > 0 && (
             <dl>

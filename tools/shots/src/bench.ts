@@ -14,6 +14,13 @@
  * governor cannot trade resolution for time under the bench's nose. A still camera costs no shadow
  * passes (the cascades re-render only as their snapped centre moves), so `--turn` poses are sampled
  * again while the orbit turns slowly (`<pose>-turn`): that is where shadows and LOD crossfades cost.
+ *
+ * Frames run uncapped (no vsync): on this GPU the main thread then blocks inside `renderer.render` on
+ * the GPU's back-pressure, so the frame time is the GPU's throughput, which a vsync-capped run hides at
+ * 60 or 120 Hz. What each part costs is measured by taking it away (`--variants`: `post=0`, `life=0`,
+ * `atmo=0`, `lod=0`, each its own page load) and reading the p95 difference: the GPU timer queries
+ * (`passes`) are kept in the report, but on ANGLE's Metal backend they measure command-buffer wall
+ * time, not pass cost, and the markdown says so when their sum does not fit the frame.
  */
 import { appendFileSync, existsSync, mkdirSync } from "node:fs"
 import { join, resolve } from "node:path"
@@ -24,7 +31,7 @@ import { serveStudio } from "./server.ts"
 
 export const BENCH_USAGE =
   "usage: bun shots bench [--label name] [--out dir] [--port n] [--seed n] [--files a,b] [--runs n]\n" +
-  "                       [--sample ms] [--poses a,b,…] [--turn a,b,…] [--note text] [--no-ledger]"
+  "                       [--sample ms] [--poses a,b,…] [--turn a,b,…] [--variants q,q,…] [--note text] [--no-ledger]"
 
 export const POSE_NAMES = ["hero", "mid", "wide", "lanterns", "square", "sea"] as const
 export type PoseName = (typeof POSE_NAMES)[number]
@@ -40,6 +47,8 @@ export interface BenchArgs {
   poses: PoseName[]
   /** Poses sampled again while the camera turns slowly. */
   turn: PoseName[]
+  /** Queries the page is loaded again with, each part taken away (`post=0`, `life=0`…); the still poses only. */
+  variants: string[]
   note: string
   ledger: boolean
 }
@@ -57,6 +66,7 @@ export const BENCH_DEFAULTS = {
   turn: ["hero", "wide"] as PoseName[],
   /** Degrees of azimuth a frame while turning: the flicker hunt's creep, slow enough to read as a pan. */
   turnStep: 0.05,
+  variants: ["post=0", "life=0", "atmo=0", "lod=0"],
 } as const
 
 const NAME = /^[a-z0-9]+([-.][a-z0-9]+)*$/
@@ -72,6 +82,7 @@ export function parseBenchArgs(argv: readonly string[]): BenchArgs {
     sampleMs: BENCH_DEFAULTS.sampleMs,
     poses: [...POSE_NAMES],
     turn: [...BENCH_DEFAULTS.turn],
+    variants: [...BENCH_DEFAULTS.variants],
     note: "",
     ledger: true,
   }
@@ -104,7 +115,12 @@ export function parseBenchArgs(argv: readonly string[]): BenchArgs {
       else if (arg === "--runs") args.runs = n
       else args.sampleMs = n
     } else if (arg === "--files") args.files = numbers(arg, value)
-    else if (arg === "--poses" || arg === "--turn") {
+    else if (arg === "--variants") {
+      const variants = value === "" ? [] : value.split(",").map((v) => v.trim())
+      const bad = variants.find((v) => !/^[a-z]+=[a-z0-9.]+$/.test(v))
+      if (bad !== undefined) throw new Error(`--variants wants key=value queries, got "${bad}"`)
+      args.variants = variants
+    } else if (arg === "--poses" || arg === "--turn") {
       const poses = value === "" ? [] : value.split(",").map((p) => p.trim())
       const bad = poses.find((p) => !(POSE_NAMES as readonly string[]).includes(p))
       if (bad !== undefined) throw new Error(`${arg}: no pose "${bad}" (${POSE_NAMES.join(", ")})`)
@@ -170,6 +186,8 @@ export interface SizeResult {
   firstAt: number | null
   longTasks: LongTask[]
   poses: PoseResult[]
+  /** The same still poses with one part taken away, per `--variants` query. */
+  variants: { query: string; poses: PoseResult[] }[]
   errors: string[]
 }
 
@@ -180,6 +198,8 @@ export interface BenchEnv {
   lowPowerMode: boolean | null
   /** Other Chromium processes on the machine when the bench started (other agents' browsers). */
   otherBrowsers: number
+  /** Frames uncapped (no vsync, the GPU's throughput) or at the display's rate. */
+  uncapped: boolean
   size: { width: number; height: number }
   dpr: number
   userAgent: string
@@ -236,6 +256,17 @@ const PASS_ORDER = ["shadows", "opaque", "water", "sky", "crowd", "post"]
 const f1 = (v: number) => v.toFixed(1)
 const f2 = (v: number) => v.toFixed(2)
 
+/** What each variant's absence saves at a pose: p95(full) − p95(without), ms; null when the pose was not sampled. */
+export function variantSavings(size: SizeResult, pose: string): Record<string, number | null> {
+  const full = size.poses.find((p) => p.name === pose)
+  const out: Record<string, number | null> = {}
+  for (const v of size.variants) {
+    const without = v.poses.find((p) => p.name === pose)
+    out[v.query] = full && without ? summarizePose(full).p95 - summarizePose(without).p95 : null
+  }
+  return out
+}
+
 /** The long tasks after the first frame, and the longest of them. */
 export function longTasksAfter(tasks: readonly LongTask[], firstAt: number | null) {
   const after = firstAt === null ? [...tasks] : tasks.filter((t) => t.start >= firstAt)
@@ -251,7 +282,7 @@ export function benchMarkdown(r: BenchReport): string {
   lines.push(
     `git ${e.git} · ${e.power}, low power mode ${e.lowPowerMode === null ? "unknown" : e.lowPowerMode ? "ON" : "off"} · ` +
       `other browsers running: ${e.otherBrowsers} · ${e.size.width}×${e.size.height} @ DPR ${e.dpr} · ` +
-      `${r.runs} runs × ${r.sampleMs} ms · seed ${r.seed}`,
+      `${e.uncapped ? "uncapped (no vsync)" : "vsync"} · ${r.runs} runs × ${r.sampleMs} ms · seed ${r.seed}`,
   )
   for (const size of r.sizes) {
     const passNames = PASS_ORDER.filter((n) =>
@@ -261,18 +292,48 @@ export function benchMarkdown(r: BenchReport): string {
       .filter((n) => !PASS_ORDER.includes(n))
       .sort()
     const cols = [...passNames, ...extra]
+    // the gpu timer columns only when the page had the queries on (`?timers=1`)
+    const gpuHead = cols.length > 0 ? ` gpu | ${cols.join(" | ")} |` : ""
     lines.push("")
     lines.push(`**${size.files.toLocaleString("en-US")} files** · first frame ${size.firstFrame ?? "?"} ms`)
     lines.push("")
-    lines.push(`| pose | fps | p50 | p95 | ±noise | cpu p95 | gpu | ${cols.join(" | ")} | calls | tris |`)
-    lines.push(`|---|${"---:|".repeat(cols.length + 8)}`)
+    lines.push(`| pose | fps | p50 | p95 | ±noise | cpu p95 |${gpuHead} calls | tris |`)
+    lines.push(`|---|${"---:|".repeat(cols.length + (cols.length > 0 ? 8 : 7))}`)
     for (const p of size.poses) {
       const s = summarizePose(p)
+      const gpuCells =
+        cols.length > 0
+          ? ` ${f1(s.gpu)} | ${cols.map((n) => (s.passes[n] === undefined ? "–" : f2(s.passes[n] as number))).join(" | ")} |`
+          : ""
       lines.push(
-        `| ${p.name} | ${Math.round(s.fps)} | ${f1(s.p50)} | ${f1(s.p95)} | ${f1(s.noise)} | ${f1(s.costP95)} | ${f1(s.gpu)} | ` +
-          `${cols.map((n) => (s.passes[n] === undefined ? "–" : f2(s.passes[n] as number))).join(" | ")} | ` +
+        `| ${p.name} | ${Math.round(s.fps)} | ${f1(s.p50)} | ${f1(s.p95)} | ${f1(s.noise)} | ${f1(s.costP95)} |${gpuCells} ` +
           `${s.calls} | ${Math.round(s.tris / 1000)}k |`,
       )
+    }
+    // the timer queries only mean something when a frame's passes fit inside the frame
+    const worst = size.poses.reduce((m, p) => {
+      const s = summarizePose(p)
+      return s.p50 > 0 ? Math.max(m, s.gpu / s.p50) : m
+    }, 0)
+    if (worst > 1.5)
+      lines.push(
+        "",
+        `gpu timer columns are not pass costs here (their sum is ${worst.toFixed(1)}× the frame): ANGLE/Metal times ` +
+          "command buffers, not passes. Read the savings table instead.",
+      )
+    if (size.variants.length > 0) {
+      lines.push("")
+      lines.push(`what each part costs (p95 full − p95 without, ms):`)
+      lines.push("")
+      lines.push(`| pose | ${size.variants.map((v) => v.query).join(" | ")} |`)
+      lines.push(`|---|${"---:|".repeat(size.variants.length)}`)
+      for (const p of size.poses) {
+        if (p.name.endsWith("-turn")) continue
+        const saved = variantSavings(size, p.name)
+        lines.push(
+          `| ${p.name} | ${size.variants.map((v) => (saved[v.query] === null ? "–" : f1(saved[v.query] as number))).join(" | ")} |`,
+        )
+      }
     }
     const cpuNames = [...new Set(size.poses.flatMap((p) => Object.keys(summarizePose(p).cpu)))]
     if (cpuNames.length > 0) {
@@ -324,6 +385,7 @@ export function benchEnv(size: BenchEnv["size"], dpr: number): BenchEnv {
     power: /Battery Power/.test(batt) ? `battery ${batt.match(/(\d+)%/)?.[1] ?? "?"}%` : "AC power",
     lowPowerMode: lpm ? lpm[1] === "1" : null,
     otherBrowsers: others.length,
+    uncapped: process.env.GUILDHALL_UNCAPPED === "1",
     size,
     dpr,
     userAgent: "",
@@ -358,6 +420,8 @@ function stopTurn() {
  * `launchChrome` takes it and the lock goes when the browser does).
  */
 export async function runBenchReport(args: BenchArgs): Promise<BenchReport> {
+  // the GPU's throughput, not the display's rate (chrome.ts caps on battery otherwise)
+  process.env.GUILDHALL_UNCAPPED = "1"
   const env = benchEnv(BENCH_DEFAULTS.size, BENCH_DEFAULTS.dpr)
   const report: BenchReport = {
     label: args.label,
@@ -373,93 +437,108 @@ export async function runBenchReport(args: BenchArgs): Promise<BenchReport> {
     const browser = await launchChrome("bench")
     try {
       for (const files of args.files) {
-        const url = new URL(`/town/${args.seed}`, server.origin)
-        url.searchParams.set("files", String(files))
-        url.searchParams.set("dpr", String(BENCH_DEFAULTS.dpr))
-        const opened = await openPage(browser, { size: BENCH_DEFAULTS.size, dpr: BENCH_DEFAULTS.dpr })
-        const { page } = opened
         const size: SizeResult = {
           files,
-          url: url.toString(),
+          url: "",
           firstFrame: null,
           firstAt: null,
           longTasks: [],
           poses: [],
+          variants: [],
           errors: [],
         }
         report.sizes.push(size)
-        try {
-          await page.goto(url.toString())
-          await waitReady(page)
-          env.userAgent ||= await page.evaluate(() => navigator.userAgent)
-          // the build settles: the heroes load, the shaders compile, the long tasks land
-          await page.waitForTimeout(1500)
-          const build = await page.evaluate(() => {
-            const g = window.guildhall
-            const b = g?.ext.build as { first?: number; firstAt?: number } | undefined
-            return {
-              first: b?.first ?? null,
-              firstAt: b?.firstAt ?? null,
-              longTasks: g?.perf.longTasks?.() ?? [],
+        for (const variant of [null, ...args.variants]) {
+          const url = new URL(`/town/${args.seed}`, server.origin)
+          url.searchParams.set("files", String(files))
+          url.searchParams.set("dpr", String(BENCH_DEFAULTS.dpr))
+          if (variant) {
+            const [k, v] = variant.split("=") as [string, string]
+            url.searchParams.set(k, v)
+          } else size.url = url.toString()
+          const into: PoseResult[] = variant ? [] : size.poses
+          if (variant) size.variants.push({ query: variant, poses: into })
+          const opened = await openPage(browser, { size: BENCH_DEFAULTS.size, dpr: BENCH_DEFAULTS.dpr })
+          const { page } = opened
+          try {
+            await page.goto(url.toString())
+            await waitReady(page)
+            env.userAgent ||= await page.evaluate(() => navigator.userAgent)
+            // the build settles: the heroes load, the shaders compile, the long tasks land
+            await page.waitForTimeout(1500)
+            if (!variant) {
+              const build = await page.evaluate(() => {
+                const g = window.guildhall
+                const b = g?.ext.build as { first?: number; firstAt?: number } | undefined
+                return {
+                  first: b?.first ?? null,
+                  firstAt: b?.firstAt ?? null,
+                  longTasks: g?.perf.longTasks?.() ?? [],
+                }
+              })
+              size.firstFrame = build.first
+              size.firstAt = build.firstAt
+              size.longTasks = build.longTasks
             }
-          })
-          size.firstFrame = build.first
-          size.firstAt = build.firstAt
-          size.longTasks = build.longTasks
-          const hero = await page.evaluate(() => window.guildhall?.camera.get() ?? null)
-          if (!hero) throw new Error("no camera")
-          for (const pose of benchPoses(hero, args.poses)) {
-            await page.evaluate(async (p) => {
-              const g = window.guildhall
-              if (!g) return
-              const clock = g.ext.clock as { set(h: number): void } | undefined
-              clock?.set(p.hour)
-              if (p.free && g.camera.fly) await g.camera.fly(p.free)
-              else if (p.orbit) await g.camera.set(p.orbit)
-            }, pose)
-            await page.waitForTimeout(BENCH_DEFAULTS.settleMs)
-            const result: PoseResult = {
-              name: pose.name,
-              hour: pose.hour,
-              camera: await page.evaluate(() => window.guildhall?.camera.get() ?? null),
-              runs: [],
-            }
-            const sample = async (into: FrameStats[]) => {
-              for (let k = 0; k < args.runs; k++) {
-                const stats = await page.evaluate(
-                  (ms) => window.guildhall?.perf.sample(ms) ?? null,
-                  args.sampleMs,
-                )
-                if (stats) into.push(stats)
-              }
-            }
-            await sample(result.runs)
-            size.poses.push(result)
-            mkdirSync(resolve(args.out, "shots"), { recursive: true })
-            await page.screenshot({
-              path: resolve(args.out, "shots", `${args.label}-${pose.name}-${files}.png`),
-              type: "png",
-            })
-            if (pose.orbit && args.turn.includes(pose.name)) {
-              const turning: PoseResult = { ...result, name: `${pose.name}-turn`, runs: [] }
-              await page.evaluate(startTurn, BENCH_DEFAULTS.turnStep)
+            const hero = await page.evaluate(() => window.guildhall?.camera.get() ?? null)
+            if (!hero) throw new Error("no camera")
+            for (const pose of benchPoses(hero, args.poses)) {
+              await page.evaluate(async (p) => {
+                const g = window.guildhall
+                if (!g) return
+                const clock = g.ext.clock as { set(h: number): void } | undefined
+                clock?.set(p.hour)
+                if (p.free && g.camera.fly) await g.camera.fly(p.free)
+                else if (p.orbit) await g.camera.set(p.orbit)
+              }, pose)
               await page.waitForTimeout(BENCH_DEFAULTS.settleMs)
-              await sample(turning.runs)
-              await page.evaluate(stopTurn)
-              size.poses.push(turning)
+              const result: PoseResult = {
+                name: pose.name,
+                hour: pose.hour,
+                camera: await page.evaluate(() => window.guildhall?.camera.get() ?? null),
+                runs: [],
+              }
+              const sample = async (into: FrameStats[]) => {
+                for (let k = 0; k < args.runs; k++) {
+                  const stats = await page.evaluate(
+                    (ms) => window.guildhall?.perf.sample(ms) ?? null,
+                    args.sampleMs,
+                  )
+                  if (stats) into.push(stats)
+                }
+              }
+              await sample(result.runs)
+              into.push(result)
+              if (!variant) {
+                mkdirSync(resolve(args.out, "shots"), { recursive: true })
+                await page.screenshot({
+                  path: resolve(args.out, "shots", `${args.label}-${pose.name}-${files}.png`),
+                  type: "png",
+                })
+              }
+              if (!variant && pose.orbit && args.turn.includes(pose.name)) {
+                const turning: PoseResult = { ...result, name: `${pose.name}-turn`, runs: [] }
+                await page.evaluate(startTurn, BENCH_DEFAULTS.turnStep)
+                await page.waitForTimeout(BENCH_DEFAULTS.settleMs)
+                await sample(turning.runs)
+                await page.evaluate(stopTurn)
+                into.push(turning)
+              }
+              // back to the orbit before the next pose (a free flight would otherwise stay)
+              if (
+                pose.free &&
+                (await page.evaluate(() => window.guildhall?.camera.mode?.() ?? "orbit")) === "free"
+              )
+                await page.evaluate(() => window.guildhall?.camera.setMode?.("orbit"))
             }
-            // back to the orbit before the next pose (a free flight would otherwise stay)
-            if (
-              pose.free &&
-              (await page.evaluate(() => window.guildhall?.camera.mode?.() ?? "orbit")) === "free"
+          } catch (error) {
+            size.errors.push(
+              `bench${variant ? ` (${variant})` : ""}: ${(error as Error).message.split("\n")[0]}`,
             )
-              await page.evaluate(() => window.guildhall?.camera.setMode?.("orbit"))
           }
-        } catch (error) {
-          size.errors.push(`bench: ${(error as Error).message.split("\n")[0]}`)
+          size.errors.unshift(...opened.errors.filter((e) => !/404/.test(e)))
+          await opened.close()
         }
-        size.errors.unshift(...opened.errors.filter((e) => !/404/.test(e)))
-        await opened.close()
       }
     } finally {
       await browser.close()

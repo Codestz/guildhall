@@ -62,7 +62,7 @@ function fakeGl(opts: { ext?: boolean; latency?: number; disjoint?: boolean } = 
 describe("timing", () => {
   test("without the extension nothing is measured and nothing breaks", () => {
     const f = fakeGl({ ext: false })
-    const t = createTiming(f.renderer)
+    const t = createTiming(f.renderer, { gpu: true })
     expect(t.gpu.available).toBe(false)
     t.frameStart()
     t.gpu.begin("opaque")
@@ -74,9 +74,15 @@ describe("timing", () => {
     expect(t.read().cpu).toEqual({ rest: 5 })
   })
 
+  test("the queries are off unless asked for", () => {
+    const f = fakeGl()
+    expect(createTiming(f.renderer).gpu.available).toBe(false)
+    expect(createTiming(f.renderer, { gpu: true }).gpu.available).toBe(true)
+  })
+
   test("a nested scope's time is its own, not its parent's", () => {
     const f = fakeGl()
-    const t = createTiming(f.renderer)
+    const t = createTiming(f.renderer, { gpu: true })
     t.frameStart()
     t.gpu.begin("opaque")
     f.spend(3)
@@ -103,7 +109,7 @@ describe("timing", () => {
 
   test("results arrive frames later and a sample sees only frames resolved in its window", () => {
     const f = fakeGl({ latency: 3 })
-    const t = createTiming(f.renderer)
+    const t = createTiming(f.renderer, { gpu: true })
     const frame = (ms: number) => {
       t.frameStart()
       t.gpu.begin("opaque")
@@ -128,7 +134,7 @@ describe("timing", () => {
 
   test("a disjoint GPU drops the frame's numbers", () => {
     const f = fakeGl({ disjoint: true })
-    const t = createTiming(f.renderer)
+    const t = createTiming(f.renderer, { gpu: true })
     t.frameStart()
     t.gpu.begin("opaque")
     f.spend(3)
@@ -158,7 +164,7 @@ describe("timing", () => {
 
   test("a tagged mesh scopes its draws through its render hooks", () => {
     const f = fakeGl()
-    const t = createTiming(f.renderer)
+    const t = createTiming(f.renderer, { gpu: true })
     const mesh = {
       isMesh: true,
       onBeforeRender: () => {},

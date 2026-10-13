@@ -24,6 +24,7 @@ describe("parseBenchArgs", () => {
     expect(args.poses).toEqual([...POSE_NAMES])
     expect(args.runs).toBe(3)
     expect(args.turn).toEqual(["hero", "wide"])
+    expect(args.variants).toEqual(["post=0", "life=0", "atmo=0", "lod=0"])
     expect(args.ledger).toBe(true)
     expect(args.label).toMatch(/^\d{12}$/)
   })
@@ -40,6 +41,8 @@ describe("parseBenchArgs", () => {
       "hero,sea",
       "--turn",
       "",
+      "--variants",
+      "post=0",
       "--port",
       "5501",
       "--no-ledger",
@@ -52,6 +55,7 @@ describe("parseBenchArgs", () => {
       runs: 1,
       poses: ["hero", "sea"],
       turn: [],
+      variants: ["post=0"],
       port: 5501,
       ledger: false,
       note: "quiet",
@@ -62,6 +66,7 @@ describe("parseBenchArgs", () => {
     expect(() => parseBenchArgs(["--poses", "hero,moon"])).toThrow(/no pose "moon"/)
     expect(() => parseBenchArgs(["--runs", "x"])).toThrow(/--runs/)
     expect(() => parseBenchArgs(["--label", "Bad Label"])).toThrow(/kebab-case/)
+    expect(() => parseBenchArgs(["--variants", "post"])).toThrow(/key=value/)
     expect(() => parseBenchArgs(["extra"])).toThrow(/unknown argument/)
   })
 })
@@ -143,6 +148,7 @@ describe("benchMarkdown", () => {
         power: "battery 90%",
         lowPowerMode: false,
         otherBrowsers: 0,
+        uncapped: true,
         size: { width: 1440, height: 860 },
         dpr: 1.5,
         userAgent: "",
@@ -160,6 +166,9 @@ describe("benchMarkdown", () => {
           poses: [
             { name: "hero", hour: 12, camera: hero, runs: [stats(12, { shadows: 1, opaque: 4, post: 2 })] },
           ],
+          variants: [
+            { query: "post=0", poses: [{ name: "hero", hour: 12, camera: hero, runs: [stats(9.5, {})] }] },
+          ],
           errors: [],
         },
       ],
@@ -171,6 +180,10 @@ describe("benchMarkdown", () => {
       "| pose | fps | p50 | p95 | ±noise | cpu p95 | gpu | shadows | opaque | post | calls | tris |",
     )
     expect(md).toContain("| hero | 83 | 10.0 | 12.0 | 0.0 | 2.0 | 7.0 | 1.00 | 4.00 | 2.00 | 40 | 1200k |")
+    expect(md).toContain("uncapped (no vsync)")
+    expect(md).toContain("| pose | post=0 |")
+    expect(md).toContain("| hero | 2.5 |")
+    expect(md).not.toContain("not pass costs")
     expect(md).toContain("long tasks after first frame: 1 (longest 1500 ms: 1500@2000)")
   })
 })

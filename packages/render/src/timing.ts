@@ -12,7 +12,12 @@
  * Query results arrive frames later: `frameEnd` files the frame's queries, `frameStart` reads every
  * finished frame into the rings (and into the open samplers) and returns its queries to the pool. A
  * disjoint GPU (a context lost its clock) drops that frame's numbers. Without the extension (Safari,
- * WebGL1) `passes` stays empty and nothing else changes.
+ * WebGL1), or with `gpu: false`, `passes` stays empty and nothing else changes.
+ *
+ * Measured on an M1 Pro (ANGLE over Metal, 2026-10): the queries themselves cost ~1.3 ms a frame at the
+ * hero view, and what they read is each command buffer's GPU wall time, not the pass's work (a scope
+ * that spans the presenting buffer reads tens of ms). So the stage leaves them off unless asked
+ * (`?timers=1`); the bench attributes GPU cost by taking parts away instead (tools/shots bench.ts).
  */
 import type { Object3D, WebGLRenderer } from "three"
 import { FrameRing } from "./stats.ts"
@@ -52,8 +57,11 @@ interface TimerExt {
   GPU_DISJOINT_EXT: number
 }
 
-/** Frames whose queries may still be in flight; beyond this the oldest is dropped. */
-const MAX_PENDING = 8
+/**
+ * Frames whose queries may still be in flight; beyond this the oldest is dropped. Without vsync the
+ * queue runs deep and a result takes 20–30 frames to come back (measured on ANGLE/Metal).
+ */
+const MAX_PENDING = 64
 const RING = 240
 
 interface PendingFrame {
@@ -82,11 +90,19 @@ const push = (m: Map<string, number[]>, split: Split) => {
   }
 }
 
+export interface TimingOpts {
+  /** False (the default) leaves the GPU timer queries out; the CPU buckets stay. The stage's `?timers=1` turns them on. */
+  gpu?: boolean
+}
+
 /** Timing on a renderer; `gl` is its context (a WebGL2 context has the extension, WebGL1 does not). */
-export function createTiming(renderer: Pick<WebGLRenderer, "getContext">): Timing {
+export function createTiming(renderer: Pick<WebGLRenderer, "getContext">, opts: TimingOpts = {}): Timing {
   const gl = renderer.getContext() as WebGL2RenderingContext
   const isGl2 = typeof WebGL2RenderingContext !== "undefined" && gl instanceof WebGL2RenderingContext
-  const ext = isGl2 ? (gl.getExtension("EXT_disjoint_timer_query_webgl2") as TimerExt | null) : null
+  const ext =
+    isGl2 && opts.gpu === true
+      ? (gl.getExtension("EXT_disjoint_timer_query_webgl2") as TimerExt | null)
+      : null
 
   const pool: WebGLQuery[] = []
   const take = (): WebGLQuery | null => pool.pop() ?? gl.createQuery()

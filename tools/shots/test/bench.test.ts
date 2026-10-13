@@ -24,6 +24,7 @@ describe("parseBenchArgs", () => {
     expect(args.poses).toEqual([...POSE_NAMES])
     expect(args.runs).toBe(3)
     expect(args.turn).toEqual(["hero", "wide"])
+    expect(args.pan).toEqual(["hero", "wide"])
     expect(args.variants).toEqual(["post=0", "life=0", "atmo=0", "lod=0"])
     expect(args.ledger).toBe(true)
     expect(args.label).toMatch(/^\d{12}$/)
@@ -41,6 +42,8 @@ describe("parseBenchArgs", () => {
       "hero,sea",
       "--turn",
       "",
+      "--pan",
+      "none",
       "--variants",
       "post=0",
       "--port",
@@ -55,6 +58,7 @@ describe("parseBenchArgs", () => {
       runs: 1,
       poses: ["hero", "sea"],
       turn: [],
+      pan: [],
       variants: ["post=0"],
       port: 5501,
       ledger: false,

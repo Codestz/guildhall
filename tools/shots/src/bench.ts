@@ -13,7 +13,8 @@
  * camera low over the sea looking back at the island. The DPR is pinned at 1.5 (the contract's), so the
  * governor cannot trade resolution for time under the bench's nose. A still camera costs no shadow
  * passes (the cascades re-render only as their snapped centre moves), so `--turn` poses are sampled
- * again while the orbit turns slowly (`<pose>-turn`): that is where shadows and LOD crossfades cost.
+ * again while the orbit turns slowly (`<pose>-turn`, where LOD crossfades cost) and `--pan` poses while
+ * the target slides (`<pose>-pan`, the one motion that re-renders the near cascades every frame).
  *
  * Frames run uncapped (no vsync): on this GPU the main thread then blocks inside `renderer.render` on
  * the GPU's back-pressure, so the frame time is the GPU's throughput, which a vsync-capped run hides at
@@ -31,7 +32,7 @@ import { serveStudio } from "./server.ts"
 
 export const BENCH_USAGE =
   "usage: bun shots bench [--label name] [--out dir] [--port n] [--seed n] [--files a,b] [--runs n]\n" +
-  "                       [--sample ms] [--poses a,b,…] [--turn a,b,…] [--variants q,q,…] [--note text] [--no-ledger]"
+  "                       [--sample ms] [--poses a,b,…] [--turn a,b,…] [--pan a,b,…] [--variants q,q,…|none] [--note text] [--no-ledger]"
 
 export const POSE_NAMES = ["hero", "mid", "wide", "lanterns", "square", "sea"] as const
 export type PoseName = (typeof POSE_NAMES)[number]
@@ -47,6 +48,8 @@ export interface BenchArgs {
   poses: PoseName[]
   /** Poses sampled again while the camera turns slowly. */
   turn: PoseName[]
+  /** Poses sampled again while the target slides slowly (the shadows' only cost). */
+  pan: PoseName[]
   /** Queries the page is loaded again with, each part taken away (`post=0`, `life=0`…); the still poses only. */
   variants: string[]
   note: string
@@ -66,6 +69,9 @@ export const BENCH_DEFAULTS = {
   turn: ["hero", "wide"] as PoseName[],
   /** Degrees of azimuth a frame while turning: the flicker hunt's creep, slow enough to read as a pan. */
   turnStep: 0.05,
+  pan: ["hero", "wide"] as PoseName[],
+  /** Metres the target slides a frame while panning: a walking pace at 90 fps. */
+  panStep: 0.02,
   variants: ["post=0", "life=0", "atmo=0", "lod=0"],
 } as const
 
@@ -82,6 +88,7 @@ export function parseBenchArgs(argv: readonly string[]): BenchArgs {
     sampleMs: BENCH_DEFAULTS.sampleMs,
     poses: [...POSE_NAMES],
     turn: [...BENCH_DEFAULTS.turn],
+    pan: [...BENCH_DEFAULTS.pan],
     variants: [...BENCH_DEFAULTS.variants],
     note: "",
     ledger: true,
@@ -116,16 +123,17 @@ export function parseBenchArgs(argv: readonly string[]): BenchArgs {
       else args.sampleMs = n
     } else if (arg === "--files") args.files = numbers(arg, value)
     else if (arg === "--variants") {
-      const variants = value === "" ? [] : value.split(",").map((v) => v.trim())
+      const variants = value === "" || value === "none" ? [] : value.split(",").map((v) => v.trim())
       const bad = variants.find((v) => !/^[a-z]+=[a-z0-9.]+$/.test(v))
       if (bad !== undefined) throw new Error(`--variants wants key=value queries, got "${bad}"`)
       args.variants = variants
-    } else if (arg === "--poses" || arg === "--turn") {
-      const poses = value === "" ? [] : value.split(",").map((p) => p.trim())
+    } else if (arg === "--poses" || arg === "--turn" || arg === "--pan") {
+      const poses = value === "" || value === "none" ? [] : value.split(",").map((p) => p.trim())
       const bad = poses.find((p) => !(POSE_NAMES as readonly string[]).includes(p))
       if (bad !== undefined) throw new Error(`${arg}: no pose "${bad}" (${POSE_NAMES.join(", ")})`)
       if (arg === "--poses") args.poses = poses as PoseName[]
-      else args.turn = poses as PoseName[]
+      else if (arg === "--turn") args.turn = poses as PoseName[]
+      else args.pan = poses as PoseName[]
     } else throw new Error(`unknown option ${arg}`)
   }
   return args
@@ -170,7 +178,7 @@ export interface LongTask {
 }
 
 export interface PoseResult {
-  /** A pose's name, or `<pose>-turn` for the same pose sampled while the camera turns. */
+  /** A pose's name, or `<pose>-turn` / `<pose>-pan` for the same pose sampled while the camera turns or its target slides. */
   name: string
   hour: number
   /** The pose as drawn (the rig may have clamped what was asked). */
@@ -328,7 +336,7 @@ export function benchMarkdown(r: BenchReport): string {
       lines.push(`| pose | ${size.variants.map((v) => v.query).join(" | ")} |`)
       lines.push(`|---|${"---:|".repeat(size.variants.length)}`)
       for (const p of size.poses) {
-        if (p.name.endsWith("-turn")) continue
+        if (p.name.endsWith("-turn") || p.name.endsWith("-pan")) continue
         const saved = variantSavings(size, p.name)
         lines.push(
           `| ${p.name} | ${size.variants.map((v) => (saved[v.query] === null ? "–" : f1(saved[v.query] as number))).join(" | ")} |`,
@@ -413,6 +421,22 @@ function stopTurn() {
   const w = window as unknown as { __benchTurn?: number }
   if (w.__benchTurn !== undefined) cancelAnimationFrame(w.__benchTurn)
   w.__benchTurn = undefined
+}
+/** Slides the orbit's target `step` metres along the view every frame until `stopTurn()`; runs in the page. */
+function startPan(step: number) {
+  const g = window.guildhall
+  const w = window as unknown as { __benchTurn?: number }
+  const tick = () => {
+    const p = g?.camera.get()
+    if (p) {
+      // the rig looks along (-sin az, -cos az): the target walks away from the eye
+      const rad = (p.azimuth * Math.PI) / 180
+      const [x, y, z] = p.target
+      void g?.camera.set({ ...p, target: [x - Math.sin(rad) * step, y, z - Math.cos(rad) * step] })
+    }
+    w.__benchTurn = requestAnimationFrame(tick)
+  }
+  w.__benchTurn = requestAnimationFrame(tick)
 }
 
 /**
@@ -523,6 +547,16 @@ export async function runBenchReport(args: BenchArgs): Promise<BenchReport> {
                 await sample(turning.runs)
                 await page.evaluate(stopTurn)
                 into.push(turning)
+              }
+              if (!variant && pose.orbit && args.pan.includes(pose.name)) {
+                const panning: PoseResult = { ...result, name: `${pose.name}-pan`, runs: [] }
+                await page.evaluate(startPan, BENCH_DEFAULTS.panStep)
+                await page.waitForTimeout(BENCH_DEFAULTS.settleMs)
+                await sample(panning.runs)
+                await page.evaluate(stopTurn)
+                // back where the pose was, for the next one
+                await page.evaluate((p) => window.guildhall?.camera.set(p), pose.orbit)
+                into.push(panning)
               }
               // back to the orbit before the next pose (a free flight would otherwise stay)
               if (

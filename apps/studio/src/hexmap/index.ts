@@ -615,7 +615,17 @@ export const hexmap: Screen = {
       view.zones = !view.zones
       zoneBtn.textContent = view.zones ? "land only" : "zones"
     })
-    row.append(gridBtn, growBtn, zoneBtn)
+    // this island in 3D: the town screen builds the same spec (seed, files and the shape knobs)
+    const open3d = btn("open in 3D", () => {
+      const q = params(view)
+      q.delete("grid")
+      q.delete("growth")
+      q.delete("zones")
+      q.delete("seed")
+      q.set("files", String(view.spec.files))
+      window.location.assign(`/town/${view.spec.seed}?${q}`)
+    })
+    row.append(gridBtn, growBtn, zoneBtn, open3d)
     row.style.flexWrap = "wrap"
     panel.append(title, row)
     for (const k of KNOBS) {

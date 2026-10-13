@@ -12,6 +12,7 @@ import {
   HEX_TILE_SIZE,
   type HexFineGround,
   type HexIsland,
+  type HexIslandSpec,
   type HexNature,
   type HexWorld,
   hexCentre,
@@ -74,6 +75,22 @@ export interface HexJobSpec {
   tiles: TilePrefab[] | null
   /** The nature knobs (`natureOf`: `?tree= ?pine= ?bush= ?rock= ?grass= ?flower= ?woods= ?wild=`); left out: today's. */
   nature?: HexNature
+  /** The island's shape knobs, as on the hex map (`?coast= ?hills= ?rain= ?forest=`); left out: the defaults. */
+  shape?: IslandShape
+}
+
+/** The hex map's shape knobs (world `HexIslandSpec`), so the 3D island can show what `/lab/hexmap` drew. */
+export type IslandShape = Partial<Pick<HexIslandSpec, "coast" | "hills" | "rain" | "forest">>
+
+/** The shape knobs a page's query sets: only those given, each a finite number. */
+export function shapeOf(query: Pick<URLSearchParams, "get">): IslandShape {
+  const out: IslandShape = {}
+  for (const k of ["coast", "hills", "rain", "forest"] as const) {
+    const raw = query.get(k)
+    const v = raw === null || raw === "" ? Number.NaN : Number(raw)
+    if (Number.isFinite(v) && v >= 0) out[k] = v
+  }
+  return out
 }
 
 /**
@@ -378,7 +395,7 @@ export function runHexJob(
     t0 = t
   }
   if (spec.tiles) installTilePrefabs(spec.tiles)
-  const h = hexIsland({ seed: spec.seed, files: spec.files })
+  const h = hexIsland({ ...spec.shape, seed: spec.seed, files: spec.files })
   lap("island")
   const z = hexZones(h, { wild: spec.nature?.wild })
   lap("zones")

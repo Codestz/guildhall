@@ -56,6 +56,7 @@ import {
   runHexJob,
   SEA_LEVEL,
   type ShoreStage,
+  shapeOf,
   type ToWorker,
 } from "./job.ts"
 import { createLife, type Life } from "./life.ts"
@@ -165,6 +166,8 @@ export const hexWorldScreen: Screen = {
     const detail = ctx.query.get("detail") !== "0"
     // the nature knobs (?tree= ?pine= ?bush= ?rock= ?grass= ?flower= ?woods= ?wild=), for side-by-sides
     const nature = natureOf(ctx.query)
+    // the hex map's shape knobs (?coast= ?hills= ?rain= ?forest=): `/lab/hexmap`'s island in 3D
+    const shape = shapeOf(ctx.query)
     // the authored tile prefabs (data/tiles) before anything is built from them: here (life builds on
     // this thread too) and in the worker
     const job = startJob(
@@ -176,6 +179,7 @@ export const hexWorldScreen: Screen = {
         paint: detail,
         tiles: tiles.length ? tiles : null,
         nature,
+        shape,
       })),
     )
     const catalogLoad = loadCatalog()
@@ -322,7 +326,7 @@ export const hexWorldScreen: Screen = {
       // ---- life (track B): townsfolk and agents on the walk graph; `?life=0` turns it off ----
       if (ctx.query.get("life") !== "0") {
         // Life plans on the map itself: its pure parts built again here (~0.1 s), once the island is drawn.
-        const island = hexIsland({ seed, files })
+        const island = hexIsland({ ...shape, seed, files })
         const zones = hexZones(island, { wild: nature.wild })
         const world = hexWorld(island, zones, { step, nature })
         life = createLife(stage, {

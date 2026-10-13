@@ -17,3 +17,6 @@ skills-lock.json
 
 .agentry
 library/.cache/
+
+# Vercel CLI output (vercel build / link)
+.vercel

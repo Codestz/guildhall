@@ -1,4 +1,14 @@
 export {
+  CHIP_GLYPHS,
+  type ChipGlyph,
+  type ChipTone,
+  glyphSvg,
+  type HeroChipParts,
+  heroChip,
+  setGlyph,
+  setPips,
+} from "./chip.ts"
+export {
   Button,
   Chip,
   IconButton,

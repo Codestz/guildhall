@@ -388,7 +388,143 @@ export const COMPONENTS_CSS = /* css */ `
 .ui-loader-error { margin: 0; color: var(--fail); font-size: var(--t-md); }
 @keyframes ui-breathe { 50% { box-shadow: 0 0 56px -4px rgba(220, 182, 98, 0.5); } }
 
+/* ── hero chips (chip.ts; V1's .chip, legacy hall.css): the label over an agent's head ──────── */
+.ui-heroes { position: absolute; inset: 0; z-index: 2; pointer-events: none; contain: layout paint; }
+.ui-hero-at { position: absolute; left: 0; top: 0; will-change: transform; }
+.ui-hero {
+  --lift: 0px;
+  /* the band kept under the plate for the deed sigil (the declutter counts it as part of the chip) */
+  --room: 0px;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  /* bottom centre on the point; --lift is the declutter's nudge, eased */
+  transform: translate(-50%, calc(0px - var(--lift)));
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease-out, visibility 0s;
+  font: 400 var(--t-sm)/1.25 var(--body);
+  white-space: nowrap;
+  user-select: none;
+}
+/* folded into a neighbour's "+N": fades, then leaves paint */
+.ui-hero[data-folded] { opacity: 0; visibility: hidden; transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease-out, visibility 0s 0.25s; }
+/* a crowd: shown or folded, never half-way */
+.ui-hero[data-crowd] { transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.ui-hero[data-crowd][data-folded] { transition: none; }
+/* under the HUD: gone at once */
+.ui-hero[data-out] { visibility: hidden; opacity: 0; transition: none; }
+.ui-hero-plate {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3px 9px 2px;
+  border-radius: 4px;
+  background: rgba(20, 15, 11, 0.88);
+  border-bottom: 2px solid var(--hero, var(--brass));
+  box-shadow: 0 0 0 1px rgba(220, 182, 98, 0.22), 0 4px 10px -4px rgba(0, 0, 0, 0.6);
+  color: var(--paper);
+}
+.ui-hero-name { display: flex; align-items: center; gap: 5px; font: 400 12.5px/1.25 var(--display); letter-spacing: 0.06em; }
+.ui-hero-pips { display: inline-flex; gap: 2px; margin-left: 1px; }
+.ui-hero-pips:empty { display: none; }
+.ui-hero-pips i { width: 5px; height: 5px; transform: rotate(45deg); background: var(--brass); box-shadow: 0 0 0 1px rgba(12, 9, 7, 0.7); }
+.ui-hero-pips[data-n="2"] i { background: var(--brass-hi); }
+.ui-hero-more { display: none; padding: 0 5px; border-radius: 8px; background: var(--brass-wash); box-shadow: inset 0 0 0 1px var(--brass-line); color: var(--brass-hi); font: normal 700 11px/15px var(--body); letter-spacing: 0; }
+.ui-hero[data-more] .ui-hero-more { display: inline-block; }
+/* a party's pennant hangs from the plate's top-left corner (more than one party on the island) */
+.ui-hero-pennant { display: none; position: absolute; top: -1px; left: -5px; width: 9px; height: 14px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5)); }
+.ui-hero-pennant path { fill: var(--party, var(--brass)); stroke: rgba(12, 9, 7, 0.85); stroke-width: 1; }
+.ui-hero[data-party] .ui-hero-pennant { display: block; }
+.ui-hero-verb { display: flex; align-items: center; gap: 4px; font-style: normal; font-size: 11.5px; line-height: 1.3; color: var(--muted); }
+.ui-hero-glyph { width: 12px; height: 12px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.ui-hero-target { font: 11px/1.3 var(--mono); color: var(--muted); max-width: 24ch; overflow: hidden; text-overflow: ellipsis; }
+.ui-hero-target:empty { display: none; }
+.ui-hero[data-tone="plea"] .ui-hero-verb { color: var(--warn); }
+.ui-hero[data-tone="fail"] .ui-hero-verb { color: var(--fail); }
+.ui-hero[data-tone="loot"] .ui-hero-verb { color: var(--ok); }
+.ui-hero[data-selected] .ui-hero-plate { box-shadow: 0 0 0 1px var(--brass), 0 4px 12px -4px rgba(220, 182, 98, 0.5); }
+/* resting or leaving: softer, never smaller */
+.ui-hero[data-quiet]:not([data-folded]):not([data-selected]) { opacity: 0.8; }
+/* following another party: this one steps back */
+.ui-hero[data-aside]:not([data-folded]) { opacity: 0.42; }
+.ui-hero-bubble {
+  display: none;
+  position: relative;
+  width: max-content;
+  max-width: 220px;
+  white-space: normal;
+  text-align: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #f6ecd6;
+  color: #22180f;
+  font: 12px/1.35 var(--body);
+  box-shadow: 0 0 0 1px rgba(120, 88, 40, 0.35), 0 6px 14px -6px rgba(0, 0, 0, 0.5);
+}
+.ui-hero-bubble::after { content: ""; position: absolute; left: 50%; bottom: -4px; width: 8px; height: 8px; margin-left: -4px; transform: rotate(45deg); background: inherit; box-shadow: 1px 1px 0 0 rgba(120, 88, 40, 0.35); }
+.ui-hero[data-speak] .ui-hero-bubble { display: block; }
+/* the deed sigil: an ink medallion, brass rim tinted by the hero's colour, the deed's glyph in paper */
+.ui-hero-sigil {
+  display: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  place-items: center;
+  background: radial-gradient(circle at 50% 35%, #3a2c1e, #15110d 70%);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--hero, var(--brass)) 55%, var(--brass)), 0 2px 6px rgba(0, 0, 0, 0.55);
+  color: #f3e9d4;
+  animation: ui-hero-bob 2.4s ease-in-out infinite alternate;
+}
+.ui-hero[data-sigil] .ui-hero-sigil { display: grid; }
+.ui-hero-sigil-glyph { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+@keyframes ui-hero-bob { to { transform: translateY(-1.5px); } }
+/* waiting on you: a hopping brass diamond, a button (the chip's only hit target) */
+.ui-hero-plea {
+  display: none;
+  position: relative;
+  isolation: isolate;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #22180f;
+  font: 700 14px/1 var(--body);
+  cursor: pointer;
+  pointer-events: auto;
+  animation: ui-hero-hop 0.6s ease-in-out infinite alternate;
+}
+.ui-hero-plea::before { content: ""; position: absolute; inset: 4px; z-index: -1; border-radius: 3px; transform: rotate(45deg); background: var(--warn); box-shadow: 0 0 0 2px rgba(20, 15, 11, 0.85), 0 0 16px var(--warn); }
+.ui-hero-plea:focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 3px; }
+.ui-hero[data-tone="plea"] .ui-hero-plea { display: grid; }
+@keyframes ui-hero-hop { to { transform: translateY(-5px); } }
+
+/* Detailed: the verb with its file or term. Minimal: name and one verb, smaller; the file or term for
+   whoever you follow and those close by. Hidden: the plate and speech go; the sigil and plea stay. */
+.ui-heroes[data-mode="minimal"] .ui-hero-plate { padding: 2px 7px 1px; }
+.ui-heroes[data-mode="minimal"] .ui-hero-name { font-size: 11px; }
+.ui-heroes[data-mode="minimal"] .ui-hero-verb { font-size: 11px; }
+.ui-heroes[data-mode="minimal"] .ui-hero:not([data-selected]):not([data-near]) .ui-hero-target { display: none; }
+.ui-heroes[data-mode="hidden"] .ui-hero-plate,
+.ui-heroes[data-mode="hidden"] .ui-hero-bubble { display: none; }
+/* a phone: a smaller chip, the verb line only for whoever you follow or close by, a 44 px plea */
+.ui-heroes[data-phone] .ui-hero-plate { padding: 2px 6px 1px; }
+.ui-heroes[data-phone] .ui-hero-name { font-size: 10.5px; letter-spacing: 0.04em; }
+.ui-heroes[data-phone] .ui-hero:not([data-selected]):not([data-near]) .ui-hero-verb { display: none; }
+.ui-heroes[data-phone] .ui-hero-target { max-width: 16ch; }
+.ui-heroes[data-phone] .ui-hero-bubble { max-width: 170px; font-size: 11px; }
+.ui-heroes[data-phone] .ui-hero-plea { width: 44px; height: 44px; margin: -9px 0; }
+.ui-heroes[data-phone] .ui-hero-plea::before { inset: 13px; }
+
 @media (prefers-reduced-motion: reduce) {
+  .ui-hero-plea, .ui-hero-sigil { animation: none; }
+  .ui-hero { transition: opacity 0.25s ease-out, visibility 0s; }
   .ui-crest { animation: none; }
   .ui-card { animation: none; }
   .ui-loader { --ui-loader-fade: 0.15s; }

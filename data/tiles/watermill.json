@@ -1,14 +1,24 @@
 {
   "blockers": [
     {
-      "r": 1.157,
-      "x": 0.65,
-      "z": -0.95
+      "r": 0.6,
+      "x": -1.696,
+      "z": 0.98
     },
     {
-      "r": 1.187,
-      "x": -1.55,
-      "z": -0.1
+      "r": 0.75,
+      "x": -1.073,
+      "z": 0.62
+    },
+    {
+      "r": 0.6,
+      "x": -0.449,
+      "z": 0.26
+    },
+    {
+      "r": 1.157,
+      "x": 1.057,
+      "z": -0.61
     },
     {
       "r": 0.53,
@@ -40,35 +50,8 @@
       "piece": "kaykit-hexagon/building-watermill-red",
       "rot": 0,
       "scale": 0.34,
-      "x": 0.65,
-      "z": -0.95
-    },
-    {
-      "piece": "kenney-nature/ground-river-straight",
-      "pin": true,
-      "rot": 0,
-      "scale": 0.36,
-      "x": -1.6,
-      "y": 0.1,
-      "z": -0.72
-    },
-    {
-      "piece": "kenney-nature/ground-river-straight",
-      "pin": true,
-      "rot": 0,
-      "scale": 0.36,
-      "x": -1.6,
-      "y": 0.1,
-      "z": 0.72
-    },
-    {
-      "piece": "kenney-town/watermill",
-      "pin": true,
-      "rot": 0,
-      "scale": 0.45,
-      "x": -1.55,
-      "y": -0.3,
-      "z": -0.1
+      "x": 1.057,
+      "z": -0.61
     },
     {
       "piece": "kaykit-resources/textiles-stack-small",
@@ -97,6 +80,33 @@
       "scale": 0.42,
       "x": 2.3,
       "z": 0.45
+    },
+    {
+      "piece": "kenney-nature/ground-river-straight",
+      "pin": true,
+      "rot": -1.047,
+      "scale": 0.36,
+      "x": -1.696,
+      "y": 0.1,
+      "z": 0.98
+    },
+    {
+      "piece": "kenney-nature/ground-river-straight",
+      "pin": true,
+      "rot": -1.047,
+      "scale": 0.36,
+      "x": -0.449,
+      "y": 0.1,
+      "z": 0.26
+    },
+    {
+      "piece": "kenney-town/watermill",
+      "pin": true,
+      "rot": -1.047,
+      "scale": 0.45,
+      "x": -1.073,
+      "y": -0.3,
+      "z": 0.62
     }
   ],
   "spots": [

@@ -278,6 +278,7 @@ const BY_USE: Record<string, string> = {
   reeds: "reeds",
   farmstead: "farmstead",
   windmill: "windmill",
+  watermill: "watermill",
   lighthouse: "lighthouse",
   watchtower: "watchtower",
   ruins: "ruins",
@@ -583,6 +584,22 @@ export function hexWorld(
     if (p) for (const d of streetSides(i)) if (standsOn(p, i, d)) return d
     return facing(i)
   }
+  /** A watermill's turn on tile i: the door side and mirroring that put its race side onto a river neighbour. */
+  const watermillTurn = (i: number): { door: number; mirror: boolean } => {
+    const nb = g.neighbours(i)
+    const p = tilePrefab("watermill")
+    const options: { door: number; mirror: boolean; score: number }[] = []
+    for (const mirror of [false, true])
+      for (let door = 0; door < 6; door++) {
+        const wet = nb[worldSide(mirror ? mirrorSide(3) : 3, door)]!
+        if (wet < 0 || kindOf(h, wet) !== "river") continue
+        const street = nb[door]! >= 0 && roadLike(nb[door]!) ? 2 : 0
+        const fits = p && standsOn(mirror ? mirrorPrefab(p) : p, i, door) ? 1 : 0
+        options.push({ door, mirror, score: street + fits })
+      }
+    options.sort((a, b) => b.score - a.score)
+    return options[0] ?? { door: facing(i), mirror: false }
+  }
   const dryLand = (i: number) => {
     const k = kindOf(h, i)
     return k !== "sea" && k !== "shallows" && k !== "lake" && k !== "river" && k !== "rock" && k !== "cliff"
@@ -862,7 +879,8 @@ export function hexWorld(
       // under a neighbour's scene: its ground, nothing of its own
       prefab = SCENE_PART
       const p = tilePrefab(scenes.get(origin)!)!
-      if ((p.ground === "dirt" || p.ground === "paved") && dryLand(i)) ground = p.ground
+      if ((p.ground === "dirt" || p.ground === "paved" || p.ground === "sand") && dryLand(i))
+        ground = p.ground
     } else if (zone?.kind === "castle" && z.castle) {
       // the Guildhall, as composed for its site (sites.ts composeCastle): each tile its role, the doors
       // onto the paved ways, the curtain wall round the yard with its gatehouse where the road comes in
@@ -973,6 +991,13 @@ export function hexWorld(
       if (prefab === "farmstead" || prefab === "market" || prefab === "windmill") {
         door = facing(i)
         rot = rotOf(door)
+      } else if (prefab === "watermill") {
+        // its race leaves through tile side 3 (side 5 mirrored), so the mill turns to put that side on a
+        // river tile; of those turns, one fronting a road and standing on its floor first
+        const turn = watermillTurn(i)
+        door = turn.door
+        rot = rotOf(door)
+        if (turn.mirror) mirror = true
       }
     } else if (k === "forest") prefab = "woods"
     else if (k === "rock") prefab = "rocky"
@@ -982,7 +1007,7 @@ export function hexWorld(
     const authored = prefab ? tilePrefab(prefab) : undefined
     const p = authored && mirror ? mirrorPrefab(authored) : authored
     if (p) {
-      if (p.ground === "dirt" || p.ground === "paved") ground = p.ground
+      if (p.ground === "dirt" || p.ground === "paved" || p.ground === "sand") ground = p.ground
       // a prefab's own pieces, minus those that would float on water tiles it was not made for
       // a castle's tiles all take its keep's colour
       const hue = zone?.kind === "castle" ? zone.tile : i

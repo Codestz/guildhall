@@ -71,6 +71,7 @@ export const TILE_USES = [
   "bluff",
   "reeds",
   "windmill",
+  "watermill",
   "lighthouse",
   "watchtower",
   "ruins",
@@ -770,6 +771,13 @@ export function hexZones(h: HexIsland, opts: { agents?: number; wild?: number } 
       for (const j of g.neighbours(i)) if (j >= 0 && use[j] === U.field) fields++
       return fields ? fields + h.level[i]! * 0.5 + h1(6 + n, i) : -1e9
     })
+  // a watermill where the land meets a river: its race runs off the tile's edge into the water
+  pick("watermill", (i) => {
+    if (kind(i) !== "grass" && kind(i) !== "meadow") return -1e9
+    let river = 0
+    for (const j of g.neighbours(i)) if (j >= 0 && kind(j) === "river") river++
+    return river ? 4 - Math.min(5, toRoad[i]!) * 0.8 + h1(7, i) : -1e9
+  })
   const lumber = zones.find((zz) => zz.kind === "lumber")
   if (lumber) pick("sawmill", (i) => (toWater[i]! <= 1 ? -dist(i, lumber.tile) : -1e9))
   // farmsteads along the roads in the open country, a few tiles apart

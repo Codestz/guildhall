@@ -3,7 +3,8 @@
  * by party (or by family). A row is a button: it picks the hero (the dossier opens, the camera follows).
  * Folded, the roster is a strip of badges (`RosterBadges`).
  */
-import { Fragment, useId, useState } from "react"
+import { createContext, Fragment, useContext, useId, useState } from "react"
+import { Avatar } from "./avatar/Avatar.tsx"
 import { count, FAMILY_LABEL, heroTitle, phaseOf } from "./format.ts"
 import { FAMILY_GLYPH, Glyphs, Pennant } from "./glyphs.tsx"
 import {
@@ -35,8 +36,17 @@ export interface RosterProps {
   compact?: boolean
   /** A row was pressed: the hero, or null when the picked one is pressed again. */
   onPick?: (id: string | null) => void
+  /** Each row's avatar: the hero's rendered portrait in a medallion (the default), or V1's diamond sigil. */
+  look?: "portrait" | "sigil"
+  /** The portrait sprite for a hero, once drawn (render `portrait.ts`); until then the face stands in. */
+  portraitOf?: (hero: HeroView) => string | null | undefined
   className?: string
 }
+
+/** How a roster row draws its hero (Roster's `look` and `portraitOf`, handed down to every row). */
+const RowArt = createContext<{ look: "portrait" | "sigil"; portraitOf?: RosterProps["portraitOf"] }>({
+  look: "portrait",
+})
 
 export function Roster({
   heroes,
@@ -49,6 +59,8 @@ export function Roster({
   onToggle,
   compact,
   onPick,
+  look = "portrait",
+  portraitOf,
   className,
 }: RosterProps) {
   const groups = rosterGroups(heroes, parties, { by, following })
@@ -66,71 +78,73 @@ export function Roster({
   const pick = (id: string) => onPick?.(selected === id ? null : id)
 
   return (
-    <FoldPanel
-      label="The Guild"
-      meta={
-        <>
-          {count(shown.length, "hero", "heroes")}
-          {pleas > 0 && <span className="hud-meta-plea"> · {count(pleas, "plea")}</span>}
-        </>
-      }
-      open={open}
-      onToggle={onToggle}
-      compact={compact}
-      className={`hud-roster${className ? ` ${className}` : ""}`}
-    >
-      {shown.length === 0 ? (
-        <Empty>The hall is quiet. The guildmaster arrives soon.</Empty>
-      ) : (
-        groups.map((group) => {
-          const split: Crowd | undefined = crowd ? crowdOf(group.heroes, selected) : undefined
-          const Mark = group.family ? FAMILY_GLYPH[group.family] : null
-          return (
-            <Fragment key={group.key}>
-              {heads && (
-                <h3 className="hud-roster-group">
-                  {group.party && <Pennant colour={group.party.colour} />}
-                  {Mark && <Mark size={14} />}
-                  <span>
-                    {group.party?.name ?? (group.family ? FAMILY_LABEL[group.family].many : "Others")}
-                  </span>
-                  <span className="hud-roster-group-n">{group.heroes.length}</span>
-                </h3>
-              )}
-              <ul className="hud-roster-list">
-                {(split ? split.notable : group.heroes).map((hero) => (
-                  <RosterRow
-                    key={hero.id}
-                    hero={hero}
-                    active={selected === hero.id}
-                    filmed={onCamera === hero.id}
-                    onPick={pick}
-                  />
-                ))}
-              </ul>
-              {split && split.families.length > 0 && (
-                <ul className="hud-roster-list hud-roster-folds" aria-label="Everyone else, by family">
-                  {split.families.map((fold) => {
-                    const key = `${group.key}:${fold.family}`
-                    return (
-                      <FamilyFold
-                        key={key}
-                        fold={fold}
-                        open={opened.has(key)}
-                        onToggle={() => flip(key)}
-                        selected={selected}
-                        onCamera={onCamera}
-                        onPick={pick}
-                      />
-                    )
-                  })}
+    <RowArt.Provider value={{ look, portraitOf }}>
+      <FoldPanel
+        label="The Guild"
+        meta={
+          <>
+            {count(shown.length, "hero", "heroes")}
+            {pleas > 0 && <span className="hud-meta-plea"> · {count(pleas, "plea")}</span>}
+          </>
+        }
+        open={open}
+        onToggle={onToggle}
+        compact={compact}
+        className={`hud-roster${className ? ` ${className}` : ""}`}
+      >
+        {shown.length === 0 ? (
+          <Empty>The hall is quiet. The guildmaster arrives soon.</Empty>
+        ) : (
+          groups.map((group) => {
+            const split: Crowd | undefined = crowd ? crowdOf(group.heroes, selected) : undefined
+            const Mark = group.family ? FAMILY_GLYPH[group.family] : null
+            return (
+              <Fragment key={group.key}>
+                {heads && (
+                  <h3 className="hud-roster-group">
+                    {group.party && <Pennant colour={group.party.colour} />}
+                    {Mark && <Mark size={14} />}
+                    <span>
+                      {group.party?.name ?? (group.family ? FAMILY_LABEL[group.family].many : "Others")}
+                    </span>
+                    <span className="hud-roster-group-n">{group.heroes.length}</span>
+                  </h3>
+                )}
+                <ul className="hud-roster-list">
+                  {(split ? split.notable : group.heroes).map((hero) => (
+                    <RosterRow
+                      key={hero.id}
+                      hero={hero}
+                      active={selected === hero.id}
+                      filmed={onCamera === hero.id}
+                      onPick={pick}
+                    />
+                  ))}
                 </ul>
-              )}
-            </Fragment>
-          )
-        })
-      )}
-    </FoldPanel>
+                {split && split.families.length > 0 && (
+                  <ul className="hud-roster-list hud-roster-folds" aria-label="Everyone else, by family">
+                    {split.families.map((fold) => {
+                      const key = `${group.key}:${fold.family}`
+                      return (
+                        <FamilyFold
+                          key={key}
+                          fold={fold}
+                          open={opened.has(key)}
+                          onToggle={() => flip(key)}
+                          selected={selected}
+                          onCamera={onCamera}
+                          onPick={pick}
+                        />
+                      )
+                    })}
+                  </ul>
+                )}
+              </Fragment>
+            )
+          })
+        )}
+      </FoldPanel>
+    </RowArt.Provider>
   )
 }
 
@@ -146,6 +160,7 @@ function RosterRow({
   onPick: (id: string) => void
 }) {
   const phase = phaseOf(hero.phase)
+  const art = useContext(RowArt)
   return (
     <li>
       <button
@@ -155,7 +170,11 @@ function RosterRow({
         data-tone={phase.tone}
         onClick={() => onPick(hero.id)}
       >
-        <Sigil family={hero.family} banner={hero.banner} ordinal={hero.ordinal} />
+        {art.look === "portrait" ? (
+          <Avatar variant="portrait" hero={hero} size={30} src={art.portraitOf?.(hero)} />
+        ) : (
+          <Sigil family={hero.family} banner={hero.banner} ordinal={hero.ordinal} />
+        )}
         <span className="hud-roster-text">
           <span className="hud-roster-name">
             <span className="hud-roster-title">{heroTitle(hero)}</span>
@@ -267,7 +286,12 @@ export function RosterBadges({
   selected = null,
   onPick,
   onExpand,
-}: Pick<RosterProps, "heroes" | "parties" | "following" | "selected" | "onPick"> & { onExpand: () => void }) {
+  look = "face",
+}: Pick<RosterProps, "heroes" | "parties" | "following" | "selected" | "onPick"> & {
+  onExpand: () => void
+  /** A chibi face whose expression follows the phase (the default), or V1's monogram diamond. */
+  look?: "face" | "sigil"
+}) {
   const groups = rosterGroups(heroes, parties, { following })
   const banners = groups.length > 1
   const partyOf = (id: string | undefined) => parties.find((p) => p.id === id)
@@ -304,7 +328,11 @@ export function RosterBadges({
                       aria-label={`${heroTitle(hero)}${party ? ` of the ${party.name} quest` : ""}, ${phase.label}${hero.doing ? `, ${hero.doing}` : ""}. Open dossier.`}
                       onClick={() => onPick?.(active ? null : hero.id)}
                     >
-                      <Sigil family={hero.family} banner={hero.banner} ordinal={hero.ordinal} />
+                      {look === "face" ? (
+                        <Avatar variant="face" hero={hero} size={30} />
+                      ) : (
+                        <Sigil family={hero.family} banner={hero.banner} ordinal={hero.ordinal} />
+                      )}
                       {Mark && (
                         <span className="hud-badge-mark" aria-hidden="true">
                           <Mark size={12} />

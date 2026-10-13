@@ -80,6 +80,15 @@ export {
 } from "./night/index.ts"
 export { loadPiece } from "./pieces.ts"
 export {
+  bustCamera,
+  createPortraits,
+  type PortraitOpts,
+  type PortraitSpec,
+  type PortraitStats,
+  type Portraits,
+  portraitKey,
+} from "./portrait.ts"
+export {
   createPost,
   DEFAULT_POST_LOOK,
   type MoodId,

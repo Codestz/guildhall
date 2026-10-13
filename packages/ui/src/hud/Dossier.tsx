@@ -4,9 +4,10 @@
  * on a phone, a bottom sheet.
  */
 import { useEffect, useRef } from "react"
+import { Avatar } from "./avatar/Avatar.tsx"
 import { cost, FAMILY_LABEL, heroTitle, phaseOf, RANK_LABEL, span, tokens } from "./format.ts"
 import { Glyphs, TOOL_GLYPH } from "./glyphs.tsx"
-import { BannerChip, FamilyChip, Sigil, Status } from "./parts.tsx"
+import { BannerChip, FamilyChip, Status } from "./parts.tsx"
 import type { FilePlace, HeroView, Ledger, PartyView, TranscriptLine } from "./types.ts"
 
 /** The transcript keeps its newest this many lines. */
@@ -24,6 +25,8 @@ export interface DossierProps {
   files?: readonly FilePlace[]
   transcript: readonly TranscriptLine[]
   onClose: () => void
+  /** The hero's rendered portrait (render `portrait.ts`); until it is drawn the face stands in. */
+  portrait?: string | null
   className?: string
 }
 
@@ -36,6 +39,7 @@ export function Dossier({
   files = [],
   transcript,
   onClose,
+  portrait,
   className,
 }: DossierProps) {
   const scroller = useRef<HTMLOListElement>(null)
@@ -64,7 +68,7 @@ export function Dossier({
       aria-labelledby="hud-dossier-h"
     >
       <header className="hud-dossier-head">
-        <Sigil family={hero.family} banner={hero.banner} ordinal={hero.ordinal} size="lg" />
+        <Avatar variant="portrait" hero={hero} size={56} src={portrait} />
         <div className="hud-dossier-id">
           <span className="hud-eyebrow">{eyebrow}</span>
           <h2 id="hud-dossier-h">

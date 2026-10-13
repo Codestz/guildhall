@@ -100,17 +100,19 @@ export function TopBar({
           <span className="label">Jump to a tool…</span>
           <span className="gh-kbd">{MOD_KEY} K</span>
         </button>
-        <button
-          type="button"
-          className="gh-led"
-          aria-pressed={hud}
-          onClick={() => onHud(!hud)}
-          title="Frame stats (` key)"
-          aria-keyshortcuts="`"
-        >
-          <span className="led" aria-hidden="true" />
-          perf
-        </button>
+        {screen !== HOME_ID && (
+          <button
+            type="button"
+            className="gh-led"
+            aria-pressed={hud}
+            onClick={() => onHud(!hud)}
+            title="Frame stats (` key)"
+            aria-keyshortcuts="`"
+          >
+            <span className="led" aria-hidden="true" />
+            perf
+          </button>
+        )}
       </header>
       {open && (
         <Switcher

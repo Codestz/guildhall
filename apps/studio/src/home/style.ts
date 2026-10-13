@@ -271,8 +271,7 @@ a.gh-card:hover .go { color: var(--brass-hi); }
 .gh-home-foot .brand { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font: 400 14px/1 var(--display); letter-spacing: 0.08em; }
 .gh-home-foot a { color: var(--muted); text-decoration: underline; text-decoration-color: var(--hair-2); text-underline-offset: 3px; }
 .gh-home-foot a:hover { color: var(--paper); }
-.gh-home-foot .num { margin-left: auto; font: 12px var(--mono); }
-.gh-home-foot .num b { color: var(--muted); font-weight: 500; }
+.gh-home-foot .copy { margin-left: auto; font-size: 13px; }
 
 /* ── narrower windows ───────────────────────────────────────────── */
 @media (max-width: 1180px) {

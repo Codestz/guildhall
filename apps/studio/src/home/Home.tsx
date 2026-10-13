@@ -225,11 +225,7 @@ export function Home({
             <Mark size={20} />
             Guildhall Studio
           </span>
-          {stats?.palette && (
-            <span className="num">
-              palette <b>{stats.palette}</b>
-            </span>
-          )}
+          <span className="copy">© 2026 Codestz</span>
         </footer>
       </main>
     </div>

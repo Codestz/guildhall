@@ -135,7 +135,7 @@ export function App({ debug }: { debug: DebugHost }) {
     <>
       {bar && <TopBar screen={screen.id} title={screen.title} hud={hud} onHud={setHud} />}
       <div ref={host} style={bar ? belowBar : fill} data-screen={screen.id} />
-      {hud && (
+      {hud && screen.id !== HOME_ID && (
         <div style={hudFrame((bar ? BAR_PX : 0) + (viewer ? VIEWER_TOOLS_PX : 0))}>
           <PerfHud stats={stats} />
         </div>

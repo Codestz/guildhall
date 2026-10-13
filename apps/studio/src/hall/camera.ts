@@ -20,6 +20,7 @@ import type { CameraPose } from "@guildhall/core"
 import { distanceRange, type RigMove, type Stage } from "@guildhall/render"
 import { type Shot as DirectorShot, type Distance, director, type Focus } from "@guildhall/sim"
 import type { ViewerHud } from "@guildhall/ui"
+import type { HudParts } from "../hexworld/index.ts"
 import type { BuiltPlace } from "../hexworld/job.ts"
 import type { HallSession } from "./feeds/index.ts"
 import type { SessionPlaces } from "./feeds/places.ts"
@@ -290,10 +291,12 @@ export interface HallCameraOptions {
   heroAt(id: string): Vec3 | null
   /** The session (`?feed=`) and its places; null: nothing to direct, follow still works off the HUD. */
   session: HallSession | null
-  sessionPlaces: SessionPlaces | null
+  sessionPlaces: Pick<SessionPlaces, "placeAt"> | null
   /** The harbour's ships now (their centroid frames the harbour), else null. */
   ships?: () => readonly { at: Vec3 }[] | null
   query: Pick<URLSearchParams, "get">
+  /** The director's switch before the link's say (`?director=` still wins): the home's is on. */
+  director?: boolean
   now?: () => number
   reducedMotion?: () => boolean
 }
@@ -305,7 +308,10 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
   const motion = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null
   const still = opts.reducedMotion ?? (() => motion?.matches === true)
   let followId: string | null = null
-  let directorOn = directorDefault(opts.query)
+  let directorOn =
+    opts.query.get("director") === null && opts.director !== undefined
+      ? opts.director
+      : directorDefault(opts.query)
   let userAt: number | null = null
   /** The director's shot on screen and when it was cut (wall clock). */
   let shot: DirectorShot | null = null
@@ -410,13 +416,30 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
     return p ? [p.at[0], p.at[1], p.at[2]] : null
   }
   const placeOf = (zone: number) => opts.places.find((p) => p.zone === zone)
+  /** An island with no built places (the home): where the heroes standing at a zone are, on average. */
+  const crowdAt = (zone: number): Vec3 | null => {
+    const world = opts.session?.snapshot().world
+    if (!world) return null
+    let n = 0
+    const sum: Vec3 = [0, 0, 0]
+    for (const a of world.actors.values()) {
+      if (a.gone !== undefined || a.place !== zone) continue
+      const feet = opts.heroAt(a.id)
+      if (!feet) continue
+      n++
+      sum[0] += feet[0]
+      sum[1] += feet[1]
+      sum[2] += feet[2]
+    }
+    return n ? [sum[0] / n, sum[1] / n, sum[2] / n] : null
+  }
   const subjectOf = (focus: Focus): Vec3 | null => {
     switch (focus.kind) {
       case "hero":
         return heroPoint(focus.id)
       case "place": {
         const p = placeOf(focus.place)
-        return p ? [p.at[0], p.at[1], p.at[2]] : null
+        return p ? [p.at[0], p.at[1], p.at[2]] : crowdAt(focus.place)
       }
       case "harbour":
         return harbourPoint()
@@ -629,4 +652,39 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
     },
   }
   return api
+}
+
+/**
+ * The camera on a hall's (or the home's) HUD parts, published as `window.guildhall.ext.camera` until
+ * its `dispose`. `director` sets the switch where the link does not (`?director=`, `?feed=story`).
+ */
+export function mountHallCamera(
+  parts: HudParts,
+  opts: {
+    session: HallSession | null
+    places: Pick<SessionPlaces, "placeAt"> | null
+    query: Pick<URLSearchParams, "get">
+    director?: boolean
+  },
+): HallCamera {
+  const camera = createHallCamera({
+    stage: parts.stage,
+    hud: parts.viewer.hud,
+    host: parts.viewer.stage,
+    places: parts.places,
+    heroAt: parts.heroAt,
+    session: opts.session,
+    sessionPlaces: opts.places,
+    ships: () => parts.fx?.ships?.ships() ?? null,
+    query: opts.query,
+    ...(opts.director !== undefined ? { director: opts.director } : {}),
+  })
+  const ext = window.guildhall?.ext as Record<string, unknown> | undefined
+  if (ext) ext.camera = camera
+  const dispose = camera.dispose
+  camera.dispose = () => {
+    dispose()
+    if (ext?.camera === camera) delete ext.camera
+  }
+  return camera
 }

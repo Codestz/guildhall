@@ -9,6 +9,7 @@
  */
 import { holdHudStyle } from "@guildhall/ui"
 import { createRoot } from "react-dom/client"
+import { mountHallCamera } from "../hall/camera.ts"
 import type { HallTime } from "../hall/clock.ts"
 import { createSession, type HallSession } from "../hall/feeds/index.ts"
 import { storyTitle } from "../hall/feeds/story.ts"
@@ -117,13 +118,15 @@ export function mountHomeHud(parts: HudParts, opts: HomeHudOptions): () => void 
   }
   raf = requestAnimationFrame(frame)
   const offFx = parts.fx ? driveFx(parts.fx, live) : () => {}
+  // the camera: follow a hero; the director films the demo guild or the story (V1's home: B, ?director=0)
+  const camera = mountHallCamera(parts, { session: live, places, query: opts.query, director: true })
 
   const paint = () =>
     root.render(
       <HallHud
         hud={viewer.hud}
         modals={modals}
-        parts={rest}
+        parts={{ ...rest, camera }}
         slug="guildhall"
         chronicle={null}
         legend={null}
@@ -142,6 +145,7 @@ export function mountHomeHud(parts: HudParts, opts: HomeHudOptions): () => void 
   return () => {
     cancelAnimationFrame(raf)
     offFx()
+    camera.dispose()
     live.stop()
     opts.time.setSession(null)
     if (session === live) session = null

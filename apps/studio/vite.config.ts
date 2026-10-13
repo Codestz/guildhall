@@ -1,10 +1,18 @@
-import { randomUUID } from "node:crypto"
-import { createReadStream, statSync } from "node:fs"
+import { createHash, randomUUID } from "node:crypto"
+import { createReadStream, readFileSync, statSync } from "node:fs"
 import { cp, lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import { dirname, extname, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
-import { PALETTE, validateMounts, validateNpc, validatePrefab } from "@guildhall/assets"
+import {
+  type CatalogEntry,
+  type CatalogIndex,
+  inStyle,
+  PALETTE,
+  validateMounts,
+  validateNpc,
+  validatePrefab,
+} from "@guildhall/assets"
 import react from "@vitejs/plugin-react"
 import { type Connect, defineConfig, type Plugin } from "vite"
 // the validator alone (its module only imports types): the world package itself does not load in a config
@@ -219,6 +227,116 @@ const SHOWCASE = process.env.VITE_STUDIO_SHOWCASE === "1"
 export const SHOWCASE_LIBRARY = ["catalog", "pieces", "rigs", "thumbs"]
 const LEFT_OUT = new Set(["tags", "batches"])
 
+/**
+ * What the showcase ships of the library, from `STUDIO_LIBRARY` at build time:
+ *   "style" (the default)  the house style's packs alone (STYLE_PACKS): their catalog shards, the
+ *                          pieces and thumbnails those shards name, and the rigs their characters use;
+ *   "full"                 every imported pack, as it is on disk (`?packs=all` then shows them all);
+ *   an https URL           nothing: the page reads `<url>/catalog/index.json` and the rest from there
+ *                          (a CDN or bucket holding the same layout, e.g. the "style" copy uploaded).
+ */
+export type LibraryMode = { kind: "style" } | { kind: "full" } | { kind: "remote"; url: string }
+
+export function libraryMode(value: string | undefined): LibraryMode {
+  const v = (value ?? "").trim()
+  if (v === "" || v === "style") return { kind: "style" }
+  if (v === "full") return { kind: "full" }
+  if (/^https:\/\/[^\s]+$/.test(v)) return { kind: "remote", url: v.replace(/\/+$/, "") }
+  throw new Error(`STUDIO_LIBRARY: expected "style", "full" or an https URL, got "${v}"`)
+}
+
+/** The house-style subset of a library: the index to ship and every library-relative file it needs. */
+export interface LibrarySubset {
+  index: CatalogIndex
+  files: string[]
+}
+
+/** Reads the library at `root` and keeps the house style's packs and what their entries name. */
+export async function styleSubset(root: string): Promise<LibrarySubset> {
+  const full = JSON.parse(await readFile(join(root, "catalog", "index.json"), "utf8")) as CatalogIndex
+  const packs = full.packs.filter((p) => inStyle(p.id))
+  const files = new Set<string>(["catalog/index.json"])
+  const rigs = new Set<string>()
+  for (const { id } of packs) {
+    files.add(`catalog/${id}.json`)
+    const shard = JSON.parse(await readFile(join(root, "catalog", `${id}.json`), "utf8")) as CatalogEntry[]
+    for (const entry of shard) {
+      for (const path of Object.values(entry.files)) if (typeof path === "string") files.add(path)
+      if (entry.character) rigs.add(entry.character.rig)
+    }
+  }
+  const keptRigs = full.rigs.filter((r) => rigs.has(r.id))
+  for (const rig of keptRigs) files.add(rig.file)
+  return { index: { ...full, packs, rigs: keptRigs }, files: [...files].sort() }
+}
+
+/** Every file the "full" mode ships: the SHOWCASE_LIBRARY folders, minus dot-files and importer caches. */
+async function everyFile(root: string): Promise<string[]> {
+  const files: string[] = []
+  for (const folder of SHOWCASE_LIBRARY) {
+    const entries = await readdir(join(root, folder), { withFileTypes: true, recursive: true }).catch(
+      () => [],
+    )
+    for (const entry of entries) {
+      if (!entry.isFile()) continue
+      const rel = join(entry.parentPath, entry.name)
+        .slice(root.length + 1)
+        .split(sep)
+        .join("/")
+      const parts = rel.split("/")
+      if (parts.some((p) => p.startsWith(".") || LEFT_OUT.has(p))) continue
+      // thumbs/<pack>.json is the importer's thumbnail hash cache, not read by the page
+      if (parts[0] === "thumbs" && parts.length === 2 && rel.endsWith(".json")) continue
+      files.push(rel)
+    }
+  }
+  return files.sort()
+}
+
+/**
+ * The library as a showcase ships it: the files, the index written in place of the library's own (the
+ * style subset names fewer packs; null keeps it), and `version`, a hash of every shipped path and byte.
+ * The build serves the library under `/library/<version>/`, so every file in it can be cached as
+ * immutable: a re-import that changes any byte ships under a new folder.
+ */
+export interface ShippedLibrary {
+  root: string
+  files: string[]
+  index: CatalogIndex | null
+  version: string
+}
+
+const INDEX = "catalog/index.json"
+const indexText = (index: CatalogIndex) => `${JSON.stringify(index, null, 2)}\n`
+
+export async function planLibrary(library: string, mode: "style" | "full"): Promise<ShippedLibrary> {
+  const root = await realpath(library).catch(() => null)
+  if (!root) throw new Error(`showcase: no library at ${library} (run bun import first)`)
+  const { files, index } =
+    mode === "style" ? await styleSubset(root) : { files: await everyFile(root), index: null }
+  const hash = createHash("sha256")
+  for (const rel of files) {
+    hash.update(`${rel}\n`)
+    hash.update(rel === INDEX && index ? indexText(index) : await readFile(join(root, rel)))
+  }
+  return { root, files, index, version: hash.digest("hex").slice(0, 12) }
+}
+
+/** Copies a planned library into `out` (each path checked to stay inside the library). */
+async function copyLibrary(plan: ShippedLibrary, out: string): Promise<void> {
+  for (const rel of plan.files) {
+    const to = join(out, rel)
+    await mkdir(dirname(to), { recursive: true })
+    if (rel === INDEX && plan.index) {
+      await writeFile(to, indexText(plan.index))
+      continue
+    }
+    const from = resolve(plan.root, rel)
+    if (!from.startsWith(plan.root + sep)) throw new Error(`showcase: ${rel} is outside the library`)
+    await cp(from, to, { dereference: true })
+  }
+}
+
 /** Every file under `dir`: how many, and their bytes. */
 async function measure(dir: string): Promise<{ files: number; bytes: number }> {
   const total = { files: 0, bytes: 0 }
@@ -255,7 +373,7 @@ export async function copyData(root: string, out: string): Promise<Record<string
 }
 
 /** After a showcase build: the library and the data beside the app, so it runs with no server behind it. */
-function showcase(library: string, data: string): Plugin {
+function showcase(plan: ShippedLibrary | null, mode: LibraryMode, data: string): Plugin {
   let outDir = "dist"
   return {
     name: "guildhall-showcase",
@@ -264,73 +382,162 @@ function showcase(library: string, data: string): Plugin {
       outDir = resolve(config.root, config.build.outDir)
     },
     async writeBundle() {
-      const from = await realpath(library).catch(() => null)
-      if (!from) throw new Error(`showcase: no library at ${library} (run bun import first)`)
-      for (const folder of SHOWCASE_LIBRARY)
-        await cp(join(from, folder), join(outDir, "library", folder), {
-          recursive: true,
-          dereference: true,
-          filter: (src) => {
-            const name = src.slice(src.lastIndexOf(sep) + 1)
-            return !name.startsWith(".") && !LEFT_OUT.has(name)
-          },
-        })
+      const lib = plan ? join(outDir, "library", plan.version) : null
+      if (plan && lib) await copyLibrary(plan, lib)
       const index = await copyData(data, join(outDir, "data"))
-      const lib = await measure(join(outDir, "library"))
+      const shipped = lib ? await measure(lib) : null
       const all = await measure(outDir)
       const mb = (bytes: number) => `${(bytes / 1e6).toFixed(1)} MB`
       const recipes = Object.entries(index).map(([folder, ids]) => `${folder} ${ids.length}`)
       this.info(
-        `library ${lib.files} files, ${mb(lib.bytes)}; data ${recipes.join(", ") || "mounts only"}; ` +
-          `dist ${all.files} files, ${mb(all.bytes)}`,
+        `library ${mode.kind === "remote" ? `read from ${mode.url}` : `${mode.kind} /library/${plan?.version}/`}` +
+          `${shipped ? `: ${shipped.files} files, ${mb(shipped.bytes)}` : ""}; ` +
+          `data ${recipes.join(", ") || "mounts only"}; dist ${all.files} files, ${mb(all.bytes)}`,
       )
     },
   }
 }
 
+/** The host's config for the public site (the proposal the deploy uses; deploy/plan in .probe). */
+export const HOST_CONFIG = fileURLToPath(new URL("../../deploy/vercel.v2.json", import.meta.url))
+
+interface HostConfig {
+  rewrites?: { source: string; destination: string }[]
+  headers?: { source: string; headers: { key: string; value: string }[] }[]
+}
+
 /**
- * The showcase preview answers like the host (vercel.json): a missing `/library/` or `/data/` file is a
- * 404, not the app's index.html, which vite's SPA fallback would otherwise serve in its place.
+ * A vercel.json's rewrites and headers as the host applies them to a path. The sources here are plain
+ * regular expressions (groups, alternations, `.*`, escaped dots), which path-to-regexp reads the same
+ * way; named `:params` are not used, so the file needs no translation.
+ */
+export function hostRules(config: HostConfig) {
+  const whole = (source: string) => new RegExp(`^${source}$`)
+  const rewrites = (config.rewrites ?? []).map((r) => ({ test: whole(r.source), to: r.destination }))
+  const headers = (config.headers ?? []).map((h) => ({ test: whole(h.source), set: h.headers }))
+  return {
+    /** Where a path that is not a file is rewritten to, or null (the host's 404). */
+    rewrite: (path: string): string | null => rewrites.find((r) => r.test.test(path))?.to ?? null,
+    /** Every header the host sends for a path; a later rule wins for the same key. */
+    headers: (path: string): Record<string, string> => {
+      const out: Record<string, string> = {}
+      for (const rule of headers) if (rule.test.test(path)) for (const h of rule.set) out[h.key] = h.value
+      return out
+    },
+  }
+}
+
+/**
+ * The showcase preview answers like the host: deploy/vercel.v2.json's headers on every answer (so the
+ * CSP is tried locally), a file when there is one, index.html for a path the rewrites name, and
+ * 404.html with a 404 status for anything else (a missing `/library/` piece included), where vite's SPA
+ * fallback would otherwise answer every path with the app.
  */
 function hostLike(): Plugin {
   return {
     name: "guildhall-host-like",
     configurePreviewServer(server) {
       const dist = resolve(server.config.root, server.config.build.outDir)
+      const rules = hostRules(JSON.parse(readFileSync(HOST_CONFIG, "utf8")) as HostConfig)
       server.middlewares.use((req, res, next) => {
-        const url = (req.url ?? "").split("?")[0] ?? ""
-        if (!url.startsWith("/library/") && !url.startsWith("/data/")) return next()
+        const [path = "/", query] = (req.url ?? "/").split("?")
+        for (const [key, value] of Object.entries(rules.headers(path))) res.setHeader(key, value)
         let file: string
         try {
-          file = resolve(dist, `.${decodeURIComponent(url)}`)
+          file = resolve(dist, `.${decodeURIComponent(path)}`)
         } catch {
           file = ""
         }
-        if (file.startsWith(dist + sep) && statSync(file, { throwIfNoEntry: false })?.isFile()) return next()
+        const inside = file === dist || file.startsWith(dist + sep)
+        if (path === "/" || (inside && statSync(file, { throwIfNoEntry: false })?.isFile())) return next()
+        const to = rules.rewrite(path)
+        if (to) {
+          req.url = query === undefined ? to : `${to}?${query}`
+          return next()
+        }
         res.statusCode = 404
-        res.end()
+        res.setHeader("Content-Type", "text/html; charset=utf-8")
+        createReadStream(join(dist, "404.html")).pipe(res)
       })
     },
   }
 }
 
-export default defineConfig({
-  // `/library/` is what the importer wrote; `/data/` is the authored data the studio edits. The showcase
-  // serves neither: its build copies the library and the data into dist, and its preview serves dist
-  // alone, as the host will.
-  plugins: [
-    react(),
-    ...(SHOWCASE ? [showcase(LIBRARY, DATA), hostLike()] : [folder("library", LIBRARY), data(DATA)]),
-  ],
-  // a Cloudflare quick tunnel may serve the dev Studio to a phone (writes stay local: `isLocal`)
-  server: { port: 5300, strictPort: true, allowedHosts: [".trycloudflare.com"] },
-  preview: { port: 5310, strictPort: true },
-  build: {
-    rollupOptions: {
-      // The studio, and (not in the showcase) the thumbnail page tools/import drives headless.
-      input: SHOWCASE
-        ? { main: page("index.html") }
-        : { main: page("index.html"), thumbs: page("thumbs.html") },
+/**
+ * The public site's origin (STUDIO_SITE_URL), for what must be absolute: the social card's image,
+ * robots.txt's sitemap line and the sitemap. The default is the host decided for the showcase.
+ */
+export const SITE_URL = (process.env.STUDIO_SITE_URL ?? "https://studio.guildhall.codestz.dev").replace(
+  /\/+$/,
+  "",
+)
+
+/** The public pages a crawler is pointed at (the Studio's tools and the labs are reachable from them). */
+export const SITEMAP_PATHS = ["/", "/demos", "/built", "/studio", "/hall/facebook/react"]
+
+export function sitemap(site: string, paths: readonly string[] = SITEMAP_PATHS): string {
+  const urls = paths.map((p) => `  <url><loc>${site}${p}</loc></url>`).join("\n")
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`
+}
+
+export const robots = (site: string): string => `User-agent: *\nAllow: /\n\nSitemap: ${site}/sitemap.xml\n`
+
+/** `%SITE_URL%` in index.html becomes the site's origin. */
+function siteUrl(site: string): Plugin {
+  return { name: "guildhall-site-url", transformIndexHtml: (html) => html.replaceAll("%SITE_URL%", site) }
+}
+
+/**
+ * After a showcase build: robots.txt, sitemap.xml, and 404.html (the app itself, which draws its own
+ * "Not found" for a path no route answers; the host serves it with a 404 status for any path its
+ * rewrites do not send to index.html).
+ */
+function publicFiles(site: string): Plugin {
+  let outDir = "dist"
+  return {
+    name: "guildhall-public-files",
+    apply: "build",
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir)
     },
-  },
+    async writeBundle() {
+      await writeFile(join(outDir, "robots.txt"), robots(site))
+      await writeFile(join(outDir, "sitemap.xml"), sitemap(site))
+      await cp(join(outDir, "index.html"), join(outDir, "404.html"))
+    },
+  }
+}
+
+export default defineConfig(async ({ command }) => {
+  // The showcase's library (STUDIO_LIBRARY): planned once, before the bundle, so the page is built
+  // knowing the versioned folder it reads from. Dev and the plain build serve the library as it is.
+  const mode: LibraryMode = SHOWCASE ? libraryMode(process.env.STUDIO_LIBRARY) : { kind: "full" }
+  const plan =
+    SHOWCASE && command === "build" && mode.kind !== "remote" ? await planLibrary(LIBRARY, mode.kind) : null
+  const libraryUrl = mode.kind === "remote" ? mode.url : plan ? `/library/${plan.version}` : ""
+  return {
+    // src/env.ts: where the page reads the library ("" = vite's own `/library/`)
+    define: { "import.meta.env.VITE_LIBRARY_URL": JSON.stringify(libraryUrl) },
+    // `/library/` is what the importer wrote; `/data/` is the authored data the studio edits. The showcase
+    // serves neither: its build copies the library and the data into dist, and its preview serves dist
+    // alone, as the host will.
+    plugins: [
+      react(),
+      siteUrl(SITE_URL),
+      ...(SHOWCASE
+        ? [showcase(plan, mode, DATA), publicFiles(SITE_URL), hostLike()]
+        : [folder("library", LIBRARY), data(DATA)]),
+    ],
+    // a Cloudflare quick tunnel may serve the dev Studio to a phone (writes stay local: `isLocal`)
+    server: { port: 5300, strictPort: true, allowedHosts: [".trycloudflare.com"] },
+    preview: { port: 5310, strictPort: true },
+    build: {
+      rollupOptions: {
+        // The studio, and (not in the showcase) the thumbnail page tools/import drives headless.
+        input: SHOWCASE
+          ? { main: page("index.html") }
+          : { main: page("index.html"), thumbs: page("thumbs.html") },
+      },
+    },
+  }
 })

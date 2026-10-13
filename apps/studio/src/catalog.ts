@@ -1,12 +1,12 @@
 /** The asset library as the studio reads it: `/library/catalog/index.json` plus one shard per pack. */
 import { type Catalog, type CatalogEntry, type CatalogIndex, createCatalog, inStyle } from "@guildhall/assets"
 import { log } from "@guildhall/core"
-import { BASE } from "./env.ts"
+import { LIBRARY_ROOT } from "./env.ts"
 
 const logger = log("studio:catalog")
 
-/** Where vite serves the library (vite.config.ts). */
-export const LIBRARY = `${BASE}library`
+/** Where the library is served: vite's `/library/` (vite.config.ts), or the CDN a showcase build names. */
+export const LIBRARY = LIBRARY_ROOT
 
 type Fetch = (url: string) => Promise<Pick<Response, "ok" | "status" | "json">>
 

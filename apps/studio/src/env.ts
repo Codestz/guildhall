@@ -9,6 +9,11 @@ declare global {
     readonly BASE_URL?: string
     /** "1" in the read-only showcase build (`bun run build:showcase`). */
     readonly VITE_STUDIO_SHOWCASE?: string
+    /**
+     * The library's root in a showcase build: its versioned `/library/<hash>`, or a CDN's URL
+     * (STUDIO_LIBRARY=<url>); "" in dev, where vite serves `/library/`.
+     */
+    readonly VITE_LIBRARY_URL?: string
   }
   interface ImportMeta {
     readonly env: ImportMetaEnv
@@ -17,6 +22,9 @@ declare global {
 
 /** The path the studio is served under, ending in "/": "/" unless the build sets a `base`. */
 export const BASE: string = import.meta.env.BASE_URL ?? "/"
+
+/** Where the asset library is read from: vite's `<base>library` unless the build names another root. */
+export const LIBRARY_ROOT: string = import.meta.env.VITE_LIBRARY_URL || `${BASE}library`
 
 /** The read-only public build: no writes, saves become downloads, dev-only screens hidden. */
 export const SHOWCASE: boolean = import.meta.env.VITE_STUDIO_SHOWCASE === "1"

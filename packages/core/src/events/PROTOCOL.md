@@ -418,7 +418,7 @@ project opened in both shares one guild. `projectRefOf(cwd)` (`src/project.ts`) 
 | `SubagentStop` | the child's `session`, a `reply` (`last_assistant_message`), then `status: idle`. Nothing when `agent_type` is empty: those are Claude Code's own helpers. |
 | `Stop` | `reply` (`last_assistant_message`), then `status: idle` |
 | `StopFailure` | `status: failed` with the API error |
-| `SessionEnd` | `status: idle` |
+| `SessionEnd` | `status: idle` with `closed: true` (the session is over: V2's island lets it leave) |
 | `PreCompact` and every other event | nothing |
 
 Where Claude Code's names become the world's:

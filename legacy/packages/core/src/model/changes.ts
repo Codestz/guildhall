@@ -49,6 +49,8 @@ export type Change =
        * about to start, and read that way it showed as running for good.
        */
       settled?: boolean
+      /** The host closed the session (Claude Code's `SessionEnd`): V2's island lets it leave. */
+      closed?: boolean
       at: number
     }
   /** Something said *to* it: the first is the task it was given, the rest are messages. */

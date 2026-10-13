@@ -145,7 +145,8 @@ export function translate(payload: unknown, at: number): Change[] {
         },
       ]
     case "SessionEnd":
-      return [{ type: "status", id: main, status: "idle", at }]
+      // `closed`: the session is over, not a turn's end (V1 reads it as idle; V2's island lets it leave)
+      return [{ type: "status", id: main, status: "idle", closed: true, at }]
     default:
       // PreCompact and the rest have nothing in the vocabulary to say.
       return []

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { SeaEvent } from "@guildhall/core"
 import {
+  CLOSED_MS,
   emptyWorld,
   flush,
   GONE_MS,
@@ -30,6 +31,33 @@ describe("normalize: the guild", () => {
     const sub = feed.change({ type: "session", id: "s", agent: "explore", parentID: "r", at: T0 + 10 })
     expect(sub[0]).toMatchObject({ kind: "actor.join", id: "s", parent: "r" })
     expect(sub[0]?.src).toBe("g#2")
+  })
+
+  test("three sessions open on one repo are three guildmasters by join order, never three alike", () => {
+    const feed = new Feed()
+    for (const [k, id] of ["a", "b", "c"].entries()) feed.start(id, T0 + k * 1000)
+    feed.start("s", T0 + 4000, "b", "explore")
+    expect(heroes(feed.log.head).map((h) => h.name)).toEqual([
+      "Guildmaster",
+      "Guildmaster II",
+      "Guildmaster III",
+      "Wanderer",
+    ])
+  })
+
+  test("a session its host closed (SessionEnd) leaves with its party; a turn's end keeps its seat", () => {
+    const feed = new Feed()
+    feed.start("r", T0)
+    feed.start("s", T0 + 100, "r", "explore")
+    feed.start("q", T0 + 200)
+    // a turn's end: idle, not closed — it rests in the hall
+    feed.change({ type: "status", id: "q", status: "idle", at: T0 + 300 })
+    feed.change({ type: "status", id: "r", status: "idle", closed: true, at: T0 + 1000 })
+    feed.log.append(...flush(feed.ctx, T0 + 1000 + CLOSED_MS))
+    expect(heroes(feed.log.head).map((h) => h.id)).toEqual(["q"])
+    // nothing leaves twice
+    feed.log.append(...flush(feed.ctx, T0 + 1000 + GONE_MS * 2))
+    expect(feed.log.events.filter((e) => e.kind === "actor.leave").map((e) => "id" in e && e.id)).toEqual(["r", "s"])
   })
 
   test("a parent learned later is an info, not a second join", () => {

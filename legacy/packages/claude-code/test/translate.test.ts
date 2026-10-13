@@ -103,9 +103,9 @@ describe("one conversation", () => {
     })
   })
 
-  test("compaction has nothing to say; the end is idle", () => {
+  test("compaction has nothing to say; the end is idle, and closed", () => {
     expect(changes[9]).toEqual([])
-    expect(changes[10]).toEqual([{ type: "status", id: MAIN, status: "idle", at: 1010 }])
+    expect(changes[10]).toEqual([{ type: "status", id: MAIN, status: "idle", closed: true, at: 1010 }])
   })
 })
 

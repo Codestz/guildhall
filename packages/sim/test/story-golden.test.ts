@@ -58,7 +58,16 @@ describe("the story tells V1's sessions as V1 told them", () => {
   for (const name of NAMES) {
     test(name, async () => {
       const golden = await Bun.file(join(STORY_DIR, `${name}.story.json`)).json()
-      const ours = told(await input(name))
+      // The one departure from V1 (user, 10-13): a second guildmaster is numbered (`Guildmaster II`),
+      // where V1 called every root session `Guildmaster`. The saga has one; nothing else differs.
+      // A caption holds 30 ms longer per character, so the numeral's three hold it 90 ms longer.
+      const raw = told(await input(name))
+      for (const { caption: c } of raw.captions as { caption: { hold: number; parts: { text: string }[] } }[]) {
+        const extra = c.parts.reduce((n, p) => n + (p.text.match(/Guildmaster [IVX]+\b/g)?.length ?? 0), 0)
+        // (within the narrator's 3.4–8 s: a hold at the cap was at it before)
+        if (extra && c.hold < 8000) c.hold = Math.max(3400, c.hold - extra * 90)
+      }
+      const ours = JSON.parse(JSON.stringify(raw).replaceAll(/Guildmaster [IVX]+\b/g, "Guildmaster"))
       // Piece by piece, so a mismatch names what drifted.
       for (const key of ["start", "told", "sessions", "legend", "markdown", "recap", "renown", "captions"])
         expect({ [key]: ours[key] }).toEqual({ [key]: golden[key] })
@@ -68,6 +77,8 @@ describe("the story tells V1's sessions as V1 told them", () => {
   test("the fixtures are stories worth telling: chapters, renown, the sea, a hero", async () => {
     const saga = told(await input("saga"))
     expect(saga.legend.chapters.length).toBeGreaterThan(15)
+    // its second root session is the second guildmaster, by name
+    expect(saga.told.some((m: StoryMoment) => m.title === "Guildmaster II")).toBe(true)
     expect(saga.renown.length).toBeGreaterThan(2)
     expect(saga.recap.hero.label).toBe("The quest is done")
     const seas = told(await input("seas"))

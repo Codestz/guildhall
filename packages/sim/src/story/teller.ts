@@ -111,13 +111,26 @@ export function ordinalOf(model: Model, s: Session, names: Names = "world"): num
   return n
 }
 
+/**
+ * Which guildmaster `s` (a root session) is, by join order (1-based): three sessions open on one repo
+ * read `Guildmaster`, `Guildmaster II`, `Guildmaster III`, never three alike.
+ */
+export function masterOrdinalOf(model: Model, s: Session): number {
+  let n = 1
+  for (const other of model.sessions.values())
+    if (other !== s && !other.parentID && byJoin(other, s) < 0) n++
+  return n
+}
+
 /** Who a moment is about, named as the log names them. */
 export function actorOf(model: Model, s: Session, names: Names = "world"): Actor {
   const named = namedOf(s, names)
   return {
     id: s.id,
     agent: s.agent,
-    title: s.parentID ? numbered(named.name, ordinalOf(model, s, names)) : named.name,
+    title: s.parentID
+      ? numbered(named.name, ordinalOf(model, s, names))
+      : numbered(named.name, masterOrdinalOf(model, s)),
     color: named.archetype.color,
     ...(s.parentID ? { parent: s.parentID } : {}),
     master: rootOf(model, s.id),

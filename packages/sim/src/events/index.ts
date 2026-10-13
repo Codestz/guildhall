@@ -10,6 +10,7 @@
  */
 export { CHECKPOINT_EVERY, EventLog } from "./log.ts"
 export {
+  CLOSED_MS,
   flush,
   type NormalizeContext,
   type NormalizeOptions,

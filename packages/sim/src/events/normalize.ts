@@ -49,7 +49,12 @@ export interface NormalizeContext {
   readonly said: Map<string, string>
   /** Calls whose start was an `actor.step`. */
   readonly stepped: Set<string>
+  /** Sessions that have left (until one works again). */
+  readonly gone: Set<string>
 }
+
+/** A session its host closed (`closed`, Claude Code's `SessionEnd`) leaves this long after, ms. */
+export const CLOSED_MS = 3000
 
 export function normalizer(opts: NormalizeOptions = {}): NormalizeContext {
   return {
@@ -65,6 +70,7 @@ export function normalizer(opts: NormalizeOptions = {}): NormalizeContext {
     ranks: new Map(),
     said: new Map(),
     stepped: new Set(),
+    gone: new Set(),
   }
 }
 
@@ -100,12 +106,21 @@ export function flush(ctx: NormalizeContext, t: number): WorldEvent[] {
   const out: WorldEvent[] = []
   for (const [id, at] of due) {
     ctx.leaving.delete(id)
+    ctx.gone.add(id)
     out.push(...stamp(ctx, at, "clock", [{ kind: "actor.leave", id }]))
   }
   return out
 }
 
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
+
+/** `id` and every session under it (its subagents, theirs…), `id` first. */
+function partyOf(sessions: ReadonlyMap<string, Pick<Session, "parentID">>, id: string): string[] {
+  const out = [id]
+  for (let k = 0; k < out.length; k++)
+    for (const [other, s] of sessions) if (s.parentID === out[k] && !out.includes(other)) out.push(other)
+  return out
+}
 
 function stamp(ctx: NormalizeContext, at: number, src: string, happenings: WorldHappening[]): WorldEvent[] {
   return happenings.map((h) => {
@@ -233,6 +248,7 @@ function fromChange(input: GuildEvent, ctx: NormalizeContext): WorldHappening[] 
       }
       case "recover":
         ctx.leaving.delete(m.id)
+        ctx.gone.delete(m.id)
         out.push({ kind: "actor.recover", id: m.id })
         break
     }
@@ -241,8 +257,17 @@ function fromChange(input: GuildEvent, ctx: NormalizeContext): WorldHappening[] 
   // a finished session at work again (the moments only say so for a failed one)
   if (wasDone && working(s)) {
     ctx.leaving.delete(s.id)
+    ctx.gone.delete(s.id)
     out.push({ kind: "actor.resume", id: s.id })
   }
+
+  // closed by its host (SessionEnd): it leaves CLOSED_MS on, and every subagent of its still here with it
+  if (change.type === "status" && change.closed)
+    for (const id of partyOf(ctx.model.sessions, s.id)) {
+      if (ctx.gone.has(id)) continue
+      const due = change.at + CLOSED_MS
+      ctx.leaving.set(id, Math.min(ctx.leaving.get(id) ?? due, due))
+    }
 
   if (change.type === "tool" || change.type === "usage" || !seen) {
     const rank = rankOf(experienceOf(s))

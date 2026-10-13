@@ -1,18 +1,11 @@
 /**
- * A told story as a feed (`?feed=story`): a session's changes, its sea and its acts, played on the
- * session clock like a recording. Today the story is one of V1's (the Saga, from /lab/story); D1's
- * `saga()` for this repo's real places plugs in as another `StorySource` (the seam is `loadStory`).
+ * A told story as a feed (`?feed=story&story=<id>`): sim's demo stories (plan D1, `story(id, {repo, seed})`:
+ * the saga re-authored for this repo, and V1's solo, party, parties, rush, seas, factions), told on the
+ * hall's own repo so its paths land on the hall's places, and played on the session clock like a recording.
  */
-import type { Change, SeaEvent } from "@guildhall/core"
+import type { SeaEvent } from "@guildhall/core"
+import { STORY_IDS, type StoryId, type StoryUnit, story } from "@guildhall/sim"
 import type { Feed, FeedChapter, FeedSink, FeedStatus } from "./feed.ts"
-
-/** What a story is: V1's `<name>.input.json` (changes and sea at ms from the story's start, its acts). */
-export interface StorySource {
-  name: string
-  changes: readonly Change[]
-  sea?: readonly SeaEvent[]
-  chapters?: readonly (FeedChapter & { hour?: number })[]
-}
 
 /**
  * A story's clock starts here: a fixed morning (13 Oct 2026, 09:00 UTC), so a story told twice is the
@@ -20,52 +13,42 @@ export interface StorySource {
  */
 export const STORY_EPOCH = Date.UTC(2026, 9, 13, 9)
 
-/** V1's told stories, shipped with the Studio for /lab/story. */
-export const STORIES = ["saga", "seas", "party", "rush", "solo"] as const
-export type StoryName = (typeof STORIES)[number]
-
-const TITLES: Record<StoryName, string> = {
+const TITLES: Record<StoryId, string> = {
   saga: "The Saga",
-  seas: "The Seas",
-  party: "A Party",
-  rush: "The Rush",
   solo: "Alone",
+  party: "A Party",
+  parties: "Two Parties",
+  rush: "The Rush",
+  seas: "The Seas",
+  factions: "The Factions",
 }
 
 /** A story's title, for the Brand. */
-export const storyTitle = (name: StoryName): string => TITLES[name]
+export const storyTitle = (id: StoryId): string => TITLES[id]
 
 /** The story a link names (`?story=`), the Saga by default. */
-export const storyOf = (asked: string | null): StoryName =>
-  (STORIES as readonly string[]).includes(asked ?? "") ? (asked as StoryName) : "saga"
+export const storyOf = (asked: string | null): StoryId =>
+  (STORY_IDS as readonly string[]).includes(asked ?? "") ? (asked as StoryId) : "saga"
 
-/** Reads one of V1's stories (the seam: D1's saga comes in here). */
-export async function loadStory(name: StoryName): Promise<StorySource> {
-  const res = await fetch(`/lab/story/${name}.input.json`)
-  if (!res.ok) throw new Error(`story ${name}: ${res.status}`)
-  const input = (await res.json()) as Omit<StorySource, "name">
-  return { name: TITLES[name], ...input }
-}
-
-/** A change moved `by` ms: its time, and a call's start and end. */
-function shifted(change: Change, by: number): Change {
-  const out = { ...change, at: change.at + by } as Change & { started?: number; ended?: number }
-  if (out.type === "tool") {
-    if (out.started !== undefined) out.started += by
-    if (out.ended !== undefined) out.ended += by
-  }
-  return out
+/** Where a story is told: the hall's repo (its name, its units), and the jitter's seed. */
+export interface StoryStage {
+  name?: string
+  units?: readonly StoryUnit[]
+  seed?: number
 }
 
 export class StoryFeed implements Feed {
   readonly kind = "story"
+  readonly name: string
   private state: FeedStatus = "offline"
   private live = false
 
   constructor(
-    readonly name: string,
-    private readonly load: () => Promise<StorySource>,
-  ) {}
+    readonly id: StoryId,
+    private readonly stage: StoryStage = {},
+  ) {
+    this.name = storyTitle(id)
+  }
 
   status(): FeedStatus {
     return this.state
@@ -74,37 +57,30 @@ export class StoryFeed implements Feed {
   start(sink: FeedSink): void {
     if (this.live) return
     this.live = true
-    this.state = "connecting"
-    sink.status("connecting")
-    this.load().then(
-      (story) => {
-        if (!this.live) return
-        sink.reset()
-        const start = story.changes[0]?.at ?? 0
-        const shift = STORY_EPOCH - start
-        const sea = [...(story.sea ?? [])]
-          .map((e) => ({ ...e, at: e.at + shift }))
-          .sort((a, b) => a.at - b.at)
-        let s = 0
-        story.changes.forEach((change, i) => {
-          const at = change.at + shift
-          while (s < sea.length && (sea[s] as SeaEvent).at <= at) sink.take(sea[s++] as SeaEvent, false)
-          sink.take({ v: 1, guild: "story", seq: i + 1, change: shifted(change, shift) }, false)
-        })
-        while (s < sea.length) sink.take(sea[s++] as SeaEvent, false)
-        sink.chapters?.(
-          (story.chapters ?? []).map(({ at, numeral, title, tagline }) => ({ at, numeral, title, tagline })),
-        )
-        sink.loaded?.()
-        this.state = "replay"
-        sink.status("replay")
-      },
-      (error: unknown) => {
-        if (!this.live) return
-        this.state = "offline"
-        sink.status("offline", String(error))
-      },
+    const { name, units, seed } = this.stage
+    const told = story(this.id, {
+      ...(name || units ? { repo: { ...(name ? { name } : {}), ...(units ? { units } : {}) } } : {}),
+      seed: seed ?? 1,
+      start: STORY_EPOCH,
+    })
+    sink.reset()
+    // the guild's changes and the sea, merged by time (the guild's first on a tie)
+    const sea = [...told.seas].sort((a, b) => a.at - b.at)
+    let s = 0
+    for (const event of told.events) {
+      while (s < sea.length && (sea[s] as SeaEvent).at < event.change.at)
+        sink.take(sea[s++] as SeaEvent, false)
+      sink.take(event, false)
+    }
+    while (s < sea.length) sink.take(sea[s++] as SeaEvent, false)
+    sink.chapters?.(
+      told.chapters.map(
+        ({ at, numeral, title, tagline }): FeedChapter => ({ at: at - STORY_EPOCH, numeral, title, tagline }),
+      ),
     )
+    sink.loaded?.()
+    this.state = "replay"
+    sink.status("replay")
   }
 
   stop(): void {

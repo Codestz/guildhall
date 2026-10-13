@@ -72,6 +72,7 @@ const CSS = /* css */ `
 .ui-viewer[data-phone] .hall-sheet .hud-dossier, .ui-viewer[data-phone] .hall-sheet .hud-roster { max-height: min(64cqh, 620px); }
 .ui-viewer[data-phone] .ui-hud-corner .hud-pleas { width: calc(100cqw - 16px); }
 .gh .ui-hud-bottom .hall-timeline .st-captions { width: 100%; }
+.ui-viewer[data-phone] .ui-hud-bottom .hall-chapter { align-self: flex-end; }
 
 .hall-keys { margin: 0; display: grid; gap: 6px; }
 .hall-keys div { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--t-sm); color: var(--muted); }

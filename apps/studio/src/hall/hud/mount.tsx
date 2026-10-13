@@ -43,7 +43,13 @@ function startSession(parts: HudParts, opts: HallHudOptions): HudSession | null 
   const kind = query ? feedKindOf(query) : null
   if (!query || !kind) return null
   const st = Number(query.get("st"))
-  const session = createSession(openFeed(kind, opts.slug, query), {
+  // a story is told on this repo: its paths rehomed onto the repo's units, so heroes reach its places
+  const repo = parts.repo?.kind === "chronicled" ? parts.repo : null
+  const units = repo?.places.flatMap((p) =>
+    p.pooled?.length ? p.pooled.map((name) => ({ name })) : [{ name: p.id, files: p.files }],
+  )
+  const stage = { name: repo?.name ?? opts.slug, ...(units?.length ? { units } : {}) }
+  const session = createSession(openFeed(kind, opts.slug, query, stage), {
     autoplay: query.get("play") !== "0",
     ...(query.has("st") && Number.isFinite(st) ? { openAt: Math.max(0, st) } : {}),
   })

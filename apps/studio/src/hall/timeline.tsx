@@ -33,8 +33,10 @@ export function HallTimeline({ time }: { time: HallTime }) {
       releaseHall()
     }
   }, [])
-  const onScale = range && session ? (s: TimeScale) => time.setScale(s) : undefined
-  if (session && (scale === "session" || !range))
+  // a session with nothing in it yet (live, before the first event) leaves the bar to the history
+  const heard = useSyncExternalStore(session?.subscribe ?? quiet, () => (session?.snapshot().events ?? 0) > 0)
+  const onScale = range && session && heard ? (s: TimeScale) => time.setScale(s) : undefined
+  if (session && (heard || !range) && (scale === "session" || !range))
     return <SessionBar session={session} onScale={onScale} historyless={!range} />
   if (!range) return null
   return <HistoryBar time={time} range={range} onScale={onScale} session={session} />
@@ -88,6 +90,17 @@ function SessionCaptions({ session }: { session: HallSession }) {
   return <Captions {...(snap.caption ? { caption: snap.caption } : {})} />
 }
 
+const quiet = () => () => {}
+
+/** A phone's width (the Viewer's): the chapter chip is its numeral alone, at the right, clear of the Chronicle chip. */
+const NARROW = "(max-width: 600px)"
+const onNarrow = (fn: () => void) => {
+  const q = matchMedia(NARROW)
+  q.addEventListener("change", fn)
+  return () => q.removeEventListener("change", fn)
+}
+const isNarrow = () => matchMedia(NARROW).matches
+
 /** The Session scale: the log's minutes, its beats, live's way back to now, a told story's acts. */
 function SessionBar({
   session,
@@ -99,6 +112,7 @@ function SessionBar({
   historyless: boolean
 }) {
   const snap = useSyncExternalStore(session.subscribe, session.snapshot)
+  const narrow = useSyncExternalStore(onNarrow, isNarrow)
   const { clock } = session
   const c = snap.clock
   const events = snap.events
@@ -114,6 +128,7 @@ function SessionBar({
           chapters={snap.chapters}
           current={Math.max(0, snap.chapter)}
           onJump={(k) => clock.seek(c.start + (snap.chapters[k]?.at ?? 0), { jump: true })}
+          compact={narrow}
           className="hall-chapter"
         />
       )}

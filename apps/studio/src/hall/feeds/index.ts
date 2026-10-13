@@ -4,18 +4,18 @@
  *   feed     `Feed`, `FeedSink`, `FeedStatus`: the lean V1 shape
  *   live     `LiveFeed`: the legacy hub's WebSocket (seq dedup, backoff, the backlog rule)
  *   replay   `ReplayFeed`: a recorded `.jsonl` (a guild chronicle the dev Studio serves, core's fixtures)
- *   story    `StoryFeed`: a told story (V1's; the seam for D1's saga)
+ *   story    `StoryFeed`: a demo story (sim `story(id)`, D1), told on the hall's repo
  *   session  `createSession`: the hall's one EventLog, its clock and a 10 Hz snapshot for React
  *   view     the session read into the HUD's props
  *
  * Link knobs: `?guild=` (the hub's guild, exactly; default: the repo's name and its `·n` clones),
  * `?hub=ws://127.0.0.1:<port>/ws`, `?src=` (a chronicle of the guild, or a path on this origin),
- * `?story=saga|seas|party|rush|solo`, `?st=<seconds>` (open at), `?play=0` (open paused).
+ * `?story=saga|solo|party|parties|rush|seas|factions`, `?seed=`, `?st=<seconds>` (open at), `?play=0` (open paused).
  */
 import type { Feed, FeedKind } from "./feed.ts"
 import { hubUrlOf, LiveFeed } from "./live.ts"
 import { fetchRecording, ReplayFeed, recordingUrl } from "./replay.ts"
-import { loadStory, StoryFeed, storyOf, storyTitle } from "./story.ts"
+import { StoryFeed, type StoryStage, storyOf } from "./story.ts"
 import { guildMatcher } from "./wire.ts"
 
 export type { Feed, FeedKind, FeedSink, FeedStatus } from "./feed.ts"
@@ -28,7 +28,7 @@ export function feedKindOf(query: URLSearchParams): FeedKind | null {
 }
 
 /** The feed for a repo's hall (`slug`: `Codestz/guildhall`). */
-export function openFeed(kind: FeedKind, slug: string, query: URLSearchParams): Feed {
+export function openFeed(kind: FeedKind, slug: string, query: URLSearchParams, stage: StoryStage = {}): Feed {
   const repo = slug.split("/").pop() || slug
   const exact = query.get("guild")
   const guild = exact ?? repo
@@ -47,5 +47,6 @@ export function openFeed(kind: FeedKind, slug: string, query: URLSearchParams): 
     })
   }
   const story = storyOf(query.get("story"))
-  return new StoryFeed(storyTitle(story), () => loadStory(story))
+  const seed = Number(query.get("seed"))
+  return new StoryFeed(story, { ...stage, ...(Number.isInteger(seed) && seed > 0 ? { seed } : {}) })
 }

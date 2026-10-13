@@ -20,12 +20,11 @@ import {
 import { ReplayFeed, recordingUrl } from "../src/hall/feeds/replay.ts"
 import { createSession } from "../src/hall/feeds/session.ts"
 import { throttled } from "../src/hall/feeds/store.ts"
-import { STORY_EPOCH, StoryFeed, type StorySource } from "../src/hall/feeds/story.ts"
+import { STORY_EPOCH, StoryFeed } from "../src/hall/feeds/story.ts"
 import { markersOf, rosterOf, shortPath } from "../src/hall/feeds/view.ts"
 import { guildMatcher, hubMessage, readRecording } from "../src/hall/feeds/wire.ts"
 
 const FIXTURES = join(import.meta.dir, "../../../packages/core/test/events/fixtures")
-const STORIES = join(import.meta.dir, "../public/lab/story")
 
 /** Timers that run only when told: `advance(ms)` runs what fell due, in order. */
 function fakeTime(start = 0) {
@@ -365,8 +364,7 @@ describe("replay", () => {
   })
 
   test("a told story plays from a fixed morning, with its acts", async () => {
-    const input = (await Bun.file(join(STORIES, "saga.input.json")).json()) as Omit<StorySource, "name">
-    const session = createSession(new StoryFeed("The Saga", async () => ({ name: "The Saga", ...input })), {
+    const session = createSession(new StoryFeed("saga"), {
       autoplay: false,
       throttle: instant,
     })
@@ -376,12 +374,19 @@ describe("replay", () => {
     const snap = session.snapshot()
     expect(snap.chapters.map((c) => c.numeral)).toEqual(["I", "II", "III", "IV", "V"])
     expect(snap.chapter).toBe(4)
-    // midway the guild is busy: the roster has a party under its guildmaster
-    session.clock.seek(STORY_EPOCH + 12 * 60_000)
+    // midway the guild is busy: the guildmaster and the three heroes it sent at once
+    let most = 0
+    for (let s = 0; s <= 170; s += 5) {
+      session.clock.seek(STORY_EPOCH + s * 1000)
+      session.frame(0)
+      const at = session.snapshot()
+      most = Math.max(most, rosterOf(at.world, at.clock.at, () => "the town").length)
+    }
+    expect(most).toBeGreaterThanOrEqual(4)
+    session.clock.seek(STORY_EPOCH + 90_000)
     session.frame(0)
     const mid = session.snapshot()
     const roster = rosterOf(mid.world, mid.clock.at, () => "the town")
-    expect(roster.length).toBeGreaterThan(2)
     expect(roster.filter((h) => h.master).length).toBeGreaterThanOrEqual(1)
     expect(mid.chapter).toBeGreaterThanOrEqual(1)
     const marks = markersOf(session.log().events, STORY_EPOCH)
@@ -390,8 +395,7 @@ describe("replay", () => {
   })
 
   test("captions are told as a replay plays, not across a seek", async () => {
-    const input = (await Bun.file(join(STORIES, "party.input.json")).json()) as Omit<StorySource, "name">
-    const session = createSession(new StoryFeed("A Party", async () => ({ name: "A Party", ...input })), {
+    const session = createSession(new StoryFeed("party"), {
       throttle: instant,
     })
     session.start()

@@ -99,6 +99,11 @@ const ROOM = 0.3
  */
 const FROM_SPOT = 0.9
 const FROM_SLOT = 0.7
+/**
+ * A meeting slot's room a place's spots keep first (user, 10-13: a hero and someone at a chat never
+ * closer than 0.9 m); a place with too few spots then takes FROM_SLOT.
+ */
+const FROM_SLOT_WIDE = 1
 /** A meeting slot's room where a place has no other (a one-tile place among another's streets): bodies apart. */
 const FROM_SLOT_TIGHT = 0.55
 /** Hero spots of one place keep this far apart, metres; at the Guildhall, as far as agents rest apart. */
@@ -181,6 +186,8 @@ export function heroSpotPool(inp: HeroPoolInputs, k: number): (zone: number) => 
   // ---- what nobody's spot may stand on: the townsfolk's spots and slots ----
   const FOLK_CELL = 4
   const folkKey = (cx: number, cz: number) => (cx + 4096) * 8192 + cz + 4096
+  /** The room kept from a meeting slot now (FROM_SLOT_WIDE first, FROM_SLOT where that leaves too few). */
+  let slotRoom = FROM_SLOT_WIDE
   let folkCells: Map<number, { x: number; z: number; r: number }[]> | null = null
   const nearFolk = (x: number, zz: number, tight: boolean): boolean => {
     if (!folkCells) {
@@ -202,7 +209,9 @@ export function heroSpotPool(inp: HeroPoolInputs, k: number): (zone: number) => 
     for (let a = cx - 1; a <= cx + 1; a++)
       for (let b = cz - 1; b <= cz + 1; b++)
         for (const p of folkCells.get(folkKey(a, b)) ?? [])
-          if (Math.hypot(p.x - x, p.z - zz) < (tight && p.r === FROM_SLOT ? FROM_SLOT_TIGHT : p.r))
+          if (
+            Math.hypot(p.x - x, p.z - zz) < (p.r === FROM_SLOT ? (tight ? FROM_SLOT_TIGHT : slotRoom) : p.r)
+          )
             return true
     return false
   }
@@ -450,7 +459,15 @@ export function heroSpotPool(inp: HeroPoolInputs, k: number): (zone: number) => 
       const order = [inp.home, ...z.zones.keys()].filter((i, n) => n === 0 || i !== inp.home)
       for (const i of order) {
         if (!z.zones[i]) continue
-        lists[i] = i === inp.home ? gatherSpots(i) : workSpots(i)
+        const of = i === inp.home ? gatherSpots : workSpots
+        const want = Math.max(k, HERO_SPOTS_MIN) * (i === inp.home ? GATHER_PER_SPOT : 1)
+        slotRoom = FROM_SLOT_WIDE
+        lists[i] = of(i)
+        if (lists[i]!.length < want) {
+          slotRoom = FROM_SLOT
+          const near = of(i)
+          if (near.length > lists[i]!.length) lists[i] = near
+        }
         placed.push(...lists[i]!)
       }
       all = lists

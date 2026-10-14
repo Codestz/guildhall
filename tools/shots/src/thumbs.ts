@@ -44,6 +44,22 @@ export interface Pose {
   run?: string
   /** Settle time after the page is ready, ms. */
   settle?: number
+  /** A story moment, filmed as it plays (see `film`) instead of a page script and a settle. */
+  moment?: Moment
+}
+
+/**
+ * A story's moment: the session seeks to `from` (s into the story) and plays on to `at`, where the clock is
+ * paused (every show with it) and the HUD hidden. With `look` the director is switched off a little before
+ * and the camera put on that subject (the castle) at `distance`, `elevation` and `azimuth`, aimed `off`
+ * metres from it; without, the director frames the moment, as a viewer would see it.
+ */
+export interface Moment {
+  from: number
+  at: number
+  /** Seconds into the playing shows to hold them at (a burst of the festival at its best), else they stand as paused. */
+  hold?: number
+  look?: { off?: [number, number, number]; distance: number; elevation: number; azimuth: number }
 }
 
 const CARD = { size: [1280, 800] as [number, number], width: 800, quality: 80 }
@@ -112,22 +128,47 @@ const HIDE_HUD = `${HIDE_SITE};document.querySelector(".ui-viewer-hud")?.style.s
 /** A hall's camera pulled back `k` times its opening distance, at `el`° and turned `turn`°. */
 const pulled = (k: number, el = 50, turn = 0) =>
   `${HIDE_HUD};(async () => { const c = guildhall.camera.get(); await guildhall.camera.set({ ...c, azimuth: c.azimuth + ${turn}, elevation: ${el}, distance: c.distance * ${k} }) })()`
-const DEMO = { size: [1280, 800] as [number, number], width: 640, quality: 74 }
+const DEMO = { size: [1280, 800] as [number, number], width: 800, quality: 82 }
+/** The HUD and the site's pieces hidden by style only, once the director has filmed the moment. */
+const HUD_CSS = ".ui-viewer-hud,.site-pieces{display:none!important}"
+/** The camera the festival's fireworks are filmed from: over the keep, the village behind it lit. */
+const OVER_THE_KEEP = {
+  off: [0, 7, 0] as [number, number, number],
+  distance: 44,
+  elevation: 22,
+  azimuth: 330,
+}
+/** The keep's yard from the south-east, close: the party at work under its pennants. */
+const AT_THE_KEEP = { off: [0, -3, 0] as [number, number, number], distance: 24, elevation: 26, azimuth: 20 }
+const story = (id: string) => `/?story=${id}&play=0&${BARE}`
 
 /**
  * The demo picker's story cards (apps/studio/src/site/stories.ts `STORIES`), each its own link as V2 opens
  * it: a told story mid-way on the home island with the director filming, a repo's hall pulled back, the
- * night storm; the site's pieces and the HUD left out. 640×400 (the Saga's feature card 1024×640).
+ * night storm, each filmed at a scripted moment (`Moment`); the site's pieces and the HUD left out. 800×500.
  */
 export const DEMOS: readonly Pose[] = [
-  // the saga's nightfall festival and World events' fireworks (the director frames them; a gold burst)
-  { id: "saga", url: `/?story=saga&act=2&${BARE}`, ...DEMO, width: 1024, run: HIDE_HUD, settle: 12_000 },
-  { id: "events", url: `/?story=events&st=176&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_500 },
-  { id: "party", url: `/?story=party&st=45&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },
-  { id: "solo", url: `/?story=solo&st=70&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },
-  { id: "factions", url: `/?story=factions&st=60&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },
-  { id: "seas", url: `/?story=seas&st=80&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },
-  { id: "crowd", url: `/?story=rush&st=30&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },
+  // the saga's nightfall festival: a red and green burst over the keep
+  { id: "saga", url: story("saga"), ...DEMO, moment: { from: 150, at: 166, hold: 2.6, look: OVER_THE_KEEP } },
+  // World events' festival fireworks over the keep, gold and rose
+  {
+    id: "events",
+    url: story("events"),
+    ...DEMO,
+    moment: { from: 176, at: 184, hold: 5.5, look: OVER_THE_KEEP },
+  },
+  // the keep's yard at work, the director's own frame; the lone guildmaster and the two parties from close by
+  { id: "party", url: story("party"), ...DEMO, moment: { from: 5, at: 45 } },
+  { id: "solo", url: story("solo"), ...DEMO, moment: { from: 0, at: 8, look: AT_THE_KEEP } },
+  {
+    id: "factions",
+    url: story("factions"),
+    ...DEMO,
+    moment: { from: 16, at: 22, look: AT_THE_KEEP },
+  },
+  // the harbour with the PR ships docked and one more sailing in
+  { id: "seas", url: story("seas"), ...DEMO, moment: { from: 70, at: 100 } },
+  { id: "crowd", url: story("rush"), ...DEMO, moment: { from: 30, at: 48 } },
   { id: "react", url: `/hall/facebook/react?labels=0&${BARE}`, ...DEMO, run: pulled(1.6, 44), settle: 7000 },
   {
     id: "world",
@@ -139,6 +180,59 @@ export const DEMOS: readonly Pose[] = [
   { id: "island", url: `/hall/Codestz/mcpx?labels=0&${BARE}`, ...DEMO, run: pulled(2.4, 50), settle: 7000 },
   { id: "night", url: `/?hour=21&weather=storm&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },
 ]
+
+// biome-ignore lint/suspicious/noExplicitAny: the page's debug surface
+type G = any
+
+/** Plays a story to its moment, steers the camera and freezes the frame (see `Moment`). */
+async function film(page: Page, m: Moment): Promise<void> {
+  await page.waitForFunction(
+    () => (window as unknown as { guildhall: G }).guildhall?.ext?.session,
+    undefined,
+    { timeout: 60_000 },
+  )
+  await page.waitForTimeout(2500)
+  const t = () =>
+    page.evaluate(() => {
+      const c = (window as unknown as { guildhall: G }).guildhall.ext.session.clock.get()
+      return (c.at - c.start) / 1000
+    }) as Promise<number>
+  await page.evaluate((from) => {
+    const clock = (window as unknown as { guildhall: G }).guildhall.ext.session.clock
+    clock.seek(clock.get().start + from * 1000, { jump: true })
+    clock.play(true)
+  }, m.from)
+  let steered = !m.look
+  const deadline = Date.now() + 150_000
+  for (;;) {
+    const now = await t()
+    if (now >= m.at - 0.02 || Date.now() > deadline) break
+    if (!steered && now >= m.at - 4) {
+      steered = true
+      await page.evaluate((look) => {
+        const g = (window as unknown as { guildhall: G }).guildhall
+        g.ext.camera?.director(false)
+        const keep = g.ext.shows?.sites().castle as [number, number, number] | undefined
+        if (!keep || !look) return
+        const o = look.off ?? [0, 0, 0]
+        return g.camera.set({
+          target: [keep[0] + o[0], keep[1] + o[1], keep[2] + o[2]],
+          azimuth: look.azimuth,
+          elevation: look.elevation,
+          distance: look.distance,
+        })
+      }, m.look)
+    }
+    await page.waitForTimeout(Math.min(1000, Math.max(20, (m.at - now) * 300)))
+  }
+  await page.evaluate((hold) => {
+    const g = (window as unknown as { guildhall: G }).guildhall
+    g.ext.session.clock.play(false)
+    if (hold !== undefined) g.ext.shows?.hold(hold)
+  }, m.hold)
+  await page.addStyleTag({ content: HUD_CSS })
+  await page.waitForTimeout(500)
+}
 
 /** The poses, sized by the catalog's file counts (read live; a repo it does not list gets the middle). */
 export async function repoPoses(): Promise<Pose[]> {
@@ -252,7 +346,8 @@ async function capture(
         await waitReady(page)
         if (pose.camera) await page.evaluate((c) => window.guildhall?.camera.set(c), parseCamera(pose.camera))
         if (pose.run) await page.evaluate(pose.run)
-        await page.waitForTimeout(pose.settle ?? 800)
+        if (pose.moment) await film(page, pose.moment)
+        else await page.waitForTimeout(pose.settle ?? 800)
         const png = await page.screenshot({ type: "png" })
         const webp = await encode(page, png, pose.width, pose.quality)
         const folder = args.out ? resolve(args.out) : join(STUDIO_PUBLIC, dir(pose))

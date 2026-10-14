@@ -61,6 +61,36 @@ describe("the harvest piles", () => {
     }
   })
 
+  test("heaps are full and mixed: hay leads, pumpkins stay a third at most, hay and crates are stacked", () => {
+    let heaps = 0
+    let pieces = 0
+    const kinds = { hay: 0, pumpkins: 0, other: 0 }
+    let stacked = 0
+    for (const { piles, w } of islands) {
+      const ground = new Map(w.tiles.map((t) => [t.i, t.top]))
+      const by = new Map<string, HarvestPiece[]>()
+      for (const p of piles) by.set(`${p.tile}:${p.heap}`, [...(by.get(`${p.tile}:${p.heap}`) ?? []), p])
+      for (const list of by.values()) {
+        heaps++
+        pieces += list.length
+        const ids = list.map((p) => p.piece)
+        const kind = ids.some((i) => i.includes("hay"))
+          ? "hay"
+          : ids.every((i) => i.includes("pumpkin"))
+            ? "pumpkins"
+            : "other"
+        kinds[kind]++
+        const base = Math.min(...list.map((p) => p.y))
+        if (kind !== "pumpkins" && list.some((p) => p.y > base + 0.25)) stacked++
+        expect(Math.abs(base - (ground.get(list[0]!.tile) as number))).toBeLessThan(0.9)
+      }
+    }
+    expect(pieces / heaps).toBeGreaterThan(7)
+    expect(kinds.hay / heaps).toBeGreaterThanOrEqual(0.4)
+    expect(kinds.pumpkins / heaps).toBeLessThanOrEqual(0.35)
+    expect(stacked / (kinds.hay + kinds.other)).toBeGreaterThan(0.6)
+  })
+
   test("are placed the same each time, whatever order the tiles come in", () => {
     for (const island of islands.slice(0, 2)) {
       const again = harvestPiles(island.h, island.w, { walk: island.walk })

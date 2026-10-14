@@ -65,21 +65,21 @@ const FARM_HEAPS: Readonly<Record<string, number>> = {
 
 /** Heaps by tile kind: the odds of each kind of heap (hay, pumpkins, crates, sacks), summing to 1. */
 const ODDS: Readonly<Record<string, readonly [number, number, number, number]>> = {
-  field: [0.6, 0.3, 0, 0.1],
-  farmstead: [0.4, 0.15, 0.3, 0.15],
-  "farmstead-yard": [0.4, 0.15, 0.3, 0.15],
-  orchard: [0.2, 0.2, 0.6, 0],
-  "cottage-veg": [0.1, 0.6, 0.2, 0.1],
-  homestead: [0.35, 0.2, 0.3, 0.15],
+  field: [0.7, 0.14, 0.04, 0.12],
+  farmstead: [0.58, 0.14, 0.16, 0.12],
+  "farmstead-yard": [0.58, 0.14, 0.16, 0.12],
+  orchard: [0.4, 0.2, 0.4, 0],
+  "cottage-veg": [0.35, 0.35, 0.2, 0.1],
+  homestead: [0.58, 0.14, 0.16, 0.12],
 }
 const KINDS: readonly HarvestKind[] = ["hay", "pumpkins", "crates", "sacks"]
 
 /** The round a heap keeps clear, by kind, metres. */
 const REACH: Readonly<Record<HarvestKind, number>> = {
   hay: 0.5 * GROW,
-  pumpkins: 0.42 * GROW,
+  pumpkins: 0.45 * GROW,
   crates: 0.5 * GROW,
-  sacks: 0.46 * GROW,
+  sacks: 0.45 * GROW,
 }
 /** What a heap keeps clear of, beyond its own round, metres. */
 const FROM_SOLID = 0.12
@@ -177,63 +177,137 @@ function heapParts(kind: HarvestKind, r: (k: number) => number): Part[] {
   })
   if (kind === "hay") {
     const a = r(1) < 0.5 ? HARVEST_PIECES.bale : HARVEST_PIECES.bundle
-    const k = 0.5 + r(2) * 0.08
-    const parts = [at(-0.3, 0, -0.2, (r(3) - 0.5) * 0.3, k, a), at(0.3, 0, 0.18, (r(4) - 0.5) * 0.3, k, a)]
-    // a third on the two, three times in five
-    if (r(5) < 0.6) parts.push(at(0, 0.36 * k * 1.6, 0, Math.PI / 2 + (r(6) - 0.5) * 0.4, k, a))
+    const k = 0.5 + r(2) * 0.06
+    // real stacks: bales lie in rows, the next layer across the seams of the one below
+    const bw = 0.6
+    const bd = 0.44
+    const bh = 0.29
+    const parts: Part[] = []
+    const wob = (j: number) => (r(j) - 0.5) * 0.14
+    if (r(7) < 0.5) {
+      // a block three high: two rows of two, two across them, one on top
+      for (let i = 0; i < 4; i++)
+        parts.push(at(((i % 2) - 0.5) * bw, 0, (Math.floor(i / 2) - 0.5) * bd, wob(10 + i), k, a))
+      for (let i = 0; i < 2; i++)
+        parts.push(at(0, bh, (i - 0.5) * bd * 1.05, Math.PI / 2 + wob(20 + i), k, a))
+      parts.push(at(0, bh * 2, 0, wob(30), k, a))
+      // and sometimes one leaning at its foot
+      if (r(8) < 0.5) parts.push(at(bw * 0.95, 0, bd * 0.3, wob(31) + 0.4, k, a))
+    } else {
+      // a wall two high: a row of three, two on it
+      const n = 3
+      for (let i = 0; i < n; i++)
+        parts.push(at((i - (n - 1) / 2) * bw, 0, wob(10 + i) * 0.3, wob(40 + i), k, a))
+      for (let i = 0; i < n - 1; i++)
+        parts.push(at((i - (n - 2) / 2) * bw, bh, wob(20 + i) * 0.3, wob(50 + i), k, a))
+      // a second row behind it, the first of a block
+      if (r(9) < 0.5)
+        for (let i = 0; i < n - 1; i++) parts.push(at((i - (n - 2) / 2) * bw, 0, bd, wob(60 + i), k, a))
+    }
     return parts
   }
   if (kind === "pumpkins") {
-    const n = 5 + Math.floor(r(1) * 3)
+    // a mound: a ring, a ring on it, a crown
     const parts: Part[] = []
+    const pick = (j: number) => (r(70 + j) < 0.25 ? HARVEST_PIECES.squash : HARVEST_PIECES.pumpkin)
+    const n = 5 + Math.floor(r(1) * 2)
     for (let j = 0; j < n; j++) {
       const ang = (j / n) * Math.PI * 2 + r(2) * 0.6
-      const rr = 0.27 + r(10 + j) * 0.06
-      const k = 0.36 + r(20 + j) * 0.1
+      const rr = 0.34 + r(10 + j) * 0.06
       parts.push(
         at(
           Math.cos(ang) * rr,
           0,
           Math.sin(ang) * rr,
           r(30 + j) * Math.PI * 2,
-          k,
-          r(40 + j) < 0.28 ? HARVEST_PIECES.squash : HARVEST_PIECES.pumpkin,
+          0.38 + r(20 + j) * 0.08,
+          pick(j),
         ),
       )
     }
-    // the crown of the heap
-    parts.push(at(0, 0.17, 0, r(3) * Math.PI * 2, 0.4 + r(4) * 0.08, HARVEST_PIECES.pumpkin))
-    if (r(5) < 0.5) parts.push(at(0.05, 0.3, -0.04, r(6) * Math.PI * 2, 0.34, HARVEST_PIECES.squash))
+    const m = 3
+    for (let j = 0; j < m; j++) {
+      const ang = (j / m) * Math.PI * 2 + r(3) * 2
+      parts.push(
+        at(
+          Math.cos(ang) * 0.16,
+          0.14,
+          Math.sin(ang) * 0.16,
+          r(35 + j) * Math.PI * 2,
+          0.4 + r(25 + j) * 0.06,
+          pick(10 + j),
+        ),
+      )
+    }
+    parts.push(at(0, 0.29, 0, r(4) * Math.PI * 2, 0.4 + r(5) * 0.06, HARVEST_PIECES.pumpkin))
+    if (r(6) < 0.5) parts.push(at(0.1, 0.36, -0.06, r(7) * Math.PI * 2, 0.32, HARVEST_PIECES.squash))
     return parts
   }
   if (kind === "crates") {
     const k = 0.33
-    const parts = [at(-0.19, 0, 0, (r(1) - 0.5) * 0.2, k, HARVEST_PIECES.crate)]
-    parts.push(at(0.2, 0, (r(2) - 0.5) * 0.06, (r(3) - 0.5) * 0.2, k, HARVEST_PIECES.crate))
-    // the produce in them, heaped over their open tops
-    for (let j = 0; j < 4; j++) {
-      const x = j < 2 ? -0.19 : 0.2
-      parts.push(
-        at(
-          x + (r(10 + j) - 0.5) * 0.12,
-          k * 0.9,
-          (j % 2 ? 1 : -1) * 0.07 + (r(20 + j) - 0.5) * 0.05,
-          r(30 + j) * Math.PI * 2,
-          0.3 + r(40 + j) * 0.06,
-          j === 3 ? HARVEST_PIECES.squash : HARVEST_PIECES.pumpkin,
-        ),
-      )
+    const cw = 0.38
+    const parts: Part[] = []
+    // a row of three, two on it (the next layer on the seams), sometimes a second row of two behind
+    const rows: [number, number][] = [[0, 0]]
+    if (r(1) < 0.45) rows.push([0, cw * 1.02])
+    for (const [, z] of rows) {
+      const n = z === 0 ? 3 : 2
+      for (let i = 0; i < n; i++)
+        parts.push(
+          at((i - (n - 1) / 2) * cw, 0, z, (r(2 + i + z * 10) - 0.5) * 0.16, k, HARVEST_PIECES.crate),
+        )
     }
-    // a third crate on the two, sometimes
-    if (r(5) < 0.5) parts.push(at(0, k * 1.05, 0, (r(6) - 0.5) * 0.5, k, HARVEST_PIECES.crate))
+    const second = r(3) < 0.7 ? 2 : 1
+    for (let i = 0; i < second; i++)
+      parts.push(
+        at(second === 2 ? (i - 0.5) * cw : 0, k * 1.02, 0, (r(5 + i) - 0.5) * 0.3, k, HARVEST_PIECES.crate),
+      )
+    // the produce heaped over the open tops: the crates on top, the second row's, and the first row's
+    // ends when only one crate stands on it
+    const open: [number, number, number][] = []
+    for (let i = 0; i < second; i++) open.push([second === 2 ? (i - 0.5) * cw : 0, k * 1.9, 0])
+    if (second === 1) open.push([-cw, k * 0.9, 0], [cw, k * 0.9, 0])
+    if (rows.length > 1) for (const x of [-0.5 * cw, 0.5 * cw]) open.push([x, k * 0.9, cw * 1.02])
+    for (const [j, [x, y, z]] of open.entries()) {
+      for (let q = 0; q < 2; q++)
+        parts.push(
+          at(
+            x + (q - 0.5) * 0.13 + (r(10 + j + q) - 0.5) * 0.05,
+            y,
+            z + (r(20 + j + q) - 0.5) * 0.1,
+            r(30 + j + q) * Math.PI * 2,
+            0.28 + r(40 + j + q) * 0.06,
+            r(50 + j + q) < 0.25 ? HARVEST_PIECES.squash : HARVEST_PIECES.pumpkin,
+          ),
+        )
+    }
     return parts
   }
+  // sacks: a row of three, two on it, one on those
   const k = 0.7
-  const parts = [
-    at(-0.2, 0, -0.1, (r(1) - 0.5) * 0.6, k, HARVEST_PIECES.sack),
-    at(0.22, 0, 0.1, (r(2) - 0.5) * 0.6 + 0.3, k, HARVEST_PIECES.sack),
-  ]
-  if (r(3) < 0.6) parts.push(at(0, 0.2 * k * 1.1, 0, r(4) * Math.PI * 2, k * 0.95, HARVEST_PIECES.sack))
+  const sw = 0.42
+  const sh = 0.17
+  const parts: Part[] = []
+  const n = 2 + Math.floor(r(1) * 2)
+  for (let i = 0; i < n; i++)
+    parts.push(
+      at((i - (n - 1) / 2) * sw, 0, (r(10 + i) - 0.5) * 0.1, (r(20 + i) - 0.5) * 0.7, k, HARVEST_PIECES.sack),
+    )
+  for (let i = 0; i < n - 1; i++)
+    parts.push(
+      at(
+        (i - (n - 2) / 2) * sw,
+        sh,
+        (r(30 + i) - 0.5) * 0.08,
+        (r(40 + i) - 0.5) * 0.7,
+        k,
+        HARVEST_PIECES.sack,
+      ),
+    )
+  if (n === 3) parts.push(at(0, sh * 2, 0, (r(50) - 0.5) * 0.7, k * 0.95, HARVEST_PIECES.sack))
+  // one slumped beside, and one more behind
+  parts.push(at(sw * (n / 2 + 0.15), 0, 0.12, r(51) * Math.PI * 2, k, HARVEST_PIECES.sack))
+  if (r(52) < 0.6) parts.push(at(0, 0, sw * 0.95, (r(53) - 0.5) * 0.7, k, HARVEST_PIECES.sack))
   return parts
 }
 
@@ -344,18 +418,23 @@ export function harvestPiles(h: HexIsland, w: HexWorld, opts: HarvestOpts = {}):
         if (!free(t.top, x, z, reach)) continue
         const own = (n: number) => hash2(seed * 31 + 7 + n, Math.round(x * 20), Math.round(z * 20))
         const parts = heapParts(kind, own)
-        // every piece itself on free ground too: the heap's edge may meet a crop
         const y = w.heightAt(x, z)
+        // every piece standing on the ground on free ground too (a heap's edge may meet a crop): a stack
+        // never stands on a hole, so what is blocked goes with what rests on it, and a heap that loses
+        // much of itself is tried elsewhere first
+        const blocked = parts.filter((p) => p.dy === 0 && !free(t.top, x + p.dx, z + p.dz, 0.14))
+        const left = parts.filter(
+          (p) =>
+            !blocked.some((b) => (p.dy === 0 ? p === b : Math.hypot(p.dx - b.dx, p.dz - b.dz) < 0.5 * GROW)),
+        )
+        if (blocked.length && (a < TRIES * 0.6 || left.length < parts.length * 0.6)) continue
         let n = 0
-        for (const p of parts) {
-          const px = x + p.dx
-          const pz = z + p.dz
-          if (p.dy === 0 && !free(t.top, px, pz, 0.14)) continue
+        for (const p of left) {
           out.push({
             piece: p.piece,
-            x: px,
+            x: x + p.dx,
             y: y + p.dy,
-            z: pz,
+            z: z + p.dz,
             rot: p.rot,
             scale: p.scale,
             tile: t.i,

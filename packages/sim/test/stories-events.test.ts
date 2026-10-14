@@ -116,11 +116,12 @@ describe("World events: every show in turn", () => {
   test("each show answers its cause", () => {
     const shows = big(all)
     const of = (kind: string) => shows.find((x) => x.kind === kind) as Show
-    // red CI raises a grave; green CI's fixer is the Implementer, who built it
+    // red CI raises a grave; green CI's fixer is the Guildmaster, who watched it turn (by the graveyard)
     const ci = all.find((x) => x.params.grave?.cause === "ci") as Show
+    const master = told.s.events.find((e) => e.change.type === "session")?.change.id
     expect(ci.start).toBe(at("ci-red"))
     expect(ci.params.grave?.fixed).toBe(at("ci-green"))
-    expect(ci.params.grave?.fixer?.id).toBe(of("dragon").params.who?.id)
+    expect(ci.params.grave?.fixer?.id).toBe(master)
     // the third failed build in a row brings the dragon; the build that passes sends it home
     expect(of("dragon").start).toBe(at("dragon"))
     expect(of("dragon").leave).toBe(at("built"))

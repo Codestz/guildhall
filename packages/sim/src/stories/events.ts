@@ -11,8 +11,10 @@ import { type Adventurer, type Chapter, type Economy, Script } from "./script.ts
  *   II   Red skies         CI fails (a storm, the lamp red, a skeleton claws up in the graveyard); the
  *                          Implementer's build fails three times in a row (the dragon circles the peaks)
  *                          until it builds; the fix is pushed, CI passes (the lamp warm), the storm clears
- *                          (a rainbow) and the Implementer walks to the graveyard and strikes the grave
- *   III  The hundredth deed  the heroes called back, many hands: the guild's 100th deed (a comet)
+ *                          (a rainbow), and the Guildmaster, who watched CI turn from the hall, walks to
+ *                          the graveyard by it and strikes the grave
+ *   III  The hundredth deed  the heroes called back and two more, many hands: the guild's 100th deed (a
+ *                          comet)
  *   IV   The deep          two Scouts sent into the old backlog fall within two minutes (the ghost ship
  *                          glides past the graveyard's coast, a grave for each); an Oracle thinks hard
  *                          and dear (the party's purse passes $10: pirates anchor off the quay)
@@ -243,11 +245,14 @@ export function eventsTale(seed = 1, repo = EVENTS_REPO): EventsTale {
     const head = push(k.clock, 1)
     green = ci(k.clock, head, "passed", 8000)
     beat("ci-green", green)
-    k.think("Watching the checks.", Math.max(600, green - k.clock + 300))
-    until(k, green + 400)
-    k.deed("bash", { command: `gh pr checks ${PR}` }, 900, { summary: "all passed" })
-    k.finish("Green: a grave faces one way, the build and CI pass.", 900)
+    k.finish("Pushed: a grave faces one way. CI will tell.", 900)
   })
+  // the Guildmaster watches CI from the hall, by the graveyard: the last good deed before it turns
+  // green, so it is the one who mends the red grave and walks over to strike it (story/worldEvents.ts)
+  until(master, green - 6000)
+  master.deed("bash", { command: `gh run watch` }, 5400, { summary: "running" })
+  until(master, green + 400)
+  master.deed("bash", { command: `gh pr checks ${PR}` }, 900, { summary: "all passed" })
   // the rainbow plays out (32 s) before the many hands earn the comet
   until(master, green + 18_000)
 
@@ -318,9 +323,15 @@ export function eventsTale(seed = 1, repo = EVENTS_REPO): EventsTale {
     }),
   )
   hands.push(
-    master.resume(smith, "The engine's words for every show", (k) => work(k, lists[2] ?? [], 1100), {
-      wait: false,
-    }),
+    // a new hand for the engine's words
+    master.quest(
+      "guild-implementer",
+      "The engine's words for every show",
+      (k) => work(k, lists[2] ?? [], 1100),
+      {
+        wait: false,
+      },
+    ),
   )
   hands.push(
     master.quest(

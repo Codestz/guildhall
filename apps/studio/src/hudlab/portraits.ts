@@ -1,24 +1,18 @@
 /**
  * The lab's portraits (avatar variant A): each fixture hero's own figure, dressed as the island dresses
- * it (hexworld/life.ts `heroLook`: its body's recipe, resolved with a seed from its id, on its body), drawn
+ * it (hexworld/life.ts `heroLook` on `usable`: its body's recipe with its headgear and the props this
+ * library mounts, resolved with a seed from its id, on its body), drawn
  * by render's `createPortraits` off the frame's path. One store for the lab; a hero's sprite URL once
  * drawn, null (the face stands in) until then. No library: no portraits, the faces stay.
  */
-import {
-  applyOverlay,
-  type Catalog,
-  createCatalog,
-  type NpcLook,
-  type NpcRecipe,
-  resolveNpc,
-  validateNpc,
-} from "@guildhall/assets"
+import { applyOverlay, type Catalog, createCatalog, type NpcRecipe, validateNpc } from "@guildhall/assets"
 import { hash } from "@guildhall/core"
 import { createPortraits, type PortraitSpec, type Portraits } from "@guildhall/render"
 import type { HeroView } from "@guildhall/ui"
 import { useSyncExternalStore } from "react"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import * as data from "../data.ts"
+import { heroLook, usable } from "../hexworld/life.ts"
 import { recipeOf } from "../hexworld/lifeAgents.ts"
 
 interface Kit {
@@ -53,27 +47,21 @@ async function open(): Promise<Kit | null> {
   return { portraits, catalog, recipes, looks: new Map() }
 }
 
-/** A hero's portrait spec: its body's recipe (props only this library has), its banner as the tint. */
+/**
+ * A hero's portrait spec: dressed as the island dresses a hero of its body (life's `heroLook` on its
+ * body's recipe, its headgear and the props this library has), its banner as the tint.
+ */
 function specOf(k: Kit, hero: HeroView): PortraitSpec | null {
   if (k.looks.has(hero.id)) return k.looks.get(hero.id) ?? null
   const body = `kaykit-adventurers/${hero.family}`
   const recipe = k.recipes.get(recipeOf(hero.family))
-  let spec: PortraitSpec | null = null
-  if (recipe && k.catalog.get(body)) {
-    const known = (list: readonly string[] | undefined) =>
-      list?.filter((id) => id === "" || k.catalog.get(id)?.compose.mount)
-    const r = known(recipe.hands?.r)
-    const l = known(recipe.hands?.l)
-    const usable: NpcRecipe = {
-      ...recipe,
-      hands: { ...(r?.length ? { r } : {}), ...(l?.length ? { l } : {}) },
-      head: undefined,
-    }
-    const look = resolveNpc(usable, hash(`agent:${hero.id}`), k.catalog)
-    const parts = k.catalog.get(body)?.character?.parts
-    const hide = (recipe.hide ?? []).filter((p) => !parts || parts.includes(p))
-    spec = { look: { ...look, body, hide, scale: 1 } satisfies NpcLook, tint: hero.banner }
-  }
+  const spec =
+    recipe && k.catalog.get(body)
+      ? {
+          look: heroLook(usable(recipe, k.catalog), body, hash(`agent:${hero.id}`), k.catalog),
+          tint: hero.banner,
+        }
+      : null
   k.looks.set(hero.id, spec)
   return spec
 }

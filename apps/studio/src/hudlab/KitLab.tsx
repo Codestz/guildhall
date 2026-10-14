@@ -33,6 +33,7 @@ import { captionOf, type Told, tell } from "./story.ts"
 
 export const KIT_SECTIONS = [
   "avatars",
+  "portraits",
   "badges",
   "roster",
   "toasts",
@@ -76,6 +77,23 @@ const SIX: readonly HeroView[] = [
   { id: "explorer", name: "Scout", banner: "#2fa7a0", family: "ranger", phase: "loot", party: "redis" },
   { id: "archivist", name: "Archivist", banner: "#8b6cd9", family: "mage", phase: "idle", party: "redis" },
 ]
+/** One hero of each body the hall draws (the Automaton is a knight in bronze), then three of one kind. */
+const BODIES: readonly HeroView[] = [
+  { id: "b-mage", name: "Mage", banner: "#8b6cd9", family: "mage", phase: "working" },
+  { id: "b-knight", name: "Knight", banner: "#4f8fd6", family: "knight", phase: "working" },
+  { id: "b-ranger", name: "Ranger", banner: "#2fa7a0", family: "ranger", phase: "working" },
+  { id: "b-barbarian", name: "Barbarian", banner: "#e0702f", family: "barbarian", phase: "working" },
+  { id: "b-rogue", name: "Rogue", banner: "#3fae6b", family: "rogue", phase: "working" },
+  { id: "b-automaton", name: "Automaton", banner: "#b0793a", family: "knight", phase: "working" },
+]
+const KIN: readonly HeroView[] = [1, 2, 3].map((ordinal) => ({
+  id: `w-${ordinal}`,
+  name: "Wanderer",
+  banner: "#9a8f80",
+  family: "rogue",
+  phase: ordinal === 2 ? "waiting" : "working",
+  ...(ordinal > 1 ? { ordinal } : {}),
+}))
 const PHASES: readonly Phase[] = ["working", "waiting", "failed", "loot", "idle", "leaving"]
 const PHASE_WORD: Record<Phase, string> = {
   working: "thinking",
@@ -131,14 +149,16 @@ function AvatarRow({
   variant,
   size,
   portraitOf,
+  heroes = SIX,
 }: {
   variant: AvatarVariant
   size: number
   portraitOf: (h: HeroView) => string | null
+  heroes?: readonly HeroView[]
 }) {
   return (
     <div className="kit-row">
-      {SIX.map((h) => (
+      {heroes.map((h) => (
         <figure key={h.id}>
           <Avatar
             variant={variant}
@@ -150,7 +170,7 @@ function AvatarRow({
           />
           <figcaption>
             {h.name}
-            {h.ordinal ? " II" : ""}
+            {h.ordinal ? ` ${"I".repeat(h.ordinal)}` : ""}
             <br />
             {PHASE_WORD[h.phase]}
           </figcaption>
@@ -162,7 +182,9 @@ function AvatarRow({
 
 export function KitLab({ section, phone }: { section: KitSection; phone: boolean }) {
   const show = (s: KitSection) => section === "all" || section === s
-  const { portraitOf, stats } = usePortraits(show("avatars") || show("roster"))
+  const { portraitOf, stats } = usePortraits(
+    show("avatars") || show("portraits") || show("roster") || show("badges"),
+  )
   const [saga, setSaga] = useState<Told | undefined>()
   const [following, setFollowing] = useState<string | null>(null)
   const [picked, setPicked] = useState<string | null>("explorer")
@@ -239,7 +261,7 @@ export function KitLab({ section, phone }: { section: KitSection; phone: boolean
           </Card>
           <Card
             title="A · Portrait (roster rows, dossier)"
-            note={`The hero's own KayKit figure, rendered once off the frame's path (render portrait.ts, 96 px, cached per body + tint + props). ${
+            note={`The hero's own KayKit figure as the island dresses it, rendered once off the frame's path (render portrait.ts, 128 px, cached per look + tint). ${
               s
                 ? `${s.drawn} drawn · longest main-thread slice ${s.worstSliceMs.toFixed(1)} ms (${Object.entries(
                     s.worst,
@@ -264,6 +286,20 @@ export function KitLab({ section, phone }: { section: KitSection; phone: boolean
         </>
       )}
 
+      {show("portraits") && (
+        <Card
+          title="Portraits by body"
+          note="Mage, knight, ranger, barbarian, rogue and the Automaton (a knight in bronze) at 40 px and 96 px; then three Wanderers of one body and one banner, told apart by outfit, rim and numeral."
+          wide
+        >
+          <div className="kit-stack">
+            <AvatarRow variant="portrait" size={40} portraitOf={portraitOf} heroes={BODIES} />
+            <AvatarRow variant="portrait" size={96} portraitOf={portraitOf} heroes={BODIES} />
+            <AvatarRow variant="portrait" size={40} portraitOf={portraitOf} heroes={KIN} />
+          </div>
+        </Card>
+      )}
+
       {show("badges") && (
         <Card
           title="The Guild, folded"
@@ -273,6 +309,8 @@ export function KitLab({ section, phone }: { section: KitSection; phone: boolean
           <div className="kit-stack">
             <RosterBadges
               heroes={SIX.slice(0, 3)}
+              look="portrait"
+              portraitOf={portraitOf}
               selected="gm"
               onPick={() => undefined}
               onExpand={() => undefined}
@@ -290,6 +328,8 @@ export function KitLab({ section, phone }: { section: KitSection; phone: boolean
               following={following}
               selected={picked}
               onPick={setPicked}
+              look="portrait"
+              portraitOf={portraitOf}
               onExpand={() => undefined}
             />
           </div>
@@ -305,6 +345,7 @@ export function KitLab({ section, phone }: { section: KitSection; phone: boolean
             compact
             selected={picked}
             onPick={setPicked}
+            look="portrait"
             portraitOf={portraitOf}
             onToggle={() => undefined}
           />

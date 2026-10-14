@@ -141,6 +141,11 @@ export interface Life {
   setAgents(source: AgentSource | null): void
   /** Where hero `id` is drawn now (its feet, metres), or null when it is not on the island. */
   heroAt(id: string): [number, number, number] | null
+  /**
+   * How hero `id` is drawn (its figure's look, at scale 1, holding its role's own props) and the catalog
+   * it is dressed from: what its HUD portrait shows. Null while it has no figure.
+   */
+  heroLook(id: string): { look: NpcLook; catalog: Catalog } | null
   /** The heroes' chips (chips.ts), once everyone is drawn; null without them. */
   chips(): Chips | null
   dispose(): void
@@ -172,7 +177,7 @@ async function npcRecipes(): Promise<Map<string, NpcRecipe>> {
  * A recipe with only the props this library has (the curated hex library dropped some packs a few
  * recipes still name, e.g. quaternius-props/bag): a hand left with no option goes empty.
  */
-function usable(r: NpcRecipe, catalog: Catalog): NpcRecipe {
+export function usable(r: NpcRecipe, catalog: Catalog): NpcRecipe {
   const known = (list: readonly string[] | undefined) =>
     list?.filter((id) => id === "" || catalog.get(id)?.compose.mount)
   const r2 = known(r.hands?.r)
@@ -215,7 +220,7 @@ function spotClips(loops: readonly (readonly LifeStep[])[]): string[] {
 const scaled = (look: NpcLook): NpcLook => ({ ...look, scale: look.scale * CHARACTER_SCALE })
 
 /** An agent's look: its role's props and clips on its class's body. */
-function heroLook(recipe: NpcRecipe, body: string, seed: number, catalog: Catalog): NpcLook {
+export function heroLook(recipe: NpcRecipe, body: string, seed: number, catalog: Catalog): NpcLook {
   const look = resolveNpc(recipe, seed, catalog)
   const parts = catalog.get(body)?.character?.parts
   const hide = (recipe.hide ?? []).filter((p) => !parts || parts.includes(p))
@@ -270,6 +275,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
   let source: AgentSource | null = null
   let swapped = true
   let heroAt: (id: string) => [number, number, number] | null = () => null
+  let heroLookOf: Life["heroLook"] = () => null
 
   /** Draws the notice board at the plan's place, NOTICE_BOARD_M tall, facing the gathering. */
   const placeBoard = async (board: { at: [number, number, number]; facing: number }) => {
@@ -335,13 +341,19 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
      * The heroes' figures: one for each hero the source has now (its look), and with `agentPool` spares
      * of every body for those it adds; `agent` is the hero a figure draws, and its banner says who.
      */
-    const figures: { crowd: number; hero: string; agent: string | null; own: string[] }[] = []
+    const figures: { crowd: number; hero: string; agent: string | null; own: string[]; look: NpcLook }[] = []
     const figure = (hero: string, recipeId: string, seed: string, agent: string | null) => {
       const recipe = usableOf(recipeId)
       if (!recipe || !catalog.get(hero)) return
       const look = heroLook(recipe, hero, hash(seed), catalog)
       // its role's own props show while nothing else is in hand (walking, resting)
-      figures.push({ crowd: looks.length, hero, agent, own: look.mounts.map((m) => m.piece) })
+      figures.push({
+        crowd: looks.length,
+        hero,
+        agent,
+        own: look.mounts.map((m) => m.piece),
+        look: { ...look, scale: 1 },
+      })
       looks.push(withHeroProps(look, catalog))
       loops.push({ figure: figures.length - 1 })
     }
@@ -362,6 +374,10 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         for (let k = 0; k < AGENT_POOL; k++)
           figure(hero, recipeOf(hero.split("/").pop() ?? ""), `agent:spare:${hero}:${k}`, null)
     const agentIds = figures.map((f) => f.crowd)
+    heroLookOf = (id) => {
+      const f = figures.find((g) => g.agent === id)
+      return f ? { look: f.look, catalog } : null
+    }
     /** The source's version the figures were given out for. */
     let given = Number.NaN
     /** Gives the source's heroes figures: each keeps its own; a new one takes a free one of its body. */
@@ -794,6 +810,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       swapped = true
     },
     heroAt: (id) => heroAt(id),
+    heroLook: (id) => heroLookOf(id),
     chips: () => chips,
     dispose() {
       disposed = true

@@ -28,6 +28,7 @@ import { type SessionPlaces, sessionPlaces } from "../feeds/places.ts"
 import { storyTitle } from "../feeds/story.ts"
 import { driveFx } from "../fx.ts"
 import { type HallFloat, HallHud, type HallHudProps, type HallLevers, REMEMBERED } from "./HallHud.tsx"
+import { createHeroPortraits } from "./portraits.ts"
 import type { HudSession } from "./SessionHud.tsx"
 import { holdHallHudStyle } from "./style.ts"
 
@@ -260,7 +261,12 @@ function startSession(parts: HudParts, opts: HallHudOptions): HudSession | null 
   })
   const places = sessionPlaces(parts.repo, parts.places)
   session.start(places.placeOf)
-  return { session, places, repo: opts.slug.split("/").pop() || opts.slug }
+  return {
+    session,
+    places,
+    repo: opts.slug.split("/").pop() || opts.slug,
+    portraits: createHeroPortraits(parts),
+  }
 }
 
 export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void {
@@ -305,6 +311,7 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
     gone = true
     if (live && current === live.session) current = null
     m.dispose()
+    live?.portraits?.dispose()
   }
 }
 
@@ -336,6 +343,7 @@ export function mountHomeHud(parts: HudParts, opts: HomeHudOptions): () => void 
     ...(opts.query.has("st") && Number.isFinite(st) ? { openAt: Math.max(0, st) } : {}),
   })
   session.start(places.placeOf)
+  const portraits = createHeroPortraits(parts)
   // the demo guild goes round again; a told story stops at its end for the visitor to leave or replay
   const after = (s: HallSession) => {
     const c = s.clock.get()
@@ -368,7 +376,7 @@ export function mountHomeHud(parts: HudParts, opts: HomeHudOptions): () => void 
         recap={null}
         go={opts.go}
         hrefs={opts.hrefs}
-        session={{ session, places, repo: "guildhall" }}
+        session={{ session, places, repo: "guildhall", portraits }}
         time={opts.time}
         home={{
           title: story === "demo" ? "The demo guild" : storyTitle(story),
@@ -401,5 +409,6 @@ export function mountHomeHud(parts: HudParts, opts: HomeHudOptions): () => void 
   return () => {
     setHome(null)
     m.dispose()
+    portraits.dispose()
   }
 }

@@ -220,6 +220,7 @@ export function HudLab(opts: LabOptions) {
               by={opts.by}
               following={following}
               selected={selected}
+              look="portrait"
               portraitOf={portraitOf}
               onCamera={fx.heroes[0]?.id ?? null}
               open
@@ -243,6 +244,8 @@ export function HudLab(opts: LabOptions) {
                 following={following}
                 selected={selected}
                 onPick={pick}
+                look="portrait"
+                portraitOf={portraitOf}
                 onExpand={() => {
                   if (phone) return setPhoneSheet("roster")
                   setRoster(true)

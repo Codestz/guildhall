@@ -25,6 +25,7 @@ import {
   Vector3,
 } from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
+import { CART_BED } from "./stockLayout.ts"
 
 /** The pieces this module builds, by name: `built/<name>`. */
 export const BUILT = ["basket", "cart", "float", "board", "spyglass", "bellows", "dummy"] as const
@@ -36,7 +37,7 @@ export const builtId = (name: BuiltName): string => `built/${name}`
 /** Each built piece's size (w, h, d metres), as the catalog would give it. */
 export const BUILT_SIZE: Readonly<Record<BuiltName, readonly [number, number, number]>> = {
   basket: [0.56, 0.32, 0.56],
-  cart: [0.84, 0.62, 1.04],
+  cart: [0.8, 0.64, 0.9],
   float: [0.14, 0.18, 0.14],
   board: [1.44, 2.05, 0.5],
   spyglass: [0.1, 0.1, 0.5],
@@ -112,13 +113,16 @@ const ball = (r: number) => new IcosahedronGeometry(r, 0)
 
 // ---- the pieces ----
 
-/** A round wicker basket, open at the top: a dark inside under the rim, two woven bands. */
+/**
+ * A round wicker basket, open at the top: a dark inside under a rim of dark timber (so it reads on a
+ * dock's planks or stone), a light woven band round the middle and a dark one low down.
+ */
 function basket(): Part[] {
   return [
     { geometry: cyl(0.26, 0.2, 0.28), swatch: "thatch", at: [0, 0.14, 0] },
     { geometry: cyl(0.235, 0.235, 0.02), swatch: "dirt-dark", at: [0, 0.275, 0] },
-    { geometry: cyl(0.28, 0.28, 0.045), swatch: "thatch-dark", at: [0, 0.285, 0] },
-    { geometry: cyl(0.25, 0.25, 0.035), swatch: "thatch-dark", at: [0, 0.16, 0] },
+    { geometry: cyl(0.28, 0.28, 0.045), swatch: "timber-dark", at: [0, 0.285, 0] },
+    { geometry: cyl(0.25, 0.25, 0.035), swatch: "thatch-light", at: [0, 0.17, 0] },
     { geometry: cyl(0.215, 0.215, 0.035), swatch: "thatch-dark", at: [0, 0.05, 0] },
     // two little grips on the rim, left and right
     { geometry: box(0.05, 0.06, 0.1), swatch: "timber", at: [0.27, 0.3, 0] },
@@ -126,44 +130,72 @@ function basket(): Part[] {
   ]
 }
 
-/** A mine cart on four iron wheels: a timber tub bound in iron, open on top, wheels a rail's gauge apart. */
+/** The mine cart's tub (outer, metres): narrower than the wheels' track, so they show beside it. */
+const TUB = { w: 0.5, d: 0.84, y0: 0.22, y1: 0.58, wall: 0.05 }
+
+/**
+ * A mine cart that reads as one from above: an open timber tub (four walls round a dark bed the ore lies
+ * on), a light rim bound in iron at the corners, on a chassis whose four iron wheels stand outside the
+ * tub, a rail's gauge apart.
+ */
 function cart(): Part[] {
+  const { w, d, y0, y1, wall } = TUB
+  const h = y1 - y0
   const wheels: Part[] = [-1, 1].flatMap((sx) =>
     [-1, 1].map(
       (sz): Part => ({
-        geometry: cyl(0.13, 0.13, 0.07, 8),
+        geometry: cyl(0.14, 0.14, 0.08, 8),
         swatch: "grey-dark",
-        at: [sx * 0.36, 0.13, sz * 0.3],
+        at: [sx * 0.36, 0.14, sz * 0.27],
         turn: [0, 0, Math.PI / 2],
+      }),
+    ),
+  )
+  const hubs: Part[] = [-1, 1].flatMap((sx) =>
+    [-1, 1].map(
+      (sz): Part => ({
+        geometry: cyl(0.045, 0.045, 0.1, 6),
+        swatch: "iron",
+        at: [sx * 0.37, 0.14, sz * 0.27],
+        turn: [0, 0, Math.PI / 2],
+      }),
+    ),
+  )
+  const corners: Part[] = [-1, 1].flatMap((sx) =>
+    [-1, 1].map(
+      (sz): Part => ({
+        geometry: box(0.08, h + 0.02, 0.08),
+        swatch: "iron",
+        at: [sx * (w / 2 - 0.02), y0 + h / 2, sz * (d / 2 - 0.02)],
       }),
     ),
   )
   return [
     ...wheels,
-    { geometry: box(0.6, 0.06, 0.84), swatch: "iron", at: [0, 0.16, 0] },
+    ...hubs,
+    // axles and the chassis the tub sits on
+    { geometry: box(0.74, 0.05, 0.05), swatch: "iron", at: [0, 0.14, 0.27] },
+    { geometry: box(0.74, 0.05, 0.05), swatch: "iron", at: [0, 0.14, -0.27] },
+    { geometry: box(w - 0.04, 0.06, d - 0.04), swatch: "iron", at: [0, y0 - 0.02, 0] },
+    // the tub: a floor, the dark bed the ore lies on, four walls
+    { geometry: box(w, 0.04, d), swatch: "timber-dark", at: [0, y0 + 0.02, 0] },
+    // (CART_BED, stockLayout.ts: what the ore lies on)
     {
-      geometry: cyl(0.48, 0.38, 0.4, 4),
-      swatch: "timber",
-      at: [0, 0.4, 0],
-      turn: [0, Math.PI / 4, 0],
-      scale: [0.95, 1, 1.38],
+      geometry: box(w - 2 * wall, CART_BED - y0, d - 2 * wall),
+      swatch: "dirt-dark",
+      at: [0, (CART_BED + y0) / 2, 0],
     },
-    { geometry: box(0.6, 0.02, 0.86), swatch: "timber-dark", at: [0, 0.57, 0] },
-    // iron bands round the rim and the middle
-    {
-      geometry: cyl(0.505, 0.505, 0.05, 4),
-      swatch: "iron",
-      at: [0, 0.58, 0],
-      turn: [0, Math.PI / 4, 0],
-      scale: [0.95, 1, 1.38],
-    },
-    {
-      geometry: cyl(0.44, 0.44, 0.05, 4),
-      swatch: "iron",
-      at: [0, 0.36, 0],
-      turn: [0, Math.PI / 4, 0],
-      scale: [0.95, 1, 1.38],
-    },
+    { geometry: box(w, h, wall), swatch: "timber", at: [0, y0 + h / 2, d / 2 - wall / 2] },
+    { geometry: box(w, h, wall), swatch: "timber", at: [0, y0 + h / 2, -d / 2 + wall / 2] },
+    { geometry: box(wall, h, d - 2 * wall), swatch: "timber", at: [w / 2 - wall / 2, y0 + h / 2, 0] },
+    { geometry: box(wall, h, d - 2 * wall), swatch: "timber", at: [-w / 2 + wall / 2, y0 + h / 2, 0] },
+    // a light rim round the top, wider than the walls, and the iron band at mid height
+    { geometry: box(w + 0.06, 0.04, 0.07), swatch: "timber-light", at: [0, y1 + 0.02, d / 2 - 0.015] },
+    { geometry: box(w + 0.06, 0.04, 0.07), swatch: "timber-light", at: [0, y1 + 0.02, -d / 2 + 0.015] },
+    { geometry: box(0.07, 0.04, d - 0.03), swatch: "timber-light", at: [w / 2 - 0.015, y1 + 0.02, 0] },
+    { geometry: box(0.07, 0.04, d - 0.03), swatch: "timber-light", at: [-w / 2 + 0.015, y1 + 0.02, 0] },
+    { geometry: box(w + 0.02, 0.04, d + 0.02), swatch: "iron", at: [0, y0 + h * 0.4, 0] },
+    ...corners,
   ]
 }
 

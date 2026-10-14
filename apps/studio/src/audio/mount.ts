@@ -242,11 +242,18 @@ function start(parts: SoundParts, cpu: { frame: number; sample: number; frames: 
     if (audio.audible) {
       const fire = nearest(fires, listener)
       const town = busiest(towns, listener)
-      const wind = Math.min(1, 0.22 + 0.55 * storm + 0.12 * cloud + 0.06 * Math.sin(t0 / 20000))
+      const rainy = drive?.mix.rain ?? 0
+      const snowy = drive?.mix.snow ?? 0
+      // snow is a hush: the wind only a little up, and the fall itself near silent (ambience.ts)
+      const wind = Math.min(
+        1,
+        0.22 + 0.55 * storm + 0.2 * rainy + 0.12 * cloud + 0.06 * snowy + 0.06 * Math.sin(t0 / 20000),
+      )
       const bed = bedOf({
         env: {
-          weather: storm > 0.05 ? "rain" : cloud > 0.3 ? "cloudy" : "clear",
-          precipitation: Math.round(storm * 0.9 * 1000) / 1000,
+          weather:
+            snowy > 0.05 ? "snow" : storm > 0.05 || rainy > 0.05 ? "rain" : cloud > 0.3 ? "cloudy" : "clear",
+          precipitation: Math.round(Math.max(storm * 0.9, rainy * 0.5, snowy * 0.5) * 1000) / 1000,
           daylight,
           cloudCover: Math.max(cloud, storm),
           temperature: 14,

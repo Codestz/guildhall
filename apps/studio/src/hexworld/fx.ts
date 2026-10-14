@@ -3,7 +3,7 @@
  * the sky, pull-request ships at the harbour, scaffolds at the busy places. A hall drives them from its
  * world (`HudParts.fx`); without a feed, `?fx=` shows them for a look:
  *
- *   ?fx=storm | cloudy | clear        the weather (eased in, as a CI run would)
+ *   ?fx=storm | rain | snow | cloudy | clear  the weather (eased in, as a CI run would)
  *   ?fx=ships=3                       three pull requests docked at the harbour
  *   ?fx=busy=<place>                  a scaffold at a place: its id (a hall's `packages/sim`), its kind
  *                                     (`market`, the first of that kind) or its zone's index; `+` for more
@@ -36,6 +36,7 @@ import {
   type EventSites,
   type HarbourShips,
   type HarbourShipsOpts,
+  pinOf,
   type Scaffolds,
   SHIP_PIECE,
   type ShipEnd,
@@ -70,7 +71,7 @@ export function fxOf(query: Pick<URLSearchParams, "get">): FxSpec | null {
   const spec: FxSpec = { weather: null, ships: 0, busy: [], progress: {}, close: "sink", lamps: false }
   for (const part of raw.split(/[,;]/)) {
     const [k, v = ""] = part.split("=") as [string, string?]
-    if (k === "storm" || k === "cloudy" || k === "clear") spec.weather = k
+    if (pinOf(k)) spec.weather = pinOf(k)
     else if (k === "lamps") spec.lamps = v === "1"
     else if (k === "close") spec.close = v === "sail" ? "sail" : "sink"
     else if (k === "ships") spec.ships = Math.max(0, Math.min(12, Math.floor(Number(v) || 0)))

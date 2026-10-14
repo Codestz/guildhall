@@ -290,12 +290,14 @@ const QUALITIES: readonly { value: Quality; label: string }[] = [
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
 ]
-/** The skies the island can show (render events/weather.ts): no rain without a storm, no snow. */
+/** The skies the island can show (render events/weather.ts); Auto follows the guild's CI. */
 const WEATHERS: readonly { value: WeatherPick; label: string }[] = [
   { value: "auto", label: "Auto" },
   { value: "clear", label: "Clear" },
   { value: "cloudy", label: "Cloudy" },
+  { value: "rain", label: "Rain" },
   { value: "storm", label: "Storm" },
+  { value: "snow", label: "Snow" },
 ]
 
 /** The camera's keys, as the hall's Settings lists them. */

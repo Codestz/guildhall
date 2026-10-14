@@ -11,7 +11,7 @@
  * that is no repo's: the demo guild at work, or a story the demos picked (`/?story=saga&act=3`), its
  * places the island's own zones (site/homePlaces.ts), switched in place (site/homeHud.tsx `homeStage`).
  */
-import type { WeatherKind } from "@guildhall/render"
+import { pinOf, type WeatherKind } from "@guildhall/render"
 import { repoLegendMarkdown, repoLegendOf, repoRecapOf, requestChronicleUrl } from "@guildhall/sim"
 import { holdHudStyle } from "@guildhall/ui"
 import { createRoot, type Root } from "react-dom/client"
@@ -64,10 +64,9 @@ export function quietSkip(events: readonly { at: number }[], at: number): number
   return Math.min(SKIP_MAX, Math.max(1, ahead / 2500))
 }
 
-/** A weather a link names (`rain` reads as a storm), else null: the session's. */
+/** A weather a link names (clear, cloudy, rain, storm, snow), else null: the session's. */
 export function weatherOf(asked: string | null): WeatherKind | null {
-  if (asked === "rain") return "storm"
-  return asked === "clear" || asked === "cloudy" || asked === "storm" ? asked : null
+  return pinOf(asked)
 }
 
 /** The levers the HUD's Settings pull and the mount reads: the director's style, a pinned weather, the skip. */
@@ -151,7 +150,7 @@ function mountOn(
   document.body.append(modals)
   const root = createRoot(host)
   const levers = createLevers()
-  // `?weather=clear|cloudy|storm`: a sky pinned from the link (a demo's night storm), as Settings pins it
+  // `?weather=clear|cloudy|rain|storm|snow`: a sky pinned from the link (a demo's night storm), as Settings pins it
   levers.weather = weatherOf(opts.query.get("weather"))
   if (levers.weather) parts.fx?.drive.set(levers.weather)
   if (ext) ext.levers = levers

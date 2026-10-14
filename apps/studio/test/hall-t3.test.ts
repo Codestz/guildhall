@@ -170,11 +170,12 @@ describe("the chips' nudge holds still while heroes walk", () => {
 })
 
 describe("a link's weather", () => {
-  test("clear, cloudy and storm pin the sky; rain reads as a storm; anything else follows the session", () => {
+  test("every sky pins; anything else follows the session", () => {
     expect(weatherOf("storm")).toBe("storm")
-    expect(weatherOf("rain")).toBe("storm")
+    expect(weatherOf("rain")).toBe("rain")
     expect(weatherOf("cloudy")).toBe("cloudy")
-    expect(weatherOf("snow")).toBeNull()
+    expect(weatherOf("snow")).toBe("snow")
+    expect(weatherOf("hail")).toBeNull()
     expect(weatherOf(null)).toBeNull()
   })
 })

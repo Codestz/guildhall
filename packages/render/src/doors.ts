@@ -143,7 +143,7 @@ export async function createGates(
   for (const [id, leaves] of kinds) {
     const of = gates.map((g, k) => (g.piece === id ? k : -1)).filter((k) => k >= 0)
     for (const leaf of leaves) {
-      const mesh = new InstancedMesh(leaf.geometry, paletteMaterial(), of.length)
+      const mesh = new InstancedMesh(leaf.geometry, paletteMaterial("instanced"), of.length)
       mesh.name = `gate-leaf:${id}`
       mesh.instanceMatrix.setUsage(DynamicDrawUsage)
       // a moving leaf would leave the cached sun shadows stale: its frame casts, it only receives

@@ -3,7 +3,7 @@ import { Mesh, type Object3D } from "three"
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js"
-import { paletteMaterial } from "./material.ts"
+import { isPaletteMaterial, paletteMaterial } from "./material.ts"
 import { builtOf, builtPiece } from "./props/built.ts"
 
 const logger = log("render:pieces")
@@ -22,7 +22,7 @@ export function preparePiece(root: Object3D): Object3D {
   root.traverse((node) => {
     if (!(node instanceof Mesh)) return
     const old = Array.isArray(node.material) ? node.material : [node.material]
-    for (const material of old) if (material !== paletteMaterial()) material.dispose()
+    for (const material of old) if (!isPaletteMaterial(material)) material.dispose()
     node.material = paletteMaterial()
     node.castShadow = true
     node.receiveShadow = true

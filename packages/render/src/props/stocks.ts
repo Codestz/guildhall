@@ -156,7 +156,7 @@ export async function createStocks(
     Math.max(1, count),
     Math.max(1, vertices),
     Math.max(1, indices),
-    paletteMaterial(),
+    paletteMaterial("batched"),
   )
   mesh.name = "life:stocks"
   mesh.perObjectFrustumCulled = true

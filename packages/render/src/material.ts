@@ -5,27 +5,42 @@ import { patchLodFade } from "./lodFade.ts"
 import { patchGlow } from "./night/glow.ts"
 import { patchCascades } from "./sun/patch.ts"
 
-let shared: MeshStandardMaterial | null = null
+/**
+ * What draws with the palette material: a plain mesh, an InstancedMesh or a BatchedMesh. Three keys a
+ * material's program by the object kind drawing it (`instancing`, `batching`), so one material drawn
+ * by all three kinds in a frame swapped programs at every change of kind (a cache-key string and a
+ * parameters object each time, and garbage); one shared material per kind, the same look, never swaps.
+ */
+export type PaletteKind = "mesh" | "instanced" | "batched"
+
+const palette: Partial<Record<PaletteKind, MeshStandardMaterial>> = {}
 
 /**
  * The one material every library piece draws with (ADR 003): colour comes from the baked vertex
- * colours, so one material serves the whole palette. Shared, so never dispose it per piece. Its sun
- * shadows read the cascades when the sun has them (ADR 009, `sun/patch.ts`), the sun dims under the
- * clouds' shadows when there is an atmosphere (`atmosphere/shade.ts`), and the light sources a batch
- * marks (`_glow`) glow by night (`night/glow.ts`).
+ * colours, so one material serves the whole palette. Shared (one per object `kind`, see PaletteKind),
+ * so never dispose it per piece. Its sun shadows read the cascades when the sun has them (ADR 009,
+ * `sun/patch.ts`), the sun dims under the clouds' shadows when there is an atmosphere
+ * (`atmosphere/shade.ts`), and the light sources a batch marks (`_glow`) glow by night (`night/glow.ts`).
  */
-export function paletteMaterial(): MeshStandardMaterial {
+export function paletteMaterial(kind: PaletteKind = "mesh"): MeshStandardMaterial {
+  let shared = palette[kind]
   if (!shared) {
     shared = new MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 })
+    shared.name = `palette:${kind}`
     shared.onBeforeCompile = (shader) => {
       patchCascades(shader)
       patchCloudShade(shader)
       patchSnowCover(shader)
       patchGlow(shader)
     }
+    palette[kind] = shared
   }
   return shared
 }
+
+/** Whether `material` is one of the shared palette materials (never to be disposed per piece). */
+export const isPaletteMaterial = (material: unknown): boolean =>
+  Object.values(palette).some((m) => m === material)
 
 const batched: (MeshStandardMaterial | null)[] = [null, null]
 

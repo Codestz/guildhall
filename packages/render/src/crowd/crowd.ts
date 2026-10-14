@@ -226,7 +226,7 @@ export async function warmCrowdPrograms(
   const body = new LodBatchedMesh(1, 3, 3, material)
   const bodyGeometry = standInGeometry(BODY_ATTRIBUTES)
   body.addInstance(body.addGeometry(bodyGeometry))
-  const held = new BatchedMesh(1, 3, 3, paletteMaterial())
+  const held = new BatchedMesh(1, 3, 3, paletteMaterial("batched"))
   const heldGeometry = standInGeometry()
   held.addInstance(held.addGeometry(heldGeometry))
   for (const mesh of [body, held]) {
@@ -387,7 +387,7 @@ export async function createCrowd(
     Math.max(1, propCount),
     Math.max(1, propVertices),
     Math.max(1, propIndices),
-    paletteMaterial(),
+    paletteMaterial("batched"),
   )
   props.name = "crowd:props"
   props.perObjectFrustumCulled = true

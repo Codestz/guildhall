@@ -121,6 +121,10 @@ export const SITE_CSS = /* css */ `
 .gh .site-welcome[data-dock="top"][data-open="true"] { padding: 0 12px; }
 .gh .site-welcome[data-dock="top"] .site-scrim { pointer-events: auto; }
 .gh .site-welcome[data-dock="top"] .site-welcome-foot { align-items: flex-start; }
+@media (max-width: 380px) {
+  .gh .site-welcome[data-dock="top"] .site-go { width: 40px; padding: 0; }
+  .gh .site-welcome[data-dock="top"] .site-go-word { display: none; }
+}
 .gh .site-welcome[data-dock="top"] .site-welcome-card { position: relative; z-index: 32; width: 100%; margin-top: 56px; }
 
 /* ── crest menu ─────────────────────────────────────────────────── */

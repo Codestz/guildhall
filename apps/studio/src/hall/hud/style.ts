@@ -115,6 +115,8 @@ const CSS = /* css */ `
 /* ── a short screen (a phone on its side): the desktop's layout, compact heights; one toast at most ── */
 @container viewer (max-height: 460px) {
   .hud-toast-list .hud-toast:nth-last-child(n + 2) { display: none; }
+  .ui-viewer:has(.ui-hud-corner > :is(.hall-roster, .hall-places, .hud-brand-more)) .ui-hud-feed .hud-toast-list { display: none; }
+  .ui-hud-corner { max-height: calc(100% - var(--hud-top, var(--gut)) - var(--gut) - 52px); }
   .gh .hall-rail-btn { width: 38px; height: 38px; }
   .ui-hud-sheet { top: calc(var(--gut) + 50px); }
   .gh .hall-feed, .gh .ui-hud-sheet .hud-panel { max-height: 100%; }

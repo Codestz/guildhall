@@ -43,8 +43,8 @@ export function installTiles(): void {
   )
 }
 
-/** The hall's heroes' pace (studio hexworld/lifePlan.ts `AGENT_OPTS`: LIFE_MPS × AGENT_PACE, run past 10 s at up to 7 m/s). */
-export const HALL_OPTS: ItineraryOptions = { mps: 0.8 * 1.15, hurry: { within: 10, mps: 7 } }
+/** The hall's heroes' pace (studio hexworld/lifePlan.ts `AGENT_OPTS`: LIFE_MPS × AGENT_PACE, run past 10 s at up to 5 m/s). */
+export const HALL_OPTS: ItineraryOptions = { mps: 0.8 * 1.15, hurry: { within: 10, mps: 5 } }
 
 export interface SagaIsland {
   kit: LifeKit

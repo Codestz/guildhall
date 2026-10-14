@@ -1,5 +1,6 @@
-// KayKit Medieval Hexagon, buildings and landmarks only: the hex tiles and the tile-scale decoration
-// (barrels, crates, little trees) are board-game miniatures and are not imported.
+// KayKit Medieval Hexagon, buildings and landmarks plus four hand-and-yard props (wheelbarrow, sack,
+// archery target, weapon rack); the hex tiles and the rest of the tile-scale decoration (barrels,
+// crates, little trees) are board-game miniatures and are not imported.
 import type { PackConfig } from "@guildhall/assets"
 
 export default {
@@ -7,7 +8,10 @@ export default {
   source: "KayKit_Medieval_Hexagon_Pack_1.0_FREE",
   vendor: "kaykit",
   license: "CC0",
-  include: ["**/Assets/gltf/buildings/**/*.gltf"],
+  include: [
+    "**/Assets/gltf/buildings/**/*.gltf",
+    "**/Assets/gltf/decoration/props/{wheelbarrow,sack,target,weaponrack}.gltf",
+  ],
   // A catapult stone at x8 is a 2 m boulder.
   exclude: ["**/projectile_catapult.gltf"],
   colour: { mode: "atlas" },
@@ -15,6 +19,11 @@ export default {
   // stands on a stone plinth that is part of the mesh, so a house reads 7-10 m overall.
   scale: { factor: 8 },
   scaleBy: [
+    // Tile-scale props raised to hero size: a 2.5 m barrow (waist-high on a 2.2 m hero), a 0.8 m sack, a 2 m target, a 1.4 m rack.
+    { match: "wheelbarrow", factor: 5 },
+    { match: "sack", factor: 5 },
+    { match: "target", factor: 6.5 },
+    { match: "weaponrack", factor: 6 },
     // The town wall at x8 would be 8.8 m: x4.2 gives a 4.6 m wall and a 5.9 m gatehouse.
     { match: "wall_*", factor: 4.2 },
     // Fences are knee-high on a tile; at hero scale the wooden one is a 1.1 m rail fence and the
@@ -30,6 +39,10 @@ export default {
     { match: "building_tower_*", category: "tower" },
     { match: "building_castle_*", category: "building", tags: ["castle", "landmark"] },
     { match: "building_{church,windmill,watermill}_*", category: "building", tags: ["landmark"] },
+    { match: "wheelbarrow", category: "prop", tags: ["cart", "wheelbarrow"] },
+    { match: "sack", category: "prop", tags: ["sack"] },
+    { match: "target", category: "prop", tags: ["target", "arena"] },
+    { match: "weaponrack", category: "prop", tags: ["arena", "rack"] },
     { match: "building_well*", category: "prop", tags: ["well"] },
     // Stages A and B are a foundation and a half-raised frame, not yet a building's height.
     { match: "building_stage_{A,B}", category: "prop", tags: ["construction"] },

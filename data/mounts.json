@@ -355,6 +355,63 @@
       "hands": 1,
       "slot": "hand.r"
     },
+    "kaykit-hexagon/sack": {
+      "axis": [
+        0,
+        -1,
+        0
+      ],
+      "clips": {
+        "Waving": {
+          "hide": true
+        }
+      },
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        0.26,
+        0
+      ],
+      "hands": 1,
+      "scale": 0.9,
+      "slot": "hand.r",
+      "upright": {
+        "up": [
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    "kaykit-resources/wood-log-a": {
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "clips": {
+        "Waving": {
+          "hide": true
+        }
+      },
+      "edge": [
+        0,
+        1,
+        0
+      ],
+      "handle": [
+        0,
+        0,
+        0
+      ],
+      "hands": 1,
+      "scale": 0.55,
+      "slot": "hand.r"
+    },
     "kaykit-tools/axe": {
       "axis": [
         0,
@@ -590,6 +647,56 @@
       ],
       "hands": 1,
       "scale": 0.8,
+      "slot": "hand.r"
+    },
+    "kaykit-tools/map-rolled": {
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "clips": {
+        "Waving": {
+          "hide": true
+        }
+      },
+      "edge": [
+        0,
+        1,
+        0
+      ],
+      "handle": [
+        0,
+        0,
+        0
+      ],
+      "hands": 1,
+      "scale": 0.55,
+      "slot": "hand.r"
+    },
+    "kaykit-tools/pencil-b-long": {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "clips": {
+        "Waving": {
+          "hide": true
+        }
+      },
+      "edge": [
+        1,
+        0,
+        0
+      ],
+      "handle": [
+        0,
+        -0.15,
+        0
+      ],
+      "hands": 1,
+      "scale": 1.2,
       "slot": "hand.r"
     },
     "kaykit-tools/pickaxe": {
@@ -834,38 +941,6 @@
       "hands": 1,
       "scale": 2,
       "slot": "hand.r"
-    },
-    "quaternius-props/bag": {
-      "axis": [
-        0,
-        -1,
-        0
-      ],
-      "clips": {
-        "Waving": {
-          "hide": true
-        }
-      },
-      "edge": [
-        1,
-        0,
-        0
-      ],
-      "handle": [
-        0,
-        0.88,
-        0
-      ],
-      "hands": 1,
-      "scale": 0.65,
-      "slot": "hand.r",
-      "upright": {
-        "up": [
-          0,
-          1,
-          0
-        ]
-      }
     }
   },
   "version": 1

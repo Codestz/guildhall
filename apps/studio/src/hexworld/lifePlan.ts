@@ -39,7 +39,9 @@ import {
   lifePlaces,
   type PlaceSpec,
   planFolk,
+  planStocks,
   type Solid,
+  type Stock,
   type Walkway,
   workTiles,
 } from "@guildhall/world"
@@ -47,6 +49,8 @@ import { type AgentFeed, type AgentPlan, demoPlaceOf, demoStory } from "./lifeAg
 
 /** Day-hours per real hour. */
 export const SPEEDUP = 20
+/** Screen seconds to a day hour: what work routines run on (world routines.ts). */
+export const SEC_PER_HOUR = 3600 / SPEEDUP
 /** Walking pace, metres a second: a toy-scale person's natural walk. */
 export const LIFE_MPS = 0.8
 /** Agents walk this much faster than the townsfolk (they are on an errand). */
@@ -59,6 +63,11 @@ const ROUND_REST = 15_000
 export interface LifePlan {
   /** Every townsfolk's day (world `planFolk`). */
   folk: Folk[]
+  /**
+   * What their work leaves over the day (world `planStocks`): baskets, the ore carts and heaps, log
+   * piles, planks, bars, crates, arrows, a stall's fish; levels by `stocksAt(stocks, hour, SEC_PER_HOUR)`.
+   */
+  stocks: Stock[]
   /** The agents' guild planned on the walk graph (none: `?agents=0`). */
   agents: AgentPlan | null
   /** The collision layer's solids: every piece's outline, the authored blockers, the cheeks and rails. */
@@ -113,9 +122,15 @@ export function planLifeDesk(
   const t1 = now()
   const agents = opts.agents ? planGuild(z, walk, kit, opts.agents, opts) : null
   const agentsMs = now() - t1
-  const folk = planFolk(h, z, w, walk, { seed, pace: (LIFE_MPS * 3600) / SPEEDUP, places })
+  const folk = planFolk(h, z, w, walk, {
+    seed,
+    pace: (LIFE_MPS * 3600) / SPEEDUP,
+    places,
+    secPerHour: SEC_PER_HOUR,
+  })
   const plan: LifePlan = {
     folk,
+    stocks: planStocks(folk),
     agents,
     solids: [...places.furniture.solids],
     walkways: [...w.stairs, ...w.bridges.flatMap((b) => b.legs), ...w.decks],

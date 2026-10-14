@@ -81,15 +81,23 @@ for (const s of spec.shots) {
       return { at, hour: g.ext.clock?.get(), lifeHour: g.ext.life?.clock?.() }
     }, s as never)
     await page.waitForTimeout(k === 0 ? 900 : (s.gap ?? 600))
-    const life = await page.evaluate(() => {
-      const l = (window as G).guildhall.ext.life
-      return l
-        ? {
-            agents: l.agents(),
-            chips: l.chips().map((c: G) => ({ id: c.id, folded: c.folded, lift: c.lift })),
-          }
-        : null
-    })
+    const life = await page.evaluate(
+      (at: G) => {
+        const l = (window as G).guildhall.ext.life
+        const near = (x: number, z: number, r: number) =>
+          Array.isArray(at) && Math.hypot(x - at[0], z - at[2]) < r
+        return l
+          ? {
+              agents: l.agents(),
+              chips: l.chips().map((c: G) => ({ id: c.id, folded: c.folded, lift: c.lift })),
+              // the townsfolk at work round the shot (their routine's clip and beat) and the stocks there
+              work: l.work?.().filter((p: G) => near(p.at[0], p.at[1], 4)),
+              stocks: l.stocks?.().filter((s: G) => near(s.at[0], s.at[2], 8)),
+            }
+          : null
+      },
+      (placed as G)?.at,
+    )
     info.push({ k, placed, life })
     await page.screenshot({ path: `${out}/${s.name}-${k}.png` })
   }

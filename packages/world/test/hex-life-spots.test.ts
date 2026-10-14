@@ -100,30 +100,55 @@ describe("people at spots", () => {
   const key = (at: readonly number[]) => `${at[0]!.toFixed(2)},${at[2]!.toFixed(2)}`
   const spotAt = new Map(places.furniture.spots.map((s) => [key([s.x, 0, s.z]), s]))
 
-  test("everyone works only at a spot, facing its way, and no two people hold the same one", () => {
+  /** Work made up for those the spots do not hold (beside someone's work, chores), and the woodcutters' piles. */
+  const madeAt = new Map(
+    [...z.zones.keys()].flatMap((zi) => places.madeUp(zi)).map((m) => [key(m.spot.at), m]),
+  )
+  const piles = new Set(
+    places.furniture.spots.flatMap((_, k) => {
+      const p = places.pileOf(k)
+      return p ? [key(p.at)] : []
+    }),
+  )
+
+  test("everyone works only at a spot (or work made up for them), facing its way, and no two people hold the same one", () => {
     const holder = new Map<string, number>()
+    const made = new Set<number>()
     for (const f of folk)
       for (const s of stays(f.day)) {
         if (s.kind !== "stay" || s.act !== "work") continue
         const spot = spotAt.get(key(s.at))
-        expect(spot).toBeDefined()
-        expect(Math.abs(Math.sin((spot!.facing - s.facing) / 2))).toBeLessThan(1e-6)
-        expect(!spot!.roles || spot!.roles.includes(f.role)).toBe(true)
         const who = holder.get(key(s.at))
         expect(who === undefined || who === f.id).toBe(true)
         holder.set(key(s.at), f.id)
+        if (!spot) {
+          // made-up work, a woodcutter's pile, or a castle guard's post on the rounds
+          const m = madeAt.get(key(s.at))
+          expect(!!m || piles.has(key(s.at)) || s.routine?.id === "post").toBe(true)
+          if (m) expect(Math.abs(Math.sin((m.spot.facing - s.facing) / 2))).toBeLessThan(1e-6)
+          if (!piles.has(key(s.at))) made.add(f.id)
+          continue
+        }
+        expect(Math.abs(Math.sin((spot.facing - s.facing) / 2))).toBeLessThan(1e-6)
+        expect(!spot.roles || spot.roles.includes(f.role)).toBe(true)
       }
     expect(holder.size).toBeGreaterThan(80)
+    // made-up work is the exception: most work at the place's own spots
+    expect(made.size).toBeLessThan(folk.length / 4)
   })
 
-  test("archers shoot from the archery range's line: each at its own spot there", () => {
+  test("archers shoot from the archery range's line: each at its own spot there (the rest lend a hand)", () => {
     const archers = folk.filter((f) => f.role === "archer")
     // (seed 1 has a camp's range: three at its line at least)
     expect(archers.length).toBeGreaterThanOrEqual(3)
     for (const f of archers) {
       const work = f.day.find((s) => s.kind === "stay" && s.act === "work")
-      if (!work || work.kind !== "stay") continue
-      expect(spotAt.get(key(work.at))?.roles).toContain("archer")
+      expect(work?.kind).toBe("stay")
+      if (work?.kind !== "stay") continue
+      const spot = spotAt.get(key(work.at))
+      // (the agents, planned first, hold some of the line: an archer left over works made-up work)
+      if (spot) expect(spot.roles).toContain("archer")
+      else expect(madeAt.has(key(work.at))).toBe(true)
     }
   })
 

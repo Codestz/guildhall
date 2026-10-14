@@ -31,6 +31,7 @@ import {
   type DoorPass,
   DRILLS,
   type DrillAt,
+  type DrillFrame,
   doorPasses,
   drillClips,
   drillFrame,
@@ -41,10 +42,15 @@ import {
   hexCollide,
   hexWalk,
   type LifePose,
+  type LifeSample,
   type LifeStep,
   lifePlaces,
   lifePose,
+  routineClips,
+  routineSample,
   solidDistance,
+  spotFrame,
+  stockAt,
   workTiles,
 } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
@@ -52,7 +58,7 @@ import * as data from "../data.ts"
 import { type ChipMode, type Chips, chipViews, createChips } from "./chips.ts"
 import { collideView } from "./collideView.ts"
 import { type AgentSource, recipeOf } from "./lifeAgents.ts"
-import { type LifePlan, SPEEDUP } from "./lifePlan.ts"
+import { type LifePlan, SEC_PER_HOUR, SPEEDUP } from "./lifePlan.ts"
 import { createSpace } from "./space.ts"
 
 export { LIFE_MPS, SPEEDUP } from "./lifePlan.ts"
@@ -178,6 +184,8 @@ function spotClips(loops: readonly (readonly LifeStep[])[]): string[] {
       if (s.clip) out.add(s.clip)
       // a routine's every clip (its solo's too: a duellist alone)
       if (s.drill) for (const c of drillClips(s.drill.id)) out.add(c)
+      // a work routine's every clip
+      if (s.routine) for (const c of routineClips(s.routine.id)) out.add(c)
     }
   return [...out].sort()
 }
@@ -252,12 +260,15 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     const looks: NpcLook[] = []
     /** A townsfolk's day, or a hero figure (`figures[figure]`). */
     const loops: ({ steps: LifeStep[]; figure?: undefined } | { figure: number })[] = []
+    /** Each townsfolk's role, by crowd id (shots). */
+    const roleOf: string[] = []
     for (const f of folk) {
       const recipe = usableOf(f.role)
       if (!recipe) continue
       const look = resolveNpc(recipe, hash(`hexfolk:${opts.seed}:${f.id}`), catalog)
       looks.push(scaled(holding(look, f.prop, catalog)))
       loops.push({ steps: f.day })
+      roleOf[looks.length - 1] = f.role
     }
     /**
      * The heroes' figures: one for each hero the source has now (its look), and with `agentPool` spares
@@ -384,10 +395,21 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       space.step(poses, step)
     }
     /** A drilling person's clip and how far into it, on the shared clock (the agents' seconds). */
-    const drilled = (d: DrillAt): { clip: string; phase: number } => {
+    /**
+     * A drilling person's frame on the shared clock: the day's, in screen seconds (so a set clock and a
+     * played one agree, and the spectators' cheers meet the duels' hits); a duellist alone waits.
+     */
+    const drilled = (d: DrillAt): DrillFrame => {
       const alone = d.pair !== undefined && (duelling.get(d.pair) ?? 0) < 2
       const solo = DRILLS[d.id]?.solo
-      return alone && solo ? drillFrame(solo, 0, secs + d.at) : drillFrame(d.id, d.side, secs + d.at)
+      const t = day * SEC_PER_HOUR + d.at
+      return alone && solo ? drillFrame(solo, 0, t) : drillFrame(d.id, d.side, t)
+    }
+    /** A townsfolk's routine sample now: seconds into their stay on the day's clock (less their queueing). */
+    const routined = (id: number, p: LifePose): LifeSample => {
+      const now = day - (space.delay[id]! * SPEEDUP) / 3600
+      const into = ((((now - (p.since ?? 0)) % 24) + 24) % 24) * SEC_PER_HOUR
+      return routineSample(p.routine!, into)
     }
     /** Where feet stand: a stair's tread, a deck's planks, the ground (a dock's deck: the way's own height). */
     const footAt = (x: number, zz: number, p: LifePose) =>
@@ -406,9 +428,24 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       // always the walk
       if (p.act !== "walk" && p.drill) {
         const f = drilled(p.drill)
+        // stepping in to fight, out after
+        const [px, pz] = f.step ? spotFrame(x, zz, p.facing, 0, f.step) : [x, zz]
         return {
-          position: [x, y, zz],
+          position: [px, y, pz],
           heading: p.facing,
+          clip: f.clip,
+          phase: f.phase,
+          hidden: p.indoors || (hiddenAt !== null && hiddenAt(x, zz)),
+        }
+      }
+      // at work: its routine (world routines.ts), on the day's clock from when the stay began, so a
+      // played clock and a set one give the same frame; standing a little off the spot when it says
+      if (p.act !== "walk" && p.routine) {
+        const f = routined(id, p)
+        const [px, pz] = f.shift ? spotFrame(x, zz, p.facing, f.shift[0], f.shift[1]) : [x, zz]
+        return {
+          position: [px, f.shift ? footAt(px, pz, p) + (p.lift ?? 0) : y, pz],
+          heading: p.facing + (f.turn ?? 0),
           clip: f.clip,
           phase: f.phase,
           hidden: p.indoors || (hiddenAt !== null && hiddenAt(x, zz)),
@@ -598,6 +635,29 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
               : [space.x[id], space.z[id], figures.find((f) => f.crowd === id)?.agent ?? null],
           ).filter(Boolean),
         walk: { nodes: plan.stats.nodes, edges: plan.stats.edges },
+        // for shots and tests: what each townsfolk at work plays now (their routine's sample), and
+        // the stocks their work fills, at the day's clock
+        work: () =>
+          loops.flatMap((l, id) => {
+            const p = poses[id]
+            if (l.figure !== undefined || !p || p.indoors) return []
+            const f = p.act !== "walk" && p.routine ? routined(id, p) : null
+            return [
+              {
+                id,
+                role: roleOf[id],
+                at: [space.x[id], space.z[id]],
+                act: p.act,
+                routine: p.routine?.id ?? null,
+                clip: f?.clip ?? p.clip ?? null,
+                cycle: f?.cycle ?? null,
+                beat: f?.beat ?? null,
+                props: f?.props ?? [],
+                carry: p.carry ?? null,
+              },
+            ]
+          }),
+        stocks: () => plan.stocks.map((s) => ({ kind: s.kind, at: s.at, ...stockAt(s, day, SEC_PER_HOUR) })),
       }
     logger.info("life", {
       folk: folk.length,

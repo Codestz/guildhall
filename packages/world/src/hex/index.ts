@@ -29,10 +29,14 @@ export {
 } from "./curtain.ts"
 export { DOORWAYS, type Doorway, doorwayOf } from "./doorways.ts"
 export {
+  BOUT_S,
+  boutWinner,
   CLIP_SECONDS,
   DRILLS,
   type Drill,
+  type DrillFrame,
   type DrillMove,
+  DUEL_HITS,
   drillClips,
   drillFrame,
   pairedDrill,
@@ -117,6 +121,35 @@ export {
   WOODED,
 } from "./nature.ts"
 export { parseTilePrefabs, SPOT_KINDS, TILE_GROUNDS, TILE_GROUPS, validateTilePrefab } from "./prefabs.ts"
+export {
+  BEAT_S,
+  type Beat,
+  CHOP_TRIP,
+  cyclesSpan,
+  type LifeSample,
+  PROPS,
+  planStocks,
+  ROUTINE_CLIP_SECONDS,
+  ROUTINES,
+  type Routine,
+  type RoutineAt,
+  type RoutinePart,
+  routineClips,
+  routineCycles,
+  routineFor,
+  routineSample,
+  routineSpan,
+  routineYield,
+  STOCK_DAY,
+  type Stock,
+  type StockFeed,
+  type StockKind,
+  type StockSample,
+  type StockSpec,
+  spotFrame,
+  stockAt,
+  stocksAt,
+} from "./routines.ts"
 export {
   CASTLE_TILES,
   type CastlePlan,

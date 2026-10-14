@@ -4,6 +4,7 @@ import { patchSnowCover } from "./events/snowCover.ts"
 import { patchLodFade } from "./lodFade.ts"
 import { patchGlow } from "./night/glow.ts"
 import { patchRegionTint } from "./regionTint.ts"
+import { patchSeason } from "./season.ts"
 import { patchCascades } from "./sun/patch.ts"
 
 /**
@@ -34,6 +35,8 @@ export function paletteMaterial(kind: PaletteKind = "mesh"): MeshStandardMateria
       patchSnowCover(shader)
       patchRegionTint(shader)
       patchGlow(shader)
+      // season tint (season.ts): the light's warmth only; summer draws as before
+      patchSeason(shader, "light")
     }
     palette[kind] = shared
   }
@@ -63,6 +66,8 @@ export function batchMaterial(dither = false): MeshStandardMaterial {
       patchSnowCover(shader)
       patchRegionTint(shader)
       patchGlow(shader)
+      // season tint (season.ts): foliage, pines and crops by swatch, each tree its own; summer as before
+      patchSeason(shader, "batch")
       patchLodFade(shader, dither)
     }
     material.customProgramCacheKey = () => (dither ? "guildhall-batch-dither" : "guildhall-batch")

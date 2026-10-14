@@ -23,6 +23,7 @@ import { type LodCounts, PIECE_TIERS, SHELL, TIER_MIN_AREA, TIER_MIN_SAVING } fr
 import { lodError, shellGeometry, simplifierReady, simplifyGeometry, surfaceArea } from "./lodGeometry.ts"
 import { batchMaterial } from "./material.ts"
 import { GLOW_SWATCHES } from "./night/glow.ts"
+import { isEvergreen, markEvergreen } from "./season.ts"
 import { createSlicer } from "./slice.ts"
 import type { Stage } from "./stage.ts"
 import { swatchMapKey } from "./tint.ts"
@@ -283,7 +284,13 @@ export async function createStaticBatch(
       geometry = Promise.all([piece, simplifierReady]).then(async ([root]) => {
         // many pieces resolve in one tick: their bakes are spread over frames
         await slicer.yield()
-        return withTiers(batchGeometry(root, instanceSwatchMap(instance), GLOW_SWATCHES[instance.piece]))
+        const tiers = withTiers(
+          batchGeometry(root, instanceSwatchMap(instance), GLOW_SWATCHES[instance.piece]),
+        )
+        // a conifer's needles stay green through autumn (season.ts): its leaf swatches read as pine, once
+        // its tiers are simplified (they keep its swatch borders, so its LODs are today's)
+        if (isEvergreen(instance.piece)) for (const g of new Set(tiers)) markEvergreen(g)
+        return tiers
       })
       baked.set(key, geometry)
     }

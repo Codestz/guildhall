@@ -135,6 +135,26 @@ export {
   zoomTilt,
 } from "./rig/world.ts"
 export * from "./sea/index.ts"
+export {
+  applySeason,
+  BLOSSOM_FROM,
+  createSeasonDrive,
+  dayOfYear,
+  pieceVertices,
+  SEASON_AT,
+  SEASON_NAMES,
+  type SeasonDrive,
+  type SeasonName,
+  type SeasonPick,
+  type SeasonWeights,
+  seasonName,
+  seasonOfDate,
+  seasonPinOf,
+  seasonStep,
+  seasonWeights,
+  treeHash,
+  wrapSeason,
+} from "./season.ts"
 export { createShadows, fitShadowCamera, type ShadowBox } from "./shadow.ts"
 export {
   bakeShoreField,

@@ -9,6 +9,7 @@ import { patchCloudShade } from "./atmosphere/shade.ts"
 import { patchSnowCover } from "./events/snowCover.ts"
 import { paletteMaterial } from "./material.ts"
 import { patchRegionTint } from "./regionTint.ts"
+import { patchSeason } from "./season.ts"
 import type { Stage } from "./stage.ts"
 import { patchCascades } from "./sun/patch.ts"
 import type { TerrainMesh } from "./terrain.ts"
@@ -40,7 +41,8 @@ const SPECKLE_FRAGMENT = /* glsl */ `#include <color_fragment>
 #ifdef REGION_TINT
 		meadow = regionW.a;
 #endif
-		if (h > 0.9 - 0.14 * meadow && drift > 0.55 - 0.5 * meadow) {
+		// spring flowers more and in more drifts, winter none (season.ts; at summer exactly as before)
+		if (h > 0.9 - 0.14 * meadow - 0.06 * uSpring && drift > 0.55 - 0.5 * meadow - 0.35 * uSpring && uWinter < 0.5) {
 			float pick = fract(h * 53.7);
 			vec3 petal = pick < 0.35 ? vec3(0.95, 0.93, 0.85) : pick < 0.65 ? vec3(0.98, 0.82, 0.25) : pick < 0.85 ? vec3(0.93, 0.52, 0.62) : vec3(0.62, 0.52, 0.9);
 			diffuseColor.rgb = mix(c, petal, k * (1.0 - smoothstep(0.08, 0.13, d)));
@@ -74,6 +76,7 @@ export function groundMaterial(): MeshStandardMaterial {
         .replace("#include <color_fragment>", SPECKLE_FRAGMENT)
       // after the speckle, so the region's green is turned before the speckle reads it
       patchRegionTint(shader, "ground")
+      patchSeason(shader, "ground")
     }
     ground.customProgramCacheKey = () => "guildhall-ground"
   }

@@ -17,6 +17,7 @@ import {
 } from "three"
 import { ATMOSPHERE, patchCloudShade } from "./atmosphere/shade.ts"
 import { patchRegionTint } from "./regionTint.ts"
+import { ICE } from "./season.ts"
 import type { ShoreField } from "./shoreField.ts"
 import type { Stage } from "./stage.ts"
 import { patchCascades } from "./sun/patch.ts"
@@ -341,7 +342,8 @@ function patchWater(
 ) {
   patchCascades(shader)
   patchCloudShade(shader)
-  Object.assign(shader.uniforms, ATMOSPHERE, uniforms)
+  // the season's ice on still inland water (season.ts: 0 but in winter)
+  Object.assign(shader.uniforms, ATMOSPHERE, uniforms, ICE)
   shader.vertexShader = shader.vertexShader
     .replace(
       "#include <common>",
@@ -364,7 +366,7 @@ vWater = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
   shader.fragmentShader = shader.fragmentShader
     .replace(
       "#include <dithering_pars_fragment>",
-      () => `#include <dithering_pars_fragment>\n${PARS}\n${REVEAL_PARS}`,
+      () => `#include <dithering_pars_fragment>\n${PARS}\n${REVEAL_PARS}\nuniform float uIce;`,
     )
     .replace(
       "#include <color_fragment>",
@@ -419,6 +421,9 @@ if (wInland && wSpeed > 0.02) {
 	vec2 wL = vWorld * 0.8 + vec2(0.23, 0.11) * uTime;
 	wSlope = wSlope * 0.6 + 0.035 * noiseSlope(wL) * (1.0 - smoothstep(0.25, 0.6, length(fwidth(wL))));
 }
+// winter (season.ts): a still pond freezes over, its ripples gone; a river keeps running
+float wIce = wInland && wSpeed <= 0.02 ? uIce : 0.0;
+if (wIce > 0.0) wSlope *= 1.0 - wIce;
 float wBreak = waterNoise(wQ * 0.5 + vec2(uTime * 0.04, 0.0));
 // Body: shallow by the shore, deep further out, stepped through soft toon bands (V1 water v2).
 float wDepth = wInland ? smoothstep(0.3, 2.0, wD) * 0.35 + 0.35 : smoothstep(0.4, 7.5, wD);
@@ -460,7 +465,15 @@ if (!wInland) {
 foam = max(foam, wStreak * 0.75);
 foam = max(foam, wakeFoam(vWorld));
 foam = clamp(foam, 0.0, 1.0);
-diffuseColor.rgb = mix(diffuseColor.rgb, uFoam, foam * (0.9 - 0.4 * wNight));`,
+diffuseColor.rgb = mix(diffuseColor.rgb, uFoam, foam * (0.9 - 0.4 * wNight));
+if (wIce > 0.0) {
+	// ice: pale and milky, clearer toward the middle, a few white cracks, snow drifted on at the rim
+	float iceCrack = 1.0 - smoothstep(0.0, 0.035 + 2.0 * wQw, abs(waterNoise(wQ * 1.7) - waterNoise(wQ * 2.3 + vec2(4.1, 1.7))));
+	vec3 ice = mix(vec3(0.62, 0.78, 0.86), vec3(0.42, 0.62, 0.74), smoothstep(0.4, 2.2, wD));
+	ice = mix(ice, vec3(0.9, 0.95, 0.98), 0.55 * iceCrack + 0.8 * (1.0 - smoothstep(0.15, 0.7, wD)));
+	diffuseColor.rgb = mix(diffuseColor.rgb, ice * (1.0 - 0.45 * wNight), wIce);
+	foam *= 1.0 - wIce;
+}`,
     )
     .replace(
       "#include <roughnessmap_fragment>",

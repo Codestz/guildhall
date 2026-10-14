@@ -172,8 +172,8 @@ export const PLACE_ROLES: Readonly<Record<ZoneKind, readonly [string, number][]>
  */
 export const SCENE_FOLK: Readonly<Record<string, readonly [string, number][]>> = {
   "training-arena": [
-    ["soldier", 13],
-    ["knight", 3],
+    ["soldier", 6],
+    ["knight", 2],
   ],
 }
 

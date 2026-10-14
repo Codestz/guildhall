@@ -112,7 +112,8 @@ describe("the training arena", () => {
         expect(lone).toBeLessThanOrEqual(hour > 11 && hour < 14.5 ? 2 : 0)
         for (const [i, { s }] of bareSpots.entries()) if (s.clip?.startsWith("Sit") && who[i]) seated++
       }
-      expect(seated).toBeGreaterThan(8)
+      // (the arena brings ~8 fighters, so its duels read: fewer left over to watch than before)
+      expect(seated).toBeGreaterThan(4)
     })
 
     test(`seed ${seed}: a duel's stay carries its routine, its side and its pair; the Warden spars there`, () => {

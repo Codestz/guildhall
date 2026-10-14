@@ -4,7 +4,7 @@
  * both, switchable in place: a story picked from the demos replaces what plays without rebuilding the
  * island (the session starts the log over, and the heroes' desk with it).
  */
-import { STORY_IDS, type StoryId } from "@guildhall/sim"
+import { STORY_IDS, type StoryId, type StoryShowRules } from "@guildhall/sim"
 import type { Feed, FeedChapter, FeedHero, FeedKind, FeedSink, FeedStatus } from "../hall/feeds/feed.ts"
 import { STORY_EPOCH, StoryFeed } from "../hall/feeds/story.ts"
 import { DEMO_AGENTS, demoStory } from "../hexworld/lifeAgents.ts"
@@ -35,6 +35,11 @@ export class HomeFeed implements Feed {
   /** The demo guild names its heroes: Claude the mage, Warden the knight, Scout the ranger. */
   get cast(): readonly FeedHero[] | undefined {
     return this.pick === "demo" ? DEMO_AGENTS : undefined
+  }
+
+  /** The playing story's pacing for the world events (none for the demo guild). */
+  get showRules(): StoryShowRules | undefined {
+    return this.told?.showRules
   }
 
   status(): FeedStatus {

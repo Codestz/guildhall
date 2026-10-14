@@ -18,8 +18,8 @@ const instant = {
   clearTimer: () => {},
 }
 
-async function saga(): Promise<{ session: HallSession; told: string[] }> {
-  const session = createSession(new StoryFeed("saga"), { throttle: instant })
+async function saga(id: "saga" | "events" = "saga"): Promise<{ session: HallSession; told: string[] }> {
+  const session = createSession(new StoryFeed(id), { throttle: instant })
   const told: string[] = []
   const herald = session.herald
   session.herald = (parts, about) => {
@@ -40,7 +40,7 @@ function play(session: HallSession, events: { read(): void }, seconds: number) {
 }
 
 describe("the hall's world events", () => {
-  test("the saga played through tells each show once, in order, and the director gets its hints", async () => {
+  test("the saga played through tells each show once, in order (its festival at nightfall), and the director gets its hints", async () => {
     const { session, told } = await saga()
     const events = createEvents(session)
     const kinds: string[] = []
@@ -49,7 +49,7 @@ describe("the hall's world events", () => {
     })
     let hinted = 0
     const captions = new Set<string>()
-    for (let k = 0; k < 200 * 4 && session.clock.get().playing; k++) {
+    for (let k = 0; k < 260 * 4 && session.clock.get().playing; k++) {
       session.frame(0.25)
       events.read()
       hinted = Math.max(hinted, events.hints().length)
@@ -57,14 +57,31 @@ describe("the hall's world events", () => {
       if (c?.kind === "renown") captions.add(c.text)
     }
     // the narrator says them, on the HUD's strip
-    expect(captions.size).toBe(3)
+    expect(captions.size).toBe(4)
     off()
-    expect(kinds.map((id) => id.split(":")[0])).toEqual(["undead", "undead", "rainbow"])
-    expect(told.length).toBe(3)
+    expect(kinds.map((id) => id.split(":")[0])).toEqual(["undead", "undead", "rainbow", "festival"])
+    expect(told.length).toBe(4)
     expect(told[0]).toMatch(/grave|skeleton/)
     expect(told[1]).toContain("packages/world")
     expect(told[2]).toMatch(/rainbow/)
+    expect(told[3]).toMatch(/festival|lantern|firework|square/i)
     expect(hinted).toBeGreaterThan(0)
+  })
+
+  test("World events played through: every show once, in order, with the story's pacing and its purse", async () => {
+    const { session, told } = await saga("events")
+    const events = createEvents(session)
+    const started: string[] = []
+    for (let k = 0; k < 300 * 4 && session.clock.get().playing; k++) {
+      session.frame(0.25)
+      events.read()
+      for (const s of events.shows()) if (!started.includes(s.id)) started.push(s.id)
+    }
+    const big = started.map((id) => id.split(":")[0]).filter((k) => k !== "undead")
+    expect(big).toEqual(["dragon", "rainbow", "comet", "ghostship", "raid", "festival"])
+    // the CI grave and the two falls' graves are told; the failed builds' minions are not
+    expect(told.filter((t) => /grave|skeleton|claws|stirs/i.test(t)).length).toBeGreaterThanOrEqual(3)
+    expect(told.length).toBeGreaterThanOrEqual(9)
   })
 
   test("a seek into a show tells nothing and shows nothing of it; seeking before it plays it again", async () => {

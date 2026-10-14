@@ -4,6 +4,10 @@
  * log and per "watching began" (`since`: the hall's opening live, a seek's landing), fed only the new
  * events, so idle it reads a few shows and stops.
  *
+ * The rules are a live hall's (sim `SHOW_RULES`) but for a told story's own pacing (`feed.showRules`, the
+ * demos' shorter gap between big shows), and the raid's purse is the party's as of each moment
+ * (`session.purseAt`), so a replay, a story and a live hall earn it alike.
+ *
  * As each show starts (played through, not sought past) it is told (`showLine` through the session's
  * narrator), sounded (the audio engine's renown motif; a grave's toll) and pointed at (the director
  * reads `hints()` beside its own beats, hall/camera.ts). The render tasks read `shows(t)` (B graves,
@@ -106,8 +110,10 @@ export function createEvents(session: HallSession): HallEvents & { read(): void 
   let nForced = 0
 
   const at = () => session.clock.get().at
-  /** Read once per read of the shows, only when a rule asks. */
-  const purseOf = (master: string) => {
+  /** The party's purse as of `at` (the session's book); without one, a live session model's head. */
+  const purseOf = (master: string, when: number) => {
+    if (session.purseAt) return session.purseAt(master, when)
+    if (!live) return undefined
     if (!purses) purses = pursesOf(session)
     return purses.get(master)
   }
@@ -158,11 +164,17 @@ export function createEvents(session: HallSession): HallEvents & { read(): void 
     }
     lastAt = c.at
     lastReal = begin
-    if (log !== engineLog) engine = null
+    if (log !== engineLog) {
+      // a new log (the feed started over, the home switched stories): its shows are new ones
+      engine = null
+      if (engineLog !== null) announced.clear()
+    }
     if (!engine) {
+      const gap = session.feed.showRules?.gapMs
       engine = new ShowEngine({
         since,
-        ...(live ? { purse: (master: string) => purseOf(master) } : {}),
+        purse: purseOf,
+        ...(gap !== undefined ? { gapMs: gap } : {}),
       })
       engineLog = log
     }

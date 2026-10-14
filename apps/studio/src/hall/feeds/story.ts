@@ -4,7 +4,7 @@
  * hall's own repo so its paths land on the hall's places, and played on the session clock like a recording.
  */
 import type { SeaEvent } from "@guildhall/core"
-import { STORY_IDS, type StoryId, type StoryUnit, story } from "@guildhall/sim"
+import { STORY_IDS, type StoryId, type StoryShowRules, type StoryUnit, story } from "@guildhall/sim"
 import type { Feed, FeedChapter, FeedSink, FeedStatus } from "./feed.ts"
 
 /**
@@ -51,6 +51,8 @@ export class StoryFeed implements Feed {
   readonly name: string
   private state: FeedStatus = "offline"
   private live = false
+  /** The story's pacing for the world events, once it is told. */
+  showRules: StoryShowRules | undefined
 
   constructor(
     readonly id: StoryId,
@@ -72,6 +74,7 @@ export class StoryFeed implements Feed {
       seed: seed ?? 1,
       start: STORY_EPOCH,
     })
+    this.showRules = told.showRules
     sink.reset()
     // the guild's changes and the sea, merged by time (the guild's first on a tie)
     const sea = [...told.seas].sort((a, b) => a.at - b.at)

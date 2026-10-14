@@ -22,6 +22,7 @@ import {
   type NormalizeContext,
   normalize,
   normalizer,
+  PurseBook,
   type StoryMoment,
   Teller,
   type WireInput,
@@ -60,6 +61,11 @@ export interface HallSession {
   log(): EventLog
   /** The session model behind it (transcripts, purses), at the log's head. */
   model(): GuildModel
+  /**
+   * What the party under guildmaster `master` had spent by `at` (epoch ms), from the sessions' running
+   * totals as they came: the raid's treasury rule, read causally (a seek back reads it as it was then).
+   */
+  purseAt?(master: string, at: number): { tokens: number; cost: number } | undefined
   /** The log's first event's time (epoch ms), or null while it is empty. */
   origin(): number | null
   /** What the session's Teller has told so far (its moments, its sessions): the Legends and the card. */
@@ -95,6 +101,7 @@ export function createSession(feed: Feed, opts: SessionOptions = {}): HallSessio
   const clock = createSessionClock({ live })
   let placeOf: ((path: string) => number | undefined) | undefined
   let log = new EventLog()
+  let purses = new PurseBook()
   // a story that names its heroes (the demo guild): its names over the hall's, in the world and the
   // captions; read as each hero joins, so a feed that switches stories in place switches casts too
   const cast: Cast = (k) => {
@@ -167,6 +174,7 @@ export function createSession(feed: Feed, opts: SessionOptions = {}): HallSessio
   const sink: FeedSink = {
     reset() {
       log = new EventLog()
+      purses = new PurseBook()
       ctx = normalizer({ ...(placeOf ? { placeOf } : {}), cast })
       teller = null
       narrator = null
@@ -183,8 +191,10 @@ export function createSession(feed: Feed, opts: SessionOptions = {}): HallSessio
         teller = new Teller(at, "world", cast)
         narrate()
       }
-      if (isChange) teller.take((input as GuildEvent).change as Change, news)
-      else teller.sight({ event: input as SeaEvent, at: at - teller.start }, news)
+      if (isChange) {
+        teller.take((input as GuildEvent).change as Change, news)
+        purses.take((input as GuildEvent).change as Change)
+      } else teller.sight({ event: input as SeaEvent, at: at - teller.start }, news)
       append(normalize(input, ctx))
       store.invalidate()
     },
@@ -245,6 +255,7 @@ export function createSession(feed: Feed, opts: SessionOptions = {}): HallSessio
     clock,
     log: () => log,
     model: () => ctx.model,
+    purseAt: (master, at) => purses.at(master, at),
     origin: () => log.events[0]?.at ?? null,
     teller: () => teller,
     start(bind) {

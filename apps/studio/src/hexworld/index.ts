@@ -644,7 +644,14 @@ const world = {
         sea: SEA_LEVEL,
       })
       // the sky and town shows (shows.ts): nothing in the scene until one plays
-      shows = mountShows({ stage, query: ctx.query, sites: m.sites, span, light: () => sky.light() })
+      shows = mountShows({
+        stage,
+        query: ctx.query,
+        sites: m.sites,
+        span,
+        light: () => sky.light(),
+        session: extra.session ?? session,
+      })
       steps.progress(0.74, 150)
       go("Water", 0.8)
       await shoreDone

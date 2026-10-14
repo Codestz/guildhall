@@ -4,14 +4,17 @@
  * the sea what it says. A push sends a cargo ship out from the quay, the newest release brings the
  * galleon, the newest CI run lights the lighthouse. The sea's clock is the session's (`sync`), so the
  * voyages are where the bar says: a seek back shows the water as it was then, a replay at 4× sails 4×.
- * The world's shows (the ghost ship, the raid) come from the world-events engine (`setShows`).
+ * The world's shows (the ghost ship, the raid) come from the world-events engine (hall/events.ts, read
+ * through hall/shows.ts `driveSeaShows`) once the hall's events are up.
  */
 import type { SeaLife } from "@guildhall/render"
 import { harbourOf } from "@guildhall/sim"
+import { type HallEvents, hallEvents } from "./events.ts"
 import type { HallSession } from "./feeds/index.ts"
 import { FX_READ_MS, fleetRate } from "./fx.ts"
+import { driveSeaShows } from "./shows.ts"
 
-export function driveSea(sea: SeaLife, session: HallSession): () => void {
+export function driveSea(sea: SeaLife, session: HallSession, opts: { level?: number } = {}): () => void {
   let pushes: number | null = null
   let lastPush = 0
   const follow = () => {
@@ -37,6 +40,19 @@ export function driveSea(sea: SeaLife, session: HallSession): () => void {
     const run = harbour.ci[0]
     sea.setLighthouse(run?.state ?? null, run?.at)
   }
+  // the world events' ghost ship and raid: from the hall's events, re-bound when they are mounted anew
+  let bound: HallEvents | null = null
+  let unshow = () => {}
+  const bind = () => {
+    const events = hallEvents()
+    if (events === bound) return
+    unshow()
+    unshow = () => {}
+    bound = events
+    if (events) unshow = driveSeaShows(sea, events, opts.level ?? 0)
+  }
+  bind()
+  const binding = setInterval(bind, 1000)
   read()
   const timer = setInterval(read, FX_READ_MS)
   const offReset = session.onReset(() => {
@@ -46,6 +62,8 @@ export function driveSea(sea: SeaLife, session: HallSession): () => void {
   })
   return () => {
     clearInterval(timer)
+    clearInterval(binding)
+    unshow()
     offReset()
     offClock()
     sea.setRate(1)

@@ -4,7 +4,7 @@
  * sink, the hall's session (session.ts), which owns everything derived: the log, the world, the clock.
  * A feed never folds, never narrates, never keeps time for the HUD.
  */
-import type { WireInput } from "@guildhall/sim"
+import type { StoryShowRules, WireInput } from "@guildhall/sim"
 
 /**
  * How a feed is doing. `connecting`: the hub is being reached (or reached again, with backoff); `live`:
@@ -56,6 +56,11 @@ export interface Feed {
    * their bodies on the island. None: the hall's own names (Guildmaster, Wanderer II…).
    */
   readonly cast?: readonly FeedHero[] | undefined
+  /**
+   * A told story's own pacing for the world events (sim `Story.showRules`, the demos' override of the
+   * 150 s between big shows): the hall's events engine honours it (hall/events.ts). None: a live hall's.
+   */
+  readonly showRules?: StoryShowRules | undefined
 }
 
 /** A story's hero: its name, banner colour, KayKit body (a catalog id) and NPC recipe. */

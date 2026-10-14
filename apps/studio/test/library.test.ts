@@ -96,7 +96,7 @@ describe("styleSubset", () => {
   })
 })
 
-describe("the host config (deploy/vercel.v2.json)", () => {
+describe("the host config (apps/studio/vercel.json)", () => {
   const rules = hostRules(JSON.parse(readFileSync(HOST_CONFIG, "utf8")))
 
   test("every route deep-links to the app, with and without its id", () => {

@@ -462,7 +462,7 @@ function showcase(plan: ShippedLibrary | null, mode: LibraryMode, data: string):
 }
 
 /** The host's config for the public site (the proposal the deploy uses; deploy/plan in .probe). */
-export const HOST_CONFIG = fileURLToPath(new URL("../../deploy/vercel.v2.json", import.meta.url))
+export const HOST_CONFIG = fileURLToPath(new URL("./vercel.json", import.meta.url))
 
 interface HostConfig {
   rewrites?: { source: string; destination: string }[]
@@ -491,7 +491,7 @@ export function hostRules(config: HostConfig) {
 }
 
 /**
- * The showcase preview answers like the host: deploy/vercel.v2.json's headers on every answer (so the
+ * The showcase preview answers like the host: apps/studio/vercel.json's headers on every answer (so the
  * CSP is tried locally), a file when there is one, index.html for a path the rewrites name, and
  * 404.html with a 404 status for anything else (a missing `/library/` piece included), where vite's SPA
  * fallback would otherwise answer every path with the app.

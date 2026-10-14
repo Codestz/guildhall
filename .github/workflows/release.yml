@@ -2,12 +2,12 @@
 # and every version carries provenance linking it to the commit it was built from.
 #
 # Release: bump legacy/packages/opencode-guildhall/package.json "version", commit, then
-#   git tag v0.1.0 && git push origin v0.1.0
+#   git tag opencode-v0.1.0 && git push origin opencode-v0.1.0 (plain v* tags are the app's own releases)
 name: Release
 
 on:
   push:
-    tags: ["v*.*.*"]
+    tags: ["opencode-v*.*.*"]
 
 permissions:
   contents: read

@@ -86,8 +86,8 @@ const LEAN_S = 7.2
 export const CHAT_MIN = 1.0
 export const CHAT_MAX = 1.6
 /** And wave across this far. */
-const WAVE_MIN = 5
-const WAVE_MAX = 10
+const WAVE_MIN = 4
+const WAVE_MAX = 8
 /** Screen seconds a chat lasts (from, to) and a wave. */
 const CHAT_S: readonly [number, number] = [4, 8]
 const WAVE_S = 2.4

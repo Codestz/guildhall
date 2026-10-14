@@ -118,6 +118,23 @@ describe("beats", () => {
     expect(beatKinds("splash")).toEqual(["splash", "ring"])
   })
 
+  test("hero beats: shoot, pin and cheer are kinds of their own, small enough to stay in budget", () => {
+    expect(beatKinds("shoot")).toEqual(["shoot"])
+    expect(beatKinds("pin")).toEqual(["pin"])
+    expect(beatKinds("cheer")).toEqual(["cheer"])
+    for (const k of ["shoot", "pin", "cheer"] as const) {
+      expect(WORK_KINDS).toContain(k)
+      expect(KIND[k].count).toBeLessThanOrEqual(MAX_BURST)
+      expect(burstCount(k, 1.5)).toBeLessThanOrEqual(MAX_BURST)
+      expect(siteFor(k, [], [0, 0])).toBeNull()
+    }
+    // a cheer from every hero of a party of ten still fits the pool
+    expect(10 * KIND.cheer.count).toBeLessThanOrEqual(MAX_PARTICLES)
+    // each kind has its own shader branch
+    for (const k of WORK_KINDS.slice(0, -1)) expect(VERTEX).toContain(`${KIND[k].id}.5`)
+    expect(new Set(WORK_KINDS.map((k) => KIND[k].id)).size).toBe(WORK_KINDS.length)
+  })
+
   test("the rest, and a kind's own name; unknown beats make nothing", () => {
     expect(beatKinds("quench")).toEqual(["steam"])
     expect(beatKinds("pickup")).toEqual(["dust"])

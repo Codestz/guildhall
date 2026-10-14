@@ -24,6 +24,11 @@ const COL = {
   greyLight: v3(swatch("grey-light")),
   foam: v3(swatch("water-foam")),
   dirtLight: v3(swatch("dirt-light")),
+  dirt: v3(swatch("dirt")),
+  timberLightWood: v3(swatch("timber-light")),
+  red: v3(swatch("banner-red")),
+  blue: v3(swatch("roof-blue")),
+  green: v3(swatch("teal")),
   whitewash: v3(swatch("whitewash")),
   snowLight: v3(swatch("snow-light")),
   tealLight: v3(swatch("teal-light")),
@@ -88,6 +93,8 @@ void main() {
   float life = 1.0;
   vec3 colour = vec3(1.0);
   float th = rnd(seed, 1.0) * 6.2832;
+  // a streak's tail (shape 4): where it was a moment ago
+  vec3 prev = o;
 
   if (kind < ${KIND.sparks.id}.5) {
     life = 0.28 + 0.3 * rnd(seed, 2.0);
@@ -96,6 +103,9 @@ void main() {
     float r = 1.2 + 2.4 * rnd(seed, 3.0);
     p = thrown(o, th, r, 2.2 + 2.8 * rnd(seed, 4.0), age, 0.9);
     p.xz += vec2(sin(yaw), cos(yaw)) * 0.6 * age;
+    float agoS = max(age - 0.05, 0.0);
+    prev = thrown(o, th, r, 2.2 + 2.8 * rnd(seed, 4.0), agoS, 0.9);
+    prev.xz += vec2(sin(yaw), cos(yaw)) * 0.6 * agoS;
     size = 0.035 * scale;
     colour = mix(${COL.glow}, ${COL.orange}, clamp(u * 1.3, 0.0, 1.0)) * 5.0;
     alpha = 1.0 - u * u;
@@ -106,11 +116,14 @@ void main() {
     float u = age / life;
     float r = (wood ? 1.0 : 1.4) + 1.5 * rnd(seed, 3.0);
     p = thrown(o, th, r, (wood ? 1.5 : 1.8) + 1.6 * rnd(seed, 4.0), age, 0.55 * scale);
-    size = (wood ? 0.12 : 0.1) * (0.8 + 0.6 * rnd(seed, 5.0)) * scale;
+    size = (wood ? 0.13 : 0.1) * (0.8 + 0.6 * rnd(seed, 5.0)) * scale;
     stretch = wood ? vec2(1.0, 0.45) : vec2(1.0, 0.8);
     spin = age * (8.0 + 10.0 * rnd(seed, 6.0)) * (rnd(seed, 7.0) < 0.5 ? -1.0 : 1.0);
     colour = wood
-      ? mix(${COL.sandLight}, ${COL.orangeLight}, 0.25 + 0.5 * rnd(seed, 8.0)) * 1.15
+      // dark bark and brown wood read on sand and on logs; the odd fresh-cut orange flake
+      ? (rnd(seed, 9.0) < 0.25
+          ? mix(${COL.orange}, ${COL.orangeLight}, rnd(seed, 8.0))
+          : mix(${COL.dirt}, ${COL.timberLightWood}, rnd(seed, 8.0)))
       : mix(${COL.stoneLight}, ${COL.greyLight}, rnd(seed, 8.0));
     alpha = 1.0 - smoothstep(0.7, 1.0, u);
     shape = 1.0;
@@ -127,10 +140,10 @@ void main() {
     life = ${KIND.ring.life.toFixed(2)};
     float u = age / life;
     // flat on the water, spreading and thinning
-    size = (0.2 + 1.2 * (1.0 - (1.0 - u) * (1.0 - u))) * scale;
+    size = (0.14 + 0.8 * (1.0 - (1.0 - u) * (1.0 - u))) * scale;
     p = o + vec3(0.0, 0.18, 0.0);
     colour = ${COL.foam};
-    alpha = 0.9 * (1.0 - u);
+    alpha = 0.6 * (1.0 - u);
     shape = 3.0;
   } else if (kind < ${KIND.dust.id}.5) {
     life = 0.9 + 0.4 * rnd(seed, 2.0);
@@ -180,7 +193,7 @@ void main() {
     colour = mix(${COL.gold}, ${COL.glow}, 0.5) * 4.0;
     alpha = 1.0;
     add = 1.0; lit = false; shape = 2.0;
-  } else {
+  } else if (kind < ${KIND.steam.id}.5) {
     // steam: puffs off the work, staggered, rising and slowing, growing as they thin
     float delay = 0.35 * rnd(seed, 2.0);
     life = 1.1 + 0.5 * rnd(seed, 3.0) + delay;
@@ -194,6 +207,76 @@ void main() {
     alpha = 0.7 * (1.0 - u) * min(1.0, age * 8.0);
     spin = th;
     shape = 5.0;
+  } else if (kind < ${KIND.shoot.id}.5) {
+    // arrows: each flies in along the facing and stands in the target, one after another
+    float delay = 0.22 * rnd(seed, 2.0);
+    float fly = 0.16;
+    float a = age - delay;
+    vec3 dir = vec3(sin(yaw), 0.0, cos(yaw));
+    vec3 hit = o + vec3(rnd(seed, 3.0) - 0.5, rnd(seed, 4.0) - 0.5, rnd(seed, 5.0) - 0.5) * 0.35;
+    // from short of the target and a little above, fast, dropping into it
+    vec3 from = hit - dir * 3.2 + vec3(0.0, 0.7, 0.0);
+    float f = clamp(a / fly, 0.0, 1.0);
+    p = mix(from, hit, f);
+    float fb = clamp((a - 0.045) / fly, 0.0, 1.0);
+    prev = mix(from, hit, fb);
+    // landed: the shaft stands in it
+    if (a >= fly) prev = hit - dir * 0.3 + vec3(0.0, 0.06, 0.0);
+    size = 0.06 * scale;
+    age = a;
+    colour = mix(${COL.sandLight}, vec3(1.0), 0.6) * 1.4;
+    alpha = 1.0 - smoothstep(0.55, 1.0, (a - fly) / 0.75);
+    lit = false; shape = 4.0;
+    life = fly + 0.75;
+  } else if (kind < ${KIND.pin.id}.5) {
+    // paper sheets drift in from the side, flutter and lie pinned to the board
+    float delay = 0.3 * rnd(seed, 2.0);
+    life = 1.9;
+    age -= delay;
+    float u = age / life;
+    float settle = 1.0 - smoothstep(0.0, 0.55, age);
+    vec2 side = vec2(cos(th), sin(th));
+    vec3 rest = vec3((rnd(seed, 3.0) - 0.5) * 1.0, 0.1 + (rnd(seed, 4.0) - 0.5) * 0.55, 0.0);
+    vec3 off = vec3(side.x * 0.7, 0.8, side.y * 0.7) * settle;
+    off.x += sin(age * 14.0 + th) * 0.12 * settle;
+    off.y += sin(age * 9.0 + th * 2.0) * 0.1 * settle;
+    p = o + rest + off;
+    size = 0.19 * scale;
+    stretch = vec2(0.8, 1.0);
+    spin = (rnd(seed, 6.0) - 0.5) * 0.5 + sin(age * 12.0 + th) * 0.6 * settle;
+    colour = mix(${COL.whitewash}, vec3(1.0), 0.3 + 0.4 * rnd(seed, 8.0)) * 1.1;
+    alpha = min(1.0, age * 10.0) * (1.0 - smoothstep(0.8, 1.0, u));
+    shape = 1.0;
+    life += delay;
+    age += delay;
+  } else {
+    // cheer: confetti thrown up from the heroes, fluttering down, with the odd glint
+    life = 1.0 + 0.5 * rnd(seed, 2.0);
+    float u = age / life;
+    bool star = rnd(seed, 9.0) < 0.25;
+    float r = 0.5 + 1.0 * rnd(seed, 3.0);
+    float up = 3.0 + 1.6 * rnd(seed, 4.0);
+    // light: the paper slows and sways rather than falls
+    float a = age;
+    vec3 q = o + vec3(cos(th) * r * (1.0 - exp(-2.5 * a)) / 2.5, up * (1.0 - exp(-2.0 * a)) / 2.0 - 0.7 * a, sin(th) * r * (1.0 - exp(-2.5 * a)) / 2.5);
+    q.y -= 1.1 * a * a;
+    q.xz += vec2(sin(a * 7.0 + th), cos(a * 6.0 + th * 2.0)) * 0.08 * a;
+    p = q;
+    float ci = floor(rnd(seed, 8.0) * 5.0);
+    colour = ci < 1.0 ? ${COL.red} : ci < 2.0 ? ${COL.blue} : ci < 3.0 ? ${COL.green} : ci < 4.0 ? ${COL.gold} : ${COL.orangeLight};
+    if (star) {
+      size = 0.2 * sin(3.1416 * clamp(u, 0.0, 1.0)) * scale;
+      spin = age * 3.0 + th;
+      colour = mix(${COL.gold}, ${COL.glow}, 0.5) * 4.0;
+      alpha = 1.0; add = 1.0; lit = false; shape = 2.0;
+    } else {
+      size = 0.07 * (0.8 + 0.5 * rnd(seed, 5.0)) * scale;
+      stretch = vec2(1.0, 0.55 + 0.45 * abs(sin(age * 9.0 + th)));
+      spin = age * (6.0 + 6.0 * rnd(seed, 6.0));
+      colour *= 1.1;
+      alpha = 1.0 - smoothstep(0.75, 1.0, u);
+      lit = false; shape = 1.0;
+    }
   }
 
   float far = 1.0 - smoothstep(uFade.x, uFade.y, distance(cameraPosition, o));
@@ -211,10 +294,8 @@ void main() {
 
   if (shape > 3.5 && shape < 4.5) {
     // a streak from where it was a moment ago to where it is, across the view
-    vec3 before = thrown(o, th, 1.2 + 2.4 * rnd(seed, 3.0), 2.2 + 2.8 * rnd(seed, 4.0), max(age - 0.05, 0.0), 0.9);
-    before.xz += vec2(sin(yaw), cos(yaw)) * 0.6 * max(age - 0.05, 0.0);
     vec4 a = viewMatrix * vec4(p, 1.0);
-    vec4 b = viewMatrix * vec4(before, 1.0);
+    vec4 b = viewMatrix * vec4(prev, 1.0);
     vec2 d = a.xy - b.xy;
     float n = length(d);
     vec2 along = n > 1e-5 ? d / n : vec2(0.0, 1.0);
@@ -256,7 +337,7 @@ void main() {
     float star = max(0.0, 1.0 - x * 7.0) * (1.0 - y) + max(0.0, 1.0 - y * 7.0) * (1.0 - x);
     a *= clamp(star + exp(-r * r * 14.0), 0.0, 1.0);
   } else if (vShape < 3.5) {
-    a *= smoothstep(0.74, 0.86, r) * (1.0 - smoothstep(0.9, 1.0, r));
+    a *= smoothstep(0.52, 0.8, r) * (1.0 - smoothstep(0.82, 1.0, r));
   } else if (vShape < 4.5) {
     a *= 1.0 - vUv.y * vUv.y;
   } else {

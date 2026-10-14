@@ -28,6 +28,12 @@ const ALIAS: Record<string, WorkKind> = {
   mote: "motes",
   coin: "glint",
   quench: "steam",
+  arrow: "shoot",
+  bow: "shoot",
+  board: "pin",
+  notice: "pin",
+  confetti: "cheer",
+  hooray: "cheer",
 }
 
 /** `?workfx=`: null when absent. */
@@ -56,6 +62,9 @@ export const RHYTHM: Record<WorkKind, number> = {
   motes: 1.4,
   glint: 1.6,
   steam: 3.2,
+  shoot: 2.4,
+  pin: 2.8,
+  cheer: 2.6,
 }
 
 /** Where each kind happens (piece ids), and how high over the piece's foot (m). */
@@ -70,6 +79,9 @@ const SITES: Record<WorkKind, { re: RegExp; lift: number }> = {
   pages: { re: /desk|lectern|book|scroll|table/, lift: 0.85 },
   motes: { re: /altar|shrine|statue|crystal|obelisk/, lift: 0.9 },
   glint: { re: /coin|gold|chest|stall|market/, lift: 0.7 },
+  shoot: { re: /target|dummy|archery|training|post/, lift: 1.0 },
+  pin: { re: /notice|board|sign|post/, lift: 1.3 },
+  cheer: { re: /flag|banner|statue|well|fountain|tent|house|building|barracks/, lift: 2.0 },
 }
 
 export interface SitePiece {

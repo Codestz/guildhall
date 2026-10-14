@@ -15,6 +15,9 @@ export const WORK_KINDS = [
   "motes",
   "glint",
   "steam",
+  "shoot",
+  "pin",
+  "cheer",
 ] as const
 export type WorkKind = (typeof WORK_KINDS)[number]
 
@@ -48,6 +51,12 @@ export const KIND: Record<WorkKind, KindSpec> = {
   glint: { id: 8, count: 1, life: 0.45 },
   // steam off a quenched blade: soft puffs rising and growing
   steam: { id: 9, count: 8, life: 1.8 },
+  // a flight of arrows into the target: streaks that land and stand a moment (hero beat `shoot`)
+  shoot: { id: 10, count: 3, life: 1.2 },
+  // sheets of paper fluttering onto the notice board and staying put a moment (hero beat `pin`)
+  pin: { id: 11, count: 3, life: 2.2 },
+  // a small burst of confetti and glints, thrown up and fluttering down (hero beat `cheer`)
+  cheer: { id: 12, count: 14, life: 1.6 },
 }
 
 /** The most particles one emit takes. */

@@ -735,3 +735,228 @@ export function squareSite(
   }
   return poles.length >= 3 ? { at: [cx, h, cz], poles, cords } : null
 }
+
+// ==== Sea routes (world events, Task D "sea life"): the merchants' laps and the lanes out to sea ====
+//
+// Pure geometry on the grid, metres (xz), for the sea's ships (render sea/). `solid` is whatever a hull
+// must keep off: land, inland water, a pier's tile. Kept apart from the sites above, which are land.
+
+/** A closed ring round the island, its points in order round `centre` (the last joins the first). */
+export interface SeaRing {
+  centre: [number, number]
+  points: [number, number][]
+}
+
+/**
+ * A lap round the island: a closed ring `clear` metres or more off every solid tile (a tile taken as the
+ * disc round its corners, radius `size`). Built from the island's outline seen from its middle: at each
+ * of `samples` bearings the farthest point of any tile's disc grown by `clear`, eased round so the ring
+ * swings wide of a cape and straight across a bay, never in. A ray from `centre` out through the ring meets no
+ * solid tile beyond it, so a straight run out from any point on a ring is open sea too.
+ */
+export function seaRing(
+  g: HexGrid,
+  solid: (i: number) => boolean,
+  opts: { size: number; clear: number; samples?: number },
+): SeaRing {
+  const N = opts.samples ?? 256
+  const R = opts.size
+  const tiles: [number, number][] = []
+  for (let i = 0; i < g.size; i++)
+    if (solid(i)) tiles.push([Math.sqrt(3) * (g.q[i]! + g.r[i]! / 2) * R, 1.5 * g.r[i]! * R])
+  let cx = 0
+  let cz = 0
+  for (const [x, z] of tiles) {
+    cx += x
+    cz += z
+  }
+  if (tiles.length) {
+    cx /= tiles.length
+    cz /= tiles.length
+  }
+  // the farthest point at each bearing of any solid tile's disc grown by the clearance: a ray out
+  // past it meets no grown disc, so a point there is `clear` off every tile
+  const reach = new Float64Array(N)
+  const step = (Math.PI * 2) / N
+  const grown = R + opts.clear
+  for (const [x, z] of tiles) {
+    const d = Math.hypot(x - cx, z - cz)
+    const out = d + grown
+    const half = d <= grown ? Math.PI : Math.asin(grown / d)
+    const at = Math.atan2(z - cz, x - cx)
+    const k0 = Math.floor((at - half) / step)
+    const k1 = Math.ceil((at + half) / step)
+    for (let k = k0; k <= k1; k++) {
+      const j = ((k % N) + N) % N
+      if (reach[j]! < out) reach[j] = out
+    }
+  }
+  // the widest over a window, then eased over as wide a one: the mean of maxima that all cover the
+  // bearing itself, so never in from it
+  const W = Math.max(1, Math.round(N / 50))
+  const H = W
+  const wide = new Float64Array(N)
+  for (let k = 0; k < N; k++) {
+    let m = 0
+    for (let j = -W; j <= W; j++) m = Math.max(m, reach[(k + j + N) % N]!)
+    wide[k] = m
+  }
+  const points: [number, number][] = []
+  for (let k = 0; k < N; k++) {
+    let s = 0
+    for (let j = -H; j <= H; j++) s += wide[(k + j + N) % N]!
+    const r = s / (2 * H + 1)
+    points.push([cx + Math.cos(k * step) * r, cz + Math.sin(k * step) * r])
+  }
+  return { centre: [cx, cz], points }
+}
+
+/** How far out a ring lies at a bearing (radians about its centre, atan2(z, x)): between its two points there. */
+export function ringRadius(ring: SeaRing, bearing: number): number {
+  const N = ring.points.length
+  const step = (Math.PI * 2) / N
+  const f = (((bearing / step) % N) + N) % N
+  const k = Math.floor(f)
+  const a = ring.points[k]!
+  const b = ring.points[(k + 1) % N]!
+  const [cx, cz] = ring.centre
+  const ra = Math.hypot(a[0] - cx, a[1] - cz)
+  const rb = Math.hypot(b[0] - cx, b[1] - cz)
+  return ra + (rb - ra) * (f - k)
+}
+
+/**
+ * The way out from the sea tile `from` past `ring`, then straight on `beyond` metres: tile centres over
+ * open water (each step costs more the nearer land it runs, so it keeps to the middle of a channel),
+ * from the first tile outside the ring straight out from the ring's centre, eased with Chaikin's corner
+ * cutting. Its first point is `from`'s centre. Null when no water way leads out.
+ */
+export function seaLane(
+  g: HexGrid,
+  solid: (i: number) => boolean,
+  from: number,
+  ring: SeaRing,
+  opts: { size: number; beyond: number },
+): [number, number][] | null {
+  const R = opts.size
+  const centre = (i: number): [number, number] => [
+    Math.sqrt(3) * (g.q[i]! + g.r[i]! / 2) * R,
+    1.5 * g.r[i]! * R,
+  ]
+  const water = (i: number) => i >= 0 && !solid(i)
+  if (!water(from)) return null
+  const near = stepsFromSolid(g, solid)
+  const [cx, cz] = ring.centre
+  const outside = (i: number) => {
+    const [x, z] = centre(i)
+    return Math.hypot(x - cx, z - cz) > ringRadius(ring, Math.atan2(z - cz, x - cx)) + R
+  }
+  // the cheapest way to a tile outside the ring (or to the map's edge, open sea all round)
+  const cost = new Float64Array(g.size).fill(Number.POSITIVE_INFINITY)
+  const prev = new Int32Array(g.size).fill(-1)
+  const done = new Uint8Array(g.size)
+  cost[from] = 0
+  // a binary heap of tiles by their cost when pushed (a tile pushed again, cheaper, is popped first)
+  const heap: [number, number][] = [[0, from]]
+  const push = (c: number, i: number) => {
+    heap.push([c, i])
+    for (let k = heap.length - 1; k > 0; ) {
+      const up = (k - 1) >> 1
+      if (heap[up]![0] <= heap[k]![0]) break
+      ;[heap[up], heap[k]] = [heap[k]!, heap[up]!]
+      k = up
+    }
+  }
+  const pop = (): number => {
+    const top = heap[0]![1]
+    const last = heap.pop()!
+    if (heap.length) {
+      heap[0] = last
+      for (let k = 0; ; ) {
+        const a = 2 * k + 1
+        const b = a + 1
+        let m = k
+        if (a < heap.length && heap[a]![0] < heap[m]![0]) m = a
+        if (b < heap.length && heap[b]![0] < heap[m]![0]) m = b
+        if (m === k) break
+        ;[heap[m], heap[k]] = [heap[k]!, heap[m]!]
+        k = m
+      }
+    }
+    return top
+  }
+  let end = -1
+  while (heap.length) {
+    const at = pop()
+    if (done[at]) continue
+    done[at] = 1
+    const edge = g.neighbours(at).some((j) => j < 0)
+    if (outside(at) || edge) {
+      end = at
+      break
+    }
+    for (const j of g.neighbours(at)) {
+      if (!water(j) || done[j]) continue
+      const c = cost[at]! + 1 + 4 / Math.max(1, near[j]!) ** 2
+      if (c < cost[j]!) {
+        cost[j] = c
+        prev[j] = at
+        push(c, j)
+      }
+    }
+  }
+  if (end < 0) return null
+  const tiles: number[] = []
+  for (let i = end; i >= 0; i = prev[i]!) tiles.push(i)
+  tiles.reverse()
+  const points = tiles.map(centre)
+  const [lx, lz] = points[points.length - 1]!
+  const out = Math.atan2(lz - cz, lx - cx)
+  const steps = Math.max(1, Math.ceil(opts.beyond / (R * 4)))
+  for (let s = 1; s <= steps; s++) {
+    const d = (opts.beyond * s) / steps
+    points.push([lx + Math.cos(out) * d, lz + Math.sin(out) * d])
+  }
+  return chaikin(points)
+}
+
+/** Steps from anything solid, per tile: made once per grid and `solid` (the lanes of one island share it). */
+const NEAR = new WeakMap<HexGrid, WeakMap<(i: number) => boolean, Int16Array>>()
+function stepsFromSolid(g: HexGrid, solid: (i: number) => boolean): Int16Array {
+  const byGrid = NEAR.get(g) ?? new WeakMap()
+  NEAR.set(g, byGrid)
+  const known = byGrid.get(solid)
+  if (known) return known
+  const near = new Int16Array(g.size).fill(-1)
+  const queue: number[] = []
+  for (let i = 0; i < g.size; i++)
+    if (solid(i)) {
+      near[i] = 0
+      queue.push(i)
+    }
+  for (let k = 0; k < queue.length; k++)
+    for (const j of g.neighbours(queue[k]!))
+      if (j >= 0 && near[j] === -1) {
+        near[j] = near[queue[k]!]! + 1
+        queue.push(j)
+      }
+  byGrid.set(solid, near)
+  return near
+}
+
+/** Chaikin's corner cutting, twice, the ends kept. */
+function chaikin(points: [number, number][]): [number, number][] {
+  let p = points
+  for (let pass = 0; pass < 2 && p.length > 2; pass++) {
+    const out: [number, number][] = [p[0]!]
+    for (let i = 0; i + 1 < p.length; i++) {
+      const a = p[i]!
+      const b = p[i + 1]!
+      if (i > 0) out.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25])
+      if (i + 2 < p.length) out.push([a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75])
+    }
+    out.push(p[p.length - 1]!)
+    p = out
+  }
+  return p
+}

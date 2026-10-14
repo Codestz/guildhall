@@ -162,7 +162,11 @@ export {
   type PeakSite,
   peakSite,
   pieceSize,
+  ringRadius,
+  type SeaRing,
   type SquareSite,
+  seaLane,
+  seaRing,
   squareSite,
 } from "./sites.ts"
 export {

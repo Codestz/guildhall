@@ -26,6 +26,7 @@ import {
   type WorldEvent,
 } from "@guildhall/sim"
 import {
+  discSolid,
   doorPasses,
   type Folk,
   guildhallZone,
@@ -57,6 +58,8 @@ export const LIFE_MPS = 0.8
 export const AGENT_PACE = 1.15
 /** Hero spots each place sets aside (world heroes.ts; the Guildhall's gathering has up to twice as many). */
 export const HERO_SPOTS = 3
+/** The notice board's room on the collision layer, metres. */
+const NOTICE_BOARD_R = 0.3
 /** A round of agents ends this long after its last walk home (ms), before it plays again. */
 const ROUND_REST = 15_000
 
@@ -76,6 +79,8 @@ export interface LifePlan {
   walkways: Walkway[]
   /** Where each building's door is, for the doors that open and the passes through them. */
   doorways: HexDoorway[]
+  /** The Guildhall's notice board (world `heroSpots.board()`: where the Guildmaster pins quests), if any. */
+  board: { at: [number, number, number]; facing: number } | null
   /** How many people pass a door over the day, in all. */
   passes: number
   stats: { nodes: number; edges: number; planMs: number; agentsMs: number; walks: number }
@@ -119,6 +124,7 @@ export function planLifeDesk(
   // aside when first asked for, and changing nobody's day)
   const places = lifePlaces(h, z, w, walk, { heroSpots: HERO_SPOTS })
   const kit = kitOf(h, z, walk, places)
+  const board = places.heroSpots.board()
   const t1 = now()
   const agents = opts.agents ? planGuild(z, walk, kit, opts.agents, opts) : null
   const agentsMs = now() - t1
@@ -132,9 +138,14 @@ export function planLifeDesk(
     folk,
     stocks: planStocks(folk),
     agents,
-    solids: [...places.furniture.solids],
+    // the notice board stands in the way like any prop (it is drawn by life.ts, not the batch)
+    solids: [
+      ...places.furniture.solids,
+      ...(board ? [discSolid("prop", board.at[0], board.at[2], NOTICE_BOARD_R, board.at[1])] : []),
+    ],
     walkways: [...w.stairs, ...w.bridges.flatMap((b) => b.legs), ...w.decks],
     doorways: w.doorways,
+    board: board && { at: board.at, facing: board.facing },
     passes: folk.reduce((n, f) => n + doorPasses(f.day).length, 0),
     stats: {
       nodes: walk.nodes.length,
@@ -161,6 +172,7 @@ export function kitOf(
     home: guildhallZone(walk, z),
     near: places.walkNear,
     island: h,
+    board: places.heroSpots.board(),
   }
 }
 

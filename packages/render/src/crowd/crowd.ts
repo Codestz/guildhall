@@ -93,6 +93,11 @@ export interface ActorSample {
   phase: number
   /** Not drawn this frame (indoors): no body, props, shadow, nor hero. */
   hidden?: boolean
+  /**
+   * The props in hand this frame (catalog ids, of its look's mounts): the others are not drawn (a hero's
+   * book while it reads, its hammer while it hammers). None: every mount of its look.
+   */
+  props?: readonly string[]
 }
 
 /** Where bodies and props load from: the catalog (with mounts) and its library url mapping. */
@@ -162,7 +167,7 @@ interface Person {
   actor: CrowdActor
   body: number
   instance: number
-  props: { prop: HeldProp; instance: number }[]
+  props: { prop: HeldProp; instance: number; piece: string }[]
   playing: Playing
   hidden: number
   hero: Hero | null
@@ -414,7 +419,11 @@ export async function createCrowd(
         return []
       }
       return [
-        { prop: { mount, slot, bone }, instance: props.addInstance(propGeometryId.get(piece) as number) },
+        {
+          prop: { mount, slot, bone },
+          instance: props.addInstance(propGeometryId.get(piece) as number),
+          piece,
+        },
       ]
     })
     const at =
@@ -579,6 +588,12 @@ export async function createCrowd(
           root.position.set(x, y, z)
           root.rotation.set(0, s.heading, 0)
           poseHero(hero.npc, person.playing)
+          const held = s.props
+          const mounted = hero.npc.character.mounted
+          for (const [m, mount] of person.actor.look.mounts.entries()) {
+            const piece = mounted[m]?.piece
+            if (piece) piece.visible = !held || held.includes(mount.piece)
+          }
           root.visible = true
           bodies.setVisibleAt(person.instance, false)
           for (const p of person.props) props.setVisibleAt(p.instance, false)
@@ -601,7 +616,10 @@ export async function createCrowd(
         crowd++
         const showProps = (talls[i] as number) >= PROP_MIN_PX
         for (const p of person.props) {
-          const shown = showProps && propMatrix(bake, pose, person.playing.clip, p.prop, local)
+          const shown =
+            showProps &&
+            (!s.props || s.props.includes(p.piece)) &&
+            propMatrix(bake, pose, person.playing.clip, p.prop, local)
           props.setVisibleAt(p.instance, shown)
           if (!shown) continue
           props.setMatrixAt(p.instance, world.multiplyMatrices(place, local))

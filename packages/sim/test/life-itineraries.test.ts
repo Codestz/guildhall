@@ -85,6 +85,7 @@ const kit: LifeKit = {
   home,
   near: places.walkNear,
   island: h,
+  board: places.heroSpots.board(),
 }
 const MPS = WALK_MPS * 1.1
 
@@ -240,6 +241,8 @@ describe("a hero's walk", () => {
         if (next?.kind !== "stay") continue
         const stay = next as LifeStay
         expect(stay.from).toBe(s.to)
+        // stopped on the way (a plea: it waits where it is) is not a way walked whole
+        if (s.times[s.times.length - 1]! > s.to) continue
         const end = s.pts[s.pts.length - 1]!
         let metres = 0
         for (let k = 1; k < s.pts.length; k++)
@@ -308,7 +311,10 @@ describe("spots, the Guildmaster and the leavers", () => {
         const busy = subs.some(
           (a) => a.status === "working" || a.status === "starting" || a.status === "waiting",
         )
-        const atGather = gather.some((g) => Math.hypot(g.at[0] - s.at[0], g.at[2] - s.at[2]) < 1e-9)
+        // (or at the notice board, pinning a quest and beckoning its recruit)
+        const atGather = [...gather, ...(kit.board ? [kit.board.spot] : [])].some(
+          (g) => Math.hypot(g.at[0] - s.at[0], g.at[2] - s.at[2]) < 1e-9,
+        )
         if (busy) {
           expect(atGather).toBe(true)
           dispatching++
@@ -341,10 +347,11 @@ describe("spots, the Guildmaster and the leavers", () => {
         expect(fade).toBeGreaterThanOrEqual(left.at)
         expect(poseAt(it, fade)).toBeNull()
         expect(poseAt(it, fade + 60_000)).toBeNull()
+        // at its seat, or before the Guildmaster's (its loot set down) or at the board
         const before = poseAt(it, fade - 1)!
-        expect(gather.some((g) => Math.hypot(g.at[0] - before.at[0], g.at[2] - before.at[2]) < 0.01)).toBe(
-          true,
-        )
+        const seats = [...gather, ...(kit.board ? [kit.board.spot, ...kit.board.brief] : [])]
+        expect(seats.some((g) => Math.hypot(g.at[0] - before.at[0], g.at[2] - before.at[2]) < 1)).toBe(true)
+        expect(before.act).not.toBe("walk")
         // before it joins, nobody
         expect(poseAt(it, it.shown[0]![0] - 1)).toBeNull()
         // somewhere along the way it worked at a spot of a package's place
@@ -374,6 +381,7 @@ describe("a long way is run", () => {
       for (const it of its.values())
         for (const [k, s] of it.steps.entries()) {
           if (s.kind !== "walk" || it.steps[k + 1]?.kind !== "stay") continue
+          if (s.times[s.times.length - 1]! > s.to) continue
           let metres = 0
           for (let j = 1; j < s.pts.length; j++)
             metres += Math.hypot(s.pts[j]![0] - s.pts[j - 1]![0], s.pts[j]![2] - s.pts[j - 1]![2])

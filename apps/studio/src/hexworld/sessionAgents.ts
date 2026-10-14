@@ -52,6 +52,7 @@ export function sessionAgents(
       const it = byId.get(id)
       return it ? poseAt(it, session.clock.get().at) : null
     },
+    itinerary: (id) => byId.get(id),
     // the HUD's 10 Hz snapshot: the world at the session clock (no fold of its own)
     worldAt() {
       const snap = session.snapshot?.()

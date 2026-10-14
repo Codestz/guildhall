@@ -402,8 +402,7 @@ button.st-place-hero:hover { background: var(--raise-2); }
 
 /* ── the README badge ───────────────────────────────────────────── */
 .st-badge { position: relative; display: inline-block; }
-.st-badge-pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 5; width: min(380px, calc(100vw - 32px)); display: grid; gap: 10px; padding: 12px 14px 14px; background: rgba(20, 15, 11, 0.96); }
-.st-badge[data-placement="above"] .st-badge-pop { top: auto; bottom: calc(100% + 8px); right: auto; left: 0; }
+.st-badge-pop { position: fixed; z-index: 45; width: min(380px, calc(100vw - 32px)); display: grid; gap: 10px; padding: 12px 14px 14px; background: rgba(20, 15, 11, 0.96); }
 .st-badge-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .st-badge-head h2 { margin: 0; }
 .st-badge-preview { margin: 0; min-height: 20px; }

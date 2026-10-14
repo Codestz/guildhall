@@ -801,7 +801,7 @@ export function HallHud(props: HallHudProps) {
                 </Button>
               </>
             )}
-            {!home && <ReadmeBadge repo={slug} placement="above" previewSrc="/badge.svg" />}
+            {!home && <ReadmeBadge repo={slug} previewSrc="/badge.svg" />}
           </>
         ) : undefined
       }

@@ -5,7 +5,8 @@
  * Markdown and a Copy button. Esc or a click elsewhere closes it. The link is where the hall serves the
  * island (`/hall/<owner>/<repo>`).
  */
-import { useEffect, useId, useRef, useState } from "react"
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { Glyphs } from "../glyphs.tsx"
 import { copyText } from "./clipboard.ts"
 import { StoryGlyphs } from "./glyphs.tsx"
@@ -38,8 +39,6 @@ export interface ReadmeBadgeProps {
   compact?: boolean
   /** Open on mount (the lab, shots). */
   open?: boolean
-  /** Where the popover opens: below the button (default), or above it (a button at the foot of a sheet). */
-  placement?: "below" | "above"
   /** Show the badge's picture in the popover. */
   preview?: boolean
   /** Where the preview loads from when not the public address (the app's own `/badge.svg`, before it is deployed). */
@@ -51,7 +50,6 @@ export function ReadmeBadge({
   site = SITE,
   compact,
   open: opened = false,
-  placement = "below",
   preview = true,
   previewSrc = BADGE_IMAGE,
 }: ReadmeBadgeProps) {
@@ -60,6 +58,8 @@ export function ReadmeBadge({
   const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle")
   const root = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
+  const pop = useRef<HTMLElement>(null)
+  const [at, setAt] = useState<{ left: number; top: number; width: number } | null>(null)
   const markdown = badgeMarkdown(repo, site)
 
   useEffect(() => {
@@ -71,11 +71,38 @@ export function ReadmeBadge({
   useEffect(() => {
     if (!open) return
     const away = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false)
+      const target = event.target as Node
+      if (!root.current?.contains(target) && !pop.current?.contains(target)) setOpen(false)
     }
     document.addEventListener("pointerdown", away)
     return () => document.removeEventListener("pointerdown", away)
   }, [open])
+
+  // The popover is fixed to the viewport (the HUD's panels clip and blur what they hold): beside its button,
+  // below it when there is room, else above, kept inside the screen.
+  useLayoutEffect(() => {
+    if (!open) return void setAt(null)
+    const place = () => {
+      const b = button.current?.getBoundingClientRect()
+      const p = pop.current
+      if (!b || !p) return
+      const pad = 16
+      const width = Math.min(380, window.innerWidth - 2 * pad)
+      const left = Math.min(Math.max(b.right - width, pad), window.innerWidth - width - pad)
+      const below = b.bottom + 8 + p.offsetHeight <= window.innerHeight - pad
+      const top = below ? b.bottom + 8 : Math.max(pad, b.top - 8 - p.offsetHeight)
+      setAt({ left, top, width })
+    }
+    place()
+    window.addEventListener("resize", place)
+    return () => window.removeEventListener("resize", place)
+  }, [open])
+
+  // the popover sits away from its button in the page, so the keyboard goes in with it (Esc comes back)
+  const placed = at !== null
+  useEffect(() => {
+    if (open && placed) pop.current?.querySelector<HTMLElement>('[data-variant="primary"]')?.focus()
+  }, [open, placed])
 
   async function copy() {
     setCopied((await copyText(markdown)) ? "done" : "failed")
@@ -86,7 +113,6 @@ export function ReadmeBadge({
     <div
       ref={root}
       className="st-badge"
-      data-placement={placement}
       onKeyDown={(event) => {
         if (event.key === "Escape" && open) {
           event.stopPropagation()
@@ -109,60 +135,72 @@ export function ReadmeBadge({
         <StoryGlyphs.island />
         {!compact && <span>README badge</span>}
       </button>
-      {open && (
-        <section className="ui-panel st-badge-pop" id={`${id}-pop`} aria-labelledby={`${id}-h`}>
-          <header className="st-badge-head">
-            <h2 id={`${id}-h`} className="ui-eyebrow">
-              README badge
-            </h2>
-            <button
-              type="button"
-              className="ui-icon-btn"
-              aria-label="Close (Esc)"
-              onClick={() => {
-                setOpen(false)
-                button.current?.focus()
-              }}
-            >
-              <Glyphs.close />
-            </button>
-          </header>
-          <p className="ui-hint">
-            Paste it into <span className="num">{repo}</span>’s README: it links to the repo’s island.
-          </p>
-          {preview && (
-            <p className="st-badge-preview">
-              <img src={previewSrc} alt={`See ${repo} as an island in Guildhall`} height={20} />
+      {open &&
+        createPortal(
+          <section
+            ref={pop}
+            className="ui-panel st-badge-pop"
+            id={`${id}-pop`}
+            aria-labelledby={`${id}-h`}
+            style={at ? { left: at.left, top: at.top, width: at.width } : { visibility: "hidden" }}
+          >
+            <header className="st-badge-head">
+              <h2 id={`${id}-h`} className="ui-eyebrow">
+                README badge
+              </h2>
+              <button
+                type="button"
+                className="ui-icon-btn"
+                aria-label="Close (Esc)"
+                onClick={() => {
+                  setOpen(false)
+                  button.current?.focus()
+                }}
+              >
+                <Glyphs.close />
+              </button>
+            </header>
+            <p className="ui-hint">
+              Paste it into <span className="num">{repo}</span>’s README: it links to the repo’s island.
             </p>
-          )}
-          <label className="ui-visually-hidden" htmlFor={`${id}-md`}>
-            The badge as Markdown
-          </label>
-          <textarea
-            id={`${id}-md`}
-            className="st-badge-md num"
-            readOnly
-            rows={3}
-            value={markdown}
-            onFocus={(e) => e.currentTarget.select()}
-          />
-          <div className="st-badge-actions">
-            <button type="button" className="ui-btn" data-variant="primary" onClick={copy}>
-              {copied === "done" ? <StoryGlyphs.check /> : <StoryGlyphs.copy />}
-              <span>
-                {copied === "done" ? "Badge copied" : copied === "failed" ? "Couldn't copy" : "Copy Markdown"}
-              </span>
-            </button>
-          </div>
-          <span className="ui-visually-hidden" aria-live="polite">
-            {copied === "done"
-              ? `README badge for ${repo} copied, as Markdown`
-              : copied === "failed"
-                ? "Could not copy"
-                : ""}
-          </span>
-        </section>
-      )}
+            {preview && (
+              <p className="st-badge-preview">
+                <img src={previewSrc} alt={`See ${repo} as an island in Guildhall`} height={20} />
+              </p>
+            )}
+            <label className="ui-visually-hidden" htmlFor={`${id}-md`}>
+              The badge as Markdown
+            </label>
+            <textarea
+              id={`${id}-md`}
+              className="st-badge-md num"
+              readOnly
+              rows={5}
+              value={markdown}
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <div className="st-badge-actions">
+              <button type="button" className="ui-btn" data-variant="primary" onClick={copy}>
+                {copied === "done" ? <StoryGlyphs.check /> : <StoryGlyphs.copy />}
+                <span>
+                  {copied === "done"
+                    ? "Badge copied"
+                    : copied === "failed"
+                      ? "Couldn't copy"
+                      : "Copy Markdown"}
+                </span>
+              </button>
+            </div>
+            <span className="ui-visually-hidden" aria-live="polite">
+              {copied === "done"
+                ? `README badge for ${repo} copied, as Markdown`
+                : copied === "failed"
+                  ? "Could not copy"
+                  : ""}
+            </span>
+          </section>,
+          root.current?.closest<HTMLElement>(".gh") ?? document.body,
+        )}
     </div>
   )
 }

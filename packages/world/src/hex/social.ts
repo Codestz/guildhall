@@ -74,7 +74,7 @@ export const TIPSY_FROM = 21
 /** Home by then at the latest. */
 export const TIPSY_HOME = 23.9
 /** Share of the late ones who walk home tipsy. */
-const TIPSY_P = 0.45
+const TIPSY_P = 0.3
 /** How much longer a tipsy walk takes, at most. */
 const TIPSY_SLOW = 1.5
 /** Screen seconds a weave takes (one side and back). */
@@ -344,8 +344,16 @@ function tipsy(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
       tipsy: weave,
     }
     // half-way, a wall to slump against (a body's width off it), else a reel where they are
-    const stop = leanPoint(slowed, solids)
-    const t = stop?.t ?? slowed.from + (slowed.to - slowed.from) * 0.5
+    // (never on a hero's spot: LifePlaces `heroNear`)
+    const free = (t: number) => {
+      const p = walkAt(slowed, t)
+      return !o.places.heroNear(p.x, p.z, 0)
+    }
+    const stop = leanPoint(slowed, solids, free)
+    let t = stop?.t ?? slowed.from + (slowed.to - slowed.from) * 0.5
+    for (let k = 1; !stop && !free(t) && k <= 20; k++)
+      t = slowed.from + (slowed.to - slowed.from) * (0.5 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.02)
+    if (!stop && !free(t)) continue
     const seed = Math.floor(rnd(o.seed + 4423, f.id, 2) * 2 ** 30)
     const way = walkAt(slowed, t)
     const cut = cutWalk(slowed, t, lean, {
@@ -361,13 +369,18 @@ function tipsy(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
 }
 
 /** Where on the middle of a walk a wall is a body's width off (the time there, and the way out from it). */
-function leanPoint(w: LifeWalk, furniture: LifePlaces["furniture"]): { t: number; facing: number } | null {
+function leanPoint(
+  w: LifeWalk,
+  furniture: LifePlaces["furniture"],
+  free: (t: number) => boolean,
+): { t: number; facing: number } | null {
   const span = w.to - w.from
   let best: { t: number; facing: number; d: number } | null = null
   const out: [number, number] = [0, 0]
   for (let k = 0; k <= 30; k++) {
     const t = w.from + span * (0.35 + (0.3 * k) / 30)
     const p = walkAt(w, t)
+    if (!free(t)) continue
     for (const s of furniture.solidsNear(p.x, p.z, 1.2)) {
       if (!HARD(s.kind)) continue
       const d = solidDistance(s, p.x, p.z, out)
@@ -462,7 +475,7 @@ function meetings(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
       if (p.indoors) return false
       return [m.a, m.b].some((s) => Math.hypot(p.at[0] - s.x, p.at[2] - s.z) < MEET_CLEAR)
     })
-    if (crowded) continue
+    if (crowded || o.places.heroNear(m.a.x, m.a.z, 0) || o.places.heroNear(m.b.x, m.b.z, 0)) continue
     for (const s of [m.a, m.b]) {
       walks.add(`${s.f}:${s.j}`)
       last.set(s.f, m.t + len)
@@ -531,7 +544,7 @@ function lamplighters(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
         const a = base + da
         const x = l.x + Math.sin(a) * 0.75
         const zz = l.z + Math.cos(a) * 0.75
-        if (o.places.furniture.blocked(x, zz, 0.26)) continue
+        if (o.places.furniture.blocked(x, zz, 0.26) || o.places.heroNear(x, zz, 0)) continue
         stands.push({ node, at: [x, n.y, zz], facing: headingTo(x, zz, l.x, l.z), ground: true })
         break
       }

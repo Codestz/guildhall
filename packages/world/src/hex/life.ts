@@ -679,7 +679,17 @@ export interface LifePlaces {
    * (and `heroSpots.board()`, its notice board).
    */
   heroSpots: HeroPool
+  /**
+   * Whether a body of radius `r` at (x, z) comes within HERO_KEEP of a hero spot as the pool sets them
+   * aside (HERO_RESERVE a place), whether or not this book asked for the pool: what the stops between
+   * people (social.ts) keep off.
+   */
+  heroNear(x: number, z: number, r: number): boolean
 }
+
+/** The hero spots a place sets aside (lifePlan's HERO_SPOTS), and how far townsfolk's stops keep off them, metres. */
+export const HERO_RESERVE = 3
+const HERO_KEEP = 0.6
 
 /** Work made up for someone (LifePlaces `madeUp`): where, whose work it is beside, the door it is before. */
 export interface MadeUp {
@@ -1189,25 +1199,44 @@ export function lifePlaces(
     }
     return made
   }
-  const heroSpots = heroSpotPool(
-    {
-      h,
-      z,
-      w,
-      walk,
-      furniture,
-      slots,
-      stands: () => {
-        const { byZone, piles } = madeAll()
-        const extra = [...byZone.values()].flat().map((m) => ({ x: m.spot.at[0], z: m.spot.at[2] }))
-        for (const p of piles.values()) extra.push({ x: p.at[0], z: p.at[2] })
-        return [...folkStands(h, z, walk), ...extra]
-      },
-      home: guildhallZone(walk, z),
+  const poolInputs = {
+    h,
+    z,
+    w,
+    walk,
+    furniture,
+    slots,
+    stands: () => {
+      const { byZone, piles } = madeAll()
+      const extra = [...byZone.values()].flat().map((m) => ({ x: m.spot.at[0], z: m.spot.at[2] }))
+      for (const p of piles.values()) extra.push({ x: p.at[0], z: p.at[2] })
+      return [...folkStands(h, z, walk), ...extra]
     },
-    opts.heroSpots ?? 0,
-  )
+    home: guildhallZone(walk, z),
+  }
+  // the heroes' spots as they stand when set aside (HERO_RESERVE a place), worked out whether or not this
+  // book sets them aside: the townsfolk's stops between people keep off them either way, so a day is the
+  // same with the pool or without it (and a pool of another size still never meets anyone)
+  const reserve = heroSpotPool(poolInputs, HERO_RESERVE)
+  const heroSpots =
+    (opts.heroSpots ?? 0) === HERO_RESERVE ? reserve : heroSpotPool(poolInputs, opts.heroSpots ?? 0)
+  let reserved: SolidGrid | null = null
+  const heroNear = (x: number, zz: number, r: number): boolean => {
+    if (!reserved) {
+      const discs: Solid[] = []
+      for (const zi of z.zones.keys())
+        for (const s of reserve(zi)) discs.push(discSolid("blocker", s.at[0], s.at[2], HERO_KEEP, 0))
+      const b = reserve.board()
+      if (b)
+        for (const s of [b.spot, ...b.brief]) discs.push(discSolid("blocker", s.at[0], s.at[2], HERO_KEEP, 0))
+      reserved = new SolidGrid(discs)
+    }
+    for (const o of reserved.near(x, zz, r + HERO_KEEP))
+      if (Math.hypot(o.cx - x, o.cz - zz) < r + HERO_KEEP) return true
+    return false
+  }
   return {
+    heroNear,
     furniture,
     nodeOf,
     walled: isWalled,

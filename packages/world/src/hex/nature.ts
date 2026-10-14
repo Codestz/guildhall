@@ -341,7 +341,7 @@ const AUTUMN = [REGION_TONES.rust, REGION_TONES.orange, REGION_TONES.orange, REG
  *
  * - highlands: leaf trees become pines or go (the woods thin), bushes and flowers thin, the cover goes olive;
  * - dry: trees thin, some stand bare, the rest and the shrubs go straw and ochre, flowers and crops thin;
- * - autumn: the leaf trees and bushes turn rust, orange and gold (the pines stay green);
+ * - autumn: the leaf trees and bushes turn rust, orange or gold, one colour per tile (the pines stay green);
  * - marsh: the trees thin, reeds stand in the wet ground, lilies float on the lake;
  * - meadow: drifts of flowers on the open ground.
  *
@@ -400,8 +400,9 @@ export function dressRegion(pieces: readonly PlacedPiece[], t: RegionTile, seed:
       } else if (fam === "pine" || fam === "grass") out.push(tone(REGION_TONES.dry))
       else out.push(p)
     } else if (t.kind === "autumn") {
+      // one colour per tile (the user's pick: calmer than a colour per tree), so a wood turns in patches
       if (leafTree || fam === "bush")
-        out.push(tone(AUTUMN[Math.floor(roll(k, 4) * AUTUMN.length)] ?? REGION_TONES.orange))
+        out.push(tone(AUTUMN[Math.floor(roll(0, 4) * AUTUMN.length)] ?? REGION_TONES.orange))
       else if (fam === "grass") out.push(tone(REGION_TONES.olive))
       else out.push(p)
     } else if (t.kind === "marsh") {

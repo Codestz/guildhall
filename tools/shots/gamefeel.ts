@@ -4,7 +4,10 @@
  *
  * shots.json: { "url": "...", "wait": ms, "shots": [{ "name", "at": [x, y, z] | "hero:<name>", "hour"?,
  * "distance"?, "elevation"?, "azimuth"?, "frames"?, "gap"? (ms between frames) }] }. A shot `at` a hero
- * follows it (where `ext.life.heroAt` puts it at each frame). Each shot writes <outdir>/<name>-<k>.png,
+ * follows it (where `ext.life.heroAt` puts it at each frame). A shot with `seek` pauses a hall's session
+ * at a moment of its log (the `n`th event of `kind`, by the actor named `who`, of `craft`) plus `plus`
+ * ms, and each frame k at `gap` ms after the last (`gap` is then session ms); `at: "hero:@"` follows
+ * that moment's actor. Each shot writes <outdir>/<name>-<k>.png,
  * and <outdir>/<name>.json what life said was there (the heroes' acts, the chips).
  * The page's DOM chrome is hidden except the chips layer (CHROME=1 keeps everything).
  */
@@ -24,6 +27,8 @@ interface Shot {
   settle?: number
   /** Frame the person drawn nearest `at` within this many metres (townsfolk move; spots are planned). */
   snap?: number
+  /** Pause the hall's session at a moment of its log (see the top). */
+  seek?: { kind: string; who?: string; craft?: string; n?: number; plus?: number }
 }
 
 const [file, out] = process.argv.slice(2)
@@ -48,7 +53,32 @@ for (const s of spec.shots) {
   if (s.hour !== undefined) await page.evaluate((h) => (window as G).guildhall.ext.clock?.set(h), s.hour)
   await page.waitForTimeout((s.settle ?? 1.5) * 1000)
   const info: unknown[] = []
+  let shot = s
   for (let k = 0; k < (s.frames ?? 4); k++) {
+    if (s.seek) {
+      const sought = await page.evaluate(
+        ([sk, ms]) => {
+          const session = (window as G).guildhall.ext.session
+          const log = session?.log()
+          if (!log) return null
+          const nameOf = (id: string) => log.head.actors.get(id)?.name
+          const ev = log.events.filter(
+            (e: G) =>
+              e.kind === sk.kind &&
+              (!sk.who || nameOf(e.id) === sk.who) &&
+              (!sk.craft || e.craft === sk.craft),
+          )[sk.n ?? 0]
+          if (!ev) return null
+          session.clock.play(false)
+          session.clock.seek(ev.at + (sk.plus ?? 0) + ms, { jump: true })
+          return { at: ev.at, into: ev.at - session.clock.get().start, who: nameOf(ev.id) as string }
+        },
+        [s.seek, k * (s.gap ?? 600)] as const,
+      )
+      if (!sought) console.log(s.name, "no such moment", JSON.stringify(s.seek))
+      else if (s.at === "hero:@") shot = { ...s, at: `hero:${sought.who}` }
+      await page.waitForTimeout(400)
+    }
     const placed = await page.evaluate((sh) => {
       const g = (window as G).guildhall
       let at = sh.at
@@ -79,8 +109,8 @@ for (const s of spec.shots) {
         azimuth: sh.azimuth ?? p.azimuth,
       })
       return { at, hour: g.ext.clock?.get(), lifeHour: g.ext.life?.clock?.() }
-    }, s as never)
-    await page.waitForTimeout(k === 0 ? 900 : (s.gap ?? 600))
+    }, shot as never)
+    await page.waitForTimeout(k === 0 ? 900 : s.seek ? 500 : (s.gap ?? 600))
     const life = await page.evaluate(
       (at: G) => {
         const l = (window as G).guildhall.ext.life

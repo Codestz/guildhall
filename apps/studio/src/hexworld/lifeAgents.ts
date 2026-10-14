@@ -17,6 +17,7 @@ import {
   type AgentInfo,
   EventLog,
   type GuildWorld,
+  type Itinerary,
   type PlannedAgents,
   poseAt,
   Script,
@@ -54,6 +55,8 @@ export interface AgentSource {
   worldAt?(secs: number): { world: GuildWorld; t: number } | null
   /** Its looks name and colour the heroes over the world (the demo's Claude, Warden and Scout). */
   ownNames?: boolean
+  /** Hero `id`'s itinerary as planned (shots and probes read what it does when). */
+  itinerary?(id: string): Itinerary | undefined
 }
 
 /** Which agents the island shows (the job's spec): the demo story, or a recorded guild's wire. */

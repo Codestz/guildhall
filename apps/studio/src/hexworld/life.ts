@@ -23,8 +23,16 @@ import {
   validateNpc,
 } from "@guildhall/assets"
 import { hash, log } from "@guildhall/core"
-import { type ActorSample, type Crowd, createCrowd, loadCharacter, type Stage } from "@guildhall/render"
-import { RUN_CLIP } from "@guildhall/sim"
+import {
+  type ActorSample,
+  type Crowd,
+  createCrowd,
+  loadCharacter,
+  loadPiece,
+  measure,
+  type Stage,
+} from "@guildhall/render"
+import { type AgentPose, HERO_CLIPS, HERO_PROP_STANDIN, HERO_PROPS, RUN_CLIP } from "@guildhall/sim"
 import { PHONE_MAX } from "@guildhall/ui"
 import {
   CHARACTER_SCALE,
@@ -129,6 +137,10 @@ export interface Life {
   dispose(): void
 }
 
+/** The notice board's piece, and how tall it stands (metres: a little over a hero's head). */
+const NOTICE_BOARD = "kenney-nature/sign"
+const NOTICE_BOARD_M = 1.35
+
 /** Spare figures of each body a growing source may use (`agentPool`). */
 export const AGENT_POOL = 4
 /** The bodies a hero is drawn with (sim `Body`), as catalog ids. */
@@ -201,6 +213,31 @@ function heroLook(recipe: NpcRecipe, body: string, seed: number, catalog: Catalo
   return scaled({ ...look, body, hide, scale: 1.06 })
 }
 
+/**
+ * The piece drawn for a hero's prop (sim `HERO_PROPS`): itself when the library mounts it, else its
+ * stand-in (sim `HERO_PROP_STANDIN`) when that is mounted; "" for none.
+ */
+function shownProp(id: string, catalog: Catalog): string {
+  if (catalog.get(id)?.compose.mount) return id
+  const stand = HERO_PROP_STANDIN[id]
+  return stand && catalog.get(stand)?.compose.mount ? stand : ""
+}
+
+/**
+ * A hero's look holding every prop its work may call for besides its role's own (the game-feel plan,
+ * task D): each frame its sample says which show (crowd `ActorSample.props`).
+ */
+function withHeroProps(look: NpcLook, catalog: Catalog): NpcLook {
+  const mounts = [...look.mounts]
+  for (const id of Object.values(HERO_PROPS)) {
+    const piece = shownProp(id, catalog)
+    const mount = piece ? catalog.get(piece)?.compose.mount : undefined
+    if (!mount || mounts.some((m) => m.piece === piece)) continue
+    mounts.push({ piece, slot: mount.slot })
+  }
+  return { ...look, mounts }
+}
+
 /** The HUD's mode and whether the view is a phone, off the Viewer's root (attributes: no layout). */
 function chipField(host: HTMLElement, width: number): { mode: ChipMode; phone: boolean } {
   const root = host.closest<HTMLElement>(".ui-viewer")
@@ -224,6 +261,21 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
   let source: AgentSource | null = null
   let swapped = true
   let heroAt: (id: string) => [number, number, number] | null = () => null
+
+  /** Draws the notice board at the plan's place, NOTICE_BOARD_M tall, facing the gathering. */
+  const placeBoard = async (board: { at: [number, number, number]; facing: number }) => {
+    const catalog = await loadCatalog()
+    const entry = catalog?.get(NOTICE_BOARD)
+    if (!entry || disposed) return
+    const piece = await loadPiece(libraryUrl(entry.files.glb))
+    if (disposed) return
+    const tall = measure(piece).size[1] || 1
+    piece.scale.setScalar(NOTICE_BOARD_M / tall)
+    piece.position.set(board.at[0], opts.groundAt(board.at[0], board.at[2]), board.at[2])
+    piece.rotation.y = board.facing
+    stage.scene.add(piece)
+    cleanup.push(() => piece.removeFromParent())
+  }
 
   const ready = (async () => {
     const t0 = performance.now()
@@ -274,13 +326,26 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
      * The heroes' figures: one for each hero the source has now (its look), and with `agentPool` spares
      * of every body for those it adds; `agent` is the hero a figure draws, and its banner says who.
      */
-    const figures: { crowd: number; hero: string; agent: string | null }[] = []
+    const figures: { crowd: number; hero: string; agent: string | null; own: string[] }[] = []
     const figure = (hero: string, recipeId: string, seed: string, agent: string | null) => {
       const recipe = usableOf(recipeId)
       if (!recipe || !catalog.get(hero)) return
-      figures.push({ crowd: looks.length, hero, agent })
-      looks.push(heroLook(recipe, hero, hash(seed), catalog))
+      const look = heroLook(recipe, hero, hash(seed), catalog)
+      // its role's own props show while nothing else is in hand (walking, resting)
+      figures.push({ crowd: looks.length, hero, agent, own: look.mounts.map((m) => m.piece) })
+      looks.push(withHeroProps(look, catalog))
       loops.push({ figure: figures.length - 1 })
+    }
+    /** The pieces a hero's sample puts in its hands (`shownProp`), cached by the sample's list. */
+    const handsOf = new Map<string, string[]>()
+    const hands = (props: readonly string[]): string[] => {
+      const key = props.join("|")
+      let out = handsOf.get(key)
+      if (!out) {
+        out = props.map((p) => shownProp(p, catalog)).filter((p) => p !== "")
+        handsOf.set(key, out)
+      }
+      return out
     }
     for (const a of agents) figure(a.hero, a.recipe, `agent:${a.id}`, a.id)
     if (opts.agentPool)
@@ -314,7 +379,10 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       stage,
       looks.map((look, id) => ({ id, look })),
       { catalog, url: libraryUrl },
-      { heroes: 12, clips: [...spotClips(folk.map((f) => f.day)), ...(figures.length ? [RUN_CLIP] : [])] },
+      {
+        heroes: 12,
+        clips: [...spotClips(folk.map((f) => f.day)), ...(figures.length ? [RUN_CLIP, ...HERO_CLIPS] : [])],
+      },
     )
     if (disposed) {
       made.dispose()
@@ -322,6 +390,8 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     }
     crowd = made
     crowd.setHeroes(agentIds)
+    // the Guildhall's notice board (where the Guildmaster pins quests: sim life), when the plan has one
+    if (plan.board && figures.length) void placeBoard(plan.board)
     // the canvas's CSS size, kept by an observer (never read in a frame)
     const canvas = stage.renderer.domElement
     const view = { width: canvas.clientWidth, height: canvas.clientHeight }
@@ -451,6 +521,23 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
           hidden: p.indoors || (hiddenAt !== null && hiddenAt(x, zz)),
         }
       }
+      const l = loops[id]!
+      const fig = l.figure !== undefined ? figures[l.figure] : undefined
+      // a hero: what its work or its moment plays (sim life's sample, a pure function of its clock), with
+      // the props it holds for it; walking, the walk with its role's own props (or the loot it carries)
+      const work = fig ? (p as AgentPose).sample : undefined
+      const props = fig ? (work ? hands(work.props) : fig.own) : undefined
+      if (work && p.act !== "walk") {
+        phase[id] = work.phase
+        return {
+          position: [x, y, zz],
+          heading: p.facing,
+          clip: work.clip,
+          phase: work.phase,
+          hidden: p.indoors || (hiddenAt !== null && hiddenAt(x, zz)),
+          ...(props ? { props } : {}),
+        }
+      }
       // walking: the walk, or the run a hero takes on a long way (sim RUN_CLIP); at a spot, its clip
       const clip = p.clip && (p.act !== "walk" || p.clip === RUN_CLIP) ? p.clip : look.clips[p.act]
       // walking: the feet keep pace with the ground covered; standing: the clip's own time
@@ -465,6 +552,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         clip,
         phase: phase[id]! - Math.floor(phase[id]!),
         hidden: p.indoors || (hiddenAt !== null && hiddenAt(x, zz)),
+        ...(props ? { props } : {}),
       }
     }
     /** The chips' words: read again when the source's world changed, or every WORDS_MS (speech ends, walks end). */
@@ -621,10 +709,14 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
                     name: source?.list().find((a) => a.id === f.agent)?.name,
                     at: poses[f.crowd]?.indoors ? null : [space.x[f.crowd], space.z[f.crowd]],
                     act: poses[f.crowd]?.act,
+                    // what its work or moment plays and holds (sim life's sample)
+                    sample: (poses[f.crowd] as AgentPose | undefined)?.sample,
                   },
                 ],
           ),
         heroAt: (id: string) => heroAt(id),
+        // a hero's itinerary as planned (its steps and acts), when the source keeps one
+        itinerary: (id: string) => source?.itinerary?.(id),
         // the chips as the declutter left them (shots, the perf probe)
         chips: () => chips?.declutter.slots.map((s) => ({ ...s })) ?? [],
         // everyone drawn now (x, z, a hero's id or null), for the spacing probe
@@ -658,6 +750,8 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
             ]
           }),
         stocks: () => plan.stocks.map((s) => ({ kind: s.kind, at: s.at, ...stockAt(s, day, SEC_PER_HOUR) })),
+        // the notice board (sim life: where the Guildmaster pins quests), if the island has one
+        board: plan.board,
       }
     logger.info("life", {
       folk: folk.length,

@@ -126,6 +126,13 @@ describe("pickToasts", () => {
     expect(later[0]!.left).toBe(500)
     expect(pickToasts(log, 20_000, seen)).toEqual([])
   })
+
+  test("a cap shortens every life (a short screen folds a toast into the chip after 4 s)", () => {
+    const seen = new Map<string, number>()
+    expect(pickToasts(log, 0, seen, 3, 4000).map((t) => t.key)).toEqual(["a", "c", "e"])
+    expect(pickToasts(log, 3000, seen, 3, 4000).map((t) => t.left)).toEqual([1000, 1000, 1000])
+    expect(pickToasts(log, 4500, seen, 3, 4000)).toEqual([])
+  })
 })
 
 describe("a repo chip's name shortens to fit", () => {

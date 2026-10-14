@@ -142,6 +142,8 @@ export interface ToastsProps {
   stamp?: string
   /** The chip's word (default "Chronicle"). */
   label?: string
+  /** A short screen: the chip is smaller and drops its stamp, so it takes little of the corner. */
+  compact?: boolean
 }
 
 /** The chronicle folded away: the last moments that matter, fading on their own. */
@@ -154,9 +156,14 @@ export function Toasts({
   quiet = false,
   stamp,
   label = "Chronicle",
+  compact = false,
 }: ToastsProps) {
   return (
-    <section className="hud-toasts" aria-label="Latest in the chronicle">
+    <section
+      className="hud-toasts"
+      aria-label="Latest in the chronicle"
+      data-compact={compact ? "" : undefined}
+    >
       <ol
         className="hud-toast-list"
         role="log"

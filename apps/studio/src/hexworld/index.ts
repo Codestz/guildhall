@@ -298,7 +298,7 @@ export interface HudParts {
   /** How a session's hero is drawn (its figure's look, life's `heroLook`): its HUD portrait. */
   heroLook?(id: string): ReturnType<Life["heroLook"]>
   /** The heroes' chips (null: no life, no agents, or `?chips=0`): the one followed, a plea mark tapped. */
-  chips: Pick<Chips, "select" | "onPlea" | "hit"> | null
+  chips: Pick<Chips, "select" | "onPlea" | "hit" | "extent"> | null
   /** The hall's camera (hall/camera.ts: follow a hero, the director), set by the hall's HUD as it mounts. */
   camera?: HallCamera
 }

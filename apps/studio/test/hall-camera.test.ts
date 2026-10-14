@@ -261,8 +261,10 @@ function standIn(world: () => GuildWorld) {
   const listeners = new Map<string, (e: unknown) => void>()
   /** Chips: Ada's stands at (700, 400)–(760, 430). */
   let selected: string | null = null
+  let chipBox: [number, number, number, number] | null = null
   const chips = {
     hit: (x: number, y: number) => (x >= 700 && x <= 760 && y >= 400 && y <= 430 ? "ada" : null),
+    extent: (): [number, number, number, number] | null => chipBox,
     select: (id: string | null) => {
       selected = id
     },
@@ -300,6 +302,10 @@ function standIn(world: () => GuildWorld) {
     aimed: () => aimed,
     user: emit,
     chipSelected: () => selected,
+    /** Where the pleading hero's chip stands (with its mark), or off screen. */
+    chipAt(box: [number, number, number, number] | null) {
+      chipBox = box
+    },
     /** A press and release on the stage (`travel` px apart, `ms` long). */
     press(x: number, y: number, travel = 0, ms = 120) {
       listeners.get("pointerdown")?.({ button: 0, isPrimary: true, clientX: x, clientY: y, pointerId: 1 })
@@ -347,6 +353,18 @@ describe("the controller", () => {
     expect(st.mode).toBe("director")
     expect(st.shot).toEqual({ key: "hero:ada", reason: "plea", distance: "close" })
     expect(s.glides.at(-1)?.distance).toBe(CLOSE.distance)
+  })
+
+  test("a pleading hero's chip poking out of the clear area nudges the frame in, and the nudge goes once it fits", () => {
+    const s = standIn(() => pleading(60_000))
+    s.run(300)
+    expect(s.camera.frame().x).toBe(0)
+    s.chipAt([-30, 300, 60, 340])
+    s.run(1500)
+    expect(s.camera.frame().x).toBeGreaterThan(0.05)
+    s.chipAt([300, 300, 390, 340])
+    s.run(4000)
+    expect(Math.abs(s.camera.frame().x)).toBeLessThan(0.02)
   })
 
   test("follow flies close and tracks the hero as they walk; a turn keeps them, a pan lets go", () => {

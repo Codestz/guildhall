@@ -140,18 +140,20 @@ export const TOAST_LIFE: Partial<Record<EntryKind, number>> = {
 /**
  * The toasts to show now: the newest `max` moments that earn one and still have time left, oldest
  * first. `firstSeen` remembers when each was first shown (wall clock), so a toast keeps its own life
- * across renders and a paused story still clears; it is updated in place.
+ * across renders and a paused story still clears; it is updated in place. `cap` (ms) shortens every
+ * moment's life: on a short screen a toast folds into the Chronicle chip after a few seconds.
  */
 export function pickToasts(
   log: readonly ChronicleEntry[],
   now: number,
   firstSeen: Map<string, number>,
   max = 3,
+  cap = Number.POSITIVE_INFINITY,
 ): ToastItem[] {
   const shown: ToastItem[] = []
   for (let i = log.length - 1; i >= 0 && shown.length < max; i--) {
     const entry = log[i]
-    const life = entry && TOAST_LIFE[entry.kind]
+    const life = entry && Math.min(cap, TOAST_LIFE[entry.kind] ?? 0)
     if (!entry || !life) continue
     let first = firstSeen.get(entry.key)
     if (first === undefined) {

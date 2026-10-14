@@ -29,6 +29,7 @@ import {
   lifePlaces,
   lifePose,
   NATURE_CHOSEN,
+  ownRoom,
   petitionLane,
   planFolk,
   routineSample,
@@ -46,6 +47,8 @@ import { played } from "./stories-fixtures.ts"
 export const BRUSH = 0.15
 /** How far a walk's end in a doorway may run in its house: the threshold, metres. */
 const DOOR = 1.0
+/** How far a tipsy weave sways off its way (life.ts WEAVE_M), with room to spare, metres. */
+const WEAVE = 0.3
 /** Samples along a way, metres. */
 const STEP = 0.1
 
@@ -96,12 +99,69 @@ export interface Cut {
 
 type Near = (x: number, z: number, r: number) => Solid[]
 
+/** Whether a solid at a point is a walk's end's own there (its house by the doorway, its seat). */
+type Skip = (s: Solid, x: number, z: number) => boolean
+
+/** A walk's end: where it stands, how near a solid counts as its own, and (a doorway) the way out. */
+export interface End {
+  at: readonly number[]
+  slack: number
+  /** A doorway's end: the walk from it outward, its house left the way the walk leaves it. */
+  door?: readonly (readonly number[])[]
+  /** How far off that way a body sways (a tipsy weave), metres. */
+  sway?: number
+}
+
+/** The points (every 5 cm) of `line` from its start while it is in `o`: a doorway's run out of its house. */
+function runIn(o: Solid, line: readonly (readonly number[])[]): [number, number][] {
+  const out: [number, number][] = []
+  for (let k = 0; k + 1 < line.length; k++) {
+    const a = line[k]!
+    const b = line[k + 1]!
+    const n = Math.max(1, Math.ceil(Math.hypot(b[0]! - a[0]!, b[2]! - a[2]!) / 0.05))
+    for (let j = 0; j <= n; j++) {
+      const x = a[0]! + ((b[0]! - a[0]!) * j) / n
+      const z = a[2]! + ((b[2]! - a[2]!) * j) / n
+      out.push([x, z])
+      if (solidDistance(o, x, z) > 0) return out
+    }
+  }
+  return out
+}
+
+/**
+ * What a walk's ends stand in, near them (decisions.md "door thresholds excepted"): what an end stands
+ * in (within `slack`: its seat, its house by the doorway, a neighbour's wall by the door) as far as it
+ * takes to leave it (walk.ts `ownRoom`), and a house a doorway's end stands in along the walk's run out
+ * of it too (under a forge's porch, out to the street). Further on, it is walked round like anything else (a spot set
+ * against the butts is not reached through them).
+ */
+export function endsOwn(ends: readonly End[]): Skip {
+  const runs = ends.map(() => new Map<Solid, [number, number][]>())
+  return (o, x, z) =>
+    ends.some((e, k) => {
+      const d = solidDistance(o, e.at[0]!, e.at[2]!)
+      if (d >= e.slack) return false
+      if (Math.hypot(x - e.at[0]!, z - e.at[2]!) <= ownRoom(d)) return true
+      if (e.door && d < 0) {
+        let run = runs[k]!.get(o)
+        if (!run) {
+          run = runIn(o, e.door)
+          runs[k]!.set(o, run)
+        }
+        const r = 0.06 + (e.sway ?? 0)
+        return run.some(([px, pz]) => Math.hypot(px - x, pz - z) < r)
+      }
+      return false
+    })
+}
+
 /** How deep a point is in a hard solid (≤ 0: out), the ones `skip` lists aside. */
-function depthAt(near: Near, x: number, z: number, skip: (s: Solid) => boolean): [number, Solid | null] {
+function depthAt(near: Near, x: number, z: number, skip: Skip): [number, Solid | null] {
   let worst = 0
   let by: Solid | null = null
   for (const o of near(x, z, 0.05)) {
-    if (!HARD(o.kind) || skip(o)) continue
+    if (!HARD(o.kind) || skip(o, x, z)) continue
     const d = -solidDistance(o, x, z)
     if (d > worst) {
       worst = d
@@ -123,7 +183,7 @@ function tallySegment(
   who: string,
   a: readonly number[],
   b: readonly number[],
-  skip: (s: Solid) => boolean,
+  skip: Skip,
   offset?: (f: number) => [number, number],
 ): void {
   const t = out.table[source]
@@ -218,9 +278,10 @@ function sweepSteps(
       !prev.indoors &&
       prev.at === a0 &&
       /chat|wave|reel|slump/.test(prev.routine?.id ?? "")
-    const skip = (o: Solid) =>
-      solidDistance(o, a0[0], a0[2]) < (fromIn ? DOOR : 0.05) ||
-      solidDistance(o, b0[0], b0[2]) < (toIn ? DOOR : 0.05)
+    const skip = endsOwn([
+      fromIn ? { at: a0, slack: DOOR, door: w.pts } : { at: a0, slack: 0.05 },
+      toIn ? { at: b0, slack: DOOR, door: [...w.pts].reverse() } : { at: b0, slack: 0.05 },
+    ])
     const last = w.pts.length - 2
     for (let k = 0; k + 1 < w.pts.length; k++) {
       const a = w.pts[k]!
@@ -290,8 +351,22 @@ export function sweepIsland(
     // along its way round, when it has one
     const line = [[a.x, a.y, a.z], ...(e.via ?? []).map(([x, z]) => [x, a.y, z]), [b.x, b.y, b.z]]
     for (let k = 0; k + 1 < line.length; k++)
-      tallySegment(out, near, src, who(`edge ${e.a}-${e.b}`), line[k]!, line[k + 1]!, (o) =>
-        door ? solidDistance(o, a.x, a.z) < DOOR || solidDistance(o, b.x, b.z) < DOOR : false,
+      tallySegment(
+        out,
+        near,
+        src,
+        who(`edge ${e.a}-${e.b}`),
+        line[k]!,
+        line[k + 1]!,
+        door
+          ? endsOwn([
+              { at: [a.x, 0, a.z], slack: DOOR, door: line },
+              { at: [b.x, 0, b.z], slack: DOOR, door: [...line].reverse() },
+            ])
+          : endsOwn([
+              { at: [a.x, 0, a.z], slack: 0.05 },
+              { at: [b.x, 0, b.z], slack: 0.05 },
+            ]),
       )
   }
 
@@ -302,15 +377,24 @@ export function sweepIsland(
     sweepSteps(out, near, walk, grid, p.day, who(`folk ${p.id} ${p.role}`), false, SEC_PER_HOUR)
   // the tipsy weave is sampled again by lifePose itself (its eased weave), every few seconds of a walk
   for (const p of folk)
-    for (const s of p.day) {
+    for (const [si, s] of p.day.entries()) {
       if (s.kind !== "walk" || !s.tipsy) continue
       const a0 = s.pts[0]!
       const b0 = s.pts[s.pts.length - 1]!
+      const prev = p.day[si - 1] ?? p.day[p.day.length - 1]
+      const next = p.day[si + 1] ?? p.day[0]
+      // (the weave's sway off the way, by the doorways too)
+      const skip = endsOwn([
+        prev?.kind === "stay" && prev.indoors
+          ? { at: a0, slack: DOOR, door: s.pts, sway: WEAVE }
+          : { at: a0, slack: 0.05 },
+        next?.kind === "stay" && next.indoors
+          ? { at: b0, slack: DOOR, door: [...s.pts].reverse(), sway: WEAVE }
+          : { at: b0, slack: 0.05 },
+      ])
       for (let t = s.from; t < s.to; t += 2 / 3600) {
         const pose = lifePose(p.day, t, 24)
         if (pose.act !== "walk") continue
-        const skip = (o: Solid) =>
-          solidDistance(o, a0[0], a0[2]) < 0.05 || solidDistance(o, b0[0], b0[2]) < DOOR
         tallySegment(out, near, "tipsy weave", who(`folk ${p.id} weave`), pose.at, pose.at, skip)
       }
     }
@@ -321,8 +405,10 @@ export function sweepIsland(
     for (const way of [lane.approach, lane.exit]) {
       const a0 = way[0]!
       const b0 = way[way.length - 1]!
-      const skip = (o: Solid) =>
-        solidDistance(o, a0[0], a0[2]) < DOOR || solidDistance(o, b0[0], b0[2]) < DOOR
+      const skip = endsOwn([
+        { at: a0, slack: DOOR, door: way },
+        { at: b0, slack: DOOR, door: [...way].reverse() },
+      ])
       for (let k = 0; k + 1 < way.length; k++)
         tallySegment(out, near, "petitioner lane", who("petitions"), way[k]!, way[k + 1]!, skip)
     }

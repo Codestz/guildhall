@@ -137,6 +137,7 @@ export {
   shoreDistances,
   shoreFieldTexture,
 } from "./shoreField.ts"
+export * from "./shows/index.ts"
 export { createSky, type Sky, type SkyPreset } from "./sky.ts"
 export { createSlicer, NO_SLICE, type Slicer } from "./slice.ts"
 export { createStage, type Stage, toScreen } from "./stage.ts"

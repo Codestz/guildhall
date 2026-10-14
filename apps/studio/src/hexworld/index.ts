@@ -101,6 +101,7 @@ import { HALL_STEPS, LINES, loadPlan, PITCH, STEPS, type Step } from "./loading.
 import { createPlaceLabels, kindWord, labelsOn, type PlaceLabels } from "./places.ts"
 import { loaderOn, publishWorld, settle } from "./ready.ts"
 import { sessionAgents } from "./sessionAgents.ts"
+import { mountShows } from "./shows.ts"
 
 const logger = log("studio:hexworld")
 
@@ -449,6 +450,7 @@ const world = {
     let unHud = () => {}
     let fx: Fx | null = null
     let workfx: WorkFxMount | null = null
+    let shows: ReturnType<typeof mountShows> | null = null
     let unAgents = () => {}
     let unSound = () => {}
     let pick: ((index: number) => void) | null = null
@@ -637,6 +639,8 @@ const world = {
         pieces: () => loose,
         sea: SEA_LEVEL,
       })
+      // the sky and town shows (shows.ts): nothing in the scene until one plays
+      shows = mountShows({ stage, query: ctx.query, sites: m.sites, span, light: () => sky.light() })
       steps.progress(0.74, 150)
       go("Water", 0.8)
       await shoreDone
@@ -906,6 +910,7 @@ const world = {
       doors?.dispose()
       fx?.dispose()
       workfx?.dispose()
+      shows?.dispose()
       labels?.dispose()
       unHud()
       unTick()

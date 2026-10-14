@@ -808,7 +808,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       const zz = space.z[id]!
       const y = footAt(x, zz, p) + (p.lift ?? 0)
       const prev = last[id]!
-      const moved = Number.isNaN(prev[0]) ? 0 : Math.hypot(x - prev[0], zz - prev[1])
+      const moved = Number.isNaN(prev[0]) ? 0 : Math.sqrt((x - prev[0]) ** 2 + (zz - prev[1]) ** 2)
       prev[0] = x
       prev[1] = zz
       // at a spot, its routine (a duel's side, a drill line: on the shared clock) or its clip; walking,
@@ -1041,7 +1041,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     nearAt = (x, zz, r) => {
       for (let id = 0; id < n; id++) {
         if (poses[id]?.indoors) continue
-        if (Math.hypot(space.x[id]! - x, space.z[id]! - zz) < r) return true
+        if ((space.x[id]! - x) ** 2 + (space.z[id]! - zz) ** 2 < r * r) return true
       }
       return false
     }

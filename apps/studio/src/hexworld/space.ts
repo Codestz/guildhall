@@ -104,9 +104,27 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
   let pairs = new Int32Array(1024)
   let npairs = 0
 
+  /** A plane distance (Math.hypot takes its arguments as a list: an allocation per call, in V8). */
+  const hyp = (a: number, b: number): number => Math.sqrt(a * a + b * b)
   /** Whether a walker may stand at (px, pz): on its way's step and out of every solid. */
   const fits = (i: number, px: number, pz: number): boolean =>
     Math.abs(world.heightAt(px, pz) - baseY[i]!) <= STEP
+  /** Whether walker `w` has room a side-step (`g` = ±1, `need` metres) off its way: no step, no solid. */
+  const room = (w: number, g: number, need: number): boolean => {
+    const px = x[w]! + dirZ[w]! * g * need
+    const pz = z[w]! - dirX[w]! * g * need
+    if (Math.abs(world.heightAt(px, pz) - world.heightAt(x[w]!, z[w]!)) > STEP) return false
+    for (const o of world.solidsNear(px, pz, CORE)) if (world.solidDistance(o, px, pz) < CORE) return false
+    return true
+  }
+  /** A solid person `i` (at pose `p`) may stand in: a walker's door or spot at either end, a stayer's own seat. */
+  const own = (s: Solid, i: number, p: SpacePose): boolean =>
+    walk[i]
+      ? (!!p.to && world.solidDistance(s, p.to[0]!, p.to[2]!) < DOOR) ||
+        (!!p.from && world.solidDistance(s, p.from[0]!, p.from[2]!) < DOOR)
+      : world.solidDistance(s, baseX[i]!, baseZ[i]!) < 0.02
+  /** Per frame: how hard each walker brakes behind the one ahead (kept, not made, each frame). */
+  const brake = new Float32Array(n)
 
   const step = (poses: readonly SpacePose[], dt: number) => {
     const relax = Math.exp(-dt / RELAX)
@@ -131,7 +149,7 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
       walk[i] = p.act === "walk" ? 1 : 0
       dirX[i] = Math.sin(p.facing)
       dirZ[i] = Math.cos(p.facing)
-      arriving[i] = walk[i] && p.to && Math.hypot(p.to[0]! - baseX[i]!, p.to[2]! - baseZ[i]!) < ARRIVE ? 1 : 0
+      arriving[i] = walk[i] && p.to && hyp(p.to[0]! - baseX[i]!, p.to[2]! - baseZ[i]!) < ARRIVE ? 1 : 0
       offX[i] = offX[i]! * relax
       offZ[i] = offZ[i]! * relax
       x[i] = baseX[i]! + offX[i]!
@@ -170,7 +188,7 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
         }
     }
     // queueing: a walker close behind another going its way brakes (its clock falls behind)
-    const brake = new Float32Array(n)
+    brake.fill(0)
     for (let q = 0; q < npairs; q++) {
       const a = pairs[q * 2]!
       const b = pairs[q * 2 + 1]!
@@ -179,7 +197,7 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
         const w = walk[a] ? a : b
         const s = w === a ? b : a
         if (!arriving[w]) continue
-        const d = Math.hypot(x[s]! - x[w]!, z[s]! - z[w]!) - radii[w]! - radii[s]!
+        const d = hyp(x[s]! - x[w]!, z[s]! - z[w]!) - radii[w]! - radii[s]!
         if ((x[s]! - x[w]!) * dirX[w]! + (z[s]! - z[w]!) * dirZ[w]! > 0 && d < GAP)
           brake[w] = Math.max(brake[w]!, d <= 0 ? 1 : 1 - d / GAP)
         continue
@@ -189,7 +207,7 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
       // who is behind whom, along their mean way
       const mx = dirX[a]! + dirX[b]!
       const mz = dirZ[a]! + dirZ[b]!
-      const ml = Math.hypot(mx, mz) || 1
+      const ml = hyp(mx, mz) || 1
       const along = ((x[b]! - x[a]!) * mx + (z[b]! - z[a]!) * mz) / ml
       const side = Math.abs(((x[b]! - x[a]!) * -mz + (z[b]! - z[a]!) * mx) / ml)
       const r = radii[a]! + radii[b]!
@@ -219,20 +237,12 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
       if (ahead <= 0 || arriving[w]) continue
       const need = radii[w]! + radii[s]! + MARGIN
       const side = rx * -dirZ[w]! + rz * dirX[w]!
-      const d = Math.hypot(rx, rz)
+      const d = hyp(rx, rz)
       if (Math.abs(side) >= need || d > need + LOOK) continue
       const k = Math.min(1, (need + LOOK - d) / LOOK)
       // to the side it already passes on (to its right when dead ahead), unless a wall or a step is there
       let sgn = side > 0 ? 1 : -1
-      const room = (g: number) => {
-        const px = x[w]! + dirZ[w]! * g * need
-        const pz = z[w]! - dirX[w]! * g * need
-        if (Math.abs(world.heightAt(px, pz) - world.heightAt(x[w]!, z[w]!)) > STEP) return false
-        for (const o of world.solidsNear(px, pz, CORE))
-          if (world.solidDistance(o, px, pz) < CORE) return false
-        return true
-      }
-      if (!room(sgn) && room(-sgn)) sgn = -sgn
+      if (!room(w, sgn, need) && room(w, -sgn, need)) sgn = -sgn
       x[w] = x[w]! + dirZ[w]! * sgn * steer * k
       z[w] = z[w]! - dirX[w]! * sgn * steer * k
     }
@@ -243,7 +253,7 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
         const b = pairs[q * 2 + 1]!
         let ex = x[a]! - x[b]!
         let ez = z[a]! - z[b]!
-        let d = Math.hypot(ex, ez)
+        let d = hyp(ex, ez)
         const need = radii[a]! + radii[b]! + MARGIN
         if (d >= need) continue
         if (d < 1e-4) {
@@ -274,7 +284,7 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
       let oz = z[i]! - baseZ[i]!
       let cx = ox - offX[i]!
       let cz = oz - offZ[i]!
-      const c = Math.hypot(cx, cz)
+      const c = hyp(cx, cz)
       if (c > most) {
         cx *= most / c
         cz *= most / c
@@ -282,7 +292,7 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
       ox = offX[i]! + cx
       oz = offZ[i]! + cz
       const cap = walk[i] ? WALK_CAP : STAY_CAP
-      const m = Math.hypot(ox, oz)
+      const m = hyp(ox, oz)
       if (m > cap) {
         ox *= cap / m
         oz *= cap / m
@@ -293,15 +303,10 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
         let pz = baseZ[i]! + oz
         // out of the solids (but the seat a stayer sits in, and whatever stands by the door or the spot
         // a walk leaves or makes for: it goes in or out there)
-        const own = (s: Solid) =>
-          walk[i]
-            ? (!!p.to && world.solidDistance(s, p.to[0]!, p.to[2]!) < DOOR) ||
-              (!!p.from && world.solidDistance(s, p.from[0]!, p.from[2]!) < DOOR)
-            : world.solidDistance(s, baseX[i]!, baseZ[i]!) < 0.02
         for (let round = 0; round < 2; round++) {
           let moved = false
           for (const s of world.solidsNear(px, pz, CORE)) {
-            if (own(s)) continue
+            if (own(s, i, p)) continue
             const d = world.solidDistance(s, px, pz, dir)
             if (d >= CORE) continue
             px += dir[0] * (CORE - d + 1e-3)

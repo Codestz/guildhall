@@ -332,7 +332,7 @@ export function createLamps(stage: Pick<Stage, "scene" | "getCamera">, points: r
       // a lamp put out is never handed a light
       distance[i] = hidden[i]
         ? Number.POSITIVE_INFINITY
-        : Math.hypot(p.at[0] - target.x, p.at[1] - target.y, p.at[2] - target.z)
+        : Math.sqrt((p.at[0] - target.x) ** 2 + (p.at[1] - target.y) ** 2 + (p.at[2] - target.z) ** 2)
     })
     order.sort((a, b) => (distance[a] as number) - (distance[b] as number))
     const next = order.length > MAX_LIGHTS ? (distance[order[MAX_LIGHTS] as number] as number) : Infinity

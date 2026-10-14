@@ -539,6 +539,13 @@ export async function createCrowd(
     })
   }
   let wantHero = new Set<number>()
+  // the frame's lists, kept from frame to frame (no allocation per person per frame: GC pauses were
+  // the hitches on the far views): each person's candidate record, sample, drawn height
+  const records = persons.map((p) => ({ id: p.actor.id, distance: 0, tall: 0 }))
+  const candidates: { id: number; distance: number; tall: number }[] = []
+  const samples: ActorSample[] = new Array(persons.length)
+  const talls = new Float32Array(persons.length)
+  const current = new Set<number>()
 
   return {
     update(dt, sample) {
@@ -550,25 +557,32 @@ export async function createCrowd(
       const cssHeight = stage.renderer.domElement.clientHeight || 1
       const focal = cssHeight / (2 * Math.tan((camera.fov * Math.PI) / 360))
 
-      const candidates: { id: number; distance: number; tall: number }[] = []
-      const samples: ActorSample[] = []
-      const talls: number[] = []
-      for (const person of persons) {
+      candidates.length = 0
+      for (const [i, person] of persons.entries()) {
         const s = sample(person.actor.id)
-        samples.push(s)
+        samples[i] = s
         advance(person.playing, s.clip, s.phase, dt)
         if (s.hidden) {
-          talls.push(0)
+          talls[i] = 0
           continue
         }
-        const [x, y, z] = s.position
+        const x = s.position[0]
+        const y = s.position[1]
+        const z = s.position[2]
         const height = FIGURE_HEIGHT * person.actor.look.scale
         const depth = (x - eye.x) * forward.x + (y + height / 2 - eye.y) * forward.y + (z - eye.z) * forward.z
         const tall = depth > 0.1 ? (height * focal) / depth : 0
-        talls.push(tall)
-        candidates.push({ id: person.actor.id, distance: Math.hypot(x - eye.x, y - eye.y, z - eye.z), tall })
+        talls[i] = tall
+        const record = records[i] as { id: number; distance: number; tall: number }
+        const dx = x - eye.x
+        const dy = y - eye.y
+        const dz = z - eye.z
+        record.distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
+        record.tall = tall
+        candidates.push(record)
       }
-      const current = new Set(persons.filter((p) => p.hero || p.pending).map((p) => p.actor.id))
+      current.clear()
+      for (const p of persons) if (p.hero || p.pending) current.add(p.actor.id)
       wantHero = allHeroes
         ? new Set(persons.map((p) => p.actor.id))
         : chooseHeroes(

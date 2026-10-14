@@ -22,13 +22,20 @@ export {
 } from "./fleet.ts"
 export { RAIN_FAR, RAIN_STREAKS } from "./rain.ts"
 export {
+  BUILD_W,
+  BUSY_PROGRESS,
+  builtAt,
   createScaffolds,
+  FLAG_ORDER,
+  PROGRESS_S,
   SCAFFOLD_NOMINAL,
   SCAFFOLD_S,
+  type ScaffoldOpts,
   type ScaffoldPlace,
   type Scaffolds,
   scaffoldGeometry,
   scaffoldSize,
+  scaffoldStage,
 } from "./scaffold.ts"
 export {
   createHarbourShips,

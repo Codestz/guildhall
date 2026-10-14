@@ -3,7 +3,16 @@ import { HEX_KINDS, HEX_TILE_SIZE, hexAt, hexIsland, hexWorld, hexZones, TILE_US
 import { boltPath, flashAt, nextStrike } from "../src/events/bolt.ts"
 import { random, transition } from "../src/events/ease.ts"
 import { FLEET, harbourChanges, planFleet, type ShipLog, sinkPose, voyagePose } from "../src/events/fleet.ts"
-import { SCAFFOLD_NOMINAL, scaffoldGeometry, scaffoldSize } from "../src/events/scaffold.ts"
+import {
+  BUILD_W,
+  BUSY_PROGRESS,
+  builtAt,
+  FLAG_ORDER,
+  SCAFFOLD_NOMINAL,
+  scaffoldGeometry,
+  scaffoldSize,
+  scaffoldStage,
+} from "../src/events/scaffold.ts"
 import { along, flareGeometry, laneLengths } from "../src/events/ships.ts"
 import { eventSites, footing, HEART_REACH } from "../src/events/sites.ts"
 import { BASE_COVER, BASE_WIND, isClear, mixOf, weathered, weatherLook } from "../src/events/weather.ts"
@@ -418,6 +427,64 @@ describe("scaffold", () => {
       footing({ piece: "kaykit-hexagon/building-market-red", x: 0, z: 0, rot: 0, scale: 1 }, 0),
     ).toBeNull()
     expect(footing({ piece: "kaykit-forest/tree-1", x: 0, z: 0, rot: 0, scale: 1 }, 0)).toBeNull()
+  })
+})
+
+describe("scaffold stages", () => {
+  test("progress maps to stages: nothing, frame, decks, roof, done", () => {
+    expect(scaffoldStage(0)).toBe(0)
+    expect(scaffoldStage(0.1)).toBe(1)
+    expect(scaffoldStage(1 / 3)).toBe(1)
+    expect(scaffoldStage(0.5)).toBe(2)
+    expect(scaffoldStage(0.9)).toBe(3)
+    expect(scaffoldStage(BUSY_PROGRESS)).toBe(3)
+    expect(scaffoldStage(1)).toBe(4)
+    expect(scaffoldStage(-1)).toBe(0)
+    expect(scaffoldStage(7)).toBe(4)
+  })
+
+  test("a timber comes in as the progress passes its order, eased over BUILD_W", () => {
+    expect(builtAt(1, 0)).toBe(0)
+    expect(builtAt(1, 1 / 3)).toBe(0)
+    expect(builtAt(1, (1 + BUILD_W / 2) / 3)).toBeCloseTo(0.5, 6)
+    expect(builtAt(1, 0.5)).toBe(1)
+  })
+
+  test("every timber has its order, each stage's within it, built bottom up; the flag only when done", () => {
+    const g = scaffoldGeometry()
+    const order = g.getAttribute("order")
+    const pos = g.getAttribute("position")
+    expect(order.count).toBe(pos.count)
+    const orders = new Set<number>()
+    let lowFrame = Infinity
+    let highFrame = -Infinity
+    for (let i = 0; i < order.count; i++) {
+      const o = order.getX(i)
+      orders.add(o)
+      expect(o).toBeGreaterThanOrEqual(0)
+      expect(o).toBeLessThan(3)
+      if (o < 1) {
+        lowFrame = Math.min(lowFrame, pos.getY(i))
+        highFrame = Math.max(highFrame, pos.getY(i))
+      }
+    }
+    // all three stages are there, and the flag
+    for (const k of [0, 1, 2]) expect([...orders].some((o) => o >= k && o < k + 1)).toBe(true)
+    // (orders are float32 in the geometry)
+    const flag = Math.fround(FLAG_ORDER)
+    expect(orders.has(flag)).toBe(true)
+    // the frame stands from the ground up
+    expect(lowFrame).toBeLessThan(0.05)
+    expect(highFrame).toBeGreaterThan(3)
+    // at the busy default everything but the flag is built; the flag only at 1
+    for (const o of orders) {
+      if (o === flag) {
+        expect(builtAt(o, BUSY_PROGRESS)).toBe(0)
+        expect(builtAt(o, 1)).toBeCloseTo(1, 4)
+      } else expect(builtAt(o, BUSY_PROGRESS)).toBe(1)
+    }
+    // stage 1 alone shows no deck and no crane
+    for (const o of orders) if (o >= 1) expect(builtAt(o, 1 / 3)).toBe(0)
   })
 })
 

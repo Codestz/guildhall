@@ -269,6 +269,8 @@ const RING = 1.6
 const RING_STEP = 1.1
 /** A ring place keeps this far from the place's spots and from the other ring places, metres (two bodies). */
 const RING_APART = 1.1
+/** A ring place keeps this far from every wall, house and prop, metres (a body). */
+const RING_BODY = 0.35
 
 /**
  * The ring places round a place's heart (where heroes stand when its every spot is held), the first `n`:
@@ -279,9 +281,12 @@ export function ringPlaces(
   heart: { x: number; z: number },
   spots: readonly { at: readonly number[] }[],
   n: number,
+  /** Whether a body stands clear there (out of the walls and houses round the heart). */
+  free: (x: number, z: number) => boolean = () => true,
 ): [number, number][] {
   const out: [number, number][] = []
   const clear = (x: number, z: number) =>
+    free(x, z) &&
     spots.every((s) => Math.hypot((s.at[0] ?? 0) - x, (s.at[2] ?? 0) - z) >= RING_APART) &&
     out.every(([px, pz]) => Math.hypot(px - x, pz - z) >= RING_APART)
   for (let j = 0; out.length < n && j < 64; j++) {
@@ -808,11 +813,18 @@ export class LifePlanner {
     const n = this.kit.walk.nodes[node]!
     let ring = this.rings.get(zone)
     if (!ring || ring.length <= k) {
-      ring = ringPlaces(n, this.kit.spots(zone), Math.max(16, (k + 1) * 2))
+      // (each a body's room from every wall and house round the heart)
+      ring = ringPlaces(n, this.kit.spots(zone), Math.max(16, (k + 1) * 2), (x, z) => this.roomAt(x, z))
       this.rings.set(zone, ring)
     }
     const [x, z] = ring[k] ?? [n.x, n.z]
     return { node, at: [x, n.y, z], facing: Math.atan2(n.x - x, n.z - z), ground: true }
+  }
+
+  /** Whether a body stands at (x, z) out of every wall, house and prop (`RING_BODY` of room). */
+  private roomAt(x: number, z: number): boolean {
+    const near = this.kit.near
+    return !near?.(x, z, RING_BODY).some((o) => "pts" in o && !o.soft && solidDistance(o, x, z) < RING_BODY)
   }
 
   /** Each place's ring places so far (`ringPlaces`, grown as more are asked for). */
@@ -1077,9 +1089,12 @@ export class LifePlanner {
           return [g.at[0] + (ux * c - uz * s) * 0.9, g.at[1], g.at[2] + (ux * s + uz * c) * 0.9]
         }
         this.delivering = this.delivering.filter((q) => q.until > t)
+        // (and with a body's room from the walls: never set down inside the keep's)
         const free = (p: [number, number, number]) =>
+          this.roomAt(p[0], p[2]) &&
           this.delivering.every((q) => Math.hypot(q.at[0] - p[0], q.at[2] - p[2]) >= DELIVER_APART)
-        const at = [0, 0.8, -0.8, 1.6, -1.6].map(spotAt).find(free) ?? spotAt(0)
+        const turns = [0, 0.8, -0.8, 1.6, -1.6, 2.4, -2.4, Math.PI].map(spotAt)
+        const at = turns.find(free) ?? turns.find((p) => this.roomAt(p[0], p[2])) ?? spotAt(0)
         to = { node: g.node, at, facing: headingTo(at, g.at), ground: g.ground }
       }
     } else if (this.kit.board) to = this.kit.board.brief[0]!
@@ -1377,7 +1392,9 @@ export function stepPose(steps: readonly HeroStep[], t: number, at = stepIndex(s
   }
   // a way run (ItineraryOptions.hurry): the whole walk's pace names its gait, so a pose never flickers
   const span = (s.times[s.times.length - 1] as number) - s.from
-  const gait = span > 0 ? gaitOf((pathLength(s) / span) * 1000 + 1e-9) : undefined
+  // (a little over: its times are epoch milliseconds, whose rounding takes a run paced at RUN_FROM a
+  // hair under it)
+  const gait = span > 0 ? gaitOf((pathLength(s) / span) * 1000 * (1 + 1e-6)) : undefined
   if (gait) pose.clip = gait
   return pose
 }

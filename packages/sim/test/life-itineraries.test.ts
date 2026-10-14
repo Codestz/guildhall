@@ -192,17 +192,22 @@ describe("a hero's pose is a pure sample", () => {
   })
 })
 
-/** Metres from a point to the nearest edge of the walk graph. */
+/** Metres from a point to the nearest edge of the walk graph (along its way round a wall, when it has one). */
 function offGraph(x: number, zz: number): number {
   let best = Number.POSITIVE_INFINITY
   for (const e of walk.edges) {
-    const a = walk.nodes[e.a]!
-    const b = walk.nodes[e.b]!
-    const dx = b.x - a.x
-    const dz = b.z - a.z
-    const l2 = dx * dx + dz * dz
-    const f = l2 > 0 ? Math.max(0, Math.min(1, ((x - a.x) * dx + (zz - a.z) * dz) / l2)) : 0
-    best = Math.min(best, Math.hypot(a.x + dx * f - x, a.z + dz * f - zz))
+    if (e.walled) continue
+    const ends = [walk.nodes[e.a]!, walk.nodes[e.b]!]
+    const line = [[ends[0]!.x, ends[0]!.z], ...(e.via ?? []), [ends[1]!.x, ends[1]!.z]] as [number, number][]
+    for (let k = 0; k + 1 < line.length; k++) {
+      const [ax, az] = line[k]!
+      const [bx, bz] = line[k + 1]!
+      const dx = bx - ax
+      const dz = bz - az
+      const l2 = dx * dx + dz * dz
+      const f = l2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (zz - az) * dz) / l2)) : 0
+      best = Math.min(best, Math.hypot(ax + dx * f - x, az + dz * f - zz))
+    }
   }
   return best
 }

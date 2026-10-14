@@ -186,6 +186,7 @@ export {
   planCarts,
   planStocks,
   ROUTINE_CLIP_SECONDS,
+  ROUTINE_IN_PLACE,
   ROUTINES,
   type Routine,
   type RoutineAt,
@@ -197,6 +198,7 @@ export {
   routineFor,
   routineSample,
   routineSpan,
+  routineStands,
   routineYield,
   STOCK_DAY,
   type Stock,
@@ -284,7 +286,9 @@ export {
 } from "./tiles.ts"
 export {
   clearWay,
+  cutsHard,
   DOOR_OUT,
+  floodWay,
   HEX_WALK_KINDS,
   type HexWalk,
   type HexWalkEdge,

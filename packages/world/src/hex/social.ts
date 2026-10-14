@@ -31,6 +31,7 @@ import {
   type LifeWalk,
   LoopBuilder,
   lifePose,
+  nodeNear,
   spotAt,
   type Vec3,
 } from "./life.ts"
@@ -104,6 +105,8 @@ const MEET_GAP = 0.25
 const MEET_MAX = 4
 /** Nobody else stands this near a meeting (metres, their planned stays). */
 const MEET_CLEAR = 0.75
+/** … and this far from every wall and house (out of a doorway's threshold), metres. */
+const MEET_ROOM = 0.2
 
 /** Lamp posts a lamplighter goes round (pieces). */
 const LAMP = /post-lantern/
@@ -114,6 +117,8 @@ const LAMPLIGHTERS_MAX = 4
 const LAMPS_MAX = 14
 /** Out at dusk (day hours) and the seconds at a lamp (routines.ts `light`: 2.5 s). */
 const LAMP_FROM = 17.4
+/** … and lights none after this hour (day hours). */
+const LAMP_BY = 20.9
 const LAMP_S = 2.6
 /** A lamplighter stands this far off the post, metres. */
 const LAMP_ARM = 0.75
@@ -345,11 +350,13 @@ function tipsy(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
       to: w.from + dur * slow,
       tipsy: weave,
     }
+    // (not a way so tight to a wall or a fence that the weave would take them into it)
+    if (weavesIntoWall(slowed, solids)) continue
     // half-way, a wall to slump against (a body's width off it), else a reel where they are
     // (never on a hero's spot: LifePlaces `heroNear`)
     const free = (t: number) => {
       const p = walkAt(slowed, t)
-      return !o.places.heroNear(p.x, p.z, 0)
+      return !o.places.heroNear(p.x, p.z, 0) && !solids.blocked(p.x, p.z, MEET_ROOM, HARD)
     }
     const stop = leanPoint(slowed, solids, free)
     let t = stop?.t ?? slowed.from + (slowed.to - slowed.from) * 0.5
@@ -369,6 +376,32 @@ function tipsy(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
     stats.tipsy++
   }
 }
+
+/**
+ * Whether a tipsy walk's weave (lifePose) would take the walker into a wall, a house or a fence on the
+ * way: sampled every few centimetres of it, the house its ends stand in (a door's threshold) aside.
+ */
+function weavesIntoWall(w: LifeWalk, furniture: LifePlaces["furniture"]): boolean {
+  const a = w.pts[0]!
+  const b = w.pts[w.pts.length - 1]!
+  const steps: LifeStep[] = [w]
+  let metres = 0
+  for (let k = 1; k < w.pts.length; k++)
+    metres += Math.hypot(w.pts[k]![0] - w.pts[k - 1]![0], w.pts[k]![2] - w.pts[k - 1]![2])
+  const n = Math.max(2, Math.ceil(metres / 0.15))
+  for (let k = 1; k < n; k++) {
+    const t = w.from + ((w.to - w.from) * k) / n
+    const p = lifePose(steps, t, 24).at
+    for (const s of furniture.solidsNear(p[0], p[2], 0.05)) {
+      if (!HARD(s.kind) || solidDistance(s, p[0], p[2]) >= -WEAVE_ROOM) continue
+      if (solidDistance(s, a[0], a[2]) < 1 || solidDistance(s, b[0], b[2]) < 1) continue
+      return true
+    }
+  }
+  return false
+}
+/** How far a weave may brush into a wall's foot (a shoulder, not the feet), metres. */
+const WEAVE_ROOM = 0.1
 
 /** Where on the middle of a walk a wall is a body's width off (the time there, and the way out from it). */
 function leanPoint(
@@ -470,14 +503,18 @@ function meetings(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
       return next?.kind === "stay" && next.routine?.id !== "chop" && next.to - next.from > len + 0.01
     }
     if (!room(m.a) || !room(m.b)) continue
-    // nobody else standing where they stop
+    // nobody else standing where they stop, while they stand there
     const crowded = folk.some((f, fi) => {
       if (fi === m.a.f || fi === m.b.f) return false
-      const p = lifePose(f.day, m.t, 24)
-      if (p.indoors) return false
-      return [m.a, m.b].some((s) => Math.hypot(p.at[0] - s.x, p.at[2] - s.z) < MEET_CLEAR)
+      return [m.t, m.t + len / 2, m.t + len].some((t) => {
+        const p = lifePose(f.day, t, 24)
+        if (p.indoors) return false
+        return [m.a, m.b].some((s) => Math.hypot(p.at[0] - s.x, p.at[2] - s.z) < MEET_CLEAR)
+      })
     })
     if (crowded || o.places.heroNear(m.a.x, m.a.z, 0) || o.places.heroNear(m.b.x, m.b.z, 0)) continue
+    // (nor in a doorway's threshold or against a wall: a body's room round where each stops)
+    if ([m.a, m.b].some((s) => o.places.furniture.blocked(s.x, s.z, MEET_ROOM, HARD))) continue
     for (const s of [m.a, m.b]) {
       walks.add(`${s.f}:${s.j}`)
       last.set(s.f, m.t + len)
@@ -539,7 +576,8 @@ function lamplighters(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
     // each lamp's spot: an arm's length off the post, toward the way, facing it
     const stands: LifeSpot[] = []
     for (const l of lamps) {
-      const node = o.walk.at(l.tile) >= 0 ? o.walk.at(l.tile) : o.walk.hearts[zi]!
+      // (from the street the post stands on, not from across the houses)
+      const node = nodeNear(o.walk, o.h, l.x, l.z, o.places.walkNear, o.walk.hearts[zi]!)
       const n = o.walk.nodes[node]!
       const base = Math.atan2(n.x - l.x, n.z - l.z)
       for (const da of [0, 0.6, -0.6, 1.2, -1.2, 1.9, -1.9, Math.PI]) {
@@ -579,16 +617,25 @@ function lamplighters(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
       o.places.walkNear,
     )
     let t = LAMP_FROM + r(3) * 0.3
+    let lit = 0
     for (const [k, s] of route.entries()) {
       const at: LifeSpot = { ...s, routine: { id: "light", seed: Math.floor(r(10 + k) * 2 ** 30) } }
-      t = b.go(t, at, { act: "work" })
-      t += LAMP_S / o.secPerHour
+      // (a lamp the way round the houses reaches only after dark is left for the night)
+      const before = b.mark()
+      const arrive = b.go(t, at, { act: "work" })
+      if (arrive > LAMP_BY) {
+        b.back(before)
+        break
+      }
+      t = arrive + LAMP_S / o.secPerHour
+      lit++
       if (t > 20.5) break
     }
+    if (lit < LAMP_MIN) continue
     b.go(t, home.spot, { act: "idle", indoors: home.indoors })
     folk.push({ id, role: "lamplighter", zone: zi, day: b.close(24), prop: PROPS.torch })
     stats.lamplighters++
-    stats.lamps += route.length
+    stats.lamps += lit
   }
 }
 

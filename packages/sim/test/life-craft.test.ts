@@ -297,7 +297,9 @@ describe("the Guildmaster's dispatch at the notice board", () => {
     expect(clipAt(gm, q + 100)).toBe("Sit_Floor_StandUp")
     const walk = gm.steps.find((s) => s.kind === "walk" && s.from === q + RISE_MS)
     expect(walk?.to).toBe(arrive)
-    expect(arrive - q).toBeLessThan(15_000)
+    // (a short errand: on this island the courts before the hall have no room for the board, so it
+    // stands out by the curtain and he walks round to it, never through the wall)
+    expect(arrive - q).toBeLessThan(30_000)
     expect(clipAt(gm, arrive + 100)).toBe("Interact")
     expect(poseAt(gm, arrive + 100)?.sample?.props).toEqual([HERO_PROPS.scroll])
     expect(poseAt(gm, arrive + PIN_MS * 0.6)?.sample?.beat).toBe("pages")

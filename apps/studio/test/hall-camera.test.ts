@@ -15,6 +15,7 @@ import {
   createHallCamera,
   directorDefault,
   directorFree,
+  easeFrame,
   framedTarget,
   glideMs,
   insetsOf,
@@ -105,6 +106,21 @@ describe("framing: clear of the HUD", () => {
   test("nothing covered: the target is the subject", () => {
     const pose = { azimuth: 30, elevation: 30, distance: 20 }
     expect(framedTarget([1, 2, 3], pose, LENS, clearFrame(W, H, NO_INSETS))).toEqual([1, 2, 3])
+  })
+})
+
+describe("a panel opening slides the frame, never jumps it", () => {
+  test("the held frame moves at most ~10% of the way a frame and arrives in about half a second", () => {
+    const shown = clearFrame(W, H, NO_INSETS)
+    const to = clearFrame(390, 844, { ...NO_INSETS, bottom: 422 })
+    let worst = 0
+    for (let i = 0; i < 40; i++) {
+      const before = shown.y
+      easeFrame(shown, to, 1 / 60)
+      worst = Math.max(worst, Math.abs(shown.y - before))
+    }
+    expect(worst).toBeLessThan(Math.abs(to.y) * 0.11)
+    expect(Math.abs(shown.y - to.y)).toBeLessThan(Math.abs(to.y) * 0.05)
   })
 })
 

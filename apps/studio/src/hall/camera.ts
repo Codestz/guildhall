@@ -122,6 +122,19 @@ export function clearFrame(width: number, height: number, insets: Insets): Clear
 
 export { framedTarget } from "@guildhall/render"
 
+/** How fast the held frame follows the measured one, per second (a sheet opening slides the view over ~0.5 s). */
+export const FRAME_RATE = 6
+
+/** One step of the held frame toward the measured one (in place). Pure but for `out`. */
+export function easeFrame(out: ClearFrame, to: ClearFrame, dt: number): ClearFrame {
+  const k = 1 - Math.exp(-FRAME_RATE * Math.max(0, dt))
+  out.x += (to.x - out.x) * k
+  out.y += (to.y - out.y) * k
+  out.w += (to.w - out.w) * k
+  out.h += (to.h - out.h) * k
+  return out
+}
+
 /** The camera's lens: vertical field of view (degrees), width over height. */
 export interface Lens {
   fov: number
@@ -211,7 +224,7 @@ export function shotPose(
   if (distance === "close") return at(CLOSE.distance, CLOSE.elevation)
   if (focus === "place") return at(Math.min(150, 42 + Math.sqrt(Math.max(0, sizes.tiles ?? 0)) * 6), 40)
   if (focus === "harbour") return at(58, 34)
-  return at(30, 32)
+  return at(24, 30)
 }
 
 /** A glide's length, ms: longer for farther and for a bigger change of size (V1: 1.1–2.4 s), shorter for a follow. */
@@ -347,7 +360,9 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
   }
   /** The clear frame, as last measured (never read from the layout in a frame). */
   let clear: ClearFrame = clearFrame(1, 1, NO_INSETS)
-  const frame = (): ClearFrame => clear
+  /** The frame the subject is held at: eased toward the measured one, so a panel opening slides the view, never jumps it. */
+  const shown = { x: 0, y: 0, w: 1, h: 1 }
+  const frame = (): ClearFrame => shown
   // Measured when the HUD's regions or the open panel change size (the observer runs after layout, so
   // reading the boxes there forces none), and on a follow or a cut.
   const watched = new Set<Element>()
@@ -522,6 +537,7 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
       cost.decides++
       cost.decideMs += performance.now() - begin
     }
+    easeFrame(shown, clear, dt)
     const focus: Focus | null = followId ? { kind: "hero", id: followId } : shot ? shot.focus : null
     if (focus) {
       const subject = subjectOf(focus)
@@ -621,7 +637,7 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
       const focus: Focus | null = followId ? { kind: "hero", id: followId } : shot ? shot.focus : null
       return focus ? subjectOf(focus) : null
     },
-    frame: () => ({ ...clear }),
+    frame: () => ({ ...shown }),
     state: () => ({
       mode: mode(),
       following: followId,

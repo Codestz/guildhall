@@ -37,6 +37,7 @@ import {
 } from "@guildhall/render"
 import {
   type AgentPose,
+  BEAT_FX,
   BRISK_WALK,
   gaitMps,
   HERO_CLIPS,
@@ -71,6 +72,7 @@ import {
   lifePose,
   PROPS,
   routineClips,
+  routineClock,
   routineSample,
   solidDistance,
   spotFrame,
@@ -81,6 +83,7 @@ import { libraryUrl, loadCatalog } from "../catalog.ts"
 import * as data from "../data.ts"
 import { type ChipMode, type Chips, chipViews, createChips } from "./chips.ts"
 import { collideView } from "./collideView.ts"
+import { createFolkTalk, FOLK_SAY_M, type FolkTalk } from "./folkTalk.ts"
 import { type AgentSource, recipeOf } from "./lifeAgents.ts"
 import { AGENT_OPTS, LIFE_MPS, type LifePlan, SEC_PER_HOUR, SPEEDUP } from "./lifePlan.ts"
 import { createSpace } from "./space.ts"
@@ -103,6 +106,16 @@ export { LIFE_MPS, SPEEDUP } from "./lifePlan.ts"
 const logger = log("studio:hexworld:life")
 /** A chip stands this far over an agent's feet, metres: just over its head. */
 const CHIP_UP = 1.3
+/** Townsfolk this near the notice board (metres) come to read a quest just pinned, at most one per reader spot. */
+const READ_REACH = 20
+/** Seconds they read it (and a few more by their seed), their pace there and back (m/s), between gatherings. */
+const READ_S = 11
+const READ_MPS = 0.85
+const READ_AGAIN_S = 40
+
+/** A townsfolk's words stand this far over their feet, metres: just over the head (seated: lower). */
+const SAY_UP = 1.15
+const SAY_SAT = 0.85
 /** How often the chips' words are read again from the source's world when it has not changed, ms. */
 const WORDS_MS = 250
 /** Where an agent not on the island yet is kept (undrawn) before its first pose. */
@@ -479,6 +492,28 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     const chipHost = opts.chips
     if (figures.length && chipHost)
       chips = createChips(chipHost, () => ({ ...view, ...chipField(chipHost, view.width) }))
+    // the townsfolk's words near the camera, under the heroes' speaker cap (folkTalk.ts)
+    const talk: FolkTalk | null = chipHost ? createFolkTalk(chipHost) : null
+    if (talk) cleanup.push(() => talk.dispose())
+    /** This frame's camera, for the townsfolk's words: its matrices and where it is. */
+    const eyeCam = stage.camera
+    const sayAt = (id: number, text: string, x: number, y: number, z: number) => {
+      const e = eyeCam.position
+      if (!talk || Math.hypot(e.x - x, e.y - y, e.z - z) > FOLK_SAY_M) return
+      const v = eyeCam.matrixWorldInverse.elements
+      const pm = eyeCam.projectionMatrix.elements
+      const vx = v[0]! * x + v[4]! * y + v[8]! * z + v[12]!
+      const vy = v[1]! * x + v[5]! * y + v[9]! * z + v[13]!
+      const vz = v[2]! * x + v[6]! * y + v[10]! * z + v[14]!
+      if (-vz <= eyeCam.near) return
+      const cx = pm[0]! * vx + pm[4]! * vy + pm[8]! * vz + pm[12]!
+      const cy = pm[1]! * vx + pm[5]! * vy + pm[9]! * vz + pm[13]!
+      const cw = pm[3]! * vx + pm[7]! * vy + pm[11]! * vz + pm[15]!
+      const sx = ((cx / cw + 1) / 2) * view.width
+      const sy = ((1 - cy / cw) / 2) * view.height
+      if (sx < 0 || sx > view.width || sy < 0 || sy > view.height) return
+      talk.say(id, text, sx, sy, -vz)
+    }
 
     // the day's clock: follows the screen's when it moves, else runs SPEEDUP× real time (`held`: shots
     // hold it at an hour, ext.life.hold)
@@ -543,11 +578,131 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     let work: Work | null = null
     /** This frame's ms in the agents' source. */
     let agentMs = 0
+    /**
+     * The crowd round the notice board (plan `readers`): townsfolk standing near it when a quest is
+     * pinned walk over, read and talk it over, and walk back to their stay; times are the agents' seconds.
+     */
+    interface Reader {
+      from: [number, number, number]
+      spot: { at: [number, number, number]; facing: number }
+      go: number
+      arrive: number
+      leave: number
+      back: number
+      seed: number
+    }
+    const reading = new Map<number, Reader>()
+    let gathered = Number.NEGATIVE_INFINITY
+    /** Whether the straight way between two points keeps clear of walls and blockers (its ends aside: where one works). */
+    const clearLine = (ax: number, az: number, bx: number, bz: number) => {
+      const len = Math.hypot(bx - ax, bz - az)
+      const n = Math.ceil(len / 0.35)
+      for (let k = Math.ceil((0.7 / len) * n); k < n - 1; k++) {
+        const x = ax + ((bx - ax) * k) / n
+        const zz = az + ((bz - az) * k) / n
+        for (const o of collide.solidsNear(x, zz, 0.5))
+          if (o.kind !== "seat" && o.kind !== "prop" && solidDistance(o, x, zz) < 0.2) return false
+      }
+      return true
+    }
+    /** A quest pinned at `t`: the nearest few standing about come to the board. */
+    const gather = (t: number) => {
+      const spots = plan.readers
+      if (!spots.length || t - gathered < READ_AGAIN_S) return
+      gathered = t
+      reading.clear()
+      const cx = spots.reduce((m, r) => m + r.at[0], 0) / spots.length
+      const cz = spots.reduce((m, r) => m + r.at[2], 0) / spots.length
+      const near: { id: number; d: number }[] = []
+      for (let id = 0; id < n; id++) {
+        const l = loops[id]!
+        const p = poses[id]
+        // (not a duel, a tavern's table, a chat: those keep a clock with others)
+        if (l.figure !== undefined || !p || p.indoors || p.act === "walk" || p.drill) continue
+        if (p.routine?.day !== undefined) continue
+        const d = Math.hypot(space.x[id]! - cx, space.z[id]! - cz)
+        if (d > READ_REACH) continue
+        // still at the same stay when they would be back
+        const away = READ_S + 6 + (2 * d) / READ_MPS + 4
+        const later = lifePose(l.steps, (day + (away * SPEEDUP) / 3600) % 24, 24)
+        if (later.act === "walk" || later.since !== p.since) continue
+        near.push({ id, d })
+      }
+      near.sort((a, b) => a.d - b.d || a.id - b.id)
+      const free = [...spots]
+      for (const c of near) {
+        if (!free.length) break
+        const x = space.x[c.id]!
+        const zz = space.z[c.id]!
+        let k = 0
+        for (let j = 1; j < free.length; j++)
+          if (
+            Math.hypot(free[j]!.at[0] - x, free[j]!.at[2] - zz) <
+            Math.hypot(free[k]!.at[0] - x, free[k]!.at[2] - zz)
+          )
+            k = j
+        const spot = free[k]!
+        if (!clearLine(x, zz, spot.at[0], spot.at[2])) continue
+        free.splice(k, 1)
+        const go = t + 0.8 + reading.size * 0.7
+        const arrive = go + Math.hypot(spot.at[0] - x, spot.at[2] - zz) / READ_MPS
+        const seed = hash(`read:${opts.seed}:${c.id}:${Math.round(t)}`)
+        const leave = arrive + READ_S + (seed % 5)
+        reading.set(c.id, {
+          from: [x, poses[c.id]!.at[1], zz],
+          spot,
+          go,
+          arrive,
+          leave,
+          back: leave + (arrive - go),
+          seed,
+        })
+      }
+      // they read it together: everyone stays until the last has had a look, then they go a few apart
+      const last = Math.max(...[...reading.values()].map((r) => r.arrive))
+      for (const r of reading.values()) {
+        r.leave = last + READ_S + (r.seed % 4)
+        r.back = r.leave + (r.arrive - r.go)
+      }
+    }
+    /** A reader's pose now, or null when they are at their own stay. */
+    const readerPose = (id: number): LifePose | null => {
+      const r = reading.get(id)
+      if (!r) return null
+      if (secs < gathered) {
+        // the clock went back before the pin: nobody has gone
+        reading.clear()
+        return null
+      }
+      if (secs < r.go || secs >= r.back) {
+        if (secs >= r.back) reading.delete(id)
+        return null
+      }
+      const walking = (a: readonly number[], b: readonly number[], f: number): LifePose => ({
+        at: [a[0]! + (b[0]! - a[0]!) * f, a[1]! + (b[1]! - a[1]!) * f, a[2]! + (b[2]! - a[2]!) * f],
+        facing: Math.atan2(b[0]! - a[0]!, b[2]! - a[2]!),
+        act: "walk",
+        indoors: false,
+        ground: true,
+      })
+      if (secs < r.arrive) return walking(r.from, r.spot.at, (secs - r.go) / (r.arrive - r.go))
+      if (secs >= r.leave) return walking(r.spot.at, r.from, (secs - r.leave) / (r.back - r.leave))
+      return {
+        at: r.spot.at,
+        facing: r.spot.facing,
+        act: "idle",
+        indoors: false,
+        ground: true,
+        routine: { id: "notice", seed: r.seed },
+        since: day - (secs - r.arrive) / SEC_PER_HOUR,
+      }
+    }
     /** Where person id's way has them now: their clock, less how late queueing has made them. */
     const pose = (id: number): LifePose => {
       const l = loops[id]!
       const late = space.delay[id]!
-      if (l.figure === undefined) return lifePose(l.steps, day - (late * SPEEDUP) / 3600, 24)
+      if (l.figure === undefined)
+        return (reading.size ? readerPose(id) : null) ?? lifePose(l.steps, day - (late * SPEEDUP) / 3600, 24)
       const t1 = performance.now()
       // an agent not on the island (not yet come, or gone), or a spare figure, is drawn nowhere: as
       // someone indoors
@@ -586,7 +741,8 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     const routined = (id: number, p: LifePose): LifeSample => {
       const now = day - (space.delay[id]! * SPEEDUP) / 3600
       const into = ((((now - (p.since ?? 0)) % 24) + 24) % 24) * SEC_PER_HOUR
-      return routineSample(p.routine!, into)
+      // (a tavern's tables, a chat's two sides, a haggle: on the day's own clock, so they keep together)
+      return routineSample(p.routine!, routineClock(p.routine!, into, day, SEC_PER_HOUR))
     }
     /** Where feet stand: a stair's tread, a deck's planks, the ground (a dock's deck: the way's own height). */
     const footAt = (x: number, zz: number, p: LifePose) =>
@@ -620,7 +776,9 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       if (p.act !== "walk" && p.routine) {
         const f = routined(id, p)
         const [px, pz] = f.shift ? spotFrame(x, zz, p.facing, f.shift[0], f.shift[1]) : [x, zz]
-        const py = f.shift ? footAt(px, pz, p) + (p.lift ?? 0) : y
+        // a seat's lift only while seated (a patron stands for the toast)
+        const lift = p.lift && f.clip.startsWith("Sit_Chair") ? p.lift : 0
+        const py = (f.shift ? footAt(px, pz, p) : y - (p.lift ?? 0)) + lift
         // a part's turn (to the basket, the cart) eased rather than snapped
         heading[id] = easeAngle(heading[id]!, p.facing + (f.turn ?? 0), dt)
         const hidden = p.indoors || (hiddenAt !== null && hiddenAt(x, zz))
@@ -628,6 +786,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         const carry = f.carry
         const shown = carry ? listOf(`${f.props.join()}+${carry}`, () => [...f.props, carry]) : f.props
         if (!hidden) work?.note(id, p, f, [px, py, pz], heading[id]!)
+        if (f.say && !hidden) sayAt(id, f.say, px, py + (f.clip.startsWith("Sit") ? SAY_SAT : SAY_UP), pz)
         return {
           position: [px, py, pz],
           heading: heading[id]!,
@@ -645,8 +804,11 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       const props = fig ? (doing ? hands(doing.props) : fig.own) : undefined
       if (doing && p.act !== "walk") {
         phase[id] = doing.phase
-        if (doing.beat !== beats[id] && doing.beat && !p.indoors)
+        if (doing.beat !== beats[id] && doing.beat && !p.indoors) {
           opts.beat?.(doing.beat, [x, y + 0.6, zz], { clip: doing.clip, props: doing.props })
+          // a quest pinned at the board: a few townsfolk come to read it
+          if (doing.beat === BEAT_FX.pin && doing.clip === "Interact") gather(secs)
+        }
         beats[id] = doing.beat
         return {
           position: [x, y, zz],
@@ -781,6 +943,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       const t2 = performance.now()
       stage.timing.cpu.add("life", t2 - t1)
       agentCpu += (agentMs - agentCpu) * 0.05
+      talk?.begin()
       crowd?.update(step, sample)
       // the work round them, from what the crowd drew (rods' tips): floats, lines, beats, stocks
       work?.frame(day, step, seek || step > 0.5)
@@ -790,6 +953,14 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       if (chips) {
         placeChips()
         chips.frame(t3)
+      }
+      if (talk) {
+        // the heroes' bubbles first: the townsfolk take what the cap leaves, clear of theirs
+        const taken: { x: number; y: number }[] = []
+        for (const sl of chips?.declutter.slots ?? [])
+          if (sl.speak) taken.push({ x: sl.x, y: sl.y - sl.lift - sl.height - 16 })
+        const field = chipHost ? chipField(chipHost, view.width) : null
+        talk.end(taken, taken.length, !field || field.mode === "hidden" || field.phone)
       }
       stage.timing.cpu.add("chips", performance.now() - t3)
       cpuMs += (performance.now() - t1 - cpuMs) * 0.05
@@ -958,6 +1129,19 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
             drawn: looks[id]?.mounts.map((_, k) => [at(k, [0, 0.36, 0]), at(k, [0, 0.36, 0.6])]),
           }
         },
+        // shots and tests: a townsfolk's role and day as planned (world planFolk, social.ts)
+        day: (id: number) => {
+          const l = loops[id]
+          return l && l.figure === undefined ? { role: roleOf[id], steps: l.steps } : null
+        },
+        // shots: who reads at the notice board now (the crowd a pin gathers), and a gathering by hand
+        readers: () => [...reading.keys()],
+        readerSpots: plan.readers,
+        gather: () => {
+          gathered = Number.NEGATIVE_INFINITY
+          gather(secs)
+          return [...reading.keys()]
+        },
         // shots: hold the day's clock at an hour (null: let it run on from there)
         hold: (h: number | null) => {
           held = h
@@ -982,7 +1166,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
             }
             if (p.act === "walk" || !p.routine) continue
             const into = ((((h - (p.since ?? 0)) % 24) + 24) % 24) * SEC_PER_HOUR
-            const f = routineSample(p.routine, into)
+            const f = routineSample(p.routine, routineClock(p.routine, into, h, SEC_PER_HOUR))
             if (f.clip === clip && f.phase >= min && f.phase <= max) return h
           }
           return null

@@ -26,6 +26,8 @@ import {
   type WorldEvent,
 } from "@guildhall/sim"
 import {
+  type BoardReader,
+  boardReaders,
   doorPasses,
   type Folk,
   graveStrikeSpot,
@@ -83,6 +85,11 @@ export interface LifePlan {
    * `HexWorld.board`, drawn by the batch; `heroSpots.board()` is where the Guildmaster pins at it).
    */
   board: { at: [number, number, number]; facing: number } | null
+  /**
+   * Where townsfolk gather round the Guildhall's notice board when a quest is pinned (world
+   * `boardReaders`): life.ts sends the nearest few there for a read.
+   */
+  readers: BoardReader[]
   /** How many people pass a door over the day, in all. */
   passes: number
   stats: { nodes: number; edges: number; planMs: number; agentsMs: number; walks: number }
@@ -144,6 +151,10 @@ export function planLifeDesk(
     walkways: [...w.stairs, ...w.bridges.flatMap((b) => b.legs), ...w.decks],
     doorways: w.doorways,
     board: null,
+    readers: (() => {
+      const b = places.heroSpots.board()
+      return b ? boardReaders(b, places.furniture) : []
+    })(),
     passes: folk.reduce((n, f) => n + doorPasses(f.day).length, 0),
     stats: {
       nodes: walk.nodes.length,

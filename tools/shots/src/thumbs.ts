@@ -120,7 +120,9 @@ const DEMO = { size: [1280, 800] as [number, number], width: 640, quality: 74 }
  * night storm; the site's pieces and the HUD left out. 640×400 (the Saga's feature card 1024×640).
  */
 export const DEMOS: readonly Pose[] = [
+  // the saga's nightfall festival and World events' fireworks (the director frames them; a gold burst)
   { id: "saga", url: `/?story=saga&act=2&${BARE}`, ...DEMO, width: 1024, run: HIDE_HUD, settle: 12_000 },
+  { id: "events", url: `/?story=events&st=176&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_500 },
   { id: "party", url: `/?story=party&st=45&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },
   { id: "solo", url: `/?story=solo&st=70&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },
   { id: "factions", url: `/?story=factions&st=60&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },

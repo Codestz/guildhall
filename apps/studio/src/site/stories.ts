@@ -15,13 +15,14 @@ export const STORIES: readonly Story[] = [
     id: "saga",
     shelf: "Stories",
     title: "The Saga",
-    kicker: "Five acts · about 3 minutes",
+    kicker: "Five acts · about 3½ minutes",
     blurb:
       "One pull request from quest to release: the Guildmaster dispatches three heroes, CI turns red, a hero pleads for your word, the fix lands and the island clears.",
     shows: [
       "A plea waits for your word",
       "Red CI rolls in a storm with lightning; green clears it",
       "Heroes walk to the folders they work in",
+      "Nightfall ends with a festival and fireworks",
     ],
     art: `${ART}/saga.webp`,
     alt: "The whole island at golden hour, its hall lit by the fire.",
@@ -34,6 +35,29 @@ export const STORIES: readonly Story[] = [
     ],
     link: "?story=saga",
     feature: true,
+  },
+  {
+    id: "events",
+    shelf: "Stories",
+    title: "World events",
+    kicker: "Every show · about 4 minutes",
+    blurb:
+      "One guild earns every world event in turn: red CI raises a skeleton, a red streak wakes the dragon, the 100th deed brings a comet, two falls the ghost ship, a dear session the pirates, and a clean quest a festival with fireworks at night.",
+    shows: [
+      "Skeletons rise on red CI and the fixer strikes the grave",
+      "Dragon, comet, rainbow, ghost ship, pirate raid and galleon, each from its rule",
+      "Fireworks over the keep at nightfall",
+    ],
+    art: `${ART}/events.webp`,
+    alt: "The island at nightfall, its lamps and the festival lit.",
+    acts: [
+      { n: 1, title: "Dawn" },
+      { n: 2, title: "Red skies" },
+      { n: 3, title: "The hundredth deed" },
+      { n: 4, title: "The deep" },
+      { n: 5, title: "Nightfall" },
+    ],
+    link: "?story=events",
   },
   {
     id: "party",

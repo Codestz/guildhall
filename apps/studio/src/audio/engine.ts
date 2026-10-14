@@ -5,6 +5,7 @@ import type { CueKind, SigilKind } from "./kinds.ts"
 import { type Bus, Limiter, PleaCalls, type Verdict } from "./limiter.ts"
 import { type Key, keyOf, motifOf, type Note, renownMotifOf } from "./music.ts"
 import { filesOf, loadSamples, type Rendition, renditionOf, SAMPLES, type SampleName } from "./samples.ts"
+import { type ShowSoundName, ShowSounds } from "./showSounds.ts"
 import { type Listener, NO_LISTENER, placeOf } from "./spatial.ts"
 import { play, playBuffer } from "./synth.ts"
 
@@ -112,6 +113,7 @@ interface Graph {
   buses: Record<Bus | "ambience", GainNode>
   master: GainNode
   ambience: Ambience
+  shows: ShowSounds
 }
 
 export class AudioEngine {
@@ -243,6 +245,20 @@ export class AudioEngine {
   renown(kind: EventKind): void {
     if (!this.audible) return
     this.cue("notes", `renown:${kind}`, renownMotifOf(kind, this.key), undefined, 1, `renown:${kind}`)
+  }
+
+  /**
+   * A world event's own sound (audio/showSounds.ts): a rocket's whoosh, a shell's burst and crackle,
+   * the dragon's roar; `delay` s from now (a burst is timed to its flash), and later still by how far
+   * it is from the camera's focus (sound's speed: the flash first, then the bang). Placed by the
+   * camera; a far one is still heard (the whole island watches), duller.
+   */
+  showSound(name: ShowSoundName, where?: Where, delay = 0, rate = 1): void {
+    if (!this.audible || !this.graph) return
+    const place = where ? placeOf(where.x, where.z, this.listener, THUNDER_FLOOR) : { pan: 0, gain: 1 }
+    const distance = where ? Math.hypot(where.x - this.listener.x, where.z - this.listener.z) : 0
+    this.fired[`show:${name}`] = (this.fired[`show:${name}`] ?? 0) + 1
+    this.graph.shows.play(name, delay + Math.min(1.5, distance / 343), place.pan, place.gain, rate)
   }
 
   /** Lightning struck at `where` (the castle's keep): its thunder, as late as it is far. */
@@ -434,7 +450,13 @@ function build(ctx: AudioContext): Graph {
     return gain
   }
   const buses = { notes: bus(), sfx: bus(), ambience: bus() }
-  return { ctx, buses, master, ambience: new Ambience(ctx, buses.ambience) }
+  return {
+    ctx,
+    buses,
+    master,
+    ambience: new Ambience(ctx, buses.ambience),
+    shows: new ShowSounds(ctx, buses.sfx),
+  }
 }
 
 const round = (value: number): number => Math.round(value * 1000) / 1000

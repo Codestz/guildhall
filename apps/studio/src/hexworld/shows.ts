@@ -60,7 +60,8 @@ export function mountShows(parts: {
         : import("../hall/hud/mount.tsx").then((m) => m.hallSession),
       import("../hall/events.ts"),
       import("../hall/shows.ts"),
-    ]).then(([sessionOf, { hallEvents }, { driveSkyShows }]) => {
+      import("../audio/engine.ts"),
+    ]).then(([sessionOf, { hallEvents }, { driveSkyShows }, { audio }]) => {
       let bound: unknown = null
       let undrive = () => {}
       const bind = () => {
@@ -80,6 +81,9 @@ export function mountShows(parts: {
             { jumps: () => session.clock.get().jumps, now: () => session.clock.get().at / 1000 },
             parts.sites,
             () => parts.light().night > NIGHT_AT,
+            // the dragon's roar, the fireworks' whoosh, bang and crackle, as late as they are far
+            (cue, where, delay) =>
+              audio.showSound(cue.name, where ? { x: where[0], z: where[2] } : undefined, delay, cue.rate),
           )
       }
       bind()

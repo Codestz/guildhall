@@ -14,13 +14,17 @@
  * festival on the square, the comet and the rainbow over the island, the ghost ship and the raid where
  * their hulls are on the water.
  */
-import type {
-  EventSites,
-  Show as RenderShow,
-  ShowKind as RenderShowKind,
-  SeaLife,
-  SeaShow,
-  Shows,
+import {
+  DRAGON_ARRIVE_S,
+  type EventSites,
+  fireworksProgramme,
+  type Show as RenderShow,
+  type ShowKind as RenderShowKind,
+  ROCKET_S,
+  type SeaLife,
+  type SeaShow,
+  type Shows,
+  STAR_S,
 } from "@guildhall/render"
 import type { Show, ShowKind } from "@guildhall/sim"
 import type { HallEvents, ShowPoint } from "./events.ts"
@@ -112,6 +116,58 @@ export function skyPlan(
   return plan
 }
 
+/** A show's sound at a moment of it: what (audio/showSounds.ts), when (s into the show), and where. */
+export interface ShowCue {
+  name: "launch" | "burst" | "crackle" | "roar"
+  at: number
+  where: "keep" | "peak"
+  /** Playback rate (a big shell booms lower). */
+  rate?: number
+}
+
+/** When the dragon roars: as it banks in over the peaks, near the end of its glide in (render `DRAGON_ARRIVE_S`). */
+export const ROAR_S = DRAGON_ARRIVE_S - 2.2
+
+/**
+ * The sounds a sky show makes (pure): the dragon's roar as it arrives; by night the festival's every
+ * rocket (its whoosh from the keep), its burst on its flash (a bigger shell lower) and a crackle shell's
+ * crackle as its stars pop. The comet and the rainbow are silent (their motif tells them).
+ */
+export function showCues(kind: RenderShowKind, night: boolean): ShowCue[] {
+  if (kind === "dragon") return [{ name: "roar", at: ROAR_S, where: "peak" }]
+  if (kind !== "festival" || !night) return []
+  const out: ShowCue[] = []
+  for (const shell of fireworksProgramme()) {
+    const burst = shell.launch + ROCKET_S
+    out.push({ name: "launch", at: shell.launch, where: "keep" })
+    out.push({ name: "burst", at: burst, where: "keep", rate: 1.15 - (shell.size - 1) * 0.6 })
+    if (shell.style === "crackle")
+      out.push({ name: "crackle", at: burst + STAR_S.crackle * 0.48, where: "keep" })
+  }
+  return out.sort((a, b) => a.at - b.at)
+}
+
+/** The cues of a show started at `start` that fall in `(from, to]` on the shows' clock (seconds), with their time. Pure. */
+export function cuesDue(
+  cues: readonly ShowCue[],
+  start: number,
+  from: number,
+  to: number,
+): { cue: ShowCue; at: number }[] {
+  const out: { cue: ShowCue; at: number }[] = []
+  for (const cue of cues) {
+    const at = start + cue.at
+    if (at > from && at <= to) out.push({ cue, at })
+  }
+  return out
+}
+
+/** The dragon flies this far over the peaks (render shows/dragon.ts): its site before it is built. */
+const DRAGON_OVER_PEAKS = 27
+
+/** How far ahead of a cue it is scheduled (the audio clock places it exactly), seconds. */
+const CUE_AHEAD_S = 0.35
+
 /** How often the drive looks again between the engine's changes (a fade ending, a seek), ms. */
 const SYNC_MS = 250
 /**
@@ -132,14 +188,43 @@ export function driveSkyShows(
   sites: EventSites,
   /** Whether the sky is night now (render `NIGHT_AT`): a festival by night is its fireworks. */
   night: () => boolean = () => false,
+  /** Plays a show's sound (`showCues`) at a point, `delay` s from now; none: silent. */
+  sound?: (cue: ShowCue, where: ShowPoint | null, delay: number) => void,
 ): () => void {
   /** What render plays for whom: the engine id each kind was started for, and the end it was given. */
   const started = new Map<RenderShowKind, { id: string; end: number }>()
+  /** The shows' clock as far as their sounds have been scheduled (NaN: from now on). */
+  let heard = Number.NaN
+  const cueCache = new Map<string, ShowCue[]>()
+  const cueAt = (where: ShowCue["where"]): ShowPoint | null => {
+    const p = where === "peak" ? (shows.subject("dragon") ?? sites.peak?.at) : sites.castle
+    return p ? [p[0], p[1], p[2]] : null
+  }
+  const listen = (jumped: boolean) => {
+    const now = clock.now()
+    // a seek, or a skip through a quiet stretch: nothing from before it is heard
+    if (!sound || jumped || !(now >= heard) || now - heard > 2) {
+      heard = now
+      return
+    }
+    for (const p of shows.playing()) {
+      const key = `${p.kind}:${String(p.params?.id ?? "")}:${night()}`
+      let cues = cueCache.get(key)
+      if (!cues) {
+        cues = showCues(p.kind, night())
+        cueCache.set(key, cues)
+      }
+      for (const { cue, at } of cuesDue(cues, p.start, heard + CUE_AHEAD_S, now + CUE_AHEAD_S))
+        if (at < p.end) sound(cue, cueAt(cue.where), Math.max(0, at - now))
+    }
+    heard = now
+  }
   let jumps = clock.jumps()
   const sync = () => {
     const j = clock.jumps()
     const jumped = j !== jumps
     jumps = j
+    listen(jumped)
     // what render still plays (a stopped one fades, then is gone)
     const live = new Set(shows.playing().map((p) => p.kind))
     for (const kind of [...started.keys()]) if (!live.has(kind)) started.delete(kind)
@@ -167,7 +252,13 @@ export function driveSkyShows(
   const peak = sites.peak?.at
   const square = sites.square?.at
   const middle: ShowPoint = [0, 0, 0]
-  events.setSite("dragon", () => (peak ? [peak[0], peak[1], peak[2]] : null))
+  // the dragon: where it flies (render shows `subject`: over the peaks as it comes in off the sea, then
+  // on it, so the camera follows it banking round), else the peaks
+  events.setSite("dragon", () => {
+    const at = shows.subject("dragon")
+    if (at) return [at[0], at[1], at[2]]
+    return peak ? [peak[0], peak[1] + DRAGON_OVER_PEAKS, peak[2]] : null
+  })
   // the festival: by night its fireworks over the keep (render festival.ts bursts 10-19 m over it), by
   // day the square's bunting and confetti
   const keep = sites.castle

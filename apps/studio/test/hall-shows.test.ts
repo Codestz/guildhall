@@ -1,10 +1,25 @@
 import { describe, expect, test } from "bun:test"
-import type { EventSites, Show as RenderShow, ShowKind as RenderShowKind, Shows } from "@guildhall/render"
+import {
+  type EventSites,
+  fireworksProgramme,
+  type Show as RenderShow,
+  type ShowKind as RenderShowKind,
+  ROCKET_S,
+  type Shows,
+} from "@guildhall/render"
 import { forcedShow, type Show } from "@guildhall/sim"
 import { createEvents } from "../src/hall/events.ts"
 import { createSession, type HallSession } from "../src/hall/feeds/session.ts"
 import { StoryFeed } from "../src/hall/feeds/story.ts"
-import { driveSkyShows, seaShowsOf, skyPlan, skyShowOf } from "../src/hall/shows.ts"
+import {
+  cuesDue,
+  driveSkyShows,
+  ROAR_S,
+  seaShowsOf,
+  showCues,
+  skyPlan,
+  skyShowOf,
+} from "../src/hall/shows.ts"
 
 /**
  * The engine's shows on the island (hall/shows.ts): the mapping to render shows/ (seconds on the
@@ -99,6 +114,7 @@ function fakeShows(session: HallSession) {
       calls.push("clear")
       on.clear()
     },
+    subject: () => null,
     playing() {
       for (const [k, s] of on) if (now() >= s.end) on.delete(k)
       return [...on.values()]
@@ -150,8 +166,8 @@ describe("World events on the island", () => {
       const s = sky.find((x) => x.id === f.params?.id) as Show
       expect([f.kind, f.start]).toEqual([s.kind, s.start / 1000])
     }
-    // the director frames each: the dragon over the peaks, the festival over the square, the sky the middle
-    expect(points.get("dragon")).toEqual([10, 30, -5])
+    // the director frames each: the dragon where it flies, the festival over the square, the sky the middle
+    expect(points.get("dragon")).toEqual([10, 57, -5]) // not yet built: over the peaks
     expect(points.get("festival")).toEqual([4, 6, 6]) // by day: the square's bunting
     expect(points.get("comet")).toEqual([0, 0, 0])
     expect(points.get("undead")).toBeNull() // no graveyard mounted here: the camera falls back
@@ -183,5 +199,32 @@ describe("World events on the island", () => {
     stop()
     expect(calls).toContain("clear")
     expect(firsts.map((f) => f.kind)).toEqual(["dragon"])
+  })
+})
+
+describe("the shows' sounds", () => {
+  test("the dragon roars as it banks in; by night every rocket whooshes, bursts on its flash, a crackle crackles", () => {
+    expect(showCues("dragon", false)).toEqual([{ name: "roar", at: ROAR_S, where: "peak" }])
+    expect(ROAR_S).toBeGreaterThan(0)
+    expect(showCues("festival", false)).toEqual([]) // confetti by day: the motif says it
+    expect(showCues("comet", true)).toEqual([])
+    const night = showCues("festival", true)
+    const shells = fireworksProgramme()
+    expect(night.filter((c) => c.name === "launch")).toHaveLength(shells.length)
+    expect(night.filter((c) => c.name === "burst").map((c) => c.at)).toEqual(
+      shells.map((s) => s.launch + ROCKET_S).sort((a, b) => a - b),
+    )
+    expect(night.filter((c) => c.name === "crackle")).toHaveLength(
+      shells.filter((s) => s.style === "crackle").length,
+    )
+    for (let i = 1; i < night.length; i++)
+      expect(night[i]?.at).toBeGreaterThanOrEqual(night[i - 1]?.at as number)
+  })
+
+  test("a cue is due once, in the window it falls in", () => {
+    const cues = showCues("dragon", false)
+    expect(cuesDue(cues, 100, 100, 100 + ROAR_S - 0.01)).toEqual([])
+    expect(cuesDue(cues, 100, 100 + ROAR_S - 0.25, 100 + ROAR_S)).toHaveLength(1)
+    expect(cuesDue(cues, 100, 100 + ROAR_S, 100 + ROAR_S + 0.25)).toEqual([])
   })
 })

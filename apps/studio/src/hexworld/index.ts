@@ -80,6 +80,7 @@ import { type DocketMount, mountDocket } from "./docket.ts"
 import { createDoors, type Doors } from "./doors.ts"
 import { type Fx, fxOf, mountFx, mountWorkFx, type WorkFxMount } from "./fx.ts"
 import { type HallRepo, hallBuild, hallSubtitle, placeRows } from "./hall.ts"
+import { type HarvestMount, mountHarvest } from "./harvest.ts"
 import {
   type BuiltPlace,
   batchSets,
@@ -90,6 +91,7 @@ import {
   heightsAt,
   type MapStage,
   natureOf,
+  type PackedHarvest,
   type PackedPieces,
   runHexJob,
   SEA_LEVEL,
@@ -133,6 +135,8 @@ interface Stages {
   map: Promise<MapStage>
   ground: Promise<GroundStage>
   pieces: Promise<PackedPieces>
+  /** The autumn harvest's pieces (last: after the life plan). */
+  harvest: Promise<PackedHarvest>
   shore: Promise<ShoreStage>
   /** Settles only when the spec asked for life (`?life=0` leaves it pending; disposing fails it). */
   life: Promise<LifePlan>
@@ -154,9 +158,11 @@ function startJob(spec: Promise<HexJobSpec>): Stages {
   const map = stage<MapStage>()
   const ground = stage<GroundStage>()
   const pieces = stage<PackedPieces>()
+  const harvest = stage<PackedHarvest>()
   const shore = stage<ShoreStage>()
   const life = stage<LifePlan>()
-  const [onMap, onGround, onPieces, onShore, onLife] = waiting as [
+  const [onMap, onGround, onPieces, onHarvest, onShore, onLife] = waiting as [
+    (typeof waiting)[0],
     (typeof waiting)[0],
     (typeof waiting)[0],
     (typeof waiting)[0],
@@ -167,7 +173,7 @@ function startJob(spec: Promise<HexJobSpec>): Stages {
     for (const w of waiting) w.fail(e)
   }
   // a screen torn down mid-build drops the stages it no longer waits on quietly
-  for (const p of [map, ground, pieces, shore, life]) p.catch(() => {})
+  for (const p of [map, ground, pieces, harvest, shore, life]) p.catch(() => {})
   // the agents' planning, after the build: requests answered in turn, by id
   const asked = new Map<number, (reply: AgentDeskReply | null) => void>()
   let nextAsk = 1
@@ -179,6 +185,7 @@ function startJob(spec: Promise<HexJobSpec>): Stages {
     } else if (msg.type === "map") onMap.take(msg.map)
     else if (msg.type === "ground") onGround.take(msg.ground)
     else if (msg.type === "pieces") onPieces.take(msg.pieces)
+    else if (msg.type === "harvest") onHarvest.take(msg.harvest)
     else if (msg.type === "shore") onShore.take(msg.shore)
     else if (msg.type === "life") onLife.take(msg.life)
     else fail(new Error(msg.message))
@@ -207,6 +214,7 @@ function startJob(spec: Promise<HexJobSpec>): Stages {
     map,
     ground,
     pieces,
+    harvest,
     shore,
     life,
     planAgents(req) {
@@ -456,6 +464,7 @@ const world = {
     let night: Night | null = null
     let season: SeasonMount | null = null
     let seasonFx: SeasonFx | null = null
+    let harvest: HarvestMount | null = null
     let unTick = () => {}
     let post: Post | null = null
     let disposeField = () => {}
@@ -682,6 +691,20 @@ const world = {
           vertices: async (id) => pieceVertices(await load(id)),
         })
       if (seasonFx && window.guildhall?.ext) window.guildhall.ext.seasonFx = seasonFx
+      // the autumn harvest (harvest.ts): hay, pumpkins, crates on the farms, one draw in autumn, none otherwise
+      if (seasonOn)
+        void mountHarvest({
+          stage,
+          catalog,
+          packed: job.harvest,
+          weights: () => seasonOn.weights(),
+          gone: () => disposed,
+        })
+          .then((made) => {
+            harvest = made
+            if (made && window.guildhall?.ext) window.guildhall.ext.harvest = made
+          })
+          .catch(() => undefined)
       // the sky and town shows (shows.ts): nothing in the scene until one plays
       shows = mountShows({
         stage,
@@ -1000,6 +1023,7 @@ const world = {
       air?.dispose()
       night?.dispose()
       seasonFx?.dispose()
+      harvest?.dispose()
       season?.dispose()
       unAgents()
       unSound()

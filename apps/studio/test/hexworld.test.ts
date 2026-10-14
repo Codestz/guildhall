@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { lightAt } from "@guildhall/render"
 import {
+  HARVEST_IDS,
   hexGroundFine,
   hexIsland,
   hexWalk,
@@ -19,6 +20,7 @@ import {
   sinkPools,
   transferables,
   unpack,
+  unpackHarvest,
 } from "../src/hexworld/job.ts"
 
 /** The hex island's opening camera sees the sun from the side, so its shadows read (V1's look). */
@@ -58,8 +60,21 @@ describe("runHexJob", () => {
   const placed = msgs[2]?.type === "pieces" ? msgs[2].pieces : null
   const shore = msgs[3]?.type === "shore" ? msgs[3].shore : null
 
-  test("posts the map, the ground, the pieces and the shore field, in that order and nothing else", () => {
-    expect(msgs.map((m) => m.type)).toEqual(["map", "ground", "pieces", "shore"])
+  test("posts the map, the ground, the pieces and the shore field, then the autumn harvest, in that order and nothing else", () => {
+    expect(msgs.map((m) => m.type)).toEqual(["map", "ground", "pieces", "shore", "harvest"])
+  })
+
+  test("the harvest stage packs the heaps the world placed, each piece on a farm's ground", () => {
+    const h = msgs[4]?.type === "harvest" ? msgs[4].harvest : null
+    expect(h).not.toBeNull()
+    const piles = unpackHarvest(h!)
+    expect(piles.length).toBeGreaterThan(20)
+    expect(piles.length).toBe(h!.index.length)
+    for (const p of piles) {
+      expect(HARVEST_IDS).toContain(p.piece)
+      expect(Number.isFinite(p.x + p.y + p.z)).toBe(true)
+    }
+    expect(new Set(piles.map((p) => `${p.tile}:${p.heap}`)).size).toBeGreaterThan(5)
   })
 
   test("the ground stage's heights answer as the fine ground's heightAt does ", () => {
@@ -136,7 +151,7 @@ describe("runHexJob life stage", () => {
   const life = msgs[4]?.type === "life" ? msgs[4].life : null
 
   test("comes after the shore, and only when asked for", () => {
-    expect(msgs.map((m) => m.type)).toEqual(["map", "ground", "pieces", "shore", "life"])
+    expect(msgs.map((m) => m.type)).toEqual(["map", "ground", "pieces", "shore", "life", "harvest"])
     expect(life).not.toBeNull()
   })
 

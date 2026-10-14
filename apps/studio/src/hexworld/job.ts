@@ -22,6 +22,7 @@ import {
   vertexMeshData,
 } from "@guildhall/render/worker"
 import {
+  type HarvestPiece,
   HEX_TILE_SIZE,
   type HexFineGround,
   type HexGraveyard,
@@ -29,12 +30,14 @@ import {
   type HexIslandSpec,
   type HexNature,
   type HexWorld,
+  harvestPiles,
   heightsReader,
   hexCentre,
   hexGroundFine,
   hexGroundMesh,
   hexIsland,
   hexStructures,
+  hexWalk,
   hexWorld,
   hexZones,
   installTilePrefabs,
@@ -44,6 +47,7 @@ import {
   type PlaceSpec,
   REGION_KINDS,
   type TilePrefab,
+  workTiles,
 } from "@guildhall/world"
 import type { AgentFeed } from "./lifeAgents.ts"
 import {
@@ -187,6 +191,46 @@ export interface PackedPieces {
   clusters: { key: string; x: number; y: number; z: number }[]
 }
 
+/**
+ * The autumn harvest's pieces (world harvest.ts), packed: piece `kinds[index[k]]` at `place[5k ..]` = x, y, z,
+ * rot, scale, of heap `group[k]` (tile × 16 + the tile's heap).
+ */
+export interface PackedHarvest {
+  kinds: string[]
+  index: Uint8Array
+  place: Float32Array
+  group: Int32Array
+}
+
+/** The harvest back as placements. */
+export function unpackHarvest(p: PackedHarvest): HarvestPiece[] {
+  return Array.from(p.index, (s, k) => ({
+    piece: p.kinds[s] as string,
+    x: p.place[k * 5] as number,
+    y: p.place[k * 5 + 1] as number,
+    z: p.place[k * 5 + 2] as number,
+    rot: p.place[k * 5 + 3] as number,
+    scale: p.place[k * 5 + 4] as number,
+    tile: (p.group[k] as number) >> 4,
+    heap: (p.group[k] as number) & 15,
+  }))
+}
+
+function packHarvest(list: readonly HarvestPiece[]): PackedHarvest {
+  const kinds: string[] = []
+  const index = new Uint8Array(list.length)
+  const place = new Float32Array(list.length * 5)
+  const group = new Int32Array(list.length)
+  list.forEach((p, k) => {
+    let s = kinds.indexOf(p.piece)
+    if (s < 0) s = kinds.push(p.piece) - 1
+    index[k] = s
+    place.set([p.x, p.y, p.z, p.rot, p.scale], k * 5)
+    group[k] = p.tile * 16 + p.heap
+  })
+  return { kinds, index, place, group }
+}
+
 /** One hex prism (`?ground=hex`), as render's `createHexGround` takes it. */
 export interface Prism {
   x: number
@@ -257,6 +301,7 @@ export type FromWorker =
   | { type: "pieces"; pieces: PackedPieces }
   | { type: "shore"; shore: ShoreStage }
   | { type: "life"; life: LifePlan }
+  | { type: "harvest"; harvest: PackedHarvest }
   | { type: "agents"; id: number; reply: AgentDeskReply | null }
   | { type: "fail"; message: string }
 
@@ -483,6 +528,8 @@ export function transferables(msg: FromWorker): ArrayBuffer[] {
   }
   if (msg.type === "pieces")
     return [msg.pieces.index, msg.pieces.place, msg.pieces.cluster].map((a) => a.buffer as ArrayBuffer)
+  if (msg.type === "harvest")
+    return [msg.harvest.index, msg.harvest.place, msg.harvest.group].map((a) => a.buffer as ArrayBuffer)
   if (msg.type !== "ground") return []
   const g = msg.ground
   const arrays = g.mesh ? [g.heights.y, g.mesh.position, g.mesh.color, g.mesh.normal] : [g.heights.y]
@@ -634,6 +681,7 @@ export function runHexJob(
     },
   })
   post({ type: "shore", shore: { min, size, res, reach: SHORE_REACH, data, ms: Math.round(now() - t0) } })
+  let desk: AgentDesk | null = null
   if (spec.life) {
     const placed = { ...w, pieces: w.pieces.map((p, k) => ({ ...p, y: placedY[k] as number })) }
     const agents = spec.agents === undefined ? ({ kind: "story" } as const) : spec.agents
@@ -642,9 +690,19 @@ export function runHexJob(
       ...(spec.places ? { places: spec.places } : {}),
       ...(spec.repo ? { repo: spec.repo } : {}),
     }
-    const { plan, desk } = planLifeDesk(h, z, placed, spec.seed, now, opts)
-    post({ type: "life", life: plan })
-    return desk
+    const made = planLifeDesk(h, z, placed, spec.seed, now, opts)
+    desk = made.desk
+    post({ type: "life", life: made.plan })
   }
-  return null
+  // the autumn harvest (world harvest.ts), last: the Studio shows it only in autumn and nothing waits on
+  // it. Placed on the world's own ground, then stood on the fine ground as the pieces are
+  const walk = hexWalk(h, z, w, { reach: workTiles(h, z) })
+  const piles = harvestPiles(h, w, { walk })
+  if (groundAt)
+    for (const p of piles) {
+      const shift = groundAt(p.x, p.z) - w.heightAt(p.x, p.z)
+      if (Math.abs(shift) < 3) p.y += shift
+    }
+  post({ type: "harvest", harvest: packHarvest(piles) })
+  return desk
 }

@@ -16,8 +16,12 @@ import {
   type HexZones,
   hexAt,
   hexCentre,
+  type PeakSite,
+  peakSite,
   pieceOutline,
+  type SquareSite,
   solidToFoot,
+  squareSite,
   TILE_USES,
 } from "@guildhall/world"
 
@@ -70,6 +74,10 @@ export interface EventSites {
   castle: Vec3 | null
   harbours: HarbourSite[]
   places: PlaceSite[]
+  /** The island's peaks, where the dragon circles (world `peakSite`); null with no rock. */
+  peak?: PeakSite | null
+  /** The festival's poles round the busiest square (world `squareSite`); null without a square. */
+  square?: SquareSite | null
 }
 
 export interface SiteOpts {
@@ -322,8 +330,25 @@ export function eventSites(island: HexIsland, zones: HexZones, world: HexWorld, 
   const doors = new Map(world.doorways.map((d) => [d.tile, d]))
   const plan = zones.castle
   const keep = plan ? top(plan.keep) : null
+  // the shows' (render shows/): the peaks, and the square of the place with the most buildings
+  const use = (i: number) => TILE_USES[zones.use[i] ?? 0]
+  let busiest: HexZones["zones"][number] | null = null
+  for (const zone of zones.zones)
+    if (use(zone.tile) === "square" && (!busiest || zone.buildings > busiest.buildings)) busiest = zone
+  const peak = peakSite(world.tiles, (i) => kindOf(i) === "rock" || kindOf(i) === "cliff")
+  const square = busiest
+    ? squareSite(
+        g,
+        busiest.tile,
+        (i) => tops.get(i),
+        (i) => use(i) === "road" || use(i) === "square",
+        world.pieces,
+      )
+    : null
   return {
     castle: keep ? [keep[0], keep[1] + KEEP_TOP, keep[2]] : null,
+    peak,
+    square,
     harbours,
     places: zones.zones.map((zone, zi) => {
       const at = top(zone.tile)

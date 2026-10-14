@@ -159,7 +159,11 @@ export {
   type CastleRole,
   footprint,
   type IslandSites,
+  type PeakSite,
+  peakSite,
   pieceSize,
+  type SquareSite,
+  squareSite,
 } from "./sites.ts"
 export {
   type Disc,

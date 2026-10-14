@@ -8,8 +8,9 @@
  */
 
 import { hash2 } from "../geom/noise.ts"
-import { pieceFootprint, pieceOutline, solidDistance, solidKind } from "./collide.ts"
+import { pieceFootprint, pieceOutline, pieceSolids, solidDistance, solidKind } from "./collide.ts"
 import type { HexGrid } from "./grid.ts"
+import { HEX_TILE_SIZE, type PlacedPiece } from "./tiles.ts"
 
 /** The island's reserved sites: tile lists, the first tile the heart (the town's square, the castle's keep). */
 export interface IslandSites {
@@ -586,3 +587,151 @@ export function settlePieces(
 }
 const FIT_STEPS = 6
 const MIN_FIT = 0.7
+
+// ─────────────────────────── the shows' sites (render shows/) ───────────────────────────
+
+/** Where the dragon circles: the middle of the island's peaks on top, and how far they spread (metres). */
+export interface PeakSite {
+  at: [number, number, number]
+  reach: number
+}
+
+/** How far from the highest rock the peaks' cluster reaches, metres. */
+const PEAK_REACH = 40
+
+/**
+ * The island's peaks (pure): the highest rock tile and the rock round it, their middle (x, z), weighted
+ * to the high ground, their top and how far they spread. Null on an island with no rock.
+ */
+export function peakSite(
+  tiles: readonly { i: number; x: number; z: number; top: number }[],
+  rock: (i: number) => boolean,
+): PeakSite | null {
+  let high: (typeof tiles)[number] | null = null
+  for (const t of tiles) if (rock(t.i) && (!high || t.top > high.top)) high = t
+  if (!high) return null
+  const peak = high
+  const near = tiles.filter((t) => rock(t.i) && Math.hypot(t.x - peak.x, t.z - peak.z) <= PEAK_REACH)
+  let w = 0
+  let x = 0
+  let z = 0
+  for (const t of near) {
+    const k = 1 + Math.max(0, t.top - peak.top + 4)
+    w += k
+    x += t.x * k
+    z += t.z * k
+  }
+  x /= w
+  z /= w
+  let reach = 0
+  for (const t of near) reach = Math.max(reach, Math.hypot(t.x - x, t.z - z))
+  return { at: [x, peak.top, z], reach }
+}
+
+/** A festival's poles round a square and the cords strung between them (render shows/festival.ts). */
+export interface SquareSite {
+  /** The square's middle, on top. */
+  at: [number, number, number]
+  /** Each pole's foot (x, ground, z). */
+  poles: [number, number, number][]
+  /** Cords between two poles (indices): pennants round the square and across its ways, lanterns along them. */
+  cords: { a: number; b: number; hang: "pennants" | "lanterns" }[]
+}
+
+/** How far a pole stands from any solid piece's outline, metres. */
+const POLE_CLEAR = 0.35
+/** Two ways' poles closer than this are one pole, metres. */
+const POLE_SHARE = 1.6
+
+/**
+ * The pole spots round a square (pure): one at each corner of its tile, moved in or out until clear of
+ * every solid piece, and a pair flanking each way that leaves it (`avenue`: a road or a square on that
+ * side), most of a tile down it. Pennants hang round the square and across each way, lanterns along the
+ * ways, from the nearer corner of the square to each of the pair. A spot with no clear ground is left
+ * out, and its cords with it.
+ */
+export function squareSite(
+  g: HexGrid,
+  square: number,
+  top: (i: number) => number | undefined,
+  avenue: (i: number) => boolean,
+  pieces: readonly PlacedPiece[],
+): SquareSite | null {
+  const R = HEX_TILE_SIZE
+  const SQ3 = Math.sqrt(3)
+  const centre = (i: number): [number, number] => [SQ3 * (g.q[i]! + g.r[i]! / 2) * R, 1.5 * g.r[i]! * R]
+  const h = top(square)
+  if (h === undefined) return null
+  const [cx, cz] = centre(square)
+  const solids = pieces.filter((p) => Math.hypot(p.x - cx, p.z - cz) < R * 5).flatMap((p) => pieceSolids(p))
+  const clear = (x: number, z: number) => solids.every((s) => solidDistance(s, x, z) >= POLE_CLEAR)
+  const poles: [number, number, number][] = []
+  /** The first clear spot of `tries`, as a pole's index (a pole already standing near it); -1 when none is. */
+  const place = (tries: [number, number][], y: number): number => {
+    for (const [x, z] of tries)
+      if (clear(x, z)) {
+        const near = poles.findIndex((p) => Math.hypot(p[0] - x, p[2] - z) < POLE_SHARE)
+        if (near >= 0) return near
+        poles.push([x, y, z])
+        return poles.length - 1
+      }
+    return -1
+  }
+  // the square's corners (pointy-top: at 30° + 60° k), at the tile's edge, then inward, then a little out
+  const cornerAngle = (k: number) => Math.PI / 6 + (Math.PI / 3) * k
+  const corners = [0, 1, 2, 3, 4, 5].map((k) =>
+    place(
+      [0.95, 0.85, 1.05, 0.75].map(
+        (f) =>
+          [cx + Math.cos(cornerAngle(k)) * R * f, cz + Math.sin(cornerAngle(k)) * R * f] as [number, number],
+      ),
+      h,
+    ),
+  )
+  const cords: SquareSite["cords"] = []
+  const cord = (a: number, b: number, hang: "pennants" | "lanterns") => {
+    if (a >= 0 && b >= 0 && a !== b) cords.push({ a, b, hang })
+  }
+  for (let k = 0; k < 6; k++) cord(corners[k]!, corners[(k + 1) % 6]!, "pennants")
+  const around = g.neighbours(square)
+  for (let d = 0; d < 6; d++) {
+    const n = around[d] ?? -1
+    if (n < 0 || !avenue(n)) continue
+    const ny = top(n)
+    if (ny === undefined) continue
+    const [nx, nz] = centre(n)
+    const ux = (nx - cx) / (SQ3 * R)
+    const uz = (nz - cz) / (SQ3 * R)
+    const mx = cx + (nx - cx) * 0.8
+    const mz = cz + (nz - cz) * 0.8
+    const pair = [1, -1].map((s) =>
+      place(
+        [0.95, 0.8, 1.1].map((f) => [mx - uz * s * R * f, mz + ux * s * R * f] as [number, number]),
+        ny,
+      ),
+    )
+    cord(pair[0]!, pair[1]!, "pennants")
+    // the square's two corners either side of this way (30° off its heading)
+    const heading = Math.atan2(nz - cz, nx - cx)
+    const flank = [0, 1, 2, 3, 4, 5].filter((k) => {
+      const a = cornerAngle(k) - heading
+      return corners[k]! >= 0 && Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) < Math.PI / 4
+    })
+    for (const p of pair) {
+      if (p < 0) continue
+      const [px, , pz] = poles[p]!
+      let best = -1
+      let bd = Number.POSITIVE_INFINITY
+      for (const k of flank) {
+        const q = poles[corners[k]!]!
+        const dd = Math.hypot(q[0] - px, q[2] - pz)
+        if (dd < bd) {
+          bd = dd
+          best = corners[k]!
+        }
+      }
+      cord(best, p, "lanterns")
+    }
+  }
+  return poles.length >= 3 ? { at: [cx, h, cz], poles, cords } : null
+}

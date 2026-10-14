@@ -12,9 +12,9 @@ export const BUILT: BuiltContent = {
   title: "A repository, grown into an island",
   lede: "Events in, a living world out: Guildhall turns what happens in a repository (its files, its coding agents, its CI) into a hex island with people on it. It is built to be **looked at**, so every part was tuned from pictures, and every part that must always work is tested across seeds, not examples. This page walks through how, and what went wrong on the way.",
   stats: [
-    { n: "12k", unit: "files", label: "on the largest island grown so far" },
+    { n: "2,800", unit: "tiles", label: "the most land an island gets, reached at about 11k files" },
     { n: "1", label: "source of truth for where things stand" },
-    { n: "74", unit: "tiles", label: "authored as data, with about 150 spots for people" },
+    { n: "83", unit: "tiles", label: "authored as data, with 236 spots for people" },
   ],
   note: "The island is drawn with three.js in your browser. The Studio, the world and this site share one design system.",
   sections: [
@@ -24,7 +24,7 @@ export const BUILT: BuiltContent = {
       blocks: [
         {
           kind: "p",
-          text: "The island is a grid of hexagons, built from a seed and the repo's size. Land is `2 × (40 + 13·√files)` tiles, capped, so ten times the code gets far less than ten times the land.",
+          text: "The island is a grid of hexagons, built from a seed and the repo's size. Land is `2 × (40 + 13·√files)` tiles, capped at 2,800, so ten times the code gets far less than ten times the land.",
         },
         {
           kind: "p",
@@ -49,7 +49,7 @@ export const BUILT: BuiltContent = {
             },
             {
               term: "The castle",
-              text: "the Guildhall grows in tiers with the repo, from a tower to a keep with a curtain wall",
+              text: "the Guildhall grows in four tiers with the repo's files: a keep alone, a walled keep, a castle with wards and its great hall, then a citadel",
             },
           ],
         },
@@ -131,7 +131,7 @@ export const BUILT: BuiltContent = {
       blocks: [
         {
           kind: "p",
-          text: "Townsfolk live by daily routines: they go to authored **spots** where they sit, work, talk or drink, and the evening finds them in the tavern garden. About 150 spots and 300 blockers are authored as data on 74 tile prefabs, so a design opinion (“a canteen with a beer garden”) becomes something the simulation uses.",
+          text: "Townsfolk live by daily routines: they go to authored **spots** where they sit, work, talk or drink, and the evening finds them in the tavern garden. 236 spots and 467 blockers are authored as data on 83 tile prefabs, so a design opinion (“a canteen with a beer garden”) becomes something the simulation uses.",
         },
         {
           kind: "techs",
@@ -175,7 +175,7 @@ export const BUILT: BuiltContent = {
           items: [
             {
               title: "Pieces and palette",
-              text: "1,521 pieces from 18 asset packs, browsable at true scale, with a curated style list.",
+              text: "1,525 pieces from 17 asset packs, browsable at true scale, with a curated style list.",
             },
             {
               title: "Scale board",
@@ -203,7 +203,8 @@ export const BUILT: BuiltContent = {
           kind: "image",
           src: `${J}/studio-home.webp`,
           alt: "The Studio home screen, a gallery of its tools.",
-          caption: "The Studio's home. Public and view-only online; editable on localhost only.",
+          caption:
+            "The Studio's home. Public online: every tool works, nothing is saved. Saving works on localhost.",
           wide: true,
         },
         {
@@ -219,7 +220,7 @@ export const BUILT: BuiltContent = {
       blocks: [
         {
           kind: "p",
-          text: "The heavy world is built in a **worker** and streamed in stages (map, then ground, then pieces, then shore), with shader compiles started early, so the first paint stays light while the island arrives behind it.",
+          text: "The heavy world is built in a **worker**, with shader compiles started early, behind a loading cover. When the island is ready (terrain, buildings and people) it shows at once, instead of terrain first and buildings popping in.",
         },
         {
           kind: "p",
@@ -231,7 +232,7 @@ export const BUILT: BuiltContent = {
             "**LOD is invisible at its switch point**: it swaps only where the difference is under about one pixel, and crossfades (dithered) over a distance band.",
             "**Every threshold has a gap** between its switch-in and switch-out distance, so nothing flickers back and forth.",
             "**Far detail** drops sub-pixel props, and far crop rows merge into one shell per field.",
-            "**The quality governor** steps one rung at a time and never mid-glance; phones get a lower tier (pixel-ratio cap, lighter shadows).",
+            "**The quality governor** trades resolution, not detail: it moves the pixel ratio a quarter step at a time (between 1.5 and 2) to hold a 12 ms frame, waits longer after a raise that did not hold, and never overrides a Low, Medium or High picked in Settings.",
           ],
         },
         {
@@ -247,7 +248,7 @@ export const BUILT: BuiltContent = {
         },
         {
           kind: "p",
-          text: "V1 compared WebGL with WebGPU. V2 stays on WebGL: at about 35 draw calls the cost is pixels and triangles, not calls, so WebGPU was not worth it yet. Numbers are measured with vsync on and an idle machine, because headless Chrome distorts worker timing.",
+          text: "V1 compared WebGL with WebGPU. V2 stays on WebGL: at 30 to 43 draw calls in the bench, the cost is pixels and triangles, not calls, so WebGPU was not worth it yet. Numbers are measured with vsync on and an idle machine, because headless Chrome distorts worker timing.",
         },
       ],
     },
@@ -262,9 +263,9 @@ export const BUILT: BuiltContent = {
         {
           kind: "list",
           items: [
-            "**Agents become heroes.** A session is a hero with a banner colour and a family; tool calls are deeds you can watch; a plea waiting on a human shows on the crest.",
-            "**CI is weather.** A failing run brings the clouds; a release arrives as a galleon, and the lighthouse pulses red when tests fail.",
-            "**A repo is a sea.** Pull requests anchor offshore. Nothing old is announced: the first look at a repo is a baseline.",
+            "**Agents become heroes.** A session is a hero with a banner colour and a family; tool calls are deeds you can watch; a plea waiting on a human puts a mark over the hero.",
+            "**CI is weather.** A failing run brings the clouds and a storm; green brings the sun back, and everyone cheers.",
+            "**Pull requests are ships.** One sails in and docks at the harbour; merged, it dips its pennant under a gold flare and sails out; closed, it sinks at its berth.",
             "**Ported with a golden.** V1's event model was run on recorded inputs, its outputs saved, and the V2 port is required to match exactly, which made it provably faithful.",
           ],
         },

@@ -148,6 +148,19 @@ export {
   natureReach,
   WOODED,
 } from "./nature.ts"
+export {
+  CHEER_CLIP,
+  CHEER_MS,
+  PETITION_CAP,
+  PETITION_FIGURES,
+  PETITION_GAP,
+  PETITION_LEAVING,
+  PETITION_MPS,
+  type PetitionLane,
+  type PetitionQueue,
+  petitionerPoses,
+  petitionLane,
+} from "./petitioners.ts"
 export { parseTilePrefabs, SPOT_KINDS, TILE_GROUNDS, TILE_GROUPS, validateTilePrefab } from "./prefabs.ts"
 export {
   BEAT_S,

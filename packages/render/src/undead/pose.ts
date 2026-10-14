@@ -45,8 +45,8 @@ export const SUNK = -1.8
 /** Its death plays this long before it goes down, then sinks over SINK_DOWN_MS. */
 export const DIE_MS = 1500
 export const SINK_DOWN_MS = 1000
-/** How far its death falls back (root and hips, measured on the rig). */
-export const DRIFT = 1.7
+/** How far it slides forward as its death falls back (the fall is ~1.8 on the rig; a little more keeps the bones off the headstone behind). */
+export const DRIFT = 2.3
 
 /** The rig's skeleton clips (and the blow's), seconds. */
 export const UNDEAD_CLIP_SECONDS = {

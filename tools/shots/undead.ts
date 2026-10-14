@@ -5,7 +5,8 @@
  * "minion" | "all", "hold"?: ms into the scene (held there), "run"?: ms to let the scene play live
  * (its puffs fly) before it is held where it got to, "seek"?: run time ms from a hall session's start,
  * "at"?: "gate" | grave slot (default 0) | [x, y, z], "distance"?, "elevation"?, "azimuth"? (default:
- * three-quarters onto the grave's front), "lift"?: metres over its feet the camera looks at }]}.
+ * three-quarters onto the grave's front; "turn"?: degrees off its front instead), "lift"?: metres over its feet
+ * the camera looks at }]}.
  * The camera flies the free camera (the orbit keeps 10 m off). Each writes <outdir>/<name>.png (900 px
  * wide) and <outdir>/<name>.json (what was drawn: the figures, the undead's stats, the heroes).
  */
@@ -23,6 +24,8 @@ interface Shot {
   elevation?: number
   azimuth?: number
   lift?: number
+  /** Degrees off the grave's front the camera stands (default 30). */
+  turn?: number
 }
 
 const [file, out] = process.argv.slice(2)
@@ -53,7 +56,8 @@ try {
           ? u.gate()
           : [grave.x, grave.y + (sh.lift ?? 0.45), grave.z]
       // the camera looks along (−sin az, −cos az)
-      const az = sh.azimuth ?? (grave ? (grave.facing * 180) / Math.PI + 30 : g.camera.get().azimuth)
+      const az =
+        sh.azimuth ?? (grave ? (grave.facing * 180) / Math.PI + (sh.turn ?? 30) : g.camera.get().azimuth)
       const el = sh.elevation ?? 30
       const d = sh.distance ?? 4
       const a = (az * Math.PI) / 180

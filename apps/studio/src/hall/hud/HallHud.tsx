@@ -75,6 +75,7 @@ import type { HallTime } from "../clock.ts"
 import type { SessionSnapshot } from "../feeds/session.ts"
 import { chronicleOf, groupRepeats, partiesOf, rosterOf, type SessionEntry } from "../feeds/view.ts"
 import { HallTimeline } from "../timeline.tsx"
+import { usePortraitOf } from "./portraits.ts"
 import {
   HeroSheet,
   type HudSession,
@@ -426,6 +427,7 @@ export function HallHud(props: HallHudProps) {
     live?.session.subscribe ?? nothing,
     live ? live.session.snapshot : noSnapshot,
   )
+  const portraitOf = usePortraitOf(live?.portraits)
   const [hero, setHero] = useState<string | null>(null)
   // who the camera follows (a badge reads pressed), and the director's switch
   const filmed = useSyncExternalStore(camera?.subscribe ?? nothing, () => camera?.state().following ?? null)
@@ -889,6 +891,8 @@ export function HallHud(props: HallHudProps) {
               parties={roster.parties}
               following={following}
               selected={filmed}
+              look="portrait"
+              portraitOf={portraitOf}
               onPick={(id) => (id ? follow(id) : camera?.release())}
               onExpand={() => {
                 if (detailed && !phone) setFolded((f) => ({ ...f, roster: false }))

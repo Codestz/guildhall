@@ -1,14 +1,15 @@
 /**
  * The avatars' sheet: the rim takes the state's tone (plea warn, fail fail, loot ok), otherwise the
- * banner (face, portrait) or brass (shield). Idle heroes dim. Part of HUD_CSS.
+ * hero's own colour (face, portrait) or brass (shield). Idle heroes dim. Part of HUD_CSS.
  */
 export const AVATAR_CSS = /* css */ `
 .hud-avatar { --rim: var(--banner); flex: none; position: relative; display: inline-grid; place-items: center; width: var(--av); line-height: 0; }
 .hud-avatar svg { display: block; overflow: visible; }
 .hud-avatar-rim { stroke: var(--rim); }
 .hud-avatar[data-variant="shield"] { --rim: var(--brass); }
-/* a face's rim is its hero's own colour: heroes of one banner still tell apart */
-.hud-avatar[data-variant="face"] { --rim: var(--accent, var(--banner)); }
+/* a face's or portrait's rim is its hero's own colour (the medallion's ground is the banner): heroes of
+   one body and one banner still tell apart */
+.hud-avatar[data-variant="face"], .hud-avatar[data-variant="portrait"] { --rim: var(--accent, var(--banner)); }
 .hud-avatar[data-tone="plea"] { --rim: var(--warn); }
 .hud-avatar[data-tone="fail"] { --rim: var(--fail); }
 .hud-avatar[data-tone="loot"] { --rim: var(--ok); }

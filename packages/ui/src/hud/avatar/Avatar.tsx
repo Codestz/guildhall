@@ -1,9 +1,11 @@
 /**
  * A hero's avatar, one component with three looks (decisions.md "V1 UI parity", user picks):
  *
- *   face      C · a chibi face per body family whose expression follows the phase (the badge bar)
- *   portrait  A · the hero's own KayKit figure, rendered once (render `portrait.ts`), in a round medallion
- *               with a state-coloured rim (roster rows, the dossier); the face stands in until it is drawn
+ *   face      C · a chibi face per body family whose expression follows the phase (where no portrait is
+ *               drawn: the labs, a crowd's role badge; and standing in for a portrait until it lands)
+ *   portrait  A · the hero's own KayKit figure as the island draws it, rendered once (render `portrait.ts`),
+ *               in a round medallion of its banner with a rim in its own colour or its state's (the badge
+ *               bar, roster rows, the dossier); the face stands in until it is drawn
  *   shield    B · a heraldic shield: the banner's tincture, a division seeded by the session, a family charge
  *               (the shareable card)
  *

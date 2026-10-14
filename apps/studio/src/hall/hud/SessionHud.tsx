@@ -10,12 +10,15 @@ import { useMemo, useSyncExternalStore } from "react"
 import type { SessionPlaces } from "../feeds/places.ts"
 import type { HallSession, SessionSnapshot } from "../feeds/session.ts"
 import { dossierOf, partiesOf, pleaViews, rosterOf } from "../feeds/view.ts"
+import { type HeroPortraits, usePortraitOf } from "./portraits.ts"
 
 /** The session as the HUD sees it: the session, its places, and the repo's name (for short paths). */
 export interface HudSession {
   session: HallSession
   places: SessionPlaces
   repo: string
+  /** The heroes' portraits (their island figures, drawn on the stage's renderer); none: the faces stay. */
+  portraits?: HeroPortraits
 }
 
 export const useSnapshot = (session: HallSession): SessionSnapshot =>
@@ -87,6 +90,7 @@ export function RosterPanel({
   onClose: () => void
 }) {
   const { heroes, parties } = useRoster(hud, snap)
+  const portraitOf = usePortraitOf(hud.portraits)
   return (
     <Roster
       heroes={heroes}
@@ -97,6 +101,8 @@ export function RosterPanel({
       open
       onToggle={onClose}
       onPick={(id) => (id ? onPick(id) : onClose())}
+      look="portrait"
+      portraitOf={portraitOf}
       className="hall-roster"
     />
   )
@@ -137,6 +143,7 @@ export function HeroSheet({
       }),
     [snap, hud, id],
   )
+  const portraitOf = usePortraitOf(hud.portraits)
   if (!view) return <p className="hud-empty">This hero has left the island.</p>
   return (
     <div className="hall-hero-sheet">
@@ -145,7 +152,7 @@ export function HeroSheet({
           ← The Guild
         </button>
       )}
-      <Dossier {...view} onClose={onClose} />
+      <Dossier {...view} portrait={portraitOf(view.hero)} onClose={onClose} />
     </div>
   )
 }

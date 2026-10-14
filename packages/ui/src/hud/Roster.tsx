@@ -292,10 +292,14 @@ export function RosterBadges({
   onPick,
   onExpand,
   look = "face",
-}: Pick<RosterProps, "heroes" | "parties" | "following" | "selected" | "onPick"> & {
+  portraitOf,
+}: Pick<RosterProps, "heroes" | "parties" | "following" | "selected" | "onPick" | "portraitOf"> & {
   onExpand: () => void
-  /** A chibi face whose expression follows the phase (the default), or V1's monogram diamond. */
-  look?: "face" | "sigil"
+  /**
+   * A chibi face whose expression follows the phase (the default), the hero's own figure in a medallion
+   * (`portraitOf`'s sprite; the face until it lands), or V1's monogram diamond.
+   */
+  look?: "face" | "portrait" | "sigil"
 }) {
   const groups = rosterGroups(heroes, parties, { following })
   const banners = groups.length > 1
@@ -339,6 +343,8 @@ export function RosterBadges({
                       >
                         {look === "face" ? (
                           <Avatar variant="face" hero={hero} size={30} />
+                        ) : look === "portrait" ? (
+                          <Avatar variant="portrait" hero={hero} size={30} src={portraitOf?.(hero)} />
                         ) : (
                           <Sigil family={hero.family} banner={hero.banner} ordinal={hero.ordinal} />
                         )}

@@ -295,6 +295,8 @@ export interface HudParts {
   workfx?: WorkFxMount["fx"] | null
   /** Where a session's hero is drawn now (its feet, metres; null: not on the island, or no life). */
   heroAt(id: string): [number, number, number] | null
+  /** How a session's hero is drawn (its figure's look, life's `heroLook`): its HUD portrait. */
+  heroLook?(id: string): ReturnType<Life["heroLook"]>
   /** The heroes' chips (null: no life, no agents, or `?chips=0`): the one followed, a plea mark tapped. */
   chips: Pick<Chips, "select" | "onPlea" | "hit"> | null
   /** The hall's camera (hall/camera.ts: follow a hero, the director), set by the hall's HUD as it mounts. */
@@ -836,6 +838,7 @@ const world = {
           fx,
           workfx: workfx?.fx ?? null,
           heroAt: (id) => life?.heroAt(id) ?? null,
+          heroLook: (id) => life?.heroLook(id) ?? null,
           chips: life?.chips() ?? null,
         })
       // a hall's session drives its heroes: planned in the worker as its log grows (the HUD starts the

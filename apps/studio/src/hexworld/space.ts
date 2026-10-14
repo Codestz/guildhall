@@ -12,7 +12,9 @@
  *              people meeting pass on their lanes (the world's walks keep to one side of the way);
  *   solids     a walker pushed off its way is kept out of every solid and on the walkable height its way is
  *              at: never beside a flight of stairs at the foot of its cheek, off a bridge's planks or up a
- *              terrace edge.
+ *              terrace edge. A nudge that would still leave a body inside a wall, a house or a fence its
+ *              way is not in is drawn back toward the way (which keeps out: the world's walls sweep) until
+ *              it is out: nobody is drawn through a wall (decisions.md 10-14).
  *
  * Pure: the Studio's life draws people where `x`, `z` say, at their clock less `delay`.
  */
@@ -55,6 +57,8 @@ const STAYER = 0.3
 const CORE = 0.2
 /** Near a walk's ends a walker may cross what stands there (a doorway, its bench), metres. */
 const DOOR = 1
+/** How far from a walk's end a walker may be in what the end stands in (its doorway's house), metres. */
+const DOOR_ROOM = 1.6
 /** A step up or down a walker may be pushed onto, metres. */
 const STEP = 0.2
 /** How far ahead a walker starts steering round someone standing in its way, metres. */
@@ -117,12 +121,25 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
     for (const o of world.solidsNear(px, pz, CORE)) if (world.solidDistance(o, px, pz) < CORE) return false
     return true
   }
-  /** A solid person `i` (at pose `p`) may stand in: a walker's door or spot at either end, a stayer's own seat. */
-  const own = (s: Solid, i: number, p: SpacePose): boolean =>
-    walk[i]
-      ? (!!p.to && world.solidDistance(s, p.to[0]!, p.to[2]!) < DOOR) ||
-        (!!p.from && world.solidDistance(s, p.from[0]!, p.from[2]!) < DOOR)
-      : world.solidDistance(s, baseX[i]!, baseZ[i]!) < 0.02
+  /**
+   * A solid person `i` (at pose `p`, drawn at px, pz) may stand in: what their way stands in where they
+   * are on it (a stayer's own seat, a doorway's porch the walk runs under), and by a walk's end what the
+   * end stands in (its door, its bench), near that end only.
+   */
+  const own = (s: Solid, i: number, p: SpacePose, px: number, pz: number): boolean => {
+    if (world.solidDistance(s, baseX[i]!, baseZ[i]!) < 0.02) return true
+    if (!walk[i]) return false
+    for (const e of [p.to, p.from])
+      if (e && world.solidDistance(s, e[0]!, e[2]!) < DOOR && hyp(px - e[0]!, pz - e[2]!) < DOOR_ROOM)
+        return true
+    return false
+  }
+  /** Whether (px, pz) is inside a solid person `i` may not stand in (a wall, a house, a fence, a cart). */
+  const inside = (i: number, p: SpacePose, px: number, pz: number): boolean => {
+    for (const s of world.solidsNear(px, pz, 0.02))
+      if (!s.soft && world.solidDistance(s, px, pz) < 0 && !own(s, i, p, px, pz)) return true
+    return false
+  }
   /** Per frame: how hard each walker brakes behind the one ahead (kept, not made, each frame). */
   const brake = new Float32Array(n)
 
@@ -306,7 +323,7 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
         for (let round = 0; round < 2; round++) {
           let moved = false
           for (const s of world.solidsNear(px, pz, CORE)) {
-            if (own(s, i, p)) continue
+            if (own(s, i, p, px, pz)) continue
             const d = world.solidDistance(s, px, pz, dir)
             if (d >= CORE) continue
             px += dir[0] * (CORE - d + 1e-3)
@@ -326,6 +343,18 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
             const f = (lo + hi) / 2
             if (fits(i, baseX[i]! + ox * f, baseZ[i]! + oz * f)) lo = f
             else hi = f
+          }
+          ox *= lo
+          oz *= lo
+        }
+        // never left inside a solid: drawn back toward its way (out of them) until it is out
+        if (inside(i, p, baseX[i]! + ox, baseZ[i]! + oz)) {
+          let lo = 0
+          let hi = 1
+          for (let k = 0; k < 6; k++) {
+            const f = (lo + hi) / 2
+            if (inside(i, p, baseX[i]! + ox * f, baseZ[i]! + oz * f)) hi = f
+            else lo = f
           }
           ox *= lo
           oz *= lo

@@ -89,6 +89,7 @@ import { collideView } from "./collideView.ts"
 import { createFolkTalk, FOLK_SAY_M, type FolkTalk } from "./folkTalk.ts"
 import { type AgentSource, recipeOf } from "./lifeAgents.ts"
 import { AGENT_OPTS, LIFE_MPS, type LifePlan, SEC_PER_HOUR, SPEEDUP } from "./lifePlan.ts"
+import { createReaders, type ReaderCandidate } from "./readers.ts"
 import { createSpace } from "./space.ts"
 import {
   CARRIED,
@@ -109,12 +110,6 @@ export { LIFE_MPS, SPEEDUP } from "./lifePlan.ts"
 const logger = log("studio:hexworld:life")
 /** A chip stands this far over an agent's feet, metres: just over its head. */
 const CHIP_UP = 1.3
-/** Townsfolk this near the notice board (metres) come to read a quest just pinned, at most one per reader spot. */
-const READ_REACH = 20
-/** Seconds they read it (and a few more by their seed), their pace there and back (m/s), between gatherings. */
-const READ_S = 11
-const READ_MPS = 0.85
-const READ_AGAIN_S = 40
 
 /** A townsfolk's words stand this far over their feet, metres: just over the head (seated: lower). */
 const SAY_UP = 1.15
@@ -624,41 +619,14 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     /** This frame's ms in the agents' source. */
     let agentMs = 0
     /**
-     * The crowd round the notice board (plan `readers`): townsfolk standing near it when a quest is
-     * pinned walk over, read and talk it over, and walk back to their stay; times are the agents' seconds.
+     * The crowd round the notice board (plan `readers`, readers.ts): townsfolk standing near it when a
+     * quest is pinned walk over, read and talk it over, and walk back to their stay; times are the
+     * agents' seconds.
      */
-    interface Reader {
-      from: [number, number, number]
-      spot: { at: [number, number, number]; facing: number }
-      go: number
-      arrive: number
-      leave: number
-      back: number
-      seed: number
-    }
-    const reading = new Map<number, Reader>()
-    let gathered = Number.NEGATIVE_INFINITY
-    /** Whether the straight way between two points keeps clear of walls and blockers (its ends aside: where one works). */
-    const clearLine = (ax: number, az: number, bx: number, bz: number) => {
-      const len = Math.hypot(bx - ax, bz - az)
-      const n = Math.ceil(len / 0.35)
-      for (let k = Math.ceil((0.7 / len) * n); k < n - 1; k++) {
-        const x = ax + ((bx - ax) * k) / n
-        const zz = az + ((bz - az) * k) / n
-        for (const o of collide.solidsNear(x, zz, 0.5))
-          if (o.kind !== "seat" && o.kind !== "prop" && solidDistance(o, x, zz) < 0.2) return false
-      }
-      return true
-    }
+    const readers = createReaders(plan.readers, { solidsNear: collide.solidsNear, solidDistance }, opts.seed)
     /** A quest pinned at `t`: the nearest few standing about come to the board. */
     const gather = (t: number) => {
-      const spots = plan.readers
-      if (!spots.length || t - gathered < READ_AGAIN_S) return
-      gathered = t
-      reading.clear()
-      const cx = spots.reduce((m, r) => m + r.at[0], 0) / spots.length
-      const cz = spots.reduce((m, r) => m + r.at[2], 0) / spots.length
-      const near: { id: number; d: number }[] = []
+      const crowd: ReaderCandidate[] = []
       for (let id = 0; id < n; id++) {
         const l = loops[id]!
         const p = poses[id]
@@ -673,82 +641,16 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         )
           continue
         if (p.routine?.day !== undefined) continue
-        const d = Math.hypot(space.x[id]! - cx, space.z[id]! - cz)
-        if (d > READ_REACH) continue
-        // still at the same stay when they would be back
-        const away = READ_S + 6 + (2 * d) / READ_MPS + 4
-        const later = lifePose(l.steps, (day + (away * SPEEDUP) / 3600) % 24, 24)
-        if (later.act === "walk" || later.since !== p.since) continue
-        near.push({ id, d })
-      }
-      near.sort((a, b) => a.d - b.d || a.id - b.id)
-      const free = [...spots]
-      for (const c of near) {
-        if (!free.length) break
-        const x = space.x[c.id]!
-        const zz = space.z[c.id]!
-        let k = 0
-        for (let j = 1; j < free.length; j++)
-          if (
-            Math.hypot(free[j]!.at[0] - x, free[j]!.at[2] - zz) <
-            Math.hypot(free[k]!.at[0] - x, free[k]!.at[2] - zz)
-          )
-            k = j
-        const spot = free[k]!
-        if (!clearLine(x, zz, spot.at[0], spot.at[2])) continue
-        free.splice(k, 1)
-        const go = t + 0.8 + reading.size * 0.7
-        const arrive = go + Math.hypot(spot.at[0] - x, spot.at[2] - zz) / READ_MPS
-        const seed = hash(`read:${opts.seed}:${c.id}:${Math.round(t)}`)
-        const leave = arrive + READ_S + (seed % 5)
-        reading.set(c.id, {
-          from: [x, poses[c.id]!.at[1], zz],
-          spot,
-          go,
-          arrive,
-          leave,
-          back: leave + (arrive - go),
-          seed,
+        crowd.push({
+          id,
+          x: space.x[id]!,
+          z: space.z[id]!,
+          y: p.at[1],
+          steps: l.steps,
+          ...(p.since !== undefined ? { since: p.since } : {}),
         })
       }
-      // they read it together: everyone stays until the last has had a look, then they go a few apart
-      const last = Math.max(...[...reading.values()].map((r) => r.arrive))
-      for (const r of reading.values()) {
-        r.leave = last + READ_S + (r.seed % 4)
-        r.back = r.leave + (r.arrive - r.go)
-      }
-    }
-    /** A reader's pose now, or null when they are at their own stay. */
-    const readerPose = (id: number): LifePose | null => {
-      const r = reading.get(id)
-      if (!r) return null
-      if (secs < gathered) {
-        // the clock went back before the pin: nobody has gone
-        reading.clear()
-        return null
-      }
-      if (secs < r.go || secs >= r.back) {
-        if (secs >= r.back) reading.delete(id)
-        return null
-      }
-      const walking = (a: readonly number[], b: readonly number[], f: number): LifePose => ({
-        at: [a[0]! + (b[0]! - a[0]!) * f, a[1]! + (b[1]! - a[1]!) * f, a[2]! + (b[2]! - a[2]!) * f],
-        facing: Math.atan2(b[0]! - a[0]!, b[2]! - a[2]!),
-        act: "walk",
-        indoors: false,
-        ground: true,
-      })
-      if (secs < r.arrive) return walking(r.from, r.spot.at, (secs - r.go) / (r.arrive - r.go))
-      if (secs >= r.leave) return walking(r.spot.at, r.from, (secs - r.leave) / (r.back - r.leave))
-      return {
-        at: r.spot.at,
-        facing: r.spot.facing,
-        act: "idle",
-        indoors: false,
-        ground: true,
-        routine: { id: "notice", seed: r.seed },
-        since: day - (secs - r.arrive) / SEC_PER_HOUR,
-      }
+      readers.gather(t, day, crowd, SPEEDUP)
     }
     /** Where person id's way has them now: their clock, less how late queueing has made them. */
     const pose = (id: number): LifePose => {
@@ -756,7 +658,10 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       const late = space.delay[id]!
       if (l.petition !== undefined) return petitionNow?.[l.petition] ?? petitionDoor ?? OFF_ISLAND
       if (l.figure === undefined)
-        return (reading.size ? readerPose(id) : null) ?? lifePose(l.steps, day - (late * SPEEDUP) / 3600, 24)
+        return (
+          (readers.size ? readers.pose(id, secs, day, SEC_PER_HOUR) : null) ??
+          lifePose(l.steps, day - (late * SPEEDUP) / 3600, 24)
+        )
       const t1 = performance.now()
       // an agent not on the island (not yet come, or gone), or a spare figure, is drawn nowhere: as
       // someone indoors
@@ -1190,12 +1095,12 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
           return l && l.figure === undefined ? { role: roleOf[id], steps: l.steps } : null
         },
         // shots: who reads at the notice board now (the crowd a pin gathers), and a gathering by hand
-        readers: () => [...reading.keys()],
+        readers: () => readers.ids,
         readerSpots: plan.readers,
         gather: () => {
-          gathered = Number.NEGATIVE_INFINITY
+          readers.reset()
           gather(secs)
-          return [...reading.keys()]
+          return readers.ids
         },
         // shots: hold the day's clock at an hour (null: let it run on from there)
         hold: (h: number | null) => {

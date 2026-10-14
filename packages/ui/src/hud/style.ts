@@ -326,7 +326,7 @@ button.hud-toast-btn { cursor: pointer; }
 button.hud-toast-btn:hover { color: var(--paper); border-color: var(--brass-line); }
 .hud-toast-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hud-toast:is([data-kind="plea"], [data-kind="fail"]) .hud-toast-btn { color: var(--paper); border-color: var(--tone-c); box-shadow: inset 3px 0 0 0 var(--tone-c), var(--shadow); }
-.hud-chron-open { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px 0 10px; font: 400 var(--t-md)/1 var(--display); letter-spacing: 0.1em; color: var(--brass-hi); cursor: pointer; }
+.hud-chron-open { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px 0 10px; font: 400 13px/1 var(--display); letter-spacing: 0.1em; color: var(--brass-hi); cursor: pointer; }
 .hud-chron-open::before { display: none; }
 .hud-chron-open .hud-glyph { color: var(--brass); }
 .hud-chron-open .num { font-size: 11.5px; letter-spacing: 0; color: var(--faint); }

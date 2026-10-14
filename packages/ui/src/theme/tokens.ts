@@ -83,7 +83,9 @@ export const TOKENS_CSS = /* css */ `
   -webkit-font-smoothing: antialiased;
 }
 .gh *, .gh *::before, .gh *::after { box-sizing: border-box; }
-.gh button, .gh input, .gh select { font: inherit; color: inherit; }
+/* V1's bare-element reset at no specificity: a class's own face, size, weight and colour on a button
+   (the Chronicle chip's Marcellus, a segment's muted label) win over it, as they did in V1 */
+:where(.gh) :where(button, input, select) { font: inherit; color: inherit; }
 .gh ::-webkit-scrollbar { width: 8px; height: 8px; }
 .gh ::-webkit-scrollbar-thumb { background: var(--hair-2); border-radius: 4px; }
 .gh ::-webkit-scrollbar-track { background: transparent; }

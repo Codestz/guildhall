@@ -517,7 +517,9 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
         ]
         const [hx, hz] = at(0, 0)
         put(hx, 3, hz, 18, 14, colour.setRGB(0.25, 1, 0.6), 0.28 * pose.seen)
-        for (let i = 0; i < 10; i++) {
+        // the mist bank on the water, thinner by night (where it glows: it would drown the hull)
+        const dim = 1 - 0.45 * (opts.light?.().lamps ?? 0)
+        for (let i = 0; i < 14; i++) {
           const t = wall * (0.2 + hash01(i * 3) * 0.2) + hash01(i) * 40
           const [mx, mz] = at(
             (hash01(i * 5) - 0.5) * 12 + Math.sin(t) * 1.5,
@@ -525,28 +527,28 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
           )
           put(
             mx,
-            0.6 + hash01(i * 11) * 0.8,
+            1.2 + hash01(i * 11) * 1.0,
             mz,
-            6 + hash01(i * 13) * 5,
-            2.6,
-            colour.setRGB(0.45, 0.85, 0.65),
-            0.32 * pose.seen * (0.6 + 0.4 * Math.sin(t * 1.3)),
+            7 + hash01(i * 13) * 6,
+            3.6,
+            colour.setRGB(0.62, 0.98, 0.8),
+            0.5 * dim * pose.seen * (0.6 + 0.4 * Math.sin(t * 1.3)),
           )
         }
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < 16; i++) {
           const t = wall * (0.5 + hash01(i * 17) * 0.5) + hash01(i * 19) * 40
           const [wx, wz] = at(
             (hash01(i * 23) - 0.5) * 7 + Math.cos(t * 0.8) * 0.7,
             (hash01(i * 29) - 0.5) * 3 + Math.sin(t) * 0.6,
           )
-          const size = 0.7 + 0.4 * hash01(i * 31)
+          const size = 1.0 + 0.6 * hash01(i * 31)
           put(
             wx,
-            1.5 + hash01(i * 37) * 4 + Math.sin(t * 1.7) * 0.4,
+            1.5 + hash01(i * 37) * 6 + Math.sin(t * 1.7) * 0.4,
             wz,
             size,
             size,
-            colour.setRGB(0.6, 1.6, 1),
+            colour.setRGB(0.7, 2.0, 1.3),
             pose.seen * (0.55 + 0.45 * Math.sin(t * 3)),
           )
         }
@@ -595,11 +597,11 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
         colour.setRGB(...lamp.colour)
         // the glass, lit (it covers the lantern, so it reads by day), and its halo
         put(lx, ly, lz, 1.3, 1.3, colour.clone().multiplyScalar(0.6 + 1.6 * lamp.glow), 1, 1)
-        put(lx, ly, lz, 4.5 + 2 * night, 4.5 + 2 * night, colour, (0.35 + 0.45 * night) * lamp.glow)
+        put(lx, ly, lz, 6 + night, 6 + night, colour, (0.5 + 0.3 * night) * lamp.glow)
         beam.mesh.position.set(lx, ly, lz)
         beam.mesh.rotation.set(0, Math.PI / 2 - (lamp.beam ?? lh.seaward), 0)
         beam.material.color.copy(colour)
-        beam.material.opacity = lamp.glow * (0.16 + 0.26 * night)
+        beam.material.opacity = lamp.glow * (0.3 + 0.12 * night)
         beam.mesh.visible = warm
       }
     }

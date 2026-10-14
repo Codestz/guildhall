@@ -565,7 +565,8 @@ export function lampOf(state: CiState | null, since: number, now: number): Lamp 
   const s = (now - since) / 1000
   switch (state) {
     case "passed":
-      return { colour: [1, 0.72, 0.4], glow: 1, beam: null }
+      // a steady warm white: all is well (by day it must read apart from the running amber)
+      return { colour: [1, 0.9, 0.66], glow: 1, beam: null }
     case "failed":
       // a slow red pulse, about 2.5 s a beat, never quite out
       return {
@@ -575,7 +576,12 @@ export function lampOf(state: CiState | null, since: number, now: number): Lamp 
       }
     case "queued":
     case "running":
-      return { colour: [1, 0.45, 0.04], glow: 0.9, beam: s * 1.6 }
+      // a deep amber, blinking as its beam sweeps round (by day the blink tells it from the steady warm)
+      return {
+        colour: [1, 0.36, 0.02],
+        glow: 0.62 + 0.38 * (0.5 + 0.5 * Math.cos(s * Math.PI * 2 * 1.6)),
+        beam: s * 1.6,
+      }
     default:
       return { colour: [0, 0, 0], glow: 0, beam: null }
   }

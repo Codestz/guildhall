@@ -266,6 +266,8 @@ export interface ShotSizes {
   show?: ShowKind | "galleon"
   /** How long the shot has run since its cut, ms (which of its beats it is in). */
   beat?: number
+  /** The screen's width over its height: a portrait one (a phone) frames a show from further back. */
+  aspect?: number
   /** The island's middle (x, z): a sea show is filmed from the island, looking out. */
   centre?: readonly [number, number]
 }
@@ -313,7 +315,7 @@ export const SHOW_BEATS: Readonly<Partial<Record<ShowKind | "galleon", readonly 
     { at: 0, distance: 62, elevation: 12 },
     { at: 7000, distance: 36, elevation: 10 },
   ],
-  undead: [{ at: 0, distance: 10, elevation: 26 }],
+  undead: [{ at: 0, distance: 12, elevation: 30 }],
 }
 /** The shows filmed from the island looking out to their hull. */
 export const SEAWARD: ReadonlySet<ShowKind | "galleon"> = new Set(["ghostship", "raid", "galleon"])
@@ -347,7 +349,10 @@ export function shotPose(
   const beats = kind ? SHOW_BEATS[kind] : undefined
   if (kind && beats && distance !== "close") {
     const beat = beats[Math.max(0, showBeatAt(kind, sizes.beat ?? 0))] as ShowBeat
-    const d = beat.ofMap ? sizes.map * beat.distance : Math.min(sizes.map, beat.distance)
+    // a portrait screen sees a narrower slice: a show framed for a wide one stands back to fit
+    const narrow =
+      sizes.aspect !== undefined && sizes.aspect < 1 ? Math.min(1.8, 1 / Math.sqrt(sizes.aspect)) : 1
+    const d = beat.ofMap ? sizes.map * beat.distance : Math.min(sizes.map, beat.distance * narrow)
     const pose = at(d, beat.elevation)
     if (SEAWARD.has(kind) && sizes.centre) {
       const dx = target[0] - sizes.centre[0]
@@ -706,6 +711,7 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
     const kind = showOf(focus)
     return {
       map: mapDistance(),
+      aspect: stage.camera.aspect,
       ...(focus.kind === "place" ? { tiles: placeOf(focus.place)?.tiles ?? 0 } : {}),
       ...(kind ? { show: kind, beat: lastCut === null ? 0 : Math.max(0, now() - lastCut) } : {}),
       ...(kind && rig.world() ? { centre: rig.world()?.centre as [number, number] } : {}),

@@ -192,10 +192,11 @@ export function createComet(ctx: ShowCtx): ShowPiece {
       s.tail = (14 + hash01(i * 13) * 12) * k
     })
   } else {
-    // the comet and, a little behind it, its fainter ion tail: across the top of the view, slowly
+    // the comet and, a little behind it, its fainter ion tail: across the sky over the island, slowly,
+    // below the HUD's top row (its crest and faces sit over the top of the view)
     geometry = streaks(2, (i, s) => {
-      onFrame(f, -0.95, 0.66, s.from)
-      onFrame(f, 1.45, 0.36, to)
+      onFrame(f, -1.0, 0.5, s.from)
+      onFrame(f, 1.45, 0.3, to)
       s.dir.subVectors(to, s.from)
       s.birth = 0.3
       s.life = 14

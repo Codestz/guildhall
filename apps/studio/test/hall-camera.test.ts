@@ -222,6 +222,12 @@ describe("the rules", () => {
     const wide = shotPose("show", "map", [0, 30, 0], from, { map: 400, show: "dragon", beat: 0 })
     const near = shotPose("show", "map", [0, 30, 0], from, { map: 400, show: "dragon", beat: 9000 })
     expect(near.distance).toBeLessThan(wide.distance)
+    // a phone held upright stands further back, so the show still fits across
+    const upright = shotPose("show", "map", [0, 30, 0], from, { map: 400, show: "dragon", aspect: 0.46 })
+    expect(upright.distance).toBeGreaterThan(wide.distance * 1.3)
+    expect(
+      shotPose("show", "map", [0, 30, 0], from, { map: 400, show: "dragon", aspect: 1.6 }).distance,
+    ).toBe(wide.distance)
     // the rainbow is sized by the map view; a galleon is filmed from the island looking out at it
     expect(shotPose("show", "map", [0, 0, 0], from, { map: 400, show: "rainbow" }).distance).toBe(320)
     const galleon = shotPose("harbour", "mid", [100, 0, 0], from, {

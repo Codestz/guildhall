@@ -163,7 +163,7 @@ export function WelcomeCard({
           onClick={() => setOpen(true)}
         >
           <RepoGlyph />
-          Your repo
+          <span className="site-repo-word">Your repo</span>
         </button>
       )}
       <section

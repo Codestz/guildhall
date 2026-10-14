@@ -140,18 +140,20 @@ export const TOAST_LIFE: Partial<Record<EntryKind, number>> = {
 /**
  * The toasts to show now: the newest `max` moments that earn one and still have time left, oldest
  * first. `firstSeen` remembers when each was first shown (wall clock), so a toast keeps its own life
- * across renders and a paused story still clears; it is updated in place.
+ * across renders and a paused story still clears; it is updated in place. `cap` (ms) shortens every
+ * moment's life: on a short screen a toast folds into the Chronicle chip after a few seconds.
  */
 export function pickToasts(
   log: readonly ChronicleEntry[],
   now: number,
   firstSeen: Map<string, number>,
   max = 3,
+  cap = Number.POSITIVE_INFINITY,
 ): ToastItem[] {
   const shown: ToastItem[] = []
   for (let i = log.length - 1; i >= 0 && shown.length < max; i--) {
     const entry = log[i]
-    const life = entry && TOAST_LIFE[entry.kind]
+    const life = entry && Math.min(cap, TOAST_LIFE[entry.kind] ?? 0)
     if (!entry || !life) continue
     let first = firstSeen.get(entry.key)
     if (first === undefined) {
@@ -162,4 +164,34 @@ export function pickToasts(
     if (left > 0) shown.push({ ...entry, left })
   }
   return shown.reverse()
+}
+
+/** `abcdefgh` kept to `keep` characters with the middle left out: `abc…fgh` (the ends tell repos apart). */
+export function middleEllipsis(text: string, keep: number): string {
+  const chars = Array.from(text)
+  if (chars.length <= keep) return text
+  if (keep <= 1) return "…"
+  const tail = Math.floor((keep - 1) / 2)
+  const head = keep - 1 - tail
+  return `${chars.slice(0, head).join("")}…${chars.slice(chars.length - tail).join("")}`
+}
+
+/**
+ * A name's forms from the whole to the least: `owner/repo`, then the repo alone (the owner is dropped
+ * first), then the repo with its middle left out, a character shorter each time. Pure.
+ */
+export function nameForms(name: string): string[] {
+  const slash = name.indexOf("/")
+  const forms = [name]
+  const rest = slash > 0 && slash < name.length - 1 ? name.slice(slash + 1) : name
+  if (rest !== name) forms.push(rest)
+  for (let keep = Array.from(rest).length - 1; keep >= 3; keep--) forms.push(middleEllipsis(rest, keep))
+  return forms
+}
+
+/** The longest form of `name` that `measure` (its width, px) says fits in `room`; the shortest when none does. */
+export function fitName(name: string, room: number, measure: (text: string) => number): string {
+  const forms = nameForms(name)
+  for (const f of forms) if (measure(f) <= room) return f
+  return forms[forms.length - 1] as string
 }

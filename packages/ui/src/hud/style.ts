@@ -331,6 +331,11 @@ button.hud-toast-btn:hover { color: var(--paper); border-color: var(--brass-line
 .hud-chron-open .hud-glyph { color: var(--brass); }
 .hud-chron-open .num { font-size: 11.5px; letter-spacing: 0; color: var(--faint); }
 .hud-chron-open:hover { border-color: var(--brass-line); }
+/* a short screen: the chip is the small mark of where the log is, not a plate over the corner */
+.hud-toasts[data-compact] .hud-chron-open { height: 28px; gap: 6px; padding: 0 9px 0 8px; font-size: 12px; opacity: 0.85; }
+.hud-toasts[data-compact] .hud-chron-open .hud-glyph { width: 12px; height: 12px; }
+.hud-toasts[data-compact] .hud-chron-open .num { display: none; }
+.hud-toasts[data-compact] .hud-chron-open:is(:hover, :focus-visible) { opacity: 1; }
 
 /* ── dossier ────────────────────────────────────────────────────── */
 .hud-dossier { width: 372px; max-width: 100%; max-height: 100%; display: flex; flex-direction: column; min-height: 0; background: rgba(20, 15, 11, 0.93); animation: hud-slide 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }

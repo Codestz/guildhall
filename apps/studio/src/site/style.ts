@@ -24,6 +24,10 @@ const CSS = /* css */ `
 .site-root[data-welcome] .ui-viewer:not([data-phone]) .ui-hud-bottom { bottom: calc(var(--gut) + var(--welcome-h, 0px) + 12px); }
 /* the top row on a phone with "Your repo" in it: the repo chip leaves it room */
 .site-root:has(.site-welcome[data-dock="top"]) .ui-viewer[data-phone] { --rail-w: 156px; }
+/* ≤ 380 px "Your repo" is its icon alone (packages/ui site/style.ts), 44 px + 8 px */
+@media (max-width: 380px) {
+  .site-root:has(.site-welcome[data-dock="top"]) .ui-viewer[data-phone] { --rail-w: 104px; }
+}
 `
 
 let users = 0

@@ -168,6 +168,26 @@ const noSnapshot = (): SessionSnapshot | null => null
 const useHud = (hud: ViewerHud): HudState => useSyncExternalStore(hud.subscribe, hud.state)
 const usePhone = (hud: ViewerHud): boolean => useSyncExternalStore(hud.subscribe, hud.phone)
 
+/** A short screen (a phone on its side): the viewer is at most this tall, CSS px (the HUD's own `@container` line). */
+const SHORT_PX = 460
+/** How long a toast stays on a short screen before it folds into the Chronicle chip, ms. */
+const SHORT_TOAST_MS = 4000
+
+/** True while the viewer is a short screen's (its height only, so a window dragged short does it too). */
+function useShortScreen(hud: ViewerHud): boolean {
+  const [short, setShort] = useState(false)
+  useEffect(() => {
+    const viewer = hud.corner.closest<HTMLElement>(".ui-viewer")
+    if (!viewer) return
+    const read = () => setShort(viewer.clientHeight > 0 && viewer.clientHeight <= SHORT_PX)
+    read()
+    const watch = new ResizeObserver(read)
+    watch.observe(viewer)
+    return () => watch.disconnect()
+  }, [hud])
+  return short
+}
+
 /** The viewer's width (CSS px) while it is a phone's, for the face bar; 0 before it is laid out. */
 function useViewerWidth(hud: ViewerHud, on: boolean): number {
   const [width, setWidth] = useState(0)
@@ -397,13 +417,13 @@ function PlacesPanel({
  * earn one, each fading on its own wall clock. A playing session's snapshot re-reads them (10 Hz); a still
  * one (`still`: paused) is re-read four times a second while one is up, so its toasts still clear.
  */
-function useToasts(entries: readonly SessionEntry[], on: boolean, still: boolean): ToastItem[] {
+function useToasts(entries: readonly SessionEntry[], on: boolean, still: boolean, cap?: number): ToastItem[] {
   const seen = useRef(new Map<string, number>())
   const [tick, setTick] = useState(0)
   // biome-ignore lint/correctness/useExhaustiveDependencies: `tick` re-reads the wall clock
   const items = useMemo(
-    () => (on ? pickToasts(groupRepeats(entries), performance.now(), seen.current, TOASTS_MAX) : []),
-    [entries, on, tick],
+    () => (on ? pickToasts(groupRepeats(entries), performance.now(), seen.current, TOASTS_MAX, cap) : []),
+    [entries, on, tick, cap],
   )
   const fading = still && items.length > 0
   useEffect(() => {
@@ -451,6 +471,7 @@ export function HallHud(props: HallHudProps) {
   const state = useHud(hud)
   const phone = usePhone(hud)
   const width = useViewerWidth(hud, phone)
+  const short = useShortScreen(hud)
   useCrestWidth(hud)
   const camera = parts.camera
   const [picked, setPicked] = useState<number | null>(null)
@@ -631,6 +652,7 @@ export function HallHud(props: HallHudProps) {
     sessionEntries,
     sessionFeed && !chronicleOpen && !phone && !hidden,
     !snap?.clock.playing && snap?.clock.mode !== "live",
+    short ? SHORT_TOAST_MS : undefined,
   )
   const roster = useMemo(
     () =>
@@ -1064,6 +1086,7 @@ export function HallHud(props: HallHudProps) {
             time={0}
             parties={roster.parties}
             quiet
+            compact={short}
             onPick={(id) => openHero(id)}
             stamp={sessionFeed ? sessionStamp : chronicle ? feedStamp(chronicle) : "sketch"}
             onExpand={() =>

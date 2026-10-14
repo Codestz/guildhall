@@ -625,6 +625,11 @@ export interface Chips {
   boxes(): readonly Rect[]
   /** The hero whose chip is under a point (layer px) as the last run laid them, or null (a click follows them). */
   hit(x: number, y: number): string | null
+  /**
+   * Where hero `id`'s chip stands with everything that hangs on it (its plea mark, its speech), layer px,
+   * measured now (a layout read: a few times a second, never per frame); null when it is not drawn.
+   */
+  extent(id: string): Rect | null
   /** The declutter, for shots and tests. */
   readonly declutter: Declutter
   dispose(): void
@@ -877,6 +882,25 @@ export function createChips(
     },
     boxes: () => shownBoxes,
     hit: (x, y) => declutter.hit(x, y, 4, phone),
+    extent(id) {
+      const c = chips.get(id)
+      if (!c || c.slot.folded || c.slot.out || !c.slot.on) return null
+      const at = layer.getBoundingClientRect()
+      let box: Rect | null = null
+      for (const part of [c.parts.chip, c.parts.plea, c.parts.bubble]) {
+        const r = part.getBoundingClientRect()
+        if (r.width <= 0 || r.height <= 0) continue
+        box = box
+          ? [
+              Math.min(box[0], r.left),
+              Math.min(box[1], r.top),
+              Math.max(box[2], r.right),
+              Math.max(box[3], r.bottom),
+            ]
+          : [r.left, r.top, r.right, r.bottom]
+      }
+      return box ? [box[0] - at.left, box[1] - at.top, box[2] - at.left, box[3] - at.top] : null
+    },
     dispose() {
       clearInterval(timer)
       observer?.disconnect()

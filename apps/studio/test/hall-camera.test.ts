@@ -10,12 +10,14 @@ import { emptyWorld, type GuildWorld, type WorldActor } from "@guildhall/sim"
 import type { ViewerHud } from "@guildhall/ui"
 import {
   type Box,
+  biasStep,
   CLOSE,
   clearFrame,
   createHallCamera,
   directorDefault,
   directorFree,
   easeFrame,
+  fitShift,
   framedTarget,
   glideMs,
   insetsOf,
@@ -259,8 +261,10 @@ function standIn(world: () => GuildWorld) {
   const listeners = new Map<string, (e: unknown) => void>()
   /** Chips: Ada's stands at (700, 400)–(760, 430). */
   let selected: string | null = null
+  let chipBox: [number, number, number, number] | null = null
   const chips = {
     hit: (x: number, y: number) => (x >= 700 && x <= 760 && y >= 400 && y <= 430 ? "ada" : null),
+    extent: (): [number, number, number, number] | null => chipBox,
     select: (id: string | null) => {
       selected = id
     },
@@ -298,6 +302,10 @@ function standIn(world: () => GuildWorld) {
     aimed: () => aimed,
     user: emit,
     chipSelected: () => selected,
+    /** Where the pleading hero's chip stands (with its mark), or off screen. */
+    chipAt(box: [number, number, number, number] | null) {
+      chipBox = box
+    },
     /** A press and release on the stage (`travel` px apart, `ms` long). */
     press(x: number, y: number, travel = 0, ms = 120) {
       listeners.get("pointerdown")?.({ button: 0, isPrimary: true, clientX: x, clientY: y, pointerId: 1 })
@@ -345,6 +353,18 @@ describe("the controller", () => {
     expect(st.mode).toBe("director")
     expect(st.shot).toEqual({ key: "hero:ada", reason: "plea", distance: "close" })
     expect(s.glides.at(-1)?.distance).toBe(CLOSE.distance)
+  })
+
+  test("a pleading hero's chip poking out of the clear area nudges the frame in, and the nudge goes once it fits", () => {
+    const s = standIn(() => pleading(60_000))
+    s.run(300)
+    expect(s.camera.frame().x).toBe(0)
+    s.chipAt([-30, 300, 60, 340])
+    s.run(1500)
+    expect(s.camera.frame().x).toBeGreaterThan(0.05)
+    s.chipAt([300, 300, 390, 340])
+    s.run(4000)
+    expect(Math.abs(s.camera.frame().x)).toBeLessThan(0.02)
   })
 
   test("follow flies close and tracks the hero as they walk; a turn keeps them, a pan lets go", () => {
@@ -406,5 +426,30 @@ describe("the controller", () => {
     }
     // 5 s of picks that flip subject every 400 ms: the first cut plus at most one per MIN_CUT_MS
     expect(cuts.length).toBeLessThanOrEqual(1 + Math.floor(5000 / MIN_CUT_MS))
+  })
+})
+
+describe("a pleading hero's chip stays in the clear area", () => {
+  const rect: Box = { left: 0, top: 120, right: 390, bottom: 780 }
+  const box = (l: number, t: number, r: number, b: number): Box => ({ left: l, top: t, right: r, bottom: b })
+
+  test("a chip that fits asks for nothing", () => {
+    expect(fitShift(box(150, 300, 240, 400), rect, 10)).toEqual({ dx: 0, dy: 0 })
+  })
+  test("a chip clipped by an edge is brought in by its margin", () => {
+    expect(fitShift(box(-40, 300, 50, 400), rect, 10)).toEqual({ dx: 50, dy: 0 })
+    expect(fitShift(box(330, 300, 420, 400), rect, 10)).toEqual({ dx: -40, dy: 0 })
+    expect(fitShift(box(150, 60, 240, 160), rect, 10)).toEqual({ dx: 0, dy: 70 })
+  })
+  test("a box wider than the area is centred", () => {
+    expect(fitShift(box(-30, 300, 440, 400), rect, 10).dx).toBe(-10)
+  })
+  test("a nudge that is no longer needed unwinds only as far as the margin allows", () => {
+    // pushed 60 px right and now centred: all of it unwinds
+    expect(biasStep(box(150, 300, 240, 400), rect, 10, { x: 60, y: 0 })).toEqual({ dx: -60, dy: 0 })
+    // the chip sits 20 px from the left margin: it may only give back 20
+    expect(biasStep(box(30, 300, 120, 400), rect, 10, { x: 60, y: 0 })).toEqual({ dx: -20, dy: 0 })
+    // no nudge, nothing to do
+    expect(biasStep(box(150, 300, 240, 400), rect, 10, { x: 0, y: 0 })).toEqual({ dx: 0, dy: 0 })
   })
 })

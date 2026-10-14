@@ -62,6 +62,12 @@ export function quietSkip(events: readonly { at: number }[], at: number): number
   return Math.min(SKIP_MAX, Math.max(1, ahead / 2500))
 }
 
+/** A weather a link names (`rain` reads as a storm), else null: the session's. */
+export function weatherOf(asked: string | null): WeatherKind | null {
+  if (asked === "rain") return "storm"
+  return asked === "clear" || asked === "cloudy" || asked === "storm" ? asked : null
+}
+
 /** The levers the HUD's Settings pull and the mount reads: the director's style, a pinned weather, the skip. */
 function createLevers(): HallLevers & { setSkip(k: number): void } {
   let skip = 1
@@ -143,6 +149,9 @@ function mountOn(
   document.body.append(modals)
   const root = createRoot(host)
   const levers = createLevers()
+  // `?weather=clear|cloudy|storm`: a sky pinned from the link (a demo's night storm), as Settings pins it
+  levers.weather = weatherOf(opts.query.get("weather"))
+  if (levers.weather) parts.fx?.drive.set(levers.weather)
   if (ext) ext.levers = levers
 
   // the camera: follow a hero (a badge, a roster row, a chip), the director on a session (B)

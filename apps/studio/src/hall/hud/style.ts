@@ -9,14 +9,12 @@ const CSS = /* css */ `
 .gh .hall-rail-btn { width: 40px; height: 40px; }
 .gh .hall-rail-btn[aria-expanded="true"] { color: var(--brass-hi); border-color: var(--brass); background: rgba(38, 29, 19, 0.95); box-shadow: 0 0 0 1px var(--brass-line), 0 0 18px -8px rgba(220, 182, 98, 0.7); }
 
-/* the brand under the site's crest: compact, the name its own fold */
-.ui-hud-corner .hud-brand { width: 304px; max-width: 100%; background: rgba(21, 17, 13, 0.92); }
-.ui-hud-corner .hud-brand[data-compact="true"]:not([data-open="true"]) { width: max-content; max-width: 304px; }
+/* the brand under the site's crest: compact, the name its own fold (its width: the left column, below) */
 .hud-about .hall-about-quiet { font: 12px/1.45 var(--mono); color: var(--faint); }
 .hud-about .hall-about-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 
 /* places: a list folded under the brand */
-.gh .hall-places { width: 304px; max-width: 100%; min-height: 0; flex: 0 1 auto; background: rgba(21, 17, 13, 0.92); }
+.gh .hall-places { min-height: 0; flex: 0 1 auto; }
 .hall-place-list { list-style: none; margin: 0; padding: 4px; display: grid; gap: 1px; }
 .hall-place-row {
   position: relative; width: 100%; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 5px 8px 7px;
@@ -97,8 +95,41 @@ const CSS = /* css */ `
 .gh .hall-feed { max-height: min(460px, 100%); }
 .gh .hall-feed .hud-chron-text b { color: var(--brass-hi); }
 
-/* panels over the world are near opaque: the plates under them never read through */
-.gh .ui-hud-region .ui-panel { background: rgba(20, 15, 11, 0.96); }
+/* panels over the world: translucent ink over a blur (the plates keep out of them, data-keepout), the
+   sheet's long reads a little denser; a soft shadow under the small type keeps it AA over a bright sky */
+.gh .ui-hud-region .ui-panel, .gh .hall-float .ui-panel {
+  background: rgba(20, 15, 11, 0.74);
+  backdrop-filter: blur(14px) saturate(1.25); -webkit-backdrop-filter: blur(14px) saturate(1.25);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+.gh .ui-hud-sheet .ui-panel { background: rgba(20, 15, 11, 0.88); }
+
+/* ── the left column (user 10-13): the crest pill, the Brand and the Guild's bar on one edge, one width,
+   one radius and one hairline; 8 px between them ── */
+.ui-viewer { --hud-col: 288px; --hud-r: 10px; }
+.ui-viewer[data-phone] { --hud-col: min(300px, calc(100cqw - 2 * var(--gut))); }
+.site-world .ui-viewer[data-hud="on"]:not([data-phone]) { --hud-top: 68px; }
+@media (min-width: 601px) {
+  .gh.site-root:has(.hall-hud-root) .site-crest-btn { width: 288px; border-radius: 10px; }
+}
+.gh .ui-hud-corner { gap: 8px; }
+.gh .ui-hud-corner > :is(.hud-brand, .hud-badges, .hud-parties, .hall-roster, .hall-places, .hud-pleas) {
+  width: var(--hud-col); max-width: 100%; border-radius: var(--hud-r); border: 1px solid var(--hair);
+}
+.gh .ui-hud-corner .hud-brand[data-compact="true"]:not([data-open="true"]) { width: var(--hud-col); min-width: 0; max-width: 100%; }
+/* the Guild's bar: the faces from the left, ⤢ at the right end */
+.gh .ui-hud-corner .hud-badges { justify-content: space-between; }
+.gh .ui-hud-corner .hud-badges-expand { margin-left: auto; }
+
+/* the Brand, denser: smaller type, tighter padding, the about's links on one row */
+.gh .ui-hud-corner .hud-brand { padding: 8px 12px 9px; gap: 7px; }
+.gh .ui-hud-corner .hud-brand-name { font-size: 18px; }
+.gh .ui-hud-corner .hud-brand .ui-figures { padding-top: 7px; gap: 4px 14px; }
+.gh .ui-hud-corner .hud-brand .ui-figures dd { font-size: 14px; }
+.gh .ui-hud-corner .hud-brand .ui-figures dt { font-size: 11px; }
+.gh .ui-hud-corner .hud-about { gap: 6px; padding-top: 7px; font-size: 12.5px; line-height: 1.45; }
+.gh .hud-about .hall-about-links { flex-wrap: nowrap; gap: 12px; white-space: nowrap; }
+.gh .hud-about .hall-about-links .site-link { min-height: 26px; font-size: 12.5px; padding: 0; }
 
 /* the sheet: the panel fills it, scrolling inside */
 .hall-sheet { display: flex; flex-direction: column; min-height: 0; max-height: 100%; outline: none; }
@@ -109,15 +140,13 @@ const CSS = /* css */ `
 
 /* the session (?feed=): the Guild under the brand like the Places, the pleas pinned between, a hero's
    dossier in the sheet, a plea's dot on the Guild's icon */
-.gh .hall-roster { width: 304px; max-width: 100%; min-height: 0; flex: 0 1 auto; }
-.gh .ui-hud-corner .hud-pleas { width: 304px; max-width: 100%; }
+.gh .hall-roster { min-height: 0; flex: 0 1 auto; }
 .gh .hall-rail-btn { position: relative; }
 .gh .hall-rail-btn .hud-tab-dot { position: absolute; top: 5px; right: 5px; }
 .hall-hero-sheet { display: flex; flex-direction: column; gap: 6px; min-height: 0; max-height: 100%; }
 .hall-hero-sheet > .hud-dossier { min-height: 0; }
 .gh .hall-back { align-self: flex-start; padding: 4px 2px; }
 .ui-viewer[data-phone] .hall-sheet .hud-dossier, .ui-viewer[data-phone] .hall-sheet .hud-roster { max-height: min(64cqh, 620px); }
-.ui-viewer[data-phone] .ui-hud-corner .hud-pleas { width: calc(100cqw - 16px); }
 
 .hall-keys { margin: 0; display: grid; gap: 6px; }
 .hall-keys div { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--t-sm); color: var(--muted); }

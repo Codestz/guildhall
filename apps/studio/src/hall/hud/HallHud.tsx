@@ -455,7 +455,7 @@ export function HallHud(props: HallHudProps) {
   const [quality, setQuality] = useState(storedQuality)
   const [captions, setCaptions] = useState(true)
   const [style, setStyle] = useState<"calm" | "cinematic">(levers.cinematic ? "cinematic" : "calm")
-  const [weather, setWeather] = useState<WeatherPick>("auto")
+  const [weather, setWeather] = useState<WeatherPick>(levers.weather ?? "auto")
   const storyTold = (snap?.chapters.length ?? 0) > 0
   const [timeMode, setTimeMode] = useState<TimeMode>(() => (storyTold ? "story" : "fixed"))
   const [hour, setHour] = useState(() => parts.clock.get())

@@ -9,9 +9,10 @@ import { readChronicle } from "@guildhall/sim"
 import { pickToasts } from "@guildhall/ui"
 import { fewMarkers, groupRepeats, REPEAT_MS, type SessionEntry } from "../src/hall/feeds/view.ts"
 import { storyHour } from "../src/hall/hud/HallHud.tsx"
-import { QUIET_AHEAD_MS, quietSkip, SKIP_MAX } from "../src/hall/hud/mount.tsx"
+import { QUIET_AHEAD_MS, quietSkip, SKIP_MAX, weatherOf } from "../src/hall/hud/mount.tsx"
 import { growthLine } from "../src/hall/hud/view.ts"
 import { barScale } from "../src/hall/timeline.tsx"
+import { LIFT_STEP, liftStep } from "../src/hexworld/chips.ts"
 
 let seq = 0
 const line = (at: number, over: Partial<SessionEntry> = {}): SessionEntry => {
@@ -140,5 +141,34 @@ describe("a told story's acts as hours", () => {
     expect(storyHour(4, 5)).toBeCloseTo(20.5)
     expect(storyHour(2, 5)).toBeGreaterThan(storyHour(1, 5))
     expect(storyHour(9, 5)).toBeCloseTo(20.5)
+  })
+})
+
+describe("the chips' nudge holds still while heroes walk", () => {
+  test("it climbs at once, in whole steps", () => {
+    expect(liftStep(0, 3, 0)).toEqual({ lift: LIFT_STEP, runs: 0 })
+    expect(liftStep(8, 13, 0)).toEqual({ lift: 16, runs: 0 })
+    // a lift inside the drawn step changes nothing
+    expect(liftStep(16, 9, 0)).toEqual({ lift: 16, runs: 0 })
+  })
+
+  test("it drops only once the runs have asked for it a while", () => {
+    let s = { lift: 16, runs: 0 }
+    const seen: number[] = []
+    for (let k = 0; k < 4; k++) {
+      s = liftStep(s.lift, 0, s.runs)
+      seen.push(s.lift)
+    }
+    expect(seen).toEqual([16, 16, 16, 0])
+  })
+})
+
+describe("a link's weather", () => {
+  test("clear, cloudy and storm pin the sky; rain reads as a storm; anything else follows the session", () => {
+    expect(weatherOf("storm")).toBe("storm")
+    expect(weatherOf("rain")).toBe("storm")
+    expect(weatherOf("cloudy")).toBe("cloudy")
+    expect(weatherOf("snow")).toBeNull()
+    expect(weatherOf(null)).toBeNull()
   })
 })

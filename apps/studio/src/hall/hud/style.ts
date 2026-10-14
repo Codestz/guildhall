@@ -123,6 +123,8 @@ const CSS = /* css */ `
 /* the Guild's bar: the faces from the left, ⤢ at the right end */
 .gh .ui-hud-corner .hud-badges { justify-content: space-between; }
 .gh .ui-hud-corner .hud-badges-expand { margin-left: auto; }
+/* six faces and ⤢ on one row of the column */
+.gh .ui-hud-corner .hud-badge { width: 36px; height: 36px; }
 
 /* the Brand, denser: smaller type, tighter padding, the about's links on one row */
 .gh .ui-hud-corner .hud-brand { padding: 8px 12px 9px; gap: 7px; }

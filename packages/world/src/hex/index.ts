@@ -167,6 +167,7 @@ export {
   type RoutinePart,
   railTracks,
   routineClips,
+  routineClock,
   routineCycles,
   routineFor,
   routineSample,
@@ -181,6 +182,7 @@ export {
   spotFrame,
   stockAt,
   stocksAt,
+  TOAST_AT,
   TRACK_BEHIND,
   TRACK_LEN,
 } from "./routines.ts"
@@ -200,6 +202,19 @@ export {
   seaRing,
   squareSite,
 } from "./sites.ts"
+export {
+  BARD_TILES,
+  type BoardReader,
+  boardReaders,
+  CHAT_MAX,
+  CHAT_MIN,
+  CHAT_TURN,
+  planSocial,
+  type SocialOpts,
+  type SocialStats,
+  TIPSY_FROM,
+  TIPSY_HOME,
+} from "./social.ts"
 export {
   type Disc,
   HARD,

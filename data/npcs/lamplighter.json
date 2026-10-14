@@ -1,0 +1,66 @@
+{
+  "activity": {
+    "idle": [
+      "Idle_A",
+      "Idle_B"
+    ],
+    "walk": "Walking_A",
+    "work": "Interact"
+  },
+  "body": [
+    "kaykit-adventurers/rogue-hooded",
+    "kaykit-adventurers/barbarian"
+  ],
+  "hands": {
+    "r": [
+      "kaykit-tools/torch"
+    ]
+  },
+  "hide": [
+    "RogueHooded_Mask",
+    "Barbarian_BearHat"
+  ],
+  "id": "lamplighter",
+  "outfit": {
+    "grass": [
+      "slate",
+      "cobble"
+    ],
+    "leaf": [
+      "slate",
+      "cobble",
+      "water"
+    ],
+    "sand": [
+      "slate",
+      "cobble",
+      "water"
+    ],
+    "stone": [
+      "cobble",
+      "slate"
+    ],
+    "terracotta": [
+      "slate",
+      "water"
+    ],
+    "timber": [
+      "timber",
+      "dirt",
+      "thatch",
+      "grey"
+    ]
+  },
+  "role": "lamplighter",
+  "vary": {
+    "height": [
+      0.96,
+      1.04
+    ],
+    "speed": [
+      0.9,
+      1.1
+    ]
+  },
+  "version": 1
+}

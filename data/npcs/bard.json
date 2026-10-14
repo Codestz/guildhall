@@ -1,0 +1,53 @@
+{
+  "activity": {
+    "idle": [
+      "Idle_A",
+      "Idle_B"
+    ],
+    "walk": "Walking_A",
+    "work": "Idle_B"
+  },
+  "body": [
+    "kaykit-adventurers/rogue",
+    "kaykit-adventurers/ranger",
+    "kaykit-adventurers/mage"
+  ],
+  "hands": {},
+  "hide": [
+    "Rogue_Cape",
+    "Ranger_Quiver",
+    "Mage_Hat"
+  ],
+  "id": "bard",
+  "outfit": {
+    "dirt": [
+      "water",
+      "dirt"
+    ],
+    "leaf": [
+      "terracotta",
+      "water",
+      "thatch"
+    ],
+    "sand": [
+      "sand",
+      "terracotta"
+    ],
+    "timber": [
+      "timber",
+      "terracotta"
+    ]
+  },
+  "role": "bard",
+  "vary": {
+    "height": [
+      0.96,
+      1.04
+    ],
+    "speed": [
+      0.9,
+      1.1
+    ]
+  },
+  "version": 1
+}

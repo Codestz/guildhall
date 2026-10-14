@@ -122,9 +122,12 @@ describe("people at spots", () => {
         expect(who === undefined || who === f.id).toBe(true)
         holder.set(key(s.at), f.id)
         if (!spot) {
-          // made-up work, a woodcutter's pile, or a castle guard's post on the rounds
+          // made-up work, a woodcutter's pile, a castle guard's post on the rounds, or a lamp the
+          // lamplighter lights (social.ts: an arm's length off its post)
           const m = madeAt.get(key(s.at))
-          expect(!!m || piles.has(key(s.at)) || s.routine?.id === "post").toBe(true)
+          expect(!!m || piles.has(key(s.at)) || s.routine?.id === "post" || s.routine?.id === "light").toBe(
+            true,
+          )
           if (m) expect(Math.abs(Math.sin((m.spot.facing - s.facing) / 2))).toBeLessThan(1e-6)
           if (!piles.has(key(s.at))) made.add(f.id)
           continue

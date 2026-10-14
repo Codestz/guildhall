@@ -25,6 +25,7 @@ import { hexAt, hexCentre } from "./grid.ts"
 import { type HeroPool, heroSpotPool } from "./heroes.ts"
 import { type HexIsland, kindOf } from "./island.ts"
 import { CHOP_TRIP, cyclesSpan, PROPS, planCarts, type RoutineAt, routineFor, spotFrame } from "./routines.ts"
+import { planSocial } from "./social.ts"
 import { HARD, type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
 import { HEX_TILE_SIZE, opensEvening, type SpotHours, spotWindows } from "./tiles.ts"
 import { clearWay, type HexWalk, type HexWalkNode, type WalkBlocker, walledIn } from "./walk.ts"
@@ -90,6 +91,8 @@ export interface LifeWalk {
   ground: boolean[]
   /** Something carried in the arms on the way (catalog id: a basket of fish, a log). */
   carry?: string
+  /** Walked tipsy (social.ts): weaving side to side, one weave this long (the loop's unit). */
+  tipsy?: number
 }
 
 export type LifeStep = LifeStay | LifeWalk
@@ -106,6 +109,8 @@ export interface LifePose extends SpotDoing {
   to?: Vec3
   /** Walking: what is carried (a carry walk). */
   carry?: string
+  /** Walking tipsy (a weave on the way). */
+  tipsy?: boolean
   /** At a stay: when it began (the loop's unit), for a routine's time into it. */
   since?: number
 }
@@ -448,17 +453,33 @@ export function lifePose(steps: readonly LifeStep[], t: number, period: number):
   const t0 = s.times[k]!
   const t1 = s.times[k + 1]!
   const f = t1 > t0 ? Math.min(1, Math.max(0, (h - t0) / (t1 - t0))) : 0
+  const at: Vec3 = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f]
+  let facing = headingTo(a[0], a[2], b[0], b[2])
+  if (s.tipsy) {
+    // a weave either side of the way, eased in and out at its ends, the body turned with it
+    const ease = Math.max(0, Math.min(1, (h - s.from) / (s.tipsy * 2), (s.to - h) / (s.tipsy * 2)))
+    const ph = ((h - s.from) / s.tipsy) * Math.PI * 2
+    const side = WEAVE_M * ease * Math.sin(ph)
+    at[0] -= Math.cos(facing) * side
+    at[2] += Math.sin(facing) * side
+    facing += WEAVE_TURN * ease * Math.cos(ph)
+  }
   return {
-    at: [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f],
-    facing: headingTo(a[0], a[2], b[0], b[2]),
+    at,
+    facing,
     act: "walk",
     indoors: false,
     ground: s.ground[k] ?? true,
     from: s.pts[0]!,
     to: s.pts[s.pts.length - 1]!,
     ...(s.carry ? { carry: s.carry } : {}),
+    ...(s.tipsy ? { tipsy: true } : {}),
   }
 }
+
+/** A tipsy walk's weave either side of the way, metres, and the body's turn with it, radians. */
+const WEAVE_M = 0.22
+const WEAVE_TURN = 0.35
 
 /**
  * A hero's walk (plan-hud-events.md L1): from where it is (`from`: a stay, or `heroFrom` for a point
@@ -1280,7 +1301,7 @@ export function planFolk(
   z: HexZones,
   w: Pick<HexWorld, "tiles" | "pieces"> & Partial<Pick<HexWorld, "stairAt" | "doorways">>,
   walk: HexWalk,
-  opts: { seed: number; pace: number; places?: LifePlaces; secPerHour?: number },
+  opts: { seed: number; pace: number; places?: LifePlaces; secPerHour?: number; social?: boolean },
 ): Folk[] {
   const { seed, pace } = opts
   // screen seconds to a day hour (a routine runs on screen seconds: SPEEDUP 20 by default)
@@ -1672,6 +1693,9 @@ export function planFolk(
     }
   }
   mineCarts(h, w, places, folk)
+  // life between people (social.ts): the tavern's evening, chats and waves, haggles, tipsy walks home,
+  // the bards and the lamplighters
+  if (opts.social !== false) planSocial(folk, { h, z, w, walk, places, seed, pace, secPerHour })
   return folk
 }
 

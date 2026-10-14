@@ -43,6 +43,9 @@ export type Beat =
   | "ring"
   | "page"
   | "look"
+  | "toast"
+  | "light"
+  | "splash"
 
 /**
  * The shared life sample (decisions.md "Game feel plan"): what a person plays now. `phase` is how far
@@ -62,6 +65,8 @@ export interface LifeSample {
   shift?: readonly [number, number]
   turn?: number
   carry?: string
+  /** A short line said aloud through the part (a townsfolk's bubble when the camera is close). */
+  say?: string
 }
 
 /** Seconds a beat stays set after its moment (a frame at 60 or 30 fps, or two, always sees it). */
@@ -99,6 +104,15 @@ export const ROUTINE_CLIP_SECONDS: Readonly<Record<string, number>> = {
   Use_Item: 1.6,
   Walking_A: 1.067,
   Waving: 2.133,
+  Cheering: 1.667,
+  Sit_Chair_Idle: 3.6,
+  Sit_Chair_Down: 0.8,
+  Sit_Chair_StandUp: 0.8,
+  Sit_Floor_Down: 1,
+  Sit_Floor_Idle: 4,
+  Sit_Floor_StandUp: 1.133,
+  Holding_B: 1,
+  Ranged_Magic_Spellcasting: 0.667,
   Working_A: 1.5,
   Working_B: 2.533,
 }
@@ -125,6 +139,8 @@ export const PROPS = {
   arrow: "kaykit-weapons/arrow-a",
   book: "kaykit-adventurers/spellbook-open",
   quill: "kaykit-tools/pencil-a-long",
+  bucket: "kaykit-tools/bucket-metal",
+  torch: "kaykit-tools/torch",
 } as const
 
 /** One part of a cycle. */
@@ -151,6 +167,14 @@ export interface RoutinePart {
   last?: boolean
   /** Units the part leaves in the routine's stock when it ends (a fish in the basket). */
   yields?: number
+  /** Radians the body sways either way through the part (a song heard over a mug, a tipsy reel). */
+  sway?: number
+  /**
+   * Lines said aloud through the part, one drawn per cycle by the routine's seed; `sayP` the share of
+   * cycles that say anything (rare by default: a bubble now and then, not a chorus).
+   */
+  say?: readonly string[]
+  sayP?: number
 }
 
 /** Where a routine's stock stands, in its spot's frame (metres: x right, z ahead), and what it holds. */
@@ -190,6 +214,156 @@ export interface Routine {
 }
 
 const P = PROPS
+
+// ---- life between people (social.ts plans who plays these; most run on the day's clock, `RoutineAt.day`) ----
+
+/** Seconds into a tavern cycle its toast comes: the seated rise at 26, everyone's mug goes up at 26.8. */
+export const TOAST_AT = 26.8
+/** A tavern's song, seconds: in the last cycle of every block (the bard sings, the garden sways). */
+const SONG_S = 12
+const CHEERS = ["Cheers!", "Your health!", "Another round!", "To the guild!"]
+
+/**
+ * Leisure and the moments between people: a tavern's evening (seated, standing, the bard's), a lunch
+ * over a mug, a chat stopped on the road, a wave across it, a haggle at a stall, the lamplighter at a
+ * lamp, a wash at the well, a tipsy walker's reel and slump, a crowd round the notice board. The three
+ * tavern routines keep one timing (a cycle of TOAST_AT, the toast and the sit, two to a block, the song
+ * last), so a tile's patrons and its bard, on one clock, raise their mugs and sing together.
+ */
+const SOCIAL: Readonly<Record<string, Routine>> = {
+  // a patron on a stool: sits over the mug, rises for the toast, sits; sways through the song
+  drink: {
+    props: [PROPS.mug],
+    block: 2,
+    parts: [
+      { clip: "Sit_Chair_Idle", hold: TOAST_AT - 0.8 },
+      { clip: "Sit_Chair_StandUp" },
+      { clip: "Cheering", beats: [[0.35, "toast"]], say: CHEERS, sayP: 0.35 },
+      { clip: "Sit_Chair_Down" },
+      { clip: "Sit_Chair_Idle", hold: SONG_S, sway: 0.14, last: true },
+    ],
+  },
+  // a patron standing at the bar's end: sips, looks about, toasts with the seated, sways to the song
+  "drink-stand": {
+    props: [PROPS.mug],
+    block: 2,
+    parts: [
+      { clip: "Idle_A", hold: 12.6 },
+      { clip: "Use_Item" },
+      { clip: "Idle_B", hold: TOAST_AT - 14.2 },
+      { clip: "Cheering", beats: [[0.35, "toast"]], say: CHEERS, sayP: 0.35 },
+      { clip: "Idle_A", hold: 0.8 },
+      { clip: "Idle_B", hold: SONG_S, sway: 0.16, last: true },
+    ],
+  },
+  // the bard: a word with the tables, the toast, then the song (a verse waved, a chorus cheered)
+  bard: {
+    props: [],
+    block: 2,
+    parts: [
+      { clip: "Idle_B", hold: 12.1 },
+      { clip: "Interact", say: ["A song?", "Who'll sing?", "Quiet now!"], sayP: 0.3 },
+      { clip: "Idle_A", hold: TOAST_AT - 13.4 },
+      { clip: "Cheering", beats: [[0.35, "toast"]] },
+      { clip: "Idle_A", hold: 0.8 },
+      {
+        clip: "Waving",
+        hold: SONG_S / 2,
+        last: true,
+        sway: 0.2,
+        say: ["♪ Hey ho, the guild…", "♪ Oh the forge burns bright…", "♪ A pint for the road…"],
+        sayP: 1,
+      },
+      { clip: "Cheering", hold: SONG_S / 2, last: true, say: ["♪ …and home we go!"], sayP: 0.6 },
+    ],
+  },
+  // lunch over a mug at a canteen's table: no toasts by day
+  dine: { props: [PROPS.mug], parts: [{ clip: "Sit_Chair_Idle", hold: [10, 20] }] },
+  // a chat stopped on the road: one talks while the other listens (the other side a half-cycle on)
+  chat: {
+    props: [],
+    parts: [
+      {
+        clip: "Interact",
+        reps: 2,
+        say: ["Good morrow!", "Fine day for it!", "Heard the news?", "How's the family?", "Busy, busy!"],
+        sayP: 0.4,
+      },
+      { clip: "Idle_A", hold: 2.6 },
+    ],
+  },
+  // a wave across the road at someone known
+  wave: {
+    props: [],
+    parts: [{ clip: "Waving", hold: 2.4, say: ["Hallo!", "Morning!", "Good day!"], sayP: 0.4 }],
+  },
+  // a buyer at a stall: asks, offers, haggles down, pays (on one clock with the seller's `haggle-sell`)
+  "haggle-buy": {
+    props: [],
+    parts: [
+      { clip: "Idle_A", hold: 1.3 },
+      { clip: "Interact", say: ["How much?", "Too dear!", "Half that!"], sayP: 0.5 },
+      { clip: "Idle_B", hold: 2.7 },
+      { clip: "Interact" },
+      { clip: "Idle_A", hold: 1.4 },
+      { clip: "Use_Item", props: [PROPS.coin], beats: [[0.45, "coin"]], say: ["Deal."], sayP: 0.3 },
+      { clip: "Idle_B", hold: 2.4 },
+    ],
+  },
+  // the seller across the counter: shows the goods, answers, takes the coin
+  "haggle-sell": {
+    props: [],
+    parts: [
+      { clip: "Interact", say: ["Finest in town!", "Fresh today!"], sayP: 0.3 },
+      { clip: "Idle_A", hold: 2.7 },
+      { clip: "Interact", say: ["Ten coppers.", "For you? Eight."], sayP: 0.4 },
+      { clip: "Idle_B", hold: 2.7 },
+      { clip: "Use_Item", props: [PROPS.coin], beats: [[0.45, "coin"]] },
+      { clip: "Idle_A", hold: 2.4 },
+    ],
+  },
+  // the lamplighter at a lamp: the torch up to the glass, a breath
+  light: {
+    props: [PROPS.torch],
+    parts: [
+      { clip: "Interact", beats: [[0.55, "light"]] },
+      { clip: "Idle_A", hold: 1.2 },
+    ],
+  },
+  // a wash at the well: haul the bucket up, set it on the rim, splash the face, look about
+  wash: {
+    props: [],
+    parts: [
+      { clip: "Working_A", reps: 2 },
+      { clip: "PickUp", props: [PROPS.bucket], propsFrom: 0.4, beats: [[0.4, "pickup"]] },
+      { clip: "Use_Item", props: [PROPS.bucket], beats: [[0.5, "splash"]] },
+      { clip: "Idle_B", hold: [1.5, 3.5] },
+    ],
+  },
+  // a tipsy walker steadying himself
+  reel: {
+    props: [],
+    parts: [{ clip: "Idle_B", hold: 7, sway: 0.3, say: ["Hic!", "Which way's home?"], sayP: 0.5 }],
+  },
+  // a tipsy walker down against a wall for a moment, and up again
+  slump: {
+    props: [],
+    parts: [
+      { clip: "Sit_Floor_Down" },
+      { clip: "Sit_Floor_Idle", hold: 4.6, say: ["Hic!", "Just a moment…"], sayP: 0.5 },
+      { clip: "Sit_Floor_StandUp" },
+    ],
+  },
+  // round the notice board when a quest is pinned: read, point, talk it over
+  notice: {
+    props: [],
+    parts: [
+      { clip: "Idle_B", hold: [2, 4] },
+      { clip: "Interact", say: ["A quest!", "Who'll take it?", "Gold, it says!"], sayP: 0.5 },
+      { clip: "Idle_A", hold: [1.5, 3] },
+    ],
+  },
+}
 
 /** The routines, by id. */
 export const ROUTINES: Readonly<Record<string, Routine>> = {
@@ -404,6 +578,7 @@ export const ROUTINES: Readonly<Record<string, Routine>> = {
       { clip: "Idle_A", hold: 60 },
     ],
   },
+  ...SOCIAL,
 }
 
 /** Cycles of chopping between a woodcutter's trips with a log to the pile. */
@@ -418,6 +593,20 @@ export interface RoutineAt {
    * turn the throws take toward it. None: the routine's own (StockSpec `at` and `rail`, its parts' turns).
    */
   cart?: CartPlan
+  /**
+   * On the day's clock rather than the stay's: the routine is at `hour · secPerHour + day` seconds
+   * (`routineClock`), so everyone at a tavern's tables toasts at once, a chat's two sides take turns
+   * and a buyer and a seller haggle on one clock, whenever each arrived.
+   */
+  day?: number
+}
+
+/**
+ * Seconds into a routine at a stay: `into` seconds since the stay began, or, for a routine on the day's
+ * clock (`RoutineAt.day`), the day's `hour` in screen seconds plus its offset.
+ */
+export function routineClock(at: RoutineAt, into: number, hour: number, secPerHour: number): number {
+  return at.day === undefined ? into : hour * secPerHour + at.day
 }
 
 const clipSeconds = (clip: string) => ROUTINE_CLIP_SECONDS[clip] ?? 1.5
@@ -443,6 +632,8 @@ export function routineFor(
 ): string | undefined {
   const c = spot.clip ?? ""
   if (c.startsWith("Sit") || c.startsWith("Melee")) return undefined
+  // the well's bucket: a wash
+  if (spot.prop === PROPS.bucket) return "wash"
   if (
     role === "monk" &&
     (byTower || (spot.kind === "stand" && (prefab === "monastery" || prefab === "chapel")))
@@ -674,9 +865,19 @@ export function routineSample(at: RoutineAt, t: number): LifeSample {
   } else if (p.at && (p.at[0] !== 0 || p.at[1] !== 0)) out.shift = p.at
   // (a planned cart: the throws and the wait turn to where it stands)
   if (p.turn !== undefined && !p.move) out.turn = at.cart ? at.cart.aim : p.turn
+  // a sway either way (a song, a reel) on the part's turn
+  if (p.sway) out.turn = (out.turn ?? 0) + p.sway * Math.sin((w.into / SWAY_S) * Math.PI * 2)
   if (p.carry) out.carry = p.carry
+  if (p.say?.length) {
+    const chance = p.sayP ?? 0.25
+    const r = hash2(at.seed + w.part * 131, w.cycle, 7)
+    if (r < chance) out.say = p.say[Math.min(p.say.length - 1, Math.floor((r / chance) * p.say.length))]
+  }
   return out
 }
+
+/** Seconds a sway takes there and back. */
+const SWAY_S = 2.6
 
 /** Units a routine has yielded `t` seconds into a stay (a fish counted once it is in the basket). */
 export function routineYield(at: RoutineAt, t: number): number {

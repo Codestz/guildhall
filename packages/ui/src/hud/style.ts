@@ -469,6 +469,26 @@ button.hud-toast-btn:hover { color: var(--paper); border-color: var(--brass-line
 .hud-beat:is([data-kind="plea"], [data-kind="fail"]) { width: 7px; height: 7px; margin: -14px 0 0 -3.5px; transform: rotate(45deg); }
 .hud-beat[data-kind="plea"] { --c: var(--warn); }
 .hud-beat[data-kind="fail"] { --c: var(--fail); }
+/* the history's beats, each its own shape: an era a tall notch through the rail, a release a dot on it,
+   the busiest week a warm glow */
+.hud-beat[data-kind="era"] { --c: var(--brass-hi); width: 3px; height: 16px; margin: -8px 0 0 -1.5px; border-radius: 1.5px; box-shadow: 0 0 0 1px rgba(20, 15, 11, 0.85); }
+.hud-beat[data-kind="release"] { width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; box-shadow: 0 0 0 1.5px rgba(20, 15, 11, 0.9); }
+.hud-beat[data-kind="busiest"] { --c: #f0a35a; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: radial-gradient(circle, var(--c) 0 2.5px, rgba(240, 163, 90, 0.45) 3.5px, rgba(240, 163, 90, 0) 7px); opacity: 0.75; }
+.hud-beat[data-kind="busiest"][data-past="true"] { opacity: 1; }
+/* the scrub's keyboard focus: a ring round the whole track (the thumb's own ring is not every engine's) */
+.hud-track:has(input:focus-visible) { border-radius: 8px; box-shadow: 0 0 0 2px rgba(241, 213, 144, 0.55); }
+/* the bar's first action in place of the play disc (History at today: Watch it grow) */
+.hud-grow {
+  flex: none; display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px 0 12px; border: 0; border-radius: 999px;
+  color: var(--on-brass); background: var(--brass); font: 700 var(--t-md)/1 var(--body); letter-spacing: 0.03em; white-space: nowrap;
+  box-shadow: 0 0 0 3px rgba(20, 15, 11, 0.9), 0 0 0 4px var(--brass-line); cursor: pointer; transition: background 0.15s, transform 0.1s;
+}
+.hud-grow:hover { background: var(--brass-hi); }
+.hud-grow:active { transform: scale(0.97); }
+.gh .hud-grow:focus-visible { outline-offset: 4px; }
+.hud-tape-close { flex: none; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--muted); cursor: pointer; }
+.hud-tape-close:hover { color: var(--paper); background: var(--raise); }
+.hud-tape-time small > span + span::before { content: " · "; }
 .hud-ticks { position: absolute; left: 7px; right: 7px; top: 27px; margin: 0; padding: 0; list-style: none; height: 14px; pointer-events: none; }
 .hud-ticks li { position: absolute; translate: -50% 0; font: 10.5px/14px var(--mono); color: var(--faint); white-space: nowrap; }
 .hud-ticks li::before { content: ""; position: absolute; left: 50%; top: -6px; width: 1px; height: 4px; background: var(--hair-2); }

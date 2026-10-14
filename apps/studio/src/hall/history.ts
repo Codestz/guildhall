@@ -134,14 +134,46 @@ export function writeT(c: Pick<Chronicle, "start" | "end">, t: number): string |
 
 type Marker = HistoryRange["markers"][number]
 
-/** The bar's beats and bounds for a chronicle: its majors as releases, the eras' starts and the units' births. */
+/** An era's numeral as the book and the captions say it (a book has ten eras at most). */
+const NUMERALS = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"]
+
+/**
+ * The week with the most commits (its middle day), or null when the chronicle counts none. Ties go to the
+ * earlier week.
+ */
+export function busiestWeek(
+  c: Pick<Chronicle, "start" | "end" | "weekly">,
+): { day: Day; commits: number } | null {
+  const commits = c.weekly.commits ?? []
+  let best = -1
+  for (let w = 0; w < commits.length; w++) if ((commits[w] ?? 0) > (commits[best] ?? 0)) best = w
+  if (best < 0 || !(commits[best]! > 0)) return null
+  return { day: Math.min(c.end, c.start + best * 7 + 3), commits: commits[best]! }
+}
+
+/**
+ * The bar's beats and bounds for a chronicle, each its own shape: the eras' starts (a tall notch; an era
+ * a major opens is that major's beat), the other majors (a dot), the busiest week (a glow) and the
+ * units' births.
+ */
 export function historyMarkers(c: Chronicle): Marker[] {
   const at = (day: Day) => day * DAY_MS
-  const out: Marker[] = majorsOf(c).map((r) => ({ at: at(r.day), kind: "release", label: r.tag }))
-  const eras = erasOf(c).spans
-  for (const e of eras.slice(1))
-    if (!out.some((m) => Math.abs(m.at - at(e.from)) < DAY_MS))
-      out.push({ at: at(e.from), kind: "release", label: e.opens?.tag ?? `A new era, ${isoOf(e.from)}` })
+  const eras = erasOf(c).spans.slice(1)
+  const out: Marker[] = eras.map((e, k) => ({
+    at: at(e.from),
+    kind: "era",
+    label: `Chapter ${NUMERALS[k + 1] ?? k + 2}${e.opens ? ` · ${e.opens.tag}` : ""}`,
+  }))
+  for (const r of majorsOf(c))
+    if (!out.some((m) => Math.abs(m.at - at(r.day)) < DAY_MS))
+      out.push({ at: at(r.day), kind: "release", label: r.tag })
+  const busy = busiestWeek(c)
+  if (busy && busy.day > c.start)
+    out.push({
+      at: at(busy.day),
+      kind: "busiest",
+      label: `The busiest week, ${busy.commits.toLocaleString("en-US")} commits`,
+    })
   for (const m of c.milestones)
     if (m.kind === "born" && m.day > c.start) out.push({ at: at(m.day), kind: "born", label: m.text })
   return out.sort((a, b) => a.at - b.at)

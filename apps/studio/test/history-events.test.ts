@@ -82,16 +82,20 @@ describe("react's history, narrated", async () => {
       expect(captions.length).toBeLessThanOrEqual(Math.floor(HISTORY_SECONDS / rate / CAPTION_GAP_S) + 1)
     })
 
-  test("at 1×: the founding, the eras as acts, the places and hands in the toasts", () => {
+  test("at 1× (40 s): the founding, the first great hands, every era as an act, ~13 captions; the rest in the toasts", () => {
     const { captions, toasts } = scheduleOf(beats, 1)
     const said = captions.map((b) => `${isoOf(b.moment.day)} ${b.moment.chapter?.title ?? b.moment.text}`)
-    expect(said.slice(0, 4)).toEqual([
+    expect(said.slice(0, 5)).toEqual([
       "2013-05-29 Ben Newman makes the first commit: the island of react is founded",
+      "2014-05-25 Dan Abramov arrives: the first of 1,601 commits",
+      "2015-03-19 Joe Savona arrives: the first of 1,162 commits",
       "2016-04-08 The Age of v15",
       "2017-09-26 The Old Ground Cleared",
-      "2020-10-20 The Age of v17",
     ])
-    expect(toasts.some((b) => b.moment.who === "Dan Abramov")).toBe(true)
+    for (const era of ["The Age of v17", "The Rise of compiler", "The Age of v19"])
+      expect(said.some((line) => line.endsWith(era))).toBe(true)
+    expect(captions.length).toBeGreaterThanOrEqual(11)
+    expect(captions.length).toBeLessThanOrEqual(16)
     expect(toasts.some((b) => b.moment.unit === "compiler")).toBe(true)
   })
 

@@ -123,7 +123,8 @@ export interface SourceState {
 /** A beat on the timeline, in the bar's own units (ms of session, or epoch ms of history). */
 export interface TimelineMarker {
   at: number
-  kind: "quest" | "loot" | "plea" | "fail" | "release" | "born"
+  /** `era` an era opens (a tall notch), `release` a major (a dot on the rail), `busiest` the busiest week (a glow). */
+  kind: "quest" | "loot" | "plea" | "fail" | "release" | "born" | "era" | "busiest"
   label?: string
 }
 

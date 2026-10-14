@@ -337,6 +337,8 @@ const LOUDNESS: Record<TimelineMarker["kind"], number> = {
   plea: 0,
   fail: 1,
   release: 2,
+  era: 1.5,
+  busiest: 3,
   quest: 3,
   born: 4,
   loot: 5,
@@ -367,5 +369,5 @@ export function fewMarkers<M extends TimelineMarker>(
 
 /** A told story's acts as the bar's beats, at ms from its start. */
 export function actMarkers(chapters: readonly FeedChapter[]): TimelineMarker[] {
-  return chapters.map((c) => ({ at: c.at, kind: "release", label: `${c.numeral} · ${c.title}` }))
+  return chapters.map((c) => ({ at: c.at, kind: "era", label: `${c.numeral} · ${c.title}` }))
 }

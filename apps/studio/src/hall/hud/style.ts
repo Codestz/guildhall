@@ -14,9 +14,13 @@ const CSS = /* css */ `
 .hud-about .hall-about-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 
 /* a place's plate lit while the history tells its founding (hexworld/places.ts flash) */
-.ui-plate[data-flash] { animation: hall-plate-flash var(--flash-ms, 3200ms) ease-out both; }
+/* founded: it comes up out of nothing as its caption does (a fade, a small rise in scale from its foot:
+   the origin 0 0 is the anchor once the plate's own translate(-50%, -100%) has moved it), then glows */
+.ui-plate[data-flash] { transform-origin: 0 0; animation: hall-plate-flash var(--flash-ms, 3200ms) ease-out both; }
 @keyframes hall-plate-flash {
-  0% { border-color: var(--brass-hi); box-shadow: 0 0 0 1px var(--brass-hi), 0 0 26px -2px rgba(240, 206, 120, 0.85); }
+  0% { opacity: 0; scale: 0.8; border-color: var(--brass-hi); box-shadow: 0 0 0 1px var(--brass-hi), 0 0 26px -2px rgba(240, 206, 120, 0.85); }
+  10% { opacity: 1; scale: 1.05; }
+  18% { scale: 1; border-color: var(--brass-hi); box-shadow: 0 0 0 1px var(--brass-hi), 0 0 26px -2px rgba(240, 206, 120, 0.85); }
   45% { border-color: var(--brass); box-shadow: 0 0 0 1px var(--brass-line), 0 0 18px -4px rgba(220, 182, 98, 0.6); }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
@@ -53,17 +57,13 @@ const CSS = /* css */ `
   width: min(680px, calc(100cqw - 2 * var(--gut) - 2 * 250px));
 }
 .gh .ui-hud-bottom .hall-timeline[data-pinned="false"] { pointer-events: none; }
-.gh .ui-hud-bottom .hall-timeline[data-pinned="false"] :is(.hud-timeline-hint, .hall-grow) { pointer-events: auto; }
+.gh .ui-hud-bottom .hall-timeline[data-pinned="false"] .hud-timeline-hint { pointer-events: auto; }
 .gh.site-root .ui-viewer[data-phone] .ui-hud-bottom .hall-timeline, .gh .ui-viewer[data-phone] .ui-hud-bottom .hall-timeline { width: 100%; }
 /* a sheet that is up without a panel opened (Detailed's Chronicle) keeps the bar clear of it too */
 .ui-viewer:not([data-phone]) .ui-hud-sheet:not(:empty) ~ .ui-hud-bottom { translate: calc(-50% - 190px) 0; }
 /* a phone: the timeline is the bottom edge, a hairline across it (a tap opens the bar); the row over it
    steps up while the bar is open */
 .ui-viewer[data-phone] .hud-timeline-hint { left: 0; width: 100%; margin-left: 0; }
-.ui-viewer[data-phone] .ui-hud-bottom .hall-grow { align-self: flex-end; margin-bottom: 52px; }
-/* the growth line under the date (V1's history bar), a phone's too */
-.gh .hud-tape-time[data-note] small { max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
-.ui-viewer[data-phone] .hud-tape-time[data-note] small { display: block; max-width: 132px; }
 
 /* ── the HUD's own slots (hall/hud/mount.tsx): top centre, the captions, the act chip ── */
 .hall-float { position: absolute; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
@@ -83,6 +83,8 @@ const CSS = /* css */ `
    and a strip that shrank to it would refit it every frame) */
 .hall-caps .st-captions { width: 100%; }
 .ui-viewer:has(.ui-hud-bottom .hud-timeline:is(:hover, :focus-within, [data-open="true"])) .hall-caps { bottom: calc(var(--gut) + 74px); }
+/* the history's tape is always open: the captions ride over it, one row or two (--tape-h, timeline.tsx) */
+.ui-viewer:not([data-phone], [data-hud-mode="hidden"]):has(.ui-hud-bottom .hall-timeline[data-scale="history"]) .hall-caps { bottom: calc(var(--gut) + var(--tape-h, 60px) + 14px); }
 .ui-viewer[data-hud-mode="hidden"] .hall-caps { bottom: var(--gut); }
 .ui-viewer:not([data-phone]) .ui-hud-sheet:not(:empty) ~ .hall-caps { translate: calc(-50% - 190px) 0; }
 /* the act chip bottom right (V1), its title centred, its list up over it */
@@ -97,7 +99,7 @@ const CSS = /* css */ `
    steps up over what is under it: --foot-bar, the timeline (a hairline, or the open bar); --foot-row, the
    row (none when it is empty). The sheet up hides them all ── */
 .ui-viewer[data-phone] { --foot-bar: 18px; --foot-row: 0px; --foot: calc(var(--gut) + env(safe-area-inset-bottom)); }
-.ui-viewer[data-phone]:has(.ui-hud-bottom .hud-timeline:is([data-pinned="true"], [data-open="true"], :focus-within)) { --foot-bar: 60px; }
+.ui-viewer[data-phone]:has(.ui-hud-bottom .hud-timeline:is([data-pinned="true"], [data-open="true"], :focus-within)) { --foot-bar: calc(var(--tape-h, 56px) + 10px); }
 .ui-viewer[data-phone]:has(.hall-acts:not(:empty)) { --foot-row: 58px; }
 .ui-viewer[data-phone] .hall-acts {
   left: var(--gut); right: var(--gut); bottom: calc(var(--foot) + var(--foot-bar)); flex-direction: row; align-items: flex-end; gap: 8px;
@@ -109,6 +111,8 @@ const CSS = /* css */ `
 .ui-viewer[data-phone] .hall-acts .hud-badge { width: 44px; height: 44px; }
 .ui-viewer[data-phone] .hall-acts .hud-badges { padding: 3px; border-radius: 12px; }
 .ui-viewer[data-phone] .hall-acts .hud-badges-expand { height: 44px; }
+/* a phone's touch target: the roster's expander a full 44 × 44 wherever the face bar is */
+.gh .ui-viewer[data-phone] .hud-badges-expand { width: auto; min-width: 44px; height: 44px; }
 .ui-viewer[data-phone] .hall-acts .hud-tip { display: none; }
 .gh .ui-viewer[data-phone] .hall-acts .st-chapter-btn { width: 52px; height: 52px; padding: 0; align-items: center; justify-content: center; line-height: 1; border-radius: 12px; font-size: 15px; }
 .ui-viewer[data-phone] .hall-caps { bottom: calc(var(--foot) + var(--foot-bar) + var(--foot-row) + 4px); width: calc(100% - 2 * var(--gut)); }
@@ -144,6 +148,14 @@ const CSS = /* css */ `
 /* the feed's open form keeps to the screen */
 .gh .hall-feed { max-height: min(460px, 100%); }
 .gh .hall-feed .hud-chron-text b { color: var(--brass-hi); }
+/* one truncation rule for its rows (two lines, then an ellipsis), and a soft fade where the list runs on
+   under the panel's foot rather than a row cut in half; room under the last row to scroll it clear */
+.gh .hall-feed .hud-chron-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; white-space: normal; }
+.gh .hall-feed .hud-panel-body {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
+}
+.gh .hall-feed .hud-chron-list { padding-bottom: 28px; }
 
 /* panels over the world: V1's plaque ink (0.86) over a blur, the sheet's long reads V1's settings ink
    (0.95): at 0.74 a noon meadow showed through and the faint and muted type fell under AA; a soft shadow
@@ -238,23 +250,20 @@ const CSS = /* css */ `
 }
 .ui-viewer:not([data-phone]):has(.hall-timeline[data-telling="true"]) .ui-hud-bottom { max-width: var(--tell-w); }
 .gh .ui-viewer:not([data-phone]) .ui-hud-bottom .hall-timeline[data-telling="true"] { width: var(--tell-w); }
-.ui-viewer:not([data-phone]):has(.hall-timeline[data-telling="true"]) .hall-caps { bottom: calc(var(--gut) + 74px); width: min(640px, var(--tell-w)); }
+.ui-viewer:not([data-phone]):has(.hall-timeline[data-telling="true"]) .hall-caps { width: min(640px, var(--tell-w)); }
 .ui-viewer:not([data-phone]):has(.hall-timeline[data-telling="true"]) .ui-hud-feed .hud-toasts {
   max-width: max(180px, calc((100cqw - var(--tell-w)) / 2 - var(--gut) - 10px));
 }
 .ui-viewer:not([data-phone]):has(.hall-timeline[data-telling="true"]) .ui-hud-feed .hud-toast-text {
   white-space: normal; line-height: 1.3; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
 }
-/* the tape's figures give way before its track does: the date stays whole, the line under it ellipsised */
-.gh .hall-timeline[data-telling="true"] .hud-tape-time { flex: 0 1 auto; min-width: 0; overflow: hidden; }
-.gh .hall-timeline[data-telling="true"] .hud-tape-time small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.ui-viewer:not([data-phone]) .hall-timeline[data-telling="true"] .hud-track { min-width: 140px; }
 @container viewer (max-width: 1180px) {
   .gh .hall-timeline[data-telling="true"] .hud-ticks { display: none; }
 }
 @container viewer (max-height: 460px) {
   .ui-viewer:has(.hall-timeline[data-telling="true"]) .ui-hud-feed .hud-toast-list { display: none; }
-  .ui-viewer:not([data-phone]):has(.hall-timeline[data-telling="true"]) .hall-caps { bottom: calc(var(--gut) + 66px); }
+  .ui-viewer:not([data-phone]):has(.hall-timeline[data-telling="true"]) { --tell-w: min(720px, calc(100cqw - 2 * var(--gut) - 2 * 196px)); }
+  .ui-viewer:not([data-phone], [data-hud-mode="hidden"]):has(.ui-hud-bottom .hall-timeline[data-scale="history"]) .hall-caps { bottom: calc(var(--gut) + var(--tape-h, 60px) + 8px); }
 }
 `
 

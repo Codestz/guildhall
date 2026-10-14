@@ -346,13 +346,29 @@ export function growthLine(
   c: Pick<Chronicle, "contributors" | "repo" | "snapshots" | "weekly" | "start" | "end">,
   day: number,
 ): string {
+  return growthParts(c, day).join(" · ")
+}
+
+/**
+ * The growth line as its three parts (contributors so far, in town, files), so a narrow bar can leave
+ * out the middle one.
+ */
+export function growthParts(
+  c: Pick<Chronicle, "contributors" | "repo" | "snapshots" | "weekly" | "start" | "end">,
+  day: number,
+): [string, string, string] {
   const listed = c.contributors.filter((p) => !p.bot)
-  const firsts = listed.filter((p) => p.first <= day).length
+  let firsts = 0
+  let town = 0
+  for (const p of listed)
+    if (p.first <= day) {
+      firsts++
+      if (day <= p.last + IN_TOWN_DAYS) town++
+    }
   const total = c.repo.contributors
   const so = day >= c.end ? total : listed.length === 0 ? 0 : Math.round((firsts / listed.length) * total)
-  const town = listed.filter((p) => p.first <= day && day <= p.last + IN_TOWN_DAYS).length
   const files = day >= c.end ? c.repo.files : filesAt(c, Math.floor(day))
-  return `${n(so)} ${so === 1 ? "contributor" : "contributors"} · ${n(town)} in town · ${n(files)} files`
+  return [`${n(so)} ${so === 1 ? "contributor" : "contributors"}`, `${n(town)} in town`, `${n(files)} files`]
 }
 
 /** The feed's stamp: the history's span. */

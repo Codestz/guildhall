@@ -4,7 +4,7 @@
  * exactly). V1's tape: a brass play disc, the time, a brass rail with the beats on it; plus the scale
  * switch and, live, a way back to now. Props only: the caller owns the clock.
  */
-import { type CSSProperties, useEffect, useRef, useState } from "react"
+import { type CSSProperties, useEffect, useId, useRef, useState } from "react"
 import { clock, day, month, ticks } from "./format.ts"
 import { Glyphs } from "./glyphs.tsx"
 import type { TimelineMarker, TimeScale } from "./types.ts"
@@ -40,10 +40,25 @@ export interface TimelineProps {
   onRate?: () => void
   /**
    * The line under the time in place of the span (V1's growth bar: `1,534 contributors · 60 in town ·
-   * 1,113 files`).
+   * 1,113 files`); as parts, each its own span (`data-part` its index), so a narrow bar can drop one.
    */
-  note?: string
+  note?: TimelineNote
+  /**
+   * Moves the bar without a render (V1's growth tape): called once with a writer the caller runs as the
+   * time goes (a frame, a clock's tick); it writes the fill, the time, the scrub and the note straight
+   * into the bar. Returns the stop.
+   */
+  drive?: (write: TimelineWrite) => () => void
+  /** The bar's first action in place of the play disc (History at today: "Watch it grow"). */
+  primary?: { label: string; onClick: () => void; title?: string }
+  /** A ✕ at the bar's end (History told: "Skip to today"). */
+  onClose?: () => void
+  closeLabel?: string
 }
+
+export type TimelineNote = string | readonly string[]
+/** Writes the time `at` (and the note) into a driven bar. */
+export type TimelineWrite = (at: number, note?: TimelineNote) => void
 
 const MARKER_LABEL: Record<TimelineMarker["kind"], string> = {
   quest: "Quest sent",
@@ -52,7 +67,13 @@ const MARKER_LABEL: Record<TimelineMarker["kind"], string> = {
   fail: "Deed failed",
   release: "Release",
   born: "A package is born",
+  era: "An era opens",
+  busiest: "The busiest week",
 }
+
+const partsOf = (note: TimelineNote): readonly string[] => (typeof note === "string" ? [note] : note)
+const sameParts = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every((x, k) => x === b[k])
 
 /** The history's span under the date: its years, or its months (or month) when it is younger than a year. */
 export function historySpan(start: number, end: number): string {
@@ -82,6 +103,10 @@ export function Timeline({
   rate,
   onRate,
   note,
+  drive,
+  primary,
+  onClose,
+  closeLabel = "Close",
 }: TimelineProps) {
   const history = scale === "history"
   const len = Math.max(1, end - start)
@@ -92,7 +117,52 @@ export function Timeline({
   const behind = live && end - at > 1500
   const say = (t: number) => (history ? month(t) : clock(t - start))
   const root = useRef<HTMLDivElement>(null)
+  const timeRef = useRef<HTMLElement>(null)
+  const noteRef = useRef<HTMLElement>(null)
+  const rangeRef = useRef<HTMLInputElement>(null)
+  const railRef = useRef<HTMLDivElement>(null)
+  const dragging = useRef(false)
   const [opened, setOpened] = useState(false)
+  const id = useId()
+  const parts = note === undefined ? undefined : partsOf(note)
+
+  // a driven bar: the caller's writer moves it between renders (no render a frame)
+  const bounds = useRef({ start, end, history })
+  bounds.current = { start, end, history }
+  useEffect(() => {
+    if (!drive) return
+    let said = ""
+    let shown: readonly string[] = []
+    return drive((t, next) => {
+      const { start: s, end: e, history: h } = bounds.current
+      const span = Math.max(1, e - s)
+      root.current?.style.setProperty("--p", String(Math.max(0, Math.min(1, (t - s) / span))))
+      const label = h ? day(t) : clock(t - s)
+      if (label !== said) {
+        said = label
+        if (timeRef.current) timeRef.current.textContent = label
+        rangeRef.current?.setAttribute("aria-valuetext", h ? label : `${label} of ${clock(span)}`)
+      }
+      const range = rangeRef.current
+      if (range && !dragging.current) range.value = String(Math.max(s, Math.min(e, t)))
+      for (const beat of railRef.current?.querySelectorAll<HTMLElement>(".hud-beat") ?? []) {
+        const past = String(Number(beat.dataset.at) <= t)
+        if (beat.dataset.past !== past) beat.dataset.past = past
+      }
+      const want = next === undefined ? undefined : partsOf(next)
+      const box = noteRef.current
+      if (want && box && !sameParts(want, shown)) {
+        shown = want
+        if (box.children.length !== want.length)
+          box.replaceChildren(...want.map(() => document.createElement("span")))
+        want.forEach((text, k) => {
+          const el = box.children[k] as HTMLElement
+          el.dataset.part = String(k)
+          if (el.textContent !== text) el.textContent = text
+        })
+      }
+    })
+  }, [drive])
 
   // a tapped-open hairline folds again on a press anywhere else
   useEffect(() => {
@@ -131,21 +201,47 @@ export function Timeline({
         </button>
       )}
       <section className="ui-panel hud-tape" aria-label={`Timeline: ${what}`}>
-        <button
-          type="button"
-          className="hud-play"
-          onClick={() => onPlay(!playing)}
-          aria-label={playing ? `Pause the ${what.toLowerCase()}` : `Play the ${what.toLowerCase()}`}
-          aria-pressed={playing}
-        >
-          {playing ? <Glyphs.pause /> : <Glyphs.play />}
-        </button>
-        <span className="hud-tape-time" aria-hidden="true" data-note={note ? "" : undefined}>
-          <b className="num">{now}</b>
-          <small className="num">{note ?? (history ? total : `/ ${total}`)}</small>
+        {primary ? (
+          <button
+            type="button"
+            className="hud-grow"
+            onClick={primary.onClick}
+            {...(primary.title ? { title: primary.title } : {})}
+          >
+            <Glyphs.play />
+            <span>{primary.label}</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="hud-play"
+            onClick={() => onPlay(!playing)}
+            aria-label={playing ? `Pause the ${what.toLowerCase()}` : `Play the ${what.toLowerCase()}`}
+            aria-pressed={playing}
+            title={playing ? "Pause · Space" : "Play · Space"}
+          >
+            {playing ? <Glyphs.pause /> : <Glyphs.play />}
+          </button>
+        )}
+        <span className="hud-tape-time" aria-hidden="true" data-note={parts ? "" : undefined}>
+          <b ref={timeRef} className="num">
+            {now}
+          </b>
+          <small ref={noteRef} className="num">
+            {parts
+              ? parts.map((text, k) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: the note's parts are positional
+                  <span key={k} data-part={k}>
+                    {text}
+                  </span>
+                ))
+              : history
+                ? total
+                : `/ ${total}`}
+          </small>
         </span>
         <div className="hud-track">
-          <div className="hud-track-rail" aria-hidden="true">
+          <div ref={railRef} className="hud-track-rail" aria-hidden="true">
             <div className="hud-track-fill" />
             {markers.map((m, k) => (
               <i
@@ -153,6 +249,7 @@ export function Timeline({
                 key={k}
                 className="hud-beat"
                 data-kind={m.kind}
+                data-at={m.at}
                 data-past={m.at <= at}
                 style={{ left: `${((m.at - start) / len) * 100}%` }}
                 title={`${m.label ?? MARKER_LABEL[m.kind]} · ${say(m.at)}`}
@@ -166,15 +263,31 @@ export function Timeline({
               </li>
             ))}
           </ol>
+          {markers.length > 0 && (
+            <p id={`${id}-beats`} className="ui-visually-hidden">
+              {`Marks: ${markers.map((m) => `${m.label ?? MARKER_LABEL[m.kind]}, ${say(m.at)}`).join("; ")}`}
+            </p>
+          )}
           <input
+            ref={rangeRef}
             type="range"
             min={start}
             max={end}
             step={step ?? (history ? DAY_MS : 1000)}
             value={Math.max(start, Math.min(end, at))}
             aria-label={history ? "Repo history: day" : "Session time"}
+            {...(markers.length > 0 ? { "aria-describedby": `${id}-beats` } : {})}
             aria-valuetext={history ? day(at) : `${clock(at - start)} of ${clock(len)}`}
             onChange={(event) => onSeek(Number(event.currentTarget.value))}
+            onPointerDown={() => {
+              dragging.current = true
+            }}
+            onPointerUp={() => {
+              dragging.current = false
+            }}
+            onPointerCancel={() => {
+              dragging.current = false
+            }}
           />
         </div>
         {rate !== undefined && onRate && (
@@ -199,6 +312,17 @@ export function Timeline({
           >
             <i aria-hidden="true" />
             Live
+          </button>
+        )}
+        {onClose && (
+          <button
+            type="button"
+            className="hud-tape-close"
+            onClick={onClose}
+            aria-label={closeLabel}
+            title={closeLabel}
+          >
+            <Glyphs.close />
           </button>
         )}
         {onScale && (

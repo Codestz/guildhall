@@ -100,7 +100,7 @@ import {
   feedOf,
   feedPick,
   feedStamp,
-  growthLine,
+  growthParts,
   monthOf,
   type PlaceRow,
   placeDossier,
@@ -1190,7 +1190,7 @@ export function HallHud(props: HallHudProps) {
             time={props.time}
             pinned={detailed}
             overlay={false}
-            {...(chronicle ? { growth: (at: number) => growthLine(chronicle, at / DAY_MS) } : {})}
+            {...(chronicle ? { growth: (at: number) => growthParts(chronicle, at / DAY_MS) } : {})}
           />,
           hud.bottom,
         )}

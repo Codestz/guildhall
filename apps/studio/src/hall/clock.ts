@@ -41,7 +41,7 @@ export interface Clock {
 /** The speeds the bar offers. */
 export const RATES: readonly number[] = [0.5, 1, 2, 4]
 /** Seconds the whole history takes at 1×. */
-export const HISTORY_SECONDS = 20
+export const HISTORY_SECONDS = 40
 /** A tick never moves more than this (a tab coming back from the background does not skip the history). */
 export const MAX_DT = 0.1
 
@@ -93,7 +93,7 @@ export function createClock(opts: ClockOpts = {}): Clock {
       if (state.mode === "live") return false
       if (!state.playing || !(dt > 0)) return false
       const t = Math.min(1, state.t + (Math.min(dt, MAX_DT) * state.rate) / duration)
-      set(t >= 1 ? { t: 1, playing: false } : { t })
+      set(t >= 1 - 1e-9 ? { t: 1, playing: false } : { t })
       return true
     },
     subscribe(fn) {
@@ -107,7 +107,7 @@ export function createClock(opts: ClockOpts = {}): Clock {
 export interface HistoryRange {
   start: number
   end: number
-  markers: readonly { at: number; kind: "release" | "born"; label?: string }[]
+  markers: readonly { at: number; kind: "era" | "release" | "busiest" | "born"; label?: string }[]
 }
 
 /**

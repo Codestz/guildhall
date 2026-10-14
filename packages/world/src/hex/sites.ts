@@ -36,6 +36,13 @@ const CLOSED = 1000
 /** How far below the best gate's score (steps) another gate is tried for a castle with no closed notch. */
 const GATE_SLACK = 3
 
+/** A tile's centre in hex-centre units. */
+const centreOf = (g: HexGrid, i: number): [number, number] => {
+  const q = g.q[i]!
+  const r = g.r[i]!
+  return [Math.sqrt(3) * (q + r / 2), 1.5 * r]
+}
+
 const steps = (g: HexGrid, a: number, b: number) => {
   const dq = g.q[a]! - g.q[b]!
   const dr = g.r[a]! - g.r[b]!
@@ -226,6 +233,14 @@ export interface CastlePlan {
   gateSide: number
   /** The tile outside the gate the road arrives from (a river tile there is a bridge over the moat); −1 none. */
   entry: number
+  /**
+   * The postern (tier 2 up, where a side fits): a second gate in the curtain on the far side from the
+   * gate, so a walk out to a place behind the castle need not go round it. −1 none; its side and the
+   * dry tile outside it as the gate's.
+   */
+  postern: number
+  posternSide: number
+  posternEntry: number
   /** The inner yard in front of the hall (the keep below tier 3): the castle's heart, where agents gather. */
   heart: number
   role: Map<number, CastleRole>
@@ -254,7 +269,10 @@ export interface CastlePlan {
  *   the yard     every other tile, all joined; the ways from the gate to the heart and to each door are paved
  *                and kept clear (court), the rest is yard (props, drill);
  *   the walls    along every yard side that faces out of the site (a building on the edge closes its own
- *                side), the gatehouse on the gate side.
+ *                side), the gatehouse on the gate side;
+ *   the postern  (tier 2 up, with `posternOpen`) a second gatehouse on a paved court's outer side, away
+ *                from the gate past the heart, onto dry ground a step off at most, where it crosses no notch
+ *                the curtain cannot stand out over: a walk out to a place behind the castle goes through it.
  *
  * `open(from, to)` says whether a road may come from tile `to`, outside the site, into tile `from` on it.
  */
@@ -267,6 +285,8 @@ export function composeCastle(
     seed: number
     usable: (i: number) => boolean
     open: (from: number, to: number) => boolean
+    /** Whether a postern on tile `from` may open onto tile `to` outside the site (none without it). */
+    posternOpen?: (from: number, to: number) => boolean
     /** Whether a tile off the site may take the curtain's outer half (its foot, open at its level). */
     foot?: (j: number) => boolean
   },
@@ -315,7 +335,11 @@ export function composeCastle(
   return best!.plan
 
   /** The castle with its gate on side `gateSide` of `gate`, and how many of its ways cross a closed notch. */
-  function composeAt(gate: number, gateSide: number): { plan: CastlePlan; closed: number } {
+  function composeAt(
+    gate: number,
+    gateSide: number,
+    withPostern = true,
+  ): { plan: CastlePlan; closed: number } {
     const entry = nb(gate)[gateSide]!
     const role = new Map<number, CastleRole>(tiles.map((i) => [i, "yard"]))
     role.set(keep, "keep")
@@ -430,6 +454,36 @@ export function composeCastle(
     }
     if (gate === keep) door.set(keep, gateSide)
     else paved.add(gate)
+    // ---- the postern (tier 2 up): a gate on the far side, on a court the ways already pave (so the
+    // yard keeps every tile it had: its trades, its gathering, the notice board) ----
+    let postern = -1
+    let posternSide = -1
+    let posternEntry = -1
+    if (withPostern && opts.posternOpen && tier >= 2 && gate !== keep) {
+      const [gx, gz] = centreOf(g, gate)
+      const [kx, kz] = centreOf(g, heart)
+      let bestScore = -Infinity
+      for (const t of tiles) {
+        if (isBuilt(role.get(t)) || t === gate || !paved.has(t) || !prev.has(t) || cost.get(t)! >= CLOSED)
+          continue
+        for (const d of outside(t)) {
+          const o = nb(t)[d]!
+          // a side whose ends turn the same way (no lone notch: neither flank in the way through), to dry
+          // open ground no more than a step off, not the gate's own approach nor the curtain's foot
+          if (o < 0 || o === entry || !opts.posternOpen(t, o) || notches(t, d).length === 1) continue
+          const [ox, oz] = centreOf(g, o)
+          // out the far side: away from the gate, past the heart
+          const away = Math.hypot(ox - gx, oz - gz) - Math.hypot(ox - kx, oz - kz) * 0.5
+          const sc = away - cost.get(t)! * 0.3 + hh(5, o) * 0.1
+          if (sc > bestScore && steps(g, t, gate) >= 2) {
+            bestScore = sc
+            postern = t
+            posternSide = d
+            posternEntry = o
+          }
+        }
+      }
+    }
     for (const i of paved) if (!isBuilt(role.get(i))) role.set(i, "court")
     // ---- the curtain wall (tier 2 up) ----
     const walls = new Map<number, number[]>()
@@ -453,6 +507,12 @@ export function composeCastle(
       for (const w of ways) for (let k = 1; k < w.length; k++) cross(w[k - 1]!, nb(w[k - 1]!).indexOf(w[k]!))
       for (const [i, d] of door) if (i !== gate) cross(i, d)
     }
+    // a postern whose way crosses a notch the curtain cannot stand out over (or whose approach the
+    // curtain stands out over) is not made
+    if (postern >= 0) {
+      const plain = composeAt(gate, gateSide, false)
+      if (closed > plain.closed || foot.has(posternEntry)) return plain
+    }
     const plan: CastlePlan = {
       tier,
       tiles,
@@ -461,6 +521,9 @@ export function composeCastle(
       gate,
       gateSide,
       entry,
+      postern,
+      posternSide,
+      posternEntry,
       heart,
       role,
       door,

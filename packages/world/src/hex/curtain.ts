@@ -175,6 +175,8 @@ export function curtainWall(opts: {
   R: number
   y: number
   gate: { tile: number; side: number } | null
+  /** A second gate (the postern, sites.ts CastlePlan): a gatehouse as the gate's, with no banners. */
+  postern?: { tile: number; side: number } | null
   bodies: readonly CurtainBody[]
   colour: string
   /** Whether a court's way (or a door's approach) crosses the side between site tiles a and b. */
@@ -199,6 +201,9 @@ export function curtainWall(opts: {
     return [cx + Math.cos(a) * R, cz - Math.sin(a) * R]
   }
   const key = (p: P) => `${Math.round(p[0] * 100)},${Math.round(p[1] * 100)}`
+  /** The gate (or the postern) on side d of tile i, null for none. */
+  const gateAt = (i: number, d: number) =>
+    [opts.gate, opts.postern].find((q) => !!q && q.tile === i && q.side === d) ?? null
   // ---- the outline: each tile side facing out, its two corners, its offset line ----
   interface Edge {
     tile: number
@@ -217,8 +222,7 @@ export function curtainWall(opts: {
   const insetOf = (i: number, d: number, nb: Int32Array | readonly number[]): number => {
     const j = nb[d]!
     // the gate between two outward turns: set back between its flanks
-    if (opts.gate && i === opts.gate.tile && d === opts.gate.side)
-      return gateRecessed(nb, S, d) ? WALL_INSET + GATE_RECESS : WALL_INSET
+    if (gateAt(i, d)) return gateRecessed(nb, S, d) ? WALL_INSET + GATE_RECESS : WALL_INSET
     if (j < 0 || !opts.spill?.(j) || !opts.crossed) return WALL_INSET
     for (const e of [d + 5, d + 1]) {
       const k = nb[e % 6]!
@@ -328,7 +332,8 @@ export function curtainWall(opts: {
       }
       parts = next.filter(([p, q]) => q - p > 1e-6)
     }
-    const isGate = opts.gate !== null && run.tile === opts.gate.tile && run.side === opts.gate.side
+    const isGate = gateAt(run.tile, run.side) !== null
+    const banners = isGate && gateAt(run.tile, run.side) === opts.gate
     const rot = Math.atan2(-u[1], u[0])
     // (the gate square to its side's middle, where the way comes through)
     const m = (run.mid[0] - run.a[0]) * u[0] + (run.mid[1] - run.a[1]) * u[1]
@@ -357,9 +362,9 @@ export function curtainWall(opts: {
       })
       fill(run, u, p, ga)
       fill(run, u, gb, q)
-      // a banner either side of the gate, on its outer face
+      // a banner either side of the gate, on its outer face (the postern goes plain)
       const [ox, oz] = dir(run.side)
-      for (const s of [-1, 1])
+      for (const s of banners ? [-1, 1] : [])
         put({
           piece: `kaykit-dungeon/banner-${opts.colour}`,
           x: run.a[0] + u[0] * (m + s * 1.05 * GATE_STRETCH) + ox * 0.42,

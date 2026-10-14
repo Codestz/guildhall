@@ -43,7 +43,9 @@ import {
   type LifePlaces,
   lampLightings,
   lifePlaces,
+  type PetitionLane,
   type PlaceSpec,
+  petitionLane,
   planFolk,
   planStocks,
   type Solid,
@@ -94,6 +96,11 @@ export interface LifePlan {
   readers: BoardReader[]
   /** The lamps the lamplighters light at dusk, and when (world `lampLightings`): the night lights each then. */
   lamps: LampLighting[]
+  /**
+   * Where the petitioners queue on the harbour's quay, their way in and their way off (world
+   * `petitionLane`): the docket (docket.ts) stands an open issue's petitioner there. Null with no quay.
+   */
+  petitions: PetitionLane | null
   /** How many people pass a door over the day, in all. */
   passes: number
   stats: { nodes: number; edges: number; planMs: number; agentsMs: number; walks: number }
@@ -160,6 +167,7 @@ export function planLifeDesk(
       return b ? boardReaders(b, places.furniture) : []
     })(),
     lamps: lampLightings(folk, SEC_PER_HOUR),
+    petitions: petitionLane({ world: w, walk, places, doorways: w.doorways }),
     passes: folk.reduce((n, f) => n + doorPasses(f.day).length, 0),
     stats: {
       nodes: walk.nodes.length,

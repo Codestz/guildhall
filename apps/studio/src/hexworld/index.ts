@@ -73,6 +73,7 @@ import { islandWorld, worldCamera } from "../shell/worldCamera.ts"
 import { loadTiles } from "../tiles.ts"
 import { atmoKnobs, createIslandAir, type IslandAir } from "./atmo.ts"
 import type { Chips } from "./chips.ts"
+import { type DocketMount, mountDocket } from "./docket.ts"
 import { createDoors, type Doors } from "./doors.ts"
 import { type Fx, fxOf, mountFx, mountWorkFx, type WorkFxMount } from "./fx.ts"
 import { type HallRepo, hallBuild, hallSubtitle, placeRows } from "./hall.ts"
@@ -453,6 +454,7 @@ const world = {
     let fx: Fx | null = null
     let seaLife: SeaMount | null = null
     let undead: UndeadMount | null = null
+    let docket: DocketMount | null = null
     let workfx: WorkFxMount | null = null
     let shows: ReturnType<typeof mountShows> | null = null
     let unAgents = () => {}
@@ -764,6 +766,17 @@ const world = {
         hall: fxOn || session,
         ...(extra.session ? { session: extra.session } : {}),
       })
+      // the docket (docket.ts): the open issues' plates over the quay and their petitioners queueing on it
+      if (life)
+        docket = mountDocket({
+          stage,
+          life,
+          layer: viewer.labels,
+          workfx: workfx?.fx ?? null,
+          query: ctx.query,
+          hall: fxOn || session,
+          ...(extra.session ? { session: extra.session } : {}),
+        })
       // a hook's parts (a hall's history reveal) go in before the light, so their shaders compile behind the cover
       if (hooks && island && world)
         hooks.built({
@@ -939,6 +952,7 @@ const world = {
       job.dispose()
       seaLife?.dispose()
       undead?.dispose()
+      docket?.dispose()
       batch?.dispose()
       water?.dispose()
       disposeField()

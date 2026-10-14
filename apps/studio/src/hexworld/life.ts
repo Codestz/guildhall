@@ -52,6 +52,7 @@ import {
 import { PHONE_MAX } from "@guildhall/ui"
 import {
   CHARACTER_SCALE,
+  CHEER_CLIP,
   type DoorPass,
   DRILLS,
   type DrillAt,
@@ -70,6 +71,8 @@ import {
   type LifeStep,
   lifePlaces,
   lifePose,
+  PETITION_FIGURES,
+  type PetitionLane,
   PROPS,
   routineClips,
   routineClock,
@@ -181,6 +184,13 @@ export interface Life {
   doorways(): readonly HexDoorway[]
   /** Draws the agents of another source from now on (a hall's session): on the figures life has. */
   setAgents(source: AgentSource | null): void
+  /**
+   * Stands the petitioners where `poses` says each frame (docket.ts: world `petitionerPoses`, one per
+   * figure, null: indoors at the quay's door); null puts them all back indoors.
+   */
+  setPetitioners(poses: (() => readonly (LifePose | null)[]) | null): void
+  /** Where the petitioners queue (the plan's), once `ready`; null with no quay. */
+  petitionLane(): PetitionLane | null
   /** Where hero `id` is drawn now (its feet, metres), or null when it is not on the island. */
   heroAt(id: string): [number, number, number] | null
   /** Hero `id`'s itinerary as planned (its steps and acts), when its source keeps one (the graveyard reads a fixer's blow). */
@@ -198,6 +208,9 @@ export interface Life {
 /** The notice board's piece, and how tall it stands (metres: a little over a hero's head). */
 const NOTICE_BOARD = "kenney-nature/sign"
 const NOTICE_BOARD_M = 1.35
+
+/** The bodies a petitioner is drawn with: hooded travellers. */
+const PETITIONER_BODIES = ["kaykit-adventurers/rogue-hooded", "kaykit-adventurers/rogue"]
 
 /** Spare figures of each body a growing source may use (`agentPool`). */
 export const AGENT_POOL = 4
@@ -326,6 +339,12 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
   let swapped = true
   let heroAt: (id: string) => [number, number, number] | null = () => null
   let heroLookOf: Life["heroLook"] = () => null
+  /** The petitioners' poses this frame (docket.ts), by figure, and where a figure not out waits (the quay's door). */
+  let petitionSource: (() => readonly (LifePose | null)[]) | null = null
+  let petitionNow: readonly (LifePose | null)[] | null = null
+  let petitionDoor: LifePose | null = null
+  let petitionLaneOf: PetitionLane | null = null
+  const petitionIds: number[] = []
 
   /** Draws the notice board at the plan's place, NOTICE_BOARD_M tall, facing the gathering. */
   const placeBoard = async (board: { at: [number, number, number]; facing: number }) => {
@@ -353,6 +372,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     ])
     if (disposed) return
     const { folk } = plan
+    petitionLaneOf = plan.petitions
     if (swapped) source = first
     const agents = source?.list() ?? []
     doorways = plan.doorways
@@ -376,7 +396,10 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     }
     const looks: NpcLook[] = []
     /** A townsfolk's day, or a hero figure (`figures[figure]`). */
-    const loops: ({ steps: LifeStep[]; figure?: undefined } | { figure: number })[] = []
+    const loops: (
+      | { steps: LifeStep[]; figure?: undefined; petition?: number }
+      | { figure: number; petition?: undefined }
+    )[] = []
     /** Each townsfolk's role, by crowd id (shots). */
     const roleOf: string[] = []
     /** Each townsfolk's mounts for the day's work (work.ts), by crowd id. */
@@ -391,6 +414,27 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       looks.push(w.look)
       loops.push({ steps: f.day })
       roleOf[looks.length - 1] = f.role
+    }
+    // the petitioners' figures (docket.ts): hooded travellers, indoors at the quay's door until the docket stands them out
+    const lane = plan.petitions
+    const base = lane ? (usableOf("monk") ?? usableOf("farmer")) : undefined
+    const bodies = PETITIONER_BODIES.filter((b) => catalog.get(b))
+    if (lane && base && bodies.length) {
+      const { head: _, ...bare } = base
+      const recipe: NpcRecipe = { ...bare, id: "petitioner", body: bodies, hands: {} }
+      const door = lane.approach[0]!
+      for (let k = 0; k < PETITION_FIGURES; k++) {
+        petitionIds.push(looks.length)
+        looks.push(scaled(resolveNpc(recipe, hash(`petitioner:${opts.seed}:${k}`), catalog)))
+        loops.push({
+          steps: [
+            { kind: "stay", from: 0, to: 24, at: door, facing: 0, act: "idle", ground: true, indoors: true },
+          ],
+          petition: k,
+        })
+        roleOf[looks.length - 1] = "petitioner"
+      }
+      petitionDoor = { at: door, facing: 0, act: "idle", indoors: true, ground: true }
     }
     // a carry walk is baked when someone carries a load in both arms
     const carries = folk.some((f) =>
@@ -469,6 +513,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
           ...spotClips(folk.map((f) => f.day)),
           ...(figures.length ? [RUN_CLIP, SPRINT_CLIP, BRISK_WALK, ...HERO_CLIPS] : []),
           ...(carries ? [CARRY_WALK] : []),
+          ...(petitionIds.length ? [CHEER_CLIP] : []),
         ],
       },
     )
@@ -618,7 +663,15 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         const l = loops[id]!
         const p = poses[id]
         // (not a duel, a tavern's table, a chat: those keep a clock with others)
-        if (l.figure !== undefined || !p || p.indoors || p.act === "walk" || p.drill) continue
+        if (
+          l.figure !== undefined ||
+          l.petition !== undefined ||
+          !p ||
+          p.indoors ||
+          p.act === "walk" ||
+          p.drill
+        )
+          continue
         if (p.routine?.day !== undefined) continue
         const d = Math.hypot(space.x[id]! - cx, space.z[id]! - cz)
         if (d > READ_REACH) continue
@@ -701,6 +754,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     const pose = (id: number): LifePose => {
       const l = loops[id]!
       const late = space.delay[id]!
+      if (l.petition !== undefined) return petitionNow?.[l.petition] ?? petitionDoor ?? OFF_ISLAND
       if (l.figure === undefined)
         return (reading.size ? readerPose(id) : null) ?? lifePose(l.steps, day - (late * SPEEDUP) / 3600, 24)
       const t1 = performance.now()
@@ -930,6 +984,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       source?.tick?.()
       assign()
       dt = step
+      petitionNow = petitionSource?.() ?? null
       const clock = opts.hour()
       const seek = Math.abs(clock - seen) > 1e-6
       if (held !== null) day = held
@@ -1198,6 +1253,10 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       source = next
       swapped = true
     },
+    setPetitioners(poses) {
+      petitionSource = poses
+    },
+    petitionLane: () => petitionLaneOf,
     heroAt: (id) => heroAt(id),
     itinerary: (id) => source?.itinerary?.(id),
     heroLook: (id) => heroLookOf(id),

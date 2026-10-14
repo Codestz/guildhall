@@ -365,7 +365,12 @@ export function dressRegion(pieces: readonly PlacedPiece[], t: RegionTile, seed:
     const name = kaykitName(p.piece) ?? ""
     const leafTree = fam === "tree" && !name.startsWith("tree-bare")
     const r = roll(k, 2)
-    const tone = (m: Record<number, number>): PlacedPiece => ({ ...p, swatchMap: overTone(p.swatchMap, m) })
+    // a KayKit piece's foliage takes the region's tone in place of its wood's (one variant per piece and
+    // tone, not one per tone it had: each is a geometry the batch bakes); any other piece's tone over its own
+    const tone = (m: Record<number, number>): PlacedPiece => ({
+      ...p,
+      swatchMap: p.piece.startsWith("kaykit-forest/") ? { ...m } : overTone(p.swatchMap, m),
+    })
     if (t.kind === "highlands") {
       if (leafTree) {
         if (r < 0.35) return

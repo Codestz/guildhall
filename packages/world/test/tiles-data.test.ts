@@ -7,9 +7,12 @@ import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import {
   blockedDoors,
+  boutWinner,
   CLIP_SECONDS,
   DRILLS,
+  DUEL_HITS,
   doorWays,
+  drillClips,
   drillFrame,
   FRONT_SIDE,
   installTilePrefabs,
@@ -134,28 +137,60 @@ describe("drills (drills.ts)", () => {
     }
     const DEFEND = new Set(["Melee_Block_Hit", "Melee_Blocking", "Hit_A", "Hit_B", "Dodge_Backward"])
     let blows = 0
-    for (const [side, moves] of duel.sides.entries())
-      for (const m of moves) {
-        const hit = CONTACT[m.clip]
-        if (hit === undefined) continue
-        blows++
-        expect(at(side, m.at + hit)).toBe(m.clip)
-        expect([m.clip, DEFEND.has(at(1 - side, m.at + hit))]).toEqual([m.clip, true])
-        // and the other side's answer starts at the blow, give or take a crossfade
-        const answer = duel.sides[1 - side]!.find((o) => o.at > m.at - 0.01 && o.at <= m.at + hit + 0.01)
-        if (answer) expect(Math.abs(answer.at - (m.at + hit))).toBeLessThan(0.6)
+    // two bouts, one won by each side (the finale's moves are the winner's and the loser's)
+    const bouts = [0, 1, 2, 3, 4, 5, 6, 7].filter((n) => boutWinner(n) === 0).slice(0, 1)
+    bouts.push([0, 1, 2, 3, 4, 5, 6, 7].find((n) => boutWinner(n) === 1)!)
+    expect(bouts).toHaveLength(2)
+    for (const n of bouts) {
+      const t0 = n * duel.period
+      const w = boutWinner(n)
+      for (const side of [0, 1]) {
+        const moves = [...duel.sides[side]!, ...(side === w ? duel.finale!.win : duel.finale!.lose)]
+        const theirs = [...duel.sides[1 - side]!, ...(1 - side === w ? duel.finale!.win : duel.finale!.lose)]
+        for (const m of moves) {
+          const hit = CONTACT[m.clip]
+          if (hit === undefined) continue
+          blows++
+          expect(at(side, t0 + m.at + hit)).toBe(m.clip)
+          expect([m.clip, DEFEND.has(at(1 - side, t0 + m.at + hit))]).toEqual([m.clip, true])
+          // and the other side's answer starts at the blow, give or take a crossfade
+          const answer = theirs.find((o) => o.at > m.at - 0.01 && o.at <= m.at + hit + 0.01)
+          if (answer) expect(Math.abs(answer.at - (m.at + hit))).toBeLessThan(0.6)
+        }
       }
-    expect(blows).toBeGreaterThanOrEqual(6)
+      // the winner cheers after the decisive blow, the loser does not
+      expect(at(w, t0 + 14.5)).toBe("Cheering")
+      expect(at(1 - w, t0 + 14.5)).not.toBe("Cheering")
+    }
+    expect(blows).toBeGreaterThanOrEqual(12)
     // both sides attack and both defend
     for (const moves of duel.sides) expect(moves.some((m) => CONTACT[m.clip] !== undefined)).toBe(true)
+    // they step in to fight and out after
+    expect(drillFrame("duel", 0, 5).step).toBeGreaterThan(0.1)
+    expect(drillFrame("duel", 0, 18).step).toBeLessThan(0.01)
+  })
+
+  test("the spectators cheer as a hit lands, in either of a tile's two bouts", () => {
+    const half = DRILLS.duel!.period / 2
+    for (const hit of DUEL_HITS)
+      for (const t of [hit, hit + half]) expect(drillFrame("cheer", 0, t + 0.5).clip).toBe("Cheering")
+    expect(drillFrame("cheer", 0, 8.5).clip).not.toBe("Cheering")
+  })
+
+  test("a duellist alone never swings at nothing", () => {
+    const solo = DRILLS[DRILLS.duel!.solo!]!
+    expect(drillClips(DRILLS.duel!.solo!).some((c) => c.includes("Attack"))).toBe(false)
+    expect(solo.sides).toHaveLength(1)
   })
 
   test("a move plays once and is held to its end, then the rest; the loop wraps", () => {
-    const f = drillFrame("duel", 0, 0.5)
+    const f = drillFrame("duel", 0, 1.1)
     expect(f.clip).toBe("Melee_1H_Attack_Chop")
     expect(f.phase).toBeCloseTo(0.5 / CLIP_SECONDS.Melee_1H_Attack_Chop!, 5)
-    expect(drillFrame("duel", 0, 1.2).clip).toBe(DRILLS.duel!.rest)
-    expect(drillFrame("duel", 0, DRILLS.duel!.period + 0.5)).toEqual(f)
+    expect(drillFrame("duel", 0, 1.8).clip).toBe(DRILLS.duel!.rest)
+    const g = drillFrame("duel", 0, 2 * DRILLS.duel!.period + 1.1)
+    expect([g.clip, g.step]).toEqual([f.clip, f.step])
+    expect(g.phase).toBeCloseTo(f.phase, 9)
     // a drill line moves as one: the same frame for everyone on its clock
     expect(drillFrame("drill", 0, 3)).toEqual(drillFrame("drill", 0, 3))
   })

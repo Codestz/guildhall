@@ -755,6 +755,7 @@ function EraPage({
     era.span,
     era.release,
     era.commits !== undefined ? `${era.commits.toLocaleString("en")} commits` : "",
+    era.image ? "" : `${count} files at its end`,
   ]
   return (
     <li className="st-chapter st-era" data-page={era.id}>
@@ -772,21 +773,21 @@ function EraPage({
           <p className="st-ch-meta">{facts.filter(Boolean).join(" · ")}</p>
         </div>
       </header>
-      <figure className="st-era-island" data-empty={!era.image}>
-        {era.image ? (
+      {/* the island as the era left it when the hall has filmed it; no empty frame while it has not
+          (GUI audit #14): its size goes in the chapter's facts instead */}
+      {era.image && (
+        <figure className="st-era-island">
           <img
             src={era.image}
             alt={`The island at the end of ${unmarked(era.title)}: ${count} files.`}
             loading="lazy"
             decoding="async"
           />
-        ) : (
-          <StoryGlyphs.island size={28} />
-        )}
-        <figcaption>
-          The island at its end: <span className="num">{count}</span> files
-        </figcaption>
-      </figure>
+          <figcaption>
+            The island at its end: <span className="num">{count}</span> files
+          </figcaption>
+        </figure>
+      )}
       <p className="st-era-lede">{era.lede}</p>
       <ol className="st-annals">
         {era.milestones.map((m) => (

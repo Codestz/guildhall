@@ -30,17 +30,18 @@ export const AVATAR_CSS = /* css */ `
 /* the medal's rim is drawn over the picture */
 .hud-avatar-medal::after { content: ""; position: absolute; inset: 0; border-radius: 50%; box-shadow: inset 0 0 0 max(2px, calc(var(--av) * 0.07)) var(--rim); pointer-events: none; }
 .hud-avatar-num {
+  /* a plain numeral on a brass-line pill (GUI audit #10): a square box edged in the banner read as a pause icon */
   position: absolute;
-  right: -3px;
-  bottom: -3px;
-  min-width: 14px;
-  padding: 0 2px;
-  border-radius: 3px;
+  right: -5px;
+  bottom: -4px;
+  min-width: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
   background: var(--ink-solid);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--banner) 70%, transparent);
-  color: var(--paper);
-  font: normal 400 10px/13px var(--display);
-  letter-spacing: 0.02em;
+  box-shadow: 0 0 0 1px var(--brass-line), 0 1px 3px rgba(0, 0, 0, 0.55);
+  color: var(--brass-hi);
+  font: normal 400 12.5px/15px var(--display);
+  letter-spacing: 0.06em;
   text-align: center;
 }
 `

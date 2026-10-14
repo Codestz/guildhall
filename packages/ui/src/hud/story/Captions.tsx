@@ -34,6 +34,11 @@ export interface CaptionsProps {
   visible?: boolean
   /** Voice pleas too: off while the plea banner already speaks them. */
   announcePleas?: boolean
+  /**
+   * A plea's card is up: a plea's line is neither shown nor voiced (the card is its voice; GUI audit #3),
+   * and the line before it stays.
+   */
+  pleading?: boolean
   /** Hold the line on screen (shots, the lab). */
   still?: boolean
 }
@@ -42,6 +47,7 @@ export const Captions = memo(function Captions({
   caption,
   visible = true,
   announcePleas = true,
+  pleading = false,
   still = false,
 }: CaptionsProps) {
   const [shown, setShown] = useState<{ caption: CaptionView; leaving: boolean } | undefined>()
@@ -50,7 +56,7 @@ export const Captions = memo(function Captions({
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: one schedule per line, keyed by its key
   useEffect(() => {
-    if (!caption) return
+    if (!caption || (pleading && caption.kind === "plea")) return
     setShown({ caption, leaving: false })
     // the live region speaks at most once per ANNOUNCE_GAP_MS, the newest line winning, so a busy session
     // is never read as a queue the listener cannot keep up with

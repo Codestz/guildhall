@@ -6,12 +6,15 @@
 import { describe, expect, test } from "bun:test"
 import { emptyWorld, type GuildWorld, reduce, type WorldEvent, type WorldHappening } from "@guildhall/sim"
 import {
+  BUBBLE_GAP,
   type ChipField,
   type ChipSlot,
   CROWD_AT,
   chipSlot,
   chipViews,
   Declutter,
+  GAP,
+  LIFT_STEP,
   MAX_SPEAKERS,
   NEAR_PX,
   shortFile,
@@ -51,8 +54,68 @@ describe("the declutter", () => {
     laid([p!, q!])
     expect([p!.folded, q!.folded]).toEqual([false, false])
     expect(p!.lift).toBe(0)
-    // the farther one climbs over the nearer: its bottom GAP above the other's top
-    expect(q!.lift).toBe(410 - (400 - 30) + 3)
+    // the farther one climbs over the nearer: its bottom at least GAP above the other's top, in whole steps
+    const need = 410 - (400 - 30) + GAP
+    expect(q!.lift).toBe(Math.ceil(need / LIFT_STEP) * LIFT_STEP)
+  })
+
+  test("no two drawn chips ever meet: each stands GAP px clear, or folds into the one under it (+N)", () => {
+    // a tight knot of five, a near pair, and a few strays, run as a walk would move them
+    let seed = 7
+    const rnd = () => {
+      seed = (seed * 16807) % 2147483647
+      return seed / 2147483647
+    }
+    const slots = Array.from({ length: 14 }, (_, k) =>
+      slot(`c${k}`, 400 + rnd() * 260, 380 + rnd() * 90, rnd() * 40, {
+        width: 70 + Math.round(rnd() * 110),
+        height: k % 3 === 0 ? 62 : 33,
+        bubble: k % 4 === 0,
+        bubbleW: 150,
+        bubbleH: 34,
+        selected: k === 5,
+      }),
+    )
+    const d = new Declutter()
+    d.slots.push(...slots)
+    for (let run = 0; run < 30; run++) {
+      for (const s of slots) {
+        s.x += (rnd() - 0.5) * 6
+        s.y += (rnd() - 0.5) * 4
+      }
+      d.run(FIELD)
+      const boxes = d.boxes([])
+      for (let i = 0; i < boxes.length; i++)
+        for (let j = i + 1; j < boxes.length; j++) {
+          const [a, b] = [boxes[i]!, boxes[j]!]
+          const apart =
+            a[2] + GAP <= b[0] + 0.001 ||
+            b[2] + GAP <= a[0] + 0.001 ||
+            a[3] + GAP <= b[1] + 0.001 ||
+            b[3] + GAP <= a[1] + 0.001
+          expect(apart).toBe(true)
+        }
+      // every chip is drawn or counted in someone's "+N"
+      const drawn = slots.filter((s) => !s.folded)
+      expect(drawn.length + drawn.reduce((n, s) => n + s.more, 0)).toBe(slots.length)
+    }
+  })
+
+  test("two chips that cannot climb clear fold into one +1 at once, never drawn over each other", () => {
+    // the near one's plate is tall (a plea mark over it): the far one would climb past MAX_LIFT
+    const near = slot("near", 500, 400, 1, { height: 120, width: 160 })
+    const far = slot("far", 505, 402, 2, { width: 160 })
+    laid([near, far], 1)
+    expect([near.folded, far.folded, near.more]).toEqual([false, true, 1])
+  })
+
+  test("a speaker's bubble is part of its box: the chip above climbs over the bubble, not into it", () => {
+    const talker = slot("talker", 500, 400, 1, { bubble: true, bubbleW: 160, bubbleH: 30 })
+    const above = slot("above", 520, 372, 2)
+    laid([talker, above], 2)
+    expect(talker.speak).toBe(true)
+    const bubbleTop = 400 - talker.lift - 30 - BUBBLE_GAP - 30
+    expect(372 - above.lift).toBeLessThanOrEqual(bubbleTop - GAP)
   })
 
   test("the followed and the pleading are placed first and never fold", () => {

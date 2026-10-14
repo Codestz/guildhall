@@ -78,7 +78,7 @@ export function Dossier({
         )}
         <div className="hud-dossier-id">
           <span className="hud-eyebrow">{eyebrow}</span>
-          <h2 id="hud-dossier-h">
+          <h2 id="hud-dossier-h" data-long={longName(heroTitle(hero), hero.source) || undefined}>
             {heroTitle(hero)}
             {hero.source && <span className="hud-dossier-source"> · {hero.source}</span>}
           </h2>
@@ -223,3 +223,14 @@ function Line({ line }: { line: TranscriptLine }) {
     }
   }
 }
+
+/**
+ * A title too long for the display face's tracked small caps at full size (GUI audit #12): set smaller, in
+ * the reading serif, untracked, breaking only between words. `source` rides on the same line.
+ */
+export function longName(name: string, source?: string): boolean {
+  return name.length + (source ? source.length + 3 : 0) > LONG_NAME
+}
+
+/** Characters a dossier's title holds at full size on one line of a 372 px panel. */
+export const LONG_NAME = 20

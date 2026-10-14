@@ -2,16 +2,16 @@
   {
     "at": ["captions", 4, "caption", "text"],
     "v1": "The Guildmaster runs git push -u origin dark-mode and gh pr create --fill — #128.",
-    "v2": "The Guildmaster runs git push and gh pr create — #128."
+    "v2": "The Guildmaster pushes the work upstream and opens a pull request, #128."
   },
   {
     "at": ["captions", 4, "caption", "parts", 1, "text"],
     "v1": " runs git push -u origin dark-mode and gh pr create --fill — #128.",
-    "v2": " runs git push and gh pr create — #128."
+    "v2": " pushes the work upstream and opens a pull request, #128."
   },
   {
     "at": ["captions", 4, "caption", "hold"],
     "v1": 4030,
-    "v2": 3400
+    "v2": 3760
   }
 ]

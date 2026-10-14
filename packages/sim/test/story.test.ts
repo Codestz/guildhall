@@ -5,6 +5,8 @@ import { describe, expect, test } from "bun:test"
 import type { Change } from "@guildhall/core"
 import {
   clip,
+  commandWords,
+  deedWords,
   legendMarkdown,
   legendOf,
   lineOf,
@@ -143,8 +145,72 @@ describe("story: the phrase grammar", () => {
       /(reads|pores over|studies) life\.ts\.$/,
     )
     expect(told("bun test packages/sim")).toMatch(/(puts the work to the test|runs the tests)\.$/)
-    expect(told("git status --short")).toBe("The Guildmaster runs git status.")
+    // a command by what it does for the work (GUI audit #6: `runs gh pr create — #42`)
+    expect(told("git status --short")).toBe("The Guildmaster looks over the changes.")
+    expect(told("gh pr create --fill")).toBe("The Guildmaster opens a pull request.")
+    expect(told("git push -u origin fix/emoji")).toBe("The Guildmaster pushes the work upstream.")
+    expect(told("bun run typecheck")).toBe("The Guildmaster checks the types.")
+    expect(told("frobnicate --all ./x")).toBe("The Guildmaster runs a command.")
     for (const line of [grep, told("rg -n 'fetch\\(|/api' apps")]) expect(line).not.toMatch(/[\\|"]/)
+  })
+
+  test("a pull request's number follows its deed after a comma; a plea says what it waits to do", () => {
+    const entry = (command: string, state: string, summary?: string) => ({
+      kind: "tool",
+      call: "c",
+      state,
+      output: "",
+      at: 0,
+      name: "Bash",
+      input: { command },
+      ...(summary ? { summary } : {}),
+    })
+    const lookupOf = (e: ReturnType<typeof entry>) => ({
+      session: () => session("x", { entries: [e] as Session["entries"] }),
+    })
+    const pr = lineOf(
+      "deed",
+      [moment("deed", "Guildmaster", { tool: "Bash", call: "c" })],
+      lookupOf(entry("gh pr create --fill", "completed", "#42")),
+    )
+    expect(pr.map((p) => p.text).join("")).toBe("The Guildmaster opens a pull request, #42.")
+    const url = lineOf(
+      "deed",
+      [moment("deed", "Guildmaster", { tool: "Bash", call: "c" })],
+      lookupOf(entry("gh pr create --base main", "completed", "https://github.com/o/r/pull/418")),
+    )
+    expect(url.map((p) => p.text).join("")).toBe("The Guildmaster opens a pull request, #418.")
+    const plea = lineOf(
+      "plea",
+      [moment("plea", "Artisan")],
+      lookupOf(entry("gh pr merge 42 --squash", "running")),
+    )
+      .map((p) => p.text)
+      .join("")
+    expect(plea).toMatch(/merging the pull request\.$/)
+    expect(plea).not.toMatch(/gh |--/)
+  })
+
+  test("the narrator's verb map: three forms of each, a command it does not know left unnamed", () => {
+    expect(commandWords("gh pr create --fill")).toEqual({
+      does: "opens a pull request",
+      doing: "opening a pull request",
+      to: "open a pull request",
+    })
+    expect(commandWords("bun test packages/world").to).toBe("run the tests")
+    expect(commandWords("cd apps && bun install").does).toBe("fetches the dependencies")
+    expect(commandWords("git commit -am 'fix'").doing).toBe("committing the work")
+    expect(commandWords("./scripts/weird.sh --flag").does).toBe("runs a command")
+    expect(deedWords({ craft: "test", tool: "bash", target: "bun test packages/world/test" }).to).toBe(
+      "run the tests",
+    )
+    expect(deedWords({ craft: "read", tool: "bash", target: "sed -n 1,40p packages/x/life.ts" }).to).toBe(
+      "read life.ts",
+    )
+    expect(deedWords({ craft: "edit", tool: "edit", target: "life.ts" }).to).toBe("change life.ts")
+    expect(deedWords({ craft: "search", tool: "grep", target: '"requireSession" *.ts' }).does).toBe(
+      "searches the code for requireSession",
+    )
   })
 
   test("a failing test run quotes how many failed", () => {

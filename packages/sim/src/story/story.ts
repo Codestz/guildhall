@@ -1,6 +1,7 @@
 // From V1 hall (main:packages/hall/src/guild/story.ts): the phrase grammar and the narrator.
 import { type Craft, commandGist, deedCraft, fnv1a, plainPattern } from "@guildhall/core"
 import type { Entry, Session } from "../guild/model.ts"
+import { commandWords } from "./commands.ts"
 import type { Renown } from "./renown.ts"
 import type { StoryMoment as Moment } from "./teller.ts"
 
@@ -217,7 +218,7 @@ function doing(craft: Told, target: string | undefined): string {
     case "test":
       return "running the tests"
     case "run":
-      return target ? `running ${target}` : "running a command"
+      return commandWords(target).doing
     case "consult":
       return "reaching beyond the hall"
     case "plan":
@@ -455,12 +456,19 @@ function deedPhrase(craft: Told, deeds: readonly Deed[], seed: number): string {
       return summary
         ? pick([`puts the work to the test${tail}`, `runs the tests${tail}`, `tries the work${tail}`], seed)
         : pick(["puts the work to the test", "runs the tests"], seed)
-    case "run":
-      return named
-        ? `runs ${named}${tail}`
-        : n === 1
-          ? `runs a command${tail}`
-          : `runs ${spell(n)} commands${tail}`
+    case "run": {
+      // what the commands do, never their lines (decisions.md): `opens a pull request, #42`
+      const told = named ? [...new Set(targets.map((t) => commandWords(t).does))] : []
+      const known = told.filter((d) => d !== "runs a command")
+      const said = summary
+        ? runTail(
+            summary,
+            told.some((d) => d.includes("pull request")),
+          )
+        : ""
+      if (known.length > 0 && known.length === told.length) return `${listOf(known)}${said}`
+      return n === 1 ? `runs a command${said}` : `runs ${spell(n)} commands${said}`
+    }
     case "consult":
       return named
         ? `${pick(["consults distant scrolls on", "sends for word on", "asks the archives about"], seed)} ${named}`
@@ -470,6 +478,15 @@ function deedPhrase(craft: Told, deeds: readonly Deed[], seed: number): string {
     default:
       return n === 1 ? "finishes a deed" : `finishes ${spell(n)} deeds`
   }
+}
+
+/**
+ * What a command's run gave, after its deed: a pull request's number after a comma (`, #42`, from `#42`
+ * or its URL) when the deed was about one, anything else after a dash as before.
+ */
+function runTail(summary: string, pull: boolean): string {
+  const pr = pull ? (/^#(\d+)$/.exec(summary.trim()) ?? /\/pull\/(\d+)\b/.exec(summary)) : null
+  return pr ? `, #${pr[1]}` : ` — ${summary}`
 }
 
 /** Deeds across the guild, counted: `three files forged, two read`. */

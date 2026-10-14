@@ -200,9 +200,19 @@
     "v2": 4480
   },
   {
+    "at": ["captions", 53, "caption", "text"],
+    "v1": "The Artisan III runs bun run typecheck — ok.",
+    "v2": "The Artisan III checks the types — ok."
+  },
+  {
+    "at": ["captions", 53, "caption", "parts", 1, "text"],
+    "v1": " runs bun run typecheck — ok.",
+    "v2": " checks the types — ok."
+  },
+  {
     "at": ["captions", 66, "caption", "text"],
     "v1": "The Guildmaster runs git commit -am \"fix(search)… — 2 files changed.",
-    "v2": "The Guildmaster II runs git commit — 2 files changed."
+    "v2": "The Guildmaster II commits the work — 2 files changed."
   },
   {
     "at": ["captions", 66, "caption", "parts", 0, "text"],
@@ -212,7 +222,7 @@
   {
     "at": ["captions", 66, "caption", "parts", 1, "text"],
     "v1": " runs git commit -am \"fix(search)… — 2 files changed.",
-    "v2": " runs git commit — 2 files changed."
+    "v2": " commits the work — 2 files changed."
   },
   {
     "at": ["captions", 66, "caption", "hold"],
@@ -222,7 +232,7 @@
   {
     "at": ["captions", 68, "caption", "text"],
     "v1": "The Guildmaster runs git push -u origin fix/emoji-search — pushed.",
-    "v2": "The Guildmaster II runs git push — pushed."
+    "v2": "The Guildmaster II pushes the work upstream — pushed."
   },
   {
     "at": ["captions", 68, "caption", "parts", 0, "text"],
@@ -232,7 +242,7 @@
   {
     "at": ["captions", 68, "caption", "parts", 1, "text"],
     "v1": " runs git push -u origin fix/emoji-search — pushed.",
-    "v2": " runs git push — pushed."
+    "v2": " pushes the work upstream — pushed."
   },
   {
     "at": ["captions", 68, "caption", "hold"],
@@ -242,7 +252,7 @@
   {
     "at": ["captions", 70, "caption", "text"],
     "v1": "The Guildmaster runs gh pr create --base release/2.4… — https://github.com/quill-notes/quill/pull/418.",
-    "v2": "The Guildmaster II runs gh pr create — https://github.com/quill-notes/quill/pull/418."
+    "v2": "The Guildmaster II opens a pull request, #418."
   },
   {
     "at": ["captions", 70, "caption", "parts", 0, "text"],
@@ -252,12 +262,12 @@
   {
     "at": ["captions", 70, "caption", "parts", 1, "text"],
     "v1": " runs gh pr create --base release/2.4… — https://github.com/quill-notes/quill/pull/418.",
-    "v2": " runs gh pr create — https://github.com/quill-notes/quill/pull/418."
+    "v2": " opens a pull request, #418."
   },
   {
     "at": ["captions", 70, "caption", "hold"],
     "v1": 4660,
-    "v2": 4150
+    "v2": 3400
   },
   {
     "at": ["captions", 76, "caption", "text"],
@@ -277,12 +287,12 @@
   {
     "at": ["captions", 78, "caption", "text"],
     "v1": "The Warden runs gh run view --log-failed — 1 failing job.",
-    "v2": "The Warden runs gh run view — 1 failing job."
+    "v2": "The Warden reads the CI's log — 1 failing job."
   },
   {
     "at": ["captions", 78, "caption", "parts", 1, "text"],
     "v1": " runs gh run view --log-failed — 1 failing job.",
-    "v2": " runs gh run view — 1 failing job."
+    "v2": " reads the CI's log — 1 failing job."
   },
   {
     "at": ["captions", 81, "caption", "text"],
@@ -302,22 +312,22 @@
   {
     "at": ["captions", 96, "caption", "text"],
     "v1": "The Artisan runs rm -rf .quill-data && bun run… — dropped quill_dev · migrated 14 · seeded 120 notes.",
-    "v2": "The Artisan runs bun run db:reset — dropped quill_dev · migrated 14 · seeded 120 notes."
+    "v2": "The Artisan runs a script — dropped quill_dev · migrated 14 · seeded 120 notes."
   },
   {
     "at": ["captions", 96, "caption", "parts", 1, "text"],
     "v1": " runs rm -rf .quill-data && bun run… — dropped quill_dev · migrated 14 · seeded 120 notes.",
-    "v2": " runs bun run db:reset — dropped quill_dev · migrated 14 · seeded 120 notes."
+    "v2": " runs a script — dropped quill_dev · migrated 14 · seeded 120 notes."
   },
   {
     "at": ["captions", 96, "caption", "hold"],
     "v1": 4630,
-    "v2": 4210
+    "v2": 3970
   },
   {
     "at": ["captions", 99, "caption", "text"],
     "v1": "The Guildmaster runs gh pr checks 418 --watch — all checks passed.",
-    "v2": "The Guildmaster II runs gh pr checks — all checks passed."
+    "v2": "The Guildmaster II checks on the pull request — all checks passed."
   },
   {
     "at": ["captions", 99, "caption", "parts", 0, "text"],
@@ -327,12 +337,7 @@
   {
     "at": ["captions", 99, "caption", "parts", 1, "text"],
     "v1": " runs gh pr checks 418 --watch — all checks passed.",
-    "v2": " runs gh pr checks — all checks passed."
-  },
-  {
-    "at": ["captions", 99, "caption", "hold"],
-    "v1": 3580,
-    "v2": 3400
+    "v2": " checks on the pull request — all checks passed."
   },
   {
     "at": ["captions", 100, "caption", "text"],
@@ -347,7 +352,7 @@
   {
     "at": ["captions", 102, "caption", "text"],
     "v1": "The Guildmaster runs git switch release/2.3 && git… — Switched to a new branch.",
-    "v2": "The Guildmaster II runs git switch — Switched to a new branch."
+    "v2": "The Guildmaster II switches branches — Switched to a new branch."
   },
   {
     "at": ["captions", 102, "caption", "parts", 0, "text"],
@@ -357,17 +362,17 @@
   {
     "at": ["captions", 102, "caption", "parts", 1, "text"],
     "v1": " runs git switch release/2.3 && git… — Switched to a new branch.",
-    "v2": " runs git switch — Switched to a new branch."
+    "v2": " switches branches — Switched to a new branch."
   },
   {
     "at": ["captions", 102, "caption", "hold"],
     "v1": 3970,
-    "v2": 3460
+    "v2": 3520
   },
   {
     "at": ["captions", 103, "caption", "text"],
     "v1": "The Guildmaster runs git cherry-pick 3f9c2e1 a71d0b4 — 2 commits applied.",
-    "v2": "The Guildmaster II runs git cherry-pick — 2 commits applied."
+    "v2": "The Guildmaster II merges the branches — 2 commits applied."
   },
   {
     "at": ["captions", 103, "caption", "parts", 0, "text"],
@@ -377,7 +382,7 @@
   {
     "at": ["captions", 103, "caption", "parts", 1, "text"],
     "v1": " runs git cherry-pick 3f9c2e1 a71d0b4 — 2 commits applied.",
-    "v2": " runs git cherry-pick — 2 commits applied."
+    "v2": " merges the branches — 2 commits applied."
   },
   {
     "at": ["captions", 103, "caption", "hold"],
@@ -407,7 +412,7 @@
   {
     "at": ["captions", 108, "caption", "text"],
     "v1": "The Guildmaster runs git push -u origin fix/emoji-search… — https://github.com/quill-notes/quill/pull/421.",
-    "v2": "The Guildmaster II runs git push — https://github.com/quill-notes/quill/pull/421."
+    "v2": "The Guildmaster II pushes the work upstream — https://github.com/quill-notes/quill/pull/421."
   },
   {
     "at": ["captions", 108, "caption", "parts", 0, "text"],
@@ -417,12 +422,32 @@
   {
     "at": ["captions", 108, "caption", "parts", 1, "text"],
     "v1": " runs git push -u origin fix/emoji-search… — https://github.com/quill-notes/quill/pull/421.",
-    "v2": " runs git push — https://github.com/quill-notes/quill/pull/421."
+    "v2": " pushes the work upstream — https://github.com/quill-notes/quill/pull/421."
   },
   {
     "at": ["captions", 108, "caption", "hold"],
     "v1": 4780,
-    "v2": 4030
+    "v2": 4360
+  },
+  {
+    "at": ["captions", 117, "caption", "text"],
+    "v1": "The Artisan II runs bun run typecheck — ok.",
+    "v2": "The Artisan II checks the types — ok."
+  },
+  {
+    "at": ["captions", 117, "caption", "parts", 1, "text"],
+    "v1": " runs bun run typecheck — ok.",
+    "v2": " checks the types — ok."
+  },
+  {
+    "at": ["captions", 122, "caption", "text"],
+    "v1": "The Artisan II runs bun run typecheck — ok.",
+    "v2": "The Artisan II checks the types — ok."
+  },
+  {
+    "at": ["captions", 122, "caption", "parts", 1, "text"],
+    "v1": " runs bun run typecheck — ok.",
+    "v2": " checks the types — ok."
   },
   {
     "at": ["captions", 133, "caption", "text"],
@@ -452,17 +477,17 @@
   {
     "at": ["captions", 144, "caption", "text"],
     "v1": "The Guildmaster runs git status --short — 21 files.",
-    "v2": "The Guildmaster runs git status — 21 files."
+    "v2": "The Guildmaster looks over the changes — 21 files."
   },
   {
     "at": ["captions", 144, "caption", "parts", 1, "text"],
     "v1": " runs git status --short — 21 files.",
-    "v2": " runs git status — 21 files."
+    "v2": " looks over the changes — 21 files."
   },
   {
     "at": ["captions", 145, "caption", "text"],
     "v1": "The Guildmaster runs gh pr checks 421 --watch — all checks passed.",
-    "v2": "The Guildmaster II runs gh pr checks — all checks passed."
+    "v2": "The Guildmaster II checks on the pull request — all checks passed."
   },
   {
     "at": ["captions", 145, "caption", "parts", 0, "text"],
@@ -472,17 +497,12 @@
   {
     "at": ["captions", 145, "caption", "parts", 1, "text"],
     "v1": " runs gh pr checks 421 --watch — all checks passed.",
-    "v2": " runs gh pr checks — all checks passed."
-  },
-  {
-    "at": ["captions", 145, "caption", "hold"],
-    "v1": 3580,
-    "v2": 3400
+    "v2": " checks on the pull request — all checks passed."
   },
   {
     "at": ["captions", 146, "caption", "text"],
     "v1": "The Guildmaster runs gh issue close 412 --comment… — closed #412.",
-    "v2": "The Guildmaster II runs gh issue close — closed #412."
+    "v2": "The Guildmaster II closes an issue — closed #412."
   },
   {
     "at": ["captions", 146, "caption", "parts", 0, "text"],
@@ -492,7 +512,7 @@
   {
     "at": ["captions", 146, "caption", "parts", 1, "text"],
     "v1": " runs gh issue close 412 --comment… — closed #412.",
-    "v2": " runs gh issue close — closed #412."
+    "v2": " closes an issue — closed #412."
   },
   {
     "at": ["captions", 146, "caption", "hold"],
@@ -512,12 +532,12 @@
   {
     "at": ["captions", 154, "caption", "text"],
     "v1": "The Herald II runs git log --oneline main..HEAD — 14 commits.",
-    "v2": "The Herald II runs git log — 14 commits."
+    "v2": "The Herald II reads the history — 14 commits."
   },
   {
     "at": ["captions", 154, "caption", "parts", 1, "text"],
     "v1": " runs git log --oneline main..HEAD — 14 commits.",
-    "v2": " runs git log — 14 commits."
+    "v2": " reads the history — 14 commits."
   },
   {
     "at": ["captions", 154, "caption", "hold"],
@@ -525,19 +545,29 @@
     "v2": 3400
   },
   {
+    "at": ["captions", 156, "caption", "text"],
+    "v1": "The Warden runs bun run typecheck — ok.",
+    "v2": "The Warden checks the types — ok."
+  },
+  {
+    "at": ["captions", 156, "caption", "parts", 1, "text"],
+    "v1": " runs bun run typecheck — ok.",
+    "v2": " checks the types — ok."
+  },
+  {
     "at": ["captions", 163, "caption", "text"],
     "v1": "The Warden runs bun run smoke:offline… — 20 reconnects · 0 duplicates · 0 lost edits.",
-    "v2": "The Warden runs bun run smoke:offline — 20 reconnects · 0 duplicates · 0 lost edits."
+    "v2": "The Warden runs a script — 20 reconnects · 0 duplicates · 0 lost edits."
   },
   {
     "at": ["captions", 163, "caption", "parts", 1, "text"],
     "v1": " runs bun run smoke:offline… — 20 reconnects · 0 duplicates · 0 lost edits.",
-    "v2": " runs bun run smoke:offline — 20 reconnects · 0 duplicates · 0 lost edits."
+    "v2": " runs a script — 20 reconnects · 0 duplicates · 0 lost edits."
   },
   {
     "at": ["captions", 163, "caption", "hold"],
     "v1": 4150,
-    "v2": 4120
+    "v2": 3730
   },
   {
     "at": ["captions", 165, "caption", "text"],
@@ -557,42 +587,42 @@
   {
     "at": ["captions", 169, "caption", "text"],
     "v1": "The Guildmaster runs git diff --stat — 19 files changed, 1146 insertions(+), 38 deletions(-).",
-    "v2": "The Guildmaster runs git diff — 19 files changed, 1146 insertions(+), 38 deletions(-)."
+    "v2": "The Guildmaster looks over the changes — 19 files changed, 1146 insertions(+), 38 deletions(-)."
   },
   {
     "at": ["captions", 169, "caption", "parts", 1, "text"],
     "v1": " runs git diff --stat — 19 files changed, 1146 insertions(+), 38 deletions(-).",
-    "v2": " runs git diff — 19 files changed, 1146 insertions(+), 38 deletions(-)."
+    "v2": " looks over the changes — 19 files changed, 1146 insertions(+), 38 deletions(-)."
   },
   {
     "at": ["captions", 169, "caption", "hold"],
     "v1": 4390,
-    "v2": 4180
+    "v2": 4450
   },
   {
     "at": ["captions", 170, "caption", "text"],
     "v1": "The Guildmaster runs gh pr create --fill --body-file… — https://github.com/quill-notes/quill/pull/424.",
-    "v2": "The Guildmaster runs gh pr create — https://github.com/quill-notes/quill/pull/424."
+    "v2": "The Guildmaster opens a pull request, #424."
   },
   {
     "at": ["captions", 170, "caption", "parts", 1, "text"],
     "v1": " runs gh pr create --fill --body-file… — https://github.com/quill-notes/quill/pull/424.",
-    "v2": " runs gh pr create — https://github.com/quill-notes/quill/pull/424."
+    "v2": " opens a pull request, #424."
   },
   {
     "at": ["captions", 170, "caption", "hold"],
     "v1": 4660,
-    "v2": 4060
+    "v2": 3400
   },
   {
     "at": ["captions", 172, "caption", "text"],
     "v1": "The Guildmaster runs gh pr merge 424 --squash… — merged into main.",
-    "v2": "The Guildmaster runs gh pr merge — merged into main."
+    "v2": "The Guildmaster merges the pull request — merged into main."
   },
   {
     "at": ["captions", 172, "caption", "parts", 1, "text"],
     "v1": " runs gh pr merge 424 --squash… — merged into main.",
-    "v2": " runs gh pr merge — merged into main."
+    "v2": " merges the pull request — merged into main."
   },
   {
     "at": ["captions", 172, "caption", "hold"],
@@ -602,12 +632,12 @@
   {
     "at": ["captions", 174, "caption", "text"],
     "v1": "The Guildmaster runs gh issue close 398 --comment… — closed #398.",
-    "v2": "The Guildmaster runs gh issue close — closed #398."
+    "v2": "The Guildmaster closes an issue — closed #398."
   },
   {
     "at": ["captions", 174, "caption", "parts", 1, "text"],
     "v1": " runs gh issue close 398 --comment… — closed #398.",
-    "v2": " runs gh issue close — closed #398."
+    "v2": " closes an issue — closed #398."
   },
   {
     "at": ["captions", 174, "caption", "hold"],

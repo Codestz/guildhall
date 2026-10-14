@@ -80,7 +80,14 @@ import type { BuiltPlace } from "../../hexworld/job.ts"
 import { captureStage } from "../../shell/viewer.ts"
 import type { HallTime } from "../clock.ts"
 import type { SessionSnapshot } from "../feeds/session.ts"
-import { chronicleOf, groupRepeats, partiesOf, rosterOf, type SessionEntry } from "../feeds/view.ts"
+import {
+  chronicleOf,
+  groupRepeats,
+  partiesOf,
+  rosterOf,
+  type SessionEntry,
+  toastLines,
+} from "../feeds/view.ts"
 import { beatsOf } from "../historyEvents.ts"
 import { HallTimeline } from "../timeline.tsx"
 import { useHistoryNarration } from "./historyHud.ts"
@@ -428,7 +435,10 @@ function useToasts(entries: readonly SessionEntry[], on: boolean, still: boolean
   const [tick, setTick] = useState(0)
   // biome-ignore lint/correctness/useExhaustiveDependencies: `tick` re-reads the wall clock
   const items = useMemo(
-    () => (on ? pickToasts(groupRepeats(entries), performance.now(), seen.current, TOASTS_MAX, cap) : []),
+    () =>
+      on
+        ? pickToasts(groupRepeats(toastLines(entries)), performance.now(), seen.current, TOASTS_MAX, cap)
+        : [],
     [entries, on, tick, cap],
   )
   const fading = still && items.length > 0
@@ -1138,6 +1148,7 @@ export function HallHud(props: HallHudProps) {
             {...(snap.caption ? { caption: snap.caption } : {})}
             visible={captions && !detailed}
             announcePleas={false}
+            pleading={pleas > 0 && !hidden}
           />,
           float.caps,
         )}

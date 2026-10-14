@@ -10,6 +10,7 @@
  *   purse    a party's spending over time (the raid's treasury rule), from the session's changes
  */
 
+export { commandWords, type DeedWords, deedWords } from "./commands.ts"
 export {
   type GravePhase,
   type GraveState,

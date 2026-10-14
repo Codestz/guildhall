@@ -209,7 +209,6 @@ export const STORY_CSS = /* css */ `
 }
 /* a still that fails to load leaves the sea-blue frame, not its alt text */
 .st-era-island img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 55%; color: transparent; }
-.st-era-island[data-empty="true"] { aspect-ratio: 16 / 4; display: grid; place-items: center; background: rgba(110, 78, 34, 0.08); color: var(--umber); }
 .st-era-island figcaption {
   position: absolute;
   left: 10px;
@@ -308,6 +307,8 @@ h3 .st-code { font-size: 0.8em; letter-spacing: 0; }
   backdrop-filter: blur(10px) saturate(1.1);
   -webkit-backdrop-filter: blur(10px) saturate(1.1);
   font: 19px/1.36 var(--serif);
+  /* Alegreya's old-style figures read "v0.2.0" as "vo.2.o" (GUI audit #4): lining figures in every line */
+  font-variant-numeric: lining-nums;
   color: var(--paper);
   text-align: center;
   animation: st-caption-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -367,7 +368,8 @@ h3 .st-code { font-size: 0.8em; letter-spacing: 0; }
 .st-place-head { display: flex; align-items: flex-start; gap: 10px; }
 .st-place-mark { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--brass-line); background: radial-gradient(circle at 50% 35%, rgba(220, 182, 98, 0.18), transparent 70%); color: var(--brass-hi); }
 .st-place-id { flex: 1; min-width: 0; display: grid; gap: 2px; }
-.st-place-id h2 { margin: 0; font: 400 var(--t-2xl)/1.1 var(--display); letter-spacing: 0.05em; color: var(--brass-hi); }
+.st-place-id h2 { margin: 0; font: 400 var(--t-2xl)/1.1 var(--display); letter-spacing: 0.05em; color: var(--brass-hi); overflow-wrap: break-word; hyphens: manual; }
+.st-place-id h2[data-long] { font: 600 var(--t-xl)/1.2 var(--serif); letter-spacing: 0; }
 .st-place-pkg { font-size: var(--t-sm); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .st-place-about { margin: 0; font-size: var(--t-md); color: var(--muted); }
 .st-place section { display: grid; gap: 6px; }
@@ -449,6 +451,48 @@ button.st-place-hero:hover { background: var(--raise-2); }
   .st-chapter-chip[data-compact="true"] .st-chapter-btn { width: 40px; }
   .st-place { width: 100%; border-radius: 12px 12px 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
   .st-place-chip { min-height: 44px; }
+}
+/* ── a phone held sideways (GUI audit #6, #9): the book and the card are full-height sheets under a one-row
+   header; the act list opens beside its chip, as tall as the screen allows ── */
+@media (orientation: landscape) and (max-height: 520px) {
+  .st-scrim { padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left)); place-items: stretch center; }
+  .st-book, .st-card { height: 100%; max-height: 100%; border-radius: 0; }
+  .st-book { width: min(880px, 100%); box-shadow: 0 0 0 1px rgba(90, 62, 26, 0.45), 0 0 50px -10px rgba(0, 0, 0, 0.8); }
+  .st-book-head { align-items: center; gap: 10px; padding: 6px 8px 6px 22px; }
+  .st-book-titles { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+  .st-book-eyebrow { flex: none; margin: 0; font-size: 11.5px; }
+  .st-book-head h2 { flex: 0 1 auto; min-width: 0; max-width: 46%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-wrap: nowrap; font-size: 19px; }
+  .st-book-head h2 * { white-space: nowrap; }
+  .st-book-meta { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; }
+  .st-book-btn { min-height: 32px; padding: 0 10px 0 8px; font-size: 13px; }
+  .st-book-close { width: 32px; height: 32px; }
+  .st-book-tabs { padding: 2px 22px 0; }
+  .st-book-tab { min-height: 32px; font-size: 13px; }
+  .st-book-body { padding: 12px 30px 18px; }
+  .st-book-foot { padding: 4px 12px calc(4px + env(safe-area-inset-bottom)); }
+  /* the card: the picture as tall as the sheet on the left, its words and buttons on the right */
+  .st-card {
+    width: min(880px, 100%);
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr);
+    grid-template-rows: auto auto auto 1fr;
+    align-content: start;
+    gap: 10px 18px;
+    padding: 12px 16px;
+    overflow: hidden;
+  }
+  .st-card > * { grid-column: 2; }
+  .st-card > .st-card-preview { grid-column: 1; grid-row: 1 / -1; align-self: stretch; height: 100%; min-height: 0; }
+  .st-card > .st-card-preview[data-format="portrait"] { width: 100%; height: 100%; }
+  .st-card-head h2 { font-size: 20px; }
+  .st-card-sub { font-size: 13.5px; }
+  .st-card-formats { flex-wrap: wrap; }
+  .st-card-format { min-height: 34px; }
+  .st-card-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .st-card-actions > :first-child { grid-column: 1 / -1; }
+  .st-card-actions .ui-btn { min-height: 36px; padding: 0 10px; }
+  .st-chapter-pop { right: calc(100% + 8px); bottom: 0; max-height: calc(100dvh - 24px); }
+  .st-chapter-list button { min-height: 36px; padding: 5px 10px; }
 }
 @media (hover: none) and (pointer: coarse) {
   .st-book-btn, .st-book-close, .st-page-btn, .st-book-tab { min-height: 44px; }

@@ -4,6 +4,7 @@
  * beats. Pure: no React, no DOM.
  */
 import {
+  deedWords,
   type Entry,
   firstWords,
   type GuildModel,
@@ -114,8 +115,12 @@ export function pleaViews(world: GuildWorld, t: number, place: PlaceName): PleaV
   return pleas(world).flatMap((p) => {
     const h = cast.get(p.id)
     if (!h) return []
-    const ask = h.intent ? `${h.intent.tool} · ${h.intent.target}` : undefined
-    return [{ hero: heroView(world, h, place), ...(ask ? { ask } : {}) }]
+    // what it waits to do in the narrator's words; its tool and line only in the card's title
+    const intent = h.intent
+    if (!intent) return [{ hero: heroView(world, h, place) }]
+    const ask = `wants to ${deedWords(intent).to}`
+    const command = intent.target ? `${intent.tool} · ${intent.target}` : intent.tool
+    return [{ hero: heroView(world, h, place), ask, command }]
   })
 }
 
@@ -229,6 +234,8 @@ export interface SessionEntry extends ChronicleEntry {
   same: string
   /** The line as a repeat tells it, without what differs between them (a failed deed's target). */
   short: string
+  /** A failed deed in the narrator's words (`fails to run the tests`), for a toast: never its tool or line. */
+  told?: string
 }
 
 /**
@@ -268,6 +275,7 @@ export function chronicleOf(
     const a = world.actors.get(e.id)
     let text = ""
     let short = ""
+    let told = ""
     let same = `${e.kind}|${e.id}`
     if (e.kind === "actor.join") text = e.parent ? "joins the party" : "takes the seat in the great hall"
     else if (e.kind === "actor.quest") text = `sends a quest: ${firstWords(e.text)}`
@@ -278,6 +286,7 @@ export function chronicleOf(
       const tool = e.tool.toLowerCase()
       same = `${same}|${tool}|${e.failed}`
       if (e.failed) {
+        told = `fails to ${deedWords(e).to}`
         short = `${tool} failed`
         text = `${short}${e.target ? `: ${e.target}` : e.error ? `: ${firstWords(e.error)}` : ""}`
       } else {
@@ -298,9 +307,34 @@ export function chronicleOf(
       party: masterOf(world, e.id),
       same,
       short: short || text,
+      ...(told ? { told } : {}),
     })
   }
   return out.slice(-max)
+}
+
+/**
+ * The chronicle's lines as toasts tell them (GUI audit #2, #3): a failed deed in the narrator's words, not
+ * its tool and line (the Chronicle keeps those); no plea, ever: its card is up for as long as it waits and
+ * is its voice (the chip's mark and bubble stay), and once answered an "awaits your word" toast would be
+ * stale. Pure: the same array when nothing changes.
+ */
+export function toastLines<E extends SessionEntry>(entries: readonly E[]): readonly E[] {
+  let changed = false
+  const out: E[] = []
+  for (const e of entries) {
+    if (e.kind === "plea") {
+      changed = true
+      continue
+    }
+    if (e.told) {
+      changed = true
+      out.push({ ...e, text: e.told, short: e.told })
+      continue
+    }
+    out.push(e)
+  }
+  return changed ? out : entries
 }
 
 /** Repeats further apart than this (session ms) are separate moments. */

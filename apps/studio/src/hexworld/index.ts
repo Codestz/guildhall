@@ -714,8 +714,9 @@ const world = {
           agentPool: session,
           // a hero's work beats make the work FX's bursts (sparks off a hammer, pages, motes)
           beat: (b, at, sample) => workfx?.fx.beat(b, at, sample),
-          // the heroes' chips, in the labels layer with the plates (`?chips=0`: none)
-          ...(ctx.query.get("chips") !== "0" ? { chips: viewer.labels } : {}),
+          // the heroes' chips, in the labels layer with the plates (`?chips=0`: none); a repo's hall with
+          // no session (its history alone) has no guild to name: its walkers stay unlabelled townsfolk
+          ...(ctx.query.get("chips") !== "0" && !(hall && !session) ? { chips: viewer.labels } : {}),
           debug: overlay
             ? () => {
                 const island = hexIsland({ ...shape, seed, files })

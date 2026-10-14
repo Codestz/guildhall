@@ -57,6 +57,11 @@ const FADE_MS = 280
 export const HERO_TIER = 3
 /** The gap kept between plates, CSS px. */
 const GAP = 4
+/**
+ * The band along the top no plate rises into, CSS px: the HUD's top row (the crest, the repo chip, the
+ * icon rail) lives there; a plate whose heart is under it slides down below it.
+ */
+export const SAFE_TOP = 72
 
 /** left, top, right, bottom, CSS px. */
 export type Rect = [number, number, number, number]
@@ -108,6 +113,8 @@ export function layoutPlates(
   view?: readonly [number, number],
   /** Rects only the plates `yields(k)` keep clear of: the heroes' chips, over a hamlet's plate. */
   soft?: { rects: readonly Rect[]; yields(k: number): boolean },
+  /** With `view`, the band along its top the plates keep below (`SAFE_TOP`). */
+  safeTop = 0,
 ): PlateLaid[] {
   const out: PlateLaid[] = anchors.map(() => ({ at: null, size: "full" }))
   const taken: Rect[] = keepOut.map((r) => [...r] as Rect)
@@ -124,7 +131,7 @@ export function layoutPlates(
   const inside = (a: readonly [number, number], w: number, h: number): [number, number] => {
     if (!view) return [a[0], a[1]]
     const x = Math.min(Math.max(a[0], w / 2 + GAP), view[0] - w / 2 - GAP)
-    const y = Math.min(Math.max(a[1], h + GAP), view[1] - GAP)
+    const y = Math.min(Math.max(a[1], h + GAP + safeTop), view[1] - GAP)
     return [Math.round(x), Math.round(y)]
   }
   for (const k of order) {
@@ -227,15 +234,15 @@ export function createPlaceLabels(
   const lit = new Float64Array(places.length)
   const wanted = (k: number) =>
     !hidden[k] && (plateOn(places[k]!.tier, mode) || (lit[k] as number) > performance.now())
-  // the crest (and anything else marked `data-keepout`) keeps its corner: its box in the layer's pixels,
-  // re-read every half second and on a resize
+  // the crest (and anything else marked `data-keepout`) and the HUD's icon rail keep their corners: their
+  // boxes in the layer's pixels, re-read every half second and on a resize
   let keep: Rect[] = []
   let view: [number, number] = [0, 0]
   let frame = 0
   const readKeep = () => {
     const at = layer.getBoundingClientRect()
     view = [at.width, at.height]
-    keep = [...document.querySelectorAll("[data-keepout]")].map((el) => {
+    keep = [...document.querySelectorAll("[data-keepout], .ui-hud-rail")].map((el) => {
       const r = el.getBoundingClientRect()
       return [r.left - at.left - 8, r.top - at.top - 8, r.right - at.left + 8, r.bottom - at.top + 8] as Rect
     })
@@ -265,6 +272,7 @@ export function createPlaceLabels(
       keep,
       view[0] > 0 ? view : undefined,
       heroes ? { rects: heroes(), yields: (k) => (places[k]?.tier ?? 0) < HERO_TIER } : undefined,
+      SAFE_TOP,
     )
     for (let k = 0; k < els.length; k++) {
       const el = els[k] as HTMLElement

@@ -93,7 +93,10 @@ export function LegendsBook({
   const tabs = useRef<(HTMLButtonElement | null)[]>([])
   /** Until when a turn's own scroll is under way: the page it turned to stands, whatever passes by. */
   const turning = useRef(0)
-  const [view, setView] = useState<BookView>(history ? initial : "session")
+  // the tabs only when there are two books: a session with no legend yet (a hall with only its history,
+  // a guild that has not stirred) opens the history alone
+  const tabbed = Boolean(history && legend)
+  const [view, setView] = useState<BookView>(history ? (legend ? initial : "history") : "session")
   const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle")
   const [page, setPage] = useState(0)
   const [said, setSaid] = useState("")
@@ -284,7 +287,7 @@ export function LegendsBook({
           </div>
         </header>
 
-        {history && (
+        {tabbed && (
           <div className="st-book-tabs" role="tablist" aria-label="Which book">
             {(["session", "history"] as const).map((v, i) => (
               <button
@@ -318,7 +321,7 @@ export function LegendsBook({
             turning.current = 0
           }}
           // A stop of its own (it scrolls): a tab panel, or a labelled region.
-          {...(history
+          {...(tabbed
             ? { role: "tabpanel", "aria-labelledby": `${id}-tab-${view}` }
             : { role: "region", "aria-labelledby": `${id}-h` })}
           // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling region must be reachable by keyboard

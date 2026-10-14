@@ -28,9 +28,13 @@ import {
   Vector3,
 } from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
+import { courseAt, roundedPath } from "../sea/course.ts"
+import { motionOf, type Path } from "../sea/plan.ts"
+import { attitudeOf, FEEL } from "../sea/swell.ts"
 import type { Stage } from "../stage.ts"
 import { warmPrograms } from "../warm.ts"
 import type { Wake, Water } from "../water.ts"
+import { smooth01 } from "./ease.ts"
 import {
   FLEET,
   type HarbourReading,
@@ -98,6 +102,8 @@ export const SHIP_PIECE = "kenney-pirate/ship-small"
 const SCALE = 0.38
 /** How deep a sunk ship goes, metres. */
 const SINK_DEPTH = 6.5
+/** The pennant's length, model units. */
+const PENNANT = 6
 
 const PENNANTS = ["banner-red", "royal-blue", "gold", "teal", "orange", "purple"].map((name) => {
   const s = PALETTE.swatches.find((w) => w.name === name)
@@ -277,14 +283,29 @@ export function withPennant(geometry: BufferGeometry, length: number): BufferGeo
 /**
  * The ships' shader parts (fxMaterial `patch`): the pennant dips by `instanceGlint.y` of `dip` model
  * units, and the flare's vertices spread on the screen's plane over the masthead while
- * `instanceGlint.x` (its progress) runs, glowing gold.
+ * `instanceGlint.x` (its progress) runs, glowing gold. With `flutter` (the masthead, the pennant's
+ * length and a clock), the pennant flutters, more toward its tip, each ship in its own time.
  */
-export function shipPatch(dip: number) {
-  return (shader: { vertexShader: string; fragmentShader: string }) => {
+export function shipPatch(
+  dip: number,
+  flutter?: { mast: readonly [number, number, number]; length: number; time: { value: number } },
+) {
+  return (shader: { vertexShader: string; fragmentShader: string; uniforms?: Record<string, unknown> }) => {
+    if (flutter && shader.uniforms) shader.uniforms.uFlutter = flutter.time
+    const flap = flutter
+      ? `
+if ( tint > 0.5 && burstKind < 0.5 ) {
+  float reach = clamp( ( ${flutter.mast[2].toFixed(4)} - position.z ) / ${flutter.length.toFixed(4)}, 0.0, 1.0 );
+  float ph = dot( instanceMatrix[ 3 ].xz, vec2( 0.41, 0.27 ) );
+  transformed.x += reach * 0.55 * sin( uFlutter * 7.0 + ph - reach * 4.0 );
+  transformed.y += reach * 0.3 * sin( uFlutter * 5.3 + ph * 1.7 - reach * 3.0 );
+}`
+      : ""
     shader.vertexShader = shader.vertexShader
       .replace(
         "#include <common>",
         `#include <common>
+${flutter ? "uniform float uFlutter;" : ""}
 attribute vec2 instanceGlint;
 attribute vec4 burst;
 attribute float burstKind;
@@ -293,7 +314,7 @@ varying float vBurst;`,
       .replace(
         "#include <begin_vertex>",
         `vec3 transformed = vec3( position );
-transformed.y -= tint * instanceGlint.y * ${dip.toFixed(4)};`,
+transformed.y -= tint * instanceGlint.y * ${dip.toFixed(4)};${flap}`,
       )
       .replace(
         "#include <project_vertex>",
@@ -363,9 +384,35 @@ export function laneLengths(lane: readonly [number, number][]): number[] {
   return out
 }
 
+/**
+ * Where a voyage's ship is at `t` on its rounded lane (`route`), which way it points and how far it
+ * has turned about (0 … 1). Leaving, it first backs off its berth stern first, then swings its bow round
+ * once it has room (`BACK_OFF` metres out), so its stern never sweeps the quay.
+ */
+export function voyagePlace(
+  route: Path,
+  v: Voyage,
+  t: number,
+): { x: number; z: number; heading: number; turn: number } {
+  const pose = voyagePose(v, t)
+  const c = courseAt(route, pose.along * route.length, 2.5)
+  const leaving = pose.phase === "leaving" || pose.phase === "turning-back"
+  const out = leaving ? ((v.back ?? 1) - pose.along) * route.length : 0
+  const turn = leaving ? smooth01((out - BACK_OFF) / 7) : pose.turn
+  return { x: c.x, z: c.z, heading: c.heading + Math.PI * turn, turn }
+}
+
+/** How far a ship backs off its berth before it swings round, metres. */
+const BACK_OFF = 2.5
+
 export function createHarbourShips(stage: Stage, opts: HarbourShipsOpts): HarbourShips {
   const berths = opts.berths.slice(0, FLEET.MAX)
-  const lengths = berths.map((b) => laneLengths(b.lane))
+  // each lane with its corners rounded: a ship turns on a curve, never at a waypoint
+  const routes = berths.map((b) => roundedPath(b.lane))
+  /** Where a voyage's ship is at `at` and which way it points (turned about as it leaves). */
+  const placeOf = (v: Voyage, at: number) => voyagePlace(routes[v.berth] as Path, v, at)
+  /** The swell's clock, for the pennants' flutter. */
+  const flutter = { value: 0 }
   const scale = opts.scale ?? SCALE
   const logs = new Map<string, ShipLog>()
   const colours = new Map<string, Color>()
@@ -388,14 +435,16 @@ export function createHarbourShips(stage: Stage, opts: HarbourShipsOpts): Harbou
   const build = (geometry: BufferGeometry) => {
     // the pennant dips a third of the way down the mast
     const dip = mastheadOf(geometry)[1] * 0.35
-    const g = withPennant(geometry, 6)
+    const g = withPennant(geometry, PENNANT)
     const seen = new InstancedBufferAttribute(new Float32Array(FLEET.MAX), 1)
     seen.setUsage(DynamicDrawUsage)
     g.setAttribute("instanceSeen", seen)
     const glint = new InstancedBufferAttribute(new Float32Array(FLEET.MAX * 2), 2)
     glint.setUsage(DynamicDrawUsage)
     g.setAttribute("instanceGlint", glint)
-    material = fxMaterial(`ships-${dip.toFixed(3)}`, { patch: shipPatch(dip) })
+    material = fxMaterial(`ships-${dip.toFixed(3)}`, {
+      patch: shipPatch(dip, { mast: mastheadOf(geometry), length: PENNANT, time: flutter }),
+    })
     const m = new InstancedMesh(g, material, FLEET.MAX)
     m.name = "harbour ships"
     m.instanceMatrix.setUsage(DynamicDrawUsage)
@@ -438,6 +487,7 @@ export function createHarbourShips(stage: Stage, opts: HarbourShipsOpts): Harbou
 
   const draw = () => {
     if (!mesh) return
+    flutter.value = wall
     const seen = mesh.geometry.getAttribute("instanceSeen") as InstancedBufferAttribute
     const glint = mesh.geometry.getAttribute("instanceGlint") as InstancedBufferAttribute
     let k = 0
@@ -446,18 +496,23 @@ export function createHarbourShips(stage: Stage, opts: HarbourShipsOpts): Harbou
       if (t < v.start || t >= v.gone || k >= FLEET.MAX) continue
       const pose = voyagePose(v, t)
       const berth = berths[v.berth] as (typeof berths)[number]
-      const [x, z, inbound] = along(berth.lane, lengths[v.berth] as number[], pose.along)
-      const heading = inbound + Math.PI * pose.turn
+      const place = (at: number) => placeOf(v, at)
+      const { x, z, heading, turn } = place(t)
+      const inbound = heading - Math.PI * turn
       const phase = (hashKey(v.key) % 628) / 100
-      const bob = 0.07 * Math.sin(wall * 1.3 + phase) - pose.sink * SINK_DEPTH
-      p.set(x, berth.at[1] + bob, z)
-      // bow along the model's +z, turned to the heading; sinking, it lists to one side, then the bow goes
-      q.setFromAxisAngle(up, Math.PI / 2 - heading)
-      roll.setFromAxisAngle(
-        e.set(0, 0, 1),
-        0.035 * Math.sin(wall * 0.9 + phase) + 0.45 * pose.list + 0.25 * pose.sink,
+      // riding the swell where it lies, heeled into its turns, tied up on its lines at the berth
+      const a = attitudeOf(
+        { x, z, heading, ...motionOf(place, t), hold: pose.hold, way: pose.way },
+        FEEL.small,
+        wall,
+        phase,
+        { sails: true, reach: 0.35 },
       )
-      pitch.setFromAxisAngle(e.set(1, 0, 0), 0.02 * Math.sin(wall * 1.1 + phase * 1.7) + 0.35 * pose.sink)
+      p.set(a.x, berth.at[1] + a.heave - pose.sink * SINK_DEPTH, a.z)
+      // bow along the model's +z, turned to the heading; sinking, it lists to one side, then the bow goes
+      q.setFromAxisAngle(up, Math.PI / 2 - a.heading)
+      roll.setFromAxisAngle(e.set(0, 0, 1), a.roll + 0.45 * pose.list + 0.25 * pose.sink)
+      pitch.setFromAxisAngle(e.set(1, 0, 0), a.pitch + 0.35 * pose.sink)
       q.multiply(roll).multiply(pitch)
       s.setScalar(scale)
       matrix.compose(p, q, s)
@@ -467,7 +522,7 @@ export function createHarbourShips(stage: Stage, opts: HarbourShipsOpts): Harbou
       seen.setX(k, pose.seen)
       glint.setXY(k, pose.flare, pose.dip)
       if (pose.way > 0.05 && flow.length < 8)
-        flow.push({ x, z, heading: pose.turn > 0.5 ? inbound + Math.PI : inbound, speed: 0.8 * pose.way })
+        flow.push({ x, z, heading: turn > 0.5 ? inbound + Math.PI : inbound, speed: 0.8 * pose.way })
       // a sinking ship churns the water round it as it goes down
       else if (pose.phase === "sinking" && pose.sink > 0.05 && pose.seen > 0.2 && flow.length < 8)
         flow.push({ x, z, heading: inbound + wall * 0.6, speed: 0.35 })
@@ -533,7 +588,7 @@ export function createHarbourShips(stage: Stage, opts: HarbourShipsOpts): Harbou
         .map((v) => {
           const berth = berths[v.berth] as (typeof berths)[number]
           const pose = voyagePose(v, t)
-          const [x, z] = along(berth.lane, lengths[v.berth] as number[], pose.along)
+          const { x, z } = placeOf(v, t)
           return {
             key: v.key,
             berth: v.berth,

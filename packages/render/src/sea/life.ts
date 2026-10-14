@@ -37,6 +37,7 @@ import {
   Quaternion,
   ShaderMaterial,
   Vector3,
+  type WebGLProgramParametersWithUniforms,
 } from "three"
 import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import { fxMaterial, swatch } from "../events/fxMaterial.ts"
@@ -44,6 +45,7 @@ import { bakeModel } from "../events/ships.ts"
 import type { DayLight } from "../light.ts"
 import type { Stage } from "../stage.ts"
 import { warmPrograms } from "../warm.ts"
+import { roundedPath } from "./course.ts"
 import {
   anchorage,
   cargoPose,
@@ -57,25 +59,25 @@ import {
   type Path,
   type Point,
   type Push,
-  pathOf,
   raidPose,
   SEA,
   type SeaShow,
   type ShipPose,
 } from "./plan.ts"
 import type { Mooring, SeaSites } from "./sites.ts"
+import { attitudeOf, FEEL, type HullFeel } from "./swell.ts"
 
 /** Each hull: the model it is (an index into MODELS), its size (metres per model unit) and how deep it sits (model units). */
 const HULLS: Record<
   Exclude<Hull, "ghost">,
-  { model: number; scale: number; draft: number; extras: number }
+  { model: number; scale: number; draft: number; extras: number; feel: HullFeel; sails: boolean }
 > = {
-  "merchant-large": { model: 0, scale: 0.44, draft: 0.9, extras: 0 },
-  "merchant-medium": { model: 1, scale: 0.42, draft: 0.9, extras: 0 },
-  cargo: { model: 2, scale: 0.4, draft: 0.8, extras: 0 },
-  galleon: { model: 5, scale: 0.54, draft: 0.9, extras: 7 },
-  pirate: { model: 3, scale: 0.48, draft: 0.9, extras: 0 },
-  rowboat: { model: 4, scale: 0.46, draft: 0.25, extras: 0 },
+  "merchant-large": { model: 0, scale: 0.44, draft: 0.9, extras: 0, feel: FEEL.large, sails: true },
+  "merchant-medium": { model: 1, scale: 0.42, draft: 0.9, extras: 0, feel: FEEL.medium, sails: true },
+  cargo: { model: 2, scale: 0.4, draft: 0.8, extras: 0, feel: FEEL.small, sails: true },
+  galleon: { model: 5, scale: 0.54, draft: 0.9, extras: 7, feel: FEEL.galleon, sails: true },
+  pirate: { model: 3, scale: 0.48, draft: 0.9, extras: 0, feel: FEEL.medium, sails: true },
+  rowboat: { model: 4, scale: 0.46, draft: 0.25, extras: 0, feel: FEEL.rowboat, sails: false },
 }
 /** The hulls' models; the galleon (5) is the large ship again, its sails and flags in its own colour. */
 const MODELS = [
@@ -161,7 +163,8 @@ export interface SeaLife {
 
 export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
   const { sites } = opts
-  const laps: Path[] = sites.laps.map((ring) => pathOf(ring.points, true))
+  // the routes with their corners rounded: every hull turns on a curve
+  const laps: Path[] = sites.laps.map((ring) => roundedPath(ring.points, true))
   const keepOff = opts.keepOff ?? []
   const clearOf = (m: Mooring) =>
     keepOff.length ? Math.min(...keepOff.map(([x, z]) => Math.hypot(x - m.at[0], z - m.at[1]))) : 99
@@ -169,7 +172,7 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
   const byClear = [...sites.moorings].sort((a, b) => clearOf(b) - clearOf(a))
   const quay = byClear[0] ?? null
   const loading = sites.moorings.find((m) => m !== quay && clearOf(m) > 4) ?? byClear[1] ?? quay
-  const lane = loading ? pathOf(loading.lane) : null
+  const lane = loading ? roundedPath(loading.lane) : null
   const raidLane = lane
   const centre: Point = (sites.laps[0] as SeaRing | undefined)?.centre ?? [0, 0]
   const harbourBearing = loading ? Math.atan2(loading.at[1] - centre[1], loading.at[0] - centre[0]) : 0
@@ -192,6 +195,8 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
   let ghost: Mesh | null = null
   let ghostMaterial: MeshStandardMaterial | null = null
   const ghostFade = { value: 0 }
+  /** The swell's clock for the sails' work in the wind. */
+  const seaTime = { value: 0 }
   const ghostTime = { value: 0 }
   const glows = glowMesh()
   const beam = beamMesh()
@@ -242,6 +247,14 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
       if (sails && rgb)
         for (let i = 0; i < n; i++) tint[i] = Math.min(rgb.getX(i), rgb.getY(i), rgb.getZ(i)) > 0.5 ? 1 : 0
       c.setAttribute("tint", new BufferAttribute(tint, 1))
+      // the sails: pale cloth above the deck, weighted up the mast (the wind works the canvas, not the hull)
+      const cloth = new Float32Array(n)
+      const pos = c.getAttribute("position")
+      if (rgb && slot === 0)
+        for (let i = 0; i < n; i++)
+          if (Math.min(rgb.getX(i), rgb.getY(i), rgb.getZ(i)) > 0.5)
+            cloth[i] = Math.min(1, Math.max(0, (pos.getY(i) - 4.5) / 7))
+      c.setAttribute("cloth", new BufferAttribute(cloth, 1))
       parts.push(c)
     }
     MODELS.forEach((id, k) => {
@@ -289,7 +302,7 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
       const hull = new InstancedBufferAttribute(new Float32Array(MAX_SHIPS * 2), 2)
       hull.setUsage(DynamicDrawUsage)
       merged.setAttribute("instanceHull", hull)
-      const m = new InstancedMesh(merged, fxMaterial("sea-fleet", { patch: fleetPatch }), MAX_SHIPS)
+      const m = new InstancedMesh(merged, fxMaterial("sea-fleet", { patch: fleetPatch(seaTime) }), MAX_SHIPS)
       const sails = new Color(...swatch(GALLEON_SAILS))
       for (let i = 0; i < MAX_SHIPS; i++) m.setColorAt(i, sails)
       m.name = "sea fleet"
@@ -378,13 +391,20 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
   const s = new Vector3()
   const colour = new Color()
 
-  const shipMatrix = (pose: ShipPose, scale: number, draft: number, phase: number) => {
-    const sway = 0.6 + 0.8 * pose.way
-    const bob = 0.08 * Math.sin(wall * 0.9 + phase)
-    p.set(pose.x, sites.sea - draft * scale + bob, pose.z)
-    q.setFromAxisAngle(up, Math.PI / 2 - pose.heading)
-    roll.setFromAxisAngle(axis.set(0, 0, 1), 0.04 * sway * Math.sin(wall * 0.8 + phase))
-    pitch.setFromAxisAngle(axis.set(1, 0, 0), 0.022 * sway * Math.sin(wall * 0.6 + phase * 1.7))
+  const shipMatrix = (
+    pose: ShipPose,
+    scale: number,
+    draft: number,
+    phase: number,
+    feel: HullFeel,
+    sails: boolean,
+  ) => {
+    // the quay's rowboat is tied up short; a ship at anchor swings on a long cable
+    const a = attitudeOf(pose, feel, wall, phase, { sails, reach: pose.key === "quay-boat" ? 0.3 : 1 })
+    p.set(a.x, sites.sea - draft * scale + a.heave, a.z)
+    q.setFromAxisAngle(up, Math.PI / 2 - a.heading)
+    roll.setFromAxisAngle(axis.set(0, 0, 1), a.roll)
+    pitch.setFromAxisAngle(axis.set(1, 0, 0), a.pitch)
     q.multiply(roll).multiply(pitch)
     s.setScalar(scale)
     return matrix.compose(p, q, s)
@@ -395,6 +415,7 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
   let lastLamp = 0
   let sparksOn = false
   const draw = () => {
+    seaTime.value = wall
     const { ships, sparks } = poses()
     sparksOn = sparks !== null
     let k = 0
@@ -418,7 +439,7 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
         }
         if (k >= MAX_SHIPS || pose.seen <= 0.002) continue
         const h = HULLS[pose.hull]
-        fleet.setMatrixAt(k, shipMatrix(pose, h.scale, h.draft, phaseOf(pose.key)))
+        fleet.setMatrixAt(k, shipMatrix(pose, h.scale, h.draft, phaseOf(pose.key), h.feel, h.sails))
         seen.setX(k, pose.seen)
         hulls.setXY(k, h.model, pose.hull === "cargo" ? pose.crates : h.extras)
         k++
@@ -436,7 +457,7 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
       const pose = ghostPoseNow
       ghost.visible = warm && pose !== null
       if (pose) {
-        ghost.matrix.copy(shipMatrix(pose, GHOST.scale, GHOST.draft, 3.1))
+        ghost.matrix.copy(shipMatrix(pose, GHOST.scale, GHOST.draft, 3.1, FEEL.ghost, false))
         ghost.matrixWorld.copy(ghost.matrix)
         ghostFade.value = pose.seen
         ghostTime.value = wall
@@ -646,12 +667,23 @@ const phaseOf = (key: string) => {
  * 8, against `instanceHull.x`) or a load past its count (`part` % 8, against `instanceHull.y`) folds
  * to the origin, so its triangles are drawn as nothing.
  */
-function fleetPatch(shader: { vertexShader: string }) {
+const fleetPatch = (time: { value: number }) => (shader: WebGLProgramParametersWithUniforms) => {
+  shader.uniforms.uSeaTime = time
   shader.vertexShader = shader.vertexShader
-    .replace("#include <common>", "#include <common>\nattribute float part;\nattribute vec2 instanceHull;")
+    .replace(
+      "#include <common>",
+      "#include <common>\nattribute float part;\nattribute float cloth;\nattribute vec2 instanceHull;\nuniform float uSeaTime;",
+    )
     .replace(
       "#include <begin_vertex>",
       `vec3 transformed = vec3( position );
+// the sails fill and work in the wind, each ship in its own time (from where it is)
+if ( cloth > 0.0 ) {
+  float ph = dot( instanceMatrix[ 3 ].xz, vec2( 0.37, 0.23 ) );
+  float w = sin( uSeaTime * 1.7 + ph + position.y * 0.45 ) + 0.5 * sin( uSeaTime * 2.9 + ph * 1.3 + position.x * 0.6 );
+  transformed.z += cloth * ( 0.22 + 0.12 * w );
+  transformed.x += cloth * 0.07 * w;
+}
 float hullOf = floor( part / 8.0 + 0.01 );
 float slotOf = part - hullOf * 8.0;
 if ( abs( hullOf - instanceHull.x ) > 0.5 || slotOf > instanceHull.y + 0.5 ) transformed = vec3( 0.0 );`,

@@ -5,9 +5,10 @@
  * say, so a seek, a paused shot and a replay all show the same water.
  *
  *   merchants   two ships on slow laps round the island (300 s and 260 s, the other way round)
- *   push        a cargo ship, crates on deck, casts off from the quay and sails out (16 s)
- *   release     a galleon sails in (11 s), anchors broadside between the laps for 120 s, sparks once as
- *               it drops anchor, then sails off (14 s)
+ *               (each paced by the wind: slower beating into it, quicker off it)
+ *   push        a cargo ship, crates on deck, gathers way off the quay and sails out (22 s)
+ *   release     a galleon sails in (20 s) on a curve that brings it round broadside between the laps,
+ *               lies there 120 s swinging to its anchor, sparks once as it drops anchor, then sails off (18 s)
  *   ghostship   a show: the ghost ship glides along the inner lap past a coast (36 s), fading in and out
  *   raid        a show: a pirate ship sails in along the quay's lane (20 s), anchors broadside off the
  *               quay, its rowboat pulling for the pier and back again and again; at the show's end it
@@ -15,26 +16,34 @@
  *   lighthouse  the newest CI run: warm and steady (passed), a slow red pulse (failed), a spinning
  *               amber beam (queued, running), dark before any run
  *
+ * Every hull turns on a curve (its heading read off the rounded route, never a step), gathers way
+ * and loses it smoothly (course.ts), and says how fast it goes and turns (`speed`, `yawRate`) and how
+ * settled it lies (`hold`), so the layer can heel it into its turns and swing it at anchor (swell.ts).
+ *
  * Headings are radians from +x toward +z (as the harbour's ships, events/ships.ts); times are ms on the
  * sea's clock unless named `_S`.
  */
 import type { CiState } from "@guildhall/core"
 import type { SeaRing } from "@guildhall/world"
-import { clamp01, easeIn, easeOut, smooth01 } from "../events/ease.ts"
+import { clamp01, smooth01 } from "../events/ease.ts"
+import { bezier, courseAt, type PacedLap, pacedAt, pacedLap, strokes, swing, wayAlong } from "./course.ts"
 import type { Mooring } from "./sites.ts"
+import { windPace } from "./swell.ts"
 
 export const SEA = {
   /** The merchants' laps, seconds a lap (inner, outer). */
   LAP_S: [300, 260] as const,
   /** A push's cargo ship, from casting off to over the horizon. */
-  CARGO_S: 16,
+  CARGO_S: 22,
+  /** Seconds a cargo ship takes to gather way off the quay. */
+  CARGO_GATHER_S: 6,
   /** Cargo ships set out at least this far apart (they share the quay's lane). */
   CARGO_GAP_S: 5,
   /** Crates a cargo ship carries at most (one a commit). */
   CRATES: 6,
-  GALLEON_IN_S: 11,
+  GALLEON_IN_S: 20,
   GALLEON_STAY_S: 120,
-  GALLEON_OUT_S: 14,
+  GALLEON_OUT_S: 18,
   /** The galleon's sparks as it drops anchor: three bursts over this long. */
   SPARKS_S: 3.6,
   GHOST_S: 36,
@@ -63,6 +72,11 @@ export interface ShipPose {
   way: number
   /** A cargo ship's crates. */
   crates: number
+  /** Its way, m/s along its heading, and its rate of turn, rad/s (+ to starboard, the heading growing). */
+  speed: number
+  yawRate: number
+  /** How settled it lies at anchor or tied up, 0 (under way, or just come up) … 1: it swings that much. */
+  hold: number
 }
 
 export type Point = [number, number]
@@ -121,28 +135,73 @@ export function turn(a: number, b: number, t: number): number {
   return a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t
 }
 
+// ── motion: how fast a hull goes and turns ──
+
+/** A hull's way and rate of turn at `s`, read off its pose either side (m/s along its heading, rad/s to starboard). */
+export function motionOf(
+  at: (s: number) => { x: number; z: number; heading: number } | null,
+  s: number,
+  h = 0.05,
+): { speed: number; yawRate: number } {
+  const a = at(s - h)
+  const b = at(s + h)
+  if (!a || !b) return { speed: 0, yawRate: 0 }
+  const head = turn(a.heading, b.heading, 0.5)
+  const speed = ((b.x - a.x) * Math.cos(head) + (b.z - a.z) * Math.sin(head)) / (2 * h)
+  const yawRate = Math.atan2(Math.sin(b.heading - a.heading), Math.cos(b.heading - a.heading)) / (2 * h)
+  return { speed, yawRate }
+}
+
+/** A pose with its way and turn filled in from its own lifecycle (`at`, the same function at other times). */
+function moving<T extends ShipPose>(pose: T, at: (s: number) => T | null, s: number): T {
+  const m = motionOf(at, s)
+  pose.speed = m.speed
+  pose.yawRate = m.yawRate
+  return pose
+}
+
 // ── the merchants ──
+
+const PACED = new WeakMap<Path, PacedLap[]>()
+/** A merchant's lap paced by the wind: slower beating into it, quicker off it (the same lap time). */
+function pacedFor(lap: Path, k: number): PacedLap {
+  let pair = PACED.get(lap)
+  if (!pair) {
+    pair = []
+    PACED.set(lap, pair)
+  }
+  const dir = k === 0 ? 1 : -1
+  let p = pair[k]
+  if (!p) {
+    p = pacedLap(lap, SEA.LAP_S[k] as number, (h) => windPace(dir > 0 ? h : h + Math.PI))
+    pair[k] = p
+  }
+  return p
+}
+
+function merchantAt(lap: Path, k: number, s: number): ShipPose {
+  const dir = k === 0 ? 1 : -1
+  const start = (k === 0 ? 0.1 : 0.6) * lap.length
+  const d = start + dir * pacedAt(pacedFor(lap, k), s)
+  const p = courseAt(lap, d, 4)
+  return {
+    hull: k === 0 ? "merchant-large" : "merchant-medium",
+    key: `merchant-${k}`,
+    x: p.x,
+    z: p.z,
+    heading: dir > 0 ? p.heading : p.heading + Math.PI,
+    seen: 1,
+    way: 1,
+    crates: 0,
+    speed: 0,
+    yawRate: 0,
+    hold: 0,
+  }
+}
 
 /** The two merchants at wall time `s` (seconds): the large one round the inner lap, the medium one the other way round the outer. */
 export function merchants(laps: readonly Path[], s: number): ShipPose[] {
-  const out: ShipPose[] = []
-  const hulls: Hull[] = ["merchant-large", "merchant-medium"]
-  laps.slice(0, 2).forEach((lap, k) => {
-    const dir = k === 0 ? 1 : -1
-    const f = (k === 0 ? 0.1 : 0.6) + (dir * s) / (SEA.LAP_S[k] as number)
-    const p = pointAt(lap, f * lap.length)
-    out.push({
-      hull: hulls[k] as Hull,
-      key: `merchant-${k}`,
-      x: p.x,
-      z: p.z,
-      heading: dir > 0 ? p.heading : p.heading + Math.PI,
-      seen: 1,
-      way: 1,
-      crates: 0,
-    })
-  })
-  return out
+  return laps.slice(0, 2).map((lap, k) => moving(merchantAt(lap, k, s), (x) => merchantAt(lap, k, x), s))
 }
 
 // ── pushes: cargo ships ──
@@ -164,19 +223,28 @@ export function cargoStarts(pushes: readonly Push[]): { push: Push; start: numbe
   })
 }
 
-/** A cargo ship `age` seconds after it cast off: easing off the quay, then out along the lane, fading at the end. */
-export function cargoPose(lane: Path, key: string, crates: number, age: number): ShipPose | null {
+function cargoAt(lane: Path, key: string, crates: number, age: number): ShipPose | null {
   if (age < 0 || age >= SEA.CARGO_S) return null
   const u = age / SEA.CARGO_S
-  const p = pointAt(lane, easeIn(u) * lane.length)
+  // gathering way off the quay, then out at a steady pace
+  const p = courseAt(lane, wayAlong(age, SEA.CARGO_S, lane.length, { gather: SEA.CARGO_GATHER_S }), 2.5)
   return {
     hull: "cargo",
     key,
     ...p,
     seen: smooth01(u / 0.06) * (1 - smooth01((u - 0.72) / 0.28)),
-    way: smooth01(u / 0.2),
+    way: smooth01(age / SEA.CARGO_GATHER_S),
     crates: Math.max(1, Math.min(SEA.CRATES, crates)),
+    speed: 0,
+    yawRate: 0,
+    hold: 0,
   }
+}
+
+/** A cargo ship `age` seconds after it cast off: gathering way off the quay, then out along the lane, fading at the end. */
+export function cargoPose(lane: Path, key: string, crates: number, age: number): ShipPose | null {
+  const pose = cargoAt(lane, key, crates, age)
+  return pose && moving(pose, (s) => cargoAt(lane, key, crates, s), age)
 }
 
 // ── releases: the galleon ──
@@ -206,32 +274,52 @@ function radiusAt(ring: SeaRing, bearing: number): number {
 }
 
 /** How far out the galleon comes from and goes to, metres past its anchorage. */
-const OFFING = 140
+const OFFING = 120
 
-/** The galleon `age` seconds after its release (null before and after its visit), and its sparks' progress (0 … 1, else null). */
-export function galleonPose(
-  anchor: ReturnType<typeof anchorage>,
+type Anchor = ReturnType<typeof anchorage>
+const COURSES = new WeakMap<Anchor, { in: Path; out: Path }>()
+/**
+ * The galleon's courses: in from the offing on a curve that brings it round broadside to its anchor
+ * (it turns as it comes, never on the spot), and out ahead from its anchor round to the open sea.
+ */
+function galleonCourses(a: Anchor): { in: Path; out: Path } {
+  const known = COURSES.get(a)
+  if (known) return known
+  const ox = Math.cos(a.out)
+  const oz = Math.sin(a.out)
+  const fx = Math.cos(a.heading)
+  const fz = Math.sin(a.heading)
+  const at: Point = [a.x, a.z]
+  const off = (k: number, j = 0): Point => [a.x + ox * k + fx * j, a.z + oz * k + fz * j]
+  const courses = {
+    // the last and first stretches straight, so it lies on its anchor exactly as it came up to it
+    in: pathOf([...bezier(off(OFFING), off(OFFING * 0.45), off(0, -40), off(0, -12)), at]),
+    out: pathOf([at, ...bezier(off(0, 12), off(0, 36), off(OFFING * 0.4, 20), off(OFFING))]),
+  }
+  COURSES.set(a, courses)
+  return courses
+}
+
+function galleonAt(
+  anchor: Anchor,
   key: string,
   age: number,
 ): { pose: ShipPose; sparks: number | null } | null {
   const { GALLEON_IN_S: IN, GALLEON_STAY_S: STAY, GALLEON_OUT_S: OUT } = SEA
   if (age < 0 || age >= IN + STAY + OUT) return null
-  const ox = Math.cos(anchor.out)
-  const oz = Math.sin(anchor.out)
-  const base = { hull: "galleon" as const, key, crates: 0 }
+  const courses = galleonCourses(anchor)
+  const base = { hull: "galleon" as const, key, crates: 0, speed: 0, yawRate: 0 }
   if (age < IN) {
-    // in from the offing, easing to a stop, swinging broadside for the last stretch
-    const u = age / IN
-    const d = OFFING * (1 - easeOut(u))
-    const inward = anchor.out + Math.PI
+    // in from the offing, losing way, swinging round broadside, running a little past and back
+    const d = wayAlong(age, IN, courses.in.length, { slow: 8, overshoot: 0.9, settle: 3.5 })
+    const p = courseAt(courses.in, d, 4)
     return {
       pose: {
         ...base,
-        x: anchor.x + ox * d,
-        z: anchor.z + oz * d,
-        heading: turn(inward, anchor.heading, smooth01((u - 0.55) / 0.45)),
-        seen: smooth01(u / 0.15),
-        way: 1 - smooth01((u - 0.8) / 0.2),
+        ...p,
+        seen: smooth01(age / IN / 0.15),
+        way: 1 - smooth01((age / IN - 0.75) / 0.25),
+        hold: 0,
       },
       sparks: null,
     }
@@ -239,24 +327,38 @@ export function galleonPose(
   if (age < IN + STAY) {
     const s = age - IN
     return {
-      pose: { ...base, x: anchor.x, z: anchor.z, heading: anchor.heading, seen: 1, way: 0 },
+      pose: {
+        ...base,
+        x: anchor.x,
+        z: anchor.z,
+        heading: anchor.heading,
+        seen: 1,
+        way: 0,
+        // settled on its cable, swinging; brought short again before it weighs
+        hold: smooth01(s / 8) * (1 - smooth01((s - (STAY - 6)) / 6)),
+      },
       sparks: s < SEA.SPARKS_S ? s / SEA.SPARKS_S : null,
     }
   }
-  // away: turning for the open sea, out and over the horizon
-  const u = (age - IN - STAY) / OUT
-  const d = OFFING * easeIn(u)
+  // away: gathering way ahead, round for the open sea, out and over the horizon
+  const s = age - IN - STAY
+  const u = s / OUT
+  const p = courseAt(courses.out, wayAlong(s, OUT, courses.out.length, { gather: 7 }), 4)
   return {
-    pose: {
-      ...base,
-      x: anchor.x + ox * d,
-      z: anchor.z + oz * d,
-      heading: turn(anchor.heading, anchor.out, smooth01(u / 0.3)),
-      seen: 1 - smooth01((u - 0.7) / 0.3),
-      way: smooth01(u / 0.2),
-    },
+    pose: { ...base, ...p, seen: 1 - smooth01((u - 0.7) / 0.3), way: smooth01(s / 7), hold: 0 },
     sparks: null,
   }
+}
+
+/** The galleon `age` seconds after its release (null before and after its visit), and its sparks' progress (0 … 1, else null). */
+export function galleonPose(
+  anchor: Anchor,
+  key: string,
+  age: number,
+): { pose: ShipPose; sparks: number | null } | null {
+  const g = galleonAt(anchor, key, age)
+  if (g) moving(g.pose, (s) => galleonAt(anchor, key, s)?.pose ?? null, age)
+  return g
 }
 
 // ── shows: the ghost ship and the raid ──
@@ -284,10 +386,12 @@ export function ghostPose(
   // the lap's point nearest the bearing, and a drift along it centred there
   const mid = nearestAlong(lap, centre[0] + Math.cos(bearing) * 1e4, centre[1] + Math.sin(bearing) * 1e4)
   const span = SEA.GHOST_SPEED * total
-  const p = pointAt(lap, mid - span / 2 + SEA.GHOST_SPEED * age)
+  const along = (s: number) => courseAt(lap, mid - span / 2 + SEA.GHOST_SPEED * s, 5)
+  const p = along(age)
   const fade =
     smooth01(age / 5) * (1 - smooth01((age - (total - 6)) / 6)) * (left === null ? 1 : 1 - smooth01(left / 6))
-  return { hull: "ghost", key: "ghost", ...p, seen: fade, way: 1, crates: 0 }
+  const m = motionOf(along, age)
+  return { hull: "ghost", key: "ghost", ...p, seen: fade, way: 1, crates: 0, ...m, hold: 0 }
 }
 
 /** Distance along a path to its point nearest (x, z) (toward it from the centre: the far point of a ray). */
@@ -310,69 +414,85 @@ export interface RaidPoses {
   boat: ShipPose | null
 }
 
-/**
- * The raid `age` seconds in (`left`: seconds since its show ended, else null). The pirate ship sails in
- * along the quay's lane (`lane`, from the pier's water out to sea) to its anchorage `RAID_OFF` metres out,
- * swinging broadside; the rowboat pulls along the lane between it and the pier and back while it lies
- * there; told to go, the boat is taken up and the ship sails off the way it came.
- */
-export function raidPose(lane: Path, age: number, left: number | null): RaidPoses {
+function raidAt(lane: Path, age: number, left: number | null): RaidPoses {
   const anchorAt = Math.min(SEA.RAID_OFF, lane.length * 0.4)
-  const anchor = pointAt(lane, anchorAt)
+  const anchor = courseAt(lane, anchorAt, 2)
   const broadside = anchor.heading + Math.PI / 2
-  const base = { key: "raid", crates: 0 }
+  const base = { key: "raid", crates: 0, speed: 0, yawRate: 0, hold: 0 }
   if (age < 0) return { ship: null, boat: null }
+  const run = lane.length - anchorAt
   if (left !== null) {
     if (left >= SEA.RAID_OUT_S) return { ship: null, boat: null }
     const u = left / SEA.RAID_OUT_S
-    const p = pointAt(lane, anchorAt + easeIn(u) * (lane.length - anchorAt))
-    // the ship may be told to go before it arrived: it leaves from where it got to
-    const from = Math.min(1, age / SEA.RAID_IN_S)
+    // the ship may be told to go before it arrived: it leaves from where it got to, as it lay
+    const ended = age - left
+    const from = Math.min(1, ended / SEA.RAID_IN_S)
+    const got = from < 1 ? raidIn(lane.length, run, Math.max(0, ended)) : anchorAt
+    const was = from < 1 ? (raidAt(lane, Math.max(0, ended), null).ship?.heading ?? broadside) : broadside
+    const p = courseAt(lane, got + wayAlong(left, SEA.RAID_OUT_S, lane.length - got, { gather: 6 }), 2.5)
     return {
       ship: {
         ...base,
         hull: "pirate",
         ...p,
-        heading: turn(from < 1 ? anchor.heading + Math.PI : broadside, p.heading, smooth01(u / 0.3)),
+        heading: swing(was, p.heading, u / 0.35),
         seen: (1 - smooth01((u - 0.65) / 0.35)) * smooth01(from / 0.15),
-        way: smooth01(u / 0.2),
+        way: smooth01(left / 6),
+        // still swinging on its cable as it weighs: the swing dies away as it gathers way
+        hold: smooth01((ended - SEA.RAID_IN_S) / 8) * (1 - smooth01(left / 3)),
       },
       boat: null,
     }
   }
   if (age < SEA.RAID_IN_S) {
     const u = age / SEA.RAID_IN_S
-    const p = pointAt(lane, lane.length - easeOut(u) * (lane.length - anchorAt))
+    const p = courseAt(lane, raidIn(lane.length, run, age), 2.5)
     return {
       ship: {
         ...base,
         hull: "pirate",
         ...p,
-        heading: turn(p.heading + Math.PI, broadside, smooth01((u - 0.65) / 0.35)),
+        // bows in, swinging broadside to the quay as it loses way
+        heading: swing(p.heading + Math.PI, broadside, (u - 0.55) / 0.45),
         seen: smooth01(u / 0.15),
-        way: 1 - smooth01((u - 0.8) / 0.2),
+        way: 1 - smooth01((u - 0.75) / 0.25),
       },
       boat: null,
     }
   }
-  const ship: ShipPose = { ...base, hull: "pirate", ...anchor, heading: broadside, seen: 1, way: 0 }
-  // the rowboat: from the ship's landward side to the pier, wait, back, wait
-  const s = age - SEA.RAID_IN_S - 2
+  const lying = age - SEA.RAID_IN_S
+  const ship: ShipPose = {
+    ...base,
+    hull: "pirate",
+    x: anchor.x,
+    z: anchor.z,
+    heading: broadside,
+    seen: 1,
+    way: 0,
+    hold: smooth01(lying / 8),
+  }
+  // the rowboat: from the ship's landward side to the pier, wait, back, wait; pulled stroke by stroke
+  const s = lying - 2
   if (s < 0) return { ship, boat: null }
   const cycle = 2 * (SEA.ROW_S + SEA.ROW_WAIT_S)
   const c = s % cycle
   const { ROW_S: ROW, ROW_WAIT_S: WAIT } = SEA
   let k: number
   let back = false
-  if (c < WAIT) k = 0
-  else if (c < WAIT + ROW) k = smooth01((c - WAIT) / ROW)
-  else if (c < 2 * WAIT + ROW) k = 1
-  else {
-    k = 1 - smooth01((c - 2 * WAIT - ROW) / ROW)
+  let waiting = 0
+  if (c < WAIT) {
+    k = 0
+    waiting = c
+  } else if (c < WAIT + ROW) k = smooth01(strokes((c - WAIT) / ROW, ROW_STROKES))
+  else if (c < 2 * WAIT + ROW) {
+    k = 1
+    waiting = c - WAIT - ROW
+  } else {
+    k = 1 - smooth01(strokes((c - 2 * WAIT - ROW) / ROW, ROW_STROKES))
     back = true
   }
   const from = anchorAt - 3.5
-  const p = pointAt(lane, from * (1 - k))
+  const p = courseAt(lane, from * (1 - k), 1.2)
   const boat: ShipPose = {
     ...base,
     key: "raid-boat",
@@ -382,8 +502,30 @@ export function raidPose(lane: Path, age: number, left: number | null): RaidPose
     heading: back ? p.heading : p.heading + Math.PI,
     seen: s < 1 ? s : 1,
     way: k > 0 && k < 1 ? 1 : 0,
+    hold: smooth01(waiting / 2) * (1 - smooth01((waiting - (WAIT - 1.5)) / 1.5)),
   }
   return { ship, boat }
+}
+
+/** The raid's way in: down the lane from the open sea to its anchorage, losing way, running past a little and back. */
+function raidIn(length: number, run: number, age: number): number {
+  return length - wayAlong(age, SEA.RAID_IN_S, run, { slow: 8, overshoot: 0.7, settle: 3 })
+}
+
+/** Strokes a pull between the raid's ship and the pier takes (each surges the boat on, then it runs). */
+const ROW_STROKES = 7
+
+/**
+ * The raid `age` seconds in (`left`: seconds since its show ended, else null). The pirate ship sails in
+ * along the quay's lane (`lane`, from the pier's water out to sea) to its anchorage `RAID_OFF` metres out,
+ * swinging broadside; the rowboat pulls along the lane between it and the pier and back while it lies
+ * there; told to go, the boat is taken up and the ship sails off the way it came.
+ */
+export function raidPose(lane: Path, age: number, left: number | null): RaidPoses {
+  const r = raidAt(lane, age, left)
+  if (r.ship) moving(r.ship, (s) => raidAt(lane, s, left === null ? null : left + (s - age)).ship, age)
+  if (r.boat) moving(r.boat, (s) => raidAt(lane, s, left).boat, age)
+  return r
 }
 
 // ── the quay's rowboat ──
@@ -401,6 +543,9 @@ export function mooredBoat(mooring: Mooring): ShipPose {
     seen: 1,
     way: 0,
     crates: 0,
+    speed: 0,
+    yawRate: 0,
+    hold: 0.5,
   }
 }
 

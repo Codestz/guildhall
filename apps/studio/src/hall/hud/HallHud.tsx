@@ -44,6 +44,7 @@ import {
   Glyphs,
   type HeroView,
   type HudState,
+  heroTitle,
   LegendsBook,
   PartyTabs,
   type PartyView,
@@ -749,7 +750,8 @@ export function HallHud(props: HallHudProps) {
       if (pin) parts.fx?.drive.set(pin)
     }
   }
-  const followedName = filmed ? roster.heroes.find((h) => h.id === filmed)?.name : undefined
+  const followed = filmed ? roster.heroes.find((h) => h.id === filmed) : undefined
+  const followedName = followed ? heroTitle(followed) : undefined
   const settings = (
     <SettingsPanel
       values={values}

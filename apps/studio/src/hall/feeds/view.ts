@@ -54,6 +54,20 @@ function masterOf(world: GuildWorld, id: string): string {
   return at
 }
 
+const ROMAN: Record<string, number> = { I: 1, V: 5, X: 10, L: 50, C: 100 }
+
+/**
+ * `Wanderer III` → name `Wanderer`, ordinal 3 (the sim numbers a second of a kind in its name); the HUD
+ * draws the numeral as the face's pip and puts it back in the title. A name without one is its own.
+ */
+export function nameAndOrdinal(name: string): { name: string; ordinal?: number } {
+  const m = /^(.*\S)\s+([IVXLC]+)$/.exec(name)
+  if (!m) return { name }
+  const digits = [...(m[2] as string)].map((c) => ROMAN[c] ?? 0)
+  const n = digits.reduce((sum, v, k) => sum + (v < (digits[k + 1] ?? 0) ? -v : v), 0)
+  return n > 1 ? { name: m[1] as string, ordinal: n } : { name }
+}
+
 /** A hero as the Roster draws it. */
 export function heroView(world: GuildWorld, h: SimHero, place: PlaceName): HeroView {
   const where = place(h.place)
@@ -61,7 +75,7 @@ export function heroView(world: GuildWorld, h: SimHero, place: PlaceName): HeroV
   const intent = h.intent?.running ? h.intent : undefined
   return {
     id: h.id,
-    name: h.name,
+    ...nameAndOrdinal(h.name),
     ...(h.agent && h.agent !== "agent" ? { source: h.agent } : {}),
     family: h.body,
     banner: h.color,

@@ -7,7 +7,13 @@ import { describe, expect, test } from "bun:test"
 import { join } from "node:path"
 import { readChronicle } from "@guildhall/sim"
 import { pickToasts } from "@guildhall/ui"
-import { fewMarkers, groupRepeats, REPEAT_MS, type SessionEntry } from "../src/hall/feeds/view.ts"
+import {
+  fewMarkers,
+  groupRepeats,
+  nameAndOrdinal,
+  REPEAT_MS,
+  type SessionEntry,
+} from "../src/hall/feeds/view.ts"
 import { storyHour } from "../src/hall/hud/HallHud.tsx"
 import { QUIET_AHEAD_MS, quietSkip, SKIP_MAX, weatherOf } from "../src/hall/hud/mount.tsx"
 import { growthLine } from "../src/hall/hud/view.ts"
@@ -170,5 +176,14 @@ describe("a link's weather", () => {
     expect(weatherOf("cloudy")).toBe("cloudy")
     expect(weatherOf("snow")).toBeNull()
     expect(weatherOf(null)).toBeNull()
+  })
+})
+
+describe("a hero's numeral", () => {
+  test("the sim's `Wanderer III` is the Wanderer, third of the name; a plain name is its own", () => {
+    expect(nameAndOrdinal("Wanderer III")).toEqual({ name: "Wanderer", ordinal: 3 })
+    expect(nameAndOrdinal("Wanderer IV")).toEqual({ name: "Wanderer", ordinal: 4 })
+    expect(nameAndOrdinal("Guildmaster")).toEqual({ name: "Guildmaster" })
+    expect(nameAndOrdinal("Guildmaster I")).toEqual({ name: "Guildmaster I" })
   })
 })

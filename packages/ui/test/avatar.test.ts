@@ -39,6 +39,15 @@ describe("faceFeatures", () => {
   test("a rogue's mask leaves no beard under it", () => {
     for (let i = 0; i < 40; i++) expect(faceFeatures(`r${i}`, "rogue").beard).toBe("none")
   })
+
+  test("the first to eighth of one kind and banner each wear their own colour", () => {
+    const kin = "rogue:#c0392b"
+    const accents = Array.from(
+      { length: 8 },
+      (_, k) => faceFeatures(`w${k}`, "rogue", { ordinal: k + 1, kin }).accent,
+    )
+    expect(new Set(accents).size).toBe(8)
+  })
 })
 
 describe("shieldOf", () => {

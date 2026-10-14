@@ -21,6 +21,7 @@
  * the rest are yards and gardens. Round a farm village and the town's edge, open lowland becomes fields.
  */
 import { hash2 } from "../geom/noise.ts"
+import { type GraveyardSite, graveyardSite } from "./graveyard.ts"
 import type { HexIsland, HexKind } from "./island.ts"
 import { forestLine, kindOf } from "./island.ts"
 import { CASTLE_TILES, type CastlePlan, castleFoot, composeCastle } from "./sites.ts"
@@ -83,6 +84,8 @@ export const TILE_USES = [
   "homestead",
   // a castle's paved ways, from its gate to its doors (sites.ts composeCastle)
   "court",
+  // the island's graveyard near the town (graveyard.ts): its front tile and the one behind it
+  "graveyard",
 ] as const
 export type TileUse = (typeof TILE_USES)[number]
 
@@ -148,6 +151,8 @@ export interface HexZones {
   tier: number
   /** The castle composed for its site (sites.ts `composeCastle`), null when the island has none. */
   castle: CastlePlan | null
+  /** The graveyard (graveyard.ts `graveyardSite`): its tiles and the side its gate opens onto; null without one. */
+  graveyard: GraveyardSite | null
   stats: { buildings: number; roadTiles: number; bridges: number; fields: number; ms: number }
 }
 
@@ -1011,6 +1016,30 @@ export function hexZones(
                 : "orchard"
     use[i] = U[u]
   }
+  // the graveyard last, over open country near the Guildhall (graveyard.ts), where heroes rest and
+  // slump, so the one who mends a grave has a short way to it (the town's heart with no castle):
+  // nothing else moves for it
+  const castleZone = zones.findIndex((zz) => zz.kind === "castle") + 1
+  const graveGround = new Set<number>([U.meadow, U.grove, U.pasture, U.orchard, U.field, U.hillside])
+  const graveyard = graveyardSite({
+    grid: g,
+    seed,
+    level: h.level,
+    open: (i) =>
+      !zoneOf[i] &&
+      graveGround.has(use[i]!) &&
+      !site.has(i) &&
+      !foot.has(i) &&
+      (kind(i) === "grass" || kind(i) === "meadow" || kind(i) === "hill"),
+    road: (i) => use[i] === U.road,
+    near: plan?.heart ?? (zones.find((zz) => zz.kind === "town") ?? zones[0])?.tile,
+    way: (i) =>
+      use[i] === U.road ||
+      use[i] === U.bridge ||
+      use[i] === U.square ||
+      (castleZone > 0 && zoneOf[i] === castleZone),
+  })
+  if (graveyard) for (const i of [graveyard.tile, ...graveyard.cover]) use[i] = U.graveyard
 
   let buildings = 0
   let roadTiles = 0
@@ -1029,6 +1058,7 @@ export function hexZones(
     use,
     tier,
     castle: plan,
+    graveyard,
     stats: { buildings, roadTiles, bridges, fields, ms: Math.round(performance.now() - t0) },
   }
 }

@@ -1,0 +1,842 @@
+{
+  "blockers": [
+    {
+      "r": 0.38,
+      "x": -1.67,
+      "z": 1.3
+    },
+    {
+      "r": 0.38,
+      "x": 1.67,
+      "z": 1.3
+    },
+    {
+      "r": 0.38,
+      "x": -1.67,
+      "z": 0
+    },
+    {
+      "r": 0.38,
+      "x": 1.67,
+      "z": 0
+    },
+    {
+      "r": 0.38,
+      "x": -1.67,
+      "z": -1.3
+    },
+    {
+      "r": 0.38,
+      "x": 1.67,
+      "z": -1.3
+    },
+    {
+      "r": 0.38,
+      "x": -1.67,
+      "z": -4.1
+    },
+    {
+      "r": 0.38,
+      "x": 1.67,
+      "z": -4.1
+    },
+    {
+      "r": 1.35,
+      "x": 0,
+      "z": -6.399
+    },
+    {
+      "r": 0.25,
+      "x": -2.25,
+      "z": -5.569
+    },
+    {
+      "r": 0.25,
+      "x": 2.3,
+      "z": -5.269
+    },
+    {
+      "r": 0.3,
+      "x": 2.2,
+      "z": 0.1
+    }
+  ],
+  "footprint": [
+    1
+  ],
+  "ground": "grass",
+  "group": "landmark",
+  "id": "graveyard-yard",
+  "name": "Graveyard",
+  "pieces": [
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 2.094,
+      "scale": 0.43,
+      "x": -2.714,
+      "z": 0.429
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 2.094,
+      "scale": 0.43,
+      "x": -2.221,
+      "z": 1.282
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 2.094,
+      "scale": 0.43,
+      "x": -1.728,
+      "z": 2.136
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 2.094,
+      "scale": 0.43,
+      "x": -2.96,
+      "z": 0.002
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 2.094,
+      "scale": 0.43,
+      "x": -1.482,
+      "z": 2.562
+    },
+    {
+      "piece": "kaykit-halloween/arch",
+      "pin": true,
+      "rot": 3.142,
+      "scale": 0.42,
+      "x": 0,
+      "z": 2.565
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 3.142,
+      "scale": 0.43,
+      "x": -0.975,
+      "z": 2.565
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 3.142,
+      "scale": 0.43,
+      "x": -1.478,
+      "z": 2.565
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 3.142,
+      "scale": 0.43,
+      "x": 0.975,
+      "z": 2.565
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 3.142,
+      "scale": 0.43,
+      "x": 1.478,
+      "z": 2.565
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 4.189,
+      "scale": 0.43,
+      "x": 1.728,
+      "z": 2.136
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 4.189,
+      "scale": 0.43,
+      "x": 2.221,
+      "z": 1.282
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 4.189,
+      "scale": 0.43,
+      "x": 2.714,
+      "z": 0.429
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 4.189,
+      "scale": 0.43,
+      "x": 1.482,
+      "z": 2.562
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 4.189,
+      "scale": 0.43,
+      "x": 2.96,
+      "z": 0.002
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": -1.047,
+      "scale": 0.43,
+      "x": 2.714,
+      "z": -0.429
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": -1.047,
+      "scale": 0.43,
+      "x": 2.221,
+      "z": -1.282
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": -1.047,
+      "scale": 0.43,
+      "x": 1.728,
+      "z": -2.136
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": -1.047,
+      "scale": 0.43,
+      "x": 2.96,
+      "z": -0.002
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": -1.047,
+      "scale": 0.43,
+      "x": 1.482,
+      "z": -2.562
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 1.047,
+      "scale": 0.43,
+      "x": -1.728,
+      "z": -2.136
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 1.047,
+      "scale": 0.43,
+      "x": -2.221,
+      "z": -1.282
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 1.047,
+      "scale": 0.43,
+      "x": -2.714,
+      "z": -0.429
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 1.047,
+      "scale": 0.43,
+      "x": -1.482,
+      "z": -2.562
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 1.047,
+      "scale": 0.43,
+      "x": -2.96,
+      "z": -0.002
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 4.189,
+      "scale": 0.43,
+      "x": 1.728,
+      "z": -3.234
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 4.189,
+      "scale": 0.43,
+      "x": 2.221,
+      "z": -4.087
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 4.189,
+      "scale": 0.43,
+      "x": 2.714,
+      "z": -4.94
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 4.189,
+      "scale": 0.43,
+      "x": 1.482,
+      "z": -2.807
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 4.189,
+      "scale": 0.43,
+      "x": 2.96,
+      "z": -5.367
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": -1.047,
+      "scale": 0.43,
+      "x": 2.714,
+      "z": -5.798
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": -1.047,
+      "scale": 0.43,
+      "x": 2.221,
+      "z": -6.652
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": -1.047,
+      "scale": 0.43,
+      "x": 1.728,
+      "z": -7.505
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": -1.047,
+      "scale": 0.43,
+      "x": 2.96,
+      "z": -5.372
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": -1.047,
+      "scale": 0.43,
+      "x": 1.482,
+      "z": -7.932
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.43,
+      "x": 0.985,
+      "z": -7.934
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.43,
+      "x": 0,
+      "z": -7.934
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.43,
+      "x": -0.985,
+      "z": -7.934
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.43,
+      "x": 1.478,
+      "z": -7.934
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.43,
+      "x": -1.478,
+      "z": -7.934
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 1.047,
+      "scale": 0.43,
+      "x": -1.728,
+      "z": -7.505
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 1.047,
+      "scale": 0.43,
+      "x": -2.221,
+      "z": -6.652
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 1.047,
+      "scale": 0.43,
+      "x": -2.714,
+      "z": -5.798
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 1.047,
+      "scale": 0.43,
+      "x": -1.482,
+      "z": -7.932
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 1.047,
+      "scale": 0.43,
+      "x": -2.96,
+      "z": -5.372
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 2.094,
+      "scale": 0.43,
+      "x": -2.714,
+      "z": -4.94
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 2.094,
+      "scale": 0.43,
+      "x": -2.221,
+      "z": -4.087
+    },
+    {
+      "piece": "kaykit-halloween/fence",
+      "pin": true,
+      "rot": 2.094,
+      "scale": 0.43,
+      "x": -1.728,
+      "z": -3.234
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 2.094,
+      "scale": 0.43,
+      "x": -2.96,
+      "z": -5.367
+    },
+    {
+      "piece": "kaykit-halloween/fence-pillar",
+      "pin": true,
+      "rot": 2.094,
+      "scale": 0.43,
+      "x": -1.482,
+      "z": -2.807
+    },
+    {
+      "piece": "kaykit-halloween/path-a",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.45,
+      "x": -0.03,
+      "y": 0.01,
+      "z": 2.2
+    },
+    {
+      "piece": "kaykit-halloween/path-b",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.45,
+      "x": 0.03,
+      "y": 0.01,
+      "z": 1.34
+    },
+    {
+      "piece": "kaykit-halloween/path-c",
+      "pin": true,
+      "rot": 3.142,
+      "scale": 0.45,
+      "x": -0.03,
+      "y": 0.01,
+      "z": 0.48
+    },
+    {
+      "piece": "kaykit-halloween/path-d",
+      "pin": true,
+      "rot": 4.712,
+      "scale": 0.45,
+      "x": 0.03,
+      "y": 0.01,
+      "z": -0.38
+    },
+    {
+      "piece": "kaykit-halloween/path-a",
+      "pin": true,
+      "rot": 6.283,
+      "scale": 0.45,
+      "x": -0.03,
+      "y": 0.01,
+      "z": -1.24
+    },
+    {
+      "piece": "kaykit-halloween/path-b",
+      "pin": true,
+      "rot": 7.854,
+      "scale": 0.45,
+      "x": 0.03,
+      "y": 0.01,
+      "z": -2.1
+    },
+    {
+      "piece": "kaykit-halloween/path-c",
+      "pin": true,
+      "rot": 9.425,
+      "scale": 0.45,
+      "x": -0.03,
+      "y": 0.01,
+      "z": -2.96
+    },
+    {
+      "piece": "kaykit-halloween/path-d",
+      "pin": true,
+      "rot": 10.996,
+      "scale": 0.45,
+      "x": 0.03,
+      "y": 0.01,
+      "z": -3.82
+    },
+    {
+      "piece": "kaykit-halloween/path-a",
+      "pin": true,
+      "rot": 12.566,
+      "scale": 0.45,
+      "x": -0.03,
+      "y": 0.01,
+      "z": -4.68
+    },
+    {
+      "piece": "kaykit-halloween/floor-dirt-grave",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.25,
+      "x": -1.05,
+      "y": -0.353,
+      "z": 1.3
+    },
+    {
+      "piece": "kenney-graveyard/grave",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.34,
+      "x": -1.05,
+      "z": 1.3
+    },
+    {
+      "piece": "kaykit-halloween/grave-a",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.42,
+      "x": -1.67,
+      "z": 1.3
+    },
+    {
+      "piece": "kaykit-halloween/floor-dirt-grave",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.25,
+      "x": 1.05,
+      "y": -0.353,
+      "z": 1.3
+    },
+    {
+      "piece": "kenney-graveyard/grave",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.34,
+      "x": 1.05,
+      "z": 1.3
+    },
+    {
+      "piece": "kaykit-halloween/gravestone",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.48,
+      "x": 1.67,
+      "z": 1.3
+    },
+    {
+      "piece": "kaykit-halloween/floor-dirt-grave",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.25,
+      "x": -1.05,
+      "y": -0.353,
+      "z": 0
+    },
+    {
+      "piece": "kenney-graveyard/grave",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.34,
+      "x": -1.05,
+      "z": 0
+    },
+    {
+      "piece": "kaykit-halloween/grave-b",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.4,
+      "x": -1.67,
+      "z": 0
+    },
+    {
+      "piece": "kaykit-halloween/floor-dirt-grave",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.25,
+      "x": 1.05,
+      "y": -0.353,
+      "z": 0
+    },
+    {
+      "piece": "kenney-graveyard/grave",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.34,
+      "x": 1.05,
+      "z": 0
+    },
+    {
+      "piece": "kaykit-halloween/gravemarker-a",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.62,
+      "x": 1.67,
+      "z": 0
+    },
+    {
+      "piece": "kaykit-halloween/floor-dirt-grave",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.25,
+      "x": -1.05,
+      "y": -0.353,
+      "z": -1.3
+    },
+    {
+      "piece": "kenney-graveyard/grave",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.34,
+      "x": -1.05,
+      "z": -1.3
+    },
+    {
+      "piece": "kaykit-halloween/grave-a-destroyed",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.42,
+      "x": -1.67,
+      "z": -1.3
+    },
+    {
+      "piece": "kaykit-halloween/floor-dirt-grave",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.25,
+      "x": 1.05,
+      "y": -0.353,
+      "z": -1.3
+    },
+    {
+      "piece": "kenney-graveyard/grave",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.34,
+      "x": 1.05,
+      "z": -1.3
+    },
+    {
+      "piece": "kaykit-halloween/grave-b",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.4,
+      "x": 1.67,
+      "z": -1.3
+    },
+    {
+      "piece": "kaykit-halloween/floor-dirt-grave",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.25,
+      "x": -1.05,
+      "y": -0.353,
+      "z": -4.1
+    },
+    {
+      "piece": "kenney-graveyard/grave",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.34,
+      "x": -1.05,
+      "z": -4.1
+    },
+    {
+      "piece": "kaykit-halloween/gravemarker-b",
+      "pin": true,
+      "rot": 1.571,
+      "scale": 0.62,
+      "x": -1.67,
+      "z": -4.1
+    },
+    {
+      "piece": "kaykit-halloween/floor-dirt-grave",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.25,
+      "x": 1.05,
+      "y": -0.353,
+      "z": -4.1
+    },
+    {
+      "piece": "kenney-graveyard/grave",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.34,
+      "x": 1.05,
+      "z": -4.1
+    },
+    {
+      "piece": "kaykit-halloween/grave-a",
+      "pin": true,
+      "rot": -1.571,
+      "scale": 0.42,
+      "x": 1.67,
+      "z": -4.1
+    },
+    {
+      "piece": "kaykit-halloween/crypt",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.36,
+      "x": 0,
+      "z": -6.399
+    },
+    {
+      "piece": "kaykit-halloween/lantern-standing",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.42,
+      "x": -0.72,
+      "z": -4.649
+    },
+    {
+      "piece": "kaykit-halloween/lantern-standing",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.42,
+      "x": 0.72,
+      "z": -4.649
+    },
+    {
+      "piece": "kaykit-halloween/candle-triple",
+      "pin": true,
+      "rot": 0.4,
+      "scale": 0.4,
+      "x": -1.62,
+      "z": 1.72
+    },
+    {
+      "piece": "kaykit-halloween/candle",
+      "pin": true,
+      "rot": 0,
+      "scale": 0.4,
+      "x": 1.62,
+      "z": -1.7
+    },
+    {
+      "piece": "kaykit-halloween/tree-dead-medium",
+      "pin": true,
+      "rot": 0.6,
+      "scale": 0.42,
+      "x": -2.25,
+      "z": -5.569
+    },
+    {
+      "piece": "kaykit-halloween/tree-dead-small",
+      "pin": true,
+      "rot": 2.4,
+      "scale": 0.42,
+      "x": 2.3,
+      "z": -5.269
+    },
+    {
+      "piece": "kaykit-halloween/tree-dead-large",
+      "pin": true,
+      "rot": -0.5,
+      "scale": 0.36,
+      "x": 2.2,
+      "z": 0.1
+    },
+    {
+      "piece": "kaykit-halloween/skull",
+      "pin": true,
+      "rot": 0.9,
+      "scale": 0.25,
+      "x": 1.9,
+      "z": -6.869
+    },
+    {
+      "piece": "kaykit-halloween/bone-a",
+      "pin": true,
+      "rot": 0.7,
+      "scale": 0.3,
+      "x": -0.6,
+      "z": -2.6
+    },
+    {
+      "piece": "kaykit-halloween/ribcage",
+      "pin": true,
+      "rot": 1.2,
+      "scale": 0.28,
+      "x": -1.95,
+      "z": -6.569
+    }
+  ]
+}

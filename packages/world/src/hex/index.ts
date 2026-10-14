@@ -55,6 +55,22 @@ export {
   drillFrame,
   pairedDrill,
 } from "./drills.ts"
+export {
+  GRAVE_COUNT,
+  GRAVES,
+  GRAVEYARD_FOOTPRINT,
+  GRAVEYARD_SCENE,
+  type GraveSpot,
+  type GraveyardSite,
+  graveStrikeSpot,
+  graveyardPrefab,
+  graveyardSite,
+  type HexGraveyard,
+  placeGraveyard,
+  STRIKE_REACH,
+  strikeSpot,
+  type WorldGrave,
+} from "./graveyard.ts"
 export { DIRS, type Hex, type HexGrid, hexAt, hexCentre, hexDistance, hexGrid } from "./grid.ts"
 export {
   type GroundPalette,

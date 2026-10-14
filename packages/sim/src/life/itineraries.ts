@@ -31,6 +31,15 @@ import {
   SETDOWN_MS,
   STANDUP_MS,
 } from "./craft.ts"
+import {
+  type GraveKit,
+  type GraveStrike,
+  GraveStrikes,
+  STRIKE_LEAD_MS,
+  STRIKE_PAUSE_MS,
+  STRIKE_WATCH_MS,
+  strikeWalkMs,
+} from "./graveStrike.ts"
 
 /**
  * The heroes' itineraries (plan-hud-events.md §3.1, L1; decision D): where each hero walks and stands,
@@ -99,6 +108,8 @@ export interface LifeKit {
   island?: HexIsland
   /** The Guildhall's notice board (world `LifePlaces.heroSpots.board()`); none: no pinning, no briefing. */
   board?: HeroBoard | null
+  /** The graveyard's strike spots (graveStrike.ts): with them, a hero who mends a grave strikes it. */
+  graves?: GraveKit | null
 }
 
 export interface ItineraryOptions {
@@ -165,6 +176,8 @@ export interface HeroAct {
   craft?: Craft
   /** Radians to face (the stay's own facing when left out). */
   face?: number
+  /** A strike's grave (graveStrike.ts): which slot it strikes. */
+  grave?: number
 }
 
 /** One hero's itinerary: its steps, ms on the events' clock, and when it is on the island. */
@@ -303,6 +316,8 @@ export class LifePlanner {
   private readonly mps: number
   private readonly lane: number
   private readonly hurry: { within: number; mps: number } | undefined
+  /** The graves mended as the events come, for their fixers to strike (graveStrike.ts; none without `kit.graves`). */
+  private readonly strikes: GraveStrikes | null
 
   constructor(
     private readonly kit: LifeKit,
@@ -311,6 +326,7 @@ export class LifePlanner {
     this.mps = (opts.mps ?? WALK_MPS * 1.1) / 1000
     this.lane = opts.lane ?? 0.3
     this.hurry = opts.hurry && { within: opts.hurry.within * 1000, mps: opts.hurry.mps / 1000 }
+    this.strikes = kit.graves ? new GraveStrikes() : null
   }
 
   /** A long way run: its times pressed so it arrives within `hurry.within` (no faster than its run). */
@@ -352,6 +368,7 @@ export class LifePlanner {
     this.state = reduce(this.state, ev)
     this.review(t)
     this.react(ev, t)
+    if (this.strikes) for (const s of this.strikes.take(ev)) this.strikeGrave(s, t)
   }
 
   /** Plans the moves that fall due by `t` (a dwell running out, an errand's end) with no event to make them. */
@@ -1106,6 +1123,47 @@ export class LifePlanner {
     }
     this.act(track, "plea", Math.max(t, track.hold))
     track.hold = Number.POSITIVE_INFINITY
+  }
+
+  // ---- the graveyard (world events Task B's hook, graveStrike.ts): kept apart from the moments above ----
+
+  /**
+   * The hero who mended a grave goes to it once what holds it is over (a long way run), squares up,
+   * strikes it, watches it go down and goes back to what it was doing. One that would not get there by
+   * the grave's deadline (`s.deadline`), or is leaving the island, does not come.
+   */
+  private strikeGrave(s: GraveStrike, t: number): void {
+    const track = this.tracks.get(s.fixer)
+    const spot = this.kit.graves?.strike(s.slot)
+    if (!track || !spot || track.want.leave || !shownAt(track.it, t)) return
+    const leave = Math.max(t, track.hold)
+    const way = heroRoute(this.kit.walk, track.here, spot, {
+      leave,
+      mps: this.mps,
+      lane: this.lane,
+      ...(this.kit.near ? { near: this.kit.near } : {}),
+    })
+    const took = strikeWalkMs(way ? pathLength(way) : 0, this.mps)
+    if (leave + took + STRIKE_PAUSE_MS + STRIKE_LEAD_MS > s.deadline) return
+    this.walkTo(track, spot, leave, "idle")
+    const steps = track.it.steps
+    const walk = steps[steps.length - 2]
+    let arrive = leave
+    if (walk?.kind === "walk" && walk.to > walk.from) {
+      // its own pace: the way as planned, its times pressed to a run when it is long
+      const metres = pathLength(walk)
+      const ms = strikeWalkMs(metres, this.mps)
+      const scale = ms / (walk.to - walk.from)
+      walk.times = walk.times.map((x) => walk.from + (x - walk.from) * scale)
+      walk.to = walk.from + ms
+      arrive = walk.to
+      steps[steps.length - 1]!.from = arrive
+    }
+    // squares up as it arrives, then swings (craft.ts `strike`)
+    this.act(track, "strike", arrive, { grave: s.slot })
+    track.hold = arrive + STRIKE_PAUSE_MS + STRIKE_LEAD_MS + STRIKE_WATCH_MS
+    track.timer = track.hold
+    track.after = undefined
   }
 
   /** A cheer for `CHEER_MS` (a green CI), then on with what it was doing; not while a moment holds it. */

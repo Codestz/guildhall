@@ -103,6 +103,7 @@ import { loaderOn, publishWorld, settle } from "./ready.ts"
 import { mountSea, type SeaMount, seaOf, seaOn } from "./sea.ts"
 import { sessionAgents } from "./sessionAgents.ts"
 import { mountShows } from "./shows.ts"
+import { mountUndead, type UndeadMount } from "./undead.ts"
 
 const logger = log("studio:hexworld")
 
@@ -451,6 +452,7 @@ const world = {
     let unHud = () => {}
     let fx: Fx | null = null
     let seaLife: SeaMount | null = null
+    let undead: UndeadMount | null = null
     let workfx: WorkFxMount | null = null
     let shows: ReturnType<typeof mountShows> | null = null
     let unAgents = () => {}
@@ -737,8 +739,20 @@ const world = {
           load,
           light: () => sky.light(),
           spec: seaSpec,
+          ghostNear: m.graveyard ? [m.graveyard.gate[0], m.graveyard.gate[2]] : null,
           session: extra.session ?? session,
         })
+      // the graveyard's undead (undead.ts): a session's graves, or `?undead=`; nothing loads until one stands
+      undead = mountUndead({
+        stage,
+        graveyard: m.graveyard,
+        library: { catalog, url: libraryUrl },
+        workfx: workfx?.fx ?? null,
+        query: ctx.query,
+        itinerary: (id) => life?.itinerary(id),
+        hall: fxOn || session,
+        ...(extra.session ? { session: extra.session } : {}),
+      })
       // a hook's parts (a hall's history reveal) go in before the light, so their shaders compile behind the cover
       if (hooks && island && world)
         hooks.built({
@@ -912,7 +926,8 @@ const world = {
       tornDown()
       publishWorld(null)
       job.dispose()
-      cam.dispose()
+      seaLife?.dispose()
+      undead?.dispose()
       batch?.dispose()
       water?.dispose()
       disposeField()

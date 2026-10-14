@@ -122,6 +122,8 @@ export interface SeaLifeOpts {
   keepOff?: readonly (readonly [number, number])[]
   /** The day's light: the lamp and the beam glow brighter by night. */
   light?: () => DayLight
+  /** The coast the ghost ship passes when its show names none: the graveyard's (world graveyard.ts), xz. */
+  ghostNear?: readonly [number, number] | null
 }
 
 export interface SeaView {
@@ -367,7 +369,7 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
           ? (now - show.end) / 1000
           : null
       if (show.kind === "ghostship" && laps.length) {
-        const near = show.params?.near
+        const near = show.params?.near ?? opts.ghostNear ?? undefined
         const bearing = near ? Math.atan2(near[1] - centre[1], near[0] - centre[0]) : harbourBearing + 0.5
         const p = ghostPose(laps[0] as Path, centre, bearing, age, left)
         if (p) ships.push(p)

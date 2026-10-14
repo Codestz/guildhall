@@ -8,6 +8,16 @@
  *   recap    the Chronicle card's words: the hero moment (`heroOf`), the numbers, three lines
  *   worldEvents  the world events on stage: `worldShows(log, t)`, the renown rules scheduled as shows
  */
+
+export {
+  type GravePhase,
+  type GraveState,
+  graveAt,
+  gravesOf,
+  UNDEAD_KINDS,
+  type UndeadKind,
+  undeadKind,
+} from "./graveyard.ts"
 export {
   type Chapter,
   clockOf,

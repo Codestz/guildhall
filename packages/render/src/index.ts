@@ -157,6 +157,7 @@ export {
 export { boundingSphere, fitSphere, renderThumbnail, type ThumbnailOpts } from "./thumbnail.ts"
 export type { Split, Timing, TimingSample } from "./timing.ts"
 export { recolour, recolourPiece, swatchMapKey } from "./tint.ts"
+export * from "./undead/index.ts"
 export {
   createViewer,
   type Overlay,

@@ -21,6 +21,7 @@ import {
 import {
   HEX_TILE_SIZE,
   type HexFineGround,
+  type HexGraveyard,
   type HexIsland,
   type HexIslandSpec,
   type HexNature,
@@ -207,6 +208,8 @@ export interface MapStage {
   sites: EventSites
   /** Where the sea's life sails (render sea/sites.ts): the merchants' laps, the quay's moorings and lanes, the lighthouse's lamp. */
   sea: SeaSites
+  /** The graveyard (world graveyard.ts): its gate and graves, where the undead rise (undead.ts); null without one. */
+  graveyard: HexGraveyard | null
   stats: {
     land: number
     tiles: number
@@ -496,6 +499,7 @@ export function runHexJob(
       }),
       sites: eventSites(h, z, w, { sea: SEA_LEVEL }),
       sea: seaSites(h, z, w, { sea: SEA_LEVEL }),
+      graveyard: w.graveyard,
       stats: {
         land: h.stats.land,
         tiles: w.tiles.length,

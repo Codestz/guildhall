@@ -195,8 +195,13 @@ export const SHOW_RULES = {
   /** A failed deed's minion waits this long (the same failure may end its session: the grave tells it). */
   minionGraceMs: 2000,
   minionMs: 5000,
-  /** From the mending to the fixer's blow: its walk to the grave. */
-  strikeMs: 3000,
+  /**
+   * From the mending, the latest the fixer's blow lands: its way to the grave (run when long). The
+   * blow lands when it gets there (life graveStrike.ts `asStruck` reads it from its itinerary); one that
+   * cannot get there by then does not come, and the grave sinks at this deadline. The graveyard is
+   * near the Guildhall, where heroes rest and slump (world graveyard.ts).
+   */
+  strikeMs: 45_000,
   /** From the blow to the sinking. */
   strikeHoldMs: 600,
   /** Who last did good work this recently mends a red CI's grave. */

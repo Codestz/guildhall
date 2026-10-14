@@ -32,6 +32,19 @@ export {
   SETDOWN_MS,
 } from "./craft.ts"
 export {
+  asStruck,
+  type GraveKit,
+  type GraveStrike,
+  GraveStrikes,
+  STRIKE_LEAD_MS,
+  STRIKE_PAUSE_MS,
+  STRIKE_RUN_MPS,
+  STRIKE_WALK_M,
+  STRIKE_WATCH_MS,
+  strikeWalkMs,
+  struckAt,
+} from "./graveStrike.ts"
+export {
   type AgentPose,
   BECKON_MS,
   BRIEF_WITHIN,

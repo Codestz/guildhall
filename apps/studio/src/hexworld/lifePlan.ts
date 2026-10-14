@@ -28,8 +28,10 @@ import {
 import {
   doorPasses,
   type Folk,
+  graveStrikeSpot,
   guildhallZone,
   type HexDoorway,
+  type HexGraveyard,
   type HexIsland,
   type HexWalk,
   type HexWorld,
@@ -123,7 +125,7 @@ export function planLifeDesk(
   // one reservation book for the townsfolk; the heroes' spots are a pool of their own beside it (set
   // aside when first asked for, and changing nobody's day)
   const places = lifePlaces(h, z, w, walk, { heroSpots: HERO_SPOTS })
-  const kit = kitOf(h, z, walk, places)
+  const kit = kitOf(h, z, walk, places, w.graveyard)
   const t1 = now()
   const agents = opts.agents ? planGuild(z, walk, kit, opts.agents, opts) : null
   const agentsMs = now() - t1
@@ -161,7 +163,10 @@ export function kitOf(
   z: HexZones,
   walk: HexWalk,
   places: Pick<LifePlaces, "heroSpots" | "walkNear">,
+  graveyard?: HexGraveyard | null,
 ): LifeKit {
+  // the graveyard's strike spots (world graveyard.ts): a hero who mends a grave goes there to strike it
+  const node = graveyard ? walk.at(graveyard.tile) : -1
   return {
     walk,
     spots: (zi) => places.heroSpots(zi),
@@ -169,6 +174,9 @@ export function kitOf(
     near: places.walkNear,
     island: h,
     board: places.heroSpots.board(),
+    ...(graveyard && node >= 0
+      ? { graves: { strike: (slot: number) => graveStrikeSpot(graveyard, node, slot) } }
+      : {}),
   }
 }
 

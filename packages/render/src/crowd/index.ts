@@ -10,3 +10,4 @@ export {
   propShown,
   warmCrowdPrograms,
 } from "./crowd.ts"
+export { RATE_MAX, strideRate, strideStep } from "./gait.ts"

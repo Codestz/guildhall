@@ -183,7 +183,8 @@ export function kitOf(
 /**
  * How the heroes are planned in life: a little quicker than the townsfolk (they are on an errand), and a
  * way that would take over 10 s to walk is run, at up to 7 m/s (sim `hurry`), so more of a session is
- * seen at work than on the road.
+ * seen at work than on the road. Past 4.4 m/s it is the long-striding sprint (sim gait.ts), so even at
+ * 7 m/s the legs go at 1.4× its own pace (under the 1.6× cap), not the plain run's 2.3×.
  */
 export const AGENT_OPTS = { mps: LIFE_MPS * AGENT_PACE, hurry: { within: 10, mps: 7 } } as const
 

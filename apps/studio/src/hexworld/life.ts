@@ -32,15 +32,21 @@ import {
   loadPiece,
   measure,
   type Stage,
+  strideStep,
   type WorkFx,
 } from "@guildhall/render"
 import {
   type AgentPose,
+  BRISK_WALK,
+  gaitMps,
   HERO_CLIPS,
   HERO_PROP_STANDIN,
   HERO_PROPS,
   type Itinerary,
+  isRun,
   RUN_CLIP,
+  SPRINT_CLIP,
+  walkFor,
 } from "@guildhall/sim"
 import { PHONE_MAX } from "@guildhall/ui"
 import {
@@ -76,7 +82,7 @@ import * as data from "../data.ts"
 import { type ChipMode, type Chips, chipViews, createChips } from "./chips.ts"
 import { collideView } from "./collideView.ts"
 import { type AgentSource, recipeOf } from "./lifeAgents.ts"
-import { type LifePlan, SEC_PER_HOUR, SPEEDUP } from "./lifePlan.ts"
+import { AGENT_OPTS, LIFE_MPS, type LifePlan, SEC_PER_HOUR, SPEEDUP } from "./lifePlan.ts"
 import { createSpace } from "./space.ts"
 import {
   CARRIED,
@@ -95,10 +101,6 @@ import {
 export { LIFE_MPS, SPEEDUP } from "./lifePlan.ts"
 
 const logger = log("studio:hexworld:life")
-/** Metres one walk-clip cycle covers at look scale 1 (crowd/sim STRIDE). */
-const STRIDE = 1.3
-/** Metres one run-clip cycle covers at look scale 1 (a hero running a long way). */
-const RUN_STRIDE = 2.4
 /** A chip stands this far over an agent's feet, metres: just over its head. */
 const CHIP_UP = 1.3
 /** How often the chips' words are read again from the source's world when it has not changed, ms. */
@@ -452,7 +454,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         heroes: 12,
         clips: [
           ...spotClips(folk.map((f) => f.day)),
-          ...(figures.length ? [RUN_CLIP, ...HERO_CLIPS] : []),
+          ...(figures.length ? [RUN_CLIP, SPRINT_CLIP, BRISK_WALK, ...HERO_CLIPS] : []),
           ...(carries ? [CARRY_WALK] : []),
         ],
       },
@@ -659,18 +661,21 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       // a load in both arms (a log to the pile, a basket to market): the carrying walk, the load on the chest
       const carried = p.act === "walk" && p.carry && worn[id] ? drawnAs(p.carry) : undefined
       const chest = carried !== undefined && CARRIED.has(carried)
-      // walking: the walk, or the run a hero takes on a long way (sim RUN_CLIP); at a spot, its clip
+      // walking: the walk (one that keeps the pace: sim walkFor), or the run or sprint a hero takes on a
+      // long way (sim gait.ts); at a spot, its clip
       const clip = chest
         ? CARRY_WALK
-        : p.clip && (p.act !== "walk" || p.clip === RUN_CLIP)
+        : p.clip && (p.act !== "walk" || isRun(p.clip))
           ? p.clip
-          : look.clips[p.act]
-      // walking: the feet keep pace with the ground covered; standing: the clip's own time
+          : p.act === "walk"
+            ? walkFor(look.clips.walk, fig ? AGENT_OPTS.mps : LIFE_MPS)
+            : look.clips[p.act]
+      // walking: stride-matched, the feet keep to the ground covered (render strideStep); standing: the
+      // clip's own time
+      const seconds = durations.get(clip) ?? 1.5
       phase[id] =
         phase[id]! +
-        (p.act === "walk"
-          ? moved / ((clip === RUN_CLIP ? RUN_STRIDE : STRIDE) * look.scale)
-          : dt / (durations.get(clip) ?? 1.5))
+        (p.act === "walk" ? strideStep(moved, dt, gaitMps(clip), seconds, look.scale) : dt / seconds)
       const mask = !worn[id]
         ? undefined
         : carried === undefined

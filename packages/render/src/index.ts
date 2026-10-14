@@ -36,6 +36,9 @@ export {
   type CrowdStats,
   createCrowd,
   propShown,
+  RATE_MAX,
+  strideRate,
+  strideStep,
   warmCrowdPrograms,
 } from "./crowd/index.ts"
 export {

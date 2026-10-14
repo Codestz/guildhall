@@ -140,6 +140,7 @@ export {
   BLOSSOM_FROM,
   createSeasonDrive,
   dayOfYear,
+  harvestShow,
   pieceVertices,
   SEASON_AT,
   SEASON_NAMES,

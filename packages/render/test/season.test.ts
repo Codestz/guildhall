@@ -3,6 +3,7 @@ import { SNOW_COVER } from "../src/events/snowCover.ts"
 import {
   applySeason,
   createSeasonDrive,
+  harvestShow,
   ICE,
   patchSeason,
   SEASON,
@@ -144,5 +145,32 @@ describe("picks", () => {
     expect(lit.uniforms.uWinter).toBe(SEASON.uWinter)
     expect(lit.vertexShader).toContain("_swatch")
     expect(lit.fragmentShader).toContain("uSpring + uAutumn + uWinter > 0.0")
+  })
+})
+
+describe("the autumn harvest's weight", () => {
+  const show = (iso: string) => harvestShow(seasonWeights(seasonOfDate(day(iso))).autumn)
+
+  test("none in spring or summer or winter, whole in the heart of autumn", () => {
+    for (const iso of ["2025-04-20", "2025-06-20", "2025-07-20", "2025-08-10", "2025-12-25", "2025-01-18"])
+      expect(show(iso)).toBe(0)
+    expect(show("2025-10-19")).toBe(1)
+  })
+
+  test("grows in as autumn begins and is gone before winter, never jumping", () => {
+    let last = 0
+    let rose = 0
+    let fell = 0
+    for (let d = 0; d < 365; d += 1) {
+      const v = harvestShow(seasonWeights(seasonOfDate(Date.UTC(2025, 0, 1) + d * 86_400_000)).autumn)
+      expect(Math.abs(v - last)).toBeLessThan(0.2)
+      if (v > last) rose++
+      if (v < last) fell++
+      last = v
+    }
+    expect(rose).toBeGreaterThan(10)
+    expect(fell).toBeGreaterThan(10)
+    expect(show("2025-12-01")).toBeLessThan(0.05)
+    expect(show("2025-08-25")).toBe(0)
   })
 })

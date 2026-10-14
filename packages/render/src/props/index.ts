@@ -9,6 +9,7 @@ export {
   builtPiece,
 } from "./built.ts"
 export { CARRY_AT, CARRY_SPAN, carryMount } from "./carry.ts"
+export { createHarvest, type Harvest, type HarvestOpts } from "./harvest.ts"
 export {
   CAST_AT,
   CATCH_AT,

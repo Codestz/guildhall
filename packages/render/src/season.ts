@@ -80,6 +80,12 @@ export function seasonWeights(s: number): SeasonWeights {
   return { spring: w(0), summer: w(1), autumn: w(2), winter: w(3) }
 }
 
+/**
+ * How much of the autumn harvest (props/harvest.ts) shows at an autumn weight, 0 … 1: nothing while autumn is
+ * only coming (summer's tail, a third of the way in), whole through its heart, gone again before winter.
+ */
+export const harvestShow = (autumn: number): number => smooth(0.55, 0.95, autumn)
+
 /** The season whose heart is nearest `s`. */
 export function seasonName(s: number): SeasonName {
   return SEASON_NAMES[Math.round(wrapSeason(s)) % 4] as SeasonName

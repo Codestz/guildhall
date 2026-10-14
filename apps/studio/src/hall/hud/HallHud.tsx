@@ -81,7 +81,9 @@ import { captureStage } from "../../shell/viewer.ts"
 import type { HallTime } from "../clock.ts"
 import type { SessionSnapshot } from "../feeds/session.ts"
 import { chronicleOf, groupRepeats, partiesOf, rosterOf, type SessionEntry } from "../feeds/view.ts"
+import { beatsOf } from "../historyEvents.ts"
 import { HallTimeline } from "../timeline.tsx"
+import { useHistoryNarration } from "./historyHud.ts"
 import { faceSlots, type MenuTab, menuOpens, menuTab, menuTabs, TAB_LABEL } from "./phone.ts"
 import { usePortraitOf } from "./portraits.ts"
 import {
@@ -102,6 +104,7 @@ import {
   monthOf,
   type PlaceRow,
   placeDossier,
+  placeLabelOf,
   placeOfUnit,
   placeRows,
 } from "./view.ts"
@@ -523,6 +526,11 @@ export function HallHud(props: HallHudProps) {
   const rows = useMemo(() => placeRows(parts.places, parts.repo), [parts])
   const unitAt = useMemo(() => placeOfUnit(parts.places, parts.repo), [parts])
   const feed = useMemo(() => (legend ? feedOf(legend, unitAt) : []), [legend, unitAt])
+  // the history's moments (hall/historyEvents.ts): a repo's hall narrates them while its growth plays
+  const beats = useMemo(
+    () => (chronicle && !home ? beatsOf(chronicle, legend, placeLabelOf(parts.places)) : null),
+    [chronicle, legend, home, parts.places],
+  )
   const place = picked !== null ? parts.places[picked] : undefined
   const dossier = useMemo(
     () => (place ? placeDossier(place, parts.repo, chronicle, legend) : null),
@@ -666,6 +674,11 @@ export function HallHud(props: HallHudProps) {
     return chronicleOf(live.session.log().events, snap.world, snap.clock.at, origin)
   }, [snap, live])
   const sessionStamp = snap ? clockWords(snap.clock.at - snap.clock.start) : ""
+  // without a session, the history tells its moments: a caption, toasts, the Chronicle at the clock's day
+  const labels = parts.labels
+  const flash = useMemo(() => (labels ? (k: number) => labels.flash(k) : undefined), [labels])
+  const narration = useHistoryNarration(props.time?.clock ?? null, beats, !sessionFeed, unitAt, flash)
+  const historyFeed = beats ? narration.feed : feed
   // toasts while the Chronicle is folded (a phone's captions tell the moments; its chip opens the log)
   const toasts = useToasts(
     sessionEntries,
@@ -765,7 +778,7 @@ export function HallHud(props: HallHudProps) {
   const legendsAt = legend || live
   const chronicleFeed = (
     <ChronicleFeed
-      entries={sessionFeed ? sessionEntries : feed}
+      entries={sessionFeed ? sessionEntries : historyFeed}
       time={sessionFeed && snap ? snap.clock.at - snap.clock.start : 0}
       parties={roster.parties}
       open
@@ -1124,6 +1137,16 @@ export function HallHud(props: HallHudProps) {
           />,
           float.caps,
         )}
+      {!snap &&
+        beats &&
+        createPortal(
+          <Captions
+            key={narration.epoch}
+            {...(narration.caption ? { caption: narration.caption } : {})}
+            visible={captions && !detailed}
+          />,
+          float.caps,
+        )}
       {createPortal(
         <>
           {phone && faces}
@@ -1143,12 +1166,12 @@ export function HallHud(props: HallHudProps) {
       {createPortal(
         chronicleOpen || phone ? null : (
           <Toasts
-            items={toasts}
+            items={sessionFeed ? toasts : hidden ? [] : narration.toasts}
             time={0}
             parties={roster.parties}
             quiet
             compact={short}
-            onPick={(id) => openHero(id)}
+            onPick={(id) => (sessionFeed ? openHero(id) : onFeedPick(id))}
             stamp={sessionFeed ? sessionStamp : chronicle ? feedStamp(chronicle) : "sketch"}
             onExpand={() =>
               detailed && !phone ? setFolded((f) => ({ ...f, chronicle: false })) : toggle("chronicle")

@@ -13,6 +13,17 @@ const CSS = /* css */ `
 .hud-about .hall-about-quiet { font: 12px/1.45 var(--mono); color: var(--faint); }
 .hud-about .hall-about-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 
+/* a place's plate lit while the history tells its founding (hexworld/places.ts flash) */
+.ui-plate[data-flash] { animation: hall-plate-flash var(--flash-ms, 3200ms) ease-out both; }
+@keyframes hall-plate-flash {
+  0% { border-color: var(--brass-hi); box-shadow: 0 0 0 1px var(--brass-hi), 0 0 26px -2px rgba(240, 206, 120, 0.85); }
+  45% { border-color: var(--brass); box-shadow: 0 0 0 1px var(--brass-line), 0 0 18px -4px rgba(220, 182, 98, 0.6); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-plate[data-flash] { animation: none; border-color: var(--brass); }
+}
+
 /* places: a list folded under the brand */
 .gh .hall-places { min-height: 0; flex: 0 1 auto; }
 .hall-place-list { list-style: none; margin: 0; padding: 4px; display: grid; gap: 1px; }
@@ -213,6 +224,33 @@ const CSS = /* css */ `
 /* the captions and the act chip slide up over the bar: still, when motion is not wanted */
 @media (prefers-reduced-motion: reduce) {
   .hall-caps, .ui-viewer[data-phone] .hall-acts { transition: none; }
+}
+
+/* ── the history told (hall/historyEvents.ts): while it plays, or rests short of today, the tape stays
+   open (V1's growth tape) and takes the bottom row's middle, clear of the Chronicle chip; the captions
+   ride over it; the toasts keep left of it and wrap; a short screen leaves the moments to the captions ── */
+.ui-viewer:not([data-phone]):has(.hall-timeline[data-telling="true"]) {
+  --tell-w: min(720px, calc(100cqw - 2 * var(--gut) - 2 * 212px));
+}
+.ui-viewer:not([data-phone]):has(.hall-timeline[data-telling="true"]) .ui-hud-bottom { max-width: var(--tell-w); }
+.gh .ui-viewer:not([data-phone]) .ui-hud-bottom .hall-timeline[data-telling="true"] { width: var(--tell-w); }
+.ui-viewer:not([data-phone]):has(.hall-timeline[data-telling="true"]) .hall-caps { bottom: calc(var(--gut) + 74px); width: min(640px, var(--tell-w)); }
+.ui-viewer:not([data-phone]):has(.hall-timeline[data-telling="true"]) .ui-hud-feed .hud-toasts {
+  max-width: max(180px, calc((100cqw - var(--tell-w)) / 2 - var(--gut) - 10px));
+}
+.ui-viewer:not([data-phone]):has(.hall-timeline[data-telling="true"]) .ui-hud-feed .hud-toast-text {
+  white-space: normal; line-height: 1.3; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+}
+/* the tape's figures give way before its track does: the date stays whole, the line under it ellipsised */
+.gh .hall-timeline[data-telling="true"] .hud-tape-time { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.gh .hall-timeline[data-telling="true"] .hud-tape-time small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.ui-viewer:not([data-phone]) .hall-timeline[data-telling="true"] .hud-track { min-width: 140px; }
+@container viewer (max-width: 1180px) {
+  .gh .hall-timeline[data-telling="true"] .hud-ticks { display: none; }
+}
+@container viewer (max-height: 460px) {
+  .ui-viewer:has(.hall-timeline[data-telling="true"]) .ui-hud-feed .hud-toast-list { display: none; }
+  .ui-viewer:not([data-phone]):has(.hall-timeline[data-telling="true"]) .hall-caps { bottom: calc(var(--gut) + 66px); }
 }
 `
 

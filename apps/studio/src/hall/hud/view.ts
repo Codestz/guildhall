@@ -158,6 +158,16 @@ export function placeRows(places: readonly BuiltPlace[], repo: HallRepo | null):
     .sort((a, b) => b.files - a.files || (a.label < b.label ? -1 : 1))
 }
 
+/** How the book names a unit's place as the island built it: `the village of react-dom`, `the capital`. */
+export function placeLabelOf(places: readonly BuiltPlace[]): (unit: string) => string | undefined {
+  return (unit) => {
+    const p = places.find((q) => q.id === unit)
+    if (!p) return undefined
+    const kind = kindWord(p.kind)
+    return kind === "capital" ? "the capital" : `the ${kind} of ${p.label}`
+  }
+}
+
 /** Which place a unit is told at: its own, or the pool it went into. */
 export function placeOfUnit(places: readonly BuiltPlace[], repo: HallRepo | null): (unit: string) => number {
   const specs = specsById(repo)

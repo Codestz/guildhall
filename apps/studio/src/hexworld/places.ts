@@ -164,8 +164,16 @@ export interface PlaceLabels {
   shown(): boolean
   /** Marks one place's plate as the one open (by index), or none. */
   select(index: number | null): void
+  /**
+   * Lights a place's plate for a moment (by index): a history's narration telling its founding. It shows
+   * at any zoom while lit (a hamlet's too), unless its place is not there yet.
+   */
+  flash(index: number, ms?: number): void
   dispose(): void
 }
+
+/** How long a plate stays lit, ms (`PlaceLabels.flash`). */
+export const FLASH_MS = 3200
 
 /** A plate's box at each size, measured once (one layout) before it is moved anywhere. */
 function measure(el: HTMLElement): PlateBox {
@@ -216,7 +224,9 @@ export function createPlaceLabels(
   let mode: PlateMode = plateMode("map", stage.getCamera().distance)
   const hidden = new Uint8Array(places.length)
   /** Whether plate k is wanted now: its tier at this zoom, and its place there at all. */
-  const wanted = (k: number) => !hidden[k] && plateOn(places[k]!.tier, mode)
+  const lit = new Float64Array(places.length)
+  const wanted = (k: number) =>
+    !hidden[k] && (plateOn(places[k]!.tier, mode) || (lit[k] as number) > performance.now())
   // the crest (and anything else marked `data-keepout`) keeps its corner: its box in the layer's pixels,
   // re-read every half second and on a resize
   let keep: Rect[] = []
@@ -296,6 +306,7 @@ export function createPlaceLabels(
     }
   })
   let picked: number | null = null
+  const flashes: number[] = []
   const lines = els.map((el) => el.querySelector("small"))
   return {
     files(count) {
@@ -332,8 +343,21 @@ export function createPlaceLabels(
         if (el) el.dataset.selected = ""
       }
     },
+    flash(index, ms = FLASH_MS) {
+      const el = els[index]
+      if (!el) return
+      lit[index] = performance.now() + ms
+      // the light runs once from the start: off, a layout, on again
+      delete el.dataset.flash
+      void el.offsetWidth
+      el.dataset.flash = ""
+      el.style.setProperty("--flash-ms", `${ms}ms`)
+      clearTimeout(flashes[index])
+      flashes[index] = window.setTimeout(() => delete el.dataset.flash, ms)
+    },
     dispose() {
       off()
+      for (const timer of flashes) clearTimeout(timer)
       removeEventListener("resize", readKeep)
       for (const el of els) el.remove()
     },

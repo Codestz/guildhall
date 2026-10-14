@@ -16,7 +16,6 @@ import { repoLegendMarkdown, repoLegendOf, repoRecapOf, requestChronicleUrl } fr
 import { holdHudStyle } from "@guildhall/ui"
 import { createRoot, type Root } from "react-dom/client"
 import type { HudParts } from "../../hexworld/index.ts"
-import { kindWord } from "../../hexworld/places.ts"
 import { hallChronicle } from "../../site/chronicle.ts"
 import { HomeFeed, type HomeStory, homeStoryOf } from "../../site/homeFeed.ts"
 import { setHome } from "../../site/homeHud.tsx"
@@ -32,6 +31,7 @@ import { type HallFloat, HallHud, type HallHudProps, type HallLevers, REMEMBERED
 import { createHeroPortraits } from "./portraits.ts"
 import type { HudSession } from "./SessionHud.tsx"
 import { holdHallHudStyle } from "./style.ts"
+import { placeLabelOf } from "./view.ts"
 
 // ── the director's skip ────────────────────────────────────────────
 
@@ -281,12 +281,7 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
     if (gone) return
     const chronicle = found.status === "ok" ? found.chronicle : null
     // the book names a unit's place as the island built it: "the village of react-dom"
-    const label = (unit: string) => {
-      const p = parts.places.find((q) => q.id === unit)
-      if (!p) return undefined
-      const kind = kindWord(p.kind)
-      return kind === "capital" ? "the capital" : `the ${kind} of ${p.label}`
-    }
+    const label = placeLabelOf(parts.places)
     const legend = chronicle ? repoLegendOf(chronicle, { placeOf: label }) : null
     const [owner = "", repo = ""] = opts.slug.split("/")
     m.root.render(

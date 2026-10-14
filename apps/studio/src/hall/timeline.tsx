@@ -94,8 +94,11 @@ function HistoryBar({
   const week = Math.floor(at / (7 * 86_400_000))
   // biome-ignore lint/correctness/useExhaustiveDependencies: read once a week of history
   const note = useMemo(() => growth?.(at), [growth, week])
+  // while the history is told (playing, or resting short of today) the tape stays open, as V1's growth
+  // tape did: its date and figures count up under the captions
+  const open = pinned || !idle
   return (
-    <div className="hall-timeline" data-scale="history" data-pinned={pinned}>
+    <div className="hall-timeline" data-scale="history" data-pinned={open} data-telling={!idle}>
       {idle && (
         <button type="button" className="hall-grow" onClick={() => clock.play(true)}>
           Watch it grow
@@ -107,7 +110,7 @@ function HistoryBar({
         end={range.end}
         at={at}
         markers={markers}
-        pinned={pinned}
+        pinned={open}
         playing={state.playing}
         onPlay={(on) => clock.play(on)}
         onSeek={(v) => clock.seek((v - range.start) / len)}
@@ -205,6 +208,12 @@ const CSS = /* css */ `
   cursor: pointer; transition: background 0.15s, transform 0.1s;
 }
 .gh .hall-grow:hover { background: var(--brass-hi); }
+/* the history's date in V1's growth tape face: the title serif in brass, its figures counting under it */
+.gh .hall-timeline[data-scale="history"] .hud-tape-time { min-width: 128px; }
+.gh .hall-timeline[data-scale="history"] .hud-tape-time b {
+  font: 400 18px/1.15 var(--display); letter-spacing: 0.04em; color: var(--brass-hi); font-variant-numeric: tabular-nums;
+}
+.gh .hall-timeline[data-scale="history"] .hud-tape-time small { font: 11px/1.3 var(--mono); font-variant-numeric: tabular-nums; }
 .gh .hall-grow:active { transform: scale(0.97); }
 @media (max-width: 720px) {
   .gh .hall-timeline { bottom: calc(8px + env(safe-area-inset-bottom)); width: calc(100% - 16px); gap: 8px; }

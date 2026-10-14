@@ -250,7 +250,7 @@ export const ROUTINES: Readonly<Record<string, Routine>> = {
       { clip: "Idle_B", hold: 8, last: true, beats: [[0, "roll"]], turn: -1.3 },
     ],
     roll: 3,
-    stock: { kind: "ore-cart", at: [0.95, -0.15], cap: 6, piece: P.ore, rail: [0.95, -2.4], tips: true },
+    stock: { kind: "ore-cart", at: [0.95, -0.15], cap: 6, piece: P.ore, rail: [0.95, -3.15], tips: true },
   },
   // blows on the anvil (two to a play of Hammering), a quench every 6–8, a breath
   smith: {
@@ -413,6 +413,11 @@ export const CHOP_TRIP = 6
 export interface RoutineAt {
   id: string
   seed: number
+  /**
+   * A miner's cart as planned with the mine's others (`planCarts`): where it and its rail stand, and the
+   * turn the throws take toward it. None: the routine's own (StockSpec `at` and `rail`, its parts' turns).
+   */
+  cart?: CartPlan
 }
 
 const clipSeconds = (clip: string) => ROUTINE_CLIP_SECONDS[clip] ?? 1.5
@@ -667,7 +672,8 @@ export function routineSample(at: RoutineAt, t: number): LifeSample {
     const dz = b[1] - a[1]
     if (Math.hypot(dx, dz) > 1e-6) out.turn = Math.atan2(-dx, dz)
   } else if (p.at && (p.at[0] !== 0 || p.at[1] !== 0)) out.shift = p.at
-  if (p.turn !== undefined && !p.move) out.turn = p.turn
+  // (a planned cart: the throws and the wait turn to where it stands)
+  if (p.turn !== undefined && !p.move) out.turn = at.cart ? at.cart.aim : p.turn
   if (p.carry) out.carry = p.carry
   return out
 }
@@ -789,6 +795,8 @@ export function stockAt(s: Stock, hour: number, secPerHour: number): StockSample
   for (const t of s.takes ?? []) if (un(t) <= h && un(t) > lastTake) lastTake = un(t)
   let count = 0
   let roll: number | undefined
+  /** A cart's load from the stays at it now. */
+  let live: number | undefined
   for (const f of s.feeds) {
     const from = un(f.from)
     const to = from + (f.to - f.from)
@@ -806,7 +814,11 @@ export function stockAt(s: Stock, hour: number, secPerHour: number): StockSample
       // this block's throws (its last cycle's roll tips them)
       n = routineYield(f.routine, secs) - Math.floor(routineCycles(f.routine, secs) / K) * per
       if (rail.tipped) n = 0
-      if (h < to) roll = rail.roll
+      if (h < to) {
+        // (a cart two miners share: both their throws, rolled out by whichever is rolling)
+        roll = Math.max(roll ?? 0, rail.roll)
+        live = Math.min(s.cap, (live ?? 0) + n)
+      }
       count = n
       continue
     }
@@ -826,6 +838,7 @@ export function stockAt(s: Stock, hour: number, secPerHour: number): StockSample
     }
     count += Math.max(0, n)
   }
+  if (live !== undefined) count = live
   for (const t of s.arrivals ?? []) if (un(t) <= h && un(t) > lastTake) count++
   const out: StockSample = { count, fill: Math.min(1, count / Math.max(1, s.cap)) }
   if (roll !== undefined) out.roll = roll
@@ -921,28 +934,33 @@ export function planStocks(folk: readonly StockFolk[]): Stock[] {
       const id = s.routine?.id
       const spec = id ? ROUTINES[id]?.stock : undefined
       if (!spec || !s.routine) continue
-      const st = add(`${spec.kind}:${s.at.join()}`, () => {
+      // a cart planned with the mine's others stands where that says (two miners may share one)
+      const cart = spec.rail ? s.routine.cart : undefined
+      const y = s.at[1]
+      const place = cart ? cart.at.join() : s.at.join()
+      const st = add(`${spec.kind}:${place}`, () => {
         const made: Stock = {
           folk: f.id,
           kind: spec.kind,
-          at: world(s, spec.at[0], spec.at[1]),
+          at: cart ? [cart.at[0], y, cart.at[1]] : world(s, spec.at[0], spec.at[1]),
           facing: s.facing,
           cap: spec.cap,
           piece: spec.piece,
           feeds: [],
           since: STOCK_DAY,
         }
-        if (spec.rail) made.rail = world(s, spec.rail[0], spec.rail[1])
+        if (spec.rail)
+          made.rail = cart ? [cart.rail[0], y, cart.rail[1]] : world(s, spec.rail[0], spec.rail[1])
         return made
       })
       st.feeds.push({ from: s.from, to: s.to, routine: s.routine })
       // a cart tips into a heap at its rail's end
       if (spec.rail) {
         const rail = spec.rail
-        const heap = add(`heap:${s.at.join()}`, () => ({
+        const heap = add(`heap:${place}`, () => ({
           folk: f.id,
           kind: "ore-heap",
-          at: world(s, rail[0], rail[1] - 0.6),
+          at: cart ? [cart.heap[0], y, cart.heap[1]] : world(s, rail[0], rail[1] - HEAP_PAST),
           facing: s.facing,
           cap: 90,
           piece: spec.piece,
@@ -956,6 +974,239 @@ export function planStocks(folk: readonly StockFolk[]): Stock[] {
   for (const s of out) {
     s.takes?.sort((a, b) => a - b)
     s.arrivals?.sort((a, b) => a - b)
+  }
+  return out
+}
+
+// ---- the mines' carts ----
+
+/** Metres past its rail's end a cart's heap stands (where it tips). */
+export const HEAP_PAST = 0.6
+/** Least metres between two rails' centre lines (a track is ~0.9 m wide: a hand's gap between them). */
+export const RAIL_GAP = 1.1
+/** A full heap's reach from its middle, metres (stockLayout's 25 pieces, three rings). */
+export const HEAP_R = 0.7
+/** Half a track's width, metres. */
+const TRACK_HALF = 0.45
+/** A track piece's length (kaykit-holiday/tracks-straight), metres. */
+export const TRACK_LEN = 2
+/** Metres the tracks start behind a cart's place (the rest of the last piece runs on past the rail's end). */
+export const TRACK_BEHIND = 0.5
+
+/**
+ * A miner's cart as planned (world metres): where it stands by them, its rail's far end, the heap it
+ * tips into, and the turn (radians from the spot's facing, + to the left) their throws take toward it.
+ */
+export interface CartPlan {
+  at: readonly [number, number]
+  rail: readonly [number, number]
+  heap: readonly [number, number]
+  aim: number
+}
+
+/** A miner's spot: where they stand and the way they face. */
+export interface CartSpot {
+  x: number
+  z: number
+  facing: number
+}
+
+type P2 = readonly [number, number]
+
+/**
+ * The tracks a rail `len` long is laid with (render `railPieces`): whole pieces from TRACK_BEHIND
+ * behind the cart's place, at least half a metre past the rail's end; how many and how far past it.
+ */
+export function railTracks(len: number): { pieces: number; past: number } {
+  const pieces = Math.max(1, Math.ceil((len + TRACK_BEHIND + 0.5) / TRACK_LEN))
+  return { pieces, past: pieces * TRACK_LEN - len - TRACK_BEHIND }
+}
+
+/** The distance from p to segment ab. */
+export function pointGap(p: P2, a: P2, b: P2): number {
+  const dx = b[0] - a[0]
+  const dz = b[1] - a[1]
+  const l2 = dx * dx + dz * dz
+  const t = l2 > 0 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / l2)) : 0
+  return Math.hypot(p[0] - a[0] - dx * t, p[1] - a[1] - dz * t)
+}
+
+/** The least distance between segments ab and cd (0 when they cross). */
+export function segmentGap(a: P2, b: P2, c: P2, d: P2): number {
+  const cross = (o: P2, p: P2, q: P2) => (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0])
+  if (cross(a, b, c) * cross(a, b, d) < 0 && cross(c, d, a) * cross(c, d, b) < 0) return 0
+  return Math.min(pointGap(c, a, b), pointGap(d, a, b), pointGap(a, c, d), pointGap(b, c, d))
+}
+
+/** A planned cart's tracks as laid (running past both ends of its rail), for keeping others off them. */
+export function cartTracks(c: CartPlan): [P2, P2] {
+  const dx = c.rail[0] - c.at[0]
+  const dz = c.rail[1] - c.at[1]
+  const len = Math.hypot(dx, dz) || 1
+  const { past } = railTracks(len)
+  return [
+    [c.at[0] - (dx / len) * TRACK_BEHIND, c.at[1] - (dz / len) * TRACK_BEHIND],
+    [c.rail[0] + (dx / len) * past, c.rail[1] + (dz / len) * past],
+  ]
+}
+
+/** Whether two planned carts keep clear: rails apart, neither heap on the other's rail, heaps apart. */
+export function cartsClear(a: CartPlan, b: CartPlan): boolean {
+  const [a0, a1] = cartTracks(a)
+  const [b0, b1] = cartTracks(b)
+  return (
+    segmentGap(a0, a1, b0, b1) >= RAIL_GAP &&
+    pointGap(a.heap, b0, b1) >= HEAP_R + TRACK_HALF &&
+    pointGap(b.heap, a0, a1) >= HEAP_R + TRACK_HALF &&
+    Math.hypot(a.heap[0] - b.heap[0], a.heap[1] - b.heap[1]) >= 2 * HEAP_R
+  )
+}
+
+/** The mine routine's cart and rail in its spot's frame (x right, z ahead), and the throws' turn to it. */
+const MINE_CART = (() => {
+  const r = ROUTINES.mine!
+  const s = r.stock!
+  const rail = s.rail ?? s.at
+  const len = Math.hypot(rail[0] - s.at[0], rail[1] - s.at[1])
+  return { x: s.at[0], z: s.at[1], len, aim: r.parts.find((p) => p.clip === "Throw")?.turn ?? 0 }
+})()
+/** Rail directions tried, radians off straight back, swung away from the miner (0 first: as authored). */
+const RAIL_TURNS = [0, 0.4, 0.8, 1.2, -0.35, 1.6]
+const RAIL_LENS = [MINE_CART.len, 2, 1]
+/** Metres within which miners plan their carts together (one mine), and share one when they must. */
+const MINE_M = 6
+/** Each miner's fitting carts tried against the others' (the cheapest first). */
+const CART_TRIES = 16
+/** What sharing a cart costs against any cart of one's own (the search's unit: one candidate step). */
+const SHARED = 1000
+
+/** Whether a point is clear ground for a miner's tracks or heap (radius r), for the miner at `spot`. */
+export type CartClear = (x: number, z: number, r: number, spot: number) => boolean
+
+/**
+ * The carts of the miners at `spots` planned together (in the worker, with their days): each one's
+ * tracks keep RAIL_GAP from every other's, no heap sits on another's tracks or by a miner, and the
+ * ground under them is clear. A cart stands to its miner's right as authored or mirrored to the left,
+ * its rail straight back or swung outward, shortened if need be. The miners of one mine are planned at
+ * once: as few sharing as can be, then the carts nearest the authored. One left without room shares the
+ * nearest cart of the mine (the throws turned to it).
+ *
+ * `clears` are the ground's tests from the strictest (nothing in the way: no building, rock, seat or
+ * tree, the miner's own level) to the most lenient: a mine takes the strictest under which nobody
+ * shares, else the one where fewest do. The rails never cross whichever it takes.
+ */
+export function planCarts(
+  spots: readonly CartSpot[],
+  clears: readonly CartClear[] = [() => true],
+): CartPlan[] {
+  const candidate = (s: CartSpot, side: number, turn: number, len: number): CartPlan => {
+    const at = (along: number) => {
+      const x = side * (MINE_CART.x + Math.sin(turn) * along)
+      return spotFrame(s.x, s.z, s.facing, x, MINE_CART.z - Math.cos(turn) * along)
+    }
+    return { at: at(0), rail: at(len), heap: at(len + HEAP_PAST), aim: side * MINE_CART.aim }
+  }
+  /** Whether a cart of spot `self`'s fits on its own: nobody on its tracks or by its heap, clear ground. */
+  const fits = (c: CartPlan, self: number, clear: CartClear): boolean => {
+    const [t0, t1] = cartTracks(c)
+    // (the miner's own cart stands beside them)
+    for (const [k, o] of spots.entries()) {
+      if (pointGap([o.x, o.z], t0, t1) < (k === self ? 0.45 : TRACK_HALF + 0.3)) return false
+      if (Math.hypot(c.heap[0] - o.x, c.heap[1] - o.z) < HEAP_R + 0.45) return false
+    }
+    const n = Math.max(1, Math.ceil(Math.hypot(t1[0] - t0[0], t1[1] - t0[1]) / 0.4))
+    for (let k = 0; k <= n; k++)
+      if (!clear(t0[0] + ((t1[0] - t0[0]) * k) / n, t0[1] + ((t1[1] - t0[1]) * k) / n, 0.3, self))
+        return false
+    return clear(c.heap[0], c.heap[1], 0.5, self)
+  }
+  /** Each spot's carts that fit alone under a test, cheapest (nearest the authored) first. */
+  const optionsUnder = (clear: CartClear) =>
+    spots.map((s, k) => {
+      const list: { cart: CartPlan; cost: number }[] = []
+      let cost = 0
+      for (const len of RAIL_LENS)
+        for (const turn of RAIL_TURNS)
+          for (const side of [1, -1]) {
+            const cart = candidate(s, side, turn, len)
+            if (list.length < CART_TRIES && fits(cart, k, clear)) list.push({ cart, cost })
+            cost++
+          }
+      return list
+    })
+  const tiers = (clears.length ? clears : [() => true]).map(optionsUnder)
+  // the mines: spots within MINE_M of each other, chained
+  const mine = spots.map((_, k) => k)
+  const root = (k: number): number => {
+    let r = k
+    while (mine[r] !== r) r = mine[r]!
+    return r
+  }
+  for (const [a, p] of spots.entries())
+    for (const [b, q] of spots.entries())
+      if (a < b && Math.hypot(p.x - q.x, p.z - q.z) < MINE_M) mine[root(a)] = root(b)
+  /** A mine's cheapest choice under one tier's options: per spot an option index, or −1 to share. */
+  const choose = (group: number[], options: { cart: CartPlan; cost: number }[][]) => {
+    let best = Number.POSITIVE_INFINITY
+    let pick: number[] = group.map(() => -1)
+    const chosen: number[] = []
+    const walk = (i: number, cost: number) => {
+      if (cost >= best) return
+      if (i === group.length) {
+        best = cost
+        pick = [...chosen]
+        return
+      }
+      for (const [j, o] of options[group[i]!]!.entries()) {
+        if (!chosen.every((c, g) => c < 0 || cartsClear(o.cart, options[group[g]!]![c]!.cart))) continue
+        chosen.push(j)
+        walk(i + 1, cost + o.cost)
+        chosen.pop()
+      }
+      chosen.push(-1)
+      walk(i + 1, cost + SHARED)
+      chosen.pop()
+    }
+    walk(0, 0)
+    return { pick, shared: pick.filter((c) => c < 0).length }
+  }
+  const out: CartPlan[] = new Array(spots.length)
+  for (const r of new Set(spots.map((_, k) => root(k)))) {
+    const group = spots.map((_, k) => k).filter((k) => root(k) === r)
+    let take = { tier: 0, ...choose(group, tiers[0]!) }
+    for (let t = 1; t < tiers.length && take.shared > 0; t++) {
+      const c = choose(group, tiers[t]!)
+      if (c.shared < take.shared) take = { tier: t, ...c }
+    }
+    const options = tiers[take.tier]!
+    const own = group.flatMap((k, g) => (take.pick[g]! >= 0 ? [options[k]![take.pick[g]!]!.cart] : []))
+    for (const [g, k] of group.entries()) {
+      const s = spots[k]!
+      const c = take.pick[g]!
+      if (c >= 0) {
+        out[k] = options[k]![c]!.cart
+        continue
+      }
+      // no room of their own: the nearest of the mine's carts, the throws turned to it (a little short
+      // of it, as the authored throw is: 1.3 of 1.73); with none at all, the authored one
+      let near: CartPlan | undefined
+      let d = Number.POSITIVE_INFINITY
+      for (const o of own) {
+        const dd = Math.hypot(o.at[0] - s.x, o.at[1] - s.z)
+        if (dd < d) {
+          d = dd
+          near = o
+        }
+      }
+      if (!near) {
+        near = candidate(s, 1, 0, MINE_CART.len)
+        own.push(near)
+        out[k] = near
+        continue
+      }
+      const to = Math.atan2(near.at[0] - s.x, near.at[1] - s.z) - s.facing
+      out[k] = { ...near, aim: Math.atan2(Math.sin(to), Math.cos(to)) * 0.75 }
+    }
   }
   return out
 }

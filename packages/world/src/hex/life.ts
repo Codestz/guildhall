@@ -24,7 +24,7 @@ import { DRILLS, pairedDrill } from "./drills.ts"
 import { hexAt, hexCentre } from "./grid.ts"
 import { type HeroPool, heroSpotPool } from "./heroes.ts"
 import { type HexIsland, kindOf } from "./island.ts"
-import { CHOP_TRIP, cyclesSpan, PROPS, type RoutineAt, routineFor, spotFrame } from "./routines.ts"
+import { CHOP_TRIP, cyclesSpan, PROPS, planCarts, type RoutineAt, routineFor, spotFrame } from "./routines.ts"
 import { HARD, type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
 import { HEX_TILE_SIZE, opensEvening, type SpotHours, spotWindows } from "./tiles.ts"
 import { clearWay, type HexWalk, type HexWalkNode, type WalkBlocker, walledIn } from "./walk.ts"
@@ -1671,7 +1671,59 @@ export function planFolk(
       folk.push({ id, role, zone: zi, day: b.close(24), ...(prop ? { prop } : {}) })
     }
   }
+  mineCarts(h, w, places, folk)
   return folk
+}
+
+/**
+ * The miners' carts planned together (routines.ts `planCarts`): every stay at a mine spot gets its
+ * spot's cart, so no two rails cross and no heap lands on another's rail; a rail keeps to clear ground
+ * at its miner's level (no building, rock or tree on it, not over water or off a terrace).
+ */
+function mineCarts(
+  h: HexIsland,
+  w: Pick<HexWorld, "tiles">,
+  places: LifePlaces,
+  folk: readonly Folk[],
+): void {
+  const stays = new Map<string, LifeStay[]>()
+  for (const f of folk)
+    for (const s of f.day)
+      if (s.kind === "stay" && s.routine?.id === "mine") {
+        const key = `${s.at[0]},${s.at[2]}`
+        stays.set(key, [...(stays.get(key) ?? []), s])
+      }
+  if (!stays.size) return
+  const g = h.grid
+  const top = new Map(w.tiles.map((t) => [t.i, t.top]))
+  const levelAt = (x: number, zz: number): number | null => {
+    const { q, r } = hexAt(x / HEX_TILE_SIZE, zz / HEX_TILE_SIZE)
+    const i = g.index(q, r)
+    if (i < 0 || WATER_KINDS.has(kindOf(h, i))) return null
+    return top.get(i) ?? null
+  }
+  // the spots in a fixed order (the plan is the same whoever stands there)
+  const keys = [...stays.keys()].sort()
+  const spots = keys.map((k) => {
+    const s = stays.get(k)![0]!
+    return { x: s.at[0], z: s.at[2], facing: s.facing, level: levelAt(s.at[0], s.at[2]) }
+  })
+  // the ground's tests, strictest first: on the miner's own level with nothing in the way; then only
+  // no building or wall on it; then off the level too; then anything (the rails still never cross)
+  const onLand = (x: number, zz: number) => levelAt(x, zz) !== null
+  const onLevel = (x: number, zz: number, k: number) => {
+    const here = levelAt(x, zz)
+    const level = spots[k]!.level
+    return here !== null && (level === null || Math.abs(here - level) < 0.3)
+  }
+  const plans = planCarts(spots, [
+    (x, zz, r, k) => onLevel(x, zz, k) && !places.furniture.blocked(x, zz, r),
+    (x, zz, r, k) => onLevel(x, zz, k) && !places.furniture.blocked(x, zz, r, HARD),
+    (x, zz, r) => onLand(x, zz) && !places.furniture.blocked(x, zz, r, HARD),
+    () => true,
+  ])
+  for (const [k, key] of keys.entries())
+    for (const s of stays.get(key)!) s.routine = { ...s.routine!, cart: plans[k]! }
 }
 
 /**

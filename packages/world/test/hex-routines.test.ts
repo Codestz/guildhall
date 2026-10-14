@@ -8,17 +8,24 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { type Folk, lifePlaces, lifePose, planFolk, workTiles } from "../src/hex/life.ts"
 import {
+  type CartPlan,
   CHOP_TRIP,
+  cartsClear,
+  cartTracks,
   cyclesSpan,
   type LifeSample,
   PROPS,
+  planCarts,
   planStocks,
+  pointGap,
+  RAIL_GAP,
   ROUTINES,
   routineCycles,
   routineSample,
   routineSpan,
   routineYield,
   STOCK_DAY,
+  segmentGap,
   stockAt,
 } from "../src/hex/routines.ts"
 import { hexIsland, hexWalk, hexWorld, hexZones, installTilePrefabs, type TilePrefab } from "../src/index.ts"
@@ -195,6 +202,78 @@ describe("a routine is a pure function of its stay, its seed and the time", () =
     for (let f = 0; f < frames; f++) for (const at of ats) routineSample(at, 1000 + f / 60)
     const per = (performance.now() - t0) / frames
     expect(per).toBeLessThan(0.1)
+  })
+})
+
+describe("the mines' carts", () => {
+  for (const seed of [1, 2, 3, 4, 5, 6])
+    test(`seed ${seed}: no two rails cross or come within a track's width, no heap on another's rail or by a miner`, () => {
+      const { folk } = island(seed)
+      const stocks = planStocks(folk)
+      const carts = stocks.filter((s) => s.kind === "ore-cart")
+      const heaps = stocks.filter((s) => s.kind === "ore-heap")
+      // (seed 2 has no mine)
+      expect(carts.length).toBeGreaterThan(seed === 2 ? -1 : 0)
+      expect(heaps.length).toBe(carts.length)
+      const plan = (s: (typeof carts)[number]): CartPlan => {
+        const heap = heaps.find((h) => h.feeds[0]!.routine === s.feeds[0]!.routine)!
+        return {
+          at: [s.at[0], s.at[2]],
+          rail: [s.rail![0], s.rail![2]],
+          heap: [heap.at[0], heap.at[2]],
+          aim: 0,
+        }
+      }
+      const plans = carts.map(plan)
+      for (const [i, a] of plans.entries())
+        for (const b of plans.slice(i + 1)) {
+          if (Math.hypot(a.at[0] - b.at[0], a.at[1] - b.at[1]) > 12) continue
+          expect(cartsClear(a, b)).toBe(true)
+          const [a0, a1] = cartTracks(a)
+          const [b0, b1] = cartTracks(b)
+          expect(segmentGap(a0, a1, b0, b1)).toBeGreaterThanOrEqual(RAIL_GAP)
+        }
+      // every miner stands clear of every rail but their own cart's, and of every heap
+      const miners = folk.flatMap((f) =>
+        f.day.flatMap((s) => (s.kind === "stay" && s.routine?.id === "mine" ? [s] : [])),
+      )
+      for (const m of miners) {
+        expect(m.routine!.cart).toBeDefined()
+        for (const p of plans) {
+          const [t0, t1] = cartTracks(p)
+          const own = p.at[0] === m.routine!.cart!.at[0] && p.at[1] === m.routine!.cart!.at[1]
+          expect(pointGap([m.at[0], m.at[2]], t0, t1)).toBeGreaterThanOrEqual(own ? 0.45 : 0.7)
+          expect(Math.hypot(p.heap[0] - m.at[0], p.heap[1] - m.at[2])).toBeGreaterThan(1)
+        }
+      }
+    }, 30000)
+
+  test("two miners back to back share a cart when only one rail fits", () => {
+    // a spot boxed in: only straight back is clear for the first; the second faces the same way beside it
+    const spots = [
+      { x: 0, z: 0, facing: 0 },
+      { x: 0.6, z: 0, facing: 0 },
+    ]
+    const plans = planCarts(spots, [(x) => Math.abs(x + 0.95) < 0.5 || Math.abs(x - 0.95) < 0.5])
+    expect(plans.length).toBe(2)
+    expect(plans[1]!.at).toEqual(plans[0]!.at)
+    // the second throws toward it (to its right)
+    expect(plans[1]!.aim).toBeLessThan(0)
+  })
+
+  test("the throw and the wait turn to a planned cart; without a plan the authored turn", () => {
+    const span = routineSpan("mine")
+    const turns = (at: { id: string; seed: number; cart?: CartPlan }) => {
+      const out = new Set<number>()
+      for (let t = 0; t < span; t += 0.1) {
+        const s = routineSample(at, t)
+        if (s.turn !== undefined) out.add(s.turn)
+      }
+      return [...out]
+    }
+    expect(turns({ id: "mine", seed: 3 })).toEqual([-1.3])
+    const cart: CartPlan = { at: [-1, 0], rail: [-1, -2], heap: [-1, -2.6], aim: 1.3 }
+    expect(turns({ id: "mine", seed: 3, cart })).toEqual([1.3])
   })
 })
 

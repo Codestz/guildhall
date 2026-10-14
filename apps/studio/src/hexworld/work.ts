@@ -362,7 +362,9 @@ export async function createWork(o: WorkOpts): Promise<Work> {
     }
     const spec = p.routine ? ROUTINES[p.routine.id]?.stock : undefined
     if (spec && INTO_STOCK.has(b)) {
-      const [x, z] = spotFrame(p.at[0], p.at[2], p.facing, spec.at[0], spec.at[1])
+      // (a miner's cart stands where the mine's plan put it)
+      const cart = p.routine?.cart?.at
+      const [x, z] = cart ?? spotFrame(p.at[0], p.at[2], p.facing, spec.at[0], spec.at[1])
       return [x, o.ground(x, z) + 0.45, z]
     }
     const [x, y, z] = beatPoint(b, p.routine?.id)

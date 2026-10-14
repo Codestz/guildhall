@@ -4,7 +4,13 @@
  * `min(count, cap)` mapped to a few levels (decisions.md GF-A: basket 40, heap 90, pile 40), so the stock
  * batch is written only when a level changes, never per unit.
  */
-import { PROPS, type StockKind } from "@guildhall/world"
+import {
+  PROPS,
+  railTracks,
+  type StockKind,
+  TRACK_BEHIND,
+  TRACK_LEN as WORLD_TRACK_LEN,
+} from "@guildhall/world"
 
 export type DrawnKind = StockKind | "stall-fish"
 
@@ -24,8 +30,10 @@ export const CART = "built/cart"
 export const FLOAT = "built/float"
 export const CRATE = "kaykit-dungeon/box-small"
 export const TRACK = "kaykit-holiday/tracks-straight"
+/** Height of the dark bed in the mine cart's tub (built.ts), the ore lying on it, metres. */
+export const CART_BED = 0.42
 /** A track piece's length along its rail, metres. */
-export const TRACK_LEN = 2
+export const TRACK_LEN = WORLD_TRACK_LEN
 
 /** Levels a kind is drawn at (0: empty), and the units each level shows (the last: full). */
 export const LEVELS: Readonly<Record<DrawnKind, readonly number[]>> = {
@@ -171,12 +179,13 @@ export function stockLayout(kind: DrawnKind, level: number, piece: string): Stoc
     case "crates":
       return [{ piece: CRATE, at: [0, 0, 0], yaw: 0, scale: 0.5 }, ...heap(n, piece, 0.1, 0.22, 0.5)]
     case "ore-cart":
+      // on the tub's dark bed, the last throws heaped over the rim
       return Array.from({ length: n }, (_, k): StockPiece => {
         const a = k * 2.1
-        const r = k === 0 ? 0 : 0.17
+        const r = k === 0 ? 0 : 0.14
         return {
           piece,
-          at: [Math.cos(a) * r * 0.8, 0.5 + (k > 3 ? 0.08 : 0), Math.sin(a) * r * 1.2],
+          at: [Math.cos(a) * r * 0.8, CART_BED + (k > 3 ? 0.08 : 0), Math.sin(a) * r * 1.6],
           yaw: k,
           scale: 0.75,
           cart: true,
@@ -215,9 +224,10 @@ export function railPieces(
   const len = Math.hypot(dx, dz)
   if (len < 1e-3) return []
   const yaw = Math.atan2(dx, dz)
-  const n = Math.max(1, Math.ceil((len + 1) / TRACK_LEN))
-  // centred on the run from half a metre behind the cart to half a metre past the end
-  const start = -0.5 + (len + 1 - n * TRACK_LEN) / 2
+  // whole pieces from just behind the cart, the last running on past the end (world `railTracks`: what
+  // the mines' plan keeps clear of other rails)
+  const n = railTracks(len).pieces
+  const start = -TRACK_BEHIND
   return Array.from({ length: n }, (_, k) => {
     const s = start + (k + 0.5) * TRACK_LEN
     return { at: [from[0] + (dx / len) * s, from[2] + (dz / len) * s], yaw }

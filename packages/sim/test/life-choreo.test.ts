@@ -169,12 +169,12 @@ describe("craft poses are seen", () => {
     expect(sprints).toBeGreaterThan(0)
   })
 
-  test("the saga's hero-time at work is at least 40% (it was 5% walking 59%)", () => {
+  test("the saga's hero-time at work is at least 37% (it was 5% walking 59%; 41% before act V's festival walk home)", () => {
     const share = shareOf(saga, sagaEnd)
     const pct = (n: number) => Math.round((1000 * n) / share.total) / 10
     if (process.env.SHARE)
       console.log(`saga: craft ${pct(share.craft)}%, walk ${pct(share.walk)}%, other ${pct(share.other)}%`)
-    expect(share.craft / share.total).toBeGreaterThanOrEqual(0.4)
+    expect(share.craft / share.total).toBeGreaterThanOrEqual(0.37)
     expect(share.walk / share.total).toBeLessThan(0.35)
   })
 })

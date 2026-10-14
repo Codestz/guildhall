@@ -22,6 +22,7 @@ import type { Vec3 } from "./life.ts"
 import { ROAD_HALF, roadStrips, StripGrid } from "./roads.ts"
 import { tileFurniture } from "./spots.ts"
 import { HEX_TILE_SIZE, type PlacedPiece } from "./tiles.ts"
+import { cutsHard, gridWay } from "./walk.ts"
 import type { HexWorld } from "./world.ts"
 import { type HexZones, useOf } from "./zones.ts"
 
@@ -59,6 +60,14 @@ const NEAR = 10
 const FROM_FOLK = 0.6
 /** The way from the pinning spot to the gathering is open ground this far at least, metres. */
 const OPEN_RUN = 2.5
+/** How far round the walls the way from the pinning spot to the gathering is looked for, metres. */
+const REACH_ROUND = 20
+/** What a board no way round reaches counts as, metres of detour (a last resort). */
+const UNREACHED = 200
+/** Metres of way round from the gathering a board may take for nothing. */
+const ROUND_FREE = 4
+/** How many of the best placed boards are weighed by their walk from the gathering. */
+const BOARD_TRIES = 80
 /** A body's room at a spot (the pin, a briefing). */
 const BODY = 0.3
 /** A body standing a while keeps this far from a townsfolk spot (heroes.ts FROM_SPOT). */
@@ -374,9 +383,38 @@ export function noticeBoard(inp: BoardInputs): NoticeBoardPlace | null {
   // (a stable order: the best first, ties as found)
   const order = fit.map((f, k) => ({ ...f, k })).sort((a, b) => b.score - a.score || a.k - b.k)
   let best: { score: number; place: NoticeBoardPlace } | null = null
-  for (const f of order) {
-    if (best && f.score + views.length * 10 <= best.score) break
-    const score = f.score + seen(f.place.at[0], level + 1.3, f.place.at[2]) * 10
+  // the walk to it from the gathering round the walls counts (decisions.md "one source of truth for
+  // space"): a board behind the curtain, that only a way through the wall reaches in a few steps, is a
+  // long errand round by the gate (or none found: a last resort)
+  const wall = (x: number, zz: number, r: number) =>
+    furniture.solidsNear(x, zz, r).filter((o) => o.kind === "building" || o.kind === "wall")
+  const roundBy = (p: NoticeBoardPlace): number => {
+    const a: [number, number, number] = [
+      p.at[0] + Math.sin(p.facing) * BOARD_PIN,
+      level,
+      p.at[2] + Math.cos(p.facing) * BOARD_PIN,
+    ]
+    const b: [number, number, number] = [gx, level, gz]
+    const straight = Math.hypot(b[0] - a[0], b[2] - a[2])
+    if (!cutsHard(a, b, wall)) return 0
+    const way = gridWay(a, b, wall, BODY - 0.1, 0.2, false, REACH_ROUND, false, 60000)
+    if (!way.length) return UNREACHED
+    let len = 0
+    let [px, pz] = [a[0], a[2]]
+    for (const [x, zz] of [...way, [b[0], b[2]] as [number, number]]) {
+      len += Math.hypot(x - px, zz - pz)
+      px = x
+      pz = zz
+    }
+    return len - straight
+  }
+  for (const [k, f] of order.entries()) {
+    if (best && (f.score + views.length * 10 <= best.score || k >= BOARD_TRIES)) break
+    // (a few steps round a well or a corner are nothing; the way round a wall is)
+    const score =
+      f.score -
+      Math.max(0, roundBy(f.place) - ROUND_FREE) * 1.2 +
+      seen(f.place.at[0], level + 1.3, f.place.at[2]) * 10
     if (!best || score > best.score + 1e-9) best = { score, place: f.place }
   }
   return best?.place ?? null

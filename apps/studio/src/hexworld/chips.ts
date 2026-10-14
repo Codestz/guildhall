@@ -9,10 +9,12 @@
  *                      one, and speech from the world's recent moments (a quest given, loot, a fall). Pure.
  *   where chips go     `Declutter` (V1's chips.ts, pure): about ten times a second, nearest first with the
  *                      followed and the pleading placed before anyone, it folds a pile of three or more
- *                      overlapping chips into one that reads "+N", nudges any other overlap upward, keeps
- *                      chips off the HUD (`data-keepout`), lets at most MAX_SPEAKERS speak (never two
- *                      bubbles in one place; in Minimal only the followed or those close by), and turns
- *                      strict at crowd scale (two make a pile, folded chips never fade) and on a phone.
+ *                      overlapping chips into one that reads "+N", lets at most MAX_SPEAKERS speak (never
+ *                      two bubbles in one place; in Minimal only the followed or those close by), stacks
+ *                      every other chip GAP px clear of those before it on the lift it is drawn at (a
+ *                      speaker's bubble counted in its box; one that cannot climb clear folds into "+N"),
+ *                      keeps chips off the HUD (`data-keepout`), and turns strict at crowd scale (two
+ *                      make a pile, folded chips never fade) and on a phone.
  *   the DOM            `createChips(host)`: one chip per hero, moved every frame (a transform, only when it
  *                      moved), its texts and attributes written only when they change, its size measured by
  *                      a ResizeObserver (never read per run), the HUD's rects read twice a second between
@@ -228,9 +230,12 @@ export interface ChipSlot {
   perUnit: number
   /** Drawn at all this run (on the island, in front of the camera, on screen). */
   shown: boolean
-  /** Its size, CSS px (measured by a ResizeObserver; 0 until then). */
+  /** Its size, CSS px (measured by a ResizeObserver; 0 until then): the plate with its plea mark. */
   width: number
   height: number
+  /** Its speech bubble's size, CSS px (measured while it has words; it hangs over the chip). */
+  bubbleW: number
+  bubbleH: number
   /** The one you follow. */
   selected: boolean
   /** Waiting on a human. */
@@ -243,6 +248,7 @@ export interface ChipSlot {
   folded: boolean
   /** "+N": chips folded into this one. */
   more: number
+  /** The nudge to draw, px: in `LIFT_STEP`s, a falling one held a few runs (`liftStep`). */
   lift: number
   speak: boolean
   /** Under the HUD: not drawn. */
@@ -255,6 +261,14 @@ export interface ChipSlot {
   notable: boolean
   w: number
   h: number
+  /** The box the chip takes this run with its bubble when it speaks (layout only; hits use w × h). */
+  bw: number
+  bh: number
+  /** Runs in a row a lower lift has been asked for (`liftStep`). */
+  liftRuns: number
+  /** Its distance as the stack orders by: moves only in steps of Z_STEP, so two walking past each other
+   *  swap places once, not back and forth (each swap eases both chips across each other) */
+  zKey: number
   index: number
   parent: number
   count: number
@@ -271,6 +285,8 @@ export function chipSlot(id: string): ChipSlot {
     shown: false,
     width: 0,
     height: 0,
+    bubbleW: 0,
+    bubbleH: 0,
     selected: false,
     plea: false,
     fallen: false,
@@ -286,6 +302,10 @@ export function chipSlot(id: string): ChipSlot {
     notable: false,
     w: 0,
     h: 0,
+    bw: 0,
+    bh: 0,
+    liftRuns: 0,
+    zKey: Number.NaN,
     index: 0,
     parent: 0,
     count: 0,
@@ -294,9 +314,13 @@ export function chipSlot(id: string): ChipSlot {
 }
 
 /** Space kept between two chips, px. */
-const GAP = 3
+export const GAP = 4
+/** Between a chip's top and its bubble's tail, px (`.ui-hero-bubble`'s `bottom`). */
+export const BUBBLE_GAP = 6
 /** A chip never climbs further than this above its head, px. */
 const MAX_LIFT = 96
+/** Metres a chip's distance must change before the stack orders it anew (`ChipSlot.zKey`). */
+const Z_STEP = 1.5
 /** A pile this large folds into one chip. */
 export const FOLD_AT = 3
 /**
@@ -400,12 +424,15 @@ export class Declutter {
       s.out = false
       s.pinned = s.selected || s.plea
       s.notable = crowd && (s.plea || s.fallen)
+      if (!(Math.abs(s.z - s.zKey) < Z_STEP)) s.zKey = s.z
       s.near = s.perUnit >= (s.near ? NEAR_PX * NEAR_KEEP : NEAR_PX)
       if (!s.shown || s.width === 0 || s.height === 0) continue
       // a phone folds a chip the edge would clip (the followed and a plea stay)
       if (field.phone && !s.pinned && Math.abs(s.x - field.width / 2) > (field.width - s.width) / 2) continue
       s.w = s.width
       s.h = s.height
+      s.bw = s.width
+      s.bh = s.height
       s.on = true
       order.push(s)
     }
@@ -453,53 +480,64 @@ export class Declutter {
       }
     }
 
-    // ── nudge: shown chips in priority order, each above whatever it would cover ──
-    for (const s of order) s.lift = 0
-    for (let i = 0; i < order.length; i++) {
-      const s = order[i] as ChipSlot
-      if (s.folded) continue
-      let moved = true
-      for (let guard = 0; moved && guard < 8; guard++) {
-        moved = false
-        for (let j = 0; j < i; j++) {
-          const o = order[j] as ChipSlot
-          if (o.folded || !overlaps(s, s.lift, o, o.lift)) continue
-          const need = s.y - (o.y - o.lift - o.h) + GAP
-          if (need > s.lift) {
-            s.lift = Math.min(MAX_LIFT, need)
-            moved = s.lift < MAX_LIFT
-          }
-        }
-      }
-    }
-
-    // ── the HUD: a chip whose box lies under a HUD region is not drawn ──
-    for (const s of order) {
-      if (s.folded) continue
-      const l = s.x - s.w / 2
-      const r = s.x + s.w / 2
-      const b = s.y - s.lift
-      const t = b - s.h
-      for (const [L, T, R, B] of field.keep)
-        if (l < R && r > L && t < B && b > T) {
-          s.out = true
-          break
-        }
-    }
-
-    // ── speech: pinned and nearest first, never two bubbles in one place, MAX_SPEAKERS in all ──
+    // ── speech, before the nudge: a speaker's bubble is part of its box, so nothing is laid under it.
+    //    Pinned and nearest first, never two bubbles in one place, MAX_SPEAKERS in all ──
     const { speakers } = this
     speakers.length = 0
     for (const s of this.slots) s.speak = false
     for (const s of order) {
-      if (speakers.length >= MAX_SPEAKERS) break
-      if (s.folded || s.out || !s.bubble || !speaks(field.mode, s.selected, s.near, field.phone)) continue
+      s.bw = s.w
+      s.bh = s.h
+      if (s.folded || speakers.length >= MAX_SPEAKERS) continue
+      if (!s.bubble || !speaks(field.mode, s.selected, s.near, field.phone)) continue
       let crowded = false
       for (const o of speakers)
         if (Math.abs(s.x - o.x) < BUBBLE_W + GAP && Math.abs(s.y - o.y) < BUBBLE_H + GAP) crowded = true
       if (crowded) continue
       s.speak = true
       speakers.push(s)
+      if (s.bubbleH > 0) {
+        s.bw = Math.max(s.w, s.bubbleW)
+        s.bh = s.h + BUBBLE_GAP + s.bubbleH
+      }
+    }
+
+    // ── stack: shown chips in priority order, each GAP px above whatever it would cover, on the lift it
+    //    will be drawn at (in steps, a falling one held: `liftStep`). One that cannot climb clear within
+    //    MAX_LIFT folds into the chip it stands on ("+N"): no two chips are ever drawn over each other ──
+    for (let i = 0; i < order.length; i++) {
+      const s = order[i] as ChipSlot
+      if (s.folded) continue
+      const want = this.climb(s, i, 0)
+      const step = liftStep(s.lift, want, s.liftRuns)
+      let lift = step.lift
+      s.liftRuns = step.runs
+      // a held or rounded-up lift may meet a chip placed before: climb on from there, in whole steps
+      for (let guard = 0; guard < 4; guard++) {
+        const clear = this.climb(s, i, lift)
+        if (clear === lift) break
+        lift = Math.ceil(clear / LIFT_STEP) * LIFT_STEP
+        s.liftRuns = 0
+      }
+      if (lift > MAX_LIFT && !s.pinned) {
+        const host = this.under(s, i)
+        if (host) {
+          s.folded = true
+          s.votes = 0
+          s.speak = false
+          host.more += 1 + s.more
+          s.more = 0
+          continue
+        }
+      }
+      s.lift = lift
+    }
+
+    // ── the HUD: a chip whose plate lies under a HUD region is not drawn; a bubble there is not said ──
+    for (const s of order) {
+      if (s.folded) continue
+      s.out = covered(s.x, s.y - s.lift, s.w, s.h, field.keep)
+      if (s.speak && (s.out || covered(s.x, s.y - s.lift, s.bw, s.bh, field.keep))) s.speak = false
     }
 
     // off screen: rests, so it comes back where it belongs; drawn but left out (not measured yet, or a
@@ -513,7 +551,6 @@ export class Declutter {
       }
   }
 
-  /** The shown chips' boxes now (left, top, right, bottom), for the plates to keep off. */
   /**
    * The hero whose shown chip (as the last run laid it) holds the point (layer px, `slop` px round each),
    * the front-most first: pinned, then nearest. Null: none.
@@ -534,13 +571,46 @@ export class Declutter {
     return null
   }
 
+  /** The shown chips' boxes now (left, top, right, bottom; a speaker's with its bubble), for the plates to keep off. */
   boxes(out: Rect[]): Rect[] {
     out.length = 0
     for (const s of this.order) {
       if (s.folded || s.out) continue
-      out.push([s.x - s.w / 2, s.y - s.lift - s.h, s.x + s.w / 2, s.y - s.lift])
+      out.push([s.x - s.bw / 2, s.y - s.lift - s.bh, s.x + s.bw / 2, s.y - s.lift])
     }
     return out
+  }
+
+  /** The least lift from `from` up at which `s` (the `i`th in order) clears every chip placed before it. */
+  private climb(s: ChipSlot, i: number, from: number): number {
+    const { order } = this
+    let lift = from
+    let moved = true
+    for (let guard = 0; moved && guard < 8; guard++) {
+      moved = false
+      for (let j = 0; j < i; j++) {
+        const o = order[j] as ChipSlot
+        if (o.folded || !overlaps(s, lift, o, o.lift)) continue
+        const need = s.y - (o.y - o.lift - o.bh) + GAP
+        if (need > lift) {
+          lift = need
+          moved = true
+        }
+      }
+    }
+    return lift
+  }
+
+  /** The chip placed before `s` that it stands on (its box at rest meets it), the one that takes its "+N". */
+  private under(s: ChipSlot, i: number): ChipSlot | undefined {
+    let first: ChipSlot | undefined
+    for (let j = 0; j < i; j++) {
+      const o = this.order[j] as ChipSlot
+      if (o.folded) continue
+      if (overlaps(s, 0, o, o.lift)) return o
+      first ??= overlaps(s, MAX_LIFT, o, o.lift) ? o : undefined
+    }
+    return first
   }
 
   private find(i: number): number {
@@ -589,15 +659,27 @@ export class Declutter {
 function before(a: ChipSlot, b: ChipSlot): number {
   if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
   if (a.notable !== b.notable) return a.notable ? -1 : 1
-  return a.z - b.z || (a.id < b.id ? -1 : 1)
+  return a.zKey - b.zKey || (a.id < b.id ? -1 : 1)
 }
 
-/** Do the two boxes, at these lifts, come within GAP (+ `pad`) px of each other? */
+/**
+ * Do the two boxes, at these lifts, come within GAP (+ `pad`) px of each other? A box is the chip's with
+ * its bubble when it speaks (`bw` × `bh`, set each run before the stack; the plate's alone till then).
+ */
 function overlaps(a: ChipSlot, liftA: number, b: ChipSlot, liftB: number, pad = 0): boolean {
   const ab = a.y - liftA
   const bb = b.y - liftB
   const gap = GAP + pad
-  return Math.abs(a.x - b.x) * 2 < a.w + b.w + gap * 2 && ab - a.h < bb + gap && bb - b.h < ab + gap
+  return Math.abs(a.x - b.x) * 2 < a.bw + b.bw + gap * 2 && ab - a.bh < bb + gap && bb - b.bh < ab + gap
+}
+
+/** Does a `w` × `h` box standing on (x, bottom) meet any of the HUD's rects? */
+function covered(x: number, bottom: number, w: number, h: number, keep: readonly Rect[]): boolean {
+  const l = x - w / 2
+  const r = x + w / 2
+  const t = bottom - h
+  for (const [L, T, R, B] of keep) if (l < R && r > L && t < B && bottom > T) return true
+  return false
 }
 
 // ─────────────────────────────── the DOM ───────────────────────────────
@@ -647,10 +729,10 @@ interface Chip {
   movedAt: number
   whole: boolean
   lift: number
-  /** Runs in a row the declutter has asked for a lower lift (`liftStep`). */
-  liftRuns: number
   more: number
   flags: number
+  /** Its stacking: 2 followed or pleading, 1 speaking, 0 the rest. */
+  front: number
 }
 
 /** A flag per attribute the declutter writes, so a run writes only what changed. */
@@ -694,6 +776,13 @@ export function createChips(
             const c = owners.get(e.target)
             if (!c) continue
             const el = e.target as HTMLElement
+            // the bubble hangs over the chip out of its flow (measured while it has words, said or not)
+            if (el === c.parts.bubble) {
+              if (el.offsetWidth === 0) continue
+              c.slot.bubbleW = el.offsetWidth
+              c.slot.bubbleH = el.offsetHeight
+              continue
+            }
             c.slot.width = el.offsetWidth
             c.slot.height = el.offsetHeight
           }
@@ -725,19 +814,23 @@ export function createChips(
       movedAt: 0,
       whole: false,
       lift: 0,
-      liftRuns: 0,
       more: 0,
       flags: 0,
+      front: 0,
     }
     layer.append(parts.at)
     owners.set(parts.chip, c)
+    owners.set(parts.bubble, c)
     observer?.observe(parts.chip)
+    observer?.observe(parts.bubble)
     declutter.slots.push(c.slot)
     return c
   }
   const drop = (c: Chip) => {
     observer?.unobserve(c.parts.chip)
+    observer?.unobserve(c.parts.bubble)
     owners.delete(c.parts.chip)
+    owners.delete(c.parts.bubble)
     c.parts.at.remove()
     const k = declutter.slots.indexOf(c.slot)
     if (k >= 0) declutter.slots.splice(k, 1)
@@ -856,14 +949,16 @@ export function createChips(
             if ((flags & bit) !== (c.flags & bit)) el.toggleAttribute(attr, (flags & bit) !== 0)
           c.flags = flags
         }
-        // the nudge in steps, a falling one only once asked for a while: no restless easing while walking
-        if (!s.folded) {
-          const next = liftStep(c.lift, s.lift, c.liftRuns)
-          c.liftRuns = next.runs
-          if (next.lift !== c.lift) {
-            c.lift = next.lift
-            el.style.setProperty("--lift", `${next.lift}px`)
-          }
+        // the followed and the pleading over everyone (a bubble passes under them), a speaker over the rest
+        const front = s.selected || s.plea ? 2 : s.speak ? 1 : 0
+        if (front !== c.front) {
+          c.front = front
+          c.parts.at.style.zIndex = front ? String(front) : ""
+        }
+        // the nudge as the run drew it: in steps, a falling one only once asked for a while
+        if (!s.folded && s.lift !== c.lift) {
+          c.lift = s.lift
+          el.style.setProperty("--lift", `${s.lift}px`)
         }
         if (s.more !== c.more) {
           c.more = s.more

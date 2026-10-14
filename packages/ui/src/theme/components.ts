@@ -404,7 +404,7 @@ export const COMPONENTS_CSS = /* css */ `
   gap: 4px;
   /* bottom centre on the point; --lift is the declutter's nudge, eased */
   transform: translate(-50%, calc(0px - var(--lift)));
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease-out, visibility 0s;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease-out, visibility 0s;
   font: 400 var(--t-sm)/1.25 var(--body);
   white-space: nowrap;
   user-select: none;
@@ -412,9 +412,9 @@ export const COMPONENTS_CSS = /* css */ `
   will-change: transform;
 }
 /* folded into a neighbour's "+N": fades, then leaves paint */
-.ui-hero[data-folded] { opacity: 0; visibility: hidden; transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease-out, visibility 0s 0.25s; }
+.ui-hero[data-folded] { opacity: 0; visibility: hidden; transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease-out, visibility 0s 0.25s; }
 /* a crowd: shown or folded, never half-way */
-.ui-hero[data-crowd] { transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.ui-hero[data-crowd] { transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1); }
 .ui-hero[data-crowd][data-folded] { transition: none; }
 /* under the HUD: gone at once */
 .ui-hero[data-out] { visibility: hidden; opacity: 0; transition: none; }
@@ -453,10 +453,15 @@ export const COMPONENTS_CSS = /* css */ `
 .ui-hero[data-quiet]:not([data-folded]):not([data-selected]) { opacity: 0.8; }
 /* following another party: this one steps back */
 .ui-hero[data-aside]:not([data-folded]) { opacity: 0.42; }
-/* speech: the plate's own language (ink, a brass hairline, the body face), in italic as said aloud */
+/* speech: the plate's own language (ink, a brass hairline, the body face), in italic as said aloud. It hangs
+   over the chip out of its flow (the declutter measures it and counts it in the chip's box while it speaks),
+   laid out but unseen until said, so its size is known before it is */
 .ui-hero-bubble {
-  display: none;
-  position: relative;
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  visibility: hidden;
   width: max-content;
   max-width: 220px;
   white-space: normal;
@@ -469,7 +474,8 @@ export const COMPONENTS_CSS = /* css */ `
   box-shadow: 0 0 0 1px rgba(220, 182, 98, 0.22), 0 4px 10px -4px rgba(0, 0, 0, 0.6);
 }
 .ui-hero-bubble::after { content: ""; position: absolute; left: 50%; bottom: -4px; width: 7px; height: 7px; margin-left: -3.5px; transform: rotate(45deg); background: rgb(20, 15, 11); box-shadow: 1px 1px 0 0 rgba(220, 182, 98, 0.22); }
-.ui-hero[data-speak] .ui-hero-bubble { display: block; }
+.ui-hero-bubble:empty { display: none; }
+.ui-hero[data-speak] .ui-hero-bubble { visibility: visible; }
 /* the deed sigil: an ink medallion, brass rim tinted by the hero's colour, the deed's glyph in paper */
 .ui-hero-sigil {
   display: none;

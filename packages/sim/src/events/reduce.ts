@@ -109,6 +109,33 @@ export interface Ci {
   at: number
 }
 
+export interface Issue {
+  repo: string
+  n: number
+  title: string
+  author: string
+  labels?: string[]
+  url?: string
+  opened: number
+}
+
+/**
+ * The petitioners at the quay (PROTOCOL.md §7: every open issue a place in their queue): one comes for
+ * each issue opened and is served, first come first, when one closes; the queue is the order they came
+ * in, whichever issue a closing names. Pure counts and times, so a seek and a replay see the same queue.
+ */
+export interface Petitioners {
+  /** When each one still waiting came (its issue opened), first come first: one per open issue. */
+  waiting: readonly number[]
+  /** How many have been served in all (the next served is the `served`-th to have come, from 0). */
+  served: number
+  /** When the latest were served (an issue closed), oldest first, at most SERVED_KEPT. */
+  lately: readonly number[]
+}
+
+/** How many of the latest servings `Petitioners.lately` keeps (a queue's shuffle forward is drawn from them). */
+export const SERVED_KEPT = 8
+
 export interface SeaState {
   /** Open pull requests, by `repo#n`. */
   prs: ReadonlyMap<string, Pr>
@@ -118,6 +145,10 @@ export interface SeaState {
   merged: number
   lastPush?: number
   lastRelease?: { repo: string; tag: string; name?: string; at: number }
+  /** Open issues, by `repo#n` (none: no issue ever seen). */
+  issues?: ReadonlyMap<string, Issue>
+  /** The petitioners their issues bring to the quay (none: no issue ever seen). */
+  petitioners?: Petitioners
 }
 
 export interface GuildWorld {
@@ -153,7 +184,10 @@ const QUIET = new Set(["actor.info", "actor.step", "actor.rank"])
 /** The world after one event. Pure: `world` is not changed; the parts the event did not touch are shared. */
 export function reduce(world: GuildWorld, ev: WorldEvent): GuildWorld {
   const base = { at: ev.at, seq: ev.seq, count: world.count + 1 }
-  const recent = QUIET.has(ev.kind) || (ev.kind === "sea.ci" && !ev.moment) ? world.recent : told(world, ev)
+  const recent =
+    QUIET.has(ev.kind) || ev.kind === "sea.issue" || (ev.kind === "sea.ci" && !ev.moment)
+      ? world.recent
+      : told(world, ev)
   if (ev.kind.startsWith("sea.")) return { ...world, ...base, recent, sea: sea(world.sea, ev) }
   const actors = cast(world.actors, ev)
   return { ...world, ...base, recent, actors }
@@ -348,8 +382,48 @@ function sea(s: SeaState, ev: WorldEvent): SeaState {
         ...s,
         lastRelease: { repo: ev.repo, tag: ev.tag, ...(ev.name ? { name: ev.name } : {}), at: ev.at },
       }
+    case "sea.issue":
+      return docket(s, ev)
     default:
       return s
+  }
+}
+
+const NO_PETITIONERS: Petitioners = { waiting: [], served: 0, lately: [] }
+
+/**
+ * An issue opened or closed: a petitioner comes to the end of the queue, or the first in it is served.
+ * An issue opened again while open, or closed while not open (it was never seen opening), changes nothing.
+ */
+function docket(s: SeaState, ev: Extract<WorldEvent, { kind: "sea.issue" }>): SeaState {
+  const key = `${ev.repo}#${ev.n}`
+  const open = s.issues?.has(key) ?? false
+  const was = s.petitioners ?? NO_PETITIONERS
+  if (ev.state === "opened") {
+    if (open) return s
+    const issues = new Map(s.issues)
+    issues.set(key, {
+      repo: ev.repo,
+      n: ev.n,
+      title: ev.title,
+      author: ev.author,
+      ...(ev.labels ? { labels: ev.labels } : {}),
+      ...(ev.url ? { url: ev.url } : {}),
+      opened: ev.at,
+    })
+    return { ...s, issues, petitioners: { ...was, waiting: [...was.waiting, ev.at] } }
+  }
+  if (!open) return s
+  const issues = new Map(s.issues)
+  issues.delete(key)
+  return {
+    ...s,
+    issues,
+    petitioners: {
+      waiting: was.waiting.slice(1),
+      served: was.served + 1,
+      lately: [...was.lately, ev.at].slice(-SERVED_KEPT),
+    },
   }
 }
 

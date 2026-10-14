@@ -13,6 +13,7 @@ import {
   pleas,
   recent,
   reduce,
+  SERVED_KEPT,
   Teller,
   type WorldEvent,
   weatherOf,
@@ -293,16 +294,83 @@ describe("normalize: the sea", () => {
     expect(kinds(recent(feed.log.head, 10)).filter((k) => k === "sea.ci")).toHaveLength(2)
   })
 
-  test("a push and a release; an issue makes no event", () => {
+  test("a push and a release; an issue is bookkeeping, never a caption", () => {
     const feed = new Feed()
     feed.sea({ ...base, kind: "push", id: "p1", branch: "main", commits: 3, author: "me", sha: "s" })
     feed.sea({ ...base, kind: "release", id: "r1", tag: "v1.0.0", at: T0 + 1 })
+    const told = recent(feed.log.head, 10).length
     expect(
-      feed.sea({ ...base, kind: "issue_opened", id: "i1", number: 3, title: "bug", author: "x" }),
-    ).toEqual([])
+      kinds(
+        feed.sea({
+          ...base,
+          kind: "issue_opened",
+          id: "i1",
+          number: 3,
+          title: "bug",
+          author: "x",
+          at: T0 + 2,
+        }),
+      ),
+    ).toEqual(["sea.issue"])
     const harbour = harbourOf(feed.log.head)
     expect(harbour.pushes).toBe(1)
     expect(harbour.release).toMatchObject({ tag: "v1.0.0" })
+    expect(harbour.issues.map((i) => i.n)).toEqual([3])
+    expect(recent(feed.log.head, 10)).toHaveLength(told)
+  })
+
+  describe("the docket", () => {
+    const issue = (kind: "issue_opened" | "issue_closed", n: number, at: number): SeaEvent => ({
+      ...base,
+      kind,
+      id: `${kind}-${n}`,
+      number: n,
+      title: `Issue ${n}`,
+      author: "lou",
+      labels: ["bug"],
+      at,
+    })
+
+    test("a petitioner comes for each issue opened, and the first come is served when any closes", () => {
+      const feed = new Feed()
+      for (const [k, n] of [131, 133, 135].entries()) feed.sea(issue("issue_opened", n, T0 + k * 100))
+      expect(harbourOf(feed.log.head).petitioners).toEqual({
+        waiting: [T0, T0 + 100, T0 + 200],
+        served: 0,
+        lately: [],
+      })
+      // the last issue opened closes first: still the first in the queue is served
+      feed.sea(issue("issue_closed", 135, T0 + 1000))
+      const h = harbourOf(feed.log.head)
+      expect(h.petitioners).toEqual({ waiting: [T0 + 100, T0 + 200], served: 1, lately: [T0 + 1000] })
+      expect(h.issues.map((i) => i.n)).toEqual([131, 133])
+    })
+
+    test("an issue opened twice, or closed unseen, changes nothing; repeats are dropped", () => {
+      const feed = new Feed()
+      feed.sea(issue("issue_opened", 1, T0))
+      feed.sea({ ...issue("issue_opened", 1, T0 + 5), id: "again" })
+      feed.sea(issue("issue_closed", 9, T0 + 6))
+      expect(feed.sea(issue("issue_opened", 1, T0))).toEqual([])
+      expect(harbourOf(feed.log.head).petitioners).toEqual({ waiting: [T0], served: 0, lately: [] })
+    })
+
+    test("is the same however the log is read: folded whole, or at a time on the way", () => {
+      const tell = () => {
+        const feed = new Feed()
+        for (let n = 0; n < 12; n++) feed.sea(issue("issue_opened", n, T0 + n * 10))
+        for (let n = 0; n < 11; n++) feed.sea(issue("issue_closed", (n * 5) % 12, T0 + 1000 + n * 10))
+        return feed.log
+      }
+      const a = tell()
+      const b = tell()
+      expect(harbourOf(a.head)).toEqual(harbourOf(b.head))
+      const mid = harbourOf(a.stateAt(T0 + 1035)).petitioners
+      expect(mid.served).toBe(4)
+      expect(mid.waiting).toHaveLength(8)
+      // only the latest servings are kept
+      expect(harbourOf(a.head).petitioners.lately).toHaveLength(SERVED_KEPT)
+    })
   })
 })
 

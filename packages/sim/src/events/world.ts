@@ -117,6 +117,20 @@ export type WorldHappening =
     }
   /** A release was published. */
   | { kind: "sea.release"; repo: string; tag: string; name?: string }
+  /**
+   * An issue was opened (or was open when the hub began to watch) or closed: the docket's petitioners
+   * (reduce.ts `SeaState.docket`). Bookkeeping, never told in `recent`.
+   */
+  | {
+      kind: "sea.issue"
+      repo: string
+      n: number
+      title: string
+      author: string
+      state: "opened" | "closed"
+      labels?: string[]
+      url?: string
+    }
 
 export type PrState = "opened" | "updated" | "merged" | "closed"
 

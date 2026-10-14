@@ -329,6 +329,18 @@ function fromSea(event: SeaEvent, ctx: NormalizeContext): WorldHappening | undef
     }
     case "release":
       return { kind: "sea.release", repo, tag: event.tag, ...(event.name ? { name: event.name } : {}) }
+    case "issue_opened":
+    case "issue_closed":
+      return {
+        kind: "sea.issue",
+        repo,
+        n: event.number,
+        title: event.title,
+        author: event.author,
+        state: event.kind === "issue_opened" ? "opened" : "closed",
+        ...(event.labels?.length ? { labels: event.labels } : {}),
+        ...(event.url ? { url: event.url } : {}),
+      }
     default:
       return undefined
   }

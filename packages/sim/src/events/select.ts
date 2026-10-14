@@ -2,7 +2,16 @@ import type { Craft } from "@guildhall/core"
 import type { ArchetypeId } from "../roster/archetypes.ts"
 import type { Body } from "../roster/bodies.ts"
 import type { Rank } from "../roster/ranks.ts"
-import { type ActorStatus, type Ci, type GuildWorld, type Pr, placeAt, type WorldActor } from "./reduce.ts"
+import {
+  type ActorStatus,
+  type Ci,
+  type GuildWorld,
+  type Issue,
+  type Petitioners,
+  type Pr,
+  placeAt,
+  type WorldActor,
+} from "./reduce.ts"
 import type { WorldEvent } from "./world.ts"
 
 /**
@@ -111,10 +120,20 @@ export interface Harbour {
   pushes: number
   merged: number
   release: GuildWorld["sea"]["lastRelease"]
+  /** Open issues, oldest first (the docket's plates over the quay). */
+  issues: Issue[]
+  /** The petitioners their issues bring to the quay. */
+  petitioners: Petitioners
 }
+
+const NO_PETITIONERS: Petitioners = { waiting: [], served: 0, lately: [] }
 
 export function harbourOf(world: GuildWorld): Harbour {
   return {
+    issues: [...(world.sea.issues?.values() ?? [])].sort(
+      (a, b) => a.opened - b.opened || (a.repo < b.repo ? -1 : a.repo > b.repo ? 1 : a.n - b.n),
+    ),
+    petitioners: world.sea.petitioners ?? NO_PETITIONERS,
     prs: [...world.sea.prs.values()].sort((a, b) => a.opened - b.opened || a.n - b.n),
     ci: [...world.sea.ci.values()].sort((a, b) => b.at - a.at),
     weather: weatherOf(world),

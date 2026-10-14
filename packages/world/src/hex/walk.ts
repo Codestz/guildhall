@@ -37,8 +37,16 @@ export interface HexWalkEdge {
   a: number
   b: number
   kind: HexWalkKind
-  /** Metres, with height. */
+  /** Metres, with height (along `via` when it has one). */
   len: number
+  /**
+   * Where the straight way between its ends would run through a wall, a building or a fence (a door
+   * whose street lies past its own chapel, a court's node behind a well): the corners of the way round,
+   * from `a` to `b` (decisions.md "one source of truth for space"). None: the straight way is clear.
+   */
+  via?: [number, number][]
+  /** Through a wall with no way round it: left out of every route (its nodes keep their other edges). */
+  walled?: boolean
 }
 
 export interface HexWalk {
@@ -128,6 +136,32 @@ function segmentDistance(s: Solid, ax: number, az: number, bx: number, bz: numbe
     best = Math.min(best, Math.hypot(cx - ax - lx * f, cz - az - lz * f))
   }
   return best
+}
+
+/**
+ * Whether segment a→b runs through a wall, a building or a fence (a hard blocker: the soft places people
+ * stand a while aside), those its ends stand in aside (`from`/`to`: how near an end a blocker may be
+ * and still be the end's own, metres: a doorway's house, a seat).
+ */
+export function cutsHard(
+  a: readonly number[],
+  b: readonly number[],
+  near: (x: number, z: number, r: number) => readonly WalkBlocker[],
+  ends: { from?: number; to?: number } = {},
+): boolean {
+  const ax = a[0]!
+  const az = a[2]!
+  const bx = b[0]!
+  const bz = b[2]!
+  const len = Math.hypot(bx - ax, bz - az)
+  for (const o of near((ax + bx) / 2, (az + bz) / 2, len / 2 + 0.1)) {
+    const so = solidOfBlocker(o)
+    if (so.soft) continue
+    if (solidDistance(so, ax, az) < (ends.from ?? 0.05) || solidDistance(so, bx, bz) < (ends.to ?? 0.05))
+      continue
+    if (segmentDistance(so, ax, az, bx, bz) < 0.02) return true
+  }
+  return false
 }
 
 /** A solid's corners pushed out by `c` along their corner's bisector (so its edges stand `c` out). */
@@ -325,6 +359,16 @@ const GRID_STEPS = 6000
 const GRID_NEAR = 1.6
 /** … and how far when that finds none (round a long fence, a row of houses). */
 const GRID_FAR = 4.5
+/** How an edge through a wall looks for its way round: clearance, cell and margin, the roomiest first. */
+const EDGE_SEARCH: readonly (readonly [number, number, number])[] = [
+  [WALK_CLEAR, 0.2, 4.5],
+  [0.2, 0.2, 12],
+]
+/** … opening at most this many cells. */
+const EDGE_STEPS = 40000
+/** How far a part cut off by a wall looks for a node of the rest to join, metres. */
+const REJOIN = HEX_TILE_SIZE * 4
+const onDeckKind = (k: HexWalkKind) => k === "bridge" || k === "dock"
 /** The least room a tight way keeps from a wall (a body's core: a narrow gate), metres. */
 const TIGHT = 0.2
 /** A body's core (spots.ts BODY_CORE): the narrowest gap a body squeezes through. */
@@ -346,6 +390,8 @@ export function gridWay(
   GRID_MARGIN = GRID_NEAR,
   /** Keep clear of the soft blockers too (the places people stand a while), not only the walls. */
   soft = false,
+  /** The most cells it opens (by default a few thousand, ten times that past GRID_FAR). */
+  steps = GRID_MARGIN > GRID_FAR ? GRID_STEPS * 10 : GRID_STEPS,
 ): [number, number][] {
   // the box is on the world's own grid, so the cells' answers are shared by every way looked for
   const x0 = Math.floor((Math.min(a[0], b[0]) - GRID_MARGIN) / GRID) * GRID
@@ -354,7 +400,7 @@ export function gridWay(
   const nz = Math.ceil((Math.max(a[2], b[2]) + GRID_MARGIN - z0) / GRID)
   if (nx * nz > 400000) return []
   const memo = memoOf(near, `${C},${GRID},${soft}`)
-  const key = `${a[0].toFixed(2)},${a[2].toFixed(2)},${b[0].toFixed(2)},${b[2].toFixed(2)},${any},${GRID_MARGIN}`
+  const key = `${a[0].toFixed(2)},${a[2].toFixed(2)},${b[0].toFixed(2)},${b[2].toFixed(2)},${any},${GRID_MARGIN},${steps}`
   const had = memo.ways.get(key)
   if (had) return had
   const gi0 = Math.round(x0 / GRID)
@@ -450,7 +496,7 @@ export function gridWay(
   g[start] = 0
   push(h(ai, aj), start)
   let found = false
-  for (let it = 0; hf.length && it < (GRID_MARGIN > GRID_FAR ? GRID_STEPS * 10 : GRID_STEPS); it++) {
+  for (let it = 0; hf.length && it < steps; it++) {
     const k = pop()
     if (k === goal) {
       found = true
@@ -600,6 +646,115 @@ export function walledIn(
   return !out
 }
 
+/**
+ * The way out from a point to the nearest of `to` (walk nodes) a body's core gets through, round the
+ * walls, houses and fences `near` gives, as `walledIn` floods it (its own seat and the point's own room
+ * aside): which of `to` it reaches and the way's corners from there to the point, pulled taut; null when
+ * none is reached within `reach` metres. One flood a spot (lifePlaces: a spot behind a wall from its
+ * node, reached round by the gate).
+ */
+export function floodWay(
+  x: number,
+  z: number,
+  near: (x: number, z: number, r: number) => readonly WalkBlocker[],
+  to: readonly { x: number; z: number }[],
+  reach = 20,
+): { to: number; way: [number, number][] } | null {
+  const GRID = 0.1
+  const C = CORE
+  const memo = memoOf(near, `${C},${GRID}`)
+  const own = new Set<Solid>()
+  for (const o of near(x, z, 0.05)) {
+    const so = solidOfBlocker(o)
+    if (solidDistance(so, x, z) < 0.05) own.add(so)
+  }
+  const open = (i: number, j: number): boolean => {
+    const wk = (i + 32768) * 65536 + (j + 32768)
+    let by = memo.cells.get(wk)
+    const cx = (i + 0.5) * GRID
+    const cz = (j + 0.5) * GRID
+    if (by === undefined) {
+      by = null
+      for (const o of near(cx, cz, C)) {
+        const so = solidOfBlocker(o)
+        if (!so.soft && solidDistance(so, cx, cz) < C) {
+          if (!by) by = []
+          by.push(so)
+        }
+      }
+      memo.cells.set(wk, by)
+    }
+    if (!by) return true
+    const byIt = Math.hypot(cx - x, cz - z) < END_ROOM
+    return by.every(
+      (so) =>
+        own.has(so) || (byIt && solidDistance(so, cx, cz) >= Math.min(C, solidDistance(so, x, z)) - 0.01),
+    )
+  }
+  const i0 = Math.floor(x / GRID)
+  const j0 = Math.floor(z / GRID)
+  const key = (i: number, j: number) => (i + 32768) * 65536 + (j + 32768)
+  const from = new Map<number, number>([[key(i0, j0), -1]])
+  const queue: [number, number][] = [[i0, j0]]
+  const far = (reach / GRID) ** 2
+  let hit = -1
+  let end: [number, number] | null = null
+  for (let q = 0; q < queue.length && q < 160000 && hit < 0; q++) {
+    const [i, j] = queue[q]!
+    const cx = (i + 0.5) * GRID
+    const cz = (j + 0.5) * GRID
+    for (const [t, n] of to.entries())
+      if (Math.hypot(cx - n.x, cz - n.z) <= FLOOD_AT) {
+        hit = t
+        end = [i, j]
+        break
+      }
+    for (const [di, dj] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const ni = i + di
+      const nj = j + dj
+      const k = key(ni, nj)
+      if (from.has(k) || (ni - i0) ** 2 + (nj - j0) ** 2 >= far || !open(ni, nj)) continue
+      from.set(k, key(i, j))
+      queue.push([ni, nj])
+    }
+  }
+  if (hit < 0 || !end) return null
+  // the cells back from the node to the point, pulled taut over open cells
+  const cells: [number, number][] = []
+  for (let k = key(end[0], end[1]); k >= 0; k = from.get(k)!) {
+    const i = Math.floor(k / 65536) - 32768
+    const j = (k % 65536) - 32768
+    cells.push([(i + 0.5) * GRID, (j + 0.5) * GRID])
+  }
+  const sees = (p: [number, number], q: [number, number]) => {
+    const n = Math.ceil(Math.hypot(q[0] - p[0], q[1] - p[1]) / (GRID / 2))
+    for (let s = 1; s < n; s++) {
+      const px = p[0] + ((q[0] - p[0]) * s) / n
+      const pz = p[1] + ((q[1] - p[1]) * s) / n
+      if (!open(Math.floor(px / GRID), Math.floor(pz / GRID))) return false
+    }
+    return true
+  }
+  const node = to[hit]!
+  const pts: [number, number][] = [[node.x, node.z], ...cells, [x, z]]
+  const out: [number, number][] = []
+  let at = 0
+  while (at < pts.length - 1) {
+    let next = pts.length - 1
+    while (next > at + 1 && !sees(pts[at]!, pts[next]!)) next--
+    if (next !== pts.length - 1) out.push(pts[next]!)
+    at = next
+  }
+  return { to: hit, way: out }
+}
+/** A flood reaches a walk node this near it, metres. */
+const FLOOD_AT = 0.6
+
 function memoOf(near: object, kind: string): GridMemo {
   let byKind = memos.get(near)
   if (!byKind) {
@@ -634,8 +789,10 @@ export function clearWay(
   const endsIn = (so: Solid, k: number): boolean => {
     const a = P[k]!
     const b = P[k + 1]!
-    const ra = k === 0 && door.from ? DOOR_SLACK : 0.05
-    const rb = k + 1 === P.length - 1 && door.to ? DOOR_SLACK : 0.05
+    // (only the walk's own ends: a corner on the way that touches a house is no reason to cross it)
+    const ra = k === 0 ? (door.from ? DOOR_SLACK : 0.05) : Number.NEGATIVE_INFINITY
+    const rb = k + 1 === P.length - 1 ? (door.to ? DOOR_SLACK : 0.05) : Number.NEGATIVE_INFINITY
+
     return solidDistance(so, a[0], a[2]) < ra || solidDistance(so, b[0], b[2]) < rb
   }
   const G = [...ground]
@@ -695,22 +852,28 @@ export function clearWay(
   }
   // last, a segment that still runs through a wall (round one thing into another) goes the tight way
   const hard = (x: number, z: number, r: number) => near(x, z, r).filter((o) => !solidOfBlocker(o).soft)
-  for (let k = 0, fixed = 0; k < P.length - 1 && fixed < (door.thorough ? 40 : 8); k++) {
+  /** Whether segment k runs through a wall (what its ends stand in aside). */
+  const cutAt = (k: number): boolean => {
     const a = P[k]!
     const b = P[k + 1]!
     const len = Math.hypot(b[0] - a[0], b[2] - a[2])
-    if (len < 1e-6) continue
-    const cuts = hard((a[0] + b[0]) / 2, (a[2] + b[2]) / 2, len / 2 + 0.1).some((o) => {
+    if (len < 1e-6) return false
+    return hard((a[0] + b[0]) / 2, (a[2] + b[2]) / 2, len / 2 + 0.1).some((o) => {
       const so = solidOfBlocker(o)
       if (endsIn(so, k)) return false
       return segmentDistance(so, a[0], a[2], b[0], b[2]) < 0.02
     })
-    if (!cuts) continue
+  }
+  for (let k = 0, fixed = 0; k < P.length - 1 && fixed < (door.thorough ? 40 : 16); k++) {
+    const a = P[k]!
+    const b = P[k + 1]!
+    const len = Math.hypot(b[0] - a[0], b[2] - a[2])
+    if (!cutAt(k)) continue
     // in a tight spot (a courtyard, a gate in front of a hall) the way is found on a fine grid
     // a way found from either end (one standing in a tight corner is easier left than reached)
-    const either = (C: number, grid: number, margin = GRID_NEAR) => {
-      const there = gridWay(a, b, near, C, grid, false, margin)
-      return there.length ? there : [...gridWay(b, a, near, C, grid, false, margin)].reverse()
+    const either = (C: number, grid: number, margin = GRID_NEAR, steps?: number) => {
+      const there = gridWay(a, b, near, C, grid, false, margin, false, steps)
+      return there.length ? there : [...gridWay(b, a, near, C, grid, false, margin, false, steps)].reverse()
     }
     // round the places people stand too where there is room, else only round the walls
     let found = gridWay(a, b, near, TIGHT, 0.1, false, GRID_NEAR, true)
@@ -720,6 +883,9 @@ export function clearWay(
     if (!found.length && door.thorough) found = either(TIGHT, 0.1, GRID_FAR * 2)
     // (… and squeezes through a gap a body's core passes, as a spot is judged reachable: walledIn)
     if (!found.length && door.thorough) found = either(CORE, 0.1, GRID_FAR * 2)
+    // (… and last, wide and coarse, as an edge of the walk graph looks for its way round: a spot whose
+    // node is across a chapel from it)
+    if (!found.length && door.thorough) found = either(0.2, 0.2, 12, EDGE_STEPS)
     if (!found.length) continue
     const ux = (b[0] - a[0]) / len
     const uz = (b[2] - a[2]) / len
@@ -1007,6 +1173,131 @@ export function hexWalk(
       }
     }
     for (const e of edges) e.len = Math.hypot(nodes[e.b]!.x - nodes[e.a]!.x, nodes[e.b]!.z - nodes[e.a]!.z)
+    // an edge whose straight way cuts through a wall, a house or a fence goes round it: the way found
+    // once here, on the fine grid, so everyone walking it walks round (ways on decks are the decks')
+    const near = (x: number, z: number, r: number) => hard.near(x, z, r)
+    for (const e of edges) {
+      const p = nodes[e.a]!
+      const q = nodes[e.b]!
+      if (onDeckKind(p.kind) || onDeckKind(q.kind) || e.kind === "bridge") continue
+      const a: Pt = [p.x, p.y, p.z]
+      const b: Pt = [q.x, q.y, q.z]
+      if (!cutsHard(a, b, near)) continue
+      let way: [number, number][] = []
+      for (const [C, grid, margin] of EDGE_SEARCH) {
+        way = gridWay(a, b, near, C, grid, false, margin, false, EDGE_STEPS)
+        if (!way.length) way = [...gridWay(b, a, near, C, grid, false, margin, false, EDGE_STEPS)].reverse()
+        if (way.length) break
+      }
+      if (!way.length) {
+        // no way round at all (a spur across a wall): no way, nobody walks it
+        e.walled = true
+        const id = edges.indexOf(e)
+        out[e.a] = out[e.a]!.filter((x) => x !== id)
+        out[e.b] = out[e.b]!.filter((x) => x !== id)
+        // a door with no way out to its street (a fence across it) is no door: nobody lives behind it
+        for (const n of [e.a, e.b])
+          if (nodes[n]!.kind === "door" && !out[n]!.length) doors.delete(nodes[n]!.tile)
+        continue
+      }
+      e.via = way
+      let len = 0
+      let [px, pz] = [p.x, p.z]
+      for (const [x, z] of [...way, [q.x, q.z] as [number, number]]) {
+        len += Math.hypot(x - px, z - pz)
+        px = x
+        pz = z
+      }
+      e.len = len
+    }
+    // what an edge through a wall alone joined to the rest (a spur into a castle court over its
+    // curtain) is joined again to the nearest node of the rest a way round the walls reaches (the
+    // court's own), else is no node of any tile: nobody is sent there to walk out through the wall
+    if (edges.some((e) => e.walled)) {
+      const joined = new Uint8Array(nodes.length)
+      const spread = (from: number[]) => {
+        const queue = from.filter((n) => !joined[n])
+        for (const n of queue) joined[n] = 1
+        for (let k = 0; k < queue.length; k++)
+          for (const id of out[queue[k]!]!) {
+            const ed = edges[id]!
+            const o = ed.a === queue[k] ? ed.b : ed.a
+            if (!joined[o]) {
+              joined[o] = 1
+              queue.push(o)
+            }
+          }
+      }
+      spread(hearts.filter((n) => n >= 0))
+      for (const e of edges) {
+        if (!e.walled) continue
+        for (const start of [e.a, e.b]) {
+          if (joined[start]) continue
+          // the part cut off
+          const part = [start]
+          const inPart = new Set(part)
+          for (let k = 0; k < part.length; k++)
+            for (const id of out[part[k]!]!) {
+              const ed = edges[id]!
+              const o = ed.a === part[k] ? ed.b : ed.a
+              if (!inPart.has(o)) {
+                inPart.add(o)
+                part.push(o)
+              }
+            }
+          let link: { a: number; b: number; via: [number, number][]; len: number } | null = null
+          for (const n of part) {
+            const p = nodes[n]!
+            const close = nodes
+              .map((q, i) => ({ i, d: Math.hypot(q.x - p.x, q.z - p.z) }))
+              .filter(({ i, d }) => joined[i] && d < REJOIN && Math.abs(nodes[i]!.y - p.y) < 0.6)
+              .sort((x, y) => x.d - y.d)
+            for (const { i, d } of close) {
+              if (link && d >= link.len) break
+              const q = nodes[i]!
+              const pa: Pt = [p.x, p.y, p.z]
+              const pb: Pt = [q.x, q.y, q.z]
+              let via: [number, number][] | null = cutsHard(pa, pb, near) ? null : []
+              for (const [C, grid, margin] of via ? [] : EDGE_SEARCH) {
+                const w = gridWay(pa, pb, near, C, grid, false, margin, false, EDGE_STEPS)
+                if (w.length) {
+                  via = w
+                  break
+                }
+              }
+              if (!via) continue
+              let len = 0
+              let [px, pz] = [p.x, p.z]
+              for (const [x, z] of [...via, [q.x, q.z] as [number, number]]) {
+                len += Math.hypot(x - px, z - pz)
+                px = x
+                pz = z
+              }
+              if (!link || len < link.len) link = { a: n, b: i, via, len }
+              break
+            }
+          }
+          if (link) {
+            edges.push({
+              a: link.a,
+              b: link.b,
+              kind: "path",
+              len: link.len,
+              ...(link.via.length ? { via: link.via } : {}),
+            })
+            out[link.a]!.push(edges.length - 1)
+            out[link.b]!.push(edges.length - 1)
+            spread([link.b])
+            continue
+          }
+          for (const n of part) {
+            const node = nodes[n]!
+            if (byTile.get(node.tile) === n) byTile.delete(node.tile)
+            if (doors.get(node.tile) === n) doors.delete(node.tile)
+          }
+        }
+      }
+    }
   }
 
   return {

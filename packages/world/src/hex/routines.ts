@@ -620,6 +620,21 @@ export function routineClips(id: string): string[] {
 }
 
 /**
+ * Where a routine stands its body off the spot, in the spot's frame (x right, z ahead): every part's
+ * `at` (a farmer's steps down a row, to the crate). None for a routine played on the spot.
+ */
+export function routineStands(id: string): (readonly [number, number])[] {
+  const r = ROUTINES[id]
+  if (!r) return []
+  const out: (readonly [number, number])[] = []
+  for (const p of r.parts) if (p.at && (p.at[0] !== 0 || p.at[1] !== 0)) out.push(p.at)
+  return out
+}
+
+/** A routine that plays on the spot in place of one whose steps off it would run into a wall (a fence by a row). */
+export const ROUTINE_IN_PLACE: Readonly<Record<string, string>> = { farm: "garden" }
+
+/**
  * The routine a townsfolk plays at a work spot: by role, the spot's clip and kind, the prefab of its tile
  * and whether it stands by a tower (a monk at the church's door or the bell tower rings the bell). None:
  * the spot's own clip (a seat, a drill, a role's odd job).

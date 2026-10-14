@@ -24,11 +24,30 @@ import { DRILLS, pairedDrill } from "./drills.ts"
 import { hexAt, hexCentre } from "./grid.ts"
 import { type HeroPool, heroSpotPool } from "./heroes.ts"
 import { type HexIsland, kindOf } from "./island.ts"
-import { CHOP_TRIP, cyclesSpan, PROPS, planCarts, type RoutineAt, routineFor, spotFrame } from "./routines.ts"
+import {
+  CHOP_TRIP,
+  cyclesSpan,
+  PROPS,
+  planCarts,
+  ROUTINE_IN_PLACE,
+  type RoutineAt,
+  routineFor,
+  routineStands,
+  spotFrame,
+} from "./routines.ts"
 import { planSocial } from "./social.ts"
-import { HARD, type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
+import { BODY_CORE, HARD, type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
 import { HEX_TILE_SIZE, opensEvening, type SpotHours, spotWindows } from "./tiles.ts"
-import { clearWay, type HexWalk, type HexWalkNode, type WalkBlocker, walledIn } from "./walk.ts"
+import {
+  clearWay,
+  cutsHard,
+  DOOR_SLACK,
+  floodWay,
+  type HexWalk,
+  type HexWalkNode,
+  type WalkBlocker,
+  walledIn,
+} from "./walk.ts"
 import type { HexDoorway, HexWorld } from "./world.ts"
 import { type HexZones, useOf, type ZoneKind } from "./zones.ts"
 
@@ -200,6 +219,11 @@ export interface LifeSpot extends SpotDoing {
   at: Vec3
   facing: number
   ground: boolean
+  /**
+   * The way in from its node when the straight way runs through a wall, a house or a fence (a pen's
+   * gate, round a block): corners from the node to the spot (walk.ts `floodWay`).
+   */
+  way?: [number, number][]
 }
 
 const onDeck = (n: HexWalkNode) => n.kind === "bridge" || n.kind === "dock"
@@ -229,8 +253,16 @@ function routeLength(walk: HexWalk, a: number, b: number): number {
   return m
 }
 
+/** What a wall across the straight way from a node to a spot costs that node, metres (lifePlaces `nodeOf`). */
+const CUT_OFF_M = 40
+/** How many of a cut-off spot's nearest nodes are tried for a way in (lifePlaces `nodeOf`). */
+const WAY_IN_TRIES = 3
 /** Hours a castle guard stands at a post between rounds of the wall. */
 const ROUND_EVERY = 0.7
+/** How far toward its walls a castle round's point stands from its court's node, metres: the first clear. */
+const ROUND_OFF = [0.9, 0.6, 0.3, 0, -0.4]
+/** A round's point keeps this far from walls and buildings, metres (a body). */
+const ROUND_BODY = 0.3
 
 /** How far inside its face a doorway's spot is: someone going in is through the door when they vanish. */
 const IN_DOOR = 0.2
@@ -288,6 +320,40 @@ export function laneLine(walk: HexWalk, path: readonly number[], lane: number): 
   })
 }
 
+/**
+ * The way through the nodes of `path` as points: each node pushed `lane` metres to the walker's right
+ * (laneLine), and between two nodes the corners of their edge's way round a wall (HexWalkEdge `via`),
+ * as found. Each point's flag: on the ground (not a deck).
+ */
+export function wayPoints(
+  walk: HexWalk,
+  path: readonly number[],
+  lane: number,
+): { pts: Vec3[]; flags: boolean[] } {
+  const line = laneLine(walk, path, lane)
+  const pts: Vec3[] = []
+  const flags: boolean[] = []
+  for (let k = 0; k < path.length; k++) {
+    const i = path[k]!
+    pts.push(line[k]!)
+    flags.push(!onDeck(walk.nodes[i]!))
+    const j = path[k + 1]
+    if (j === undefined) continue
+    const e = walk.out[i]!.map((id) => walk.edges[id]!).find((ed) => ed.a === j || ed.b === j)
+    if (!e?.via) continue
+    const via = e.a === i ? e.via : [...e.via].reverse()
+    const p = walk.nodes[i]!
+    const q = walk.nodes[j]!
+    const span = Math.hypot(q.x - p.x, q.z - p.z) || 1
+    for (const [x, z] of via) {
+      const f = Math.min(1, Math.hypot(x - p.x, z - p.z) / span)
+      pts.push([x, p.y + (q.y - p.y) * f, z])
+      flags.push(true)
+    }
+  }
+  return { pts, flags }
+}
+
 /** Blockers near a point, for keeping walks clear of them (TileFurniture's `solidsNear`). */
 export type NearBlockers = (x: number, z: number, r: number) => readonly WalkBlocker[]
 
@@ -320,6 +386,26 @@ export class LoopBuilder {
 
   get spot(): LifeSpot {
     return this.here
+  }
+
+  /** Where the loop is now, to come back to (`back`): a step tried and not kept. */
+  mark(): { steps: number; here: LifeSpot; since: number; act: "work" | "idle"; indoors: boolean } {
+    return {
+      steps: this.steps.length,
+      here: this.here,
+      since: this.since,
+      act: this.act,
+      indoors: this.indoors,
+    }
+  }
+
+  /** Back to a `mark`: the steps after it dropped. */
+  back(m: ReturnType<LoopBuilder["mark"]>): void {
+    this.steps.length = m.steps
+    this.here = m.here
+    this.since = m.since
+    this.act = m.act
+    this.indoors = m.indoors
   }
 
   /**
@@ -356,23 +442,7 @@ export class LoopBuilder {
       const straight = !!how.direct && to.node === this.here.node
       const path = straight ? [to.node] : this.walk.route(this.here.node, to.node)
       const nodes = path ?? [this.here.node, to.node]
-      const line = laneLine(this.walk, nodes, this.lane)
-      const flags = nodes.map((i) => !onDeck(this.walk.nodes[i]!))
-      let pts: Vec3[] = [this.here.at, ...line.slice(1, -1), to.at]
-      if (nodes.length === 1 && !straight) pts.splice(1, 0, line[0]!)
-      let ground: boolean[] = []
-      for (let k = 1; k < pts.length; k++) {
-        // a segment is on a deck when either end is
-        const fa = flags[Math.min(flags.length - 1, k - 1)]!
-        const fb = flags[Math.min(flags.length - 1, k)]!
-        ground.push(fa && fb)
-      }
-      if (this.near)
-        ({ pts, ground } = clearWay(pts, ground, this.near, {
-          from: this.indoors,
-          to: !!as.indoors,
-          thorough: this.thorough,
-        }))
+      const { pts, ground } = this.way(nodes, to, as, straight)
       const times = [t]
       for (let k = 1; k < pts.length; k++) {
         const a = pts[k - 1]!
@@ -389,6 +459,65 @@ export class LoopBuilder {
     this.act = as.act
     this.indoors = !!as.indoors
     return t
+  }
+
+  /**
+   * The points of a walk from here to `to` by `nodes`, cleared round the blockers: each node on the
+   * walker's lane, with the corners of the edges that go round a wall (HexWalkEdge `via`) and the spots'
+   * ways in (LifeSpot `way`). From the spot straight on to the way's second point (and from its last but
+   * one to the spot) unless that cuts through a wall, a house or a fence (a court's spot to the road past
+   * its gate): then by the way's own first (last) node, as the walk graph goes.
+   */
+  private way(
+    nodes: readonly number[],
+    to: LifeSpot,
+    as: { indoors?: boolean },
+    straight: boolean,
+  ): { pts: Vec3[]; ground: boolean[] } {
+    const { pts: line, flags } = wayPoints(this.walk, nodes, this.lane)
+    let first = 1
+    let last = line.length - 1
+    if (straight) last = 1
+    else if (nodes.length === 1) {
+      first = 0
+      last = line.length
+    } else if (this.near) {
+      const near = this.near
+      const out = this.indoors ? DOOR_SLACK : 0.05
+      const into = as.indoors ? DOOR_SLACK : 0.05
+      const long = line.length > 2
+      if (cutsHard(this.here.at, long ? line[1]! : to.at, near, { from: out, to: long ? 0.05 : into }))
+        first = 0
+      if (
+        cutsHard(long ? line[line.length - 2]! : this.here.at, to.at, near, {
+          from: long ? 0.05 : out,
+          to: into,
+        })
+      )
+        last = line.length
+    }
+    // a spot behind a wall from its node is left and reached by its way in, from and to the node itself
+    const out = !straight && this.here.way ? this.here.way : undefined
+    const into = !straight && to.way ? to.way : undefined
+    if (out) first = 0
+    if (into) last = line.length
+    const yOut = line[0]![1]
+    const yIn = line[line.length - 1]![1]
+    const away: Vec3[] = out ? [...out].reverse().map(([x, z]): Vec3 => [x, yOut, z]) : []
+    const come: Vec3[] = into ? into.map(([x, z]): Vec3 => [x, yIn, z]) : []
+    const pts: Vec3[] = [this.here.at, ...away, ...line.slice(first, last), ...come, to.at]
+    // each point's flag (the spots their own nodes'); a segment is on a deck when either end is
+    const pf = [
+      flags[0]!,
+      ...away.map(() => true),
+      ...flags.slice(first, last),
+      ...come.map(() => true),
+      flags[flags.length - 1]!,
+    ]
+    const ground: boolean[] = []
+    for (let k = 1; k < pts.length; k++) ground.push(pf[k - 1]! && pf[k]!)
+    if (!this.near) return { pts, ground }
+    return clearWay(pts, ground, this.near, { from: this.indoors, to: !!as.indoors, thorough: this.thorough })
   }
 
   /** Ends the loop at `end`: stays where it is until then. */
@@ -534,6 +663,47 @@ export function heroFrom(walk: HexWalk, h: HexIsland, at: Vec3, facing = 0): Lif
   if (node < 0) for (let c = 0; c < walk.nodes.length; c++) consider(c)
   const n = node >= 0 ? walk.nodes[node] : undefined
   return { node, at, facing, ground: n ? !onDeck(n) : true }
+}
+
+/**
+ * The walk node a point is reached from: of its tile's and its neighbours' nodes and doors, the nearest
+ * whose straight way to it runs through no wall, house or fence; else the nearest of them; else
+ * `fallback` (decisions.md "one source of truth for space": a lamp post is walked to from its own
+ * street, not from across the houses).
+ */
+export function nodeNear(
+  walk: HexWalk,
+  h: HexIsland,
+  x: number,
+  z: number,
+  near: NearBlockers,
+  fallback: number,
+): number {
+  const g = h.grid
+  const { q, r } = hexAt(x / HEX_TILE_SIZE, z / HEX_TILE_SIZE)
+  const i = g.index(q, r)
+  if (i < 0) return fallback
+  let clear = -1
+  let any = -1
+  let clearD = Number.POSITIVE_INFINITY
+  let anyD = Number.POSITIVE_INFINITY
+  for (const j of [i, ...g.neighbours(i)]) {
+    if (j < 0) continue
+    for (const c of [walk.at(j), walk.door(j)]) {
+      if (c < 0) continue
+      const n = walk.nodes[c]!
+      const d = Math.hypot(n.x - x, n.z - z)
+      if (d < anyD) {
+        anyD = d
+        any = c
+      }
+      if (d < clearD && !cutsHard([n.x, n.y, n.z], [x, n.y, z], near)) {
+        clearD = d
+        clear = c
+      }
+    }
+  }
+  return clear >= 0 ? clear : any >= 0 ? any : fallback
 }
 
 const BUILT = new Set<string>(["building", "farmstead", "homestead", "landmark"])
@@ -778,6 +948,10 @@ export function lifePlaces(
     return n
   }
   const walled = new Set<number>()
+  /** Each spot's way in from its node, where the straight way is through a wall (`floodWay`). */
+  const ways = new Map<number, [number, number][]>()
+  /** Everything the walks step round near a point (the places people stand aside). */
+  const solidsNear = (x: number, zz: number, r: number) => furniture.solidsNear(x, zz, r)
   /** The buildings, walls and fences near a point (what walls a place in; props are stepped round). */
   const hardNear = (x: number, zz: number, r: number) =>
     furniture.solidsNear(x, zz, r).filter((o) => HARD(o.kind))
@@ -796,9 +970,14 @@ export function lifePlaces(
     if (n !== undefined) return n
     const s = furniture.spots[spot]!
     // its tile's node or door; else the nearest node or door two tiles round it (or round the tile it
-    // stands over: a scene's spot out on its footprint), on that ground's level or a step off it
-    n = walk.at(s.tile) >= 0 ? walk.at(s.tile) : walk.door(s.tile)
-    if (n < 0) {
+    // stands over: a scene's spot out on its footprint), on that ground's level or a step off it; one
+    // with a clear straight way in first (a spot behind its own tile's chapel is reached from the street
+    // on its own side)
+    const own = walk.at(s.tile) >= 0 ? walk.at(s.tile) : walk.door(s.tile)
+    const ownCut = own >= 0 && cutOff(walk.nodes[own]!, s)
+    /** The nodes it may be reached from, best first. */
+    const ranked: number[] = own >= 0 && !ownCut ? [own] : []
+    if (!ranked.length) {
       const { q, r } = hexAt(s.x / HEX_TILE_SIZE, s.z / HEX_TILE_SIZE)
       const under = g.index(q, r)
       const level = h.level[under >= 0 ? under : s.tile]!
@@ -812,28 +991,56 @@ export function lifePlaces(
           for (const k of g.neighbours(j)) if (k >= 0) round.add(k)
         }
       }
-      let best = Infinity
+      const costs = new Map<number, number>()
       for (const j of round) {
         if (Math.abs(h.level[j]! - level) > 1) continue
         for (const c of [walk.at(j), walk.door(j)]) {
-          if (c < 0) continue
+          if (c < 0 || costs.has(c)) continue
           const node = walk.nodes[c]!
           const d = Math.hypot(node.x - s.x, node.z - s.z)
           if (d >= HEX_TILE_SIZE * 2.6 || wet(node, s)) continue
-          // the nearest, a house or a well in the straight way counting as a few metres more
-          const cost = d + 2.5 * inTheWay(node, s)
-          if (cost < best - 1e-9) {
-            best = cost
-            n = c
-          }
+          // the nearest, a house or a well in the straight way counting as a few metres more, a wall
+          // across it as a long way round (its own tile's node, cut off, before any other cut off)
+          const cut = c === own ? ownCut : cutOff(node, s)
+          costs.set(c, d + 2.5 * inTheWay(node, s) + (cut ? CUT_OFF_M + (c === own ? 0 : CUT_OFF_M) : 0))
         }
       }
+      if (own >= 0 && !costs.has(own)) costs.set(own, CUT_OFF_M)
+      ranked.push(...[...costs.keys()].sort((p, q) => costs.get(p)! - costs.get(q)! || p - q))
     }
-    // a spot walled in (a seat in a closed yard, a post behind a gate too narrow to pass) is offered
-    // to nobody
-    if (n >= 0 && cutOff(walk.nodes[n]!, s) && walledIn(s.x, s.z, hardNear, 12, walk.nodes[n]!)) {
-      walled.add(spot)
-      n = -1
+    // a spot behind a wall from its node (a pasture's spot inside its ring, a seat behind a tavern) is
+    // walked to by a way in found once here, round by the gate (decisions.md "one source of truth for
+    // space"); one walled in (a seat in a closed yard, a post behind a gate too narrow to pass), or in the
+    // open with no way in from the nearest few, is offered to nobody
+    n = ranked[0] ?? -1
+    const nd = n >= 0 ? walk.nodes[n]! : undefined
+    if (nd && cutOff(nd, s)) {
+      // one flood from the spot to the nearest few nodes, round the walls: the first it reaches (none:
+      // walled in, or in the open with no way in, as `walledIn` judges it)
+      const tries = ranked.slice(0, WAY_IN_TRIES)
+      const clear = tries.find((c) => !cutOff(walk.nodes[c]!, s))
+      let way: [number, number][] | null = null
+      if (clear !== undefined) {
+        n = clear
+        way = []
+      } else {
+        const found = floodWay(
+          s.x,
+          s.z,
+          hardNear,
+          tries.map((c) => walk.nodes[c]!),
+        )
+        if (found) {
+          n = tries[found.to]!
+          way = found.way
+        }
+      }
+      const shut = way === null && walledIn(s.x, s.z, hardNear, 12, nd)
+      if (way?.length) ways.set(spot, way)
+      if (shut || (way === null && !furniture.blocked(s.x, s.z, BODY_CORE, HARD))) {
+        walled.add(spot)
+        n = -1
+      }
     }
     nodes.set(spot, n)
     return n
@@ -845,6 +1052,8 @@ export function lifePlaces(
     const out: LifeSpot = { node: nodeOf(spot), at: [s.x, node.y, s.z], facing: s.facing, ground: !deck }
     if (s.clip) out.clip = s.clip
     if (s.prop) out.prop = s.prop
+    const way = ways.get(spot)
+    if (way) out.way = way
     // a deck's spot stands on the deck (its height is the node's); elsewhere `y` lifts off the ground
     if (s.y && !deck) out.lift = s.y
     const drill = s.drill ? drillAt(spot, s.drill) : undefined
@@ -1199,6 +1408,8 @@ export function lifePlaces(
     }
     return made
   }
+  // a castle round's point: a body's room from every wall and building
+  const roundFree = (x: number, zz: number) => !furniture.blocked(x, zz, ROUND_BODY, HARD)
   const poolInputs = {
     h,
     z,
@@ -1210,7 +1421,7 @@ export function lifePlaces(
       const { byZone, piles } = madeAll()
       const extra = [...byZone.values()].flat().map((m) => ({ x: m.spot.at[0], z: m.spot.at[2] }))
       for (const p of piles.values()) extra.push({ x: p.at[0], z: p.at[2] })
-      return [...folkStands(h, z, walk), ...extra]
+      return [...folkStands(h, z, walk, roundFree), ...extra]
     },
     home: guildhallZone(walk, z),
   }
@@ -1402,9 +1613,10 @@ export function planFolk(
     }
     return undefined
   }
+  const roundFree = (x: number, zz: number) => !places.furniture.blocked(x, zz, ROUND_BODY, HARD)
   /** A castle's rounds (castleRounds), from a start of each guard's own. */
   const rounds = (zi: number, pick: number): LifeSpot[] => {
-    const out = castleRounds(h, z, walk, zi)
+    const out = castleRounds(h, z, walk, zi, roundFree)
     const k0 = Math.floor(pick * out.length)
     return [...out.slice(k0), ...out.slice(0, k0)]
   }
@@ -1425,7 +1637,7 @@ export function planFolk(
   ): { spot: LifeSpot; post?: boolean } | undefined => {
     const zone = z.zones[zi]!
     if (zone.kind === "castle" && (role === "guard" || role === "night-watch")) {
-      const points = castleRounds(h, z, walk, zi)
+      const points = castleRounds(h, z, walk, zi, roundFree)
       const used = posted.get(zi) ?? new Set<number>()
       posted.set(zi, used)
       // spread over the wall: from a start of their own, the next point no other post is beside (then any)
@@ -1588,7 +1800,14 @@ export function planFolk(
                 Math.hypot(p.x - spots[spot]!.x, p.z - spots[spot]!.z) < BELL_REACH,
             ),
         )
-        if (id) work.routine = { id, seed: Math.floor(r(21) * 2 ** 30) }
+        // (one whose steps off the spot would run into a fence or a wall plays on the spot instead)
+        const fits = (rid: string) =>
+          routineStands(rid).every(([sx, sz]) => {
+            const [px, pz] = spotFrame(work.at[0], work.at[2], work.facing, sx, sz)
+            return !places.furniture.blocked(px, pz, BODY_CORE, HARD)
+          })
+        const fit = id && !fits(id) ? ROUTINE_IN_PLACE[id] : id
+        if (fit && fits(fit)) work.routine = { id: fit, seed: Math.floor(r(21) * 2 ** 30) }
       } else if (work.routine) work.routine = { ...work.routine, seed: Math.floor(r(21) * 2 ** 30) }
       const open = spot !== undefined ? spotWindows(spots[spot]!.hours)[0] : undefined
       const lane = 0.25 + r(3) * 0.35
@@ -1784,7 +2003,14 @@ function mineCarts(
  * A castle's rounds: points just inside its curtain wall (its walled court and yard tiles' nodes, a step
  * toward the wall), in order round the castle.
  */
-function castleRounds(h: HexIsland, z: HexZones, walk: HexWalk, zi: number): LifeSpot[] {
+function castleRounds(
+  h: HexIsland,
+  z: HexZones,
+  walk: HexWalk,
+  zi: number,
+  /** Whether a body stands clear of the walls and buildings there (TileFurniture `blocked`). */
+  free: (x: number, z: number) => boolean,
+): LifeSpot[] {
   const zone = z.zones[zi]!
   const inZone = new Set(zone.tiles)
   const heart = walk.nodes[walk.hearts[zi]!]!
@@ -1804,8 +2030,11 @@ function castleRounds(h: HexIsland, z: HexZones, walk: HexWalk, zi: number): Lif
       sz -= Math.sin((Math.PI / 3) * d)
     }
     const l = Math.hypot(sx, sz) || 1
-    const x = node.x + (sx / l) * 0.9
-    const zz = node.z + (sz / l) * 0.9
+    // (as near the wall as is clear of what stands in the court: a well, a chapel set against it)
+    const off = ROUND_OFF.find((o) => free(node.x + (sx / l) * o, node.z + (sz / l) * o))
+    if (off === undefined) continue
+    const x = node.x + (sx / l) * off
+    const zz = node.z + (sz / l) * off
     out.push({
       spot: { node: n, at: [x, node.y, zz], facing: Math.atan2(sx, sz), ground: true },
       a: Math.atan2(zz - heart.z, x - heart.x),
@@ -1852,13 +2081,18 @@ const HOMELESS_R = 2.4
  * Every point townsfolk stand at that is no spot and no slot (planFolk): the castles' rounds, and the
  * homes round the heart of a place with no doors. The hero spots keep off them too.
  */
-function folkStands(h: HexIsland, z: HexZones, walk: HexWalk): { x: number; z: number }[] {
+function folkStands(
+  h: HexIsland,
+  z: HexZones,
+  walk: HexWalk,
+  roundFree: (x: number, z: number) => boolean,
+): { x: number; z: number }[] {
   const out: { x: number; z: number }[] = []
   for (const [zi, zone] of z.zones.entries()) {
     const heart = walk.hearts[zi]!
     if (heart < 0 || !zone.tiles.length) continue
     if (zone.kind === "castle")
-      for (const s of castleRounds(h, z, walk, zi)) out.push({ x: s.at[0], z: s.at[2] })
+      for (const s of castleRounds(h, z, walk, zi, roundFree)) out.push({ x: s.at[0], z: s.at[2] })
     if (!zone.tiles.some((i) => walk.door(i) >= 0))
       for (let k = 0; k < 6; k++) {
         const s = spotAt(walk, heart, k, HOMELESS_R)

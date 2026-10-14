@@ -165,8 +165,8 @@ const onFrame = (f: CometFrame, x: number, y: number, out: Vector3, deeper = 1) 
 export function createComet(ctx: ShowCtx): ShowPiece {
   const uniforms = { uTime: { value: 0 }, uFade: { value: 0 } }
   const f = cometFrame(ctx.stage.camera, ctx.stage.getCamera().distance)
-  // a streak's scale: metres per unit of the layer's height
-  const k = f.h / 40
+  // a streak's scale: metres per unit of the layer's shorter side (on a phone held upright, its width)
+  const k = Math.min(f.h, f.w) / 40
   const night = ctx.night
   let geometry: PlaneGeometry
   const to = new Vector3()

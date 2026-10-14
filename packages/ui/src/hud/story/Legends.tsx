@@ -755,7 +755,7 @@ function EraPage({
     era.span,
     era.release,
     era.commits !== undefined ? `${era.commits.toLocaleString("en")} commits` : "",
-    era.image ? "" : `${count} files at its end`,
+    era.image || era.imageLoading ? "" : `${count} files at its end`,
   ]
   return (
     <li className="st-chapter st-era" data-page={era.id}>
@@ -773,16 +773,17 @@ function EraPage({
           <p className="st-ch-meta">{facts.filter(Boolean).join(" · ")}</p>
         </div>
       </header>
-      {/* the island as the era left it when the hall has filmed it; no empty frame while it has not
-          (GUI audit #14): its size goes in the chapter's facts instead */}
-      {era.image && (
-        <figure className="st-era-island">
-          <img
-            src={era.image}
-            alt={`The island at the end of ${unmarked(era.title)}: ${count} files.`}
-            loading="lazy"
-            decoding="async"
-          />
+      {/* the island as the era left it once the hall has filmed it, a shimmer while it films; no empty
+          frame when it cannot (GUI audit #14): its size goes in the chapter's facts instead */}
+      {(era.image || era.imageLoading) && (
+        <figure className="st-era-island" aria-busy={era.image ? undefined : true}>
+          {era.image && (
+            <img
+              src={era.image}
+              alt={`The island at the end of ${unmarked(era.title)}: ${count} files.`}
+              decoding="async"
+            />
+          )}
           <figcaption>
             The island at its end: <span className="num">{count}</span> files
           </figcaption>

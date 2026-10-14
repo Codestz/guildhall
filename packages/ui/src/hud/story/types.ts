@@ -157,10 +157,12 @@ export interface RepoEraView {
   commits?: number
   milestones: readonly RepoMilestoneView[]
   /**
-   * The island as it was at the era's end (`files(t)`): an image URL. The hall films it live (H1);
-   * without one the page shows the count alone.
+   * The island as it was at the era's end (`files(t)`): an image URL. The hall films it live (H1,
+   * studio hall/eraShots.ts); without one the page shows the count alone.
    */
   image?: string
+  /** The hall is filming it: the frame waits with a shimmer (and the count) until `image` lands. */
+  imageLoading?: boolean
 }
 
 export interface RepoLegendView {

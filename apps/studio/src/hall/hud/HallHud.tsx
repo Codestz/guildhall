@@ -52,6 +52,7 @@ import {
   type HudState,
   heroTitle,
   LegendsBook,
+  type LegendsBookProps,
   PartyTabs,
   type PartyView,
   PlaceDossier,
@@ -59,6 +60,7 @@ import {
   type Quality,
   ReadmeBadge,
   type RecapView,
+  type RepoLegendView,
   RosterBadges,
   type SeasonPick,
   SettingsPanel,
@@ -80,6 +82,7 @@ import type { HudParts } from "../../hexworld/index.ts"
 import type { BuiltPlace } from "../../hexworld/job.ts"
 import { captureStage } from "../../shell/viewer.ts"
 import type { HallTime } from "../clock.ts"
+import { type EraShots, eraShotKey } from "../eraShots.ts"
 import type { SessionSnapshot } from "../feeds/session.ts"
 import {
   chronicleOf,
@@ -172,9 +175,12 @@ export interface HallHudProps {
    * out of a told story.
    */
   home?: { title: string; leave?: { label: string; href: string } }
+  /** The Legends' era pictures (eraShots.ts): filmed when the book opens; the latest is the card's island. */
+  eraShots?: EraShots
 }
 
 const nothing = () => () => {}
+const zero = () => 0
 const noSnapshot = (): SessionSnapshot | null => null
 
 const useHud = (hud: ViewerHud): HudState => useSyncExternalStore(hud.subscribe, hud.state)
@@ -656,6 +662,20 @@ export function HallHud(props: HallHudProps) {
       on = false
     }
   }, [state.open, parts.stage])
+  // the era pictures: filmed once the book opens (in book order), each chapter's frame shimmering till its
+  // lands (the book alone hears them land: `EraBook`)
+  const shots = props.eraShots ?? null
+  const eraJobs = useMemo(
+    () => (legend && !home ? legend.eras.map((e) => ({ key: eraShotKey(slug, e), at: e.end })) : []),
+    [legend, slug, home],
+  )
+  useEffect(() => {
+    if (state.open === "legends" && shots) shots.want(eraJobs)
+  }, [state.open, shots, eraJobs])
+  // the latest era ends today: its picture is the Repo Chronicle card's island when it is drawn
+  const lastKey = eraJobs[eraJobs.length - 1]?.key
+  const latest = lastKey ? shots?.get(lastKey) : undefined
+  const repoFrame = latest ?? frame
 
   const toggle = (id: string) => hud.dispatch({ type: "toggle", id })
   const close = () => hud.dispatch({ type: "close" })
@@ -1237,10 +1257,12 @@ export function HallHud(props: HallHudProps) {
       {state.open === "legends" &&
         legendsAt &&
         createPortal(
-          <LegendsBook
+          <EraBook
+            shots={shots}
+            jobs={eraJobs}
+            history={legend}
             {...(told?.legend ? { legend: told.legend } : {})}
             {...(told?.markdown ? { markdown: told.markdown } : {})}
-            {...(legend ? { history: { repo: legend.repo, sessions: [], milestones: [], legend } } : {})}
             {...(props.legendMarkdown ? { historyMarkdown: props.legendMarkdown } : {})}
             view={live ? "session" : "history"}
             onCard={(view) => {
@@ -1256,7 +1278,7 @@ export function HallHud(props: HallHudProps) {
           ? createPortal(
               <ChronicleCard
                 recap={recapView(recap)}
-                {...(frame ? { image: frame } : {})}
+                {...(repoFrame ? { image: repoFrame } : {})}
                 focus={{ x: 0.5, y: 0.5 }}
                 link={`https://${recap.link}`}
                 onClose={close}
@@ -1275,6 +1297,40 @@ export function HallHud(props: HallHudProps) {
             ))}
       {sources && createPortal(<SourcesCard onClose={() => setSources(false)} />, props.modals)}
     </>
+  )
+}
+
+/**
+ * The Legends book with the era pictures as they land: the book alone re-renders when one does, not the
+ * HUD. Each era carries its picture once drawn, or the shimmer while the hall films it.
+ */
+function EraBook({
+  shots,
+  jobs,
+  history,
+  ...book
+}: Omit<LegendsBookProps, "history"> & {
+  shots: EraShots | null
+  jobs: readonly { key: string }[]
+  history: RepoLegend | null
+}) {
+  useSyncExternalStore(shots?.subscribe ?? nothing, shots?.version ?? zero)
+  const legend: RepoLegendView | null = history
+    ? {
+        ...history,
+        eras: history.eras.map((e, k) => {
+          const key = jobs[k]?.key
+          const image = key ? shots?.get(key) : undefined
+          if (image) return { ...e, image }
+          return key && shots?.waiting(key) ? { ...e, imageLoading: true } : e
+        }),
+      }
+    : null
+  return (
+    <LegendsBook
+      {...book}
+      {...(legend ? { history: { repo: legend.repo, sessions: [], milestones: [], legend } } : {})}
+    />
   )
 }
 

@@ -201,7 +201,7 @@ export const STORY_CSS = /* css */ `
 .st-era > .st-era-island { margin: 12px 0 4px; }
 .st-era-island {
   position: relative;
-  aspect-ratio: 16 / 7;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: 4px;
   background: #22394a;
@@ -220,6 +220,16 @@ export const STORY_CSS = /* css */ `
   color: var(--ink-soft);
 }
 .st-era-island figcaption .num { font: inherit; font-variant-numeric: lining-nums tabular-nums; color: var(--ink-text); }
+/* while the hall films the era: a slow light passes over the sea-blue frame; the picture fades in over it */
+.st-era-island[aria-busy="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 236, 196, 0.16) 45%, rgba(255, 236, 196, 0.26) 50%, rgba(255, 236, 196, 0.16) 55%, transparent 80%) -150% 0 / 60% 100% no-repeat, radial-gradient(ellipse 46% 40% at 50% 56%, rgba(120, 150, 110, 0.35), transparent 70%);
+  animation: st-shimmer 1.8s ease-in-out infinite;
+}
+@keyframes st-shimmer { to { background-position: 250% 0, 0 0; } }
+.st-era-island img { animation: st-fade 0.5s ease-out; }
 .st-era-lede { margin-top: 8px; margin-bottom: 4px; font-size: 16.5px; font-style: italic; text-wrap: pretty; }
 .st-era .st-ch-meta { margin-top: 2px; }
 .st-era .st-annal { grid-template-columns: 70px 22px 1fr; }
@@ -503,5 +513,7 @@ button.st-place-hero:hover { background: var(--raise-2); }
   .st-caption { animation: none; transition: opacity 0.3s linear; }
   .st-caption[data-leaving="true"] { translate: none; }
   .st-spinner { animation-duration: 2.4s; }
+  .st-era-island[aria-busy="true"]::before { animation: none; }
+  .st-era-island img { animation: none; }
 }
 `

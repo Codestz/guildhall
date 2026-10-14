@@ -23,6 +23,7 @@ import { setHome } from "../../site/homeHud.tsx"
 import { homePlaces } from "../../site/homePlaces.ts"
 import { type HallCamera, mountHallCamera } from "../camera.ts"
 import type { HallTime } from "../clock.ts"
+import { createEraShots, hallCapture } from "../eraShots.ts"
 import { mountEvents } from "../events.ts"
 import { createSession, feedKindOf, type HallSession, openFeed } from "../feeds/index.ts"
 import { type SessionPlaces, sessionPlaces } from "../feeds/places.ts"
@@ -277,6 +278,10 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
   const live = startSession(parts, opts)
   if (live) current = live.session
   const m = mountOn(parts, live, { query: opts.query ?? new URLSearchParams(), time: opts.time ?? null })
+  // the Legends' era pictures: filmed only once the book opens (eraShots.ts)
+  const eraShots = createEraShots(hallCapture(parts))
+  const ext = window.guildhall?.ext as Record<string, unknown> | undefined
+  if (ext) ext.eraShots = () => eraShots.stats()
   let gone = false
   void hallChronicle(opts.slug).then((found) => {
     if (gone) return
@@ -303,11 +308,14 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
         {...(found.status === "unavailable" ? { onRetry: opts.retry } : {})}
         {...(live ? { session: live } : {})}
         time={opts.time ?? null}
+        eraShots={eraShots}
       />,
     )
   })
   return () => {
     gone = true
+    eraShots.dispose()
+    if (ext?.eraShots) delete ext.eraShots
     if (live && current === live.session) current = null
     m.dispose()
     live?.portraits?.dispose()

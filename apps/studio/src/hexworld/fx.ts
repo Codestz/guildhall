@@ -120,7 +120,14 @@ export function mountFx(parts: {
   const scaffolds = sites.places.length
     ? createScaffolds(
         stage,
-        sites.places.map((p) => ({ id: idOf(p), at: p.build, yaw: p.yaw, half: p.half, top: p.top })),
+        sites.places.map((p) => ({
+          id: idOf(p),
+          at: p.build,
+          yaw: p.yaw,
+          half: p.half,
+          top: p.top,
+          colour: p.colour,
+        })),
         {
           // done: a puff of dust at the frame's feet (its back corners and the middle of its sides)
           onFinish: (place) => {

@@ -8,13 +8,14 @@ import {
   BUSY_PROGRESS,
   builtAt,
   FLAG_ORDER,
+  flagColour,
   SCAFFOLD_NOMINAL,
   scaffoldGeometry,
   scaffoldSize,
   scaffoldStage,
 } from "../src/events/scaffold.ts"
 import { along, flareGeometry, laneLengths } from "../src/events/ships.ts"
-import { eventSites, footing, HEART_REACH } from "../src/events/sites.ts"
+import { eventSites, footing, HEART_REACH, pieceColour } from "../src/events/sites.ts"
 import { BASE_COVER, BASE_WIND, isClear, mixOf, weathered, weatherLook } from "../src/events/weather.ts"
 import { lightAt } from "../src/light.ts"
 
@@ -365,7 +366,7 @@ describe("sites", () => {
 })
 
 describe("scaffold", () => {
-  test("stands on the ground (foot at 0) round its building, a crane over it, tint 0 everywhere", () => {
+  test("stands on the ground (foot at 0) round its building, a crane over it, only the flag takes the place's tint", () => {
     const g = scaffoldGeometry()
     g.computeBoundingBox()
     const box = g.boundingBox
@@ -378,7 +379,25 @@ describe("scaffold", () => {
     expect(box?.max.x).toBeLessThan(hx + 4)
     expect(box?.min.z).toBeLessThan(-hz)
     const tint = g.getAttribute("tint")
-    for (let i = 0; i < tint.count; i++) expect(tint.getX(i)).toBe(0)
+    const order = g.getAttribute("order")
+    let tinted = 0
+    for (let i = 0; i < tint.count; i++) {
+      if (tint.getX(i) === 1) tinted++
+      // the flag is the last thing built
+      if (tint.getX(i) === 1) expect(order.getX(i)).toBeCloseTo(FLAG_ORDER, 5)
+    }
+    expect(tinted).toBeGreaterThan(0)
+    expect(tinted).toBeLessThan(tint.count / 20)
+  })
+
+  test("the flag flies in the place's colour; unknown or none is the banner red", () => {
+    expect(flagColour("blue")).not.toEqual(flagColour("red"))
+    expect(new Set(["red", "blue", "green", "yellow"].map((c) => flagColour(c).join())).size).toBe(4)
+    expect(flagColour(undefined)).toEqual(flagColour("red"))
+    expect(flagColour("mauve")).toEqual(flagColour("red"))
+    expect(pieceColour("kaykit-hexagon/building-home-a-blue")).toBe("blue")
+    expect(pieceColour("kaykit-hexagon/building-well-yellow")).toBe("yellow")
+    expect(pieceColour("kaykit-forest/tree-1")).toBeUndefined()
   })
 
   test("fits any building: each vertex moves with its anchor, so a timber keeps its section", () => {

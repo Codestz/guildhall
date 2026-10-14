@@ -20,6 +20,7 @@ import type { WebGLProgramParametersWithUniforms } from "three"
 import {
   BufferAttribute,
   BufferGeometry,
+  Color,
   DynamicDrawUsage,
   InstancedBufferAttribute,
   InstancedMesh,
@@ -71,6 +72,22 @@ export interface ScaffoldPlace {
   half?: readonly [number, number]
   /** The building's height (m). */
   top?: number
+  /** The place's colour (`flagColour`): its flag flies in it; none: the banner red. */
+  colour?: string
+}
+
+/** The flags a place can fly: the KayKit building colours (the red is the palette's banner red). */
+const FLAGS: Record<string, string> = {
+  red: "#cc3333",
+  blue: "#3a6fd0",
+  green: "#3f9a4a",
+  yellow: "#e0b030",
+}
+
+/** A place's flag colour (linear, as vertex colours are): its colour's, else the banner red. */
+export function flagColour(colour?: string): [number, number, number] {
+  const c = new Color(FLAGS[colour ?? ""] ?? FLAGS.red)
+  return [c.r, c.g, c.b]
 }
 
 /** The frame's size for a place (`instanceSize`: half x, height, half z), its building's, kept sane. */
@@ -109,11 +126,12 @@ class Frame {
   private col: number[] = []
   private anc: number[] = []
   private ord: number[] = []
+  private tnt: number[] = []
   /** The order the next timbers get (`builtAt`). */
   order = 0
 
   /** A timber from `a` to `b`, `w` metres across (level, square to it) and `h` the other way. */
-  timber(a: Pt, b: Pt, colour: V3, w: number, h = w): this {
+  timber(a: Pt, b: Pt, colour: V3, w: number, h = w, tint = 0): this {
     const pa = nominal(a)
     const pb = nominal(b)
     const d = new Vector3(pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2]).normalize()
@@ -161,6 +179,7 @@ class Frame {
         this.col.push(...colour)
         this.anc.push(...v.s)
         this.ord.push(this.order)
+        this.tnt.push(tint)
       }
     }
     return this
@@ -173,7 +192,7 @@ class Frame {
     g.setAttribute("color", new BufferAttribute(new Float32Array(this.col), 3))
     g.setAttribute("anchor", new BufferAttribute(new Float32Array(this.anc), 3))
     g.setAttribute("order", new BufferAttribute(new Float32Array(this.ord), 1))
-    g.setAttribute("tint", new BufferAttribute(new Float32Array(this.pos.length / 3), 1))
+    g.setAttribute("tint", new BufferAttribute(new Float32Array(this.tnt), 1))
     return g
   }
 }
@@ -189,7 +208,8 @@ export function scaffoldGeometry(): BufferGeometry {
   const rope = swatch("thatch-light")
   const canvas = swatch("sand-light")
   const load = swatch("stone-light")
-  const flag = swatch("banner-red")
+  // the flag takes each place's colour (the instance's: tint 1)
+  const flag: V3 = [1, 1, 1]
   const f = new Frame()
   // the poles stand this far out from the walls, the decks between them and the walls
   const out = 1
@@ -310,7 +330,7 @@ export function scaffoldGeometry(): BufferGeometry {
   // done: a flag on a staff over the mast's top
   f.order = FLAG_ORDER
   f.timber(mast(3.8), mast(5), pole, 0.07)
-  f.timber(mast(4.7), pt([1, 1, -1], [out + 1 + 0.75, 4.7, -out - 1 + 0.75]), flag, 0.03, 0.55)
+  f.timber(mast(4.7), pt([1, 1, -1], [out + 1 + 0.75, 4.7, -out - 1 + 0.75]), flag, 0.03, 0.55, 1)
   return f.geometry()
 }
 
@@ -376,6 +396,10 @@ export function createScaffolds(
   progressAttr.setUsage(DynamicDrawUsage)
   geometry.setAttribute("instanceProgress", progressAttr)
   const mesh = new InstancedMesh(geometry, material, max)
+  // every flag's colour (set before the first draw: the program takes instance colours)
+  const flagColours = new Map(places.map((pl) => [pl.id, new Color(...flagColour(pl.colour))]))
+  for (let i = 0; i < max; i++)
+    mesh.setColorAt(i, flagColours.get(places[i]?.id ?? "") ?? new Color(...flagColour()))
   mesh.name = "scaffolds"
   mesh.instanceMatrix.setUsage(DynamicDrawUsage)
   mesh.count = 0
@@ -410,6 +434,7 @@ export function createScaffolds(
       s.set(1, Math.max(0.02, level), 1)
       m.compose(p, q, s)
       mesh.setMatrixAt(k, m)
+      mesh.setColorAt(k, flagColours.get(id) as Color)
       seen.setX(k, level)
       size.setXYZ(k, ...scaffoldSize(place))
       progressAttr.setX(k, built.get(id)?.at(t) ?? BUSY_PROGRESS)
@@ -417,6 +442,7 @@ export function createScaffolds(
     }
     mesh.count = k
     mesh.instanceMatrix.needsUpdate = true
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     seen.needsUpdate = true
     size.needsUpdate = true
     progressAttr.needsUpdate = true

@@ -56,6 +56,13 @@ export interface PlaceSite {
   half: [number, number]
   /** Its height, metres (0 without one). */
   top: number
+  /** That building's colour (a KayKit building's `-red`/`-blue`/`-green`/`-yellow`), when it has one: the scaffold's flag takes it. */
+  colour?: string
+}
+
+/** A building piece's colour: the suffix of its name (`kaykit-hexagon/building-home-b-blue`), or none. */
+export function pieceColour(piece: string): string | undefined {
+  return /-(red|blue|green|yellow)$/.exec(piece)?.[1]
 }
 
 export interface EventSites {
@@ -321,7 +328,7 @@ export function eventSites(island: HexIsland, zones: HexZones, world: HexWorld, 
     places: zones.zones.map((zone, zi) => {
       const at = top(zone.tile)
       const heart = { q: g.q[zone.tile] ?? 0, r: g.r[zone.tile] ?? 0 }
-      let best: { tile: number; f: Footing | null; yaw: number; score: number } | null = null
+      let best: { tile: number; f: Footing | null; yaw: number; score: number; piece?: string } | null = null
       for (const i of zone.tiles) {
         if (TILE_USES[zones.use[i] ?? 0] !== "building") continue
         const dq = (g.q[i] ?? 0) - heart.q
@@ -332,17 +339,19 @@ export function eventSites(island: HexIsland, zones: HexZones, world: HexWorld, 
         const door = doors.get(i)
         let f: Footing | null = null
         let yaw = 0
+        let piece: string | undefined
         for (const p of piecesOn.get(i) ?? []) {
           const turn = door?.facing ?? p.rot
           const here = footing(p, turn)
           if (here && (!f || here.bulk > f.bulk)) {
             f = here
             yaw = turn
+            piece = p.piece
           }
         }
         // the biggest closed building near the heart; failing any, the nearest building
         const score = steps <= HEART_REACH && f ? 1e6 + f.bulk : -dist
-        if (!best || score > best.score) best = { tile: i, f, yaw, score }
+        if (!best || score > best.score) best = { tile: i, f, yaw, score, ...(piece ? { piece } : {}) }
       }
       if (!best)
         return {
@@ -366,6 +375,7 @@ export function eventSites(island: HexIsland, zones: HexZones, world: HexWorld, 
         yaw: f ? best.yaw : 0,
         half: f ? f.half : ([0, 0] as [number, number]),
         top: f ? f.top : 0,
+        ...(best.piece && pieceColour(best.piece) ? { colour: pieceColour(best.piece) } : {}),
       }
     }),
   }

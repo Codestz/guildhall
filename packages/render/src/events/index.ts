@@ -27,6 +27,7 @@ export {
   builtAt,
   createScaffolds,
   FLAG_ORDER,
+  flagColour,
   PROGRESS_S,
   SCAFFOLD_NOMINAL,
   SCAFFOLD_S,

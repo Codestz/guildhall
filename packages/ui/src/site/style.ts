@@ -240,11 +240,12 @@ button.site-menu-palette:hover { background: var(--raise-2); color: var(--paper)
 .gh .site-card-shows[data-chips] li::before { display: none; }
 .gh .site-acts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
 .gh .site-act {
-  display: flex; flex-direction: column; justify-content: center; min-height: 52px; padding: 6px 8px; width: 100%;
+  display: flex; flex-direction: column; justify-content: flex-start; gap: 2px; height: 100%; min-height: 52px; padding: 6px 4px 6px 7px; width: 100%;
   border-radius: var(--r-sm); border: 1px solid var(--hair-2); background: var(--raise); color: var(--brass-hi);
   font: 400 15px/1.15 var(--display); text-align: left; text-decoration: none; cursor: pointer;
 }
-.gh .site-act span { font: 12.5px/1.2 var(--body); color: var(--muted); }
+/* five equal tiles, the numeral on one line and the title in two at most (GUI audit #18: titles wrapped unevenly) */
+.gh .site-act span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; min-height: 2.4em; overflow: hidden; hyphens: auto; font: 11.5px/1.2 var(--body); color: var(--muted); }
 .gh .site-act:hover { background: var(--raise-2); border-color: var(--brass-line); }
 .gh .site-card-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: auto; padding-top: 10px; }
 .gh .site-open {

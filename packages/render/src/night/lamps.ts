@@ -17,6 +17,7 @@ import {
   Matrix4,
   PlaneGeometry,
   PointLight,
+  ShaderChunk,
   ShaderMaterial,
   UniformsLib,
   UniformsUtils,
@@ -26,6 +27,32 @@ import type { Stage } from "../stage.ts"
 
 /** Real lights near the view, at most. */
 export const MAX_LIGHTS = 8
+
+/**
+ * Three's point-light loop (`lights_fragment_begin`) with the lights that are dark skipped: by day the
+ * MAX_LIGHTS real lights stay in the scene at intensity 0 (the count never changes, so no program is
+ * relinked), and every lit fragment on the island (the pieces, the ground, the water, the people) paid
+ * eight distance falloffs and eight BRDFs for nothing (measured: 1.2–3.6 ms a frame at DPR 1.5). A
+ * light's `color` uniform is its colour times its intensity, so a dark light is exactly `vec3(0)`
+ * and its term exactly zero: a branch on the uniform (the same for every fragment, so no divergence)
+ * leaves the picture byte for byte as it was and the lit lights at night as they were. The pattern
+ * three's `#pragma unroll_loop` needs (the loop body up to the first `}` before the end pragma) is kept:
+ * the branch's own brace is followed by the loop's, not by the pragma.
+ */
+const DARK_SKIP = "if ( pointLight.color != vec3( 0.0 ) )"
+
+export function skipDarkPointLights(chunk: string): string {
+  if (chunk.includes(DARK_SKIP)) return chunk
+  const body =
+    /(\t*pointLight = pointLights\[ i \];\n)([\s\S]*?)(\t*RE_Direct\( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight \);\n)/
+  return chunk.replace(
+    body,
+    (_, pick: string, between: string, direct: string) =>
+      `${pick}\t\t${DARK_SKIP} {\n${between}${direct}\t\t}\n`,
+  )
+}
+
+ShaderChunk.lights_fragment_begin = skipDarkPointLights(ShaderChunk.lights_fragment_begin)
 /** Metres over which a real light fades out as another lamp comes nearer than it. */
 const HANDOVER = 6
 /** Pools sit this far over the ground (the overlays are at +1–3 cm). */

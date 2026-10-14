@@ -4,7 +4,10 @@ import {
   cost,
   count,
   day,
+  fitName,
+  middleEllipsis,
   month,
+  nameForms,
   phaseOf,
   pickToasts,
   span,
@@ -122,5 +125,23 @@ describe("pickToasts", () => {
     expect(later.map((t) => t.key)).toEqual(["c", "e"])
     expect(later[0]!.left).toBe(500)
     expect(pickToasts(log, 20_000, seen)).toEqual([])
+  })
+})
+
+describe("a repo chip's name shortens to fit", () => {
+  const width = (t: string) => t.length * 10
+  test("middle ellipsis keeps both ends", () => {
+    expect(middleEllipsis("abcdefgh", 6)).toBe("abc…gh")
+    expect(middleEllipsis("abc", 6)).toBe("abc")
+  })
+  test("the owner goes first, then the middle", () => {
+    expect(nameForms("facebook/react").slice(0, 3)).toEqual(["facebook/react", "react", "re…t"])
+    expect(fitName("facebook/react", 150, width)).toBe("facebook/react")
+    expect(fitName("facebook/react", 80, width)).toBe("react")
+    expect(fitName("Codestz/guildhall-studio", 70, width)).toBe("gui…dio")
+  })
+  test("a name with no owner only loses its middle; never nothing", () => {
+    expect(fitName("The demo guild", 100, width)).toBe("The d…uild")
+    expect(fitName("x/averyveryverylongname", 5, width)).toBe("a…e")
   })
 })

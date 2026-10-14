@@ -121,7 +121,21 @@ export const SITE_CSS = /* css */ `
 .gh .site-welcome[data-dock="top"][data-open="true"] { padding: 0 12px; }
 .gh .site-welcome[data-dock="top"] .site-scrim { pointer-events: auto; }
 .gh .site-welcome[data-dock="top"] .site-welcome-foot { align-items: flex-start; }
+/* the three links on one row, the dots dropped and the gaps even (Watch a demo · How it's built · Connect a
+   source at 13.5 px is ~233 px; a 360 px phone's row has ~266 px beside the fold button) */
+.gh .site-welcome[data-dock="top"] .site-welcome-links { flex: 1 1 auto; flex-wrap: nowrap; justify-content: space-between; gap: 0 8px; }
+.gh .site-welcome[data-dock="top"] .site-welcome-links > span { display: none; }
+.gh .site-welcome[data-dock="top"] .site-welcome-links .site-link { font-size: 13.5px; white-space: nowrap; }
+/* narrower than that: two rows, the fold button on the last so no link stands alone */
+@media (max-width: 339px) {
+  .gh .site-welcome[data-dock="top"] .site-welcome-foot { align-items: flex-end; }
+  .gh .site-welcome[data-dock="top"] .site-welcome-links { flex-wrap: wrap; justify-content: flex-start; gap: 0 20px; }
+}
 @media (max-width: 380px) {
+  /* "Your repo" folds to its icon in a round 44 px button: the repo chip keeps its name */
+  .gh .site-repo-btn { width: 44px; padding: 0; justify-content: center; }
+  .gh .site-repo-btn .site-repo-word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .gh .site-repo-btn svg { width: 18px; height: 18px; }
   .gh .site-welcome[data-dock="top"] .site-go { width: 40px; padding: 0; }
   .gh .site-welcome[data-dock="top"] .site-go-word { display: none; }
 }

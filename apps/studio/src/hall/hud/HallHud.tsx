@@ -343,10 +343,10 @@ function PlacesPanel({
 
 /**
  * The toasts to show now from a session's chronicle: repeats told once (`×3`), the newest moments that
- * earn one, each fading on its own wall clock. Re-reads four times a second while one is up, so a paused
- * replay still clears them.
+ * earn one, each fading on its own wall clock. A playing session's snapshot re-reads them (10 Hz); a still
+ * one (`still`: paused) is re-read four times a second while one is up, so its toasts still clear.
  */
-function useToasts(entries: readonly SessionEntry[], on: boolean): ToastItem[] {
+function useToasts(entries: readonly SessionEntry[], on: boolean, still: boolean): ToastItem[] {
   const seen = useRef(new Map<string, number>())
   const [tick, setTick] = useState(0)
   // biome-ignore lint/correctness/useExhaustiveDependencies: `tick` re-reads the wall clock
@@ -354,12 +354,12 @@ function useToasts(entries: readonly SessionEntry[], on: boolean): ToastItem[] {
     () => (on ? pickToasts(groupRepeats(entries), performance.now(), seen.current, TOASTS_MAX) : []),
     [entries, on, tick],
   )
-  const live = items.length > 0
+  const fading = still && items.length > 0
   useEffect(() => {
-    if (!live) return
+    if (!fading) return
     const timer = setInterval(() => setTick((k) => k + 1), 250)
     return () => clearInterval(timer)
-  }, [live])
+  }, [fading])
   return items
 }
 
@@ -563,7 +563,11 @@ export function HallHud(props: HallHudProps) {
   }, [snap, live])
   const sessionStamp = snap ? clockWords(snap.clock.at - snap.clock.start) : ""
   // toasts while the Chronicle is folded (a phone's captions tell the moments; its chip opens the log)
-  const toasts = useToasts(sessionEntries, sessionFeed && !chronicleOpen && !phone && !hidden)
+  const toasts = useToasts(
+    sessionEntries,
+    sessionFeed && !chronicleOpen && !phone && !hidden,
+    !snap?.clock.playing && snap?.clock.mode !== "live",
+  )
   const roster = useMemo(
     () =>
       live && snap

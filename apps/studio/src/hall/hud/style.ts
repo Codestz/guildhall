@@ -65,6 +65,9 @@ const CSS = /* css */ `
   transition: bottom 0.2s ease;
 }
 .hall-caps > * { pointer-events: none; }
+/* the strip spans the slot: its width never follows the line it holds (the line is fitted to the strip,
+   and a strip that shrank to it would refit it every frame) */
+.hall-caps .st-captions { width: 100%; }
 .ui-viewer:has(.ui-hud-bottom .hud-timeline:is(:hover, :focus-within, [data-open="true"])) .hall-caps { bottom: calc(var(--gut) + 74px); }
 .ui-viewer[data-hud-mode="hidden"] .hall-caps { bottom: var(--gut); }
 .ui-viewer:not([data-phone]) .ui-hud-sheet:not(:empty) ~ .hall-caps { translate: calc(-50% - 190px) 0; }

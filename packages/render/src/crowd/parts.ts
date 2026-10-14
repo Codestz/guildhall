@@ -10,10 +10,13 @@
  */
 import { MeshoptSimplifier } from "meshoptimizer"
 import {
+  type Bone,
   BufferAttribute,
   BufferGeometry,
+  Matrix4,
+  type Mesh,
   type Object3D,
-  type SkinnedMesh,
+  SkinnedMesh,
   Uint8BufferAttribute,
   Uint16BufferAttribute,
 } from "three"
@@ -26,6 +29,54 @@ export function skinnedParts(root: Object3D): SkinnedMesh[] {
   const out: SkinnedMesh[] = []
   root.traverse((node) => {
     if ((node as SkinnedMesh).isSkinnedMesh) out.push(node as SkinnedMesh)
+  })
+  return out
+}
+
+/**
+ * The rigid meshes riding a bone of the body's skeleton (KayKit's skeletons wear their helmet, hat, hood
+ * and cape that way; the adventurers have none), as skinned parts: each bound whole to its bone (weight
+ * 1), its vertices in the skinned parts' bind space, so the crowd's bake moves it as the bone moves.
+ * Read with the body in its rest pose (as loaded).
+ */
+export function boneRiders(root: Object3D): SkinnedMesh[] {
+  const first = skinnedParts(root)[0]
+  if (!first) return []
+  const { bones, boneInverses } = first.skeleton
+  root.updateMatrixWorld(true)
+  const out: SkinnedMesh[] = []
+  const toBind = new Matrix4()
+  root.traverse((node) => {
+    const mesh = node as Mesh
+    if (!mesh.isMesh || (mesh as SkinnedMesh).isSkinnedMesh) return
+    let up: Object3D | null = mesh.parent
+    while (up && !bones.includes(up as Bone)) up = up.parent
+    const k = up ? bones.indexOf(up as Bone) : -1
+    const inverse = boneInverses[k]
+    if (!up || k < 0 || !inverse) return
+    // posed by the bake as (bone now) · boneInverse · bindMatrix · v: from the mesh's own space, at rest,
+    // v = bindMatrix⁻¹ · boneInverse⁻¹ · (bone at rest)⁻¹ · (mesh at rest)
+    toBind
+      .copy(first.bindMatrix)
+      .invert()
+      .multiply(inverse.clone().invert())
+      .multiply(up.matrixWorld.clone().invert())
+      .multiply(mesh.matrixWorld)
+    const g = mesh.geometry.clone()
+    g.applyMatrix4(toBind)
+    const n = g.getAttribute("position").count
+    const index = new Uint16Array(n * 4)
+    const weight = new Float32Array(n * 4)
+    for (let v = 0; v < n; v++) {
+      index[v * 4] = k
+      weight[v * 4] = 1
+    }
+    g.setAttribute("skinIndex", new Uint16BufferAttribute(index, 4))
+    g.setAttribute("skinWeight", new BufferAttribute(weight, 4))
+    const rider = new SkinnedMesh(g, mesh.material)
+    rider.name = mesh.name
+    rider.bind(first.skeleton, first.bindMatrix)
+    out.push(rider)
   })
   return out
 }

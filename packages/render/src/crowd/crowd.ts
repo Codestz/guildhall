@@ -70,7 +70,7 @@ import {
   TEXELS_PER_PERSON,
 } from "./material.ts"
 import { outfitTable, tintTable } from "./outfit.ts"
-import { mergeParts, type PartsTier, simplifyParts, skinnedParts } from "./parts.ts"
+import { boneRiders, mergeParts, type PartsTier, simplifyParts, skinnedParts } from "./parts.ts"
 import { type HeldProp, propMatrix } from "./props.ts"
 
 const logger = log("render:crowd")
@@ -330,7 +330,8 @@ export async function createCrowd(
   const geometries: BufferGeometry[][] = []
   const partNames: string[][] = []
   for (const [i, root] of roots.entries()) {
-    const parts = skinnedParts(root)
+    // (a skeleton's helmet, hat, hood or cape rides a bone: a part too, `boneRiders`)
+    const parts = [...skinnedParts(root), ...boneRiders(root)]
     const joints = parts[0] ? boneMap(bake, parts[0]) : null
     if (!joints) throw new Error(`createCrowd: body "${bodyIds[i]}" is not on the baked rig`)
     const base = mergeParts(parts, joints)

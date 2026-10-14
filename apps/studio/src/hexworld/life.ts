@@ -34,7 +34,14 @@ import {
   type Stage,
   type WorkFx,
 } from "@guildhall/render"
-import { type AgentPose, HERO_CLIPS, HERO_PROP_STANDIN, HERO_PROPS, RUN_CLIP } from "@guildhall/sim"
+import {
+  type AgentPose,
+  HERO_CLIPS,
+  HERO_PROP_STANDIN,
+  HERO_PROPS,
+  type Itinerary,
+  RUN_CLIP,
+} from "@guildhall/sim"
 import { PHONE_MAX } from "@guildhall/ui"
 import {
   CHARACTER_SCALE,
@@ -161,6 +168,8 @@ export interface Life {
   setAgents(source: AgentSource | null): void
   /** Where hero `id` is drawn now (its feet, metres), or null when it is not on the island. */
   heroAt(id: string): [number, number, number] | null
+  /** Hero `id`'s itinerary as planned (its steps and acts), when its source keeps one (the graveyard reads a fixer's blow). */
+  itinerary(id: string): Itinerary | undefined
   /**
    * How hero `id` is drawn (its figure's look, at scale 1, holding its role's own props) and the catalog
    * it is dressed from: what its HUD portrait shows. Null while it has no figure.
@@ -994,6 +1003,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       swapped = true
     },
     heroAt: (id) => heroAt(id),
+    itinerary: (id) => source?.itinerary?.(id),
     heroLook: (id) => heroLookOf(id),
     chips: () => chips,
     dispose() {

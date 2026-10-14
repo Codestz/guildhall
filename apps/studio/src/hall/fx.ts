@@ -7,6 +7,8 @@
  * The ships sail at the clock's rate (`fleetRate`): a replay at 4× sails them 4× as fast, a paused one
  * holds them where they are.
  */
+
+import type { WeatherKind } from "@guildhall/render"
 import { harbourOf, heroes } from "@guildhall/sim"
 import type { Fx } from "../hexworld/fx.ts"
 import type { SessionClockState } from "./feeds/clock.ts"
@@ -21,7 +23,8 @@ export function fleetRate(clock: Pick<SessionClockState, "mode" | "playing" | "r
   return clock.playing ? clock.rate : 0
 }
 
-export function driveFx(fx: Fx, session: HallSession): () => void {
+/** `pin`: a weather the viewer picked (Settings), over what the session says; null follows the session. */
+export function driveFx(fx: Fx, session: HallSession, pin?: () => WeatherKind | null): () => void {
   let jumps = session.clock.get().jumps
   const follow = () => fx.ships?.setRate(fleetRate(session.clock.get()))
   follow()
@@ -34,7 +37,7 @@ export function driveFx(fx: Fx, session: HallSession): () => void {
     jumps = clock.jumps
     const world = session.log().stateAt(at)
     const harbour = harbourOf(world)
-    fx.drive.set(harbour.weather)
+    fx.drive.set(pin?.() ?? harbour.weather)
     fx.ships?.update(harbour)
     const busy = new Set<string>()
     for (const h of heroes(world, at))

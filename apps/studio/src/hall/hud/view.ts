@@ -6,6 +6,7 @@
 import {
   type Chronicle,
   DAY_MS,
+  filesAt,
   isoOf,
   type RepoLegend,
   type RepoMilestone,
@@ -318,6 +319,30 @@ export function feedOf(legend: RepoLegend, placeOf: (unit: string) => number): C
     })
   }
   return out.sort((a, b) => a.at - b.at)
+}
+
+// ── the growth line ───────────────────────────────────────────────
+
+/** A contributor counts as in town for this many days after a commit (V1 town/presence.ts, a month). */
+export const IN_TOWN_DAYS = 30
+
+/**
+ * The history bar's line under the date (V1 TimelineGrowth): the contributors so far, those in town
+ * (a commit in the last `IN_TOWN_DAYS`, of the chronicle's listed contributors) and the files, on `day`.
+ * The contributors so far are the listed ones' share scaled to the repo's total (V1 `contributorsAt`);
+ * today, the total.
+ */
+export function growthLine(
+  c: Pick<Chronicle, "contributors" | "repo" | "snapshots" | "weekly" | "start" | "end">,
+  day: number,
+): string {
+  const listed = c.contributors.filter((p) => !p.bot)
+  const firsts = listed.filter((p) => p.first <= day).length
+  const total = c.repo.contributors
+  const so = day >= c.end ? total : listed.length === 0 ? 0 : Math.round((firsts / listed.length) * total)
+  const town = listed.filter((p) => p.first <= day && day <= p.last + IN_TOWN_DAYS).length
+  const files = day >= c.end ? c.repo.files : filesAt(c, Math.floor(day))
+  return `${n(so)} ${so === 1 ? "contributor" : "contributors"} · ${n(town)} in town · ${n(files)} files`
 }
 
 /** The feed's stamp: the history's span. */

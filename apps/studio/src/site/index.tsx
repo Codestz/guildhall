@@ -83,7 +83,7 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
 
       // The pieces first: fonts permitting (they settle within 3 s), the card is the first paint.
       void studio.ready.then(() => {
-        if (!gone) flushSync(() => react.render(<SiteApp time={time} />))
+        if (!gone) flushSync(() => react.render(<SiteApp />))
       })
 
       let offWorld = () => {}
@@ -99,7 +99,7 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
               let off = () => {}
               let done = false
               setHudBottom(parts.viewer.hud.bottom)
-              void import("./homeHud.tsx").then(({ mountHomeHud }) => {
+              void import("../hall/hud/mount.tsx").then(({ mountHomeHud }) => {
                 if (done || gone || !time) return
                 off = mountHomeHud(parts, {
                   go: openUrl,

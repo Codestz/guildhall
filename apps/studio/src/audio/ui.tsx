@@ -60,13 +60,15 @@ const LEVELS = [
 
 const percent = (v: number) => `${Math.round(v * 100)}%`
 
-/** Settings › Sound: the switch and three levels. */
-export function SoundSettings() {
+/**
+ * Settings › Sound: the switch and three levels. `bare`: the levers alone, for a Settings sheet that
+ * draws the section and its head itself (ui `SettingsPanel`'s Sound slot).
+ */
+export function SoundSettings({ bare = false }: { bare?: boolean }) {
   const prefs = useSoundPrefs()
   const waiting = useSoundWaiting()
-  return (
-    <section className="hud-set-section" aria-label="Sound">
-      <h3 className="ui-section-head">Sound</h3>
+  const levers = (
+    <>
       <Toggle
         label="Sound"
         hint={waiting ? "On: click to start it" : "A soft note per deed, and the world around you"}
@@ -87,6 +89,13 @@ export function SoundSettings() {
           onChange={(v) => soundPrefs.set({ [key]: v })}
         />
       ))}
+    </>
+  )
+  if (bare) return levers
+  return (
+    <section className="hud-set-section" aria-label="Sound">
+      <h3 className="ui-section-head">Sound</h3>
+      {levers}
     </section>
   )
 }

@@ -62,6 +62,8 @@ export interface HallSession {
   model(): GuildModel
   /** The log's first event's time (epoch ms), or null while it is empty. */
   origin(): number | null
+  /** What the session's Teller has told so far (its moments, its sessions): the Legends and the card. */
+  teller(): Teller | null
   /** Starts the feed; `placeOf` binds a file path to a zone (the hall's places). */
   start(placeOf?: (path: string) => number | undefined): void
   stop(): void
@@ -237,6 +239,7 @@ export function createSession(feed: Feed, opts: SessionOptions = {}): HallSessio
     log: () => log,
     model: () => ctx.model,
     origin: () => log.events[0]?.at ?? null,
+    teller: () => teller,
     start(bind) {
       if (started) return
       started = true

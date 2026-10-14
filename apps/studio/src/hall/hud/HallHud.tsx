@@ -1,43 +1,79 @@
 /**
- * A repo's hall HUD in history mode (plan-hud-events H1, decisions.md "HUD stays light"): V1's layout on
- * the Viewer's HUD regions, fed from the repo's chronicle. The Brand top-left (under the site's crest),
- * the icon rail top-right, the Chronicle folded to a chip bottom-left, a place's Dossier and Settings
- * in the right-hand sheet, and the bottom-centre left free for the timeline. Minimal by default, one
- * panel at a time, H cycles the mode; on a phone every panel is the one bottom sheet.
+ * The island's HUD (plan-hud-events H1; decisions.md "HUD stays light", "V1 UI parity", "UI picks"):
+ * V1's layout on the Viewer's HUD regions, for a repo's hall (its chronicle, `?feed=` its session) and
+ * for the home (its demo guild or a told story).
+ *
+ *   top left      the Brand (under the site's crest); with a session the party tabs and the Guild's
+ *                 badge bar (faces; a crowd folds into one badge per role), ⤢ opening the Guild
+ *   top right     the icon rail (Places, Legends, the card, sound, Settings); Hidden keeps only the
+ *                 "Show HUD · H" pill there
+ *   top centre    a plea's card, and the fast-forward chip while the director skips a quiet stretch
+ *   right         the one sheet: a place's or a hero's dossier, Settings, or the Chronicle
+ *   bottom left   the last moments as toasts over the Chronicle chip
+ *   bottom        the captions over the timeline: one scale picked for you, a hairline until hovered
+ *   bottom right  a told story's act chip and its acts
+ *
+ * Minimal by default; Detailed opens the Guild on the left and the Chronicle on the right and pins the
+ * timeline (V1); Hidden leaves the world, the captions and the way back. A badge or a roster row follows
+ * its hero with the camera (a row also opens the hero's dossier). On a phone every panel is the one
+ * bottom sheet.
  */
 import type { CameraPose } from "@guildhall/core"
-import { type QualityPick, qualityDpr, qualityOf } from "@guildhall/render"
-import type { Chronicle, RepoLegend, RepoRecap } from "@guildhall/sim"
+import { type QualityPick, qualityDpr, qualityOf, type WeatherKind } from "@guildhall/render"
+import {
+  type Chronicle,
+  DAY_MS,
+  type Legend,
+  legendMarkdown,
+  legendOf,
+  type Recap,
+  type RepoLegend,
+  type RepoRecap,
+  recapOf,
+} from "@guildhall/sim"
 import {
   BrandCard,
   Button,
+  Captions,
+  ChapterChip,
   ChronicleCard,
   ChronicleFeed,
   clock as clockWords,
+  FastForwardChip,
   FoldPanel,
   Glyphs,
+  type HeroView,
   type HudState,
-  Kbd,
   LegendsBook,
+  PartyTabs,
+  type PartyView,
   PlaceDossier,
+  pickToasts,
+  type Quality,
   type RecapView,
-  Segmented,
-  Slider,
+  RosterBadges,
+  SettingsPanel,
+  type SettingsValues,
+  ShowHudPill,
+  SourcesCard,
   StoryGlyphs,
+  type TimeMode,
+  type ToastItem,
   Toasts,
   Toggle,
   type ViewerHud,
+  type WeatherPick,
 } from "@guildhall/ui"
 import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import { createPortal } from "react-dom"
 import { SoundButton, SoundSettings } from "../../audio/ui.tsx"
 import type { HudParts } from "../../hexworld/index.ts"
 import type { BuiltPlace } from "../../hexworld/job.ts"
-import { clock as hourOf } from "../../hexworld/knobs.ts"
 import { captureStage } from "../../shell/viewer.ts"
 import type { HallTime } from "../clock.ts"
 import type { SessionSnapshot } from "../feeds/session.ts"
-import { chronicleOf } from "../feeds/view.ts"
+import { chronicleOf, groupRepeats, partiesOf, rosterOf, type SessionEntry } from "../feeds/view.ts"
+import { HallTimeline } from "../timeline.tsx"
 import {
   HeroSheet,
   type HudSession,
@@ -52,6 +88,7 @@ import {
   feedOf,
   feedPick,
   feedStamp,
+  growthLine,
   monthOf,
   type PlaceRow,
   placeDossier,
@@ -59,13 +96,39 @@ import {
   placeRows,
 } from "./view.ts"
 
-/** The panels the HUD remembers open or folded between visits. */
-export const REMEMBERED = ["places", "chronicle", "roster"] as const
+/**
+ * The panels the HUD remembers open or folded between visits. Not the Guild: it always opens folded to
+ * its badge bar (V1; user 10-13), ⤢ unfolds it.
+ */
+export const REMEMBERED = ["places", "chronicle"] as const
+
+/** The HUD's own slots beside the Viewer's regions (hall/hud/mount.tsx makes them). */
+export interface HallFloat {
+  /** Top centre: a plea's card, the fast-forward chip. */
+  top: HTMLElement
+  /** Bottom centre over the bar: the captions (kept in the Hidden HUD). */
+  caps: HTMLElement
+  /** Bottom right: a told story's act chip. */
+  acts: HTMLElement
+}
+
+/** What Settings pulls that the mount reads, and the director's skip it shows. */
+export interface HallLevers {
+  /** The director's style: a cinematic one skips a replay's quiet stretches. */
+  cinematic: boolean
+  /** A weather the viewer pinned, over what the session says (null: the session's). */
+  weather: WeatherKind | null
+  /** How fast the director runs a quiet stretch now (1: not skipping). */
+  skip(): number
+  subscribe(fn: () => void): () => void
+}
 
 export interface HallHudProps {
   hud: ViewerHud
-  /** Where the dialogs (the Legends, the card) are drawn: over the whole page. */
+  /** Where the dialogs (the Legends, the cards) are drawn: over the whole page. */
   modals: HTMLElement
+  float: HallFloat
+  levers: HallLevers
   parts: Omit<HudParts, "viewer">
   slug: string
   chronicle: Chronicle | null
@@ -78,9 +141,9 @@ export interface HallHudProps {
   /** No chronicle: the link that asks for one, and a retry when it could not be read. */
   request?: string
   onRetry?: () => void
-  /** The hall's session (`?feed=`): the Roster, the Pleas, a hero's Dossier, the Brand's source. */
+  /** The hall's session (`?feed=`): the Guild, the Pleas, a hero's Dossier, the Brand's source. */
   session?: HudSession
-  /** The hall's time: which scale the bar shows (the Chronicle follows it). */
+  /** The hall's time: the bar's clock. */
   time?: HallTime | null
   /**
    * The site's home, not a repo's hall: the island has no places to list (its zones are not a repo's units),
@@ -92,7 +155,6 @@ export interface HallHudProps {
 
 const nothing = () => () => {}
 const noSnapshot = (): SessionSnapshot | null => null
-const historyScale = () => "history" as const
 
 const useHud = (hud: ViewerHud): HudState => useSyncExternalStore(hud.subscribe, hud.state)
 const usePhone = (hud: ViewerHud): boolean => useSyncExternalStore(hud.subscribe, hud.phone)
@@ -148,6 +210,52 @@ function storeQuality(pick: QualityPick): void {
 function applyQuality(stage: HudParts["stage"], pick: QualityPick): void {
   stage.pickDpr(qualityDpr(pick, devicePixelRatio || 1))
 }
+
+/** The tiers the hall offers (the renderer has no Ultra). */
+const QUALITIES: readonly { value: Quality; label: string }[] = [
+  { value: "auto", label: "Auto" },
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+]
+/** The skies the island can show (render events/weather.ts): no rain without a storm, no snow. */
+const WEATHERS: readonly { value: WeatherPick; label: string }[] = [
+  { value: "auto", label: "Auto" },
+  { value: "clear", label: "Clear" },
+  { value: "cloudy", label: "Cloudy" },
+  { value: "storm", label: "Storm" },
+]
+
+/** The camera's keys, as the hall's Settings lists them. */
+const KEYS: readonly (readonly [string, string])[] = [
+  ["Drag", "Turn · one finger on a phone"],
+  ["Right-drag", "Pan · two fingers"],
+  ["Wheel", "Zoom · pinch"],
+  ["Click a hero", "Follow them (a badge, a chip, a row)"],
+  ["Click a name", "Open the place"],
+  ["B", "The director on / off"],
+  ["H", "Detailed / Minimal / Hidden"],
+  ["Esc", "Let go · fold the open panel"],
+]
+
+/** A told story's acts as hours: dawn to night across them (V1 `time: story`, the Saga's acts). */
+export function storyHour(chapter: number, chapters: number): number {
+  if (chapters <= 1) return 10
+  const k = Math.max(0, Math.min(chapters - 1, chapter))
+  return 6.5 + (14 * k) / (chapters - 1)
+}
+
+/** The local clock's hour, 0–24. */
+const nowHour = () => {
+  const d = new Date()
+  return d.getHours() + d.getMinutes() / 60
+}
+
+/** A whole day in this many seconds (`time: cycle`). */
+const CYCLE_SECONDS = 360
+
+/** The toasts shown at once (decisions.md "HUD stays light": at most 2). */
+const TOASTS_MAX = 2
 
 function RailButton({
   id,
@@ -233,131 +341,78 @@ function PlacesPanel({
   )
 }
 
-function Settings({
-  hud,
-  mode,
-  parts,
-  onClose,
-}: {
-  hud: ViewerHud
-  mode: HudState["mode"]
-  parts: HallHudProps["parts"]
-  onClose: () => void
-}) {
-  const head = useRef<HTMLHeadingElement>(null)
-  const [plates, setPlates] = useState(() => parts.labels?.shown() ?? false)
-  const [hour, setHour] = useState(() => parts.clock.get())
-  const [quality, setQuality] = useState(storedQuality)
-  useEffect(() => head.current?.focus(), [])
-  return (
-    <aside className="ui-panel hud-settings" role="dialog" aria-labelledby="hall-settings-h">
-      <header className="hud-settings-head">
-        <h2 id="hall-settings-h" ref={head} tabIndex={-1}>
-          Settings
-        </h2>
-        <button type="button" className="ui-icon-btn" onClick={onClose} aria-label="Close settings (Esc)">
-          <Glyphs.close />
-        </button>
-      </header>
-      <div className="hud-settings-body">
-        <section className="hud-set-section">
-          <h3 className="ui-section-head">Display</h3>
-          <Segmented
-            label="HUD (press H)"
-            value={mode}
-            options={[
-              { value: "detailed", label: "Detailed" },
-              { value: "minimal", label: "Minimal" },
-              { value: "hidden", label: "Hidden" },
-            ]}
-            onChange={(v) => hud.dispatch({ type: "mode", mode: v as HudState["mode"] })}
-          />
-          {parts.labels && (
-            <Toggle
-              label="Name plates"
-              hint="Each place's name over the island; click one to open it"
-              checked={plates}
-              onChange={(on) => {
-                parts.labels?.show(on)
-                setPlates(on)
-              }}
-            />
-          )}
-        </section>
-        <section className="hud-set-section">
-          <h3 className="ui-section-head">World</h3>
-          <Slider
-            label="Time of day"
-            value={hour}
-            min={0}
-            max={24}
-            step={0.25}
-            format={hourOf}
-            onChange={(h) => {
-              parts.clock.set(h)
-              setHour(h)
-            }}
-          />
-        </section>
-        <SoundSettings />
-        <section className="hud-set-section">
-          <h3 className="ui-section-head">Quality</h3>
-          <Segmented
-            label="Sharpness"
-            value={quality}
-            options={[
-              { value: "auto", label: "Auto" },
-              { value: "low", label: "Low" },
-              { value: "medium", label: "Medium" },
-              { value: "high", label: "High" },
-            ]}
-            onChange={(v) => {
-              const pick = qualityOf(v)
-              setQuality(pick)
-              storeQuality(pick)
-              applyQuality(parts.stage, pick)
-            }}
-          />
-          <p className="ui-hint">
-            {quality === "auto"
-              ? "Trades sharpness for a smooth frame rate as it goes."
-              : "Kept for your next visits. Low is lightest on a phone or an old laptop."}
-          </p>
-        </section>
-        <section className="hud-set-section">
-          <h3 className="ui-section-head">Camera</h3>
-          <dl className="hall-keys">
-            {KEYS.map(([k, what]) => (
-              <div key={k}>
-                <dt>
-                  <Kbd>{k}</Kbd>
-                </dt>
-                <dd>{what}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      </div>
-    </aside>
+/**
+ * The toasts to show now from a session's chronicle: repeats told once (`×3`), the newest moments that
+ * earn one, each fading on its own wall clock. Re-reads four times a second while one is up, so a paused
+ * replay still clears them.
+ */
+function useToasts(entries: readonly SessionEntry[], on: boolean): ToastItem[] {
+  const seen = useRef(new Map<string, number>())
+  const [tick, setTick] = useState(0)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `tick` re-reads the wall clock
+  const items = useMemo(
+    () => (on ? pickToasts(groupRepeats(entries), performance.now(), seen.current, TOASTS_MAX) : []),
+    [entries, on, tick],
   )
+  const live = items.length > 0
+  useEffect(() => {
+    if (!live) return
+    const timer = setInterval(() => setTick((k) => k + 1), 250)
+    return () => clearInterval(timer)
+  }, [live])
+  return items
 }
 
-const KEYS: readonly (readonly [string, string])[] = [
-  ["Drag", "Turn · one finger on a phone"],
-  ["Right-drag", "Pan · two fingers"],
-  ["Wheel", "Zoom · pinch"],
-  ["Click a name", "Open the place"],
-  ["H", "Detailed / Minimal / Hidden"],
-  ["Esc", "Fold the open panel"],
-]
+/** The time-of-day lever at work: the local clock, a fast day, a told story's acts; Fixed leaves the hour be. */
+function useTimeOfDay(
+  clock: HudParts["clock"],
+  mode: TimeMode,
+  chapter: { at: number; of: number } | null,
+): void {
+  useEffect(() => {
+    if (mode === "real") {
+      clock.set(nowHour())
+      const timer = setInterval(() => clock.set(nowHour()), 30_000)
+      return () => clearInterval(timer)
+    }
+    if (mode === "cycle") {
+      const timer = setInterval(() => clock.set((clock.get() + 24 / CYCLE_SECONDS) % 24), 1000)
+      return () => clearInterval(timer)
+    }
+  }, [clock, mode])
+  // a new act eases the hour over two seconds, ten steps a second
+  const act = mode === "story" && chapter ? storyHour(chapter.at, chapter.of) : null
+  useEffect(() => {
+    if (act === null) return
+    const from = clock.get()
+    let k = 0
+    const timer = setInterval(() => {
+      k++
+      clock.set(from + ((act - from) * k) / 20)
+      if (k >= 20) clearInterval(timer)
+    }, 100)
+    return () => clearInterval(timer)
+  }, [clock, act])
+}
 
 export function HallHud(props: HallHudProps) {
-  const { hud, parts, slug, chronicle, legend, recap } = props
+  const { hud, parts, slug, chronicle, legend, recap, float, levers } = props
   const state = useHud(hud)
   const phone = usePhone(hud)
+  const camera = parts.camera
   const [picked, setPicked] = useState<number | null>(null)
   const [brandOpen, setBrandOpen] = useState(false)
   const [frame, setFrame] = useState<string | undefined>()
+  const [sources, setSources] = useState(false)
+  const [following, setFollowing] = useState<string | null>(null)
+  const [cardOf, setCardOf] = useState<"repo" | "session">("repo")
+  // Detailed opens the Guild and the Chronicle; either may still be folded by hand until the mode changes
+  const [folded, setFolded] = useState<{ roster: boolean; chronicle: boolean }>({
+    roster: false,
+    chronicle: false,
+  })
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new mode unfolds them again
+  useEffect(() => setFolded({ roster: false, chronicle: false }), [state.mode])
   const sheetRef = useRef<HTMLDivElement>(null)
   // the remembered quality pick, in force from the start (Auto leaves the governor alone)
   useEffect(() => {
@@ -370,8 +425,14 @@ export function HallHud(props: HallHudProps) {
     live?.session.subscribe ?? nothing,
     live ? live.session.snapshot : noSnapshot,
   )
-  const scale = useSyncExternalStore(props.time?.subscribe ?? nothing, props.time?.scale ?? historyScale)
   const [hero, setHero] = useState<string | null>(null)
+  // who the camera follows (a badge reads pressed), and the director's switch
+  const filmed = useSyncExternalStore(camera?.subscribe ?? nothing, () => camera?.state().following ?? null)
+  const directing = useSyncExternalStore(
+    camera?.subscribe ?? nothing,
+    () => camera?.state().director ?? false,
+  )
+  const skip = useSyncExternalStore(levers.subscribe, levers.skip)
 
   const home = props.home
   const brand = useMemo(
@@ -390,6 +451,21 @@ export function HallHud(props: HallHudProps) {
     [place, parts.repo, chronicle, legend],
   )
 
+  // ── Settings' levers ──
+  const [quality, setQuality] = useState(storedQuality)
+  const [captions, setCaptions] = useState(true)
+  const [style, setStyle] = useState<"calm" | "cinematic">(levers.cinematic ? "cinematic" : "calm")
+  const [weather, setWeather] = useState<WeatherPick>("auto")
+  const storyTold = (snap?.chapters.length ?? 0) > 0
+  const [timeMode, setTimeMode] = useState<TimeMode>(() => (storyTold ? "story" : "fixed"))
+  const [hour, setHour] = useState(() => parts.clock.get())
+  useTimeOfDay(
+    parts.clock,
+    timeMode,
+    snap && storyTold ? { at: Math.max(0, snap.chapter), of: snap.chapters.length } : null,
+  )
+  const pace = snap ? snap.clock.rate : (props.time?.clock.get().rate ?? 1)
+
   const open = (index: number, from?: string) => {
     const p = parts.places[index]
     if (!p) return
@@ -397,15 +473,19 @@ export function HallHud(props: HallHudProps) {
     hud.dispatch({ type: "open", id: "dossier", ...(from ? { from } : {}) })
     parts.stage.rig.glide(poseFor(p, parts.stage.rig.get(), hud.phone() ? "bottom" : "right"), 1100)
   }
-  // a hero: its dossier in the sheet, the camera flying to them and following (hall/camera.ts), or
-  // without one over where they stand (their place, or the hall's)
-  const openHero = (id: string, from?: string) => {
-    setHero(id)
-    hud.dispatch({ type: "open", id: "hero", ...(from ? { from } : {}) })
-    if (parts.camera) return parts.camera.follow(id)
+  // a hero followed: the camera flies to them and keeps them framed (hall/camera.ts), or without one
+  // it looks over where they stand (their place, or the hall's)
+  const follow = (id: string) => {
+    if (camera) return camera.follow(id)
     const a = snap?.world.actors.get(id)
     const p = live?.places.placeAt(a?.place)
     if (p) parts.stage.rig.glide(poseFor(p, parts.stage.rig.get(), hud.phone() ? "bottom" : "right"), 1100)
+  }
+  // a hero opened: their dossier in the sheet, and followed
+  const openHero = (id: string, from?: string) => {
+    setHero(id)
+    hud.dispatch({ type: "open", id: "hero", ...(from ? { from } : {}) })
+    follow(id)
   }
   // a plate clicked or tapped in the world opens its place
   // biome-ignore lint/correctness/useExhaustiveDependencies: `open` only reads what is stable (the HUD, the parts)
@@ -413,16 +493,15 @@ export function HallHud(props: HallHudProps) {
   // the hero open in the sheet is the one its chip follows; a chip's plea mark opens its hero
   const heroOpen = state.open === "hero" ? hero : null
   // (with the hall's camera, the chip followed is the hero the camera follows: hall/camera.ts says)
-  const followsChips = Boolean(parts.camera)
   useEffect(() => {
-    if (!followsChips) parts.chips?.select(heroOpen)
-  }, [parts.chips, heroOpen, followsChips])
+    if (!camera) parts.chips?.select(heroOpen)
+  }, [parts.chips, heroOpen, camera])
   const openHeroRef = useRef(openHero)
   openHeroRef.current = openHero
   useEffect(() => {
-    parts.chips?.onPlea((id) => openHeroRef.current(id, hud.phone() ? undefined : "roster"))
+    parts.chips?.onPlea((id) => openHeroRef.current(id))
     return () => parts.chips?.onPlea(null)
-  }, [parts.chips, hud])
+  }, [parts.chips])
   // the open place's plate is marked
   useEffect(() => {
     parts.labels?.select(state.open === "dossier" ? picked : null)
@@ -435,48 +514,91 @@ export function HallHud(props: HallHudProps) {
     was.current = state.open
     if (state.open === "dossier" || state.open === "hero") sheetRef.current?.focus({ preventScroll: true })
     const lost = document.activeElement === document.body || document.activeElement === null
-    // back from a place to the list it was opened from: the place's own row
-    if (before === "hero" && state.open === "roster" && lost) {
-      document
-        .querySelector<HTMLElement>(".hall-roster .hud-roster-row[aria-pressed='true'], .hall-roster button")
-        ?.focus()
-    } else if (before === "dossier" && state.open === "places" && lost) {
+    if (before === "dossier" && state.open === "places" && lost) {
       const row = document.querySelector<HTMLElement>(`.hall-place-row[data-index="${picked}"]`)
       if (row) row.focus()
       else
         document.querySelector<HTMLElement>(".hall-places .hud-panel-head button, .hall-place-row")?.focus()
     } else if (before && !state.open && lost)
-      hud.rail
-        .querySelector<HTMLElement>(
-          `[data-panel="${before === "dossier" ? "places" : before === "hero" ? "roster" : before}"]`,
-        )
-        ?.focus()
+      (
+        hud.rail.querySelector<HTMLElement>(`[data-panel="${before === "dossier" ? "places" : before}"]`) ??
+        document.querySelector<HTMLElement>(".hud-badges-expand, .hud-chron-open")
+      )?.focus()
   }, [state.open, hud, picked])
   // the card's picture is the island as it is drawn now
   useEffect(() => {
     if (state.open !== "card") return
-    let live = true
-    void captureStage(parts.stage).then((url) => live && url && setFrame(url))
+    let on = true
+    void captureStage(parts.stage).then((url) => on && url && setFrame(url))
     return () => {
-      live = false
+      on = false
     }
   }, [state.open, parts.stage])
 
   const toggle = (id: string) => hud.dispatch({ type: "toggle", id })
   const close = () => hud.dispatch({ type: "close" })
   const hidden = state.mode === "hidden"
+  const detailed = state.mode === "detailed"
   const placesOpen =
     state.open === "places" || (state.open === "dossier" && state.back === "places" && !phone)
+  // the Guild: its badges, or (opened, or Detailed on a wide screen) its roster under the Brand
   const rosterOpen =
-    Boolean(snap) && (state.open === "roster" || (state.open === "hero" && state.back === "roster" && !phone))
-  // the Chronicle follows the bar: the session's moments on its Session scale, the eras on History
-  const sessionFeed = snap !== null && (scale === "session" || !legend)
+    Boolean(snap) &&
+    (state.open === "roster" ||
+      (state.open === "hero" && state.back === "roster" && !phone) ||
+      (detailed && !phone && !folded.roster && !placesOpen))
+  // the Chronicle on the right: opened, or Detailed with the sheet free (a dossier, Settings take it)
+  const sheetBusy =
+    state.open === "dossier" ||
+    state.open === "hero" ||
+    state.open === "settings" ||
+    (phone && state.open !== null && state.open !== "chronicle")
+  const chronicleOpen = state.open === "chronicle" || (detailed && !phone && !folded.chronicle && !sheetBusy)
+  // the session's moments when there is a session, else the history's eras
+  const sessionFeed = snap !== null
   const sessionEntries = useMemo(() => {
     if (!snap || !live) return []
     const origin = live.session.origin() ?? snap.clock.start
     return chronicleOf(live.session.log().events, snap.world, snap.clock.at, origin)
   }, [snap, live])
   const sessionStamp = snap ? clockWords(snap.clock.at - snap.clock.start) : ""
+  // toasts while the Chronicle is folded (a phone's captions tell the moments; its chip opens the log)
+  const toasts = useToasts(sessionEntries, sessionFeed && !chronicleOpen && !phone && !hidden)
+  const roster = useMemo(
+    () =>
+      live && snap
+        ? {
+            heroes: rosterOf(snap.world, snap.clock.at, live.places.name),
+            parties: partiesOf(snap.world, snap.clock.at),
+          }
+        : NO_ROSTER,
+    [live, snap],
+  )
+
+  // the session's own book and card (the Teller's story so far), told when asked for
+  const [told, setTold] = useState<{ legend?: Legend; markdown?: string; recap?: Recap } | null>(null)
+  const wantsBook = state.open === "legends" || (state.open === "card" && cardOf === "session")
+  // biome-ignore lint/correctness/useExhaustiveDependencies: told once each time the book or card opens
+  useEffect(() => {
+    if (!wantsBook || !live) return
+    const teller = live.session.teller()
+    if (!teller) return setTold(null)
+    const sessions = teller.party()
+    const book = legendOf(teller.history, sessions)
+    if (!book) return setTold({})
+    setTold({
+      legend: book,
+      markdown: legendMarkdown(book),
+      recap: recapOf({
+        legend: book,
+        history: teller.history,
+        sessions,
+        lookup: { session: (id) => teller.session(id) },
+        guild: home ? "The demo guild" : slug,
+        story: snap?.name ?? "",
+      }),
+    })
+  }, [wantsBook, live])
 
   const onFeedPick = (id: string) => {
     if (sessionFeed) return openHero(id, phone ? "chronicle" : undefined)
@@ -524,29 +646,43 @@ export function HallHud(props: HallHudProps) {
         <Link href={props.hrefs.demos} go={props.go}>
           Watch a demo
         </Link>
+        <button type="button" className="site-link" onClick={() => setSources(true)}>
+          Connect a source
+        </button>
       </p>
     </>
   )
 
+  const legendsAt = legend || live
   const chronicleFeed = (
     <ChronicleFeed
       entries={sessionFeed ? sessionEntries : feed}
       time={sessionFeed && snap ? snap.clock.at - snap.clock.start : 0}
+      parties={roster.parties}
       open
       compact
-      onToggle={() => toggle("chronicle")}
+      onToggle={() =>
+        state.open === "chronicle" ? toggle("chronicle") : setFolded((f) => ({ ...f, chronicle: true }))
+      }
       onPick={onFeedPick}
       {...(sessionFeed ? {} : { when: monthOf })}
       stamp={sessionFeed ? sessionStamp : chronicle ? feedStamp(chronicle) : ""}
       empty={sessionFeed ? "Nothing yet: the guild has not stirred." : "No history: this island is a sketch."}
       foot={
-        legend && !sessionFeed ? (
+        legendsAt ? (
           <>
             <Button size="sm" variant="outline" onClick={() => hud.dispatch({ type: "open", id: "legends" })}>
               <StoryGlyphs.book size={14} />
-              Legends by era
+              {sessionFeed ? "Legends" : "Legends by era"}
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => hud.dispatch({ type: "open", id: "card" })}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setCardOf(sessionFeed ? "session" : "repo")
+                hud.dispatch({ type: "open", id: "card" })
+              }}
+            >
               <StoryGlyphs.card size={14} />
               Chronicle card
             </Button>
@@ -568,14 +704,78 @@ export function HallHud(props: HallHudProps) {
     />
   )
 
+  const values: SettingsValues = {
+    pace,
+    director: directing,
+    quality,
+    hud: state.mode,
+    captions,
+    ...(snap ? { directorStyle: style } : {}),
+    time: timeMode,
+    hour,
+    ...(parts.fx ? { weather } : {}),
+  }
+  const onSettings = (patch: Partial<SettingsValues>) => {
+    if (patch.pace !== undefined) {
+      if (live) live.session.clock.setRate(patch.pace)
+      else props.time?.clock.setRate(patch.pace)
+    }
+    if (patch.director !== undefined) camera?.director(patch.director)
+    if (patch.quality !== undefined) {
+      const pick = qualityOf(patch.quality)
+      setQuality(pick)
+      storeQuality(pick)
+      applyQuality(parts.stage, pick)
+    }
+    if (patch.hud !== undefined) hud.dispatch({ type: "mode", mode: patch.hud })
+    if (patch.captions !== undefined) setCaptions(patch.captions)
+    if (patch.directorStyle !== undefined) {
+      setStyle(patch.directorStyle)
+      levers.cinematic = patch.directorStyle === "cinematic"
+    }
+    if (patch.time !== undefined) setTimeMode(patch.time)
+    if (patch.hour !== undefined) {
+      parts.clock.set(patch.hour)
+      setHour(patch.hour)
+    }
+    if (patch.weather !== undefined) {
+      setWeather(patch.weather)
+      const pin = patch.weather === "auto" ? null : (patch.weather as WeatherKind)
+      levers.weather = pin
+      if (pin) parts.fx?.drive.set(pin)
+    }
+  }
+  const followedName = filmed ? roster.heroes.find((h) => h.id === filmed)?.name : undefined
+  const settings = (
+    <SettingsPanel
+      values={values}
+      onChange={onSettings}
+      onClose={close}
+      onRepo={() => props.go(props.hrefs.another)}
+      hourNow={hour}
+      qualities={QUALITIES}
+      weathers={WEATHERS}
+      keys={KEYS}
+      sound={<SoundSettings bare />}
+      {...(followedName ? { cameraNote: `Following ${followedName}` } : {})}
+      display={parts.labels ? <PlatesToggle labels={parts.labels} /> : undefined}
+    />
+  )
+
   let sheet: ReactNode = null
   const rosterPanel = live && snap && (
     <RosterPanel
       hud={live}
       snap={snap}
+      following={following}
       picked={state.open === "hero" ? hero : null}
+      onCamera={filmed}
       onPick={(id) => openHero(id, "roster")}
-      onClose={() => hud.dispatch({ type: phone ? "close" : "closeAll" })}
+      onClose={() => {
+        if (state.open === "roster" || state.open === "hero")
+          hud.dispatch({ type: phone ? "close" : "closeAll" })
+        else setFolded((f) => ({ ...f, roster: true }))
+      }}
     />
   )
   if (state.open === "dossier") sheet = placeSheet
@@ -590,63 +790,51 @@ export function HallHud(props: HallHudProps) {
       />
     )
   else if (phone && state.open === "roster") sheet = rosterPanel
-  else if (state.open === "settings")
-    sheet = <Settings hud={hud} mode={state.mode} parts={parts} onClose={close} />
+  else if (state.open === "settings") sheet = settings
   else if (phone && state.open === "places")
     sheet = <PlacesPanel rows={rows} picked={picked} onPick={(k) => open(k, "places")} onClose={close} />
-  else if (phone && state.open === "chronicle") sheet = chronicleFeed
+  else if (chronicleOpen) sheet = chronicleFeed
+
+  const pleas = snap ? pleaCount(snap) : 0
+  // a plea's card: top centre (V1), under the Guild on a phone; the fast-forward chip beside it
+  const pleaCards = live && snap && !hidden && (
+    <PleaCards hud={live} snap={snap} onOpen={(id) => openHero(id)} />
+  )
+  const ffwd = snap?.kind === "replay" && <FastForwardChip rate={pace * skip} skip={skip} />
+  const chapters = snap?.chapters ?? []
+  const clock = live?.session.clock
 
   return (
     <>
       {createPortal(
         hidden ? (
-          <RailButton
-            id="show"
-            label="Show the HUD (H)"
-            open={false}
-            onClick={() => hud.dispatch({ type: "mode", mode: "minimal" })}
-          >
-            <Glyphs.eye size={18} />
-          </RailButton>
+          <ShowHudPill onShow={() => hud.dispatch({ type: "mode", mode: "minimal" })} pleas={pleas} />
         ) : (
           <nav className="hall-rail" aria-label="HUD">
-            {snap && (
-              <RailButton id="roster" label="The Guild" open={rosterOpen} onClick={() => toggle("roster")}>
-                <Glyphs.crown size={18} />
-                {snap.world.actors.size > 0 && pleaCount(snap) > 0 && (
-                  <i className="hud-tab-dot" aria-hidden="true" />
-                )}
-              </RailButton>
-            )}
             {!home && (
               <RailButton id="places" label="Places" open={placesOpen} onClick={() => toggle("places")}>
                 <Glyphs.place size={18} />
               </RailButton>
             )}
-            <RailButton
-              id="chronicle"
-              label="Chronicle"
-              open={state.open === "chronicle"}
-              onClick={() => toggle("chronicle")}
-            >
-              <Glyphs.quest size={18} />
-            </RailButton>
-            {legend && (
+            {legendsAt && (
               <RailButton
                 id="legends"
-                label="Legends by era"
+                label={legend ? "Legends by era" : "Legends"}
                 open={state.open === "legends"}
                 onClick={() => toggle("legends")}
               >
                 <StoryGlyphs.book size={18} />
               </RailButton>
             )}
-            {recap && (
+            {(recap || live) && !phone && (
               <RailButton
                 id="card"
                 label="Chronicle card"
                 open={state.open === "card"}
-                onClick={() => toggle("card")}
+                onClick={() => {
+                  setCardOf(live ? "session" : "repo")
+                  toggle("card")
+                }}
               >
                 <StoryGlyphs.card size={18} />
               </RailButton>
@@ -672,16 +860,37 @@ export function HallHud(props: HallHudProps) {
             status={snap ? sessionStatus(snap) : brand.status}
             stats={brand.stats}
             crest={false}
-            compact={state.mode !== "detailed" && !brandOpen}
+            compact={!detailed && !brandOpen}
             about={about}
             open={brandOpen}
             onToggle={() => setBrandOpen((v) => !v)}
-            {...(snap ? { pleas: pleaCount(snap) } : {})}
+            {...(snap ? { pleas } : {})}
             {...(live && snap?.kind === "live" ? { onRetry: () => live.session.retry() } : {})}
           />
-          {live && snap && !hidden && (
-            <PleaCards hud={live} snap={snap} onOpen={(id) => openHero(id, phone ? undefined : "roster")} />
+          {live && snap && (
+            <PartyTabs
+              parties={roster.parties}
+              heroes={roster.heroes}
+              following={following}
+              onFollow={setFollowing}
+              compact={phone}
+              className="hall-parties"
+            />
           )}
+          {live && snap && !rosterOpen && !(phone && state.open === "roster") && (
+            <RosterBadges
+              heroes={roster.heroes}
+              parties={roster.parties}
+              following={following}
+              selected={filmed}
+              onPick={(id) => (id ? follow(id) : camera?.release())}
+              onExpand={() => {
+                if (detailed && !phone) setFolded((f) => ({ ...f, roster: false }))
+                else hud.dispatch({ type: "open", id: "roster" })
+              }}
+            />
+          )}
+          {phone && pleaCards}
           {!phone && rosterOpen && rosterPanel}
           {!phone && placesOpen && (
             <PlacesPanel
@@ -695,25 +904,69 @@ export function HallHud(props: HallHudProps) {
         hud.corner,
       )}
       {createPortal(
-        !phone && state.open === "chronicle" ? (
-          chronicleFeed
-        ) : (
+        <>
+          {!phone && pleaCards}
+          {!phone && ffwd}
+        </>,
+        float.top,
+      )}
+      {snap &&
+        createPortal(
+          <Captions
+            {...(snap.caption ? { caption: snap.caption } : {})}
+            visible={captions && !detailed}
+            announcePleas={false}
+          />,
+          float.caps,
+        )}
+      {createPortal(
+        <>
+          {phone && ffwd}
+          {chapters.length > 0 && clock && snap && !hidden && (
+            <ChapterChip
+              chapters={chapters}
+              current={Math.max(0, snap.chapter)}
+              onJump={(k) => clock.seek(snap.clock.start + (chapters[k]?.at ?? 0), { jump: true })}
+              compact={phone}
+              className="hall-chapter"
+            />
+          )}
+        </>,
+        float.acts,
+      )}
+      {createPortal(
+        chronicleOpen && !phone ? null : (
           <Toasts
-            items={[]}
+            items={toasts}
             time={0}
+            parties={roster.parties}
+            quiet
+            onPick={(id) => openHero(id)}
             stamp={sessionFeed ? sessionStamp : chronicle ? feedStamp(chronicle) : "sketch"}
-            onExpand={() => toggle("chronicle")}
+            onExpand={() =>
+              detailed && !phone ? setFolded((f) => ({ ...f, chronicle: false })) : toggle("chronicle")
+            }
           />
         ),
         hud.feed,
       )}
+      {props.time &&
+        createPortal(
+          <HallTimeline
+            time={props.time}
+            pinned={detailed}
+            overlay={false}
+            {...(chronicle ? { growth: (at: number) => growthLine(chronicle, at / DAY_MS) } : {})}
+          />,
+          hud.bottom,
+        )}
       {sheet &&
         createPortal(
           <div
             className="hall-sheet"
             ref={sheetRef}
             tabIndex={-1}
-            data-panel={state.open ?? ""}
+            data-panel={state.open ?? (chronicleOpen ? "chronicle" : "")}
             data-keepout=""
           >
             {sheet}
@@ -721,30 +974,63 @@ export function HallHud(props: HallHudProps) {
           hud.sheet,
         )}
       {state.open === "legends" &&
-        legend &&
+        legendsAt &&
         createPortal(
           <LegendsBook
-            history={{ repo: legend.repo, sessions: [], milestones: [], legend }}
+            {...(told?.legend ? { legend: told.legend } : {})}
+            {...(told?.markdown ? { markdown: told.markdown } : {})}
+            {...(legend ? { history: { repo: legend.repo, sessions: [], milestones: [], legend } } : {})}
             {...(props.legendMarkdown ? { historyMarkdown: props.legendMarkdown } : {})}
-            view="history"
-            onCard={recap ? () => hud.dispatch({ type: "open", id: "card", from: "legends" }) : undefined}
+            view={live ? "session" : "history"}
+            onCard={(view) => {
+              setCardOf(view === "history" ? "repo" : "session")
+              hud.dispatch({ type: "open", id: "card", from: "legends" })
+            }}
             onClose={() => hud.dispatch({ type: "closeAll" })}
           />,
           props.modals,
         )}
       {state.open === "card" &&
-        recap &&
-        createPortal(
-          <ChronicleCard
-            recap={recapView(recap)}
-            {...(frame ? { image: frame } : {})}
-            focus={{ x: 0.5, y: 0.5 }}
-            link={`https://${recap.link}`}
-            onClose={close}
-          />,
-          props.modals,
-        )}
+        (cardOf === "repo" && recap
+          ? createPortal(
+              <ChronicleCard
+                recap={recapView(recap)}
+                {...(frame ? { image: frame } : {})}
+                focus={{ x: 0.5, y: 0.5 }}
+                link={`https://${recap.link}`}
+                onClose={close}
+              />,
+              props.modals,
+            )
+          : told?.recap &&
+            createPortal(
+              <ChronicleCard
+                recap={sessionRecapView(told.recap)}
+                {...(frame ? { image: frame } : {})}
+                focus={{ x: 0.5, y: 0.5 }}
+                onClose={close}
+              />,
+              props.modals,
+            ))}
+      {sources && createPortal(<SourcesCard onClose={() => setSources(false)} />, props.modals)}
     </>
+  )
+}
+
+const NO_ROSTER: { heroes: HeroView[]; parties: PartyView[] } = { heroes: [], parties: [] }
+
+function PlatesToggle({ labels }: { labels: NonNullable<HudParts["labels"]> }) {
+  const [on, setOn] = useState(() => labels.shown())
+  return (
+    <Toggle
+      label="Name plates"
+      hint="Each place's name over the island; click one to open it"
+      checked={on}
+      onChange={(next) => {
+        labels.show(next)
+        setOn(next)
+      }}
+    />
   )
 }
 
@@ -778,4 +1064,9 @@ export function recapView(recap: RepoRecap): RecapView {
     hero: recap.hero,
     site: recap.link,
   }
+}
+
+/** A session's card as the ui draws it (as /lab/hud's story `recapView`). */
+export function sessionRecapView(recap: Recap): RecapView {
+  return { ...recap, ...(recap.hero ? { hero: { label: recap.hero.label, at: recap.hero.at } } : {}) }
 }

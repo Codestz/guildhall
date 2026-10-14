@@ -123,6 +123,52 @@ export function clearFrame(width: number, height: number, insets: Insets): Clear
 
 export { framedTarget } from "@guildhall/render"
 
+/** A pleading hero's chip (mark and speech with it) keeps this far, px, inside the clear area's edge. */
+export const PLEA_MARGIN = 10
+/** The share of the measured overshoot the frame is nudged by per measure (the held frame lags by ~0.3 s). */
+const BIAS_GAIN = 0.6
+
+/**
+ * The shift, px, that brings `box` (a chip with its plea mark and speech) inside `rect` (the clear area)
+ * with `margin` to spare; a box wider (taller) than the area is centred in it. Zero when it already fits. Pure.
+ */
+export function fitShift(box: Box, rect: Box, margin = 0): { dx: number; dy: number } {
+  const axis = (lo: number, hi: number, from: number, to: number) => {
+    if (hi - lo > to - from - 2 * margin) return (from + to) / 2 - (lo + hi) / 2
+    if (lo < from + margin) return from + margin - lo
+    if (hi > to - margin) return to - margin - hi
+    return 0
+  }
+  return {
+    dx: axis(box.left, box.right, rect.left, rect.right),
+    dy: axis(box.top, box.bottom, rect.top, rect.bottom),
+  }
+}
+
+/**
+ * How far to change a nudge of `have` px (screen axes, y down) given where the chip's `box` stands in it:
+ * what `fitShift` asks while it pokes out, else the nudge unwinds toward zero as far as the box keeps its
+ * margin (a nudge made while the view glided in never stays once the hero is centred). Pure.
+ */
+export function biasStep(
+  box: Box,
+  rect: Box,
+  margin: number,
+  have: { x: number; y: number },
+): { dx: number; dy: number } {
+  const fit = fitShift(box, rect, margin)
+  const axis = (ask: number, keep: number, lo: number, hi: number, from: number, to: number) => {
+    if (ask !== 0 || keep === 0) return ask
+    // moving the box against the nudge: it may go until it touches the margin
+    const room = keep < 0 ? to - margin - hi : lo - (from + margin)
+    return -Math.sign(keep) * Math.min(Math.abs(keep), Math.max(0, room))
+  }
+  return {
+    dx: axis(fit.dx, have.x, box.left, box.right, rect.left, rect.right),
+    dy: axis(fit.dy, have.y, box.top, box.bottom, rect.top, rect.bottom),
+  }
+}
+
 /** How fast the held frame follows the measured one, per second (a sheet opening slides the view over ~0.5 s). */
 export const FRAME_RATE = 6
 
@@ -292,7 +338,7 @@ export interface HallCameraOptions {
   /** The director's switch before the link's say (`?director=` still wins): the home's is on. */
   director?: boolean
   /** The heroes' chips: a plain click on one follows its hero; the followed one is pinned first. */
-  chips?: Pick<Chips, "select" | "hit"> | null
+  chips?: Pick<Chips, "select" | "hit" | "extent"> | null
   /** The layer the chips are laid out in (their boxes' origin; the stage's host by default). */
   chipsHost?: HTMLElement
   now?: () => number
@@ -363,7 +409,29 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
   let clear: ClearFrame = clearFrame(1, 1, NO_INSETS)
   /** The frame the subject is held at: eased toward the measured one, so a panel opening slides the view, never jumps it. */
   const shown = { x: 0, y: 0, w: 1, h: 1 }
-  const frame = (): ClearFrame => shown
+  /** A nudge (NDC) of the frame that keeps a pleading hero's chip inside the clear area (see `fitShift`). */
+  const bias = { x: 0, y: 0 }
+  const frame = (): ClearFrame =>
+    bias.x === 0 && bias.y === 0 ? shown : { ...shown, x: shown.x + bias.x, y: shown.y + bias.y }
+  /** The pleading hero's chip, kept on screen: the bias grows while its box (mark and speech too) pokes out. */
+  const keepPlea = (id: string | null) => {
+    const actor = id ? opts.session?.snapshot().world.actors.get(id) : undefined
+    pleading = actor?.status === "waiting"
+    const box = id && pleading ? (opts.chips?.extent(id) ?? null) : null
+    if (!box) return
+    const stage = host.getBoundingClientRect()
+    const rect: Box = {
+      left: ((clear.x - clear.w + 1) / 2) * stage.width,
+      right: ((clear.x + clear.w + 1) / 2) * stage.width,
+      top: ((1 - clear.y - clear.h) / 2) * stage.height,
+      bottom: ((1 - clear.y + clear.h) / 2) * stage.height,
+    }
+    const have = { x: (bias.x * stage.width) / 2, y: (-bias.y * stage.height) / 2 }
+    const s = biasStep({ left: box[0], top: box[1], right: box[2], bottom: box[3] }, rect, PLEA_MARGIN, have)
+    bias.x = clamp(bias.x + ((s.dx * 2) / Math.max(1, stage.width)) * BIAS_GAIN, -0.9, 0.9)
+    bias.y = clamp(bias.y - ((s.dy * 2) / Math.max(1, stage.height)) * BIAS_GAIN, -0.9, 0.9)
+  }
+  let pleading = false
   // Measured when the HUD's regions or the open panel change size (the observer runs after layout, so
   // reading the boxes there forces none), and on a follow or a cut.
   const watched = new Set<Element>()
@@ -550,11 +618,18 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
         }
       }
       decide(t)
+      keepPlea(followId ?? (shot?.focus.kind === "hero" ? shot.focus.id : null))
       if (mode() !== lastMode) changed()
       cost.decides++
       cost.decideMs += performance.now() - begin
     }
     easeFrame(shown, clear, dt)
+    // nobody pleading in frame: the nudge eases away
+    if (!pleading && (bias.x !== 0 || bias.y !== 0)) {
+      const k = Math.exp(-FRAME_RATE * Math.max(0, dt))
+      bias.x = Math.abs(bias.x * k) < 1e-3 ? 0 : bias.x * k
+      bias.y = Math.abs(bias.y * k) < 1e-3 ? 0 : bias.y * k
+    }
     const focus: Focus | null = followId ? { kind: "hero", id: followId } : shot ? shot.focus : null
     if (focus) {
       const subject = subjectOf(focus)
@@ -654,7 +729,7 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
       const focus: Focus | null = followId ? { kind: "hero", id: followId } : shot ? shot.focus : null
       return focus ? subjectOf(focus) : null
     },
-    frame: () => ({ ...shown }),
+    frame: () => ({ ...frame() }),
     state: () => ({
       mode: mode(),
       following: followId,

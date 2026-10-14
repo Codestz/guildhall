@@ -10,12 +10,14 @@ import { emptyWorld, type GuildWorld, type WorldActor } from "@guildhall/sim"
 import type { ViewerHud } from "@guildhall/ui"
 import {
   type Box,
+  biasStep,
   CLOSE,
   clearFrame,
   createHallCamera,
   directorDefault,
   directorFree,
   easeFrame,
+  fitShift,
   framedTarget,
   glideMs,
   insetsOf,
@@ -406,5 +408,30 @@ describe("the controller", () => {
     }
     // 5 s of picks that flip subject every 400 ms: the first cut plus at most one per MIN_CUT_MS
     expect(cuts.length).toBeLessThanOrEqual(1 + Math.floor(5000 / MIN_CUT_MS))
+  })
+})
+
+describe("a pleading hero's chip stays in the clear area", () => {
+  const rect: Box = { left: 0, top: 120, right: 390, bottom: 780 }
+  const box = (l: number, t: number, r: number, b: number): Box => ({ left: l, top: t, right: r, bottom: b })
+
+  test("a chip that fits asks for nothing", () => {
+    expect(fitShift(box(150, 300, 240, 400), rect, 10)).toEqual({ dx: 0, dy: 0 })
+  })
+  test("a chip clipped by an edge is brought in by its margin", () => {
+    expect(fitShift(box(-40, 300, 50, 400), rect, 10)).toEqual({ dx: 50, dy: 0 })
+    expect(fitShift(box(330, 300, 420, 400), rect, 10)).toEqual({ dx: -40, dy: 0 })
+    expect(fitShift(box(150, 60, 240, 160), rect, 10)).toEqual({ dx: 0, dy: 70 })
+  })
+  test("a box wider than the area is centred", () => {
+    expect(fitShift(box(-30, 300, 440, 400), rect, 10).dx).toBe(-10)
+  })
+  test("a nudge that is no longer needed unwinds only as far as the margin allows", () => {
+    // pushed 60 px right and now centred: all of it unwinds
+    expect(biasStep(box(150, 300, 240, 400), rect, 10, { x: 60, y: 0 })).toEqual({ dx: -60, dy: 0 })
+    // the chip sits 20 px from the left margin: it may only give back 20
+    expect(biasStep(box(30, 300, 120, 400), rect, 10, { x: 60, y: 0 })).toEqual({ dx: -20, dy: 0 })
+    // no nudge, nothing to do
+    expect(biasStep(box(150, 300, 240, 400), rect, 10, { x: 0, y: 0 })).toEqual({ dx: 0, dy: 0 })
   })
 })

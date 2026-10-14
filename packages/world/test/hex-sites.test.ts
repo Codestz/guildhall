@@ -13,8 +13,8 @@
  *   the castle's site and the town's square stay where they are as the island grows, and no river or
  *   lake lies inside them.
  *
- * The full sweep (seeds 1–20 × 9 knob sets × files 500/1500/4000/12000, 720 islands, about a minute and
- * a half) runs with FUZZ=full; by default each seed and knob set is built at one of the four sizes in turn.
+ * The full sweep (seeds 1–20 × 9 knob sets × files 500/1500/4000/12000, 720 islands, five to six minutes
+ * on a busy machine) runs with FUZZ=full; by default each seed and knob set is built at one of the four sizes in turn.
  */
 import { afterAll, describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
@@ -116,7 +116,7 @@ describe("every place has floor, a way in and room of its own", () => {
       loose: 0,
     })
     expect(n).toBe(FULL ? 720 : 180)
-  }, 300_000)
+  }, 600_000)
 })
 
 describe("the reserved sites", () => {

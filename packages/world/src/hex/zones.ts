@@ -14,7 +14,11 @@
  * tile path (a step up or down costs, a river tile is a bridge and costs more, rock and lakes are
  * closed), and later roads ride the earlier ones. A road reaches the castle through its gate, never over
  * its walls. Where no gentle way joins a place to the rest, its road climbs two or three levels at once by
- * a flight of stairs, so every place is on the one network.
+ * a flight of stairs, so every place is on the one network. A tree goes round, so then, nearest place
+ * first, a place whose walk from the Guildhall is over SHORTCUT_RATIO times the straight line gets a
+ * shortcut: the shortest new way on from the roads (stairs, bridges and woods as dear as a road's, never
+ * onto a bridge, round a place's lots by its streets), out of the castle's postern where that is
+ * nearer (sites.ts), built when it saves a sixth of the walk at least.
  *
  * Then every tile of a place gets a job, so it reads when built: the heart is a square; a road tile is
  * a street; a tile beside a street is a building (thinned by the place's density, never a solid block);
@@ -220,6 +224,56 @@ export function placeSizes(specs: readonly PlaceSpec[], land: number): Map<strin
     out.set(s.id, Math.min(cap, Math.max(PLAN[kind].min, want)))
   }
   return out
+}
+
+/** How much longer than the straight line a walk from the Guildhall to a place may be before it gets a shortcut. */
+const SHORTCUT_RATIO = 1.3
+/** A shortcut is built only when it saves at least this share of the walk (×: the new walk's most). */
+const SHORTCUT_GAIN = 0.85
+/** What a shortcut pays (in steps) for each tile of a place off its streets it crosses. */
+const SHORTCUT_LOT = 6
+
+/** A binary min-heap of (key, value) pairs. */
+class MinHeap {
+  private readonly k: number[] = []
+  private readonly v: number[] = []
+  get size(): number {
+    return this.k.length
+  }
+  push(key: number, value: number): void {
+    const { k, v } = this
+    k.push(key)
+    v.push(value)
+    for (let c = k.length - 1; c > 0; ) {
+      const p = (c - 1) >> 1
+      if (k[p]! <= k[c]!) break
+      ;[k[p], k[c]] = [k[c]!, k[p]!]
+      ;[v[p], v[c]] = [v[c]!, v[p]!]
+      c = p
+    }
+  }
+  pop(): [number, number] {
+    const { k, v } = this
+    const out: [number, number] = [k[0]!, v[0]!]
+    const lk = k.pop()!
+    const lv = v.pop()!
+    if (k.length) {
+      k[0] = lk
+      v[0] = lv
+      for (let c = 0; ; ) {
+        const l = c * 2 + 1
+        const r = l + 1
+        let m = c
+        if (l < k.length && k[l]! < k[m]!) m = l
+        if (r < k.length && k[r]! < k[m]!) m = r
+        if (m === c) break
+        ;[k[m], k[c]] = [k[c]!, k[m]!]
+        ;[v[m], v[c]] = [v[c]!, v[m]!]
+        c = m
+      }
+    }
+    return out
+  }
 }
 
 /** Cheapest tile path from `from` to any tile `goal` accepts; null if none. */
@@ -531,6 +585,11 @@ export function hexZones(
             return [...g.neighbours(to)].some((j) => j >= 0 && j !== from && dry(j) && !site.has(j))
           return true
         },
+        // a postern opens onto dry open ground a step off at most (no moat to bridge)
+        posternOpen: (from, to) => {
+          const kk = kind(to)
+          return dry(to) && kk !== "cliff" && !foot.has(to) && Math.abs(h.level[to]! - h.level[from]!) <= 1
+        },
         foot: (j) =>
           (site.has(j) || foot.has(j)) &&
           dry(j) &&
@@ -832,6 +891,148 @@ export function hexZones(
       if (!lane) break
       roads.push({ a: ti - 1, b: ti - 1, tiles: lane })
       for (const i of lane) if (!use[i]) use[i] = kind(i) === "river" ? U.bridge : U.road
+    }
+  }
+
+  // ---- shortcuts: from the Guildhall to every place, a walk no longer than the land makes it ----
+  // (nearest place first, so a far one may ride a nearer one's; a new way is the shortest walk on from the
+  // roads already built, climbing, bridging and through woods as a road does, never onto a bridge)
+  const hub = plan ? ci : zones.findIndex((zz) => zz.kind === "town")
+  if (hub >= 0) {
+    const SQ3 = Math.sqrt(3)
+    const cx = (i: number) => SQ3 * (g.q[i]! + g.r[i]! / 2)
+    const cz = (i: number) => 1.5 * g.r[i]!
+    const span = (i: number, j: number) => Math.hypot(cx(i) - cx(j), cz(i) - cz(j))
+    const heartOf = (zi: number) => (zi === ci && plan ? plan.heart : zones[zi]!.tile)
+    /** The walking length along `ways` (tile paths) from `seeds` (a tile and its length so far) to every tile on them. */
+    const along = (ways: readonly (readonly number[])[], seeds: [number, number][]): Float64Array => {
+      const nb = new Map<number, Set<number>>()
+      for (const w of ways)
+        for (let k = 1; k < w.length; k++) {
+          const a = w[k - 1]!
+          const b = w[k]!
+          if (!nb.has(a)) nb.set(a, new Set())
+          if (!nb.has(b)) nb.set(b, new Set())
+          nb.get(a)!.add(b)
+          nb.get(b)!.add(a)
+        }
+      const d = new Float64Array(N).fill(Infinity)
+      const pq = new MinHeap()
+      for (const [i, di] of seeds)
+        if (di < d[i]!) {
+          d[i] = di
+          pq.push(di, i)
+        }
+      while (pq.size) {
+        const [di, i] = pq.pop()
+        if (di > d[i]!) continue
+        for (const j of nb.get(i) ?? []) {
+          const dj = di + span(i, j)
+          if (dj < d[j]!) {
+            d[j] = dj
+            pq.push(dj, j)
+          }
+        }
+      }
+      return d
+    }
+    // out of the castle: from its heart along its courts to the gate (or the postern), then a step out
+    const exits: { gate: number; out: number; d: number }[] = []
+    if (plan) {
+      const inner = along(plan.ways, [[plan.heart, 0]])
+      exits.push({ gate: plan.gate, out: endOf(ci), d: inner[plan.gate]! + span(plan.gate, endOf(ci)) })
+      if (plan.postern >= 0 && Number.isFinite(inner[plan.postern]!))
+        exits.push({
+          gate: plan.postern,
+          out: plan.posternEntry,
+          d: inner[plan.postern]! + span(plan.postern, plan.posternEntry),
+        })
+    } else exits.push({ gate: -1, out: endOf(hub), d: 0 })
+    const network = () =>
+      along(
+        roads.map((r) => r.tiles),
+        exits.map((e): [number, number] => [e.out, e.d]),
+      )
+    /** A new way's step: its length, a climb, a bridge and the woods dearer, as a road's. */
+    const wayStep = (a: number, b: number): number => {
+      // (never onto a bridge already built: its deck runs one way, a new way would leave it sideways)
+      if (use[b] === U.bridge) return Infinity
+      const c = roadStep(a, b, 2)
+      if (!Number.isFinite(c)) return c
+      // (roadStep's discount for riding a road is the network's own length here)
+      if (use[b] === U.road) return c / 0.35
+      // (and through a place it keeps to the place's streets: its tiles off them are its buildings' lots)
+      return zoneOf[b] ? c + SHORTCUT_LOT : c
+    }
+    const order = zones
+      .map((_, zi) => zi)
+      .filter((zi) => zi !== hub)
+      .sort((p, q) => span(heartOf(p), heartOf(hub)) - span(heartOf(q), heartOf(hub)) || p - q)
+    let net = network()
+    for (const zi of order) {
+      const to = endOf(zi)
+      const straight = span(heartOf(zi), heartOf(hub))
+      if (straight < 3) continue
+      const now = net[to]!
+      if (now / straight <= SHORTCUT_RATIO) continue
+      // from every tile on the roads at its walking length, the cheapest new way on to the place
+      const cost = new Float64Array(N).fill(Infinity)
+      const prev = new Int32Array(N).fill(-1)
+      const pq = new MinHeap()
+      for (let i = 0; i < N; i++)
+        if (Number.isFinite(net[i]!) && !walled.has(i) && use[i] !== U.bridge) {
+          cost[i] = net[i]!
+          pq.push(net[i]!, i)
+        }
+      routeEnds[0] = to
+      routeEnds[1] = -1
+      while (pq.size) {
+        const [d, i] = pq.pop()
+        if (d > cost[i]!) continue
+        if (i === to) break
+        for (const j of g.neighbours(i)) {
+          if (j < 0) continue
+          const c = wayStep(i, j)
+          if (!Number.isFinite(c) || d + c >= cost[j]!) continue
+          cost[j] = d + c
+          prev[j] = i
+          pq.push(d + c, j)
+        }
+      }
+      if (prev[to]! < 0) continue
+      const tiles = [to]
+      for (let k = prev[to]!; k >= 0; k = prev[k]!) tiles.push(k)
+      tiles.reverse()
+      // the new walk's length (its first tile is on the roads, or a gate's step out)
+      let len = net[tiles[0]!]!
+      for (let k = 1; k < tiles.length; k++) len += span(tiles[k - 1]!, tiles[k]!)
+      if (len > now * SHORTCUT_GAIN) continue
+      // out through the postern, when it starts at its step out and no road runs there yet
+      const exit = exits.find((e) => e.out === tiles[0] && e.gate >= 0)
+      if (exit && !roads.some((r) => r.tiles.includes(exit.gate))) tiles.unshift(exit.gate)
+      roads.push({ a: hub, b: zi, tiles })
+      for (const i of tiles) if (!use[i]) use[i] = kind(i) === "river" ? U.bridge : U.road
+      net = network()
+    }
+    // a postern no shortcut took still leads somewhere: a lane from it to the nearest road
+    if (plan && plan.postern >= 0 && !roads.some((r) => r.tiles.includes(plan.postern))) {
+      const on = new Set<number>()
+      for (const r of roads) for (const i of r.tiles) if (!walled.has(i) && use[i] !== U.bridge) on.add(i)
+      routeEnds[0] = plan.posternEntry
+      routeEnds[1] = -1
+      const lane = on.has(plan.posternEntry)
+        ? [plan.posternEntry]
+        : path(
+            h,
+            plan.posternEntry,
+            (i) => on.has(i),
+            (a, b) => (use[b] === U.bridge ? Infinity : roadCost(a, b)),
+          )
+      if (lane) {
+        lane.unshift(plan.postern)
+        roads.push({ a: ci, b: ci, tiles: lane })
+        for (const i of lane) if (!use[i]) use[i] = kind(i) === "river" ? U.bridge : U.road
+      }
     }
   }
 

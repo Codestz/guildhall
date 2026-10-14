@@ -885,7 +885,7 @@ export function hexWorld(
       .sort((a, b) => steps(a, plan.heart) - steps(b, plan.heart) || a - b)
     for (const i of courts) {
       const kind: CourtKind | undefined =
-        i === plan.gate
+        i === plan.gate || i === plan.postern
           ? "gate"
           : i === plan.heart
             ? "heart"
@@ -1300,6 +1300,7 @@ export function hexWorld(
       R,
       y: top(plan.keep),
       gate: plan.gate !== plan.keep ? { tile: plan.gate, side: plan.gateSide } : null,
+      postern: plan.postern >= 0 ? { tile: plan.postern, side: plan.posternSide } : null,
       bodies: castleBodies,
       colour,
       // a court's way or a door's approach across the side between two of its tiles

@@ -63,11 +63,14 @@ describe("the curtain wall meets what it abuts", () => {
           continue
         }
         expect(walls.length).toBeGreaterThan(6)
-        // one gatehouse, at its own size drawn out to its opening's width (GATE_OPENING between its posts)
+        // one gatehouse (and the postern's, where it has one), at its own size drawn out to its opening's
+        // width (GATE_OPENING between its posts)
         const gates = walls.filter((p) => p.piece === "kaykit-hexagon/wall-straight-gate")
-        expect(gates.length).toBe(1)
-        expect(gates[0]!.scale).toBe(WALL_SCALE)
-        expect(4 * WALL_SCALE * gates[0]!.stretch!).toBeCloseTo(GATE_OPENING, 5)
+        expect(gates.length).toBe(z.castle!.postern >= 0 ? 2 : 1)
+        for (const gate of gates) {
+          expect(gate.scale).toBe(WALL_SCALE)
+          expect(4 * WALL_SCALE * gate.stretch!).toBeCloseTo(GATE_OPENING, 5)
+        }
         // every piece fitted to its run, never drawn out past a third (a stub against a building is short)
         for (const p of walls) if (p.stretch !== undefined) expect(p.stretch).toBeLessThan(1.31)
         const r = siteReport(h, z, w, hexWalk(h, z, w, { reach: workTiles(h, z) }))
@@ -143,17 +146,19 @@ describe("the castle's doors and gate have clear approaches", () => {
             .map((sol) => sol.piece)
           expect([seed, files, d.tile, hit]).toEqual([seed, files, d.tile, []])
         }
-        const gate = w.pieces.find((p) => p.piece === "kaykit-hexagon/wall-straight-gate")!
-        // through the gate, a metre and more either side of its wall (its own sides and the walls aside)
-        const pts = strip(gate.x, gate.z, gate.rot, -1.8, 1.8).filter(([x, zz]) => {
-          const [ox, oz] = [x - gate.x, zz - gate.z]
-          return Math.abs(ox * Math.sin(gate.rot) + oz * Math.cos(gate.rot)) > 0.75
-        })
-        expect([seed, files, blocked(pts, (q) => q.includes("/wall-"))]).toEqual([seed, files, []])
-        // and the opening itself, its leaves swung back: nothing (its posts, the walls) within MIN_WIDTH/2 of
-        // its middle line, from a metre out to a metre in
-        const through = strip(gate.x, gate.z, gate.rot, -1, 1, MIN_WIDTH / 2)
-        expect([seed, files, blocked(through, () => false)]).toEqual([seed, files, []])
+        // (the gate and the postern alike)
+        for (const gate of w.pieces.filter((p) => p.piece === "kaykit-hexagon/wall-straight-gate")) {
+          // through the gate, a metre and more either side of its wall (its own sides and the walls aside)
+          const pts = strip(gate.x, gate.z, gate.rot, -1.8, 1.8).filter(([x, zz]) => {
+            const [ox, oz] = [x - gate.x, zz - gate.z]
+            return Math.abs(ox * Math.sin(gate.rot) + oz * Math.cos(gate.rot)) > 0.75
+          })
+          expect([seed, files, blocked(pts, (q) => q.includes("/wall-"))]).toEqual([seed, files, []])
+          // and the opening itself, its leaves swung back: nothing (its posts, the walls) within MIN_WIDTH/2
+          // of its middle line, from a metre out to a metre in
+          const through = strip(gate.x, gate.z, gate.rot, -1, 1, MIN_WIDTH / 2)
+          expect([seed, files, blocked(through, () => false)]).toEqual([seed, files, []])
+        }
       }
     }, 60_000)
 })

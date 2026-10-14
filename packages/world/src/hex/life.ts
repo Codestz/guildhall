@@ -280,6 +280,22 @@ export function doorSpot(walk: HexWalk, node: number, doorways: ReadonlyMap<numb
   return { node, at: [x, n.y, z], facing: d.facing + Math.PI, ground: true }
 }
 
+/**
+ * Whether a door node's doorway is walked out of to the node clear of the walls and the other buildings
+ * (its own house left the way the doorway faces: `cutsHard`). One whose way out runs through a stall's
+ * counter or a neighbour's wall is lived behind by nobody.
+ */
+export function doorOut(
+  walk: HexWalk,
+  node: number,
+  doorways: ReadonlyMap<number, HexDoorway>,
+  near: NearBlockers,
+): boolean {
+  const n = walk.nodes[node]!
+  const at = doorSpot(walk, node, doorways).at
+  return !cutsHard(at, [n.x, n.y, n.z], near, { from: DOOR_SLACK })
+}
+
 /** A step through a door: someone goes in (`enter`) or comes out at time `t` (the loop's unit), at `at`. */
 export interface DoorPass {
   t: number
@@ -363,6 +379,8 @@ export class LoopBuilder {
   /** Short trips walked already (`direct`), by their ends: walked again the same way. */
   private readonly trips = new Map<string, LifeWalk>()
   private here: LifeSpot
+  /** Walks built that still run through a wall, a house or a fence (clearWay found no clean way). */
+  cuts = 0
   private since: number
   private act: "work" | "idle"
   private indoors: boolean
@@ -389,8 +407,16 @@ export class LoopBuilder {
   }
 
   /** Where the loop is now, to come back to (`back`): a step tried and not kept. */
-  mark(): { steps: number; here: LifeSpot; since: number; act: "work" | "idle"; indoors: boolean } {
+  mark(): {
+    steps: number
+    here: LifeSpot
+    since: number
+    act: "work" | "idle"
+    indoors: boolean
+    cuts: number
+  } {
     return {
+      cuts: this.cuts,
       steps: this.steps.length,
       here: this.here,
       since: this.since,
@@ -402,6 +428,7 @@ export class LoopBuilder {
   /** Back to a `mark`: the steps after it dropped. */
   back(m: ReturnType<LoopBuilder["mark"]>): void {
     this.steps.length = m.steps
+    this.cuts = m.cuts
     this.here = m.here
     this.since = m.since
     this.act = m.act
@@ -517,7 +544,13 @@ export class LoopBuilder {
     const ground: boolean[] = []
     for (let k = 1; k < pts.length; k++) ground.push(pf[k - 1]! && pf[k]!)
     if (!this.near) return { pts, ground }
-    return clearWay(pts, ground, this.near, { from: this.indoors, to: !!as.indoors, thorough: this.thorough })
+    const cleared = clearWay(pts, ground, this.near, {
+      from: this.indoors,
+      to: !!as.indoors,
+      thorough: this.thorough,
+    })
+    if (cleared.cut) this.cuts++
+    return cleared
   }
 
   /** Ends the loop at `end`: stays where it is until then. */
@@ -1247,6 +1280,21 @@ export function lifePlaces(
     const byZone = new Map<number, MadeUp[]>()
     const piles = new Map<number, LifeSpot>()
     made = { byZone, piles }
+    /**
+     * The way in to a point made up by node `node` (none: the straight way is clear), round the walls by
+     * the gap a body gets through (`floodWay`); null: none reaches it (an archer's stand set inside the
+     * butts' fence beside one who is reached by the gate is reached by the gate too, or not at all).
+     */
+    const wayTo = (x: number, zz: number, node: number): [number, number][] | null => {
+      const n = walk.nodes[node]!
+      if (!cutOff(n, { x, z: zz })) return []
+      return floodWay(x, zz, hardNear, [n], Math.min(20, 4 + 2 * Math.hypot(n.x - x, n.z - zz)))?.way ?? null
+    }
+    const withWay = (spot: LifeSpot): LifeSpot | null => {
+      const way = wayTo(spot.at[0], spot.at[2], spot.node)
+      if (!way) return null
+      return way.length ? { ...spot, way } : spot
+    }
     /** Whether a body may stand at (x, z) a while: dry open ground on `level`, off every solid, spot and slot. */
     const roomAt = (
       x: number,
@@ -1290,14 +1338,16 @@ export function lifePlaces(
         const f = (len - PILE_AHEAD) / len
         const [sx, sz] = spotFrame(s.x, s.z, s.facing, ox * flip * f, oz * f)
         if (furniture.blocked(sx, sz, 0.25)) continue
-        pts.push({ x: px, z: pz }, { x: sx, z: sz })
-        piles.set(k, {
+        const pile = withWay({
           node: base.node,
           at: [sx, base.at[1], sz],
           facing: headingTo(sx, sz, px, pz),
           ground: true,
           routine: { id: "stack", seed: 0 },
         })
+        if (!pile) continue
+        pts.push({ x: px, z: pz }, { x: sx, z: sz })
+        piles.set(k, pile)
         break
       }
     }
@@ -1340,7 +1390,8 @@ export function lifePlaces(
         for (const [ox, oz] of BESIDE) {
           const [x, zz] = spotFrame(s.x, s.z, s.facing, ox, oz)
           if (!roomAt(x, zz, h.level[s.tile]!, zi)) continue
-          const spot: LifeSpot = { node: base.node, at: [x, base.at[1], zz], facing: s.facing, ground: true }
+          const spot = withWay({ node: base.node, at: [x, base.at[1], zz], facing: s.facing, ground: true })
+          if (!spot) continue
           if (s.clip) spot.clip = s.clip
           if (s.prop) spot.prop = s.prop
           push(s.roles ? { spot, roles: s.roles } : { spot })
@@ -1360,16 +1411,15 @@ export function lifePlaces(
           const tile = g.index(q, r)
           if (tile < 0 || tile === i || h.level[tile] !== level || !roomAt(x, zz, level, zi)) continue
           const n = walk.nodes[node]!
-          push({
-            spot: {
-              node,
-              at: [x, n.y, zz],
-              facing: d.facing + Math.PI,
-              ground: true,
-              routine: { id: "help", seed: 0 },
-            },
-            door: i,
+          const spot = withWay({
+            node,
+            at: [x, n.y, zz],
+            facing: d.facing + Math.PI,
+            ground: true,
+            routine: { id: "help", seed: 0 },
           })
+          if (!spot) continue
+          push({ spot, door: i })
           break
         }
       }
@@ -1394,15 +1444,14 @@ export function lifePlaces(
           const zz = oz + Math.sin(a) * rr
           if (!roomAt(x, zz, h.level[i]!, zi, !late)) continue
           // facing away from the way, at whatever stands there
-          push({
-            spot: {
-              node,
-              at: [x, n.y, zz],
-              facing: headingTo(n.x, n.z, x, zz),
-              ground: !onDeck(n),
-              routine: { id: "help", seed: 0 },
-            },
+          const spot = withWay({
+            node,
+            at: [x, n.y, zz],
+            facing: headingTo(n.x, n.z, x, zz),
+            ground: !onDeck(n),
+            routine: { id: "help", seed: 0 },
           })
+          if (spot) push({ spot })
         }
       }
     }
@@ -1687,7 +1736,9 @@ export function planFolk(
   for (const [zi, zone] of z.zones.entries()) {
     const heart = walk.hearts[zi]!
     if (heart < 0 || !zone.tiles.length) continue
-    const homes = zone.tiles.filter((i) => walk.door(i) >= 0).map((i) => walk.door(i))
+    const homes = zone.tiles
+      .filter((i) => walk.door(i) >= 0 && doorOut(walk, walk.door(i), doorways, near))
+      .map((i) => walk.door(i))
     const roles = PLACE_ROLES[zone.kind]
     const total = roles.reduce((s, [, n]) => s + n, 0)
     const n = peopleFor(zone.kind, zone.buildings)

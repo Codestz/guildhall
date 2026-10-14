@@ -296,6 +296,7 @@ export {
 export {
   clearWay,
   cutsHard,
+  cutsSolid,
   DOOR_OUT,
   floodWay,
   HEX_WALK_KINDS,
@@ -304,6 +305,7 @@ export {
   type HexWalkKind,
   type HexWalkNode,
   hexWalk,
+  ownRoom,
   WALK_CLEAR,
   type WalkBlocker,
   walledIn,

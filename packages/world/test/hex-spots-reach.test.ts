@@ -48,11 +48,13 @@ installTilePrefabs(parseTilePrefabs(data).prefabs)
 afterAll(() => installTilePrefabs(null))
 
 /**
- * Tiles with spots the collision layer finds walled in (reported to their authors). None today: the
- * pasture's ring has a gate and a walk round it, the monastery's garth opens toward its graveyard, and
- * the market's, the building site's and the castle ward's posts stand in the open.
+ * Tiles with spots the collision layer finds walled in (reported to their authors). The pasture's ring
+ * has a gate and a walk round it, the monastery's garth opens toward its graveyard, and the market's,
+ * the building site's and the castle ward's posts stand in the open. The barracks: on seed 1 the
+ * curtain's wall stubs run across its front, and one guard post stands in their wedge, a hand off a
+ * wall (it was reached through that wall while a spot's own wall was walked through: walk.ts `ownRoom`).
  */
-const WALLED = new Set<string>([])
+const WALLED = new Set<string>(["barracks"])
 
 const build = (seed: number) => {
   const h = hexIsland({ seed, files: 4000 })

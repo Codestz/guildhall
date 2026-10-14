@@ -82,7 +82,7 @@ const CSS = /* css */ `
 /* the strip spans the slot: its width never follows the line it holds (the line is fitted to the strip,
    and a strip that shrank to it would refit it every frame) */
 .hall-caps .st-captions { width: 100%; }
-.ui-viewer:has(.ui-hud-bottom .hud-timeline:is(:hover, :focus-within, [data-open="true"])) .hall-caps { bottom: calc(var(--gut) + 74px); }
+.ui-viewer:not([data-phone]):has(.ui-hud-bottom .hall-timeline[data-scale="session"] .hud-timeline:is(:hover, :focus-within, [data-open="true"])) .hall-caps { bottom: calc(var(--gut) + 74px); }
 /* the history's tape is always open: the captions ride over it, one row or two (--tape-h, timeline.tsx) */
 .ui-viewer:not([data-phone], [data-hud-mode="hidden"]):has(.ui-hud-bottom .hall-timeline[data-scale="history"]) .hall-caps { bottom: calc(var(--gut) + var(--tape-h, 60px) + 14px); }
 .ui-viewer[data-hud-mode="hidden"] .hall-caps { bottom: var(--gut); }

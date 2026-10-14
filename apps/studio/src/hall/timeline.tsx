@@ -327,9 +327,9 @@ const CSS = /* css */ `
   .gh .hall-timeline[data-scale="history"] .hud-tape-time { grid-area: time; min-width: 0; }
   .gh .hall-timeline[data-scale="history"] .hud-rate { grid-area: rate; height: 32px; min-width: 44px; }
   .gh .hall-timeline[data-scale="history"] .hud-tape-close { grid-area: close; }
-  .gh .hall-timeline[data-scale="history"] .hud-track { grid-area: track; height: 30px; min-width: 0; }
-  .gh .hall-timeline[data-scale="history"] .hud-track-rail { top: 13px; margin-top: 0; }
-  .gh .hall-timeline[data-scale="history"] .hud-timeline { --thumb-y: 7px; }
+  .gh .hall-timeline[data-scale="history"] .hud-track { grid-area: track; height: var(--track-h, 30px); min-width: 0; }
+  .gh .hall-timeline[data-scale="history"] .hud-track-rail { top: calc(var(--track-h, 30px) / 2 - 2px); margin-top: 0; }
+  .gh .hall-timeline[data-scale="history"] .hud-timeline { --thumb-y: calc(var(--track-h, 30px) / 2 - 8px); }
   .gh .hall-timeline[data-scale="history"] .hud-ticks { display: none; }
 }
 /* very narrow: the figures keep the contributors and the files */
@@ -337,9 +337,22 @@ const CSS = /* css */ `
   .gh .hall-timeline[data-scale="history"] .hud-tape-time small > [data-part="1"] { display: none; }
 }
 @media (max-width: 720px) {
-  .gh .hall-timeline { bottom: calc(8px + env(safe-area-inset-bottom)); width: calc(100% - 16px); gap: 8px; --thumb-y: 12px; }
-  .gh .hall-timeline[data-scale="history"] .hud-grow { height: 40px; }
-  .gh .hall-timeline[data-scale="history"] .hud-tape-close { width: 40px; height: 40px; }
+  .gh .hall-timeline { bottom: calc(8px + env(safe-area-inset-bottom)); width: calc(100% - 16px); gap: 8px; --thumb-y: 14px; }
+  .gh .hall-timeline[data-scale="history"] .hud-grow { height: var(--hit, 40px); }
+  .gh .hall-timeline[data-scale="history"] .hud-tape-close { width: var(--hit, 40px); height: var(--hit, 40px); }
+}
+/* touch (a phone, a coarse pointer: --hit, ui viewer/style.ts): the rail's row and the thumb a finger's
+   size, the thumb drawn as the touch thumb (a ring at the old size inside it) on the rail's line */
+.gh .ui-viewer[data-phone] .hall-timeline[data-scale="history"] { --track-h: var(--hit, 30px); }
+.gh .ui-viewer[data-phone] .hall-timeline[data-scale="history"] .hud-rate { height: var(--hit, 32px); }
+.gh .ui-viewer[data-phone] .hall-timeline .hud-track input[type="range"]:not(.ui-range)::-webkit-slider-thumb {
+  width: var(--hit); height: var(--hit); margin-top: calc(var(--thumb-y) + 8px - var(--hit) / 2); border: 0; background: var(--thumb); box-shadow: none;
+}
+@media (pointer: coarse) {
+  .gh .hall-timeline[data-scale="history"] { --track-h: var(--hit, 30px); }
+  .gh .hall-timeline .hud-track input[type="range"]:not(.ui-range)::-webkit-slider-thumb {
+    width: var(--hit); height: var(--hit); margin-top: calc(var(--thumb-y) + 8px - var(--hit) / 2); border: 0; background: var(--thumb); box-shadow: none;
+  }
 }
 `
 

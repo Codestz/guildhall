@@ -31,7 +31,15 @@ describe("the tape's renders", () => {
 
 describe("Space", () => {
   const press = (target: unknown, more: Partial<KeyboardEvent> = {}) =>
-    isSpace({ key: " ", repeat: false, metaKey: false, ctrlKey: false, altKey: false, target, ...more } as never)
+    isSpace({
+      key: " ",
+      repeat: false,
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
+      target,
+      ...more,
+    } as never)
   test("on the page or the scrub it plays and pauses", () => {
     expect(press(null)).toBe(true)
     expect(press({ tagName: "BODY" })).toBe(true)
@@ -44,7 +52,9 @@ describe("Space", () => {
     expect(press({ tagName: "DIV", isContentEditable: true })).toBe(false)
     expect(press(null, { repeat: true })).toBe(false)
     expect(press(null, { metaKey: true })).toBe(false)
-    expect(isSpace({ key: "k", repeat: false, metaKey: false, ctrlKey: false, altKey: false, target: null })).toBe(false)
+    expect(
+      isSpace({ key: "k", repeat: false, metaKey: false, ctrlKey: false, altKey: false, target: null }),
+    ).toBe(false)
   })
 })
 

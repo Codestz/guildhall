@@ -82,6 +82,8 @@ export function placedPoint(piece: Pick<PlacedPiece, "x" | "y" | "z" | "rot" | "
 
 export interface SeasonFx {
   stats(): { trees: number; chimneys: number; emitted: number; ms: number }
+  /** How many leafy trees stand within `r` metres of (x, z) (shots: where a wood is). */
+  treesWithin(x: number, z: number, r: number): number
   /** The chimneys near the camera now, world metres (shots). */
   chimneys(): readonly (readonly [number, number, number])[]
   dispose(): void
@@ -192,6 +194,7 @@ export function mountSeasonFx(parts: {
       emitted,
       ms: frames ? costs / frames : 0,
     }),
+    treesWithin: (x, z, r) => trees.filter((p) => (p.x - x) ** 2 + (p.z - z) ** 2 < r * r).length,
     chimneys: () => nearChimneys,
     dispose: off,
   }

@@ -698,6 +698,8 @@ const world = {
           hour: () => now,
           seed,
           agentT: num("lifeT", 0),
+          workfx: workfx?.fx ?? null,
+          sea: SEA_LEVEL,
           overlay,
           heroSpots,
         })

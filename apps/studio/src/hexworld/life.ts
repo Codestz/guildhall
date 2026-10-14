@@ -25,12 +25,14 @@ import {
 import { hash, log } from "@guildhall/core"
 import {
   type ActorSample,
+  CARRY_WALK,
   type Crowd,
   createCrowd,
   loadCharacter,
   loadPiece,
   measure,
   type Stage,
+  type WorkFx,
 } from "@guildhall/render"
 import { type AgentPose, HERO_CLIPS, HERO_PROP_STANDIN, HERO_PROPS, RUN_CLIP } from "@guildhall/sim"
 import { PHONE_MAX } from "@guildhall/ui"
@@ -54,6 +56,7 @@ import {
   type LifeStep,
   lifePlaces,
   lifePose,
+  PROPS,
   routineClips,
   routineSample,
   solidDistance,
@@ -68,6 +71,19 @@ import { collideView } from "./collideView.ts"
 import { type AgentSource, recipeOf } from "./lifeAgents.ts"
 import { type LifePlan, SEC_PER_HOUR, SPEEDUP } from "./lifePlan.ts"
 import { createSpace } from "./space.ts"
+import {
+  CARRIED,
+  carryId,
+  createWork,
+  drawnAs,
+  easeAngle,
+  type Fisher,
+  propMask,
+  type Work,
+  type WorkLook,
+  workEntries,
+  workLook,
+} from "./work.ts"
 
 export { LIFE_MPS, SPEEDUP } from "./lifePlan.ts"
 
@@ -122,6 +138,10 @@ export interface LifeOpts {
     at: [number, number, number],
     sample: { clip: string; props: readonly string[] },
   ) => void
+  /** The work FX the townsfolk's beats burst through (fx.ts `mountWorkFx`); none: no bursts. */
+  workfx?: WorkFx | null
+  /** The sea's level, metres (a fisher's float rides it). */
+  sea?: number
 }
 
 export interface Life {
@@ -163,7 +183,13 @@ const BODIES = ["mage", "knight", "ranger", "barbarian", "rogue"].map((b) => `ka
 /** The catalog with `data/mounts.json` laid over it, so props carry their authored mounts. */
 async function mountedCatalog(): Promise<Catalog | null> {
   const [catalog, overlay] = await Promise.all([loadCatalog(), data.loadOverlay().catch(() => ({}))])
-  return catalog && createCatalog(catalog.index, [applyOverlay(catalog.all(), overlay)])
+  if (!catalog) return null
+  const all = applyOverlay(catalog.all(), overlay)
+  // the props built in code and the loads carried on the chest (work.ts)
+  const template = catalog.get("kaykit-tools/axe") ?? all.find((e) => e.kind === "static")
+  const byId = new Map(all.map((e) => [e.id, e]))
+  const extra = template ? workEntries({ get: (id) => byId.get(id) }, template) : []
+  return createCatalog(catalog.index, [all, extra])
 }
 
 async function npcRecipes(): Promise<Map<string, NpcRecipe>> {
@@ -329,14 +355,23 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     const loops: ({ steps: LifeStep[]; figure?: undefined } | { figure: number })[] = []
     /** Each townsfolk's role, by crowd id (shots). */
     const roleOf: string[] = []
+    /** Each townsfolk's mounts for the day's work (work.ts), by crowd id. */
+    const worn: WorkLook[] = []
+    const mountOf = (piece: string) => catalog.get(piece)?.compose.mount
     for (const f of folk) {
       const recipe = usableOf(f.role)
       if (!recipe) continue
       const look = resolveNpc(recipe, hash(`hexfolk:${opts.seed}:${f.id}`), catalog)
-      looks.push(scaled(holding(look, f.prop, catalog)))
+      const w = workLook(scaled(holding(look, f.prop, catalog)), f, mountOf)
+      worn[looks.length] = w
+      looks.push(w.look)
       loops.push({ steps: f.day })
       roleOf[looks.length - 1] = f.role
     }
+    // a carry walk is baked when someone carries a load in both arms
+    const carries = folk.some((f) =>
+      f.day.some((s) => s.kind === "walk" && s.carry && CARRIED.has(drawnAs(s.carry))),
+    )
     /**
      * The heroes' figures: one for each hero the source has now (its look), and with `agentPool` spares
      * of every body for those it adds; `agent` is the hero a figure draws, and its banner says who.
@@ -406,7 +441,11 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       { catalog, url: libraryUrl },
       {
         heroes: 12,
-        clips: [...spotClips(folk.map((f) => f.day)), ...(figures.length ? [RUN_CLIP, ...HERO_CLIPS] : [])],
+        clips: [
+          ...spotClips(folk.map((f) => f.day)),
+          ...(figures.length ? [RUN_CLIP, ...HERO_CLIPS] : []),
+          ...(carries ? [CARRY_WALK] : []),
+        ],
       },
     )
     if (disposed) {
@@ -430,7 +469,9 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     if (figures.length && chipHost)
       chips = createChips(chipHost, () => ({ ...view, ...chipField(chipHost, view.width) }))
 
-    // the day's clock: follows the screen's when it moves, else runs SPEEDUP× real time
+    // the day's clock: follows the screen's when it moves, else runs SPEEDUP× real time (`held`: shots
+    // hold it at an hour, ext.life.hold)
+    let held: number | null = null
     let seen = opts.hour()
     let day = seen
     let secs = opts.agentT ?? 0
@@ -461,6 +502,34 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       solidDistance,
     })
     const poses: LifePose[] = new Array(n)
+    /** The way each townsfolk faces as drawn: a routine's turns eased (work.ts), else the pose's. */
+    const heading = new Float32Array(n).fill(Number.NaN)
+    /** Per townsfolk, the mask a props list gives (lists are kept by the routine: one per part). */
+    const masks = looks.map(() => new Map<readonly string[], number>())
+    const maskOf = (id: number, shown: readonly string[], busy: boolean): number | undefined => {
+      const w = worn[id]
+      if (!w) return undefined
+      const m = masks[id]!
+      let mask = m.get(shown)
+      if (mask === undefined) {
+        mask = propMask(w, shown, busy)
+        m.set(shown, mask)
+      }
+      return mask
+    }
+    const NOTHING: readonly string[] = []
+    /** One list per piece (and per routine props list plus a carry), so the masks' cache keys stay the same. */
+    const lists = new Map<string, readonly string[]>()
+    const listOf = (key: string, make: () => readonly string[]) => {
+      let l = lists.get(key)
+      if (!l) {
+        l = make()
+        lists.set(key, l)
+      }
+      return l
+    }
+    /** The work drawn round the townsfolk: stocks, floats and lines, beats (work.ts). */
+    let work: Work | null = null
     /** This frame's ms in the agents' source. */
     let agentMs = 0
     /** Where person id's way has them now: their clock, less how late queueing has made them. */
@@ -540,42 +609,68 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       if (p.act !== "walk" && p.routine) {
         const f = routined(id, p)
         const [px, pz] = f.shift ? spotFrame(x, zz, p.facing, f.shift[0], f.shift[1]) : [x, zz]
+        const py = f.shift ? footAt(px, pz, p) + (p.lift ?? 0) : y
+        // a part's turn (to the basket, the cart) eased rather than snapped
+        heading[id] = easeAngle(heading[id]!, p.facing + (f.turn ?? 0), dt)
+        const hidden = p.indoors || (hiddenAt !== null && hiddenAt(x, zz))
+        // what is in the hands: the sample's props, and a crop carried down the row
+        const carry = f.carry
+        const shown = carry ? listOf(`${f.props.join()}+${carry}`, () => [...f.props, carry]) : f.props
+        if (!hidden) work?.note(id, p, f, [px, py, pz], heading[id]!)
         return {
-          position: [px, f.shift ? footAt(px, pz, p) + (p.lift ?? 0) : y, pz],
-          heading: p.facing + (f.turn ?? 0),
+          position: [px, py, pz],
+          heading: heading[id]!,
           clip: f.clip,
           phase: f.phase,
-          hidden: p.indoors || (hiddenAt !== null && hiddenAt(x, zz)),
+          hidden,
+          ...(worn[id] ? { mask: maskOf(id, shown, true) } : {}),
         }
       }
       const l = loops[id]!
       const fig = l.figure !== undefined ? figures[l.figure] : undefined
       // a hero: what its work or its moment plays (sim life's sample, a pure function of its clock), with
       // the props it holds for it; walking, the walk with its role's own props (or the loot it carries)
-      const work = fig ? (p as AgentPose).sample : undefined
-      const props = fig ? (work ? hands(work.props) : fig.own) : undefined
-      if (work && p.act !== "walk") {
-        phase[id] = work.phase
-        if (work.beat !== beats[id] && work.beat && !p.indoors)
-          opts.beat?.(work.beat, [x, y + 0.6, zz], { clip: work.clip, props: work.props })
-        beats[id] = work.beat
+      const doing = fig ? (p as AgentPose).sample : undefined
+      const props = fig ? (doing ? hands(doing.props) : fig.own) : undefined
+      if (doing && p.act !== "walk") {
+        phase[id] = doing.phase
+        if (doing.beat !== beats[id] && doing.beat && !p.indoors)
+          opts.beat?.(doing.beat, [x, y + 0.6, zz], { clip: doing.clip, props: doing.props })
+        beats[id] = doing.beat
         return {
           position: [x, y, zz],
           heading: p.facing,
-          clip: work.clip,
-          phase: work.phase,
+          clip: doing.clip,
+          phase: doing.phase,
           hidden: p.indoors || (hiddenAt !== null && hiddenAt(x, zz)),
           ...(props ? { props } : {}),
         }
       }
+      heading[id] = p.facing
+      // a load in both arms (a log to the pile, a basket to market): the carrying walk, the load on the chest
+      const carried = p.act === "walk" && p.carry && worn[id] ? drawnAs(p.carry) : undefined
+      const chest = carried !== undefined && CARRIED.has(carried)
       // walking: the walk, or the run a hero takes on a long way (sim RUN_CLIP); at a spot, its clip
-      const clip = p.clip && (p.act !== "walk" || p.clip === RUN_CLIP) ? p.clip : look.clips[p.act]
+      const clip = chest
+        ? CARRY_WALK
+        : p.clip && (p.act !== "walk" || p.clip === RUN_CLIP)
+          ? p.clip
+          : look.clips[p.act]
       // walking: the feet keep pace with the ground covered; standing: the clip's own time
       phase[id] =
         phase[id]! +
         (p.act === "walk"
           ? moved / ((clip === RUN_CLIP ? RUN_STRIDE : STRIDE) * look.scale)
           : dt / (durations.get(clip) ?? 1.5))
+      const mask = !worn[id]
+        ? undefined
+        : carried === undefined
+          ? maskOf(id, NOTHING, false)
+          : maskOf(
+              id,
+              listOf(chest ? carryId(carried) : carried, () => [chest ? carryId(carried) : carried]),
+              chest,
+            )
       return {
         position: [x, y, zz],
         heading: p.facing,
@@ -583,6 +678,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         phase: phase[id]! - Math.floor(phase[id]!),
         hidden: p.indoors || (hiddenAt !== null && hiddenAt(x, zz)),
         ...(props ? { props } : {}),
+        ...(mask !== undefined ? { mask } : {}),
       }
     }
     /** The chips' words: read again when the source's world changed, or every WORDS_MS (speech ends, walks end). */
@@ -659,7 +755,9 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       assign()
       dt = step
       const clock = opts.hour()
-      if (Math.abs(clock - seen) > 1e-6) {
+      const seek = Math.abs(clock - seen) > 1e-6
+      if (held !== null) day = held
+      else if (seek) {
         seen = clock
         day = clock
       } else day = (day + (step * SPEEDUP) / 3600) % 24
@@ -670,6 +768,8 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       stage.timing.cpu.add("life", t2 - t1)
       agentCpu += (agentMs - agentCpu) * 0.05
       crowd?.update(step, sample)
+      // the work round them, from what the crowd drew (rods' tips): floats, lines, beats, stocks
+      work?.frame(day, held !== null ? 0 : step, seek || step > 0.5)
       const t3 = performance.now()
       stage.timing.cpu.add("crowd", t3 - t2)
       // the chips over their agents: placed every frame, their words and the declutter at most 10 times a second
@@ -713,6 +813,35 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       const zz = space.z[f.crowd]!
       return [x, footAt(x, zz, p), zz]
     }
+    // the stocks, floats and lines (one batch, one line draw), on the ground the walkers stand on
+    const fishers: Fisher[] = []
+    for (const [id, w] of worn.entries()) {
+      const rod = w?.index.get(PROPS.rod)
+      const l = loops[id]
+      if (
+        rod !== undefined &&
+        l?.figure === undefined &&
+        l?.steps.some((s) => s.kind === "stay" && s.routine?.id === "fish")
+      )
+        fishers.push({ id, rod })
+    }
+    work = await createWork({
+      stage,
+      crowd: made,
+      catalog,
+      url: libraryUrl,
+      stocks: plan.stocks,
+      ground: (x, zz) => collide.walkwayAt(x, zz) ?? collide.heightAt(x, zz),
+      sea: opts.sea ?? 0,
+      workfx: opts.workfx ?? null,
+      secPerHour: SEC_PER_HOUR,
+      fishers,
+    })
+    if (disposed) {
+      work?.dispose()
+      return
+    }
+    cleanup.push(() => work?.dispose())
     unFrame = stage.onFrame(tick)
     tick(0)
     // heroes load as the crowd first updates: let them settle before `ready` resolves
@@ -769,8 +898,15 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
                 id,
                 role: roleOf[id],
                 at: [space.x[id], space.z[id]],
+                y: footAt(space.x[id]!, space.z[id]!, p),
                 act: p.act,
+                facing: p.facing,
+                heading: Number.isNaN(heading[id]!) ? p.facing : heading[id],
                 routine: p.routine?.id ?? null,
+                drill:
+                  p.drill && p.act !== "walk"
+                    ? { id: p.drill.id, side: p.drill.side, pair: p.drill.pair ?? null }
+                    : null,
                 clip: f?.clip ?? p.clip ?? null,
                 cycle: f?.cycle ?? null,
                 beat: f?.beat ?? null,
@@ -782,6 +918,54 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
         stocks: () => plan.stocks.map((s) => ({ kind: s.kind, at: s.at, ...stockAt(s, day, SEC_PER_HOUR) })),
         // the notice board (sim life: where the Guildmaster pins quests), if the island has one
         board: plan.board,
+        // the work drawn (work.ts): stocks laid out, floats and lines, beats sent, its CPU
+        workStats: () => work?.stats() ?? null,
+        // shots and tests: a townsfolk's mounts and which show now (bit k: mount k), its clip
+        dress: (id: number) => {
+          const s = sample(id)
+          // where each mount's origin and a metre along its z were drawn (null: not drawn)
+          const at = (k: number, local: [number, number, number]) => {
+            const out = [0, 0, 0]
+            return made.propPoint(id, k, local, out) ? out.map((v) => Math.round(v * 100) / 100) : null
+          }
+          return {
+            mounts: looks[id]?.mounts.map((m) => `${m.piece}@${m.slot}`),
+            mask: s.mask,
+            clip: s.clip,
+            feet: s.position,
+            heading: s.heading,
+            drawn: looks[id]?.mounts.map((_, k) => [at(k, [0, 0.36, 0]), at(k, [0, 0.36, 0.6])]),
+          }
+        },
+        // shots: hold the day's clock at an hour (null: let it run on from there)
+        hold: (h: number | null) => {
+          held = h
+          if (h !== null) day = h
+        },
+        // shots: the first hour from `from` (scanning `secs` screen seconds) when townsfolk `id` plays
+        // `clip` between phases `min` and `max` (null: not in that time)
+        when: (id: number, from: number, clip: string, min = 0, max = 1, secs = 900): number | null => {
+          const l = loops[id]
+          if (!l || l.figure !== undefined) return null
+          for (let t = 0; t < secs; t += 0.02) {
+            const h = (from + t / SEC_PER_HOUR) % 24
+            const p = lifePose(l.steps, h, 24)
+            // "carry:<piece>": walking with it in the arms, `min`–`max` of the way
+            if (clip.startsWith("carry:")) {
+              if (p.act === "walk" && p.carry === clip.slice(6) && p.from && p.to) {
+                const all = Math.hypot(p.to[0] - p.from[0], p.to[2] - p.from[2]) || 1
+                const done = Math.hypot(p.at[0] - p.from[0], p.at[2] - p.from[2]) / all
+                if (done >= min && done <= max) return h
+              }
+              continue
+            }
+            if (p.act === "walk" || !p.routine) continue
+            const into = ((((h - (p.since ?? 0)) % 24) + 24) % 24) * SEC_PER_HOUR
+            const f = routineSample(p.routine, into)
+            if (f.clip === clip && f.phase >= min && f.phase <= max) return h
+          }
+          return null
+        },
       }
     logger.info("life", {
       folk: folk.length,

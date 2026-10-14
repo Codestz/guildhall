@@ -434,7 +434,8 @@ const world = {
     const torn = new Promise<void>((done) => {
       tornDown = done
     })
-    const stage = createStage(host)
+    // the post pipeline anti-aliases its own target (SMAA); the canvas's MSAA is for `?post=0` alone
+    const stage = createStage(host, { antialias: ctx.query.get("post") === "0" })
     ctx.attach(stage)
     viewer.attachStage(stage)
     const cam = worldCamera(stage, viewer.camera, ctx.query)

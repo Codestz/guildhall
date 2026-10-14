@@ -82,9 +82,19 @@ export function clampDpr(device: number, [min, max]: readonly [number, number]):
  * A lit scene drawn every animation frame into a canvas that fills `host`, with an orbit camera. A DPR
  * governor keeps the frame cost under budget within `opts.dpr`; `?dpr=` in the page's URL pins it.
  */
-export function createStage(host: HTMLElement, opts: { dpr?: [number, number] } = {}): Stage {
+export function createStage(
+  host: HTMLElement,
+  opts: { dpr?: [number, number]; antialias?: boolean } = {},
+): Stage {
   ColorManagement.enabled = true
-  const renderer = new WebGLRenderer({ antialias: true, powerPreference: "high-performance" })
+  // `antialias: false` where a post pipeline draws the scene into its own target and anti-aliases it
+  // there (post/index.ts, SMAA): the canvas's 4x MSAA buffer would then only be resolved from a
+  // full-screen quad every frame (the same colour in all four samples, nothing gained) and held at
+  // four times the memory.
+  const renderer = new WebGLRenderer({
+    antialias: opts.antialias ?? true,
+    powerPreference: "high-performance",
+  })
   renderer.outputColorSpace = SRGBColorSpace
   renderer.info.autoReset = false
   const range = opts.dpr ?? DPR

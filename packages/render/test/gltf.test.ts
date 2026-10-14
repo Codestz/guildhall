@@ -15,7 +15,8 @@ const answering = (body: Uint8Array, ok = true): typeof fetch =>
     ({
       ok,
       status: ok ? 200 : 404,
-      arrayBuffer: async () => body.slice().buffer,
+      // a copy of exactly these bytes: zlib's Buffers can be views into a shared pool, so `.buffer` alone is not the body
+      arrayBuffer: async () => new Uint8Array(body).buffer,
     }) as unknown as Response) as typeof fetch
 
 describe("GLBs gzipped on the wire", () => {

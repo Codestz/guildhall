@@ -223,7 +223,8 @@ export function afloat(voyages: readonly Voyage[], t: number): Voyage[] {
 
 /** What a harbour reading (sim `harbourOf`) says has changed since the last one: opened keys, ended ones and how. */
 export interface HarbourReading {
-  prs: readonly { repo?: string; n: number }[]
+  /** The open pull requests; `size`: lines added and removed, when known (the ship's hull, sea `prHull`). */
+  prs: readonly { repo?: string; n: number; size?: number }[]
   merged: number
 }
 

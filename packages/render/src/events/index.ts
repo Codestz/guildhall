@@ -42,9 +42,12 @@ export {
   createHarbourShips,
   type HarbourShips,
   type HarbourShipsOpts,
+  PR_PIECES,
   pennantOf,
+  prFleetGeometry,
   SHIP_PIECE,
   type ShipView,
+  wakeOf,
 } from "./ships.ts"
 export {
   type Berth,

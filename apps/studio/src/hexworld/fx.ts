@@ -38,7 +38,6 @@ import {
   type HarbourShipsOpts,
   pinOf,
   type Scaffolds,
-  SHIP_PIECE,
   type ShipEnd,
   type SitePiece,
   type SkyDrive,
@@ -114,7 +113,7 @@ export function mountFx(parts: {
     ? createHarbourShips(stage, {
         berths: harbour.berths,
         close: parts.spec?.close ?? "sink",
-        load: () => parts.load(SHIP_PIECE),
+        load: (piece) => parts.load(piece),
         water: parts.water,
       })
     : null
@@ -165,8 +164,9 @@ export function mountFx(parts: {
     return byZone ? idOf(byZone) : null
   }
   let opened = 0
-  const open = (n: number, docked: boolean) => {
-    for (let i = 0; i < n; i++) ships?.open(`#${101 + opened++}`, { docked })
+  const open = (n: number, docked: boolean, lines?: number) => {
+    for (let i = 0; i < n; i++)
+      ships?.open(`#${101 + opened++}`, { docked, ...(lines !== undefined ? { lines } : {}) })
   }
   const spec = parts.spec
   if (spec) {
@@ -204,7 +204,7 @@ export function mountFx(parts: {
       sites,
       weather: (kind: WeatherKind, now = false) => drive.set(kind, now),
       strike: (hold?: number) => drive.strike(hold),
-      open: (n = 1, docked = false) => open(n, docked),
+      open: (n = 1, docked = false, lines?: number) => open(n, docked, lines),
       merge: (key?: string) => end(key, "merged"),
       close: (key?: string) => end(key, "closed"),
       busy: (names: string[], now = false) =>

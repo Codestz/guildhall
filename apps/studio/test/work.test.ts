@@ -8,6 +8,7 @@ import { describe, expect, test } from "bun:test"
 import type { CatalogEntry, Mount, MountSlot, NpcLook } from "@guildhall/assets"
 import { type LifeStep, PROPS } from "@guildhall/world"
 import {
+  afterReveal,
   beatPoint,
   CARRIED,
   carryId,
@@ -202,5 +203,15 @@ describe("beats and entries", () => {
     expect(carried?.files.glb).toBe("pieces/log.glb")
     expect(carried?.compose.mount?.slot).toBe("chest")
     expect(byId.get(carryId("built/basket"))?.compose.mount?.slot).toBe("chest")
+  })
+})
+
+describe("the stocks load off the ready path", () => {
+  test("with no loading screen to wait for, they start at once", async () => {
+    let started = false
+    await afterReveal(50).then(() => {
+      started = true
+    })
+    expect(started).toBe(true)
   })
 })

@@ -15,6 +15,7 @@
  * Pure parts are exported for tests; `createWork` is the drawing side life.ts drives.
  */
 import type { Catalog, CatalogEntry, Mount, MountSlot, NpcLook } from "@guildhall/assets"
+import { log } from "@guildhall/core"
 import {
   BUILT,
   BUILT_SIZE,
@@ -39,6 +40,8 @@ import {
   spotFrame,
   stockAt,
 } from "@guildhall/world"
+
+const logger = log("studio:hexworld:work")
 
 // ---- pieces ----
 
@@ -308,15 +311,64 @@ const STOCK_EVERY = 0.5
 export const CAST_M = 3.4
 export const QUAY_M = 0.95
 
+/** Seconds the stocks take to fade in once they have loaded. */
+export const STOCKS_FADE_S = 0.6
+
+/**
+ * Resolves once the island is on screen (`<html data-world="revealed">`, ready.ts), at once where there
+ * is no loading screen (no document, `?loader=0`), and in any case after `capMs`.
+ */
+export function afterReveal(capMs = 30_000): Promise<void> {
+  if (typeof document === "undefined" || typeof MutationObserver === "undefined") return Promise.resolve()
+  const html = document.documentElement
+  if (html.dataset.world === undefined || html.dataset.world === "revealed") return Promise.resolve()
+  return new Promise((done) => {
+    const finish = () => {
+      watch.disconnect()
+      clearTimeout(cap)
+      done()
+    }
+    const watch = new MutationObserver(() => {
+      if (html.dataset.world === "revealed" || html.dataset.world === undefined) finish()
+    })
+    watch.observe(html, { attributes: true, attributeFilter: ["data-world"] })
+    const cap = setTimeout(finish, capMs)
+  })
+}
+
+/**
+ * The work drawn. Resolves at once: the stocks' pieces load off the ready path (after the island is
+ * revealed) and fade in when they land; until then a frame sends the beats and nothing else.
+ */
 export async function createWork(o: WorkOpts): Promise<Work> {
   const fishers = o.fishers.slice(0, 32)
-  const stocks: Stocks = await createStocks(o.stage, o.stocks, {
-    catalog: o.catalog,
-    url: o.url,
-    ground: o.ground,
-    floats: fishers.length,
-    lines: fishers.length,
-  })
+  let stocks: Stocks | null = null
+  let disposed = false
+  /** Seconds the stocks have been fading in (−1: not landed). */
+  let fade = -1
+  void afterReveal()
+    .then(() =>
+      disposed
+        ? null
+        : createStocks(o.stage, o.stocks, {
+            catalog: o.catalog,
+            url: o.url,
+            ground: o.ground,
+            floats: fishers.length,
+            lines: fishers.length,
+          }),
+    )
+    .then((made) => {
+      if (!made) return
+      if (disposed) {
+        made.dispose()
+        return
+      }
+      made.opacity(0)
+      stocks = made
+      fade = 0
+    })
+    .catch((error: unknown) => logger.warn("the stocks did not load", { error: String(error) }))
   const carts = o.stocks.flatMap((s, k) => (s.kind === "ore-cart" ? [k] : []))
   const doing = new Map<number, Doing>()
   /** Each townsfolk's last beat sent (its cycle and name): one beat, one burst. */
@@ -332,7 +384,7 @@ export async function createWork(o: WorkOpts): Promise<Work> {
   const eye = o.stage.camera.position
 
   /** A fisher's float and line, when near and the rod is drawn; false: none this frame. */
-  const fishing = (f: Fisher, k: number): boolean => {
+  const fishing = (stocks: Stocks, f: Fisher, k: number): boolean => {
     const w = doing.get(f.id)
     if (!w || w.p.routine?.id !== "fish") return false
     const state = floatAt(w.s.clip, w.s.phase, secs + f.id)
@@ -379,9 +431,11 @@ export async function createWork(o: WorkOpts): Promise<Work> {
     frame(hour, dt, seek) {
       const t0 = performance.now()
       secs += dt
-      stocks.beginLines()
-      for (const [k, f] of fishers.entries()) if (!fishing(f, k)) stocks.float(k, null)
-      stocks.endLines()
+      if (stocks) {
+        stocks.beginLines()
+        for (const [k, f] of fishers.entries()) if (!fishing(stocks, f, k)) stocks.float(k, null)
+        stocks.endLines()
+      }
       // beats → bursts, once per cycle and beat, near the camera (workfx culls off-screen ones)
       const fx = o.workfx
       for (const [id, w] of doing) {
@@ -398,16 +452,31 @@ export async function createWork(o: WorkOpts): Promise<Work> {
         // TODO(sound): audio/ has spot sounds for world events only, no per-beat entry yet; call it here
         beats++
       }
-      // the stocks: their levels every STOCK_EVERY s (and on a seek), the carts every frame
-      since += dt
-      if (seek || since >= STOCK_EVERY) {
-        since = 0
-        for (const [k, s] of o.stocks.entries()) stocks.set(k, stockAt(s, hour, o.secPerHour))
-      } else for (const k of carts) stocks.set(k, stockAt(o.stocks[k]!, hour, o.secPerHour))
+      // the stocks (once landed): their levels every STOCK_EVERY s (and on a seek, and as they land),
+      // the carts every frame; faded in over their first STOCKS_FADE_S
+      if (stocks) {
+        since += dt
+        if (seek || since >= STOCK_EVERY || fade === 0) {
+          since = 0
+          for (const [k, s] of o.stocks.entries()) stocks.set(k, stockAt(s, hour, o.secPerHour))
+        } else for (const k of carts) stocks.set(k, stockAt(o.stocks[k]!, hour, o.secPerHour))
+        if (fade >= 0) {
+          fade += Math.min(dt, 0.1)
+          stocks.opacity(Math.min(1, fade / STOCKS_FADE_S))
+          if (fade >= STOCKS_FADE_S) fade = -1
+        }
+      }
       doing.clear()
       ms += (performance.now() - t0 - ms) * 0.05
     },
-    stats: () => ({ ...stocks.stats(), beats, ms }),
-    dispose: () => stocks.dispose(),
+    stats: () => ({ ...(stocks?.stats() ?? NO_STOCKS), beats, ms }),
+    dispose: () => {
+      disposed = true
+      stocks?.dispose()
+      stocks = null
+    },
   }
 }
+
+/** The stocks' stats before they have landed. */
+const NO_STOCKS = { stocks: 0, shown: 0, relayouts: 0, rolls: 0, lines: 0, instances: 0 }

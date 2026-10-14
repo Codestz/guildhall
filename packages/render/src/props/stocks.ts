@@ -21,6 +21,7 @@ import {
   LineBasicMaterial,
   LineSegments,
   Matrix4,
+  type MeshStandardMaterial,
   Quaternion,
   Vector3,
 } from "three"
@@ -79,6 +80,8 @@ export interface Stocks {
   beginLines(): void
   line(a: V3, b: V3, sag: number): void
   endLines(): void
+  /** How opaque all of it is drawn (0–1): faded in when it arrives after the island is shown. */
+  opacity(a: number): void
   stats(): StocksStats
   dispose(): void
 }
@@ -236,11 +239,19 @@ export async function createStocks(
   lines.visible = false
   let lineCount = 0
 
+  // the same light see-through while it fades in (the palette's program, blended)
+  const solid = mesh.material as MeshStandardMaterial
+  const faded = solid.clone()
+  faded.onBeforeCompile = solid.onBeforeCompile
+  faded.transparent = true
+  faded.opacity = 1
+  const lineOpacity = lineMaterial.opacity
+
   stage.scene.add(mesh, lines)
   stage.timing?.gpu.tag(mesh, "stocks")
   stage.timing?.gpu.tag(lines, "stocks")
   mesh.visible = false
-  await warmPrograms(stage, mesh)
+  await warmPrograms(stage, mesh, [faded])
   mesh.visible = true
 
   let relayouts = 0
@@ -316,6 +327,13 @@ export async function createStocks(
       }
       lines.visible = lineCount > 0
     },
+    opacity(a) {
+      const o = Math.max(0, Math.min(1, a))
+      mesh.material = o < 1 ? faded : solid
+      faded.opacity = o
+      mesh.visible = o > 0
+      lineMaterial.opacity = lineOpacity * o
+    },
     stats: () => ({
       stocks: stocks.length,
       instances: count,
@@ -330,6 +348,7 @@ export async function createStocks(
       mesh.dispose()
       lineGeometry.dispose()
       lineMaterial.dispose()
+      faded.dispose()
     },
   }
 }

@@ -1,16 +1,14 @@
 /**
  * Day and night for a town: one `setHour(h)` moves the sun or the moon, the sky, the haze, the light
  * sources' glow, the lit windows and the lamplight together; `cycle(speed)` runs the clock. The town's
- * lights come from `townLights` (packages/world): append its `pieces` to the batch, hand its `points`
- * and `windows` here.
+ * lights are its lamps' `points` and its lit `windows`.
  */
-import type { TownLights } from "@guildhall/world"
 import type { DayLight } from "../light.ts"
 import type { Sky } from "../sky.ts"
 import type { Stage } from "../stage.ts"
 import { setGlow, setNightGrade } from "./glow.ts"
-import { createLamps, MAX_LIGHTS } from "./lamps.ts"
-import { createWindows } from "./windows.ts"
+import { createLamps, type LightPoint, MAX_LIGHTS } from "./lamps.ts"
+import { createWindows, type WindowLight } from "./windows.ts"
 
 export { GLOW_SWATCHES, patchGlow, setGlow, setNightGrade } from "./glow.ts"
 export { MAX_LIGHTS } from "./lamps.ts"
@@ -64,7 +62,7 @@ export interface Night {
 
 export function createNight(
   stage: Pick<Stage, "scene" | "getCamera" | "onFrame">,
-  lights: Pick<TownLights, "points" | "windows">,
+  lights: { points: readonly LightPoint[]; windows: readonly WindowLight[] },
   opts: NightOpts,
 ): Night {
   const lamps = createLamps(stage, lights.points)

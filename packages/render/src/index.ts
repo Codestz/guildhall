@@ -52,8 +52,6 @@ export {
 export * from "./events/index.ts"
 export { createGizmo, type Gizmo, type GizmoMode, type GizmoOpts, type GizmoPose } from "./gizmo.ts"
 export { QUALITY_DPR, type QualityPick, qualityDpr, qualityOf } from "./governor.ts"
-export { createGrid, type Disposable } from "./grid.ts"
-export { createGround, type Ground, type GroundDraw } from "./ground.ts"
 export { disposeObject, heroSilhouette, testBox } from "./hero.ts"
 export {
   applyLight,
@@ -138,7 +136,7 @@ export {
 export * from "./shows/index.ts"
 export { createSky, type Sky, type SkyPreset } from "./sky.ts"
 export { createSlicer, NO_SLICE, type Slicer } from "./slice.ts"
-export { createStage, type Stage, toScreen } from "./stage.ts"
+export { createStage, type Disposable, type Stage, toScreen } from "./stage.ts"
 export {
   type Box,
   type CascadeFit,

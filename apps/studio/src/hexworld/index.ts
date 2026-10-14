@@ -739,6 +739,7 @@ const world = {
           load,
           light: () => sky.light(),
           spec: seaSpec,
+          ghostNear: m.graveyard ? [m.graveyard.gate[0], m.graveyard.gate[2]] : null,
           session: extra.session ?? session,
         })
       // the graveyard's undead (undead.ts): a session's graves, or `?undead=`; nothing loads until one stands

@@ -91,6 +91,8 @@ export function mountSea(parts: {
   load: SeaLifeOpts["load"]
   light: () => DayLight
   spec: SeaSpec | null
+  /** The coast the world events' ghost ship passes: the graveyard's (world graveyard.ts), xz. */
+  ghostNear?: readonly [number, number] | null
   /** A session plays on the island: its clock and its harbour drive the sea (hall/sea.ts) once it is up. */
   session?: (() => HallSession | null) | boolean
 }): SeaMount {
@@ -98,7 +100,13 @@ export function mountSea(parts: {
   const berths = (parts.events?.harbours ?? []).flatMap((h) =>
     h.berths.map((b) => [b.at[0], b.at[2]] as [number, number]),
   )
-  const life = createSeaLife(stage, { sites, load: parts.load, keepOff: berths, light: parts.light })
+  const life = createSeaLife(stage, {
+    sites,
+    load: parts.load,
+    keepOff: berths,
+    light: parts.light,
+    ghostNear: parts.ghostNear ?? null,
+  })
   let shows: SeaShow[] = []
   const setShows = (next: SeaShow[]) => {
     shows = next

@@ -176,6 +176,8 @@ export interface HeroAct {
   craft?: Craft
   /** Radians to face (the stay's own facing when left out). */
   face?: number
+  /** A strike's grave (graveStrike.ts): which slot it strikes. */
+  grave?: number
 }
 
 /** One hero's itinerary: its steps, ms on the events' clock, and when it is on the island. */
@@ -1158,7 +1160,7 @@ export class LifePlanner {
       steps[steps.length - 1]!.from = arrive
     }
     // squares up as it arrives, then swings (craft.ts `strike`)
-    this.act(track, "strike", arrive)
+    this.act(track, "strike", arrive, { grave: s.slot })
     track.hold = arrive + STRIKE_PAUSE_MS + STRIKE_LEAD_MS + STRIKE_WATCH_MS
     track.timer = track.hold
     track.after = undefined

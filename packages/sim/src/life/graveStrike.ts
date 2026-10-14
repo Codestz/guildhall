@@ -83,7 +83,12 @@ export function strikeWalkMs(metres: number, mps: number): number {
 export function struckAt(g: Grave, acts: readonly HeroAct[] | undefined): number | undefined {
   if (g.fixed === undefined || g.strike === undefined || !acts) return undefined
   for (const a of acts)
-    if (a.play === "strike" && a.from >= g.fixed && a.from + STRIKE_PAUSE_MS + STRIKE_LEAD_MS <= g.strike)
+    if (
+      a.play === "strike" &&
+      a.grave === g.slot &&
+      a.from >= g.fixed &&
+      a.from + STRIKE_PAUSE_MS + STRIKE_LEAD_MS <= g.strike
+    )
       return a.from + STRIKE_PAUSE_MS + STRIKE_LEAD_MS
   return undefined
 }

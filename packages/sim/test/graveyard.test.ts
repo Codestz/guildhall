@@ -127,6 +127,9 @@ describe("the fight at the graveyard", () => {
     expect(at).toBeLessThanOrEqual(grave.strike!)
     const swing = it.acts.find((a) => a.play === "strike")!
     expect(swing.from).toBe(at - STRIKE_LEAD_MS - STRIKE_PAUSE_MS)
+    // the blow is this grave's: another grave its fixer mends is not struck by it
+    expect(swing.grave).toBe(grave.slot)
+    expect(struckAt({ ...grave, slot: grave.slot + 1 }, it.acts)).toBeUndefined()
     // there, facing it, before the swing
     const ready = poseAt(it, swing.from + 100)!
     expect(ready.sample?.clip).toBe("Melee_Block")

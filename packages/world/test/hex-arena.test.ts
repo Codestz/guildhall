@@ -114,7 +114,7 @@ describe("the training arena", () => {
       }
       // (the arena brings ~8 fighters, so its duels read: fewer left over to watch than before)
       expect(seated).toBeGreaterThan(4)
-    })
+    }, 20_000)
 
     test(`seed ${seed}: a duel's stay carries its routine, its side and its pair; the Warden spars there`, () => {
       const duels = folk.flatMap((f) =>

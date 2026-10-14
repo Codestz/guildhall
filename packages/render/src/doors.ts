@@ -202,7 +202,7 @@ export async function createGates(
     hide(at) {
       const moved = new Set<number>()
       gates.forEach((g, k) => {
-        const h = at !== null && at(g.x, g.z)
+        const h = at?.(g.x, g.z) ?? false
         if (h === hidden[k]) return
         hidden[k] = h
         pose(k)

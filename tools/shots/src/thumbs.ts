@@ -3,7 +3,7 @@
  *
  *   bun shots thumbs                   every home-directory card → apps/studio/public/home/<id>.webp
  *   bun shots thumbs hudlab sitelab    just these cards
- *   bun shots stills                   the lab backdrops (site, HUD) → apps/studio/public/lab/
+ *   bun shots stills                   the backdrops: the island hero → public/site/, the HUD lab's → public/lab/hud/
  *   bun shots repos [owner__repo …]    the demo picker's live-chronicle cards → apps/studio/public/site/repos/
  *   bun shots demos [id …]             the demo picker's story cards, captured on V2 → apps/studio/public/site/demos/
  *   bun shots thumbs --out .probe/x --port 5341 --dpr 2
@@ -169,7 +169,7 @@ export async function repoPoses(): Promise<Pose[]> {
   return REPO_SLUGS.map((slug) => pose(slug, files.get(slug) ?? 5000))
 }
 
-const STILL_DIRS: Record<string, string> = { "island-hero": "lab/site", "hud-bg": "lab/hud" }
+const STILL_DIRS: Record<string, string> = { "island-hero": "site", "hud-bg": "lab/hud" }
 
 /** The screenshot as a WebP of `width` px: halved stepwise (smooth, never aliased), then encoded. */
 async function encode(page: Page, png: Buffer, width: number, quality: number): Promise<Buffer> {

@@ -98,7 +98,6 @@ export function SiteApp() {
   // a story the link names plays on the home's island in place (the picker, an act, back and forward)
   const storyId = story?.story.id ?? null
   const storyAct = story?.act
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the story and its act are what the link says
   useEffect(() => {
     if (!world || slug) return
     const stage = homeStage()

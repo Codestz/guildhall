@@ -41,7 +41,7 @@
       "json": { "formatter": { "expand": "always" } }
     },
     {
-      "includes": ["**/test/**"],
+      "includes": ["**/test/**", "packages/world/src/hex/**", "apps/studio/src/hexworld/space.ts"],
       "linter": {
         "rules": {
           "style": {

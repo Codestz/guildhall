@@ -6,8 +6,12 @@ import {
   Color,
   type DataTexture,
   Fog,
+  Frustum,
+  Matrix4,
   Mesh,
   MeshStandardMaterial,
+  Sphere,
+  Vector3,
   Vector4,
   type WebGLProgramParametersWithUniforms,
 } from "three"
@@ -40,15 +44,62 @@ const swatch = (name: string): Color => {
 /** The sea disc's rim segments. */
 const SEA_SEGMENTS = 48
 
-/** Boats' wakes the water draws at once (`Water.setWakes`). */
-export const MAX_WAKES = 8
+/** Boats' wakes the water draws at once, from every source together (`Water.setWakes`): the weakest beyond are dropped. */
+export const MAX_WAKES = 12
 
-/** A moving boat's wake: where the boat is, the way it heads (radians from +x toward +z), its speed (m/s). */
+/**
+ * A moving boat's wake: where the boat is, the way it moves (radians from +x toward +z), its speed (m/s:
+ * the foam fades as it slows, gone at rest) and its half-beam (metres, default 1.2: the trail's width
+ * and where the wedge starts).
+ */
 export interface Wake {
   x: number
   z: number
   heading: number
   speed: number
+  beam?: number
+}
+
+/** How much a wake shows: its foam (full from 3 m/s) times its boat's size. The weakest go first. */
+export function wakeStrength(w: Wake): number {
+  return Math.min(1, Math.max(0, w.speed) / 3) * (w.beam ?? 1.2)
+}
+
+/**
+ * A wake's shape on the water: how far it trails behind its boat (metres: longer the faster and the
+ * bigger it is), how white it is (0 … 1, full from 3 m/s) and its half-beam.
+ */
+export function wakeShape(w: Wake): { length: number; white: number; beam: number } {
+  const beam = w.beam ?? 1.2
+  const speed = Math.max(0, w.speed)
+  return {
+    length: (4 + 1.8 * Math.min(speed, 7)) * (0.55 + 0.38 * beam),
+    white: Math.min(1, speed / 3),
+    beam,
+  }
+}
+
+/**
+ * Every source's wakes as one list of at most `cap`: the strongest kept (in their sources' order), the
+ * weakest dropped. Each source sets its own without touching the others' (the harbour's ships, the
+ * sea's life). `seen` keeps only the wakes it passes (those in view: every pixel of the sea pays for
+ * each wake it is given).
+ */
+export function mergeWakes(
+  sources: Iterable<readonly Wake[]>,
+  cap = MAX_WAKES,
+  seen: (w: Wake) => boolean = () => true,
+): Wake[] {
+  const all: Wake[] = []
+  for (const list of sources) for (const w of list) if (w.speed > 0 && seen(w)) all.push(w)
+  if (all.length <= cap) return all
+  const keep = all
+    .map((w, i) => ({ i, s: wakeStrength(w) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .slice(0, cap)
+    .map((x) => x.i)
+    .sort((a, b) => a - b)
+  return keep.map((i) => all[i] as Wake)
 }
 
 const PARS = /* glsl */ `
@@ -59,6 +110,8 @@ uniform vec3 uFoam;
 uniform vec3 uSky;
 uniform vec3 uBank;
 uniform vec4 uWakes[${MAX_WAKES}];
+uniform vec3 uWakeShape[${MAX_WAKES}];
+uniform vec4 uWakeBox;
 uniform int uWakeCount;
 uniform float uReflect;
 uniform float uUnit;
@@ -143,20 +196,34 @@ vec2 waveSlope( vec2 p, float t ) {
 	return s;
 }
 
-// Foam behind each boat: the two arms of a Kelvin wedge (about 19.5 degrees) and the churned trail.
+// Foam behind each boat: the two arms of a Kelvin wedge (about 19.5 degrees) off its quarters and the
+// churned trail its beam wide, longer and whiter the faster it goes (gone at rest). Each wake is where
+// its boat is and the way it moves (uWakes: x, z, and that way's cosine and sine) and its shape
+// (uWakeShape: length, whiteness, half-beam); a pixel out of a wake's reach skips it at once.
 float wakeFoam( vec2 p ) {
+	// clear of every wake's reach (uWakeBox: their bounds, xz min and max): none to test
+	if ( any( lessThan( p, uWakeBox.xy ) ) || any( greaterThan( p, uWakeBox.zw ) ) ) return 0.0;
 	float foam = 0.0;
 	for ( int i = 0; i < ${MAX_WAKES}; i ++ ) {
 		if ( i >= uWakeCount ) break;
 		vec4 w = uWakes[ i ];
-		vec2 ahead = vec2( cos( w.z ), sin( w.z ) );
 		vec2 q = p - w.xy;
-		float behind = -dot( q, ahead );
-		float side = abs( dot( q, vec2( -ahead.y, ahead.x ) ) );
-		float reach = 1.0 - smoothstep( 0.0, 6.0 + 9.0 * w.w, behind );
-		float arms = 1.0 - smoothstep( 0.0, 0.25 + 0.05 * behind, abs( side - 0.35 * behind ) );
-		float trail = ( 1.0 - smoothstep( 0.3, 1.2 + 0.04 * behind, side ) ) * 0.8;
-		foam = max( foam, step( 0.0, behind ) * reach * max( arms, trail ) * clamp( w.w, 0.0, 1.0 ) );
+		vec3 shape = uWakeShape[ i ];
+		float len = shape.x;
+		if ( dot( q, q ) > len * len ) continue;
+		float behind = -dot( q, w.zw );
+		float side = abs( dot( q, vec2( -w.w, w.z ) ) );
+		float b = shape.z;
+		if ( behind < 0.0 || side > 1.5 * b + 0.4 * behind ) continue;
+		float reach = 1.0 - smoothstep( 0.0, len, behind );
+		// the arms break up as they spread (a broken line of foam, not a stroke)
+		float broken = 0.55 + 0.45 * waterNoise( vec2( behind * 0.9 - uTime * 1.5, side * 0.7 + float( i ) * 7.0 ) );
+		float arms = ( 1.0 - smoothstep( 0.0, 0.12 * b + 0.025 * behind, abs( side - 0.45 * b - 0.35 * behind ) ) )
+			* 0.9 * broken * ( 1.0 - smoothstep( 0.2 * len, 0.7 * len, behind ) );
+		float churn = waterNoise( vec2( behind * 1.3 - uTime * 2.0, side * 2.2 + float( i ) * 3.0 ) );
+		float trail = ( 1.0 - smoothstep( 0.2 * b, ( 0.75 + 0.03 * behind ) * b, side ) )
+			* ( 0.5 + 0.5 * churn ) * ( 1.0 - smoothstep( 0.1 * len, 0.85 * len, behind ) );
+		foam = max( foam, reach * max( arms, trail ) * shape.y );
 	}
 	return foam;
 }
@@ -473,8 +540,11 @@ export interface WaterReveal {
 
 export interface Water {
   mesh: Mesh
-  /** The wakes of the boats moving now (at most MAX_WAKES; more are dropped). */
-  setWakes(wakes: readonly Wake[]): void
+  /**
+   * The wakes of `source`'s boats moving now (the harbour's ships, the sea's life): every source's are
+   * drawn together, at most MAX_WAKES, the weakest dropped (`mergeWakes`). An empty list clears it.
+   */
+  setWakes(wakes: readonly Wake[], source?: string): void
   /** Reveals the water with an island's reveal (null: the whole island). */
   setReveal(reveal: WaterReveal | null): void
   dispose(): void
@@ -583,6 +653,8 @@ function waterMesh(stage: Stage, geometry: BufferGeometry, field: ShoreField | n
     uSky: { value: new Color("#cde2f6") },
     uBank: { value: swatch("grass-dark").lerp(swatch("water-deep"), 0.45) },
     uWakes: { value: Array.from({ length: MAX_WAKES }, () => new Vector4()) },
+    uWakeShape: { value: Array.from({ length: MAX_WAKES }, () => new Vector3()) },
+    uWakeBox: { value: new Vector4(1e9, 1e9, -1e9, -1e9) },
     uWakeCount: { value: 0 },
     uField: { value: field?.texture ?? null },
     uFieldWindow: { value: field?.window ?? new Vector4() },
@@ -611,6 +683,34 @@ function waterMesh(stage: Stage, geometry: BufferGeometry, field: ShoreField | n
     mesh.visible = true
   })
 
+  // each source's wakes, merged once a frame just before the water draws (after every source has moved
+  // and the camera has): only those in view, inside one box the sea's pixels test before any wake
+  const wakeSources = new Map<string, readonly Wake[]>()
+  const frustum = new Frustum()
+  const view = new Matrix4()
+  const sphere = new Sphere()
+  const level = geometry.getAttribute("position").getY(0)
+  mesh.onBeforeRender = (_renderer, _scene, camera) => {
+    if (!wakeSources.size && uniforms.uWakeCount.value === 0) return
+    frustum.setFromProjectionMatrix(view.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
+    const merged = mergeWakes(wakeSources.values(), MAX_WAKES, (w) =>
+      frustum.intersectsSphere(sphere.set(sphere.center.set(w.x, level, w.z), wakeShape(w).length)),
+    )
+    const box = uniforms.uWakeBox.value.set(1e9, 1e9, -1e9, -1e9)
+    merged.forEach((w, i) => {
+      const s = wakeShape(w)
+      uniforms.uWakes.value[i]?.set(w.x, w.z, Math.cos(w.heading), Math.sin(w.heading))
+      uniforms.uWakeShape.value[i]?.set(s.length, s.white, s.beam)
+      box.set(
+        Math.min(box.x, w.x - s.length),
+        Math.min(box.y, w.z - s.length),
+        Math.max(box.z, w.x + s.length),
+        Math.max(box.w, w.z + s.length),
+      )
+    })
+    uniforms.uWakeCount.value = merged.length
+  }
+
   const unsubscribe = stage.onFrame((dt) => {
     uniforms.uTime.value += dt
     // The fresnel leans toward the haze the sky set (light.ts), so the far water meets the horizon.
@@ -619,13 +719,9 @@ function waterMesh(stage: Stage, geometry: BufferGeometry, field: ShoreField | n
   })
   return {
     mesh,
-    setWakes(wakes) {
-      const count = Math.min(wakes.length, MAX_WAKES)
-      for (let i = 0; i < count; i++) {
-        const w = wakes[i] as Wake
-        uniforms.uWakes.value[i]?.set(w.x, w.z, w.heading, w.speed)
-      }
-      uniforms.uWakeCount.value = count
+    setWakes(wakes, source = "") {
+      if (wakes.length) wakeSources.set(source, wakes.slice())
+      else wakeSources.delete(source)
     },
     setReveal(reveal) {
       revealed = reveal !== null

@@ -178,9 +178,11 @@ export {
   createFieldWater,
   type FieldWaterOpts,
   MAX_WAKES,
+  mergeWakes,
   type Wake,
   type Water,
   type WaterPool,
   type WaterReveal,
+  wakeStrength,
 } from "./water.ts"
 export * from "./workfx/index.ts"

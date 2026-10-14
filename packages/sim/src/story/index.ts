@@ -6,6 +6,7 @@
  *   renown   the Deeds of Renown's rules (festival, ghost ship, rainbow, raid, comet, dragon)
  *   legends  `legendOf`: the session's book, one chapter per quest, and its Markdown
  *   recap    the Chronicle card's words: the hero moment (`heroOf`), the numbers, three lines
+ *   worldEvents  the world events on stage: `worldShows(log, t)`, the renown rules scheduled as shows
  */
 export {
   type Chapter,
@@ -102,3 +103,25 @@ export {
   Teller,
   tellAll,
 } from "./teller.ts"
+export {
+  dismissed,
+  forcedShow,
+  type Grave,
+  type GraveCause,
+  LASTING_SHOWS,
+  renownKindOf,
+  SHOW_KINDS,
+  SHOW_LOOK,
+  SHOW_RULES,
+  type Show,
+  ShowEngine,
+  type ShowHint,
+  type ShowKind,
+  type ShowParams,
+  type ShowWhere,
+  type ShowWho,
+  showHint,
+  showLine,
+  type WorldShowOptions,
+  worldShows,
+} from "./worldEvents.ts"

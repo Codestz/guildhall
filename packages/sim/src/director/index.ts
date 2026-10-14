@@ -8,6 +8,7 @@ export {
   type Distance,
   director,
   type Focus,
+  type FocusHint,
   focusKey,
   HOLD_MS,
   LIFE_MS,

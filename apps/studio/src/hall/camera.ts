@@ -23,6 +23,7 @@ import type { ViewerHud } from "@guildhall/ui"
 import type { Chips } from "../hexworld/chips.ts"
 import type { HudParts } from "../hexworld/index.ts"
 import type { BuiltPlace } from "../hexworld/job.ts"
+import { hallEvents } from "./events.ts"
 import type { HallSession } from "./feeds/index.ts"
 import type { SessionPlaces } from "./feeds/places.ts"
 
@@ -442,6 +443,16 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
       }
       case "harbour":
         return harbourPoint()
+      case "show": {
+        // a world event: where its render task says it stands (hall/events.ts), else over the island
+        const world = rig.world()
+        const p = hallEvents()?.pointOf(focus)
+        return p
+          ? [p[0], p[1], p[2]]
+          : world
+            ? [world.centre[0], focus.lift ?? 0, world.centre[1]]
+            : [0, 0, 0]
+      }
       default: {
         const world = rig.world()
         return world ? [world.centre[0], 0, world.centre[1]] : [0, 0, 0]
@@ -486,7 +497,13 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
     if (!session || !directorFree(directorOn, followId !== null, t, userAt)) return
     const snap = session.snapshot()
     if (snap.events === 0) return
-    const next = director.pick(snap.world, snap.world.recent, snap.clock.at, shot ? { shot } : {})
+    const next = director.pick(
+      snap.world,
+      snap.world.recent,
+      snap.clock.at,
+      shot ? { shot } : {},
+      hallEvents()?.hints(),
+    )
     if (shot && next.key === shot.key) {
       // the same subject: its beat may have risen (a closer framing), no cut
       if (next.distance !== shot.distance) {

@@ -1,5 +1,6 @@
 import { type GuildWorld, placeAt, settle, type WorldActor } from "../events/reduce.ts"
 import type { WorldEvent } from "../events/world.ts"
+import type { ShowKind } from "../story/worldEvents.ts"
 
 /**
  * The director (plan-hud-events.md D1): which shot the camera runs now, chosen from the guild's world
@@ -17,6 +18,9 @@ import type { WorldEvent } from "../events/world.ts"
  *   loot    a hero's quest done; CI green again after a red (`clear`)
  *   walk    a hero walking to a new place, from its move until `WALK_MS` later
  *   work    nothing new: the place where most heroes work (`idle`, the overview, when nobody does)
+ *   show    a world event starting (story/worldEvents.ts `showHint`): its own weight (V1's scale, halved
+ *           onto this one: a dragon's 8 ranks with a failure, a comet's 5 between quest and loot), its
+ *           own framing, for its own `ttl`
  *
  * A moment counts for its `LIFE_MS` after it happened. The shot changes only once it has run `HOLD_MS`,
  * and then only for a higher rank, for a subject of the same rank after `SAME_RANK_MS` when that one has
@@ -32,6 +36,8 @@ export type Focus =
   | { kind: "place"; place: number }
   | { kind: "harbour" }
   | { kind: "overview" }
+  /** A world event (story/worldEvents.ts): the camera asks the show's site where it is; `lift` aims up. */
+  | { kind: "show"; id: string; show: ShowKind; lift?: number }
 
 /** Why: the beat that chose the shot. */
 export type Reason =
@@ -46,6 +52,7 @@ export type Reason =
   | "walk"
   | "work"
   | "idle"
+  | "show"
 
 /** How far the camera stands: a hero's face, a place with its people, the whole island. */
 export type Distance = "close" | "mid" | "map"
@@ -63,6 +70,8 @@ export const RANK: Readonly<Record<Reason, number>> = {
   walk: 1,
   work: 0.5,
   idle: 0,
+  /** A show's default; each hint brings its own (`weight / 2`). */
+  show: 4,
 }
 
 /** The framing each beat asks for. */
@@ -77,6 +86,7 @@ export const DISTANCE: Readonly<Record<Exclude<Reason, "user">, Distance>> = {
   walk: "mid",
   work: "mid",
   idle: "map",
+  show: "map",
 }
 
 /** No shot is shorter than this. */
@@ -112,8 +122,10 @@ export interface Shot {
   holdUntil: number
   /** When the beat it shows happened. */
   start: number
-  /** The focus as a key (`hero:<id>`, `place:<n>`, `harbour`, `overview`). */
+  /** The focus as a key (`hero:<id>`, `place:<n>`, `harbour`, `overview`, `show:<id>`). */
   key: string
+  /** Its beat's rank, when the beat brought its own (a show's hint). */
+  rank?: number
   /** When each subject was last on camera (kept for `RECENT_MS`, by key). */
   seen: Readonly<Record<string, number>>
 }
@@ -134,6 +146,8 @@ export function focusKey(focus: Focus): string {
       return `hero:${focus.id}`
     case "place":
       return `place:${focus.place}`
+    case "show":
+      return `show:${focus.id}`
     default:
       return focus.kind
   }
@@ -149,12 +163,25 @@ interface Candidate {
   rank: number
   /** When its beat happened. */
   start: number
+  distance: Distance
+}
+
+/**
+ * A world event's hint (story/worldEvents.ts `showHint`): film `focus` from `start` for `ttl` ms at
+ * `distance`, ranked `weight / 2` (V1's 10-a-plea scale onto this one's 5).
+ */
+export interface FocusHint {
+  focus: Extract<Focus, { kind: "show" }>
+  weight: number
+  start: number
+  ttl: number
+  distance: Distance
 }
 
 const hero = (id: string): Focus => ({ kind: "hero", id })
 
 function candidate(focus: Focus, reason: Exclude<Reason, "user">, start: number): Candidate {
-  return { focus, key: focusKey(focus), reason, rank: RANK[reason], start }
+  return { focus, key: focusKey(focus), reason, rank: RANK[reason], start, distance: DISTANCE[reason] }
 }
 
 /** The beat a moment is, if it is one the director films. */
@@ -195,8 +222,23 @@ function movedAt(a: WorldActor, t: number): number | undefined {
 }
 
 /** Everything worth a shot at `t`. */
-function candidates(world: GuildWorld, moments: readonly WorldEvent[], t: number): Candidate[] {
+function candidates(
+  world: GuildWorld,
+  moments: readonly WorldEvent[],
+  t: number,
+  hints: readonly FocusHint[],
+): Candidate[] {
   const out: Candidate[] = []
+  for (const h of hints)
+    if (t >= h.start && t - h.start < h.ttl)
+      out.push({
+        focus: h.focus,
+        key: focusKey(h.focus),
+        reason: "show",
+        rank: h.weight / 2,
+        start: h.start,
+        distance: h.distance,
+      })
   const here = (id: string) => {
     const a = world.actors.get(id)
     return a !== undefined && a.gone === undefined
@@ -268,21 +310,22 @@ function cut(c: Candidate, t: number, seen: Readonly<Record<string, number>>): S
   return {
     focus: c.focus,
     reason: c.reason,
-    distance: DISTANCE[c.reason],
+    distance: c.distance,
     since: t,
     holdUntil: t + HOLD_MS,
     start: c.start,
     key: c.key,
+    ...(c.reason === "show" ? { rank: c.rank } : {}),
     seen: remember(seen, c.key, t),
   }
 }
 
 /** The same shot, still running: reframed if its subject's beat rose (no cut), and seen now. */
 function keep(shot: Shot, now: Candidate | undefined, t: number): Shot {
-  const rose = now !== undefined && now.rank > RANK[shot.reason]
+  const rose = now !== undefined && now.rank > (shot.rank ?? RANK[shot.reason])
   return {
     ...shot,
-    ...(rose ? { reason: now.reason, distance: DISTANCE[now.reason], start: now.start } : {}),
+    ...(rose ? { reason: now.reason, distance: now.distance, start: now.start, rank: now.rank } : {}),
     seen: remember(shot.seen, shot.key, t),
   }
 }
@@ -291,12 +334,16 @@ function keep(shot: Shot, now: Candidate | undefined, t: number): Shot {
 const userDistance = (focus: Focus): Distance =>
   focus.kind === "hero" ? "close" : focus.kind === "overview" ? "map" : "mid"
 
-/** The shot to run at `t` (see the top of this file). `moments` are the latest world events (default `world.recent`). */
+/**
+ * The shot to run at `t` (see the top of this file). `moments` are the latest world events (default
+ * `world.recent`); `hints` the world events' (story/worldEvents.ts `showHint`), none by default.
+ */
 export function pick(
   world: GuildWorld,
   moments: readonly WorldEvent[] = world.recent,
   t: number = world.at,
   state: DirectorState = {},
+  hints: readonly FocusHint[] = [],
 ): Shot {
   const prev = state.shot
   const seen = prev?.seen ?? {}
@@ -315,7 +362,7 @@ export function pick(
       seen: remember(seen, key, t),
     }
   }
-  const list = candidates(world, moments, t)
+  const list = candidates(world, moments, t, hints)
   const top = best(list, seen, t)
   if (!prev || prev.reason === "user" || t < prev.since) return cut(top, t, seen)
   const mine = list.filter((c) => c.key === prev.key)

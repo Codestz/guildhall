@@ -113,6 +113,15 @@ export interface LifeOpts {
   agentPool?: boolean
   /** Where the heroes' chips go (the Viewer's labels layer); none: no chips. */
   chips?: HTMLElement
+  /**
+   * A hero's work beat as it falls (sim life's sample `beat`: a hammer landing, a spell cast…), where and
+   * with what it plays and holds: the work FX's `beat`.
+   */
+  beat?: (
+    beat: string,
+    at: [number, number, number],
+    sample: { clip: string; props: readonly string[] },
+  ) => void
 }
 
 export interface Life {
@@ -411,6 +420,8 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     let secs = opts.agentT ?? 0
     let dt = 0
     const last = looks.map(() => [Number.NaN, 0] as [number, number])
+    /** Each hero's beat as last drawn: a beat fires as it begins. */
+    const beats: (string | undefined)[] = looks.map(() => undefined)
     const phase = looks.map((l) => l.phase)
     // clip lengths, from the rig every body shares
     const body = catalog.get(looks[0]?.body ?? "")
@@ -529,6 +540,9 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       const props = fig ? (work ? hands(work.props) : fig.own) : undefined
       if (work && p.act !== "walk") {
         phase[id] = work.phase
+        if (work.beat !== beats[id] && work.beat && !p.indoors)
+          opts.beat?.(work.beat, [x, y + 0.6, zz], { clip: work.clip, props: work.props })
+        beats[id] = work.beat
         return {
           position: [x, y, zz],
           heading: p.facing,

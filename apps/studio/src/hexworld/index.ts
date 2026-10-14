@@ -681,6 +681,8 @@ const world = {
           // the agents: the guild the worker planned (the demo story); a session's come later
           agents: job.life.then((plan) => (plan.agents ? agentSource(plan.agents) : null)),
           agentPool: session,
+          // a hero's work beats make the work FX's bursts (sparks off a hammer, pages, motes)
+          beat: (b, at, sample) => workfx?.fx.beat(b, at, sample),
           // the heroes' chips, in the labels layer with the plates (`?chips=0`: none)
           ...(ctx.query.get("chips") !== "0" ? { chips: viewer.labels } : {}),
           debug: overlay

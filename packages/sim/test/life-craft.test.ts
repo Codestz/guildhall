@@ -230,17 +230,17 @@ describe("a hero works by craft and where it stands", () => {
       expect([clip, rig.get(clip)]).toEqual([clip, secs])
   })
 
-  test("a stand-in is shown for each prop the library cannot mount yet, never for one it can", () => {
-    const mounted = new Set([
-      HERO_PROPS.book,
-      HERO_PROPS.hammer,
-      HERO_PROPS.bow,
-      HERO_PROPS.file,
-      HERO_PROPS.staff,
-    ])
-    for (const id of mounted) expect(HERO_PROP_STANDIN[id]).toBeUndefined()
-    for (const id of [HERO_PROPS.pencil, HERO_PROPS.map, HERO_PROPS.chest])
-      expect(HERO_PROP_STANDIN[id]).toBeString()
+  test("a stand-in is shown for each prop the library cannot mount yet (a mounted one), never for one it can", () => {
+    const file = join(import.meta.dir, "../../../data/mounts.json")
+    const mounts = (JSON.parse(readFileSync(file, "utf8")) as { mounts: Record<string, unknown> }).mounts
+    // the catalog's own mounts (the adventurers' book, staff, bow) besides data/mounts.json's
+    const own = new Set<string>([HERO_PROPS.book, HERO_PROPS.staff, HERO_PROPS.bow])
+    const mounted = (id: string) => own.has(id) || id in mounts
+    for (const id of Object.values(HERO_PROPS)) {
+      const stand = HERO_PROP_STANDIN[id]
+      if (mounted(id)) expect([id, stand]).toEqual([id, undefined])
+      else expect([id, stand !== undefined && mounted(stand)]).toEqual([id, true])
+    }
   })
 
   test("a routine is a pure function of the time since it began: phases wrap, beats fall on their cue", () => {

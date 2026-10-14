@@ -25,8 +25,12 @@ import type { HeroPose } from "@guildhall/world"
  * however it is reached (a scrub and a play agree).
  */
 
-/** A cue on a routine's clock for particles and sound: the instant a hammer lands, a spell goes off… */
-export type Beat = "hit" | "cast" | "shoot" | "pickup" | "pin" | "cheer" | "fall" | "page" | "scratch"
+/**
+ * A cue on a routine's clock for particles and sound: the instant a hammer lands, a spell goes off… (the
+ * names render's work FX reads, `beatKinds`: hit, cast, pickup, page, write, drop, loot; shoot, pin and
+ * cheer are for sound).
+ */
+export type Beat = "hit" | "cast" | "shoot" | "pickup" | "pin" | "cheer" | "drop" | "page" | "write" | "loot"
 
 /**
  * What a hero is drawn doing at a time (the game-feel plan's shared life sample): the clip, how far
@@ -77,14 +81,14 @@ export const HERO_CLIPS: readonly HeroClip[] = Object.keys(CLIP_SECONDS) as Hero
 /** The props heroes hold, as catalog ids. */
 export const HERO_PROPS = {
   book: "kaykit-adventurers/spellbook-open",
-  pencil: "kaykit-tools/pencil-a-short",
+  pencil: "kaykit-tools/pencil-b-long",
   hammer: "kaykit-tools/hammer",
   map: "kaykit-tools/map",
   magnifier: "kaykit-tools/magnifying-glass",
   bow: "kaykit-adventurers/bow-with-string",
   file: "kaykit-tools/file",
   staff: "kaykit-adventurers/staff",
-  scroll: "quaternius-props/scroll-1",
+  scroll: "kaykit-tools/map-rolled",
   chest: "kaykit-dungeon/chest",
   sword: "kaykit-adventurers/sword-1handed",
   shield: "kaykit-adventurers/shield-round",
@@ -95,11 +99,9 @@ export const HERO_PROPS = {
  * nearest piece that has one, shown in its place meanwhile; "" for none (empty-handed).
  */
 export const HERO_PROP_STANDIN: Readonly<Record<string, string>> = {
-  [HERO_PROPS.pencil]: "kaykit-tools/chisel",
-  [HERO_PROPS.map]: "kaykit-adventurers/spellbook-closed",
+  [HERO_PROPS.map]: "kaykit-tools/map-rolled",
   [HERO_PROPS.magnifier]: "kaykit-tools/lantern",
-  [HERO_PROPS.scroll]: "kaykit-adventurers/spellbook-closed",
-  [HERO_PROPS.chest]: "kaykit-tools/bucket-metal",
+  [HERO_PROPS.chest]: "kaykit-hexagon/sack",
 }
 
 /** One move of a routine: a clip for `ms` (one cycle when left out), and what goes with it. */
@@ -175,7 +177,7 @@ export function craftRoutine(craft: Craft, pose: HeroPose | undefined, seed = 0)
     case "write":
       return pose && HAMMER_POSES.has(pose)
         ? one({ clip: "Hammering", beat: ["hit", 0.42] }, [P.hammer])
-        : one({ clip: "Working_A", beat: ["scratch", 0.5] }, [P.pencil])
+        : one({ clip: "Working_A", beat: ["write", 0.5] }, [P.pencil])
     case "search":
     case "fetch":
       return one({ clip: "Working_B" }, [P.map, P.magnifier])
@@ -247,7 +249,7 @@ const PLAYS: Readonly<Record<Exclude<Play, "craft" | "think">, Routine>> = {
   carry: one({ clip: "Walking_A" }, [P.chest]),
   deliver: {
     moves: [
-      { clip: "PickUp", ms: SETDOWN_MS, beat: ["pickup", 0.55], props: [P.chest] },
+      { clip: "PickUp", ms: SETDOWN_MS, beat: ["loot", 0.55], props: [P.chest] },
       { clip: "Cheering", ms: CHEER_MS, beat: ["cheer", 0.25] },
       { clip: "Idle_A" },
     ],
@@ -255,7 +257,7 @@ const PLAYS: Readonly<Record<Exclude<Play, "craft" | "think">, Routine>> = {
     props: [],
   },
   plea: one({ clip: "Waving" }),
-  fail: { moves: [{ clip: "Hit_A", ms: HIT_MS, beat: ["fall", 0.1] }, ...SIT], loop: "last", props: [] },
+  fail: { moves: [{ clip: "Hit_A", ms: HIT_MS, beat: ["drop", 0.6] }, ...SIT], loop: "last", props: [] },
   slump: { moves: SIT, loop: "last", props: [] },
   standup: {
     moves: [{ clip: "Sit_Floor_StandUp", ms: STANDUP_MS }, { clip: "Idle_A" }],

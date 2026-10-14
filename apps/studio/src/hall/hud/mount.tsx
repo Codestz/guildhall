@@ -11,11 +11,12 @@
  * that is no repo's: the demo guild at work, or a story the demos picked (`/?story=saga&act=3`), its
  * places the island's own zones (site/homePlaces.ts), switched in place (site/homeHud.tsx `homeStage`).
  */
-import { pinOf, type WeatherKind } from "@guildhall/render"
+import { pinOf, SEASON_AT, type WeatherKind } from "@guildhall/render"
 import { repoLegendMarkdown, repoLegendOf, repoRecapOf, requestChronicleUrl } from "@guildhall/sim"
 import { holdHudStyle } from "@guildhall/ui"
 import { createRoot, type Root } from "react-dom/client"
 import type { HudParts } from "../../hexworld/index.ts"
+import { storySeason } from "../../hexworld/season.ts"
 import { hallChronicle } from "../../site/chronicle.ts"
 import { HomeFeed, type HomeStory, homeStoryOf } from "../../site/homeFeed.ts"
 import { setHome } from "../../site/homeHud.tsx"
@@ -349,6 +350,11 @@ export function mountHomeHud(parts: HudParts, opts: HomeHudOptions): () => void 
   }
   // the camera: the director films the demo guild or the story (V1's home: B, ?director=0)
   const m = mountOn(parts, { session, places }, { query: opts.query, time: opts.time, director: true, after })
+  // a told story is set in its own season (saga in autumn, the world events in winter…); the demo guild in today's
+  parts.season?.setSource(() => {
+    const name = storySeason(story)
+    return name ? SEASON_AT[name] : null
+  }, true)
 
   /** Opens the story's act: the clock at its start, playing. */
   const openAct = (n: number) => {
@@ -405,6 +411,7 @@ export function mountHomeHud(parts: HudParts, opts: HomeHudOptions): () => void 
   })
   paint()
   return () => {
+    parts.season?.setSource(null)
     setHome(null)
     m.dispose()
     portraits.dispose()

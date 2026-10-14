@@ -60,6 +60,7 @@ import {
   ReadmeBadge,
   type RecapView,
   RosterBadges,
+  type SeasonPick,
   SettingsPanel,
   type SettingsValues,
   ShowHudPill,
@@ -310,6 +311,14 @@ const WEATHERS: readonly { value: WeatherPick; label: string }[] = [
   { value: "snow", label: "Snow" },
 ]
 
+/** The season shown now, as Settings names it beside the lever. */
+const SEASON_WORDS: Readonly<Record<Exclude<SeasonPick, "auto">, string>> = {
+  spring: "Spring",
+  summer: "Summer",
+  autumn: "Autumn",
+  winter: "Winter",
+}
+
 /** The camera's keys, as the hall's Settings lists them. */
 const KEYS: readonly (readonly [string, string])[] = [
   ["Drag", "Turn · one finger on a phone"],
@@ -552,6 +561,7 @@ export function HallHud(props: HallHudProps) {
   const [captions, setCaptions] = useState(true)
   const [style, setStyle] = useState<"calm" | "cinematic">(levers.cinematic ? "cinematic" : "calm")
   const [weather, setWeather] = useState<WeatherPick>(levers.weather ?? "auto")
+  const [season, setSeason] = useState<SeasonPick>(() => parts.season?.pinned() ?? "auto")
   const storyTold = (snap?.chapters.length ?? 0) > 0
   const [timeMode, setTimeMode] = useState<TimeMode>(() => (storyTold ? "story" : "fixed"))
   const [hour, setHour] = useState(() => parts.clock.get())
@@ -859,6 +869,7 @@ export function HallHud(props: HallHudProps) {
     time: timeMode,
     hour,
     ...(parts.fx ? { weather } : {}),
+    ...(parts.season ? { season } : {}),
   }
   const onSettings = (patch: Partial<SettingsValues>) => {
     if (patch.pace !== undefined) {
@@ -889,6 +900,10 @@ export function HallHud(props: HallHudProps) {
       levers.weather = pin
       if (pin) parts.fx?.drive.set(pin)
     }
+    if (patch.season !== undefined) {
+      setSeason(patch.season)
+      parts.season?.pin(patch.season)
+    }
   }
   const followed = filmed ? roster.heroes.find((h) => h.id === filmed) : undefined
   const followedName = followed ? heroTitle(followed) : undefined
@@ -901,6 +916,7 @@ export function HallHud(props: HallHudProps) {
       hourNow={hour}
       qualities={QUALITIES}
       weathers={WEATHERS}
+      {...(parts.season ? { seasonNow: SEASON_WORDS[parts.season.name()] } : {})}
       keys={KEYS}
       sound={<SoundSettings bare />}
       {...(followedName ? { cameraNote: `Following ${followedName}` } : {})}

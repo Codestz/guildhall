@@ -143,6 +143,8 @@ export type DirectorStyle = "calm" | "cinematic"
 export type TimeMode = "real" | "cycle" | "fixed" | "story"
 /** The weather: following the guild's health, or pinned. */
 export type WeatherPick = "auto" | "clear" | "cloudy" | "rain" | "storm" | "snow"
+/** The season: following the world's date (a hall's timeline, a story's, today), or pinned. */
+export type SeasonPick = "auto" | "spring" | "summer" | "autumn" | "winter"
 
 /** What Settings tunes. A value left out leaves its lever out. */
 export interface SettingsValues {
@@ -162,4 +164,6 @@ export interface SettingsValues {
   /** The pinned hour (0–24), for `time: "fixed"`. */
   hour?: number
   weather?: WeatherPick
+  /** The season (left out: no Season lever). */
+  season?: SeasonPick
 }

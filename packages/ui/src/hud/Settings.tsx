@@ -14,6 +14,7 @@ import type {
   HudMode,
   Names,
   Quality,
+  SeasonPick,
   SettingsValues,
   TimeMode,
   WeatherPick,
@@ -62,6 +63,15 @@ const WEATHERS: readonly { value: WeatherPick; label: string }[] = [
   { value: "snow", label: "Snow" },
 ]
 
+/** The seasons, in the year's order; Auto follows the world's date. */
+const SEASONS: readonly { value: SeasonPick; label: string }[] = [
+  { value: "auto", label: "Auto" },
+  { value: "spring", label: "Spring" },
+  { value: "summer", label: "Summer" },
+  { value: "autumn", label: "Autumn" },
+  { value: "winter", label: "Winter" },
+]
+
 /** The camera's keys, as the Settings sheet lists them. */
 export const SETTINGS_KEYS: readonly (readonly [string, string])[] = [
   ["Drag", "Pan"],
@@ -90,6 +100,8 @@ export interface SettingsPanelProps {
   onRepo?: () => void
   /** What the world is doing now, beside Weather: `Cloudy · 23°C`. */
   weatherNow?: string
+  /** The season shown now, beside Season: `Autumn`. */
+  seasonNow?: string
   /** The hour the world shows now (0–24), beside Time. */
   hourNow?: number
   /** Who the camera is on, under the Bard switch (`Following the Warden`); default from `director`. */
@@ -140,6 +152,7 @@ export function SettingsPanel({
   onClose,
   onRepo,
   weatherNow,
+  seasonNow,
   hourNow,
   cameraNote,
   sound,
@@ -157,7 +170,7 @@ export function SettingsPanel({
   }, [])
   const auto = values.quality === "auto"
   const qualityNow = values.qualityNow && qualities.find((q) => q.value === values.qualityNow)?.label
-  const world = values.time !== undefined || values.weather !== undefined
+  const world = values.time !== undefined || values.weather !== undefined || values.season !== undefined
   const style = values.directorStyle
 
   return (
@@ -215,7 +228,7 @@ export function SettingsPanel({
           <header className="hud-director-head">
             <h3 id={directorId}>Director's controls</h3>
             <p className="ui-hint">
-              The story's pace, the hour and the weather, and how the Bard films them.
+              The story's pace, the hour, the weather and the season, and how the Bard films them.
             </p>
           </header>
           <Sub title="Story" value={values.pace === 0 ? "Paused" : undefined}>
@@ -260,6 +273,21 @@ export function SettingsPanel({
                   />
                   {values.weather === "auto" && (
                     <p className="ui-hint">Follows the guild: failures bring clouds, rain and storms.</p>
+                  )}
+                </>
+              )}
+              {values.season !== undefined && (
+                <>
+                  <Segmented
+                    label={`Season${seasonNow ? ` · ${seasonNow}` : ""}`}
+                    value={values.season}
+                    options={SEASONS}
+                    onChange={(v) => onChange({ season: v as SeasonPick })}
+                  />
+                  {values.season === "auto" && (
+                    <p className="ui-hint">
+                      Follows the date: the timeline's in a history, the story's own, else today's.
+                    </p>
                   )}
                 </>
               )}

@@ -38,6 +38,7 @@ import {
   type Night,
   type Post,
   type PostAa,
+  pieceVertices,
   type Stage,
   type StaticBatch,
   type Sun,
@@ -104,6 +105,8 @@ import { HALL_STEPS, LINES, loadPlan, PITCH, STEPS, type Step } from "./loading.
 import { createPlaceLabels, kindWord, labelsOn, type PlaceLabels } from "./places.ts"
 import { loaderOn, publishWorld, settle } from "./ready.ts"
 import { mountSea, type SeaMount, seaOf, seaOn } from "./sea.ts"
+import { mountSeason, type SeasonMount, timelineSeason } from "./season.ts"
+import { mountSeasonFx, type SeasonFx } from "./seasonFx.ts"
 import { sessionAgents } from "./sessionAgents.ts"
 import { mountShows } from "./shows.ts"
 import { mountUndead, type UndeadMount } from "./undead.ts"
@@ -278,6 +281,8 @@ export interface HexWorldExtra {
    * heroes are that session's, planned as its log grows. Returns the session once its HUD has started it.
    */
   session?: () => HallSession | null
+  /** The date the island is at (epoch ms; season.ts): a hall's timeline; null or left out: today's. */
+  seasonDate?: () => number | null
 }
 
 /** What the island hands a hall's HUD. */
@@ -307,6 +312,8 @@ export interface HudParts {
   chips: Pick<Chips, "select" | "onPlea" | "hit" | "extent"> | null
   /** The hall's camera (hall/camera.ts: follow a hero, the director), set by the hall's HUD as it mounts. */
   camera?: HallCamera
+  /** The season (season.ts): a story sets its own, Settings pins one. */
+  season?: SeasonMount | null
 }
 
 /** What `window.guildhall.ext.hall` tells the shots: how long each part took, and the places built. */
@@ -447,6 +454,8 @@ const world = {
     let water: Water | null = null
     let air: IslandAir | null = null
     let night: Night | null = null
+    let season: SeasonMount | null = null
+    let seasonFx: SeasonFx | null = null
     let unTick = () => {}
     let post: Post | null = null
     let disposeField = () => {}
@@ -514,6 +523,10 @@ const world = {
       // the night: a light in every lantern the tiles hold
       const lamps = m.lamps.map((at) => ({ kind: "street" as const, at, radius: 6 }))
       night = createNight(stage, { points: lamps, windows: [] }, { sky, hour })
+      // the season (season.ts): `?season=`, else the screen's own (a hall's date), else today's
+      season = mountSeason({ stage, query: ctx.query })
+      const seasonDate = extra.seasonDate
+      if (seasonDate) season.setSource(() => timelineSeason(seasonDate()), true)
       // the clock: the Viewer's transport; drag to set the hour, play runs the day at half an hour a second
       let now = hour
       const show = (h: number) => {
@@ -657,6 +670,18 @@ const world = {
         pieces: () => loose,
         sea: SEA_LEVEL,
       })
+      // the season's particles (seasonFx.ts): leaves, petals, chimney smoke near the camera, in the work FX's draw
+      const seasonOn = season
+      if (workfx && seasonOn)
+        seasonFx = mountSeasonFx({
+          stage,
+          workfx: workfx.fx,
+          pieces: loose,
+          weights: () => seasonOn.weights(),
+          heightOf: (id) => catalog.get(id)?.size[1] ?? 4,
+          vertices: async (id) => pieceVertices(await load(id)),
+        })
+      if (seasonFx && window.guildhall?.ext) window.guildhall.ext.seasonFx = seasonFx
       // the sky and town shows (shows.ts): nothing in the scene until one plays
       shows = mountShows({
         stage,
@@ -912,6 +937,7 @@ const world = {
           heroAt: (id) => life?.heroAt(id) ?? null,
           heroLook: (id) => life?.heroLook(id) ?? null,
           chips: life?.chips() ?? null,
+          season,
         })
       // a hall's session drives its heroes: planned in the worker as its log grows (the HUD starts the
       // session as it mounts, which may be a moment after this: looked for until it is there)
@@ -973,6 +999,8 @@ const world = {
       setRegionField(null)
       air?.dispose()
       night?.dispose()
+      seasonFx?.dispose()
+      season?.dispose()
       unAgents()
       unSound()
       life?.dispose()

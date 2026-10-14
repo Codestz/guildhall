@@ -168,7 +168,20 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
                   : null
               // a hall with a session (`?feed=`) shows its events on the island: CI weather, PR ships, scaffolds
               const fx = hallQuery.has("feed")
-              const extra = repo ? { repo, hud, fx } : home ? { hud, fx: true, session: homeSession } : {}
+              // the season follows the history's date on the bar (Watch it grow cycles its years); a session's: today's
+              const seasonDate =
+                past && time
+                  ? () => {
+                      const range = time.range()
+                      if (!range || time.scale() !== "history") return null
+                      return range.start + time.clock.get().t * (range.end - range.start)
+                    }
+                  : undefined
+              const extra = repo
+                ? { repo, hud, fx, ...(seasonDate ? { seasonDate } : {}) }
+                : home
+                  ? { hud, fx: true, session: homeSession }
+                  : {}
               const offMap = mountHexWorld(world, inner, past?.hooks, extra)
               offWorld = () => {
                 offMap()

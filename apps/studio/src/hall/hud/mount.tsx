@@ -23,6 +23,7 @@ import { setHome } from "../../site/homeHud.tsx"
 import { homePlaces } from "../../site/homePlaces.ts"
 import { type HallCamera, mountHallCamera } from "../camera.ts"
 import type { HallTime } from "../clock.ts"
+import { mountEvents } from "../events.ts"
 import { createSession, feedKindOf, type HallSession, openFeed } from "../feeds/index.ts"
 import { type SessionPlaces, sessionPlaces } from "../feeds/places.ts"
 import { storyTitle } from "../feeds/story.ts"
@@ -166,6 +167,7 @@ function mountOn(
   // the session: its clock run by the frames (a replay's quiet stretches skipped by a cinematic director)
   let raf = 0
   let offFx = () => {}
+  let offEvents = () => {}
   if (live) {
     const { session } = live
     opts.time?.setSession(session)
@@ -191,6 +193,7 @@ function mountOn(
     raf = requestAnimationFrame(frame)
     // the island's event FX (weather, ships, scaffolds) read the session, twice a second
     if (parts.fx) offFx = driveFx(parts.fx, session, () => levers.weather)
+    offEvents = mountEvents(session)
   }
 
   return {
@@ -202,6 +205,7 @@ function mountOn(
     parts: { ...rest, camera },
     dispose() {
       offFx()
+      offEvents()
       camera.dispose()
       if (live) {
         cancelAnimationFrame(raf)

@@ -75,6 +75,8 @@ export interface HallSession {
   onReset(fn: () => void): () => void
   /** Live: try the hub again now. */
   retry(): void
+  /** A world event's line (hall/events.ts), told next and alone, as a deed of renown is. */
+  herald(parts: Parameters<Narrator["herald"]>[0], about?: Parameters<Narrator["herald"]>[2]): void
 }
 
 export interface SessionOptions {
@@ -280,5 +282,6 @@ export function createSession(feed: Feed, opts: SessionOptions = {}): HallSessio
     retry() {
       if (feed instanceof LiveFeed) feed.retry()
     },
+    herald: (parts, about) => narrator?.herald(parts, clock.get().at - (teller?.start ?? 0), about),
   }
 }

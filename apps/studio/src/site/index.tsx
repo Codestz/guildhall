@@ -79,6 +79,8 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
       const feed = withWorld && slug ? ctx.query.get("feed") : null
       // the home (the island, the demos over it, a bare /hall) plays a session of its own: its bar is the Session scale
       const home = withWorld && !slug
+      // on localhost a hall with no `?feed=` follows the hub when it answers (hall/feeds/probe.ts): `hallQuery` then says so
+      let hallQuery = ctx.query
       const time: HallTime | null = history || feed || home ? createHallTime(createClock()) : null
 
       // The pieces first: fonts permitting (they settle within 3 s), the card is the first paint.
@@ -126,7 +128,7 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
                     go: openUrl,
                     hrefs: { another: href("hall"), demos: destHref("demos") },
                     retry: () => openUrl(href("hall", { repo: slug, try: String(Date.now() % 100000) })),
-                    query: ctx.query,
+                    query: hallQuery,
                     time,
                   })
                 })
@@ -142,8 +144,17 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
             Promise.all([
               import("../hexworld/index.ts"),
               history && time && slug ? import("../hall/history.ts") : null,
-            ]).then(([{ mountHexWorld }, hall]) => {
+              slug
+                ? import("../hall/feeds/probe.ts").then((p) =>
+                    p.autoFeed(ctx.query, slug, { hostname: location.hostname }),
+                  )
+                : null,
+            ]).then(([{ mountHexWorld }, hall, auto]) => {
               if (gone) return
+              if (auto) {
+                hallQuery = new URLSearchParams(ctx.query)
+                hallQuery.set("feed", auto)
+              }
               // the history: the island revealed as it was on the clock's day (`?t=`, today by default)
               const past =
                 hall && time && slug
@@ -155,7 +166,7 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
                     })
                   : null
               // a hall with a session (`?feed=`) shows its events on the island: CI weather, PR ships, scaffolds
-              const fx = ctx.query.has("feed")
+              const fx = hallQuery.has("feed")
               const extra = repo ? { repo, hud, fx } : home ? { hud, fx: true, session: homeSession } : {}
               const offMap = mountHexWorld(world, inner, past?.hooks, extra)
               offWorld = () => {

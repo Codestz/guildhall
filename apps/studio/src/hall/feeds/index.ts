@@ -8,6 +8,8 @@
  *   session  `createSession`: the hall's one EventLog, its clock and a 10 Hz snapshot for React
  *   view     the session read into the HUD's props
  *
+ *   probe    the live default: on localhost, with no `?feed=`, a hub that holds a guild of the repo opens `live`
+ *
  * Link knobs: `?guild=` (the hub's guild, exactly; default: the repo's name and its `·n` clones),
  * `?hub=ws://127.0.0.1:<port>/ws`, `?src=` (a chronicle of the guild, or a path on this origin),
  * `?story=saga|solo|party|parties|rush|seas|factions`, `?seed=`, `?st=<seconds>` (open at), `?act=1..5` (a story opens at that act, like the home), `?play=0` (open paused).
@@ -19,6 +21,7 @@ import { actOf, StoryFeed, type StoryStage, storyOf } from "./story.ts"
 import { guildMatcher } from "./wire.ts"
 
 export type { Feed, FeedKind, FeedSink, FeedStatus } from "./feed.ts"
+export { type AutoFeedOptions, autoFeed, isLocalHost, PROBE_MS, probeHub } from "./probe.ts"
 export { createSession, type HallSession, type SessionSnapshot } from "./session.ts"
 
 /** The feed a link asks for, or null (no `?feed=`: the hall shows its history only). */

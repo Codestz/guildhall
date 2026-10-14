@@ -2,6 +2,7 @@ export { blockedDoors, DOOR_HALF, DOOR_RUN, type DoorWay, doorWays, spotsInPiece
 export {
   boxSolid,
   type CollideInputs,
+  discSolid,
   fitToTiles,
   flightSteps,
   type HexCollide,
@@ -57,6 +58,8 @@ export {
 export {
   GATHER_PER_SPOT,
   HERO_SPOTS_MIN,
+  type HeroBoard,
+  type HeroPool,
   type HeroPoolInputs,
   type HeroPose,
   type HeroSpot,

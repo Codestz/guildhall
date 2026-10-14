@@ -22,7 +22,7 @@ import { hash2 } from "../geom/noise.ts"
 import { discSolid, type Solid, SolidGrid } from "./collide.ts"
 import { DRILLS, pairedDrill } from "./drills.ts"
 import { hexAt, hexCentre } from "./grid.ts"
-import { type HeroSpot, heroSpotPool } from "./heroes.ts"
+import { type HeroPool, heroSpotPool } from "./heroes.ts"
 import { type HexIsland, kindOf } from "./island.ts"
 import { CHOP_TRIP, cyclesSpan, PROPS, type RoutineAt, routineFor, spotFrame } from "./routines.ts"
 import { HARD, type PlacedSpot, type TileFurniture, tileFurniture } from "./spots.ts"
@@ -652,9 +652,10 @@ export interface LifePlaces {
   /**
    * A place's hero spots (heroes.ts): the pool set aside for the agents, new spots no townsfolk is ever
    * given (none of `furniture.spots`), so the townsfolk's days are the same with or without it. Empty
-   * unless `lifePlaces` was asked for some (`heroSpots`); at the Guildhall, the gathering before its hall.
+   * unless `lifePlaces` was asked for some (`heroSpots`); at the Guildhall, the gathering before its hall
+   * (and `heroSpots.board()`, its notice board).
    */
-  heroSpots(zone: number): readonly HeroSpot[]
+  heroSpots: HeroPool
 }
 
 /** Work made up for someone (LifePlaces `madeUp`): where, whose work it is beside, the door it is before. */

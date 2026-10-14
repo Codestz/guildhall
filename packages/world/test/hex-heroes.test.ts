@@ -233,3 +233,52 @@ describe("a hero's walk to its spot", () => {
     expect(turn?.pts.at(-1)).toEqual(other.at)
   })
 })
+
+describe("the gathering two by two, and the notice board", () => {
+  const islands = [1, 2, 3, 5].map((seed) => ({ seed, ...build(seed) }))
+
+  test("heroes at rest pair off: most gathering spots face a partner 1.25 m across", () => {
+    let paired = 0
+    let all = 0
+    for (const { z, walk, places } of islands) {
+      const gather = places.heroSpots(guildhallZone(walk, z))
+      all += gather.length
+      for (const s of gather) {
+        const mate = gather.find(
+          (o) => o !== s && Math.abs(Math.hypot(o.at[0] - s.at[0], o.at[2] - s.at[2]) - 1.25) < 1e-6,
+        )
+        if (!mate) continue
+        // facing each other
+        expect(Math.cos(s.facing - Math.atan2(mate.at[0] - s.at[0], mate.at[2] - s.at[2]))).toBeCloseTo(1, 6)
+        paired++
+      }
+    }
+    expect(paired / all).toBeGreaterThan(0.5)
+  })
+
+  test("the board stands on the Guildhall's ground, clear, facing the gathering, with a pinning spot and briefing spots", () => {
+    let boards = 0
+    for (const { seed, h, z, walk, places } of islands) {
+      const home = guildhallZone(walk, z)
+      const board = places.heroSpots.board()
+      if (!board) continue
+      boards++
+      const [bx, , bz] = board.at
+      expect([seed, z.zones[home]!.tiles.includes(h.grid.index(...qr(board.at)))]).toEqual([seed, true])
+      expect(places.furniture.blocked(bx, bz, 0.35)).toBe(false)
+      const spot = board.spot
+      expect([spot.kind, spot.pose, spot.zone]).toEqual(["work", "board", home])
+      // the pinning spot faces the board, 0.8 m before it
+      expect(Math.hypot(spot.at[0] - bx, spot.at[2] - bz)).toBeCloseTo(0.8, 6)
+      expect(Math.cos(spot.facing - Math.atan2(bx - spot.at[0], bz - spot.at[2]))).toBeCloseTo(1, 6)
+      expect(board.brief.length).toBeGreaterThan(0)
+      for (const b of [spot, ...board.brief])
+        for (const g of places.heroSpots(home))
+          expect(Math.hypot(g.at[0] - b.at[0], g.at[2] - b.at[2])).toBeGreaterThan(0.85)
+      // the same island, the same board
+      expect(build(seed).places.heroSpots.board()).toEqual(board)
+    }
+    expect(boards).toBeGreaterThanOrEqual(3)
+    expect(build(1, 4000, 0).places.heroSpots.board()).toBeNull()
+  }, 30000)
+})

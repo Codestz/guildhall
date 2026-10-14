@@ -12,6 +12,8 @@
 import {
   type EventSites,
   eventSites,
+  type SeaSites,
+  seaSites,
   shoreBytes,
   type VertexMeshData,
   vertexMeshData,
@@ -203,6 +205,8 @@ export interface MapStage {
   zoneKinds: string[]
   /** Where the event FX happen (render events/sites.ts): the castle's keep, the harbours' berths, the places' hearts. */
   sites: EventSites
+  /** Where the sea's life sails (render sea/sites.ts): the merchants' laps, the quay's moorings and lanes, the lighthouse's lamp. */
+  sea: SeaSites
   stats: {
     land: number
     tiles: number
@@ -491,6 +495,7 @@ export function runHexJob(
         ]
       }),
       sites: eventSites(h, z, w, { sea: SEA_LEVEL }),
+      sea: seaSites(h, z, w, { sea: SEA_LEVEL }),
       stats: {
         land: h.stats.land,
         tiles: w.tiles.length,

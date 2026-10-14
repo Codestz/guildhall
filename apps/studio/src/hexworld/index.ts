@@ -100,6 +100,7 @@ import type { AgentDesk, AgentDeskReply, AgentDeskRequest, LifePlan } from "./li
 import { HALL_STEPS, LINES, loadPlan, PITCH, STEPS, type Step } from "./loading.ts"
 import { createPlaceLabels, kindWord, labelsOn, type PlaceLabels } from "./places.ts"
 import { loaderOn, publishWorld, settle } from "./ready.ts"
+import { mountSea, type SeaMount, seaOf, seaOn } from "./sea.ts"
 import { sessionAgents } from "./sessionAgents.ts"
 import { mountShows } from "./shows.ts"
 
@@ -449,6 +450,7 @@ const world = {
     let island: HexIsland | null = null
     let unHud = () => {}
     let fx: Fx | null = null
+    let seaLife: SeaMount | null = null
     let workfx: WorkFxMount | null = null
     let shows: ReturnType<typeof mountShows> | null = null
     let unAgents = () => {}
@@ -725,6 +727,18 @@ const world = {
         return
       }
       if (drive) fx = mountFx({ stage, drive, sites: m.sites, water, load, spec: fxSpec, workfx: workfx?.fx })
+      // the sea's life (sea.ts): with the FX or `?sea=`; a session drives it once its HUD is up
+      const seaSpec = seaOf(ctx.query)
+      if (seaOn(seaSpec, fxOn))
+        seaLife = mountSea({
+          stage,
+          sites: m.sea,
+          events: m.sites,
+          load,
+          light: () => sky.light(),
+          spec: seaSpec,
+          session: extra.session ?? session,
+        })
       // a hook's parts (a hall's history reveal) go in before the light, so their shaders compile behind the cover
       if (hooks && island && world)
         hooks.built({
@@ -909,6 +923,7 @@ const world = {
       life?.dispose()
       doors?.dispose()
       fx?.dispose()
+      seaLife?.dispose()
       workfx?.dispose()
       shows?.dispose()
       labels?.dispose()

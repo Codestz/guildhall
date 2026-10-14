@@ -475,7 +475,8 @@ export const COMPONENTS_CSS = /* css */ `
 }
 .ui-hero-bubble::after { content: ""; position: absolute; left: 50%; bottom: -4px; width: 7px; height: 7px; margin-left: -3.5px; transform: rotate(45deg); background: rgb(20, 15, 11); box-shadow: 1px 1px 0 0 rgba(220, 182, 98, 0.22); }
 .ui-hero-bubble:empty { display: none; }
-.ui-hero[data-speak] .ui-hero-bubble { visibility: visible; }
+/* said once the chips above have climbed clear of it (their 0.2 s ease), gone at once */
+.ui-hero[data-speak] .ui-hero-bubble { visibility: visible; transition: visibility 0s 0.2s; }
 /* the deed sigil: an ink medallion, brass rim tinted by the hero's colour, the deed's glyph in paper */
 .ui-hero-sigil {
   display: none;

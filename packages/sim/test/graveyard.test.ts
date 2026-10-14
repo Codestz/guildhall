@@ -21,6 +21,7 @@ import {
 import {
   asStruck,
   type Grave,
+  gaitOf,
   graveAt,
   itineraries,
   type LifeKit,
@@ -137,7 +138,9 @@ describe("the fight at the graveyard", () => {
     // on its way it ran
     const running = poseAt(it, (T0 + 27_000 + swing.from) / 2)!
     expect(running.act).toBe("walk")
-    expect(running.clip).toBe("Running_A")
+    // (at STRIKE_RUN_MPS: the sprint, sim gait.ts)
+    expect(running.clip).toBe(gaitOf(STRIKE_RUN_MPS) as string)
+    expect(running.clip).toBe("Running_B")
     // the blow: the slice, sword in hand, its hit as the skeleton is struck
     const blow = poseAt(it, at)!
     expect(blow.sample?.clip).toBe("Melee_1H_Attack_Slice_Diagonal")

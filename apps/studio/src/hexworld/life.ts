@@ -883,6 +883,13 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
                 ],
           ),
         heroAt: (id: string) => heroAt(id),
+        // shots: the heroes' clock (screen seconds into their source), set when `s` is given
+        agentSecs: (s?: number) => {
+          if (s !== undefined) secs = s
+          return secs
+        },
+        // shots: where a hero's source has it at second `s` (its walk's gait in `clip`), drawn or not
+        agentPoseAt: (id: string, s: number) => source?.poseAt(id, s) ?? null,
         // a hero's itinerary as planned (its steps and acts), when the source keeps one
         itinerary: (id: string) => source?.itinerary?.(id),
         // the chips as the declutter left them (shots, the perf probe)

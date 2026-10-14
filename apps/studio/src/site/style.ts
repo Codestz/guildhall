@@ -24,9 +24,16 @@ const CSS = /* css */ `
 .site-root[data-welcome] .ui-viewer:not([data-phone]) .ui-hud-bottom { bottom: calc(var(--gut) + var(--welcome-h, 0px) + 12px); }
 /* the top row on a phone with "Your repo" in it: the repo chip leaves it room */
 .site-root:has(.site-welcome[data-dock="top"]) .ui-viewer[data-phone] { --rail-w: 156px; }
-/* ≤ 380 px "Your repo" is its icon alone (packages/ui site/style.ts), 44 px + 8 px */
-@media (max-width: 380px) {
+/* < 400 px "Your repo" is its icon alone (packages/ui site/style.ts), 44 px + 8 px */
+@media (max-width: 399px) {
   .site-root:has(.site-welcome[data-dock="top"]) .ui-viewer[data-phone] { --rail-w: 104px; }
+}
+/* a screen on its side (a container up to 460 px tall): the caption is one line, its rows run on, so the
+   island keeps the height (the welcome is the top row's button there, packages/ui site/style.ts) */
+@container viewer (max-height: 460px) {
+  .ui-viewer:not([data-phone]) .hall-caps .st-caption:not([data-kind="chapter"]) { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .ui-viewer:not([data-phone]) .hall-caps .st-caption:not([data-kind="chapter"]) .st-caption-row { display: inline; padding: 0; margin: 0; overflow: visible; }
+  .ui-viewer:not([data-phone]) .hall-caps .st-caption-row + .st-caption-row::before { content: " "; }
 }
 `
 

@@ -156,7 +156,9 @@ export function SiteApp() {
 
       {card && (
         <WelcomeCard
+          key={screen}
           busy={busy}
+          startOpen={screen === "hall"}
           demoHref={destHref("demos")}
           builtHref={destHref("built")}
           onGenerate={(repo) => {

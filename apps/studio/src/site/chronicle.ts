@@ -9,7 +9,7 @@ import type { Story } from "@guildhall/ui"
 import { useEffect, useMemo, useState } from "react"
 import { type HallRepo, repoOf } from "../hexworld/hall.ts"
 
-/** One fetch per repo while the page lives: the world and the note read the same answer. A failed read is forgotten, so a retry asks again. */
+/** One fetch per repo while the page lives: the world and the note read the same answer. A read that failed is forgotten, so a retry asks again. */
 const reads = new Map<string, Promise<ChronicleResult>>()
 
 /** A repo's chronicle, fetched once (`chronicleFor`); never rejects. */
@@ -19,7 +19,9 @@ export function hallChronicle(slug: string): Promise<ChronicleResult> {
   if (!read) {
     const [owner = "", repo = ""] = slug.split("/")
     read = chronicleFor(owner, repo).then((found) => {
-      if (found.status !== "ok") reads.delete(key)
+      // only a read that failed is forgotten: "no chronicle" is an answer, and asking again for it is the
+      // second 404 on a sketch hall (the world reads it, then the HUD)
+      if (found.status === "unavailable") reads.delete(key)
       return found
     })
     reads.set(key, read)

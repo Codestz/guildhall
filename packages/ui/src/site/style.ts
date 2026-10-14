@@ -131,13 +131,28 @@ export const SITE_CSS = /* css */ `
   .gh .site-welcome[data-dock="top"] .site-welcome-foot { align-items: flex-end; }
   .gh .site-welcome[data-dock="top"] .site-welcome-links { flex-wrap: wrap; justify-content: flex-start; gap: 0 20px; }
 }
-@media (max-width: 380px) {
+@media (max-width: 399px) {
   /* "Your repo" folds to its icon in a round 44 px button: the repo chip keeps its name */
   .gh .site-repo-btn { width: 44px; padding: 0; justify-content: center; }
   .gh .site-repo-btn .site-repo-word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .gh .site-repo-btn svg { width: 18px; height: 18px; }
-  .gh .site-welcome[data-dock="top"] .site-go { width: 40px; padding: 0; }
+  .gh .site-welcome[data-dock="top"] .site-go { width: var(--hit); padding: 0; }
   .gh .site-welcome[data-dock="top"] .site-go-word { display: none; }
+}
+/* a phone's touch size: --hit is 44 px for what the pieces size themselves (the field is as tall as its
+   Generate button; the fold and the demos' close are icon buttons) */
+@media (max-width: 600px) {
+  .gh :is(.site-welcome, .site-layer, .site-crestmenu) { --hit: 44px; }
+  .gh .site-field { height: calc(var(--hit) + 14px); }
+  .gh .site-go { height: var(--hit); min-width: var(--hit); }
+}
+/* a phone on its side (601 – 960 px wide, up to 480 tall): the welcome is the same top-row button, left of the HUD's rail
+   (four 40 px tools), and the card it unfolds is a column's width, not the screen's */
+@media (min-width: 601px) and (max-width: 960px) and (max-height: 480px) {
+  .gh .site-welcome[data-dock="top"] { padding-right: 200px; }
+  .gh .site-welcome[data-dock="top"][data-open="true"] { padding: 0 12px; justify-content: flex-end; }
+  .gh .site-welcome[data-dock="top"] section.site-welcome-card { width: min(560px, 100%); }
+  .gh .site-welcome[data-dock="top"] .site-welcome-links { flex-wrap: nowrap; }
 }
 .gh .site-welcome[data-dock="top"] .site-welcome-card { position: relative; z-index: 32; width: 100%; margin-top: 56px; }
 
@@ -298,7 +313,7 @@ button.site-menu-palette:hover { background: var(--raise-2); color: var(--paper)
 /* the Harbour: the demo cards, one repo each */
 .gh .site-article.site-harbour { max-width: 1100px; }
 .gh .site-harbour .site-hero { max-width: 832px; }
-.gh .site-harbour-count { margin: 22px 0 0; font: 14px var(--mono); color: var(--faint); }
+.gh .site-harbour-count { margin: 22px 0 0; font: 400 var(--t-md)/1.2 var(--display); letter-spacing: 0.14em; color: var(--brass); }
 .gh .site-harbour-cards { margin: 28px 0 0; }
 .gh .site-harbour .site-card-title { font-size: 20px; text-transform: none; font-variant: all-small-caps; letter-spacing: 0.05em; }
 .gh .site-harbour-owner { color: var(--muted); }
@@ -422,6 +437,30 @@ button.site-menu-palette:hover { background: var(--raise-2); color: var(--paper)
   .gh .site-post { grid-template-columns: 1fr; }
   .gh .site-post > img { height: 170px; border-right: 0; border-bottom: 1px solid var(--hair); }
 }
+
+/* ── lost at sea (a path nothing answers) ───────────────────────── */
+.gh.site-lost {
+  position: fixed; inset: 0; display: grid; place-items: center; padding: 24px 16px; overflow-y: auto;
+  background: radial-gradient(900px 480px at 50% 0, rgba(220, 182, 98, 0.1), transparent 70%), var(--ink-solid);
+}
+.gh .site-lost-body { display: grid; justify-items: center; gap: 14px; max-width: 520px; text-align: center; outline: none; }
+.gh .site-lost-crest {
+  display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; color: var(--brass-hi);
+  border: 1px solid var(--brass-line); background: radial-gradient(circle at 50% 35%, rgba(220, 182, 98, 0.22), transparent 70%);
+}
+.gh .site-lost-body h1 { margin: 6px 0 0; font: 400 clamp(34px, 8vw, 52px)/1.1 var(--display); letter-spacing: 0.03em; color: var(--paper); }
+.gh .site-lost-body p { margin: 0; font: 18px/1.5 var(--serif); color: var(--muted); overflow-wrap: anywhere; }
+.gh .site-lost-body code { font: 0.86em var(--mono); color: var(--paper); background: var(--raise); padding: 1px 6px; border-radius: 4px; }
+.gh .site-lost-ways { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 12px; }
+.gh .site-lost-btn {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 112px; min-height: 44px; padding: 0 22px; border-radius: 999px;
+  border: 1px solid var(--brass-line); background: var(--ink); color: var(--brass-hi); font: 400 17px/1 var(--display); letter-spacing: 0.05em;
+  text-decoration: none; cursor: pointer;
+}
+.gh .site-lost-btn:hover { border-color: var(--brass); color: var(--paper); }
+.gh .site-lost-btn:focus-visible { outline: none; box-shadow: var(--ring); }
+.gh .site-lost-btn[data-primary] { border-color: transparent; color: var(--on-brass); background: linear-gradient(180deg, var(--brass-hi), var(--brass)); }
+.gh .site-lost-btn[data-primary]:hover { filter: brightness(1.07); color: var(--on-brass); }
 
 @media (prefers-reduced-motion: no-preference) {
   .gh .site-open, .gh .site-card article, .gh .site-act, .gh .site-menu-item, .gh .site-crest-btn, .gh .site-link, .gh .site-input {

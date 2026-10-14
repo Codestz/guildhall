@@ -13,6 +13,7 @@ export {
 export { CrestMenu, type CrestMenuProps, type SiteDest } from "./CrestMenu.tsx"
 export { DemoPicker, type DemoPickerProps, type Story, type StoryAct } from "./DemoPicker.tsx"
 export { type HarbourEntry, HarbourPage, type HarbourPageProps } from "./HarbourPage.tsx"
+export { type LostDest, NotFoundPage, type NotFoundPageProps } from "./NotFoundPage.tsx"
 export {
   parseRepo,
   type RepoParse,

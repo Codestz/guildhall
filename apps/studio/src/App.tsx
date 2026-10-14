@@ -1,15 +1,15 @@
 import { configureLog, type FrameStats, log } from "@guildhall/core"
-import { PerfHud } from "@guildhall/ui"
-import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react"
+import { holdSiteStyle, NotFoundPage, PerfHud } from "@guildhall/ui"
+import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { holdStudioStyle } from "./browser/style.ts"
 import type { DebugHost } from "./debug.ts"
-import { BASE } from "./env.ts"
 import { screenFor } from "./screens.ts"
-import { HOME_ID, openable, placeOf } from "./shell/directory.ts"
-import { follow } from "./shell/nav.ts"
-import { canonical, here, resolve } from "./shell/router.ts"
+import { HOME_ID, placeOf } from "./shell/directory.ts"
+import { canonical, here, href, resolve } from "./shell/router.ts"
 import { BAR_PX } from "./shell/style.ts"
 import { TopBar } from "./shell/TopBar.tsx"
-import { isSiteScreen, mountKey } from "./site/routes.ts"
+import { openUrl } from "./site/nav.ts"
+import { destHref, isSiteScreen, mountKey } from "./site/routes.ts"
 
 const logger = log("studio:shell")
 
@@ -31,15 +31,6 @@ const fill: CSSProperties = { position: "fixed", inset: 0, overflow: "hidden" }
 const belowBar: CSSProperties = { ...fill, top: BAR_PX }
 /** The perf HUD's frame: its own `top: 12; right: 12` then lands below the bar. */
 const hudFrame = (top: number): CSSProperties => ({ position: "fixed", top, left: 0, right: 0, zIndex: 40 })
-const missing: CSSProperties = {
-  ...fill,
-  display: "grid",
-  placeContent: "center",
-  background: "#15110d",
-  color: "#f3e9d4",
-  font: "14px/1.6 ui-monospace, Menlo, monospace",
-}
-const link: CSSProperties = { color: "#e2b85c" }
 
 /** The URL now, after replacing an old `?screen=` link (or any non-canonical form) in place. */
 function sync(): string {
@@ -61,11 +52,32 @@ function useUrl(): string {
 
 /** The tab's title for a screen: its directory name, "Not found" for a path no screen answers. */
 function titleOf(id: string | null, fallback: string): string {
+  if (id === null) return "Lost at sea · Guildhall"
   if (id === "island") return "Guildhall"
   if (isSiteScreen(id)) return `${fallback} · Guildhall`
   if (id === HOME_ID) return "Guildhall Studio"
   const name = id ? (placeOf(id)?.tool.name ?? fallback) : "Not found"
   return `${name} · Guildhall Studio`
+}
+
+/** A path nothing answers: the site's own "Lost at sea" page, with the way back to the island, the demos, the harbour. */
+function NotFound({ path }: { path: string }) {
+  // the tokens and the site's sheet are up before the first paint, so the page never shows unstyled
+  useLayoutEffect(() => {
+    const studio = holdStudioStyle()
+    const site = holdSiteStyle()
+    return () => {
+      site()
+      studio.release()
+    }
+  }, [])
+  return (
+    <NotFoundPage
+      path={path}
+      hrefs={{ island: href("island"), demos: destHref("demos"), harbour: destHref("harbour") }}
+      onNavigate={(id) => openUrl(id === "island" ? href("island") : destHref(id))}
+    />
+  )
 }
 
 /** The studio shell: the top bar, the screen the URL names in the window below it, the perf HUD. */
@@ -132,22 +144,7 @@ export function App({ debug }: { debug: DebugHost }) {
 
   const stats = useCallback(() => debug.stage()?.stats() ?? NO_STATS, [debug])
 
-  if (!screen) {
-    const known = openable()
-      .map((p) => p.tool.name)
-      .join(", ")
-    return (
-      <div style={missing}>
-        <p>Nothing at “{pathname}”.</p>
-        <p>
-          The studio has: {known}.{" "}
-          <a style={link} href={BASE} onClick={follow(HOME_ID)}>
-            Go home
-          </a>
-        </p>
-      </div>
-    )
-  }
+  if (!screen) return <NotFound path={pathname} />
   const site = isSiteScreen(screen.id)
   return (
     <>

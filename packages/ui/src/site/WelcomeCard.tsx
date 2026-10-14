@@ -18,6 +18,8 @@ import { parseRepo } from "./repo.ts"
 
 /** At or below this width the welcome is the top row's button (the HUD's phone width, viewer/hud.ts). */
 export const WELCOME_TOP_MAX = 600
+/** The same button on a phone on its side: up to this wide and this tall (the field would take half the height). */
+const WELCOME_LANDSCAPE = "(max-width: 960px) and (max-height: 480px)"
 
 /** The repos the empty field suggests in turn (its placeholder), a few seconds each. */
 export const EXAMPLES: readonly string[] = [
@@ -46,9 +48,9 @@ function useExample(on: boolean): number {
   return k
 }
 
-/** True while the screen is a phone's (the welcome docks in the top row). */
+/** True while the screen is a phone's, upright or on its side (the welcome docks in the top row). */
 function useTopDock(): boolean {
-  const query = `(max-width: ${WELCOME_TOP_MAX}px)`
+  const query = `(max-width: ${WELCOME_TOP_MAX}px), ${WELCOME_LANDSCAPE}`
   const [on, setOn] = useState(() => typeof matchMedia === "function" && matchMedia(query).matches)
   useEffect(() => {
     if (typeof matchMedia !== "function") return
@@ -75,6 +77,8 @@ export interface WelcomeCardProps {
   builtHref?: string
   /** The field's starting text. */
   initial?: string
+  /** Opens unfolded with the field focused: the page is the ask (a bare `/hall`). */
+  startOpen?: boolean
   /** A repo is being read: the button waits. */
   busy?: boolean
   /** A problem from the caller (not found, rate limited): shown under the field. */
@@ -109,6 +113,7 @@ export function WelcomeCard({
   demoHref,
   builtHref,
   initial = "",
+  startOpen = false,
   busy,
   error,
 }: WelcomeCardProps) {
@@ -117,7 +122,7 @@ export function WelcomeCard({
   const [touched, setTouched] = useState(initial !== "")
   const root = useRef<HTMLElement>(null)
   const field = useRef<HTMLInputElement>(null)
-  const [open, setOpen] = useState(initial !== "" || Boolean(error))
+  const [open, setOpen] = useState(startOpen || initial !== "" || Boolean(error))
   const top = useTopDock()
   const on = (event: WelcomeEvent) => {
     const next = welcomeFold(open, event, text)
@@ -131,6 +136,10 @@ export function WelcomeCard({
   useEffect(() => {
     if (top && open) field.current?.focus({ preventScroll: true })
   }, [top, open])
+  // a page that is the ask itself (a bare `/hall`) starts with the field in hand
+  useEffect(() => {
+    if (startOpen) field.current?.focus({ preventScroll: true })
+  }, [startOpen])
   const example = useExample(text === "")
   const parsed = parseRepo(text)
   const problem = error ?? (touched && text.trim() !== "" && !parsed.ok ? parsed.reason : undefined)

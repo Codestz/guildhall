@@ -2,7 +2,7 @@
  * The Studio's committed pictures, captured from the real pages at hi-DPI and written as WebP:
  *
  *   bun shots thumbs                   every home-directory card → apps/studio/public/home/<id>.webp
- *   bun shots thumbs hudlab sitelab    just these cards
+ *   bun shots thumbs town hexmap       just these cards
  *   bun shots stills                   the backdrops: the island hero → public/site/, the HUD lab's → public/lab/hud/
  *   bun shots repos [owner__repo …]    the demo picker's live-chronicle cards → apps/studio/public/site/repos/
  *   bun shots demos [id …]             the demo picker's story cards, captured on V2 → apps/studio/public/site/demos/
@@ -53,15 +53,7 @@ const BARE = "bar=0&ui=0"
 export const CARDS: readonly Pose[] = [
   { id: "town", url: `/town/1?${BARE}`, ...CARD, settle: 3000 },
   { id: "hexmap", url: `/lab/hexmap?${BARE}`, ...CARD },
-  {
-    id: "hexscale",
-    url: `/lab/hexscale?board=scale&${BARE}`,
-    ...CARD,
-    camera: "0,32,112,52,1,2",
-    settle: 1500,
-  },
   { id: "hudlab", url: `/lab/hud?still=1&${BARE}`, ...CARD, settle: 1500 },
-  { id: "sitelab", url: `/lab/site?${BARE}`, ...CARD, settle: 1500 },
   { id: "pieces", url: `/pieces?${BARE}`, ...CARD },
   { id: "palette", url: `/palette?${BARE}`, ...CARD },
   { id: "composer", url: `/composer?tile=tavern-garden&${BARE}`, ...CARD },
@@ -73,7 +65,7 @@ export const CARDS: readonly Pose[] = [
 
 /** Backdrops the labs draw behind their panels (shown `cover` over the whole window). */
 export const STILLS: readonly Pose[] = [
-  // the site lab's island: the town's opening view
+  // How it's built's hero: the town's opening view
   {
     id: "island-hero",
     url: `/town/1?${BARE}`,

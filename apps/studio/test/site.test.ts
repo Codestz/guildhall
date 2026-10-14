@@ -28,7 +28,7 @@ const at = (url: string) => {
 describe("site routes", () => {
   test("the site's five screens are the site; the Studio's are not", () => {
     for (const id of ["island", "demos", "harbour", "built", "hall"]) expect(isSiteScreen(id)).toBe(true)
-    for (const id of ["home", "pieces", "town", "sitelab"]) expect(isSiteScreen(id)).toBe(false)
+    for (const id of ["home", "pieces", "town", "hexmap"]) expect(isSiteScreen(id)).toBe(false)
     expect(isSiteScreen(null)).toBe(false)
   })
 

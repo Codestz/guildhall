@@ -55,7 +55,6 @@ export const NATURE_CHOSEN: Readonly<HexNature> = {
 }
 
 export type NatureFamily = "tree" | "pine" | "bush" | "rock" | "grass" | "flower"
-export const NATURE_FAMILIES: readonly NatureFamily[] = ["tree", "pine", "bush", "rock", "grass", "flower"]
 
 /** The nature family a catalog piece belongs to, or null (a building, a crop, a fence). */
 export function natureFamily(piece: string): NatureFamily | null {
@@ -79,7 +78,7 @@ export function natureFamily(piece: string): NatureFamily | null {
 }
 
 /** The multiplier `nature` gives a family. */
-export function natureScale(nature: HexNature, family: NatureFamily): number {
+function natureScale(nature: HexNature, family: NatureFamily): number {
   if (family === "pine") return nature.pine ?? nature.tree ?? 1
   return nature[family] ?? 1
 }

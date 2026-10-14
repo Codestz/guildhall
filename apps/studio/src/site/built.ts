@@ -178,10 +178,6 @@ export const BUILT: BuiltContent = {
               text: "1,531 pieces from 18 asset packs, browsable at true scale, with a curated style list.",
             },
             {
-              title: "Scale board",
-              text: "Buildings, trees and characters side by side, so the door is exactly a character's height.",
-            },
-            {
               title: "Tile composer",
               text: "Move pieces with a gizmo, author where people sit and work, then try it with characters on every spot.",
             },

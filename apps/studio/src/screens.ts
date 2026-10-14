@@ -66,10 +66,7 @@ export const SCREENS: readonly Screen[] = [
   lazy("grips", "Grip matrix", () => import("./grips/matrix/index.ts").then((m) => m.grips)),
   lazy("town", "Town", () => import("./town/index.ts").then((m) => m.town)),
   lazy("hexmap", "Hex map", () => import("./hexmap/index.ts").then((m) => m.hexmap)),
-  lazy("hexscale", "Scale board", () => import("./hexscale/index.ts").then((m) => m.hexScale)),
   lazy("hudlab", "HUD lab", () => import("./hudlab/index.tsx").then((m) => m.hudLab)),
-  lazy("sitelab", "Site lab", () => import("./sitelab/index.tsx").then((m) => m.siteLab)),
-  lazy("replay", "History replay", () => import("./replay/index.ts").then((m) => m.replayLab)),
 ]
 
 export const DEFAULT_SCREEN = "island"

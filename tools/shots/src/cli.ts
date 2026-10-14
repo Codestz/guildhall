@@ -64,7 +64,7 @@ if (process.argv[2] === "prefabs") process.exit(await runPrefabs(process.argv.sl
 // `bun shots bench`: the perf bench, six poses at two sizes, into .probe/perf2 and its ledger (bench.ts).
 if (process.argv[2] === "bench") process.exit(await runBench(process.argv.slice(3)))
 
-// `bun shots thumbs` / `bun shots stills`: the Studio's committed card previews and lab backdrops (thumbs.ts).
+// `bun shots thumbs` / `bun shots stills`: the Studio's committed card previews and the site's backdrop (thumbs.ts).
 if (process.argv[2] === "thumbs") process.exit(await runThumbs(process.argv.slice(3)))
 if (process.argv[2] === "repos") process.exit(await runRepos(process.argv.slice(3)))
 if (process.argv[2] === "demos") process.exit(await runDemos(process.argv.slice(3)))

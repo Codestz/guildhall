@@ -50,14 +50,6 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         purpose: "The hex world from above: island, heights in steps, sand, cliffs, rivers, lakes, forest.",
         preview: true,
       },
-      {
-        id: "hudlab",
-        name: "HUD lab",
-        purpose:
-          "Every HUD panel (roster, chronicle, dossier, pleas, settings, timeline) in V1's layout, on fixtures.",
-        preview: true,
-        dev: true,
-      },
     ],
   },
   {

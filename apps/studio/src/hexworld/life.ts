@@ -769,7 +769,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       agentCpu += (agentMs - agentCpu) * 0.05
       crowd?.update(step, sample)
       // the work round them, from what the crowd drew (rods' tips): floats, lines, beats, stocks
-      work?.frame(day, held !== null ? 0 : step, seek || step > 0.5)
+      work?.frame(day, step, seek || step > 0.5)
       const t3 = performance.now()
       stage.timing.cpu.add("crowd", t3 - t2)
       // the chips over their agents: placed every frame, their words and the declutter at most 10 times a second

@@ -530,10 +530,7 @@ function hostLike(): Plugin {
  * The public site's origin (STUDIO_SITE_URL), for what must be absolute: the social card's image,
  * robots.txt's sitemap line and the sitemap. The default is the host decided for the showcase.
  */
-export const SITE_URL = (process.env.STUDIO_SITE_URL ?? "https://studio.guildhall.codestz.dev").replace(
-  /\/+$/,
-  "",
-)
+export const SITE_URL = (process.env.STUDIO_SITE_URL ?? "https://guildhall.codestz.dev").replace(/\/+$/, "")
 
 /** The public pages a crawler is pointed at (the Studio's tools and the labs are reachable from them). */
 export const SITEMAP_PATHS = ["/", "/demos", "/harbour", "/built", "/studio", "/hall/facebook/react"]

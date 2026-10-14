@@ -9,7 +9,13 @@
   "redirects": [
     { "source": "/(how|how\\.html)", "destination": "/built", "permanent": false },
     { "source": "/harbour\\.html", "destination": "/harbour", "permanent": false },
-    { "source": "/demos\\.html", "destination": "/demos", "permanent": false }
+    { "source": "/demos\\.html", "destination": "/demos", "permanent": false },
+    {
+      "source": "/",
+      "has": [{ "type": "query", "key": "repo", "value": "(?<repo>[^/]+/[^/]+)" }],
+      "destination": "/hall/:repo",
+      "permanent": false
+    }
   ],
   "rewrites": [
     {

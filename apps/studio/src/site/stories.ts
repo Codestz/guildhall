@@ -15,13 +15,13 @@ export const STORIES: readonly Story[] = [
     id: "saga",
     shelf: "Stories",
     title: "The Saga",
-    kicker: "OpenCode · five acts · about 17 minutes",
+    kicker: "Five acts · about 3 minutes",
     blurb:
-      "The site's first home, with every lever in reach. One feature, “make Quill work offline”, from the quest to the clean sweep, told by a guild of OpenCode agents.",
+      "One pull request from quest to release: the Guildmaster dispatches three heroes, CI turns red, a hero pleads for your word, the fix lands and the island clears.",
     shows: [
-      "A plan asked for and approved: pleas wait for you",
-      "Red tests bring a storm and a dragon; the fallen rise as skeletons",
-      "Every world event fires on its own: nothing is forced",
+      "A plea waits for your word",
+      "Red CI rolls in a storm with lightning; green clears it",
+      "Heroes walk to the folders they work in",
     ],
     art: `${ART}/saga.webp`,
     alt: "The whole island at golden hour, its hall lit by the fire.",
@@ -79,8 +79,8 @@ export const STORIES: readonly Story[] = [
     blurb:
       "A party with its GitHub sea beside it, from the first push to the release: the repo's life as ships coming and going.",
     shows: [
-      "Pull requests anchor offshore; a release arrives as a galleon",
-      "The lighthouse pulses red when CI fails",
+      "Each pull request sails in and docks; a merge sails off with a flare",
+      "Red CI brings a storm over the harbour",
     ],
     art: `${ART}/seas.webp`,
     alt: "Ships at anchor off the island's quay.",

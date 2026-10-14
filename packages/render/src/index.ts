@@ -176,3 +176,4 @@ export {
   type WaterPool,
   type WaterReveal,
 } from "./water.ts"
+export * from "./workfx/index.ts"

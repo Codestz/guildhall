@@ -74,7 +74,7 @@ import { loadTiles } from "../tiles.ts"
 import { atmoKnobs, createIslandAir, type IslandAir } from "./atmo.ts"
 import type { Chips } from "./chips.ts"
 import { createDoors, type Doors } from "./doors.ts"
-import { type Fx, fxOf, mountFx } from "./fx.ts"
+import { type Fx, fxOf, mountFx, mountWorkFx, type WorkFxMount } from "./fx.ts"
 import { type HallRepo, hallBuild, hallSubtitle, placeRows } from "./hall.ts"
 import {
   type BuiltPlace,
@@ -291,6 +291,8 @@ export interface HudParts {
   zoneKinds: readonly string[]
   /** The event FX (with `extra.fx` or `?fx=`), else null. */
   fx: Fx | null
+  /** The work FX (sparks, chips, splashes, dust: `workfx.beat(beat, at, sample)`); null with `?workfx=0`. */
+  workfx?: WorkFxMount["fx"] | null
   /** Where a session's hero is drawn now (its feet, metres; null: not on the island, or no life). */
   heroAt(id: string): [number, number, number] | null
   /** The heroes' chips (null: no life, no agents, or `?chips=0`): the one followed, a plea mark tapped. */
@@ -444,6 +446,7 @@ const world = {
     let island: HexIsland | null = null
     let unHud = () => {}
     let fx: Fx | null = null
+    let workfx: WorkFxMount | null = null
     let unAgents = () => {}
     let unSound = () => {}
     let pick: ((index: number) => void) | null = null
@@ -624,6 +627,14 @@ const world = {
         async (id) => (id.endsWith(FRAME) ? gateFrame(await load(id.slice(0, -FRAME.length))) : load(id)),
         clusters,
       )
+      // the work FX (fx.ts): ready for life's beats, nothing drawn until one comes
+      workfx = mountWorkFx({
+        stage,
+        query: ctx.query,
+        light: () => sky.light(),
+        pieces: () => loose,
+        sea: SEA_LEVEL,
+      })
       steps.progress(0.74, 150)
       go("Water", 0.8)
       await shoreDone
@@ -703,7 +714,7 @@ const world = {
         doors.dispose()
         return
       }
-      if (drive) fx = mountFx({ stage, drive, sites: m.sites, water, load, spec: fxSpec })
+      if (drive) fx = mountFx({ stage, drive, sites: m.sites, water, load, spec: fxSpec, workfx: workfx?.fx })
       // a hook's parts (a hall's history reveal) go in before the light, so their shaders compile behind the cover
       if (hooks && island && world)
         hooks.built({
@@ -821,6 +832,7 @@ const world = {
           },
           clock: dayClock,
           fx,
+          workfx: workfx?.fx ?? null,
           heroAt: (id) => life?.heroAt(id) ?? null,
           chips: life?.chips() ?? null,
         })
@@ -886,6 +898,7 @@ const world = {
       life?.dispose()
       doors?.dispose()
       fx?.dispose()
+      workfx?.dispose()
       labels?.dispose()
       unHud()
       unTick()

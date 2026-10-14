@@ -20,13 +20,15 @@
 </p>
 
 <p align="center">
-  <img src=".github/media/v2-hero.webp" alt="The demo guild's castle by day: a stone keep and a great hall inside a curtain wall, forest and fields around it. Three heroes are at work, with chips over their heads ('Warden, editing test/arena.test.ts'), and the chronicle at the bottom left reads 'Claude sends a quest: Pack the harbour's assets'." width="100%" />
+  <img src=".github/media/v2-hero.webp" alt="The demo guild's castle at golden hour: a stone keep and a great hall inside a curtain wall, forest and fields around it. Six heroes are at work, with chips over their heads ('Artisan II, editing', 'Architect, returning with loot'), portraits in the face bar at the top left, the chronicle at the bottom left and a caption reading 'The Guildmaster sends the Artisan, the Artisan II and the Archivist out at once.'" width="100%" />
 </p>
 
 Guildhall turns what happens in a repository into a world you can watch. The repo's folders and
 packages become towns, villages, a mine and a harbour on a hex island, and the island grows with the
 repo. Each coding agent is a hero who walks to the place its work touches. Pull requests sail in as
-ships, CI is the weather, and townsfolk keep their own day around it all.
+ships, CI is the weather, and townsfolk keep their own day around it all. When things go wrong, the
+island answers: a storm, a skeleton in the graveyard, a dragon over the peaks. When they go well, there
+are fireworks.
 
 This is V2, a rebuild of [V1](#v1). Same idea, a new world: hex tiles, prefabs authored as data, a
 castle that grows with the repo, and a world built off the main thread.
@@ -34,25 +36,55 @@ castle that grows with the repo, and a world built off the main thread.
 ## What you can do
 
 - **Watch a demo story.** [Demos](https://guildhall.codestz.dev/demos) plays guilds of agents at
-  work: the five-act Saga, a party, a lone hero, Claude Code and OpenCode side by side, a GitHub sea,
-  a rush of twelve quests. Click a hero to follow it.
+  work: the five-act Saga, [World events](https://guildhall.codestz.dev/?story=events), a party, a
+  lone hero, Claude Code and OpenCode side by side, a GitHub sea, a rush of twelve quests. Click a
+  hero to follow it, and a director picks the shots when you don't.
 - **Grow a public repo's island from its history.** `/hall/<owner>/<repo>` builds the island from
   the repo's chronicle, then **Watch it grow** replays it from the first commit.
   [The Harbour](https://guildhall.codestz.dev/harbour) lists every repo with a chronicle.
 - **Connect Claude Code live, on your machine.** Your sessions show up as heroes on your repo's
   island while they work. This runs on localhost only ([how](#connect-claude-code-live)).
+- **Take it on your phone.** The HUD folds into a face bar, a caption and one menu, and one finger
+  orbits around the hero you follow.
 
 <p align="center">
   <img src=".github/media/v2-react.webp" alt="React's repository as a hex island seen from the sea: villages and towns labelled with its packages (compiler, 4,253 files, capital; react-dom, react-reconciler, react-devtools-shared and more), roads between them, rivers, lakes, forest and a mine." width="100%" />
   <br /><sub>React's island at <a href="https://guildhall.codestz.dev/hall/facebook/react">/hall/facebook/react</a>.</sub>
 </p>
 
+## The island answers
+
+Real events set off the island's own shows. Nothing is faked: each one is earned by a rule, and a
+live hall spaces the big ones at least 150 seconds apart.
+[World events](https://guildhall.codestz.dev/?story=events) is a four-minute demo that earns every
+one in turn.
+
+<table>
+  <tr>
+    <td width="25%"><img src=".github/media/v2-strip-fireworks.webp" alt="Night over the island: a gold and rose firework bursting above the lit keep and village." width="100%" /></td>
+    <td width="25%"><img src=".github/media/v2-strip-dragon.webp" alt="A red dragon flying over the coast and the mountains in the rain." width="100%" /></td>
+    <td width="25%"><img src=".github/media/v2-strip-tavern.webp" alt="The tavern's beer garden at eight in the evening: patrons round the tables under a glowing lamp, a song line over them." width="100%" /></td>
+    <td width="25%"><img src=".github/media/v2-strip-skeleton.webp" alt="A skeleton warrior rising from a grave among the headstones of the graveyard." width="100%" /></td>
+  </tr>
+  <tr>
+    <td valign="top"><sub><strong>Fireworks.</strong> Fifteen clean deeds earn a festival at nightfall.</sub></td>
+    <td valign="top"><sub><strong>The dragon.</strong> Three failed builds in a row bring it over the peaks.</sub></td>
+    <td valign="top"><sub><strong>The tavern.</strong> At 20:00 the tables drink, toast and sing.</sub></td>
+    <td valign="top"><sub><strong>The graveyard.</strong> A red CI run raises a skeleton. A fix lays it to rest.</sub></td>
+  </tr>
+</table>
+
+There is more: a comet for the hundredth deed, a rainbow when a storm clears, a ghost ship, pirates
+when a party's bill runs high, a galleon for a release, a lighthouse for CI. At sea, wakes follow
+every boat, and open issues queue on the quay as plates. In town, lamplighters go round at dusk and
+a few of the latest drinkers walk home tipsy.
+
 ## The site
 
 | Route | What it is |
 |---|---|
 | [`/`](https://guildhall.codestz.dev) | The island with a demo guild at work. Type an `owner/repo` to open its hall. |
-| [`/demos`](https://guildhall.codestz.dev/demos) | The demo stories, opened over the island (`/?story=saga`, `party`, `solo`, `factions`, `seas`, `rush`) |
+| [`/demos`](https://guildhall.codestz.dev/demos) | The demo stories, opened over the island (`/?story=saga`, `events`, `party`, `solo`, `factions`, `seas`, `rush`) |
 | [`/hall/<owner>/<repo>`](https://guildhall.codestz.dev/hall/facebook/react) | A repo's island, grown from its chronicle, with its history on a timeline |
 | [`/harbour`](https://guildhall.codestz.dev/harbour) | Every chronicled repo |
 | [`/built`](https://guildhall.codestz.dev/built) | How it's built: the engineering, the numbers, and the journey |
@@ -166,6 +198,17 @@ short:
 - **Data, not code, for the look.** Tile prefabs are JSON in `data/tiles/`, with the spots where
   people sit, work and talk, authored in the Studio.
 
+## On your phone
+
+<p align="center">
+  <img src=".github/media/v2-phone.webp" alt="The island on a phone, 390 pixels wide: the castle at golden hour, a caption at the bottom and a bar of six hero portraits, with the crest, the party's name and a menu button along the top." width="260" />
+</p>
+
+The same site works at 390 px wide. The top row is the crest, the repo and a menu. The menu opens
+one bottom sheet (Guild, Places, Chronicle, Settings). At the bottom are the face bar, the caption
+and a thin timeline. Chips show names only, except on the hero you follow. Landscape is laid out
+like the desktop.
+
 ## The Studio
 
 <p align="center">
@@ -190,8 +233,12 @@ must not change what you see**.
   still does.
 - Placed pieces are batched per material, the crowd draws from one baked bone texture, and the
   island draws in a few dozen calls.
+- A static draw list, one shared material per kind of object and no extra anti-aliasing pass keep
+  a standing camera nearly free. The 3D models ship gzipped.
 
-Numbers are measured with the bench in `tools/shots` on a quiet machine, never estimated.
+The hero view draws in 8.1 ms at the 95th percentile, and a first visit downloads 5.2 MB (it was
+9.3). A 12,000-file island at mid and wide views still takes 12 to 15 ms a frame, GPU-bound, over the 12 ms the governor aims for. Numbers are measured
+with the bench in `tools/shots` on a quiet machine, never estimated.
 
 ## Credits
 
@@ -220,7 +267,8 @@ site does not ship them.
 V1 is kept for history. Its code is on the [`v1` tag](https://github.com/Codestz/guildhall/tree/v1)
 and runs from `legacy/` here. V1 had the OpenCode plugin (`opencode-guildhall` on npm), the
 archipelago of repos and the WebGPU renderer; [RELEASE_NOTES.md](RELEASE_NOTES.md) says what moved,
-what changed and what is parked.
+what changed and what is parked. Animals are parked too: they did not fit the low-poly style, so
+pens and pastures stand empty for now.
 
 ## License
 

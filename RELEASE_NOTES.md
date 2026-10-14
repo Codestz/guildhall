@@ -37,15 +37,37 @@ chronicle, names its places on plates, and puts its history on a timeline. **Wat
 it from the first commit: tiles rise from the sea and buildings grow from the ground. The Legends book
 tells the repo by era, and the Repo Chronicle card is a picture to share.
 
-**V1's HUD, ported.** Hero chips with what each is doing, the faces bar, the chronicle, captions in
-the narrator's voice, the act chip, Legends, pleas, the place dossier. Click a hero to fly to it and
-follow it. On a phone, panels become one bottom sheet.
+**V1's HUD, ported and tightened.** Hero chips with what each is doing, captions in the narrator's
+voice, the act chip, Legends, pleas, the place dossier. The crest is one compact pill, with the repo
+as its own small chip beside it. The face bar shows a real miniature portrait of each hero's own 3D
+character, with state marks. Click a hero to fly to it and follow it; a director picks the shots
+when nobody does. On a phone the HUD is a top row, a face bar, a caption and one bottom sheet, and a
+finger drag orbits the hero you follow.
 
 **Events on the island.** CI is the weather: a failing run brings a storm, green brings the sun back
-and everyone cheers. Pull requests are ships: one sails in and docks; merged, it dips its pennant under
-a gold flare and sails out; closed, it sinks at its berth. A place where a hero works raises a scaffold.
+and everyone cheers. Rain and snow have their own looks. Pull requests are ships: one sails in and
+docks; merged, it dips its pennant under a gold flare and sails out; closed, it sinks at its berth.
+Ships come small, medium or large by their diff, every hull under way leaves a wake, a push is a
+cargo ship, and open issues queue on the quay as docket plates with a hooded petitioner each. A
+place where a hero works raises a scaffold.
+
+**V1's world events, back.** A red CI run raises a skeleton at the graveyard, which keeps vigil until
+a fix, when the Guildmaster strikes the grave. Three failed builds in a row bring the dragon over the
+peaks. Also a comet, a rainbow, a ghost ship, pirates, a galleon for a release, the lighthouse, and a
+festival with fireworks at nightfall. Each is earned by a rule, and the island frames it. The
+[World events](https://guildhall.codestz.dev/?story=events) demo earns them all in turn, and the
+Saga now ends with the festival.
+
+**Game feel.** Every townsfolk has work with a visible result: logs pile up, fish are caught, carts
+roll. Heroes work by craft (read, edit, search, test) and run at a pace their legs keep. Between
+people there is life: the tavern's tables drink, toast and sing at night, a few walk home tipsy, walkers
+stop to chat or wave, buyers haggle, and lamplighters light the lamps at dusk.
 
 **V1's sounds**, with 18 Kenney CC0 samples. Off until you turn them on.
+
+**Faster.** Gzipped models, a static draw list, shared materials and less garbage a frame: frames
+are 25 to 35% shorter, the hero view draws in 8.1 ms at the 95th percentile, and a first visit
+downloads 5.2 MB (9.3 before).
 
 **The Studio, public.** The workshop the world is made in: pieces and palette at true scale, the tile
 composer, the hex map, NPCs, grips. Online it is read-only: explore freely, nothing is saved.
@@ -78,13 +100,11 @@ composer, the hex map, NPCs, grips. Online it is read-only: explore freely, noth
 
 ## What's gone or parked
 
-- **Animals.** Parked until after release. The packs we had didn't match the low-poly style. Pens
-  and pastures stand empty for now.
+- **Animals.** Parked until after release, the dog included. The packs we had didn't match the
+  low-poly style. Pens and pastures stand empty for now.
 - **The archipelago.** V1's several-repos-as-islands view, and the split of a big repo into an
   archipelago, are not in V2. A repo is one island.
 - **WebGPU.** V1's experimental renderer is gone; V2 draws on WebGL.
-- **V1's world events.** The dragon, the ghost ship, the rainbow, comets, the festival, risen
-  skeletons, the release galleon and the lighthouse are not drawn in V2 yet.
 - **The crowd of 300.** The rush story sends twelve heroes; the big crowd waits for the crowd's
   level of detail in the stories.
 - **The OpenCode plugin and the nine guild agents** stay V1 (`opencode-guildhall` on npm, code in
@@ -95,7 +115,9 @@ composer, the hex map, NPCs, grips. Online it is read-only: explore freely, noth
 ## Known limits
 
 - **First load.** The island takes several seconds to build behind the cover, and a first visit
-  downloads about 8 MB (3D models are not compressed by the host). A performance pass is next.
+  downloads about 5.2 MB. The first frame waits on the browser's shader compile queue.
+- **Big islands at a distance.** A 12,000-file island at mid and wide views takes 12 to 15 ms a
+  frame, GPU-bound, over the 12 ms the governor aims for.
 - **Repos without a chronicle** open as a sketch: the generator's own island at a default size,
   marked as such, not that repo's island.
 - **Live mode** needs a clone, V1's hub and a hook in your Claude Code settings, and runs on
@@ -103,6 +125,7 @@ composer, the hex map, NPCs, grips. Online it is read-only: explore freely, noth
   `&guild=`.
 - **One social card** for every page: a static host can't vary it per repo.
 - **Phones.** The site works on a phone, with the HUD in one bottom sheet. Quality is held by
-  lowering resolution; there is no separate phone tier.
+  lowering resolution; there is no separate phone tier. It has been tried in an emulator, not yet on
+  every device.
 - **The deploy** is built on one machine, because the asset library is generated locally and not
   in git.

@@ -148,6 +148,15 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
   /** The target that puts the aimed subject at its frame, seen from `p`. */
   const aimFrom = (p: CameraPose): Vec3 =>
     framedTarget(aimed as Vec3, p, { fov: camera.fov, aspect: camera.aspect }, aimFrame)
+  /**
+   * `p` aimed and held inside the world, its target kept at the subject's height: a target set off the
+   * subject (beside a sheet) may stand over a terrace or a wall, and riding that floor would lift the view.
+   */
+  const aimHeld = (p: CameraPose): CameraPose => {
+    const t = aimFrom(p)
+    const h = held({ ...p, target: t })
+    return { ...h, target: [h.target[0], t[1], h.target[2]] }
+  }
   let driver: ((dt: number) => void) | null = null
   const listeners = new Set<() => void>()
   const notify = () => {
@@ -395,7 +404,7 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
       const dt = Math.min(0.1, seconds)
       driver?.(dt)
       // a followed target: the glide lands on where it is now, then the goal rides it
-      if (aimed && mode === "orbit" && glide) glide.to = held({ ...glide.to, target: aimFrom(glide.to) })
+      if (aimed && mode === "orbit" && glide) glide.to = aimHeld(glide.to)
       if (glide) {
         glide.t = Math.min(1, glide.t + (dt * 1000) / glide.ms)
         pose = blendPose(glide.from, glide.to, smooth(glide.t))
@@ -412,7 +421,7 @@ export function createRig(camera: PerspectiveCamera, el: HTMLElement, initial: C
         pose = held(next)
         // aimed: the target is set from the pose as drawn, so the subject holds its place exactly
         if (aimed) {
-          pose = held({ ...pose, target: aimFrom(pose) })
+          pose = aimHeld(pose)
           goal = { ...goal, target: pose.target }
         }
       } else {

@@ -215,7 +215,7 @@ describe("nearPlane", () => {
 
 describe("aiming at a subject (the follow camera)", () => {
   /** A rig on a stand-in canvas (no input arrives) over the island. */
-  const aimedRig = () => {
+  const aimedRig = (world: World = ISLAND) => {
     const el = {
       addEventListener() {},
       removeEventListener() {},
@@ -225,7 +225,7 @@ describe("aiming at a subject (the follow camera)", () => {
     } as unknown as HTMLElement
     const camera = new PerspectiveCamera(LENS.fov, LENS.aspect, 0.1, LENS.far)
     const rig = createRig(camera, el, pose({ target: [0, 0, 0], distance: 40, elevation: 30 }))
-    rig.setWorld(ISLAND)
+    rig.setWorld(world)
     return { rig, camera }
   }
   const screen = (camera: PerspectiveCamera, p: [number, number, number]) => {
@@ -261,5 +261,19 @@ describe("aiming at a subject (the follow camera)", () => {
     const p = screen(camera, subject)
     expect(Math.abs(p.x)).toBeLessThan(1e-3)
     expect(Math.abs(p.y)).toBeLessThan(1e-3)
+  })
+
+  test("a target set off the subject over a 30 m shelf does not lift the view off the subject", () => {
+    const { rig, camera } = aimedRig(TERRACED)
+    const subject: [number, number, number] = [45, 1, 0]
+    const frame = { x: 0.35, y: 0.25 }
+    for (const azimuth of [90, 270, 0]) {
+      rig.steer({ azimuth, distance: 40, elevation: 30 })
+      rig.aim(subject, frame)
+      for (let i = 0; i < 60; i++) rig.update(1 / 60)
+      const p = screen(camera, subject)
+      expect(Math.abs(p.x - frame.x)).toBeLessThan(1e-3)
+      expect(Math.abs(p.y - frame.y)).toBeLessThan(1e-3)
+    }
   })
 })

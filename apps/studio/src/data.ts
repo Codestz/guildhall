@@ -47,8 +47,36 @@ async function put(url: string, json: unknown, fetcher: Fetch, readOnly = READ_O
 export const DATA_INDEX = "index.json"
 
 /**
+ * The file the showcase build writes with the whole of `data/` in it: every folder's files by id and
+ * mounts.json. One request (the host gzips it) in place of about a hundred (83 tiles, the npcs, the
+ * mounts, the index), all of them on the way to the island's first stage: the worker builds nothing
+ * until the tiles are in. A build without it (an older deploy) is read file by file, as before.
+ */
+export const DATA_BUNDLE = "bundle.json"
+
+export interface DataBundle {
+  mounts: MountsFile | null
+  files: Partial<Record<DataKind, Record<string, unknown>>>
+}
+
+const bundles = new Map<string, Promise<DataBundle | null>>()
+
+/** The showcase's bundle at `base`, read once per base (a missing one is null: the files are read one by one). */
+function bundleAt(fetcher: Fetch, base: string): Promise<DataBundle | null> {
+  // only the page's own fetch is memoised: a test's fetcher sees a fresh read each time
+  if (fetcher !== fetch)
+    return getJson(`${base}/${DATA_BUNDLE}`, fetcher).catch(() => null) as Promise<DataBundle | null>
+  let held = bundles.get(base)
+  if (!held) {
+    held = (getJson(`${base}/${DATA_BUNDLE}`, fetcher) as Promise<DataBundle | null>).catch(() => null)
+    bundles.set(base, held)
+  }
+  return held
+}
+
+/**
  * The ids saved in a data folder, sorted; none when the folder does not exist yet. A static build
- * (`fromIndex`, the showcase) has no folder listing, so it reads them from `DATA_INDEX`.
+ * (`fromIndex`, the showcase) has no folder listing, so it reads them from the bundle, or `DATA_INDEX`.
  */
 export async function list(
   kind: DataKind,
@@ -57,19 +85,26 @@ export async function list(
   fromIndex = SHOWCASE,
 ): Promise<string[]> {
   if (fromIndex) {
+    const bundle = await bundleAt(fetcher, base)
+    if (bundle) return Object.keys(bundle.files[kind] ?? {}).sort()
     const index = (await getJson(`${base}/${DATA_INDEX}`, fetcher)) as Record<string, string[]> | null
     return index?.[kind] ?? []
   }
   return ((await getJson(`${base}/${kind}/`, fetcher)) as string[] | null) ?? []
 }
 
-/** One data file, parsed, or null when it does not exist. */
+/** One data file, parsed, or null when it does not exist (from the bundle in a static build). */
 export async function load(
   kind: DataKind,
   id: string,
   fetcher: Fetch = fetch,
   base = DATA,
+  bundled = SHOWCASE,
 ): Promise<unknown> {
+  if (bundled) {
+    const bundle = await bundleAt(fetcher, base)
+    if (bundle) return bundle.files[kind]?.[id] ?? null
+  }
   return getJson(fileUrl(base, kind, id), fetcher)
 }
 
@@ -86,8 +121,13 @@ export async function save(
 }
 
 /** What `data/mounts.json` lays over the catalog (feed it to `applyOverlay`); empty when there is none. */
-export async function loadOverlay(fetcher: Fetch = fetch, base = DATA): Promise<DataOverlay> {
-  const file = (await getJson(`${base}/mounts.json`, fetcher)) as MountsFile | null
+export async function loadOverlay(
+  fetcher: Fetch = fetch,
+  base = DATA,
+  bundled = SHOWCASE,
+): Promise<DataOverlay> {
+  const bundle = bundled ? await bundleAt(fetcher, base) : null
+  const file = bundle ? bundle.mounts : ((await getJson(`${base}/mounts.json`, fetcher)) as MountsFile | null)
   return file ? { mounts: file.mounts } : {}
 }
 

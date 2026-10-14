@@ -33,6 +33,7 @@ import {
   FRAME,
   GATE_PIECES,
   gateFrame,
+  loadClips,
   loadPiece,
   type Night,
   type Post,
@@ -557,19 +558,25 @@ const world = {
       // load and bake, and the batch finds them made.
       stage.hold(Promise.all([warmScene(stage), post?.warm()]))
       void warmBatchPrograms(stage)
-      // the crowd's as well (~1 s), for the rigs the house style's bodies ride, once the catalog is in
+      // the crowd's as well (~1 s), for the rigs the house style's bodies ride, once the catalog is in;
+      // and those rigs' clips (the biggest file on the wire) start loading now, in parallel with the
+      // pieces, instead of once the batch is built and the crowd asks for them
       if (lifeOn)
         void catalogLoad.then((catalog) => {
           if (!catalog || disposed) return
           const bones = new Set<number>()
+          const rigs = new Set<string>()
           for (const entry of catalog.all()) {
             const rig =
               entry.character && inStyle(entry.id.split("/")[0] ?? "")
                 ? catalog.rig(entry.character.rig)
                 : null
-            if (rig) bones.add(rig.bones)
+            if (!rig) continue
+            bones.add(rig.bones)
+            rigs.add(rig.file)
           }
           for (const count of bones) void warmCrowdPrograms(stage, count)
+          for (const file of rigs) loadClips(libraryUrl(file)).catch(() => undefined)
         })
       const azimuth = num("az", sideLit(sky.light().sunDir))
       const pose: CameraPose = m.heart

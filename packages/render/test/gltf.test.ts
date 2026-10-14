@@ -12,7 +12,11 @@ const glb = (): Uint8Array => {
 
 const answering = (body: Uint8Array, ok = true): typeof fetch =>
   (async () =>
-    ({ ok, status: ok ? 200 : 404, arrayBuffer: async () => body.slice().buffer }) as unknown as Response) as typeof fetch
+    ({
+      ok,
+      status: ok ? 200 : 404,
+      arrayBuffer: async () => body.slice().buffer,
+    }) as unknown as Response) as typeof fetch
 
 describe("GLBs gzipped on the wire", () => {
   test("gzip's magic tells the gzipped bytes from a plain GLB", () => {
@@ -37,6 +41,8 @@ describe("GLBs gzipped on the wire", () => {
   })
 
   test("a missing file is an error naming it", async () => {
-    await expect(fetchGlb("/gone.glb.gz", answering(new Uint8Array(0), false))).rejects.toThrow("/gone.glb.gz")
+    await expect(fetchGlb("/gone.glb.gz", answering(new Uint8Array(0), false))).rejects.toThrow(
+      "/gone.glb.gz",
+    )
   })
 })

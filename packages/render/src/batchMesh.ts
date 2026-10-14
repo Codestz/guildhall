@@ -133,7 +133,11 @@ export class LodBatchedMesh extends BatchedMesh {
     this.dirty = true
   }
 
-  override addGeometry(geometry: BufferGeometry, reservedVertexCount?: number, reservedIndexCount?: number): number {
+  override addGeometry(
+    geometry: BufferGeometry,
+    reservedVertexCount?: number,
+    reservedIndexCount?: number,
+  ): number {
     const id = super.addGeometry(geometry, reservedVertexCount, reservedIndexCount)
     // its own only, until setTiers: the walk then never makes a list per instance
     this.tierIds[id] ??= [id]

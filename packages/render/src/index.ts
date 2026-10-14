@@ -23,7 +23,7 @@ export {
 export { setLod } from "./batchMesh.ts"
 export { cameraToPose, poseToCamera } from "./camera.ts"
 export { armTrack, CARRY_WALK, carryClip, withCarry } from "./character/carry.ts"
-export { type Character, createCharacter, loadCharacter, type PlayOpts } from "./character/load.ts"
+export { type Character, createCharacter, loadCharacter, loadClips, type PlayOpts } from "./character/load.ts"
 export { attachMount, detachMount, type Mounted, mountClip, mountPose } from "./character/mount.ts"
 export { createNpc, dressNpc, type Npc, type NpcActivity, type NpcProp } from "./character/npc.ts"
 export { keepUpright } from "./character/upright.ts"

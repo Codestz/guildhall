@@ -393,7 +393,8 @@ export async function planLibrary(library: string, mode: "style" | "full"): Prom
 export const GZIP_GLB = process.env.STUDIO_LIBRARY_GZ !== "0"
 
 /** The path a library file is shipped under: a GLB gzipped, when the build gzips them. */
-export const shippedPath = (rel: string, gz = GZIP_GLB): string => (gz && rel.endsWith(".glb") ? `${rel}.gz` : rel)
+export const shippedPath = (rel: string, gz = GZIP_GLB): string =>
+  gz && rel.endsWith(".glb") ? `${rel}.gz` : rel
 
 /**
  * Copies a planned library into `out` (each path checked to stay inside the library), the GLBs
@@ -431,9 +432,17 @@ async function measure(dir: string): Promise<{ files: number; bytes: number }> {
  */
 export async function copyData(root: string, out: string): Promise<Record<string, string[]>> {
   const index: Record<string, string[]> = {}
+  // the whole of the data in one file as well (src/data.ts DATA_BUNDLE): one request in place of a hundred
+  const bundle: { mounts: unknown; files: Record<string, Record<string, unknown>> } = {
+    mounts: null,
+    files: {},
+  }
   await mkdir(out, { recursive: true })
   const mounts = join(root, "mounts.json")
-  if (statSync(mounts, { throwIfNoEntry: false })?.isFile()) await cp(mounts, join(out, "mounts.json"))
+  if (statSync(mounts, { throwIfNoEntry: false })?.isFile()) {
+    await cp(mounts, join(out, "mounts.json"))
+    bundle.mounts = JSON.parse(await readFile(mounts, "utf8"))
+  }
   for (const folder of DATA_FOLDERS) {
     const names = await readdir(join(root, folder), { withFileTypes: true }).catch(() => [])
     const ids = names
@@ -442,10 +451,16 @@ export async function copyData(root: string, out: string): Promise<Record<string
       .sort()
     if (ids.length === 0) continue
     await mkdir(join(out, folder), { recursive: true })
-    for (const id of ids) await cp(join(root, folder, `${id}.json`), join(out, folder, `${id}.json`))
+    const files: Record<string, unknown> = {}
+    for (const id of ids) {
+      await cp(join(root, folder, `${id}.json`), join(out, folder, `${id}.json`))
+      files[id] = JSON.parse(await readFile(join(root, folder, `${id}.json`), "utf8"))
+    }
+    bundle.files[folder] = files
     index[folder] = ids
   }
   await writeFile(join(out, "index.json"), formatData(index))
+  await writeFile(join(out, "bundle.json"), JSON.stringify(bundle))
   return index
 }
 

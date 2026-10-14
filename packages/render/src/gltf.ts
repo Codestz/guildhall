@@ -7,18 +7,22 @@
  * else is handed to the loader as it is, so a host that already decoded a `Content-Encoding: gzip`
  * answer, a plain `.glb` from the dev server, or a CDN of either kind all read the same.
  */
-import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js"
+
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js"
+import { type GLTF, GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 
 let loader: GLTFLoader | null = null
 
 /** Whether `bytes` are a gzip member (its magic). */
-export const isGzip = (bytes: Uint8Array): boolean => bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b
+export const isGzip = (bytes: Uint8Array): boolean =>
+  bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b
 
 /** `bytes` inflated when gzipped, else as they are (a copy-free view either way). */
 export async function inflateIfGzip(bytes: Uint8Array): Promise<Uint8Array> {
   if (!isGzip(bytes)) return bytes
-  const stream = new Blob([bytes as Uint8Array<ArrayBuffer>]).stream().pipeThrough(new DecompressionStream("gzip"))
+  const stream = new Blob([bytes as Uint8Array<ArrayBuffer>])
+    .stream()
+    .pipeThrough(new DecompressionStream("gzip"))
   return new Uint8Array(await new Response(stream).arrayBuffer())
 }
 

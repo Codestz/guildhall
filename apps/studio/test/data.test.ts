@@ -257,6 +257,11 @@ describe("showcase data", () => {
     })
     expect((await readdir(join(out, "tiles"))).sort()).toEqual(["cottage.json"])
     expect(await readFile(join(out, "mounts.json"), "utf8")).toBe("{}\n")
+    // and the whole of it in one file: mounts and every folder's files by id
+    expect(JSON.parse(await readFile(join(out, "bundle.json"), "utf8"))).toEqual({
+      mounts: {},
+      files: { tiles: { cottage: {} } },
+    })
     await rm(from, { recursive: true })
     await rm(out, { recursive: true })
   })
@@ -266,10 +271,30 @@ describe("showcase data", () => {
     const asked: string[] = []
     const fetcher = async (url: string) => {
       asked.push(url)
+      if (url.endsWith("bundle.json")) return { ok: false, status: 404, json: async () => null } as never
       return { ok: true, status: 200, json: async () => index } as never
     }
     expect(await data.list("tiles", fetcher, "/data", true)).toEqual(["cottage", "tavern"])
     expect(await data.list("npcs", fetcher, "/data", true)).toEqual([])
-    expect(asked).toEqual(["/data/index.json", "/data/index.json"])
+    expect(asked).toEqual(["/data/bundle.json", "/data/index.json", "/data/bundle.json", "/data/index.json"])
+  })
+
+  test("a static build with the bundle lists, loads and reads the mounts from it, no file asked for", async () => {
+    const bundle = {
+      mounts: mounts(),
+      files: { tiles: { tavern: tile(), cottage: { ...tile(), id: "cottage" } }, npcs: { farmer: npc() } },
+    }
+    const asked: string[] = []
+    const fetcher = async (url: string) => {
+      asked.push(url)
+      if (url.endsWith("bundle.json")) return { ok: true, status: 200, json: async () => bundle } as never
+      return { ok: false, status: 404, json: async () => null } as never
+    }
+    expect(await data.list("tiles", fetcher, "/data", true)).toEqual(["cottage", "tavern"])
+    expect(await data.load("tiles", "tavern", fetcher, "/data", true)).toEqual(tile())
+    expect(await data.load("tiles", "gone", fetcher, "/data", true)).toBeNull()
+    expect(await data.load("npcs", "farmer", fetcher, "/data", true)).toEqual(npc())
+    expect(await data.loadOverlay(fetcher, "/data", true)).toEqual({ mounts: mounts().mounts } as never)
+    expect(asked.every((u) => u === "/data/bundle.json")).toBe(true)
   })
 })

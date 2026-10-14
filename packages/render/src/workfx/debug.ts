@@ -65,6 +65,9 @@ export const RHYTHM: Record<WorkKind, number> = {
   shoot: 2.4,
   pin: 2.8,
   cheer: 2.6,
+  leaf: 0.7,
+  petal: 0.8,
+  smoke: 1.5,
 }
 
 /** Where each kind happens (piece ids), and how high over the piece's foot (m). */
@@ -82,6 +85,9 @@ const SITES: Record<WorkKind, { re: RegExp; lift: number }> = {
   shoot: { re: /target|dummy|archery|training|post/, lift: 1.0 },
   pin: { re: /notice|board|sign|post/, lift: 1.3 },
   cheer: { re: /flag|banner|statue|well|fountain|tent|house|building|barracks/, lift: 2.0 },
+  leaf: { re: /kaykit-forest\/tree-\d/, lift: 3.2 },
+  petal: { re: /kaykit-forest\/tree-\d/, lift: 3.2 },
+  smoke: { re: /building-home|tavern|blacksmith/, lift: 4.6 },
 }
 
 export interface SitePiece {

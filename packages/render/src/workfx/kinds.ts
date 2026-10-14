@@ -18,6 +18,9 @@ export const WORK_KINDS = [
   "shoot",
   "pin",
   "cheer",
+  "leaf",
+  "petal",
+  "smoke",
 ] as const
 export type WorkKind = (typeof WORK_KINDS)[number]
 
@@ -57,6 +60,12 @@ export const KIND: Record<WorkKind, KindSpec> = {
   pin: { id: 11, count: 3, life: 2.2 },
   // a small burst of confetti and glints, thrown up and fluttering down (hero beat `cheer`)
   cheer: { id: 12, count: 14, life: 1.6 },
+  // the seasons' (season.ts): a leaf or two let go by a tree in autumn, tumbling and drifting down
+  leaf: { id: 13, count: 3, life: 5 },
+  // a blossoming tree's petals in spring: smaller, lighter, slower
+  petal: { id: 14, count: 3, life: 5.2 },
+  // a chimney's smoke in winter: soft puffs rising, swelling and leaning off on the wind
+  smoke: { id: 15, count: 3, life: 5.8 },
 }
 
 /** The most particles one emit takes. */

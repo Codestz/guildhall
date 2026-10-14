@@ -249,7 +249,7 @@ void main() {
     shape = 1.0;
     life += delay;
     age += delay;
-  } else {
+  } else if (kind < ${KIND.cheer.id}.5) {
     // cheer: confetti thrown up from the heroes, fluttering down, with the odd glint
     life = 1.0 + 0.5 * rnd(seed, 2.0);
     float u = age / life;
@@ -277,6 +277,48 @@ void main() {
       alpha = 1.0 - smoothstep(0.75, 1.0, u);
       lit = false; shape = 1.0;
     }
+  } else if (kind < ${KIND.petal.id}.5) {
+    // a leaf (autumn) or a petal (spring) let go from the canopy: it tumbles down slowly, swinging side
+    // to side as it falls, drifting off on the wind, and lies a moment on the ground before it goes
+    bool petal = !(kind < ${KIND.leaf.id}.5);
+    float delay = 0.8 * rnd(seed, 2.0);
+    life = (petal ? 4.4 : 4.2) + delay;
+    age -= delay;
+    float u = age / (life - delay);
+    // where it lets go: round the crown, a little out from the trunk
+    float r0 = 0.5 + 1.1 * rnd(seed, 4.0);
+    vec3 start = o + vec3(cos(th) * r0, (rnd(seed, 5.0) - 0.5) * 1.0, sin(th) * r0);
+    // down to the ground: the emit's yaw carries how high the crown is over it
+    float down = min(age * (petal ? 0.55 : 0.75), max(yaw, 0.5) + start.y - o.y - 0.02);
+    float swing = sin(age * (petal ? 2.6 : 2.1) + th * 3.0);
+    vec2 wind = vec2(0.32, 0.14) * age + vec2(cos(th), sin(th)) * 0.35 * swing;
+    p = start + vec3(wind.x, -down, wind.y);
+    size = (petal ? 0.09 : 0.16) * (0.85 + 0.3 * rnd(seed, 6.0)) * scale;
+    stretch = vec2(1.0, (petal ? 0.6 : 0.55) * (0.3 + 0.7 * abs(cos(age * 3.3 + th))));
+    spin = swing * 1.2 + age * (rnd(seed, 7.0) - 0.5) * 3.0;
+    float ci = rnd(seed, 8.0);
+    colour = petal
+      ? mix(vec3(0.96, 0.66, 0.72), vec3(0.98, 0.9, 0.92), ci)
+      : (ci < 0.4 ? mix(${COL.orange}, ${COL.orangeLight}, ci * 2.0) : ci < 0.75 ? mix(${COL.gold}, ${COL.orangeLight}, ci) : mix(${COL.red}, ${COL.orange}, ci - 0.5));
+    alpha = min(1.0, age * 4.0) * (1.0 - smoothstep(0.82, 1.0, u));
+    shape = 1.0;
+    age += delay;
+  } else {
+    // chimney smoke: puffs one after another off the stack, rising and slowing, swelling as they thin,
+    // leaning off with the wind
+    float delay = 1.6 * rnd(seed, 2.0);
+    life = 3.4 + 0.8 * rnd(seed, 3.0) + delay;
+    age -= delay;
+    float u = age / (life - delay);
+    float rise = 2.6 * (1.0 - exp(-0.55 * age));
+    vec2 lean = vec2(0.42, 0.18) * age * (0.8 + 0.4 * rnd(seed, 4.0)) + vec2(cos(th), sin(th)) * 0.12 * age;
+    p = o + vec3(lean.x, rise, lean.y);
+    size = (0.16 + 0.42 * sqrt(max(u, 0.0))) * (0.85 + 0.3 * rnd(seed, 5.0)) * scale;
+    colour = mix(${COL.stoneLight}, ${COL.greyLight}, 0.15 + 0.5 * rnd(seed, 8.0));
+    alpha = 0.8 * (1.0 - smoothstep(0.35, 1.0, u)) * min(1.0, age * 3.0);
+    spin = th + age * 0.3;
+    shape = 5.0;
+    age += delay;
   }
 
   float far = 1.0 - smoothstep(uFade.x, uFade.y, distance(cameraPosition, o));

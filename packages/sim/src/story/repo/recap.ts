@@ -12,9 +12,11 @@
  * If one of them has nothing to say, the first major release or the first release takes its place.
  * Shaped like the session recap (`Recap`), so the ui's card draws both. Pure and deterministic.
  */
+
+import { fnv1a } from "@guildhall/core"
 import { type Chronicle, DAY_MS, type Day } from "../../repo/chronicle.ts"
 import { compactOf, countOf, type RecapNumber } from "../recap.ts"
-import { hash, pick } from "../story.ts"
+import { pick } from "../story.ts"
 import { majorsOf } from "./eras.ts"
 import { factsOf, founderOf, isPlace, peakOf } from "./facts.ts"
 import { figuresOf, nameOf, type RepoStoryOptions } from "./legend.ts"
@@ -105,7 +107,7 @@ function whenOf(c: Chronicle, day: Day): string {
 
 export function highlightsOf(c: Chronicle, options: RepoStoryOptions = {}): RepoHighlight[] {
   const out: RepoHighlight[] = []
-  const seed = (key: string) => hash(`${c.repo.name}:${key}`)
+  const seed = (key: string) => fnv1a(`${c.repo.name}:${key}`)
 
   // A release: the first major, else the first release.
   const major = majorsOf(c)[0]
@@ -220,7 +222,7 @@ function busiestOf(c: Chronicle): RepoHighlight | undefined {
           `The busiest month was ${monthOf(day)}, with ${plural(Math.round(n), "commit")}.`,
           `${monthOf(day)} was its busiest month: ${plural(Math.round(n), "commit")}.`,
         ],
-        hash(`${c.repo.name}:busy`),
+        fnv1a(`${c.repo.name}:busy`),
       ),
     )
   }

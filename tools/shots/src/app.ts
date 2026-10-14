@@ -70,7 +70,7 @@ export async function waitReady(page: Page, timeout = READY_TIMEOUT_MS): Promise
 export interface OpenAppOptions extends PageOptions {
   app: "studio"
   page?: "index" | "thumbs"
-  /** A query (`"screen=m0&hud=perf"`, `{ screen: "m0" }`): the studio redirects it to its path. */
+  /** A query (`"screen=pieces&hud=perf"`, `{ screen: "pieces" }`): the studio redirects it to its path. */
   query?: string | Record<string, string>
 }
 

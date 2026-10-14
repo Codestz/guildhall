@@ -1,8 +1,8 @@
 /**
- * What `?screen=grips` reads from its query: which props (rows), which clips (columns), at which
+ * What `/grips` reads from its query: which props (rows), which clips (columns), at which
  * frozen times, and whether to add the slot-axes row.
  *
- *   ?screen=grips&props=held&clips=idle,chop,sit&t=0.3,0.7&axes=1
+ *   /grips?props=held&clips=idle,chop,sit&t=0.3,0.7&axes=1
  */
 
 /** Column keys → Rig_Medium clip names (all verified in the rig's clip list). */

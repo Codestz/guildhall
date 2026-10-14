@@ -12,7 +12,7 @@ import { hash2 } from "../geom/noise.ts"
 export const HEX_TILE_SIZE = 3.1
 
 /** Scale B: KayKit hex buildings and trees as the library imports them, scaled to the hex world. */
-export const SCALE_B = { building: 0.5, tree: 0.6 } as const
+const SCALE_B = { building: 0.5, tree: 0.6 } as const
 
 /**
  * Characters in the hex world (user: "the door = the same height as the character"): the KayKit heroes

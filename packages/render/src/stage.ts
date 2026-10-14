@@ -16,6 +16,11 @@ import { createRig, type Rig } from "./rig/index.ts"
 import { type FrameCounters, FrameRing, NO_COUNTERS, summarize } from "./stats.ts"
 import { createTiming, type Timing } from "./timing.ts"
 
+/** Something that holds GPU or scene resources until `dispose`. */
+export interface Disposable {
+  dispose(): void
+}
+
 export interface Stage {
   scene: Scene
   camera: PerspectiveCamera

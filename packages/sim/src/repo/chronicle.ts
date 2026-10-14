@@ -172,17 +172,6 @@ export function weeksOf(c: Pick<Chronicle, "start" | "end">): number {
   return Math.floor((c.end - c.start) / 7) + 1
 }
 
-/** The week index a Day falls in, clamped to the chronicle's weeks. */
-export function weekOf(c: Pick<Chronicle, "start" | "end">, day: Day): number {
-  return Math.max(0, Math.min(weeksOf(c) - 1, Math.floor((day - c.start) / 7)))
-}
-
-/** A contributor's commits in week `week` (0 outside their span). */
-export function activityAt(contributor: Pick<Contributor, "from" | "weeks">, week: number): number {
-  const char = contributor.weeks[week - contributor.from]
-  return char ? Number.parseInt(char, 36) : 0
-}
-
 /** A chronicle from its JSON; throws a ChronicleError on another version or a broken shape. */
 export function decodeChronicle(text: string): Chronicle {
   let value: unknown

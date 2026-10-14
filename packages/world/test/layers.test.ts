@@ -1,6 +1,7 @@
 /**
- * The layers inside world (ADR 011): geom at the bottom; draw (the contracts render reads) and hex (the
- * hex world) on it, beside each other. A folder may import itself and the folders below it, and only the workspace packages its row allows; `src/index.ts` sits above them all.
+ * The layers inside world (ADR 011): geom at the bottom, hex (the hex world) on it. A folder may import
+ * itself and the folders below it, and only the workspace packages its row allows; `src/index.ts` sits
+ * above them all.
  * The cross-package order (core < assets < world …) is the root test/layers.test.ts.
  */
 import { describe, expect, test } from "bun:test"
@@ -12,8 +13,6 @@ const SRC = resolve(import.meta.dir, "../src")
 /** Per folder: the world folders and the @guildhall packages it may import. */
 const RULES: Readonly<Record<string, { folders: readonly string[]; packages: readonly string[] }>> = {
   geom: { folders: ["geom"], packages: ["core"] },
-  // the ground, water and light contracts render reads
-  draw: { folders: ["geom", "draw"], packages: ["core", "assets"] },
   // the hex world (decisions.md "Clean restart on hex"): on geom only
   hex: { folders: ["geom", "hex"], packages: ["core", "assets"] },
 }
@@ -67,41 +66,39 @@ function checkWorldLayers(files: readonly SourceFile[]): string[] {
       if (!spec.startsWith(".")) continue
       const to = folderOf(path, spec)
       if (!rule.folders.includes(to))
-        out.push(
-          `${path} -> ${spec}: ${folder} may import ${rule.folders.join(", ")} only (geom < draw, geom < hex)`,
-        )
+        out.push(`${path} -> ${spec}: ${folder} may import ${rule.folders.join(", ")} only (geom < hex)`)
     }
   }
   return out
 }
 
 describe("world layers", () => {
-  test("world's own folders respect geom < draw, geom < hex", () => {
+  test("world's own folders respect geom < hex", () => {
     const files = read(SRC)
     expect(files.length).toBeGreaterThan(0)
     expect(checkWorldLayers(files)).toEqual([])
   })
 
-  test("hex importing draw fails, a dynamic or re-export import included", () => {
+  test("hex importing an unknown folder fails, a dynamic or re-export import included", () => {
     const files = [
       { path: "hex/index.ts", text: 'export { LEVELS } from "../draw/types.ts"' },
       { path: "hex/world.ts", text: 'const m = await import("../draw/water.ts")' },
     ]
     expect(checkWorldLayers(files)).toEqual([
-      "hex/index.ts -> ../draw/types.ts: hex may import geom, hex only (geom < draw, geom < hex)",
-      "hex/world.ts -> ../draw/water.ts: hex may import geom, hex only (geom < draw, geom < hex)",
+      "hex/index.ts -> ../draw/types.ts: hex may import geom, hex only (geom < hex)",
+      "hex/world.ts -> ../draw/water.ts: hex may import geom, hex only (geom < hex)",
     ])
   })
 
   test("geom importing hex, geom importing assets, and an unknown folder fail", () => {
     const files = [
-      { path: "geom/route.ts", text: 'import { hexCentre } from "../hex/grid.ts"' },
-      { path: "geom/poly.ts", text: 'import type { PrefabMeta } from "@guildhall/assets"' },
+      { path: "geom/noise.ts", text: 'import { hexCentre } from "../hex/grid.ts"' },
+      { path: "geom/noise.ts", text: 'import type { PALETTE } from "@guildhall/assets"' },
       { path: "sky/clouds.ts", text: "" },
     ]
     expect(checkWorldLayers(files)).toEqual([
-      "geom/route.ts -> ../hex/grid.ts: geom may import geom only (geom < draw, geom < hex)",
-      "geom/poly.ts -> @guildhall/assets: geom may import core only",
+      "geom/noise.ts -> ../hex/grid.ts: geom may import geom only (geom < hex)",
+      "geom/noise.ts -> @guildhall/assets: geom may import core only",
       "sky/clouds.ts: folder has no layer; add it to RULES in packages/world/test/layers.test.ts",
     ])
   })
@@ -109,8 +106,8 @@ describe("world layers", () => {
   test("downward imports, npm packages and the package index pass", () => {
     const files = [
       { path: "hex/world.ts", text: 'import { x } from "../geom/noise.ts"\nimport { y } from "./grid.ts"' },
-      { path: "hex/sub/deep.ts", text: 'import { z } from "../../geom/vec.ts"' },
-      { path: "geom/poly.ts", text: 'import pc from "polygon-clipping"' },
+      { path: "hex/sub/deep.ts", text: 'import { z } from "../../geom/noise.ts"' },
+      { path: "geom/noise.ts", text: 'import { Vector3 } from "three"' },
       { path: "index.ts", text: 'export * from "./hex/index.ts"' },
     ]
     expect(checkWorldLayers(files)).toEqual([])

@@ -73,7 +73,7 @@ async function scan(names: string[], out: string): Promise<void> {
   const scans: PackScan[] = []
   for (const name of folders) {
     const pack = packs.find((c) => c.id === name)
-    const scanned = await scanPack(p.raw, pack?.source ?? name, join(p.library, ".cache"), pack)
+    const scanned = await scanPack(p.raw, pack?.source ?? name, pack)
     console.log(
       `${scanned.folder}: ${scanned.rows.length} files, ${scanned.rows.filter((r) => r.error).length} failed`,
     )

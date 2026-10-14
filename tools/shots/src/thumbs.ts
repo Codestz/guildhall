@@ -2,15 +2,15 @@
  * The Studio's committed pictures, captured from the real pages at hi-DPI and written as WebP:
  *
  *   bun shots thumbs                   every home-directory card → apps/studio/public/home/<id>.webp
- *   bun shots thumbs hudlab sitelab    just these cards
- *   bun shots stills                   the lab backdrops (site, HUD) → apps/studio/public/lab/
+ *   bun shots thumbs town hexmap       just these cards
+ *   bun shots stills                   the island hero How it's built shows → apps/studio/public/site/
  *   bun shots repos [owner__repo …]    the demo picker's live-chronicle cards → apps/studio/public/site/repos/
  *   bun shots demos [id …]             the demo picker's story cards, captured on V2 → apps/studio/public/site/demos/
  *   bun shots thumbs --out .probe/x --port 5341 --dpr 2
  *
  * Each card is the page at 1280×800 CSS px with no top bar, shot at device pixel ratio 2 and scaled
  * down to 800×500 (2.5× the card's widest display, ~320 px) so it stays sharp on a phone at 3×.
- * Backdrops are shot at the size the lab shows them and kept at 2× up to 2560 px wide. The scaling and the
+ * Backdrops are shot at the size the page shows them and kept at 2× up to 2560 px wide. The scaling and the
  * WebP encoding run in the browser (no image tool needed). Poses live in CARDS and STILLS below.
  */
 import { mkdirSync, writeFileSync } from "node:fs"
@@ -53,15 +53,6 @@ const BARE = "bar=0&ui=0"
 export const CARDS: readonly Pose[] = [
   { id: "town", url: `/town/1?${BARE}`, ...CARD, settle: 3000 },
   { id: "hexmap", url: `/lab/hexmap?${BARE}`, ...CARD },
-  {
-    id: "hexscale",
-    url: `/lab/hexscale?board=scale&${BARE}`,
-    ...CARD,
-    camera: "0,32,112,52,1,2",
-    settle: 1500,
-  },
-  { id: "hudlab", url: `/lab/hud?still=1&${BARE}`, ...CARD, settle: 1500 },
-  { id: "sitelab", url: `/lab/site?${BARE}`, ...CARD, settle: 1500 },
   { id: "pieces", url: `/pieces?${BARE}`, ...CARD },
   { id: "palette", url: `/palette?${BARE}`, ...CARD },
   { id: "composer", url: `/composer?tile=tavern-garden&${BARE}`, ...CARD },
@@ -71,25 +62,15 @@ export const CARDS: readonly Pose[] = [
   { id: "grips", url: `/grips?${BARE}`, ...CARD },
 ]
 
-/** Backdrops the labs draw behind their panels (shown `cover` over the whole window). */
+/** Backdrops the site draws behind its pages (shown `cover` over the whole window). */
 export const STILLS: readonly Pose[] = [
-  // the site lab's island: the town's opening view
+  // How it's built's hero: the town's opening view
   {
     id: "island-hero",
     url: `/town/1?${BARE}`,
     size: [1440, 860],
     width: 2560,
     quality: 72,
-    settle: 3000,
-  },
-  // the HUD lab's backdrop: a close street of the same town
-  {
-    id: "hud-bg",
-    url: `/town/1?${BARE}`,
-    size: [1440, 860],
-    width: 2560,
-    quality: 70,
-    camera: "295,38,36,-8,1.95,12",
     settle: 3000,
   },
 ]
@@ -169,7 +150,7 @@ export async function repoPoses(): Promise<Pose[]> {
   return REPO_SLUGS.map((slug) => pose(slug, files.get(slug) ?? 5000))
 }
 
-const STILL_DIRS: Record<string, string> = { "island-hero": "lab/site", "hud-bg": "lab/hud" }
+const STILL_DIRS: Record<string, string> = { "island-hero": "site" }
 
 /** The screenshot as a WebP of `width` px: halved stepwise (smooth, never aliased), then encoded. */
 async function encode(page: Page, png: Buffer, width: number, quality: number): Promise<Buffer> {

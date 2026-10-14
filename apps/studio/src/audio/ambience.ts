@@ -42,8 +42,6 @@ export interface AmbienceLevels {
   insects: number
 }
 
-export const SILENT: AmbienceLevels = { wind: 0, rain: 0, sea: 0, fire: 0, insects: 0 }
-
 export function ambienceOf({ env, wind, listener, sea, fire }: AmbienceInput): AmbienceLevels {
   const r = listener.radius
   const wet = smoothstep(0, 0.08, env.precipitation)

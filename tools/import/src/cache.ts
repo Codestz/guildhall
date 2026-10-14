@@ -8,7 +8,7 @@ import { dirname, join } from "node:path"
 
 export type PackCache = Record<string, string>
 
-/** 16 hex characters of SHA-256: content hashes for GLBs, FBX conversions and cache keys. */
+/** 16 hex characters of SHA-256: content hashes for GLBs and cache keys. */
 export const contentHash = (...parts: (string | Uint8Array)[]): string => {
   const h = createHash("sha256")
   for (const p of parts) h.update(p).update("\0")

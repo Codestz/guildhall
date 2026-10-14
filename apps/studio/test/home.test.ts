@@ -58,8 +58,8 @@ describe("directory", () => {
     expect(search("").length).toBe(openable().length)
     expect(search("grip").map((p) => p.tool.id)).toEqual(["grip", "grips"])
     expect(search("grip matrix").map((p) => p.tool.id)).toEqual(["grips"])
-    // "scale" names Scale board; the tile prefabs only mention it in their purpose.
-    expect(search("scale")[0]?.tool.id).toBe("hexscale")
+    // "town" names Town; the pieces and the NPC builder only mention it in their purpose.
+    expect(search("town").map((p) => p.tool.id)).toEqual(["town", "pieces", "npc"])
     // A group name finds its tools.
     expect(search("library").map((p) => p.tool.id)).toEqual(["pieces", "palette"])
     expect(search("zzz")).toEqual([])

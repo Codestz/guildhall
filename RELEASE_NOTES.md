@@ -21,7 +21,7 @@ the site around it are new. V1 is kept on the `v1` tag and runs from `legacy/`.
 - One collision layer that paths, people, placement and tests all read. A sweep over 720 islands
   went from about 2,000 violations per class to 0.
 
-**Tiles and scenes authored as data.** 83 tile prefabs in `data/tiles/`, with 236 spots where people
+**Tiles and scenes authored as data.** 82 tile prefabs in `data/tiles/`, with 232 spots where people
 sit, work and talk. Scenes span several tiles: a tavern with a beer garden, a training arena where
 knights spar in bouts, a harbour quay, a monastery, a farmstead, a market round a fountain, a
 lighthouse, a watermill.

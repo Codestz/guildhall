@@ -36,7 +36,7 @@ const ALL_GROUPS: readonly ToolGroup[] = [
   {
     id: "world",
     name: "World",
-    blurb: "The hex island: its map, its scale and the town on it.",
+    blurb: "The hex island: its map and the town on it.",
     tools: [
       {
         id: "town",
@@ -49,37 +49,6 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         name: "Hex map",
         purpose: "The hex world from above: island, heights in steps, sand, cliffs, rivers, lakes, forest.",
         preview: true,
-      },
-      {
-        id: "hexscale",
-        name: "Scale board",
-        purpose:
-          "The hex world's proportions side by side: tile, buildings, trees and characters at three scales.",
-        preview: true,
-        dev: true,
-      },
-      {
-        id: "replay",
-        name: "History replay",
-        purpose:
-          "A repository's island grown from its first commit: scrub the history and the tiles come in, no rebuild.",
-        dev: true,
-      },
-      {
-        id: "hudlab",
-        name: "HUD lab",
-        purpose:
-          "Every HUD panel (roster, chronicle, dossier, pleas, settings, timeline) in V1's layout, on fixtures.",
-        preview: true,
-        dev: true,
-      },
-      {
-        id: "sitelab",
-        name: "Site lab",
-        purpose:
-          "The website's own pieces: welcome card, crest menu, demo picker and How it's built, on fixtures.",
-        preview: true,
-        dev: true,
       },
     ],
   },

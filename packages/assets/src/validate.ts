@@ -10,7 +10,7 @@ import type { Palette } from "./palette.ts"
 /** kebab-case: also the rule for data ids (prefab, NPC recipe). */
 export const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
-// Shape guards, shared with the data validators (compose/blueprint.ts, npc/recipe.ts).
+// Shape guards, shared with the data validators (npc/recipe.ts).
 export const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v)
 export const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v)

@@ -1,7 +1,6 @@
 import { log } from "@guildhall/core"
 import { Matrix4, Mesh, PCFShadowMap, PlaneGeometry, ShadowMaterial, Vector3 } from "three"
-import type { Disposable } from "./grid.ts"
-import type { Stage } from "./stage.ts"
+import type { Disposable, Stage } from "./stage.ts"
 
 type Vec3 = [number, number, number]
 

@@ -28,7 +28,7 @@ function swatchParam(text: string | null): number | null {
 }
 
 /**
- * The palette tuner (`?screen=palette`): every ramp as a row of three swatches, a picker for the one
+ * The palette tuner (`/palette`): every ramp as a row of three swatches, a picker for the one
  * clicked, and twelve library pieces (one per pack/category) recoloured live from their `_SWATCH` /
  * `_SHADE` attributes as the palette is edited or a biome's ramp swaps are previewed. Export shows the
  * edited palette.json to copy (the page cannot write files).

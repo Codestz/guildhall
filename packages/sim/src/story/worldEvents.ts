@@ -1,6 +1,8 @@
 // From V1 hall (legacy/packages/hall/src/guild/events.ts `WorldEvents`, guild/undead.ts `Undead`,
 // scene/events/EventsLayer.tsx `LOOK`): the live scheduler, remade as a pure function of the log.
+
 import type { CiState } from "@guildhall/core"
+import { fnv1a } from "@guildhall/core"
 import type { Distance, FocusHint } from "../director/pick.ts"
 import type { EventLog } from "../events/log.ts"
 import type { WorldEvent } from "../events/world.ts"
@@ -15,7 +17,7 @@ import {
   type RenownFacts,
   RenownLedger,
 } from "./renown.ts"
-import { type CaptionPart, hash, pick, renownLine } from "./story.ts"
+import { type CaptionPart, pick, renownLine } from "./story.ts"
 import type { StoryMoment } from "./teller.ts"
 
 /**
@@ -820,7 +822,7 @@ export function showLine(show: Show): CaptionPart[] | undefined {
   const g = show.params.grave
   if (!g || g.minion) return undefined
   const who = show.params.who
-  const seed = hash(show.id)
+  const seed = fnv1a(show.id)
   if (g.cause === "ci") {
     const branch = show.params.where?.branch
     return [

@@ -12,12 +12,11 @@ import {
   Sprite,
   SpriteMaterial,
 } from "three"
-import type { Disposable } from "./grid.ts"
 import { disposeObject, heroSilhouette } from "./hero.ts"
 import { measure } from "./model.ts"
 import { loadPiece } from "./pieces.ts"
 import { createShadows } from "./shadow.ts"
-import type { Stage } from "./stage.ts"
+import type { Disposable, Stage } from "./stage.ts"
 import { boundingSphere, fitSphere } from "./thumbnail.ts"
 
 /** One piece to show: its GLB url, and its catalog entry when it has one. */

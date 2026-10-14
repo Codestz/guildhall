@@ -8,7 +8,6 @@
   },
   "dependencies": {
     "@guildhall/assets": "workspace:*",
-    "@guildhall/core": "workspace:*",
-    "polygon-clipping": "0.15.7"
+    "@guildhall/core": "workspace:*"
   }
 }

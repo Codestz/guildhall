@@ -56,7 +56,7 @@ export type Roots = Pick<Paths, "raw" | "library">
 /** One raw file → its catalog entries (one, or one per node with `split: "top-nodes"`). */
 export async function importFile(pack: PackConfig, file: PieceSource, roots: Roots): Promise<CatalogEntry[]> {
   const logger = log("import").child(pack.id)
-  const doc = await readModel(file.file, join(roots.library, ".cache"))
+  const doc = await readModel(file.file)
   const parts =
     pack.split === "top-nodes"
       ? (await splitTopNodes(doc)).map((p) => ({

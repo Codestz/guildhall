@@ -48,30 +48,6 @@ export function titleOf(s: Session): string {
 export const callsOf = (s: Session): number => s.entries.filter((entry) => entry.kind === "tool").length
 
 /**
- * How many rounds it has had: a round is a prompt — its task, the main agent continuing it, or you
- * writing to it — and the run that followed. Never fewer than one.
- */
-export const roundsOf = (s: Session): number =>
-  Math.max(1, s.entries.filter((entry) => entry.kind === "prompt").length)
-
-/** When its current (or last) round began: the last thing it was asked, or when it started. */
-export function roundStart(s: Session): number {
-  for (let i = s.entries.length - 1; i >= 0; i--) {
-    const entry = s.entries[i]
-    if (entry?.kind === "prompt") return Math.max(entry.at, s.started)
-  }
-  return s.started
-}
-
-/**
- * How long its last round has taken: from that round's prompt to its end, or to now while it works.
- * Not the whole span: a subagent continued the next day read "done in 24h04m" for four minutes of
- * work. `roundsOf` says when there was more than one.
- */
-export const runTime = (s: Session, now: number): number =>
-  Math.max(0, (working(s) ? now : (s.ended ?? now)) - roundStart(s))
-
-/**
  * Siblings, working ones first, then oldest first inside each half. Nothing but a status change moves
  * a row: a new subagent joins the end of its half, and two that started together keep their order by
  * id. Ordered by start rather than by last activity on purpose — a list that reshuffles on every tool
@@ -128,75 +104,6 @@ export function subagentsOf(model: Model, root: string): Node[] {
   }
   walk(root, 0)
   return out
-}
-
-/**
- * One sidebar entry: subagents under the same parent with the same agent and the same task — an
- * "advisor" a subagent asks again and again. Each is a session of its own, so they are not rounds
- * (a round is another prompt within one session); they are one entry with a count, rather than a
- * column of identical rows pushing everything else out of the sidebar.
- */
-export interface Group {
-  /** The member the entry describes and a click opens: one held on you, else working, else the latest. */
-  lead: Session
-  /** Every member, oldest first. */
-  members: Session[]
-  depth: number
-  /** The entries under any of its members, in sibling order. */
-  children: Group[]
-}
-
-/** Untitled ones are never assumed to be the same. */
-const groupKey = (s: Session): string => {
-  const title = s.title || s.task
-  return title ? `${s.parentID ?? ""}\u0000${s.agent}\u0000${title}` : `\u0000${s.id}`
-}
-
-/** Held on a permission needs you first; then the newest still working; then the newest finished. */
-function leadOf(members: readonly Session[]): Session {
-  return (
-    members.filter((s) => s.status === "waiting").at(-1) ??
-    members.filter(working).at(-1) ??
-    (members.at(-1) as Session)
-  )
-}
-
-/** Whether anything in it, or under it, is working. */
-export const groupWorking = (group: Group): boolean =>
-  group.members.some(working) || group.children.some(groupWorking)
-
-/**
- * `nodes`, as `subagentsOf` gives them, folded into entries as a tree. Entries keep the sibling order,
- * keyed on the group's *first* member: a group does not move because a different member of it is the
- * one running, only because the group as a whole started or stopped working.
- */
-export function groupsOf(nodes: readonly Node[]): Group[] {
-  const listed = new Set(nodes.map((node) => node.session.id))
-  const depthOf = new Map(nodes.map((node) => [node.session.id, node.depth]))
-  const under = new Map<string, Session[]>()
-  const top: Session[] = []
-  for (const { session } of nodes) {
-    const parent = session.parentID
-    if (parent && listed.has(parent)) under.set(parent, [...(under.get(parent) ?? []), session])
-    else top.push(session)
-  }
-  const order = siblingOrder<Group>(groupWorking, (group) => group.members[0] as Session)
-  const build = (level: readonly Session[]): Group[] => {
-    const buckets = new Map<string, Session[]>()
-    for (const s of level) buckets.set(groupKey(s), [...(buckets.get(groupKey(s)) ?? []), s])
-    return [...buckets.values()]
-      .map((members): Group => {
-        members.sort((a, b) => a.started - b.started || (a.id < b.id ? -1 : 1))
-        return {
-          lead: leadOf(members),
-          members,
-          depth: depthOf.get((members[0] as Session).id) ?? 0,
-          children: build(members.flatMap((member) => under.get(member.id) ?? [])),
-        }
-      })
-      .sort(order)
-  }
-  return build(top)
 }
 
 /** The conversation a session belongs to: up its parents to the one with none. */
@@ -283,25 +190,6 @@ export function activityOf(s: Session): Activity {
     return { kind: "writing", text: "writing its answer", since: last.at }
   if (s.status === "starting") return { kind: "starting", text: "starting", since: s.started }
   return { kind: "thinking", text: "thinking", since: last?.at ?? s.started }
-}
-
-/** Counts for the block's heading. */
-export function countsOf(nodes: readonly Node[]): {
-  total: number
-  running: number
-  /** Of those running, the ones stopped on a question only you can answer. */
-  waiting: number
-  done: number
-  failed: number
-} {
-  const of = (test: (s: Session) => boolean) => nodes.filter((node) => test(node.session)).length
-  return {
-    total: nodes.length,
-    running: of((s) => s.status === "running" || s.status === "starting" || s.status === "waiting"),
-    waiting: of((s) => s.status === "waiting"),
-    done: of((s) => s.status === "done"),
-    failed: of((s) => s.status === "failed"),
-  }
 }
 
 /** What a session has done, as the roster ranks it (`rankOf`): its deeds (calls made) and tokens spent. */

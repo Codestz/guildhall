@@ -44,7 +44,7 @@ export type HallRepo =
 
 /**
  * The hall's read of a chronicle at its last day: the repo's figures and its units as places. The size is
- * `filesAt(c, end)`, the same count a history replay builds the island at (replay/), so a hall and its
+ * `filesAt(c, end)`, the same count a history replay builds the island at (hall/history.ts), so a hall and its
  * replay are one island; each place is ranked under the land the island had when its unit was born.
  */
 export function repoOf(c: Chronicle, source: "cdn" | "local"): HallRepo {

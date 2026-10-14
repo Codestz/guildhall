@@ -173,7 +173,7 @@ function aim(stage: Stage, cols: number, rows: number, inset = { left: 0, top: 0
 }
 
 /**
- * The grip matrix (`?screen=grips`, AC2.4): one small character per prop (rows) and key clip
+ * The grip matrix (`/grips`, AC2.4): one small character per prop (rows) and key clip
  * (columns), each holding its prop by its mount. Props with no authored mount use a bbox default and
  * are labelled "default": the authoring queue. `?t=0.3,0.7` freezes each clip at those fractions (two
  * columns per clip) for deterministic shots; without it the clips play live. `?axes=1` adds a row of

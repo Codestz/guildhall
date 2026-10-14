@@ -8,8 +8,6 @@ import type { CatalogEntry, Category, ScaleFlag, ScaleTarget } from "./catalog.t
 export const HERO_HEIGHT = 2.2
 /** A doorway's top, so a hero walks through. */
 export const DOOR_TOP: ScaleTarget = [2.4, 2.8]
-/** One storey, floor to floor. */
-export const STOREY: ScaleTarget = [2.8, 3.2]
 
 /** Height band per category; a category not listed has no target (confidence "pack", no flags). */
 export const SCALE_TARGETS: Readonly<Partial<Record<Category, ScaleTarget>>> = {

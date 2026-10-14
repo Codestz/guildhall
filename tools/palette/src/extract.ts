@@ -6,7 +6,6 @@
  * same way. Each triangle gives a third of its world-space area (m², after the pack's scale factor) to
  * each of its three corners' colours.
  */
-import { join } from "node:path"
 import type { Document, Primitive, Texture } from "@gltf-transform/core"
 import { linearToSrgb, type PackConfig } from "@guildhall/assets"
 import { discover } from "@guildhall/import/src/discover.ts"
@@ -103,10 +102,10 @@ export function documentColours(doc: Document, pack: PackConfig, into: Colours =
 }
 
 /** Every piece the importer would take from `pack`, read from `raw` and summed into one map. */
-export async function packColours(pack: PackConfig, raw: string, cache: string): Promise<Colours> {
+export async function packColours(pack: PackConfig, raw: string): Promise<Colours> {
   const colours: Colours = new Map()
   for (const piece of discover(pack, raw)) {
-    const doc = await readModel(piece.file, join(cache, ".cache"))
+    const doc = await readModel(piece.file)
     documentColours(doc, pack, colours)
   }
   return colours

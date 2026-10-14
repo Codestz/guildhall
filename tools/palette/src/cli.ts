@@ -38,7 +38,7 @@ async function extract(out: string): Promise<void> {
   const p = paths()
   const stored: Stored = {}
   for (const pack of (await loadPacks(p.packs)).filter((x) => isKept(x.id))) {
-    const colours = await packColours(pack, p.raw, p.library)
+    const colours = await packColours(pack, p.raw)
     const sorted = [...colours].sort((a, b) => b[1] - a[1])
     stored[pack.id] = Object.fromEntries(sorted.map(([hex, area]) => [hex, Number(area.toPrecision(6))]))
     console.log(`${pack.id}: ${colours.size} colours`)

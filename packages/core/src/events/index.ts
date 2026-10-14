@@ -30,14 +30,13 @@ export {
   plainPattern,
 } from "./craft.ts"
 export { createdSession } from "./created.ts"
-export { endOf, finishedAt } from "./ends.ts"
+export { endOf } from "./ends.ts"
 export { type Deed, failedDeed, isCheck } from "./outcome.ts"
 export {
   type CiState,
   isSeaRecord,
   type PrStatus,
   type SeaEvent,
-  type SeaKind,
   type SeaRecord,
 } from "./sea.ts"
 export { adaptV1, agentOfTitle, stripAgentSuffix, type V1Translator } from "./v1.ts"

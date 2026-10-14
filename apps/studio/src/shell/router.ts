@@ -32,11 +32,7 @@ export const ROUTES: readonly Route[] = [
   { screen: "grip", path: "grips/editor", param: { key: "piece", parts: 2 } },
   { screen: "town", path: "town", param: { key: "town", parts: 1 } },
   { screen: "hexmap", path: "lab/hexmap" },
-  { screen: "hexscale", path: "lab/hexscale" },
   { screen: "hextiles", path: "lab/hextiles" },
-  { screen: "hudlab", path: "lab/hud" },
-  { screen: "replay", path: "lab/replay" },
-  { screen: "sitelab", path: "lab/site" },
 ]
 
 /**

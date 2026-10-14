@@ -6,7 +6,6 @@
  * dark all night, so no two streets look alike. A lit window also throws a soft warm glow on the
  * wall round it (a second instanced draw, additive, just off the wall's face).
  */
-import type { WindowLight } from "@guildhall/world"
 import {
   AdditiveBlending,
   Color,
@@ -21,6 +20,20 @@ import {
   Vector3,
 } from "three"
 import type { Stage } from "../stage.ts"
+
+/**
+ * One lit window: the pane's centre, its heading (`rot`, the pane faces local +x turned by it), size,
+ * the house's rank (0–1: the late-night share of dark houses that leaves it lit is below it) and the
+ * room's (a few rooms stay dark in a lit house).
+ */
+export interface WindowLight {
+  at: [x: number, y: number, z: number]
+  rot: number
+  w: number
+  h: number
+  house: number
+  room: number
+}
 
 /** Rooms with a roll under this stay dark in a lit house. */
 const DARK_ROOMS = 0.2

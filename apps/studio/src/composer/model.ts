@@ -150,10 +150,6 @@ export function duplicate(t: TilePrefab, sel: Selection): [TilePrefab, number] {
   return [{ ...t, [sel.layer]: list }, list.length - 1]
 }
 
-/** Turn (radians) that faces from (x, z) toward (tx, tz): the TileSpot `facing` convention, 0 = +z. */
-export const facingToward = (x: number, z: number, tx: number, tz: number): number =>
-  Math.atan2(tx - x, tz - z)
-
 /** Whether a point (tile space) is on the tile: inside its hexagon (pointy-top, corner at HEX_TILE_SIZE). */
 export function onTile(x: number, z: number, inset = 0): boolean {
   const R = HEX_TILE_SIZE - inset

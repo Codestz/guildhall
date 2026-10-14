@@ -15,22 +15,3 @@ export function endOf(changes: readonly Change[], fallback: number): number {
   }
   return last || fallback
 }
-
-/**
- * When a reloaded run's last message *finished*, read off the messages themselves.
- *
- * History stamps each change with its message's creation time, so a run of one prompt and one answer —
- * an advisor consulted once — ended, by `endOf`, a moment after it started: "done · 0s" for a call that
- * took a minute. A message records when it completed; that is the end. Takes OpenCode 1's
- * `{ info, parts }` and OpenCode 2's bare messages alike.
- */
-export function finishedAt(messages: readonly unknown[]): number {
-  let last = 0
-  for (const each of messages) {
-    if (!each || typeof each !== "object") continue
-    const message = ((each as { info?: unknown }).info ?? each) as { time?: { completed?: unknown } }
-    const completed = Number(message.time?.completed)
-    if (Number.isFinite(completed) && completed > last) last = completed
-  }
-  return last
-}

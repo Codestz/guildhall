@@ -114,13 +114,9 @@ export {
   isBuildingPiece,
   isDefaultNature,
   NATURE_CHOSEN,
-  NATURE_DEFAULTS,
-  NATURE_FAMILIES,
-  type NatureFamily,
   natureFamily,
   natureOdds,
   natureReach,
-  natureScale,
   WOODED,
 } from "./nature.ts"
 export { parseTilePrefabs, SPOT_KINDS, TILE_GROUNDS, TILE_GROUPS, validateTilePrefab } from "./prefabs.ts"
@@ -192,7 +188,6 @@ export {
   opensEvening,
   type PlacedPiece,
   placeTile,
-  SCALE_B,
   type SpotHours,
   sideDir,
   spotWindows,

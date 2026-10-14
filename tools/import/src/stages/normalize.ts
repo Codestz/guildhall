@@ -216,14 +216,13 @@ const isRef = (ref: string, name: string, path: string): boolean =>
   kebab(name) === kebab(ref) || matches(ref, name, path)
 
 async function measureRef(
-  { pack, raw, library }: StageCtx,
+  { pack, raw }: StageCtx,
   r: { ref: string; measure: RefMeasure; metres: number },
 ): Promise<number> {
-  const cache = join(library, ".cache")
   for (const file of discover(pack, raw)) {
     const whole = pack.split !== "top-nodes"
     if (whole && !isRef(r.ref, file.name, file.source)) continue
-    const doc = await readModel(file.file, cache)
+    const doc = await readModel(file.file)
     const parts = whole ? [{ node: file.name, doc }] : await splitTopNodes(doc)
     const hit = parts.find((p) => whole || isRef(r.ref, p.node, `${file.source}#${p.node}`))
     if (!hit) continue

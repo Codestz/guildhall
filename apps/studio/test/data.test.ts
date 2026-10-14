@@ -7,16 +7,8 @@ import { join } from "node:path"
 import * as data from "../src/data.ts"
 import { copyData, dataHandler, dataRoute, formatData, MAX_DATA_BYTES } from "../vite.config.ts"
 
-/** A dressing-only stall: the smallest prefab recipe validatePrefab accepts. */
-const stall = () => ({
-  version: 1,
-  id: "demo",
-  kind: "stall",
-  tags: ["market"],
-  fits: {},
-  dressing: [{ piece: "kenney-town/barrel", x: 1, y: 0, z: 2, rot: 0, scale: 1 }],
-  anchors: [],
-})
+/** An empty grass tile: the smallest tile prefab validateTilePrefab accepts (as `tiles/demo.json`). */
+const tile = () => ({ id: "demo", name: "Demo", ground: "grass", pieces: [] })
 
 const npc = () => ({
   version: 1,
@@ -37,16 +29,7 @@ const mounts = () => ({
 
 describe("dataRoute", () => {
   test("accepts <id>.json in every known data folder, and mounts.json", () => {
-    for (const path of [
-      "recipes/houses/demo.json",
-      "recipes/landmarks/a.json",
-      "recipes/stalls/fish-stall.json",
-      "recipes/docks/a.json",
-      "recipes/farm/a.json",
-      "npcs/farmer.json",
-      "tiles/tavern-yard.json",
-      "mounts.json",
-    ])
+    for (const path of ["npcs/farmer.json", "tiles/tavern-yard.json", "mounts.json"])
       expect(dataRoute(path)).not.toBeNull()
   })
 
@@ -55,9 +38,10 @@ describe("dataRoute", () => {
       "",
       "../secret.json",
       "/etc/passwd.json",
-      "recipes/../mounts.json",
-      "recipes/houses/../../x.json",
+      "tiles/../mounts.json",
+      "tiles/a/../../x.json",
       "npcs/../npcs/a.json",
+      "recipes/houses/demo.json",
       "recipes/castles/a.json",
       "recipes/houses.json",
       "recipes/a.json",
@@ -75,16 +59,13 @@ describe("dataRoute", () => {
   })
 
   test("routes each folder to its S1 validator", () => {
-    expect(dataRoute("recipes/stalls/demo.json")?.(stall())).toEqual([])
-    expect(dataRoute("recipes/stalls/demo.json")?.(npc()).length).toBeGreaterThan(0)
     expect(dataRoute("npcs/farmer.json")?.(npc())).toEqual([])
-    expect(dataRoute("npcs/farmer.json")?.(stall()).length).toBeGreaterThan(0)
+    expect(dataRoute("npcs/farmer.json")?.(tile()).length).toBeGreaterThan(0)
     expect(dataRoute("mounts.json")?.(mounts())).toEqual([])
     expect(dataRoute("mounts.json")?.(npc()).length).toBeGreaterThan(0)
-    const tile = { id: "demo", name: "Demo", ground: "grass", pieces: [] }
-    expect(dataRoute("tiles/demo.json")?.(tile)).toEqual([])
+    expect(dataRoute("tiles/demo.json")?.(tile())).toEqual([])
     // a tile file must be named after its id
-    expect(dataRoute("tiles/other.json")?.(tile).join()).toContain("file's name")
+    expect(dataRoute("tiles/other.json")?.(tile()).join()).toContain("file's name")
     expect(dataRoute("tiles/demo.json")?.(npc()).length).toBeGreaterThan(0)
   })
 })
@@ -158,35 +139,34 @@ afterAll(async () => {
 })
 
 describe("PUT /data/", () => {
-  test("a bad recipe gets 422 with the validator's problems, and nothing is written", async () => {
+  test("a bad tile gets 422 with the validator's problems, and nothing is written", async () => {
     const base = await serve()
-    const response = await put(
-      `${base}/recipes/stalls/demo.json`,
-      JSON.stringify({ ...stall(), kind: "castle" }),
-    )
+    const response = await put(`${base}/tiles/demo.json`, JSON.stringify({ ...tile(), ground: "lava" }))
     expect(response.status).toBe(422)
-    expect(((await response.json()) as { problems: string[] }).problems).toEqual(['kind: unknown "castle"'])
+    expect(((await response.json()) as { problems: string[] }).problems).toEqual([
+      "ground: one of grass, soil, dirt, paved, sand, rock, water",
+    ])
     expect(await readdir(root)).toEqual([])
   })
 
-  test("a good recipe is written sorted and byte-stable, with no temporary file left", async () => {
+  test("a good tile is written sorted and byte-stable, with no temporary file left", async () => {
     const base = await serve()
-    const first = await put(`${base}/recipes/stalls/demo.json`, JSON.stringify(stall()))
+    const first = await put(`${base}/tiles/demo.json`, JSON.stringify(tile()))
     expect(first.status).toBe(200)
-    const file = join(root, "recipes/stalls/demo.json")
+    const file = join(root, "tiles/demo.json")
     const written = await readFile(file, "utf8")
-    expect(written).toBe(formatData(stall()))
+    expect(written).toBe(formatData(tile()))
 
-    const reordered = Object.fromEntries(Object.entries(stall()).reverse())
-    await put(`${base}/recipes/stalls/demo.json`, JSON.stringify(reordered))
+    const reordered = Object.fromEntries(Object.entries(tile()).reverse())
+    await put(`${base}/tiles/demo.json`, JSON.stringify(reordered))
     expect(await readFile(file, "utf8")).toBe(written)
-    expect(await readdir(join(root, "recipes/stalls"))).toEqual(["demo.json"])
+    expect(await readdir(join(root, "tiles"))).toEqual(["demo.json"])
   })
 
   test("encoded traversal and unknown folders are 404 and write nothing", async () => {
     const base = await serve()
     for (const path of [
-      "recipes%2f..%2f..%2fescape.json",
+      "tiles%2f..%2f..%2fescape.json",
       "%2Fetc%2Fescape.json",
       "npcs/..%5c..%5cescape.json",
       "x/a.json",
@@ -200,11 +180,11 @@ describe("PUT /data/", () => {
     const outside = await mkdtemp(join(tmpdir(), "guildhall-outside-"))
     await writeFile(join(outside, "farmer.json"), "{}")
     await symlink(outside, join(root, "npcs"))
-    await mkdir(join(root, "recipes/farm"), { recursive: true })
-    await symlink(join(outside, "farmer.json"), join(root, "recipes/farm/a.json"))
+    await mkdir(join(root, "tiles"), { recursive: true })
+    await symlink(join(outside, "farmer.json"), join(root, "tiles/a.json"))
     const base = await serve()
     expect((await put(`${base}/npcs/farmer.json`, JSON.stringify(npc()))).status).toBe(403)
-    expect((await put(`${base}/recipes/farm/a.json`, "{}")).status).toBe(403)
+    expect((await put(`${base}/tiles/a.json`, "{}")).status).toBe(403)
     expect((await fetch(`${base}/npcs/farmer.json`)).status).toBe(403)
     expect((await fetch(`${base}/npcs/`)).status).toBe(403)
     expect(await readFile(join(outside, "farmer.json"), "utf8")).toBe("{}")
@@ -213,27 +193,27 @@ describe("PUT /data/", () => {
 
   test("bodies over the size cap are 413", async () => {
     const base = await serve()
-    const big = JSON.stringify({ ...stall(), tags: ["x".repeat(MAX_DATA_BYTES)] })
-    expect((await put(`${base}/recipes/stalls/demo.json`, big)).status).toBe(413)
+    const big = JSON.stringify({ ...tile(), name: "x".repeat(MAX_DATA_BYTES) })
+    expect((await put(`${base}/tiles/demo.json`, big)).status).toBe(413)
   })
 
   test("only JSON: another content type is 415, an unparsable body 400", async () => {
     const base = await serve()
-    const url = `${base}/recipes/stalls/demo.json`
-    expect((await put(url, JSON.stringify(stall()), { "Content-Type": "text/plain" })).status).toBe(415)
+    const url = `${base}/tiles/demo.json`
+    expect((await put(url, JSON.stringify(tile()), { "Content-Type": "text/plain" })).status).toBe(415)
     expect((await put(url, "{ nope")).status).toBe(400)
   })
 
   test("a write from a page on another origin is 403", async () => {
     const base = await serve()
-    const url = `${base}/recipes/stalls/demo.json`
-    expect((await put(url, JSON.stringify(stall()), { Origin: "https://evil.example" })).status).toBe(403)
-    expect((await put(url, JSON.stringify(stall()), { Origin: "http://localhost:5300" })).status).toBe(200)
+    const url = `${base}/tiles/demo.json`
+    expect((await put(url, JSON.stringify(tile()), { Origin: "https://evil.example" })).status).toBe(403)
+    expect((await put(url, JSON.stringify(tile()), { Origin: "http://localhost:5300" })).status).toBe(200)
   })
 
   test("the preview server reads but never writes", async () => {
     const base = await serve(false)
-    expect((await put(`${base}/recipes/stalls/demo.json`, JSON.stringify(stall()))).status).toBe(405)
+    expect((await put(`${base}/tiles/demo.json`, JSON.stringify(tile()))).status).toBe(405)
     expect(await readdir(root)).toEqual([])
   })
 })
@@ -241,10 +221,10 @@ describe("PUT /data/", () => {
 describe("data client", () => {
   test("save, list and load round-trip through the endpoint", async () => {
     const base = await serve()
-    expect(await data.list("recipes/stalls", fetch, base)).toEqual([])
-    expect(await data.save("recipes/stalls", "demo", stall(), fetch, base)).toEqual({ ok: true })
-    expect(await data.list("recipes/stalls", fetch, base)).toEqual(["demo"])
-    expect(await data.load("recipes/stalls", "demo", fetch, base)).toEqual(stall())
+    expect(await data.list("tiles", fetch, base)).toEqual([])
+    expect(await data.save("tiles", "demo", tile(), fetch, base)).toEqual({ ok: true })
+    expect(await data.list("tiles", fetch, base)).toEqual(["demo"])
+    expect(await data.load("tiles", "demo", fetch, base)).toEqual(tile())
   })
 
   test("a refused save returns the status and problems; a missing file loads as null", async () => {
@@ -266,29 +246,29 @@ describe("showcase data", () => {
   test("copyData ships mounts and every valid id, and an index of each folder's ids", async () => {
     const from = await mkdtemp(join(tmpdir(), "gh-showcase-from-"))
     const out = await mkdtemp(join(tmpdir(), "gh-showcase-out-"))
-    await mkdir(join(from, "recipes/houses"), { recursive: true })
+    await mkdir(join(from, "tiles"), { recursive: true })
     await writeFile(join(from, "mounts.json"), "{}\n")
-    await writeFile(join(from, "recipes/houses/cottage.json"), "{}\n")
-    await writeFile(join(from, "recipes/houses/Not An Id.json"), "{}\n")
-    await writeFile(join(from, "recipes/houses/notes.txt"), "x")
-    expect(await copyData(from, out)).toEqual({ "recipes/houses": ["cottage"] })
+    await writeFile(join(from, "tiles/cottage.json"), "{}\n")
+    await writeFile(join(from, "tiles/Not An Id.json"), "{}\n")
+    await writeFile(join(from, "tiles/notes.txt"), "x")
+    expect(await copyData(from, out)).toEqual({ tiles: ["cottage"] })
     expect(JSON.parse(await readFile(join(out, "index.json"), "utf8"))).toEqual({
-      "recipes/houses": ["cottage"],
+      tiles: ["cottage"],
     })
-    expect((await readdir(join(out, "recipes/houses"))).sort()).toEqual(["cottage.json"])
+    expect((await readdir(join(out, "tiles"))).sort()).toEqual(["cottage.json"])
     expect(await readFile(join(out, "mounts.json"), "utf8")).toBe("{}\n")
     await rm(from, { recursive: true })
     await rm(out, { recursive: true })
   })
 
   test("a static build lists a folder from the index; a folder it does not name is empty", async () => {
-    const index = { "recipes/houses": ["cottage", "tavern"] }
+    const index = { tiles: ["cottage", "tavern"] }
     const asked: string[] = []
     const fetcher = async (url: string) => {
       asked.push(url)
       return { ok: true, status: 200, json: async () => index } as never
     }
-    expect(await data.list("recipes/houses", fetcher, "/data", true)).toEqual(["cottage", "tavern"])
+    expect(await data.list("tiles", fetcher, "/data", true)).toEqual(["cottage", "tavern"])
     expect(await data.list("npcs", fetcher, "/data", true)).toEqual([])
     expect(asked).toEqual(["/data/index.json", "/data/index.json"])
   })

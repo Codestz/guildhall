@@ -13,7 +13,6 @@
  */
 import { Captions, ChapterChip, holdHudStyle, Timeline } from "@guildhall/ui"
 import { useEffect, useMemo, useSyncExternalStore } from "react"
-import { createRoot } from "react-dom/client"
 import { type HallTime, type HistoryRange, nextRate } from "./clock.ts"
 import { SESSION_RATES } from "./feeds/clock.ts"
 import type { HallSession } from "./feeds/session.ts"
@@ -188,25 +187,11 @@ function SessionBar({
   )
 }
 
-/** The bar on its own (a Studio lab with no site around it): mounted into `host`; returns the unmount. */
-export function mountTimeline(host: HTMLElement, time: HallTime): () => void {
-  const el = document.createElement("div")
-  el.className = "gh hall-timeline-host"
-  host.append(el)
-  const root = createRoot(el)
-  root.render(<HallTimeline time={time} />)
-  return () => {
-    root.unmount()
-    el.remove()
-  }
-}
-
 /**
  * The bar's place off the HUD: bottom centre; on a phone the bottom edge (safe area kept). In the HUD
  * its bottom-centre slot places it (hall/hud/style.ts).
  */
 const CSS = /* css */ `
-.hall-timeline-host { position: absolute; inset: auto 0 0 0; height: 0; z-index: 20; }
 .gh .hall-timeline {
   position: absolute; z-index: 20; bottom: 16px; left: 50%; translate: -50% 0;
   width: min(680px, calc(100% - 32px)); display: flex; flex-direction: column; align-items: center; gap: 10px;

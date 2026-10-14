@@ -36,7 +36,7 @@ describe("the hall's loading order", () => {
     const repo = repoOf(c, "local")
     const built = hallBuild(repo, 4000)
     expect(built.sketch).toBe(false)
-    // the replay's size (replay/: filesAt at the last day), not the query's default
+    // the replay's size (filesAt at the last day), not the query's default
     expect(built.files).toBe(filesAt(c, c.end))
     expect(built.files).not.toBe(4000)
     // and every place ranked under the land the island had at its unit's birth

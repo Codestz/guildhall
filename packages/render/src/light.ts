@@ -255,10 +255,3 @@ export function keyLight(light: DayLight): {
 export function hazeColour(light: DayLight): Color {
   return light.horizon.clone().lerp(light.glow, 0.25 * light.golden)
 }
-
-/** The golden-hour preset (plan §5) on the stage's lights; returns the light it applied. */
-export function goldenHour(stage: Stage): DayLight {
-  const light = lightAt(GOLDEN_HOUR)
-  applyLight(stage, light)
-  return light
-}

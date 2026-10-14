@@ -58,9 +58,8 @@ export interface ScanRow {
 
 export interface PackScan {
   folder: string
-  /** Formats read, and how many files of another format were skipped as duplicates. */
+  /** Formats read. */
   formats: string[]
-  skipped: number
   rows: ScanRow[]
 }
 
@@ -70,15 +69,9 @@ const median = (xs: number[]): number => {
   return s.length === 0 ? 0 : (s[Math.floor(s.length / 2)] as number)
 }
 
-/**
- * The files worth scanning in a raw folder: every glTF/GLB, or the FBX files when the folder has no
- * glTF at all (packs ship the same models in several formats).
- */
-export function pickModelFiles(dir: string): { files: string[]; skipped: number } {
-  const models = listFiles(dir).filter((f) => MODEL_EXTS.includes(extname(f).toLowerCase()))
-  const gltf = models.filter((f) => extname(f).toLowerCase() !== ".fbx")
-  const files = gltf.length > 0 ? gltf : models
-  return { files, skipped: models.length - files.length }
+/** The files worth scanning in a raw folder: every glTF/GLB. */
+export function pickModelFiles(dir: string): string[] {
+  return listFiles(dir).filter((f) => MODEL_EXTS.includes(extname(f).toLowerCase()))
 }
 
 function triangleCount(prim: Primitive): number {
@@ -179,10 +172,10 @@ export function scanDocument(doc: Document, source: string, name: string, format
   return row
 }
 
-export async function scanFile(file: string, source: string, cacheDir: string): Promise<ScanRow> {
+export async function scanFile(file: string, source: string): Promise<ScanRow> {
   const format = extname(file).slice(1).toLowerCase()
   try {
-    return scanDocument(await readModel(file, cacheDir), source, stem(file), format)
+    return scanDocument(await readModel(file), source, stem(file), format)
   } catch (err) {
     return {
       source,
@@ -202,18 +195,13 @@ export function rawFolders(raw: string): string[] {
 }
 
 /** Scans one raw folder; with a pack config, only the files it includes. */
-export async function scanPack(
-  raw: string,
-  folder: string,
-  cacheDir: string,
-  pack?: PackConfig,
-): Promise<PackScan> {
+export async function scanPack(raw: string, folder: string, pack?: PackConfig): Promise<PackScan> {
   const dir = join(raw, folder)
-  const picked = pack ? { files: discover(pack, raw).map((p) => p.source), skipped: 0 } : pickModelFiles(dir)
+  const files = pack ? discover(pack, raw).map((p) => p.source) : pickModelFiles(dir)
   const rows: ScanRow[] = []
-  for (const f of picked.files) rows.push(await scanFile(join(dir, f), f, cacheDir))
+  for (const f of files) rows.push(await scanFile(join(dir, f), f))
   const formats = [...new Set(rows.map((r) => r.format))].sort()
-  return { folder, formats, skipped: picked.skipped, rows }
+  return { folder, formats, rows }
 }
 
 const SCALE_HINTS: [label: string, pattern: RegExp][] = [
@@ -266,7 +254,7 @@ export function scanMarkdown(scans: readonly PackScan[]): string {
     // A skinned file's mesh and armature are siblings: that is one character, not a split candidate.
     const multi = ok.filter((r) => !r.skinned && (r.nodes ?? 0) > 1).length
     lines.push(
-      `- files: ${s.rows.length} (${s.formats.join(", ")})${s.skipped ? `, ${s.skipped} in other formats skipped` : ""}${bad.length ? `, **${bad.length} failed**` : ""}`,
+      `- files: ${s.rows.length} (${s.formats.join(", ")})${bad.length ? `, **${bad.length} failed**` : ""}`,
       `- colour: ${ranked.map(([k, n]) => `${k} ${n}`).join(", ") || "none"}${top ? ` → mode \`${MODE_FOR[top]}\`` : ""}`,
       `- textures: ${
         images.size === 0

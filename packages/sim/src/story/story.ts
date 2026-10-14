@@ -1,5 +1,5 @@
 // From V1 hall (main:packages/hall/src/guild/story.ts): the phrase grammar and the narrator.
-import { type Craft, commandGist, deedCraft, plainPattern } from "@guildhall/core"
+import { type Craft, commandGist, deedCraft, fnv1a, plainPattern } from "@guildhall/core"
 import type { Entry, Session } from "../guild/model.ts"
 import type { Renown } from "./renown.ts"
 import type { StoryMoment as Moment } from "./teller.ts"
@@ -86,16 +86,6 @@ export function quote(text: string, max = 64): string {
 function sentence(text: string): string {
   const t = text.trim()
   return /[.!?…]["”’)]?$/.test(t) ? t : `${t}.`
-}
-
-/** FNV-1a: a stable 32-bit hash, so a beat picks the same words every time it is told. */
-export function hash(text: string): number {
-  let h = 0x811c9dc5
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i)
-    h = Math.imul(h, 0x01000193)
-  }
-  return h >>> 0
 }
 
 export function pick<T>(items: readonly T[], seed: number): T {
@@ -546,7 +536,7 @@ export function lineOf(
 ): CaptionPart[] {
   const first = moments[0] as Moment
   // Seeded by who (their session id), not by what they are called: Settings → Names never rewords a line.
-  const seed = hash(moments.map((m) => `${m.kind}|${m.id}|${m.at}|${"call" in m ? m.call : ""}`).join(";"))
+  const seed = fnv1a(moments.map((m) => `${m.kind}|${m.id}|${m.at}|${"call" in m ? m.call : ""}`).join(";"))
   const line = new Line()
   const actors = actorsOf(moments)
   const many = actors.length > 1
@@ -959,7 +949,7 @@ export function nth(n: number): string {
  */
 export function renownLine(renown: Renown): CaptionPart[] {
   const line = new Line()
-  const seed = hash(renown.key)
+  const seed = fnv1a(renown.key)
   const who = renown.hero ? line.who(renown.hero) : undefined
   const f = renown.facts
   switch (renown.kind) {

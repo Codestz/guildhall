@@ -245,7 +245,7 @@ describe("normalize: reference scale", () => {
     const p = (await fixturePacks()).find((x) => x.id === "fixture-colormap") as PackConfig
     const [source] = discover(p, FIXTURES)
     if (!source) throw new Error("fixture missing")
-    const doc = await readModel(source.file, tempDir())
+    const doc = await readModel(source.file)
     const out = startReport(source, doc)
     const ctx: StageCtx = { ...ctxFor(doc, p), source, out }
     await normalize(doc, ctx)
@@ -259,7 +259,7 @@ describe("normalize: reference scale", () => {
     const mixed = { ...p, scaleBy: [{ match: "wall*", ref: "wall-door", metres: 1.5 }] }
     const [source] = discover(mixed, FIXTURES)
     if (!source) throw new Error("fixture missing")
-    const doc = await readModel(source.file, tempDir())
+    const doc = await readModel(source.file)
     const ctx: StageCtx = { ...ctxFor(doc, mixed), source, out: startReport(source, doc) }
     await normalize(doc, ctx)
     expect(ctx.out.scale?.factor).toBe(1.5)
@@ -270,7 +270,7 @@ describe("normalize: reference scale", () => {
     const broken = { ...p, scale: { ref: "no-such-piece", measure: "height" as const, metres: 3 } }
     const [source] = discover(broken, FIXTURES)
     if (!source) throw new Error("fixture missing")
-    const doc = await readModel(source.file, tempDir())
+    const doc = await readModel(source.file)
     const ctx: StageCtx = { ...ctxFor(doc, broken), source, out: startReport(source, doc) }
     await expect(normalize(doc, ctx)).rejects.toThrow('scale ref "no-such-piece" matches no piece')
   })

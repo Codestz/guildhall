@@ -22,7 +22,7 @@ export const nature = (key: keyof typeof NATURE_CHOSEN | "pine" | "rock", label:
 })
 
 /** The nature families' sizes, multipliers on what the tile prefabs author (`?tree=` … `?flower=`). */
-export const NATURE_SIZES = [
+const NATURE_SIZES = [
   nature("tree", "Leaf trees"),
   nature("pine", "Pines"),
   nature("bush", "Bushes"),

@@ -9,7 +9,6 @@
  *   walls, doors and people near the view are lit too. Each fades out before it is handed to another
  *   lamp, and the count never changes (a change would recompile every lit material).
  */
-import type { LightKind, LightPoint } from "@guildhall/world"
 import {
   AdditiveBlending,
   Color,
@@ -33,6 +32,15 @@ const HANDOVER = 6
 const POOL_Y = 0.05
 
 /** Per kind: how strong its pool and halo are, the halo's radius (m), and whether it flickers (fire). */
+export type LightKind = "street" | "market" | "torch" | "door" | "pier"
+
+/** One light: its kind, where the flame or glass is (`[x, y, z]`, metres) and its pool's radius. */
+export interface LightPoint {
+  kind: LightKind
+  at: [x: number, y: number, z: number]
+  radius: number
+}
+
 const LOOK: Readonly<Record<LightKind, { pool: number; halo: number; size: number; fire: boolean }>> = {
   street: { pool: 1, halo: 1, size: 1.7, fire: false },
   market: { pool: 1.15, halo: 1.1, size: 2.2, fire: false },

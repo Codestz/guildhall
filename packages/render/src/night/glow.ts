@@ -44,8 +44,6 @@ export function setGlow(level: number): void {
   uniforms.uGlow.value = Math.min(1, Math.max(0, level))
 }
 
-export const glowLevel = (): number => uniforms.uGlow.value
-
 /**
  * The night grade, 0 (day) to 1 (deep night): what only moonlight lights goes moonlit blue (night
  * vision), what a lamp or a window lights keeps its colour, as V1's grade did without a post pass.

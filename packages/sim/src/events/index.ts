@@ -56,5 +56,4 @@ export {
   type Work,
   type WorldEvent,
   type WorldHappening,
-  type WorldKind,
 } from "./world.ts"

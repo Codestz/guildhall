@@ -42,7 +42,7 @@ export type { Catalog, CatalogQuery, Facets } from "./query.ts"
 export { createCatalog } from "./query.ts"
 export type { Recipe, RecipeInstance } from "./recipe.ts"
 export { recipeHash } from "./recipe.ts"
-export { checkScale, DOOR_TOP, HERO_HEIGHT, SCALE_TARGETS, STOREY } from "./scale.ts"
+export { checkScale, DOOR_TOP, HERO_HEIGHT, SCALE_TARGETS } from "./scale.ts"
 export { validateEntry, validateIndex } from "./validate.ts"
 
 import paletteJson from "./palette.json" with { type: "json" }

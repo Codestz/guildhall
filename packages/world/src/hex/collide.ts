@@ -260,27 +260,6 @@ export function pieceFootprint(p: PlacedPiece): Solid | null {
   return solidFrom(kind, c, p.y, p.piece)
 }
 
-/** The convex hull of x, z pairs (monotone chain). */
-export function convexHull(xz: readonly number[]): number[] {
-  const p: [number, number][] = []
-  for (let k = 0; k < xz.length; k += 2) p.push([xz[k]!, xz[k + 1]!])
-  p.sort((a, b) => a[0] - b[0] || a[1] - b[1])
-  if (p.length < 3) return p.flat()
-  const cross = (o: [number, number], a: [number, number], b: [number, number]) =>
-    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
-  const lo: [number, number][] = []
-  for (const q of p) {
-    while (lo.length >= 2 && cross(lo[lo.length - 2]!, lo[lo.length - 1]!, q) <= 0) lo.pop()
-    lo.push(q)
-  }
-  const up: [number, number][] = []
-  for (const q of p.reverse()) {
-    while (up.length >= 2 && cross(up[up.length - 2]!, up[up.length - 1]!, q) <= 0) up.pop()
-    up.push(q)
-  }
-  return [...lo.slice(0, -1), ...up.slice(0, -1)].flat()
-}
-
 /**
  * The signed distance from (x, z) to a solid's outline: negative inside. `out` (if given) takes the unit
  * direction that leads out of it the shortest way.

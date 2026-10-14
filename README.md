@@ -169,7 +169,7 @@ short:
 ## The Studio
 
 <p align="center">
-  <img src=".github/media/v2-studio.webp" alt="The Studio's home: 'Guildhall Studio, Events in. A living world out.', a live tile preview of a canteen with its beer garden, and counts: 1,525 pieces, 17 packs, 83 tile prefabs, 236 activity spots, 310 animation clips." width="100%" />
+  <img src=".github/media/v2-studio.webp" alt="The Studio's home: 'Guildhall Studio, Events in. A living world out.', a live tile preview of a canteen with its beer garden, and counts: 1,525 pieces, 17 packs, 82 tile prefabs, 232 activity spots, 310 animation clips." width="100%" />
 </p>
 
 The Studio is where the world is made: pieces and palette at true scale, the tile composer, the hex

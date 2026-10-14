@@ -120,8 +120,6 @@ export type WorldHappening =
 
 export type PrState = "opened" | "updated" | "merged" | "closed"
 
-export type WorldKind = WorldHappening["kind"]
-
 /**
  * One world event. `at` is ms on the source's clock (epoch ms live and in chronicles), never
  * decreasing along a log; `seq` grows by one per event a normaliser makes; `src` says what made it:

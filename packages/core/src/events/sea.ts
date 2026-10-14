@@ -64,8 +64,6 @@ export type SeaEvent =
   /** It was closed, however it was resolved. */
   | (Issue & { kind: "issue_closed" })
 
-export type SeaKind = SeaEvent["kind"]
-
 /** A sea event as the hub sends and records it: for one guild (a repo's events go to each of its guilds). */
 export interface SeaRecord {
   v: 1

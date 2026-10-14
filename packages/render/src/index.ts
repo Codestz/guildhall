@@ -59,7 +59,6 @@ export {
   applyLight,
   type DayLight,
   GOLDEN_HOUR,
-  goldenHour,
   keyLight,
   lightAt,
   moonAt,

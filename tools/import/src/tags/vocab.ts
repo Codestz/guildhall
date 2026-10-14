@@ -29,7 +29,6 @@ export type TagCache = Record<string, TagAnswer>
 
 export const VOCAB_FILE = resolve(import.meta.dir, "../../tags/vocab.json")
 
-export const tagsDir = (library: string): string => join(library, "tags")
 export const batchDir = (library: string): string => join(library, "tags", "batches")
 export const cacheFile = (library: string): string => join(library, "tags", "cache.json")
 

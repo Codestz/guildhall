@@ -167,6 +167,3 @@ export function nextRate(rate: number, rates: readonly number[] = RATES): number
   const at = rates.indexOf(rate)
   return rates[(at + 1) % rates.length] ?? 1
 }
-
-/** "1×", "0.5×". */
-export const rateLabel = (rate: number): string => `${rate}×`

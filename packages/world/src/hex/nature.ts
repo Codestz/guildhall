@@ -8,6 +8,8 @@
  * a building or a castle further than it already reaches today (`growNature`): a tree by a street keeps
  * its size, the wood behind it grows.
  */
+import { hash2 } from "../geom/noise.ts"
+import type { RegionKind } from "./regions.ts"
 import { HEX_TILE_SIZE, type PlacedPiece, type TilePiece, type TilePrefab } from "./tiles.ts"
 
 export interface HexNature {
@@ -227,4 +229,238 @@ export function growNature(
     }
   }
   return { grown, held }
+}
+
+// ---- the regions' nature (regions.ts): the same tiles, dressed for their stretch of country ----
+
+/**
+ * Foliage tones (palette swatch → swatch, over KayKit's leaf and grass greens and pine) the regions lay
+ * over their nature: the KayKit palette's own autumn, orange and dry-grass ramps, so a turned wood is
+ * still the house style.
+ */
+export const REGION_TONES = {
+  /** An autumn wood: rust and orange. */
+  rust: { 0: 27, 1: 36, 2: 37, 33: 27, 34: 36, 35: 37 },
+  /** An autumn wood: orange. */
+  orange: { 0: 36, 1: 37, 2: 56, 33: 36, 34: 37, 35: 55 },
+  /** An autumn wood: gold. */
+  gold: { 0: 4, 1: 55, 2: 56, 33: 3, 34: 54, 35: 56 },
+  /** The dry south: straw and ochre. */
+  dry: { 0: 3, 1: 4, 2: 5, 33: 3, 34: 4, 35: 5 },
+  /** The highlands' pines: deep and dark. */
+  pine: { 0: 33, 1: 34, 2: 34, 34: 33 },
+  /** The highlands' and the marsh's ground cover: olive and moss. */
+  olive: { 0: 34, 1: 35, 2: 35, 34: 34 },
+  /** The marsh's reeds: olive with straw tips. */
+  reed: { 0: 34, 1: 35, 2: 4, 34: 35 },
+} satisfies Record<string, Record<number, number>>
+
+/** `tone` laid over a piece's own re-tint: each swatch goes through its map, then through the tone. */
+export function overTone(
+  map: Record<number, number> | undefined,
+  tone: Record<number, number>,
+): Record<number, number> {
+  const out: Record<number, number> = {}
+  const from = new Set([...Object.keys(map ?? {}), ...Object.keys(tone)].map(Number))
+  for (const s of [...from].sort((a, b) => a - b)) {
+    const mid = map?.[s] ?? s
+    out[s] = tone[mid] ?? mid
+  }
+  return out
+}
+
+/** Heights of the KayKit trees as imported (catalog sizes), metres at scale 1: a swap keeps a tree's height. */
+const TREE_HEIGHT: Record<string, number> = {
+  "tree-1-a": 4.16,
+  "tree-1-b": 4.93,
+  "tree-1-c": 7.81,
+  "tree-2-a": 4.67,
+  "tree-2-b": 6.04,
+  "tree-2-c": 6.92,
+  "tree-2-d": 8.09,
+  "tree-2-e": 8.79,
+  "tree-3-a": 3.51,
+  "tree-3-b": 4.35,
+  "tree-3-c": 5.79,
+  "tree-4-a": 5.27,
+  "tree-4-b": 6.94,
+  "tree-4-c": 10.77,
+  "tree-bare-1-b": 3.25,
+  "tree-bare-1-c": 5.26,
+  "tree-bare-2-b": 5.54,
+}
+const kaykitName = (piece: string) => /^kaykit-forest\/(.+)-color1$/.exec(piece)?.[1]
+const KF = (name: string) => `kaykit-forest/${name}-color1`
+
+/**
+ * `p` as another KayKit tree of about its height (`k` of it), never reaching further round its trunk
+ * than it did: a leaf tree as a pine on the hills, as a bare one in the dry south.
+ */
+function swapTree(p: PlacedPiece, to: string, k: number): PlacedPiece {
+  const from = kaykitName(p.piece)
+  const h0 = (from && TREE_HEIGHT[from]) || 5
+  const h1 = TREE_HEIGHT[to] ?? 5
+  const reach = natureReach(p.piece) * p.scale
+  let scale = (p.scale * h0 * k) / h1
+  const unit = natureReach(KF(to))
+  if (unit > 0) scale = Math.min(scale, reach / unit)
+  const { swatchMap: _, ...rest } = p
+  return { ...rest, piece: KF(to), scale }
+}
+
+/** One tile of a region, as `dressRegion` dresses it. */
+export interface RegionTile {
+  kind: RegionKind
+  /** How strongly the tile is its region's country, 0–1 (regions.ts). */
+  weight: number
+  /** The tile's index (its draws' seed) and centre. */
+  i: number
+  at: [number, number]
+  /** Its top. */
+  y: number
+  /** A lake tile: the marsh lays lilies on it. */
+  lake: boolean
+  /** Open dry ground with no way over it: it may take new ground cover (reeds, flowers). */
+  open: boolean
+}
+
+/** How far under its tile's top a lily floats: the inland water's surface (the Studio's SURFACE_DROP), a hair over it. */
+export const LILY_DROP = 0.13
+
+/** A point `k` of the way out from a tile's centre toward its rim, at angle `a`. */
+const rimAt = (t: RegionTile, k: number, a: number): [number, number] => {
+  const r = HEX_TILE_SIZE * (SQ3 / 2) * k
+  return [t.at[0] + Math.cos(a) * r, t.at[1] + Math.sin(a) * r]
+}
+
+const AUTUMN = [REGION_TONES.rust, REGION_TONES.orange, REGION_TONES.orange, REGION_TONES.gold]
+
+/**
+ * The pieces of one tile as its region dresses them (pure; `pieces` is not changed). The rim's tiles
+ * (weight under 1) change only some of their pieces, so a region fades in over a few tiles:
+ *
+ * - highlands: leaf trees become pines or go (the woods thin), bushes and flowers thin, the cover goes olive;
+ * - dry: trees thin, some stand bare, the rest and the shrubs go straw and ochre, flowers and crops thin;
+ * - autumn: the leaf trees and bushes turn rust, orange and gold (the pines stay green);
+ * - marsh: the trees thin, reeds stand in the wet ground, lilies float on the lake;
+ * - meadow: drifts of flowers on the open ground.
+ *
+ * What it adds is soft ground cover only (reeds, lilies, flowers), never a solid; what it swaps reaches
+ * no further than what stood there.
+ */
+export function dressRegion(pieces: readonly PlacedPiece[], t: RegionTile, seed: number): PlacedPiece[] {
+  const w = t.weight
+  const out: PlacedPiece[] = []
+  const roll = (k: number, salt: number) => hash2(seed + 1301 + salt, t.i, k)
+  pieces.forEach((p) => {
+    // each piece rolls by where it stands, so a piece thinned out by a knob changes no other piece's roll
+    const k = Math.round(p.x * 64) * 7919 + Math.round(p.z * 64)
+    const fam = natureFamily(p.piece)
+    const crop = p.piece.startsWith("kenney-nature/crops-") || p.piece.startsWith("kenney-nature/crop-")
+    // the rim's fade: this piece takes the region's look or keeps the island's
+    if (roll(k, 1) >= w || (!fam && !(crop && t.kind === "dry"))) {
+      out.push(p)
+      return
+    }
+    const name = kaykitName(p.piece) ?? ""
+    const leafTree = fam === "tree" && !name.startsWith("tree-bare")
+    const r = roll(k, 2)
+    const tone = (m: Record<number, number>): PlacedPiece => ({ ...p, swatchMap: overTone(p.swatchMap, m) })
+    if (t.kind === "highlands") {
+      if (leafTree) {
+        if (r < 0.35) return
+        const pine = swapTree(p, (TREE_HEIGHT[name] ?? 5) < 6 ? "tree-4-b" : "tree-4-c", 1.05)
+        out.push({ ...pine, swatchMap: overTone(undefined, REGION_TONES.pine) })
+      } else if (fam === "pine") {
+        if (r >= 0.2) out.push(tone(REGION_TONES.pine))
+      } else if (fam === "bush") {
+        if (r >= 0.45) out.push(tone(REGION_TONES.olive))
+      } else if (fam === "flower") {
+        if (r >= 0.6) out.push(p)
+      } else if (fam === "grass") out.push(tone(REGION_TONES.olive))
+      else out.push(p)
+    } else if (t.kind === "dry") {
+      if (crop) {
+        if (r >= 0.4) out.push(p)
+      } else if (leafTree) {
+        if (r < 0.4) return
+        if (r < 0.65) {
+          const bare = ["tree-bare-1-c", "tree-bare-2-b", "tree-bare-1-b"][Math.floor(roll(k, 3) * 3)]!
+          out.push(swapTree(p, bare, 0.85))
+        } else out.push(tone(REGION_TONES.dry))
+      } else if (fam === "bush") {
+        if (r >= 0.3) out.push(tone(REGION_TONES.dry))
+      } else if (fam === "flower") {
+        if (r >= 0.7) out.push(p)
+      } else if (fam === "pine" || fam === "grass") out.push(tone(REGION_TONES.dry))
+      else out.push(p)
+    } else if (t.kind === "autumn") {
+      if (leafTree || fam === "bush")
+        out.push(tone(AUTUMN[Math.floor(roll(k, 4) * AUTUMN.length)] ?? REGION_TONES.orange))
+      else if (fam === "grass") out.push(tone(REGION_TONES.olive))
+      else out.push(p)
+    } else if (t.kind === "marsh") {
+      if (leafTree) {
+        if (r >= 0.3) out.push(tone(REGION_TONES.olive))
+      } else if (fam === "grass" || fam === "bush") out.push(tone(REGION_TONES.olive))
+      else out.push(p)
+    } else out.push(p)
+  })
+  if (t.kind === "marsh" && t.open && w > 0.2) {
+    // reeds standing in the wet ground
+    const n = Math.round(4 + 10 * w)
+    for (let k = 0; k < n; k++) {
+      if (roll(k, 11) > w + 0.15) continue
+      const [x, z] = rimAt(t, 0.25 + 0.65 * roll(k, 12), roll(k, 13) * Math.PI * 2)
+      out.push({
+        piece: KF(roll(k, 14) < 0.6 ? "grass-2-a" : "grass-1-a"),
+        x,
+        y: t.y,
+        z,
+        rot: roll(k, 15) * Math.PI * 2,
+        scale: 2 + 1.1 * roll(k, 16),
+        swatchMap: overTone(undefined, REGION_TONES.reed),
+      })
+    }
+  }
+  if (t.kind === "marsh" && t.lake && w > 0.3) {
+    // lilies floating on the lake
+    const n = 1 + Math.floor(3 * w * roll(0, 21) + 0.5)
+    for (let k = 0; k < n; k++) {
+      const [x, z] = rimAt(t, 0.15 + 0.55 * roll(k, 22), roll(k, 23) * Math.PI * 2)
+      out.push({
+        piece: roll(k, 24) < 0.5 ? "kenney-nature/lily-large" : "kenney-nature/lily-small",
+        x,
+        y: t.y - LILY_DROP,
+        z,
+        rot: roll(k, 25) * Math.PI * 2,
+        scale: 1 + 0.5 * roll(k, 26),
+      })
+    }
+  }
+  if (t.kind === "meadow" && t.open && w > 0.2) {
+    // two or three drifts of flowers, each of one colour
+    const colours = ["red", "yellow", "purple", "yellow"]
+    const drifts = 3 + Math.floor(roll(0, 31) * 2)
+    for (let d = 0; d < drifts; d++) {
+      if (roll(d, 32) > w + 0.1) continue
+      const colour = colours[Math.floor(roll(d, 33) * colours.length)]!
+      const [cx, cz] = rimAt(t, 0.15 + 0.35 * roll(d, 34), roll(d, 35) * Math.PI * 2)
+      const n = 4 + Math.floor(roll(d, 36) * 5)
+      for (let k = 0; k < n; k++) {
+        const j = d * 16 + k
+        const a = roll(j, 37) * Math.PI * 2
+        const rr = 0.2 + 0.75 * roll(j, 38)
+        out.push({
+          piece: `kenney-nature/flower-${colour}-${"abc"[Math.floor(roll(j, 39) * 3)]}`,
+          x: cx + Math.cos(a) * rr,
+          y: t.y,
+          z: cz + Math.sin(a) * rr,
+          rot: roll(j, 40) * Math.PI * 2,
+          scale: 1.2 + 0.5 * roll(j, 41),
+        })
+      }
+    }
+  }
+  return out
 }

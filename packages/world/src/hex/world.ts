@@ -24,12 +24,14 @@ import { seatTiles } from "./ground.ts"
 import { type HexIsland, kindOf } from "./island.ts"
 import {
   BUILDING_REACH,
+  dressRegion,
   growNature,
   type HexNature,
   isBuildingPiece,
   isDefaultNature,
   natureOdds,
 } from "./nature.ts"
+import { type HexRegions, hexRegions, regionOf } from "./regions.ts"
 import { GRAZE, type Strip, StripGrid, stripIntrusion, tileStrips, wayStrip } from "./roads.ts"
 
 /** The castle's curtain wall and its gate (tiles.ts `castleWalls`): laid clear of its ways as it is built. */
@@ -144,6 +146,11 @@ export interface HexWorld {
   board?: NoticeBoardPlace | null
   /** The graveyard (graveyard.ts): its tiles, its gate and its graves in the world; null without one. */
   graveyard: HexGraveyard | null
+  /**
+   * The island's regions (regions.ts): which stretches of country read as highlands, dry south, autumn
+   * woods, marsh or meadow, their nature dressed for it; null when built without (`regions: false`).
+   */
+  regions: HexRegions | null
   /** Metres per height level this world was built with. */
   step: number
   /** The island's ground height at a point (the top of the tile under it; 0 off the island). */
@@ -158,6 +165,31 @@ export interface HexWorld {
     nature?: { grown: number; held: number }
   }
 }
+
+/** The tiles a region leaves as they are: the ways, the buildings, the docks, the graveyard. */
+const REGION_FIXED = new Set<TileUse>([
+  "road",
+  "bridge",
+  "square",
+  "building",
+  "landmark",
+  "dock",
+  "graveyard",
+  "court",
+])
+/** The prefabs whose open ground a region may add its soft cover to (reeds, flowers). */
+const REGION_OPEN = new Set([
+  "meadow",
+  "pasture",
+  "orchard",
+  "hillside",
+  "reeds",
+  "woods",
+  "woods-dense",
+  "woods-light",
+  "woods-clearing",
+  "pines",
+])
 
 /** The castle's yards in the order they are given out, nearest its heart first. */
 const YARD_THEMES = ["castle-well", "castle-drill", "castle-stables", "castle-stores"]
@@ -310,11 +342,12 @@ const BY_USE: Record<string, string> = {
  * `agents` (default 3) is how many agents the guild has: with the repo's files it sets the Guildhall's
  * tier (`castleTier`; give hexZones the same count so its castle zone is that tier's size). `nature`
  * scales and thins the nature (nature.ts; give hexZones its `wild`): left out, today's island.
+ * `regions` (default true) gives the island its regions (regions.ts) and dresses their nature.
  */
 export function hexWorld(
   h: HexIsland,
   z: HexZones,
-  opts: { step?: number; agents?: number; nature?: HexNature } = {},
+  opts: { step?: number; agents?: number; nature?: HexNature; regions?: boolean } = {},
 ): HexWorld {
   const STEP = opts.step ?? LEVEL_STEP
   const tier = opts.agents === undefined ? z.tier : castleTier(h.spec.files, opts.agents)
@@ -1183,6 +1216,51 @@ export function hexWorld(
       ...(mirror ? { mirror } : {}),
     })
   }
+  // ---- the regions (regions.ts): their country's nature dressed for it, the places left as they are ----
+  const regions = opts.regions === false ? null : hexRegions(h, z)
+  if (regions) {
+    const byOwn = new Map<number, PlacedPiece[]>()
+    const rest: PlacedPiece[] = []
+    for (const p of pieces) {
+      const i = tileAt(p.x, p.z)
+      if (i < 0 || !byTile.has(i) || !regionOf(regions, i)) {
+        rest.push(p)
+        continue
+      }
+      if (!byOwn.has(i)) byOwn.set(i, [])
+      byOwn.get(i)!.push(p)
+    }
+    const out: PlacedPiece[] = []
+    for (const t of tiles) {
+      const r = regionOf(regions, t.i)
+      const own = byOwn.get(t.i) ?? []
+      const fixed =
+        REGION_FIXED.has(useOf(z, t.i)) ||
+        claimedBy.has(t.i) ||
+        grounds.has(t.i) ||
+        zoneAt(t.i)?.kind === "castle" ||
+        [...g.neighbours(t.i)].some((j) => j >= 0 && zoneAt(j)?.kind === "castle")
+      if (!r || fixed) {
+        out.push(...own)
+        continue
+      }
+      const open =
+        t.ground === "grass" && !t.paths?.length && (t.prefab === null || REGION_OPEN.has(t.prefab))
+      const lake = kindOf(h, t.i) === "lake"
+      const tile = {
+        kind: r.kind,
+        weight: r.weight,
+        i: t.i,
+        at: [t.x, t.z] as [number, number],
+        y: t.top,
+        lake,
+        open,
+      }
+      out.push(...dressRegion(own, tile, seed))
+    }
+    pieces.length = 0
+    pieces.push(...rest, ...out)
+  }
   /** The tile under a point (pixel → axial, pointy top, cube rounding), or -1 off the grid. */
   function tileAt(x: number, zz: number): number {
     const qf = ((Math.sqrt(3) / 3) * x - zz / 3) / R
@@ -1436,6 +1514,7 @@ export function hexWorld(
     decks,
     board,
     graveyard: builtGraveyard,
+    regions,
     step: STEP,
     heightAt,
     stairAt,

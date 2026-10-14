@@ -597,10 +597,26 @@ export function HallHud(props: HallHudProps) {
         document.querySelector<HTMLElement>(".hall-places .hud-panel-head button, .hall-place-row")?.focus()
     } else if (before && !state.open && lost)
       (
+        (phone ? hud.rail.querySelector<HTMLElement>("[data-menu-toggle]") : null) ??
         hud.rail.querySelector<HTMLElement>(`[data-panel="${before === "dossier" ? "places" : before}"]`) ??
         document.querySelector<HTMLElement>(".hud-badges-expand, .hud-chron-open")
       )?.focus()
-  }, [state.open, hud, picked])
+    // a panel opened from its control (the rail's icon, the badge bar's expander, the Chronicle chip) takes
+    // the focus: the panels come before the rail in reading order, so Tab from the icon would pass them by
+    const panel = { places: ".hall-places", roster: ".hud-roster", chronicle: ".hall-feed" }[
+      state.open as string
+    ]
+    if (panel && before !== state.open && !phone) {
+      const at = document.activeElement
+      const fromControl =
+        lost ||
+        (at instanceof HTMLElement && at.matches(".hall-rail-btn, .hud-badges-expand, .hud-chron-open"))
+      if (fromControl)
+        document
+          .querySelector<HTMLElement>(`${panel} .hall-place-row, ${panel} .hud-panel-head button`)
+          ?.focus({ preventScroll: true })
+    }
+  }, [state.open, hud, picked, phone])
   // the card's picture is the island as it is drawn now
   useEffect(() => {
     if (state.open !== "card") return
@@ -899,15 +915,41 @@ export function HallHud(props: HallHudProps) {
   if (sheet && tab)
     sheet = (
       <div className="ui-panel hall-menu" data-tab={TAB_LABEL[tab].toLowerCase()}>
-        <div className="hall-tabs" role="tablist" aria-label="Menu">
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: the arrow keys of a tab list are heard on the list */}
+        <div
+          className="hall-tabs"
+          role="tablist"
+          aria-label="Menu"
+          onKeyDown={(event) => {
+            const at = tabs.indexOf(tab)
+            const to =
+              event.key === "ArrowRight"
+                ? (at + 1) % tabs.length
+                : event.key === "ArrowLeft"
+                  ? (at - 1 + tabs.length) % tabs.length
+                  : event.key === "Home"
+                    ? 0
+                    : event.key === "End"
+                      ? tabs.length - 1
+                      : -1
+            const next = tabs[to]
+            if (!next) return
+            event.preventDefault()
+            hud.dispatch({ type: "open", id: next })
+            document.getElementById(`hall-menu-tab-${next}`)?.focus()
+          }}
+        >
           {tabs.map((t) => (
             <button
               key={t}
+              id={`hall-menu-tab-${t}`}
               type="button"
               role="tab"
               className="hall-tab"
               data-tab={TAB_LABEL[t].toLowerCase()}
               aria-selected={t === tab}
+              aria-controls="hall-menu-panel"
+              tabIndex={t === tab ? 0 : -1}
               onClick={() => hud.dispatch({ type: "open", id: t })}
             >
               {TAB_LABEL[t]}
@@ -923,7 +965,12 @@ export function HallHud(props: HallHudProps) {
             <Glyphs.close size={16} />
           </button>
         </div>
-        <div className="hall-menu-body" role="tabpanel">
+        <div
+          className="hall-menu-body"
+          role="tabpanel"
+          id="hall-menu-panel"
+          aria-labelledby={`hall-menu-tab-${tab}`}
+        >
           {sheet}
         </div>
       </div>
@@ -970,6 +1017,8 @@ export function HallHud(props: HallHudProps) {
               aria-label={state.open ? "Close the menu" : "Menu"}
               title="Menu"
               aria-expanded={state.open !== null}
+              aria-controls="hall-menu-panel"
+              data-menu-toggle=""
               onClick={toggleMenu}
             >
               {state.open ? <Glyphs.close size={18} /> : <Glyphs.menu size={18} />}

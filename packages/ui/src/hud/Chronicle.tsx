@@ -204,6 +204,7 @@ export function Toasts({
         type="button"
         className="ui-panel hud-chron-open"
         onClick={onExpand}
+        aria-expanded="false"
         aria-label={`Expand the ${label.toLowerCase()}`}
       >
         <Glyphs.quest size={14} />

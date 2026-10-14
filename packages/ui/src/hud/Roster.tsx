@@ -421,6 +421,7 @@ export function RosterBadges({
         type="button"
         className="ui-icon-btn hud-badges-expand"
         onClick={onExpand}
+        aria-expanded="false"
         aria-label={more > 0 ? `${more} more heroes: open the guild roster` : "Expand the guild roster"}
         data-more={more > 0 ? "" : undefined}
       >

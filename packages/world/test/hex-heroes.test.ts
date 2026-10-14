@@ -9,6 +9,7 @@ import { afterAll, describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import {
+  BOARD_PIN,
   GATHER_PER_SPOT,
   guildhallZone,
   HERO_SPOTS_MIN,
@@ -94,7 +95,8 @@ describe("every place keeps hero spots", () => {
       const gather = places.heroSpots(home)
       expect(gather.length).toBeGreaterThanOrEqual(HERO_SPOTS_MIN)
       expect(gather.length).toBeLessThanOrEqual(K * GATHER_PER_SPOT)
-      if (files >= 4000) expect(gather).toHaveLength(K * GATHER_PER_SPOT)
+      // (the notice board and its pinning spot may take one seat's room in a crowded court)
+      if (files >= 4000) expect(gather.length).toBeGreaterThanOrEqual(K * GATHER_PER_SPOT - (w.board ? 1 : 0))
       for (const s of gather) expect(z.zones[home]!.tiles).toContain(h.grid.index(...qr(s.at)))
       for (const s of places.heroSpots(home)) expect([s.kind, s.pose]).toEqual(["gather", "gather"])
     }, 30000)
@@ -256,20 +258,27 @@ describe("the gathering two by two, and the notice board", () => {
     expect(paired / all).toBeGreaterThan(0.5)
   })
 
-  test("the board stands on the Guildhall's ground, clear, facing the gathering, with a pinning spot and briefing spots", () => {
+  test("the board is the world's (board.ts): a pinning spot before it and briefing spots, clear of the gathering", () => {
     let boards = 0
-    for (const { seed, h, z, walk, places } of islands) {
+    for (const { seed, h, z, w, walk, places } of islands) {
       const home = guildhallZone(walk, z)
       const board = places.heroSpots.board()
       if (!board) continue
       boards++
       const [bx, , bz] = board.at
-      expect([seed, z.zones[home]!.tiles.includes(h.grid.index(...qr(board.at)))]).toEqual([seed, true])
-      expect(places.furniture.blocked(bx, bz, 0.35)).toBe(false)
+      expect([board.at, board.facing]).toEqual([w.board!.at, w.board!.facing])
+      // on the Guildhall's ground, or the open ground beside it no other place has
+      const tile = h.grid.index(...qr(board.at))
+      const beside = z.zones[home]!.tiles.some((i) => h.grid.neighbours(i).includes(tile)) && !z.zoneOf[tile]
+      expect([seed, z.zones[home]!.tiles.includes(tile) || beside]).toEqual([seed, true])
       const spot = board.spot
       expect([spot.kind, spot.pose, spot.zone]).toEqual(["work", "board", home])
-      // the pinning spot faces the board, 0.8 m before it
-      expect(Math.hypot(spot.at[0] - bx, spot.at[2] - bz)).toBeCloseTo(0.8, 6)
+      expect(spot.node).toBeGreaterThanOrEqual(0)
+      expect(places.furniture.blocked(spot.at[0], spot.at[2], 0.3)).toBe(false)
+      // the pinning spot faces the board, BOARD_PIN before it (a little further or to one side at most)
+      const d = Math.hypot(spot.at[0] - bx, spot.at[2] - bz)
+      expect(d).toBeGreaterThanOrEqual(BOARD_PIN - 1e-6)
+      expect(d).toBeLessThan(BOARD_PIN + 0.8)
       expect(Math.cos(spot.facing - Math.atan2(bx - spot.at[0], bz - spot.at[2]))).toBeCloseTo(1, 6)
       expect(board.brief.length).toBeGreaterThan(0)
       for (const b of [spot, ...board.brief])

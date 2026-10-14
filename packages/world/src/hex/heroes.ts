@@ -19,6 +19,7 @@
  * clear of the pools of the places set out before it, in zone order), in a fixed order, so a place that
  * stays as the island grows keeps its pool.
  */
+import { BOARD_PIN } from "./board.ts"
 import { DOOR_HALF, DOOR_RUN } from "./checks.ts"
 import { type Solid, solidDistance } from "./collide.ts"
 import { hexAt } from "./grid.ts"
@@ -139,11 +140,14 @@ const GATHER_APART = 1.3
 const PAIR_APART = 1.25
 /** The ways a pair may lie across its middle, radians from across the way it faces. */
 const PAIR_TURNS = [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2]
-/** The notice board: its room (no solid nearer its middle), and how far before it one pins, metres. */
-const BOARD_ROOM = 0.35
-const BOARD_ARM = 0.8
-/** A recruit is briefed this far before the pinning spot, metres. */
-const BRIEF_AT = 1.05
+/** Where a recruit may be briefed, radians off the pinning spot's way out and metres beyond it, in turn. */
+const BRIEF_WAYS: readonly (readonly [number, number])[] = [0, 0.6, -0.6, 1.2, -1.2, 1.57, -1.57].flatMap(
+  (t) => [1.05, 0.85, 1.3].map((m) => [t, m] as const),
+)
+/** A briefing spot keeps this far from the gathering's seats, metres (two bodies). */
+const BRIEF_FREE = 0.9
+/** Recruits briefed together stand this far apart at least, metres (two bodies). */
+const BRIEF_APART = 0.8
 /** A body's half-width on the way in: the straight way keeps it clear of buildings, walls and fences. */
 const WAY_BODY = 0.2
 /** The first stretch out of a node the way may pass through a solid (a node in a well's round). */
@@ -157,7 +161,7 @@ export interface HeroPoolInputs {
   h: HexIsland
   z: HexZones
   w: Pick<HexWorld, "tiles"> &
-    Partial<Pick<HexWorld, "stairs" | "bridges" | "doorways" | "stairAt" | "pieces">>
+    Partial<Pick<HexWorld, "stairs" | "bridges" | "doorways" | "stairAt" | "pieces" | "board">>
   walk: HexWalk
   furniture: TileFurniture
   /** Every place's meeting slots (life.ts `LifePlaces.slots`). */
@@ -531,86 +535,77 @@ export function heroSpotPool(inp: HeroPoolInputs, k: number): HeroPool {
     return out
   }
   /**
-   * The notice board: on the Guildhall's own ground, a body's room clear of every solid, road, door and
-   * townsfolk's stand, ~3 m from the gathering's middle and facing it, near the hall's door; the pinning
-   * spot BOARD_ARM before it (a hero spot, reachable), the briefing spots BRIEF_AT further on. None where
-   * nothing fits (a keep too small).
+   * The notice board the world set up (world.ts `board`, board.ts), when it stands on the Guildhall's
+   * ground: the pinning spot BOARD_PIN before it (a hero spot, reachable, facing it; a little further or
+   * to a side if a body has no room there), and the briefing spots BRIEF_AT beyond it, the straight one
+   * first (one at least). None where the world set none.
    */
-  const boardOf = (zi: number, gather: readonly HeroSpot[]): HeroBoard | null => {
-    const zone = z.zones[zi]!
-    const heartNode = walk.hearts[zi] ?? -1
-    if (heartNode < 0 || !zone.tiles.length || gather.length === 0) return null
-    const own = new Set(zone.tiles)
-    const doors = doorways.filter((d) => own.has(d.tile))
-    const hall =
-      doors.find((d) => tileOf.get(d.tile)?.prefab === "great-hall") ??
-      doors.find((d) => d.tile === zone.tile) ??
-      doors[0]
-    /** The board round one heart of the gathering (a pair's middle, or a spot), or null. */
-    const round = (gx: number, gz: number): HeroBoard | null => {
-      const cx = hall?.x ?? gx
-      const cz = hall?.z ?? gz
-      let best: { rank: number; board: HeroBoard } | null = null
-      // ~2.6 m out first, nearer the hall's door first
-      for (let m = 0; m < 14; m++)
-        for (let a = 0; a < 36; a++) {
-          const r = 1.6 + m * 0.3
-          const ang = ((a + (m % 2) * 0.5) / 36) * Math.PI * 2
-          const bx = gx + Math.cos(ang) * r
-          const bz = gz + Math.sin(ang) * r
-          const rank = Math.abs(r - 2.6) + 0.1 * Math.hypot(bx - cx, bz - cz)
-          if (best && rank >= best.rank) continue
-          const i = tileAt(bx, bz)
-          if (!own.has(i)) continue
-          const top = floor(i)
-          if (Number.isNaN(top) || w.stairAt?.(bx, bz) != null) continue
-          if (furniture.blocked(bx, bz, BOARD_ROOM) || strips.on(bx, bz, BOARD_ROOM)) continue
-          if (inDoorway(bx, bz) || nearFolk(bx, bz, false)) continue
-          if (gather.some((s) => Math.hypot(s.at[0] - bx, s.at[2] - bz) < APART)) continue
-          const ux = (gx - bx) / r
-          const uz = (gz - bz) / r
-          const sx = bx + ux * BOARD_ARM
-          const sz = bz + uz * BOARD_ARM
-          if (gather.some((s) => Math.hypot(s.at[0] - sx, s.at[2] - sz) < 0.9)) continue
-          const spot = spotOf(
-            zi,
-            { x: sx, z: sz, facing: headingTo(sx, sz, bx, bz), pose: "board", rank, anchor: -1 },
-            own,
-            "work",
-            false,
-          )
-          if (!spot || Math.abs(floor(tileAt(sx, sz)) - top) > 0.05) continue
-          const brief: LifeSpot[] = []
-          for (const turn of [0, 0.6, -0.6]) {
-            const c = Math.cos(turn)
-            const sn = Math.sin(turn)
-            const px = sx + (ux * c - uz * sn) * BRIEF_AT
-            const pz = sz + (ux * sn + uz * c) * BRIEF_AT
-            if (Math.abs(floor(tileAt(px, pz)) - top) > 0.05) continue
-            if (furniture.blocked(px, pz, ROOM) || inDoorway(px, pz)) continue
-            if (gather.some((g) => Math.hypot(g.at[0] - px, g.at[2] - pz) < 0.9)) continue
-            brief.push({
-              node: spot.node,
-              at: [px, spot.at[1], pz],
-              facing: headingTo(px, pz, sx, sz),
-              ground: true,
-            })
-          }
-          if (!brief.length) continue
-          best = { rank, board: { at: [bx, top, bz], facing: headingTo(bx, bz, gx, gz), spot, brief } }
-        }
-      return best?.board ?? null
+  const boardOf = (zi: number): HeroBoard | null => {
+    const placedBoard = w.board
+    const zone = z.zones[zi]
+    if (!placedBoard || !zone?.tiles.length || (walk.hearts[zi] ?? -1) < 0) return null
+    // (on its ground, or beside it where a young keep's gathering stands too)
+    const own = groundOf(zi, true)
+    const [bx, top, bz] = placedBoard.at
+    if (!own.has(tileAt(bx, bz))) return null
+    const ux = Math.sin(placedBoard.facing)
+    const uz = Math.cos(placedBoard.facing)
+    /** The briefing spots beyond a pinning spot (none where a body has no room). */
+    const briefsOf = (spot: HeroSpot): LifeSpot[] => {
+      const [sx, , sz] = spot.at
+      const out: LifeSpot[] = []
+      for (const [turn, at] of BRIEF_WAYS) {
+        const c = Math.cos(turn)
+        const sn = Math.sin(turn)
+        const px = sx + (ux * c - uz * sn) * at
+        const pz = sz + (ux * sn + uz * c) * at
+        if (Math.abs(floor(tileAt(px, pz)) - top) > 0.05) continue
+        if (furniture.blocked(px, pz, ROOM) || strips.on(px, pz, ROOM) || inDoorway(px, pz)) continue
+        out.push({
+          node: spot.node,
+          at: [px, spot.at[1], pz],
+          facing: headingTo(px, pz, sx, sz),
+          ground: true,
+        })
+      }
+      return out
     }
-    // round the first pair's middle (nearest the hall's door), else round each spot in turn
-    const hearts: [number, number][] = []
-    const [a, b] = gather
-    if (a && b && Math.abs(Math.hypot(a.at[0] - b.at[0], a.at[2] - b.at[2]) - PAIR_APART) < 1e-6)
-      hearts.push([(a.at[0] + b.at[0]) / 2, (a.at[2] + b.at[2]) / 2])
-    for (const s of gather) hearts.push([s.at[0], s.at[2]])
-    for (const [gx, gz] of hearts) {
-      const found = round(gx, gz)
-      if (found) return found
+    const tries = [0, 0.15, 0.3, 0.45].flatMap((out) =>
+      [0, 0.3, -0.3, 0.6, -0.6].map((side) => [
+        bx + ux * (BOARD_PIN + out) + uz * side,
+        bz + uz * (BOARD_PIN + out) - ux * side,
+      ]),
+    )
+    /** A pinning spot at (x, z), clear of the townsfolk's chats too (`strict`) or of their work spots only. */
+    const pinAt = (x: number, zz: number, strict: boolean): HeroSpot | null => {
+      const facing = headingTo(x, zz, bx, bz)
+      if (strict)
+        return spotOf(zi, { x, z: zz, facing, pose: "board", rank: 0, anchor: -1 }, own, "work", true)
+      const i = tileAt(x, zz)
+      if (!own.has(i) || Math.abs(floor(i) - top) > 0.05 || w.stairAt?.(x, zz) != null) return null
+      if (furniture.blocked(x, zz, ROOM) || strips.on(x, zz, ROOM) || inDoorway(x, zz)) return null
+      if (furniture.spots.some((s) => Math.hypot(s.x - x, s.z - zz) < FROM_SPOT)) return null
+      const node = nodeFor(x, zz, top)
+      if (node < 0) return null
+      return {
+        node,
+        at: [x, walk.nodes[node]!.y, zz],
+        facing,
+        ground: true,
+        zone: zi,
+        kind: "work",
+        pose: "board",
+      }
     }
+    // clear of everyone first; else (the townsfolk's slots and stands the world cannot see when it sets
+    // the board up) clear of their work spots: a moment's stand while he pins
+    for (const strict of [true, false])
+      for (const [x, zz] of tries) {
+        if (Math.abs(floor(tileAt(x!, zz!)) - top) > 0.05) continue
+        const spot = pinAt(x!, zz!, strict)
+        const brief = spot ? briefsOf(spot) : []
+        if (spot && brief.length) return { at: [bx, top, bz], facing: placedBoard.facing, spot, brief }
+      }
     return null
   }
   // every place's at once, the first time any is asked for: the Guildhall's gathering first, then the
@@ -621,6 +616,9 @@ export function heroSpotPool(inp: HeroPoolInputs, k: number): HeroPool {
     if (!all) {
       const lists: HeroSpot[][] = z.zones.map(() => [])
       const order = [inp.home, ...z.zones.keys()].filter((i, n) => n === 0 || i !== inp.home)
+      // the notice board's spots first: the gathering keeps clear of the Guildmaster and his recruits
+      board = z.zones[inp.home] ? boardOf(inp.home) : null
+      if (board) placed.push(board.spot)
       for (const i of order) {
         if (!z.zones[i]) continue
         const of = i === inp.home ? gatherSpots : workSpots
@@ -633,9 +631,21 @@ export function heroSpotPool(inp: HeroPoolInputs, k: number): HeroPool {
           if (near.length > lists[i]!.length) lists[i] = near
         }
         placed.push(...lists[i]!)
-        if (i === inp.home) {
-          board = boardOf(i, lists[i]!)
-          if (board) placed.push(board.spot)
+        // the briefing spots the gathering leaves free (a seated hero is never stood on), three at most,
+        // a body apart
+        if (i === inp.home && board) {
+          const seats = lists[i]!
+          const apart = (a: LifeSpot, b: LifeSpot, m: number) =>
+            Math.hypot(a.at[0] - b.at[0], a.at[2] - b.at[2]) >= m
+          const brief: LifeSpot[] = []
+          for (const b of board.brief)
+            if (
+              brief.length < 3 &&
+              seats.every((g) => apart(g, b, BRIEF_FREE)) &&
+              brief.every((o) => apart(o, b, BRIEF_APART))
+            )
+              brief.push(b)
+          board = brief.length ? { ...board, brief } : null
         }
       }
       all = lists

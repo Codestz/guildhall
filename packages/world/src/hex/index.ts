@@ -1,3 +1,16 @@
+export {
+  BOARD_BRIEF,
+  BOARD_HALF_D,
+  BOARD_HALF_W,
+  BOARD_PIN,
+  BOARD_TALL,
+  type BoardInputs,
+  boardPieces,
+  boardZone,
+  HALL_VIEW,
+  type NoticeBoardPlace,
+  noticeBoard,
+} from "./board.ts"
 export { blockedDoors, DOOR_HALF, DOOR_RUN, type DoorWay, doorWays, spotsInPieces } from "./checks.ts"
 export {
   boxSolid,

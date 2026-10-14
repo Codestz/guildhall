@@ -4,6 +4,7 @@
  * ground prisms, the path strips, the water tiles and the pieces, for the 3D screen to draw.
  */
 import { hash2 } from "../geom/noise.ts"
+import { boardPieces, type NoticeBoardPlace, noticeBoard } from "./board.ts"
 import { COURT_THEMES, type CourtKind, type CourtTile, courtDressing } from "./castleyard.ts"
 import { DOOR_HALF, DOOR_RUN } from "./checks.ts"
 import {
@@ -135,6 +136,11 @@ export interface HexWorld {
   bridges: HexBridge[]
   /** Decks a scene's own pieces build out over the water (a quay's stone deck): walked, not built here. */
   decks: HexWalkway[]
+  /**
+   * The Guildhall's notice board (board.ts): where it stands and faces; its pieces are among `pieces`.
+   * Null where none fits; left out by a world built without one.
+   */
+  board?: NoticeBoardPlace | null
   /** Metres per height level this world was built with. */
   step: number
   /** The island's ground height at a point (the top of the tile under it; 0 off the island). */
@@ -1387,6 +1393,17 @@ export function hexWorld(
       pieces.push(...left)
     }
   }
+  /** The tread a foot stands on (collide.ts: the numbers structures.ts builds the steps from). */
+  const stairAt = (px: number, pz: number): number | null => {
+    for (const st of walkways) {
+      const y = walkwayAt(st, px, pz)
+      if (y !== null) return y
+    }
+    return null
+  }
+  // ---- the Guildhall's notice board, before its gathering, where the hall's view sees it ----
+  const board = noticeBoard({ h, z, w: { tiles, pieces, doorways, stairs, bridges, decks, stairAt } })
+  if (board) pieces.push(...boardPieces(board))
   return {
     tiles,
     doorways,
@@ -1395,16 +1412,10 @@ export function hexWorld(
     stairs,
     bridges,
     decks,
+    board,
     step: STEP,
     heightAt,
-    stairAt(px: number, pz: number) {
-      // the tread a foot stands on (collide.ts: the numbers structures.ts builds the steps from)
-      for (const st of walkways) {
-        const y = walkwayAt(st, px, pz)
-        if (y !== null) return y
-      }
-      return null
-    },
+    stairAt,
     stats: { tiles: tiles.length, pieces: pieces.length, prefabs, ...(grown ? { nature: grown } : {}) },
   }
 }

@@ -705,7 +705,7 @@ export function lifePlaces(
   h: HexIsland,
   z: HexZones,
   w: Pick<HexWorld, "tiles" | "pieces"> &
-    Partial<Pick<HexWorld, "stairAt" | "stairs" | "bridges" | "doorways">>,
+    Partial<Pick<HexWorld, "stairAt" | "stairs" | "bridges" | "doorways" | "board">>,
   walk: HexWalk,
   opts: { heroSpots?: number } = {},
 ): LifePlaces {

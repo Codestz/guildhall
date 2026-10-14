@@ -25,7 +25,10 @@ export interface DossierProps {
   files?: readonly FilePlace[]
   transcript: readonly TranscriptLine[]
   onClose: () => void
-  /** The hero's rendered portrait (render `portrait.ts`); until it is drawn the face stands in. */
+  /**
+   * The hero's rendered portrait (render `portrait.ts`) in a medallion; left out, the hero's face (the
+   * HUD's avatar everywhere, user pick 10-13).
+   */
   portrait?: string | null
   className?: string
 }
@@ -68,7 +71,11 @@ export function Dossier({
       aria-labelledby="hud-dossier-h"
     >
       <header className="hud-dossier-head">
-        <Avatar variant="portrait" hero={hero} size={56} src={portrait} />
+        {portrait !== undefined ? (
+          <Avatar variant="portrait" hero={hero} size={56} src={portrait} />
+        ) : (
+          <Avatar variant="face" hero={hero} size={56} />
+        )}
         <div className="hud-dossier-id">
           <span className="hud-eyebrow">{eyebrow}</span>
           <h2 id="hud-dossier-h">

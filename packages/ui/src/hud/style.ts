@@ -222,6 +222,8 @@ button.hud-crest:focus-visible { border-radius: 50%; }
 .hud-badge[data-tone="idle"] .hud-sigil { opacity: 0.55; }
 .hud-badge-mark { position: absolute; top: 1px; right: 1px; display: grid; place-items: center; width: 15px; height: 15px; border-radius: 50%; background: var(--ink-solid); color: var(--tone); }
 .hud-badge[data-tone="plea"] .hud-badge-mark { animation: hud-ring 1.6s ease-out infinite; }
+.hud-badge-role .hud-fold-mark { width: 28px; height: 28px; }
+.hud-badge-count { position: absolute; right: 0; bottom: 0; min-width: 16px; height: 15px; padding: 0 3px; border-radius: 8px; background: var(--ink-solid); box-shadow: 0 0 0 1px var(--brass-line); color: var(--brass-hi); font-size: 10.5px; line-height: 15px; text-align: center; }
 @keyframes hud-ring { 0% { box-shadow: 0 0 0 0 rgba(255, 196, 81, 0.6); } 80%, 100% { box-shadow: 0 0 0 7px rgba(255, 196, 81, 0); } }
 .hud-tip {
   position: absolute;

@@ -23,4 +23,4 @@ export {
 export { SiteNav, type SiteNavId, type SiteNavProps } from "./SiteNav.tsx"
 export { SourcesCard, type SourcesCardProps } from "./SourcesCard.tsx"
 export { holdSiteStyle, SITE_CSS } from "./style.ts"
-export { WelcomeCard, type WelcomeCardProps } from "./WelcomeCard.tsx"
+export { WelcomeCard, type WelcomeCardProps, type WelcomeEvent, welcomeFold } from "./WelcomeCard.tsx"

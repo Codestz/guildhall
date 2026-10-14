@@ -139,11 +139,12 @@ export type DirectorStyle = "calm" | "cinematic"
 /** How the hour is chosen: the viewer's clock, a fast cycle, a pinned hour, or the story's own. */
 export type TimeMode = "real" | "cycle" | "fixed" | "story"
 /** The weather: following the guild's health, or pinned. */
-export type WeatherPick = "auto" | "clear" | "rain" | "storm" | "snow"
+export type WeatherPick = "auto" | "clear" | "cloudy" | "rain" | "storm" | "snow"
 
 /** What Settings tunes. A value left out leaves its lever out. */
 export interface SettingsValues {
-  names: Names
+  /** Which names the world shows; left out, no Names lever (a world with one set of names). */
+  names?: Names
   /** Story speed: 0.5, 1, 2, 4. */
   pace: number
   /** The director (Bard camera) follows the story. */

@@ -38,6 +38,11 @@ export interface TimelineProps {
   /** The playback speed (1 = the caller's own pace); with `onRate`, a chip that steps through the speeds. */
   rate?: number
   onRate?: () => void
+  /**
+   * The line under the time in place of the span (V1's growth bar: `1,534 contributors · 60 in town ·
+   * 1,113 files`).
+   */
+  note?: string
 }
 
 const MARKER_LABEL: Record<TimelineMarker["kind"], string> = {
@@ -76,6 +81,7 @@ export function Timeline({
   step,
   rate,
   onRate,
+  note,
 }: TimelineProps) {
   const history = scale === "history"
   const len = Math.max(1, end - start)
@@ -134,9 +140,9 @@ export function Timeline({
         >
           {playing ? <Glyphs.pause /> : <Glyphs.play />}
         </button>
-        <span className="hud-tape-time" aria-hidden="true">
+        <span className="hud-tape-time" aria-hidden="true" data-note={note ? "" : undefined}>
           <b className="num">{now}</b>
-          <small className="num">{history ? total : `/ ${total}`}</small>
+          <small className="num">{note ?? (history ? total : `/ ${total}`)}</small>
         </span>
         <div className="hud-track">
           <div className="hud-track-rail" aria-hidden="true">

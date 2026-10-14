@@ -542,13 +542,14 @@ void main() {
     float drag = mix(2.4, 1.5, willow);
     p = aOrigin + aDir * (1.0 - exp(-t * drag)) / drag;
     p.y -= mix(1.15, 0.85, willow) * t * t;
-    // they come out of the burst already lit: no stack of white quads at its heart
-    float bloom = smoothstep(0.0, 0.07, t);
-    size = mix(1.25, 0.45, u) * bloom * mix(1.0, 1.15, willow);
+    // they open out of the burst small and faint, growing as they spread: 60 stars piled at its heart
+    // would add up to a white sheet
+    float bloom = smoothstep(0.0, 0.3, t);
+    size = mix(1.0, 0.4, u) * mix(0.25, 1.0, bloom) * mix(1.0, 1.15, willow);
     vColor = mix(aColor, aTurn, smoothstep(0.35, 0.7, u));
     vColor = mix(vColor, mix(vec3(1.0, 0.75, 0.3), vec3(0.95, 0.4, 0.1), u), willow);
     float twinkle = uStill > 0.5 ? 1.0 : mix(1.0, 0.55 + 0.45 * sin(t * 31.0 + seed * 40.0), smoothstep(0.45, 0.8, u));
-    vAlpha = mix(pow(1.0 - u, 1.4), pow(1.0 - u, 0.7), willow) * twinkle;
+    vAlpha = mix(pow(1.0 - u, 1.4), pow(1.0 - u, 0.7), willow) * twinkle * bloom;
     if (crackle > 0.5 && u > 0.5) {
       // the crackle: each star pops in white flickers as it burns out
       float tick = floor(t * 26.0);

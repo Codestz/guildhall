@@ -299,7 +299,7 @@ export const SHOW_BEATS: Readonly<Partial<Record<ShowKind | "galleon", readonly 
   rainbow: [{ at: 0, distance: 0.8, elevation: 30, ofMap: true }],
   festival: [
     { at: 0, distance: 62, elevation: 13 },
-    { at: 9000, distance: 40, elevation: 7 },
+    { at: 9000, distance: 50, elevation: 9 },
   ],
   ghostship: [
     { at: 0, distance: 85, elevation: 12 },
@@ -310,10 +310,10 @@ export const SHOW_BEATS: Readonly<Partial<Record<ShowKind | "galleon", readonly 
     { at: 6000, distance: 40, elevation: 12 },
   ],
   galleon: [
-    { at: 0, distance: 80, elevation: 13 },
-    { at: 9000, distance: 46, elevation: 11 },
+    { at: 0, distance: 62, elevation: 12 },
+    { at: 7000, distance: 36, elevation: 10 },
   ],
-  undead: [{ at: 0, distance: 13, elevation: 30 }],
+  undead: [{ at: 0, distance: 10, elevation: 26 }],
 }
 /** The shows filmed from the island looking out to their hull. */
 export const SEAWARD: ReadonlySet<ShowKind | "galleon"> = new Set(["ghostship", "raid", "galleon"])

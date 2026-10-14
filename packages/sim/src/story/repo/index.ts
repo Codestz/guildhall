@@ -6,6 +6,7 @@
  *   facts    what happened in each era, read off the chronicle
  *   legend   `repoLegendOf`: the Legends book's History by era, each chapter with its island's size
  *   recap    `repoRecapOf`: the Repo Chronicle card (figures, the island today, three highlights)
+ *   moments  `historyMomentsOf`: what the hall narrates while the island grows (first commit, arrivals…)
  */
 export {
   commitsIn,
@@ -30,6 +31,20 @@ export {
   repoLegendOf,
   shortName,
 } from "./legend.ts"
+export {
+  ARRIVALS_MAX,
+  FILE_MARKS,
+  HAND_MARKS,
+  type HistoryMoment,
+  type HistoryMomentKind,
+  handColour,
+  handsAt,
+  historyMomentsOf,
+  type MomentEra,
+  type MomentOptions,
+  notableHands,
+  PLACE_MIN_FILES,
+} from "./moments.ts"
 export {
   HALL_SITE,
   type HighlightKind,

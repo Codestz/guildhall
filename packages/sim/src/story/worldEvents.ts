@@ -224,13 +224,17 @@ export const SHOW_LOOK: Readonly<
 export interface WorldShowOptions {
   /** Where watching began (run time): what starts before it never shows. Default: −∞ (all of it). */
   since?: number
-  /** Override the least time between big shows (tests). */
+  /**
+   * Override the least time between big shows (`SHOW_RULES.gapMs`): the tests, and a told demo story
+   * that plays every show in a few minutes (stories/index.ts `Story.showRules`; never a live hall).
+   */
   gapMs?: number
   /**
-   * A party's purse (tokens, cost) for the raid's treasury rule. Only a live hall knows it (the session
-   * model at its head), so a replay's raid comes from its length alone.
+   * A party's purse (tokens, cost) by run time `at`, for the raid's treasury rule: what the party under
+   * `master` had spent by then (story/purse.ts `PurseBook`, fed the session's changes). Without it a
+   * raid comes from a session's length alone.
    */
-  purse?: (master: string) => { tokens: number; cost: number } | undefined
+  purse?: (master: string, at: number) => { tokens: number; cost: number } | undefined
 }
 
 // ─────────────────────────────── the engine ───────────────────────────────
@@ -280,6 +284,8 @@ export class ShowEngine {
   private minted = 0
   private lastGood: { id: string; at: number } | undefined
   private master = ""
+  /** The run time of the moment the ledger is taking (the purse is read as of then). */
+  private now = Number.NEGATIVE_INFINITY
   private fed = 0
   private readonly ctx: LedgerContext
 
@@ -290,7 +296,7 @@ export class ShowEngine {
     this.ctx = {
       session: () => undefined,
       party: () => {
-        const p = this.purse?.(this.master)
+        const p = this.purse?.(this.master, this.now)
         return p
           ? [{ id: this.master, tokens: p.tokens, cost: p.cost, entries: [] } as unknown as Session]
           : []
@@ -435,6 +441,7 @@ export class ShowEngine {
     const who = this.whos.get(ev.id)
     const master = this.masterOf(ev.id)
     this.master = master
+    this.now = ev.at
     const moment = {
       ...happening,
       id: ev.id,

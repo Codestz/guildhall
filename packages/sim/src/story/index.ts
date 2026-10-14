@@ -7,6 +7,7 @@
  *   legends  `legendOf`: the session's book, one chapter per quest, and its Markdown
  *   recap    the Chronicle card's words: the hero moment (`heroOf`), the numbers, three lines
  *   worldEvents  the world events on stage: `worldShows(log, t)`, the renown rules scheduled as shows
+ *   purse    a party's spending over time (the raid's treasury rule), from the session's changes
  */
 
 export {
@@ -39,6 +40,7 @@ export {
   UNSUNG,
   type Unsung,
 } from "./legends.ts"
+export { PurseBook } from "./purse.ts"
 export {
   compactOf,
   countOf,

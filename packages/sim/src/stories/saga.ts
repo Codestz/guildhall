@@ -15,8 +15,10 @@ import { type Adventurer, type Chapter, Script } from "./script.ts"
  *                     packages/world (a storm)
  *   IV   The mending  the Implementer is called back, reproduces the failure, asks to rewrite the
  *                     goldens (a plea), lands the fix and pushes it; CI passes (the sky clears)
- *   V    Nightfall    the Implementer merges and brings the loot home; the Guildmaster cuts a release
- *                     (a galleon) and ends the quest
+ *   V    Nightfall    the Implementer merges and brings the loot home; the Guildmaster sends the
+ *                     Chronicler to write the release notes and cuts a release (a galleon); the notes
+ *                     are fifteen clean deeds, so the night ends with a festival and gold fireworks over
+ *                     the keep (story/worldEvents.ts); then the quest ends
  *
  * Nothing is forced: every beat is a change or a GitHub event the hall reads like a live one, and the
  * times the sea keeps (`BEAT`) are exact, so the beats fall in their acts whatever the seed's jitter
@@ -52,6 +54,14 @@ const CI_GREEN_MS = 13_000
 const CI_MAIN_MS = 9_000
 /** The story runs on this long after its release: the galleon sails in and the heroes go home. */
 export const SAGA_TAIL_MS = 20_000
+/** The story runs on this long after the Chronicler's notes: the festival's 42 s and a breath. */
+const FESTIVAL_TAIL_MS = 44_000
+
+/**
+ * The saga's pacing for the world events (stories/index.ts `StoryShowRules`): the rainbow at the
+ * mending and the festival at nightfall are half a minute apart, where a live hall holds 150 s.
+ */
+export const SAGA_SHOW_RULES = { gapMs: 30_000 } as const
 
 /** The saga's named beats, in story order, with their run time (ms from the start). */
 export type SagaBeat =
@@ -65,6 +75,7 @@ export type SagaBeat =
   | "merged"
   | "loot"
   | "release"
+  | "chronicled"
   | "end"
 
 export interface SagaTale {
@@ -252,6 +263,8 @@ export function sagaTale(seed = 1, repo = SAGA_REPO): SagaTale {
     beat("loot", k.clock)
   })
   const merged = beats.find((b) => b.beat === "merged")?.at ?? master.clock
+  // the release notes: fifteen clean deeds, done by nightfall's festival
+  const chronicler = master.quest("guild-librarian", `Write ${TAG}'s release notes`, notes, { wait: false })
   const main = push(merged + 300, 1, "main")
   const mainGreen = ci(merged + 300, main, "passed", CI_MAIN_MS, "main")
   until(master, mainGreen + 600)
@@ -267,13 +280,16 @@ export function sagaTale(seed = 1, repo = SAGA_REPO): SagaTale {
   beat("release", master.clock)
   const released = master.clock
   master.think("Released. Every place has its spots, every hero its banner, and the hall shows them.", 2400)
-  until(master, released + SAGA_TAIL_MS - 1600)
+  master.waitFor(chronicler)
+  beat("chronicled", chronicler.clock)
+  until(master, Math.max(released + SAGA_TAIL_MS - 1600, chronicler.clock + FESTIVAL_TAIL_MS))
   master.finish(
     "Heroes walk to their places now: spots in world, banners in render, the hall in the studio. v0.2.0 is out.",
     1600,
   )
   beat("end", master.clock)
 
+  beats.sort((a, b) => a.at - b.at)
   const changes = script.done()
   const last = Math.max(changes.at(-1)?.at ?? 0, ...sea.map((e) => e.at))
   const hours = [...script.chapters.map(({ at, hour }) => ({ at, hour })), { at: last, hour: 23 }]
@@ -326,4 +342,31 @@ function hall(k: Adventurer): void {
   k.deed("bash", { command: "bun run typecheck" }, 3400, { summary: "ok" })
   k.deed("bash", { command: "bun test apps/studio" }, 4600, { summary: "152 pass" })
   k.finish("The hall walks each hero to its place's spot and back to the castle with its loot.")
+}
+
+/** The Chronicler: the release notes, read off the three places' work; fifteen clean deeds. */
+function notes(k: Adventurer): void {
+  const reads = [
+    w("src/hex/heroes.ts"),
+    r("src/crowd/banners.ts"),
+    s("src/hall/heroes.ts"),
+    w("test/heroes.test.ts"),
+    r("src/crowd/heroes.ts"),
+    s("src/hexworld/life.ts"),
+    w("src/hex/life.ts"),
+  ]
+  k.deed("read", { filePath: "RELEASE_NOTES.md" }, 900)
+  for (const file of reads) k.deed("read", { filePath: file }, 600, { batch: true })
+  k.think("Lead with the heroes at their places, then the banners, then the fix on the cliff.", 1400)
+  k.deed("edit", { filePath: "RELEASE_NOTES.md" }, 1600)
+  k.deed("edit", { filePath: s("src/site/stories.ts") }, 900)
+  k.deed("read", { filePath: "RELEASE_NOTES.md" }, 700)
+  k.deed("edit", { filePath: "RELEASE_NOTES.md" }, 900)
+  k.deed("read", { filePath: "README.md" }, 600, { batch: true })
+  k.deed("edit", { filePath: "README.md" }, 900)
+  k.deed("read", { filePath: "README.md" }, 600)
+  k.finish(
+    `${TAG}'s notes: heroes walk to their places, banners over them, a camp on a cliff keeps two spots.`,
+    1000,
+  )
 }

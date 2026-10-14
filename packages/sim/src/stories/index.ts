@@ -1,7 +1,8 @@
 import { type Change, type GuildEvent, type SeaEvent, WIRE_VERSION } from "@guildhall/core"
+import { EVENTS_REPO, EVENTS_SHOW_RULES, type EventsBeat, eventsTale } from "./events.ts"
 import { factions } from "./factions.ts"
 import { rehome, type StoryUnit } from "./rehome.ts"
-import { SAGA_REPO, SAGA_UNITS, type SagaBeat, sagaTale } from "./saga.ts"
+import { SAGA_REPO, SAGA_SHOW_RULES, SAGA_UNITS, type SagaBeat, sagaTale } from "./saga.ts"
 import { parties, party, rush, solo } from "./scenarios.ts"
 import type { Chapter } from "./script.ts"
 import { seas } from "./seas.ts"
@@ -13,15 +14,35 @@ import { seas } from "./seas.ts"
  *   script     V1's Script/Adventurer DSL (main:packages/sim), ported as is and golden-tested
  *   scenarios  V1's solo, party, parties and rush; factions; seas (with its GitHub sea and backlog)
  *   saga       the showcase, re-authored for the hex island in this repo's own paths
+ *   events     "World events": one session that earns every world show in turn (events.ts)
  *   rehome     a story's paths moved onto another repo's units, so its heroes still spread out
  *
  * `story(id, opts)` tells one: its guild events (seq from 1, `at` in ms from the story's start plus
  * `start`), its GitHub sea, and how long it runs. The same id and options always tell the same story.
  */
 
-export type StoryId = "saga" | "solo" | "party" | "parties" | "rush" | "seas" | "factions"
+export type StoryId = "saga" | "events" | "solo" | "party" | "parties" | "rush" | "seas" | "factions"
 
-export const STORY_IDS: readonly StoryId[] = ["saga", "solo", "party", "parties", "rush", "seas", "factions"]
+export const STORY_IDS: readonly StoryId[] = [
+  "saga",
+  "events",
+  "solo",
+  "party",
+  "parties",
+  "rush",
+  "seas",
+  "factions",
+]
+
+/**
+ * A told story's own pacing for the world events (sim story/worldEvents.ts `WorldShowOptions`): the
+ * demo override. A live hall holds 150 s between two big shows; a story that tours several in a few
+ * minutes asks for less, and the hall's events engine honours it for that story only (hall/events.ts).
+ */
+export interface StoryShowRules {
+  /** The least run time between two big shows starting, ms. */
+  gapMs: number
+}
 
 export interface StoryRepo {
   /** `owner/name`: the sea's repo. */
@@ -50,8 +71,10 @@ export interface Story {
   /** From the story's start to its last event, ms. */
   duration: number
   chapters: Chapter[]
-  /** The saga's authored beats, at their `at` (start added). Empty for the other stories. */
-  beats: { beat: SagaBeat; at: number }[]
+  /** The saga's and the world events' authored beats, at their `at` (start added). Empty for the others. */
+  beats: { beat: SagaBeat | EventsBeat; at: number }[]
+  /** The demo override of the world events' pacing (`StoryShowRules`); absent: a live hall's rules. */
+  showRules?: StoryShowRules
 }
 
 /** Wrap a script's changes as wire events for one guild (V1's `toEvents`). */
@@ -63,9 +86,10 @@ interface Told {
   changes: Change[]
   sea: SeaEvent[]
   chapters: Chapter[]
-  beats: { beat: SagaBeat; at: number }[]
+  beats: { beat: SagaBeat | EventsBeat; at: number }[]
   /** The districts to rehome first (the biggest units go to them). */
   first?: readonly string[]
+  showRules?: StoryShowRules
 }
 
 function tell(id: StoryId, seed: number, opts: StoryOptions): Told {
@@ -74,7 +98,26 @@ function tell(id: StoryId, seed: number, opts: StoryOptions): Told {
     case "saga": {
       const tale = sagaTale(seed, opts.repo?.name ?? SAGA_REPO)
       const first = [SAGA_UNITS.world, SAGA_UNITS.render, SAGA_UNITS.studio]
-      return { changes: tale.changes, sea: tale.sea, chapters: tale.chapters, beats: tale.beats, first }
+      return {
+        changes: tale.changes,
+        sea: tale.sea,
+        chapters: tale.chapters,
+        beats: tale.beats,
+        first,
+        showRules: SAGA_SHOW_RULES,
+      }
+    }
+    case "events": {
+      const tale = eventsTale(seed, opts.repo?.name ?? EVENTS_REPO)
+      const first = [SAGA_UNITS.world, SAGA_UNITS.render, SAGA_UNITS.studio, SAGA_UNITS.sim]
+      return {
+        changes: tale.changes,
+        sea: tale.sea,
+        chapters: tale.chapters,
+        beats: tale.beats,
+        first,
+        showRules: EVENTS_SHOW_RULES,
+      }
     }
     case "solo":
       return plain(solo(seed))
@@ -110,12 +153,28 @@ export function story(id: StoryId, opts: StoryOptions = {}): Story {
     duration: last - (changes[0]?.at ?? 0),
     chapters: told.chapters.map(shift),
     beats: told.beats.map(shift),
+    ...(told.showRules ? { showRules: { ...told.showRules } } : {}),
   }
 }
 
+export {
+  EVENTS_REPO,
+  EVENTS_SHOW_RULES,
+  type EventsBeat,
+  type EventsTale,
+  eventsTale,
+} from "./events.ts"
 export { factions } from "./factions.ts"
 export { districtMap, districtOf, rehome, type StoryUnit, storyPaths } from "./rehome.ts"
-export { SAGA_REPO, SAGA_TAIL_MS, SAGA_UNITS, type SagaBeat, type SagaTale, sagaTale } from "./saga.ts"
+export {
+  SAGA_REPO,
+  SAGA_SHOW_RULES,
+  SAGA_TAIL_MS,
+  SAGA_UNITS,
+  type SagaBeat,
+  type SagaTale,
+  sagaTale,
+} from "./saga.ts"
 export { parties, party, rush, solo } from "./scenarios.ts"
 export {
   Adventurer,

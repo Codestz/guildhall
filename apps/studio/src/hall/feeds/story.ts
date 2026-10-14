@@ -15,6 +15,7 @@ export const STORY_EPOCH = Date.UTC(2026, 9, 13, 9)
 
 const TITLES: Record<StoryId, string> = {
   saga: "The Saga",
+  events: "World events",
   solo: "Alone",
   party: "A Party",
   parties: "Two Parties",

@@ -145,10 +145,10 @@ describe("the saga on Guildhall's island", async () => {
   if (process.env.SAGA_TABLE)
     console.log(`\n${hall.name}, ${(told.duration / 1000).toFixed(1)} s\n${table(told, beats)}\n`)
 
-  test("it normalises and reduces whole, and runs about three minutes", () => {
+  test("it normalises and reduces whole, and runs about three and a half minutes", () => {
     expect(log.length).toBeGreaterThan(100)
     expect(told.duration).toBeGreaterThan(150_000)
-    expect(told.duration).toBeLessThan(200_000)
+    expect(told.duration).toBeLessThan(215_000)
     expect(told.chapters.map((c) => c.title)).toEqual([
       "Dawn",
       "The forge",

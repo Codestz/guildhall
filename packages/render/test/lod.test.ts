@@ -369,6 +369,39 @@ describe("LodBatchedMesh", () => {
     away.updateMatrixWorld()
     expect(pass(m, away).tris).toEqual([])
   })
+
+  test("a still camera keeps the last list: no walk, no upload, until something moves or changes", () => {
+    const { m, loose, full } = mesh()
+    // a DataTexture's `needsUpdate` bumps its version: the uploads are counted by it
+    const indirect = (m as unknown as { _indirectTexture: { version: number } })._indirectTexture
+    const cam = camera(4)
+    const first = pass(m, cam)
+    let uploads = indirect.version
+    expect(pass(m, cam)).toEqual(first)
+    expect(indirect.version).toBe(uploads)
+    // a shadow pass writes the same buffers: the next main pass lists again
+    const sun = new OrthographicCamera(-10, 10, 10, -10, 0.1, 100)
+    sun.position.set(0, 0, 20)
+    sun.updateMatrixWorld()
+    pass(m, sun, true)
+    uploads = indirect.version
+    expect(pass(m, cam)).toEqual(first)
+    expect(indirect.version).toBe(uploads + 1)
+    // the camera moves: listed again
+    uploads = indirect.version
+    const moved = camera(4.5)
+    expect(pass(m, moved).tris).toEqual(first.tris)
+    expect(indirect.version).toBe(uploads + 1)
+    // an instance changes: listed again, with the change
+    uploads = indirect.version
+    m.setVisibleAt(loose, false)
+    expect(pass(m, moved).tris).toEqual([full])
+    expect(indirect.version).toBe(uploads + 1)
+    // the DPR changes nothing on screen (CSS px) but is part of what the list was made from
+    uploads = indirect.version
+    expect(pass(m, moved, false, 2).tris).toEqual([full])
+    expect(indirect.version).toBe(uploads + 1)
+  })
 })
 
 describe("createStaticBatch with clusters", () => {

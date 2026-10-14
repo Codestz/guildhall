@@ -73,6 +73,16 @@ export function setLod(on: boolean): void {
 export class LodBatchedMesh extends BatchedMesh {
   /** Geometry id → its tiers' geometry ids, finest first (a geometry without tiers is its own only). */
   private readonly tierIds: number[][] = []
+  /**
+   * What the last main pass's list was made from: the camera's matrices, the buffer's size and DPR,
+   * this mesh's matrix, the LOD switch and the reveal's state. A main pass whose key is the same and
+   * whose instances have not changed (`dirty`) keeps the list it has: on a still camera the static
+   * batch's walk (a sphere test and a tier pick per instance, 18 k of them, and the indirect texture's
+   * upload) is skipped whole. A shadow pass writes the same multi-draw buffers, so it leaves them dirty.
+   */
+  private readonly key = new Float64Array(16 + 16 + 16 + 8)
+  private keyed = false
+  private dirty = true
   /** Geometry id → how far it strays from what it stands in for, metres in its own space (0: exact). */
   private readonly errors: number[] = []
   /** Per instance: world bounding sphere (x, y, z, r), its matrix's largest scale, stale flag, cluster. */
@@ -114,11 +124,77 @@ export class LodBatchedMesh extends BatchedMesh {
   /** Gives `geometryId` coarser `tiers` (geometry ids, finer first) to draw instead when small. */
   setTiers(geometryId: number, tiers: readonly number[]): void {
     this.tierIds[geometryId] = [geometryId, ...tiers]
+    this.dirty = true
   }
 
   /** How far `geometryId` (a tier, a shell) strays from the full detail it stands in for, metres. */
   setLodError(geometryId: number, metres: number): void {
     this.errors[geometryId] = metres
+    this.dirty = true
+  }
+
+  override addGeometry(geometry: BufferGeometry, reservedVertexCount?: number, reservedIndexCount?: number): number {
+    const id = super.addGeometry(geometry, reservedVertexCount, reservedIndexCount)
+    // its own only, until setTiers: the walk then never makes a list per instance
+    this.tierIds[id] ??= [id]
+    this.dirty = true
+    return id
+  }
+
+  override setVisibleAt(instanceId: number, visible: boolean): this {
+    super.setVisibleAt(instanceId, visible)
+    this.dirty = true
+    return this
+  }
+
+  override deleteInstance(instanceId: number): this {
+    super.deleteInstance(instanceId)
+    this.dirty = true
+    return this
+  }
+
+  override setInstanceCount(maxInstanceCount: number): void {
+    super.setInstanceCount(maxInstanceCount)
+    this.dirty = true
+  }
+
+  override setGeometrySize(maxVertexCount: number, maxIndexCount: number): void {
+    super.setGeometrySize(maxVertexCount, maxIndexCount)
+    this.dirty = true
+  }
+
+  /** Whether the main pass's list from `camera` into the renderer's buffer is the one already listed. */
+  private sameAsListed(renderer: WebGLRenderer, camera: Camera): boolean {
+    const k = this.key
+    const a = camera.matrixWorld.elements
+    const b = camera.projectionMatrix.elements
+    const c = this.matrixWorld.elements
+    renderer.getDrawingBufferSize(buffer)
+    const rest = [
+      buffer.x,
+      buffer.y,
+      renderer.getPixelRatio(),
+      lodOn ? 1 : 0,
+      this.reveal === null ? 0 : 1,
+      this.revealCount,
+      this.revealSpan,
+      this.revealLook === "grow" ? 1 : 0,
+    ]
+    let same = this.keyed && !this.dirty
+    for (let i = 0; i < 16; i++) {
+      if (k[i] !== a[i]) same = false
+      k[i] = a[i] as number
+      if (k[16 + i] !== b[i]) same = false
+      k[16 + i] = b[i] as number
+      if (k[32 + i] !== c[i]) same = false
+      k[32 + i] = c[i] as number
+    }
+    for (let i = 0; i < rest.length; i++) {
+      if (k[48 + i] !== rest[i]) same = false
+      k[48 + i] = rest[i] as number
+    }
+    this.keyed = true
+    return same
   }
 
   /**
@@ -131,24 +207,28 @@ export class LodBatchedMesh extends BatchedMesh {
     this.shellWeight.push(1)
     this.clusterOf[shell] = c
     for (const id of parts) this.clusterOf[id] = c
+    this.dirty = true
   }
 
   override addInstance(geometryId: number): number {
     const id = super.addInstance(geometryId)
     this.stale[id] = true
     this.clusterOf[id] = NONE
+    this.dirty = true
     return id
   }
 
   override setMatrixAt(instanceId: number, m: Matrix4): this {
     super.setMatrixAt(instanceId, m)
     this.stale[instanceId] = true
+    this.dirty = true
     return this
   }
 
   override setGeometryIdAt(instanceId: number, geometryId: number): this {
     super.setGeometryIdAt(instanceId, geometryId)
     this.stale[instanceId] = true
+    this.dirty = true
     return this
   }
 
@@ -269,10 +349,14 @@ export class LodBatchedMesh extends BatchedMesh {
       bytesPerElement = geometry.getAttribute("position").count > 65535 ? 4 : 2
     }
 
+    const perspective = (camera as PerspectiveCamera).isPerspectiveCamera === true
+    // the main pass's list is still the one in the buffers: nothing to walk, nothing to upload
+    if (!shadow && perspective) {
+      if (this.sameAsListed(renderer, camera)) return
+    } else this.dirty = true
     toLocal.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(this.matrixWorld)
     frustum.setFromProjectionMatrix(toLocal, camera.coordinateSystem, camera.reversedDepth)
     viewer.setFromMatrixPosition(camera.matrixWorld).applyMatrix4(inverse.copy(this.matrixWorld).invert())
-    const perspective = (camera as PerspectiveCamera).isPerspectiveCamera === true
     // Only the main view picks levels by size; any other camera is drawn coarse, whole.
     const sized = !shadow && perspective && lodOn
     const full = !shadow && perspective && !lodOn
@@ -363,7 +447,7 @@ export class LodBatchedMesh extends BatchedMesh {
       const bounds = this.sphereOf(i, geometryId)
       if (!frustum.intersectsSphere(bounds)) continue
 
-      const ids = this.tierIds[geometryId] ?? [geometryId]
+      const ids = this.tierIds[geometryId] as number[]
       if (isShell) {
         shells++
         emit(i, geometryId, revealCode !== 0 ? revealCode : clusterCode)
@@ -420,6 +504,9 @@ export class LodBatchedMesh extends BatchedMesh {
     self._multiDrawCount = drawn
     self._multiDrawBytesPerElement = bytesPerElement
     self._visibilityChanged = false
-    if (!shadow && perspective) this.counts = { tiers, near, shells }
+    if (!shadow && perspective) {
+      this.counts = { tiers, near, shells }
+      this.dirty = false
+    }
   }
 }

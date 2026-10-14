@@ -25,7 +25,7 @@ export const STORIES: readonly Story[] = [
       "Nightfall ends with a festival and fireworks",
     ],
     art: `${ART}/saga.webp`,
-    alt: "The whole island at golden hour, its hall lit by the fire.",
+    alt: "Nightfall over the keep: a festival firework bursts red and green above the sea, the village lamps lit below.",
     acts: [
       { n: 1, title: "Dawn" },
       { n: 2, title: "The forge" },
@@ -49,7 +49,7 @@ export const STORIES: readonly Story[] = [
       "Fireworks over the keep at nightfall",
     ],
     art: `${ART}/events.webp`,
-    alt: "The island at nightfall, its lamps and the festival lit.",
+    alt: "The festival's fireworks over the island at night: a multicoloured gold and rose burst above the lit keep and village.",
     acts: [
       { n: 1, title: "Dawn" },
       { n: 2, title: "Red skies" },
@@ -68,7 +68,7 @@ export const STORIES: readonly Story[] = [
       "One guildmaster and the adventurers it sends out. Each quest is taken from the board, walked to its station and worked in front of you.",
     shows: ["Every tool call is a deed you can see", "Click anyone to follow them and read their dossier"],
     art: `${ART}/party.webp`,
-    alt: "The keep's hall: a guildmaster by the fire, adventurers at their stations.",
+    alt: "The keep's yard by day: a guildmaster and adventurers at their stations, each with a name chip.",
     link: "?story=party",
   },
   {
@@ -80,7 +80,7 @@ export const STORIES: readonly Story[] = [
       "A single hero with no party: one task from the board, walked to its place and finished, with the island going about its day around it.",
     shows: ["The smallest story: one hero, one quest", "Follow it and read its dossier as it works"],
     art: `${ART}/solo.webp`,
-    alt: "The keep by day: a lone guildmaster at work in its yard.",
+    alt: "The keep from close by: a lone guildmaster at the gate, its chip saying what it is doing.",
     link: "?story=solo",
   },
   {
@@ -92,7 +92,7 @@ export const STORIES: readonly Story[] = [
       "An OpenCode party and a Claude Code party share one island, each under its own banner, each with its own guildmaster.",
     shows: ["Two sources in one world", "Parties keep their colours and their own stations"],
     art: `${ART}/factions.webp`,
-    alt: "Two parties at work in the keep at golden hour.",
+    alt: "Two parties at the keep under their own pennants: guildmasters, an artisan, a scout and a wanderer at work.",
     link: "?story=factions",
   },
   {
@@ -107,7 +107,7 @@ export const STORIES: readonly Story[] = [
       "Red CI brings a storm over the harbour",
     ],
     art: `${ART}/seas.webp`,
-    alt: "Ships at anchor off the island's quay.",
+    alt: "The harbour: pull-request ships docked along the island's quay, and one more sailing in across the bay.",
     link: "?story=seas",
   },
   {
@@ -122,7 +122,7 @@ export const STORIES: readonly Story[] = [
       "V1's crowd of 300 comes back with the crowd's level of detail",
     ],
     art: `${ART}/crowd.webp`,
-    alt: "The island's keep with a party of adventurers spreading out along its roads.",
+    alt: "The whole island seen from above with a dozen adventurers spread out along its roads, each labelled with its deed.",
     link: "?story=rush",
   },
   {

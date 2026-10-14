@@ -201,7 +201,7 @@ export const SHOW_RULES = {
    * cannot get there by then does not come, and the grave sinks at this deadline. The graveyard is
    * near the Guildhall, where heroes rest and slump (world graveyard.ts).
    */
-  strikeMs: 30_000,
+  strikeMs: 45_000,
   /** From the blow to the sinking. */
   strikeHoldMs: 600,
   /** Who last did good work this recently mends a red CI's grave. */

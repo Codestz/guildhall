@@ -1157,9 +1157,9 @@ export class LifePlanner {
       arrive = walk.to
       steps[steps.length - 1]!.from = arrive
     }
-    const swing = arrive + STRIKE_PAUSE_MS
-    this.act(track, "strike", swing)
-    track.hold = swing + STRIKE_LEAD_MS + STRIKE_WATCH_MS
+    // squares up as it arrives, then swings (craft.ts `strike`)
+    this.act(track, "strike", arrive)
+    track.hold = arrive + STRIKE_PAUSE_MS + STRIKE_LEAD_MS + STRIKE_WATCH_MS
     track.timer = track.hold
     track.after = undefined
   }

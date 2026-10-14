@@ -28,6 +28,7 @@ import {
   poseAt,
   SHOW_RULES,
   STRIKE_LEAD_MS,
+  STRIKE_PAUSE_MS,
   STRIKE_RUN_MPS,
   strikeWalkMs,
   struckAt,
@@ -125,9 +126,10 @@ describe("the fight at the graveyard", () => {
     expect(at).toBeGreaterThan(T0 + 25_000)
     expect(at).toBeLessThanOrEqual(grave.strike!)
     const swing = it.acts.find((a) => a.play === "strike")!
-    expect(swing.from).toBe(at - STRIKE_LEAD_MS)
+    expect(swing.from).toBe(at - STRIKE_LEAD_MS - STRIKE_PAUSE_MS)
     // there, facing it, before the swing
-    const ready = poseAt(it, swing.from - 100)!
+    const ready = poseAt(it, swing.from + 100)!
+    expect(ready.sample?.clip).toBe("Melee_Block")
     expect(Math.hypot(ready.at[0] - spot.x, ready.at[2] - spot.z)).toBeLessThan(0.05)
     // on its way it ran
     const running = poseAt(it, (T0 + 27_000 + swing.from) / 2)!

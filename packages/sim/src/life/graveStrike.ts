@@ -2,6 +2,7 @@ import type { LifeSpot } from "@guildhall/world"
 import type { WorldEvent } from "../events/world.ts"
 import type { Grave } from "../story/worldEvents.ts"
 import { ShowEngine } from "../story/worldEvents.ts"
+import { STRIKE_GUARD_MS } from "./craft.ts"
 import type { HeroAct } from "./itineraries.ts"
 
 /**
@@ -38,13 +39,13 @@ export interface GraveStrike {
   deadline: number
 }
 
-/** The blow lands this long into the strike (Melee_1H_Attack_Slice_Diagonal's hit at 0.45). */
+/** The blow lands this long into the swing (Melee_1H_Attack_Slice_Diagonal's hit at 0.45). */
 export const STRIKE_LEAD_MS = 450
-/** Arrived, it squares up to the skeleton this long before it swings. */
-export const STRIKE_PAUSE_MS = 500
+/** Arrived, it squares up to the skeleton (sword raised) this long before it swings: the strike's first move. */
+export const STRIKE_PAUSE_MS = STRIKE_GUARD_MS
 /** A way to a grave longer than this (metres) is run, at STRIKE_RUN_MPS. */
 export const STRIKE_WALK_M = 8
-export const STRIKE_RUN_MPS = 4
+export const STRIKE_RUN_MPS = 4.5
 /** After the blow it watches the skeleton die and sink this long, then goes back to what it was doing. */
 export const STRIKE_WATCH_MS = 3000
 
@@ -82,8 +83,8 @@ export function strikeWalkMs(metres: number, mps: number): number {
 export function struckAt(g: Grave, acts: readonly HeroAct[] | undefined): number | undefined {
   if (g.fixed === undefined || g.strike === undefined || !acts) return undefined
   for (const a of acts)
-    if (a.play === "strike" && a.from >= g.fixed && a.from + STRIKE_LEAD_MS <= g.strike)
-      return a.from + STRIKE_LEAD_MS
+    if (a.play === "strike" && a.from >= g.fixed && a.from + STRIKE_PAUSE_MS + STRIKE_LEAD_MS <= g.strike)
+      return a.from + STRIKE_PAUSE_MS + STRIKE_LEAD_MS
   return undefined
 }
 

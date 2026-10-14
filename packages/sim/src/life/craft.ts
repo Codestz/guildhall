@@ -232,6 +232,9 @@ export const STANDUP_MS = 1133
 /** ms a seated hero takes to get up before it walks off (`Sit_Floor_StandUp`, played quicker). */
 export const RISE_MS = 600
 
+/** ms a hero squares up (`Melee_Block`, sword raised) before it strikes a grave (graveStrike.ts). */
+export const STRIKE_GUARD_MS = 500
+
 /** A moment the planner choreographs, or a call's craft, or thinking between calls. */
 export type Play =
   | "craft"
@@ -301,7 +304,11 @@ const PLAYS: Readonly<Record<Exclude<Play, "craft" | "think">, Routine>> = {
   // the graveyard (graveStrike.ts): one blow at a mended grave's skeleton (it lands 0.45 s in), then
   // watching it go down, sword in hand
   strike: {
-    moves: [{ clip: "Melee_1H_Attack_Slice_Diagonal", beat: ["hit", 0.45] }, { clip: "Idle_A" }],
+    moves: [
+      { clip: "Melee_Block", ms: STRIKE_GUARD_MS },
+      { clip: "Melee_1H_Attack_Slice_Diagonal", beat: ["hit", 0.45] },
+      { clip: "Idle_A" },
+    ],
     loop: "last",
     props: [P.sword],
   },

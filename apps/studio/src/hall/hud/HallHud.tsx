@@ -789,9 +789,13 @@ export function HallHud(props: HallHudProps) {
       onPick={onFeedPick}
       {...(sessionFeed ? {} : { when: monthOf })}
       stamp={sessionFeed ? sessionStamp : chronicle ? feedStamp(chronicle) : ""}
-      empty={sessionFeed ? "Nothing yet: the guild has not stirred." : "No history: this island is a sketch."}
+      empty={
+        sessionFeed
+          ? "Nothing yet: the guild has not stirred."
+          : "We haven't read this repo's history yet — the island is a sketch from its name."
+      }
       foot={
-        legendsAt || !home ? (
+        legendsAt || (!home && !brand.sketch) ? (
           <>
             {legendsAt && (
               <>

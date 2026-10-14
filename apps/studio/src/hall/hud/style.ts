@@ -27,19 +27,23 @@ const CSS = /* css */ `
 /* places: a list folded under the brand */
 .gh .hall-places { min-height: 0; flex: 0 1 auto; }
 .hall-place-list { list-style: none; margin: 0; padding: 4px; display: grid; gap: 1px; }
+/* a row is two lines always (the label over its path, the count over its kind), the share a 2 px track
+   along its foot: rows keep one height whether or not a path shows */
 .hall-place-row {
-  position: relative; width: 100%; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 5px 8px 7px;
+  position: relative; width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 18px 15px;
+  align-content: center; column-gap: 10px; align-items: center; min-height: 52px; padding: 4px 8px 6px;
   border: 1px solid transparent; border-radius: var(--r-sm); background: none; color: var(--paper); text-align: left; cursor: pointer; overflow: hidden;
 }
 .hall-place-row:hover { background: var(--raise-2); }
 .hall-place-row[aria-current="true"] { border-color: var(--brass-line); background: var(--brass-wash); }
-.hall-place-name { flex: 1; min-width: 0; display: grid; gap: 1px; }
-.hall-place-name b { font: 500 var(--t-md)/1.2 var(--body); font-variant: all-small-caps; letter-spacing: 0.06em; color: var(--brass-hi); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hall-place-name small { font-size: 11px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hall-place-meta { flex: none; display: grid; justify-items: end; gap: 1px; }
-.hall-place-meta .num { font-size: 12px; color: var(--paper); }
-.hall-place-meta small { font-size: 11px; color: var(--muted); }
-.hall-place-bar { position: absolute; left: 8px; bottom: 3px; height: 2px; max-width: calc(100% - 16px); border-radius: 1px; background: var(--brass-line); }
+.hall-place-name, .hall-place-meta { display: contents; }
+.hall-place-name b { grid-column: 1; grid-row: 1; font: 500 var(--t-md)/1.2 var(--body); font-variant: all-small-caps; letter-spacing: 0.06em; color: var(--brass-hi); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hall-place-name small { grid-column: 1; grid-row: 2; font-size: 11px; line-height: 15px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hall-place-meta .num { grid-column: 2; grid-row: 1; justify-self: end; font-size: 12px; color: var(--paper); }
+.hall-place-meta small { grid-column: 2; grid-row: 2; justify-self: end; font-size: 11px; line-height: 15px; color: var(--muted); }
+.hall-place-row::before { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 2px; border-radius: 1px; background: rgba(243, 233, 212, 0.08); }
+.hall-place-bar { position: absolute; left: 8px; bottom: 0; height: 2px; max-width: calc(100% - 16px); border-radius: 1px; background: var(--brass); opacity: 0.3; }
+.hall-place-row[aria-current="true"] .hall-place-bar { opacity: 0.6; }
 
 /* the timeline bar (hall/timeline.tsx) in the HUD's bottom-centre slot, between the Chronicle chip and
    the act chip. A hairline until hovered, focused or tapped (only the line takes the pointer then: the

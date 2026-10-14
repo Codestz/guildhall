@@ -82,6 +82,8 @@ export const TOKENS_CSS = /* css */ `
   color: var(--paper);
   -webkit-font-smoothing: antialiased;
 }
+/* a phone is touch: hit targets are 44 px (viewer/style.ts sizes what fixes its own, site/style.ts the site's) */
+.gh[data-phone], .gh [data-phone] { --hit: 44px; }
 .gh *, .gh *::before, .gh *::after { box-sizing: border-box; }
 /* V1's bare-element reset at no specificity: a class's own face, size, weight and colour on a button
    (the Chronicle chip's Marcellus, a segment's muted label) win over it, as they did in V1 */

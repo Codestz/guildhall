@@ -1,4 +1,22 @@
 /**
+ * Touch size (decisions.md "Phone GUI"): under `root` (a phone's viewer, or any coarse pointer) `--hit` is
+ * 44 px and what fixes its own size follows it: the icon buttons, the play button, the speed chip, the
+ * timeline's hairline (a transparent 44 px tap pad behind it) and the range thumbs (their ring drawn at
+ * the old size inside a 44 px thumb, so the line itself keeps its look).
+ */
+const touch = (root: string) => /* css */ `
+${root} { --hit: 44px; --thumb: radial-gradient(circle closest-side, var(--brass-hi) 0 5px, var(--ink-solid) 5px 8px, var(--brass) 8px 9px, transparent 9.5px); }
+${root} .ui-icon-btn[data-plaque] { width: var(--hit); height: var(--hit); }
+${root} :is(.hud-play, .ui-play) { width: var(--hit); height: var(--hit); }
+${root} .hud-rate { min-width: var(--hit); height: var(--hit); }
+${root} .hud-timeline-hint::before { content: ""; position: absolute; left: -10px; right: -10px; top: 50%; height: var(--hit); translate: 0 -50%; }
+${root} .ui-range::-webkit-slider-thumb { width: var(--hit); height: var(--hit); margin-top: calc((4px - var(--hit)) / 2); border: 0; background: var(--thumb); box-shadow: none; }
+${root} .hud-track { height: var(--hit); }
+${root} .hud-track input::-webkit-slider-thumb { width: var(--hit); height: var(--hit); margin-top: 0; border: 0; background: var(--thumb); box-shadow: none; }
+${root} :is(.ui-range, .hud-track input):focus-visible::-webkit-slider-thumb { background: radial-gradient(circle closest-side, var(--brass-hi) 0 5px, var(--ink-solid) 5px 8px, var(--brass) 8px 9px, rgba(241, 213, 144, 0.5) 9px 12px, transparent 12.5px); }
+`
+
+/**
  * The Viewer's layout: a stage filling the viewer, a label layer over it, and V1's corners round it
  * (title card top-left, tools top-right, transport bottom-left, camera help bottom-right) with the
  * Inspector down the right. Sized by container queries on the viewer itself, so a viewer inset in a
@@ -196,6 +214,8 @@ export const VIEWER_CSS = /* css */ `
 
 /* a phone: the rail stays top-right, the feed is a chip, the one open panel is a bottom sheet */
 .ui-viewer[data-phone] { --gut: 8px; }
+${touch(".ui-viewer[data-phone]")}
+@media (pointer: coarse) { ${touch(".gh.ui-viewer")} }
 .ui-viewer[data-phone] .ui-hud-bottom { left: var(--gut); right: var(--gut); translate: none; max-width: none; bottom: calc(var(--gut) + env(safe-area-inset-bottom)); }
 .ui-viewer[data-phone] .ui-hud-sheet {
   top: auto;

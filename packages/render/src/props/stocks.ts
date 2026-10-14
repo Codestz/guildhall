@@ -2,7 +2,8 @@
  * What work leaves, drawn (game feel, task B): every stock life plans (world routines.ts `Stock`: a
  * fisher's basket, a log pile, an ore cart on its rail and the heap at its end, planks, crates, bars,
  * arrows in the butts, baskets at a stall) as one BatchedMesh, plus the fishers' floats in it and their
- * lines as one LineSegments: two draws for all of it.
+ * lines as one LineSegments: two draws for all of it, and each stock lies in a soft dark disc
+ * (contactShadow.ts: the one draw it shares with the harvest heaps).
  *
  * A stock is laid out again only when its level changes (stockLayout.ts: a few levels, never per unit);
  * a cart moves along its rail only while it rolls. The floats and the lines are the caller's to set
@@ -31,6 +32,7 @@ import { loadPiece } from "../pieces.ts"
 import type { Stage } from "../stage.ts"
 import { warmPrograms } from "../warm.ts"
 import { builtOf, builtPath } from "./built.ts"
+import { contactShadows } from "./contactShadow.ts"
 import { LINE_SEGMENTS, sagLine } from "./line.ts"
 import {
   CART,
@@ -176,6 +178,18 @@ export async function createStocks(
     return g === undefined || Math.abs(g - own) > 0.6 ? own : g
   }
   const m = scratch.m
+  // each stock's soft shadow: a disc as wide as its full pile reaches, fuller as the pile is
+  const shadows = contactShadows(stage).range(stocks.length)
+  const disc = stocks.map((s, k) => {
+    const reach = (full[k] ?? []).map((p) => Math.hypot(p.at[0], p.at[2]) + 0.2)
+    const r0 = s.kind === "ore-cart" ? 0.62 : Math.max(0.28, ...reach)
+    return { x: s.at[0], y: 0, z: s.at[2], r0, r: r0, a: 0 }
+  })
+  let fade = 1
+  const shade = (k: number) => {
+    const d = disc[k]
+    if (d) shadows.set(k, d.x, d.y, d.z, d.r, d.a * fade)
+  }
 
   const drawn: Drawn[] = stocks.map((stock, k) => {
     const layout = full[k] ?? []
@@ -274,6 +288,14 @@ export async function createStocks(
       const i = d.instances[j]
       if (i !== undefined) mesh.setMatrixAt(i, frameMatrix(x, y, z, yaw, p, m))
     }
+    const sd = disc[stocks.indexOf(s)]
+    if (sd) {
+      sd.x = x
+      sd.y = y - 0.04
+      sd.z = z
+      sd.a = 0.9
+      shade(stocks.indexOf(s))
+    }
     c.roll = roll
     rolls++
   }
@@ -295,6 +317,14 @@ export async function createStocks(
           if (on && !d.cart) mesh.setMatrixAt(i, frameMatrix(s.at[0], d.y, s.at[2], s.facing, p, m))
         }
         d.shown = layout.length
+        const sd = disc[k]
+        if (sd && !d.cart) {
+          const f = level / Math.max(1, LEVELS[d.kind].length - 1)
+          sd.y = d.y
+          sd.a = level === 0 ? 0 : 0.55 + 0.45 * f
+          sd.r = sd.r0 * (0.7 + 0.3 * f)
+          shade(k)
+        }
         relayouts++
         if (d.cart) placeCart(d, roll)
       } else if (d.cart && Math.abs(roll - d.cart.roll) > 1e-4) placeCart(d, roll)
@@ -333,6 +363,10 @@ export async function createStocks(
       faded.opacity = o
       mesh.visible = o > 0
       lineMaterial.opacity = lineOpacity * o
+      if (o !== fade) {
+        fade = o
+        for (let k = 0; k < disc.length; k++) shade(k)
+      }
     },
     stats: () => ({
       stocks: stocks.length,
@@ -343,6 +377,7 @@ export async function createStocks(
       lines: lineCount,
     }),
     dispose() {
+      shadows.release()
       mesh.removeFromParent()
       lines.removeFromParent()
       mesh.dispose()

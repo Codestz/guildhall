@@ -3,7 +3,8 @@
  * on the farms, as one BatchedMesh: one draw while it shows, none the rest of the year (the mesh is hidden
  * at weight 0, so summer's frame is the frame it was, draw for draw). It casts no shadow (a draw more in each
  * sun cascade, and the cascades keep a heap's shadow after its season is gone) and takes the palette's batch program,
- * linked already for the island's own.
+ * linked already for the island's own. Its heaps lie in a soft dark disc each instead (contactShadow.ts,
+ * the one draw it shares with the stocks'), grown and faded with the same weight.
  *
  * `show(w)` is how much of it there is, 0 … 1 (the Studio gives the autumn blend through a smoothstep, so
  * it comes as autumn begins and is gone by winter): each heap grows from its own middle, and the
@@ -18,6 +19,7 @@ import { paletteMaterial } from "../material.ts"
 import { loadPiece } from "../pieces.ts"
 import type { Stage } from "../stage.ts"
 import { warmPrograms } from "../warm.ts"
+import { contactShadows } from "./contactShadow.ts"
 
 const logger = log("render:harvest")
 
@@ -30,7 +32,15 @@ export interface HarvestOpts {
 export interface Harvest {
   /** How much of the harvest shows, 0 … 1 (0: nothing drawn at all). */
   show(w: number): void
-  stats(): { pieces: number; heaps: number; shown: number; writes: number; draws: number }
+  stats(): {
+    pieces: number
+    heaps: number
+    shown: number
+    writes: number
+    draws: number
+    /** The contact shadows' draw (shared with the stocks'), 0 or 1. */
+    shadowDraws: number
+  }
   dispose(): void
 }
 
@@ -112,6 +122,20 @@ export async function createHarvest(
     c.x /= c.n
     c.z /= c.n
   }
+  // each heap's soft shadow: a disc under its middle, as wide as the heap reaches and a little over
+  const shadowOf = [...heapOf.keys()]
+  const reach = new Map<string, number>()
+  for (const p of kept) {
+    const c = heapOf.get(key(p)) as { x: number; z: number }
+    reach.set(key(p), Math.max(reach.get(key(p)) ?? 0, Math.hypot(p.x - c.x, p.z - c.z) + 0.3))
+  }
+  const shadows = contactShadows(stage).range(shadowOf.length)
+  const shade = (k: number) => {
+    for (const [j, id] of shadowOf.entries()) {
+      const c = heapOf.get(id) as { x: number; y: number; z: number }
+      shadows.set(j, c.x, c.y, c.z, (reach.get(id) as number) * 1.4 * (0.4 + 0.6 * k), k * k)
+    }
+  }
   const instances = kept.map((p) => mesh.addInstance(geometryId.get(p.piece) as number))
   const m = scratch.m
   /** The matrices at weight `k`: each piece's offset from its heap's middle, and the piece, grown by k. */
@@ -140,6 +164,7 @@ export async function createHarvest(
     show(w) {
       const k = Math.max(0, Math.min(1, w))
       if (k < MIN) {
+        if (at !== 0) shade(0)
         mesh.visible = false
         at = 0
         return
@@ -147,6 +172,7 @@ export async function createHarvest(
       if (at === 0 || Math.abs(k - at) > STEP || k === 1) {
         if (k !== at) {
           write(k)
+          shade(k)
           writes++
           at = k
         }
@@ -159,8 +185,10 @@ export async function createHarvest(
       shown: mesh.visible ? kept.length : 0,
       writes,
       draws: mesh.visible ? 1 : 0,
+      shadowDraws: mesh.visible ? contactShadows(stage).stats().draws : 0,
     }),
     dispose() {
+      shadows.release()
       mesh.removeFromParent()
       mesh.dispose()
     },

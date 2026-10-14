@@ -57,6 +57,7 @@ import {
   PlaceDossier,
   pickToasts,
   type Quality,
+  ReadmeBadge,
   type RecapView,
   RosterBadges,
   SettingsPanel,
@@ -759,23 +760,32 @@ export function HallHud(props: HallHudProps) {
       stamp={sessionFeed ? sessionStamp : chronicle ? feedStamp(chronicle) : ""}
       empty={sessionFeed ? "Nothing yet: the guild has not stirred." : "No history: this island is a sketch."}
       foot={
-        legendsAt ? (
+        legendsAt || !home ? (
           <>
-            <Button size="sm" variant="outline" onClick={() => hud.dispatch({ type: "open", id: "legends" })}>
-              <StoryGlyphs.book size={14} />
-              {sessionFeed ? "Legends" : "Legends by era"}
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                setCardOf(sessionFeed ? "session" : "repo")
-                hud.dispatch({ type: "open", id: "card" })
-              }}
-            >
-              <StoryGlyphs.card size={14} />
-              Chronicle card
-            </Button>
+            {legendsAt && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => hud.dispatch({ type: "open", id: "legends" })}
+                >
+                  <StoryGlyphs.book size={14} />
+                  {sessionFeed ? "Legends" : "Legends by era"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setCardOf(sessionFeed ? "session" : "repo")
+                    hud.dispatch({ type: "open", id: "card" })
+                  }}
+                >
+                  <StoryGlyphs.card size={14} />
+                  Chronicle card
+                </Button>
+              </>
+            )}
+            {!home && <ReadmeBadge repo={slug} placement="above" previewSrc="/badge.svg" />}
           </>
         ) : undefined
       }

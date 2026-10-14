@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import {
   altOf,
+  BADGE_IMAGE,
   badgeMarkdown,
   cardFileName,
   clockOf,
@@ -120,11 +123,20 @@ describe("the book's words read as the sim's Markdown", () => {
 })
 
 describe("the README badge", () => {
-  test("a shields badge that links to the island", () => {
+  test("a static badge that links to the island", () => {
     expect(islandLink("Codestz/guildhall")).toBe("https://guildhall.codestz.dev/hall/Codestz/guildhall")
     expect(badgeMarkdown("Codestz/guildhall")).toBe(
-      "[![See Codestz/guildhall as an island in Guildhall](https://img.shields.io/badge/Guildhall-see_it_as_an_island-dcb662?labelColor=15110d)](https://guildhall.codestz.dev/hall/Codestz/guildhall)",
+      "[![See Codestz/guildhall as an island in Guildhall](https://guildhall.codestz.dev/badge.svg)](https://guildhall.codestz.dev/hall/Codestz/guildhall)",
     )
+  })
+
+  test("the picture is the site's one static svg, and that file is in the app's public folder", () => {
+    expect(BADGE_IMAGE).toBe("https://guildhall.codestz.dev/badge.svg")
+    const svg = readFileSync(join(import.meta.dir, "../../../apps/studio/public/badge.svg"), "utf8")
+    expect(svg.startsWith("<svg")).toBe(true)
+    expect(svg).toContain('aria-label="Guildhall: see it as an island"')
+    // the Markdown embeds exactly this picture, once
+    expect(badgeMarkdown("a/b").split(BADGE_IMAGE)).toHaveLength(2)
   })
 
   test("a strange name cannot break out of the link", () => {

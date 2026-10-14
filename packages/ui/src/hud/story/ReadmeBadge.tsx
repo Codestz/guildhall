@@ -1,9 +1,9 @@
 /**
- * The README badge (V1's hud/DoorChronicle.tsx and chronicleLinks.ts): a shields.io badge in the hall's
- * brass and ink that links to the repo's island, as Markdown to paste into a README. Folded it is one
+ * The README badge (V1's hud/DoorChronicle.tsx and chronicleLinks.ts): a small badge in the hall's
+ * brass and ink (the site's static `/badge.svg`) that links to the repo's island, as Markdown to paste into a README. Folded it is one
  * button (the island glyph alone with `compact`); pressed, a small popover shows the badge, its
- * Markdown and a Copy button. Esc or a click elsewhere closes it. Nothing is hosted yet: the link is
- * where the hall will serve the island (`/hall/<owner>/<repo>`).
+ * Markdown and a Copy button. Esc or a click elsewhere closes it. The link is where the hall serves the
+ * island (`/hall/<owner>/<repo>`).
  */
 import { useEffect, useId, useRef, useState } from "react"
 import { Glyphs } from "../glyphs.tsx"
@@ -13,9 +13,8 @@ import { StoryGlyphs } from "./glyphs.tsx"
 /** The hall's public address: badges point here, never at the page's own origin. */
 export const SITE = "https://guildhall.codestz.dev"
 
-/** The badge's picture: V1's static shields.io badge, brass on ink. */
-export const BADGE_IMAGE =
-  "https://img.shields.io/badge/Guildhall-see_it_as_an_island-dcb662?labelColor=15110d"
+/** The badge's picture: one static SVG for every repo (the site's `/badge.svg`), brass on ink as V1's shields badge was. */
+export const BADGE_IMAGE = `${SITE}/badge.svg`
 
 /** `owner/name` kept readable in a path: each part encoded, the slash kept. */
 const pathOf = (repo: string): string => repo.split("/").map(encodeURIComponent).join("/")
@@ -39,8 +38,12 @@ export interface ReadmeBadgeProps {
   compact?: boolean
   /** Open on mount (the lab, shots). */
   open?: boolean
-  /** Show the badge's picture in the popover (it loads from shields.io). */
+  /** Where the popover opens: below the button (default), or above it (a button at the foot of a sheet). */
+  placement?: "below" | "above"
+  /** Show the badge's picture in the popover. */
   preview?: boolean
+  /** Where the preview loads from when not the public address (the app's own `/badge.svg`, before it is deployed). */
+  previewSrc?: string
 }
 
 export function ReadmeBadge({
@@ -48,7 +51,9 @@ export function ReadmeBadge({
   site = SITE,
   compact,
   open: opened = false,
+  placement = "below",
   preview = true,
+  previewSrc = BADGE_IMAGE,
 }: ReadmeBadgeProps) {
   const id = useId()
   const [open, setOpen] = useState(opened)
@@ -81,6 +86,7 @@ export function ReadmeBadge({
     <div
       ref={root}
       className="st-badge"
+      data-placement={placement}
       onKeyDown={(event) => {
         if (event.key === "Escape" && open) {
           event.stopPropagation()
@@ -126,7 +132,7 @@ export function ReadmeBadge({
           </p>
           {preview && (
             <p className="st-badge-preview">
-              <img src={BADGE_IMAGE} alt={`See ${repo} as an island in Guildhall`} height={20} />
+              <img src={previewSrc} alt={`See ${repo} as an island in Guildhall`} height={20} />
             </p>
           )}
           <label className="ui-visually-hidden" htmlFor={`${id}-md`}>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="198" height="20" viewBox="0 0 198 20" role="img" aria-label="Guildhall: see it as an island">
+  <title>Guildhall: see it as an island</title>
+  <clipPath id="r"><rect width="198" height="20" rx="3"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="70" height="20" fill="#15110d"/>
+    <rect x="70" width="128" height="20" fill="#dcb662"/>
+  </g>
+  <g font-family="Verdana,DejaVu Sans,Geneva,sans-serif" font-size="11" text-anchor="middle">
+    <text x="35" y="14" fill="#f3e9d2" textLength="54" lengthAdjust="spacingAndGlyphs">Guildhall</text>
+    <text x="134" y="14" fill="#15110d" textLength="112" lengthAdjust="spacingAndGlyphs">see it as an island</text>
+  </g>
+</svg>

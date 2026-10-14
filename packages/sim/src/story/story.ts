@@ -1145,18 +1145,33 @@ export class Narrator {
    * words. Never merged with a burst. A rebuild forgets it like any other untold beat.
    */
   proclaim(renown: Renown, now: number): void {
-    const moment = {
-      kind: "loot",
-      id: renown.hero?.id ?? renown.master,
-      agent: "",
-      title: renown.hero?.title ?? "",
-      color: renown.hero?.color ?? "",
+    const hero = renown.hero
+    this.herald(renownLine(renown), now, {
+      id: hero?.id ?? renown.master,
+      title: hero?.title ?? "",
+      color: hero?.color ?? "",
       master: renown.master,
-      seq: 0,
       at: renown.at,
-      live: true,
-    } as Moment
-    this.heard.push({ moment, beat: "renown", heard: now, parts: renownLine(renown) })
+    })
+  }
+
+  /**
+   * A world event's own line (story/worldEvents.ts `showLine`: a grave's rise), told as a deed of
+   * renown is: before anything else, alone. `about` names who it is about (none: the island's news).
+   */
+  herald(
+    parts: CaptionPart[],
+    now: number,
+    about: { id: string; title: string; color: string; master: string; at: number } = {
+      id: "",
+      title: "",
+      color: "",
+      master: "",
+      at: 0,
+    },
+  ): void {
+    const moment = { kind: "loot", agent: "", seq: 0, live: true, ...about } as Moment
+    this.heard.push({ moment, beat: "renown", heard: now, parts })
   }
 
   /**

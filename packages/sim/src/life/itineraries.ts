@@ -137,6 +137,8 @@ export const BRIEF_WITHIN = 4000
 const BOARD_BACK = 3000
 /** Recruits briefed together stand this far apart, side by side or a row further back, metres. */
 const BRIEF_ROW = 0.9
+/** How far apart two heroes set their loot down before one Guildmaster at once, metres. */
+const DELIVER_APART = 0.7
 /** A recruit stands no nearer a gathering seat than this for its briefing, metres (two bodies). */
 const BRIEF_SEAT = 0.8
 /** A failure's blow and slump hold the hero where it stands this long before it walks home (ms). */
@@ -1053,6 +1055,8 @@ export class LifePlanner {
     return out
   }
   private briefing: [number, number, number][] | null = null
+  /** Where loot is being set down before a Guildmaster, and till when (no two set it down in one place). */
+  private delivering: { at: readonly [number, number, number]; until: number }[] = []
 
   /** A subagent's loot comes home: carried to the Guildmaster, set down, cheered; then its seat. */
   private deliver(a: WorldActor, track: Track, t: number): void {
@@ -1064,12 +1068,18 @@ export class LifePlanner {
       const seat = track.spot.spot
       const d = Math.hypot(seat.at[0] - g.at[0], seat.at[2] - g.at[2])
       if (d > 1.2) {
-        const f = 0.9 / d
-        const at: [number, number, number] = [
-          g.at[0] + (seat.at[0] - g.at[0]) * f,
-          g.at[1],
-          g.at[2] + (seat.at[2] - g.at[2]) * f,
-        ]
+        // (turned round him a little where another's loot is still being set down there)
+        const ux = (seat.at[0] - g.at[0]) / d
+        const uz = (seat.at[2] - g.at[2]) / d
+        const spotAt = (turn: number): [number, number, number] => {
+          const c = Math.cos(turn)
+          const s = Math.sin(turn)
+          return [g.at[0] + (ux * c - uz * s) * 0.9, g.at[1], g.at[2] + (ux * s + uz * c) * 0.9]
+        }
+        this.delivering = this.delivering.filter((q) => q.until > t)
+        const free = (p: [number, number, number]) =>
+          this.delivering.every((q) => Math.hypot(q.at[0] - p[0], q.at[2] - p[2]) >= DELIVER_APART)
+        const at = [0, 0.8, -0.8, 1.6, -1.6].map(spotAt).find(free) ?? spotAt(0)
         to = { node: g.node, at, facing: headingTo(at, g.at), ground: g.ground }
       }
     } else if (this.kit.board) to = this.kit.board.brief[0]!
@@ -1085,6 +1095,7 @@ export class LifePlanner {
       track.hold = arrive + SETDOWN_MS + CHEER_MS
       track.timer = track.hold + 200
       track.after = undefined
+      this.delivering.push({ at: to.at, until: track.timer })
     }
     // a leaver goes once its loot is down and cheered
     if (track.want.leave) this.fade(track, t)

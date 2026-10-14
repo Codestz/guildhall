@@ -214,6 +214,7 @@ export function createHistory(opts: HistoryOpts): History {
   let places: TilePlaces | null = null
   let placeAt: PlaceAt | null = null
   let disposed = false
+  let still: ((at: number) => () => void) | null = null
   const offs: (() => void)[] = []
   void opts.chronicle.then((read) => {
     if (disposed || !read) return
@@ -223,6 +224,7 @@ export function createHistory(opts: HistoryOpts): History {
 
   const hooks: WorldHooks = {
     transport: true,
+    still: (at) => (disposed ? null : (still?.(at) ?? null)),
     prepare(island) {
       if (!c) return
       places = tilePlaces(island)
@@ -282,15 +284,30 @@ export function createHistory(opts: HistoryOpts): History {
       let shown = Number.NaN
       let jumps = clock.get().jumps
       let drawn = Number.NaN
-      /** Everything that follows the count, `n` tiles whole. */
-      const show = (n: number) => {
-        if (n === drawn) return
-        drawn = n
+      /** What the draw sees of the count (no plates, no figures): the frame's, or a still's for one draw. */
+      const lay = (n: number) => {
         // the count is the frontier's far edge: n tiles whole, the next `span` on their way in
         reveal.set(countOf(n), span)
         parts.sun.markDirty()
         gates?.hide((x, z) => place(x, z, 0, 0) >= n)
         parts.night?.hide((x, z) => place(x, z, 0, 0) >= n)
+      }
+      // an era's still (eraShots.ts): the island at a date for one draw, then the frame's count again
+      still = (at) => {
+        const day = at / DAY_MS
+        const n =
+          day >= chronicle.end
+            ? Math.max(land, tilesAt(chronicle, chronicle.end))
+            : tilesAt(chronicle, Math.max(chronicle.start, day))
+        const was = drawn
+        lay(n)
+        return () => lay(Number.isFinite(was) ? was : n)
+      }
+      /** Everything that follows the count, `n` tiles whole. */
+      const show = (n: number) => {
+        if (n === drawn) return
+        drawn = n
+        lay(n)
         // a place's plate once its unit is born and its heart is whole
         const today = dayAt(chronicle, clock.get().t)
         parts.labels?.hide(

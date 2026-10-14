@@ -254,6 +254,11 @@ export interface WorldHooks {
   mesh(stage: Stage, data: VertexMeshData, kind: "ground" | "structures" | "roads"): TerrainMesh | null
   /** The transport is the hook's (the day's clock is still set by `ext.clock`). */
   transport?: boolean
+  /**
+   * Lays the island out as it was at `at` (epoch ms) for one synchronous draw (an era's still,
+   * hall/eraShots.ts) and returns the undo; null before the island is built.
+   */
+  still?(at: number): (() => void) | null
   /** Once the island is drawn and its pure parts are built on this thread (behind the cover, before it settles). */
   built(parts: {
     island: HexIsland
@@ -322,6 +327,10 @@ export interface HudParts {
   camera?: HallCamera
   /** The season (season.ts): a story sets its own, Settings pins one. */
   season?: SeasonMount | null
+  /** The post pipeline (null with `?post=0`): stills of the island through it (render still.ts). */
+  post?: Post | null
+  /** The island as it was at a date, for one draw (`WorldHooks.still`; a hall's history), else null. */
+  still?: ((at: number) => (() => void) | null) | null
 }
 
 /** What `window.guildhall.ext.hall` tells the shots: how long each part took, and the places built. */
@@ -961,6 +970,8 @@ const world = {
           heroLook: (id) => life?.heroLook(id) ?? null,
           chips: life?.chips() ?? null,
           season,
+          post,
+          still: hooks?.still ? (at) => hooks.still?.(at) ?? null : null,
         })
       // a hall's session drives its heroes: planned in the worker as its log grows (the HUD starts the
       // session as it mounts, which may be a moment after this: looked for until it is there)

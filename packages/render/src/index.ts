@@ -126,6 +126,7 @@ export {
   zoomFraction,
   zoomTilt,
 } from "./rig/world.ts"
+export * from "./sea/index.ts"
 export { createShadows, fitShadowCamera, type ShadowBox } from "./shadow.ts"
 export {
   bakeShoreField,

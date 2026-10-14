@@ -14,7 +14,7 @@ export const BUILT: BuiltContent = {
   stats: [
     { n: "2,800", unit: "tiles", label: "the most land an island gets, reached at about 11k files" },
     { n: "1", label: "source of truth for where things stand" },
-    { n: "83", unit: "tiles", label: "authored as data, with 232 spots for people" },
+    { n: "83", unit: "tiles", label: "authored as data, with 234 spots for people" },
   ],
   note: "The island is drawn with three.js in your browser. The Studio, the world and this site share one design system.",
   sections: [
@@ -131,7 +131,7 @@ export const BUILT: BuiltContent = {
       blocks: [
         {
           kind: "p",
-          text: "Townsfolk live by daily routines: they go to authored **spots** where they sit, work, talk or drink, and the evening finds them in the tavern garden. 232 spots and 474 blockers are authored as data on 83 tile prefabs, so a design opinion (“a canteen with a beer garden”) becomes something the simulation uses.",
+          text: "Townsfolk live by daily routines: they go to authored **spots** where they sit, work, talk or drink, and the evening finds them in the tavern garden. 234 spots and 474 blockers are authored as data on 83 tile prefabs, so a design opinion (“a canteen with a beer garden”) becomes something the simulation uses.",
         },
         {
           kind: "techs",

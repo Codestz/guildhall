@@ -135,7 +135,6 @@ export {
   shoreFieldTexture,
 } from "./shoreField.ts"
 export * from "./shows/index.ts"
-export * from "./undead/index.ts"
 export { createSky, type Sky, type SkyPreset } from "./sky.ts"
 export { createSlicer, NO_SLICE, type Slicer } from "./slice.ts"
 export { createStage, type Disposable, type Stage, toScreen } from "./stage.ts"
@@ -158,6 +157,7 @@ export {
 export { boundingSphere, fitSphere, renderThumbnail, type ThumbnailOpts } from "./thumbnail.ts"
 export type { Split, Timing, TimingSample } from "./timing.ts"
 export { recolour, recolourPiece, swatchMapKey } from "./tint.ts"
+export * from "./undead/index.ts"
 export {
   createViewer,
   type Overlay,

@@ -130,14 +130,15 @@ const CSS = /* css */ `
 .gh .hall-feed { max-height: min(460px, 100%); }
 .gh .hall-feed .hud-chron-text b { color: var(--brass-hi); }
 
-/* panels over the world: translucent ink over a blur (the plates keep out of them, data-keepout), the
-   sheet's long reads a little denser; a soft shadow under the small type keeps it AA over a bright sky */
+/* panels over the world: V1's plaque ink (0.86) over a blur, the sheet's long reads V1's settings ink
+   (0.95): at 0.74 a noon meadow showed through and the faint and muted type fell under AA; a soft shadow
+   under the small type */
 .gh .ui-hud-region .ui-panel, .gh .hall-float .ui-panel {
-  background: rgba(20, 15, 11, 0.74);
-  backdrop-filter: blur(14px) saturate(1.25); -webkit-backdrop-filter: blur(14px) saturate(1.25);
+  background: var(--ink);
+  backdrop-filter: blur(14px) saturate(1.15); -webkit-backdrop-filter: blur(14px) saturate(1.15);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
-.gh .ui-hud-sheet .ui-panel { background: rgba(20, 15, 11, 0.88); }
+.gh .ui-hud-sheet .ui-panel { background: rgba(20, 15, 11, 0.95); }
 
 /* ── the top row (user 10-13): the site's crest pill (its own compact width), then the repo chip of its
    own width (--crest-w: the crest and the gap after it, hall/hud/HallHud.tsx); under them, left-aligned,

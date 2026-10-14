@@ -4,17 +4,22 @@ import { PerspectiveCamera, Scene } from "three"
 import { eventSites } from "../src/events/sites.ts"
 import type { DayLight } from "../src/light.ts"
 import {
-  BREATH_EVERY,
+  BEAT_S,
+  bankAt,
+  beatAngle,
   breathAt,
   buildBunting,
   createShows,
   DRAGON_ARRIVE_S,
   DRAGON_LEAVE_S,
+  dragonAt,
+  dragonFlight,
   dragonOrbit,
   envelope,
   rainbowSize,
   SHOW_KINDS,
   SHOW_S,
+  wingAngle,
 } from "../src/shows/index.ts"
 import type { Stage } from "../src/stage.ts"
 
@@ -79,13 +84,26 @@ describe("show sites", () => {
 })
 
 describe("show timings", () => {
-  test("the dragon breathes only once circling, every BREATH_EVERY seconds", () => {
-    expect(breathAt(DRAGON_ARRIVE_S, false)).toBe(0)
-    const t = DRAGON_ARRIVE_S + 1 + 0.6
-    expect(breathAt(t, false)).toBeGreaterThan(0.9)
-    expect(breathAt(t + BREATH_EVERY, false)).toBeCloseTo(breathAt(t, false), 5)
-    expect(breathAt(t + 3, false)).toBe(0)
-    expect(breathAt(t, true)).toBe(0)
+  test("the dragon breathes only on the route, at the bottom of a swoop, more than once a cycle", () => {
+    const plan = dragonFlight({ sites })
+    expect(breathAt(plan, DRAGON_ARRIVE_S, false)).toBe(0)
+    expect(breathAt(plan, DRAGON_ARRIVE_S + 9, true)).toBe(0)
+    let breaths = 0
+    let was = false
+    for (let t = DRAGON_ARRIVE_S; t < DRAGON_ARRIVE_S + plan.cycle; t += 0.05) {
+      const b = breathAt(plan, t, false)
+      if (b > 0.9 && !was) breaths++
+      was = b > 0.9
+      // fire comes low: in the lower half of its band, never while beating hard
+      if (b > 0.9) {
+        const s = plan.at(t - DRAGON_ARRIVE_S)
+        expect(s.alt).toBeLessThan(-2)
+        expect(s.beating).toBeLessThan(0.2)
+      }
+    }
+    expect(breaths).toBeGreaterThanOrEqual(2)
+    // the cycle repeats
+    expect(breathAt(plan, 20 + plan.cycle, false)).toBeCloseTo(breathAt(plan, 20, false), 9)
   })
 
   test("envelope rises and falls, zero at both ends", () => {
@@ -105,6 +123,126 @@ describe("show timings", () => {
     for (const name of ["position", "normal", "color", "aAnchor", "aOrder", "aSway", "_glow"])
       expect(g?.getAttribute(name)).toBeDefined()
     g?.dispose()
+  })
+})
+
+describe("the dragon's flight", () => {
+  const plan = dragonFlight({ sites })
+  const total = SHOW_S.dragon
+
+  test("bursts of three to five beats, then glides of more than two seconds on still wings", () => {
+    const runs: { beating: boolean; s: number }[] = []
+    let cur: { beating: boolean; s: number } | null = null
+    for (let tau = 0; tau < plan.cycle; tau += 0.01) {
+      const b = plan.at(tau).beating > 0.5
+      if (!cur || cur.beating !== b) {
+        cur = { beating: b, s: 0 }
+        runs.push(cur)
+      }
+      cur.s += 0.01
+    }
+    const bursts = runs.filter((r) => r.beating).map((r) => r.s / BEAT_S)
+    expect(bursts.length).toBeGreaterThanOrEqual(4)
+    for (const n of bursts) {
+      expect(n).toBeGreaterThan(2.6)
+      expect(n).toBeLessThan(6.4)
+    }
+    const glides = runs.filter((r) => !r.beating).map((r) => r.s)
+    expect(Math.max(...glides)).toBeGreaterThan(2.5)
+    // gliding, the wings are held still and a little up
+    for (let tau = 0; tau < plan.cycle; tau += 0.1) {
+      const s = plan.at(tau)
+      if (s.beating === 0) expect(wingAngle(s)).toBeGreaterThan(0)
+    }
+  })
+
+  test("it climbs on its beats and sinks on its glides", () => {
+    let up = 0
+    let down = 0
+    for (let tau = 0; tau < plan.cycle; tau += 0.05) {
+      const s = plan.at(tau)
+      const rate = (plan.at(tau + 0.05).alt - s.alt) / 0.05
+      if (s.beating > 0.95) up += rate
+      if (s.beating < 0.05) down += rate
+    }
+    expect(up).toBeGreaterThan(0)
+    expect(down).toBeLessThan(0)
+  })
+
+  test("a downstroke is quicker than the recovery", () => {
+    // from the top (beat 0) to the bottom takes two fifths of the beat
+    expect(beatAngle(0)).toBeGreaterThan(beatAngle(0.4) + 1)
+    expect(beatAngle(0.4)).toBeLessThan(beatAngle(0.2))
+    expect(beatAngle(0.4)).toBeLessThan(beatAngle(0.7))
+  })
+
+  test("its route is uneven: its distance from the peaks and its height vary", () => {
+    const { centre } = dragonOrbit({ sites })
+    let near = Number.POSITIVE_INFINITY
+    let far = 0
+    let lo = Number.POSITIVE_INFINITY
+    let hi = Number.NEGATIVE_INFINITY
+    for (let t = DRAGON_ARRIVE_S; t < total - DRAGON_LEAVE_S; t += 0.1) {
+      const [x, y, z] = dragonAt(plan, t, total)
+      const r = Math.hypot(x - centre.x, z - centre.z)
+      near = Math.min(near, r)
+      far = Math.max(far, r)
+      lo = Math.min(lo, y)
+      hi = Math.max(hi, y)
+    }
+    expect(far - near).toBeGreaterThan(5)
+    expect(hi - lo).toBeGreaterThan(8)
+  })
+
+  test("its flight never jumps: in, round, out (and when told to go mid-route)", () => {
+    for (const end of [total, 31.3 + DRAGON_LEAVE_S]) {
+      let last: number[] | null = null
+      let jump = 0
+      const F = 1 / 60
+      for (let t = 0; t < end - 2 * F; t += F) {
+        const a = dragonAt(plan, t, end)
+        const b = dragonAt(plan, t + F, end)
+        const v = [0, 1, 2].map((k) => ((b[k] as number) - (a[k] as number)) / F)
+        if (last) jump = Math.max(jump, Math.hypot(...v.map((x, k) => (x - (last as number[])[k]) as number)))
+        last = v
+      }
+      // under a metre a second from one frame to the next (≈ 6 g at its speed: a swoop, not a jerk)
+      expect(jump).toBeLessThan(1)
+      let bankJump = 0
+      for (let t = 0; t < end; t += F)
+        bankJump = Math.max(bankJump, Math.abs(bankAt(plan, t + F, end) - bankAt(plan, t, end)))
+      // a roll of at most about 2.5 rad/s (a quick roll out for home when told to go mid-turn)
+      expect(bankJump).toBeLessThan(0.045)
+    }
+  })
+
+  test("it banks into its turns", () => {
+    let banked = 0
+    for (let t = DRAGON_ARRIVE_S; t < total - DRAGON_LEAVE_S; t += 0.2)
+      banked = Math.max(banked, Math.abs(bankAt(plan, t, total)))
+    expect(banked).toBeGreaterThan(0.25)
+  })
+
+  test("a pose at a time is the same whatever came before (seek = play)", async () => {
+    const pose = async (history: number[]) => {
+      const { stage, step } = fakeStage()
+      let clock = 0
+      const shows = createShows(stage, { sites, span: 160, light: light(0), clock: () => clock })
+      shows.play({ kind: "dragon", start: 0, end: total })
+      await shows.ready()
+      for (const t of history) {
+        clock = t
+        step(0.016)
+      }
+      const group = stage.scene.getObjectByName("show dragon")
+      group?.updateMatrixWorld(true)
+      const m = group?.matrixWorld.elements.slice() ?? []
+      shows.dispose()
+      return m
+    }
+    const seek = await pose([23.4])
+    const play = await pose(Array.from({ length: 200 }, (_, i) => i * 0.117).concat([23.4]))
+    for (let k = 0; k < 16; k++) expect(play[k] as number).toBeCloseTo(seek[k] as number, 9)
   })
 })
 

@@ -9,7 +9,8 @@
  * lane in. Everything is a plan of times (`planFleet`) and a pose sampled from it (`voyagePose`), so
  * the same history and the same time always give the same picture.
  */
-import { clamp01, easeIn, easeOut, smooth01 } from "./ease.ts"
+import { wayAlong } from "../sea/course.ts"
+import { clamp01, easeIn, smooth01 } from "./ease.ts"
 
 export type ShipEnd = "merged" | "closed"
 
@@ -26,7 +27,10 @@ export const FLEET = {
   /** Berths a harbour gives the fleet at most (and so ships on the water). */
   MAX: 6,
   /** Sailing in, docking, from the open sea. */
-  ARRIVE_S: 14,
+  ARRIVE_S: 16,
+  /** The approach: losing way over this long, then running this share of its lane past the berth and back. */
+  SLOW_S: 8,
+  OVERSHOOT: 0.007,
   /** A merged ship's stay at the berth before it casts off, at least. */
   STAY_S: 2.5,
   /** A merged ship stays at its berth this long after its merge (its flare and its pennant's dip). */
@@ -105,7 +109,7 @@ export function planFleet(
       v.how = how
       if (how === "closed" && at < arrive) {
         v.leave = at
-        v.back = easeOut((at - start) / FLEET.ARRIVE_S)
+        v.back = arriveAlong(at - start)
         v.gone = at + FLEET.LEAVE_S * Math.max(0.3, v.back)
       } else if (how === "closed" && sinking) {
         v.leave = at
@@ -147,10 +151,21 @@ export interface VoyagePose {
   dip: number
   /** Moving on the water (a wake), m/s-ish 0 … 1. */
   way: number
+  /** How settled it lies tied up at its berth, 0 … 1 (it rides on its lines that much). */
+  hold: number
   phase: "waiting" | "arriving" | "docked" | "leaving" | "sinking" | "turning-back" | "gone"
 }
 
 const fadeEnds = (along: number) => smooth01(along / 0.12)
+
+/**
+ * How far in a ship has come `s` seconds after it set out (0 … 1 of its lane): in at a steady pace,
+ * a long slow approach losing way over its last `SLOW_S`, running a ship's width past its berth and
+ * settling back.
+ */
+export function arriveAlong(s: number): number {
+  return wayAlong(s, FLEET.ARRIVE_S, 1, { slow: FLEET.SLOW_S, overshoot: FLEET.OVERSHOOT, settle: 3.2 })
+}
 
 /** A merged ship's salute at `t`: the pennant's glint, the flare's progress and the dip. */
 export function salute(v: Voyage, t: number): { glint: number; flare: number; dip: number } {
@@ -171,28 +186,32 @@ export function sinkPose(u: number): { sink: number; list: number; seen: number 
 }
 
 export function voyagePose(v: Voyage, t: number): VoyagePose {
-  const still = { along: 1, turn: 0, sink: 0, list: 0, seen: 1, glint: 0, flare: 0, dip: 0, way: 0 }
+  const still = { along: 1, turn: 0, sink: 0, list: 0, seen: 1, glint: 0, flare: 0, dip: 0, way: 0, hold: 0 }
   if (t < v.start) return { ...still, seen: 0, along: 0, phase: "waiting" }
   if (t >= v.gone) return { ...still, seen: 0, phase: "gone" }
   if (t < v.arrive && t < v.leave) {
     const u = (t - v.start) / (v.arrive - v.start)
-    const along = easeOut(u)
-    return { ...still, along, seen: fadeEnds(along), way: 1 - u, phase: "arriving" }
+    const along = arriveAlong(t - v.start)
+    return { ...still, along, seen: fadeEnds(along), way: 1 - smooth01((u - 0.5) / 0.5), phase: "arriving" }
   }
-  if (t < v.leave) return { ...still, ...salute(v, t), phase: "docked" }
+  // tied up: it settles on its lines and rides there, the swing dying away once it casts off
+  const tied = v.start === v.arrive ? 1 : smooth01((Math.min(t, v.leave) - v.arrive) / 5)
+  const hold = tied * (1 - smooth01((t - v.leave) / 3))
+  if (t < v.leave) return { ...still, ...salute(v, t), hold, phase: "docked" }
   const u = clamp01((t - v.leave) / (v.gone - v.leave))
-  if (v.sinks) return { ...still, ...sinkPose(u), phase: "sinking" }
-  // turning about where it lies, then out along the lane
+  if (v.sinks) return { ...still, ...sinkPose(u), hold, phase: "sinking" }
+  // turning about where it lies, gathering way as it comes round, then out along the lane
   const from = v.back ?? 1
-  const turn = smooth01(u / 0.3)
-  const along = from * (1 - easeIn(u))
+  const turn = smooth01(u / 0.35)
+  const along = from * (1 - wayAlong(t - v.leave, v.gone - v.leave, 1, { gather: (v.gone - v.leave) * 0.45 }))
   return {
     ...still,
     ...salute(v, t),
     along,
     turn,
     seen: fadeEnds(along),
-    way: Math.min(1, u * 2),
+    hold,
+    way: smooth01(u / 0.45),
     phase: v.back !== undefined ? "turning-back" : "leaving",
   }
 }

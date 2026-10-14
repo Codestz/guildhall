@@ -1,15 +1,19 @@
 /**
- * The dragon (a red streak, plan v1events): a low-poly dragon comes down out of the northern sky,
- * circles the island's peaks banking into the turn, wings beating and tail swaying, breathes a gout of
- * fire every few seconds, and at the end climbs away north into the haze. Ported from V1
- * (scene/events/Dragon.tsx).
+ * The dragon (a red streak, plan v1events): a low-poly dragon glides down out of the northern sky onto
+ * an uneven route round the island's peaks and flies it in acts (flight.ts): a burst of strong wing
+ * beats climbing, then a long glide on still wings held a little up, sinking; now and then a swoop,
+ * diving on the peaks with its wings raised, a gout of fire at the bottom with its head turned on
+ * them, and hard beats to climb away. It banks into its turns as a flier does (its lift tilted into
+ * the turn), its wings leading the roll and its body and tail following a moment later; the tail
+ * swings wide of a turn and trails a climb. At the end it beats up and away north into the haze.
+ * Ported from V1 (scene/events/Dragon.tsx) and made to fly.
  *
  * There is no dragon in the KayKit packs, so it is built here from a handful of faceted primitives in
  * their manner: chunky, flat-shaded, a few flat colours. Two draws: the dragon (one merged mesh; the
- * wing beat and the tail's sway are in its vertex shader, bent about the shoulders and the tail's root)
- * and its fire (one instanced mesh, every flame placed in the shader, drawn only while it breathes).
- * The CPU poses one group a frame. Every pose is a function of the show's time alone (no state), so a
- * shot can seek it.
+ * wing beat, the wingtips' lag, the head's turn and the tail's swing are in its vertex shader) and its
+ * fire (one instanced mesh, every flame placed in the shader, drawn only while it breathes). The CPU
+ * poses one group a frame. Every pose is a function of the show's time alone (no state), so a shot can
+ * seek it.
  */
 import {
   type BufferGeometry,
@@ -33,22 +37,25 @@ import {
   Vector3,
 } from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
-import { clamp01, hash01, lerp, litMaterial, type ShowCtx, type ShowPiece, smooth } from "./show.ts"
+import { type FlightPlan, type FlightState, flightPlan, hermite, wingAngle } from "./flight.ts"
+import { clamp01, hash01, litMaterial, type ShowCtx, type ShowPiece, smooth } from "./show.ts"
 
-/** Seconds a lap of the peaks takes, and how far it leans into the turn (radians). */
-export const LAP_S = 15
-const BANK = 0.38
 const SCALE = 1.1
 /** The orbit over the peaks: its height over their top, and its radius from their spread (metres). */
 const OVER_PEAKS = 27
 const RADIUS: [number, number] = [24, 34]
-/** Seconds coming in and going away; the breath every so often, lasting so long. */
+/** Seconds coming in and going away. */
 export const DRAGON_ARRIVE_S = 7
 export const DRAGON_LEAVE_S = 8
-export const BREATH_EVERY = 7
-export const BREATH_S = 1.6
 /** Where it comes from and goes to, from the orbit's centre: high over the northern sea, in the haze. */
 const FAR = new Vector3(-40, 50, -240)
+/** Its speed coming in off the horizon and going away, metres a second. */
+const IN_SPEED = 34
+const OUT_SPEED = 26
+/** Seconds the body and the tail lag the wings' roll. */
+const BODY_LAG = 0.22
+const TAIL_LAG = 0.35
+const G = 9.8
 
 /** Where a dragon circles: the orbit's centre (x, height, z) and radius. */
 export function dragonOrbit(ctx: Pick<ShowCtx, "sites">): { centre: Vector3; r: number } {
@@ -62,30 +69,144 @@ export function dragonOrbit(ctx: Pick<ShowCtx, "sites">): { centre: Vector3; r: 
   return { centre: new Vector3(c?.[0] ?? 0, (c?.[1] ?? 0) + OVER_PEAKS, c?.[2] ?? 0), r: 30 }
 }
 
+/** The dragon's flight over an island: its route and its acts, from where the peaks are (the same every time). */
+export function dragonFlight(ctx: Pick<ShowCtx, "sites">): FlightPlan {
+  const { centre, r } = dragonOrbit(ctx)
+  const seed = Math.floor(hash01(Math.round(centre.x * 7) * 131 + Math.round(centre.z * 7)) * 2 ** 31)
+  return flightPlan(seed, [centre.x, centre.y, centre.z], r)
+}
+
 /** The breath's strength 0 … 1 at `t` seconds into the show (none while arriving or leaving). */
-export function breathAt(t: number, leaving: boolean): number {
-  const since = t - DRAGON_ARRIVE_S - 1
-  if (leaving || since <= 0) return 0
-  const cycle = since % BREATH_EVERY
-  return smooth(0, 0.2, cycle) * (1 - smooth(BREATH_S - 0.3, BREATH_S, cycle))
+export function breathAt(plan: FlightPlan, t: number, leaving: boolean): number {
+  if (leaving || t <= DRAGON_ARRIVE_S) return 0
+  return plan.at(t - DRAGON_ARRIVE_S).breath
+}
+
+/** What the dragon does at a moment: where, its wings and fire, how much it watches its mark. */
+export interface DragonState extends FlightState {
+  /** Weight of the head's turn on the peaks (diving and breathing). */
+  look: number
+}
+
+/**
+ * The dragon's state at `t` into a show `total` long (Infinity while it stays): coming in it glides,
+ * then takes up its acts; going away it beats steadily up into the haze, its fire out.
+ */
+export function dragonState(plan: FlightPlan, t: number, total: number): DragonState {
+  const tau = t - DRAGON_ARRIVE_S
+  const s = plan.at(tau)
+  const leaveAt = total - DRAGON_LEAVE_S
+  // gliding in until its first act begins
+  const on = smooth(-0.4, 0.3, tau)
+  let beating = s.beating * on
+  let still = s.still * on + 0.14 * (1 - on)
+  let breath = s.breath * on
+  let strength = s.strength
+  let look = clamp01(s.breath * 1.4 + (s.still > 0.3 ? (s.still - 0.3) * 4 : 0)) * on
+  if (t > leaveAt) {
+    const k = smooth(leaveAt, leaveAt + 0.6, t)
+    beating += (1 - beating) * k
+    strength += (1.15 - strength) * k
+    breath *= 1 - smooth(leaveAt, leaveAt + 0.3, t)
+    look *= 1 - k
+    still += (0.14 - still) * k
+  }
+  return { ...s, beating, still, breath, strength, look }
+}
+
+/** On the route at `t` (a show's seconds): its point and height. */
+function cruiseAt(plan: FlightPlan, t: number): [number, number, number] {
+  const s = plan.at(t - DRAGON_ARRIVE_S)
+  const [x, z] = plan.route(s.dist)
+  return [x, plan.centre[1] + s.alt, z]
+}
+
+const velOf = (f: (t: number) => readonly number[], t: number, h = 0.05): [number, number, number] => {
+  const a = f(t - h)
+  const b = f(t + h)
+  return [0, 1, 2].map((k) => ((b[k] as number) - (a[k] as number)) / (2 * h)) as [number, number, number]
+}
+
+/**
+ * Where the dragon is at `t` into a show `total` long: in off the horizon on a curve that meets the
+ * route at its own speed and heading, the route, then up and away on another from wherever it was.
+ */
+export function dragonAt(plan: FlightPlan, t: number, total: number): [number, number, number] {
+  const leaveAt = total - DRAGON_LEAVE_S
+  const far: [number, number, number] = [
+    plan.centre[0] + FAR.x,
+    plan.centre[1] + FAR.y,
+    plan.centre[2] + FAR.z,
+  ]
+  if (t >= leaveAt) {
+    const flying = (s: number) => dragonAt(plan, s, Number.POSITIVE_INFINITY)
+    const p0 = flying(leaveAt)
+    const v0 = velOf(flying, leaveAt)
+    const away = [far[0] - p0[0], far[1] - p0[1], far[2] - p0[2]]
+    const d = Math.hypot(away[0] as number, away[1] as number, away[2] as number) || 1
+    const v1 = away.map((x) => (x / d) * OUT_SPEED)
+    return hermite(p0, v0, far, v1, DRAGON_LEAVE_S, clamp01((t - leaveAt) / DRAGON_LEAVE_S))
+  }
+  if (t < DRAGON_ARRIVE_S) {
+    const p1 = cruiseAt(plan, DRAGON_ARRIVE_S)
+    const v1 = velOf((s) => cruiseAt(plan, s), DRAGON_ARRIVE_S)
+    const dir = [p1[0] - (far[0] as number), p1[1] - (far[1] as number), p1[2] - (far[2] as number)]
+    const d = Math.hypot(dir[0] as number, dir[1] as number, dir[2] as number) || 1
+    const v0 = dir.map((x) => (x / d) * IN_SPEED)
+    return hermite(far, v0, p1, v1, DRAGON_ARRIVE_S, clamp01(t / DRAGON_ARRIVE_S))
+  }
+  return cruiseAt(plan, t)
+}
+
+/**
+ * How far the dragon leans into its turn at `t` (radians, + its left wing down): its lift tilted to
+ * carry the turn, the horizontal pull to its left over gravity.
+ */
+export function bankAt(plan: FlightPlan, t: number, total: number): number {
+  // the pull to its left, averaged over a second or so (a flier eases into a bank, it never snaps)
+  const H = 0.6
+  let left = 0
+  for (const o of [-0.3, -0.15, 0, 0.15, 0.3]) {
+    const a = dragonAt(plan, t + o - H, total)
+    const b = dragonAt(plan, t + o, total)
+    const c = dragonAt(plan, t + o + H, total)
+    const ax = ((a[0] as number) - 2 * (b[0] as number) + (c[0] as number)) / (H * H)
+    const az = ((a[2] as number) - 2 * (b[2] as number) + (c[2] as number)) / (H * H)
+    const fx = (c[0] as number) - (a[0] as number)
+    const fz = (c[2] as number) - (a[2] as number)
+    const f = Math.hypot(fx, fz) || 1
+    // its left, level: up × forward
+    left += (ax * (fz / f) - az * (fx / f)) / 5
+  }
+  return 0.7 * Math.tanh((Math.atan2(left, G) * 0.9) / 0.7)
 }
 
 interface Uniforms {
   uTime: { value: number }
   uFlap: { value: number }
+  uFlapTip: { value: number }
+  uWingRoll: { value: number }
   uBreath: { value: number }
   uEmber: { value: number }
+  uHead: { value: [number, number] }
+  uTail: { value: [number, number, number] }
 }
 
 export function createDragon(ctx: ShowCtx): ShowPiece {
   const uniforms: Uniforms = {
     uTime: { value: 0 },
     uFlap: { value: 0 },
+    uFlapTip: { value: 0 },
+    uWingRoll: { value: 0 },
     uBreath: { value: 0 },
     uEmber: { value: 0 },
+    uHead: { value: [0, 0] },
+    uTail: { value: [0, 0, 1] },
   }
-  const { centre, r } = dragonOrbit(ctx)
-  const far = centre.clone().add(FAR)
+  const plan = dragonFlight(ctx)
+  const mark = ctx.sites.peak
+    ? new Vector3(ctx.sites.peak.at[0], ctx.sites.peak.at[1], ctx.sites.peak.at[2])
+    : new Vector3(plan.centre[0], plan.centre[1] - 27, plan.centre[2])
   const body = new Mesh(buildDragon(), wingbeat(uniforms))
   body.name = "dragon"
   body.frustumCulled = false
@@ -93,53 +214,57 @@ export function createDragon(ctx: ShowCtx): ShowPiece {
   const group = new Group()
   group.name = "show dragon"
   group.add(body, fire)
-  group.position.copy(far)
+  group.position.set(plan.centre[0] + FAR.x, plan.centre[1] + FAR.y, plan.centre[2] + FAR.z)
   group.scale.setScalar(SCALE)
 
-  const target = new Vector3()
   const ahead = new Vector3()
-  const from = new Vector3()
-  /** On the orbit at `s` seconds (counter-clockwise seen from above), rising and falling a little. */
-  const orbitAt = (s: number, out: Vector3) => {
-    const a = (s / LAP_S) * Math.PI * 2
-    return out.set(centre.x + Math.cos(a) * r, centre.y + Math.sin(s * 0.7) * 2.2, centre.z + Math.sin(a) * r)
-  }
-
+  const local = new Vector3()
   return {
     object: group,
     draws: () => (group.visible ? 1 + (fire.visible ? 1 : 0) : 0),
     update(t, total) {
       uniforms.uTime.value = t
-      const leaveAt = total - DRAGON_LEAVE_S
-      const leaving = t >= leaveAt
-      orbitAt(t, target)
-      orbitAt(t + 0.4, ahead)
-      let k = 1
-      if (leaving) {
-        // climbs away north into the haze, from where it was when it turned for home
-        orbitAt(leaveAt, from)
-        const p = clamp01((t - leaveAt) / DRAGON_LEAVE_S)
-        target.lerpVectors(from, far, p * p)
-        ahead.copy(far)
-        k = 0
-      } else if (t < DRAGON_ARRIVE_S) {
-        // down out of the northern sky onto the orbit
-        const p = smooth(0, DRAGON_ARRIVE_S, t)
-        ahead.lerpVectors(far, ahead, p)
-        target.lerpVectors(far, target, p)
-        k = p
+      const s = dragonState(plan, t, total)
+      if (ctx.still) {
+        s.beating = 0
+        s.still = 0.2
       }
-      group.position.copy(target)
+      const [x, y, z] = dragonAt(plan, t, total)
+      const v = velOf((u) => dragonAt(plan, u, total), t)
+      // each downstroke lifts it a little; a hard climb tips its nose up
+      const stroke = (wingAngle(s) - 0.1) / 0.62
+      group.position.set(x, y - 0.22 * stroke * s.beating, z)
+      ahead.set(x + v[0], y + v[1], z + v[2])
       group.lookAt(ahead)
-      group.rotateZ(-BANK * k)
-      // wings: a strong downstroke and a slower recovery; gliding while it comes in
-      const beat = ctx.still ? 0.2 : Math.sin(t * 4.2) * 0.75 + Math.sin(t * 8.4) * 0.12
-      uniforms.uFlap.value = lerp(0.15, beat, leaving ? 1 : 0.35 + 0.65 * k)
-      const breath = breathAt(t, leaving)
-      uniforms.uBreath.value = breath
-      fire.visible = breath > 0.001
+      group.rotateX(-0.07 * s.beating)
+      // the body rolls a moment after the wings: they lead, it follows
+      const wings = bankAt(plan, t, total)
+      const bodyBank = bankAt(plan, t - BODY_LAG, total)
+      group.rotateZ(-bodyBank)
+      uniforms.uWingRoll.value = -(wings - bodyBank)
+      uniforms.uFlap.value = wingAngle(s)
+      // the wingtips trail the stroke
+      uniforms.uFlapTip.value = wingAngle(s, s.beat - 0.12)
+      // the tail swings wide of the turn it is coming out of and sways with the beats
+      const tail = bankAt(plan, t - TAIL_LAG, total)
+      const vy0 = velOf((u) => dragonAt(plan, u, total), t - TAIL_LAG)[1]
+      uniforms.uTail.value = [
+        -tail * 1.6,
+        -Math.max(-1, Math.min(1, (v[1] - vy0) * 0.25)),
+        0.45 + 0.8 * s.beating,
+      ]
+      // its head turns on the peaks while it swoops and breathes
+      group.updateMatrixWorld(true)
+      local.copy(mark)
+      body.worldToLocal(local)
+      local.sub(HEAD_PIVOT)
+      const yaw = Math.max(-0.7, Math.min(0.7, Math.atan2(local.x, local.z)))
+      const pitch = Math.max(-0.3, Math.min(0.65, Math.atan2(-local.y, Math.hypot(local.x, local.z))))
+      uniforms.uHead.value = [yaw * s.look, pitch * s.look]
+      uniforms.uBreath.value = s.breath
+      fire.visible = s.breath > 0.001
       // by night the hide keeps a faint ember glow, so the silhouette still reads against the dark
-      uniforms.uEmber.value = 0.03 + 0.12 * ctx.nightLevel() + 0.2 * breath
+      uniforms.uEmber.value = 0.03 + 0.12 * ctx.nightLevel() + 0.2 * s.breath
     },
     dispose() {
       group.removeFromParent()
@@ -150,6 +275,9 @@ export function createDragon(ctx: ShowCtx): ShowPiece {
     },
   }
 }
+
+/** The head turns about the neck's root (model space). */
+const HEAD_PIVOT = new Vector3(0, 0.9, 2.3)
 
 // ─────────────────────────────── the model ───────────────────────────────
 
@@ -166,6 +294,8 @@ interface Bits {
   wing?: number
   tail?: number
   glow?: number
+  /** The head and neck: they turn with the head, more toward the snout. */
+  head?: boolean
 }
 
 /** A part, coloured, with its bend weights (aWing: ±1 a wing; aTail: 0 root … 1 tip) and its glow. */
@@ -180,10 +310,12 @@ function part(
   g.computeVertexNormals()
   const count = g.getAttribute("position").count
   const colors = new Float32Array(count * 3)
+  const head = new Float32Array(count)
   const p = new Vector3()
   const pos = g.getAttribute("position")
   for (let i = 0; i < count; i++) {
     p.fromBufferAttribute(pos, i)
+    if (bits.head) head[i] = Math.min(1, Math.max(0, (p.z - 2.2) / 1.4))
     const c = typeof color === "function" ? color(p) : color
     colors[i * 3] = c.r
     colors[i * 3 + 1] = c.g
@@ -191,8 +323,14 @@ function part(
   }
   g.setAttribute("color", new Float32BufferAttribute(colors, 3))
   g.setAttribute("aWing", new Float32BufferAttribute(new Float32Array(count).fill(bits.wing ?? 0), 1))
-  g.setAttribute("aTail", new Float32BufferAttribute(new Float32Array(count).fill(bits.tail ?? 0), 1))
+  // the tail bends by where each vertex lies along it (root 0 … tip 1), so its segments never part
+  const tail = new Float32Array(count)
+  if (bits.tail !== undefined)
+    for (let i = 0; i < count; i++)
+      tail[i] = Math.min(1, Math.max(0, (TAIL_ROOT - pos.getZ(i)) / TAIL_LENGTH))
+  g.setAttribute("aTail", new Float32BufferAttribute(tail, 1))
   g.setAttribute("_glow", new Float32BufferAttribute(new Float32Array(count).fill(bits.glow ?? 0), 1))
+  g.setAttribute("aHead", new Float32BufferAttribute(head, 1))
   source.dispose()
   return g
 }
@@ -227,6 +365,9 @@ function panel(points: readonly Vector3[]): BufferGeometry {
 }
 
 /** The shoulders the wings beat about (model space, x = ±SHOULDER_X). */
+/** The tail runs back from its root over this long (model space, -z). */
+const TAIL_ROOT = -2.1
+const TAIL_LENGTH = 7.2
 const SHOULDER_X = 0.7
 const SHOULDER_Y = 0.75
 
@@ -240,16 +381,19 @@ export function buildDragon(): BufferGeometry {
   parts.push(part(new IcosahedronGeometry(1, 0), hide, m(0, 0.05, -1.1, 0.1, 0, 0, 0.95, 0.85, 1.5)))
   // the neck up and forward to the head
   const neck = limb(new Vector3(0, 0.6, 2.2), new Vector3(0, 1.55, 3.6), 0.62, 0.36, 6)
-  parts.push(part(neck.geometry, hide, neck.matrix))
+  const H = { head: true }
+  parts.push(part(neck.geometry, hide, neck.matrix, H))
   // the head: skull, snout, jaw, horns, glowing eyes
-  parts.push(part(new IcosahedronGeometry(0.62, 0), hide, m(0, 1.7, 3.95, 0, 0, 0, 1, 0.82, 1.05)))
-  parts.push(part(new CylinderGeometry(0.28, 0.4, 1.1, 5), hide, m(0, 1.55, 4.75, Math.PI / 2 + 0.12, 0, 0)))
-  parts.push(part(new CylinderGeometry(0.2, 0.3, 0.9, 5), BELLY, m(0, 1.28, 4.6, Math.PI / 2 + 0.3, 0, 0)))
+  parts.push(part(new IcosahedronGeometry(0.62, 0), hide, m(0, 1.7, 3.95, 0, 0, 0, 1, 0.82, 1.05), H))
+  parts.push(
+    part(new CylinderGeometry(0.28, 0.4, 1.1, 5), hide, m(0, 1.55, 4.75, Math.PI / 2 + 0.12, 0, 0), H),
+  )
+  parts.push(part(new CylinderGeometry(0.2, 0.3, 0.9, 5), BELLY, m(0, 1.28, 4.6, Math.PI / 2 + 0.3, 0, 0), H))
   for (const s of [-1, 1]) {
-    parts.push(part(new ConeGeometry(0.13, 0.95, 5), HORN, m(0.3 * s, 2.15, 3.65, -0.9, 0, -0.35 * s)))
-    parts.push(part(new ConeGeometry(0.09, 0.55, 4), HORN, m(0.45 * s, 1.95, 3.9, -1.1, 0, -0.9 * s)))
-    parts.push(part(new OctahedronGeometry(0.12, 0), EYE, m(0.38 * s, 1.85, 4.3), { glow: 1 }))
-    parts.push(part(new OctahedronGeometry(0.06, 0), CLAW, m(0.15 * s, 1.68, 5.28)))
+    parts.push(part(new ConeGeometry(0.13, 0.95, 5), HORN, m(0.3 * s, 2.15, 3.65, -0.9, 0, -0.35 * s), H))
+    parts.push(part(new ConeGeometry(0.09, 0.55, 4), HORN, m(0.45 * s, 1.95, 3.9, -1.1, 0, -0.9 * s), H))
+    parts.push(part(new OctahedronGeometry(0.12, 0), EYE, m(0.38 * s, 1.85, 4.3), { glow: 1, head: true }))
+    parts.push(part(new OctahedronGeometry(0.06, 0), CLAW, m(0.15 * s, 1.68, 5.28), H))
   }
   // spines along the back
   for (let i = 0; i < 6; i++) {
@@ -327,6 +471,17 @@ export function buildDragon(): BufferGeometry {
 }
 
 /** The hide: the lit show material, with the wing beat, the tail's sway and the eyes' and ember glow. */
+/** The head's turn about the neck's root (`uHead`: yaw toward +x, pitch nose down), weighted `w`. */
+const HEAD_TURN = /* glsl */ `
+vec3 headTurn(vec3 p, float w) {
+  vec3 q = p - vec3(${HEAD_PIVOT.x.toFixed(2)}, ${HEAD_PIVOT.y.toFixed(2)}, ${HEAD_PIVOT.z.toFixed(2)});
+  float c = cos(uHead.y * w), s = sin(uHead.y * w);
+  q.yz = vec2(q.y * c - q.z * s, q.y * s + q.z * c);
+  c = cos(uHead.x * w); s = sin(uHead.x * w);
+  q.xz = vec2(q.x * c + q.z * s, -q.x * s + q.z * c);
+  return q + vec3(${HEAD_PIVOT.x.toFixed(2)}, ${HEAD_PIVOT.y.toFixed(2)}, ${HEAD_PIVOT.z.toFixed(2)});
+}`
+
 function wingbeat(uniforms: Uniforms) {
   const material = litMaterial(
     "dragon",
@@ -336,13 +491,17 @@ function wingbeat(uniforms: Uniforms) {
         .replace(
           "#include <common>",
           `#include <common>
-attribute float aWing; attribute float aTail;
-uniform float uTime; uniform float uFlap;
+attribute float aWing; attribute float aTail; attribute float aHead;
+uniform float uTime; uniform float uFlap; uniform float uFlapTip; uniform float uWingRoll;
+uniform vec2 uHead; uniform vec3 uTail;
+${HEAD_TURN}
 vec3 bendWing(vec3 p) {
-  // about the shoulder, along the body's long axis; the outer wing lags and bends further
+  // about the shoulder, along the body's long axis; the outer wing trails the stroke and bends further,
+  // and both lead the body's roll into a turn
   vec3 q = p - vec3(${SHOULDER_X.toFixed(2)} * aWing, ${SHOULDER_Y.toFixed(2)}, 0.0);
   float reach = smoothstep(2.0, 8.5, abs(p.x));
-  float angle = aWing * (uFlap + reach * 0.35 * uFlap);
+  float flap = mix(uFlap, uFlapTip, reach);
+  float angle = aWing * (flap + reach * 0.3 * flap) + uWingRoll;
   float c = cos(angle), s = sin(angle);
   q.xy = vec2(q.x * c - q.y * s, q.x * s + q.y * c);
   return q + vec3(${SHOULDER_X.toFixed(2)} * aWing, ${SHOULDER_Y.toFixed(2)}, 0.0);
@@ -352,7 +511,13 @@ vec3 bendWing(vec3 p) {
           "#include <begin_vertex>",
           `#include <begin_vertex>
 if (aWing != 0.0) transformed = bendWing(transformed);
-if (aTail > 0.0) transformed.x += sin(uTime * 2.4 - aTail * 3.2) * aTail * aTail * 1.4;`,
+if (aHead > 0.0) transformed = headTurn(transformed, aHead);
+// the tail: swaying with the beats, swung wide of a turn, trailing a climb
+if (aTail > 0.0) {
+  float k = aTail * aTail;
+  transformed.x += (sin(uTime * 2.4 - aTail * 3.2) * uTail.z + uTail.x) * k;
+  transformed.y += uTail.y * k;
+}`,
         )
       shader.fragmentShader = shader.fragmentShader
         .replace("#include <common>", "#include <common>\nuniform float uEmber;")
@@ -382,17 +547,20 @@ function flames(uniforms: Uniforms): InstancedMesh<PlaneGeometry, ShaderMaterial
   geometry.setAttribute("aSeed", new InstancedBufferAttribute(seed, 1))
   geometry.setAttribute("aSpread", new InstancedBufferAttribute(spread, 2))
   const material = new ShaderMaterial({
-    uniforms: { uTime: uniforms.uTime, uBreath: uniforms.uBreath },
+    uniforms: { uTime: uniforms.uTime, uBreath: uniforms.uBreath, uHead: uniforms.uHead },
     vertexShader: /* glsl */ `
 attribute float aSeed; attribute vec2 aSpread;
-uniform float uTime; uniform float uBreath;
+uniform float uTime; uniform float uBreath; uniform vec2 uHead;
 varying vec2 vUv; varying float vHeat;
 const float LIFE = 0.55;
+${HEAD_TURN}
 void main() {
   vUv = uv;
   float t = fract(uTime / LIFE + aSeed);            // 0 at the jaws … 1 burnt out
   vec3 mouth = vec3(0.0, 1.4, 5.3);
   vec3 p = mouth + vec3(aSpread.x * 2.6 * t, -1.6 * t + aSpread.y * 2.0 * t, 9.5 * t);
+  // out of the jaws the way the head is turned
+  p = headTurn(p, 1.0);
   vHeat = (1.0 - t) * uBreath;
   float size = mix(0.7, 3.4, t) * uBreath;
   vec4 mv = modelViewMatrix * vec4(p, 1.0);

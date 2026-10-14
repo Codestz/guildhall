@@ -31,15 +31,17 @@ import {
 } from "./show.ts"
 
 export {
-  BREATH_EVERY,
-  BREATH_S,
+  bankAt,
   breathAt,
   DRAGON_ARRIVE_S,
   DRAGON_LEAVE_S,
+  dragonAt,
+  dragonFlight,
   dragonOrbit,
-  LAP_S,
+  dragonState,
 } from "./dragon.ts"
 export { buildBunting, POLE_H } from "./festival.ts"
+export { BEAT_S, beatAngle, type FlightPlan, flightPlan, wingAngle } from "./flight.ts"
 export { rainbowSize } from "./rainbow.ts"
 export { envelope, NIGHT_AT, SHOW_KINDS, SHOW_S, type Show, type ShowKind } from "./show.ts"
 

@@ -207,36 +207,47 @@ export interface GraveyardInputs {
   open(i: number): boolean
   /** Whether a tile is a road a gate may open onto. */
   road(i: number): boolean
-  /** The tile it should be near (the town's heart); none: no graveyard. */
+  /** The tile it should be near (the Guildhall's heart, where heroes rest and slump); none: no graveyard. */
   near: number | undefined
+  /** The tiles a walker goes by from `near`: the roads, and the Guildhall's own ways and yards. */
+  way(i: number): boolean
 }
 
-/** How far from the town's heart the graveyard may be, in steps. */
+/** How far from `near` the graveyard may be, in steps along the ways. */
 const NEAR_MIN = 2
-const NEAR_MAX = 14
+const NEAR_MAX = 30
 
 /**
  * The graveyard's tiles: of every open tile beside a road on its own level whose tile behind (away from
- * the road) is open on that level too, the nearest the town's heart (a seeded hash between equals).
- * Null when there is none within NEAR_MAX steps.
+ * the road) is open on that level too, the one whose road is fewest steps along the ways from `near`
+ * (a seeded hash between equals): a hero who mends a grave walks there from the Guildhall. Null when
+ * there is none within NEAR_MAX steps.
  */
 export function graveyardSite(inp: GraveyardInputs): GraveyardSite | null {
   const { grid: g, near } = inp
   if (near === undefined) return null
-  const steps = (a: number, b: number) => {
-    const dq = g.q[a]! - g.q[b]!
-    const dr = g.r[a]! - g.r[b]!
-    return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2
+  // steps along the ways from `near` (breadth first)
+  const along = new Int16Array(g.size).fill(-1)
+  along[near] = 0
+  const queue = [near]
+  for (let k = 0; k < queue.length; k++) {
+    const a = queue[k]!
+    for (const b of g.neighbours(a))
+      if (b >= 0 && along[b] === -1 && inp.way(b)) {
+        along[b] = along[a]! + 1
+        queue.push(b)
+      }
   }
   let best: GraveyardSite | null = null
   let bestScore = Number.POSITIVE_INFINITY
   for (let i = 0; i < g.size; i++) {
-    const d = steps(i, near)
-    if (d < NEAR_MIN || d > NEAR_MAX || !inp.open(i)) continue
+    if (!inp.open(i)) continue
     const nb = g.neighbours(i)
     for (let door = 0; door < 6; door++) {
       const r = nb[door]!
       if (r < 0 || !inp.road(r) || inp.level[r] !== inp.level[i]) continue
+      const d = along[r]! + 1
+      if (d <= 0 || d < NEAR_MIN || d > NEAR_MAX) continue
       const cover = GRAVEYARD_FOOTPRINT.map((k) => nb[worldSide(k, door)]!)
       if (!cover.every((j) => j >= 0 && inp.open(j) && inp.level[j] === inp.level[i])) continue
       const score = d + hash2(inp.seed + 61, g.q[i]!, g.r[i]!) * 0.9 + door * 1e-3
@@ -291,4 +302,18 @@ export function placeGraveyard(
   })
   const [gx, gz] = world(0, (R * Math.sqrt(3)) / 2)
   return { ...site, gate: [gx, top, gz], graves }
+}
+
+/**
+ * Where heroes strike the graves (sim life graveStrike.ts `GraveKit`): grave `slot`'s strike spot as a
+ * stay reached from the walk node on the graveyard's front tile (`node`, `HexWalk.at(tile)`).
+ */
+export function graveStrikeSpot(
+  graveyard: Pick<HexGraveyard, "graves">,
+  node: number,
+  slot: number,
+): { node: number; at: [number, number, number]; facing: number; ground: boolean } | undefined {
+  const g = graveyard.graves[slot]
+  if (!g || node < 0) return undefined
+  return { node, at: [g.strike.x, g.y, g.strike.z], facing: g.strike.facing, ground: true }
 }

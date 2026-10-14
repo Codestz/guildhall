@@ -1016,8 +1016,11 @@ export function hexZones(
                 : "orchard"
     use[i] = U[u]
   }
-  // the graveyard last, over open country near the town (graveyard.ts): nothing else moves for it
-  const graveGround = new Set<number>([U.meadow, U.grove, U.pasture, U.orchard, U.field])
+  // the graveyard last, over open country near the Guildhall (graveyard.ts), where heroes rest and
+  // slump, so the one who mends a grave has a short way to it (the town's heart with no castle):
+  // nothing else moves for it
+  const castleZone = zones.findIndex((zz) => zz.kind === "castle") + 1
+  const graveGround = new Set<number>([U.meadow, U.grove, U.pasture, U.orchard, U.field, U.hillside])
   const graveyard = graveyardSite({
     grid: g,
     seed,
@@ -1027,9 +1030,14 @@ export function hexZones(
       graveGround.has(use[i]!) &&
       !site.has(i) &&
       !foot.has(i) &&
-      (kind(i) === "grass" || kind(i) === "meadow"),
+      (kind(i) === "grass" || kind(i) === "meadow" || kind(i) === "hill"),
     road: (i) => use[i] === U.road,
-    near: (zones.find((zz) => zz.kind === "town") ?? zones[0])?.tile,
+    near: plan?.heart ?? (zones.find((zz) => zz.kind === "town") ?? zones[0])?.tile,
+    way: (i) =>
+      use[i] === U.road ||
+      use[i] === U.bridge ||
+      use[i] === U.square ||
+      (castleZone > 0 && zoneOf[i] === castleZone),
   })
   if (graveyard) for (const i of [graveyard.tile, ...graveyard.cover]) use[i] = U.graveyard
 

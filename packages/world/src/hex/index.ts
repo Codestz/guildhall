@@ -62,6 +62,7 @@ export {
   GRAVEYARD_SCENE,
   type GraveSpot,
   type GraveyardSite,
+  graveStrikeSpot,
   graveyardPrefab,
   graveyardSite,
   type HexGraveyard,

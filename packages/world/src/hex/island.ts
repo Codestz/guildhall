@@ -152,6 +152,21 @@ function pieces(g: HexGrid, inside: (i: number) => boolean): { label: Int32Array
   return { label, sizes }
 }
 
+/**
+ * Where the seed's two hill massifs stand, in tile units (hexCentre's): the main one a fixed walk from
+ * the centre (a small island reaches its foot, a big one climbs it), a second, lower range further out
+ * on another side. The same at every island size.
+ */
+export function hexMassifs(seed: number): [[number, number], [number, number]] {
+  const rnd = (k: number) => hash2(seed, k, 4111)
+  const massifAng = rnd(5) * Math.PI * 2
+  const ang2 = massifAng + (rnd(6) < 0.5 ? 1 : -1) * (1.9 + 0.8 * rnd(7))
+  return [
+    [Math.cos(massifAng) * 12, Math.sin(massifAng) * 12],
+    [Math.cos(ang2) * 24, Math.sin(ang2) * 24],
+  ]
+}
+
 export function hexIsland(input: HexIslandSpec): HexIsland {
   const t0 = performance.now()
   const spec = { ...HEX_ISLAND_DEFAULTS, ...input }
@@ -181,12 +196,7 @@ export function hexIsland(input: HexIslandSpec): HexIsland {
       0.1 + 0.1 * rnd(40 + k),
       -(0.18 + 0.14 * rnd(45 + k)) * spec.coast,
     ])
-  const massifAng = rnd(5) * Math.PI * 2
-  // the hills sit a fixed walk from the centre: a small island reaches their foot, a big one climbs them
-  const massif: [number, number] = [Math.cos(massifAng) * 12, Math.sin(massifAng) * 12]
-  // a second, lower range further out on another side: big islands climb it too
-  const ang2 = massifAng + (rnd(6) < 0.5 ? 1 : -1) * (1.9 + 0.8 * rnd(7))
-  const massif2: [number, number] = [Math.cos(ang2) * 24, Math.sin(ang2) * 24]
+  const [massif, massif2] = hexMassifs(seed)
   const landness = new Float32Array(N)
   for (let i = 0; i < N; i++) {
     const [x, y] = at(i)

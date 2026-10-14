@@ -104,6 +104,7 @@ export {
   type HexKind,
   type HexRiver,
   hexIsland,
+  hexMassifs,
   kindOf,
   landTiles,
 } from "./island.ts"
@@ -162,6 +163,17 @@ export {
   petitionLane,
 } from "./petitioners.ts"
 export { parseTilePrefabs, SPOT_KINDS, TILE_GROUNDS, TILE_GROUPS, validateTilePrefab } from "./prefabs.ts"
+export {
+  type HexRegion,
+  type HexRegions,
+  hexRegions,
+  REGION_KINDS,
+  type RegionKind,
+  regionCount,
+  regionOf,
+  regionRadius,
+  regionWeight,
+} from "./regions.ts"
 export {
   BEAT_S,
   type Beat,

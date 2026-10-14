@@ -1708,8 +1708,9 @@ function mineCarts(
     const s = stays.get(k)![0]!
     return { x: s.at[0], z: s.at[2], facing: s.facing, level: levelAt(s.at[0], s.at[2]) }
   })
-  // the ground's tests, strictest first: on the miner's own level with nothing in the way; then only
-  // no building or wall on it; then off the level too; then anything (the rails still never cross)
+  // the ground's tests, strictest first (a mine goes on to the next only when no cart of it fits): on
+  // the miner's own level with nothing in the way; then on land with nothing in the way; then only no
+  // building or wall on it; then anything (the rails still never cross)
   const onLand = (x: number, zz: number) => levelAt(x, zz) !== null
   const onLevel = (x: number, zz: number, k: number) => {
     const here = levelAt(x, zz)
@@ -1718,7 +1719,7 @@ function mineCarts(
   }
   const plans = planCarts(spots, [
     (x, zz, r, k) => onLevel(x, zz, k) && !places.furniture.blocked(x, zz, r),
-    (x, zz, r, k) => onLevel(x, zz, k) && !places.furniture.blocked(x, zz, r, HARD),
+    (x, zz, r) => onLand(x, zz) && !places.furniture.blocked(x, zz, r),
     (x, zz, r) => onLand(x, zz) && !places.furniture.blocked(x, zz, r, HARD),
     () => true,
   ])

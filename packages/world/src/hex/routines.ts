@@ -1079,6 +1079,8 @@ const MINE_M = 6
 const CART_TRIES = 16
 /** What sharing a cart costs against any cart of one's own (the search's unit: one candidate step). */
 const SHARED = 1000
+/** Metres a miner throws ore into a cart they share; further than this they would rather have their own. */
+const THROW_M = 2.5
 
 /** Whether a point is clear ground for a miner's tracks or heap (radius r), for the miner at `spot`. */
 export type CartClear = (x: number, z: number, r: number, spot: number) => boolean
@@ -1092,8 +1094,8 @@ export type CartClear = (x: number, z: number, r: number, spot: number) => boole
  * nearest cart of the mine (the throws turned to it).
  *
  * `clears` are the ground's tests from the strictest (nothing in the way: no building, rock, seat or
- * tree, the miner's own level) to the most lenient: a mine takes the strictest under which nobody
- * shares, else the one where fewest do. The rails never cross whichever it takes.
+ * tree, the miner's own level) to the most lenient: a mine takes the strictest under which any cart
+ * fits, its other miners sharing if they must. The rails never cross whichever it takes.
  */
 export function planCarts(
   spots: readonly CartSpot[],
@@ -1116,9 +1118,9 @@ export function planCarts(
     }
     const n = Math.max(1, Math.ceil(Math.hypot(t1[0] - t0[0], t1[1] - t0[1]) / 0.4))
     for (let k = 0; k <= n; k++)
-      if (!clear(t0[0] + ((t1[0] - t0[0]) * k) / n, t0[1] + ((t1[1] - t0[1]) * k) / n, 0.3, self))
+      if (!clear(t0[0] + ((t1[0] - t0[0]) * k) / n, t0[1] + ((t1[1] - t0[1]) * k) / n, TRACK_HALF, self))
         return false
-    return clear(c.heap[0], c.heap[1], 0.5, self)
+    return clear(c.heap[0], c.heap[1], HEAP_R, self)
   }
   /** Each spot's carts that fit alone under a test, cheapest (nearest the authored) first. */
   const optionsUnder = (clear: CartClear) =>
@@ -1173,11 +1175,10 @@ export function planCarts(
   const out: CartPlan[] = new Array(spots.length)
   for (const r of new Set(spots.map((_, k) => root(k)))) {
     const group = spots.map((_, k) => k).filter((k) => root(k) === r)
+    // the strictest test under which any cart fits (sharing one beats a rail through a stall)
     let take = { tier: 0, ...choose(group, tiers[0]!) }
-    for (let t = 1; t < tiers.length && take.shared > 0; t++) {
-      const c = choose(group, tiers[t]!)
-      if (c.shared < take.shared) take = { tier: t, ...c }
-    }
+    for (let t = 1; t < tiers.length && take.shared === group.length; t++)
+      take = { tier: t, ...choose(group, tiers[t]!) }
     const options = tiers[take.tier]!
     const own = group.flatMap((k, g) => (take.pick[g]! >= 0 ? [options[k]![take.pick[g]!]!.cart] : []))
     for (const [g, k] of group.entries()) {
@@ -1188,7 +1189,8 @@ export function planCarts(
         continue
       }
       // no room of their own: the nearest of the mine's carts, the throws turned to it (a little short
-      // of it, as the authored throw is: 1.3 of 1.73); with none at all, the authored one
+      // of it, as the authored throw is: 1.3 of 1.73); one further than a throw has a cart of its own
+      // under a more lenient test if one keeps clear of the others; with none at all, the authored one
       let near: CartPlan | undefined
       let d = Number.POSITIVE_INFINITY
       for (const o of own) {
@@ -1196,6 +1198,17 @@ export function planCarts(
         if (dd < d) {
           d = dd
           near = o
+        }
+      }
+      if (d > THROW_M) {
+        const mine = tiers
+          .slice(take.tier + 1)
+          .flatMap((t) => t[k]!)
+          .find((o) => own.every((c) => cartsClear(o.cart, c)))
+        if (mine) {
+          own.push(mine.cart)
+          out[k] = mine.cart
+          continue
         }
       }
       if (!near) {

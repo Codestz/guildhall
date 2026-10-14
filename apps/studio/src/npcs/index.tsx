@@ -37,7 +37,7 @@ async function mountedCatalog() {
 }
 
 /**
- * The NPC builder (`?screen=npc&recipe=<role>&seed=<n>&strip=8&clip=<work|idle|walk>&t=<f>&cam=map`,
+ * The NPC builder (`/npcs/<role>?seed=<n>&strip=8&clip=<work|idle|walk>&t=<f>&cam=map`,
  * plan §3.3): a role's options (bodies, hidden parts, outfit ramps, headwear, held props with a mount,
  * clips, variation) over a live strip of seeds and one person large, with save/load through
  * `data/npcs/<role>.json`. `cam=map` views the strip from far and high, as on the town map.

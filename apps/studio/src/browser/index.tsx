@@ -55,7 +55,7 @@ function Empty() {
 const nextFrame = () => new Promise<void>((done) => requestAnimationFrame(() => done()))
 
 /**
- * The piece browser (`?screen=pieces`): search and facet filters over the catalog, a virtualised
+ * The piece browser (`/pieces`): search and facet filters over the catalog, a virtualised
  * thumbnail grid and the piece inspector, which animates characters. Deep link:
  * `&q=…&pack=…&cat=…&flag=a,b&misfit=1&id=…`, and for a character `&clip=…` (`&t=…` holds it paused).
  */

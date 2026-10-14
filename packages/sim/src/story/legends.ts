@@ -1,4 +1,5 @@
 // From V1 hall (main:packages/hall/src/guild/legends.ts): the session's book.
+import { fnv1a } from "@guildhall/core"
 import type { Entry, Session } from "../guild/model.ts"
 import { EVENT_KINDS, type EventKind, type Renown, renownOf } from "./renown.ts"
 import {
@@ -7,7 +8,6 @@ import {
   clip,
   errorLine,
   failing,
-  hash,
   lastReply,
   listOf,
   NOUNS,
@@ -399,7 +399,7 @@ export function legendOf(
   const cost = sessions.reduce((sum, s) => sum + s.cost, 0)
   const outcome: Legend["outcome"] =
     root.status === "done" ? "complete" : root.status === "failed" ? "lost" : "underway"
-  const seed = hash(root.task ?? root.title)
+  const seed = fnv1a(root.task ?? root.title)
   const sent = new Set(starts.filter((s) => !s.resumed).map((s) => s.session.id)).size
   const quest = root.task ?? root.title
 

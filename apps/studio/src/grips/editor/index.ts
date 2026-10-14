@@ -25,7 +25,7 @@ function el(
 }
 
 /**
- * The grip editor (`?screen=grip&piece=<id>&body=<id>&clip=<name>&t=<0..1>`, ADR 010): pick a prop and
+ * The grip editor (`/grips/editor/<piece id>?body=<id>&clip=<name>&t=<0..1>`, ADR 010): pick a prop and
  * a body and freeze a clip, then edit the prop's mount (slot, handle, working axis and strike edge,
  * upright, scale, the current clip's override) and watch it on the character, on the prop's bench
  * and in a strip of key clips. Save merges the mount into `data/mounts.json`.

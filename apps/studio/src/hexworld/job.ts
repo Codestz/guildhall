@@ -91,7 +91,7 @@ export interface HexJobSpec {
   paint: boolean
   /** The authored tile prefabs (the main thread's `loadTiles`), installed before the build; null: world's fallback. */
   tiles: TilePrefab[] | null
-  /** The nature knobs (`natureOf`: `?tree= ?pine= ?bush= ?rock= ?grass= ?flower= ?woods= ?wild=`); left out: today's. */
+  /** The nature knobs (`natureOf`: `?tree= ?pine= ?bush= ?rock= ?grass= ?flower= ?woods= ?wild=`); left out: every knob at 1. */
   nature?: HexNature
   /** The island's shape knobs, as on the hex map (`?coast= ?hills= ?rain= ?forest=`); left out: the defaults. */
   shape?: IslandShape
@@ -134,11 +134,11 @@ export function shapeOf(query: Pick<URLSearchParams, "get">): IslandShape {
 }
 
 /**
- * The nature a page builds with (nature.ts `HexNature`): the chosen nature (`NATURE_CHOSEN`, or today's
- * with `?nature=today`), each knob the query gives (a positive number) over it.
+ * The nature a page builds with (nature.ts `HexNature`): the chosen nature (`NATURE_CHOSEN`), each knob
+ * the query gives (a positive number) over it.
  */
 export function natureOf(query: Pick<URLSearchParams, "get">): HexNature {
-  const out: HexNature = query.get("nature") === "today" ? {} : { ...NATURE_CHOSEN }
+  const out: HexNature = { ...NATURE_CHOSEN }
   for (const k of NATURE_KNOBS) {
     const raw = query.get(k)
     const v = raw === null || raw === "" ? Number.NaN : Number(raw)

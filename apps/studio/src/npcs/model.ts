@@ -31,7 +31,7 @@ export const STRIP = 8
 const MAX_STRIP = 16
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
-/** What `?screen=npc&recipe=<role>&seed=<n>&strip=<n>&clip=<work|idle|walk>&t=<f>&cam=map` asks for. */
+/** What `/npcs/<role>?seed=<n>&strip=<n>&clip=<work|idle|walk>&t=<f>&cam=map` asks for. */
 export interface NpcQuery {
   role: string
   seed: number

@@ -114,7 +114,6 @@ export {
   isBuildingPiece,
   isDefaultNature,
   NATURE_CHOSEN,
-  NATURE_DEFAULTS,
   natureFamily,
   natureOdds,
   natureReach,

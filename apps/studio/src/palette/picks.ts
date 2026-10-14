@@ -1,7 +1,7 @@
 /**
  * The palette preview's cast: one piece per pack and category, twelve in all, chosen so every kept pack
- * and the colours it leans on (KayKit greys and roofs, Kenney salmon stone and teal grass, Quaternius
- * bark and walls) are on screen. Each slot names a preferred piece and falls back to the first of its
+ * and the colours it leans on (KayKit greys, roofs and timber, Kenney salmon stone, teal grass and
+ * autumn leaves) are on screen. Each slot names a preferred piece and falls back to the first of its
  * pack and category, so a re-import that renames a piece still fills the slot.
  */
 import type { Catalog, CatalogEntry, Category } from "@guildhall/assets"
@@ -24,8 +24,8 @@ export const SLOTS: readonly Slot[] = [
   { pack: "kenney-nature", category: "ground", prefer: "ground_grass" },
   { pack: "kenney-pirate", category: "vehicle", prefer: "boat-row-large" },
   { pack: "kenney-town", category: "wall", prefer: "wall-window-shutters" },
-  { pack: "quaternius-nature", category: "tree", prefer: "MapleTree_1" },
-  { pack: "quaternius-rts", category: "building", prefer: "Houses_FirstAge_1_Level1" },
+  { pack: "kenney-survival", category: "tree", prefer: "tree-autumn" },
+  { pack: "kaykit-builder", category: "building", prefer: "market.gltf" },
 ]
 
 /** Each slot's piece (static pieces only), or null when the library has nothing in that pack/category. */

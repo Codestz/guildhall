@@ -9,9 +9,11 @@
  * so the same chronicle always reads the same. Unit names are set in code marks (`packages/ui`); the
  * book draws them as code and the card strips them (words.ts `plain`).
  */
+
+import { fnv1a } from "@guildhall/core"
 import { type Chronicle, DAY_MS, type Day, dayOf, type Release, type Unit } from "../../repo/chronicle.ts"
 import { markdownText, numeral } from "../legends.ts"
-import { hash, listOf, pick, spell } from "../story.ts"
+import { listOf, pick, spell } from "../story.ts"
 import { type EraRule, erasOf } from "./eras.ts"
 import { type EraFacts, factsOf, founderOf, peakOf, placesNow, reshapedFiles } from "./facts.ts"
 import { ageOf, Count, code, dateOf, isRelease, majorName, monthOf, num, plural, spanOf } from "./words.ts"
@@ -158,7 +160,7 @@ const RULE_WORDS: Record<EraRule, string> = {
 function openingOf(c: Chronicle, chapters: number, rule: EraRule): string {
   const f = figuresOf(c)
   const founder = founderOf(c)
-  const seed = hash(c.repo.name)
+  const seed = fnv1a(c.repo.name)
   const name = c.repo.name
   const began = founder
     ? `${name} began on ${dateOf(c.start)}, with ${founder}’s first commit.`
@@ -186,7 +188,7 @@ function openingOf(c: Chronicle, chapters: number, rule: EraRule): string {
 
 function closingOf(c: Chronicle, today?: Day): string {
   const now = today ?? dayOf(c.generatedAt)
-  const seed = hash(`${c.repo.name}:end`)
+  const seed = fnv1a(`${c.repo.name}:end`)
   const files = num(c.repo.files)
   const places = placesNow(c)
   const where = places > 1 ? `${files} files in ${spell(places)} places` : `${files} files`
@@ -211,7 +213,7 @@ function lengthWord(f: EraFacts): string {
 }
 
 function ledeOf(c: Chronicle, f: EraFacts, rule: EraRule): string {
-  const seed = hash(`${c.repo.name}:${f.index}`)
+  const seed = fnv1a(`${c.repo.name}:${f.index}`)
   const a = f.filesFrom
   const b = f.filesTo
   const days = f.span.to - f.span.from + 1
@@ -263,7 +265,7 @@ function milestonesOf(c: Chronicle, f: EraFacts, options: RepoStoryOptions): Rep
   const out: RepoMilestone[] = []
   const add = (day: Day, kind: RepoMilestoneKind, text: string, unit?: string) =>
     out.push({ at: atOf(day), kind, text, ...(unit ? { unit } : {}) })
-  const seed = (key: string) => hash(`${c.repo.name}:${key}`)
+  const seed = (key: string) => fnv1a(`${c.repo.name}:${key}`)
 
   if (f.firstCommit) {
     const founder = founderOf(c)
@@ -605,7 +607,7 @@ function titlesOf(c: Chronicle, facts: readonly EraFacts[]): string[] {
     used.add(claim.kind)
   }
   // The rest: plain titles, never the same twice.
-  let k = hash(c.repo.name)
+  let k = fnv1a(c.repo.name)
   const taken = new Set(out.filter(Boolean))
   return out.map((title, i) => {
     if (title) return title

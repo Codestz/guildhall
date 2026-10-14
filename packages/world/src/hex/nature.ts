@@ -29,21 +29,11 @@ export interface HexNature {
   wild?: number
 }
 
-export const NATURE_DEFAULTS: Readonly<Required<Omit<HexNature, "pine">>> = {
-  tree: 1,
-  bush: 1,
-  rock: 1,
-  grass: 1,
-  flower: 1,
-  woods: 1,
-  wild: 1,
-}
-
 /**
  * The island's chosen nature (user, 2026-10-12, preset "C + small ground" from the nature board): trees
  * stand over the cottages (an oak about 3× the eave), woods are fewer trees but a little more of the
- * countryside, and the ground cover shrinks to knee height. The Studio builds with it unless
- * `?nature=today` asks for the knobs at 1; any knob in the query overrides its value.
+ * countryside, and the ground cover shrinks to knee height. The Studio builds with it; any knob in
+ * the query overrides its value.
  */
 export const NATURE_CHOSEN: Readonly<HexNature> = {
   tree: 1.6,

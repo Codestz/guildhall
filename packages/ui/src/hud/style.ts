@@ -143,6 +143,20 @@ button.hud-crest:focus-visible { border-radius: 50%; }
 .hud-brand-toggle:hover .hud-brand-name { color: var(--paper); }
 .hud-brand-toggle .hud-fold { color: var(--faint); transition: transform 0.2s; }
 .hud-brand-toggle[aria-expanded="false"] .hud-fold { transform: rotate(-90deg); }
+/* the top row's repo chip: a small pill of its own width beside the site's crest (the same height and ink) */
+.hud-repo-chip {
+  flex: none; display: inline-flex; align-items: center; gap: 0; max-width: 100%; min-width: 0; height: 44px; padding: 0 14px 0 16px;
+  border-radius: 999px; cursor: pointer; color: var(--paper); text-align: left;
+}
+.hud-repo-chip:hover, .hud-repo-chip[data-open="true"] { border-color: var(--brass-line); }
+.hud-repo-chip:hover .hud-repo-name { color: var(--paper); }
+.hud-repo-chip:focus-visible { outline: none; box-shadow: var(--ring); }
+.hud-repo-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 16px/1 var(--display); letter-spacing: 0.05em; color: var(--brass-hi); }
+.hud-repo-chip .hud-source-dot { margin: 0 0 0 10px; }
+.hud-repo-source { margin-left: 6px; font-size: var(--t-sm); color: var(--muted); white-space: nowrap; }
+.hud-repo-plea { display: grid; place-items: center; margin-left: 8px; color: var(--warn); }
+.hud-brand-more { gap: 8px; }
+.hud-brand-more .hud-about { padding-top: 8px; }
 .hud-source-dot[data-tone="history"] { background: var(--brass); border-color: var(--brass); box-shadow: 0 0 6px rgba(220, 182, 98, 0.55); }
 .hud-source-dot[data-tone="sketch"] { border-style: dashed; border-color: var(--muted); }
 .hud-source[data-tone="sketch"] { color: var(--muted); }
@@ -250,6 +264,8 @@ button.hud-crest:focus-visible { border-radius: 50%; }
 .hud-badge:hover .hud-tip, .hud-badge:focus-visible .hud-tip { opacity: 1; transform: none; }
 .hud-badge-empty { padding: 0 8px; font-size: var(--t-sm); font-style: italic; color: var(--faint); }
 .hud-badges-expand { margin-left: 2px; width: 32px; height: 40px; border-left: 1px solid var(--hair); border-radius: 0 var(--r-sm) var(--r-sm) 0; }
+.hud-badges-expand[data-more] { width: auto; min-width: 40px; padding: 0 6px; }
+.hud-badges-more { font: 600 13px/1 var(--body); color: var(--brass-hi); }
 
 /* ── chronicle ──────────────────────────────────────────────────── */
 .hud-chronicle { width: 400px; max-width: 100%; }

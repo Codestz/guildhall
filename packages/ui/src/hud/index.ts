@@ -70,7 +70,7 @@ export {
 } from "./group.ts"
 export { PLEAS_SHOWN, Pleas, type PleasProps } from "./Pleas.tsx"
 export { BannerChip, FamilyChip, FoldPanel, Sigil, Status } from "./parts.tsx"
-export { Roster, RosterBadges, type RosterProps } from "./Roster.tsx"
+export { pickFaces, Roster, RosterBadges, type RosterProps } from "./Roster.tsx"
 export { hourWords, SETTINGS_KEYS, SettingsPanel, type SettingsPanelProps } from "./Settings.tsx"
 export * from "./story/index.ts"
 export { HUD_CSS, holdHudStyle } from "./style.ts"

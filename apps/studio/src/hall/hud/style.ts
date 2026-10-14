@@ -42,10 +42,9 @@ const CSS = /* css */ `
 .gh.site-root .ui-viewer[data-phone] .ui-hud-bottom .hall-timeline, .gh .ui-viewer[data-phone] .ui-hud-bottom .hall-timeline { width: 100%; }
 /* a sheet that is up without a panel opened (Detailed's Chronicle) keeps the bar clear of it too */
 .ui-viewer:not([data-phone]) .ui-hud-sheet:not(:empty) ~ .ui-hud-bottom { translate: calc(-50% - 190px) 0; }
-/* a phone: the hairline between the Chronicle chip and the act chip; pinned, the bar is the bottom edge
-   and both step up over it */
-.ui-viewer[data-phone] .hud-timeline-hint { width: 96px; margin-left: -16px; }
-.ui-viewer[data-phone]:has(.ui-hud-bottom .hud-timeline[data-pinned="true"]) :is(.ui-hud-feed, .hall-acts) { bottom: calc(var(--gut) + 60px + env(safe-area-inset-bottom)); }
+/* a phone: the timeline is the bottom edge, a hairline across it (a tap opens the bar); the row over it
+   steps up while the bar is open */
+.ui-viewer[data-phone] .hud-timeline-hint { left: 0; width: 100%; margin-left: 0; }
 .ui-viewer[data-phone] .ui-hud-bottom .hall-grow { align-self: flex-end; margin-bottom: 52px; }
 /* the growth line under the date (V1's history bar), a phone's too */
 .gh .hud-tape-time[data-note] small { max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
@@ -78,18 +77,49 @@ const CSS = /* css */ `
 .gh .hall-chapter[data-compact="true"] .st-chapter-btn { min-width: 0; }
 /* the current act's thin brass bracket stays when the list takes focus by pointer; the ring is the keyboard's */
 .gh .hall-chapter .st-chapter-list button:focus:not(:focus-visible) { outline: none; }
-/* a phone: the sheet up hides what sits under it; the captions may wrap to three rows */
-.ui-viewer[data-phone] .hall-caps { bottom: calc(var(--gut) + 50px + env(safe-area-inset-bottom)); width: calc(100% - 2 * var(--gut)); }
-.ui-viewer[data-phone][data-hud-mode="hidden"] .hall-caps { bottom: calc(var(--gut) + env(safe-area-inset-bottom)); }
-.ui-viewer[data-phone] .hall-acts { bottom: calc(var(--gut) + env(safe-area-inset-bottom)); }
+/* ── a phone's foot (decisions.md "Phone GUI"), bottom up: the timeline's hairline, then one row with the
+   face bar (+N) at the left and the act chip at the right, then the captions (three rows at most). Each
+   steps up over what is under it: --foot-bar, the timeline (a hairline, or the open bar); --foot-row, the
+   row (none when it is empty). The sheet up hides them all ── */
+.ui-viewer[data-phone] { --foot-bar: 18px; --foot-row: 0px; --foot: calc(var(--gut) + env(safe-area-inset-bottom)); }
+.ui-viewer[data-phone]:has(.ui-hud-bottom .hud-timeline:is([data-pinned="true"], [data-open="true"], :focus-within)) { --foot-bar: 60px; }
+.ui-viewer[data-phone]:has(.hall-acts:not(:empty)) { --foot-row: 58px; }
+.ui-viewer[data-phone] .hall-acts {
+  left: var(--gut); right: var(--gut); bottom: calc(var(--foot) + var(--foot-bar)); flex-direction: row; align-items: flex-end; gap: 8px;
+  pointer-events: none; transition: bottom 0.2s ease;
+}
+.ui-viewer[data-phone] .hall-acts > .hud-badges { flex: 0 1 auto; min-width: 0; }
+.ui-viewer[data-phone] .hall-acts > :is(.hall-chapter, .hud-ffwd) { margin-left: auto; }
+.ui-viewer[data-phone] .hall-acts > .hud-ffwd + .hall-chapter { margin-left: 0; }
+.ui-viewer[data-phone] .hall-acts .hud-badge { width: 44px; height: 44px; }
+.ui-viewer[data-phone] .hall-acts .hud-badges { padding: 3px; border-radius: 12px; }
+.ui-viewer[data-phone] .hall-acts .hud-badges-expand { height: 44px; }
+.ui-viewer[data-phone] .hall-acts .hud-tip { display: none; }
+.gh .ui-viewer[data-phone] .hall-acts .st-chapter-btn { width: 52px; height: 52px; padding: 0; align-items: center; justify-content: center; line-height: 1; border-radius: 12px; font-size: 15px; }
+.ui-viewer[data-phone] .hall-caps { bottom: calc(var(--foot) + var(--foot-bar) + var(--foot-row) + 4px); width: calc(100% - 2 * var(--gut)); }
+.ui-viewer[data-phone][data-hud-mode="hidden"] .hall-caps { bottom: var(--foot); }
+.ui-viewer[data-phone] .ui-hud-feed { display: none; }
 .ui-viewer[data-phone][data-hud-open] .ui-hud-sheet:not(:empty) ~ :is(.hall-acts, .hall-caps, .hall-top) { display: none; }
 .ui-viewer[data-phone] .hall-caps .st-caption { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .ui-viewer[data-phone] .hall-caps .st-caption-row { display: inline; white-space: normal; }
 .ui-viewer[data-phone] .hall-caps .st-caption-row + .st-caption-row::before { content: " "; }
 .ui-viewer[data-phone] .hall-caps .st-caption[data-kind="chapter"] { display: grid; }
-/* the welcome bar at the foot (site): the captions and the act chip ride above it like the bar */
-.site-root[data-welcome] .hall-caps { bottom: calc(var(--gut) + var(--welcome-h, 0px) + 40px); }
-.site-root[data-welcome] .ui-viewer[data-phone] .hall-acts { bottom: calc(var(--welcome-h, 0px) + 24px + env(safe-area-inset-bottom)); }
+/* the welcome bar at the foot (site, wide screens; a phone's is a button in the top row): the captions
+   ride above it like the bar */
+.site-root[data-welcome] .ui-viewer:not([data-phone]) .hall-caps { bottom: calc(var(--gut) + var(--welcome-h, 0px) + 40px); }
+
+/* a screen too narrow for a card between the left column and the rail: a plea's card under the face bar */
+@container viewer (min-width: 601px) and (max-width: 1100px) {
+  .hall-top { top: calc(var(--hud-top, var(--gut)) + 44px + 8px + 48px + 8px); left: var(--gut); translate: none; width: var(--hud-col); align-items: flex-start; }
+}
+/* ── a short screen (a phone on its side): the desktop's layout, compact heights; one toast at most ── */
+@container viewer (max-height: 460px) {
+  .hud-toast-list .hud-toast:nth-last-child(n + 2) { display: none; }
+  .gh .hall-rail-btn { width: 38px; height: 38px; }
+  .ui-hud-sheet { top: calc(var(--gut) + 50px); }
+  .gh .hall-feed, .gh .ui-hud-sheet .hud-panel { max-height: 100%; }
+  .hall-caps { bottom: calc(var(--gut) + 22px); }
+}
 
 /* the folded feed is its chip alone (its box is what the plates keep out of) */
 .ui-hud-feed .hud-toasts { width: auto; }
@@ -107,24 +137,19 @@ const CSS = /* css */ `
 }
 .gh .ui-hud-sheet .ui-panel { background: rgba(20, 15, 11, 0.88); }
 
-/* ── the left column (user 10-13): the crest pill, the Brand and the Guild's bar on one edge, one width,
-   one radius and one hairline; 8 px between them ── */
-.ui-viewer { --hud-col: 288px; --hud-r: 10px; }
-.ui-viewer[data-phone] { --hud-col: min(300px, calc(100cqw - 2 * var(--gut))); }
-.site-world .ui-viewer[data-hud="on"]:not([data-phone]) { --hud-top: 68px; }
-@media (min-width: 601px) {
-  .gh.site-root:has(.hall-hud-root) .site-crest-btn { width: 288px; border-radius: 10px; }
-}
+/* ── the top row (user 10-13): the site's crest pill (its own compact width), then the repo chip of its
+   own width (--crest-w: the crest and the gap after it, hall/hud/HallHud.tsx); under them, left-aligned,
+   the Guild's face bar of its own width, and the panels at the column's width; 8 px between them ── */
+.ui-viewer { --hud-col: 300px; --hud-r: 10px; }
+.ui-viewer[data-phone] { --hud-col: min(340px, calc(100cqw - 2 * var(--gut))); }
 .gh .ui-hud-corner { gap: 8px; }
-.gh .ui-hud-corner > :is(.hud-brand, .hud-badges, .hud-parties, .hall-roster, .hall-places, .hud-pleas) {
+.gh .ui-hud-corner > .hud-repo-chip { margin-left: var(--crest-w, 0px); max-width: calc(100cqw - 2 * var(--gut) - var(--crest-w, 0px) - var(--rail-w, 0px)); }
+.gh .ui-hud-corner > :is(.hud-brand, .hud-parties, .hall-roster, .hall-places, .hud-pleas) {
   width: var(--hud-col); max-width: 100%; border-radius: var(--hud-r); border: 1px solid var(--hair);
 }
-.gh .ui-hud-corner .hud-brand[data-compact="true"]:not([data-open="true"]) { width: var(--hud-col); min-width: 0; max-width: 100%; }
-/* the Guild's bar: the faces from the left, ⤢ at the right end */
-.gh .ui-hud-corner .hud-badges { justify-content: space-between; }
-.gh .ui-hud-corner .hud-badges-expand { margin-left: auto; }
-/* six faces and ⤢ on one row of the column */
-.gh .ui-hud-corner .hud-badge { width: 36px; height: 36px; }
+.gh .ui-hud-corner > .hud-badges { width: auto; max-width: 100%; border-radius: var(--hud-r); }
+.gh .ui-hud-corner .hud-badge { width: 40px; height: 40px; }
+.gh .ui-hud-corner .hud-badges-expand { height: 40px; }
 
 /* the Brand, denser: smaller type, tighter padding, the about's links on one row */
 .gh .ui-hud-corner .hud-brand { padding: 8px 12px 9px; gap: 7px; }
@@ -157,10 +182,31 @@ const CSS = /* css */ `
 .hall-keys div { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--t-sm); color: var(--muted); }
 .hall-keys dd { margin: 0; text-align: right; }
 
-/* a phone: the brand stays a strip, the rail a little smaller */
-.ui-viewer[data-phone] .ui-hud-corner .hud-brand { max-width: calc(100cqw - 16px); }
-.ui-viewer[data-phone] .hall-rail-btn { width: 36px; height: 36px; }
-.ui-viewer[data-phone] .hall-rail { gap: 4px; }
+/* ── a phone's top row: crest · repo chip · ☰ (the rail is the menu's one button), and the one menu: a
+   bottom sheet with its tabs over the tab's panel (the panel's own head and frame give way to the tabs) ── */
+.ui-viewer[data-phone] { --rail-w: 52px; }
+.ui-viewer[data-phone] .ui-hud-rail { top: var(--gut); }
+.gh .ui-viewer[data-phone] .hall-menu-btn { width: 44px; height: 44px; border-radius: 999px; }
+.gh .hall-menu-btn .hud-tab-dot { top: 7px; right: 7px; }
+.gh .ui-hud-sheet .hall-menu { background: rgba(20, 15, 11, 0.95); }
+.ui-viewer[data-phone] .hud-repo-source { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.ui-viewer[data-phone] .hud-repo-chip { padding: 0 14px; }
+.hall-menu { display: flex; flex-direction: column; min-height: 0; max-height: min(70cqh, 640px); padding: 0; overflow: hidden; background: rgba(20, 15, 11, 0.94); }
+.hall-tabs { flex: none; display: flex; align-items: stretch; gap: 2px; padding: 4px 4px 0; border-bottom: 1px solid var(--hair); }
+.hall-tab {
+  position: relative; flex: 1 1 0; min-width: 0; min-height: 46px; padding: 0 6px; border: 0; border-bottom: 2px solid transparent; background: none;
+  color: var(--muted); font: 400 14px/1 var(--display); letter-spacing: 0.08em; cursor: pointer; white-space: nowrap;
+}
+.hall-tab:hover { color: var(--paper); }
+.hall-tab[aria-selected="true"] { color: var(--brass-hi); border-bottom-color: var(--brass); }
+.hall-tab:focus-visible { outline: none; box-shadow: inset var(--ring); }
+.hall-tab .hud-tab-dot { position: absolute; top: 9px; right: 6px; }
+.gh .hall-tabs-close { flex: none; align-self: center; width: 44px; height: 44px; border: 0; background: none; }
+.hall-menu-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.hall-menu-body > * { flex: 1 1 auto; min-height: 0; max-height: none !important; }
+.gh .hall-menu-body .ui-panel { width: 100%; max-width: none; border: 0; border-radius: 0; background: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.hall-menu-body > .hud-panel > .hud-panel-head, .hall-menu-body > .hud-settings > .hud-settings-head { display: none; }
+.hall-menu-body > .hud-panel > .hud-panel-body { border-top: 0; }
 `
 
 let users = 0

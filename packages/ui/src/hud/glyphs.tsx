@@ -89,6 +89,7 @@ export const Glyphs = {
   ),
   hidden: glyph(<path d="M2 8s2.4 3.5 6 3.5S14 8 14 8M3.6 10.2 2.5 11.6M12.4 10.2l1.1 1.4M8 11.5V13" />),
   close: glyph(<path d="m4 4 8 8M12 4l-8 8" />),
+  menu: glyph(<path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />),
   play: glyph(<path d="M5 3.5v9l7.5-4.5z" fill="currentColor" />),
   pause: glyph(<path d="M5.5 3.5v9M10.5 3.5v9" strokeWidth="2.2" />),
   island: glyph(

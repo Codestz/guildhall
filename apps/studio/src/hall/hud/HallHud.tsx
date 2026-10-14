@@ -15,8 +15,14 @@
  *
  * Minimal by default; Detailed opens the Guild on the left and the Chronicle on the right and pins the
  * timeline (V1); Hidden leaves the world, the captions and the way back. A badge or a roster row follows
- * its hero with the camera (a row also opens the hero's dossier). On a phone every panel is the one
- * bottom sheet.
+ * its hero with the camera (a row also opens the hero's dossier).
+ *
+ * The top row (user 10-13) is the site's crest pill, then the repo chip (its name and source dot; it
+ * unfolds the details under the row), the Guild's face bar under them, each its own width.
+ *
+ * A phone (decisions.md "Phone GUI"): the row ends in ☰, which opens the one bottom sheet with tabs
+ * (Guild · Places · Chronicle · Settings; the Legends and the card under the Chronicle); the foot holds
+ * the captions, then the face bar (+N) and the act chip on one row, then the timeline's hairline.
  */
 import type { CameraPose } from "@guildhall/core"
 import { type QualityPick, qualityDpr, qualityOf, type WeatherKind } from "@guildhall/render"
@@ -75,6 +81,7 @@ import type { HallTime } from "../clock.ts"
 import type { SessionSnapshot } from "../feeds/session.ts"
 import { chronicleOf, groupRepeats, partiesOf, rosterOf, type SessionEntry } from "../feeds/view.ts"
 import { HallTimeline } from "../timeline.tsx"
+import { faceSlots, type MenuTab, menuOpens, menuTab, menuTabs, TAB_LABEL } from "./phone.ts"
 import { usePortraitOf } from "./portraits.ts"
 import {
   HeroSheet,
@@ -161,6 +168,45 @@ const noSnapshot = (): SessionSnapshot | null => null
 const useHud = (hud: ViewerHud): HudState => useSyncExternalStore(hud.subscribe, hud.state)
 const usePhone = (hud: ViewerHud): boolean => useSyncExternalStore(hud.subscribe, hud.phone)
 
+/** The viewer's width (CSS px) while it is a phone's, for the face bar; 0 before it is laid out. */
+function useViewerWidth(hud: ViewerHud, on: boolean): number {
+  const [width, setWidth] = useState(0)
+  useEffect(() => {
+    const viewer = hud.corner.closest<HTMLElement>(".ui-viewer")
+    if (!on || !viewer) return
+    const read = () => setWidth(viewer.clientWidth)
+    read()
+    const watch = new ResizeObserver(read)
+    watch.observe(viewer)
+    return () => watch.disconnect()
+  }, [hud, on])
+  return width
+}
+
+/** Between the site's crest pill and the repo chip, px. */
+const CREST_GAP = 8
+
+/**
+ * The repo chip sits right of the site's crest pill in one row: the crest's width (its own, hugging its
+ * word) and the gap after it are kept on the viewer as `--crest-w` (unset where the page has no crest: a
+ * studio lab).
+ */
+function useCrestWidth(hud: ViewerHud): void {
+  useEffect(() => {
+    const viewer = hud.corner.closest<HTMLElement>(".ui-viewer")
+    const crest = document.querySelector<HTMLElement>(".site-crest-btn")
+    if (!viewer || !crest) return
+    const read = () => viewer.style.setProperty("--crest-w", `${crest.offsetWidth + CREST_GAP}px`)
+    read()
+    const watch = new ResizeObserver(read)
+    watch.observe(crest)
+    return () => {
+      watch.disconnect()
+      viewer.style.removeProperty("--crest-w")
+    }
+  }, [hud])
+}
+
 /**
  * Where the camera goes to look at a place: over its heart, as close as its size allows, keeping the way
  * it looks. `sheet` says where the open sheet covers the screen, so the place lands in what is left:
@@ -188,6 +234,9 @@ export function poseFor(
     distance,
   }
 }
+
+/** A phone's side margin (the site's 12 px edge), as the face bar counts its room. */
+const PHONE_GUT = 12
 
 /** Where the hall keeps the viewer's quality pick (Settings, Quality) between visits. */
 const QUALITY_KEY = "gh.hall.quality"
@@ -401,6 +450,8 @@ export function HallHud(props: HallHudProps) {
   const { hud, parts, slug, chronicle, legend, recap, float, levers } = props
   const state = useHud(hud)
   const phone = usePhone(hud)
+  const width = useViewerWidth(hud, phone)
+  useCrestWidth(hud)
   const camera = parts.camera
   const [picked, setPicked] = useState<number | null>(null)
   const [brandOpen, setBrandOpen] = useState(false)
@@ -540,6 +591,16 @@ export function HallHud(props: HallHudProps) {
 
   const toggle = (id: string) => hud.dispatch({ type: "toggle", id })
   const close = () => hud.dispatch({ type: "close" })
+  // the phone's one menu: its tabs, the one shown now (null: folded), the one ☰ opens next
+  const tabs = useMemo(() => menuTabs({ guild: Boolean(live), places: !home }), [live, home])
+  const tab = phone ? menuTab(state.open, state.back, tabs) : null
+  const lastTab = useRef<MenuTab | null>(null)
+  if (tab) lastTab.current = tab
+  const pleas = snap ? pleaCount(snap) : 0
+  const toggleMenu = () =>
+    state.open
+      ? hud.dispatch({ type: "closeAll" })
+      : hud.dispatch({ type: "open", id: menuOpens(lastTab.current, tabs) })
   const hidden = state.mode === "hidden"
   const detailed = state.mode === "detailed"
   const placesOpen =
@@ -802,8 +863,40 @@ export function HallHud(props: HallHudProps) {
   else if (phone && state.open === "places")
     sheet = <PlacesPanel rows={rows} picked={picked} onPick={(k) => open(k, "places")} onClose={close} />
   else if (chronicleOpen) sheet = chronicleFeed
+  // a phone's menu: the tab bar over the tab's panel (a dossier opened from a tab stays under it)
+  if (sheet && tab)
+    sheet = (
+      <div className="ui-panel hall-menu" data-tab={TAB_LABEL[tab].toLowerCase()}>
+        <div className="hall-tabs" role="tablist" aria-label="Menu">
+          {tabs.map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              className="hall-tab"
+              data-tab={TAB_LABEL[t].toLowerCase()}
+              aria-selected={t === tab}
+              onClick={() => hud.dispatch({ type: "open", id: t })}
+            >
+              {TAB_LABEL[t]}
+              {t === "roster" && pleas > 0 && <i className="hud-tab-dot" aria-hidden="true" />}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="ui-icon-btn hall-tabs-close"
+            aria-label="Close the menu"
+            onClick={() => hud.dispatch({ type: "closeAll" })}
+          >
+            <Glyphs.close size={16} />
+          </button>
+        </div>
+        <div className="hall-menu-body" role="tabpanel">
+          {sheet}
+        </div>
+      </div>
+    )
 
-  const pleas = snap ? pleaCount(snap) : 0
   // a plea's card: top centre (V1), under the Guild on a phone; the fast-forward chip beside it
   const pleaCards = live && snap && !hidden && (
     <PleaCards hud={live} snap={snap} onOpen={(id) => openHero(id)} />
@@ -811,12 +904,46 @@ export function HallHud(props: HallHudProps) {
   const ffwd = snap?.kind === "replay" && <FastForwardChip rate={pace * skip} skip={skip} />
   const chapters = snap?.chapters ?? []
   const clock = live?.session.clock
+  // the Guild's face bar: under the top row, or a phone's foot beside the act chip (as many as fit, +N)
+  const actsPx = chapters.length > 0 ? 52 : 0
+  const faces = live && snap && !(phone && state.open !== null) && (
+    <RosterBadges
+      heroes={roster.heroes}
+      parties={roster.parties}
+      following={following}
+      selected={filmed}
+      look="portrait"
+      portraitOf={portraitOf}
+      size={phone ? 40 : 36}
+      onPick={(id) => (id ? follow(id) : camera?.release())}
+      onExpand={() => {
+        if (detailed && !phone) setFolded((f) => ({ ...f, roster: false }))
+        else hud.dispatch({ type: "open", id: "roster" })
+      }}
+      {...(phone && width > 0 ? { max: faceSlots(width, PHONE_GUT, actsPx) } : {})}
+    />
+  )
 
   return (
     <>
       {createPortal(
         hidden ? (
           <ShowHudPill onShow={() => hud.dispatch({ type: "mode", mode: "minimal" })} pleas={pleas} />
+        ) : phone ? (
+          <nav className="hall-rail" aria-label="HUD">
+            <button
+              type="button"
+              className="ui-icon-btn hall-rail-btn hall-menu-btn"
+              data-plaque=""
+              aria-label={state.open ? "Close the menu" : "Menu"}
+              title="Menu"
+              aria-expanded={state.open !== null}
+              onClick={toggleMenu}
+            >
+              {state.open ? <Glyphs.close size={18} /> : <Glyphs.menu size={18} />}
+              {pleas > 0 && !state.open && <i className="hud-tab-dot" aria-hidden="true" />}
+            </button>
+          </nav>
         ) : (
           <nav className="hall-rail" aria-label="HUD">
             {!home && (
@@ -863,19 +990,18 @@ export function HallHud(props: HallHudProps) {
       {createPortal(
         <>
           <BrandCard
+            chip
             name={brand.name}
             source={snap ? sourceOf(snap) : brand.source}
             status={snap ? sessionStatus(snap) : brand.status}
             stats={brand.stats}
-            crest={false}
-            compact={!detailed && !brandOpen}
             about={about}
             open={brandOpen}
             onToggle={() => setBrandOpen((v) => !v)}
             {...(snap ? { pleas } : {})}
             {...(live && snap?.kind === "live" ? { onRetry: () => live.session.retry() } : {})}
           />
-          {live && snap && (
+          {live && snap && !phone && (
             <PartyTabs
               parties={roster.parties}
               heroes={roster.heroes}
@@ -885,21 +1011,7 @@ export function HallHud(props: HallHudProps) {
               className="hall-parties"
             />
           )}
-          {live && snap && !rosterOpen && !(phone && state.open === "roster") && (
-            <RosterBadges
-              heroes={roster.heroes}
-              parties={roster.parties}
-              following={following}
-              selected={filmed}
-              look="portrait"
-              portraitOf={portraitOf}
-              onPick={(id) => (id ? follow(id) : camera?.release())}
-              onExpand={() => {
-                if (detailed && !phone) setFolded((f) => ({ ...f, roster: false }))
-                else hud.dispatch({ type: "open", id: "roster" })
-              }}
-            />
-          )}
+          {!phone && !rosterOpen && faces}
           {phone && pleaCards}
           {!phone && rosterOpen && rosterPanel}
           {!phone && placesOpen && (
@@ -931,6 +1043,7 @@ export function HallHud(props: HallHudProps) {
         )}
       {createPortal(
         <>
+          {phone && faces}
           {phone && ffwd}
           {chapters.length > 0 && clock && snap && !hidden && (
             <ChapterChip
@@ -945,7 +1058,7 @@ export function HallHud(props: HallHudProps) {
         float.acts,
       )}
       {createPortal(
-        chronicleOpen && !phone ? null : (
+        chronicleOpen || phone ? null : (
           <Toasts
             items={toasts}
             time={0}

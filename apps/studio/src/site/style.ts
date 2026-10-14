@@ -12,17 +12,18 @@ const CSS = /* css */ `
 /* the cover is the whole screen: the crest and the card wait for the reveal */
 .site-root[data-cover] .site-pieces { visibility: hidden; }
 
-/* a hall's HUD (the Viewer's HUD regions, hall/hud) sits under the crest; with ?dev=1 the Viewer's tools
-   and Inspector show too, and the HUD's rail steps down below them */
-.site-world .ui-viewer { --hud-top: 72px; --gut: var(--site-edge, 16px); }
-.site-world .ui-viewer[data-phone] { --hud-top: 64px; --gut: 12px; }
+/* a hall's HUD (the Viewer's HUD regions, hall/hud) starts in the crest's row (its repo chip right of the
+   crest, hall/hud/style.ts); with ?dev=1 the Viewer's tools and Inspector show too, and the HUD's rail
+   steps down below them */
+.site-world .ui-viewer { --gut: var(--site-edge, 16px); --hud-top: var(--gut); }
+.site-world .ui-viewer[data-phone] { --gut: 12px; }
 .site-root[data-dev] .site-world .ui-hud-rail { top: 60px; }
 
-/* the welcome bar owns the foot of the screen while it is up: the HUD's bottom row rides above it (SiteApp sets
-   --welcome-h to the bar's height); on a phone the Chronicle chip rides up with it */
-.site-root[data-welcome] .ui-hud-bottom { bottom: calc(var(--gut) + var(--welcome-h, 0px) + 12px); }
-.site-root[data-welcome] .ui-viewer[data-phone] .ui-hud-bottom { bottom: calc(var(--welcome-h, 0px) + 24px + env(safe-area-inset-bottom)); }
-.site-root[data-welcome] .ui-viewer[data-phone] .ui-hud-feed { bottom: calc(var(--welcome-h, 0px) + 24px + 64px + env(safe-area-inset-bottom)); }
+/* the welcome bar owns the foot of a wide screen while it is up: the HUD's bottom row rides above it (SiteApp
+   sets --welcome-h to the bar's height). A phone's welcome is a button in the top row: the foot stays the HUD's */
+.site-root[data-welcome] .ui-viewer:not([data-phone]) .ui-hud-bottom { bottom: calc(var(--gut) + var(--welcome-h, 0px) + 12px); }
+/* the top row on a phone with "Your repo" in it: the repo chip leaves it room */
+.site-root:has(.site-welcome[data-dock="top"]) .ui-viewer[data-phone] { --rail-w: 156px; }
 `
 
 let users = 0

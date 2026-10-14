@@ -61,6 +61,23 @@ export const SITE_CSS = /* css */ `
   .gh .site-welcome-links .site-link { min-height: 44px; font-size: 15px; }
 }
 
+/* a phone: the welcome is a small "Your repo" pill in the top row, left of the HUD's ☰ (44 px + 8 px);
+   pressed, the card unfolds over the screen under the row, on a soft dim (WelcomeCard.tsx) */
+.gh .site-welcome[data-dock="top"] { top: 12px; bottom: auto; z-index: 33; justify-content: flex-end; align-items: flex-start; padding: 0 64px 0 12px; }
+.gh .site-welcome[data-dock="top"] .site-welcome-card[hidden] { display: none; }
+.gh .site-repo-btn {
+  pointer-events: auto; display: inline-flex; align-items: center; gap: 7px; height: 44px; padding: 0 14px 0 12px;
+  border: 1px solid var(--brass-line); border-radius: 999px; background: var(--ink); box-shadow: var(--shadow);
+  backdrop-filter: blur(14px) saturate(1.15); -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  color: var(--brass-hi); font: 500 14px/1 var(--body); white-space: nowrap; cursor: pointer;
+}
+.gh .site-repo-btn:hover { border-color: var(--brass); color: var(--paper); }
+.gh .site-repo-btn:focus-visible { outline: none; box-shadow: var(--ring), var(--shadow); }
+.gh .site-repo-btn svg { width: 16px; height: 16px; }
+.gh .site-welcome[data-dock="top"][data-open="true"] { padding: 0 12px; }
+.gh .site-welcome[data-dock="top"] .site-scrim { pointer-events: auto; }
+.gh .site-welcome[data-dock="top"] .site-welcome-card { position: relative; z-index: 32; width: 100%; margin-top: 56px; padding: 10px 10px 2px; }
+
 /* ── crest menu ─────────────────────────────────────────────────── */
 .gh .site-crestmenu { position: absolute; top: 16px; left: 16px; z-index: 32; }
 .gh .site-crest-btn {

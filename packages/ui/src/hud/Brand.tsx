@@ -39,6 +39,12 @@ export interface BrandCardProps {
   onToggle?: () => void
   /** Live and the link is lost: a way to try again. */
   onRetry?: () => void
+  /**
+   * The top row's repo chip (user 10-13): the name and its source dot on one small pill of its own width,
+   * right of the site's crest; pressing it unfolds the details (status, figures, about) as a panel under
+   * the row. The card form (the default) is the studio labs'.
+   */
+  chip?: boolean
 }
 
 /** What the source dot says, in words (never the dot's colour alone). */
@@ -68,6 +74,7 @@ export function BrandCard({
   open = false,
   onToggle,
   onRetry,
+  chip = false,
 }: BrandCardProps) {
   const id = useId()
   const words = sourceWords(source)
@@ -91,6 +98,67 @@ export function BrandCard({
       {name}
     </h1>
   )
+  const statusLine = (
+    <p className="hud-status-line" role="status">
+      <i className="hud-source-dot" data-tone={words.tone} aria-hidden="true" />
+      <span className="hud-source" data-tone={words.tone}>
+        {words.label}
+      </span>
+      {source.name && <span className="hud-sl-part hud-sl-name">{source.name}</span>}
+      {status && <span className="hud-sl-part">{status}</span>}
+      {pleas > 0 && <span className="hud-sl-part hud-sl-plea">{count(pleas, "plea")}</span>}
+    </p>
+  )
+  const alert = words.tone === "lost" && onRetry && (
+    <div className="hud-brand-alert">
+      <span>
+        <Glyphs.fail size={14} /> The hub stopped answering. The island shows the last it heard.
+      </span>
+      <Button size="sm" variant="outline" onClick={onRetry}>
+        <Glyphs.retry size={14} />
+        Retry
+      </Button>
+    </div>
+  )
+  if (chip)
+    return (
+      <>
+        <button
+          type="button"
+          className="ui-panel hud-repo-chip"
+          data-open={open}
+          aria-expanded={open}
+          aria-controls={`${id}-more`}
+          aria-label={`${name}, ${words.label}${pleas > 0 ? `, ${count(pleas, "plea")} waiting` : ""}. ${open ? "Fold the details" : "Details"}`}
+          title={`${name} · ${words.label}`}
+          onClick={onToggle}
+        >
+          <span className="hud-repo-name">{name}</span>
+          <i className="hud-source-dot" data-tone={words.tone} aria-hidden="true" />
+          <span className="hud-repo-source" data-tone={words.tone} aria-hidden="true">
+            {words.label}
+          </span>
+          {pleas > 0 && (
+            <span className="hud-repo-plea" aria-hidden="true">
+              <Glyphs.plea size={12} />
+            </span>
+          )}
+        </button>
+        {(open || alert) && (
+          <section
+            className="ui-panel hud-brand hud-brand-more"
+            id={`${id}-more`}
+            aria-label={`About ${name}`}
+            data-open={open}
+          >
+            {open && statusLine}
+            {alert}
+            {open && rows.length > 0 && <Figures rows={rows} />}
+            {open && about && <div className="hud-about">{about}</div>}
+          </section>
+        )}
+      </>
+    )
   return (
     <header className="ui-panel hud-brand" data-open={open} data-crest={withCrest} data-compact={compact}>
       <div className="hud-brand-head">

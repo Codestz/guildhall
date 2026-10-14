@@ -284,6 +284,30 @@ function FamilyFold({
  * The roster folded away: one sigil per hero. A plea, a fall or loot marks the sigil (a shape, not only
  * a colour); hovering or focusing one names it. Pressing one picks them; the last button unfolds.
  */
+/**
+ * The heroes that keep a face on a bar of `max`: all when they fit, else the followed first, then those
+ * pleading or fallen (`urgent`), then the rest in the roster's order. Pure.
+ */
+export function pickFaces<T extends { id: string }>(
+  heroes: readonly T[],
+  max: number,
+  selected: string | null,
+  urgent: (hero: T) => boolean,
+): Set<string> {
+  const out = new Set<string>()
+  if (heroes.length <= max) {
+    for (const h of heroes) out.add(h.id)
+    return out
+  }
+  const take = (h: T) => {
+    if (out.size < max) out.add(h.id)
+  }
+  for (const h of heroes) if (h.id === selected) take(h)
+  for (const h of heroes) if (urgent(h)) take(h)
+  for (const h of heroes) take(h)
+  return out
+}
+
 export function RosterBadges({
   heroes,
   parties = [],
@@ -293,6 +317,8 @@ export function RosterBadges({
   onExpand,
   look = "face",
   portraitOf,
+  max,
+  size = 36,
 }: Pick<RosterProps, "heroes" | "parties" | "following" | "selected" | "onPick" | "portraitOf"> & {
   onExpand: () => void
   /**
@@ -300,17 +326,36 @@ export function RosterBadges({
    * (`portraitOf`'s sprite; the face until it lands), or V1's monogram diamond.
    */
   look?: "face" | "portrait" | "sigil"
+  /** At most this many faces (a phone's bar): the rest are a "+N" that opens the roster (`pickFaces`). */
+  max?: number
+  /** A face's size, CSS px (36 on the column's bar, 40 on a phone's). */
+  size?: number
 }) {
   const groups = rosterGroups(heroes, parties, { following })
   const banners = groups.length > 1
   const partyOf = (id: string | undefined) => parties.find((p) => p.id === id)
   // at crowd scale (V1 hud/crowd.ts) the notable keep their faces and everyone else is one badge per role
-  const crowd = isCrowd(groups.reduce((n, g) => n + g.heroes.length, 0))
+  const total = groups.reduce((n, g) => n + g.heroes.length, 0)
+  const crowd = isCrowd(total)
+  const kept =
+    max !== undefined && !crowd
+      ? pickFaces(
+          groups.flatMap((g) => g.heroes),
+          max,
+          selected,
+          (h) => {
+            const tone = phaseOf(h.phase).tone
+            return tone === "plea" || tone === "fail"
+          },
+        )
+      : null
+  const more = kept ? total - kept.size : 0
   return (
     <nav className="ui-panel hud-badges" aria-label="The guild">
       <ul className="hud-badge-list">
         {groups.map((group) => {
           const split = crowd ? crowdOf(group.heroes, selected) : undefined
+          if (kept && !group.heroes.some((h) => kept.has(h.id))) return null
           return (
             <li key={group.key} className="hud-badge-group" data-banner={banners}>
               {banners && group.party && (
@@ -319,48 +364,50 @@ export function RosterBadges({
                 </span>
               )}
               <ul className="hud-badge-list">
-                {(split ? split.notable : group.heroes).map((hero) => {
-                  const phase = phaseOf(hero.phase)
-                  const active = selected === hero.id
-                  const Mark =
-                    phase.tone === "plea"
-                      ? Glyphs.plea
-                      : phase.tone === "fail"
-                        ? Glyphs.fail
-                        : phase.tone === "loot"
-                          ? Glyphs.loot
-                          : null
-                  const party = banners ? partyOf(hero.party) : undefined
-                  return (
-                    <li key={hero.id}>
-                      <button
-                        type="button"
-                        className="hud-badge"
-                        data-tone={phase.tone}
-                        aria-pressed={active}
-                        aria-label={`${heroTitle(hero)}${party ? ` of the ${party.name} quest` : ""}, ${phase.label}${hero.doing ? `, ${hero.doing}` : ""}. Open dossier.`}
-                        onClick={() => onPick?.(active ? null : hero.id)}
-                      >
-                        {look === "face" ? (
-                          <Avatar variant="face" hero={hero} size={30} />
-                        ) : look === "portrait" ? (
-                          <Avatar variant="portrait" hero={hero} size={30} src={portraitOf?.(hero)} />
-                        ) : (
-                          <Sigil family={hero.family} banner={hero.banner} ordinal={hero.ordinal} />
-                        )}
-                        {Mark && (
-                          <span className="hud-badge-mark" aria-hidden="true">
-                            <Mark size={12} />
+                {(split ? split.notable : group.heroes)
+                  .filter((hero) => !kept || kept.has(hero.id))
+                  .map((hero) => {
+                    const phase = phaseOf(hero.phase)
+                    const active = selected === hero.id
+                    const Mark =
+                      phase.tone === "plea"
+                        ? Glyphs.plea
+                        : phase.tone === "fail"
+                          ? Glyphs.fail
+                          : phase.tone === "loot"
+                            ? Glyphs.loot
+                            : null
+                    const party = banners ? partyOf(hero.party) : undefined
+                    return (
+                      <li key={hero.id}>
+                        <button
+                          type="button"
+                          className="hud-badge"
+                          data-tone={phase.tone}
+                          aria-pressed={active}
+                          aria-label={`${heroTitle(hero)}${party ? ` of the ${party.name} quest` : ""}, ${phase.label}${hero.doing ? `, ${hero.doing}` : ""}. Open dossier.`}
+                          onClick={() => onPick?.(active ? null : hero.id)}
+                        >
+                          {look === "face" ? (
+                            <Avatar variant="face" hero={hero} size={size} />
+                          ) : look === "portrait" ? (
+                            <Avatar variant="portrait" hero={hero} size={size} src={portraitOf?.(hero)} />
+                          ) : (
+                            <Sigil family={hero.family} banner={hero.banner} ordinal={hero.ordinal} />
+                          )}
+                          {Mark && (
+                            <span className="hud-badge-mark" aria-hidden="true">
+                              <Mark size={12} />
+                            </span>
+                          )}
+                          <span className="hud-tip" aria-hidden="true">
+                            <b>{heroTitle(hero)}</b>
+                            <span>{phase.label}</span>
                           </span>
-                        )}
-                        <span className="hud-tip" aria-hidden="true">
-                          <b>{heroTitle(hero)}</b>
-                          <span>{phase.label}</span>
-                        </span>
-                      </button>
-                    </li>
-                  )
-                })}
+                        </button>
+                      </li>
+                    )
+                  })}
                 {split?.families.map((fold) => (
                   <RoleBadge key={fold.family} fold={fold} onOpen={onExpand} />
                 ))}
@@ -374,9 +421,10 @@ export function RosterBadges({
         type="button"
         className="ui-icon-btn hud-badges-expand"
         onClick={onExpand}
-        aria-label="Expand the guild roster"
+        aria-label={more > 0 ? `${more} more heroes: open the guild roster` : "Expand the guild roster"}
+        data-more={more > 0 ? "" : undefined}
       >
-        <Glyphs.expand />
+        {more > 0 ? <span className="hud-badges-more num">+{more}</span> : <Glyphs.expand />}
       </button>
     </nav>
   )

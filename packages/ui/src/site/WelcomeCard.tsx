@@ -6,11 +6,33 @@
  * (`onDismiss`, see `writeWelcomeDismissed`). The island is the pitch, so there is no copy beyond a
  * visually hidden h1. Not modal: the world stays visible and alive behind it. It is `data-keepout`:
  * plates stay off it.
+ *
+ * On a phone (≤ 600 px, decisions.md "Phone GUI") the foot is the game's HUD, so the bar folds to a small
+ * "Your repo" button in the top row (`data-dock="top"`) that unfolds the same card over the screen; its
+ * close button, a tap outside or Esc fold it back to the button.
  */
-import { type FormEvent, useId, useRef, useState } from "react"
+import { type FormEvent, useEffect, useId, useRef, useState } from "react"
 import { Button, IconButton } from "../components/controls.tsx"
-import { AlertGlyph, CheckGlyph, CloseGlyph, Dest } from "./parts.tsx"
+import { AlertGlyph, CheckGlyph, CloseGlyph, Dest, RepoGlyph } from "./parts.tsx"
 import { parseRepo } from "./repo.ts"
+
+/** At or below this width the welcome is the top row's button (the HUD's phone width, viewer/hud.ts). */
+export const WELCOME_TOP_MAX = 600
+
+/** True while the screen is a phone's (the welcome docks in the top row). */
+function useTopDock(): boolean {
+  const query = `(max-width: ${WELCOME_TOP_MAX}px)`
+  const [on, setOn] = useState(() => typeof matchMedia === "function" && matchMedia(query).matches)
+  useEffect(() => {
+    if (typeof matchMedia !== "function") return
+    const list = matchMedia(query)
+    const change = () => setOn(list.matches)
+    change()
+    list.addEventListener("change", change)
+    return () => list.removeEventListener("change", change)
+  }, [query])
+  return on
+}
 
 export interface WelcomeCardProps {
   /** Valid `owner/repo` submitted. */
@@ -69,12 +91,19 @@ export function WelcomeCard({
   const root = useRef<HTMLElement>(null)
   const field = useRef<HTMLInputElement>(null)
   const [open, setOpen] = useState(initial !== "" || Boolean(error))
+  const top = useTopDock()
   const on = (event: WelcomeEvent) => {
     const next = welcomeFold(open, event, text)
     if (next.open !== open) setOpen(next.open)
-    if (next.dismiss) onDismiss()
+    // on a phone the button stays: Esc folds the card back to it, never dismisses it
+    if (next.dismiss && !top) onDismiss()
+    else if (event === "escape" && top) setOpen(false)
     else if (event === "escape" && !next.open) field.current?.blur()
   }
+  // the card unfolded from the top row's button: the field takes the focus (the keyboard comes up)
+  useEffect(() => {
+    if (top && open) field.current?.focus({ preventScroll: true })
+  }, [top, open])
   const parsed = parseRepo(text)
   const problem = error ?? (touched && text.trim() !== "" && !parsed.ok ? parsed.reason : undefined)
   const good = parsed.ok && text.trim() !== "" && !error
@@ -86,9 +115,31 @@ export function WelcomeCard({
   }
 
   return (
-    <div className="site-welcome" data-busy={busy ? "" : undefined} data-open={open}>
+    <div
+      className="site-welcome"
+      data-busy={busy ? "" : undefined}
+      data-open={open}
+      data-dock={top ? "top" : undefined}
+    >
       <h1 className="site-sr">Guildhall: events in, a living world out</h1>
+      {/* a tap on the dim round the unfolded card folds it */}
+      {top && open && (
+        <div className="site-scrim" data-soft="" aria-hidden="true" onClick={() => setOpen(false)} />
+      )}
+      {top && !open && (
+        <button
+          type="button"
+          className="site-repo-btn"
+          data-keepout=""
+          aria-label="Your repo as an island"
+          onClick={() => setOpen(true)}
+        >
+          <RepoGlyph />
+          Your repo
+        </button>
+      )}
       <section
+        hidden={top && !open}
         ref={root}
         className="ui-panel site-welcome-card"
         aria-label="Your repo as an island"
@@ -174,7 +225,10 @@ export function WelcomeCard({
               </>
             )}
           </nav>
-          <IconButton label="Dismiss the welcome" onClick={onDismiss}>
+          <IconButton
+            label={top ? "Fold the repo field" : "Dismiss the welcome"}
+            onClick={top ? () => setOpen(false) : onDismiss}
+          >
             <CloseGlyph size={14} />
           </IconButton>
         </div>

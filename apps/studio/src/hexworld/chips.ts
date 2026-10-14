@@ -356,10 +356,23 @@ export interface ChipField {
   keep: readonly Rect[]
 }
 
-/** May this chip speak, by the HUD mode, whether it is followed and how close? (V1 `speaks`.) */
-export function speaks(mode: ChipMode, selected: boolean, near: boolean): boolean {
+/**
+ * May this chip speak, by the HUD mode, whether it is followed and how close? (V1 `speaks`.) On a phone
+ * only the followed (or tapped) hero speaks (decisions.md "Phone GUI": chips are names alone).
+ */
+export function speaks(mode: ChipMode, selected: boolean, near: boolean, phone = false): boolean {
   if (mode === "hidden") return false
+  if (phone) return selected
   return mode === "detailed" || selected || near
+}
+
+/** A chip's touch target on a phone, CSS px a side at least (the hit box grows round a small chip). */
+export const TAP_PX = 44
+
+/** The slop round a `w` × `h` chip that makes its hit box at least `TAP_PX` a side on a phone. Pure. */
+export function tapSlop(w: number, h: number, phone: boolean, base = 4): { x: number; y: number } {
+  if (!phone) return { x: base, y: base }
+  return { x: Math.max(base, (TAP_PX - w) / 2), y: Math.max(base, (TAP_PX - h) / 2) }
 }
 
 /**
@@ -480,7 +493,7 @@ export class Declutter {
     for (const s of this.slots) s.speak = false
     for (const s of order) {
       if (speakers.length >= MAX_SPEAKERS) break
-      if (s.folded || s.out || !s.bubble || !speaks(field.mode, s.selected, s.near)) continue
+      if (s.folded || s.out || !s.bubble || !speaks(field.mode, s.selected, s.near, field.phone)) continue
       let crowded = false
       for (const o of speakers)
         if (Math.abs(s.x - o.x) < BUBBLE_W + GAP && Math.abs(s.y - o.y) < BUBBLE_H + GAP) crowded = true
@@ -505,15 +518,16 @@ export class Declutter {
    * The hero whose shown chip (as the last run laid it) holds the point (layer px, `slop` px round each),
    * the front-most first: pinned, then nearest. Null: none.
    */
-  hit(x: number, y: number, slop = 4): string | null {
+  hit(x: number, y: number, slop = 4, phone = false): string | null {
     for (const s of this.order) {
       if (s.folded || s.out || !s.on) continue
       const top = s.y - s.lift - s.h
+      const pad = tapSlop(s.w, s.h, phone, slop)
       if (
-        x >= s.x - s.w / 2 - slop &&
-        x <= s.x + s.w / 2 + slop &&
-        y >= top - slop &&
-        y <= s.y - s.lift + slop
+        x >= s.x - s.w / 2 - pad.x &&
+        x <= s.x + s.w / 2 + pad.x &&
+        y >= top - pad.y &&
+        y <= s.y - s.lift + pad.y
       )
         return s.id
     }
@@ -862,7 +876,7 @@ export function createChips(
       plea = fn
     },
     boxes: () => shownBoxes,
-    hit: (x, y) => declutter.hit(x, y),
+    hit: (x, y) => declutter.hit(x, y, 4, phone),
     dispose() {
       clearInterval(timer)
       observer?.disconnect()

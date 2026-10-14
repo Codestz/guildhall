@@ -483,10 +483,9 @@ export const COMPONENTS_CSS = /* css */ `
   animation: ui-hero-bob 2.4s ease-in-out infinite alternate;
 }
 .ui-hero[data-sigil] .ui-hero-sigil { display: grid; }
-/* the plate's verb line already shows the deed's glyph: the sigil is for when the plate's line is not read
-   (Hidden; a phone's far heroes, whose verb line is folded) */
-.ui-heroes:not([data-mode="hidden"]):not([data-phone]) .ui-hero[data-sigil] .ui-hero-sigil,
-.ui-heroes[data-phone]:not([data-mode="hidden"]) .ui-hero[data-sigil]:is([data-selected], [data-near]) .ui-hero-sigil { display: none; }
+/* the plate's verb line already shows the deed's glyph: the sigil is for when the plate is not read (Hidden);
+   a phone's chips are names alone (decisions.md "Phone GUI") */
+.ui-heroes:not([data-mode="hidden"]) .ui-hero[data-sigil] .ui-hero-sigil { display: none; }
 .ui-hero-sigil-glyph { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 @keyframes ui-hero-bob { to { transform: translateY(-1.5px); } }
 /* waiting on you: a hopping brass diamond, a button (the chip's only hit target) */
@@ -520,10 +519,11 @@ export const COMPONENTS_CSS = /* css */ `
 .ui-heroes[data-mode="minimal"] .ui-hero:not([data-selected]):not([data-near]) .ui-hero-target { display: none; }
 .ui-heroes[data-mode="hidden"] .ui-hero-plate,
 .ui-heroes[data-mode="hidden"] .ui-hero-bubble { display: none; }
-/* a phone: a smaller chip, the verb line only for whoever you follow or close by, a 44 px plea */
+/* a phone (decisions.md "Phone GUI"): a chip is the name alone; whoever you follow (or tapped) shows the
+   verb line and speaks; a plea's mark always shows, 44 px to tap */
 .ui-heroes[data-phone] .ui-hero-plate { padding: 2px 6px 1px; }
 .ui-heroes[data-phone] .ui-hero-name { font-size: 10.5px; letter-spacing: 0.04em; }
-.ui-heroes[data-phone] .ui-hero:not([data-selected]):not([data-near]) .ui-hero-verb { display: none; }
+.ui-heroes[data-phone] .ui-hero:not([data-selected]) :is(.ui-hero-verb, .ui-hero-pips) { display: none; }
 .ui-heroes[data-phone] .ui-hero-target { max-width: 16ch; }
 .ui-heroes[data-phone] .ui-hero-bubble { max-width: 170px; font-size: 11px; }
 .ui-heroes[data-phone] .ui-hero-plea { width: 44px; height: 44px; margin: -9px 0; }

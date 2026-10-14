@@ -384,20 +384,22 @@ export function eventsTale(seed = 1, repo = EVENTS_REPO): EventsTale {
       (k) => {
         k.deed("glob", { pattern: `${S}/src/legacy/**` }, 1400, { summary: "1,204 files" })
         k.deed("read", { filePath: `${S}/src/legacy/README.md` }, 1600)
-        k.think("The old backlog goes on and on…", 3000)
+        k.think("The old backlog goes on and on…", 2000)
         until(k, at)
         k.fail("context window exceeded")
       },
       { wait: false },
     )
-  const fallAt = master.clock + 12_000
+  // the falls come a little before the ghost ship's slot (the demo's 20 s after the comet): their graves
+  // are glanced at first, then the ship
+  const fallAt = master.clock + 8000
   const one = lost("Map the old backlog's world events", fallAt)
   const two = lost("Map the old backlog's sea", fallAt + FALLS_MS)
   beat("fall", fallAt)
   beat("fall-2", fallAt + FALLS_MS)
   master.waitFor(oracle)
-  // the ghost ship passes and the pirates come in (the demo's 20 s after it) before nightfall
-  until(master, fallAt + FALLS_MS + 24_000)
+  // the ghost ship passes and the pirates come in (the demo's 20 s after it), filmed, before nightfall
+  until(master, fallAt + FALLS_MS + 34_000)
   master.think("Two lost in the backlog. Let it lie; the rest is ready.", 1200)
   void one
   void two

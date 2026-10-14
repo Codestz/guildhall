@@ -77,7 +77,7 @@ describe("World events: every show in turn", () => {
 
   test("runs about four minutes in five acts, with the demo's spacing", () => {
     expect(told.s.duration).toBeGreaterThan(180_000)
-    expect(told.s.duration).toBeLessThan(250_000)
+    expect(told.s.duration).toBeLessThan(270_000)
     expect(told.s.chapters.map((c) => c.title)).toEqual([
       "Dawn",
       "Red skies",

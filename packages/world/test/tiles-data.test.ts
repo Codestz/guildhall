@@ -104,7 +104,7 @@ describe("scene checks (checks.ts), on every tile in data/tiles", () => {
     expect(plaza.pieces.map((q) => q.piece)).toContain("kaykit-tools/map-empty")
   })
 
-  test("a duel's two sides face each other across a sword's reach", () => {
+  test("a duel's two sides face each other ~1.6 m apart (a step in still keeps their helmets apart)", () => {
     let pairs = 0
     for (const t of tiles)
       for (const a of t.spots ?? []) {
@@ -114,7 +114,7 @@ describe("scene checks (checks.ts), on every tile in data/tiles", () => {
         const off = Math.abs(Math.atan2(Math.sin(a.facing - toB), Math.cos(a.facing - toB)))
         expect([t.id, a.pair, off < 0.2]).toEqual([t.id, a.pair, true])
         const gap = Math.hypot(b.x - a.x, b.z - a.z)
-        expect([t.id, a.pair, gap > 0.8 && gap < 1.3]).toEqual([t.id, a.pair, true])
+        expect([t.id, a.pair, gap > 1.45 && gap < 1.75]).toEqual([t.id, a.pair, true])
         pairs++
       }
     expect(pairs).toBeGreaterThanOrEqual(4)

@@ -6,6 +6,7 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import { DRILLS, drillFrame } from "../src/hex/drills.ts"
 import { agentLoop, type LifeStay, lifePlaces, planFolk, workTiles } from "../src/hex/life.ts"
 import {
   hexIsland,
@@ -44,6 +45,35 @@ describe("the training arena", () => {
       const at = w.tiles.filter((t) => t.prefab === ARENA)
       expect(at.length).toBe(1)
       expect(["camp", "town", "hamlet", "market"]).toContain(z.zones[z.zoneOf[at[0]!.i]! - 1]!.kind)
+    }
+  })
+
+  test("duellists stand ~1.6 m apart and never close below 1.2 m in a bout; nobody of another pair is nearer", () => {
+    const duel = tilePrefab(ARENA)!.spots!.filter((s) => s.drill === "duel")
+    expect(duel.length).toBe(4)
+    // where each stands at t: its spot plus the bout's step forward along its facing
+    const at = (s: (typeof duel)[number], t: number) => {
+      const side = duel.filter((o) => o.pair === s.pair).indexOf(s)
+      const step = drillFrame("duel", side, t).step
+      return [s.x + Math.sin(s.facing) * step, s.z + Math.cos(s.facing) * step] as const
+    }
+    let closest = Number.POSITIVE_INFINITY
+    for (let t = 0; t < DRILLS.duel!.period; t += 0.05)
+      for (const [i, a] of duel.entries())
+        for (const b of duel.slice(i + 1)) {
+          const [ax, az] = at(a, t)
+          const [bx, bz] = at(b, t)
+          const d = Math.hypot(ax - bx, az - bz)
+          if (a.pair === b.pair) {
+            expect(d).toBeGreaterThanOrEqual(1.2)
+            closest = Math.min(closest, d)
+          } else expect(d).toBeGreaterThanOrEqual(1.5)
+        }
+    // they do step in to fight
+    expect(closest).toBeLessThan(1.6)
+    for (const p of ["a", "b"]) {
+      const [a, b] = duel.filter((s) => s.pair === p)
+      expect(Math.hypot(a!.x - b!.x, a!.z - b!.z)).toBeCloseTo(1.6, 1)
     }
   })
 

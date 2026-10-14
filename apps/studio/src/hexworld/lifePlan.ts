@@ -174,9 +174,10 @@ export function kitOf(
 
 /**
  * How the heroes are planned in life: a little quicker than the townsfolk (they are on an errand), and a
- * way that would take over 30 s to walk is run, at up to 3.5 m/s (sim `hurry`).
+ * way that would take over 10 s to walk is run, at up to 7 m/s (sim `hurry`), so more of a session is
+ * seen at work than on the road.
  */
-export const AGENT_OPTS = { mps: LIFE_MPS * AGENT_PACE, hurry: { within: 30, mps: 3.5 } } as const
+export const AGENT_OPTS = { mps: LIFE_MPS * AGENT_PACE, hurry: { within: 10, mps: 7 } } as const
 
 /** A session's world events in, its heroes' itineraries out (plain data, as the worker posts them). */
 export interface AgentDeskRequest {

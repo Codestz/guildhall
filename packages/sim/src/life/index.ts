@@ -8,6 +8,7 @@
  *   scaffold     `scaffoldProgress`: how far edits at a place have built its scaffold
  */
 export {
+  BEAT_FX,
   BEAT_SPAN,
   type Beat,
   BRIEF_MS,
@@ -24,6 +25,7 @@ export {
   PIN_MS,
   type Play,
   playRoutine,
+  RISE_MS,
   type Routine,
   routineAt,
   routineMs,
@@ -33,6 +35,8 @@ export {
   type AgentPose,
   BECKON_MS,
   BRIEF_WITHIN,
+  BURST_MS,
+  FADE_AFTER_MS,
   FAIL_HOLD_MS,
   type HeroAct,
   type HeroStay,
@@ -48,6 +52,7 @@ export {
   RUN_FROM,
   shownAt,
   stepPose,
+  WORK_DWELL_MS,
   walkEnd,
 } from "./itineraries.ts"
 export { SCAFFOLD_EDITS, scaffoldProgress } from "./scaffold.ts"

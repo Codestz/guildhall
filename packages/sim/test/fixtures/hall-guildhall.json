@@ -1,0 +1,96 @@
+{
+  "note": "The hall /hall/codestz/guildhall as the Studio builds it (its CDN chronicle read on 2026-10-12): the repo size and its places (sim placeSpecs), for the life tests to plan on the same island.",
+  "name": "Codestz/guildhall",
+  "files": 889,
+  "places": [
+    {
+      "id": "packages/hall",
+      "label": "hall",
+      "kind": "settlement",
+      "tier": 3,
+      "files": 682,
+      "capital": true,
+      "rankMax": 524
+    },
+    {
+      "id": ".github",
+      "label": ".github",
+      "kind": "mine",
+      "tier": 2,
+      "files": 12,
+      "rankMax": 524
+    },
+    {
+      "id": "/",
+      "label": "guildhall",
+      "kind": "harbour",
+      "tier": 2,
+      "files": 10,
+      "rankMax": 524
+    },
+    {
+      "id": "packages/core",
+      "label": "core",
+      "kind": "settlement",
+      "tier": 2,
+      "files": 22,
+      "rankMax": 524
+    },
+    {
+      "id": "packages/herald",
+      "label": "herald",
+      "kind": "settlement",
+      "tier": 2,
+      "files": 20,
+      "rankMax": 524
+    },
+    {
+      "id": "packages/hub",
+      "label": "hub",
+      "kind": "settlement",
+      "tier": 2,
+      "files": 22,
+      "rankMax": 524
+    },
+    {
+      "id": "packages/opencode-guildhall",
+      "label": "opencode-guildhall",
+      "kind": "settlement",
+      "tier": 2,
+      "files": 14,
+      "rankMax": 524
+    },
+    {
+      "id": "packages/roster",
+      "label": "roster",
+      "kind": "settlement",
+      "tier": 2,
+      "files": 24,
+      "rankMax": 524
+    },
+    {
+      "id": "packages/sim",
+      "label": "sim",
+      "kind": "settlement",
+      "tier": 2,
+      "files": 12,
+      "rankMax": 524
+    },
+    {
+      "id": "scripts",
+      "label": "scripts",
+      "kind": "mine",
+      "tier": 2,
+      "files": 16,
+      "rankMax": 524
+    },
+    {
+      "id": "packages/claude-code",
+      "label": "claude-code",
+      "kind": "settlement",
+      "tier": 2,
+      "files": 13,
+      "rankMax": 642
+    }
+  ]
+}

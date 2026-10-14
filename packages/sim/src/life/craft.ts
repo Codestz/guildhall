@@ -18,19 +18,33 @@ import type { HeroPose } from "@guildhall/world"
  *
  * and the moments the planner choreographs (itineraries.ts): the Guildmaster pinning a quest at the
  * notice board and beckoning the recruit, the recruit's briefing, the loot carried home and set down,
- * a failure's blow and slump, a plea's wave, a cheer, standing up again, and rest (sitting two by two
- * at the gathering).
+ * a failure's blow and slump, a plea's wave, a cheer, standing up again (and getting up quickly before a
+ * walk), and rest (sitting two by two at the gathering; thinking there stands still).
  *
  * A routine is sampled by `routineAt`, a pure function of the ms since it began: the same at every t
  * however it is reached (a scrub and a play agree).
  */
 
 /**
- * A cue on a routine's clock for particles and sound: the instant a hammer lands, a spell goes off… (the
- * names render's work FX reads, `beatKinds`: hit, cast, pickup, page, write, drop, loot; shoot, pin and
- * cheer are for sound).
+ * The moments whose beat is a work FX's kind by name (render owns how it looks): a bow's release flashes
+ * (`glint`), a quest pinned flutters paper (`pages`), a cheer sends up motes (`motes`).
  */
-export type Beat = "hit" | "cast" | "shoot" | "pickup" | "pin" | "cheer" | "drop" | "page" | "write" | "loot"
+export const BEAT_FX = { shoot: "glint", pin: "pages", cheer: "motes" } as const
+
+/**
+ * A cue on a routine's clock for particles and sound: the instant a hammer lands, a spell goes off… Each
+ * is a name render's work FX reads (`beatKinds`: hit, cast, pickup, page, write, drop, loot, or a kind's
+ * own name); the moments without a word of their own there take a kind's (`BEAT_FX`).
+ */
+export type Beat =
+  | "hit"
+  | "cast"
+  | "pickup"
+  | "drop"
+  | "page"
+  | "write"
+  | "loot"
+  | (typeof BEAT_FX)[keyof typeof BEAT_FX]
 
 /**
  * What a hero is drawn doing at a time (the game-feel plan's shared life sample): the clip, how far
@@ -116,6 +130,8 @@ export interface Move {
   turn?: number
   /** Metres walked along the move's facing over the move (a few steps while thinking). */
   step?: number
+  /** The clip played once over the move's `ms`, quicker or slower than its own length (getting up quickly). */
+  fit?: boolean
 }
 
 /** A routine: its moves in turn; then they repeat (`all`) or the last goes on (`last`). */
@@ -138,7 +154,7 @@ const VOLLEY: Routine = {
   moves: [
     { clip: "Ranged_Bow_Draw" },
     { clip: "Ranged_Bow_Aiming_Idle" },
-    { clip: "Ranged_Bow_Release", beat: ["shoot", 0.12] },
+    { clip: "Ranged_Bow_Release", beat: [BEAT_FX.shoot, 0.12] },
   ],
   loop: "all",
   props: [P.bow],
@@ -164,6 +180,8 @@ const THINK: Routine = {
   loop: "all",
   props: [],
 }
+/** Thinking where there is no room to pace: standing, weight shifting. */
+const THINK_STILL: Routine = one({ clip: "Idle_B" })
 
 /**
  * The routine for a call of `craft` at a spot of `pose` (none: a ring place, a briefing spot). `seed`
@@ -211,6 +229,8 @@ export const HIT_MS = 667
 export const SIT_MS = 1000
 /** ms standing up again (`Sit_Floor_StandUp`). */
 export const STANDUP_MS = 1133
+/** ms a seated hero takes to get up before it walks off (`Sit_Floor_StandUp`, played quicker). */
+export const RISE_MS = 600
 
 /** A moment the planner choreographs, or a call's craft, or thinking between calls. */
 export type Play =
@@ -227,12 +247,13 @@ export type Play =
   | "standup"
   | "cheer"
   | "rest"
+  | "rise"
 
 const SIT: readonly Move[] = [{ clip: "Sit_Floor_Down", ms: SIT_MS }, { clip: "Sit_Floor_Idle" }]
 
 const PLAYS: Readonly<Record<Exclude<Play, "craft" | "think">, Routine>> = {
   pin: {
-    moves: [{ clip: "Interact", ms: PIN_MS, beat: ["pin", 0.55] }, { clip: "Idle_A" }],
+    moves: [{ clip: "Interact", ms: PIN_MS, beat: [BEAT_FX.pin, 0.55] }, { clip: "Idle_A" }],
     loop: "last",
     props: [P.scroll],
   },
@@ -250,7 +271,7 @@ const PLAYS: Readonly<Record<Exclude<Play, "craft" | "think">, Routine>> = {
   deliver: {
     moves: [
       { clip: "PickUp", ms: SETDOWN_MS, beat: ["loot", 0.55], props: [P.chest] },
-      { clip: "Cheering", ms: CHEER_MS, beat: ["cheer", 0.25] },
+      { clip: "Cheering", ms: CHEER_MS, beat: [BEAT_FX.cheer, 0.25] },
       { clip: "Idle_A" },
     ],
     loop: "last",
@@ -265,11 +286,17 @@ const PLAYS: Readonly<Record<Exclude<Play, "craft" | "think">, Routine>> = {
     props: [],
   },
   cheer: {
-    moves: [{ clip: "Cheering", ms: CHEER_MS, beat: ["cheer", 0.25] }, { clip: "Idle_A" }],
+    moves: [{ clip: "Cheering", ms: CHEER_MS, beat: [BEAT_FX.cheer, 0.25] }, { clip: "Idle_A" }],
     loop: "last",
     props: [],
   },
   rest: { moves: SIT, loop: "last", props: [] },
+  // getting up off the ground before walking off (the itinerary's rising stay)
+  rise: {
+    moves: [{ clip: "Sit_Floor_StandUp", ms: RISE_MS, fit: true }, { clip: "Idle_A" }],
+    loop: "last",
+    props: [],
+  },
 }
 
 /** The routine a play runs at a spot of `pose` (a craft's by `craftRoutine`). */
@@ -280,7 +307,8 @@ export function playRoutine(
   seed = 0,
 ): Routine {
   if (play === "craft") return craftRoutine(craft ?? "other", pose, seed)
-  if (play === "think") return THINK
+  // in the gathering (seats two by two, close) thinking stands still
+  if (play === "think") return pose === "gather" ? THINK_STILL : THINK
   return PLAYS[play]
 }
 
@@ -323,7 +351,8 @@ export function routineAt(r: Routine, ms: number, facing = 0): RoutineAt {
     // in this move (the last runs on when the routine holds it)
     const cycle = CLIP_SECONDS[m.clip] * 1000
     const into = Math.min(e, len)
-    const phase = cycle > 0 ? (e / cycle) % 1 : 0
+    // a fitted move plays its clip once over its own length (and holds the last frame)
+    const phase = m.fit ? (len > 0 ? Math.min(into / len, 0.999) : 0) : cycle > 0 ? (e / cycle) % 1 : 0
     if (m.step) {
       const f = len > 0 ? into / len : 1
       dx += Math.sin(facing + (m.turn ?? 0)) * m.step * f

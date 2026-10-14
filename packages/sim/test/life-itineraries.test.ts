@@ -259,8 +259,19 @@ describe("a hero's walk", () => {
   })
 
   test("a walk cut short is followed by the next from where it got to", () => {
+    // (a walk to work is never cut: the hero gets there and works a while first; one home is: here the
+    // Guildmaster at work in the core goes home to dispatch a subagent, which is done before he is there)
+    const feed = new Feed(64, normalizer({ placeOf: binding.placeOf }))
+    feed.start("root", T0)
+    for (let k = 0; k < 16; k++) feed.edit("root", "core", T0 + 1000 + k * 3000)
+    feed.start("sub", T0 + 50_000, "root", "explore")
+    feed.change({ type: "status", id: "sub", status: "idle", at: T0 + 55_000 } as never)
+    for (let k = 0; k < 10; k++) feed.edit("root", "core", T0 + 56_000 + k * 3000)
+    feed.log.append(...flush(feed.ctx, T0 + 200_000))
+    // (at a pace that has him there well before, and on his way home when the subagent is done)
+    const back = { its: itineraries(feed.log, kit, { mps: 4 }) }
     let cut = 0
-    for (const plan of plans)
+    for (const plan of [...plans, back])
       for (const it of plan.its.values())
         for (let k = 1; k < it.steps.length; k++) {
           const prev = it.steps[k - 1]!

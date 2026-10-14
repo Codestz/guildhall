@@ -26,6 +26,7 @@ import {
   PIN_MS,
   type Play,
   playRoutine,
+  RISE_MS,
   routineAt,
   SETDOWN_MS,
   STANDUP_MS,
@@ -45,9 +46,15 @@ import {
  *   a subagent      at a spot of its place (the reducer's `placeAt`: the hysteresis rule), working; in
  *                   the Guildhall's gathering while its work names no place; home once it is done or
  *                   failed (the loot comes home); when it leaves the island, it walks home (if it is not
- *                   there) and fades on arrival;
- *   the Guildmaster (a root session) sits at a gathering spot while any subagent it sent is at work
- *                   (dispatching), and otherwise walks to its own work like anyone else; home when done.
+ *                   there) and fades `FADE_AFTER_MS` after it is there;
+ *   the Guildmaster (a root session) keeps to a gathering spot while any subagent it sent is at work
+ *                   (dispatching), at his own calls there (a quest's summons), and otherwise walks to
+ *                   his own work like anyone else; home when done.
+ *
+ * Once at work at a place it walked to, a hero works there `WORK_DWELL_MS` at least: a move, its loot or
+ * its failure heard on the way or meanwhile waits until then (its last call's craft plays if the call is
+ * over). A seated hero gets up where it sits (`RISE_MS`) before it walks off. At work it takes the free
+ * spot nearest where it comes from; a newcomer's seat is the one nearest its first errand (the board).
  *
  * Spots are booked: a hero holds the spot it walks to from the moment it sets off until it sets off
  * again (a leaver until it fades), and nobody is sent to a spot someone holds. It keeps its own spot
@@ -61,12 +68,15 @@ import {
  *                  or a pencil elsewhere…), lingering `LINGER_MS` after the call ends, then thinking;
  *   a quest        the Guildmaster walks to the notice board (`LifeKit.board`), pins it (`PIN_MS`) and
  *                  beckons; the recruit, seen within `BRIEF_WITHIN` of joining, walks from the gathering
- *                  to stand before him, is briefed (`BRIEF_MS`, a scroll) and goes back to the gathering
- *                  until its work leads it away; he goes back to his seat after the last briefing (or
- *                  `BECKON_MS` after pinning when nobody comes);
+ *                  to stand before him (a briefing spot, beside one or a row behind), is briefed
+ *                  (`BRIEF_MS`, a scroll) with those who came with it, all at once, and goes back to
+ *                  the gathering (or, its work already leading it away, sets to it where it stands);
+ *                  he goes back to his seat after the last briefing (or `BECKON_MS` after pinning when
+ *                  nobody comes); quests sent within `BURST_MS` of one another are one pin;
  *   loot           a subagent carries its loot home to the Guildmaster, sets it down and cheers, then
  *                  takes its seat; the Guildmaster's own loot is a cheer;
- *   a failure      a blow and a slump where it stands (`FAIL_HOLD_MS`), then home to slump at its seat;
+ *   a failure      a blow and a slump where it stands (`FAIL_HOLD_MS`: at its place, its dwell first),
+ *                  then up, home, to slump at its seat;
  *                  standing up again when it recovers;
  *   a plea         waving until answered;
  *   a green CI     everyone standing cheers for `CHEER_MS`;
@@ -116,19 +126,35 @@ export const BECKON_MS = 6000
 export const BRIEF_WITHIN = 4000
 /** A Guildmaster keeps the board this long after he leaves it (his walk back to his seat), ms. */
 const BOARD_BACK = 3000
-/** A row of recruits further back from the board than the last, metres. */
+/** Recruits briefed together stand this far apart, side by side or a row further back, metres. */
 const BRIEF_ROW = 0.9
+/** A recruit stands no nearer a gathering seat than this for its briefing, metres (two bodies). */
+const BRIEF_SEAT = 0.8
 /** A failure's blow and slump hold the hero where it stands this long before it walks home (ms). */
 export const FAIL_HOLD_MS = 5000
+/**
+ * A hero that walks to a place's work stays at least this long at its work once there (ms): a move, its
+ * loot or its failure heard meanwhile waits until then, so every stay at work is seen worked.
+ */
+export const WORK_DWELL_MS = 3000
+/** A leaver fades this long after it is home at the earliest (ms): it is seen arrive, then go. */
+export const FADE_AFTER_MS = 2000
+/** Quests a Guildmaster sends within this long of the last are pinned with it, one pin (ms). */
+export const BURST_MS = 1000
 /**
  * A short way (metres) across open ground goes straight, not by the walk graph: nothing solid within
  * `STRAIGHT_ROOM` of the line (the gathering's errands: to the board, to the Guildmaster).
  */
 const STRAIGHT = 8
 const STRAIGHT_ROOM = 0.25
+/** Where a short way blocked straight may turn instead, metres to either side of its middle. */
+const STRAIGHT_DOGLEG = [0.6, -0.6, 1.2, -1.2, 1.8, -1.8]
 
-/** A stay at a hero spot: what kind of work it reads as there (its `pose`), when it is a hero spot. */
-export type HeroStay = LifeStay & { pose?: HeroPose }
+/**
+ * A stay at a hero spot: what kind of work it reads as there (its `pose`), when it is a hero spot; a
+ * rising stay (`rise`) is a seated hero getting up before it walks off (`RISE_MS`).
+ */
+export type HeroStay = LifeStay & { pose?: HeroPose; rise?: true }
 export type HeroStep = HeroStay | LifeWalk
 
 /** What a hero does from `from` to `to` (ms): a play of craft.ts, a call's craft, a way to face. */
@@ -172,11 +198,17 @@ type Spotted = LifeSpot & { pose?: HeroPose }
 /** A Guildmaster's spell at the notice board: pinned until, briefings given, back to its seat at. */
 interface BoardSession {
   pinEnd: number
+  /** When the last quest was heard (one within `BURST_MS` of it is pinned with it). */
+  heard: number
   /** Quests pinned, recruits briefed, and when the last briefing ends. */
   pins: number
   briefs: number
   briefEnd: number
   until: number
+  /** The recruits briefed together: when the briefing starts, and who stands for it. */
+  cohort: { start: number; tracks: Track[] }
+  /** Where the recruits briefed this spell stand (x, z). */
+  spots: [number, number][]
 }
 
 /** When the Guildmaster leaves the board: half a second after the last briefing, once every quest's recruit came. */
@@ -202,7 +234,15 @@ interface Track {
   /** At the notice board. */
   board?: BoardSession
   /** Where it was when it last set off, and when: a second walk planned at that instant starts there too. */
-  was?: { at: number; here: Spotted; pose: LifePose | null }
+  was?: { at: number; here: Spotted; pose: LifePose | null; seated: boolean }
+  /** Until when it stays at the work it walked to (`WORK_DWELL_MS` after it arrives): moves wait. */
+  dwell?: number
+  /** Its loot or its failure, heard during the dwell: played out when the dwell is over. */
+  later?: "loot" | "fail"
+  /** The craft of the call it is at (a step heard, its deed not yet), which goes on after a moment. */
+  call?: Craft
+  /** Briefed at the board: its errand's end is the briefing's. */
+  briefed?: boolean
 }
 
 interface Booked {
@@ -329,10 +369,34 @@ export class LifePlanner {
       }
       if (due > t) break
       this.now = due
+      // (its loot or failure heard during a dwell that runs out now: after the move the dwell held back)
+      const later = [...this.tracks.values()].filter((track) => track.later && track.dwell === due)
       this.review(due)
       for (const track of this.tracks.values()) if (track.timer === due) this.fire(track, due)
+      for (const track of later) this.later(track, due)
     }
     if (t > this.now) this.now = t
+  }
+
+  /**
+   * Plans every move still due however far on (a dwell at work running out, a held move, an errand's
+   * end) with no event left to come: the end of a log planned whole.
+   */
+  settle(): void {
+    for (let n = 0; n < 100_000; n++) {
+      let due = Number.POSITIVE_INFINITY
+      for (const a of this.state.actors.values())
+        if (a.pending && !this.tracks.get(a.id)?.want.leave) {
+          const s = a.pending.since + DWELL_MS
+          if (s > this.now && s < due) due = s
+        }
+      for (const track of this.tracks.values()) {
+        if (track.timer !== undefined && track.timer > this.now && track.timer < due) due = track.timer
+        if (track.wake !== undefined && track.wake > this.now && track.wake < due) due = track.wake
+      }
+      if (!Number.isFinite(due)) return
+      this.advance(due)
+    }
   }
 
   /** Where hero `id` is at `t` (null: not on the island then). */
@@ -356,6 +420,11 @@ export class LifePlanner {
       if (track.want.leave && !want.leave) this.back(track, t)
       const was = track.want
       if (was.zone === want.zone && was.act === want.act && was.leave === want.leave) continue
+      // on its way to work, or not long there: it gets there and works a while first (a leave too)
+      if (track.dwell !== undefined && track.dwell > t && (was.zone !== want.zone || want.leave)) {
+        track.wake = track.dwell
+        continue
+      }
       // a moment holds it where it is (a briefing, a pin, a cheer): its work's call to go elsewhere waits
       const ended = a.status === "done" || a.status === "failed"
       if (track.hold > t && was.zone !== want.zone && !want.leave && !ended) {
@@ -372,9 +441,10 @@ export class LifePlanner {
     const home = this.kit.home
     if (a.gone !== undefined) return { zone: home, act: "idle", leave: true }
     if (a.status === "done" || a.status === "failed") return { zone: home, act: "idle", leave: false }
-    if (a.parent === undefined && this.dispatching(a.id)) return { zone: home, act: "idle", leave: false }
-    const place = placeAt(a, t)
     const act = a.status === "working" ? "work" : "idle"
+    // dispatching, he keeps to the gathering, at his own calls there (the quests he sends are a summons)
+    if (a.parent === undefined && this.dispatching(a.id)) return { zone: home, act, leave: false }
+    const place = placeAt(a, t)
     if (place === undefined || place === home || (this.kit.walk.hearts[place] ?? -1) < 0)
       return { zone: home, act, leave: false }
     return { zone: place, act: a.status === "waiting" ? "idle" : "work", leave: false }
@@ -395,7 +465,18 @@ export class LifePlanner {
   private join(a: WorldActor, want: Want, t: number): void {
     const id = a.id
     // a newcomer appears in the Guildhall's gathering and sets off from there
-    const start = this.book(id, { zone: this.kit.home, act: "idle", leave: false }, t, new Map())
+    // (its seat the one nearest where its first errand is, a short walk: the Guildmaster's, the notice
+    // board; a recruit's, its briefing)
+    const board = this.kit.board
+    const errand = a.parent === undefined ? board?.spot.at : board?.brief[0]?.at
+    const start = this.book(
+      id,
+      { zone: this.kit.home, act: "idle", leave: false },
+      t,
+      new Map(),
+      errand,
+      true,
+    )
     const it: Itinerary = {
       id,
       steps: [stayAt(start.spot, t, "idle")],
@@ -436,14 +517,42 @@ export class LifePlanner {
   /** Walks from where it is at `t` to a free spot of the place it should be at. */
   private move(track: Track, want: Want, t: number): void {
     this.release(track.spot.key, t)
-    const to = this.book(track.it.id, want, t, track.own)
+    // where it sets off from (where a walk planned at this instant set off from, too)
+    const from = track.was?.at === t ? track.was.here : (poseBefore(track.it, t) ?? track.here)
+    const to = this.book(track.it.id, want, t, track.own, from.at)
     track.own.set(want.zone, to.key)
     track.spot = to
     track.want = want
     track.timer = undefined
     track.board = undefined
     track.wake = undefined
-    this.walkTo(track, to.spot, t, want.act)
+    track.dwell = undefined
+    track.briefed = false
+    this.atWork(track, this.walkTo(track, to.spot, t, want.act))
+  }
+
+  /**
+   * It arrives at its work at a place (`arrive`): there it works `WORK_DWELL_MS` at least, its last call's
+   * craft if the call is over by then, before anything sends it on.
+   */
+  private atWork(track: Track, arrive: number): void {
+    if (track.want.zone === this.kit.home || track.want.act !== "work" || track.want.leave) return
+    const end = arrive + WORK_DWELL_MS
+    track.dwell = end
+    const { acts } = track.it
+    const going = actAt(acts, arrive)
+    const last = [...acts].reverse().find((x) => x.play === "craft")
+    if (!last) return
+    // still at its call when it arrives: the call plays on, its lingering not before the dwell is over
+    const runs = going?.play === "craft" && going.to === Number.POSITIVE_INFINITY
+    cutActs(acts, arrive)
+    acts.push({
+      from: arrive,
+      to: runs ? Number.POSITIVE_INFINITY : end,
+      play: "craft",
+      craft: going?.craft ?? last.craft!,
+    })
+    if (!runs) acts.push({ from: end, to: Number.POSITIVE_INFINITY, play: "think" })
   }
 
   /**
@@ -453,9 +562,11 @@ export class LifePlanner {
   private walkTo(track: Track, to: Spotted, t: number, act: "work" | "idle", facing?: number): number {
     const { steps } = track.it
     // a walk planned at this same instant is planned again from where the first started
-    if (track.was?.at === t) track.here = track.was.here
-    const pose = track.was?.at === t ? track.was.pose : poseBefore(track.it, t)
-    track.was = { at: t, here: track.here, pose }
+    const again = track.was?.at === t
+    if (again) track.here = track.was!.here
+    const pose = again ? track.was!.pose : poseBefore(track.it, t)
+    const seated = again ? track.was!.seated : seatedBefore(track.it, t)
+    track.was = { at: t, here: track.here, pose, seated }
     const walking = pose?.act === "walk"
     cut(steps, t)
     let from: LifeSpot
@@ -465,22 +576,33 @@ export class LifePlanner {
         : nearestNode(this.kit.walk, pose.at, pose.facing)
     } else from = track.here
     const there: Spotted = facing === undefined ? to : { ...to, facing }
-    track.here = there
     const metres = Math.hypot(from.at[0] - to.at[0], from.at[2] - to.at[2])
+    // seated (at rest, slumped): it gets up where it sits before it sets off
+    let leave = t
+    if (seated && !walking && metres >= 1e-6) {
+      leave = t + RISE_MS
+      steps.push({ ...stayAt(track.here, t, "idle"), to: leave, rise: true })
+    }
+    track.here = there
     let walk: LifeWalk | null
+    const way =
+      metres >= 1e-6 && metres < STRAIGHT && !walking && from.ground && to.ground
+        ? this.across(from.at, to.at)
+        : null
     if (metres < 1e-6) walk = null
-    else if (metres < STRAIGHT && !walking && from.ground && to.ground && this.open(from.at, to.at))
-      walk = this.straight(from, to, t)
+    else if (way) walk = this.straight([from.at, ...way], leave)
     else {
       const route = heroRoute(this.kit.walk, from, to, {
-        leave: t,
+        leave,
         mps: this.mps,
         lane: this.lane,
         ...(this.kit.near ? { near: this.kit.near } : {}),
       })
       walk = route && this.paced(route)
     }
+    // (no way found: there now, as before, and no getting up for it)
     if (walk) steps.push(walk)
+    else if (leave > t) steps.pop()
     const arrive = walk ? walk.to : t
     steps.push(stayAt(there, arrive, act))
     return arrive
@@ -507,16 +629,45 @@ export class LifePlanner {
     return true
   }
 
-  /** A short way across open ground (within the gathering): straight there. */
-  private straight(from: LifeSpot, to: LifeSpot, t: number): LifeWalk {
-    const metres = Math.hypot(from.at[0] - to.at[0], from.at[2] - to.at[2])
+  /**
+   * A short way across open ground (within the gathering), as the points after its start: straight there,
+   * else round what stands between by one turn a little to either side (`STRAIGHT_DOGLEG`); null for none.
+   */
+  private across(a: readonly number[], b: readonly number[]): [number, number, number][] | null {
+    const end: [number, number, number] = [b[0] ?? 0, b[1] ?? 0, b[2] ?? 0]
+    if (this.open(a, b)) return [end]
+    const ax = a[0] ?? 0
+    const az = a[2] ?? 0
+    const len = Math.hypot(end[0] - ax, end[2] - az)
+    if (len < 1e-6) return null
+    // the way's side: across it, from its middle
+    const px = -(end[2] - az) / len
+    const pz = (end[0] - ax) / len
+    for (const off of STRAIGHT_DOGLEG) {
+      const mid: [number, number, number] = [
+        (ax + end[0]) / 2 + px * off,
+        end[1],
+        (az + end[2]) / 2 + pz * off,
+      ]
+      if (this.open(a, mid) && this.open(mid, end)) return [mid, end]
+    }
+    return null
+  }
+
+  /** A walk along `pts` (open ground) from `t`, at the walking pace. */
+  private straight(pts: readonly [number, number, number][], t: number): LifeWalk {
+    const times = [t]
+    for (let k = 1; k < pts.length; k++)
+      times.push(
+        times[k - 1]! + Math.hypot(pts[k]![0] - pts[k - 1]![0], pts[k]![2] - pts[k - 1]![2]) / this.mps,
+      )
     return {
       kind: "walk",
       from: t,
-      to: t + metres / this.mps,
-      pts: [from.at, to.at],
-      times: [t, t + metres / this.mps],
-      ground: [from.ground && to.ground],
+      to: times[times.length - 1]!,
+      pts: [...pts],
+      times,
+      ground: pts.slice(1).map(() => true),
     }
   }
 
@@ -524,20 +675,39 @@ export class LifePlanner {
   private fire(track: Track, t: number): void {
     track.timer = undefined
     track.board = undefined
-    if (track.want.leave) return
     const after = track.after
     track.after = undefined
-    if (track.here !== track.spot.spot) this.walkTo(track, track.spot.spot, t, track.want.act)
-    // a moment is over (a call's routine heard meanwhile goes on)
+    if (track.want.leave) {
+      // a leaver fades where its errand ends; one that failed walks home first, to slump and go there
+      if (after !== "slump") return
+      this.walkTo(track, track.spot.spot, t, track.want.act)
+      this.act(track, "slump", t)
+      this.fade(track, t)
+      return
+    }
+    const a = this.state.actors.get(track.it.id)
+    const briefed = track.briefed
+    track.briefed = false
+    if (briefed && a?.pending && !after && track.want.zone === this.kit.home) {
+      // briefed, its work already leading it away: it sets to it where it stands until it goes
+      cut(track.it.steps, t)
+      track.it.steps.push(stayAt(track.here, t, "work"))
+    } else if (track.here !== track.spot.spot) this.walkTo(track, track.spot.spot, t, track.want.act)
+    // a moment is over (a call's routine heard meanwhile goes on, and so does the call it was at)
     const now = actAt(track.it.acts, t)
-    if (now && now.play !== "craft" && now.play !== "think") cutActs(track.it.acts, t)
+    if (now && now.play !== "craft" && now.play !== "think") {
+      cutActs(track.it.acts, t)
+      if (track.call && !after) this.act(track, "craft", t, { craft: track.call })
+    }
     if (after) this.act(track, after, t)
   }
 
   /** A leaver fades once home: when its walk there ends (and what it does there is over), or now. */
   private fade(track: Track, t: number): void {
     const last = track.it.steps[track.it.steps.length - 1]!
-    const at = Math.max(t, last.from, track.hold)
+    // seen home a while first (a stay begun just now, where it stood: no arrival to see)
+    const home = last.from < t ? last.from : last.from + FADE_AFTER_MS
+    const at = Math.max(t, home, track.hold)
     const span = track.it.shown[track.it.shown.length - 1]!
     span[1] = at
     this.booked.set(track.spot.key, { id: track.it.id, until: at })
@@ -562,18 +732,41 @@ export class LifePlanner {
     if (b && b.until > t) this.booked.set(key, { id: b.id, until: t })
   }
 
-  /** Books a spot of `want.zone` for `id`: its own there when free, else the first free, else a ring place. */
-  private book(id: string, want: Want, t: number, own: ReadonlyMap<number, string>): Booked {
+  /**
+   * Books a spot of `want.zone` for `id`: its own there when free, else at work the free one nearest where
+   * it sets off from (`near`: the shortest walk in) and at the gathering the first free (its pairs fill in
+   * order), else a ring place.
+   */
+  private book(
+    id: string,
+    want: Want,
+    t: number,
+    own: ReadonlyMap<number, string>,
+    near?: readonly number[],
+    nearAtHome = false,
+  ): Booked {
     const spots = this.kit.spots(want.zone)
     const mine = own.get(want.zone)
     let key: string | undefined
     if (mine !== undefined && this.free(mine, id, t)) key = mine
+    let best = Number.POSITIVE_INFINITY
     if (key === undefined)
-      for (let k = 0; k < spots.length; k++)
-        if (this.free(`${want.zone}:${k}`, id, t)) {
+      for (let k = 0; k < spots.length; k++) {
+        if (!this.free(`${want.zone}:${k}`, id, t)) continue
+        if (!near || (want.zone === this.kit.home && !nearAtHome)) {
           key = `${want.zone}:${k}`
           break
         }
+        const s = spots[k]!.at
+        // (at the gathering, a seat with open ground to it first: a few steps, not round the court)
+        const d =
+          Math.hypot(s[0] - (near[0] ?? 0), s[2] - (near[2] ?? 0)) +
+          (nearAtHome && !this.across(s, near) ? 3 : 0)
+        if (d < best - 1e-9) {
+          best = d
+          key = `${want.zone}:${k}`
+        }
+      }
     let k = 0
     while (key === undefined) {
       if (this.free(`${want.zone}:ring${k}`, id, t)) key = `${want.zone}:ring${k}`
@@ -620,17 +813,31 @@ export class LifePlanner {
     const a = this.state.actors.get(ev.id)
     if (!track || !a) return
     const at = Math.max(t, track.hold)
+    // thinking never cuts short the work it walked to (`WORK_DWELL_MS`)
+    const think = (from: number) => Math.max(from, track.dwell ?? from)
+    // its loot or its failure while it is on its way to work or not long there: once the dwell is over
+    if (
+      (ev.kind === "actor.loot" || ev.kind === "actor.fail") &&
+      track.dwell !== undefined &&
+      track.dwell > t
+    ) {
+      track.later = ev.kind === "actor.loot" ? "loot" : "fail"
+      track.wake = track.dwell
+      return
+    }
     switch (ev.kind) {
       case "actor.info":
         this.brief(a, track, t)
         return
       case "actor.step":
+        track.call = ev.craft
         this.act(track, "craft", at, { craft: ev.craft })
         return
       case "actor.deed":
+        track.call = undefined
         // a call heard only as it ended plays from now; either way it lingers, then the hero thinks
         if (!ev.stepped) this.act(track, "craft", at, { craft: ev.craft })
-        this.act(track, "think", at + LINGER_MS)
+        this.act(track, "think", think(at + LINGER_MS))
         return
       case "actor.quest":
         this.pin(track, t)
@@ -642,12 +849,13 @@ export class LifePlanner {
         // on with its way (or a move the plea held back)
         track.hold = Math.min(track.hold, t)
         this.review(t)
-        if (track.was?.at !== t && track.here !== track.spot.spot && !track.want.leave)
-          this.walkTo(track, track.spot.spot, t, track.want.act)
-        this.act(track, "think", t)
+        if (track.was?.at !== t && track.here !== track.spot.spot && !track.want.leave) {
+          this.act(track, "think", t)
+          this.atWork(track, this.walkTo(track, track.spot.spot, t, track.want.act))
+        } else this.act(track, "think", think(t))
         return
       case "actor.resume":
-        this.act(track, "think", at)
+        this.act(track, "think", think(at))
         return
       case "actor.recover": {
         // it stands up where it slumped before it sets off (the walk just planned waits)
@@ -675,26 +883,46 @@ export class LifePlanner {
     }
   }
 
+  /** Its loot or its failure heard during its dwell at work, now that the dwell is over. */
+  private later(track: Track, t: number): void {
+    const later = track.later
+    track.later = undefined
+    const a = this.state.actors.get(track.it.id)
+    if (!a) return
+    if (later === "fail") this.fail(track, t)
+    else if (a.parent === undefined) this.cheer(track, t)
+    else this.deliver(a, track, t)
+  }
+
   /** The Guildmaster sends a quest: to the notice board, pins it, beckons the recruit. */
   private pin(track: Track, t: number): void {
     const board = this.kit.board
     if (!board || track.want.leave || track.want.zone !== this.kit.home) return
     const by = this.boardBy
     if (by && by.id !== track.it.id && by.until > t) return
-    const at =
-      track.here === board.spot
-        ? Math.max(t, track.board?.pinEnd ?? t)
-        : this.walkTo(track, board.spot, t, track.want.act)
-    const pinEnd = at + PIN_MS
-    this.act(track, "pin", at)
-    this.act(track, "beckon", pinEnd, { face: headingTo(board.spot.at, board.brief[0]!.at) })
     const was = track.board
-    const session: BoardSession = {
-      pinEnd,
-      pins: (was?.pins ?? 0) + 1,
-      briefs: was?.briefs ?? 0,
-      briefEnd: was?.briefEnd ?? Number.NEGATIVE_INFINITY,
-      until: 0,
+    let session: BoardSession
+    if (was && track.here === board.spot && t - was.heard <= BURST_MS) {
+      // a burst of quests: pinned with the last, one pin; he waits for each one's recruit
+      session = { ...was, heard: t, pins: was.pins + 1 }
+    } else {
+      const at =
+        track.here === board.spot
+          ? Math.max(t, was?.pinEnd ?? t)
+          : this.walkTo(track, board.spot, t, track.want.act)
+      const pinEnd = at + PIN_MS
+      this.act(track, "pin", at)
+      this.act(track, "beckon", pinEnd, { face: headingTo(board.spot.at, board.brief[0]!.at) })
+      session = {
+        pinEnd,
+        heard: t,
+        pins: (was?.pins ?? 0) + 1,
+        briefs: was?.briefs ?? 0,
+        briefEnd: was?.briefEnd ?? Number.NEGATIVE_INFINITY,
+        until: 0,
+        cohort: was?.cohort ?? { start: Number.NEGATIVE_INFINITY, tracks: [] },
+        spots: was?.spots ?? [],
+      }
     }
     session.until = leaveBoard(session)
     track.board = session
@@ -718,25 +946,44 @@ export class LifePlanner {
     const gm = this.tracks.get(a.parent)
     const session = gm?.board
     if (!gm || !session || gm.here !== board.spot || session.until <= t) return
-    // more recruits than briefing spots: the next row stands a body further back
-    const k = session.briefs
-    const first = board.brief[k % board.brief.length]!
-    const back = Math.floor(k / board.brief.length) * BRIEF_ROW
-    const spot: Spotted =
-      back === 0
-        ? first
-        : {
-            ...first,
-            at: [
-              first.at[0] - Math.sin(first.facing) * back,
-              first.at[1],
-              first.at[2] - Math.cos(first.facing) * back,
-            ],
-          }
+    // where it stands for it: the free place nearest it of the board's briefing spots and the places a
+    // body to either side of them or a row further back (a few steps over open ground first), clear of
+    // the solids and the gathering's seats
+    const from = track.here.at
+    const taken = session.spots
+    let spot: Spotted | null = null
+    let best = Number.POSITIVE_INFINITY
+    for (const at of this.briefPlaces(board)) {
+      if (taken.some(([x, z]) => Math.hypot(x - at[0], z - at[2]) < BRIEF_ROW - 0.05)) continue
+      const d = Math.hypot(at[0] - from[0], at[2] - from[2]) + (this.across(from, at) ? 0 : 5)
+      if (d < best) {
+        best = d
+        spot = { node: board.spot.node, at, facing: headingTo(at, board.spot.at), ground: true }
+      }
+    }
+    if (!spot) return
+    taken.push([spot.at[0], spot.at[2]])
     const arrive = this.walkTo(track, spot, t, "idle")
-    const start = Math.max(arrive, session.pinEnd)
+    // recruits who come together are briefed together: a briefing not yet begun waits for the last
+    const cohort = session.cohort
+    if (cohort.start <= t) {
+      cohort.start = Number.NEGATIVE_INFINITY
+      cohort.tracks = []
+    }
+    const start = Math.max(arrive, session.pinEnd, cohort.start)
     const end = start + BRIEF_MS
+    for (const m of cohort.tracks) {
+      const begun = m.it.acts.findLast((x) => x.play === "brief")
+      if (!begun || begun.from >= start) continue
+      cutActs(m.it.acts, begun.from)
+      m.it.acts.push({ from: start, to: Number.POSITIVE_INFINITY, play: "brief" })
+      m.hold = end
+      m.timer = end + 300
+    }
+    cohort.start = start
+    cohort.tracks.push(track)
     this.act(track, "brief", start)
+    track.briefed = true
     track.hold = end
     track.timer = end + 300
     track.after = undefined
@@ -756,6 +1003,34 @@ export class LifePlanner {
     const last = acts[acts.length - 1]
     if (last?.play === "beckon") last.to = Number.POSITIVE_INFINITY
   }
+
+  /**
+   * Where recruits may stand for a briefing (kept): the board's briefing spots, a body to either side of
+   * each, then a row further back; those with a body's room from every solid and from the gathering's
+   * seats (a seated hero is never stood on).
+   */
+  private briefPlaces(board: HeroBoard): [number, number, number][] {
+    if (this.briefing) return this.briefing
+    const seats = this.kit.spots(this.kit.home)
+    const out: [number, number, number][] = []
+    for (const back of [0, BRIEF_ROW, 2 * BRIEF_ROW])
+      for (const side of [0, BRIEF_ROW, -BRIEF_ROW, 2 * BRIEF_ROW, -2 * BRIEF_ROW])
+        for (const b of board.brief) {
+          // across: the way the briefing spot faces (to the pinning spot), turned a quarter
+          const fx = Math.sin(b.facing)
+          const fz = Math.cos(b.facing)
+          const x = b.at[0] - fx * back + fz * side
+          const z = b.at[2] - fz * back - fx * side
+          if (seats.some((g) => Math.hypot(g.at[0] - x, g.at[2] - z) < BRIEF_SEAT)) continue
+          if (out.some((o) => Math.hypot(o[0] - x, o[2] - z) < 0.05)) continue
+          const blockers = this.kit.near?.(x, z, 0.6) ?? []
+          if (blockers.some((o) => "pts" in o && !o.soft && solidDistance(o, x, z) < 0.3)) continue
+          out.push([x, b.at[1], z])
+        }
+    this.briefing = out
+    return out
+  }
+  private briefing: [number, number, number][] | null = null
 
   /** A subagent's loot comes home: carried to the Guildmaster, set down, cheered; then its seat. */
   private deliver(a: WorldActor, track: Track, t: number): void {
@@ -783,12 +1058,14 @@ export class LifePlanner {
       const last = track.it.steps[track.it.steps.length - 1]!
       this.act(track, "deliver", Math.max(t, last.from))
       track.hold = Math.max(t, last.from) + SETDOWN_MS + CHEER_MS
-      return
+    } else {
+      this.act(track, "deliver", arrive)
+      track.hold = arrive + SETDOWN_MS + CHEER_MS
+      track.timer = track.hold + 200
+      track.after = undefined
     }
-    this.act(track, "deliver", arrive)
-    track.hold = arrive + SETDOWN_MS + CHEER_MS
-    track.timer = track.hold + 200
-    track.after = undefined
+    // a leaver goes once its loot is down and cheered
+    if (track.want.leave) this.fade(track, t)
   }
 
   /** A failure: the blow and the slump where it stands, then home to slump at its seat. */
@@ -811,6 +1088,8 @@ export class LifePlanner {
       track.timer = track.hold
       track.after = "slump"
     }
+    // a leaver is seen slump before it goes (and walks home first: `fire`)
+    if (track.want.leave) this.fade(track, t)
   }
 
   /** A plea: it stops where it is (on its way, too) and waves until it is answered. */
@@ -889,6 +1168,15 @@ function poseBefore(it: Itinerary, t: number): LifePose | null {
   return k < 0 || !shownAt(it, t) ? null : stepPose(it.steps, t, k)
 }
 
+/**
+ * Whether a hero sits (at rest, slumped, sitting down) just before `t`, as planned before `t`: what is
+ * planned at `t` itself only cuts what went before at `t`, so a moment earlier reads as it was.
+ */
+function seatedBefore(it: Itinerary, t: number): boolean {
+  const clip = poseAt(it, t - 0.01)?.sample?.clip
+  return clip === "Sit_Floor_Idle" || clip === "Sit_Floor_Down"
+}
+
 /** The act going on at `t`, if any. */
 function actAt(acts: readonly HeroAct[], t: number): HeroAct | undefined {
   let lo = 0
@@ -956,6 +1244,12 @@ export function poseAt(it: Itinerary, t: number): AgentPose | null {
     return pose
   }
   const stay = step as HeroStay
+  if (stay.rise) {
+    // getting up off the ground, then off
+    const r = routineAt(playRoutine("rise", undefined, undefined), t - stay.from, stay.facing)
+    pose.sample = { clip: r.clip, phase: r.phase, props: r.props }
+    return pose
+  }
   let play: Play | undefined = act?.play
   // a call's routine (and thinking) only at work; resting at the gathering when nothing else is on
   if ((play === "craft" || play === "think") && stay.act !== "work") play = undefined
@@ -1040,7 +1334,7 @@ export function walkEnd(s: LifeWalk): [number, number, number] {
 
 /**
  * Every hero's itinerary from a log (or its events, in order), planned through `until` (by default
- * the last event and the dwell after it, so a move the last events started is made).
+ * every move the events started, however far on: `LifePlanner.settle`).
  */
 export function itineraries(
   log: EventLog | readonly WorldEvent[],
@@ -1052,5 +1346,6 @@ export function itineraries(
   for (const ev of events) planner.push(ev)
   const last = events[events.length - 1]
   planner.advance(opts.until ?? (last ? last.at + DWELL_MS : 0))
+  if (opts.until === undefined) planner.settle()
   return new Map(planner.itineraries)
 }

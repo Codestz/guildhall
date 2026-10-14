@@ -47,6 +47,7 @@ import {
   PIN_MS,
   playRoutine,
   poseAt,
+  RISE_MS,
   routineAt,
   routineMs,
   SCAFFOLD_EDITS,
@@ -292,13 +293,14 @@ describe("the Guildmaster's dispatch at the notice board", () => {
     const [atBoard] = staysAt(gm, board.spot.at)
     expect(atBoard).toBeDefined()
     const arrive = atBoard!.from
-    // he set off when the quest was sent (a walk from then to the board)
-    const walk = gm.steps.find((s) => s.kind === "walk" && s.from === q)
+    // he set off when the quest was sent: up off the ground where he rested first (RISE_MS), then walking
+    expect(clipAt(gm, q + 100)).toBe("Sit_Floor_StandUp")
+    const walk = gm.steps.find((s) => s.kind === "walk" && s.from === q + RISE_MS)
     expect(walk?.to).toBe(arrive)
     expect(arrive - q).toBeLessThan(15_000)
     expect(clipAt(gm, arrive + 100)).toBe("Interact")
     expect(poseAt(gm, arrive + 100)?.sample?.props).toEqual([HERO_PROPS.scroll])
-    expect(poseAt(gm, arrive + PIN_MS * 0.6)?.sample?.beat).toBe("pin")
+    expect(poseAt(gm, arrive + PIN_MS * 0.6)?.sample?.beat).toBe("pages")
     expect(clipAt(gm, arrive + PIN_MS + 100)).toBe("Waving")
     // facing the recruit's briefing spot while he beckons
     const beckon = poseAt(gm, arrive + PIN_MS + 100)!
@@ -307,12 +309,16 @@ describe("the Guildmaster's dispatch at the notice board", () => {
       board.brief[0]!.at[2] - board.spot.at[2],
     )
     expect(Math.cos(beckon.facing - want)).toBeCloseTo(1, 6)
-    // the recruit is briefed before him once the pin is up, for BRIEF_MS, a scroll in hand
-    const briefed = sub.steps.find(
-      (s): s is HeroStay => s.kind === "stay" && board.brief.some((b) => near(b.at, s.at)),
-    )!
-    expect(briefed).toBeDefined()
-    const start = Math.max(briefed.from, arrive + PIN_MS)
+    // the recruit is briefed before him once the pin is up, for BRIEF_MS, a scroll in hand: at a
+    // briefing spot, or a body beside one or a row behind it (within a few metres of him)
+    const act = sub.acts.find((a) => a.play === "brief")!
+    expect(act).toBeDefined()
+    const briefed = [...sub.steps]
+      .reverse()
+      .find((s): s is HeroStay => s.kind === "stay" && s.from <= act.from)!
+    expect(Math.hypot(briefed.at[0] - board.spot.at[0], briefed.at[2] - board.spot.at[2])).toBeLessThan(3)
+    const start = act.from
+    expect(start).toBeGreaterThanOrEqual(Math.max(briefed.from, arrive + PIN_MS))
     expect(clipAt(sub, start + 100)).toBe("PickUp")
     expect(poseAt(sub, start + 100)?.sample?.beat).toBeUndefined()
     expect(poseAt(sub, start + BRIEF_MS * 0.55)?.sample?.beat).toBe("pickup")
@@ -327,10 +333,13 @@ describe("the Guildmaster's dispatch at the notice board", () => {
     const back = gm.steps.find((s) => s.kind === "walk" && s.from > arrive)!
     expect(back.from).toBe(start + BRIEF_MS + 500)
     expect(poseAt(gm, back.from + 10)?.act).toBe("walk")
-    // and sits at his seat in the gathering while the recruit works (a gathering spot: rest)
+    // and stands at his seat in the gathering while the recruit works, at his own call (the quest's
+    // summons, a staff in hand), not idle
     const seat = gm.steps[gm.steps.indexOf(back) + 1]! as HeroStay
     expect(places.heroSpots(home).some((g) => near(g.at, seat.at))).toBe(true)
-    expect(clipAt(gm, seat.from + 3000)).toBe("Sit_Floor_Idle")
+    expect(seat.act).toBe("work")
+    expect(clipAt(gm, seat.from + 3000)).toBe("Ranged_Magic_Summon")
+    expect(poseAt(gm, seat.from + 3000)?.sample?.props).toEqual([HERO_PROPS.staff])
     // nobody comes for BECKON_MS: alone he would have gone back then
     expect(BECKON_MS).toBeGreaterThan(BRIEF_MS)
   })
@@ -425,7 +434,9 @@ describe("failure, a plea and a green CI", () => {
     const stay = sub.steps.find((s) => s.kind === "stay" && s.from === t) as HeroStay
     expect(poseAt(sub, t + FAIL_HOLD_MS - 10)?.at).toEqual(stay.at)
     expect(near(stay.at, where.at, 0.7)).toBe(true)
-    expect(poseAt(sub, t + FAIL_HOLD_MS + 500)?.act).toBe("walk")
+    // up off the ground first, then home
+    expect(clipAt(sub, t + FAIL_HOLD_MS + RISE_MS / 2)).toBe("Sit_Floor_StandUp")
+    expect(poseAt(sub, t + FAIL_HOLD_MS + RISE_MS + 500)?.act).toBe("walk")
     const seat = sub.steps.find((s): s is HeroStay => s.kind === "stay" && s.from > t + FAIL_HOLD_MS)!
     expect(places.heroSpots(home).some((g) => near(g.at, seat.at))).toBe(true)
     const gone = Math.min(T0 + 420_000, sub.shown[0]![1])

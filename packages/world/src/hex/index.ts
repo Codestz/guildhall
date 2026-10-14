@@ -85,6 +85,15 @@ export {
   seatTiles,
 } from "./ground.ts"
 export {
+  HARVEST_IDS,
+  HARVEST_PIECES,
+  type HarvestKind,
+  type HarvestOpts,
+  type HarvestPiece,
+  harvestHeaps,
+  harvestPiles,
+} from "./harvest.ts"
+export {
   GATHER_PER_SPOT,
   HERO_SPOTS_MIN,
   type HeroBoard,

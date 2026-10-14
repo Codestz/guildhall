@@ -186,14 +186,19 @@ export function createSession(feed: Feed, opts: SessionOptions = {}): HallSessio
       append(normalize(input, ctx))
       store.invalidate()
     },
-    loaded() {
+    loaded(open) {
       // a recording's subagents leave after their time, as they would have
       const last = log.events.at(-1)?.at
       if (last !== undefined) append(flush(ctx, last + ctx.goneMs))
       loaded = true
       const c = clock.get()
+      const chapter = open?.act === undefined ? undefined : chapters[open.act - 1]
       if (opts.openAt !== undefined) clock.seek(c.start + opts.openAt * 1000, { jump: true })
-      else if (opts.autoplay !== false) {
+      else if (chapter) {
+        // a story's act the link names: opens there (playing, unless `?play=0`)
+        clock.seek((log.events[0]?.at ?? c.start) + chapter.at, { jump: true })
+        if (opts.autoplay !== false) clock.play(true)
+      } else if (opts.autoplay !== false) {
         clock.seek(c.start, { jump: true })
         clock.play(true)
       } else clock.seek(c.end, { jump: true })

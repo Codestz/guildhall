@@ -30,8 +30,16 @@ export const storyTitle = (id: StoryId): string => TITLES[id]
 export const storyOf = (asked: string | null): StoryId =>
   (STORY_IDS as readonly string[]).includes(asked ?? "") ? (asked as StoryId) : "saga"
 
+/** The act a link opens a story at (`?act=`, 1 – 5), or undefined. */
+export function actOf(query: Pick<URLSearchParams, "get">): number | undefined {
+  const n = Number(query.get("act"))
+  return Number.isInteger(n) && n >= 1 && n <= 5 ? n : undefined
+}
+
 /** Where a story is told: the hall's repo (its name, its units), and the jitter's seed. */
 export interface StoryStage {
+  /** The act to open at (`actOf`): the session opens there, playing. */
+  act?: number
   name?: string
   units?: readonly StoryUnit[]
   seed?: number
@@ -78,7 +86,7 @@ export class StoryFeed implements Feed {
         ({ at, numeral, title, tagline }): FeedChapter => ({ at: at - STORY_EPOCH, numeral, title, tagline }),
       ),
     )
-    sink.loaded?.()
+    sink.loaded?.(this.stage.act ? { act: this.stage.act } : undefined)
     this.state = "replay"
     sink.status("replay")
   }

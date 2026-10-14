@@ -20,7 +20,7 @@ import {
 import { ReplayFeed, recordingUrl } from "../src/hall/feeds/replay.ts"
 import { createSession } from "../src/hall/feeds/session.ts"
 import { throttled } from "../src/hall/feeds/store.ts"
-import { STORY_EPOCH, StoryFeed } from "../src/hall/feeds/story.ts"
+import { actOf, STORY_EPOCH, StoryFeed } from "../src/hall/feeds/story.ts"
 import { markersOf, rosterOf, shortPath } from "../src/hall/feeds/view.ts"
 import { guildMatcher, hubMessage, readRecording } from "../src/hall/feeds/wire.ts"
 
@@ -392,6 +392,32 @@ describe("replay", () => {
     const marks = markersOf(session.log().events, STORY_EPOCH)
     expect(marks.some((m) => m.kind === "quest")).toBe(true)
     expect(marks.every((m) => m.at >= 0)).toBe(true)
+  })
+
+  test("?act=N opens a story at that act, playing; a bad act or ?play=0 or ?st= is honoured", async () => {
+    expect(actOf(new URLSearchParams("act=3"))).toBe(3)
+    expect(actOf(new URLSearchParams("act=0"))).toBeUndefined()
+    expect(actOf(new URLSearchParams("act=9"))).toBeUndefined()
+    expect(actOf(new URLSearchParams("act=x"))).toBeUndefined()
+    expect(actOf(new URLSearchParams(""))).toBeUndefined()
+    const open = async (act: number | undefined, o: { autoplay?: boolean; openAt?: number } = {}) => {
+      const session = createSession(new StoryFeed("saga", act ? { act } : {}), { throttle: instant, ...o })
+      session.start()
+      await Bun.sleep(0)
+      return session
+    }
+    const three = await open(3)
+    const snap = three.snapshot()
+    expect(snap.chapter).toBe(2)
+    expect(snap.clock.playing).toBe(true)
+    expect(snap.clock.at - three.origin()).toBe(snap.chapters[2]?.at as number)
+    expect((await open(undefined)).snapshot().chapter).toBe(0)
+    const paused = (await open(2, { autoplay: false })).snapshot()
+    expect(paused.chapter).toBe(1)
+    expect(paused.clock.playing).toBe(false)
+    // a ?st= seek wins over the act
+    const st = (await open(4, { openAt: 5 })).snapshot()
+    expect(st.clock.at - STORY_EPOCH).toBe(5000)
   })
 
   test("captions are told as a replay plays, not across a seek", async () => {

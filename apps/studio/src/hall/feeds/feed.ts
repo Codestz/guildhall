@@ -33,8 +33,8 @@ export interface FeedSink {
    * `LIVE_MS` old), so it may be captioned and toasted; else it is history, folded quietly.
    */
   take(input: WireInput, news: boolean): void
-  /** A recording or story is read whole: the session's range is known and the clock may play it. */
-  loaded?(): void
+  /** A recording or story is read whole: the session's range is known and the clock may play it. `act`: a story's act the link asked to open at (`?act=`, 1-based). */
+  loaded?(open?: { act?: number }): void
   /** The feed's status moved; `note` says why, in a few words (`no hub on 127.0.0.1:4747`). */
   status(status: FeedStatus, note?: string): void
   /** A told story's acts. */

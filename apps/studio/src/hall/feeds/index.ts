@@ -10,12 +10,12 @@
  *
  * Link knobs: `?guild=` (the hub's guild, exactly; default: the repo's name and its `·n` clones),
  * `?hub=ws://127.0.0.1:<port>/ws`, `?src=` (a chronicle of the guild, or a path on this origin),
- * `?story=saga|solo|party|parties|rush|seas|factions`, `?seed=`, `?st=<seconds>` (open at), `?play=0` (open paused).
+ * `?story=saga|solo|party|parties|rush|seas|factions`, `?seed=`, `?st=<seconds>` (open at), `?act=1..5` (a story opens at that act, like the home), `?play=0` (open paused).
  */
 import type { Feed, FeedKind } from "./feed.ts"
 import { hubUrlOf, LiveFeed } from "./live.ts"
 import { fetchRecording, ReplayFeed, recordingUrl } from "./replay.ts"
-import { StoryFeed, type StoryStage, storyOf } from "./story.ts"
+import { actOf, StoryFeed, type StoryStage, storyOf } from "./story.ts"
 import { guildMatcher } from "./wire.ts"
 
 export type { Feed, FeedKind, FeedSink, FeedStatus } from "./feed.ts"
@@ -48,5 +48,10 @@ export function openFeed(kind: FeedKind, slug: string, query: URLSearchParams, s
   }
   const story = storyOf(query.get("story"))
   const seed = Number(query.get("seed"))
-  return new StoryFeed(story, { ...stage, ...(Number.isInteger(seed) && seed > 0 ? { seed } : {}) })
+  const act = actOf(query)
+  return new StoryFeed(story, {
+    ...stage,
+    ...(act ? { act } : {}),
+    ...(Number.isInteger(seed) && seed > 0 ? { seed } : {}),
+  })
 }

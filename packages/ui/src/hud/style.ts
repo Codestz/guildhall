@@ -344,7 +344,10 @@ button.hud-toast-btn:hover { color: var(--paper); border-color: var(--brass-line
 .hud-dossier-head > .hud-sigil { margin-top: 4px; }
 .hud-dossier-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .hud-dossier-id .hud-eyebrow { font-size: 11px; color: var(--faint); }
-.hud-dossier-id h2 { margin: 0; font: 400 var(--t-2xl)/1.1 var(--display); letter-spacing: 0.04em; color: var(--paper); overflow-wrap: anywhere; }
+.hud-dossier-id h2 { margin: 0; font: 400 var(--t-2xl)/1.1 var(--display); letter-spacing: 0.04em; color: var(--paper); overflow-wrap: break-word; hyphens: manual; }
+/* a long name: the reading serif, smaller and untracked, broken only between words (GUI audit #12) */
+.hud-dossier-id h2[data-long] { font: 600 var(--t-xl)/1.2 var(--serif); letter-spacing: 0; }
+.hud-dossier-id h2[data-long] .hud-dossier-source { display: block; margin-top: 1px; }
 .hud-dossier-source { font: 400 var(--t-md) var(--body); letter-spacing: 0; color: var(--faint); }
 .hud-dossier-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 4px; }
 .hud-dossier-tags .hud-status { margin-right: 2px; }
@@ -411,7 +414,7 @@ button.hud-toast-btn:hover { color: var(--paper); border-color: var(--brass-line
 .hud-plea-mark { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: var(--warn); animation: hud-ring 1.6s ease-out infinite; }
 .hud-plea-text { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 14px; }
 .hud-plea-text b { color: #ffd98a; }
-.hud-plea-sub { font: 11.5px/1.5 var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hud-plea-sub { font: italic 12.5px/1.45 var(--body); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hud-plea-go { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: var(--r-sm); background: var(--warn); color: var(--on-brass); font-weight: 700; font-size: var(--t-md); }
 .hud-plea-card:hover .hud-plea-go { background: #ffd98a; }
 .hud-plea-more { padding: 0 5px; border-radius: 8px; background: rgba(26, 19, 12, 0.18); font-size: 11px; }
@@ -523,6 +526,23 @@ button.hud-toast-btn:hover { color: var(--paper); border-color: var(--brass-line
   .hud-rate { min-width: 44px; height: 36px; }
   .hud-ledger div { padding: 6px 8px; }
   .gh .ui-seg button { min-height: 38px; }
+}
+/* a phone held sideways (GUI audit #9): Settings is a full-height sheet at the right edge under a one-row
+   header, not a panel cut off by the screen's foot */
+@media (orientation: landscape) and (max-height: 520px) {
+  .hud-settings {
+    position: fixed;
+    z-index: 30;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(400px, 52vw);
+    max-height: none;
+    border-radius: 0;
+    padding-right: env(safe-area-inset-right);
+  }
+  .hud-settings-head { padding: 4px 6px 4px 16px; }
+  .hud-settings-head h2 { font-size: var(--t-lg); }
 }
 @media (prefers-reduced-motion: reduce) {
   .hud-chron-item, .hud-toast, .hud-dossier, .hud-settings, .hud-plea-card { animation: none; }

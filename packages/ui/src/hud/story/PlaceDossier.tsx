@@ -7,6 +7,7 @@
  */
 import type { CSSProperties } from "react"
 import { type Stat, StatRows } from "../../components/display.tsx"
+import { longName } from "../Dossier.tsx"
 import { clock, heroTitle, phaseOf } from "../format.ts"
 import { Glyphs } from "../glyphs.tsx"
 import { Sigil, Status } from "../parts.tsx"
@@ -118,7 +119,9 @@ export function PlaceDossier({
         </span>
         <div className="st-place-id">
           <span className="hud-eyebrow">{place.kind}</span>
-          <h2 id="st-place-h">{place.name}</h2>
+          <h2 id="st-place-h" data-long={longName(place.name) || undefined}>
+            {place.name}
+          </h2>
           <span className="st-place-pkg num">{place.package}</span>
         </div>
         {onCollapse && (

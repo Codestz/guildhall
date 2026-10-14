@@ -299,9 +299,12 @@ const GAP = 3
 const MAX_LIFT = 96
 /** A pile this large folds into one chip. */
 export const FOLD_AT = 3
-/** Runs a chip must want to fold (or unfold) before it does: chips walking past don't flicker. */
-const FOLD_AFTER = 3
-const UNFOLD_AFTER = 2
+/**
+ * Runs a chip must want to fold (or unfold) before it does: chips walking past each other don't flicker
+ * (half a second to fold, most of a second to come back out).
+ */
+const FOLD_AFTER = 5
+const UNFOLD_AFTER = 8
 /** More chips than this on stage is a crowd: the strict rules apply (until it drops to CROWD_UNTIL). */
 export const CROWD_AT = 24
 const CROWD_UNTIL = 20
@@ -322,6 +325,26 @@ const BUBBLE_H = 64
  * 45 px tall. Minimal shows speech and the verb's target from here; a phone its verb line.
  */
 export const NEAR_PX = 39
+/** A near hero stays near until a metre spans less than this share of `NEAR_PX` (no flicker at the line). */
+const NEAR_KEEP = 0.85
+/** The declutter's nudge is written in steps of this many px… */
+export const LIFT_STEP = 8
+/** …and only once a run has asked for the same step this many times running (a rising nudge at once). */
+const LIFT_AFTER = 4
+/** A chip still for this long is written on whole pixels (crisp text at rest; sub-pixel while it moves). */
+const REST_MS = 250
+
+/**
+ * The nudge to draw: `want` (the run's lift) rounded up to a `LIFT_STEP`, taken at once when it climbs
+ * (an overlap now), but when it would drop only after `LIFT_AFTER` runs have asked for the same step;
+ * `runs` counts them. Pure: (drawn, want, runs) → (drawn, runs).
+ */
+export function liftStep(drawn: number, want: number, runs: number): { lift: number; runs: number } {
+  const step = want <= 0 ? 0 : Math.ceil(want / LIFT_STEP) * LIFT_STEP
+  if (step === drawn) return { lift: drawn, runs: 0 }
+  if (step > drawn) return { lift: step, runs: 0 }
+  return runs + 1 >= LIFT_AFTER ? { lift: step, runs: 0 } : { lift: drawn, runs: runs + 1 }
+}
 
 /** The view a run lays chips out in. */
 export interface ChipField {
@@ -364,7 +387,7 @@ export class Declutter {
       s.out = false
       s.pinned = s.selected || s.plea
       s.notable = crowd && (s.plea || s.fallen)
-      s.near = s.perUnit >= NEAR_PX
+      s.near = s.perUnit >= (s.near ? NEAR_PX * NEAR_KEEP : NEAR_PX)
       if (!s.shown || s.width === 0 || s.height === 0) continue
       // a phone folds a chip the edge would clip (the followed and a plea stay)
       if (field.phone && !s.pinned && Math.abs(s.x - field.width / 2) > (field.width - s.width) / 2) continue
@@ -601,7 +624,12 @@ interface Chip {
   x: number
   y: number
   drawn: boolean
+  /** When it last moved (frame time), and whether it has been written on whole pixels since. */
+  movedAt: number
+  whole: boolean
   lift: number
+  /** Runs in a row the declutter has asked for a lower lift (`liftStep`). */
+  liftRuns: number
   more: number
   flags: number
 }
@@ -675,7 +703,10 @@ export function createChips(
       x: Number.NaN,
       y: Number.NaN,
       drawn: false,
+      movedAt: 0,
+      whole: false,
       lift: 0,
+      liftRuns: 0,
       more: 0,
       flags: 0,
     }
@@ -762,13 +793,21 @@ export function createChips(
         c.drawn = true
       }
       // (NaN at first: never placed yet)
+      // moving: sub-pixel (a composited layer slides smoothly); at rest `frame` writes whole pixels
       if (!(Math.abs(at.x - c.x) <= 0.25 && Math.abs(at.y - c.y) <= 0.25)) {
         c.x = at.x
         c.y = at.y
-        c.parts.at.style.transform = `translate3d(${at.x.toFixed(1)}px,${at.y.toFixed(1)}px,0)`
+        c.movedAt = performance.now()
+        c.whole = false
+        c.parts.at.style.transform = `translate3d(${at.x.toFixed(2)}px,${at.y.toFixed(2)}px,0)`
       }
     },
     frame(now) {
+      for (const c of chips.values())
+        if (c.drawn && !c.whole && now - c.movedAt > REST_MS) {
+          c.whole = true
+          c.parts.at.style.transform = `translate3d(${Math.round(c.x)}px,${Math.round(c.y)}px,0)`
+        }
       if (now - last < EVERY_MS) return
       last = now
       const f = field()
@@ -798,10 +837,14 @@ export function createChips(
             if ((flags & bit) !== (c.flags & bit)) el.toggleAttribute(attr, (flags & bit) !== 0)
           c.flags = flags
         }
-        const lift = s.folded ? c.lift : Math.round(s.lift)
-        if (lift !== c.lift) {
-          c.lift = lift
-          el.style.setProperty("--lift", `${lift}px`)
+        // the nudge in steps, a falling one only once asked for a while: no restless easing while walking
+        if (!s.folded) {
+          const next = liftStep(c.lift, s.lift, c.liftRuns)
+          c.liftRuns = next.runs
+          if (next.lift !== c.lift) {
+            c.lift = next.lift
+            el.style.setProperty("--lift", `${next.lift}px`)
+          }
         }
         if (s.more !== c.more) {
           c.more = s.more

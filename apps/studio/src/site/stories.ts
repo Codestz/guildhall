@@ -4,10 +4,11 @@ const ART = "/site/demos"
 
 /**
  * V1's Demos page ("Every scene, one link away", packages/hall/demos.html on main) as fixture data: the same
- * art, kickers, descriptions and "what it shows" lines, in the same shelves. The Saga carries its five acts
+ * kickers, descriptions and "what it shows" lines, in the same shelves. The Saga carries its five acts
  * (I Dawn · II The forge · III The storm · IV The mending · V Nightfall, from the saga story's chapters).
- * Deviations from V1: no WebGPU card (V2 draws on WebGL only), the archipelago waits for its V2 port, the
- * crowd is the `rush` story, and repo links are the V2 route (`/hall/<owner>/<repo>`).
+ * The pictures are V2's own, each card's link as it opens here (`bun shots demos`). Deviations from V1: no
+ * WebGPU card (V2 draws on WebGL only), the archipelago waits for its V2 port, the crowd of 300 is the
+ * `rush` story's twelve until the crowd LOD lands, and repo links are the V2 route (`/hall/<owner>/<repo>`).
  */
 export const STORIES: readonly Story[] = [
   {
@@ -54,8 +55,8 @@ export const STORIES: readonly Story[] = [
     blurb:
       "A single hero with no party: one task from the board, walked to its place and finished, with the island going about its day around it.",
     shows: ["The smallest story: one hero, one quest", "Follow it and read its dossier as it works"],
-    art: "/site/journey/tavern-night.webp",
-    alt: "A tavern yard at night: lit windows, tables and a few figures round a glowing lamp.",
+    art: `${ART}/solo.webp`,
+    alt: "The keep by day: a lone guildmaster at work in its yard.",
     link: "?story=solo",
   },
   {
@@ -88,17 +89,17 @@ export const STORIES: readonly Story[] = [
   {
     id: "rush",
     shelf: "Stories",
-    title: "A crowd of 300",
-    kicker: "Stress test",
+    title: "The rush",
+    kicker: "Twelve quests at once",
     blurb:
-      "Three hundred adventurers on one island, every one animated. Baked bone textures, mesh LOD and instancing keep it smooth.",
+      "One guildmaster sends twelve adventurers out at once, every one animated; two give up halfway and the graveyard's dead rise, until the sweep is done.",
     shows: [
-      "300 skinned characters in a handful of draw calls",
-      "Turn on Stats for nerds to watch the frame rate",
+      "A dozen heroes on the move, every deed on screen",
+      "V1's crowd of 300 comes back with the crowd's level of detail",
     ],
     art: `${ART}/crowd.webp`,
-    alt: "Hundreds of adventurers packed into the keep's hall.",
-    link: "?story=rush&n=300",
+    alt: "The island's keep with a party of adventurers spreading out along its roads.",
+    link: "?story=rush",
   },
   {
     id: "react",

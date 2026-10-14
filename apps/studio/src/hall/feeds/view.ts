@@ -27,6 +27,7 @@ import type {
   TimelineMarker,
   TranscriptLine,
 } from "@guildhall/ui"
+import type { FeedChapter } from "./feed.ts"
 
 /** A zone's name on the island (`the village of world`), or the hall's for undefined. */
 export type PlaceName = (zone: number | undefined) => string
@@ -53,6 +54,20 @@ function masterOf(world: GuildWorld, id: string): string {
   return at
 }
 
+const ROMAN: Record<string, number> = { I: 1, V: 5, X: 10, L: 50, C: 100 }
+
+/**
+ * `Wanderer III` → name `Wanderer`, ordinal 3 (the sim numbers a second of a kind in its name); the HUD
+ * draws the numeral as the face's pip and puts it back in the title. A name without one is its own.
+ */
+export function nameAndOrdinal(name: string): { name: string; ordinal?: number } {
+  const m = /^(.*\S)\s+([IVXLC]+)$/.exec(name)
+  if (!m) return { name }
+  const digits = [...(m[2] as string)].map((c) => ROMAN[c] ?? 0)
+  const n = digits.reduce((sum, v, k) => sum + (v < (digits[k + 1] ?? 0) ? -v : v), 0)
+  return n > 1 ? { name: m[1] as string, ordinal: n } : { name }
+}
+
 /** A hero as the Roster draws it. */
 export function heroView(world: GuildWorld, h: SimHero, place: PlaceName): HeroView {
   const where = place(h.place)
@@ -60,7 +75,7 @@ export function heroView(world: GuildWorld, h: SimHero, place: PlaceName): HeroV
   const intent = h.intent?.running ? h.intent : undefined
   return {
     id: h.id,
-    name: h.name,
+    ...nameAndOrdinal(h.name),
     ...(h.agent && h.agent !== "agent" ? { source: h.agent } : {}),
     family: h.body,
     banner: h.color,
@@ -205,11 +220,36 @@ const ENTRY: Partial<Record<WorldEvent["kind"], EntryKind>> = {
   "actor.plea": "plea",
   "actor.loot": "loot",
   "actor.fail": "fail",
+  "actor.deed": "deed",
+}
+
+/** A session chronicle line, and what makes a repeat of it the same moment (`groupRepeats`). */
+export interface SessionEntry extends ChronicleEntry {
+  /** Lines with one `same` in a row are one moment told again (`bash failed` three times). */
+  same: string
+  /** The line as a repeat tells it, without what differs between them (a failed deed's target). */
+  short: string
 }
 
 /**
- * The session's chronicle up to `t`, oldest first, at ms from its start: who joined, the quests sent,
- * pleas, loot and failures, and the failed deeds (a deed that went well is too common to list).
+ * Where to start reading `events` (sorted by time) for the newest `max` lines at `t`: a binary search
+ * for the first event after `t`, then `slack` times `max` back (every event is at most one line).
+ */
+function windowOf(events: readonly WorldEvent[], t: number, max: number, slack = 8): [number, number] {
+  let lo = 0
+  let hi = events.length
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if ((events[mid] as WorldEvent).at <= t) lo = mid + 1
+    else hi = mid
+  }
+  return [Math.max(0, lo - max * slack), lo]
+}
+
+/**
+ * The session's chronicle up to `t`, oldest first, at ms from its start (V1's Chronicle): who joined,
+ * the quests sent, pleas, loot and falls, and every deed with its tool and target (a failed one in red,
+ * its error's first words after it). The newest `max` lines.
  */
 export function chronicleOf(
   events: readonly WorldEvent[],
@@ -217,30 +257,36 @@ export function chronicleOf(
   t: number,
   origin: number,
   max = 80,
-): ChronicleEntry[] {
-  const out: ChronicleEntry[] = []
-  for (const e of events) {
-    if (e.at > t) break
+): SessionEntry[] {
+  const out: SessionEntry[] = []
+  const [from, to] = windowOf(events, t, max)
+  for (let k = from; k < to; k++) {
+    const e = events[k] as WorldEvent
     const failed = e.kind === "actor.deed" && e.failed
     const kind = failed ? "fail" : ENTRY[e.kind]
     if (!kind || !("id" in e)) continue
     const a = world.actors.get(e.id)
-    const text =
-      e.kind === "actor.join"
-        ? e.parent
-          ? "joins the party"
-          : "takes the seat in the great hall"
-        : e.kind === "actor.quest"
-          ? `sends a quest: ${firstWords(e.text)}`
-          : e.kind === "actor.plea"
-            ? "awaits your word"
-            : e.kind === "actor.loot"
-              ? "brings the loot home"
-              : e.kind === "actor.fail"
-                ? `falls${e.error ? `: ${firstWords(e.error)}` : ""}`
-                : e.kind === "actor.deed"
-                  ? `fails at ${e.tool}${e.target ? ` · ${e.target}` : ""}`
-                  : ""
+    let text = ""
+    let short = ""
+    let same = `${e.kind}|${e.id}`
+    if (e.kind === "actor.join") text = e.parent ? "joins the party" : "takes the seat in the great hall"
+    else if (e.kind === "actor.quest") text = `sends a quest: ${firstWords(e.text)}`
+    else if (e.kind === "actor.plea") text = "awaits your word"
+    else if (e.kind === "actor.loot") text = "brings the loot home"
+    else if (e.kind === "actor.fail") text = `falls${e.error ? `: ${firstWords(e.error)}` : ""}`
+    else if (e.kind === "actor.deed") {
+      const tool = e.tool.toLowerCase()
+      same = `${same}|${tool}|${e.failed}`
+      if (e.failed) {
+        short = `${tool} failed`
+        text = `${short}${e.target ? `: ${e.target}` : e.error ? `: ${firstWords(e.error)}` : ""}`
+      } else {
+        short = tool
+        text = e.target ? `${tool} ${e.target}` : tool
+        same = `${same}|${e.target}`
+      }
+    }
+    if (e.kind !== "actor.deed") same = `${same}|${text}`
     out.push({
       key: `s${e.seq}`,
       at: e.at - origin,
@@ -250,7 +296,76 @@ export function chronicleOf(
       text,
       hero: e.id,
       party: masterOf(world, e.id),
+      same,
+      short: short || text,
     })
   }
   return out.slice(-max)
+}
+
+/** Repeats further apart than this (session ms) are separate moments. */
+export const REPEAT_MS = 90_000
+
+/**
+ * The chronicle with each run of repeats told once (V1 "beyond parity": `Artisan II bash failed ×3`):
+ * lines with the same `same`, each within `REPEAT_MS` of the last and with nothing else of that hero's
+ * between, become the newest of them, its text the short form with the count. The grouped line takes
+ * the newest's key, so a toast for it comes up again at each repeat. Oldest first, as given.
+ */
+export function groupRepeats<E extends SessionEntry>(entries: readonly E[], within = REPEAT_MS): E[] {
+  const out: (E | null)[] = []
+  const count: number[] = []
+  const lastOf = new Map<string, number>()
+  for (const e of entries) {
+    const at = e.hero ? lastOf.get(e.hero) : undefined
+    const prev = at !== undefined ? out[at] : undefined
+    let n = 1
+    if (at !== undefined && prev && prev.same === e.same && e.at - prev.at <= within) {
+      // the run moves up to its newest line
+      n = (count[at] ?? 1) + 1
+      out[at] = null
+    }
+    if (e.hero) lastOf.set(e.hero, out.length)
+    out.push(n > 1 ? { ...e, text: `${e.short} ×${n}` } : e)
+    count.push(n)
+  }
+  return out.filter((e): e is E => e !== null)
+}
+
+/** The beats a bar keeps (user 10-13: fewer ticks), most telling first. */
+const LOUDNESS: Record<TimelineMarker["kind"], number> = {
+  plea: 0,
+  fail: 1,
+  release: 2,
+  quest: 3,
+  born: 4,
+  loot: 5,
+}
+
+/**
+ * A few of `markers` over a bar from `start`, `len` long: the most telling first (pleas, failures, acts
+ * and majors, quests), each at least `gap` of the bar from those kept, at most `max`. In time order.
+ */
+export function fewMarkers<M extends TimelineMarker>(
+  markers: readonly M[],
+  start: number,
+  len: number,
+  gap = 0.02,
+  max = 24,
+): M[] {
+  const room = Math.max(1, len) * gap
+  const kept: M[] = []
+  const ranked = [...markers].sort((a, b) => LOUDNESS[a.kind] - LOUDNESS[b.kind] || a.at - b.at)
+  for (const m of ranked) {
+    if (kept.length >= max) break
+    if (m.at < start || m.at > start + len) continue
+    if (kept.some((k) => Math.abs(k.at - m.at) < room)) continue
+    kept.push(m)
+  }
+  return kept.sort((a, b) => a.at - b.at)
+}
+
+/** A told story's acts as the bar's beats, at ms from its start. */
+export function actMarkers(chapters: readonly FeedChapter[]): TimelineMarker[] {
+  return chapters.map((c) => ({ at: c.at, kind: "release", label: `${c.numeral} · ${c.title}` }))
 }

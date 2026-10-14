@@ -70,13 +70,19 @@ export function useRoster(
 export function RosterPanel({
   hud,
   snap,
+  following = null,
   picked,
+  onCamera = null,
   onPick,
   onClose,
 }: {
   hud: HudSession
   snap: SessionSnapshot
+  /** The party followed (the party tabs), or null for all. */
+  following?: string | null
   picked: string | null
+  /** Who the camera follows (an eye by their name). */
+  onCamera?: string | null
   onPick: (id: string) => void
   onClose: () => void
 }) {
@@ -85,6 +91,8 @@ export function RosterPanel({
     <Roster
       heroes={heroes}
       parties={parties}
+      following={following}
+      onCamera={onCamera}
       selected={picked}
       open
       onToggle={onClose}

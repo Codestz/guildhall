@@ -26,7 +26,7 @@ function slot(id: string, x: number, y: number, z = 10, extra: Partial<ChipSlot>
   return { ...chipSlot(id), x, y, z, shown: true, width: 80, height: 30, perUnit: 20, ...extra }
 }
 
-function laid(slots: ChipSlot[], runs = 4, field: ChipField = FIELD): Declutter {
+function laid(slots: ChipSlot[], runs = 6, field: ChipField = FIELD): Declutter {
   const d = new Declutter()
   d.slots.push(...slots)
   for (let k = 0; k < runs; k++) d.run(field)
@@ -43,9 +43,8 @@ describe("the declutter", () => {
 
   test("a chip walking past does not fold at once (votes), and two overlapping chips only nudge", () => {
     const [a, b, c] = [slot("a", 500, 400, 30), slot("b", 510, 405, 10), slot("c", 520, 395, 20)]
-    const d = laid([a!, b!, c!], 1)
+    const d = laid([a!, b!, c!], 4)
     expect([a!.folded, c!.folded]).toEqual([false, false])
-    d.run(FIELD)
     d.run(FIELD)
     expect([a!.folded, c!.folded]).toEqual([true, true])
     const [p, q] = [slot("p", 200, 400, 5), slot("q", 220, 410, 9)]

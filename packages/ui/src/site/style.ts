@@ -49,6 +49,11 @@ export const SITE_CSS = /* css */ `
 .gh .site-welcome-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .gh .site-welcome-links .site-link { min-height: 36px; font-size: 14px; }
 .gh .site-welcome-links { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; color: var(--faint); font-size: 13px; }
+/* folded: the field alone, a slim pill; it unfolds to the full bar on focus */
+.gh .site-welcome[data-open="false"] .site-welcome-card { width: min(340px, 100%); padding: 6px; }
+.gh .site-welcome[data-open="false"] .site-msg { display: none; }
+.gh .site-welcome[data-open="false"] .site-input { min-height: 40px; cursor: text; }
+.gh .site-welcome-foot[hidden] { display: none; }
 
 @media (max-width: 560px) {
   .gh .site-welcome { padding: 0 16px calc(12px + env(safe-area-inset-bottom)); }
@@ -343,6 +348,7 @@ button.site-menu-palette:hover { background: var(--raise-2); color: var(--paper)
     transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   }
   .gh .site-welcome-card, .gh .site-menu, .gh .site-demos { animation: site-rise 0.22s ease-out both; }
+  .gh .site-welcome-card { transition: width 0.2s ease, padding 0.2s ease; }
   .gh .site-scrim { animation: site-fade 0.2s ease-out both; }
   @keyframes site-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
   @keyframes site-fade { from { opacity: 0; } to { opacity: 1; } }

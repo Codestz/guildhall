@@ -48,10 +48,13 @@ export function Avatar({
   const id = useId()
   const tone = rimTone(hero.phase)
   const expression = expressionOf(hero.phase)
-  const features = faceFeatures(hero.id, hero.family)
+  const features = faceFeatures(hero.id, hero.family, {
+    ...(hero.ordinal !== undefined ? { ordinal: hero.ordinal } : {}),
+    kin: `${hero.family}:${hero.banner}`,
+  })
   const ordinal = hero.ordinal ?? 1
   const a11y = label ? { role: "img", "aria-label": label } : { "aria-hidden": true }
-  const style = { "--banner": hero.banner, "--av": `${size}px` } as CSSProperties
+  const style = { "--banner": hero.banner, "--accent": features.accent, "--av": `${size}px` } as CSSProperties
 
   return (
     <span

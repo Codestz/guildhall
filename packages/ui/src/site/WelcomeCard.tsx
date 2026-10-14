@@ -1,8 +1,11 @@
 /**
- * The first-visit bar over the live island: the repo field and Generate on one row, "Watch a demo" and
- * "How it's built" under it. The island is the pitch, so there is no copy beyond a visually hidden h1.
- * Not modal: the world stays visible and alive behind it. Esc or the close button dismisses it; the
- * caller remembers that (`onDismiss`, see `writeWelcomeDismissed`). It is `data-keepout`: plates stay off it.
+ * The first-visit bar over the live island: folded, just the repo field (user pick 10-13); focusing or
+ * clicking it unfolds Generate beside it and "Watch a demo" · "How it's built" · "Connect a source" and
+ * the close button under it. Leaving it (Esc, or focus going elsewhere) with the field empty folds it
+ * again; Esc on the folded bar, or the close button, dismisses it and the caller remembers that
+ * (`onDismiss`, see `writeWelcomeDismissed`). The island is the pitch, so there is no copy beyond a
+ * visually hidden h1. Not modal: the world stays visible and alive behind it. It is `data-keepout`:
+ * plates stay off it.
  */
 import { type FormEvent, useId, useRef, useState } from "react"
 import { Button, IconButton } from "../components/controls.tsx"
@@ -29,6 +32,25 @@ export interface WelcomeCardProps {
   error?: string
 }
 
+/** What the bar does when it is focused, left or sent Esc (pure: the tests read it). */
+export type WelcomeEvent = "focus" | "leave" | "escape"
+
+/**
+ * The bar after `event`: focus unfolds it; leaving folds it while the field is empty (a typed repo
+ * keeps Generate in reach); Esc folds an unfolded empty bar, and dismisses one already folded or one
+ * with nothing to fold.
+ */
+export function welcomeFold(
+  open: boolean,
+  event: WelcomeEvent,
+  text: string,
+): { open: boolean; dismiss?: true } {
+  const empty = text.trim() === ""
+  if (event === "focus") return { open: true }
+  if (event === "leave") return { open: open && !empty }
+  return open && empty ? { open: false } : { open, dismiss: true }
+}
+
 export function WelcomeCard({
   onGenerate,
   onDemo,
@@ -45,6 +67,14 @@ export function WelcomeCard({
   const [text, setText] = useState(initial)
   const [touched, setTouched] = useState(initial !== "")
   const root = useRef<HTMLElement>(null)
+  const field = useRef<HTMLInputElement>(null)
+  const [open, setOpen] = useState(initial !== "" || Boolean(error))
+  const on = (event: WelcomeEvent) => {
+    const next = welcomeFold(open, event, text)
+    if (next.open !== open) setOpen(next.open)
+    if (next.dismiss) onDismiss()
+    else if (event === "escape" && !next.open) field.current?.blur()
+  }
   const parsed = parseRepo(text)
   const problem = error ?? (touched && text.trim() !== "" && !parsed.ok ? parsed.reason : undefined)
   const good = parsed.ok && text.trim() !== "" && !error
@@ -56,7 +86,7 @@ export function WelcomeCard({
   }
 
   return (
-    <div className="site-welcome" data-busy={busy ? "" : undefined}>
+    <div className="site-welcome" data-busy={busy ? "" : undefined} data-open={open}>
       <h1 className="site-sr">Guildhall: events in, a living world out</h1>
       <section
         ref={root}
@@ -64,12 +94,19 @@ export function WelcomeCard({
         aria-label="Your repo as an island"
         data-keepout=""
         onKeyDown={(e) => {
-          if (e.key === "Escape") onDismiss()
+          if (e.key !== "Escape") return
+          e.stopPropagation()
+          on("escape")
+        }}
+        onBlur={(e) => {
+          // focus going to another part of the bar (Generate, a link) keeps it open
+          if (!root.current?.contains(e.relatedTarget as Node | null)) on("leave")
         }}
       >
         <form className="site-welcome-form" onSubmit={submit} noValidate>
           <div className="site-welcome-row">
             <input
+              ref={field}
               id={`${id}-repo`}
               className="site-input"
               type="text"
@@ -85,12 +122,19 @@ export function WelcomeCard({
               data-ok={good ? "" : undefined}
               enterKeyHint="go"
               aria-describedby={`${id}-msg`}
-              onChange={(e) => setText(e.currentTarget.value)}
+              onChange={(e) => {
+                setText(e.currentTarget.value)
+                if (!open) setOpen(true)
+              }}
+              onFocus={() => on("focus")}
+              onClick={() => on("focus")}
               onBlur={() => setTouched(true)}
             />
-            <Button type="submit" variant="primary" disabled={busy || text.trim() === ""}>
-              {busy ? "Reading…" : "Generate"}
-            </Button>
+            {open && (
+              <Button type="submit" variant="primary" disabled={busy || text.trim() === ""}>
+                {busy ? "Reading…" : "Generate"}
+              </Button>
+            )}
           </div>
           <p
             className="site-msg"
@@ -112,7 +156,7 @@ export function WelcomeCard({
           </p>
         </form>
 
-        <div className="site-welcome-foot">
+        <div className="site-welcome-foot" id={`${id}-more`} hidden={!open}>
           <nav className="site-welcome-links" aria-label="Or look around first">
             <Dest href={demoHref} onNavigate={onDemo} className="site-link">
               Watch a demo

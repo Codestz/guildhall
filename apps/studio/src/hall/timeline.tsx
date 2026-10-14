@@ -1,30 +1,52 @@
 /**
- * The hall's timeline bar (plan-hud-events T1): the HUD's one `Timeline` (ui, props only) on the hall's
- * clock, at the bottom of the screen and thumb-sized on a phone. Play and pause, scrub, the speed, the
- * day, and the history's beats (its major releases, its eras, its packages' births). At today with the
- * clock still, "Watch it grow" plays the history from the first commit. It shows once the island can be
- * revealed by it (`HallTime.range`), never for a repo without a chronicle.
+ * The hall's timeline bar (plan-hud-events T1; user picks 10-13): the HUD's one `Timeline` (ui, props
+ * only) on the hall's clock, with ONE scale picked for you, never a switch. A hall with a session
+ * (`?feed=`, a told story, the home's demo guild) shows the session's minutes; a repo's hall without one
+ * shows its growth: the date and V1's line under it (`1,534 contributors · 60 in town · 1,113 files`).
+ * The beats are few (eras and majors, a story's acts, a session's pleas, failures and quests) and only
+ * marks: scrubbing moves the time, a beat is never a button.
+ *
+ * In the HUD it starts as V1's hairline (180×6) and opens on hover, keyboard focus or a tap; Detailed
+ * pins it open. At today with the clock still, "Watch it grow" plays the history from the first commit.
+ * Off the HUD (a Studio lab, `mountTimeline`) it is pinned, with the captions and a story's act chip
+ * over it.
  */
-import { Captions, ChapterChip, holdHudStyle, Timeline, type TimeScale } from "@guildhall/ui"
+import { Captions, ChapterChip, holdHudStyle, Timeline } from "@guildhall/ui"
 import { useEffect, useMemo, useSyncExternalStore } from "react"
 import { createRoot } from "react-dom/client"
 import { type HallTime, type HistoryRange, nextRate } from "./clock.ts"
 import { SESSION_RATES } from "./feeds/clock.ts"
 import type { HallSession } from "./feeds/session.ts"
-import { markersOf } from "./feeds/view.ts"
+import { actMarkers, fewMarkers, markersOf } from "./feeds/view.ts"
 
 /** How fine a scrub is: the history in this many steps (a 3-day history is no 3-stop slider). */
 const STEPS = 1000
 
+/** Which scale the bar shows, or none. */
+export type BarScale = "history" | "session" | null
+
 /**
- * The one bar with V1's two scales (plan §2): History (the island grows) and, with a `?feed=`, Session
- * (the heroes replay; hall/feeds). The switch shows when both can be shown; the session's captions and
- * a told story's chapter chip sit over the bar.
+ * The one scale, picked for you: a session's once it has been heard from (a live hall waiting for its
+ * first event shows its history meanwhile, if it has one), else the history's, else no bar.
  */
-export function HallTimeline({ time }: { time: HallTime }) {
+export function barScale(hasHistory: boolean, hasSession: boolean, heard: boolean): BarScale {
+  if (hasSession && (heard || !hasHistory)) return "session"
+  return hasHistory ? "history" : null
+}
+
+export interface HallTimelineProps {
+  time: HallTime
+  /** Open for good (Detailed, a lab); else V1's hairline that opens on hover, focus or a tap. */
+  pinned?: boolean
+  /** The growth line under the history's date, for an epoch-ms day (the hall's chronicle). */
+  growth?: (at: number) => string
+  /** The captions and a story's act chip over the bar (a lab); the HUD draws its own. */
+  overlay?: boolean
+}
+
+export function HallTimeline({ time, pinned = true, growth, overlay = true }: HallTimelineProps) {
   const range = useSyncExternalStore(time.subscribe, time.range)
   const session = useSyncExternalStore(time.subscribe, time.session)
-  const scale = useSyncExternalStore(time.subscribe, time.scale)
   useEffect(() => {
     const releaseHud = holdHudStyle()
     const releaseHall = holdHallStyle()
@@ -35,32 +57,46 @@ export function HallTimeline({ time }: { time: HallTime }) {
   }, [])
   // a session with nothing in it yet (live, before the first event) leaves the bar to the history
   const heard = useSyncExternalStore(session?.subscribe ?? quiet, () => (session?.snapshot().events ?? 0) > 0)
-  const onScale = range && session && heard ? (s: TimeScale) => time.setScale(s) : undefined
-  if (session && (heard || !range) && (scale === "session" || !range))
-    return <SessionBar session={session} onScale={onScale} historyless={!range} />
-  if (!range) return null
-  return <HistoryBar time={time} range={range} onScale={onScale} session={session} />
+  const scale = barScale(range !== null, session !== null, heard)
+  if (scale === "session" && session)
+    return <SessionBar session={session} pinned={pinned} overlay={overlay} />
+  if (scale === "history" && range)
+    return <HistoryBar time={time} range={range} pinned={pinned} {...(growth ? { growth } : {})} />
+  return null
 }
 
 function HistoryBar({
   time,
   range,
-  onScale,
-  session,
+  pinned,
+  growth,
 }: {
   time: HallTime
   range: HistoryRange
-  onScale: ((s: TimeScale) => void) | undefined
-  session: HallSession | null
+  pinned: boolean
+  growth?: (at: number) => string
 }) {
   const clock = time.clock
   const state = useSyncExternalStore(clock.subscribe, clock.get)
   const len = Math.max(1, range.end - range.start)
   const at = range.start + state.t * len
   const idle = state.t >= 1 && !state.playing
+  // eras and majors only: a package's birth is the Legends' to tell
+  const markers = useMemo(
+    () =>
+      fewMarkers(
+        range.markers.filter((m) => m.kind !== "born"),
+        range.start,
+        len,
+      ),
+    [range, len],
+  )
+  // the growth line moves a day at a time; a week is fine-grained enough for its figures
+  const week = Math.floor(at / (7 * 86_400_000))
+  // biome-ignore lint/correctness/useExhaustiveDependencies: read once a week of history
+  const note = useMemo(() => growth?.(at), [growth, week])
   return (
-    <div className="hall-timeline">
-      {session && <SessionCaptions session={session} />}
+    <div className="hall-timeline" data-scale="history" data-pinned={pinned}>
       {idle && (
         <button type="button" className="hall-grow" onClick={() => clock.play(true)}>
           Watch it grow
@@ -68,31 +104,26 @@ function HistoryBar({
       )}
       <Timeline
         scale="history"
-        {...(onScale ? { onScale } : {})}
         start={range.start}
         end={range.end}
         at={at}
-        markers={range.markers}
+        markers={markers}
+        pinned={pinned}
         playing={state.playing}
         onPlay={(on) => clock.play(on)}
         onSeek={(v) => clock.seek((v - range.start) / len)}
         step={len / STEPS}
         rate={state.rate}
         onRate={() => clock.setRate(nextRate(state.rate))}
+        {...(note ? { note } : {})}
       />
     </div>
   )
 }
 
-/** The narrated line over the bar (sim Narrator, through the session's snapshot). */
-function SessionCaptions({ session }: { session: HallSession }) {
-  const snap = useSyncExternalStore(session.subscribe, session.snapshot)
-  return <Captions {...(snap.caption ? { caption: snap.caption } : {})} />
-}
-
 const quiet = () => () => {}
 
-/** A phone's width (the Viewer's): the chapter chip is its numeral alone, at the right, clear of the Chronicle chip. */
+/** A phone's width (the Viewer's): the chapter chip is its numeral alone. */
 const NARROW = "(max-width: 600px)"
 const onNarrow = (fn: () => void) => {
   const q = matchMedia(NARROW)
@@ -101,29 +132,35 @@ const onNarrow = (fn: () => void) => {
 }
 const isNarrow = () => matchMedia(NARROW).matches
 
-/** The Session scale: the log's minutes, its beats, live's way back to now, a told story's acts. */
+/** The Session scale: the log's minutes, its few beats (a told story's acts), live's way back to now. */
 function SessionBar({
   session,
-  onScale,
-  historyless,
+  pinned,
+  overlay,
 }: {
   session: HallSession
-  onScale: ((s: TimeScale) => void) | undefined
-  historyless: boolean
+  pinned: boolean
+  overlay: boolean
 }) {
   const snap = useSyncExternalStore(session.subscribe, session.snapshot)
   const narrow = useSyncExternalStore(onNarrow, isNarrow)
   const { clock } = session
   const c = snap.clock
   const events = snap.events
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the beats change when the log grows
-  const markers = useMemo(() => markersOf(session.log().events, c.start), [events, c.start, session])
-  if (events === 0) return null
   const len = Math.max(1000, c.end - c.start)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the beats change when the log grows
+  const markers = useMemo(
+    () =>
+      snap.chapters.length > 0
+        ? actMarkers(snap.chapters)
+        : fewMarkers(markersOf(session.log().events, c.start), 0, len),
+    [events, c.start, len, session, snap.chapters],
+  )
+  if (events === 0) return null
   return (
-    <div className="hall-timeline" data-scale="session">
-      <Captions {...(snap.caption ? { caption: snap.caption } : {})} />
-      {snap.chapters.length > 0 && (
+    <div className="hall-timeline" data-scale="session" data-pinned={pinned}>
+      {overlay && <Captions {...(snap.caption ? { caption: snap.caption } : {})} />}
+      {overlay && snap.chapters.length > 0 && (
         <ChapterChip
           chapters={snap.chapters}
           current={Math.max(0, snap.chapter)}
@@ -134,12 +171,11 @@ function SessionBar({
       )}
       <Timeline
         scale="session"
-        {...(onScale ? { onScale } : {})}
-        {...(historyless ? { historyUnavailable: "No history for this repo" } : {})}
         start={0}
         end={len}
         at={c.at - c.start}
         markers={markers}
+        pinned={pinned}
         playing={c.mode === "live" || c.playing}
         onPlay={(on) => clock.play(on)}
         onSeek={(v) => clock.seek(c.start + v)}
@@ -166,9 +202,8 @@ export function mountTimeline(host: HTMLElement, time: HallTime): () => void {
 }
 
 /**
- * The bar's place: bottom centre; on a wide screen it keeps clear of the hall note at the bottom left,
- * on a phone it is the bottom edge (safe area kept) and the note is only moved up above it (its own look
- * is the note's; the HUD's bottom slot will take the bar from `mountTimeline`).
+ * The bar's place off the HUD: bottom centre; on a phone the bottom edge (safe area kept). In the HUD
+ * its bottom-centre slot places it (hall/hud/style.ts).
  */
 const CSS = /* css */ `
 .hall-timeline-host { position: absolute; inset: auto 0 0 0; height: 0; z-index: 20; }
@@ -186,20 +221,8 @@ const CSS = /* css */ `
 }
 .gh .hall-grow:hover { background: var(--brass-hi); }
 .gh .hall-grow:active { transform: scale(0.97); }
-/* beside the hall note (380 px at the bottom left) where there is room for both */
-@media (min-width: 1100px) {
-  .gh.site-root .hall-timeline { left: 412px; right: 16px; translate: none; width: auto; max-width: 680px; margin: 0 auto; }
-}
-/* a narrower screen: the bar full width at the bottom, the note above it */
-@media (max-width: 1099px) {
-  .gh.site-root:has(.hall-timeline) .site-note { bottom: 88px; }
-  /* "Watch it grow" sits over the bar: the note steps up over it */
-  .gh.site-root:has(.hall-grow) .site-note { bottom: 136px; }
-}
 @media (max-width: 720px) {
   .gh .hall-timeline { bottom: calc(8px + env(safe-area-inset-bottom)); width: calc(100% - 16px); gap: 8px; }
-  .gh.site-root:has(.hall-timeline) .site-note { bottom: calc(68px + env(safe-area-inset-bottom)); }
-  .gh.site-root:has(.hall-grow) .site-note { bottom: calc(122px + env(safe-area-inset-bottom)); }
   .gh .hall-grow { height: 44px; padding: 0 22px; }
 }
 `

@@ -11,8 +11,10 @@ const INK = "#15110d"
 const MOUTH = "#7a2a1a"
 
 /** The headgear, behind (`back`) and over (`front`) the face. */
-function headgear(family: Family, banner: string): { back?: ReactNode; front: ReactNode } {
+function headgear(family: Family, banner: string, f: FaceFeatures): { back?: ReactNode; front: ReactNode } {
   const dark = shade(banner, 0.62)
+  const accent = f.accent
+  const edge = shade(accent, 0.6)
   switch (family) {
     case "mage":
       return {
@@ -21,9 +23,10 @@ function headgear(family: Family, banner: string): { back?: ReactNode; front: Re
             <path d="M31 1 L45 23 H15 Z" fill={banner} stroke={dark} strokeWidth="1.2" />
             <path d="M31 1 Q37 4 41 0" stroke={banner} strokeWidth="3" fill="none" strokeLinecap="round" />
             <ellipse cx="30" cy="24" rx="20" ry="4.2" fill={banner} stroke={dark} strokeWidth="1.2" />
+            <path d="M17.5 21.2 Q30 24.5 42.5 21.2" stroke={accent} strokeWidth="2.4" fill="none" />
             <path
               d="M28 12 l1.2 2.6 2.8.3-2.1 1.9.6 2.8-2.5-1.4-2.5 1.4.6-2.8-2.1-1.9 2.8-.3z"
-              fill="#ffe08a"
+              fill={f.crest === 1 ? "#ffe08a" : accent}
             />
           </>
         ),
@@ -32,11 +35,23 @@ function headgear(family: Family, banner: string): { back?: ReactNode; front: Re
       return {
         front: (
           <>
-            <path d="M14.5 33 Q14 14 30 13 Q46 14 45.5 33 V36 H41 V30 H19 V36 H14.5 Z" fill="#a3acb7" />
-            <path d="M14.5 33 Q14 14 30 13 Q46 14 45.5 33" fill="none" stroke="#5d6672" strokeWidth="1.3" />
+            <path d="M14.5 33 Q14 14 30 13 Q46 14 45.5 33 V36 H41 V30 H19 V36 H14.5 Z" fill={f.metal} />
+            <path
+              d="M14.5 33 Q14 14 30 13 Q46 14 45.5 33"
+              fill="none"
+              stroke={shade(f.metal, 0.55)}
+              strokeWidth="1.3"
+            />
             <rect x="18" y="27" width="24" height="3.4" rx="1.2" fill="#2a2f36" />
-            <path d="M30 13 V27" stroke="#7c8692" strokeWidth="1.4" />
-            <path d="M30 13 Q33 3 42 5 Q37 8 36 14" fill={banner} stroke={dark} strokeWidth="1" />
+            <path d="M30 13 V27" stroke={shade(f.metal, 0.75)} strokeWidth="1.4" />
+            {f.crest === 2 ? (
+              <path d="M22 15 Q30 2 38 15 Q30 9 22 15 Z" fill={accent} stroke={edge} strokeWidth="1" />
+            ) : (
+              <path d="M30 13 Q33 3 42 5 Q37 8 36 14" fill={accent} stroke={edge} strokeWidth="1" />
+            )}
+            {f.crest === 1 && (
+              <path d="M30 13 Q27 3 18 5 Q23 8 24 14" fill={accent} stroke={edge} strokeWidth="1" />
+            )}
           </>
         ),
       }
@@ -44,12 +59,15 @@ function headgear(family: Family, banner: string): { back?: ReactNode; front: Re
       return {
         back: <path d="M9 52 Q8 14 30 10 Q52 14 51 52 Z" fill={dark} />,
         front: (
-          <path
-            d="M9 46 Q8 12 30 9 Q52 12 51 46 L46 40 Q46 21 30 20 Q14 21 14 40 Z"
-            fill={banner}
-            stroke={dark}
-            strokeWidth="1.2"
-          />
+          <>
+            <path
+              d="M9 46 Q8 12 30 9 Q52 12 51 46 L46 40 Q46 21 30 20 Q14 21 14 40 Z"
+              fill={banner}
+              stroke={dark}
+              strokeWidth="1.2"
+            />
+            <path d="M14 40 Q14 21 30 20 Q46 21 46 40" fill="none" stroke={accent} strokeWidth="2" />
+          </>
         ),
       }
     case "barbarian":
@@ -58,15 +76,20 @@ function headgear(family: Family, banner: string): { back?: ReactNode; front: Re
           <>
             <path d="M16 27 Q5 22 7 8 Q11 19 19 21 Z" fill="#efe3c8" stroke="#b9a988" strokeWidth="1" />
             <path d="M44 27 Q55 22 53 8 Q49 19 41 21 Z" fill="#efe3c8" stroke="#b9a988" strokeWidth="1" />
-            <path d="M15 28 Q15 15 30 15 Q45 15 45 28 Z" fill="#7c858f" stroke="#4d555e" strokeWidth="1.2" />
+            <path
+              d="M15 28 Q15 15 30 15 Q45 15 45 28 Z"
+              fill={f.metal}
+              stroke={shade(f.metal, 0.55)}
+              strokeWidth="1.2"
+            />
             <rect
               x="14.5"
               y="26"
               width="31"
               height="4"
               rx="1.5"
-              fill={banner}
-              stroke={dark}
+              fill={accent}
+              stroke={edge}
               strokeWidth="0.8"
             />
           </>
@@ -74,12 +97,16 @@ function headgear(family: Family, banner: string): { back?: ReactNode; front: Re
       }
     case "rogue":
       return {
-        back: <path d="M12 50 Q10 16 30 13 Q50 16 48 50 Z" fill="#3a3340" />,
+        back: <path d="M12 50 Q10 16 30 13 Q50 16 48 50 Z" fill={shade(accent, 0.3)} />,
         front: (
           <>
-            <path d="M13 34 Q12 13 30 12 Q48 13 47 34 Q44 22 30 21 Q16 22 13 34 Z" fill="#4a4250" />
+            <path
+              d="M13 34 Q12 13 30 12 Q48 13 47 34 Q44 22 30 21 Q16 22 13 34 Z"
+              fill={shade(accent, 0.42)}
+            />
+            <path d="M15 31 Q30 19 45 31" fill="none" stroke={accent} strokeWidth="1.6" opacity="0.8" />
             <rect x="15" y="31" width="30" height="8.5" rx="4" fill={INK} />
-            <path d="M45 33 L52 30 L50 37 Z" fill={banner} />
+            <path d="M45 33 L52 30 L50 37 Z" fill={accent} />
           </>
         ),
       }
@@ -249,12 +276,15 @@ export function FaceArt({
   expression: Expression
   features: FaceFeatures
 }) {
-  const gear = headgear(family, banner)
+  const gear = headgear(family, banner, features)
   const masked = family === "rogue"
   return (
     <g>
       {gear.back}
       <circle cx="30" cy="38" r="15" fill={features.skin} />
+      {(family === "mage" || family === "ranger") && (
+        <path d="M17 31 Q22 24 30 26 Q38 24 43 31 Q37 28 30 29.5 Q23 28 17 31 Z" fill={features.hair} />
+      )}
       {features.cheeks && expression !== "failed" && (
         <g fill="#f2988a" opacity="0.55">
           <circle cx="19.5" cy="42" r="3" />

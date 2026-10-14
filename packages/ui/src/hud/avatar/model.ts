@@ -50,15 +50,44 @@ export interface FaceFeatures {
   hair: string
   /** Eyes a touch wider apart (px in the 60-unit box). */
   spread: number
+  /**
+   * The hero's own colour (CSS), apart from its party's banner: the rim, a plume, a trim. Heroes of one
+   * body and one banner (three Wanderers) still read as different people (user 10-13).
+   */
+  accent: string
+  /** The headgear's metal or cloth (CSS): steel, bronze, iron… */
+  metal: string
+  /** Which crest the headgear wears: 0 a plume, 1 two plumes, 2 a crest ridge. */
+  crest: 0 | 1 | 2
 }
 
 const SKINS = ["#f0c9a0", "#e6b98f", "#d9a77c", "#c48b62", "#f3d2b3", "#a8714d"] as const
 const HAIRS = ["#5a3a20", "#2e2118", "#e9e3d6", "#9a4f2a", "#c9a36a"] as const
 const BEARDS: readonly Beard[] = ["none", "none", "full", "moustache", "stubble"]
 const BROWS: readonly Brows[] = ["none", "arched", "stern"]
+/** Hero colours, far apart on the wheel and readable on ink. */
+export const ACCENTS = [
+  "#e0533d",
+  "#3d8fe0",
+  "#4fb06a",
+  "#e2b13c",
+  "#a36ad8",
+  "#e07bb5",
+  "#3fc1c9",
+  "#f08a24",
+] as const
+const METALS = ["#a3acb7", "#c39a5f", "#7d8590", "#d0d4da", "#9b7a52"] as const
 
-/** A hero's features, seeded by its id: the same hero always wears the same face. */
-export function faceFeatures(seed: string, family?: Family): FaceFeatures {
+/**
+ * A hero's features, seeded by its id: the same hero always wears the same face. Its colour steps
+ * through the accents by its ordinal from a base its kind shares (`kin`: its family and banner), so the
+ * second, third and fourth of a kind never wear the first one's colour.
+ */
+export function faceFeatures(
+  seed: string,
+  family?: Family,
+  sibling?: { ordinal?: number; kin?: string },
+): FaceFeatures {
   const h = hash32(`face:${seed}`)
   // a rogue's mask hides the mouth: no beard to draw under it
   const beard = family === "rogue" ? "none" : (BEARDS[h % BEARDS.length] as Beard)
@@ -69,6 +98,11 @@ export function faceFeatures(seed: string, family?: Family): FaceFeatures {
     skin: SKINS[(h >>> 11) % SKINS.length] as string,
     hair: HAIRS[(h >>> 18) % HAIRS.length] as string,
     spread: (h >>> 15) % 3,
+    accent: ACCENTS[
+      (hash32(`accent:${sibling?.kin ?? seed}`) + 3 * ((sibling?.ordinal ?? 1) - 1)) % ACCENTS.length
+    ] as string,
+    metal: METALS[(h >>> 21) % METALS.length] as string,
+    crest: ((h >>> 25) % 3) as 0 | 1 | 2,
   }
 }
 

@@ -19,16 +19,12 @@ import {
   writeWelcomeDismissed,
 } from "@guildhall/ui"
 import { useEffect, useState } from "react"
-import { createPortal } from "react-dom"
-import type { HallTime } from "../hall/clock.ts"
-import { HallTimeline } from "../hall/timeline.tsx"
 import { current, href } from "../shell/router.ts"
 import { Switcher } from "../shell/Switcher.tsx"
 import { BUILT } from "./built.ts"
 import { repoArt, useCatalog, useLiveStories } from "./chronicle.ts"
 import { homeStoryOf } from "./homeFeed.ts"
 import { homeStage } from "./homeHud.tsx"
-import { useHudBottom } from "./hudSlot.ts"
 import { openUrl } from "./nav.ts"
 import { destHref, hallSlug, openedStory, storyHref } from "./routes.ts"
 import { STORIES } from "./stories.ts"
@@ -59,8 +55,8 @@ const NAV: Record<SiteNavId, string> = {
   built: "built",
 }
 
-/** `time`: a repo's hall's clock, for its timeline bar (null off a hall, or a hall with no history). */
-export function SiteApp({ time = null }: { time?: HallTime | null } = {}) {
+/** The site's pieces over the island (the island's HUD, its timeline bar included, is hall/hud's). */
+export function SiteApp() {
   const { screen, query } = useLocationNow()
   const [menu, setMenu] = useState(false)
   const [palette, setPalette] = useState(false)
@@ -69,7 +65,6 @@ export function SiteApp({ time = null }: { time?: HallTime | null } = {}) {
   const [sources, setSources] = useState(false)
   const live = useLiveStories()
   const catalog = useCatalog()
-  const bottom = useHudBottom()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -197,14 +192,6 @@ export function SiteApp({ time = null }: { time?: HallTime | null } = {}) {
           onClose={() => go(href("island"))}
         />
       )}
-
-      {/* the island's HUD (a repo's hall: hall/hud; the home: homeHud) is drawn on the Viewer; the timeline
-          bar (with the captions and the act chip over it) goes in the HUD's bottom-centre slot */}
-      {world &&
-        time &&
-        bottom &&
-        (screen !== "hall" || slug) &&
-        createPortal(<HallTimeline time={time} />, bottom)}
 
       {screen === "built" && (
         <BuiltPage

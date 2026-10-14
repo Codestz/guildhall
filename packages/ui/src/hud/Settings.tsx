@@ -98,6 +98,12 @@ export interface SettingsPanelProps {
   sound?: ReactNode
   /** Dev-only controls, drawn last under "Developer"; leave out unless `?dev=1`. */
   dev?: ReactNode
+  /** The weathers offered (default V1's five); the world's own kinds where they differ. */
+  weathers?: readonly { value: WeatherPick; label: string }[]
+  /** The quality tiers offered (default Auto to Ultra). */
+  qualities?: readonly { value: Quality; label: string }[]
+  /** More of the Display section's levers (a hall's name plates), after the HUD mode. */
+  display?: ReactNode
   /** Keys to list (default: the camera's). */
   keys?: readonly (readonly [string, string])[]
   className?: string
@@ -138,6 +144,9 @@ export function SettingsPanel({
   cameraNote,
   sound,
   dev,
+  weathers = WEATHERS,
+  qualities = QUALITIES,
+  display,
   keys = SETTINGS_KEYS,
   className,
 }: SettingsPanelProps) {
@@ -147,7 +156,7 @@ export function SettingsPanel({
     head.current?.focus()
   }, [])
   const auto = values.quality === "auto"
-  const qualityNow = values.qualityNow && QUALITIES.find((q) => q.value === values.qualityNow)?.label
+  const qualityNow = values.qualityNow && qualities.find((q) => q.value === values.qualityNow)?.label
   const world = values.time !== undefined || values.weather !== undefined
   const style = values.directorStyle
 
@@ -188,13 +197,17 @@ export function SettingsPanel({
           <Segmented
             label="Tier"
             value={values.quality}
-            options={QUALITIES}
+            options={qualities}
             onChange={(v) => onChange({ quality: v as Quality })}
           />
           <p className="ui-hint">
-            {auto
-              ? "Steps between Low and High to keep the frame rate smooth. Ultra is never picked for you."
-              : "Pinned. Ultra is heavier; for a strong GPU."}
+            {qualities.some((q) => q.value === "ultra")
+              ? auto
+                ? "Steps between Low and High to keep the frame rate smooth. Ultra is never picked for you."
+                : "Pinned. Ultra is heavier; for a strong GPU."
+              : auto
+                ? "Steps between Low and High to keep the frame rate smooth."
+                : "Pinned, and kept for your next visits. Low is lightest on a phone or an old laptop."}
           </p>
         </Section>
 
@@ -242,7 +255,7 @@ export function SettingsPanel({
                   <Segmented
                     label={`Weather${weatherNow ? ` · ${weatherNow}` : ""}`}
                     value={values.weather}
-                    options={WEATHERS}
+                    options={weathers}
                     onChange={(v) => onChange({ weather: v as WeatherPick })}
                   />
                   {values.weather === "auto" && (
@@ -307,13 +320,18 @@ export function SettingsPanel({
             options={HUD_MODES}
             onChange={(v) => onChange({ hud: v as HudMode })}
           />
-          <Segmented
-            label="Names"
-            value={values.names}
-            options={NAMES}
-            onChange={(v) => onChange({ names: v as Names })}
-          />
-          <p className="ui-hint">{NAMES.find((n) => n.value === values.names)?.hint}</p>
+          {display}
+          {values.names !== undefined && (
+            <>
+              <Segmented
+                label="Names"
+                value={values.names}
+                options={NAMES}
+                onChange={(v) => onChange({ names: v as Names })}
+              />
+              <p className="ui-hint">{NAMES.find((n) => n.value === values.names)?.hint}</p>
+            </>
+          )}
           <Toggle
             label="Story captions"
             hint="A narrated line for each beat, like subtitles. Shown in Minimal and Hidden"

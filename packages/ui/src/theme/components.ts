@@ -408,6 +408,8 @@ export const COMPONENTS_CSS = /* css */ `
   font: 400 var(--t-sm)/1.25 var(--body);
   white-space: nowrap;
   user-select: none;
+  /* its own layer for good: the nudge's easing never promotes and demotes it (text re-rasterised, a flicker) */
+  will-change: transform;
 }
 /* folded into a neighbour's "+N": fades, then leaves paint */
 .ui-hero[data-folded] { opacity: 0; visibility: hidden; transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease-out, visibility 0s 0.25s; }
@@ -451,6 +453,7 @@ export const COMPONENTS_CSS = /* css */ `
 .ui-hero[data-quiet]:not([data-folded]):not([data-selected]) { opacity: 0.8; }
 /* following another party: this one steps back */
 .ui-hero[data-aside]:not([data-folded]) { opacity: 0.42; }
+/* speech: the plate's own language (ink, a brass hairline, the body face), in italic as said aloud */
 .ui-hero-bubble {
   display: none;
   position: relative;
@@ -458,14 +461,14 @@ export const COMPONENTS_CSS = /* css */ `
   max-width: 220px;
   white-space: normal;
   text-align: center;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: #f6ecd6;
-  color: #22180f;
-  font: 12px/1.35 var(--body);
-  box-shadow: 0 0 0 1px rgba(120, 88, 40, 0.35), 0 6px 14px -6px rgba(0, 0, 0, 0.5);
+  padding: 4px 9px 5px;
+  border-radius: 4px;
+  background: rgba(20, 15, 11, 0.88);
+  color: var(--paper);
+  font: italic 11.5px/1.35 var(--body);
+  box-shadow: 0 0 0 1px rgba(220, 182, 98, 0.22), 0 4px 10px -4px rgba(0, 0, 0, 0.6);
 }
-.ui-hero-bubble::after { content: ""; position: absolute; left: 50%; bottom: -4px; width: 8px; height: 8px; margin-left: -4px; transform: rotate(45deg); background: inherit; box-shadow: 1px 1px 0 0 rgba(120, 88, 40, 0.35); }
+.ui-hero-bubble::after { content: ""; position: absolute; left: 50%; bottom: -4px; width: 7px; height: 7px; margin-left: -3.5px; transform: rotate(45deg); background: rgb(20, 15, 11); box-shadow: 1px 1px 0 0 rgba(220, 182, 98, 0.22); }
 .ui-hero[data-speak] .ui-hero-bubble { display: block; }
 /* the deed sigil: an ink medallion, brass rim tinted by the hero's colour, the deed's glyph in paper */
 .ui-hero-sigil {
@@ -480,6 +483,10 @@ export const COMPONENTS_CSS = /* css */ `
   animation: ui-hero-bob 2.4s ease-in-out infinite alternate;
 }
 .ui-hero[data-sigil] .ui-hero-sigil { display: grid; }
+/* the plate's verb line already shows the deed's glyph: the sigil is for when the plate's line is not read
+   (Hidden; a phone's far heroes, whose verb line is folded) */
+.ui-heroes:not([data-mode="hidden"]):not([data-phone]) .ui-hero[data-sigil] .ui-hero-sigil,
+.ui-heroes[data-phone]:not([data-mode="hidden"]) .ui-hero[data-sigil]:is([data-selected], [data-near]) .ui-hero-sigil { display: none; }
 .ui-hero-sigil-glyph { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 @keyframes ui-hero-bob { to { transform: translateY(-1.5px); } }
 /* waiting on you: a hopping brass diamond, a button (the chip's only hit target) */

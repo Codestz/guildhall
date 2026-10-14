@@ -7,6 +7,8 @@ export const AVATAR_CSS = /* css */ `
 .hud-avatar svg { display: block; overflow: visible; }
 .hud-avatar-rim { stroke: var(--rim); }
 .hud-avatar[data-variant="shield"] { --rim: var(--brass); }
+/* a face's rim is its hero's own colour: heroes of one banner still tell apart */
+.hud-avatar[data-variant="face"] { --rim: var(--accent, var(--banner)); }
 .hud-avatar[data-tone="plea"] { --rim: var(--warn); }
 .hud-avatar[data-tone="fail"] { --rim: var(--fail); }
 .hud-avatar[data-tone="loot"] { --rim: var(--ok); }

@@ -49,7 +49,6 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         name: "Hex map",
         purpose: "The hex world from above: island, heights in steps, sand, cliffs, rivers, lakes, forest.",
         preview: true,
-        dev: true,
       },
       {
         id: "hexscale",
@@ -121,7 +120,6 @@ const ALL_GROUPS: readonly ToolGroup[] = [
         purpose:
           "Every hex tile prefab (house, farmstead, woods, field, road…) at the chosen scale, with a character.",
         preview: true,
-        dev: true,
       },
       {
         id: "npc",

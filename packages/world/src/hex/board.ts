@@ -19,7 +19,7 @@ import { pieceOutline, pieceSolids, type Solid, SolidGrid, solidDistance, solidK
 import { hexAt } from "./grid.ts"
 import { type HexIsland, kindOf } from "./island.ts"
 import type { Vec3 } from "./life.ts"
-import { roadStrips, StripGrid } from "./roads.ts"
+import { ROAD_HALF, roadStrips, StripGrid } from "./roads.ts"
 import { tileFurniture } from "./spots.ts"
 import { HEX_TILE_SIZE, type PlacedPiece } from "./tiles.ts"
 import type { HexWorld } from "./world.ts"
@@ -232,6 +232,9 @@ export function noticeBoard(inp: BoardInputs): NoticeBoardPlace | null {
   /** Whether a solid stands within `r` of a point (a soft blocker's round is only kept clear where there is room). */
   const hit = (x: number, zz: number, r: number) =>
     furniture.solidsNear(x, zz, r).some((o) => !o.soft && solidDistance(o, x, zz) < r)
+  // a way's hub (where a road runs on into a tile's middle: roads.ts `roadReport` keeps it open)
+  const hubs = tiles.filter((t) => t.paths?.length)
+  const onHub = (x: number, zz: number) => hubs.some((t) => Math.hypot(t.x - x, t.z - zz) < ROAD_HALF + 0.1)
   const folk = furniture.spots
   const nearFolk = (x: number, zz: number, r = FROM_FOLK) =>
     folk.some((s) => Math.hypot(s.x - x, s.z - zz) < r)
@@ -322,6 +325,7 @@ export function noticeBoard(inp: BoardInputs): NoticeBoardPlace | null {
           hit(x, zz, ROOM) ||
           strips.on(x, zz, OFF_ROAD) ||
           inDoorway(x, zz) ||
+          onHub(x, zz) ||
           nearFolk(x, zz)
         )
           return false

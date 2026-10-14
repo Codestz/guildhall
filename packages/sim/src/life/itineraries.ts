@@ -1333,8 +1333,9 @@ export function walkEnd(s: LifeWalk): [number, number, number] {
 }
 
 /**
- * Every hero's itinerary from a log (or its events, in order), planned through `until` (by default
- * every move the events started, however far on: `LifePlanner.settle`).
+ * Every hero's itinerary from a log (or its events, in order), planned through `until` (by default the
+ * last event and the dwell after it) and then every move the events started, however far on: the log is
+ * whole, no event is left to come (`LifePlanner.settle`).
  */
 export function itineraries(
   log: EventLog | readonly WorldEvent[],
@@ -1346,6 +1347,6 @@ export function itineraries(
   for (const ev of events) planner.push(ev)
   const last = events[events.length - 1]
   planner.advance(opts.until ?? (last ? last.at + DWELL_MS : 0))
-  if (opts.until === undefined) planner.settle()
+  planner.settle()
   return new Map(planner.itineraries)
 }

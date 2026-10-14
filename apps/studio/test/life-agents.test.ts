@@ -96,11 +96,11 @@ describe("the demo story", () => {
             expect(Math.hypot(now.at[0] - later.at[0], now.at[2] - later.at[2])).toBeLessThan(1e-6)
         }
       expect(source.poseAt(id.claude, end - 0.001)?.at).toEqual(source.poseAt(id.claude, 0)?.at)
-      // while Warden and Scout work, Claude sits in the Guildhall's gathering
+      // while Warden and Scout work, Claude keeps to the Guildhall's gathering (once back from the notice board)
       const walk = hexWalk(h, z, w, { reach: workTiles(h, z) })
       const places = lifePlaces(h, z, w, walk, { heroSpots: HERO_SPOTS })
       const gather = places.heroSpots(guildhallZone(walk, z))
-      for (const s of [20, 60, 120]) {
+      for (const s of [30, 60, 120]) {
         const p = source.poseAt(id.claude, s)!
         expect(p.act).not.toBe("walk")
         expect(gather.some((g) => g.at[0] === p.at[0] && g.at[2] === p.at[2])).toBe(true)

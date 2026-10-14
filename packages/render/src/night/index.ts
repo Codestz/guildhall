@@ -7,11 +7,11 @@ import type { DayLight } from "../light.ts"
 import type { Sky } from "../sky.ts"
 import type { Stage } from "../stage.ts"
 import { setGlow, setNightGrade } from "./glow.ts"
-import { createLamps, type LightPoint, MAX_LIGHTS } from "./lamps.ts"
+import { createLamps, type LampLit, type LightPoint, MAX_LIGHTS } from "./lamps.ts"
 import { createWindows, type WindowLight } from "./windows.ts"
 
 export { GLOW_SWATCHES, patchGlow, setGlow, setNightGrade } from "./glow.ts"
-export { MAX_LIGHTS } from "./lamps.ts"
+export { type LampLit, litLevel, MAX_LIGHTS } from "./lamps.ts"
 export { windowsDark } from "./windows.ts"
 
 const smoothstep = (a: number, b: number, x: number) => {
@@ -56,6 +56,8 @@ export interface Night {
    * pools, halos and real lights, and its lit windows. Null lights the whole town again.
    */
   hide(at: ((x: number, z: number) => boolean) | null): void
+  /** The lamps lit by hand at their hours (a lamplighter's round); null: all with the town's level. */
+  schedule(lit: readonly LampLit[] | null): void
   stats(): NightStats
   dispose(): void
 }
@@ -78,6 +80,7 @@ export function createNight(
     // The grade comes in with the dusk (blue hour), ahead of the stars.
     setNightGrade(1 - smoothstep(-10, 3, light.elevation))
     windows.update(light.lamps, light.night, hour)
+    lamps.setHour(hour)
   }
   setHour(hour)
 
@@ -91,6 +94,9 @@ export function createNight(
     hour: () => hour,
     cycle(next) {
       speed = next
+    },
+    schedule(lit) {
+      lamps.schedule(lit)
     },
     hide(at) {
       lamps.hide(at)

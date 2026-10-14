@@ -162,9 +162,38 @@ function additive(
   return material
 }
 
+/** A lamp lit by hand at an hour of the day (a lamplighter's round): where its post stands, and when. */
+export interface LampLit {
+  x: number
+  z: number
+  /** Day hour it is lit (it stays lit through the night, until the town's lamplight fades at dawn). */
+  at: number
+}
+
+/** A lamp's light is matched to a hand-lit post this near (its flame hangs off the post's arm), metres. */
+const LIT_REACH = 1.4
+/** Hours a lamp takes to come up once lit (~2 s on screen at 20× time). */
+const LIT_RISE = 0.012
+/** Before this hour of the morning a lamp lit last evening is still lit. */
+const LIT_MORNING = 9
+
+/** How lit a hand-lit lamp is at `hour`: 0 before its lighting, rising to 1, lit until the morning. */
+export function litLevel(at: number, hour: number): number {
+  if (hour < LIT_MORNING) return 1
+  const t = (hour - at) / LIT_RISE
+  return t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t)
+}
+
 export interface Lamps {
   /** Lamplight level 0 (day) to 1 (night); `dt` seconds drive the flicker. */
   update(level: number, dt: number): void
+  /**
+   * The lamps lit by hand (a lamplighter's round, the life plan's): each light near one stays dark until
+   * its hour; the others follow the town's level alone. Null: every lamp follows the town's level.
+   */
+  schedule(lit: readonly LampLit[] | null): void
+  /** The day's hour, for the hand-lit lamps. */
+  setHour(hour: number): void
   /** Real lights lit last frame. */
   lit(): number
   /**
@@ -228,6 +257,26 @@ export function createLamps(stage: Pick<Stage, "scene" | "getCamera">, points: r
     halos.setMatrixAt(i, m.makeTranslation(p.at[0], p.at[1], p.at[2]))
   }
   for (let i = 0; i < points.length; i++) place(i)
+  /** Each light's hand-lit hour (NaN: none), its level now, and the day's hour. */
+  const litAt = new Float32Array(n).fill(Number.NaN)
+  const lit01 = new Float32Array(n).fill(1)
+  let dayHour = 12
+  const relight = () => {
+    let moved = false
+    for (let i = 0; i < points.length; i++) {
+      const at = litAt[i] as number
+      const f = Number.isNaN(at) ? 1 : litLevel(at, dayHour)
+      if (f === lit01[i]) continue
+      lit01[i] = f
+      const look = LOOK[(points[i] as LightPoint).kind]
+      strength[i] = look.pool * f
+      halo[i] = look.halo * f
+      moved = true
+    }
+    if (!moved) return
+    ;(poolGeometry.getAttribute("aStrength") as InstancedBufferAttribute).needsUpdate = true
+    ;(haloGeometry.getAttribute("aStrength") as InstancedBufferAttribute).needsUpdate = true
+  }
   for (const mesh of [pools, halos]) {
     mesh.instanceMatrix.needsUpdate = true
     // Spread over the whole town: always drawn (one call each), never culled as one box.
@@ -272,7 +321,8 @@ export function createLamps(stage: Pick<Stage, "scene" | "getCamera">, points: r
       const flicker = LOOK[p.kind].fire ? 0.9 + 0.1 * Math.sin(time * 8.3 + i) : 1
       light.position.set(...p.at)
       light.distance = p.radius * LIGHT_REACH
-      light.intensity = LIGHT_INTENSITY * LOOK[p.kind].pool * level * handover * flicker
+      light.intensity =
+        LIGHT_INTENSITY * LOOK[p.kind].pool * level * handover * flicker * (lit01[i] as number)
       if (light.intensity > 0) lit++
     })
   }
@@ -291,6 +341,24 @@ export function createLamps(stage: Pick<Stage, "scene" | "getCamera">, points: r
       assign()
     },
     lit: () => lit,
+    schedule(list) {
+      litAt.fill(Number.NaN)
+      for (const [i, p] of points.entries()) {
+        let best = LIT_REACH
+        for (const l of list ?? []) {
+          const d = Math.hypot(l.x - p.at[0], l.z - p.at[2])
+          if (d < best) {
+            best = d
+            litAt[i] = l.at
+          }
+        }
+      }
+      relight()
+    },
+    setHour(hour) {
+      dayHour = hour
+      relight()
+    },
     hide(at) {
       let moved = false
       points.forEach((p, i) => {

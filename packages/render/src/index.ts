@@ -72,6 +72,8 @@ export { group, loadModel, type Measure, measure, poseModel } from "./model.ts"
 export {
   createNight,
   GLOW_SWATCHES,
+  type LampLit,
+  litLevel,
   MAX_LIGHTS,
   type Night,
   type NightOpts,

@@ -209,6 +209,8 @@ export {
   CHAT_MAX,
   CHAT_MIN,
   CHAT_TURN,
+  type LampLighting,
+  lampLightings,
   planSocial,
   type SocialOpts,
   type SocialStats,

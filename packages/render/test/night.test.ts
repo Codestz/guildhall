@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { BufferAttribute, BufferGeometry, Group, Mesh, MeshBasicMaterial } from "three"
 import { batchGeometry } from "../src/batchGeometry.ts"
 import { FIRE_FLOOR, keyLight, lightAt } from "../src/light.ts"
-import { poolLevel } from "../src/night/index.ts"
+import { litLevel, poolLevel } from "../src/night/index.ts"
 import { windowsDark } from "../src/night/windows.ts"
 
 /** Night: the moon, the light sources' glow, the lit windows. */
@@ -123,5 +123,18 @@ describe("windowsDark", () => {
   test("the share falls off smoothly through the night", () => {
     for (let m = 18 * 60; m < 30 * 60; m++)
       expect(Math.abs(windowsDark((m + 1) / 60) - windowsDark(m / 60))).toBeLessThan(0.01)
+  })
+})
+
+describe("lamps lit by hand", () => {
+  test("dark until the lamplighter reaches it, up within a couple of seconds, lit through the night", () => {
+    expect(litLevel(18.2, 18.1)).toBe(0)
+    expect(litLevel(18.2, 18.2)).toBe(0)
+    expect(litLevel(18.2, 18.206)).toBeGreaterThan(0.3)
+    expect(litLevel(18.2, 18.213)).toBe(1)
+    expect(litLevel(18.2, 23.5)).toBe(1)
+    expect(litLevel(18.2, 3)).toBe(1)
+    // by day it is dark again until its next lighting
+    expect(litLevel(18.2, 14)).toBe(0)
   })
 })

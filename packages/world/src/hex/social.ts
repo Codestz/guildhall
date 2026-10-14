@@ -115,6 +115,8 @@ const LAMPS_MAX = 14
 /** Out at dusk (day hours) and the seconds at a lamp (routines.ts `light`: 2.5 s). */
 const LAMP_FROM = 17.4
 const LAMP_S = 2.6
+/** A lamplighter stands this far off the post, metres. */
+const LAMP_ARM = 0.75
 
 const rnd = (seed: number, a: number, b: number) => hash2(seed, a, b)
 const key = (x: number, z: number) => `${x.toFixed(3)},${z.toFixed(3)}`
@@ -542,8 +544,8 @@ function lamplighters(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
       const base = Math.atan2(n.x - l.x, n.z - l.z)
       for (const da of [0, 0.6, -0.6, 1.2, -1.2, 1.9, -1.9, Math.PI]) {
         const a = base + da
-        const x = l.x + Math.sin(a) * 0.75
-        const zz = l.z + Math.cos(a) * 0.75
+        const x = l.x + Math.sin(a) * LAMP_ARM
+        const zz = l.z + Math.cos(a) * LAMP_ARM
         if (o.places.furniture.blocked(x, zz, 0.26) || o.places.heroNear(x, zz, 0)) continue
         stands.push({ node, at: [x, n.y, zz], facing: headingTo(x, zz, l.x, l.z), ground: true })
         break
@@ -588,6 +590,29 @@ function lamplighters(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
     stats.lamplighters++
     stats.lamps += route.length
   }
+}
+
+/** Where a lamp the lamplighters light stands (its post), and the day hour its torch reaches it. */
+export interface LampLighting {
+  x: number
+  z: number
+  at: number
+}
+
+/** The lamps lit by hand over the day: each lamplighter's `light` stays, the post an arm's length ahead. */
+export function lampLightings(folk: readonly Folk[], secPerHour: number): LampLighting[] {
+  const out: LampLighting[] = []
+  for (const f of folk)
+    for (const s of f.day) {
+      if (s.kind !== "stay" || s.routine?.id !== "light") continue
+      out.push({
+        x: s.at[0] + Math.sin(s.facing) * LAMP_ARM,
+        z: s.at[2] + Math.cos(s.facing) * LAMP_ARM,
+        // the torch reaches the glass part-way through the Interact (routines.ts `light`: its beat at 0.55)
+        at: s.from + (1.3 * 0.55) / secPerHour,
+      })
+    }
+  return out
 }
 
 /** Where people stand round the notice board when a quest is pinned: a body apart, facing it. */

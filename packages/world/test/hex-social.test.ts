@@ -19,6 +19,7 @@ import {
   installTilePrefabs,
   type LifeStay,
   type LifeStep,
+  lampLightings,
   lifePlaces,
   lifePose,
   planFolk,
@@ -254,6 +255,18 @@ describe("life between people", () => {
       }
     }
   }, 60000)
+
+  test("each lamp a lamplighter lights is a lamp post, lit at dusk when the torch reaches it", () => {
+    const { folk, w } = island(1)
+    const lit = lampLightings(folk, SPH)
+    expect(lit.length).toBeGreaterThanOrEqual(6)
+    const posts = w.pieces.filter((p) => /post-lantern/.test(p.piece))
+    for (const l of lit) {
+      expect(Math.min(...posts.map((p) => Math.hypot(p.x - l.x, p.z - l.z)))).toBeLessThan(0.05)
+      expect(l.at).toBeGreaterThan(17)
+      expect(l.at).toBeLessThan(21)
+    }
+  })
 
   test("the notice board's readers stand clear of everything, of the pinning spot and of each other", () => {
     const { places } = island(1)

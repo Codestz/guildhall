@@ -39,7 +39,9 @@ import {
   type HexWorld,
   type HexZones,
   hexWalk,
+  type LampLighting,
   type LifePlaces,
+  lampLightings,
   lifePlaces,
   type PlaceSpec,
   planFolk,
@@ -90,6 +92,8 @@ export interface LifePlan {
    * `boardReaders`): life.ts sends the nearest few there for a read.
    */
   readers: BoardReader[]
+  /** The lamps the lamplighters light at dusk, and when (world `lampLightings`): the night lights each then. */
+  lamps: LampLighting[]
   /** How many people pass a door over the day, in all. */
   passes: number
   stats: { nodes: number; edges: number; planMs: number; agentsMs: number; walks: number }
@@ -155,6 +159,7 @@ export function planLifeDesk(
       const b = places.heroSpots.board()
       return b ? boardReaders(b, places.furniture) : []
     })(),
+    lamps: lampLightings(folk, SEC_PER_HOUR),
     passes: folk.reduce((n, f) => n + doorPasses(f.day).length, 0),
     stats: {
       nodes: walk.nodes.length,

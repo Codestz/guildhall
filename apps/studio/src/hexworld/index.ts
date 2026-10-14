@@ -719,6 +719,10 @@ const world = {
           heroSpots,
         })
         await life.ready
+        // the lamps the lamplighters light at dusk come up one by one as each is reached (the plan's)
+        void job.life.then((plan) => {
+          if (!disposed) night?.schedule(plan.lamps)
+        })
       }
       steps.progress(0.93, 150)
       // doors that open: the gates by day and for whoever comes, the buildings' doors for whoever goes in

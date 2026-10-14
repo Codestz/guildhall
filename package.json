@@ -11,7 +11,7 @@
     "dev": "bun --filter @guildhall/studio dev",
     "import": "bun tools/import/src/cli.ts",
     "shots": "bun tools/shots/src/cli.ts",
-    "test": "bun test ./packages ./apps ./tools ./test --pass-with-no-tests",
+    "test": "bun test --timeout=20000 ./packages ./apps ./tools ./test --pass-with-no-tests",
     "typecheck": "tsc -b",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

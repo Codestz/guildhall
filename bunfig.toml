@@ -1,6 +1,3 @@
 [test]
 # V1 lives in legacy/ as its own project with its own `bun test`; a bare `bun test` here never runs it.
 pathIgnorePatterns = ["legacy/**"]
-# Whole-island tests (a day's plan, a castle, the board on 32 islands) take 2–5 s alone and more while
-# other work shares the machine; 20 s keeps them honest without failing on load.
-timeout = 20000

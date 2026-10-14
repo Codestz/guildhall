@@ -17,6 +17,7 @@ import {
   createShows,
   type DayLight,
   type EventSites,
+  NIGHT_AT,
   SHOW_KINDS,
   type ShowKind,
   type Shows,
@@ -78,6 +79,7 @@ export function mountShows(parts: {
             events,
             { jumps: () => session.clock.get().jumps, now: () => session.clock.get().at / 1000 },
             parts.sites,
+            () => parts.light().night > NIGHT_AT,
           )
       }
       bind()

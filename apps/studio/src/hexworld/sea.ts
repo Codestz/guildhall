@@ -144,7 +144,8 @@ export function mountSea(parts: {
       const look = (tries: number) => {
         if (disposed) return
         const playing = sessionOf()
-        if (playing) undrive = driveSea(life, playing, { level: sites.sea })
+        if (playing)
+          undrive = driveSea(life, playing, { level: sites.sea, ghostNear: parts.ghostNear ?? null })
         else if (tries > 0) setTimeout(() => look(tries - 1), 200)
       }
       look(300)

@@ -253,20 +253,26 @@ export interface ShotSizes {
   tiles?: number
   /** A world event's kind (its own framing, `SHOW_POSES`). */
   show?: ShowKind
+  /** The island's middle (x, z): a sea show is filmed from the island, looking out. */
+  centre?: readonly [number, number]
 }
 
 /**
  * How the director frames each world event once it has cut to it (its site's point, hall/shows.ts):
  * the sky's shows from low enough to see the sky (the dragon over the peaks, the comet laid out in the
  * view it settles on), the sea's from over the water, the festival wide enough for the fireworks over
- * the keep, a grave close enough to see past the yard's clutter. The rainbow keeps the map view.
+ * the keep, a grave close enough to see past the yard's clutter. The rainbow keeps the map view. The
+ * sea's (`seaward`) look out from the island toward their hull (the camera is held over the island, so
+ * it turns to face the ship rather than keeping its way).
  */
-export const SHOW_POSES: Readonly<Partial<Record<ShowKind, { distance: number; elevation: number }>>> = {
+export const SHOW_POSES: Readonly<
+  Partial<Record<ShowKind, { distance: number; elevation: number; seaward?: boolean }>>
+> = {
   dragon: { distance: 90, elevation: 12 },
   comet: { distance: 150, elevation: 16 },
-  ghostship: { distance: 62, elevation: 20 },
-  raid: { distance: 46, elevation: 22 },
-  festival: { distance: 60, elevation: 16 },
+  ghostship: { distance: 90, elevation: 12, seaward: true },
+  raid: { distance: 70, elevation: 14, seaward: true },
+  festival: { distance: 40, elevation: 10 },
   undead: { distance: 15, elevation: 32 },
 }
 
@@ -285,7 +291,15 @@ export function shotPose(
     distance: d,
   })
   const show = focus === "show" && sizes.show ? SHOW_POSES[sizes.show] : undefined
-  if (show && distance !== "close") return at(Math.min(sizes.map, show.distance), show.elevation)
+  if (show && distance !== "close") {
+    const pose = at(Math.min(sizes.map, show.distance), show.elevation)
+    if (show.seaward && sizes.centre) {
+      const dx = target[0] - sizes.centre[0]
+      const dz = target[2] - sizes.centre[1]
+      if (Math.hypot(dx, dz) > 1) pose.azimuth = (Math.atan2(-dx, -dz) * 180) / Math.PI
+    }
+    return pose
+  }
   if (distance === "map") return at(sizes.map, 60)
   if (distance === "close") return at(CLOSE.distance, CLOSE.elevation)
   if (focus === "place") return at(Math.min(150, 42 + Math.sqrt(Math.max(0, sizes.tiles ?? 0)) * 6), 40)
@@ -620,6 +634,7 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
     map: mapDistance(),
     ...(focus.kind === "place" ? { tiles: placeOf(focus.place)?.tiles ?? 0 } : {}),
     ...(focus.kind === "show" ? { show: focus.show } : {}),
+    ...(focus.kind === "show" && rig.world() ? { centre: rig.world()?.centre as [number, number] } : {}),
   })
 
   /** Each frame, before the rig eases: aim at the followed hero or the shot's subject, drift a held shot. */

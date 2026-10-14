@@ -130,6 +130,8 @@ export function driveSkyShows(
   events: HallEvents,
   clock: { jumps(): number; now(): number },
   sites: EventSites,
+  /** Whether the sky is night now (render `NIGHT_AT`): a festival by night is its fireworks. */
+  night: () => boolean = () => false,
 ): () => void {
   /** What render plays for whom: the engine id each kind was started for, and the end it was given. */
   const started = new Map<RenderShowKind, { id: string; end: number }>()
@@ -166,14 +168,12 @@ export function driveSkyShows(
   const square = sites.square?.at
   const middle: ShowPoint = [0, 0, 0]
   events.setSite("dragon", () => (peak ? [peak[0], peak[1], peak[2]] : null))
-  // the festival: between the square's bunting and the fireworks over the keep (render festival.ts)
+  // the festival: by night its fireworks over the keep (render festival.ts bursts 10-19 m over it), by
+  // day the square's bunting and confetti
   const keep = sites.castle
-  const fair: ShowPoint | null = square
-    ? keep
-      ? [(square[0] + keep[0]) / 2, (square[1] + keep[1] + 12) / 2, (square[2] + keep[2]) / 2]
-      : [square[0], square[1] + 4, square[2]]
-    : null
-  events.setSite("festival", () => fair)
+  const fireworks: ShowPoint | null = keep ? [keep[0], keep[1] + 12, keep[2]] : null
+  const bunting: ShowPoint | null = square ? [square[0], square[1] + 4, square[2]] : null
+  events.setSite("festival", () => (night() ? (fireworks ?? bunting) : (bunting ?? fireworks)))
   events.setSite("comet", () => middle)
   events.setSite("rainbow", () => middle)
   return () => {
@@ -188,7 +188,13 @@ export function driveSkyShows(
  * Sails the engine's ghost ship and raid on `sea` (its clock already the session's, hall/sea.ts) and
  * says where their hulls are. Returns the stop.
  */
-export function driveSeaShows(sea: SeaLife, events: HallEvents, level: number): () => void {
+export function driveSeaShows(
+  sea: SeaLife,
+  events: HallEvents,
+  level: number,
+  /** Where the ghost ship passes (the graveyard's coast, xz), while its hull is not yet on the water. */
+  ghostNear: readonly [number, number] | null = null,
+): () => void {
   let last = ""
   const sync = () => {
     const list = seaShowsOf(events.shows())
@@ -199,12 +205,21 @@ export function driveSeaShows(sea: SeaLife, events: HallEvents, level: number): 
   }
   sync()
   const off = events.subscribe(sync)
-  const hull = (name: string) => (): ShowPoint | null => {
-    const ship = sea.view().ships.find((s) => s.hull === name)
-    return ship ? [ship.at[0], level, ship.at[1]] : null
-  }
-  events.setSite("ghostship", hull("ghost"))
-  events.setSite("raid", hull("pirate"))
+  // where a hull is now; before it is on the water, where it is bound (the graveyard's coast, the quay)
+  const hull =
+    (name: string, bound: () => readonly [number, number] | null | undefined) => (): ShowPoint | null => {
+      const ships = sea.view().ships
+      const at = ships.find((s) => s.hull === name)?.at ?? bound()
+      return at ? [at[0], level, at[1]] : null
+    }
+  events.setSite(
+    "ghostship",
+    hull("ghost", () => ghostNear),
+  )
+  events.setSite(
+    "raid",
+    hull("pirate", () => sea.view().ships.find((s) => s.key === "quay-boat")?.at),
+  )
   return () => {
     off()
     events.setSite("ghostship", null)

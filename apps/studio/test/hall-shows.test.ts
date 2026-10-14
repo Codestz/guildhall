@@ -152,7 +152,7 @@ describe("World events on the island", () => {
     }
     // the director frames each: the dragon over the peaks, the festival over the square, the sky the middle
     expect(points.get("dragon")).toEqual([10, 30, -5])
-    expect(points.get("festival")).toEqual([2, 11.5, 3])
+    expect(points.get("festival")).toEqual([4, 6, 6]) // by day: the square's bunting
     expect(points.get("comet")).toEqual([0, 0, 0])
     expect(points.get("undead")).toBeNull() // no graveyard mounted here: the camera falls back
   })

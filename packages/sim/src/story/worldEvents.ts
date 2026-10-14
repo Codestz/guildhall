@@ -208,17 +208,22 @@ export const SHOW_RULES = {
   fixerMs: 5 * 60_000,
 } as const
 
-/** The weight, how long and how wide the director looks when a show starts (V1's `LOOK`, the plan's). */
+/**
+ * The weight, how long and how wide the director looks when a show starts (V1's `LOOK`, the plan's).
+ * A big show outranks the beat that caused it (a failed command's, a fall's): the third failure in a
+ * row is the dragon's moment, the second fall the ghost ship's, so its weight is one over (director
+ * pick.ts ranks a hint at `weight / 2`); a grave's rise is the fall's own glance and keeps V1's 8.
+ */
 export const SHOW_LOOK: Readonly<
   Record<ShowKind, { weight: number; ttl: number; distance: Distance; lift?: number }>
 > = {
   undead: { weight: 8, ttl: 3500, distance: "mid" },
-  dragon: { weight: 8, ttl: 14_000, distance: "map", lift: 30 },
-  comet: { weight: 5, ttl: 8000, distance: "map", lift: 45 },
-  rainbow: { weight: 6, ttl: 10_000, distance: "map", lift: 50 },
-  festival: { weight: 8, ttl: 14_000, distance: "mid" },
-  ghostship: { weight: 8, ttl: 16_000, distance: "map" },
-  raid: { weight: 7, ttl: 14_000, distance: "mid" },
+  dragon: { weight: 9, ttl: 14_000, distance: "map", lift: 30 },
+  comet: { weight: 7, ttl: 8000, distance: "map", lift: 45 },
+  rainbow: { weight: 7, ttl: 10_000, distance: "map", lift: 50 },
+  festival: { weight: 9, ttl: 14_000, distance: "mid" },
+  ghostship: { weight: 9, ttl: 16_000, distance: "map" },
+  raid: { weight: 8, ttl: 14_000, distance: "mid" },
 }
 
 export interface WorldShowOptions {

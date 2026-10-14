@@ -14,7 +14,11 @@ import type { HallSession } from "./feeds/index.ts"
 import { FX_READ_MS, fleetRate } from "./fx.ts"
 import { driveSeaShows } from "./shows.ts"
 
-export function driveSea(sea: SeaLife, session: HallSession, opts: { level?: number } = {}): () => void {
+export function driveSea(
+  sea: SeaLife,
+  session: HallSession,
+  opts: { level?: number; ghostNear?: readonly [number, number] | null } = {},
+): () => void {
   let pushes: number | null = null
   let lastPush = 0
   const follow = () => {
@@ -49,7 +53,7 @@ export function driveSea(sea: SeaLife, session: HallSession, opts: { level?: num
     unshow()
     unshow = () => {}
     bound = events
-    if (events) unshow = driveSeaShows(sea, events, opts.level ?? 0)
+    if (events) unshow = driveSeaShows(sea, events, opts.level ?? 0, opts.ghostNear ?? null)
   }
   bind()
   const binding = setInterval(bind, 1000)

@@ -12,7 +12,6 @@ import {
   PALETTE,
   validateMounts,
   validateNpc,
-  validatePrefab,
 } from "@guildhall/assets"
 import react from "@vitejs/plugin-react"
 import { type Connect, defineConfig, type Plugin } from "vite"
@@ -27,7 +26,7 @@ const page = (name: string) => fileURLToPath(new URL(name, import.meta.url))
 /** The generated asset library at the repo root (tools/import writes it). It may not exist yet. */
 const LIBRARY = fileURLToPath(new URL("../../library", import.meta.url))
 
-/** Authored, committed data at the repo root (ADR 005): recipes, mounts, npcs, tile prefabs. */
+/** Authored, committed data at the repo root (ADR 005): mounts, npcs, tile prefabs. */
 const DATA = fileURLToPath(new URL("../../data", import.meta.url))
 
 const TYPES: Record<string, string> = {
@@ -130,11 +129,8 @@ export const MAX_DATA_BYTES = 1 << 20
 /** A data file name: kebab-case, as the S1 validators require of ids. */
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
-/** The folders under `data/recipes/` (plan §2.1); each holds `<id>.json` prefab recipes. */
-const RECIPE_FOLDERS = ["houses", "landmarks", "stalls", "docks", "farm", "vignettes"]
-
 /** Folders whose `<id>.json` files the endpoint lists, reads and writes. */
-export const DATA_FOLDERS = [...RECIPE_FOLDERS.map((f) => `recipes/${f}`), "npcs", "tiles"]
+export const DATA_FOLDERS = ["npcs", "tiles"]
 
 type Validate = (json: unknown) => string[]
 
@@ -150,8 +146,7 @@ export function dataRoute(path: string): Validate | null {
   const file = path.slice(slash + 1)
   if (!DATA_FOLDERS.includes(folder) || !file.endsWith(".json") || !ID.test(file.slice(0, -5))) return null
   if (folder === "npcs") return (json) => validateNpc(json, PALETTE)
-  if (folder === "tiles") return (json) => validateTilePrefab(json, file.slice(0, -5))
-  return (json) => validatePrefab(json, PALETTE)
+  return (json) => validateTilePrefab(json, file.slice(0, -5))
 }
 
 /** True when `rel` (under the real `root`), or any folder on the way to it, is a symlink. */
@@ -451,11 +446,11 @@ function showcase(plan: ShippedLibrary | null, mode: LibraryMode, data: string):
       const shipped = lib ? await measure(lib) : null
       const all = await measure(outDir)
       const mb = (bytes: number) => `${(bytes / 1e6).toFixed(1)} MB`
-      const recipes = Object.entries(index).map(([folder, ids]) => `${folder} ${ids.length}`)
+      const folders = Object.entries(index).map(([folder, ids]) => `${folder} ${ids.length}`)
       this.info(
         `library ${mode.kind === "remote" ? `read from ${mode.url}` : `${mode.kind} /library/${plan?.version}/`}` +
           `${shipped ? `: ${shipped.files} files, ${mb(shipped.bytes)}` : ""}; ` +
-          `data ${recipes.join(", ") || "mounts only"}; dist ${all.files} files, ${mb(all.bytes)}`,
+          `data ${folders.join(", ") || "mounts only"}; dist ${all.files} files, ${mb(all.bytes)}`,
       )
     },
   }

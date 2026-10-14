@@ -1,5 +1,0 @@
-export type { House, HousePart, PanelSlot } from "./house.ts"
-export { buildHouse } from "./house.ts"
-export type { KitProfile, RoofSet, WallSet } from "./kits.ts"
-export { KIT_PROFILES } from "./kits.ts"
-export { compilePrefab, SNAP } from "./prefab.ts"

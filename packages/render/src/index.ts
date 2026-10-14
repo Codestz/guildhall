@@ -99,7 +99,6 @@ export {
   type PostOpts,
 } from "./post/index.ts"
 export * from "./props/index.ts"
-export { instanceSwatchMap, placeInstance, recipeObject } from "./recipe.ts"
 export {
   createReveal,
   DEFAULT_SPAN as REVEAL_SPAN,

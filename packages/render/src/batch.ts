@@ -5,7 +5,7 @@
  * tiers simplified from it at load; a cluster (a compiled house) also gets one merged shell for far
  * away. Which tier each instance draws is picked per pass by screen size (batchMesh.ts, lod.ts).
  */
-import type { RecipeInstance } from "@guildhall/assets"
+import { PALETTE, rampMapToSwatchMap } from "@guildhall/assets"
 import { log } from "@guildhall/core"
 import {
   BufferAttribute,
@@ -23,7 +23,6 @@ import { type LodCounts, PIECE_TIERS, SHELL, TIER_MIN_AREA, TIER_MIN_SAVING } fr
 import { lodError, shellGeometry, simplifierReady, simplifyGeometry, surfaceArea } from "./lodGeometry.ts"
 import { batchMaterial } from "./material.ts"
 import { GLOW_SWATCHES } from "./night/glow.ts"
-import { instanceSwatchMap } from "./recipe.ts"
 import { createSlicer } from "./slice.ts"
 import type { Stage } from "./stage.ts"
 import { swatchMapKey } from "./tint.ts"
@@ -31,16 +30,52 @@ import { depthMaterialFor, warmPrograms } from "./warm.ts"
 
 const logger = log("render:batch")
 
+/** One placed piece: metres, `rot` in radians about +y. */
+export interface RecipeInstance {
+  /** A catalog id. */
+  piece: string
+  x: number
+  y: number
+  z: number
+  rot: number
+  scale: number
+  /**
+   * A lean before the turn: radians about the piece's own x, then its own z (Euler YXZ with `rot`), for
+   * a piece stood on end or leaned (a bow in a rack). None: upright.
+   */
+  tilt?: [number, number]
+  /** Swatch id → swatch id, a per-instance re-tint. */
+  swatchMap?: Record<number, number>
+  /** Ramp name → ramp name, tone for tone (ADR 008). */
+  rampMap?: Record<string, string>
+}
+
 /**
  * One placed static piece: a catalog id, metres, `rot` radians about +y, uniform `scale`, and an
- * optional re-tint. `TownDraw.pieces` (`PieceInstance`) and recipe instances are both this shape.
+ * optional re-tint. `TownDraw.pieces` (`PieceInstance`) is this shape.
  */
-export type BatchInstance = Pick<
-  RecipeInstance,
-  "piece" | "x" | "y" | "z" | "rot" | "scale" | "swatchMap" | "rampMap" | "tilt"
-> & {
+export type BatchInstance = RecipeInstance & {
   /** Stretch along the piece's own x on top of `scale` (a wall piece fitted to its run). */
   stretch?: number
+}
+
+/**
+ * An instance's full re-tint: its `rampMap` as swatch pairs, then its `swatchMap` on top, since a
+ * swatch map is the single-swatch fix (ADR 008) and so wins over its ramp.
+ */
+export function instanceSwatchMap(
+  instance: Pick<RecipeInstance, "rampMap" | "swatchMap">,
+): Record<number, number> {
+  const ramps = instance.rampMap ? rampMapToSwatchMap(PALETTE, instance.rampMap) : {}
+  return { ...ramps, ...instance.swatchMap }
+}
+
+/** Puts `object` where `instance` says: metres, `rot` radians about +y (after its `tilt`), uniform `scale`. */
+export function placeInstance(object: Object3D, instance: RecipeInstance): Object3D {
+  object.position.set(instance.x, instance.y, instance.z)
+  object.rotation.set(instance.tilt?.[0] ?? 0, instance.rot, instance.tilt?.[1] ?? 0, "YXZ")
+  object.scale.setScalar(instance.scale)
+  return object
 }
 
 /**

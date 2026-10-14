@@ -10,15 +10,7 @@ import { BASE, READ_ONLY, SHOWCASE } from "./env.ts"
 export const DATA = `${BASE}data`
 
 /** A folder of `<id>.json` files under `data/`. */
-export type DataKind =
-  | "recipes/houses"
-  | "recipes/landmarks"
-  | "recipes/stalls"
-  | "recipes/docks"
-  | "recipes/farm"
-  | "recipes/vignettes"
-  | "npcs"
-  | "tiles"
+export type DataKind = "npcs" | "tiles"
 
 /** A save either landed, or was refused with the endpoint's reasons (422: the validator's problems). */
 export type SaveResult = { ok: true } | { ok: false; status: number; problems: string[] }

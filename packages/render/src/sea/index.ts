@@ -32,4 +32,12 @@ export {
   type SeaShow,
   type ShipPose,
 } from "./plan.ts"
-export { LAP_CLEAR, type Mooring, type SeaSites, seaSites } from "./sites.ts"
+export {
+  errandsOf,
+  LAP_CLEAR,
+  type Mooring,
+  RAID_CLEAR,
+  type SeaErrands,
+  type SeaSites,
+  seaSites,
+} from "./sites.ts"

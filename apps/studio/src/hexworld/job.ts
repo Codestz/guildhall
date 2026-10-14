@@ -466,6 +466,9 @@ export function runHexJob(
   span += R * 4
   const heartTile = z.zones[0] ? w.tiles.find((t) => t.i === z.zones[0]!.tile) : undefined
   const built = hexStructures(w, spec.seed)
+  const sites = eventSites(h, z, w, { sea: SEA_LEVEL })
+  // the sea's errands keep clear of the harbour ships' berths
+  const berths = sites.harbours.flatMap((hb) => hb.berths.map((b) => [b.at[0], b.at[2]] as [number, number]))
   post({
     type: "map",
     map: {
@@ -497,8 +500,8 @@ export function runHexJob(
           },
         ]
       }),
-      sites: eventSites(h, z, w, { sea: SEA_LEVEL }),
-      sea: seaSites(h, z, w, { sea: SEA_LEVEL }),
+      sites,
+      sea: seaSites(h, z, w, { sea: SEA_LEVEL, keepOff: berths }),
       graveyard: w.graveyard,
       stats: {
         land: h.stats.land,

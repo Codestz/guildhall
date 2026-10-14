@@ -28,6 +28,7 @@ import {
   type SeaShow,
   type SeaSites,
   type Stage,
+  type Water,
 } from "@guildhall/render"
 import type { HallSession } from "../hall/feeds/session.ts"
 
@@ -91,6 +92,8 @@ export function mountSea(parts: {
   load: SeaLifeOpts["load"]
   light: () => DayLight
   spec: SeaSpec | null
+  /** The water: every hull under way leaves a wake on it. */
+  water?: Water | null
   /** The coast the world events' ghost ship passes: the graveyard's (world graveyard.ts), xz. */
   ghostNear?: readonly [number, number] | null
   /** A session plays on the island: its clock and its harbour drive the sea (hall/sea.ts) once it is up. */
@@ -106,6 +109,7 @@ export function mountSea(parts: {
     keepOff: berths,
     light: parts.light,
     ghostNear: parts.ghostNear ?? null,
+    water: parts.water ?? null,
   })
   let shows: SeaShow[] = []
   const setShows = (next: SeaShow[]) => {

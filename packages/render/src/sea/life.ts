@@ -18,7 +18,7 @@ import {
   AddEquation,
   AdditiveBlending,
   BufferAttribute,
-  type BufferGeometry,
+  BufferGeometry,
   Color,
   ConeGeometry,
   CustomBlending,
@@ -40,11 +40,12 @@ import {
   type WebGLProgramParametersWithUniforms,
 } from "three"
 import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js"
-import { fxMaterial, swatch } from "../events/fxMaterial.ts"
+import { Boxes, fxMaterial, swatch } from "../events/fxMaterial.ts"
 import { bakeModel } from "../events/ships.ts"
 import type { DayLight } from "../light.ts"
 import type { Stage } from "../stage.ts"
 import { warmPrograms } from "../warm.ts"
+import type { Wake, Water } from "../water.ts"
 import { roundedPath } from "./course.ts"
 import {
   anchorage,
@@ -64,7 +65,7 @@ import {
   type SeaShow,
   type ShipPose,
 } from "./plan.ts"
-import type { Mooring, SeaSites } from "./sites.ts"
+import { errandsOf, type SeaSites } from "./sites.ts"
 import { attitudeOf, FEEL, type HullFeel } from "./swell.ts"
 
 /** Each hull: the model it is (an index into MODELS), its size (metres per model unit) and how deep it sits (model units). */
@@ -74,19 +75,25 @@ const HULLS: Record<
 > = {
   "merchant-large": { model: 0, scale: 0.44, draft: 0.9, extras: 0, feel: FEEL.large, sails: true },
   "merchant-medium": { model: 1, scale: 0.42, draft: 0.9, extras: 0, feel: FEEL.medium, sails: true },
-  cargo: { model: 2, scale: 0.4, draft: 0.8, extras: 0, feel: FEEL.small, sails: true },
+  cargo: { model: 2, scale: 1.55, draft: 0.4, extras: 0, feel: FEEL.small, sails: true },
   galleon: { model: 5, scale: 0.54, draft: 0.9, extras: 7, feel: FEEL.galleon, sails: true },
   pirate: { model: 3, scale: 0.48, draft: 0.9, extras: 0, feel: FEEL.medium, sails: true },
   rowboat: { model: 4, scale: 0.46, draft: 0.25, extras: 0, feel: FEEL.rowboat, sails: false },
 }
-/** The hulls' models; the galleon (5) is the large ship again, its sails and flags in its own colour. */
+/**
+ * The hulls' models; the galleon (5) is the large ship again, its sails and flags in its own colour.
+ * The cargo ship (2) is not a pull request's ship: the large rowboat's broad open hull (its oars
+ * shipped) under one plain square sail with a red stripe, its crates stacked in the open waist
+ * (`cargoModel`), so it reads apart from the three-masted, pennanted ships at a glance.
+ */
 const MODELS = [
   "kenney-pirate/ship-large",
   "kenney-pirate/ship-medium",
-  "kenney-pirate/ship-small",
+  "kenney-pirate/boat-row-large",
   "kenney-pirate/ship-pirate-medium",
   "kenney-pirate/boat-row-small",
 ] as const
+const CARGO_MODEL = 2
 const GALLEON_MODEL = 5
 /** The galleon's sails: a release flies the palette's gold. */
 const GALLEON_SAILS = "gold"
@@ -96,19 +103,22 @@ const GHOST = { piece: "kenney-pirate/ship-ghost", scale: 0.5, draft: 0.9 }
  * (slots 1-6, as many as its commits), the galleon's gold on its main deck (slot 7).
  */
 const CRATE = "kenney-pirate/crate"
-/** Before the mast, four on the deck and two stacked on them (x, z, layer). */
+/** In the cargo's waist, fore and aft of its mast, two on the bottom boards each side and one stacked on each pair (x, z, layer). */
 const CRATE_SPOTS: readonly [number, number, number][] = [
-  [-0.85, 0.5, 0],
-  [0.85, 0.6, 0],
-  [-0.85, 2.1, 0],
-  [0.85, 2.2, 0],
-  [-0.4, 1.3, 1],
-  [0.45, 1.4, 1],
+  [-0.4, 1.0, 0],
+  [0.4, -0.85, 0],
+  [0.4, 1.05, 0],
+  [-0.4, -0.8, 0],
+  [0, 1.02, 1],
+  [0, -0.82, 1],
 ]
-const CRATE_SIZE = 1.5
-/** The goods the crates carry, a colour each, so a cargo ship reads from afar (the hull is the harbour ships' own). */
+const CRATE_SIZE = 0.62
+/** The cargo's bottom boards and a crate's height there, model units. */
+const CARGO_FLOOR = 0.78
+const CRATE_LAYER = 0.47
+/** The goods the crates carry, a colour each, so a cargo ship reads from afar. */
 const GOODS = ["banner-red", "royal-blue", "gold", "teal", "orange", "purple"]
-const DECK = { small: 3.4, large: 3.4 }
+const DECK = { large: 3.4 }
 const GOLD = "kaykit-resources/gold-bars"
 export const SEA_PIECES = [...MODELS, GHOST.piece, CRATE, GOLD] as const
 
@@ -124,6 +134,8 @@ export interface SeaLifeOpts {
   light?: () => DayLight
   /** The coast the ghost ship passes when its show names none: the graveyard's (world graveyard.ts), xz. */
   ghostNear?: readonly [number, number] | null
+  /** The water, for the wakes of every hull under way (its source "sea", merged with the harbour's). */
+  water?: Water | null
 }
 
 export interface SeaView {
@@ -159,7 +171,8 @@ export interface SeaLife {
   reset(): void
   /** What is on the water now. */
   view(): SeaView
-  stats(): { ms: number; ships: number; glows: number; draws: number }
+  /** `tris`: the fleet's triangles really drawn (each instance's own hull and load); `wakes`: hulls leaving one. */
+  stats(): { ms: number; ships: number; glows: number; draws: number; tris: number; wakes: number }
   dispose(): void
 }
 
@@ -167,17 +180,16 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
   const { sites } = opts
   // the routes with their corners rounded: every hull turns on a curve
   const laps: Path[] = sites.laps.map((ring) => roundedPath(ring.points, true))
-  const keepOff = opts.keepOff ?? []
-  const clearOf = (m: Mooring) =>
-    keepOff.length ? Math.min(...keepOff.map(([x, z]) => Math.hypot(x - m.at[0], z - m.at[1]))) : 99
-  // the quay's rowboat where it is clearest of the berths; the cargo loads at the next clearest
-  const byClear = [...sites.moorings].sort((a, b) => clearOf(b) - clearOf(a))
-  const quay = byClear[0] ?? null
-  const loading = sites.moorings.find((m) => m !== quay && clearOf(m) > 4) ?? byClear[1] ?? quay
-  const lane = loading ? roundedPath(loading.lane) : null
-  const raidLane = lane
+  // a lane for each errand (sites.ts `errandsOf`): the quay's rowboat clearest of the berths, the raid
+  // on its own lane, the cargo on another round the raid's anchorage (sites made before the errands:
+  // picked here, the cargo sharing the raid's lane)
+  const errands = sites.errands ?? errandsOf(sites.moorings, opts.keepOff ?? [], () => null)
+  const quay = errands.quay
+  const lane = errands.cargo ? roundedPath(errands.cargo.lane) : null
+  const raidLane = errands.raid ? roundedPath(errands.raid.lane) : null
   const centre: Point = (sites.laps[0] as SeaRing | undefined)?.centre ?? [0, 0]
-  const harbourBearing = loading ? Math.atan2(loading.at[1] - centre[1], loading.at[0] - centre[0]) : 0
+  const home = errands.raid ?? errands.cargo
+  const harbourBearing = home ? Math.atan2(home.at[1] - centre[1], home.at[0] - centre[0]) : 0
   const anchor = sites.laps.length ? anchorage(sites.laps, harbourBearing) : null
 
   let now = 0
@@ -194,6 +206,12 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
 
   // ---- the meshes, built once the models are in ----
   let fleet: InstancedMesh | null = null
+  /** The fleet's triangles by hull and load (`loadTris`), all of them, and those drawn this frame. */
+  let fleetTris: number[][] = []
+  let fleetAll = 0
+  let drawnTris = 0
+  const flow: Wake[] = []
+  let wakes = 0
   let ghost: Mesh | null = null
   let ghostMaterial: MeshStandardMaterial | null = null
   const ghostFade = { value: 0 }
@@ -250,9 +268,12 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
         for (let i = 0; i < n; i++) tint[i] = Math.min(rgb.getX(i), rgb.getY(i), rgb.getZ(i)) > 0.5 ? 1 : 0
       c.setAttribute("tint", new BufferAttribute(tint, 1))
       // the sails: pale cloth above the deck, weighted up the mast (the wind works the canvas, not the hull)
+      // (a model that says where its own cloth is, the cargo's, keeps it)
       const cloth = new Float32Array(n)
       const pos = c.getAttribute("position")
-      if (rgb && slot === 0)
+      const own = c.getAttribute("cloth")
+      if (own) for (let i = 0; i < n; i++) cloth[i] = own.getX(i)
+      else if (rgb && slot === 0)
         for (let i = 0; i < n; i++)
           if (Math.min(rgb.getX(i), rgb.getY(i), rgb.getZ(i)) > 0.5)
             cloth[i] = Math.min(1, Math.max(0, (pos.getY(i) - 4.5) / 7))
@@ -261,7 +282,7 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
     }
     MODELS.forEach((id, k) => {
       const g = geo(id)
-      if (g) mark(g, k, 0)
+      if (g) mark(k === CARGO_MODEL ? cargoModel(g) : g, k, 0)
     })
     const large = geo(MODELS[0])
     if (large) mark(large, GALLEON_MODEL, 0, undefined, true)
@@ -275,7 +296,7 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
           new Matrix4()
             .makeRotationY((hash01(k * 7 + 1) - 0.5) * 0.4)
             .scale(new Vector3(CRATE_SIZE, CRATE_SIZE, CRATE_SIZE))
-            .setPosition(x, DECK.small + layer * 0.77 * CRATE_SIZE, z),
+            .setPosition(x, CARGO_FLOOR + layer * CRATE_LAYER, z),
           false,
           swatch(GOODS[k % GOODS.length] as string),
         )
@@ -298,6 +319,8 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
       // indexed: a corner shared by its faces is shaded once (the folded-away hulls cost their vertices only)
       const merged = mergeVertices(mergeGeometries(parts) as BufferGeometry)
       for (const p of parts) p.dispose()
+      fleetTris = loadTris(merged)
+      fleetAll = (merged.index?.count ?? 0) / 3
       const seen = new InstancedBufferAttribute(new Float32Array(MAX_SHIPS), 1)
       seen.setUsage(DynamicDrawUsage)
       merged.setAttribute("instanceSeen", seen)
@@ -314,6 +337,10 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
       m.castShadow = false
       m.receiveShadow = true
       m.visible = false
+      // three counts every hull of the geometry for each instance; the frame's tally keeps only the drawn ones
+      m.onAfterRender = (renderer) => {
+        renderer.info.render.triangles -= fleetAll * m.count - drawnTris
+      }
       fleet = m
       stage.scene.add(m)
     }
@@ -431,6 +458,23 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
       g++
     }
     let ghostPoseNow: ShipPose | null = null
+    // every hull under way leaves a wake (the way it moves, as white as it is fast and as it is seen)
+    flow.length = 0
+    for (const pose of ships) {
+      const speed = Math.abs(pose.speed)
+      if (speed < 0.2 || pose.seen <= 0.05) continue
+      const feel = pose.hull === "ghost" ? FEEL.ghost : HULLS[pose.hull].feel
+      flow.push({
+        x: pose.x,
+        z: pose.z,
+        heading: pose.speed >= 0 ? pose.heading : pose.heading + Math.PI,
+        speed: speed * Math.min(1, pose.seen * 1.5) * (pose.hull === "ghost" ? 0.6 : 1),
+        beam: feel.beam * 0.55,
+      })
+    }
+    if (opts.water && (flow.length || wakes)) opts.water.setWakes(flow, "sea")
+    wakes = flow.length
+    drawnTris = 0
     if (fleet) {
       const seen = fleet.geometry.getAttribute("instanceSeen") as InstancedBufferAttribute
       const hulls = fleet.geometry.getAttribute("instanceHull") as InstancedBufferAttribute
@@ -443,7 +487,9 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
         const h = HULLS[pose.hull]
         fleet.setMatrixAt(k, shipMatrix(pose, h.scale, h.draft, phaseOf(pose.key), h.feel, h.sails))
         seen.setX(k, pose.seen)
-        hulls.setXY(k, h.model, pose.hull === "cargo" ? pose.crates : h.extras)
+        const load = pose.hull === "cargo" ? pose.crates : h.extras
+        hulls.setXY(k, h.model, load)
+        drawnTris += fleetTris[h.model]?.[Math.min(7, load)] ?? 0
         k++
       }
       fleet.count = k
@@ -634,10 +680,13 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
       ships: shipsDrawn,
       glows: glowsDrawn,
       draws: [fleet, ghost, glows.mesh, beam.mesh].filter((m) => m?.visible).length,
+      tris: fleet?.visible ? drawnTris : 0,
+      wakes,
     }),
     dispose() {
       disposed = true
       off()
+      if (opts.water && wakes) opts.water.setWakes([], "sea")
       for (const m of [fleet, ghost, glows.mesh, beam.mesh]) {
         if (!m) continue
         m.removeFromParent()
@@ -650,6 +699,139 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
 }
 
 const FESTIVE = [0xffd34d, 0xff5a5a, 0x5ad1ff, 0x9dff6a, 0xff8ae2, 0xffffff]
+
+/** The cargo's rig, model units of the large rowboat (bow +z): its mast, its yard and its square sail. */
+const CARGO_RIG = {
+  mast: { z: 0.12, foot: 0.4, head: 5.1 },
+  yard: { y: 4.8, half: 1.3 },
+  sail: { half: 1.2, top: 4.72, foot: 1.85, belly: 0.35 },
+  /** The stripe across the sail, from and to (shares of its height from the foot). */
+  stripe: [0.4, 0.6] as const,
+}
+
+/**
+ * The cargo ship (model units of the large rowboat, bow +z): the rowboat's hull with its oars shipped
+ * (every triangle reaching past the gunwales dropped), a stout mast and yard, and one plain square
+ * sail with a red stripe across it, bellied forward by the wind (`cloth` weights it for the wind's
+ * work, more toward its foot and its leeches).
+ */
+export function cargoModel(rowboat: BufferGeometry): BufferGeometry {
+  // the hull: the oars' blades and looms reach past the gunwales, the hull itself does not
+  const src = rowboat.index ? rowboat.toNonIndexed() : rowboat
+  const pos = src.getAttribute("position")
+  const keep: number[] = []
+  for (let t = 0; t < pos.count; t += 3)
+    if ([0, 1, 2].every((k) => Math.abs(pos.getX(t + k)) <= 1.25)) keep.push(t, t + 1, t + 2)
+  const pick = (name: string, size: number) => {
+    const a = src.getAttribute(name)
+    const out = new Float32Array(keep.length * size)
+    keep.forEach((i, k) => {
+      for (let c = 0; c < size; c++) out[k * size + c] = a.getComponent(i, c)
+    })
+    return new BufferAttribute(out, size)
+  }
+  const hull = new BufferGeometry()
+  hull.setAttribute("position", pick("position", 3))
+  hull.setAttribute("normal", pick("normal", 3))
+  // the rowboat's pale planking weathered to a working timber, its shading kept
+  const rgb = pick("color", 3)
+  const wood = swatch("timber")
+  for (let i = 0; i < rgb.count; i++) {
+    const l = (rgb.getX(i) + rgb.getY(i) + rgb.getZ(i)) / 3 / 0.4
+    rgb.setXYZ(i, wood[0] * l, wood[1] * l, wood[2] * l)
+  }
+  hull.setAttribute("color", rgb)
+  hull.setAttribute("cloth", new BufferAttribute(new Float32Array(keep.length), 1))
+
+  const { mast, yard, sail, stripe } = CARGO_RIG
+  const rig = new Boxes()
+    .box(
+      [0.08, (mast.head - mast.foot) / 2, 0.08],
+      [0, (mast.head + mast.foot) / 2, mast.z],
+      swatch("timber-dark"),
+    )
+    .box([yard.half, 0.055, 0.055], [0, yard.y, mast.z + 0.1], swatch("timber-dark"))
+    .geometry()
+  rig.deleteAttribute("tint")
+  rig.setAttribute("cloth", new BufferAttribute(new Float32Array(rig.getAttribute("position").count), 1))
+
+  // the sail: a grid across and down, its rows doubled at the stripe's edges so they stay crisp
+  const cols = 6
+  const [s0, s1] = stripe
+  const rows = [0, 0.2, s0, s0, s1, s1, 0.8, 1]
+  const canvas = swatch("sand-light")
+  const red = swatch("banner-red")
+  const vertex = (u: number, v: number) => {
+    const x = (u * 2 - 1) * sail.half
+    const y = sail.foot + (sail.top - sail.foot) * v
+    // bellied forward, most at the middle of its foot and least at the yard
+    const z = mast.z + 0.16 + sail.belly * (1 - (u * 2 - 1) ** 2) * (1 - v * 0.7)
+    return [x, y, z]
+  }
+  const p: number[] = []
+  const c: number[] = []
+  const w: number[] = []
+  for (let r = 0; r < rows.length - 1; r++) {
+    const v0 = rows[r] as number
+    const v1 = rows[r + 1] as number
+    if (v1 <= v0) continue
+    const colour = v0 >= s0 && v1 <= s1 ? red : canvas
+    for (let k = 0; k < cols; k++) {
+      const u0 = k / cols
+      const u1 = (k + 1) / cols
+      const quad = [vertex(u0, v0), vertex(u1, v0), vertex(u1, v1), vertex(u0, v1)]
+      const corners = [
+        [u0, v0],
+        [u1, v0],
+        [u1, v1],
+        [u0, v1],
+      ]
+      // both faces: the front (bow side) and the back
+      for (const order of [
+        [0, 2, 1, 0, 3, 2],
+        [0, 1, 2, 0, 2, 3],
+      ])
+        for (const i of order) {
+          p.push(...(quad[i] as number[]))
+          c.push(...colour)
+          const [u, v] = corners[i] as [number, number]
+          // the wind works the foot and the leeches, the yard holds the head
+          w.push((1 - v) * 0.5 + Math.abs(u * 2 - 1) * 0.25)
+        }
+    }
+  }
+  const cloth = new BufferGeometry()
+  cloth.setAttribute("position", new BufferAttribute(new Float32Array(p), 3))
+  cloth.computeVertexNormals()
+  cloth.setAttribute("color", new BufferAttribute(new Float32Array(c), 3))
+  cloth.setAttribute("cloth", new BufferAttribute(new Float32Array(w), 1))
+  const merged = mergeGeometries([hull, rig, cloth]) as BufferGeometry
+  for (const g of [hull, rig, cloth]) g.dispose()
+  if (src !== rowboat) src.dispose()
+  return merged
+}
+
+/**
+ * The fleet's triangles by hull and load (indexed by the `part` its vertices carry): for each hull, how
+ * many an instance carrying loads 1 … y draws (`[hull][y]`, y up to 7), so the frame's tally counts
+ * what is drawn, not the hulls folded away.
+ */
+export function loadTris(geometry: BufferGeometry): number[][] {
+  const index = geometry.index
+  const part = geometry.getAttribute("part")
+  const by: number[][] = []
+  if (!index || !part) return by
+  for (let t = 0; t < index.count; t += 3) {
+    const p = Math.round(part.getX(index.getX(t)))
+    const hull = Math.floor(p / 8)
+    const row = by[hull] ?? new Array<number>(8).fill(0)
+    by[hull] = row
+    row[p - hull * 8] = (row[p - hull * 8] ?? 0) + 1
+  }
+  for (const row of by)
+    if (row) for (let s = 1; s < 8; s++) row[s] = (row[s] as number) + (row[s - 1] as number)
+  return by
+}
 
 /** A stable 0 … 1 from an integer. */
 const hash01 = (n: number): number => {

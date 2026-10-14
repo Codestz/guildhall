@@ -98,7 +98,16 @@ export interface ActorSample {
    * book while it reads, its hammer while it hammers). None: every mount of its look.
    */
   props?: readonly string[]
+  /**
+   * Which of its look's mounts show this frame, bit k for `look.mounts[k]` (a townsfolk's routine: the
+   * rod always, the fish once caught); none: all of them. With `props` too, a mount shows when both say so.
+   */
+  mask?: number
 }
+
+/** Whether mount k shows under a sample's `mask` (none: every mount). */
+export const propShown = (mask: number | undefined, k: number): boolean =>
+  mask === undefined || ((mask >>> k) & 1) === 1
 
 /** Where bodies and props load from: the catalog (with mounts) and its library url mapping. */
 export interface CrowdLibrary {
@@ -139,6 +148,11 @@ export interface Crowd {
   update(dt: number, sample: (id: number) => ActorSample): void
   /** These ids are heroes whatever their distance (the selected or followed), until set again. */
   setHeroes(ids: readonly number[]): void
+  /**
+   * Where a point of actor `id`'s mount k (`look.mounts[k]`, in the piece's own space) was drawn last
+   * update, world metres, into `out` (a rod's tip, for its line); false when that prop was not drawn.
+   */
+  propPoint(id: number, k: number, local: readonly [number, number, number], out: number[]): boolean
   stats(): CrowdStats
   dispose(): void
 }
@@ -167,7 +181,8 @@ interface Person {
   actor: CrowdActor
   body: number
   instance: number
-  props: { prop: HeldProp; instance: number; piece: string }[]
+  /** Its drawn props: which look mount each is (`k`), its instance, its world matrix as last drawn. */
+  props: { prop: HeldProp; instance: number; piece: string; k: number; world: Matrix4; drawn: boolean }[]
   playing: Playing
   hidden: number
   hero: Hero | null
@@ -335,6 +350,10 @@ export async function createCrowd(
   )
   bodies.name = "crowd:bodies"
   bodies.perObjectFrustumCulled = true
+  // culled per person (perObjectFrustumCulled) only: three's whole-batch bounding sphere is computed once,
+  // on the first draw, and a crowd drawn before its first update (a life that is slow to be ready) would
+  // keep the sphere of everyone at the origin, and be culled whole wherever the camera goes after
+  bodies.frustumCulled = false
   bodies.sortObjects = false
   bodies.castShadow = false
   bodies.receiveShadow = true
@@ -371,6 +390,7 @@ export async function createCrowd(
   )
   props.name = "crowd:props"
   props.perObjectFrustumCulled = true
+  props.frustumCulled = false
   props.sortObjects = false
   props.castShadow = false
   props.receiveShadow = true
@@ -411,7 +431,7 @@ export async function createCrowd(
       const bit = body.parts.get(PropertyBinding.sanitizeNodeName(part))
       if (bit !== undefined) hidden += 2 ** bit
     }
-    const held = actor.look.mounts.flatMap(({ piece, slot }) => {
+    const held = actor.look.mounts.flatMap(({ piece, slot }, k) => {
       const mount = catalog.get(piece)?.compose.mount
       const bone = slotBone(slot)
       if (!mount || bone < 0) {
@@ -423,6 +443,9 @@ export async function createCrowd(
           prop: { mount, slot, bone },
           instance: props.addInstance(propGeometryId.get(piece) as number),
           piece,
+          k,
+          world: new Matrix4(),
+          drawn: false,
         },
       ]
     })
@@ -462,7 +485,6 @@ export async function createCrowd(
   const pose: BakePose = { now: 0, blendNow: 0, was: 0, blendWas: 0, fade: 1 }
   const place = new Matrix4()
   const local = new Matrix4()
-  const world = new Matrix4()
   const turn = new Quaternion()
   const up = new Vector3(0, 1, 0)
   const at = new Vector3()
@@ -565,7 +587,10 @@ export async function createCrowd(
           person.hero = null
           person.shown = false
           bodies.setVisibleAt(person.instance, false)
-          for (const p of person.props) props.setVisibleAt(p.instance, false)
+          for (const p of person.props) {
+            props.setVisibleAt(p.instance, false)
+            p.drawn = false
+          }
           blobs.place(i, 0, -1000, 0, 0)
           continue
         }
@@ -592,11 +617,14 @@ export async function createCrowd(
           const mounted = hero.npc.character.mounted
           for (const [m, mount] of person.actor.look.mounts.entries()) {
             const piece = mounted[m]?.piece
-            if (piece) piece.visible = !held || held.includes(mount.piece)
+            if (piece) piece.visible = (!held || held.includes(mount.piece)) && propShown(s.mask, m)
           }
           root.visible = true
           bodies.setVisibleAt(person.instance, false)
-          for (const p of person.props) props.setVisibleAt(p.instance, false)
+          for (const p of person.props) {
+            props.setVisibleAt(p.instance, false)
+            p.drawn = false
+          }
           continue
         }
         // The crowd member: its place, its rows in the bake, its props.
@@ -619,10 +647,12 @@ export async function createCrowd(
           const shown =
             showProps &&
             (!s.props || s.props.includes(p.piece)) &&
+            propShown(s.mask, p.k) &&
             propMatrix(bake, pose, person.playing.clip, p.prop, local)
           props.setVisibleAt(p.instance, shown)
+          p.drawn = shown
           if (!shown) continue
-          props.setMatrixAt(p.instance, world.multiplyMatrices(place, local))
+          props.setMatrixAt(p.instance, p.world.multiplyMatrices(place, local))
           held++
         }
       }
@@ -632,6 +662,25 @@ export async function createCrowd(
     },
     setHeroes(ids) {
       pinned = new Set(ids)
+    },
+    propPoint(id, k, local, out) {
+      const person = persons[id]
+      if (!person) return false
+      const hero = person.shown ? person.hero : null
+      if (hero) {
+        const m = hero.npc.character.mounted[k]
+        if (!m || !m.pivot.visible || !m.piece.visible || !hero.npc.root.visible) return false
+        m.piece.updateWorldMatrix(true, false)
+        at.set(local[0], local[1], local[2]).applyMatrix4(m.piece.matrixWorld)
+      } else {
+        const p = person.props.find((q) => q.k === k)
+        if (!p?.drawn) return false
+        at.set(local[0], local[1], local[2]).applyMatrix4(p.world)
+      }
+      out[0] = at.x
+      out[1] = at.y
+      out[2] = at.z
+      return true
     },
     stats: () => ({
       people: persons.length,

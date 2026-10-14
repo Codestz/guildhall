@@ -7,5 +7,6 @@ export {
   type CrowdStats,
   createCrowd,
   FADE,
+  propShown,
   warmCrowdPrograms,
 } from "./crowd.ts"

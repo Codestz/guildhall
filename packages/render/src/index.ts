@@ -22,6 +22,7 @@ export {
 } from "./batch.ts"
 export { setLod } from "./batchMesh.ts"
 export { cameraToPose, poseToCamera } from "./camera.ts"
+export { armTrack, CARRY_WALK, carryClip, withCarry } from "./character/carry.ts"
 export { type Character, createCharacter, loadCharacter, type PlayOpts } from "./character/load.ts"
 export { attachMount, detachMount, type Mounted, mountClip, mountPose } from "./character/mount.ts"
 export { createNpc, dressNpc, type Npc, type NpcActivity, type NpcProp } from "./character/npc.ts"
@@ -34,6 +35,7 @@ export {
   type CrowdOpts,
   type CrowdStats,
   createCrowd,
+  propShown,
   warmCrowdPrograms,
 } from "./crowd/index.ts"
 export {
@@ -97,6 +99,7 @@ export {
   type PostLook,
   type PostOpts,
 } from "./post/index.ts"
+export * from "./props/index.ts"
 export { instanceSwatchMap, placeInstance, recipeObject } from "./recipe.ts"
 export {
   createReveal,

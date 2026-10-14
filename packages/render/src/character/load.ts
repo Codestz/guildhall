@@ -16,6 +16,7 @@ import {
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { loadPiece } from "../pieces.ts"
+import { withCarry } from "./carry.ts"
 import { type Mounted, mountClip } from "./mount.ts"
 import { keepUpright } from "./upright.ts"
 
@@ -115,7 +116,8 @@ function loadClips(url: string): Promise<AnimationClip[]> {
   let clips = rigClips.get(url)
   if (!clips) {
     loader ??= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
-    clips = loader.loadAsync(url).then((gltf) => gltf.animations)
+    // with the carrying walk made from two of them (carry.ts)
+    clips = loader.loadAsync(url).then((gltf) => withCarry(gltf.animations))
     rigClips.set(url, clips)
     clips.catch(() => rigClips.delete(url))
   }

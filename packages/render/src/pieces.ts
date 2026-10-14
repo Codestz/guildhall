@@ -4,6 +4,7 @@ import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.j
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js"
 import { paletteMaterial } from "./material.ts"
+import { builtOf, builtPiece } from "./props/built.ts"
 
 const logger = log("render:pieces")
 
@@ -49,8 +50,13 @@ export function pieceCache(load: (url: string) => Promise<Object3D>): (url: stri
   }
 }
 
-/** A library GLB (meshopt-compressed, vertex-coloured) as a ready-to-draw piece; cached by url. */
+/**
+ * A library GLB (meshopt-compressed, vertex-coloured) as a ready-to-draw piece; cached by url. A
+ * `built/<name>.glb` path is one of the props built in code (props/built.ts), made instead of fetched.
+ */
 export const loadPiece = pieceCache(async (url) => {
+  const built = builtOf(url)
+  if (built) return preparePiece(builtPiece(built))
   loader ??= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
   const gltf = await loader.loadAsync(url)
   const root = preparePiece(gltf.scene)

@@ -16,6 +16,8 @@ export const STYLE_PACKS: readonly string[] = [
   "kaykit-dungeon",
   "kaykit-halloween",
   "kaykit-animations",
+  // its rail alone (the ore carts roll it)
+  "kaykit-holiday",
   "kenney-nature",
   "kenney-castle",
   "kenney-town",

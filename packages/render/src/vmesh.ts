@@ -8,6 +8,7 @@ import { BufferAttribute, BufferGeometry, Mesh, MeshStandardMaterial } from "thr
 import { patchCloudShade } from "./atmosphere/shade.ts"
 import { patchSnowCover } from "./events/snowCover.ts"
 import { paletteMaterial } from "./material.ts"
+import { patchRegionTint } from "./regionTint.ts"
 import type { Stage } from "./stage.ts"
 import { patchCascades } from "./sun/patch.ts"
 import type { TerrainMesh } from "./terrain.ts"
@@ -34,7 +35,12 @@ const SPECKLE_FRAGMENT = /* glsl */ `#include <color_fragment>
 	float drift = fract(sin(dot(floor(vSpeckleAt.xz / 4.0), vec2(269.5, 183.3))) * 43758.5453);
 	float k = green * near * up;
 	if (k > 0.0) {
-		if (h > 0.9 && drift > 0.55) {
+		// a meadow (regionTint.ts) flowers thicker, in more of its drifts
+		float meadow = 0.0;
+#ifdef REGION_TINT
+		meadow = regionW.a;
+#endif
+		if (h > 0.9 - 0.14 * meadow && drift > 0.55 - 0.5 * meadow) {
 			float pick = fract(h * 53.7);
 			vec3 petal = pick < 0.35 ? vec3(0.95, 0.93, 0.85) : pick < 0.65 ? vec3(0.98, 0.82, 0.25) : pick < 0.85 ? vec3(0.93, 0.52, 0.62) : vec3(0.62, 0.52, 0.9);
 			diffuseColor.rgb = mix(c, petal, k * (1.0 - smoothstep(0.08, 0.13, d)));
@@ -66,6 +72,8 @@ export function groundMaterial(): MeshStandardMaterial {
           "#include <common>\nvarying vec3 vSpeckleAt;\nvarying float vSpeckleUp;",
         )
         .replace("#include <color_fragment>", SPECKLE_FRAGMENT)
+      // after the speckle, so the region's green is turned before the speckle reads it
+      patchRegionTint(shader, "ground")
     }
     ground.customProgramCacheKey = () => "guildhall-ground"
   }

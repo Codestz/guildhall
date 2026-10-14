@@ -42,6 +42,7 @@ import {
   type StaticBatch,
   type Sun,
   setLod,
+  setRegionField,
   shoreFieldTexture,
   type TerrainMesh,
   type VertexMeshData,
@@ -427,6 +428,7 @@ const world = {
         nature,
         shape,
         life: lifeOn,
+        ...(ctx.query.get("regions") === "0" ? { regions: false } : {}),
         ...(places ? { places } : {}),
       })),
     )
@@ -470,6 +472,8 @@ const world = {
       // compiled by the frames drawn meanwhile) while the worker still builds the ground.
       const m = await job.map
       if (disposed) return
+      // the island's regions: the ground's green turned, snow on the peaks, mist on the marsh (render regionTint.ts)
+      setRegionField(m.regions)
       // a hook sees the pure map first (~0.1 s, behind the cover): life plans on the same one below
       if (hooks) {
         island = hexIsland({ ...shape, seed, files })
@@ -965,6 +969,7 @@ const world = {
       batch?.dispose()
       water?.dispose()
       disposeField()
+      setRegionField(null)
       air?.dispose()
       night?.dispose()
       unAgents()

@@ -4,6 +4,7 @@
  * the event FX and the sea's life happen on an island.
  */
 export { type Berth, type EventSites, eventSites, type HarbourSite, type PlaceSite } from "./events/sites.ts"
+export { REGION_CHANNELS, type RegionChannel, type RegionFieldData, regionBytes } from "./regionField.ts"
 export { type Mooring, type SeaSites, seaSites } from "./sea/sites.ts"
 export { type ShoreWindow, shoreBytes, shoreDistances } from "./shoreDistance.ts"
 export { srgbToLinear, type VertexMeshData, vertexMeshData } from "./vmeshData.ts"

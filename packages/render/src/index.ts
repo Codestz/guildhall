@@ -103,6 +103,13 @@ export {
 } from "./post/index.ts"
 export * from "./props/index.ts"
 export {
+  REGION_CHANNELS,
+  type RegionChannel,
+  type RegionFieldData,
+  regionBytes,
+} from "./regionField.ts"
+export { patchRegionTint, REGION_TINT, setRegionField } from "./regionTint.ts"
+export {
   createReveal,
   DEFAULT_SPAN as REVEAL_SPAN,
   NEVER as REVEAL_NEVER,

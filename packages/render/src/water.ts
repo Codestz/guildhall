@@ -16,6 +16,7 @@ import {
   type WebGLProgramParametersWithUniforms,
 } from "three"
 import { ATMOSPHERE, patchCloudShade } from "./atmosphere/shade.ts"
+import { patchRegionTint } from "./regionTint.ts"
 import type { ShoreField } from "./shoreField.ts"
 import type { Stage } from "./stage.ts"
 import { patchCascades } from "./sun/patch.ts"
@@ -523,6 +524,8 @@ if (uReflect > 0.5) {
 outgoingLight *= 1.0 - 0.5 * (1.0 - cloudShade());
 #include <opaque_fragment>`,
     )
+  // the marsh's water dark, the mist lying over it (regionTint.ts)
+  patchRegionTint(shader, "water")
 }
 
 /** A reveal's view of the island for the water (reveal.ts `placesTexture`, and its shared count and span). */

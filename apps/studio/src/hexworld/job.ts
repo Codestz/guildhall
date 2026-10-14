@@ -12,6 +12,9 @@
 import {
   type EventSites,
   eventSites,
+  REGION_CHANNELS,
+  type RegionFieldData,
+  regionBytes,
   type SeaSites,
   seaSites,
   shoreBytes,
@@ -39,6 +42,7 @@ import {
   NATURE_CHOSEN,
   type PlacedPiece,
   type PlaceSpec,
+  REGION_KINDS,
   type TilePrefab,
 } from "@guildhall/world"
 import type { AgentFeed } from "./lifeAgents.ts"
@@ -80,6 +84,9 @@ const SHORE_MAX_RES = 2048
 /** How fast a river runs, metres a second. */
 const RIVER_SPEED = 0.9
 const LANTERN = "kaykit-halloween/post-lantern"
+/** The region field's texel, metres, and its largest side. */
+const REGION_TEXEL = 3
+const REGION_MAX_RES = 256
 
 /** `?ground=`: fine small hexes (the default), the soft merged tiles, or one prism per tile. */
 export type GroundMode = "fine" | "soft" | "hex"
@@ -100,6 +107,8 @@ export interface HexJobSpec {
   shape?: IslandShape
   /** A repo's units as places (hall.ts, sim `placeSpecs`); left out: the island's own places. */
   places?: PlaceSpec[]
+  /** The island's regions (world regions.ts, `?regions=0` off); left out: on. */
+  regions?: boolean
   /** Plan the island's life as the last stage (lifePlan.ts); left out or false: no `life` stage (`?life=0`). */
   life?: boolean
   /** The agents life plans with it (lifeAgents.ts): the demo story, a recorded guild, or none (null). */
@@ -210,6 +219,8 @@ export interface MapStage {
   sea: SeaSites
   /** The graveyard (world graveyard.ts): its gate and graves, where the undead rise (undead.ts); null without one. */
   graveyard: HexGraveyard | null
+  /** The island's regions as the region tint's field (render regionTint.ts); null without regions. */
+  regions: RegionFieldData | null
   stats: {
     land: number
     tiles: number
@@ -347,6 +358,45 @@ function clusterTiles(h: HexIsland, w: HexWorld): Pick<PackedPieces, "cluster" |
   return { cluster, clusters }
 }
 
+/**
+ * The island's regions (world regions.ts) as the region tint's field: each channel's weight per tile,
+ * over the island's square at REGION_TEXEL; the highlands' snow line and the marsh's water level.
+ */
+function regionField(h: HexIsland, w: HexWorld, span: number): RegionFieldData | null {
+  const r = w.regions
+  if (!r?.list.length) return null
+  const g = h.grid
+  const K = REGION_KINDS.length
+  const channels = REGION_CHANNELS.map((c) => REGION_KINDS.indexOf(c))
+  const size = span * 2
+  const res = Math.min(REGION_MAX_RES, Math.ceil(size / REGION_TEXEL))
+  const min: [number, number] = [-span, -span]
+  const none = [0, 0, 0, 0] as const
+  const data = regionBytes({
+    min,
+    size,
+    res,
+    weightAt: (x, zz) => {
+      const [q, rr] = axialAt(x, zz, HEX_TILE_SIZE)
+      const i = g.index(q, rr)
+      if (i < 0) return none
+      const at = i * K
+      return [
+        r.weight[at + channels[0]!]!,
+        r.weight[at + channels[1]!]!,
+        r.weight[at + channels[2]!]!,
+        r.weight[at + channels[3]!]!,
+      ]
+    },
+  })
+  // snow from the snow level's tops up; the mist over the nature lake's surface
+  const snowY = r.snowLevel === null ? null : 0.35 + r.snowLevel * w.step - 0.3
+  const lake = r.list.some((x) => x.kind === "marsh") ? w.tiles.find((t) => t.i === h.lake[0]) : undefined
+  // (the fine ground's small hexes: world ground.ts `hexGroundFine`'s three to a tile)
+  const cell = HEX_TILE_SIZE / 3
+  return { min, size, res, data, snowY, mistY: lake ? lake.top - SURFACE_DROP : null, cell }
+}
+
 /** A river tile's current: downhill toward the tile it drains into, RIVER_SPEED m/s; none off a river. */
 function flowOf(h: HexIsland, i: number): [number, number] | undefined {
   const d = h.down[i]!
@@ -426,7 +476,10 @@ export function transferables(msg: FromWorker): ArrayBuffer[] {
   if (msg.type === "shore") return [msg.shore.data.buffer as ArrayBuffer]
   if (msg.type === "map") {
     const s = msg.map.structures
-    return [msg.map.paths, ...(s ? [s.position, s.color, s.normal] : [])].map((a) => a.buffer as ArrayBuffer)
+    const r = msg.map.regions
+    return [msg.map.paths, ...(s ? [s.position, s.color, s.normal] : []), ...(r ? [r.data] : [])].map(
+      (a) => a.buffer as ArrayBuffer,
+    )
   }
   if (msg.type === "pieces")
     return [msg.pieces.index, msg.pieces.place, msg.pieces.cluster].map((a) => a.buffer as ArrayBuffer)
@@ -457,7 +510,7 @@ export function runHexJob(
   lap("island")
   const z = hexZones(h, { wild: spec.nature?.wild, ...(spec.places ? { places: spec.places } : {}) })
   lap("zones")
-  const w = hexWorld(h, z, { step: spec.step, nature: spec.nature })
+  const w = hexWorld(h, z, { step: spec.step, nature: spec.nature, regions: spec.regions !== false })
   lap("world")
   const R = HEX_TILE_SIZE
   const { pools, pooled, sunk } = sinkPools(w)
@@ -503,6 +556,7 @@ export function runHexJob(
       sites,
       sea: seaSites(h, z, w, { sea: SEA_LEVEL, keepOff: berths }),
       graveyard: w.graveyard,
+      regions: regionField(h, w, span),
       stats: {
         land: h.stats.land,
         tiles: w.tiles.length,
@@ -556,7 +610,8 @@ export function runHexJob(
     for (const p of w.pieces) {
       const y = groundAt(p.x, p.z)
       const shift = y - w.heightAt(p.x, p.z)
-      if (y > 0 && Math.abs(shift) < 3) p.y += shift
+      // (a lily floats on the water, over the bed the fine ground lays under it)
+      if (y > 0 && Math.abs(shift) < 3 && !p.piece.startsWith("kenney-nature/lily")) p.y += shift
     }
   post({ type: "pieces", pieces: pack(w.pieces, clusterTiles(h, w)) })
   // The shore field: how far every point of the water is from land (anything but a water tile).

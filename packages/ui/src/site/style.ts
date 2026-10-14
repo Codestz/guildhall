@@ -31,12 +31,11 @@ export const SITE_CSS = /* css */ `
 .gh .site-welcome-card {
   pointer-events: auto; width: min(560px, 100%); padding: 10px 12px 2px; background: rgba(21, 17, 13, 0.95);
 }
-.gh .site-welcome-form { display: grid; gap: 4px; }
+.gh .site-welcome-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .gh .site-input:focus-visible { outline: none; border-color: var(--brass-hi); box-shadow: var(--ring); }
 .gh .site-input[aria-invalid="true"]:focus-visible { border-color: var(--fail); }
 .gh .site-input[data-ok] { border-color: rgba(166, 221, 143, 0.55); }
 .gh .site-welcome-row { display: flex; gap: 8px; }
-.gh .site-welcome-row .ui-btn { min-height: 44px; padding: 0 20px; flex: none; font-size: 15px; }
 .gh .site-input {
   flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border-radius: var(--r-sm);
   border: 1px solid var(--hair-2); background: var(--ink-deep); color: var(--paper); font: 16px var(--mono);
@@ -49,15 +48,60 @@ export const SITE_CSS = /* css */ `
 .gh .site-welcome-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .gh .site-welcome-links .site-link { min-height: 36px; font-size: 14px; }
 .gh .site-welcome-links { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; color: var(--faint); font-size: 13px; }
-/* folded: the field alone, a slim pill; it unfolds to the full bar on focus */
-.gh .site-welcome[data-open="false"] .site-welcome-card { width: min(340px, 100%); padding: 6px; }
+/* the repo field (user 10-13, "more love"): one pill, the repo mark in a brass ring at its left, an
+   example cycling in the placeholder, Generate integrated at its right end in brass with an arrow; a soft
+   inner shadow under a brass hairline, a gentle glow on focus */
+.gh .site-field {
+  position: relative; display: flex; align-items: center; gap: 0; height: 54px; padding: 6px;
+  border-radius: 999px; border: 1px solid var(--brass-line);
+  background: linear-gradient(180deg, rgba(9, 7, 5, 0.92), rgba(22, 17, 12, 0.92));
+  box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.6), inset 0 -1px 0 rgba(241, 213, 144, 0.07), 0 10px 30px -12px rgba(0, 0, 0, 0.7);
+  transition: border-color 0.2s, box-shadow 0.25s;
+}
+.gh .site-field:hover { border-color: rgba(220, 182, 98, 0.6); }
+.gh .site-field:focus-within {
+  border-color: var(--brass-hi);
+  box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.6), 0 0 0 4px rgba(220, 182, 98, 0.13), 0 0 30px -6px rgba(220, 182, 98, 0.5);
+}
+.gh .site-field[data-ok] { border-color: rgba(166, 221, 143, 0.65); }
+.gh .site-field:has(.site-input[aria-invalid="true"]) { border-color: var(--fail); }
+.gh .site-field-mark {
+  flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; color: var(--brass-hi);
+  border: 1px solid var(--brass-line); background: radial-gradient(circle at 50% 35%, rgba(220, 182, 98, 0.24), transparent 72%);
+}
+.gh .site-field .site-input {
+  flex: 1; min-width: 0; height: 40px; min-height: 0; padding: 0 12px; border: 0; border-radius: 0; background: none;
+  color: var(--paper); font: 16px var(--mono); cursor: text;
+}
+.gh .site-field .site-input:focus-visible { outline: none; border: 0; box-shadow: none; }
+.gh .site-field .site-input::placeholder { color: var(--muted); font-family: var(--mono); opacity: 0.8; }
+.gh .site-go {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; min-width: 40px; padding: 0 16px 0 18px;
+  border: 0; border-radius: 999px; cursor: pointer; color: var(--on-brass); font: 600 15px/1 var(--body);
+  background: linear-gradient(180deg, var(--brass-hi), var(--brass));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 14px -4px rgba(220, 182, 98, 0.65);
+  transition: filter 0.15s, transform 0.1s, opacity 0.2s, box-shadow 0.2s;
+}
+.gh .site-go:hover:not(:disabled) { filter: brightness(1.07); }
+.gh .site-go:active:not(:disabled) { transform: scale(0.97); }
+.gh .site-go:disabled { opacity: 0.5; cursor: default; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+.gh .site-go:focus-visible { outline: none; box-shadow: var(--ring); }
+.gh .site-go svg { flex: none; }
+/* folded: the pill alone, floating (no card round it), Generate its arrow; it unfolds to the card on focus */
+.gh .site-welcome[data-open="false"] .site-welcome-card {
+  width: min(420px, 100%); padding: 0; border: 0; background: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.gh .site-welcome[data-open="false"] .site-welcome-card::before { display: none; }
 .gh .site-welcome[data-open="false"] .site-msg { display: none; }
-.gh .site-welcome[data-open="false"] .site-input { min-height: 40px; cursor: text; }
+.gh .site-welcome[data-open="false"] .site-go { width: 40px; padding: 0; }
+.gh .site-welcome[data-open="false"] .site-go-word { display: none; }
+.gh .site-welcome[data-open="true"] .site-welcome-card { padding: 8px 8px 2px; border-radius: 32px 32px 18px 18px; }
+.gh .site-welcome-foot { padding: 0 8px 0 14px; }
 .gh .site-welcome-foot[hidden] { display: none; }
 
 @media (max-width: 560px) {
   .gh .site-welcome { padding: 0 16px calc(12px + env(safe-area-inset-bottom)); }
-  .gh .site-welcome-card { width: 100%; padding: 10px 10px 2px; }
+  .gh .site-welcome-card { width: 100%; }
   .gh .site-welcome-links .site-link { min-height: 44px; font-size: 15px; }
 }
 
@@ -76,7 +120,8 @@ export const SITE_CSS = /* css */ `
 .gh .site-repo-btn svg { width: 16px; height: 16px; }
 .gh .site-welcome[data-dock="top"][data-open="true"] { padding: 0 12px; }
 .gh .site-welcome[data-dock="top"] .site-scrim { pointer-events: auto; }
-.gh .site-welcome[data-dock="top"] .site-welcome-card { position: relative; z-index: 32; width: 100%; margin-top: 56px; padding: 10px 10px 2px; }
+.gh .site-welcome[data-dock="top"] .site-welcome-foot { align-items: flex-start; }
+.gh .site-welcome[data-dock="top"] .site-welcome-card { position: relative; z-index: 32; width: 100%; margin-top: 56px; }
 
 /* ── crest menu ─────────────────────────────────────────────────── */
 .gh .site-crestmenu { position: absolute; top: 16px; left: 16px; z-index: 32; }

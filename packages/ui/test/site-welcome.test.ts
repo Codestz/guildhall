@@ -1,6 +1,15 @@
 /** The welcome bar folds to its field and unfolds on focus (user pick 10-13). */
 import { describe, expect, test } from "bun:test"
-import { welcomeFold } from "../src/site/WelcomeCard.tsx"
+import { EXAMPLES, examplePlaceholder, welcomeFold } from "../src/site/WelcomeCard.tsx"
+
+describe("the repo field's examples", () => {
+  test("the placeholder walks the examples in turn and wraps", () => {
+    expect(examplePlaceholder(0)).toBe(`e.g. ${EXAMPLES[0]}`)
+    expect(examplePlaceholder(1)).toBe(`e.g. ${EXAMPLES[1]}`)
+    expect(examplePlaceholder(EXAMPLES.length)).toBe(examplePlaceholder(0))
+    expect(examplePlaceholder(-1)).toBe(`e.g. ${EXAMPLES[EXAMPLES.length - 1]}`)
+  })
+})
 
 describe("the welcome bar", () => {
   test("focusing or clicking the field unfolds Generate and the links", () => {

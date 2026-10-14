@@ -12,12 +12,39 @@
  * close button, a tap outside or Esc fold it back to the button.
  */
 import { type FormEvent, useEffect, useId, useRef, useState } from "react"
-import { Button, IconButton } from "../components/controls.tsx"
-import { AlertGlyph, CheckGlyph, CloseGlyph, Dest, RepoGlyph } from "./parts.tsx"
+import { IconButton } from "../components/controls.tsx"
+import { AlertGlyph, ArrowGlyph, CheckGlyph, CloseGlyph, Dest, RepoGlyph } from "./parts.tsx"
 import { parseRepo } from "./repo.ts"
 
 /** At or below this width the welcome is the top row's button (the HUD's phone width, viewer/hud.ts). */
 export const WELCOME_TOP_MAX = 600
+
+/** The repos the empty field suggests in turn (its placeholder), a few seconds each. */
+export const EXAMPLES: readonly string[] = [
+  "facebook/react",
+  "vercel/next.js",
+  "rust-lang/rust",
+  "sveltejs/svelte",
+  "Codestz/guildhall",
+]
+/** How long each example shows, ms. */
+export const EXAMPLE_MS = 3600
+
+/** The field's placeholder with the `k`th example (wrapping). Pure. */
+export function examplePlaceholder(k: number): string {
+  return `e.g. ${EXAMPLES[((k % EXAMPLES.length) + EXAMPLES.length) % EXAMPLES.length]}`
+}
+
+/** The example's turn: counts up every EXAMPLE_MS while `on` (the field empty), holds otherwise. */
+function useExample(on: boolean): number {
+  const [k, setK] = useState(0)
+  useEffect(() => {
+    if (!on) return
+    const timer = setInterval(() => setK((n) => n + 1), EXAMPLE_MS)
+    return () => clearInterval(timer)
+  }, [on])
+  return k
+}
 
 /** True while the screen is a phone's (the welcome docks in the top row). */
 function useTopDock(): boolean {
@@ -104,6 +131,7 @@ export function WelcomeCard({
   useEffect(() => {
     if (top && open) field.current?.focus({ preventScroll: true })
   }, [top, open])
+  const example = useExample(text === "")
   const parsed = parseRepo(text)
   const problem = error ?? (touched && text.trim() !== "" && !parsed.ok ? parsed.reason : undefined)
   const good = parsed.ok && text.trim() !== "" && !error
@@ -155,7 +183,10 @@ export function WelcomeCard({
         }}
       >
         <form className="site-welcome-form" onSubmit={submit} noValidate>
-          <div className="site-welcome-row">
+          <div className="site-welcome-row site-field" data-ok={good ? "" : undefined}>
+            <span className="site-field-mark" aria-hidden="true">
+              <RepoGlyph />
+            </span>
             <input
               ref={field}
               id={`${id}-repo`}
@@ -166,7 +197,7 @@ export function WelcomeCard({
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              placeholder="owner/repo or GitHub link"
+              placeholder={examplePlaceholder(example)}
               aria-label="Your repo as an island: owner/repo or GitHub link"
               value={text}
               aria-invalid={problem ? true : undefined}
@@ -181,11 +212,15 @@ export function WelcomeCard({
               onClick={() => on("focus")}
               onBlur={() => setTouched(true)}
             />
-            {open && (
-              <Button type="submit" variant="primary" disabled={busy || text.trim() === ""}>
-                {busy ? "Reading…" : "Generate"}
-              </Button>
-            )}
+            <button
+              type="submit"
+              className="site-go"
+              disabled={busy || text.trim() === ""}
+              aria-label={busy ? "Reading the repo" : "Generate the island"}
+            >
+              <span className="site-go-word">{busy ? "Reading…" : "Generate"}</span>
+              <ArrowGlyph />
+            </button>
           </div>
           <p
             className="site-msg"

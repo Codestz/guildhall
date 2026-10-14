@@ -12,7 +12,7 @@ import type { PackConfig } from "@guildhall/assets"
 import type { PieceSource } from "./stages/types.ts"
 
 /** The model formats `read` accepts. */
-export const MODEL_EXTS = [".glb", ".gltf", ".fbx"]
+export const MODEL_EXTS = [".glb", ".gltf"]
 
 export function globToRegExp(glob: string): RegExp {
   let re = ""

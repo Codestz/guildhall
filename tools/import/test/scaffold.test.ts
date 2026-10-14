@@ -8,7 +8,7 @@ import { loadPacks, paths, selectPacks } from "../src/config.ts"
 import { classify, discover, globToRegExp, kebab, slugClashes } from "../src/discover.ts"
 import { runImport } from "../src/pipeline.ts"
 import { decodePng, encodePng } from "../src/png.ts"
-import { fbxConverter, readModel, splitTopNodes } from "../src/read.ts"
+import { readModel, splitTopNodes } from "../src/read.ts"
 import { pickModelFiles, scanPack } from "../src/scan.ts"
 import { FIXTURES, fixturePacks, fixturePaths, PACKS, tempDir } from "./fixtures/env.ts"
 
@@ -145,12 +145,8 @@ describe("read", () => {
     ).toEqual([["Tree"], ["Rock"]])
   })
 
-  test("FBX2GLTF overrides where the converter is found", () => {
-    expect(fbxConverter({ FBX2GLTF: "/opt/FBX2glTF" })).toBe("/opt/FBX2glTF")
-  })
-
   test("an unknown format is rejected by name", async () => {
-    await expect(readModel(join(FIXTURES, "make.ts"), tempDir())).rejects.toThrow("unsupported format .ts")
+    await expect(readModel(join(FIXTURES, "make.ts"))).rejects.toThrow("unsupported format .ts")
   })
 })
 
@@ -169,7 +165,7 @@ describe("scan", () => {
   test("reports colour source, bounds, pivot, skin and clips per piece", async () => {
     const rows = new Map<string, Awaited<ReturnType<typeof scanPack>>["rows"][number]>()
     for (const folder of ["fixture-atlas", "fixture-colormap", "fixture-material"])
-      for (const r of (await scanPack(FIXTURES, folder, tempDir())).rows) rows.set(r.name, r)
+      for (const r of (await scanPack(FIXTURES, folder)).rows) rows.set(r.name, r)
     expect(rows.get("crate")?.colour).toBe("atlas")
     expect(rows.get("wall-door")?.colour).toBe("colormap")
     expect(rows.get("bush")).toMatchObject({
@@ -187,11 +183,8 @@ describe("scan", () => {
     })
   })
 
-  test("a folder with glTF skips its FBX copies", () => {
-    expect(pickModelFiles(join(FIXTURES, "fixture-material"))).toEqual({
-      files: ["bush.glb", "villager.glb"],
-      skipped: 0,
-    })
+  test("a raw folder's glTF and GLB files are what it scans", () => {
+    expect(pickModelFiles(join(FIXTURES, "fixture-material"))).toEqual(["bush.glb", "villager.glb"])
   })
 })
 

@@ -138,14 +138,13 @@ function rigSources(packs: readonly PackConfig[], raw: string): Map<string, RigS
 export async function buildRig(
   id: string,
   sources: readonly RigSource[],
-  cacheDir: string,
   logger: Logger = log("import").child("rigs"),
 ): Promise<{ doc: Document; entry: RigEntry }> {
   const target = new Document().setLogger(QUIET)
   const seconds = new Map<string, number>()
   let bones: number | undefined
   for (const src of sources) {
-    const doc = (await readModel(src.file, cacheDir)).setLogger(QUIET)
+    const doc = (await readModel(src.file)).setLogger(QUIET)
     const root = doc.getRoot()
     const name = stem(src.source)
     scaleSkeleton(doc, characterScale(src.pack, { name, source: src.source, slug: kebab(name) }).factor)
@@ -237,7 +236,7 @@ export async function importRigs(
   const entries: RigEntry[] = []
   const all = rigSources(packs, raw)
   for (const id of [...all.keys()].sort()) {
-    const { doc, entry } = await buildRig(id, all.get(id) ?? [], join(library, ".cache"), logger)
+    const { doc, entry } = await buildRig(id, all.get(id) ?? [], logger)
     const bytes = await io.writeBinary(doc)
     const file = join(library, entry.file)
     if (!existsSync(file) || !Buffer.from(readFileSync(file)).equals(Buffer.from(bytes))) {

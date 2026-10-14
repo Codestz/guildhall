@@ -16,7 +16,6 @@
     "three-mesh-bvh": "^0.9.15"
   },
   "devDependencies": {
-    "@types/three": "^0.186.0",
-    "fbx2gltf": "0.9.7-p1"
+    "@types/three": "^0.186.0"
   }
 }

@@ -108,6 +108,9 @@ describe("petitionerPoses", () => {
     expect(front[0]!.at[2]).toBe(0)
     const cheer = petitionerPoses(LANE, after, served + CHEER_MS / 2)
     expect(cheer[0]).toMatchObject({ clip: CHEER_CLIP, act: "idle" })
+    // while it cheers the rest keep their places: nobody steps into the front over it
+    expect(cheer[1]!.at[2]).toBeCloseTo(PETITION_GAP, 5)
+    expect(cheer[1]!.act).toBe("idle")
     const going = petitionerPoses(LANE, after, served + CHEER_MS + WALK_MS(3))
     expect(going[0]).toMatchObject({ act: "walk", indoors: false })
     expect(going[0]!.at[0]).toBe(1)

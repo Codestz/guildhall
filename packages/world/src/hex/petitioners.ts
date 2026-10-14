@@ -319,19 +319,25 @@ export function petitionerPoses(
   const pace = PETITION_MPS / 1000
   const lately = q.lately.filter((x) => x <= t)
   const L = lately.length
-  /** When the m-th serving (1-based, all time) was, −∞ when too long ago to be kept. */
-  const servedAt = (m: number) => {
+  // the queue moves up once the one served has had its cheer and stepped off (the serving's time and
+  // CHEER_MS): until then everyone keeps their place
+  const moved = lately.map((x) => x + CHEER_MS)
+  const M = moved.filter((x) => x <= t).length
+  const pending = L - M
+  /** When the m-th serving (1-based, all time) moved the queue up, −∞ when too long ago to be kept. */
+  const movedAt = (m: number) => {
     const k = m - 1 - (q.served - L)
-    return k >= 0 ? lately[k]! : Number.NEGATIVE_INFINITY
+    return k >= 0 ? moved[k]! : Number.NEGATIVE_INFINITY
   }
   const facing = lane.places[0]!.facing
   /** When the last one came out of the door: the next steps out a gap behind it. */
   let stepped = Number.NEGATIVE_INFINITY
-  // the waiting, front first
-  for (let i = 0; i < Math.min(n, q.waiting.length); i++) {
+  // the waiting, front first, each at its place as it was before the servings still to move the queue
+  for (let i = 0; i < Math.min(n - pending, q.waiting.length); i++) {
     const ordinal = q.served + i
     const m = ordinal - n + 1
-    let came = Math.max(q.waiting[i]!, m <= 0 ? Number.NEGATIVE_INFINITY : servedAt(m))
+    let came = Math.max(q.waiting[i]!, m <= 0 ? Number.NEGATIVE_INFINITY : movedAt(m))
+    if (came > t) continue
     if (Number.isFinite(came)) {
       came = Math.max(came, stepped + PETITION_GAP / pace)
       stepped = came
@@ -339,25 +345,25 @@ export function petitionerPoses(
     // walk forward from where it was: out of the door when it came, else settled before the latest servings
     let s: number
     let from: number
-    /** The first serving it walks up for (index into `lately`). */
+    /** The first moving up it walks for (index into `moved`). */
     let k0: number
     if (Number.isFinite(came)) {
       s = queue.length
       from = came
-      k0 = lately.filter((x) => x <= came).length
-    } else if (L === 0) {
-      s = i * PETITION_GAP
+      k0 = moved.filter((x) => x <= came).length
+    } else if (M === 0) {
+      s = (i + pending) * PETITION_GAP
       from = t
       k0 = 0
     } else {
-      // where it stood before the first serving kept, and its place after it
+      // where it stood before the first moving up kept, and its place after it
       s = Math.min(n - 1, i + L) * PETITION_GAP
-      from = lately[0]!
+      from = moved[0]!
       k0 = 1
     }
     let index = i + L - k0
-    for (let k = k0; k < L; k++) {
-      const x = lately[k]!
+    for (let k = k0; k < M; k++) {
+      const x = moved[k]!
       s = Math.max(index * PETITION_GAP, s - (x - from) * pace)
       index--
       from = x
@@ -368,7 +374,7 @@ export function petitionerPoses(
     const p = along(queue, s)
     out[ordinal % PETITION_FIGURES] = {
       at: p.at,
-      facing: walking ? p.heading + Math.PI : lane.places[i]!.facing,
+      facing: walking ? p.heading + Math.PI : lane.places[Math.min(index, n - 1)]!.facing,
       act: walking ? "walk" : "idle",
       indoors: s > queue.length - IN_DOOR,
       ground: true,

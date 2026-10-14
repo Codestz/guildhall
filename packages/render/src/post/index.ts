@@ -26,6 +26,7 @@ import {
   NoBlending,
   OneFactor,
   OrthographicCamera,
+  type PerspectiveCamera,
   RGBAFormat,
   Scene,
   ShaderMaterial,
@@ -83,8 +84,21 @@ export interface Post {
    * and resolves when they are ready: the first frame through the pipeline then compiles nothing.
    */
   warm(): Promise<void>
+  /**
+   * One still through the pipeline, from `camera` into `into` (an 8-bit target of any size, its aspect
+   * the camera's): the scene into a half-float target `STILL_SUPERSAMPLE` times as big (kept for the next
+   * still until `releaseStill`), the bloom, the composite drawn down into `into`. No SMAA: the composite's
+   * downsample is the anti-aliasing. `distance` (metres to what the still looks at) fades the ink as the
+   * frame's own does. The canvas and the frame's targets are left as they were.
+   */
+  still(camera: PerspectiveCamera, into: WebGLRenderTarget, distance: number): void
+  /** Frees the stills' scene target. */
+  releaseStill(): void
   dispose(): void
 }
+
+/** A still's scene is drawn at this many times its size and drawn down by the composite. */
+export const STILL_SUPERSAMPLE = 2
 
 /** LUT table size: 16³ RGBA8 = 16 KB, re-baked (~0.3 ms) only when the look has moved. */
 const LUT_SIZE = 16
@@ -244,10 +258,10 @@ export function createPost(stage: Stage, opts: PostOpts): Post {
     renderer.render(quadScene, quadCamera)
   }
 
-  const drawBloom = () => {
+  const drawBloom = (input: WebGLRenderTarget = sceneTarget) => {
     const first = levels[0] as WebGLRenderTarget
-    prefilterU.tInput.value = sceneTarget.texture
-    prefilterU.texel.value.set(1 / sceneTarget.width, 1 / sceneTarget.height)
+    prefilterU.tInput.value = input.texture
+    prefilterU.texel.value.set(1 / input.width, 1 / input.height)
     run(prefilter, first)
     for (let i = 1; i < levels.length; i++) {
       const from = levels[i - 1] as WebGLRenderTarget
@@ -316,6 +330,48 @@ export function createPost(stage: Stage, opts: PostOpts): Post {
   stage.setDraw(draw, sceneTarget)
   logger.info("post", { aa, look, mood })
 
+  let stillTarget: WebGLRenderTarget | null = null
+  const still = (cam: PerspectiveCamera, into: WebGLRenderTarget, distance: number) => {
+    resize()
+    updateLevels()
+    const w = Math.max(1, into.width * STILL_SUPERSAMPLE)
+    const h = Math.max(1, into.height * STILL_SUPERSAMPLE)
+    stillTarget ??= target(0, true)
+    if (stillTarget.width !== w || stillTarget.height !== h) stillTarget.setSize(w, h)
+    const kept = {
+      target: renderer.getRenderTarget(),
+      autoClear: renderer.autoClear,
+      inkWidth: u.inkWidth.value,
+    }
+    u.inkFade.value.set(Math.max(50, distance * 1.3), Math.max(140, distance * 3))
+    u.cameraNear.value = cam.near
+    u.cameraFar.value = cam.far
+    u.inkWidth.value = 1.5 * STILL_SUPERSAMPLE
+    const grade = AIR.uGrade.value
+    AIR.uGrade.value = 0
+    renderer.setRenderTarget(stillTarget)
+    renderer.render(scene, cam)
+    AIR.uGrade.value = grade
+    renderer.autoClear = false
+    if (look.bloom) drawBloom(stillTarget)
+    u.tScene.value = stillTarget.texture
+    u.tDepth.value = stillTarget.depthTexture
+    u.texel.value.set(1 / w, 1 / h)
+    run(composite, into)
+    // the frame's own again (its near and far, its ink fade: updateLevels writes them each frame)
+    u.tScene.value = sceneTarget.texture
+    u.tDepth.value = sceneTarget.depthTexture
+    u.texel.value.set(1 / sceneTarget.width, 1 / sceneTarget.height)
+    u.inkWidth.value = kept.inkWidth
+    renderer.autoClear = kept.autoClear
+    renderer.setRenderTarget(kept.target)
+  }
+  const releaseStill = () => {
+    stillTarget?.depthTexture?.dispose()
+    stillTarget?.dispose()
+    stillTarget = null
+  }
+
   return {
     setLook(next) {
       // Off parts weigh 0 in the composite (a stale bloom target is never added).
@@ -354,7 +410,10 @@ export function createPost(stage: Stage, opts: PostOpts): Post {
           : []),
       ])
     },
+    still,
+    releaseStill,
     dispose() {
+      releaseStill()
       stage.setDraw(null)
       sceneTarget.depthTexture?.dispose()
       sceneTarget.dispose()

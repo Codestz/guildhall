@@ -100,6 +100,7 @@ export {
   type PostAa,
   type PostLook,
   type PostOpts,
+  STILL_SUPERSAMPLE,
 } from "./post/index.ts"
 export * from "./props/index.ts"
 export {
@@ -171,6 +172,7 @@ export * from "./shows/index.ts"
 export { createSky, type Sky, type SkyPreset } from "./sky.ts"
 export { createSlicer, NO_SLICE, type Slicer } from "./slice.ts"
 export { createStage, type Disposable, type Stage, toScreen } from "./stage.ts"
+export { createStills, flipRows, type StillShot, type StillStats, type Stills } from "./still.ts"
 export {
   type Box,
   type CascadeFit,

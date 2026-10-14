@@ -16,7 +16,17 @@ import {
 } from "../src/events/scaffold.ts"
 import { along, flareGeometry, laneLengths } from "../src/events/ships.ts"
 import { eventSites, footing, HEART_REACH, pieceColour } from "../src/events/sites.ts"
-import { BASE_COVER, BASE_WIND, isClear, mixOf, weathered, weatherLook } from "../src/events/weather.ts"
+import {
+  BASE_COVER,
+  BASE_WIND,
+  FROST_EASE_S,
+  isClear,
+  mixOf,
+  pinOf,
+  WEATHER_KINDS,
+  weathered,
+  weatherLook,
+} from "../src/events/weather.ts"
 import { lightAt } from "../src/light.ts"
 
 /** The event FX (F1): their pure parts. */
@@ -109,6 +119,77 @@ describe("weather", () => {
     const storm = weatherLook(mixOf("storm"))
     expect(half.sun).toBeLessThan(cloudy.sun)
     expect(half.sun).toBeGreaterThan(storm.sun)
+  })
+})
+
+describe("rain and snow", () => {
+  test("rain rains lighter than a storm, darkens the ground a little and never strikes", () => {
+    const rain = weatherLook(mixOf("rain"))
+    const storm = weatherLook(mixOf("storm"))
+    const cloudy = weatherLook(mixOf("cloudy"))
+    expect(rain.rain).toBeGreaterThan(0.3)
+    expect(rain.rain).toBeLessThan(storm.rain)
+    expect(rain.lightning).toBe(false)
+    expect(rain.wet).toBeGreaterThan(0)
+    expect(rain.wet).toBeLessThan(storm.wet)
+    // an overcast lighter than the storm's, greyer than the plain cloudy one
+    expect(rain.sun).toBeLessThan(cloudy.sun)
+    expect(rain.sun).toBeGreaterThan(storm.sun)
+    expect(rain.grey).toBeGreaterThan(cloudy.grey)
+    expect(rain.grey).toBeLessThan(storm.grey)
+    expect(rain.snow).toBe(0)
+  })
+
+  test("snow falls without rain or lightning under a bright overcast, and the frost is its own factor", () => {
+    const snow = weatherLook(mixOf("snow"))
+    expect(snow.snow).toBe(1)
+    expect(snow.rain).toBe(0)
+    expect(snow.wet).toBe(0)
+    expect(snow.lightning).toBe(false)
+    expect(snow.frost).toBe(1)
+    // brighter than the rain's sky, and it keeps the clouds' own colour
+    expect(snow.sun).toBeGreaterThan(weatherLook(mixOf("rain")).sun)
+    expect(snow.cloudTone).toBe(1)
+    // the sky can be snowing before the ground has whitened
+    expect(weatherLook({ cloud: 1, storm: 0, snow: 1, frost: 0 }).frost).toBe(0)
+  })
+
+  test("clear, cloudy and storm are what they were: no snow, no frost, a storm as wet as before", () => {
+    for (const kind of ["clear", "cloudy", "storm"] as const) {
+      const look = weatherLook(mixOf(kind))
+      expect(look.snow).toBe(0)
+      expect(look.frost).toBe(0)
+    }
+    expect(isClear(weatherLook(mixOf("clear")))).toBe(true)
+    expect(isClear(weatherLook(mixOf("snow")))).toBe(false)
+    expect(isClear(weatherLook(mixOf("rain")))).toBe(false)
+    expect(weatherLook({ cloud: 1, storm: 1 }).rain).toBe(1)
+  })
+
+  test("a change of sky eases over 4 s, the dusting over 20 s, and either can turn back mid-way", () => {
+    const sky = transition(0, 4)
+    const frost = transition(0, FROST_EASE_S)
+    sky.to(1, 0)
+    frost.to(1, 0)
+    expect(sky.at(4)).toBe(1)
+    expect(frost.at(4)).toBeLessThan(0.15)
+    expect(frost.at(10)).toBeCloseTo(0.5, 6)
+    expect(frost.at(FROST_EASE_S)).toBe(1)
+    // the snow stops: it melts from where it was, with no jump
+    const was = frost.at(10)
+    frost.to(0, 10)
+    expect(frost.at(10)).toBeCloseTo(was, 9)
+    expect(frost.at(10 + FROST_EASE_S)).toBe(0)
+    expect(frost.at(10 + FROST_EASE_S / 2)).toBeCloseTo(was / 2, 6)
+  })
+
+  test("the lever: every kind pins itself, Auto and anything unknown follow the guild", () => {
+    for (const kind of WEATHER_KINDS) expect(pinOf(kind)).toBe(kind)
+    expect(WEATHER_KINDS).toEqual(["clear", "cloudy", "rain", "storm", "snow"])
+    expect(pinOf("auto")).toBeNull()
+    expect(pinOf("hail")).toBeNull()
+    expect(pinOf(null)).toBeNull()
+    expect(pinOf(undefined)).toBeNull()
   })
 })
 

@@ -9,6 +9,10 @@
  * nothing over it: the picture is the sky's own, bit for bit. While the weather eases, it re-runs the
  * hour (`retint`) each frame; settled, it writes nothing.
  *
+ * Rain is a quieter storm (steady streaks, a wet ground, no thunder); snow drifts flakes (snow.ts) under
+ * a bright overcast and, over ~20 s, whitens what faces up (snowCover.ts: a shader factor, no geometry),
+ * and melts off as slowly. Clear sets the cover's uniforms to 0, so its picture is the sky's own.
+ *
  * A storm also rains (rain.ts) and throws lightning (bolt.ts) over `strikeAt` (the castle): a flash
  * of the whole frame through the exposure and a bolt, every 4–11 s of the FX clock (seeded, so a
  * replay strikes the same).
@@ -22,11 +26,14 @@ import { applyLight, type DayLight } from "../light.ts"
 import type { Sky } from "../sky.ts"
 import type { Stage } from "../stage.ts"
 import { createBolt, flashAt, nextStrike, STRIKE_S } from "./bolt.ts"
-import { random, transition } from "./ease.ts"
+import { random, smoothstep, transition } from "./ease.ts"
 import { createRain } from "./rain.ts"
+import { createSnow } from "./snow.ts"
+import { SNOW_COVER } from "./snowCover.ts"
 import {
   BASE_COVER,
   BASE_WIND,
+  FROST_EASE_S,
   mixOf,
   slateOf,
   type WeatherKind,
@@ -81,6 +88,12 @@ export interface SkyDrive {
   dispose(): void
 }
 
+/** Whether a mix is a clear sky (nothing laid over the hour's own light). */
+const isDry = (m: WeatherMix) => m.cloud === 0 && m.storm === 0 && (m.rain ?? 0) === 0 && (m.snow ?? 0) === 0
+
+/** How much daylight the flakes catch: 0 in the dark … 1 with the sun well up. */
+const smoothstepDay = (elevation: number) => smoothstep(-8, 12, elevation)
+
 type Dome = Mesh<never, ShaderMaterial>
 
 export function createSkyDrive(stage: Stage, opts: SkyDriveOpts): SkyDrive {
@@ -91,6 +104,9 @@ export function createSkyDrive(stage: Stage, opts: SkyDriveOpts): SkyDrive {
   const start = mixOf(kind)
   const cloud = transition(start.cloud, WEATHER_EASE_S)
   const storm = transition(start.storm, WEATHER_EASE_S)
+  const rainy = transition(start.rain ?? 0, WEATHER_EASE_S)
+  const snowy = transition(start.snow ?? 0, WEATHER_EASE_S)
+  const frost = transition(start.frost ?? 0, FROST_EASE_S)
   let t = 0
   let atmosphere: Atmosphere | null = null
   let cover = { coverage: BASE_COVER, wind: BASE_WIND }
@@ -100,6 +116,7 @@ export function createSkyDrive(stage: Stage, opts: SkyDriveOpts): SkyDrive {
   let light: DayLight = base.light()
   let exposure = stage.renderer.toneMappingExposure
   let rain: ReturnType<typeof createRain> | null = null
+  let snow: ReturnType<typeof createSnow> | null = null
   let bolt: ReturnType<typeof createBolt> | null = null
   let strikeT = Number.NEGATIVE_INFINITY
   let nextAt = 2
@@ -115,7 +132,7 @@ export function createSkyDrive(stage: Stage, opts: SkyDriveOpts): SkyDrive {
   /** Lays the weather over what the sky has just written for the hour (only ever right after it). */
   const lay = () => {
     look = weatherLook(applied, cover, lamps)
-    const clear = applied.cloud === 0 && applied.storm === 0
+    const clear = isDry(applied)
     light = clear ? base.light() : weathered(base.light(), look)
     if (atmosphere) {
       const p = atmosphere.params()
@@ -182,17 +199,31 @@ export function createSkyDrive(stage: Stage, opts: SkyDriveOpts): SkyDrive {
   const frame = (dt: number) => {
     const t0 = performance.now()
     t += Math.min(dt, 0.1)
-    const want = { cloud: cloud.at(t), storm: storm.at(t) }
-    if (want.cloud !== applied.cloud || want.storm !== applied.storm) {
+    const want = { cloud: cloud.at(t), storm: storm.at(t), rain: rainy.at(t), snow: snowy.at(t) }
+    if (
+      want.cloud !== applied.cloud ||
+      want.storm !== applied.storm ||
+      want.rain !== applied.rain ||
+      want.snow !== applied.snow
+    ) {
       applied = want
       retint()
     }
+    // the ground's own dusting and wet: shader factors, moved without re-running the hour
+    SNOW_COVER.uSnow.value = frost.at(t)
+    SNOW_COVER.uWet.value = look.wet
     // the deck's colours after the atmosphere has painted them this frame (this hook runs after its own)
     if (atmosphere) toneClouds()
     if (look.rain > 0 && !rain) rain = createRain(stage, opts.seed ?? 1)
     if (rain) {
       const heading = ((atmosphere?.params().windHeading ?? 30) * Math.PI) / 180
       rain.set(look.rain, [Math.cos(heading) * look.wind * 0.6, Math.sin(heading) * look.wind * 0.6])
+    }
+    if (look.snow > 0 && !snow) snow = createSnow(stage, opts.seed ?? 1)
+    if (snow) {
+      const heading = ((atmosphere?.params().windHeading ?? 30) * Math.PI) / 180
+      const bright = smoothstepDay(light.elevation)
+      snow.set(look.snow, [Math.cos(heading) * look.wind * 0.6, Math.sin(heading) * look.wind * 0.6], bright)
     }
     if (look.lightning && t >= nextAt && held === null) strike()
     const since = held ?? t - strikeT
@@ -225,7 +256,7 @@ export function createSkyDrive(stage: Stage, opts: SkyDriveOpts): SkyDrive {
   }
 
   let off = stage.onFrame(frame)
-  if (start.cloud > 0 || start.storm > 0) wrapped.setHour(base.light().hour)
+  if (!isDry(start)) wrapped.setHour(base.light().hour)
 
   return {
     sky: wrapped,
@@ -246,22 +277,31 @@ export function createSkyDrive(stage: Stage, opts: SkyDriveOpts): SkyDrive {
       if (now) {
         cloud.jump(m.cloud)
         storm.jump(m.storm)
+        rainy.jump(m.rain ?? 0)
+        snowy.jump(m.snow ?? 0)
+        frost.jump(m.frost ?? 0)
       } else {
         cloud.to(m.cloud, t)
         storm.to(m.storm, t)
+        rainy.to(m.rain ?? 0, t)
+        snowy.to(m.snow ?? 0, t)
+        frost.to(m.frost ?? 0, t)
       }
     },
     weather: () => kind,
     strike: (hold) => strike(hold),
     stats: () => ({
       weather: kind,
-      mix: { ...applied },
+      mix: { ...applied, frost: frost.at(t) },
       strikes,
       ms: costs.length ? costs.reduce((a, b) => a + b, 0) / costs.length : 0,
     }),
     dispose() {
       off()
       rain?.dispose()
+      snow?.dispose()
+      SNOW_COVER.uSnow.value = 0
+      SNOW_COVER.uWet.value = 0
       bolt?.dispose()
       if (atmosphere) atmosphere.set({ coverage: cover.coverage, windSpeed: cover.wind })
     },

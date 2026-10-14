@@ -9,23 +9,54 @@ import { Color } from "three"
 import type { DayLight } from "../light.ts"
 import { clamp01, lerp, smoothstep } from "./ease.ts"
 
-/** The three skies (sim `weatherOf`: a failed run is a storm, one queued or running clouds, else clear). */
-export type WeatherKind = "clear" | "cloudy" | "storm"
+/**
+ * The skies. The guild's CI only ever makes three (sim `weatherOf`: a failed run is a storm, one
+ * queued or running clouds, else clear); `rain` (a steady rain, no thunder) and `snow` are the viewer's,
+ * pinned in Settings.
+ */
+export type WeatherKind = "clear" | "cloudy" | "rain" | "storm" | "snow"
 
-export const WEATHER_KINDS: readonly WeatherKind[] = ["clear", "cloudy", "storm"]
+export const WEATHER_KINDS: readonly WeatherKind[] = ["clear", "cloudy", "rain", "storm", "snow"]
 
-/** Where the sky is between the three: `cloud` 0 clear … 1 overcast, `storm` 0 … 1 on top of it. */
+/**
+ * Where the sky is between them: `cloud` 0 clear … 1 overcast, `storm` 0 … 1 on top of it; `rain` and
+ * `snow` (0 when absent) are the quieter rain's and the snow's sky; `frost` is the white dusting on the
+ * ground and roofs, which follows the snow far more slowly than the sky does (`FROST_EASE_S`).
+ */
 export interface WeatherMix {
   cloud: number
   storm: number
+  rain?: number
+  snow?: number
+  frost?: number
 }
 
 export function mixOf(kind: WeatherKind): WeatherMix {
-  return kind === "storm"
-    ? { cloud: 1, storm: 1 }
-    : kind === "cloudy"
-      ? { cloud: 1, storm: 0 }
-      : { cloud: 0, storm: 0 }
+  switch (kind) {
+    case "storm":
+      return { cloud: 1, storm: 1, rain: 0, snow: 0, frost: 0 }
+    case "rain":
+      return { cloud: 1, storm: 0, rain: 1, snow: 0, frost: 0 }
+    case "snow":
+      return { cloud: 1, storm: 0, rain: 0, snow: 1, frost: 1 }
+    case "cloudy":
+      return { cloud: 1, storm: 0, rain: 0, snow: 0, frost: 0 }
+    default:
+      return { cloud: 0, storm: 0, rain: 0, snow: 0, frost: 0 }
+  }
+}
+
+/** Seconds the snow takes to settle on the ground and to melt off it. */
+export const FROST_EASE_S = 20
+
+/**
+ * What a Settings pick (or a link) means: the kind it pins, null for Auto (follow the guild's CI) or
+ * anything unknown.
+ */
+export function pinOf(pick: string | null | undefined): WeatherKind | null {
+  return pick !== null && pick !== undefined && (WEATHER_KINDS as readonly string[]).includes(pick)
+    ? (pick as WeatherKind)
+    : null
 }
 
 /** What a mix does to the sky: multipliers of today's light (1 = unchanged) and what it adds. */
@@ -60,6 +91,12 @@ export interface WeatherLook {
   fire: number
   /** Rain, 0 … 1. */
   rain: number
+  /** Snow falling, 0 … 1. */
+  snow: number
+  /** The ground wet (a subtle darkening), 0 … 1. */
+  wet: number
+  /** The white dusting on the ground and roofs, 0 … 1. */
+  frost: number
   /** Whether lightning strikes. */
   lightning: boolean
 }
@@ -79,24 +116,36 @@ export function weatherLook(
 function lookOf(mix: WeatherMix, base: { coverage: number; wind: number }, lamps: boolean): WeatherLook {
   const c = clamp01(mix.cloud)
   const s = clamp01(mix.storm)
-  // a cloudy step, then a storm on top of it
-  const step = (clear: number, cloudy: number, storm: number) => lerp(lerp(clear, cloudy, c), storm, s)
+  const r = clamp01(mix.rain ?? 0)
+  const n = clamp01(mix.snow ?? 0)
+  // a cloudy step, then the rain's or the snow's sky, then a storm on top of it
+  const step = (clear: number, cloudy: number, storm: number, rainy = cloudy, snowy = cloudy) =>
+    lerp(lerp(lerp(lerp(clear, cloudy, c), rainy, r), snowy, n), storm, s)
   return {
-    coverage: step(base.coverage, Math.max(base.coverage, 0.74), Math.max(base.coverage, 0.97)),
-    wind: step(base.wind, base.wind * 1.6, base.wind * 2.8),
-    sun: step(1, 0.72, 0.4),
-    shadow: step(1, 0.78, 0.4),
-    fill: step(1, 0.96, 0.9),
-    exposure: step(1, 0.98, 0.95),
-    grey: step(0, 0.38, 0.85),
-    slate: step(1, 0.92, 0.75),
-    saturation: step(1, 0.88, 0.55),
-    haze: step(1, 1.15, 1.6),
-    discs: step(1, 0.25, 0),
-    cloudTone: step(1, 0.95, 0.7),
+    coverage: step(
+      base.coverage,
+      Math.max(base.coverage, 0.74),
+      Math.max(base.coverage, 0.97),
+      Math.max(base.coverage, 0.9),
+      Math.max(base.coverage, 0.85),
+    ),
+    wind: step(base.wind, base.wind * 1.6, base.wind * 2.8, base.wind * 1.8, base.wind * 0.8),
+    sun: step(1, 0.72, 0.4, 0.64, 0.78),
+    shadow: step(1, 0.78, 0.4, 0.5, 0.6),
+    fill: step(1, 0.96, 0.9, 1.04, 1.08),
+    exposure: step(1, 0.98, 0.95, 1.05, 1.06),
+    grey: step(0, 0.38, 0.85, 0.55, 0.5),
+    slate: step(1, 0.92, 0.75, 0.92, 1),
+    saturation: step(1, 0.88, 0.55, 0.78, 0.66),
+    haze: step(1, 1.15, 1.6, 1.35, 1.5),
+    discs: step(1, 0.25, 0, 0.05, 0.05),
+    cloudTone: step(1, 0.95, 0.7, 0.85, 1),
     lamps: lamps ? step(0, 0, 0.6) : 0,
-    fire: step(0, 0.1, 0.5),
-    rain: smoothstep(0.35, 1, s),
+    fire: step(0, 0.1, 0.5, 0.2, 0.2),
+    rain: Math.max(smoothstep(0.35, 1, s), 0.75 * smoothstep(0.35, 1, r)),
+    snow: smoothstep(0.35, 1, n),
+    wet: Math.max(smoothstep(0.2, 1, s), 0.6 * smoothstep(0.2, 1, r)),
+    frost: clamp01(mix.frost ?? 0),
     lightning: s > 0.85,
   }
 }
@@ -112,6 +161,9 @@ export function isClear(
     look.grey === 0 &&
     look.exposure === 1 &&
     look.rain === 0 &&
+    look.snow === 0 &&
+    look.wet === 0 &&
+    look.frost === 0 &&
     look.lamps === 0 &&
     look.fire === 0
   )

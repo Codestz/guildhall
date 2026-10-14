@@ -6,6 +6,7 @@
  */
 import { BufferAttribute, BufferGeometry, Mesh, MeshStandardMaterial } from "three"
 import { patchCloudShade } from "./atmosphere/shade.ts"
+import { patchSnowCover } from "./events/snowCover.ts"
 import { paletteMaterial } from "./material.ts"
 import type { Stage } from "./stage.ts"
 import { patchCascades } from "./sun/patch.ts"
@@ -52,6 +53,7 @@ export function groundMaterial(): MeshStandardMaterial {
     ground.onBeforeCompile = (shader) => {
       patchCascades(shader)
       patchCloudShade(shader)
+      patchSnowCover(shader)
       shader.vertexShader = shader.vertexShader
         .replace(
           "#include <common>",

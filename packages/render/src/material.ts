@@ -1,5 +1,6 @@
 import { MeshStandardMaterial } from "three"
 import { patchCloudShade } from "./atmosphere/shade.ts"
+import { patchSnowCover } from "./events/snowCover.ts"
 import { patchLodFade } from "./lodFade.ts"
 import { patchGlow } from "./night/glow.ts"
 import { patchCascades } from "./sun/patch.ts"
@@ -19,6 +20,7 @@ export function paletteMaterial(): MeshStandardMaterial {
     shared.onBeforeCompile = (shader) => {
       patchCascades(shader)
       patchCloudShade(shader)
+      patchSnowCover(shader)
       patchGlow(shader)
     }
   }
@@ -41,6 +43,7 @@ export function batchMaterial(dither = false): MeshStandardMaterial {
     material.onBeforeCompile = (shader) => {
       patchCascades(shader)
       patchCloudShade(shader)
+      patchSnowCover(shader)
       patchGlow(shader)
       patchLodFade(shader, dither)
     }

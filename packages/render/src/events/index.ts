@@ -64,9 +64,12 @@ export {
   type SkyDriveStats,
   WEATHER_EASE_S,
 } from "./skyDrive.ts"
+export { patchSnowCover, SNOW_COVER } from "./snowCover.ts"
 export {
+  FROST_EASE_S,
   isClear,
   mixOf,
+  pinOf,
   WEATHER_KINDS,
   type WeatherKind,
   type WeatherLook,

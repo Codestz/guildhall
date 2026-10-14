@@ -3,6 +3,7 @@
  * on the walk graph, sampled as pure poses, and the source that draws them reads.
  *
  *   itineraries  `LifePlanner` (push events, advance the clock), `itineraries(log, kit)`, `poseAt`
+ *   gait         how fast a body goes on foot and in which clip (walk, run, sprint): legs at their own pace
  *   craft        what a hero does where it stands: routines by craft and spot, the moments' routines
  *   source       `AgentSource`, `planAgents` (plain data a worker posts), `plannedSource`, `agentSourceFromLog`
  *   scaffold     `scaffoldProgress`: how far edits at a place have built its scaffold
@@ -31,6 +32,22 @@ export {
   routineMs,
   SETDOWN_MS,
 } from "./craft.ts"
+export {
+  BRISK_WALK,
+  GAIT_MPS,
+  GAIT_RATE_MAX,
+  GAIT_RATE_MIN,
+  gaitMps,
+  gaitOf,
+  isRun,
+  RUN_CLIP,
+  RUN_FROM,
+  RUN_TOP,
+  SPRINT_CLIP,
+  SPRINT_FROM,
+  WALK_TOP,
+  walkFor,
+} from "./gait.ts"
 export {
   asStruck,
   type GraveKit,
@@ -61,8 +78,6 @@ export {
   type LifeKit,
   LifePlanner,
   poseAt,
-  RUN_CLIP,
-  RUN_FROM,
   shownAt,
   stepPose,
   WORK_DWELL_MS,

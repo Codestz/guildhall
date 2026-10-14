@@ -31,6 +31,7 @@ import {
   SETDOWN_MS,
   STANDUP_MS,
 } from "./craft.ts"
+import { gaitOf, RUN_FROM, RUN_TOP, WALK_TOP } from "./gait.ts"
 import {
   type GraveKit,
   type GraveStrike,
@@ -118,16 +119,13 @@ export interface ItineraryOptions {
   /** Metres to the walker's right of the way's middle (so heroes meeting pass each other). */
   lane?: number
   /**
-   * A long way is run (`RUN_CLIP`): a walk that would take longer than `within` seconds at `mps` goes
-   * as fast as it takes to arrive within them, up to `mps` metres a second. None: every way is walked.
+   * A long way is run (gait.ts: `RUN_CLIP`, `SPRINT_CLIP` when faster): a walk that would take longer
+   * than `within` seconds at `mps` goes as fast as it takes to arrive within them, up to `mps` metres a
+   * second and never past `RUN_TOP` (the sprint's legs at their fastest); a pace too quick to walk and
+   * too slow to run is run at `RUN_FROM`. None: every way is walked.
    */
   hurry?: { within: number; mps: number }
 }
-
-/** The clip a hero's pose names while it runs (faster than `RUN_FROM` m/s): KayKit's run. */
-export const RUN_CLIP = "Running_A"
-/** From this pace on (metres a second) a hero runs. */
-export const RUN_FROM = 1.6
 
 /** A call's routine goes on this long after the call ends, then the hero thinks (ms). */
 export const LINGER_MS = 3000
@@ -329,12 +327,19 @@ export class LifePlanner {
     this.strikes = kit.graves ? new GraveStrikes() : null
   }
 
-  /** A long way run: its times pressed so it arrives within `hurry.within` (no faster than its run). */
+  /**
+   * A long way run: its times pressed so it arrives within `hurry.within`, no faster than its run (nor
+   * `RUN_TOP`), and run, not walked, once it is quicker than a walk goes (gait.ts `WALK_TOP`).
+   */
   private paced(walk: LifeWalk): LifeWalk {
     const h = this.hurry
     const took = walk.to - walk.from
     if (!h || took <= h.within) return walk
-    const scale = Math.max(h.within / took, this.mps / h.mps)
+    const top = Math.min(h.mps, RUN_TOP / 1000)
+    let scale = Math.max(h.within / took, this.mps / top)
+    // a pace between the walk's top and the run's foot: run at the run's foot
+    const pace = this.mps / scale
+    if (pace > WALK_TOP / 1000 && pace < RUN_FROM / 1000) scale = this.mps / Math.min(RUN_FROM / 1000, top)
     if (scale >= 1) return walk
     const times = walk.times.map((t) => walk.from + (t - walk.from) * scale)
     return { ...walk, times, to: times[times.length - 1] as number }
@@ -1359,9 +1364,10 @@ export function stepPose(steps: readonly HeroStep[], t: number, at = stepIndex(s
     indoors: false,
     ground: s.ground[k] ?? true,
   }
-  // a way run (ItineraryOptions.hurry): the whole walk's pace says so, so a pose never flickers
+  // a way run (ItineraryOptions.hurry): the whole walk's pace names its gait, so a pose never flickers
   const span = (s.times[s.times.length - 1] as number) - s.from
-  if (span > 0 && (pathLength(s) / span) * 1000 >= RUN_FROM) pose.clip = RUN_CLIP
+  const gait = span > 0 ? gaitOf((pathLength(s) / span) * 1000 + 1e-9) : undefined
+  if (gait) pose.clip = gait
   return pose
 }
 

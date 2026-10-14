@@ -11,18 +11,26 @@ import { type Change, hash } from "@guildhall/core"
 import { installTilePrefabs } from "@guildhall/world"
 import {
   BEAT_FX,
+  BRISK_WALK,
   craftRoutine,
   FADE_AFTER_MS,
   FAIL_HOLD_MS,
   flush,
+  GAIT_RATE_MAX,
+  GAIT_RATE_MIN,
   GONE_MS,
+  gaitMps,
   type Itinerary,
+  isRun,
   itineraries,
   LifePlanner,
   normalizer,
   playRoutine,
   poseAt,
   RISE_MS,
+  RUN_CLIP,
+  RUN_TOP,
+  SPRINT_CLIP,
   WORK_DWELL_MS,
 } from "../src/index.ts"
 import { Feed, fileIn } from "./events-fixtures.ts"
@@ -131,6 +139,34 @@ describe("craft poses are seen", () => {
           }
         }
     expect(stays).toBeGreaterThan(8)
+  })
+
+  test("every way is gone in a gait its legs keep: walked, run or sprinted within its rates (gait.ts)", () => {
+    const fast = itineraries(hall.log, kit, { ...HALL_OPTS, hurry: { within: 4, mps: 40 } })
+    let runs = 0
+    let sprints = 0
+    for (const its of [...all.map((a) => a.its), fast])
+      for (const it of its.values())
+        for (const s of it.steps) {
+          if (s.kind !== "walk" || s.times.at(-1)! <= s.from) continue
+          let metres = 0
+          for (let j = 1; j < s.pts.length; j++)
+            metres += Math.hypot(s.pts[j]![0] - s.pts[j - 1]![0], s.pts[j]![2] - s.pts[j - 1]![2])
+          const pace = (metres / (s.times.at(-1)! - s.from)) * 1000
+          const clip = poseAt(it, (s.from + s.times.at(-1)!) / 2)?.clip ?? BRISK_WALK
+          const rate = pace / gaitMps(clip)
+          expect([it.id, clip, pace <= RUN_TOP + 1e-6, rate <= GAIT_RATE_MAX + 1e-6]).toEqual([
+            it.id,
+            clip,
+            true,
+            true,
+          ])
+          if (isRun(clip)) expect(rate).toBeGreaterThanOrEqual(GAIT_RATE_MIN - 1e-6)
+          if (clip === RUN_CLIP) runs++
+          if (clip === SPRINT_CLIP) sprints++
+        }
+    expect(runs).toBeGreaterThan(0)
+    expect(sprints).toBeGreaterThan(0)
   })
 
   test("the saga's hero-time at work is at least 40% (it was 5% walking 59%)", () => {

@@ -22,6 +22,7 @@ import { solidDistance } from "./collide.ts"
 import { hexAt } from "./grid.ts"
 import type { HexIsland } from "./island.ts"
 import {
+  doorOut,
   doorSpot,
   type Folk,
   type LifePlaces,
@@ -38,7 +39,7 @@ import {
 import { PROPS, routineSpan } from "./routines.ts"
 import { HARD } from "./spots.ts"
 import { HEX_TILE_SIZE, opensEvening } from "./tiles.ts"
-import type { HexWalk } from "./walk.ts"
+import { cutsHard, floodWay, type HexWalk } from "./walk.ts"
 import type { HexDoorway, HexWorld } from "./world.ts"
 import type { HexZones } from "./zones.ts"
 
@@ -206,10 +207,11 @@ function tavern(folk: Folk[], o: SocialOpts, spotOf: Map<string, number>, stats:
 /** A home for someone a pass adds: a door of the tile (or the place), else a corner of its heart. */
 function homeOf(o: SocialOpts, zi: number, tile: number, pick: number): { spot: LifeSpot; indoors: boolean } {
   const doors = new Map((o.w.doorways ?? []).map((d) => [d.tile, d] as [number, HexDoorway]))
+  const out = (n: number) => n >= 0 && doorOut(o.walk, n, doors, o.places.walkNear)
   const own = o.walk.door(tile)
   const zone = o.z.zones[zi]!
-  const all = zone.tiles.map((i) => o.walk.door(i)).filter((n) => n >= 0)
-  const node = own >= 0 ? own : all.length ? all[Math.floor(pick * all.length)]! : -1
+  const all = zone.tiles.map((i) => o.walk.door(i)).filter(out)
+  const node = out(own) ? own : all.length ? all[Math.floor(pick * all.length)]! : -1
   if (node >= 0) return { spot: doorSpot(o.walk, node, doors), indoors: true }
   return { spot: spotAt(o.walk, o.walk.hearts[zi]!, Math.floor(pick * 6), 2.4), indoors: false }
 }
@@ -580,14 +582,33 @@ function lamplighters(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
       const node = nodeNear(o.walk, o.h, l.x, l.z, o.places.walkNear, o.walk.hearts[zi]!)
       const n = o.walk.nodes[node]!
       const base = Math.atan2(n.x - l.x, n.z - l.z)
+      // the first side the street reaches straight; else the first free one, by its way in round the
+      // fences (a post in a tavern's garden, reached by the garden's gap); none: the lamp is left
+      let round: LifeSpot | null = null
+      let straight: LifeSpot | null = null
       for (const da of [0, 0.6, -0.6, 1.2, -1.2, 1.9, -1.9, Math.PI]) {
         const a = base + da
         const x = l.x + Math.sin(a) * LAMP_ARM
         const zz = l.z + Math.cos(a) * LAMP_ARM
         if (o.places.furniture.blocked(x, zz, 0.26) || o.places.heroNear(x, zz, 0)) continue
-        stands.push({ node, at: [x, n.y, zz], facing: headingTo(x, zz, l.x, l.z), ground: true })
-        break
+        const at: Vec3 = [x, n.y, zz]
+        const stand: LifeSpot = { node, at, facing: headingTo(x, zz, l.x, l.z), ground: true }
+        if (!cutsHard([n.x, n.y, n.z], at, o.places.walkNear)) {
+          straight = stand
+          break
+        }
+        if (round) continue
+        const found = floodWay(
+          x,
+          zz,
+          o.places.walkNear,
+          [n],
+          Math.min(20, 4 + 2 * Math.hypot(n.x - x, n.z - zz)),
+        )
+        if (found) round = found.way.length ? { ...stand, way: found.way } : stand
       }
+      const stand = straight ?? round
+      if (stand) stands.push(stand)
     }
     if (stands.length < LAMP_MIN) continue
     // nearest first from home, then the nearest next
@@ -623,6 +644,11 @@ function lamplighters(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
       // (a lamp the way round the houses reaches only after dark is left for the night)
       const before = b.mark()
       const arrive = b.go(t, at, { act: "work" })
+      // (… and one no clean way reaches, round the fences, is left out)
+      if (b.cuts > before.cuts) {
+        b.back(before)
+        continue
+      }
       if (arrive > LAMP_BY) {
         b.back(before)
         break

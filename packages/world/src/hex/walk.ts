@@ -139,9 +139,54 @@ function segmentDistance(s: Solid, ax: number, az: number, bx: number, bz: numbe
 }
 
 /**
+ * How far from a point standing in (or against) a solid a way may still be in it, metres: enough to get
+ * out of it (a doorway's house, a seat, a spot set against the butts), and no further (the rest of the
+ * way keeps out of it like anything else). `d`: the point's distance from the solid (negative inside).
+ */
+export const ownRoom = (d: number): number => Math.max(END_ROOM, OWN_OUT - d)
+/** How far past its edge a way leaves a solid its end stands in before it must keep out, metres. */
+const OWN_OUT = 0.3
+
+/** How far along a→b (from a, standing in `so`) the way first comes out of it, metres (len: never). */
+function outAlong(so: Solid, ax: number, az: number, bx: number, bz: number, len: number): number {
+  for (let t = 0.05; t < len; t += 0.05)
+    if (solidDistance(so, ax + ((bx - ax) * t) / len, az + ((bz - az) * t) / len) > 0) return t
+  return len
+}
+
+/**
+ * Whether segment a→b cuts into solid `so`: the stretch by an end that stands in it (within `ra`/`rb` of
+ * it, metres: a doorway's house, a seat) aside, as far as `ownRoom` (not the whole segment: a spot set
+ * against the butts is not walked to through them), and a doorway's own house (`ra`/`rb` past a body's
+ * brush, the end inside it) as far as the way runs in it from the door (out under a forge's porch).
+ */
+export function cutsSolid(
+  so: Solid,
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+  ra = 0.05,
+  rb = 0.05,
+): boolean {
+  const len = Math.hypot(bx - ax, bz - az)
+  const da = solidDistance(so, ax, az)
+  const db = solidDistance(so, bx, bz)
+  let s0 = 0
+  let s1 = len
+  if (da < ra) s0 = Math.max(ownRoom(da), da < 0 && ra > 0.05 ? outAlong(so, ax, az, bx, bz, len) : 0)
+  if (db < rb) s1 = len - Math.max(ownRoom(db), db < 0 && rb > 0.05 ? outAlong(so, bx, bz, ax, az, len) : 0)
+  if (s1 <= s0) return false
+  if (s0 === 0 && s1 === len) return segmentDistance(so, ax, az, bx, bz) < 0.02
+  const ux = (bx - ax) / (len || 1)
+  const uz = (bz - az) / (len || 1)
+  return segmentDistance(so, ax + ux * s0, az + uz * s0, ax + ux * s1, az + uz * s1) < 0.02
+}
+
+/**
  * Whether segment a→b runs through a wall, a building or a fence (a hard blocker: the soft places people
- * stand a while aside), those its ends stand in aside (`from`/`to`: how near an end a blocker may be
- * and still be the end's own, metres: a doorway's house, a seat).
+ * stand a while aside), by its ends what they stand in aside (`from`/`to`: how near an end a blocker may
+ * be and still be the end's own, metres: a doorway's house, a seat; `cutsSolid`).
  */
 export function cutsHard(
   a: readonly number[],
@@ -157,9 +202,7 @@ export function cutsHard(
   for (const o of near((ax + bx) / 2, (az + bz) / 2, len / 2 + 0.1)) {
     const so = solidOfBlocker(o)
     if (so.soft) continue
-    if (solidDistance(so, ax, az) < (ends.from ?? 0.05) || solidDistance(so, bx, bz) < (ends.to ?? 0.05))
-      continue
-    if (segmentDistance(so, ax, az, bx, bz) < 0.02) return true
+    if (cutsSolid(so, ax, az, bx, bz, ends.from ?? 0.05, ends.to ?? 0.05)) return true
   }
   return false
 }
@@ -433,14 +476,18 @@ export function gridWay(
         }
         memo.cells.set(wk, by)
       }
-      // by either end (a spot set against a wall, a door) a body may come as near as the end itself does
+      // by either end (a spot set against a wall, a door) a body may come as near as the end itself does,
+      // and out of what the end stands in (its seat, its doorway) as far as it takes to leave it: no further
       const x = cx(i)
       const z = cz(j)
-      const byEnd = Math.hypot(x - a[0], z - a[2]) < END_ROOM || Math.hypot(x - b[0], z - b[2]) < END_ROOM
-      const room = (so: Solid) =>
-        Math.min(C, solidDistance(so, a[0], a[2]), solidDistance(so, b[0], b[2])) - 0.01
-      state[k] =
-        !by || by.every((so) => ends.has(so) || (byEnd && solidDistance(so, x, z) >= room(so))) ? 1 : 2
+      const fromA = Math.hypot(x - a[0], z - a[2])
+      const fromB = Math.hypot(x - b[0], z - b[2])
+      const byEnd = (so: Solid, p: Pt, d: number) => {
+        const dp = solidDistance(so, p[0], p[2])
+        const r = dp < 0.05 && ends.has(so) ? ownRoom(dp) : END_ROOM
+        return d < r && solidDistance(so, x, z) >= Math.min(C, dp) - 0.01
+      }
+      state[k] = !by || by.every((so) => byEnd(so, a, fromA) || byEnd(so, b, fromB)) ? 1 : 2
     }
     return state[k] === 1
   }
@@ -604,13 +651,13 @@ export function walledIn(
       memo.cells.set(wk, by)
     }
     if (!by) return true
-    // what the point stands in (its bench, its stall) closes nothing; by the point a body comes as near a
-    // wall as the point does
-    const byIt = Math.hypot(cx - x, cz - z) < END_ROOM
-    return by.every(
-      (so) =>
-        own.has(so) || (byIt && solidDistance(so, cx, cz) >= Math.min(C, solidDistance(so, x, z)) - 0.01),
-    )
+    // by the point a body comes as near a wall as the point does, and out of what it stands in (its
+    // bench, its stall) as far as it takes to leave it (`ownRoom`)
+    const off = Math.hypot(cx - x, cz - z)
+    return by.every((so) => {
+      const d = solidDistance(so, x, z)
+      return off < (own.has(so) ? ownRoom(d) : END_ROOM) && solidDistance(so, cx, cz) >= Math.min(C, d) - 0.01
+    })
   }
   const own = new Set<Solid>()
   for (const o of near(x, z, 0.05)) {
@@ -685,11 +732,11 @@ export function floodWay(
       memo.cells.set(wk, by)
     }
     if (!by) return true
-    const byIt = Math.hypot(cx - x, cz - z) < END_ROOM
-    return by.every(
-      (so) =>
-        own.has(so) || (byIt && solidDistance(so, cx, cz) >= Math.min(C, solidDistance(so, x, z)) - 0.01),
-    )
+    const off = Math.hypot(cx - x, cz - z)
+    return by.every((so) => {
+      const d = solidDistance(so, x, z)
+      return off < (own.has(so) ? ownRoom(d) : END_ROOM) && solidDistance(so, cx, cz) >= Math.min(C, d) - 0.01
+    })
   }
   const i0 = Math.floor(x / GRID)
   const j0 = Math.floor(z / GRID)
@@ -783,7 +830,7 @@ export function clearWay(
   near: (x: number, z: number, r: number) => readonly WalkBlocker[],
   /** A walk out of a building's door (`from`) or in at one (`to`): its last metre may cross the house. */
   door: { from?: boolean; to?: boolean; thorough?: boolean } = {},
-): { pts: Pt[]; ground: boolean[] } {
+): { pts: Pt[]; ground: boolean[]; cut?: boolean } {
   const P = [...pts]
   /** Whether segment k's ends stand in (or, at a door, by) a blocker: the walk starts or ends there. */
   const endsIn = (so: Solid, k: number): boolean => {
@@ -798,14 +845,33 @@ export function clearWay(
   const G = [...ground]
   const C = WALK_CLEAR
   const dir: [number, number] = [0, 0]
-  // a way point inside a blocker (a square's middle under its well) is set out of it, the shortest way
-  for (let k = 1; k < P.length - 1; k++) {
-    let x = P[k]![0]
-    let z = P[k]![2]
-    for (let round = 0; round < 3; round++) {
+  const walls = wallsOf(near)
+  /**
+   * Whether a→b runs into a solid `within` gives (anything not soft by default; `walls`: a building or a
+   * wall itself), what the walk's own ends stand in aside (`first`/`last`: a→b starts or ends the walk).
+   */
+  const cutBy = (a: Pt, b: Pt, first: boolean, last: boolean, within = near): boolean => {
+    const len = Math.hypot(b[0] - a[0], b[2] - a[2])
+    if (len < 1e-6) return false
+    const ra = first ? (door.from ? DOOR_SLACK : 0.05) : Number.NEGATIVE_INFINITY
+    const rb = last ? (door.to ? DOOR_SLACK : 0.05) : Number.NEGATIVE_INFINITY
+    return within((a[0] + b[0]) / 2, (a[2] + b[2]) / 2, len / 2 + 0.1).some((o) => {
+      const so = solidOfBlocker(o)
+      return !so.soft && cutsSolid(so, a[0], a[2], b[0], b[2], ra, rb)
+    })
+  }
+  // a way point inside a blocker (a square's middle under its well, a lane pushed into a house) is set
+  // out of it, the shortest way: out of everything when that lands clear of the solids, else out of the
+  // solids alone (never set out of a place someone stands through or into a wall: the butts' line)
+  const setOut = (ox: number, oz: number, all: boolean): [number, number] => {
+    let x = ox
+    let z = oz
+    for (let round = 0; round < (all ? 3 : 6); round++) {
       let moved = false
       for (const b of near(x, z, C)) {
-        const d = solidDistance(solidOfBlocker(b), x, z, dir)
+        const so = solidOfBlocker(b)
+        if (!all && so.soft) continue
+        const d = solidDistance(so, x, z, dir)
         if (d >= C) continue
         x += dir[0] * (C * 1.05 - d)
         z += dir[1] * (C * 1.05 - d)
@@ -813,6 +879,24 @@ export function clearWay(
       }
       if (!moved) break
     }
+    return [x, z]
+  }
+  /** Whether a way point set from (ox, oz) to (x, z) stands clear of the solids and got there clear. */
+  const fair = (ox: number, oz: number, x: number, z: number): boolean =>
+    near((x + ox) / 2, (z + oz) / 2, Math.hypot(x - ox, z - oz) / 2 + C).every((o) => {
+      const so = solidOfBlocker(o)
+      if (so.soft) return true
+      const was = solidDistance(so, ox, oz)
+      const now = solidDistance(so, x, z)
+      if (was <= 0) return now > 0.02
+      return segmentDistance(so, ox, oz, x, z) >= 0.02 && now >= Math.min(was, C * 0.5)
+    })
+  for (let k = 1; k < P.length - 1; k++) {
+    const ox = P[k]![0]
+    const oz = P[k]![2]
+    let [x, z] = setOut(ox, oz, true)
+    if (!fair(ox, oz, x, z)) [x, z] = setOut(ox, oz, false)
+    if (!fair(ox, oz, x, z)) continue
     P[k] = [x, P[k]![1], z]
   }
   for (let k = 0, added = 0; k < P.length - 1 && added < 32; k++) {
@@ -839,8 +923,18 @@ export function clearWay(
     hits.sort((p, q) => p.t - q.t)
     const y = (t: number) => a[1] + (b[1] - a[1]) * Math.max(0, Math.min(1, t / len))
     let way: Pt[] = []
+    // (a way round a place someone stands that cuts through a wall is no way: round the butts' far side)
+    const was = cutBy(a, b, k === 0, k + 2 === P.length)
     for (const { s: hit } of hits) {
       way = detour(hit, a, b, ux, uz, len, near, P, y)
+      if (way.length && !was) {
+        const pts = [a, ...way, b]
+        for (let j = 0; j + 1 < pts.length; j++)
+          if (cutBy(pts[j]!, pts[j + 1]!, k === 0 && j === 0, k + 2 === P.length && j + 2 === pts.length)) {
+            way = []
+            break
+          }
+      }
       if (way.length) break
     }
     if (!way.length) continue
@@ -851,18 +945,14 @@ export function clearWay(
     k--
   }
   // last, a segment that still runs through a wall (round one thing into another) goes the tight way
-  const hard = (x: number, z: number, r: number) => near(x, z, r).filter((o) => !solidOfBlocker(o).soft)
   /** Whether segment k runs through a wall (what its ends stand in aside). */
-  const cutAt = (k: number): boolean => {
-    const a = P[k]!
-    const b = P[k + 1]!
-    const len = Math.hypot(b[0] - a[0], b[2] - a[2])
-    if (len < 1e-6) return false
-    return hard((a[0] + b[0]) / 2, (a[2] + b[2]) / 2, len / 2 + 0.1).some((o) => {
-      const so = solidOfBlocker(o)
-      if (endsIn(so, k)) return false
-      return segmentDistance(so, a[0], a[2], b[0], b[2]) < 0.02
-    })
+  const cutAt = (k: number): boolean => cutBy(P[k]!, P[k + 1]!, k === 0, k + 2 === P.length)
+  /** Whether segment k runs through a building or a wall (a fence, a hedge) itself, not a prop. */
+  const wallCutAt = (k: number): boolean => cutBy(P[k]!, P[k + 1]!, k === 0, k + 2 === P.length, walls)
+  /** The tight way round the buildings and walls alone (a body's core where it must squeeze). */
+  const wallsWay = (a: Pt, b: Pt): [number, number][] => {
+    const there = gridWay(a, b, walls, TIGHT, 0.1, false, GRID_FAR)
+    return there.length ? there : [...gridWay(b, a, walls, CORE, 0.1, false, GRID_FAR)].reverse()
   }
   for (let k = 0, fixed = 0; k < P.length - 1 && fixed < (door.thorough ? 40 : 16); k++) {
     const a = P[k]!
@@ -879,13 +969,19 @@ export function clearWay(
     let found = gridWay(a, b, near, TIGHT, 0.1, false, GRID_NEAR, true)
     if (!found.length) found = either(TIGHT, 0.1)
     if (!found.length) found = either(TIGHT, 0.2, GRID_FAR)
-    // a walk that must be clean (an agent's) looks further on the fine grid
-    if (!found.length && door.thorough) found = either(TIGHT, 0.1, GRID_FAR * 2)
+    // a walk that must be clean (an agent's), or one through a wall or a house, looks further
+    const walled = wallCutAt(k)
+    const further = door.thorough || walled
+    // (… round the walls and the buildings alone first, for a townsperson: brushing a bale, never
+    // through a well, where props close every way in, as a shed's posts and bales round its node)
+    if (!found.length && walled && !door.thorough) found = wallsWay(a, b)
+    if (!found.length && further) found = either(TIGHT, 0.1, GRID_FAR * 2)
     // (… and squeezes through a gap a body's core passes, as a spot is judged reachable: walledIn)
-    if (!found.length && door.thorough) found = either(CORE, 0.1, GRID_FAR * 2)
+    if (!found.length && further) found = either(CORE, 0.1, GRID_FAR * 2)
     // (… and last, wide and coarse, as an edge of the walk graph looks for its way round: a spot whose
     // node is across a chapel from it)
-    if (!found.length && door.thorough) found = either(0.2, 0.2, 12, EDGE_STEPS)
+    if (!found.length && further) found = either(0.2, 0.2, 12, EDGE_STEPS)
+    if (!found.length && walled && door.thorough) found = wallsWay(a, b)
     if (!found.length) continue
     const ux = (b[0] - a[0]) / len
     const uz = (b[2] - a[2]) / len
@@ -896,7 +992,28 @@ export function clearWay(
     k += way.length
     fixed++
   }
-  return { pts: P, ground: G }
+  // (what still runs through a wall, a house or a fence: the walk has no clean way, for its planner to
+  // drop or take another)
+  let cut = false
+  for (let k = 0; k < P.length - 1 && !cut; k++) cut = wallCutAt(k)
+  return cut ? { pts: P, ground: G, cut } : { pts: P, ground: G }
+}
+
+const wallsMemo = new WeakMap<object, (x: number, z: number, r: number) => readonly WalkBlocker[]>()
+/** Of the blockers `near` gives, the buildings and the walls (fences, hedges) alone: one per `near`. */
+function wallsOf(
+  near: (x: number, z: number, r: number) => readonly WalkBlocker[],
+): (x: number, z: number, r: number) => readonly WalkBlocker[] {
+  let w = wallsMemo.get(near)
+  if (!w) {
+    w = (x, z, r) =>
+      near(x, z, r).filter((o) => {
+        const k = solidOfBlocker(o).kind
+        return k === "building" || k === "wall"
+      })
+    wallsMemo.set(near, w)
+  }
+  return w
 }
 
 /** Unit vector out through side d (60°·d counter-clockwise from +x, toward −z), as tilePath. */
@@ -1174,12 +1291,13 @@ export function hexWalk(
     }
     for (const e of edges) e.len = Math.hypot(nodes[e.b]!.x - nodes[e.a]!.x, nodes[e.b]!.z - nodes[e.a]!.z)
     // an edge whose straight way cuts through a wall, a house or a fence goes round it: the way found
-    // once here, on the fine grid, so everyone walking it walks round (ways on decks are the decks')
+    // once here, on the fine grid, so everyone walking it walks round (ways on decks are the decks'; a
+    // quay's way in from the street goes round the houses on the shore like any other)
     const near = (x: number, z: number, r: number) => hard.near(x, z, r)
     for (const e of edges) {
       const p = nodes[e.a]!
       const q = nodes[e.b]!
-      if (onDeckKind(p.kind) || onDeckKind(q.kind) || e.kind === "bridge") continue
+      if ((onDeckKind(p.kind) && onDeckKind(q.kind)) || e.kind === "bridge") continue
       const a: Pt = [p.x, p.y, p.z]
       const b: Pt = [q.x, q.y, q.z]
       if (!cutsHard(a, b, near)) continue

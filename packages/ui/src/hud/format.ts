@@ -165,33 +165,3 @@ export function pickToasts(
   }
   return shown.reverse()
 }
-
-/** `abcdefgh` kept to `keep` characters with the middle left out: `abc…fgh` (the ends tell repos apart). */
-export function middleEllipsis(text: string, keep: number): string {
-  const chars = Array.from(text)
-  if (chars.length <= keep) return text
-  if (keep <= 1) return "…"
-  const tail = Math.floor((keep - 1) / 2)
-  const head = keep - 1 - tail
-  return `${chars.slice(0, head).join("")}…${chars.slice(chars.length - tail).join("")}`
-}
-
-/**
- * A name's forms from the whole to the least: `owner/repo`, then the repo alone (the owner is dropped
- * first), then the repo with its middle left out, a character shorter each time. Pure.
- */
-export function nameForms(name: string): string[] {
-  const slash = name.indexOf("/")
-  const forms = [name]
-  const rest = slash > 0 && slash < name.length - 1 ? name.slice(slash + 1) : name
-  if (rest !== name) forms.push(rest)
-  for (let keep = Array.from(rest).length - 1; keep >= 3; keep--) forms.push(middleEllipsis(rest, keep))
-  return forms
-}
-
-/** The longest form of `name` that `measure` (its width, px) says fits in `room`; the shortest when none does. */
-export function fitName(name: string, room: number, measure: (text: string) => number): string {
-  const forms = nameForms(name)
-  for (const f of forms) if (measure(f) <= room) return f
-  return forms[forms.length - 1] as string
-}

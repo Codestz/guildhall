@@ -4,10 +4,10 @@
  * folds an "about" card open under it; a plea waiting shows as a dot on the crest. Where the page shows
  * its own crest (the site's crest menu), `crest={false}` drops it and the name folds the card instead.
  */
-import { type ReactNode, type RefObject, useId, useLayoutEffect, useRef, useState } from "react"
+import { type ReactNode, useId } from "react"
 import { Button } from "../components/controls.tsx"
 import { Figures, type Stat } from "../components/display.tsx"
-import { count, fitName } from "./format.ts"
+import { count } from "./format.ts"
 import { Crest, Glyphs } from "./glyphs.tsx"
 import type { SourceState } from "./types.ts"
 
@@ -61,49 +61,7 @@ export function sourceWords(source: SourceState): {
   return { label: "Live", tone: "live" }
 }
 
-/**
- * The repo chip's name in the room its chip has: whole, else the repo without its owner, else with its
- * middle left out (`fitName`), never an ellipsis cut at the end. The room is the chip's max width less
- * what is not text; the text is measured on a canvas in the chip's own font, so nothing is laid out twice.
- * Re-fits when the viewer or the chip changes size.
- */
-function useFitName(name: string, chip: RefObject<HTMLElement | null>, label: RefObject<HTMLElement | null>) {
-  const [text, setText] = useState(name)
-  useLayoutEffect(() => {
-    const box = chip.current
-    const span = label.current
-    if (!box || !span) return
-    const canvas = typeof document !== "undefined" ? document.createElement("canvas").getContext("2d") : null
-    let frame = 0
-    const fit = () => {
-      if (!canvas || box.offsetWidth === 0) return setText(name)
-      const style = getComputedStyle(span)
-      const max = Number.parseFloat(getComputedStyle(box).maxWidth)
-      if (!Number.isFinite(max)) return setText(name)
-      canvas.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
-      const spacing = Number.parseFloat(style.letterSpacing) || 0
-      const room = max - (box.offsetWidth - span.offsetWidth)
-      setText(fitName(name, room, (t) => canvas.measureText(t).width + spacing * Array.from(t).length))
-    }
-    const later = () => {
-      cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(fit)
-    }
-    fit()
-    const watch = typeof ResizeObserver === "function" ? new ResizeObserver(later) : null
-    const viewer = box.closest(".ui-viewer")
-    if (viewer) watch?.observe(viewer)
-    watch?.observe(box)
-    document.fonts?.ready.then(later)
-    return () => {
-      cancelAnimationFrame(frame)
-      watch?.disconnect()
-    }
-  }, [name, chip, label])
-  return text
-}
-
-/** The repo chip: its name fitted to the top row, the source dot and, with a plea, its mark. */
+/** The repo chip: its name (the row's width cuts it with an ellipsis at the end), the source dot and, with a plea, its mark. */
 function RepoChip({
   name,
   open,
@@ -121,12 +79,8 @@ function RepoChip({
   onToggle?: (() => void) | undefined
   children: ReactNode
 }) {
-  const chip = useRef<HTMLButtonElement>(null)
-  const word = useRef<HTMLSpanElement>(null)
-  const shown = useFitName(name, chip, word)
   return (
     <button
-      ref={chip}
       type="button"
       className="ui-panel hud-repo-chip"
       data-open={open}
@@ -136,9 +90,7 @@ function RepoChip({
       title={title}
       onClick={onToggle}
     >
-      <span className="hud-repo-name" ref={word}>
-        {shown}
-      </span>
+      <span className="hud-repo-name">{name}</span>
       {children}
     </button>
   )

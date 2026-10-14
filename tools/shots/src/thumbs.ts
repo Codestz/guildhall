@@ -5,6 +5,7 @@
  *   bun shots thumbs hudlab sitelab    just these cards
  *   bun shots stills                   the lab backdrops (site, HUD) → apps/studio/public/lab/
  *   bun shots repos [owner__repo …]    the demo picker's live-chronicle cards → apps/studio/public/site/repos/
+ *   bun shots demos [id …]             the demo picker's story cards, captured on V2 → apps/studio/public/site/demos/
  *   bun shots thumbs --out .probe/x --port 5341 --dpr 2
  *
  * Each card is the page at 1280×800 CSS px with no top bar, shot at device pixel ratio 2 and scaled
@@ -22,7 +23,7 @@ import { launchChrome } from "./chrome.ts"
 import { serveStudio } from "./server.ts"
 
 export const THUMBS_USAGE =
-  "usage: bun shots thumbs [id …] [--out dir] [--port n] [--dpr n]\n       bun shots stills [name …] [--out dir] [--port n]\n       bun shots repos [owner__repo …] [--out dir] [--port n]"
+  "usage: bun shots thumbs [id …] [--out dir] [--port n] [--dpr n]\n       bun shots stills [name …] [--out dir] [--port n]\n       bun shots repos [owner__repo …] [--out dir] [--port n]\n       bun shots demos [id …] [--out dir] [--port n]"
 
 const STUDIO_PUBLIC = fileURLToPath(new URL("../../../apps/studio/public/", import.meta.url))
 
@@ -125,6 +126,37 @@ const pose = (slug: string, files: number): Pose => ({
   run: `${HIDE_SITE};(async () => { const c = guildhall.camera.get(); await guildhall.camera.set({ ...c, elevation: 50, distance: c.distance * ${pullBack(files).toFixed(2)} }) })()`,
   settle: 6000,
 })
+/** The site's pieces and the island's HUD out of a card's picture (the heroes' chips stay: they are the world's). */
+const HIDE_HUD = `${HIDE_SITE};document.querySelector(".ui-viewer-hud")?.style.setProperty("display", "none")`
+/** A hall's camera pulled back `k` times its opening distance, at `el`° and turned `turn`°. */
+const pulled = (k: number, el = 50, turn = 0) =>
+  `${HIDE_HUD};(async () => { const c = guildhall.camera.get(); await guildhall.camera.set({ ...c, azimuth: c.azimuth + ${turn}, elevation: ${el}, distance: c.distance * ${k} }) })()`
+const DEMO = { size: [1280, 800] as [number, number], width: 640, quality: 74 }
+
+/**
+ * The demo picker's story cards (apps/studio/src/site/stories.ts `STORIES`), each its own link as V2 opens
+ * it: a told story mid-way on the home island with the director filming, a repo's hall pulled back, the
+ * night storm; the site's pieces and the HUD left out. 640×400 (the Saga's feature card 1024×640).
+ */
+export const DEMOS: readonly Pose[] = [
+  { id: "saga", url: `/?story=saga&act=2&${BARE}`, ...DEMO, width: 1024, run: HIDE_HUD, settle: 12_000 },
+  { id: "party", url: `/?story=party&st=45&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },
+  { id: "solo", url: `/?story=solo&st=70&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },
+  { id: "factions", url: `/?story=factions&st=60&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },
+  { id: "seas", url: `/?story=seas&st=80&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },
+  { id: "crowd", url: `/?story=rush&st=30&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },
+  { id: "react", url: `/hall/facebook/react?labels=0&${BARE}`, ...DEMO, run: pulled(1.6, 44), settle: 7000 },
+  {
+    id: "world",
+    url: `/hall/facebook/react?labels=0&${BARE}`,
+    ...DEMO,
+    run: pulled(4.2, 52, 120),
+    settle: 8000,
+  },
+  { id: "island", url: `/hall/Codestz/mcpx?labels=0&${BARE}`, ...DEMO, run: pulled(2.4, 50), settle: 7000 },
+  { id: "night", url: `/?hour=21&weather=storm&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },
+]
+
 /** The poses, sized by the catalog's file counts (read live; a repo it does not list gets the middle). */
 export async function repoPoses(): Promise<Pose[]> {
   const files = new Map<string, number>()
@@ -265,4 +297,5 @@ async function capture(
 export const runThumbs = (argv: readonly string[]) => capture(CARDS, argv, () => "home")
 export const runRepos = async (argv: readonly string[]) =>
   capture(await repoPoses(), argv, () => "site/repos")
+export const runDemos = (argv: readonly string[]) => capture(DEMOS, argv, () => "site/demos")
 export const runStills = (argv: readonly string[]) => capture(STILLS, argv, (p) => STILL_DIRS[p.id] ?? "lab")

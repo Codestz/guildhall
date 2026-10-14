@@ -1,15 +1,18 @@
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { existsSync, readFileSync } from "node:fs"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { gunzipSync } from "node:zlib"
 import { ROUTES } from "../src/shell/router.ts"
 import {
+  copyLibrary,
   HOST_CONFIG,
   hostRules,
   libraryMode,
   planLibrary,
   robots,
+  shippedPath,
   sitemap,
   styleSubset,
 } from "../vite.config.ts"
@@ -92,6 +95,31 @@ describe("styleSubset", () => {
     expect((await planLibrary(root, "style")).version).toBe(before.version)
     await writeFile(join(root, "pieces", "kaykit-adventurers", "knight.glb"), "v2")
     expect((await planLibrary(root, "style")).version).not.toBe(before.version)
+    await rm(root, { recursive: true })
+  })
+})
+
+describe("the shipped copy", () => {
+  test("every GLB goes gzipped under .glb.gz, inflating to the file; the rest as it is; or plain on request", async () => {
+    expect(shippedPath("pieces/a/b.glb", true)).toBe("pieces/a/b.glb.gz")
+    expect(shippedPath("thumbs/a/b.webp", true)).toBe("thumbs/a/b.webp")
+    expect(shippedPath("pieces/a/b.glb", false)).toBe("pieces/a/b.glb")
+    const root = await mkdtemp(join(tmpdir(), "gh-library-"))
+    await mkdir(join(root, "pieces", "p"), { recursive: true })
+    await mkdir(join(root, "catalog"), { recursive: true })
+    const glb = Buffer.from("glTF".repeat(200))
+    await writeFile(join(root, "pieces", "p", "a.glb"), glb)
+    await writeFile(join(root, "catalog", "index.json"), "{}")
+    const plan = { root, files: ["catalog/index.json", "pieces/p/a.glb"], index: null, version: "v" }
+    const out = join(root, "out")
+    await copyLibrary(plan, out, true)
+    const zipped = await readFile(join(out, "pieces", "p", "a.glb.gz"))
+    expect(zipped.length).toBeLessThan(glb.length)
+    expect(gunzipSync(zipped)).toEqual(glb)
+    expect(existsSync(join(out, "pieces", "p", "a.glb"))).toBe(false)
+    expect((await readFile(join(out, "catalog", "index.json"), "utf8")).length).toBe(2)
+    await copyLibrary(plan, join(root, "plain"), false)
+    expect(await readFile(join(root, "plain", "pieces", "p", "a.glb"))).toEqual(glb)
     await rm(root, { recursive: true })
   })
 })

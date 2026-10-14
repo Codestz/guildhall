@@ -1,14 +1,11 @@
 import { log } from "@guildhall/core"
 import { Mesh, type Object3D } from "three"
-import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js"
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js"
+import { loadGltf } from "./gltf.ts"
 import { isPaletteMaterial, paletteMaterial } from "./material.ts"
 import { builtOf, builtPiece } from "./props/built.ts"
 
 const logger = log("render:pieces")
-
-let loader: GLTFLoader | null = null
 
 /**
  * Readies a library piece's scene graph to draw: every mesh's material is replaced by the shared
@@ -51,14 +48,14 @@ export function pieceCache(load: (url: string) => Promise<Object3D>): (url: stri
 }
 
 /**
- * A library GLB (meshopt-compressed, vertex-coloured) as a ready-to-draw piece; cached by url. A
- * `built/<name>.glb` path is one of the props built in code (props/built.ts), made instead of fetched.
+ * A library GLB (meshopt-compressed, vertex-coloured, gzipped on the wire or not: gltf.ts) as a
+ * ready-to-draw piece; cached by url. A `built/<name>.glb` path is one of the props built in code
+ * (props/built.ts), made instead of fetched.
  */
 export const loadPiece = pieceCache(async (url) => {
   const built = builtOf(url)
   if (built) return preparePiece(builtPiece(built))
-  loader ??= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
-  const gltf = await loader.loadAsync(url)
+  const gltf = await loadGltf(url)
   const root = preparePiece(gltf.scene)
   // Kept on the root (and copied by clone) so a character's clips travel with it.
   root.animations = gltf.animations

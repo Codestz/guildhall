@@ -62,6 +62,10 @@
       "headers": [{ "key": "Content-Type", "value": "model/gltf-binary" }]
     },
     {
+      "source": "/library/(.*)\\.glb\\.gz",
+      "headers": [{ "key": "Content-Type", "value": "application/gzip" }]
+    },
+    {
       "source": "/data/(.*)",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }]
     },

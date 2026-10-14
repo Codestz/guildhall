@@ -14,6 +14,8 @@ declare global {
      * (STUDIO_LIBRARY=<url>); "" in dev, where vite serves `/library/`.
      */
     readonly VITE_LIBRARY_URL?: string
+    /** "1" when the build shipped every library GLB gzipped as `<name>.glb.gz` (render gltf.ts inflates it). */
+    readonly VITE_LIBRARY_GZ?: string
   }
   interface ImportMeta {
     readonly env: ImportMetaEnv
@@ -25,6 +27,9 @@ export const BASE: string = import.meta.env.BASE_URL ?? "/"
 
 /** Where the asset library is read from: vite's `<base>library` unless the build names another root. */
 export const LIBRARY_ROOT: string = import.meta.env.VITE_LIBRARY_URL || `${BASE}library`
+
+/** Whether the library's GLBs are served gzipped under `<name>.glb.gz` (the showcase build); dev serves them plain. */
+export const LIBRARY_GZ: boolean = import.meta.env.VITE_LIBRARY_GZ === "1"
 
 /** The read-only public build: no writes, saves become downloads, dev-only screens hidden. */
 export const SHOWCASE: boolean = import.meta.env.VITE_STUDIO_SHOWCASE === "1"

@@ -1,7 +1,7 @@
 /** The asset library as the studio reads it: `/library/catalog/index.json` plus one shard per pack. */
 import { type Catalog, type CatalogEntry, type CatalogIndex, createCatalog, inStyle } from "@guildhall/assets"
 import { log } from "@guildhall/core"
-import { LIBRARY_ROOT } from "./env.ts"
+import { LIBRARY_GZ, LIBRARY_ROOT } from "./env.ts"
 
 const logger = log("studio:catalog")
 
@@ -68,7 +68,11 @@ async function readCatalog(fetcher: Fetch, base: string, all: boolean): Promise<
   return catalog.all().length > 0 ? catalog : null
 }
 
-/** The url a library-relative path (`files.glb`, `files.thumb`) is served at. */
-export function libraryUrl(path: string, base = LIBRARY): string {
-  return `${base}/${path.split("/").map(encodeURIComponent).join("/")}`
+/**
+ * The url a library-relative path (`files.glb`, `files.thumb`) is served at. Where the build shipped
+ * the GLBs gzipped (`gz`, LIBRARY_GZ), a `.glb` is asked for as `.glb.gz` (render's loader inflates it).
+ */
+export function libraryUrl(path: string, base = LIBRARY, gz = LIBRARY_GZ): string {
+  const file = gz && path.endsWith(".glb") ? `${path}.gz` : path
+  return `${base}/${file.split("/").map(encodeURIComponent).join("/")}`
 }

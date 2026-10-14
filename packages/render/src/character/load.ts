@@ -13,8 +13,7 @@ import {
   type Object3D,
   PropertyBinding,
 } from "three"
-import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js"
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
+import { loadGltf } from "../gltf.ts"
 import { loadPiece } from "../pieces.ts"
 import { withCarry } from "./carry.ts"
 import { type Mounted, mountClip } from "./mount.ts"
@@ -108,16 +107,14 @@ export function createCharacter(root: Object3D, clips: AnimationClip[]): Charact
   }
 }
 
-let loader: GLTFLoader | null = null
 const rigClips = new Map<string, Promise<AnimationClip[]>>()
 
 /** A rig file's clips, loaded once per url; a failed load is forgotten so a retry refetches. */
-function loadClips(url: string): Promise<AnimationClip[]> {
+export function loadClips(url: string): Promise<AnimationClip[]> {
   let clips = rigClips.get(url)
   if (!clips) {
-    loader ??= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
     // with the carrying walk made from two of them (carry.ts)
-    clips = loader.loadAsync(url).then((gltf) => withCarry(gltf.animations))
+    clips = loadGltf(url).then((gltf) => withCarry(gltf.animations))
     rigClips.set(url, clips)
     clips.catch(() => rigClips.delete(url))
   }

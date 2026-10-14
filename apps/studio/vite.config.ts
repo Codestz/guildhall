@@ -5,6 +5,7 @@ import type { IncomingMessage, ServerResponse } from "node:http"
 import { homedir } from "node:os"
 import { dirname, extname, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
+import { gzipSync } from "node:zlib"
 import {
   type CatalogEntry,
   type CatalogIndex,
@@ -380,10 +381,27 @@ export async function planLibrary(library: string, mode: "style" | "full"): Prom
   return { root, files, index, version: hash.digest("hex").slice(0, 12) }
 }
 
-/** Copies a planned library into `out` (each path checked to stay inside the library). */
-async function copyLibrary(plan: ShippedLibrary, out: string): Promise<void> {
+/**
+ * Whether the showcase ships its GLBs gzipped (`STUDIO_LIBRARY_GZ=0` ships them plain). A static host
+ * sends `model/gltf-binary` as it is (Vercel compresses text, JSON, JS and wasm, never a GLB), and
+ * gzip takes the rig's animations from 3.1 MB to 0.9 and the pieces to about half: every `.glb` is
+ * written as `<name>.glb.gz`, the page asks for that name (src/catalog.ts `libraryUrl`) and inflates
+ * it in the browser (render gltf.ts). Only the file's name and bytes on the wire change: the hash
+ * that versions the folder is of the GLBs themselves, so an import that changes nothing ships the
+ * same folder.
+ */
+export const GZIP_GLB = process.env.STUDIO_LIBRARY_GZ !== "0"
+
+/** The path a library file is shipped under: a GLB gzipped, when the build gzips them. */
+export const shippedPath = (rel: string, gz = GZIP_GLB): string => (gz && rel.endsWith(".glb") ? `${rel}.gz` : rel)
+
+/**
+ * Copies a planned library into `out` (each path checked to stay inside the library), the GLBs
+ * gzipped under `.glb.gz` when `gz` (GZIP_GLB).
+ */
+export async function copyLibrary(plan: ShippedLibrary, out: string, gz = GZIP_GLB): Promise<void> {
   for (const rel of plan.files) {
-    const to = join(out, rel)
+    const to = join(out, shippedPath(rel, gz))
     await mkdir(dirname(to), { recursive: true })
     if (rel === INDEX && plan.index) {
       await writeFile(to, indexText(plan.index))
@@ -391,7 +409,8 @@ async function copyLibrary(plan: ShippedLibrary, out: string): Promise<void> {
     }
     const from = resolve(plan.root, rel)
     if (!from.startsWith(plan.root + sep)) throw new Error(`showcase: ${rel} is outside the library`)
-    await cp(from, to, { dereference: true })
+    if (to.endsWith(".glb.gz")) await writeFile(to, gzipSync(await readFile(from), { level: 9 }))
+    else await cp(from, to, { dereference: true })
   }
 }
 
@@ -571,8 +590,12 @@ export default defineConfig(async ({ command }) => {
     SHOWCASE && command === "build" && mode.kind !== "remote" ? await planLibrary(LIBRARY, mode.kind) : null
   const libraryUrl = mode.kind === "remote" ? mode.url : plan ? `/library/${plan.version}` : ""
   return {
-    // src/env.ts: where the page reads the library ("" = vite's own `/library/`)
-    define: { "import.meta.env.VITE_LIBRARY_URL": JSON.stringify(libraryUrl) },
+    // src/env.ts: where the page reads the library ("" = vite's own `/library/`), and whether its GLBs
+    // are the gzipped copies (a remote library is read as it is)
+    define: {
+      "import.meta.env.VITE_LIBRARY_URL": JSON.stringify(libraryUrl),
+      "import.meta.env.VITE_LIBRARY_GZ": JSON.stringify(plan && GZIP_GLB ? "1" : ""),
+    },
     // `/library/` is what the importer wrote; `/data/` is the authored data the studio edits. The showcase
     // serves neither: its build copies the library and the data into dist, and its preview serves dist
     // alone, as the host will.

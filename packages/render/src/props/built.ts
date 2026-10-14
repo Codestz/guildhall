@@ -48,7 +48,8 @@ export const BUILT_SIZE: Readonly<Record<BuiltName, readonly [number, number, nu
 /** The library path a built piece "loads" from (pieces.ts recognises it). */
 export const builtPath = (name: BuiltName): string => `built/${name}.glb`
 
-const BUILT_URL = /(?:^|\/)built\/([a-z]+)\.glb$/
+// (`.glb.gz` as the showcase names every library GLB it ships gzipped: gltf.ts)
+const BUILT_URL = /(?:^|\/)built\/([a-z]+)\.glb(?:\.gz)?$/
 
 /** The built piece a url names, or null for a library file. */
 export function builtOf(url: string): BuiltName | null {

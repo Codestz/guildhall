@@ -64,6 +64,13 @@ describe("loadCatalog", () => {
   test("library paths are url-encoded segment by segment", () => {
     expect(libraryUrl("pieces/a b/c#d.glb")).toBe("/library/pieces/a%20b/c%23d.glb")
   })
+
+  test("a build that shipped the GLBs gzipped asks for `.glb.gz`; thumbnails and the catalog as they are", () => {
+    expect(libraryUrl("pieces/a/b.glb", "/library/v1", true)).toBe("/library/v1/pieces/a/b.glb.gz")
+    expect(libraryUrl("rigs/rig-medium.glb", "/library/v1", true)).toBe("/library/v1/rigs/rig-medium.glb.gz")
+    expect(libraryUrl("thumbs/a/b.webp", "/library/v1", true)).toBe("/library/v1/thumbs/a/b.webp")
+    expect(libraryUrl("pieces/a/b.glb", "/library/v1", false)).toBe("/library/v1/pieces/a/b.glb")
+  })
 })
 
 describe("filters", () => {

@@ -253,6 +253,8 @@ describe("built pieces", () => {
 
   test("their library paths name them; a library file does not", () => {
     expect(builtOf(`/library/${builtPath("cart")}`)).toBe("cart")
+    // asked for as the showcase names a gzipped GLB: still the built piece
+    expect(builtOf(`/library/${builtPath("cart")}.gz`)).toBe("cart")
     expect(builtOf("/library/built/nothing.glb")).toBeNull()
     expect(builtOf("/library/pieces/kaykit-tools/axe.glb")).toBeNull()
   })

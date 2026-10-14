@@ -9,12 +9,9 @@ import {
   type Object3D,
   Texture,
 } from "three"
-import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js"
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
+import { loadGltf } from "./gltf.ts"
 
 const logger = log("render:model")
-
-let loader: GLTFLoader | null = null
 
 export interface Measure {
   /** Axis-aligned world size `[w, h, d]` in metres. */
@@ -31,8 +28,7 @@ export interface Measure {
  * renderer's max) so it stays crisp at grazing angles.
  */
 export async function loadModel(url: string, opts: { anisotropy?: number } = {}): Promise<Object3D> {
-  loader ??= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
-  const gltf = await loader.loadAsync(url)
+  const gltf = await loadGltf(url)
   const root = gltf.scene
   root.traverse((node) => {
     if (!(node instanceof Mesh)) return

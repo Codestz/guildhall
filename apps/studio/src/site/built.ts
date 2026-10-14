@@ -175,7 +175,7 @@ export const BUILT: BuiltContent = {
           items: [
             {
               title: "Pieces and palette",
-              text: "1,525 pieces from 17 asset packs, browsable at true scale, with a curated style list.",
+              text: "1,531 pieces from 18 asset packs, browsable at true scale, with a curated style list.",
             },
             {
               title: "Scale board",

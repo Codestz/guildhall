@@ -25,7 +25,7 @@ export function Pleas({ pleas, parties = [], onOpen }: PleasProps) {
   return (
     // assertive: a hero is blocked until someone answers
     <div className="hud-pleas" role="status" aria-live="assertive">
-      {shown.map(({ hero, ask }, k) => {
+      {shown.map(({ hero, ask, command }, k) => {
         const party = partyOf(hero.party)
         return (
           <button
@@ -47,7 +47,9 @@ export function Pleas({ pleas, parties = [], onOpen }: PleasProps) {
                 )}
                 <b>{heroTitle(hero)}</b> {party ? <>of the {party.name} quest </> : null}awaits your word
               </span>
-              <span className="hud-plea-sub">{ask || "asks for permission"}</span>
+              <span className="hud-plea-sub" {...(command ? { title: command } : {})}>
+                {ask || "asks for permission"}
+              </span>
             </span>
             <span className="hud-plea-go">
               Open

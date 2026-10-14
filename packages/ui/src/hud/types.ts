@@ -106,8 +106,10 @@ export interface Ledger {
 /** A hero waiting on a human. */
 export interface PleaView {
   hero: HeroView
-  /** What they ask: `bash · bun run migrate`. */
+  /** What they ask, in the narrator's words: `wants to run the tests`. */
   ask?: string
+  /** The tool and line behind it (`bash · bun test packages/world`), for the card's title only. */
+  command?: string
 }
 
 /** Where the HUD's events come from, for the brand's status line. */

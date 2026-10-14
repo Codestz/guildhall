@@ -12,6 +12,7 @@ What V1's own code (branch `main`) said about seven sessions; `test/story-golden
 
 - A second guildmaster is numbered by join order (`Guildmaster II`); V1 called every root session `Guildmaster`.
 - A shell command is told by its gist (core `commandGist`): `runs git status`, `hunts through the code for requireSession`, never its raw line (`runs git status --short`, `\b(requireSession|…)\b`). A caption's hold follows its length, so those holds move too.
+- A command is told by what it does for the work (sim `commandWords`, GUI audit 10-14): `opens a pull request, #418`, `pushes the work upstream`, `looks over the changes`, `checks the types`; one the map does not know `runs a command`, never `runs gh pr create` (decisions.md: captions never raw tool text).
 
 After a deliberate change, `GOLDEN_DEPARTURES=write bun test packages/sim/test/story-golden.test.ts` rewrites the departure files; read their diff before committing.
 

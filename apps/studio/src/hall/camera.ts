@@ -18,7 +18,7 @@
  */
 import type { CameraPose } from "@guildhall/core"
 import { distanceRange, framedTarget, type RigMove, type Stage } from "@guildhall/render"
-import { type Shot as DirectorShot, type Distance, director, type Focus } from "@guildhall/sim"
+import { type Shot as DirectorShot, type Distance, director, type Focus, type ShowKind } from "@guildhall/sim"
 import type { ViewerHud } from "@guildhall/ui"
 import type { Chips } from "../hexworld/chips.ts"
 import type { HudParts } from "../hexworld/index.ts"
@@ -251,6 +251,23 @@ export interface ShotSizes {
   map: number
   /** A place's size, tiles (sizes its mid shot). */
   tiles?: number
+  /** A world event's kind (its own framing, `SHOW_POSES`). */
+  show?: ShowKind
+}
+
+/**
+ * How the director frames each world event once it has cut to it (its site's point, hall/shows.ts):
+ * the sky's shows from low enough to see the sky (the dragon over the peaks, the comet laid out in the
+ * view it settles on), the sea's from over the water, the festival wide enough for the fireworks over
+ * the keep, a grave close enough to see past the yard's clutter. The rainbow keeps the map view.
+ */
+export const SHOW_POSES: Readonly<Partial<Record<ShowKind, { distance: number; elevation: number }>>> = {
+  dragon: { distance: 90, elevation: 12 },
+  comet: { distance: 150, elevation: 16 },
+  ghostship: { distance: 62, elevation: 20 },
+  raid: { distance: 46, elevation: 22 },
+  festival: { distance: 60, elevation: 16 },
+  undead: { distance: 15, elevation: 32 },
 }
 
 /** The pose a director's shot asks for: its distance and tilt by class, keeping the way the camera faces. */
@@ -267,6 +284,8 @@ export function shotPose(
     elevation,
     distance: d,
   })
+  const show = focus === "show" && sizes.show ? SHOW_POSES[sizes.show] : undefined
+  if (show && distance !== "close") return at(Math.min(sizes.map, show.distance), show.elevation)
   if (distance === "map") return at(sizes.map, 60)
   if (distance === "close") return at(CLOSE.distance, CLOSE.elevation)
   if (focus === "place") return at(Math.min(150, 42 + Math.sqrt(Math.max(0, sizes.tiles ?? 0)) * 6), 40)
@@ -600,6 +619,7 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
   const sizesOf = (focus: Focus): ShotSizes => ({
     map: mapDistance(),
     ...(focus.kind === "place" ? { tiles: placeOf(focus.place)?.tiles ?? 0 } : {}),
+    ...(focus.kind === "show" ? { show: focus.show } : {}),
   })
 
   /** Each frame, before the rig eases: aim at the followed hero or the shot's subject, drift a held shot. */

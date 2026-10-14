@@ -114,6 +114,12 @@ export function skyPlan(
 
 /** How often the drive looks again between the engine's changes (a fade ending, a seek), ms. */
 const SYNC_MS = 250
+/**
+ * The comet is laid out in the view it starts in (render shows/comet.ts): it waits for the director's
+ * glide to the sky (<= 2.4 s, hall/camera.ts `glideMs`) before it is built, so it falls in the view the
+ * camera settles on. It keeps its engine start: it is that far in when it shows.
+ */
+export const COMET_SETTLE_S = 2.6
 
 /**
  * Plays the engine's sky and town shows on `shows` (render shows/, put on the session's clock by its
@@ -122,7 +128,7 @@ const SYNC_MS = 250
 export function driveSkyShows(
   shows: Shows,
   events: HallEvents,
-  clock: { jumps(): number },
+  clock: { jumps(): number; now(): number },
   sites: EventSites,
 ): () => void {
   /** What render plays for whom: the engine id each kind was started for, and the end it was given. */
@@ -146,6 +152,8 @@ export function driveSkyShows(
       started.set(kind, { id: "", end: Number.NaN })
     }
     for (const show of plan.play) {
+      if (show.kind === "comet" && !started.has("comet") && clock.now() < show.start + COMET_SETTLE_S)
+        continue
       shows.play(show)
       started.set(show.kind, { id: String(show.params?.id ?? ""), end: show.end })
     }
@@ -158,7 +166,14 @@ export function driveSkyShows(
   const square = sites.square?.at
   const middle: ShowPoint = [0, 0, 0]
   events.setSite("dragon", () => (peak ? [peak[0], peak[1], peak[2]] : null))
-  events.setSite("festival", () => (square ? [square[0], square[1] + 4, square[2]] : null))
+  // the festival: between the square's bunting and the fireworks over the keep (render festival.ts)
+  const keep = sites.castle
+  const fair: ShowPoint | null = square
+    ? keep
+      ? [(square[0] + keep[0]) / 2, (square[1] + keep[1] + 12) / 2, (square[2] + keep[2]) / 2]
+      : [square[0], square[1] + 4, square[2]]
+    : null
+  events.setSite("festival", () => fair)
   events.setSite("comet", () => middle)
   events.setSite("rainbow", () => middle)
   return () => {

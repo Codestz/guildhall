@@ -73,7 +73,12 @@ export function mountShows(parts: {
         driver = events ? session : null
         shows.clear()
         if (session && events)
-          undrive = driveSkyShows(shows, events, { jumps: () => session.clock.get().jumps }, parts.sites)
+          undrive = driveSkyShows(
+            shows,
+            events,
+            { jumps: () => session.clock.get().jumps, now: () => session.clock.get().at / 1000 },
+            parts.sites,
+          )
       }
       bind()
       const timer = setInterval(bind, 1000)

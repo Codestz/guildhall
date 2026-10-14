@@ -127,7 +127,12 @@ describe("World events on the island", () => {
     const session = await events()
     const hall = createEvents(session)
     const { shows, firsts } = fakeShows(session)
-    const stop = driveSkyShows(shows, hall, { jumps: () => session.clock.get().jumps }, sites)
+    const stop = driveSkyShows(
+      shows,
+      hall,
+      { jumps: () => session.clock.get().jumps, now: () => session.clock.get().at / 1000 },
+      sites,
+    )
     const engine = new Map<string, Show>()
     const points = new Map<string, unknown>()
     for (let k = 0; k < 300 * 4 && session.clock.get().playing; k++) {
@@ -147,7 +152,7 @@ describe("World events on the island", () => {
     }
     // the director frames each: the dragon over the peaks, the festival over the square, the sky the middle
     expect(points.get("dragon")).toEqual([10, 30, -5])
-    expect(points.get("festival")).toEqual([4, 6, 6])
+    expect(points.get("festival")).toEqual([2, 11.5, 3])
     expect(points.get("comet")).toEqual([0, 0, 0])
     expect(points.get("undead")).toBeNull() // no graveyard mounted here: the camera falls back
   })
@@ -156,7 +161,12 @@ describe("World events on the island", () => {
     const session = await events()
     const hall = createEvents(session)
     const { shows, calls, firsts } = fakeShows(session)
-    const stop = driveSkyShows(shows, hall, { jumps: () => session.clock.get().jumps }, sites)
+    const stop = driveSkyShows(
+      shows,
+      hall,
+      { jumps: () => session.clock.get().jumps, now: () => session.clock.get().at / 1000 },
+      sites,
+    )
     const start = session.clock.get().start
     for (let k = 0; k < 50 * 4; k++) {
       session.frame(0.25)

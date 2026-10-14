@@ -3,9 +3,11 @@ import {
   type DirectorState,
   director,
   type EventLog,
+  type FocusHint,
   HOLD_MS,
   LONG_HOLD_MS,
   pick,
+  RELEASE_HOLD_MS,
   type Reason,
   Script,
   type Shot,
@@ -288,5 +290,56 @@ describe("no thrash under a busy stream", () => {
     const reasons = new Set(cuts.map((c) => c.reason))
     for (const r of ["quest", "walk", "ship", "storm", "failed", "plea", "clear"] as const)
       expect([r, reasons.has(r)]).toEqual([r, true])
+  })
+})
+
+describe("a world event is held through its key moment", () => {
+  const hint = (start: number, hold?: number): FocusHint => ({
+    focus: { kind: "show", id: "dragon:1", show: "dragon" },
+    weight: 9,
+    start,
+    ttl: 22_000,
+    distance: "map",
+    ...(hold !== undefined ? { hold } : {}),
+  })
+
+  test("once cut to, a show holds its `hold` (within its ttl), and nothing cuts in, a plea neither", () => {
+    const world = scene(["walk"]).log.stateAt(T)
+    const first = pick(world, world.recent, T, {}, [hint(T, 18_000)])
+    expect(first.reason).toBe("show")
+    expect(first.holdUntil).toBe(T + 18_000)
+    // a plea 6 s in outranks the show, but waits for the hold
+    const later = scene(["plea", "walk"]).log.stateAt(T + 6000)
+    const kept = pick(later, later.recent, T + 6000, { shot: first }, [hint(T, 18_000)])
+    expect(kept.key).toBe(first.key)
+    const after = pick(later, later.recent, T + 18_100, { shot: kept }, [hint(T, 18_000)])
+    expect(after.reason).toBe("plea")
+  })
+
+  test("a world event takes the camera from the idle overview at once (a grave's rise is short)", () => {
+    const world = scene([]).log.stateAt(T)
+    const idle = pick(world, world.recent, T, {})
+    expect(idle.reason).toBe("idle")
+    const shot = pick(world, world.recent, T + 500, { shot: idle }, [hint(T + 400, 3500)])
+    expect(shot.reason).toBe("show")
+    expect(shot.since).toBe(T + 500)
+  })
+
+  test("a hold never outlasts the hint, and a hint without one holds the usual 4 s", () => {
+    const world = scene(["walk"]).log.stateAt(T)
+    // cut 10 s into a 22 s hint: held to its end, not 18 s on
+    expect(pick(world, world.recent, T + 10_000, {}, [hint(T, 18_000)]).holdUntil).toBe(T + 22_000)
+    expect(pick(world, world.recent, T, {}, [hint(T)]).holdUntil).toBe(T + HOLD_MS)
+  })
+
+  test("a release films its galleon sailing in, held while it comes", () => {
+    const f = scene([])
+    f.sea({ kind: "release", id: "release:r:v1", at: T - 500, repo: "r", tag: "v1", name: "v1" })
+    const world = f.log.stateAt(T)
+    const shot = pick(world, world.recent, T, {})
+    expect(shot.reason).toBe("ship")
+    expect(shot.focus).toEqual({ kind: "harbour", ship: "galleon" })
+    expect(shot.key).toBe("harbour:galleon")
+    expect(shot.holdUntil).toBe(T + RELEASE_HOLD_MS)
   })
 })

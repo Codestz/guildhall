@@ -16,6 +16,7 @@ export {
   pick,
   RANK,
   RECENT_MS,
+  RELEASE_HOLD_MS,
   type Reason,
   SAME_RANK_MS,
   type Shot,

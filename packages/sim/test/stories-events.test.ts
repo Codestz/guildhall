@@ -4,6 +4,7 @@ import {
   type EventLog,
   PurseBook,
   SAGA_SHOW_RULES,
+  SHOW_LOOK,
   SHOW_RULES,
   type Show,
   ShowEngine,
@@ -109,7 +110,7 @@ describe("World events: every show in turn", () => {
     // every one told and hinted
     for (const x of shows) {
       expect(showLine(x)?.length).toBeGreaterThan(0)
-      expect(showHint(x).start).toBe(x.start)
+      expect(showHint(x).start).toBe(x.start + (SHOW_LOOK[x.kind].delay ?? 0))
     }
   })
 

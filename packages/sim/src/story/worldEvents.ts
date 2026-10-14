@@ -212,18 +212,30 @@ export const SHOW_RULES = {
  * The weight, how long and how wide the director looks when a show starts (V1's `LOOK`, the plan's).
  * A big show outranks the beat that caused it (a failed command's, a fall's): the third failure in a
  * row is the dragon's moment, the second fall the ghost ship's, so its weight is one over (director
- * pick.ts ranks a hint at `weight / 2`); a grave's rise is the fall's own glance and keeps V1's 8.
+ * pick.ts ranks a hint at `weight / 2`); a grave's rise too (V1's 8, one over: the fall, or CI's
+ * storm that raised it, would win the tie by being newer and the skeleton would claw up unseen).
+ *
+ * `hold` is how long the director stays once it has cut to the show (nothing cuts in sooner, a plea
+ * neither: the show's key moment is never cut away from), and `delay` how long after the show's start
+ * the hint begins, where its key moment comes late: the raid's pirates drop anchor 20 s in (render sea
+ * plan `RAID_IN_S`) and put off in their rowboat 7 s later, so the camera comes as they near the quay
+ * and stays through the boat's launch; the ghost ship has faded in off the sea by 3 s. The others' key
+ * moments, each held: the rise (2.8 s); the dragon's first swoop and its fire (about 15 s in); the
+ * comet crossing; the rainbow drawn in (6.5 s); the festival's finale (fireworks by night, ~28 s in).
  */
 export const SHOW_LOOK: Readonly<
-  Record<ShowKind, { weight: number; ttl: number; distance: Distance; lift?: number }>
+  Record<
+    ShowKind,
+    { weight: number; ttl: number; distance: Distance; lift?: number; hold: number; delay?: number }
+  >
 > = {
-  undead: { weight: 8, ttl: 3500, distance: "mid" },
-  dragon: { weight: 9, ttl: 14_000, distance: "map", lift: 30 },
-  comet: { weight: 7, ttl: 8000, distance: "map", lift: 45 },
-  rainbow: { weight: 7, ttl: 10_000, distance: "map", lift: 50 },
-  festival: { weight: 9, ttl: 14_000, distance: "mid" },
-  ghostship: { weight: 9, ttl: 16_000, distance: "map" },
-  raid: { weight: 8, ttl: 14_000, distance: "mid" },
+  undead: { weight: 9, ttl: 5000, distance: "mid", hold: 3500 },
+  dragon: { weight: 9, ttl: 22_000, distance: "map", hold: 18_000 },
+  comet: { weight: 7, ttl: 12_000, distance: "map", lift: 45, hold: 9000 },
+  rainbow: { weight: 7, ttl: 14_000, distance: "map", lift: 20, hold: 10_000 },
+  festival: { weight: 9, ttl: 34_000, distance: "mid", hold: 30_000 },
+  ghostship: { weight: 9, ttl: 18_000, distance: "map", hold: 14_000, delay: 2000 },
+  raid: { weight: 8, ttl: 20_000, distance: "mid", hold: 16_000, delay: 12_000 },
 }
 
 export interface WorldShowOptions {
@@ -823,9 +835,10 @@ export function showHint(show: Show): ShowHint {
       ...(look.lift !== undefined ? { lift: look.lift } : {}),
     },
     weight: show.kind === "undead" && show.params.grave?.minion ? 1 : look.weight,
-    start: show.start,
+    start: show.start + (look.delay ?? 0),
     ttl: look.ttl,
     distance: look.distance,
+    hold: look.hold,
   }
 }
 

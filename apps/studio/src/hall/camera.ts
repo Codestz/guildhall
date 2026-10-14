@@ -18,7 +18,14 @@
  */
 import type { CameraPose } from "@guildhall/core"
 import { distanceRange, framedTarget, type RigMove, type Stage } from "@guildhall/render"
-import { type Shot as DirectorShot, type Distance, director, type Focus, type ShowKind } from "@guildhall/sim"
+import {
+  type Shot as DirectorShot,
+  type Distance,
+  director,
+  type Focus,
+  HOLD_MS,
+  type ShowKind,
+} from "@guildhall/sim"
 import type { ViewerHud } from "@guildhall/ui"
 import type { Chips } from "../hexworld/chips.ts"
 import type { HudParts } from "../hexworld/index.ts"
@@ -26,6 +33,7 @@ import type { BuiltPlace } from "../hexworld/job.ts"
 import { hallEvents } from "./events.ts"
 import type { HallSession } from "./feeds/index.ts"
 import type { SessionPlaces } from "./feeds/places.ts"
+import { galleonPoint } from "./sea.ts"
 
 type Vec3 = [number, number, number]
 
@@ -230,9 +238,12 @@ export function directorFree(on: boolean, following: boolean, now: number, userA
   return on && !following && (userAt === null || now - userAt >= USER_WAIT_MS)
 }
 
-/** True when the director's new shot may be cut to now (the first one always). Pure. */
-export function mayCut(now: number, lastCut: number | null): boolean {
-  return lastCut === null || now - lastCut >= MIN_CUT_MS
+/**
+ * True when the director's new shot may be cut to now (the first one always; `urgent`, a world event
+ * taking the camera from the idle overview, at once). Pure.
+ */
+export function mayCut(now: number, lastCut: number | null, urgent = false): boolean {
+  return urgent || lastCut === null || now - lastCut >= MIN_CUT_MS
 }
 
 /** The director's default for a feed: on for a told story, off for live and replay (`?director=` wins). */
@@ -251,29 +262,71 @@ export interface ShotSizes {
   map: number
   /** A place's size, tiles (sizes its mid shot). */
   tiles?: number
-  /** A world event's kind (its own framing, `SHOW_POSES`). */
-  show?: ShowKind
+  /** A world event's kind (its own framing in beats, `SHOW_BEATS`), or a release's galleon. */
+  show?: ShowKind | "galleon"
+  /** How long the shot has run since its cut, ms (which of its beats it is in). */
+  beat?: number
   /** The island's middle (x, z): a sea show is filmed from the island, looking out. */
   centre?: readonly [number, number]
 }
 
+/** One beat of a show's framing: from `at` ms after the cut, this far and this steep (`ofMap`: a share of the map view's distance). */
+export interface ShowBeat {
+  at: number
+  distance: number
+  elevation: number
+  ofMap?: boolean
+}
+
 /**
- * How the director frames each world event once it has cut to it (its site's point, hall/shows.ts):
- * the sky's shows from low enough to see the sky (the dragon over the peaks, the comet laid out in the
- * view it settles on), the sea's from over the water, the festival wide enough for the fireworks over
- * the keep, a grave close enough to see past the yard's clutter. The rainbow keeps the map view. The
- * sea's (`seaward`) look out from the island toward their hull (the camera is held over the island, so
- * it turns to face the ship rather than keeping its way).
+ * How the director frames each world event once it has cut to it (its site's point, hall/shows.ts), in
+ * beats: an establishing shot as it arrives, then (where the show has a subject to come closer to) a
+ * nearer one once it has been seen whole, eased in over `BEAT_GLIDE_MS`. The sky's shows from low
+ * enough to see the sky: the dragon over the peaks, followed as it banks in (its site tracks it), then
+ * closer as it swoops; the comet laid out in the view it settles on (one beat: it stays where it was
+ * laid out); the rainbow wide and low enough to stand over the island. The festival wide over the keep
+ * as the first rockets go up, then low under the bursts. The sea's (`SEAWARD`) look out from the island
+ * toward their hull (the camera is held over the island, so it turns to face the ship): the ghost ship
+ * in its mist, then near enough for its wisps; the raid as it nears the quay, then on its rowboat; a
+ * release's galleon sailing in, then dropping anchor. A grave close enough to see past the yard's clutter.
  */
-export const SHOW_POSES: Readonly<
-  Partial<Record<ShowKind, { distance: number; elevation: number; seaward?: boolean }>>
-> = {
-  dragon: { distance: 90, elevation: 12 },
-  comet: { distance: 150, elevation: 16 },
-  ghostship: { distance: 90, elevation: 12, seaward: true },
-  raid: { distance: 70, elevation: 14, seaward: true },
-  festival: { distance: 40, elevation: 10 },
-  undead: { distance: 15, elevation: 32 },
+export const SHOW_BEATS: Readonly<Partial<Record<ShowKind | "galleon", readonly ShowBeat[]>>> = {
+  dragon: [
+    { at: 0, distance: 110, elevation: 13 },
+    { at: 8000, distance: 72, elevation: 9 },
+  ],
+  comet: [{ at: 0, distance: 150, elevation: 16 }],
+  rainbow: [{ at: 0, distance: 0.8, elevation: 30, ofMap: true }],
+  festival: [
+    { at: 0, distance: 62, elevation: 13 },
+    { at: 9000, distance: 40, elevation: 7 },
+  ],
+  ghostship: [
+    { at: 0, distance: 85, elevation: 12 },
+    { at: 6000, distance: 48, elevation: 9 },
+  ],
+  raid: [
+    { at: 0, distance: 66, elevation: 14 },
+    { at: 6000, distance: 40, elevation: 12 },
+  ],
+  galleon: [
+    { at: 0, distance: 80, elevation: 13 },
+    { at: 9000, distance: 46, elevation: 11 },
+  ],
+  undead: [{ at: 0, distance: 13, elevation: 30 }],
+}
+/** The shows filmed from the island looking out to their hull. */
+export const SEAWARD: ReadonlySet<ShowKind | "galleon"> = new Set(["ghostship", "raid", "galleon"])
+/** How long a show's move from one beat to the next takes, ms. */
+export const BEAT_GLIDE_MS = 3500
+
+/** Which of a show's beats `ms` after its cut is in (its index; -1 for a kind without beats). Pure. */
+export function showBeatAt(kind: ShowKind | "galleon", ms: number): number {
+  const beats = SHOW_BEATS[kind]
+  if (!beats) return -1
+  let k = 0
+  for (let i = 1; i < beats.length; i++) if (ms >= (beats[i] as ShowBeat).at) k = i
+  return k
 }
 
 /** The pose a director's shot asks for: its distance and tilt by class, keeping the way the camera faces. */
@@ -290,10 +343,13 @@ export function shotPose(
     elevation,
     distance: d,
   })
-  const show = focus === "show" && sizes.show ? SHOW_POSES[sizes.show] : undefined
-  if (show && distance !== "close") {
-    const pose = at(Math.min(sizes.map, show.distance), show.elevation)
-    if (show.seaward && sizes.centre) {
+  const kind = (focus === "show" || focus === "harbour") && sizes.show ? sizes.show : undefined
+  const beats = kind ? SHOW_BEATS[kind] : undefined
+  if (kind && beats && distance !== "close") {
+    const beat = beats[Math.max(0, showBeatAt(kind, sizes.beat ?? 0))] as ShowBeat
+    const d = beat.ofMap ? sizes.map * beat.distance : Math.min(sizes.map, beat.distance)
+    const pose = at(d, beat.elevation)
+    if (SEAWARD.has(kind) && sizes.centre) {
       const dx = target[0] - sizes.centre[0]
       const dz = target[2] - sizes.centre[1]
       if (Math.hypot(dx, dz) > 1) pose.azimuth = (Math.atan2(-dx, -dz) * 180) / Math.PI
@@ -305,6 +361,15 @@ export function shotPose(
   if (focus === "place") return at(Math.min(150, 42 + Math.sqrt(Math.max(0, sizes.tiles ?? 0)) * 6), 40)
   if (focus === "harbour") return at(58, 34)
   return at(24, 30)
+}
+
+/**
+ * The hold the director's cut asks for, counted from when the camera arrives rather than from the cut:
+ * a held beat (a show, a release: longer than `HOLD_MS`) keeps its whole hold once the glide there is
+ * over, so the key moment it waits for is on screen, not half spent travelling. Pure.
+ */
+export function arrivedHold(shot: Pick<DirectorShot, "since" | "holdUntil">, glide: number): number {
+  return shot.holdUntil - shot.since > HOLD_MS ? shot.holdUntil + glide : shot.holdUntil
 }
 
 /** A glide's length, ms: longer for farther and for a bigger change of size (V1: 1.1–2.4 s), shorter for a follow. */
@@ -543,7 +608,8 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
         return p ? [p.at[0], p.at[1], p.at[2]] : crowdAt(focus.place)
       }
       case "harbour":
-        return harbourPoint()
+        // a release: the galleon itself as it sails in (hall/sea.ts), else the harbour's ships
+        return (focus.ship === "galleon" ? galleonPoint() : null) ?? harbourPoint()
       case "show": {
         // a world event: where its render task says it stands (hall/events.ts), else over the island
         const world = rig.world()
@@ -617,25 +683,50 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
       shot = next
       return
     }
-    if (shot && !mayCut(t, lastCut)) return
+    if (shot && !mayCut(t, lastCut, shot.reason === "idle" && next.reason === "show")) return
     const target = subjectOf(next.focus)
     if (!target) return
-    shot = next
     lastCut = t
+    beatShown = 0
     tracked = target
     const from = rig.get()
     const pose = shotPose(next.focus.kind, next.distance, target, from, sizesOf(next.focus))
     pose.target = framedTarget(target, pose, lens(), frame())
     rig.aim(target, frame())
-    glide(pose, glideMs(from, pose))
+    const ms = glideMs(from, pose)
+    glide(pose, ms)
+    // a held beat's hold runs from when the camera gets there
+    shot = { ...next, holdUntil: arrivedHold(next, ms) }
     changed()
   }
-  const sizesOf = (focus: Focus): ShotSizes => ({
-    map: mapDistance(),
-    ...(focus.kind === "place" ? { tiles: placeOf(focus.place)?.tiles ?? 0 } : {}),
-    ...(focus.kind === "show" ? { show: focus.show } : {}),
-    ...(focus.kind === "show" && rig.world() ? { centre: rig.world()?.centre as [number, number] } : {}),
-  })
+  /** What a focus is framed as: a show's kind, a release's galleon; null for the rest. */
+  const showOf = (focus: Focus): ShowKind | "galleon" | null =>
+    focus.kind === "show" ? focus.show : focus.kind === "harbour" && focus.ship ? focus.ship : null
+  const sizesOf = (focus: Focus): ShotSizes => {
+    const kind = showOf(focus)
+    return {
+      map: mapDistance(),
+      ...(focus.kind === "place" ? { tiles: placeOf(focus.place)?.tiles ?? 0 } : {}),
+      ...(kind ? { show: kind, beat: lastCut === null ? 0 : Math.max(0, now() - lastCut) } : {}),
+      ...(kind && rig.world() ? { centre: rig.world()?.centre as [number, number] } : {}),
+    }
+  }
+  /** The beat of the show on screen that the camera has moved to (`showBeatAt`). */
+  let beatShown = 0
+  /** A held show's next beat, once it is due: eased in from where the camera is, on the subject. */
+  const nextBeat = () => {
+    if (!shot || followId || lastCut === null) return
+    const kind = showOf(shot.focus)
+    if (!kind) return
+    const k = showBeatAt(kind, now() - lastCut)
+    if (k <= beatShown) return
+    beatShown = k
+    const target = tracked ?? subjectOf(shot.focus)
+    if (!target) return
+    const pose = shotPose(shot.focus.kind, shot.distance, target, rig.goal(), sizesOf(shot.focus))
+    pose.target = framedTarget(target, pose, lens(), frame())
+    glide(pose, BEAT_GLIDE_MS)
+  }
 
   /** Each frame, before the rig eases: aim at the followed hero or the shot's subject, drift a held shot. */
   const drive = (dt: number) => {
@@ -653,6 +744,7 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
         }
       }
       decide(t)
+      nextBeat()
       keepPlea(followId ?? (shot?.focus.kind === "hero" ? shot.focus.id : null))
       if (mode() !== lastMode) changed()
       cost.decides++

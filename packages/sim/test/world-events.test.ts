@@ -5,6 +5,7 @@ import {
   type EventLog,
   forcedShow,
   pick,
+  SHOW_LOOK,
   SHOW_RULES,
   type Show,
   ShowEngine,
@@ -262,7 +263,7 @@ describe("the saga fires the plan's beats", () => {
     // every show is told, and hinted to the director
     for (const sh of all) {
       expect(showLine(sh)?.length).toBeGreaterThan(0)
-      expect(showHint(sh).start).toBe(sh.start)
+      expect(showHint(sh).start).toBe(sh.start + (SHOW_LOOK[sh.kind].delay ?? 0))
     }
   })
 })

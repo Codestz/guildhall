@@ -6,9 +6,10 @@
 import { describe, expect, test } from "bun:test"
 import type { CameraPose } from "@guildhall/core"
 import { poseToCamera, type RigMove, type Stage } from "@guildhall/render"
-import { emptyWorld, type GuildWorld, type WorldActor } from "@guildhall/sim"
+import { emptyWorld, type GuildWorld, HOLD_MS, type WorldActor } from "@guildhall/sim"
 import type { ViewerHud } from "@guildhall/ui"
 import {
+  arrivedHold,
   type Box,
   biasStep,
   CLOSE,
@@ -26,7 +27,9 @@ import {
   mayCut,
   NO_INSETS,
   releases,
+  SHOW_BEATS,
   shotPose,
+  showBeatAt,
   TRACK,
   trackStep,
   USER_WAIT_MS,
@@ -179,6 +182,7 @@ describe("the rules", () => {
     expect(mayCut(1000, null)).toBe(true)
     expect(mayCut(1000 + MIN_CUT_MS - 1, 1000)).toBe(false)
     expect(mayCut(1000 + MIN_CUT_MS, 1000)).toBe(true)
+    expect(mayCut(1001, 1000, true)).toBe(true) // a world event off the idle overview: at once
   })
 
   test("on by default for a story, off for live and replay; ?director= wins", () => {
@@ -198,6 +202,39 @@ describe("the rules", () => {
     expect(big).toBeGreaterThan(small)
     expect(shotPose("overview", "map", [0, 0, 0], from, { map: 400 }).distance).toBe(400)
     expect(shotPose("harbour", "mid", [0, 0, 0], from, { map: 400 }).azimuth).toBe(12)
+  })
+
+  test("a show is framed in beats: established wide, then closer once seen whole", () => {
+    expect(showBeatAt("dragon", 0)).toBe(0)
+    expect(showBeatAt("dragon", 7999)).toBe(0)
+    expect(showBeatAt("dragon", 8000)).toBe(1)
+    expect(showBeatAt("comet", 60_000)).toBe(0) // one beat: it stays where it was laid out
+    for (const kind of Object.keys(SHOW_BEATS) as (keyof typeof SHOW_BEATS)[]) {
+      const beats = SHOW_BEATS[kind] ?? []
+      expect(beats[0]?.at).toBe(0)
+      // every later beat closer and no higher: an establishing shot, then in
+      for (let i = 1; i < beats.length; i++) {
+        expect(beats[i]?.distance).toBeLessThan(beats[i - 1]?.distance as number)
+        expect(beats[i]?.elevation).toBeLessThanOrEqual(beats[i - 1]?.elevation as number)
+      }
+    }
+    const from = { azimuth: 12 }
+    const wide = shotPose("show", "map", [0, 30, 0], from, { map: 400, show: "dragon", beat: 0 })
+    const near = shotPose("show", "map", [0, 30, 0], from, { map: 400, show: "dragon", beat: 9000 })
+    expect(near.distance).toBeLessThan(wide.distance)
+    // the rainbow is sized by the map view; a galleon is filmed from the island looking out at it
+    expect(shotPose("show", "map", [0, 0, 0], from, { map: 400, show: "rainbow" }).distance).toBe(320)
+    const galleon = shotPose("harbour", "mid", [100, 0, 0], from, {
+      map: 400,
+      show: "galleon",
+      centre: [0, 0],
+    })
+    expect(galleon.azimuth).toBeCloseTo(-90, 6)
+  })
+
+  test("a held beat's hold runs from when the camera arrives; a plain cut keeps its own", () => {
+    expect(arrivedHold({ since: 1000, holdUntil: 1000 + 18_000 }, 2000)).toBe(21_000)
+    expect(arrivedHold({ since: 1000, holdUntil: 1000 + HOLD_MS }, 2000)).toBe(1000 + HOLD_MS)
   })
 
   test("glides: 1.1 to 2.4 s, longer for farther; a follow's quicker", () => {

@@ -14,6 +14,19 @@ import type { HallSession } from "./feeds/index.ts"
 import { FX_READ_MS, fleetRate } from "./fx.ts"
 import { driveSeaShows } from "./shows.ts"
 
+/** The sea a session drives now, and its level: where the director finds a release's galleon. */
+let current: { sea: SeaLife; level: number } | null = null
+
+/**
+ * Where a release's galleon is on the water now (x, sea level, z), once it shows (fading in off the
+ * open sea), else null: the director films it sailing in (sim director `harbour:galleon`).
+ */
+export function galleonPoint(): [number, number, number] | null {
+  if (!current) return null
+  const ship = current.sea.view().ships.find((s) => s.hull === "galleon" && s.seen > 0.05)
+  return ship ? [ship.at[0], current.level, ship.at[1]] : null
+}
+
 export function driveSea(
   sea: SeaLife,
   session: HallSession,
@@ -57,6 +70,8 @@ export function driveSea(
   }
   bind()
   const binding = setInterval(bind, 1000)
+  const mine = { sea, level: opts.level ?? 0 }
+  current = mine
   read()
   const timer = setInterval(read, FX_READ_MS)
   const offReset = session.onReset(() => {
@@ -65,6 +80,7 @@ export function driveSea(
     read()
   })
   return () => {
+    if (current === mine) current = null
     clearInterval(timer)
     clearInterval(binding)
     unshow()

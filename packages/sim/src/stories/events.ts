@@ -440,6 +440,9 @@ export function eventsTale(seed = 1, repo = EVENTS_REPO): EventsTale {
         ],
         1000,
       )
+      // the notes read over once more while the galleon sails in (the director films it, 20 s), so the
+      // festival that the clean quest earns comes after it rather than over it
+      k.think("Read it once more, as a stranger would.", 14_000)
       k.finish(
         "v0.3.0's notes: the graveyard, the dragon, the comet, the rainbow, the festival and the sea.",
         900,

@@ -34,7 +34,8 @@ import type { ShowKind } from "../story/worldEvents.ts"
 export type Focus =
   | { kind: "hero"; id: string }
   | { kind: "place"; place: number }
-  | { kind: "harbour" }
+  /** The harbour's ships; a release's galleon as it sails in (`ship`), where the camera can find it. */
+  | { kind: "harbour"; ship?: "galleon" }
   | { kind: "overview" }
   /** A world event (story/worldEvents.ts): the camera asks the show's site where it is; `lift` aims up. */
   | { kind: "show"; id: string; show: ShowKind; lift?: number }
@@ -122,7 +123,7 @@ export interface Shot {
   holdUntil: number
   /** When the beat it shows happened. */
   start: number
-  /** The focus as a key (`hero:<id>`, `place:<n>`, `harbour`, `overview`, `show:<id>`). */
+  /** The focus as a key (`hero:<id>`, `place:<n>`, `harbour`, `harbour:galleon`, `overview`, `show:<id>`). */
   key: string
   /** Its beat's rank, when the beat brought its own (a show's hint). */
   rank?: number
@@ -148,6 +149,8 @@ export function focusKey(focus: Focus): string {
       return `place:${focus.place}`
     case "show":
       return `show:${focus.id}`
+    case "harbour":
+      return focus.ship ? `harbour:${focus.ship}` : "harbour"
     default:
       return focus.kind
   }
@@ -155,6 +158,14 @@ export function focusKey(focus: Focus): string {
 
 const OVERVIEW: Focus = { kind: "overview" }
 const HARBOUR: Focus = { kind: "harbour" }
+const GALLEON: Focus = { kind: "harbour", ship: "galleon" }
+/**
+ * A release's galleon sails in from the open sea over 20 s (render sea plan `GALLEON_IN_S`) and drops
+ * anchor with a burst of sparks: the director stays on it this long once it cuts there, and the beat
+ * counts this long.
+ */
+export const RELEASE_HOLD_MS = 12_000
+const RELEASE_LIFE_MS = 22_000
 
 interface Candidate {
   focus: Focus
@@ -164,6 +175,8 @@ interface Candidate {
   /** When its beat happened. */
   start: number
   distance: Distance
+  /** A show's: the least it holds once cut to, and when its hint runs out (run time, ms). */
+  hold?: { ms: number; until: number }
 }
 
 /**
@@ -176,6 +189,11 @@ export interface FocusHint {
   start: number
   ttl: number
   distance: Distance
+  /**
+   * Once cut to, the director stays this long (within the hint's `ttl`): no beat cuts in sooner, a
+   * higher one neither, so a show's key moment is never cut away from. Default `HOLD_MS`.
+   */
+  hold?: number
 }
 
 const hero = (id: string): Focus => ({ kind: "hero", id })
@@ -202,7 +220,10 @@ function beatOf(ev: WorldEvent): Candidate | undefined {
     case "sea.pr":
       return ev.state === "opened" || ev.state === "merged" ? candidate(HARBOUR, "ship", ev.at) : undefined
     case "sea.release":
-      return candidate(HARBOUR, "ship", ev.at)
+      return {
+        ...candidate(GALLEON, "ship", ev.at),
+        hold: { ms: RELEASE_HOLD_MS, until: ev.at + RELEASE_LIFE_MS },
+      }
     case "sea.ci":
       return ev.moment === "sea-red"
         ? candidate(OVERVIEW, "storm", ev.at)
@@ -238,6 +259,7 @@ function candidates(
         rank: h.weight / 2,
         start: h.start,
         distance: h.distance,
+        ...(h.hold !== undefined ? { hold: { ms: h.hold, until: h.start + h.ttl } } : {}),
       })
   const here = (id: string) => {
     const a = world.actors.get(id)
@@ -247,7 +269,7 @@ function candidates(
     if (ev.at > t) continue
     const c = beatOf(ev)
     if (!c) continue
-    if (t - c.start >= LIFE_MS[c.reason as keyof typeof LIFE_MS]) continue
+    if (t - c.start >= (c.hold ? c.hold.until - c.start : LIFE_MS[c.reason as keyof typeof LIFE_MS])) continue
     if (c.focus.kind === "hero" && !here(c.focus.id)) continue
     out.push(c)
   }
@@ -312,7 +334,7 @@ function cut(c: Candidate, t: number, seen: Readonly<Record<string, number>>): S
     reason: c.reason,
     distance: c.distance,
     since: t,
-    holdUntil: t + HOLD_MS,
+    holdUntil: c.hold ? Math.max(t + HOLD_MS, Math.min(t + c.hold.ms, c.hold.until)) : t + HOLD_MS,
     start: c.start,
     key: c.key,
     ...(c.reason === "show" ? { rank: c.rank } : {}),
@@ -367,7 +389,9 @@ export function pick(
   if (!prev || prev.reason === "user" || t < prev.since) return cut(top, t, seen)
   const mine = list.filter((c) => c.key === prev.key)
   const now = mine.length > 0 ? best(mine, seen, t) : undefined
-  if (t < prev.holdUntil) return keep(prev, now, t)
+  // the idle overview is filler: a world event starting takes the camera from it at once (a grave's
+  // rise lasts 2.8 s; held off by the filler's 4 s it would claw up unseen)
+  if (t < prev.holdUntil && !(prev.reason === "idle" && top.reason === "show")) return keep(prev, now, t)
   if (!now) return cut(top, t, seen)
   if (top.rank > now.rank) return cut(top, t, seen)
   if (now.reason === "plea") return keep(prev, now, t)

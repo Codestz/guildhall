@@ -24,6 +24,8 @@ import type { CaptionView, StoryPart } from "./types.ts"
 
 /** The fade out, ms (matches `.st-caption` in the sheet). */
 export const CAPTION_FADE_MS = 650
+/** The live region speaks at most once in this long (the newest line wins). */
+export const ANNOUNCE_GAP_MS = 3500
 
 export interface CaptionsProps {
   /** The line just told (a new `key` is a new line); undefined says nothing new. */
@@ -44,13 +46,25 @@ export const Captions = memo(function Captions({
 }: CaptionsProps) {
   const [shown, setShown] = useState<{ caption: CaptionView; leaving: boolean } | undefined>()
   const [said, setSaid] = useState("")
+  const lastSaid = useRef(0)
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: one schedule per line, keyed by its key
   useEffect(() => {
     if (!caption) return
     setShown({ caption, leaving: false })
-    if (caption.priority >= 2 && (announcePleas || caption.kind !== "plea")) setSaid(caption.text)
-    if (still) return
+    // the live region speaks at most once per ANNOUNCE_GAP_MS, the newest line winning, so a busy session
+    // is never read as a queue the listener cannot keep up with
+    let spoken: ReturnType<typeof setTimeout> | undefined
+    if (caption.priority >= 2 && (announcePleas || caption.kind !== "plea")) {
+      const wait = Math.max(0, lastSaid.current + ANNOUNCE_GAP_MS - Date.now())
+      const say = () => {
+        lastSaid.current = Date.now()
+        setSaid(caption.text)
+      }
+      if (wait === 0) say()
+      else spoken = setTimeout(say, wait)
+    }
+    if (still) return () => clearTimeout(spoken)
     let gone: ReturnType<typeof setTimeout> | undefined
     const hide = setTimeout(() => {
       setShown((s) => (s?.caption.key === caption.key ? { caption, leaving: true } : s))
@@ -62,6 +76,7 @@ export const Captions = memo(function Captions({
     return () => {
       clearTimeout(hide)
       clearTimeout(gone)
+      clearTimeout(spoken)
     }
   }, [caption?.key, still])
 

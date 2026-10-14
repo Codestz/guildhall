@@ -68,7 +68,8 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
       world.className = "site-world"
       const pieces = document.createElement("div")
       pieces.className = "site-pieces"
-      root.append(...(withWorld ? [world] : []), pieces)
+      // the pieces come first: the crest menu is the keyboard's first stop, before the HUD; its z-index keeps it over the world
+      root.append(pieces, ...(withWorld ? [world] : []))
       host.append(root)
       const react = createRoot(pieces)
       let gone = false

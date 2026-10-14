@@ -210,6 +210,10 @@ const CSS = /* css */ `
 .gh .hall-menu-body .ui-panel { width: 100%; max-width: none; border: 0; border-radius: 0; background: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
 .hall-menu-body > .hud-panel > .hud-panel-head, .hall-menu-body > .hud-settings > .hud-settings-head { display: none; }
 .hall-menu-body > .hud-panel > .hud-panel-body { border-top: 0; }
+/* the captions and the act chip slide up over the bar: still, when motion is not wanted */
+@media (prefers-reduced-motion: reduce) {
+  .hall-caps, .ui-viewer[data-phone] .hall-acts { transition: none; }
+}
 `
 
 let users = 0

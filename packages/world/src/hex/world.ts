@@ -37,6 +37,7 @@ const CURTAIN = /^kaykit-hexagon\/(wall-|building-tower-base)/
 /** How near a strip a building's footprint point may stand (its points sit a little inside its outline). */
 const ROAD_MARGIN = 0.15
 
+import { GRAVEYARD_SCENE, graveyardPrefab, type HexGraveyard, placeGraveyard } from "./graveyard.ts"
 import { bodyRadius, castleFoot, footprint, settlePieces } from "./sites.ts"
 import {
   edgeDressing,
@@ -141,6 +142,8 @@ export interface HexWorld {
    * Null where none fits; left out by a world built without one.
    */
   board?: NoticeBoardPlace | null
+  /** The graveyard (graveyard.ts): its tiles, its gate and its graves in the world; null without one. */
+  graveyard: HexGraveyard | null
   /** Metres per height level this world was built with. */
   step: number
   /** The island's ground height at a point (the top of the tile under it; 0 off the island). */
@@ -265,6 +268,11 @@ const SCENE_PART = "scene-part"
 const OPEN_IN_PLACE = new Set<TileUse>(["yard", "garden", "well", "market"])
 const OPEN_COUNTRY = new Set<TileUse>(["meadow", "grove", "pasture", "orchard", "field"])
 
+const GRAVEYARD_FALLBACK = graveyardPrefab()
+/** A prefab by id: the authored one, else the code's; the graveyard's built from its graves (graveyard.ts). */
+const prefabOf = (id: string): TilePrefab | undefined =>
+  tilePrefab(id) ?? (id === GRAVEYARD_SCENE ? GRAVEYARD_FALLBACK : undefined)
+
 /** The prefab for a tile's use (besides buildings and roads). */
 const BY_USE: Record<string, string> = {
   field: "field",
@@ -313,6 +321,8 @@ export function hexWorld(
   const g = h.grid
   const R = HEX_TILE_SIZE
   const tiles: HexWorldTile[] = []
+  // the graveyard as built (graveyard.ts `placeGraveyard`), once its front tile is placed
+  let builtGraveyard: HexGraveyard | null = null
   const pieces: HexWorld["pieces"] = []
   const paths: number[] = []
   const prefabs: Record<string, number> = {}
@@ -810,6 +820,12 @@ export function hexWorld(
       continue
     if (scene && (onStreet(i) || byLane(i)) && claim(i, scene)) landmarkDoor.delete(i)
   }
+  // the graveyard (graveyard.ts): zones gave it its tiles and its gate's side; its scene covers them
+  const graveyard = z.graveyard
+  if (graveyard) {
+    scenes.set(graveyard.tile, GRAVEYARD_SCENE)
+    for (const j of graveyard.cover) claimedBy.set(j, graveyard.tile)
+  }
   /** The first of `ids` the castle's tier has (a castle piece's `tier`: the first tier that uses it). */
   const atTier = (...ids: string[]): string | null =>
     ids.find((id) => {
@@ -961,7 +977,7 @@ export function hexWorld(
     if (origin !== undefined) {
       // under a neighbour's scene: its ground, nothing of its own
       prefab = SCENE_PART
-      const p = tilePrefab(scenes.get(origin)!)!
+      const p = prefabOf(scenes.get(origin)!)!
       if ((p.ground === "dirt" || p.ground === "paved" || p.ground === "sand") && dryLand(i))
         ground = p.ground
     } else if (zone?.kind === "castle" && z.castle) {
@@ -1026,6 +1042,11 @@ export function hexWorld(
             ),
           )
       }
+    } else if (u === "graveyard" && graveyard?.tile === i) {
+      prefab = GRAVEYARD_SCENE
+      door = graveyard.door
+      rot = rotOf(door)
+      builtGraveyard = placeGraveyard(graveyard, [x, zz], t, rot)
     } else if (u === "building") {
       prefab = scenes.get(i) ?? buildOf(i)
       const turn = turned.get(i)
@@ -1084,7 +1105,7 @@ export function hexWorld(
     else if (k === "sand") prefab = "beach"
     else if (k === "lake" && hash2(seed + 7, g.q[i]!, g.r[i]!) < 0.15) prefab = null
     if (prefab === "dock" || prefab === "field") ground = prefab === "dock" ? "water" : "soil"
-    const authored = prefab ? tilePrefab(prefab) : undefined
+    const authored = prefab ? prefabOf(prefab) : undefined
     const p = authored && mirror ? mirrorPrefab(authored) : authored
     if (p) {
       if (p.ground === "dirt" || p.ground === "paved" || p.ground === "sand") ground = p.ground
@@ -1413,6 +1434,7 @@ export function hexWorld(
     bridges,
     decks,
     board,
+    graveyard: builtGraveyard,
     step: STEP,
     heightAt,
     stairAt,

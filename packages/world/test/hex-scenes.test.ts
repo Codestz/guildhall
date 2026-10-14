@@ -39,7 +39,14 @@ const SCENES = ["tavern-garden", "market-square", "smithy-works", "archery-range
  * out over the shallows), the monastery's compound (it takes in its place's other buildings), the
  * farmstead (its fields stay fields) and the town hall's plaza.
  */
-const TURNING = ["harbour-quay", "monastery-compound", "farmstead-yard", "town-hall-plaza", "training-arena"]
+const TURNING = [
+  "harbour-quay",
+  "monastery-compound",
+  "farmstead-yard",
+  "town-hall-plaza",
+  "training-arena",
+  "graveyard-yard",
+]
 /** The tiles scene tile `t` covers: its footprint's sides, mirrored when it is, turned to its door. */
 const coverOf = (
   h: ReturnType<typeof hexIsland>,
@@ -120,7 +127,7 @@ describe("scenes bigger than a tile", () => {
         const spots = furniture.spots.filter((s) => s.tile === t.i)
         // (a spot set inside a building or a wall beyond moving out of it is left out: collide.ts)
         const dropped = furniture.dropped.filter((s) => s.tile === t.i).length
-        expect(spots.length + dropped).toBe(tilePrefab(t.prefab!)!.spots!.length)
+        expect(spots.length + dropped).toBe(tilePrefab(t.prefab!)!.spots?.length ?? 0)
         for (const s of spots) expect(mine.has(tileAt(s.x, s.z))).toBe(true)
       }
       expect(furniture.spots.filter((s) => parts.has(s.tile))).toEqual([])

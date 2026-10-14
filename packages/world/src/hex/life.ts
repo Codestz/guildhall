@@ -561,6 +561,8 @@ export function workTiles(h: HexIsland, z: HexZones): number[] {
   }
   // the campsite on the nature lake's shore: campers and fishers walk out to it
   for (let i = 0; i < g.size; i++) if (useOf(z, i) === "campsite") out.add(i)
+  // the graveyard's front tile (graveyard.ts): the hero who mends a grave walks in by its gate to strike it
+  if (z.graveyard) out.add(z.graveyard.tile)
   return [...out].sort((a, b) => a - b)
 }
 

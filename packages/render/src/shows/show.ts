@@ -89,6 +89,8 @@ export interface ShowPiece {
   draws(): number
   /** Poses it at `t` seconds into the show (`total` long: Infinity for a dragon still circling). */
   update(t: number, total: number, camera: Camera): void
+  /** Where a camera should look to film it now (a moving subject's, as of its last update); none: its site. */
+  subject?(): [number, number, number] | null
   dispose(): void
 }
 

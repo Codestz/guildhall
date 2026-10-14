@@ -23,8 +23,12 @@ const BEAT_REACH = 0.62
 const CLIMB = { flap: 2.1, glide: -1.1, dive: -5.2, breath: -0.8, climb: 3.6 } as const
 /** Cruising speed over the ground, metres a second; diving it goes faster, climbing slower. */
 const CRUISE = 13
-/** The route's altitude band round its centre, metres (the swoop's bottom … the top of a climb). */
-const LOW = -10
+/**
+ * The route's altitude band round its centre, metres (the swoop's bottom … the top of a climb): the
+ * centre is 27 m over the peaks (dragon.ts), so a swoop comes down to about 10 m over the rock and its
+ * fire licks it, then climbs back to over 30 m.
+ */
+const LOW = -17
 const HIGH = 6
 const DT = 1 / 120
 

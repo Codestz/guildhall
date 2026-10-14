@@ -33,11 +33,12 @@ const STREAK_VERTEX = /* glsl */ `
 attribute vec3 aFrom; attribute vec3 aDir; attribute float aBirth; attribute float aLife;
 attribute float aSize; attribute float aTail;
 uniform float uTime;
-varying vec2 vUv; varying float vLife;
+varying vec2 vUv; varying float vLife; varying float vIon;
 void main() {
   float t = (uTime - aBirth) / aLife;
   vUv = uv;
   vLife = t;
+  vIon = float(gl_InstanceID);
   if (t < 0.0 || t > 1.0) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     return;
@@ -70,7 +71,7 @@ void main() {
 
 const COMET_FRAGMENT = /* glsl */ `
 uniform float uFade;
-varying vec2 vUv; varying float vLife;
+varying vec2 vUv; varying float vLife; varying float vIon;
 void main() {
   float across = 1.0 - abs(vUv.x - 0.5) * 2.0;
   float along = vUv.y;                         // 0 the tail's end … 1 the head
@@ -78,12 +79,16 @@ void main() {
   float cap = clamp((along - 0.88) / 0.12, 0.0, 1.0);
   float room = sqrt(max(0.0, 1.0 - cap * cap));
   float inside = smoothstep(0.0, 0.12, across - (1.0 - room));
-  float head = smoothstep(0.7, 0.92, along) * smoothstep(0.15, 0.85, across);
-  float tail = pow(along, 1.3) * pow(across, 1.3) * 0.9;
-  float a = clamp(max(head, tail), 0.0, 1.0) * inside * uFade;
+  float head = smoothstep(0.8, 0.94, along) * smoothstep(0.3, 0.9, across);
+  // the dust tail full and warm, the ion tail (the second streak) a thinner blue: bold against a pale sky
+  float ion = step(0.5, vIon);
+  float tail = min(1.0, pow(along, mix(0.8, 1.4, ion)) * pow(across, mix(0.75, 1.6, ion)) * mix(1.7, 1.0, ion));
+  float a = clamp(max(head * (1.0 - ion), tail), 0.0, 1.0) * inside * uFade;
   if (a < 0.004) discard;
-  vec3 colour = mix(vec3(1.0, 0.78, 0.42), vec3(1.0, 1.0, 0.96), max(head, pow(along, 6.0)));
-  gl_FragColor = vec4(colour * (1.0 + 1.4 * head), a);
+  vec3 dust = mix(vec3(0.95, 0.36, 0.08), vec3(1.0, 0.72, 0.32), pow(along, 2.0));
+  vec3 colour = mix(dust, vec3(0.25, 0.55, 1.0), ion);
+  colour = mix(colour, vec3(1.0, 1.0, 0.95), max(head * (1.0 - ion), pow(along, 8.0)));
+  gl_FragColor = vec4(colour * (0.9 + 1.5 * head), a);
 }`
 
 interface Streak {
@@ -189,13 +194,13 @@ export function createComet(ctx: ShowCtx): ShowPiece {
   } else {
     // the comet and, a little behind it, its fainter ion tail: across the top of the view, slowly
     geometry = streaks(2, (i, s) => {
-      onFrame(f, -1.25, 0.82, s.from)
-      onFrame(f, 1.35, 0.5, to)
+      onFrame(f, -0.95, 0.66, s.from)
+      onFrame(f, 1.45, 0.36, to)
       s.dir.subVectors(to, s.from)
       s.birth = 0.3
       s.life = 14
-      s.size = (i === 0 ? 9 : 4.4) * k
-      s.tail = (i === 0 ? 0.55 : 0.8) * f.w
+      s.size = (i === 0 ? 13 : 5.5) * k
+      s.tail = (i === 0 ? 0.62 : 0.85) * f.w
     })
   }
   const material = new ShaderMaterial({

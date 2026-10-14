@@ -261,10 +261,6 @@ transformed.z += cos(uTime * 3.1 + aAnchor.x * 0.7) * 0.08 * aSway;`,
 
 // ─────────────────────────────── fireworks and confetti ───────────────────────────────
 
-const SPARK_COLORS = ["#ff5a4a", "#ffd25a", "#5ad0ff", "#9cff6a", "#ff7ad9", "#fff2c8"].map(
-  (c) => new Color(c),
-)
-
 function sparkGeometry(
   count: number,
   plane: PlaneGeometry,
@@ -295,79 +291,272 @@ function sparkGeometry(
   return plane
 }
 
-/** Bursts over the keep: a rocket climbs from its roofs, bursts into a sphere of sparks that droop and twinkle out. */
-export const BURSTS = 13
-const PER_BURST = 52
+// ─────────────────────────────── the fireworks' programme ───────────────────────────────
 
+/** The fireworks' kinds of shell. */
+export type ShellStyle = "peony" | "willow" | "crackle" | "ring"
+const STYLE_CODE: Record<ShellStyle, number> = { peony: 0, willow: 1, crackle: 2, ring: 3 }
+
+/** One shell: when it is launched (s into the show), its kind, where it bursts (from over the keep), its colours and its size. */
+export interface Shell {
+  launch: number
+  style: ShellStyle
+  /** Where it bursts, metres from the keep's top (x, up, z). */
+  at: [number, number, number]
+  /** Its stars' colour, and the colour they turn to as they burn (indices into `SHELL_COLOURS`). */
+  colour: number
+  turn: number
+  /** How far its stars are thrown (1 a plain shell). */
+  size: number
+}
+
+/** A rocket's climb from the keep's roofs to its burst, seconds. */
+export const ROCKET_S = 1.1
+/** How long each kind's stars burn after the burst, seconds. */
+export const STAR_S: Readonly<Record<ShellStyle, number>> = {
+  peony: 2.8,
+  willow: 4.8,
+  crackle: 2.6,
+  ring: 2.6,
+}
+/** Stars in a shell, and the sparks of a rocket's trail. */
+export const STARS = 60
+const TRAIL = 7
+/** When the finale's salvo begins, seconds into the show. */
+export const FINALE_S = 21.5
+
+/** red, gold, cyan, green, rose, cream, violet, orange: bright, so they bloom by night. */
+export const SHELL_COLOURS = [
+  "#ff4a3d",
+  "#ffc23a",
+  "#45c8ff",
+  "#7dff5a",
+  "#ff6fcf",
+  "#fff0c8",
+  "#a77bff",
+  "#ff8a2a",
+].map((c) => new Color(c))
+const GOLD_I = 1
+const CREAM_I = 5
+
+/**
+ * The night's programme, the same every time: an opening of single shells, a middle that mixes every
+ * kind (two at once now and then), a finale salvo from `FINALE_S` that builds to a crown of gold
+ * willows and a crackle, and a short coda. About 30 shells over 36 s; the director holds the keep
+ * through the finale (sim `SHOW_LOOK.festival`). Many colours, as the user asked: every shell has its
+ * own and turns to another as it burns; only the willows are gold.
+ */
+export function fireworksProgramme(): Shell[] {
+  const out: Shell[] = []
+  let n = 0
+  const shell = (launch: number, style: ShellStyle, size = 1, colour?: number, turn?: number) => {
+    const h = (k: number) => hash01(n * 31 + k)
+    // by chance any colour but the cream (it would read white): that is for the crackles and the willows to turn to
+    const c = colour ?? ([0, 1, 2, 3, 4, 6, 7][Math.floor(h(1) * 7)] as number)
+    out.push({
+      launch,
+      style,
+      at: [(h(2) - 0.5) * 30, 15 + h(3) * 9 + (size - 1) * 6, (h(4) - 0.5) * 30],
+      colour: style === "willow" ? (colour ?? GOLD_I) : c,
+      turn: turn ?? (style === "willow" ? CREAM_I : (c + 1 + Math.floor(h(5) * 3)) % SHELL_COLOURS.length),
+      size,
+    })
+    n++
+  }
+  // the opening: one at a time
+  shell(1.0, "peony", 1, 0, 1)
+  shell(3.0, "ring", 1, 2)
+  shell(5.0, "peony", 1, 4)
+  shell(6.8, "willow")
+  // the middle: every kind, some in pairs
+  shell(9.0, "crackle")
+  shell(10.4, "peony", 1, 3)
+  shell(10.9, "peony", 1, 6)
+  shell(12.8, "ring", 1.1, 1)
+  shell(14.4, "willow", 1.1)
+  shell(15.9, "crackle", 1, 5)
+  shell(17.1, "peony", 1.1, 7)
+  shell(17.6, "ring", 1, 4)
+  shell(19.3, "peony", 1.1, 2)
+  // the finale: a salvo, quicker and bigger, crowned by gold willows and a crackle
+  const salvo: ShellStyle[] = [
+    "peony",
+    "ring",
+    "crackle",
+    "peony",
+    "ring",
+    "peony",
+    "crackle",
+    "peony",
+    "ring",
+    "peony",
+  ]
+  salvo.forEach((style, i) => {
+    shell(FINALE_S + i * 0.42, style, 1.15 + i * 0.02)
+  })
+  for (let i = 0; i < 3; i++) shell(FINALE_S + 4.6 + i * 0.22, "willow", 1.3)
+  shell(FINALE_S + 5.4, "crackle", 1.35, CREAM_I, GOLD_I)
+  // the coda
+  shell(32.0, "peony", 1, 4, 5)
+  shell(34.6, "willow", 1.1)
+  return out
+}
+
+const X_AXIS = new Vector3(1, 0, 0)
+
+/** Bursts over the keep: rockets climb from its roofs trailing sparks and burst into stars of four kinds. */
 function fireworks(
   over: Vec3,
   still: boolean,
   uniforms: { uTime: { value: number }; uFade: { value: number } },
 ) {
-  const count = BURSTS * PER_BURST
-  const geometry = sparkGeometry(count, new PlaneGeometry(1, 1), (i, s) => {
-    const b = Math.floor(i / PER_BURST)
-    const k = i % PER_BURST
-    s.birth = 1.2 + b * 2.45 + hash01(b * 7) * 1.1
-    s.origin.set(
-      over[0] - 16 + hash01(b * 7 + 1) * 32,
-      over[1] + 10 + hash01(b * 7 + 3) * 9,
-      over[2] - 16 + hash01(b * 7 + 2) * 32,
-    )
-    const speed = 13 + hash01(b * 7 + 4) * 6
-    // a Fibonacci sphere: an even, round burst
-    const y = 1 - (2 * (k + 0.5)) / PER_BURST
-    const r = Math.sqrt(1 - y * y)
-    const a = k * 2.399963 + b
-    s.dir.set(Math.cos(a) * r, y, Math.sin(a) * r).multiplyScalar(speed * (0.85 + 0.3 * hash01(i)))
-    s.color.copy(SPARK_COLORS[(k % 3 === 0 ? b + 3 : b) % SPARK_COLORS.length] as Color)
-    s.lead = k === 0 ? 1 : 0
+  const shells = fireworksProgramme()
+  const per = STARS + TRAIL + 1
+  const count = shells.length * per
+  const birth = new Float32Array(count)
+  const origin = new Float32Array(count * 3)
+  const dir = new Float32Array(count * 3)
+  const colour = new Float32Array(count * 3)
+  const turn = new Float32Array(count * 3)
+  // role (0 a star, 1 the rocket's head and the burst's flash, 2 a trail spark), style, a seed
+  const kind = new Float32Array(count * 3)
+  const d = new Vector3()
+  shells.forEach((sh, b) => {
+    const style = STYLE_CODE[sh.style]
+    const speed = (sh.style === "willow" ? 10.5 : 14.5) * sh.size
+    // a ring lies in its own tilted plane
+    const tilt = hash01(b * 13 + 7) * 1.1 - 0.55
+    const yaw = hash01(b * 13 + 8) * Math.PI
+    for (let k = 0; k < per; k++) {
+      const i = b * per + k
+      birth[i] = sh.launch
+      origin[i * 3] = over[0] + sh.at[0]
+      origin[i * 3 + 1] = over[1] + sh.at[1]
+      origin[i * 3 + 2] = over[2] + sh.at[2]
+      ;(SHELL_COLOURS[sh.colour] as Color).toArray(colour, i * 3)
+      ;(SHELL_COLOURS[sh.turn] as Color).toArray(turn, i * 3)
+      const role = k < STARS ? 0 : k === STARS ? 1 : 2
+      kind[i * 3] = role
+      kind[i * 3 + 1] = style
+      kind[i * 3 + 2] = hash01(i * 7 + 3)
+      if (role === 2)
+        // a trail spark: how far it lags the head, seconds
+        d.set(((k - STARS - 1) / TRAIL) * 0.34 + 0.03, 0, 0)
+      else if (role === 1) d.set(0, 0, 0)
+      else if (sh.style === "ring") {
+        const a = (k / STARS) * Math.PI * 2
+        d.set(Math.cos(a), 0, Math.sin(a))
+          .applyAxisAngle(X_AXIS, tilt)
+          .applyAxisAngle(UP, yaw)
+          .multiplyScalar(speed * (0.96 + 0.08 * hash01(i)))
+      } else {
+        // a Fibonacci sphere: an even, round burst
+        const y = 1 - (2 * (k + 0.5)) / STARS
+        const r = Math.sqrt(1 - y * y)
+        const a = k * 2.399963 + b
+        d.set(Math.cos(a) * r, y, Math.sin(a) * r).multiplyScalar(speed * (0.86 + 0.28 * hash01(i)))
+      }
+      d.toArray(dir, i * 3)
+    }
   })
+  const geometry = new PlaneGeometry(1, 1)
+  geometry.setAttribute("aBirth", new InstancedBufferAttribute(birth, 1))
+  geometry.setAttribute("aOrigin", new InstancedBufferAttribute(origin, 3))
+  geometry.setAttribute("aDir", new InstancedBufferAttribute(dir, 3))
+  geometry.setAttribute("aColor", new InstancedBufferAttribute(colour, 3))
+  geometry.setAttribute("aTurn", new InstancedBufferAttribute(turn, 3))
+  geometry.setAttribute("aKind", new InstancedBufferAttribute(kind, 3))
   const material = new ShaderMaterial({
     uniforms: {
       uTime: uniforms.uTime,
       uFade: uniforms.uFade,
       uStill: { value: still ? 1 : 0 },
-      uFrom: { value: new Vector3(over[0], over[1] - 6, over[2]) },
+      uFrom: { value: new Vector3(over[0], over[1] - 4, over[2]) },
     },
     vertexShader: /* glsl */ `
-attribute float aBirth; attribute vec3 aOrigin; attribute vec3 aDir; attribute vec3 aColor; attribute float aLead;
+attribute float aBirth; attribute vec3 aOrigin; attribute vec3 aDir; attribute vec3 aColor; attribute vec3 aTurn;
+attribute vec3 aKind;
 uniform float uTime; uniform float uStill; uniform vec3 uFrom;
 varying vec3 vColor; varying float vAlpha; varying vec2 vUv;
-const float RISE = 1.0;
-const float LIFE = 3.0;
+const float RISE = ${ROCKET_S.toFixed(2)};
+float lifeOf(float style) {
+  return style < 0.5 ? ${STAR_S.peony.toFixed(1)} : style < 1.5 ? ${STAR_S.willow.toFixed(1)} : style < 2.5 ? ${STAR_S.crackle.toFixed(1)} : ${STAR_S.ring.toFixed(1)};
+}
+// the rocket on its way up, a seconds after launch: from the keep's roofs, wobbling a little
+vec3 rocket(float a) {
+  float k = clamp(a / RISE, 0.0, 1.0);
+  vec3 from = uFrom + vec3((aOrigin.x - uFrom.x) * 0.15, 0.0, (aOrigin.z - uFrom.z) * 0.15);
+  vec3 p = mix(from, aOrigin, 1.0 - (1.0 - k) * (1.0 - k));
+  p.x += sin(a * 23.0 + aKind.z * 6.0) * 0.08;
+  p.z += cos(a * 17.0) * 0.06;
+  return p;
+}
 void main() {
   float age = uTime - aBirth;
+  float role = aKind.x;
+  float style = aKind.y;
+  float seed = aKind.z;
+  float life = lifeOf(style);
   vUv = uv;
   vColor = aColor;
   vAlpha = 0.0;
-  if (age < 0.0 || age > RISE + LIFE) {
-    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-    return;
-  }
+  gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+  if (age < 0.0 || age > RISE + life) return;
   vec3 p;
   float size;
-  if (age < RISE) {
-    // the rocket: only the burst's lead spark, climbing from the keep's roofs with a wobble
-    float k = age / RISE;
-    vec3 from = mix(uFrom, aOrigin, 0.15);
-    from.y = uFrom.y;
-    p = mix(from, aOrigin, 1.0 - (1.0 - k) * (1.0 - k));
-    p.x += sin(age * 22.0) * 0.06;
-    size = 1.0;
-    vAlpha = aLead;
-    vColor = vec3(1.0, 0.85, 0.6);
+  float t = age - RISE;
+  if (role > 1.5) {
+    // a spark of the rocket's trail: where the head was a moment ago, cooling and falling away
+    float lag = aDir.x;
+    float a = min(age, RISE) - lag;
+    if (a < 0.0 || t > 0.7) return;
+    p = rocket(a);
+    float since = age - a;
+    p.y -= 1.4 * since * since;
+    float fade = (1.0 - lag / 0.4) * (1.0 - clamp(t / 0.7, 0.0, 1.0));
+    size = 0.38 * (1.0 - 0.5 * lag / 0.4);
+    vAlpha = 0.8 * fade;
+    vColor = mix(vec3(1.0, 0.8, 0.45), vec3(1.0, 0.45, 0.12), lag / 0.4);
+  } else if (role > 0.5) {
+    if (t < 0.0) {
+      // the rocket's head
+      p = rocket(age);
+      size = 0.6;
+      vAlpha = 1.0;
+      vColor = vec3(1.0, 0.86, 0.6);
+    } else {
+      // the burst's flash: brief, in the shell's colour (never a white sheet)
+      if (t > 0.18) return;
+      float k = t / 0.18;
+      p = aOrigin;
+      size = mix(2.6, 1.2, k);
+      vAlpha = (1.0 - k) * 0.4;
+      vColor = mix(vec3(1.0, 0.92, 0.75), aColor, 0.75) * 0.6;
+    }
   } else {
-    float t = age - RISE;
-    float drag = (1.0 - exp(-t * 2.4)) / 2.4;
-    p = aOrigin + aDir * drag;
-    p.y -= 1.2 * t * t;
-    float life = 1.0 - t / LIFE;
-    size = mix(0.4, 1.5, life) * (1.0 + 0.4 * (1.0 - smoothstep(0.0, 0.2, t)));
-    float twinkle = uStill > 0.5 ? 1.0 : 0.6 + 0.4 * sin(t * 34.0 + aDir.x * 9.0);
-    vAlpha = life * life * twinkle;
-    // the first instant is a white-hot flash
-    vColor = mix(vec3(1.0, 0.95, 0.85), aColor, smoothstep(0.0, 0.18, t));
+    // a star: thrown out, dragged, drooping under gravity
+    if (t < 0.0) return;
+    float u = t / life;
+    float willow = step(0.5, style) * step(style, 1.5);
+    float crackle = step(1.5, style) * step(style, 2.5);
+    float drag = mix(2.4, 1.5, willow);
+    p = aOrigin + aDir * (1.0 - exp(-t * drag)) / drag;
+    p.y -= mix(1.15, 0.85, willow) * t * t;
+    // they come out of the burst already lit: no stack of white quads at its heart
+    float bloom = smoothstep(0.0, 0.07, t);
+    size = mix(1.25, 0.45, u) * bloom * mix(1.0, 1.15, willow);
+    vColor = mix(aColor, aTurn, smoothstep(0.35, 0.7, u));
+    vColor = mix(vColor, mix(vec3(1.0, 0.75, 0.3), vec3(0.95, 0.4, 0.1), u), willow);
+    float twinkle = uStill > 0.5 ? 1.0 : mix(1.0, 0.55 + 0.45 * sin(t * 31.0 + seed * 40.0), smoothstep(0.45, 0.8, u));
+    vAlpha = mix(pow(1.0 - u, 1.4), pow(1.0 - u, 0.7), willow) * twinkle;
+    if (crackle > 0.5 && u > 0.5) {
+      // the crackle: each star pops in white flickers as it burns out
+      float tick = floor(t * 26.0);
+      float on = uStill > 0.5 ? 1.0 : step(0.6, fract(sin(seed * 91.7 + tick * 12.9898) * 43758.5453));
+      vColor = mix(vColor, vec3(1.0, 0.97, 0.85), 0.8);
+      size *= 1.0 + on * 0.9;
+      vAlpha = on * (1.0 - smoothstep(0.85, 1.0, u)) * 0.95;
+    }
   }
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   mv.xy += position.xy * size;
@@ -382,7 +571,8 @@ void main() {
   float core = clamp(1.0 - (q.x + q.y) * 0.9 - q.x * q.y * 2.0, 0.0, 1.0);
   float a = core * vAlpha * uFade;
   if (a < 0.003) discard;
-  gl_FragColor = vec4(vColor * (1.3 + 2.4 * core), a);
+  // past the bloom's threshold at the heart of every star: they glow in the night
+  gl_FragColor = vec4(vColor * (1.05 + 1.9 * core * core), a);
 }`,
     transparent: true,
     depthWrite: false,

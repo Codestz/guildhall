@@ -52,6 +52,9 @@ const FAR = new Vector3(-40, 50, -240)
 /** Its speed coming in off the horizon and going away, metres a second. */
 const IN_SPEED = 34
 const OUT_SPEED = 26
+/** The camera follows it (its `subject`) fully within this far of the orbit's centre, not at all past the other, metres. */
+const FOLLOW_NEAR = 45
+const FOLLOW_FAR = 150
 /** Seconds the body and the tail lag the wings' roll. */
 const BODY_LAG = 0.22
 const TAIL_LAG = 0.35
@@ -219,8 +222,19 @@ export function createDragon(ctx: ShowCtx): ShowPiece {
 
   const ahead = new Vector3()
   const local = new Vector3()
+  const centre = new Vector3(plan.centre[0], plan.centre[1], plan.centre[2])
   return {
     object: group,
+    subject() {
+      // over the peaks while it is far off; on it (most of the way) once it is near enough to film
+      const d = group.position.distanceTo(centre)
+      const w = 0.75 * clamp01(1 - (d - FOLLOW_NEAR) / (FOLLOW_FAR - FOLLOW_NEAR))
+      return [
+        centre.x + (group.position.x - centre.x) * w,
+        centre.y + (group.position.y - centre.y) * w,
+        centre.z + (group.position.z - centre.z) * w,
+      ]
+    },
     draws: () => (group.visible ? 1 + (fire.visible ? 1 : 0) : 0),
     update(t, total) {
       uniforms.uTime.value = t
@@ -535,7 +549,7 @@ if (aTail > 0.0) {
 
 /** Flames from the jaws, in the dragon's space: a cone of puffs, each looping while the breath lasts. */
 function flames(uniforms: Uniforms): InstancedMesh<PlaneGeometry, ShaderMaterial> {
-  const COUNT = 46
+  const COUNT = 60
   const seed = new Float32Array(COUNT)
   const spread = new Float32Array(COUNT * 2)
   for (let i = 0; i < COUNT; i++) {
@@ -577,7 +591,7 @@ void main() {
   if (a < 0.01) discard;
   vec3 colour = mix(vec3(0.95, 0.25, 0.05), vec3(1.0, 0.85, 0.4), vHeat * vHeat);
   // hot enough to bloom at night, solid enough to read against a bright sky
-  gl_FragColor = vec4(colour * (1.0 + 1.6 * vHeat), a);
+  gl_FragColor = vec4(colour * (1.3 + 2.4 * vHeat), a);
 }`,
     transparent: true,
     depthWrite: false,

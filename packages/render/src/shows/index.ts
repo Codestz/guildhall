@@ -40,7 +40,16 @@ export {
   dragonOrbit,
   dragonState,
 } from "./dragon.ts"
-export { buildBunting, POLE_H } from "./festival.ts"
+export {
+  buildBunting,
+  FINALE_S,
+  fireworksProgramme,
+  POLE_H,
+  ROCKET_S,
+  type Shell,
+  type ShellStyle,
+  STAR_S,
+} from "./festival.ts"
 export { BEAT_S, beatAngle, type FlightPlan, flightPlan, wingAngle } from "./flight.ts"
 export { rainbowSize } from "./rainbow.ts"
 export { envelope, NIGHT_AT, SHOW_KINDS, SHOW_S, type Show, type ShowKind } from "./show.ts"
@@ -85,6 +94,8 @@ export interface Shows {
   /** Resolves once every playing show's programs are linked and it is in view. */
   ready(): Promise<void>
   playing(): Show[]
+  /** Where to film a playing kind now (the dragon as it flies), null when it is not shown or says nothing. */
+  subject(kind: ShowKind): [number, number, number] | null
   stats(): ShowsStats
   dispose(): void
 }
@@ -216,6 +227,10 @@ export function createShows(stage: Stage, opts: ShowsOpts): Shows {
       await Promise.all([...playing.values()].map((p) => p.ready))
     },
     playing: () => [...playing.values()].map((p) => ({ ...p.show })),
+    subject(kind) {
+      const p = playing.get(kind)
+      return p?.shown && p.piece.object.visible ? (p.piece.subject?.() ?? null) : null
+    },
     stats: () => ({
       playing: [...playing.keys()],
       draws: [...playing.values()].reduce((n, p) => n + p.piece.draws(), 0),

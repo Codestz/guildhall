@@ -16,9 +16,13 @@ import {
   dragonFlight,
   dragonOrbit,
   envelope,
+  FINALE_S,
+  fireworksProgramme,
+  ROCKET_S,
   rainbowSize,
   SHOW_KINDS,
   SHOW_S,
+  STAR_S,
   wingAngle,
 } from "../src/shows/index.ts"
 import type { Stage } from "../src/stage.ts"
@@ -315,5 +319,26 @@ describe("createShows", () => {
     step(0.016)
     expect(shows.stats().playing).toEqual([])
     shows.dispose()
+  })
+})
+
+describe("the fireworks' programme", () => {
+  const shells = fireworksProgramme()
+
+  test("every kind of shell, in many colours, each turning to another", () => {
+    expect(new Set(shells.map((s) => s.style))).toEqual(new Set(["peony", "willow", "crackle", "ring"]))
+    expect(new Set(shells.map((s) => s.colour)).size).toBeGreaterThanOrEqual(6)
+    for (const s of shells) if (s.style !== "willow") expect(s.turn).not.toBe(s.colour)
+    expect(fireworksProgramme()).toEqual(shells) // the same every time
+  })
+
+  test("a finale: the salvo is the busiest stretch, crowned by willows, and all burns out inside the festival", () => {
+    const within = (a: number, b: number) => shells.filter((s) => s.launch >= a && s.launch < b).length
+    const finale = within(FINALE_S, FINALE_S + 6)
+    for (let a = 0; a + 6 <= FINALE_S; a += 1) expect(within(a, a + 6)).toBeLessThan(finale)
+    expect(shells.filter((s) => s.style === "willow" && s.launch >= FINALE_S).length).toBeGreaterThanOrEqual(
+      3,
+    )
+    for (const s of shells) expect(s.launch + ROCKET_S + STAR_S[s.style]).toBeLessThan(SHOW_S.festival - 1)
   })
 })

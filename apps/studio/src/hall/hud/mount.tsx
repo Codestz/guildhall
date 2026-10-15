@@ -409,6 +409,8 @@ export function mountHomeHud(parts: HudParts, opts: HomeHudOptions): () => void 
           story = next
           places.reset()
           feed.switchTo(next)
+          // a new story opens on its own framing; nobody stays followed from the last
+          m.camera.reset()
         }
         act = n
         paint()

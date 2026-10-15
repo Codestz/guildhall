@@ -410,6 +410,8 @@ export interface HallCamera {
   follow(id: string): void
   /** Lets go of a followed hero (the director takes over once the viewer has been still `USER_WAIT_MS`). */
   release(): void
+  /** Back to the framing the hall opened with (a new story on the home): lets go a follow, drops the shot, and the director may cut at once. */
+  reset(): void
   /** Switches the director on or off (no argument: toggles); returns the switch. */
   director(on?: boolean): boolean
   state(): HallCameraState
@@ -455,6 +457,8 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
   const motion = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null
   const still = opts.reducedMotion ?? (() => motion?.matches === true)
   let followId: string | null = null
+  /** The framing the camera opened with: what a reset returns to. */
+  const opening = rig.get()
   let directorOn =
     opts.query.get("director") === null && opts.director !== undefined
       ? opts.director
@@ -847,6 +851,15 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
     release() {
       if (!followId) return
       letGo()
+      changed()
+    },
+    reset() {
+      letGo()
+      stopShot()
+      lastCut = null
+      userAt = null
+      decideIn = 0
+      glide({ ...opening, target: [...opening.target] as Vec3 }, 1100)
       changed()
     },
     director(on) {

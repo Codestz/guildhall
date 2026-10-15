@@ -26,6 +26,7 @@ import {
   type Material,
   MeshDepthMaterial,
   type Object3D,
+  type Scene,
   WebGLRenderTarget,
 } from "three"
 import type { Stage } from "./stage.ts"
@@ -87,20 +88,29 @@ export async function warmPrograms(
   // A program's key takes in the render target it draws into (its colour space, its tone mapping), so
   // the compile binds the one the scene is drawn into: the post pipeline's target, or the canvas (or
   // `options.into`, for a pass that draws into its own target). A depth material draws into a shadow
-  // map: any target but the canvas keys it the same.
+  // map: any target but the canvas keys it the same. The key also takes in the scene drawn (its fog, its
+  // lights): `options.scene` for an object drawn in a scene of its own (the post passes' quad), and the
+  // shadow pass draws its depth materials with no scene at all (three passes null: no fog, the lights
+  // of the frame), so a depth material compiles with the scene's fog off, or the program made here is
+  // one the shadow pass never draws with (measured: every warmed depth program was built twice).
   const compile = (material?: Material) => {
     const was = renderer.getRenderTarget()
+    const depth = (material as { isMeshDepthMaterial?: boolean } | undefined)?.isMeshDepthMaterial === true
     const into =
       options.into !== undefined
         ? options.into
-        : (material as { isMeshDepthMaterial?: boolean } | undefined)?.isMeshDepthMaterial
+        : depth
           ? (stage.drawTarget ?? offscreen())
           : (stage.drawTarget ?? null)
+    const target = options.scene ?? scene
+    const fog = target.fog
+    if (depth) target.fog = null
     renderer.setRenderTarget(into)
     try {
-      renderer.compile(object, camera, scene)
+      renderer.compile(object, camera, target)
     } finally {
       renderer.setRenderTarget(was)
+      target.fog = fog
     }
   }
   if (!materials) {
@@ -161,6 +171,8 @@ export interface WarmOptions {
   into?: WebGLRenderTarget | null
   /** Read the programs' layouts once ready (default), which waits for the real compile; false resolves at `isReady`. */
   prefetch?: boolean
+  /** The scene the object is drawn in (its fog and lights key the program); default the stage's. */
+  scene?: Scene
 }
 
 /** The slice of a Stage the warm-up needs (a bare renderer in the tests). */

@@ -384,8 +384,10 @@ export function createPost(stage: Stage, opts: PostOpts): Post {
     },
     async warm() {
       resize()
+      // each pass is keyed by the target it draws into, and by the quad's own scene (no fog, no lights:
+      // compiled against the stage's scene, every pass got a second program the frame never drew with)
       const into = (material: ShaderMaterial, target: WebGLRenderTarget | null) =>
-        warmPrograms(stage, quad, [material], { into: target })
+        warmPrograms(stage, quad, [material], { into: target, scene: quadScene })
       const first = levels[0] as WebGLRenderTarget
       // SMAA's three materials and the two targets between them are the pass's own (three keeps them
       // private); each program is keyed by the target it draws into, the blend's by the canvas

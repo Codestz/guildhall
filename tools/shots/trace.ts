@@ -129,6 +129,31 @@ for (const m of mains) {
     mainTasks = tasks
   }
 }
+// THREAD=worker: the build worker's thread instead (the DedicatedWorker thread of the page's process
+// with the most samples), to name what the island's build spends its time on
+if (process.env.THREAD === "worker" && main) {
+  const workers = events.filter(
+    (e) =>
+      e.name === "thread_name" &&
+      e.pid === main?.pid &&
+      /DedicatedWorker/.test((e.args as { name?: string })?.name ?? ""),
+  )
+  let best: TraceEvent | undefined
+  let bestTasks = -1
+  for (const w of workers) {
+    const n = tasksOf(w.pid, w.tid).length
+    if (n > bestTasks) {
+      best = w
+      bestTasks = n
+    }
+  }
+  if (!best) {
+    console.error("no worker thread in the trace")
+    process.exit(1)
+  }
+  main = best
+  mainTasks = tasksOf(best.pid, best.tid)
+}
 if (!main) {
   console.error("no renderer main thread in the trace")
   process.exit(1)

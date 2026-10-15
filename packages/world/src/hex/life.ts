@@ -19,7 +19,7 @@
  * of errands (scripted for now; repo events drive it later).
  */
 import { hash2 } from "../geom/noise.ts"
-import { discSolid, type Solid, SolidGrid } from "./collide.ts"
+import { discSolid, type Solid, SolidGrid, solidDistance } from "./collide.ts"
 import { DRILLS, pairedDrill } from "./drills.ts"
 import { hexAt, hexCentre } from "./grid.ts"
 import { type HeroPool, heroSpotPool } from "./heroes.ts"
@@ -278,6 +278,39 @@ export function doorSpot(walk: HexWalk, node: number, doorways: ReadonlyMap<numb
   const x = d.x - Math.sin(d.facing) * IN_DOOR
   const z = d.z - Math.cos(d.facing) * IN_DOOR
   return { node, at: [x, n.y, z], facing: d.facing + Math.PI, ground: true }
+}
+
+/** A body's room a door's threshold keeps from every wall and building, metres. */
+const THRESHOLD_BODY = 0.3
+
+/**
+ * Before a door, on its threshold: out of the doorway the way it faces, the first place a body stands
+ * clear of every wall and building (`THRESHOLD_BODY`), facing in; no farther out than the door node,
+ * which it is when nothing nearer is clear (or the building has no doorway). Where someone who goes in
+ * without being drawn through the door (a hero at rest: sim rest.ts) stops, and is gone from.
+ */
+export function doorThreshold(
+  walk: HexWalk,
+  node: number,
+  doorways: ReadonlyMap<number, HexDoorway>,
+  near: NearBlockers,
+): LifeSpot {
+  const n = walk.nodes[node]!
+  const d = doorways.get(n.tile)
+  if (!d) return spotAt(walk, node, 0, 0)
+  const ux = Math.sin(d.facing)
+  const uz = Math.cos(d.facing)
+  const reach = Math.max(0, (n.x - d.x) * ux + (n.z - d.z) * uz)
+  const clear = (x: number, z: number) =>
+    near(x, z, THRESHOLD_BODY + 0.1).every(
+      (b) => !("pts" in b) || b.soft || !HARD(b.kind) || solidDistance(b, x, z) >= THRESHOLD_BODY,
+    )
+  for (let s = 0; s <= reach; s += 0.05) {
+    const x = d.x + ux * s
+    const z = d.z + uz * s
+    if (clear(x, z)) return { node, at: [x, n.y, z], facing: d.facing + Math.PI, ground: true }
+  }
+  return { node, at: [n.x, n.y, n.z], facing: d.facing + Math.PI, ground: true }
 }
 
 /**

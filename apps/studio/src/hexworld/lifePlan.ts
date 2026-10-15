@@ -32,8 +32,9 @@ import {
   type BoardReader,
   boardReaders,
   doorPasses,
-  doorSpot,
+  doorThreshold,
   type Folk,
+  GREAT_HALL,
   graveStrikeSpot,
   guildhallZone,
   type HexDoorway,
@@ -216,7 +217,7 @@ export function kitOf(
   }
 }
 
-/** Doors a hero at rest may sleep behind: the nearest few to the Guildhall's heart reached from it. */
+/** Doors a hero at rest may go in at: the Guildhall's, the tavern's and the nearest few, reached from its heart. */
 const REST_DOORS = 6
 /** How many stand at a haunt at once, and how far from what stands round them (metres: a body and a little). */
 const HAUNT_SPOTS = 6
@@ -226,9 +227,10 @@ const HAUNT_REACH = 4
 
 /**
  * Where heroes go once their work is over (sim rest.ts): the haunts (the tavern nearest the Guildhall,
- * standing before its door; the nearest town or market square), the doors nearest the Guildhall (a leaver
- * walks in at the first) and the graveyard's graves (a ghost fades at one). Every haunt place keeps a
- * body's room from the solids and from where the townsfolk stand. Pure.
+ * standing before its door; the nearest town or market square), the doors a hero goes in at (on their
+ * thresholds, clear of the wall: the Guildhall's own first, then the tavern's, then the nearest the
+ * Guildhall; a leaver goes in at the first) and the graveyard's graves (a ghost fades at one). Every haunt
+ * place keeps a body's room from the solids and from where the townsfolk stand. Pure.
  */
 export function restKitOf(
   z: HexZones,
@@ -282,14 +284,22 @@ export function restKitOf(
     const spots = round(square.node)
     if (spots.length >= 2) haunts.push({ kind: "square", spots })
   }
-  // the doors: the nearest the Guildhall's heart, reached from it
+  // the doors: on their thresholds (clear of the wall: a hero is gone there, never drawn through it),
+  // the Guildhall's own first, then the tavern's, then the nearest the Guildhall's heart, reached from it
   const doorways = new Map(w.doorways.map((d) => [d.tile, d]))
+  const prefabOf = new Map(w.tiles.map((t) => [t.i, t.prefab]))
+  const rank = (tile: number) =>
+    prefabOf.get(tile) === GREAT_HALL || tile === heart.tile ? 0 : tile === tavern?.i ? 1 : 2
   const doors = w.doorways
-    .map((d) => walk.door(d.tile))
-    .filter((node) => node >= 0 && reached(node))
-    .map((node) => doorSpot(walk, node, doorways))
-    .sort((a, b) => far(a.at[0], a.at[2]) - far(b.at[0], b.at[2]))
+    .map((d) => ({ node: walk.door(d.tile), tile: d.tile }))
+    .filter(({ node }) => node >= 0 && reached(node))
+    .map(({ node, tile }) => ({
+      rank: rank(tile),
+      spot: doorThreshold(walk, node, doorways, places.walkNear),
+    }))
+    .sort((a, b) => a.rank - b.rank || far(a.spot.at[0], a.spot.at[2]) - far(b.spot.at[0], b.spot.at[2]))
     .slice(0, REST_DOORS)
+    .map((d) => d.spot)
   const stones = graves
     ? graves.graveyard.graves.flatMap((_, k) => graveStrikeSpot(graves.graveyard, graves.node, k) ?? [])
     : []

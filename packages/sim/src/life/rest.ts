@@ -9,7 +9,8 @@ import type { LifeSpot } from "@guildhall/world"
  *   rest       the hero sits a while at its seat in the Guildhall's gathering, then goes about the
  *              island's day: to a haunt (the tavern's yard, a square) to chat, back to its seat to sit,
  *              in the evening to the tavern; a resident by day works at its own places too
- *   sleep      at night it walks to a door near the Guildhall and goes in (fades there); at its dawn it
+ *   sleep      at night it walks to the Guildhall's door or the tavern's, stops on its threshold (clear of
+ *              the wall: never drawn through it) and is gone, indoors; at its dawn it
  *              comes out of that door again
  *   leave      a subagent whose session ends walks into the Guildhall (fades at its door), not into air
  *   ghost      a fallen subagent that leaves slumps, then rises as a pale ghost that drifts to the
@@ -24,7 +25,7 @@ import type { LifeSpot } from "@guildhall/world"
 export interface RestKit {
   /** Where heroes at rest go besides the Guildhall's gathering (its seats are the kit's home spots). */
   haunts: readonly Haunt[]
-  /** Before the doors of the houses nearest the Guildhall (facing in): where a hero goes in at night, nearest first. */
+  /** On the thresholds of the doors a hero goes in at (facing in, clear of the wall): the Guildhall's, the tavern's, then the nearest. */
   doors: readonly LifeSpot[]
   /** By the graveyard's graves: where a ghost fades. */
   graves: readonly LifeSpot[]

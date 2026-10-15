@@ -274,6 +274,29 @@ interface Want {
   leave: boolean
 }
 
+/** Where a hero set off from, and when (`Track.was`), and its set-offs before that (a few). */
+interface SetOff {
+  at: number
+  here: Spotted
+  pose: LifePose | null
+  seated: boolean
+  prev?: SetOff
+}
+
+/** How many set-offs a hero keeps behind its last (`SetOff.prev`): walks planned ahead are few. */
+const SET_OFFS = 6
+
+/** A set-off with no more than `SET_OFFS` behind it (the older ones dropped). */
+function trimWas(w: SetOff): SetOff {
+  let k = 0
+  for (let q: SetOff | undefined = w; q; q = q.prev)
+    if (++k >= SET_OFFS && q.prev) {
+      q.prev = undefined
+      break
+    }
+  return w
+}
+
 /** A spot, maybe a hero spot's kind of work. */
 type Spotted = LifeSpot & { pose?: HeroPose }
 
@@ -315,8 +338,11 @@ interface Track {
   wake?: number
   /** At the notice board. */
   board?: BoardSession
-  /** Where it was when it last set off, and when: a second walk planned at that instant starts there too. */
-  was?: { at: number; here: Spotted; pose: LifePose | null; seated: boolean }
+  /**
+   * Where it was when it last set off, and when: a second walk planned at this instant starts there too,
+   * and one planned earlier starts where the first of those after it did (`prev`: the set-offs before).
+   */
+  was?: SetOff
   /** Until when it stays at the work it walked to (`WORK_DWELL_MS` after it arrives): moves wait. */
   dwell?: number
   /** Its loot or its failure, heard during the dwell: played out when the dwell is over. */
@@ -708,12 +734,21 @@ export class LifePlanner {
     how: WalkHow = {},
   ): number {
     const { steps } = track.it
+    // walks planned to set off later than `t` (a leaver's way in at the door, planned for when its
+    // errand is over) are undone by this one: it sets off from where the earliest of them would have
+    let undone: SetOff | undefined
+    while (track.was && track.was.at > t) {
+      undone = track.was
+      track.was = track.was.prev
+    }
+    if (undone) track.here = undone.here
     // a walk planned at this same instant is planned again from where the first started
     const again = track.was?.at === t
     if (again) track.here = track.was!.here
     const pose = again ? track.was!.pose : poseBefore(track.it, t)
     const seated = again ? track.was!.seated : seatedBefore(track.it, t)
-    track.was = { at: t, here: track.here, pose, seated }
+    const prev = again ? track.was!.prev : track.was
+    track.was = { at: t, here: track.here, pose, seated, ...(prev ? { prev: trimWas(prev) } : {}) }
     const walking = pose?.act === "walk"
     cut(steps, t)
     let from: LifeSpot
@@ -871,7 +906,7 @@ export class LifePlanner {
     const home = last.from < t ? last.from : last.from + FADE_AFTER_MS
     let at = Math.max(t, home, track.hold)
     const door = this.kit.rest?.doors[0]
-    if (door) at = this.walkTo(track, door, at, "idle", undefined, { stroll: true }) + DOOR_MS
+    if (door) at = this.goIn(track, door, at)
     const span = track.it.shown[track.it.shown.length - 1]!
     span[1] = at
     this.booked.set(track.spot.key, { id: track.it.id, until: at })
@@ -1346,11 +1381,23 @@ export class LifePlanner {
     return !(a.parent === undefined && this.dispatching(a.id))
   }
 
-  /** The door a hero goes in at for the night (and comes out of): one of the few nearest the Guildhall, by its seed. */
+  /** The door a hero goes in at for the night (and comes out of): the Guildhall's or the tavern's (the kit's first two), by its seed. */
   private doorOf(track: Track): LifeSpot | undefined {
     const doors = this.kit.rest?.doors ?? []
     if (!doors.length) return undefined
-    return doors[Math.floor(restRnd(track.it.seed, "door") * Math.min(4, doors.length))]
+    return doors[Math.floor(restRnd(track.it.seed, "door") * Math.min(2, doors.length))]
+  }
+
+  /**
+   * In at a door (rest.ts): it walks to the threshold (the kit's door spot, clear of the wall), stands
+   * there facing in for `DOOR_MS` and is gone, indoors where it stood: no step of it is ever drawn
+   * through the door. Returns when it is gone.
+   */
+  private goIn(track: Track, door: LifeSpot, t: number): number {
+    const gone = this.walkTo(track, door, t, "idle", undefined, { stroll: true }) + DOOR_MS
+    cut(track.it.steps, gone)
+    track.it.steps.push({ ...stayAt(door, gone, "idle"), indoors: true })
+    return gone
   }
 
   /** Out of its door again in the morning: on the island from `t`, standing before the door. */
@@ -1411,8 +1458,7 @@ export class LifePlanner {
       if (door) {
         this.leaveSpot(r, t)
         cutActs(track.it.acts, t)
-        const arrive = this.walkTo(track, door, t, "idle", undefined, { stroll: true })
-        const gone = arrive + DOOR_MS
+        const gone = this.goIn(track, door, t)
         const span = track.it.shown[track.it.shown.length - 1]!
         span[1] = gone
         r.asleep = true

@@ -141,6 +141,37 @@ describe("era shots: the queue", () => {
   })
 })
 
+describe("era shots: the card's island", () => {
+  test("a job at null films the island as it stands, once, and is cached like an era", async () => {
+    const asked: (number | null)[] = []
+    const capture: EraCapture = {
+      shoot: (at) => {
+        asked.push(at)
+        return Promise.resolve("data:now")
+      },
+      stats: () => null,
+      dispose() {},
+    }
+    const cache = new Map<string, string>()
+    const shots = createEraShots(capture, cache)
+    shots.want([{ key: "home#now@1", at: null }])
+    expect(shots.waiting("home#now@1")).toBe(true)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(asked).toEqual([null])
+    expect(shots.get("home#now@1")).toBe("data:now")
+    // asked again (the card opened again): nothing more is filmed
+    shots.want([{ key: "home#now@1", at: null }])
+    expect(asked).toEqual([null])
+  })
+
+  test("with no capture (no post pipeline) nothing waits: the card stands on the moment on screen", () => {
+    const shots = createEraShots(null, new Map())
+    shots.want([{ key: "home#now@1", at: null }])
+    expect(shots.waiting("home#now@1")).toBe(false)
+    expect(shots.get("home#now@1")).toBeUndefined()
+  })
+})
+
 describe("era shots: the frame", () => {
   test("a key names the repo, the era and its end", () => {
     expect(eraShotKey("facebook/react", { id: "e2", end: 1_500_000_000_000 })).toBe(

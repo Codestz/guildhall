@@ -28,7 +28,7 @@ import { homePlaces } from "../../site/homePlaces.ts"
 import { storyHref } from "../../site/routes.ts"
 import { type HallCamera, mountHallCamera } from "../camera.ts"
 import type { HallTime } from "../clock.ts"
-import { createEraShots, hallCapture } from "../eraShots.ts"
+import { createEraShots, type EraShots, hallCapture } from "../eraShots.ts"
 import { mountEvents } from "../events.ts"
 import { createSession, feedKindOf, type HallSession, openFeed } from "../feeds/index.ts"
 import { type SessionPlaces, sessionPlaces } from "../feeds/places.ts"
@@ -108,6 +108,8 @@ function createLevers(): HallLevers & { setSkip(k: number): void } {
 
 interface Mounted {
   root: Root
+  /** The island's pictures: the Legends' eras, the Chronicle card's island (eraShots.ts), filmed when asked for. */
+  eraShots: EraShots
   modals: HTMLElement
   float: HallFloat
   camera: HallCamera
@@ -160,6 +162,9 @@ function mountOn(
   document.body.append(modals)
   const root = createRoot(host)
   const levers = createLevers()
+  // the island's pictures: filmed only once the book or the card asks (eraShots.ts)
+  const eraShots = createEraShots(hallCapture(parts))
+  if (ext) ext.eraShots = () => eraShots.stats()
   // `?weather=clear|cloudy|rain|storm|snow`: a sky pinned from the link (a demo's night storm), as Settings pins it
   levers.weather = weatherOf(param(opts.query, "weather"))
   if (levers.weather) parts.fx?.drive.set(levers.weather)
@@ -207,12 +212,15 @@ function mountOn(
 
   return {
     root,
+    eraShots,
     modals,
     float,
     camera,
     levers,
     parts: { ...rest, camera },
     dispose() {
+      eraShots.dispose()
+      if (ext?.eraShots) delete ext.eraShots
       stopClear()
       offFx()
       offEvents()
@@ -285,10 +293,6 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
   const live = startSession(parts, opts)
   if (live) current = live.session
   const m = mountOn(parts, live, { query: opts.query ?? new URLSearchParams(), time: opts.time ?? null })
-  // the Legends' era pictures: filmed only once the book opens (eraShots.ts)
-  const eraShots = createEraShots(hallCapture(parts))
-  const ext = window.guildhall?.ext as Record<string, unknown> | undefined
-  if (ext) ext.eraShots = () => eraShots.stats()
   let gone = false
   void hallChronicle(opts.slug).then((found) => {
     if (gone) return
@@ -315,14 +319,12 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
         {...(found.status === "unavailable" ? { onRetry: opts.retry } : {})}
         {...(live ? { session: live } : {})}
         time={opts.time ?? null}
-        eraShots={eraShots}
+        eraShots={m.eraShots}
       />,
     )
   })
   return () => {
     gone = true
-    eraShots.dispose()
-    if (ext?.eraShots) delete ext.eraShots
     if (live && current === live.session) current = null
     m.dispose()
     live?.portraits?.dispose()
@@ -409,6 +411,7 @@ export function mountHomeHud(parts: HudParts, opts: HomeHudOptions): () => void 
         hrefs={opts.hrefs}
         session={{ session, places, repo: "guildhall", portraits }}
         time={opts.time}
+        eraShots={m.eraShots}
         size={param(opts.query, "files") ?? DEFAULT_FILES}
         home={{
           title: story === "demo" ? "The demo guild" : storyTitle(story),

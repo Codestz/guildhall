@@ -8,7 +8,7 @@ import { useId, useRef, useState } from "react"
 import { Kbd } from "../components/controls.tsx"
 import { Crest } from "../hud/glyphs.tsx"
 import { focusables, useDialog } from "./hooks.ts"
-import { AnchorGlyph, BookGlyph, Dest, FlagGlyph, RepoGlyph, StudioGlyph } from "./parts.tsx"
+import { AnchorGlyph, BookGlyph, Dest, FlagGlyph, RepoGlyph, ShareGlyph, StudioGlyph } from "./parts.tsx"
 
 export type SiteDest = "repo" | "demos" | "harbour" | "studio" | "built"
 
@@ -40,6 +40,8 @@ export interface CrestMenuProps {
   onPalette?(): void
   /** Adds "Connect a source" to the foot: how to point the island at your own agents. */
   onSources?(): void
+  /** Adds "Share island" after the places: the island on screen as a picture and a link (its Chronicle card). */
+  onShare?(): void
 }
 
 export function CrestMenu({
@@ -51,6 +53,7 @@ export function CrestMenu({
   shortcut = ["⌘", "K"],
   onPalette,
   onSources,
+  onShare,
 }: CrestMenuProps) {
   const id = useId()
   const [inner, setInner] = useState(false)
@@ -134,6 +137,28 @@ export function CrestMenu({
                     </Dest>
                   </li>
                 ))}
+                {onShare && (
+                  <li className="site-menu-share">
+                    <button
+                      type="button"
+                      className="site-menu-item"
+                      aria-haspopup="dialog"
+                      data-item=""
+                      onClick={() => {
+                        set(false)
+                        onShare()
+                      }}
+                    >
+                      <span className="site-menu-glyph">
+                        <ShareGlyph />
+                      </span>
+                      <span className="site-menu-text">
+                        <b>Share island</b>
+                        <small>This island as a picture, and a link back to it</small>
+                      </span>
+                    </button>
+                  </li>
+                )}
               </ul>
             </nav>
             <div className="site-menu-foot">

@@ -18,7 +18,8 @@ import {
   WelcomeCard,
   writeWelcomeDismissed,
 } from "@guildhall/ui"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
+import { onShareOffer, shareOffer } from "../hall/hud/share.ts"
 import { current, href } from "../shell/router.ts"
 import { Switcher } from "../shell/Switcher.tsx"
 import { BUILT } from "./built.ts"
@@ -66,6 +67,8 @@ export function SiteApp() {
   // the demos over the page in place (the crest menu's Demos, the welcome card's, the HUD's): nothing
   // under it moves, and closing it leaves the visitor where they were (nav.ts `openDemosWith`)
   const [demosOver, setDemosOver] = useState(false)
+  // "Share island" while the island's HUD can draw its card (hall/hud/share.ts)
+  const share = useSyncExternalStore(onShareOffer, shareOffer)
   useEffect(() => {
     openDemosWith(() => {
       setMenu(false)
@@ -167,6 +170,7 @@ export function SiteApp() {
         }}
         onPalette={() => setPalette(true)}
         onSources={() => setSources(true)}
+        {...(share ? { onShare: share } : {})}
       />
 
       {card && (

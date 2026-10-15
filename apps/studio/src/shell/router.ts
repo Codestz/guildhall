@@ -6,7 +6,7 @@
  * Old deep links (`?screen=<id>&…`) resolve too, and the shell replaces them with the path form.
  */
 import { BASE } from "../env.ts"
-import { type ParamName, type PublicParam, rawParam } from "../params.ts"
+import { type ParamName, type PublicParam, publicOnly, rawParam } from "../params.ts"
 
 export interface Route {
   /** The screen id (`screens.ts`). */
@@ -148,6 +148,15 @@ export const current = (): Resolved => resolve(location.pathname, location.searc
 
 /** The query the open screen reads (its path id folded in), for screens that re-read their deep link. */
 export const currentQuery = (): URLSearchParams => current().query
+
+/**
+ * The address on screen as a link for someone else: absolute, its public parameters only (params.ts), so
+ * it reopens the same island at the same moment (a hall's `?t=`, a story and its act, Settings › World).
+ */
+export function publicLink(): string {
+  const { screen, query } = current()
+  return screen ? new URL(href(screen, publicOnly(query)), location.origin).href : location.href
+}
 
 /**
  * Sets (a string) or clears (null) public parameters of the address in place, no history entry: Settings ›

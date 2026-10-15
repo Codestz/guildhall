@@ -7,7 +7,9 @@
  * copy the picture, or hand it to the share sheet where the browser can (phones).
  *
  * The frame is the caller's: the hall films the hero moment from the island (H1); any image URL or
- * canvas works, and without one the card stands on ink alone. A modal over whatever opened it: focus
+ * canvas works, and without one the card stands on ink alone. While the hall films the island for it
+ * (`filming`), the card shows on ink under the era book's slow light with a word on what is happening,
+ * and Download, Copy image and Share wait for the picture (Copy link does not). A modal over whatever opened it: focus
  * starts on the title and stays inside, Esc closes this dialog only, and focus goes back to the opener.
  */
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react"
@@ -31,6 +33,11 @@ export interface ChronicleCardProps {
   format?: Format
   /** A link that opens the hall on this moment: a "Copy link" button when given. */
   link?: string
+  /**
+   * The picture is being filmed for the card (the hall draws the island for it): the card shows on ink
+   * under a slow light with a word on what is happening, and its picture actions wait for it.
+   */
+  filming?: boolean
   onClose: () => void
 }
 
@@ -47,6 +54,7 @@ export function ChronicleCard({
   focus,
   format: initial = "landscape",
   link,
+  filming = false,
   onClose,
 }: ChronicleCardProps) {
   const id = useId()
@@ -54,7 +62,9 @@ export function ChronicleCard({
   const panel = useRef<HTMLElement>(null)
   const [format, setFormat] = useState<Format>(initial)
   const [frame, setFrame] = useState<{ frame: Frame | undefined; note?: string } | undefined>()
-  const [urls, setUrls] = useState<Partial<Record<Format, string>>>({})
+  // each shape's last drawn card (its blob URL, and the drawing it came from): a card drawn again (the
+  // filmed picture landing) replaces the one shown without a blank in between
+  const [urls, setUrls] = useState<Partial<Record<Format, { url: string; of: object }>>>({})
   const [said, setSaid] = useState<Said>("idle")
   useModalFocus(head)
 
@@ -94,20 +104,30 @@ export function ChronicleCard({
   useEffect(() => {
     if (!cards) return
     let live = true
-    const made: string[] = []
     for (const { id: f } of FORMATS)
       void cardBlob(cards[f]).then((blob) => {
         if (!live) return
         const url = URL.createObjectURL(blob)
-        made.push(url)
-        setUrls((u) => ({ ...u, [f]: url }))
+        setUrls((u) => {
+          const was = u[f]?.url
+          // the one it replaces goes once the new one is up
+          if (was) setTimeout(() => URL.revokeObjectURL(was), 1000)
+          return { ...u, [f]: { url, of: cards } }
+        })
       })
     return () => {
       live = false
-      for (const url of made) URL.revokeObjectURL(url)
-      setUrls({})
     }
   }, [cards])
+  // the last ones go with the card
+  const shown = useRef(urls)
+  shown.current = urls
+  useEffect(
+    () => () => {
+      for (const u of Object.values(shown.current)) if (u) URL.revokeObjectURL(u.url)
+    },
+    [],
+  )
 
   useEffect(() => {
     if (said === "idle") return
@@ -115,7 +135,12 @@ export function ChronicleCard({
     return () => clearTimeout(timer)
   }, [said])
 
-  const url = urls[format]
+  const url = urls[format]?.url
+  // the picture actions wait for this drawing (the filmed picture's): a card on ink alone is only its preview
+  const stale = Boolean(url) && urls[format]?.of !== cards
+  const ready = Boolean(url) && !stale && !filming
+  // the filming shows until the card with its picture is up (the redraw after it lands included)
+  const developing = filming || (stale && Boolean(image))
   const fileName = cardFileName(recap, format)
   const size = SIZES[format]
   const shareable = useShareable()
@@ -164,7 +189,7 @@ export function ChronicleCard({
         aria-modal="true"
         aria-labelledby={`${id}-h`}
         aria-describedby={`${id}-d`}
-        aria-busy={!url}
+        aria-busy={!ready}
         onKeyDown={(event) => {
           if (event.key === "Escape") {
             // this dialog only: whatever is under it (the book) never hears it
@@ -229,14 +254,32 @@ export function ChronicleCard({
         <figure
           className="st-card-preview"
           data-format={format}
+          data-filming={developing ? "" : undefined}
           style={{ aspectRatio: `${size.width} / ${size.height}` }}
         >
           {url ? (
-            <img src={url} width={size.width} height={size.height} alt={altOf(recap, format)} />
+            <img
+              key={url}
+              src={url}
+              width={size.width}
+              height={size.height}
+              alt={developing ? "" : altOf(recap, format)}
+            />
           ) : (
-            <div className="st-card-drawing" role="status">
-              <span className="st-spinner" aria-hidden="true" />
-              <span>Drawing the card…</span>
+            !developing && (
+              <div className="st-card-drawing" role="status">
+                <span className="st-spinner" aria-hidden="true" />
+                <span>Drawing the card…</span>
+              </div>
+            )
+          )}
+          {developing && (
+            <div className="st-card-filming" role="status">
+              <div>
+                <span className="st-spinner" aria-hidden="true" />
+                <b>Filming the island</b>
+                <span>The whole island from above, at golden hour: drawn for you, here in your browser.</span>
+              </div>
             </div>
           )}
         </figure>
@@ -247,7 +290,7 @@ export function ChronicleCard({
         )}
 
         <div className="st-card-actions">
-          {url ? (
+          {ready && url ? (
             <a className="ui-btn" data-variant="primary" href={url} download={fileName}>
               <StoryGlyphs.download />
               <span>Download PNG</span>
@@ -260,7 +303,7 @@ export function ChronicleCard({
           )}
           {copyable && (
             <Action
-              disabled={!url}
+              disabled={!ready}
               onClick={onCopyImage}
               icon={said === "image" ? <StoryGlyphs.check /> : <StoryGlyphs.image />}
             >
@@ -276,7 +319,7 @@ export function ChronicleCard({
             </Action>
           )}
           {shareable && (
-            <Action disabled={!url} onClick={onShare} icon={<StoryGlyphs.share />}>
+            <Action disabled={!ready} onClick={onShare} icon={<StoryGlyphs.share />}>
               Share…
             </Action>
           )}
@@ -293,7 +336,7 @@ export function ChronicleCard({
                 ? "Link copied"
                 : said === "link-failed"
                   ? "Could not copy the link"
-                  : url
+                  : ready
                     ? "The card is ready"
                     : ""}
         </span>

@@ -177,6 +177,7 @@ export const SITE_CSS = /* css */ `
   position: absolute; top: calc(100% + 8px); left: 0; z-index: 33; width: 340px; padding: 6px; background: rgba(21, 17, 13, 0.97);
 }
 .gh .site-menu-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.gh .site-menu-share { margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--hair); }
 .gh .site-menu-item {
   display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 8px 12px; text-align: left;
   border: 1px solid transparent; border-radius: var(--r-sm); background: none; color: var(--paper); text-decoration: none; cursor: pointer;

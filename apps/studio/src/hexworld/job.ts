@@ -661,6 +661,22 @@ export function runHexJob(
       if (y > 0 && Math.abs(shift) < 3 && !p.piece.startsWith("kenney-nature/lily")) p.y += shift
     }
   post({ type: "pieces", pieces: pack(w.pieces, clusterTiles(h, w)) })
+  // Life next, before the shore: the plan is the reveal's long pole (the crowd is built from it once the
+  // pieces are in), while the water is drawn from the shore field only after the batch is built, so the
+  // shore's own time is hidden behind the pieces' load wherever it lands.
+  let desk: AgentDesk | null = null
+  if (spec.life) {
+    const placed = { ...w, pieces: w.pieces.map((p, k) => ({ ...p, y: placedY[k] as number })) }
+    const agents = spec.agents === undefined ? ({ kind: "story" } as const) : spec.agents
+    const opts = {
+      agents,
+      ...(spec.places ? { places: spec.places } : {}),
+      ...(spec.repo ? { repo: spec.repo } : {}),
+    }
+    const made = planLifeDesk(h, z, placed, spec.seed, now, opts)
+    desk = made.desk
+    post({ type: "life", life: made.plan })
+  }
   // The shore field: how far every point of the water is from land (anything but a water tile).
   t0 = now()
   const g = h.grid
@@ -681,19 +697,6 @@ export function runHexJob(
     },
   })
   post({ type: "shore", shore: { min, size, res, reach: SHORE_REACH, data, ms: Math.round(now() - t0) } })
-  let desk: AgentDesk | null = null
-  if (spec.life) {
-    const placed = { ...w, pieces: w.pieces.map((p, k) => ({ ...p, y: placedY[k] as number })) }
-    const agents = spec.agents === undefined ? ({ kind: "story" } as const) : spec.agents
-    const opts = {
-      agents,
-      ...(spec.places ? { places: spec.places } : {}),
-      ...(spec.repo ? { repo: spec.repo } : {}),
-    }
-    const made = planLifeDesk(h, z, placed, spec.seed, now, opts)
-    desk = made.desk
-    post({ type: "life", life: made.plan })
-  }
   // the autumn harvest (world harvest.ts), last: the Studio shows it only in autumn and nothing waits on
   // it. Placed on the world's own ground, then stood on the fine ground as the pieces are
   const walk = hexWalk(h, z, w, { reach: workTiles(h, z) })

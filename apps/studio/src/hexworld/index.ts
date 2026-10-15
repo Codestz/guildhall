@@ -263,7 +263,6 @@ export interface WorldHooks {
   /** Once the island is drawn and its pure parts are built on this thread (behind the cover, before it settles). */
   built(parts: {
     island: HexIsland
-    world: HexWorld
     batch: StaticBatch
     life: Life | null
     doors: Doors
@@ -765,14 +764,11 @@ const world = {
           () => life?.chips()?.boxes() ?? [],
         )
       // ---- life (track B): townsfolk and agents on the walk graph; `?life=0` turns it off ----
-      let world: ReturnType<typeof hexWorld> | null = null
-      if (hooks) {
-        // Another screen drives parts of the island (a hall's history): the map's pure parts, built once
-        // for it (~0.1 s, at the map stage). Life itself takes its plan from the worker (below).
-        island ??= hexIsland({ ...shape, seed, files })
-        const zones = hexZones(island, { wild: nature.wild, ...(places ? { places } : {}) })
-        world = hexWorld(island, zones, { step, nature })
-      }
+      // Another screen drives parts of the island (a hall's history): the pure map, built once for it
+      // (~0.1 s, at `prepare`). Life takes its plan from the worker (below). (The world itself was built
+      // here too, 2 s on this thread for a repo the size of react, and nothing read it: the worker's is
+      // the one the island is built from.)
+      if (hooks) island ??= hexIsland({ ...shape, seed, files })
       if (lifeOn) {
         go("Townsfolk", 0.92)
         // the plan arrives from the worker (job.life); the overlay alone rebuilds the map here
@@ -880,10 +876,9 @@ const world = {
           ...(extra.session ? { session: extra.session } : {}),
         })
       // a hook's parts (a hall's history reveal) go in before the light, so their shaders compile behind the cover
-      if (hooks && island && world)
+      if (hooks && island)
         hooks.built({
           island,
-          world,
           batch,
           life,
           doors,

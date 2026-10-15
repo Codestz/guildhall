@@ -4,6 +4,7 @@ import { flushSync } from "react-dom"
 import { createRoot } from "react-dom/client"
 import { holdStudioStyle } from "../browser/style.ts"
 import { createClock, createHallTime, type HallTime } from "../hall/clock.ts"
+import { playingSeasonDate } from "../hall/seasonPace.ts"
 import type { HudParts } from "../hexworld/index.ts"
 import type { Screen, ScreenCtx } from "../screens.ts"
 import { current, href } from "../shell/router.ts"
@@ -174,7 +175,10 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
                   ? () => {
                       const range = time.range()
                       if (!range || time.scale() !== "history") return null
-                      return range.start + time.clock.get().t * (range.end - range.start)
+                      const c = time.clock.get()
+                      const date = range.start + c.t * (range.end - range.start)
+                      // playing, a chapter keeps one season (seasonPace.ts); at rest, the day's own
+                      return c.playing ? playingSeasonDate(date, range) : date
                     }
                   : undefined
               const extra = repo

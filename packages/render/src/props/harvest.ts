@@ -8,7 +8,8 @@
  *
  * `show(w)` is how much of it there is, 0 … 1 (the Studio gives the autumn blend through a smoothstep, so
  * it comes as autumn begins and is gone by winter): each heap grows from its own middle, and the
- * matrices are rewritten only while w moves.
+ * matrices are rewritten only while w moves. `hide(at)` takes out the heaps whose middle `at` says is
+ * not there (a hall's history reveal: land not yet risen is open sea), its pieces and its shadow.
  */
 import type { Catalog } from "@guildhall/assets"
 import { log } from "@guildhall/core"
@@ -32,6 +33,8 @@ export interface HarvestOpts {
 export interface Harvest {
   /** How much of the harvest shows, 0 … 1 (0: nothing drawn at all). */
   show(w: number): void
+  /** Hides each heap whose middle `at` says is not there now (null: every heap there). */
+  hide(at: ((x: number, z: number) => boolean) | null): void
   stats(): {
     pieces: number
     heaps: number
@@ -130,13 +133,22 @@ export async function createHarvest(
     reach.set(key(p), Math.max(reach.get(key(p)) ?? 0, Math.hypot(p.x - c.x, p.z - c.z) + 0.3))
   }
   const shadows = contactShadows(stage).range(shadowOf.length)
+  /** Each heap hidden now (`hide`), in `shadowOf`'s order. */
+  const gone = new Uint8Array(shadowOf.length)
+  const heapIndex = new Map(shadowOf.map((id, j) => [id, j]))
+  const shadeOne = (j: number, k: number) => {
+    const id = shadowOf[j] as string
+    const c = heapOf.get(id) as { x: number; y: number; z: number }
+    shadows.set(j, c.x, c.y, c.z, (reach.get(id) as number) * 1.4 * (0.4 + 0.6 * k), gone[j] ? 0 : k * k)
+  }
   const shade = (k: number) => {
-    for (const [j, id] of shadowOf.entries()) {
-      const c = heapOf.get(id) as { x: number; y: number; z: number }
-      shadows.set(j, c.x, c.y, c.z, (reach.get(id) as number) * 1.4 * (0.4 + 0.6 * k), k * k)
-    }
+    for (let j = 0; j < shadowOf.length; j++) shadeOne(j, k)
   }
   const instances = kept.map((p) => mesh.addInstance(geometryId.get(p.piece) as number))
+  /** Each heap's instances (in `shadowOf`'s order). */
+  const byHeap: number[][] = shadowOf.map(() => [])
+  for (const [j, p] of kept.entries()) byHeap[heapIndex.get(key(p)) as number]?.push(instances[j] as number)
+  let hiddenPieces = 0
   const m = scratch.m
   /** The matrices at weight `k`: each piece's offset from its heap's middle, and the piece, grown by k. */
   const write = (k: number) => {
@@ -161,6 +173,18 @@ export async function createHarvest(
   let at = 0
   let writes = 0
   return {
+    hide(test) {
+      for (let j = 0; j < shadowOf.length; j++) {
+        const c = heapOf.get(shadowOf[j] as string) as { x: number; z: number }
+        const out = test?.(c.x, c.z) ? 1 : 0
+        if (out === gone[j]) continue
+        gone[j] = out
+        const list = byHeap[j] as number[]
+        for (const i of list) mesh.setVisibleAt(i, out === 0)
+        hiddenPieces += out ? list.length : -list.length
+        shadeOne(j, at)
+      }
+    },
     show(w) {
       const k = Math.max(0, Math.min(1, w))
       if (k < MIN) {
@@ -182,7 +206,7 @@ export async function createHarvest(
     stats: () => ({
       pieces: kept.length,
       heaps: heapOf.size,
-      shown: mesh.visible ? kept.length : 0,
+      shown: mesh.visible ? kept.length - hiddenPieces : 0,
       writes,
       draws: mesh.visible ? 1 : 0,
       shadowDraws: mesh.visible ? contactShadows(stage).stats().draws : 0,

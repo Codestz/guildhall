@@ -25,8 +25,8 @@ const CLIMB = { flap: 2.1, glide: -1.1, dive: -5.2, breath: -0.8, climb: 3.6 } a
 const CRUISE = 13
 /**
  * The route's altitude band round its centre, metres (the swoop's bottom … the top of a climb): the
- * centre is 27 m over the peaks (dragon.ts), so a swoop comes down to about 10 m over the rock and its
- * fire licks it, then climbs back to over 30 m.
+ * centre is set over the highest ground under the route (dragon.ts `dragonFlight`) so that it cruises
+ * well clear of it and a swoop dips toward it without coming close.
  */
 const LOW = -17
 const HIGH = 6
@@ -93,6 +93,11 @@ export interface FlightPlan {
   at(tau: number): FlightState
   /** The route's point `d` metres round it (x, z). */
   route(d: number): [number, number]
+  /**
+   * Its lowest, over the route's centre (metres): anywhere in the cycle (`all`, a swoop's bottom) and
+   * outside a swoop (`cruise`: the bursts and the glides).
+   */
+  low: { all: number; cruise: number }
 }
 
 export interface FlightState {
@@ -179,6 +184,7 @@ export function flightPlan(
   const still = new Float64Array(n)
   const breath = new Float64Array(n)
   const strength = new Float64Array(n)
+  const swoop = new Uint8Array(n)
   let i = 0
   let lastStill = GLIDE_WING
   for (const seg of segs) {
@@ -198,6 +204,7 @@ export function flightPlan(
       still[i] = seg.mode === "flap" || seg.mode === "climb" ? GLIDE_WING : pose
       breath[i] = seg.mode === "breath" ? 1 : 0
       strength[i] = seg.mode === "climb" ? 1.3 : 1
+      swoop[i] = seg.mode === "dive" || seg.mode === "breath" || seg.mode === "climb" ? 1 : 0
     }
   }
   const c = smoothed(climb, Math.round(0.45 / DT))
@@ -218,6 +225,8 @@ export function flightPlan(
   }
   const fit = (HIGH - LOW) / Math.max(1e-6, hi - lo)
   for (let k = 0; k <= n; k++) alt[k] = LOW + ((alt[k] as number) - lo) * fit
+  let cruiseLow = Number.POSITIVE_INFINITY
+  for (let k = 0; k < n; k++) if (!swoop[k]) cruiseLow = Math.min(cruiseLow, alt[k] as number)
   // way over the ground: quicker sinking, slower climbing (with the height fitted, as it is flown)
   const dist = new Float64Array(n + 1)
   for (let k = 1; k <= n; k++) {
@@ -239,6 +248,7 @@ export function flightPlan(
     centre,
     length,
     route,
+    low: { all: LOW, cruise: Number.isFinite(cruiseLow) ? cruiseLow : LOW },
     at(tau) {
       const laps = Math.floor(tau / cycle)
       const r = tau - laps * cycle

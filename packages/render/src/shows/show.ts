@@ -79,6 +79,11 @@ export interface ShowCtx {
   still: boolean
   /** The sky's night now, 0 by day … 1 deep night (a dragon's hide glows a little in the dark). */
   nightLevel: () => number
+  /**
+   * The island's surface at (x, z), metres (the sea's where there is no land): the dragon flies clear of
+   * it and its shadow lies on it. Without it the dragon keeps over the peaks and casts none.
+   */
+  ground?: (x: number, z: number) => number
 }
 
 /** One playing show's scene part: built when it starts, freed when it is over. */

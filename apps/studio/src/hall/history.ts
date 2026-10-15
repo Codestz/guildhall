@@ -9,8 +9,9 @@
  * What follows the count (`WorldHooks`, hexworld/index.ts): the ground, roads, stairs and bridges by draw
  * range (render reveal.ts), the batch's pieces by its walk, the water (open sea over land not yet risen,
  * pools rising in their beds), a skirt walling the frontier (order.ts), the gates' leaves, the night's
- * lamps and windows, the town cascade's shadows, and the townsfolk, who stay hidden off the tiles not yet
- * there (their routines are still today's: life on `tiles(t)` is later work).
+ * lamps and windows, the season's props (the harvest's heaps), the town cascade's shadows, and the
+ * townsfolk and their work's stocks, who stay hidden off the tiles not yet there (their routines are
+ * still today's: life on `tiles(t)` is later work).
  *
  * The count follows the clock's tiles at a bounded speed (`follow`): a jump in files (a vendored folder)
  * moves the frontier no faster than twice the history's own pace while playing, and a scrub catches up in
@@ -291,6 +292,8 @@ export function createHistory(opts: HistoryOpts): History {
         parts.sun.markDirty()
         gates?.hide((x, z) => place(x, z, 0, 0) >= n)
         parts.night?.hide((x, z) => place(x, z, 0, 0) >= n)
+        // today's props in season (the harvest's heaps) are not on land that has not risen
+        parts.props.hide((x, z) => place(x, z, 0, 0) >= n)
       }
       // an era's still (eraShots.ts): the island at a date for one draw, then the frame's count again
       still = (at) => {

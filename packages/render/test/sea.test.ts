@@ -5,6 +5,9 @@
  */
 import { describe, expect, test } from "bun:test"
 import { HEX_KINDS, HEX_TILE_SIZE, hexAt, hexIsland, hexWorld, hexZones, TILE_USES } from "@guildhall/world"
+import { BoxGeometry, Mesh, MeshStandardMaterial, PerspectiveCamera, Scene } from "three"
+import type { DayLight } from "../src/light.ts"
+import { createSeaLife, GALLEON_LANTERNS, SAIL_GLOW } from "../src/sea/life.ts"
 import {
   anchorage,
   cargoPose,
@@ -21,6 +24,7 @@ import {
   type ShipPose,
 } from "../src/sea/plan.ts"
 import { seaSites } from "../src/sea/sites.ts"
+import type { Stage } from "../src/stage.ts"
 
 const lane = pathOf([
   [0, 0],
@@ -284,4 +288,46 @@ describe("on an island", () => {
       }
     })
   }
+})
+
+describe("the galleon by night", () => {
+  test("its lanterns hang on the ship (its stern and its mainmast's head), lit only by night", async () => {
+    // the large ship, model units: 7.8 wide, 16.2 tall, 21.3 long (bow +z)
+    for (const l of GALLEON_LANTERNS) {
+      expect(Math.abs(l.at[0])).toBeLessThan(3.9)
+      expect(l.at[1]).toBeGreaterThan(3)
+      expect(l.at[1]).toBeLessThan(16.2)
+      expect(Math.abs(l.at[2])).toBeLessThan(11.5)
+    }
+    expect(GALLEON_LANTERNS.some((l) => l.at[2] < -9)).toBe(true) // the stern's
+    expect(SAIL_GLOW).toBeGreaterThan(0)
+    expect(SAIL_GLOW).toBeLessThan(0.5) // a little: the gold, not a lamp
+
+    const island = hexIsland({ seed: 1, files: 4000 })
+    const zones = hexZones(island, {})
+    const sites = seaSites(island, zones, hexWorld(island, zones, {}), { sea: -0.05 })
+    const lit = async (lamps: number) => {
+      const stage = {
+        scene: new Scene(),
+        camera: new PerspectiveCamera(),
+        renderer: {},
+        onFrame: () => () => {},
+      } as unknown as Stage
+      const life = createSeaLife(stage, {
+        sites,
+        load: async () => new Mesh(new BoxGeometry(2, 2, 2), new MeshStandardMaterial()),
+        light: () => ({ lamps }) as DayLight,
+      })
+      await life.ready
+      life.setAmbient(false)
+      life.setLighthouse(null)
+      life.release()
+      life.advance(SEA.GALLEON_IN_S + 5)
+      const glows = life.stats().glows
+      life.dispose()
+      return glows
+    }
+    expect(await lit(0)).toBe(0)
+    expect(await lit(1)).toBe(GALLEON_LANTERNS.length * 2)
+  })
 })

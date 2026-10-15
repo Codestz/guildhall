@@ -981,6 +981,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       workfx: opts.workfx ?? null,
       secPerHour: SEC_PER_HOUR,
       fishers,
+      hidden: () => hiddenAt,
     })
     if (disposed) {
       work?.dispose()

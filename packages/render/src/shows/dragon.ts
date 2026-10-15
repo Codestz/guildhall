@@ -16,10 +16,13 @@
  * seek it.
  */
 import {
+  BufferAttribute,
   type BufferGeometry,
   Color,
   ConeGeometry,
   CylinderGeometry,
+  DoubleSide,
+  DynamicDrawUsage,
   Euler,
   Float32BufferAttribute,
   BufferGeometry as Geometry,
@@ -72,11 +75,58 @@ export function dragonOrbit(ctx: Pick<ShowCtx, "sites">): { centre: Vector3; r: 
   return { centre: new Vector3(c?.[0] ?? 0, (c?.[1] ?? 0) + OVER_PEAKS, c?.[2] ?? 0), r: 30 }
 }
 
-/** The dragon's flight over an island: its route and its acts, from where the peaks are (the same every time). */
-export function dragonFlight(ctx: Pick<ShowCtx, "sites">): FlightPlan {
+/** Its clearance over the highest ground under its route, metres: cruising, and at the bottom of a swoop. */
+export const CRUISE_CLEAR = 25
+export const SWOOP_CLEAR = 12
+/** How far either side of the route counts as under it (its wings' reach), and the step along it, metres. */
+const UNDER = 9
+const UNDER_STEP = 2
+
+/**
+ * The highest thing under a route (metres): the ground (`ground`) within `UNDER` of it, and the keep
+ * and every place's biggest building it passes over. Null without a ground to read. Pure.
+ */
+export function highestUnder(
+  route: (d: number) => [number, number],
+  length: number,
+  ctx: Pick<ShowCtx, "sites" | "ground">,
+): number | null {
+  const ground = ctx.ground
+  if (!ground) return null
+  const tops: { x: number; z: number; r: number; y: number }[] = []
+  const keep = ctx.sites.castle
+  if (keep) tops.push({ x: keep[0], z: keep[2], r: 10, y: keep[1] })
+  for (const p of ctx.sites.places)
+    if (p.top > 0)
+      tops.push({ x: p.build[0], z: p.build[2], r: Math.max(p.half[0], p.half[1]), y: p.build[1] + p.top })
+  let high = Number.NEGATIVE_INFINITY
+  for (let d = 0; d < length; d += UNDER_STEP) {
+    const [x, z] = route(d)
+    high = Math.max(high, ground(x, z))
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2
+      high = Math.max(high, ground(x + Math.cos(a) * UNDER, z + Math.sin(a) * UNDER))
+    }
+    for (const t of tops) if (Math.hypot(t.x - x, t.z - z) <= t.r + UNDER) high = Math.max(high, t.y)
+  }
+  return Number.isFinite(high) ? high : null
+}
+
+/**
+ * The dragon's flight over an island: its route and its acts, from where the peaks are (the same every
+ * time), flown high enough to read as flying over the land: cruising at least `CRUISE_CLEAR` over the
+ * highest ground under its route, a swoop's bottom at least `SWOOP_CLEAR` (never lower than over the
+ * peaks' orbit).
+ */
+export function dragonFlight(ctx: Pick<ShowCtx, "sites" | "ground">): FlightPlan {
   const { centre, r } = dragonOrbit(ctx)
   const seed = Math.floor(hash01(Math.round(centre.x * 7) * 131 + Math.round(centre.z * 7)) * 2 ** 31)
-  return flightPlan(seed, [centre.x, centre.y, centre.z], r)
+  const plan = flightPlan(seed, [centre.x, centre.y, centre.z], r)
+  const high = highestUnder(plan.route, plan.length, ctx)
+  if (high === null) return plan
+  const y = Math.max(centre.y, high + CRUISE_CLEAR - plan.low.cruise, high + SWOOP_CLEAR - plan.low.all)
+  // the route's ground track and acts do not depend on its height: the same flight, raised
+  return y === centre.y ? plan : flightPlan(seed, [centre.x, y, centre.z], r)
 }
 
 /** The breath's strength 0 … 1 at `t` seconds into the show (none while arriving or leaving). */
@@ -215,16 +265,22 @@ export function createDragon(ctx: ShowCtx): ShowPiece {
   body.frustumCulled = false
   const fire = flames(uniforms)
   const group = new Group()
-  group.name = "show dragon"
+  group.name = "dragon flying"
   group.add(body, fire)
   group.position.set(plan.centre[0] + FAR.x, plan.centre[1] + FAR.y, plan.centre[2] + FAR.z)
   group.scale.setScalar(SCALE)
+  // its shadow on the ground below it (one soft blob, laid over the ground), when the ground is known
+  const shadow = ctx.ground ? groundShadow() : null
+  const root = new Group()
+  root.name = "show dragon"
+  root.add(group)
+  if (shadow) root.add(shadow.mesh)
 
   const ahead = new Vector3()
   const local = new Vector3()
   const centre = new Vector3(plan.centre[0], plan.centre[1], plan.centre[2])
   return {
-    object: group,
+    object: root,
     subject() {
       // over the peaks while it is far off; on it (most of the way) once it is near enough to film
       const d = group.position.distanceTo(centre)
@@ -235,7 +291,7 @@ export function createDragon(ctx: ShowCtx): ShowPiece {
         centre.z + (group.position.z - centre.z) * w,
       ]
     },
-    draws: () => (group.visible ? 1 + (fire.visible ? 1 : 0) : 0),
+    draws: () => (root.visible ? 1 + (fire.visible ? 1 : 0) + (shadow?.mesh.visible ? 1 : 0) : 0),
     update(t, total) {
       uniforms.uTime.value = t
       const s = dragonState(plan, t, total)
@@ -278,14 +334,120 @@ export function createDragon(ctx: ShowCtx): ShowPiece {
       uniforms.uBreath.value = s.breath
       fire.visible = s.breath > 0.001
       // by night the hide keeps a faint ember glow, so the silhouette still reads against the dark
-      uniforms.uEmber.value = 0.03 + 0.12 * ctx.nightLevel() + 0.2 * s.breath
+      const night = ctx.nightLevel()
+      uniforms.uEmber.value = 0.03 + 0.12 * night + 0.2 * s.breath
+      if (shadow && ctx.ground) shadow.place(x, y, z, Math.atan2(v[0], v[2]), night, ctx.ground)
     },
     dispose() {
-      group.removeFromParent()
+      root.removeFromParent()
+      shadow?.dispose()
       body.geometry.dispose()
       body.material.dispose()
       fire.geometry.dispose()
       fire.material.dispose()
+    },
+  }
+}
+
+/** The shadow's size, metres across the wings, by the dragon's height over the ground (its span near, wider and softer high up). */
+export function shadowLook(height: number, night: number): { across: number; along: number; alpha: number } {
+  const h = Math.max(0, height)
+  const across = 10 + h * 0.1
+  // darker the nearer it flies, gone past a hundred metres or so; faint under the moon (blended in the
+  // linear light before the grade, so it takes more than it looks to read)
+  const alpha = 0.85 * clamp01(1 - (h - 6) / 130) * (1 - 0.7 * clamp01(night))
+  return { across, along: across * 0.62, alpha }
+}
+
+/** Cells either way of the shadow's grid (laid over the ground vertex by vertex). */
+const SHADOW_CELLS = 10
+
+/**
+ * The dragon's shadow: a soft dark ellipse (across its wings, along its way) right under it, its
+ * vertices laid on the ground each frame so it drapes over terraces and the sea alike. One draw.
+ */
+function groundShadow() {
+  const n = SHADOW_CELLS + 1
+  const uv = new Float32Array(n * n * 2)
+  const position = new Float32Array(n * n * 3)
+  const index: number[] = []
+  for (let j = 0; j < n; j++)
+    for (let i = 0; i < n; i++) {
+      uv[(j * n + i) * 2] = (i / SHADOW_CELLS) * 2 - 1
+      uv[(j * n + i) * 2 + 1] = (j / SHADOW_CELLS) * 2 - 1
+      if (i < SHADOW_CELLS && j < SHADOW_CELLS) {
+        const a = j * n + i
+        index.push(a, a + n, a + 1, a + 1, a + n, a + n + 1)
+      }
+    }
+  const geometry = new Geometry()
+  const pos = new BufferAttribute(position, 3)
+  pos.setUsage(DynamicDrawUsage)
+  geometry.setAttribute("position", pos)
+  geometry.setAttribute("uv", new Float32BufferAttribute(uv, 2))
+  geometry.setIndex(index)
+  const alpha = { value: 0 }
+  const material = new ShaderMaterial({
+    uniforms: { uAlpha: alpha },
+    vertexShader: /* glsl */ `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
+}`,
+    fragmentShader: /* glsl */ `
+uniform float uAlpha; varying vec2 vUv;
+void main() {
+  float a = uAlpha * (1.0 - smoothstep(0.45, 1.0, length(vUv)));
+  if (a < 0.004) discard;
+  gl_FragColor = vec4(0.01, 0.012, 0.03, a);
+}`,
+    transparent: true,
+    depthWrite: false,
+    // its grid is laid mirrored (across its wings is to its right): drawn from both faces
+    side: DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -4,
+  })
+  const mesh = new Mesh(geometry, material)
+  mesh.name = "dragon shadow"
+  mesh.frustumCulled = false
+  mesh.matrixAutoUpdate = false
+  mesh.renderOrder = 3
+  mesh.visible = false
+  return {
+    mesh,
+    /** Under the dragon at (x, y, z), heading `yaw` (radians about +y, 0 = +z), by night `night`. */
+    place(
+      x: number,
+      y: number,
+      z: number,
+      yaw: number,
+      night: number,
+      ground: (x: number, z: number) => number,
+    ) {
+      const look = shadowLook(y - ground(x, z), night)
+      alpha.value = look.alpha
+      mesh.visible = look.alpha > 0.004
+      if (!mesh.visible) return
+      const c = Math.cos(yaw)
+      const s = Math.sin(yaw)
+      for (let k = 0; k < n * n; k++) {
+        const u = (uv[k * 2] as number) * look.across * 0.5
+        const w = (uv[k * 2 + 1] as number) * look.along * 0.5
+        // across its wings (its right, -x when it heads +z) and along its way
+        const wx = x - u * c + w * s
+        const wz = z + u * s + w * c
+        position[k * 3] = wx
+        position[k * 3 + 1] = ground(wx, wz) + 0.12
+        position[k * 3 + 2] = wz
+      }
+      pos.needsUpdate = true
+    },
+    dispose() {
+      geometry.dispose()
+      material.dispose()
     },
   }
 }

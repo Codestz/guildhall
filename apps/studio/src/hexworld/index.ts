@@ -111,7 +111,7 @@ import { mountSeason, type SeasonMount, timelineSeason } from "./season.ts"
 import { mountSeasonFx, type SeasonFx } from "./seasonFx.ts"
 import { sessionAgents } from "./sessionAgents.ts"
 import { mountShows } from "./shows.ts"
-import { mountUndead, type UndeadMount } from "./undead.ts"
+import { graveBlockers, mountUndead, type UndeadMount } from "./undead.ts"
 
 const logger = log("studio:hexworld")
 
@@ -275,6 +275,11 @@ export interface WorldHooks {
     viewer: Viewer
     groundAt(x: number, z: number): number
     land: number
+    /**
+     * Today's props laid on the island in season (the autumn harvest's heaps): `hide(at)` takes out those
+     * standing where `at` says is not there now (null: all there); one that lands later is told too.
+     */
+    props: { hide(at: ((x: number, z: number) => boolean) | null): void }
   }): void
 }
 
@@ -474,6 +479,8 @@ const world = {
     let season: SeasonMount | null = null
     let seasonFx: SeasonFx | null = null
     let harvest: HarvestMount | null = null
+    /** Where a hook (a hall's history) says today's props are not there now (`WorldHooks.built` `props`). */
+    let propsGone: ((x: number, z: number) => boolean) | null = null
     let unTick = () => {}
     let post: Post | null = null
     let disposeField = () => {}
@@ -711,6 +718,7 @@ const world = {
         })
           .then((made) => {
             harvest = made
+            made?.hide(propsGone)
             if (made && window.guildhall?.ext) window.guildhall.ext.harvest = made
           })
           .catch(() => undefined)
@@ -721,6 +729,7 @@ const world = {
         sites: m.sites,
         span,
         light: () => sky.light(),
+        ground: (x, z) => Math.max(SEA_LEVEL, groundAt(x, z)),
         session: extra.session ?? session,
       })
       steps.progress(0.74, 150)
@@ -827,9 +836,12 @@ const world = {
           session: extra.session ?? session,
         })
       // the graveyard's undead (undead.ts): a session's graves, or `?undead=`; nothing loads until one stands
+      const graves = m.graveyard?.graves ?? []
       undead = mountUndead({
         stage,
         graveyard: m.graveyard,
+        // what stands round the graves (a pine), for the camera to film a rise past
+        blockers: graveBlockers(graves, loose, (id) => catalog.get(id)?.size),
         library: { catalog, url: libraryUrl },
         workfx: workfx?.fx ?? null,
         query: ctx.query,
@@ -864,6 +876,12 @@ const world = {
           viewer,
           groundAt,
           land: m.stats.land,
+          props: {
+            hide(at) {
+              propsGone = at
+              harvest?.hide(at)
+            },
+          },
         })
       // The light: shaders compiled and a calm run of frames drawn with all of it in, behind the cover.
       go("Light", 0.99)

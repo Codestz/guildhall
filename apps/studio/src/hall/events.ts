@@ -43,6 +43,20 @@ export type ShowPoint = readonly [x: number, y: number, z: number]
 /** Where a show stands on the island (a render task's site: the graveyard, the peaks, the square). */
 export type ShowSite = (show: Show) => ShowPoint | null
 
+/**
+ * Something round a show's site the camera must not film it through (a tree, a building): an upright
+ * cylinder, its middle (x, z), its reach and the heights it fills (a tree's crown: from `bottom` up).
+ */
+export interface ViewBlocker {
+  x: number
+  z: number
+  r: number
+  bottom: number
+  top: number
+  /** What it is (a piece's id), for a look. */
+  what?: string
+}
+
 export interface HallEvents {
   /** The shows on stage at `t` (default: the session clock's), forced ones included. */
   shows(t?: number): readonly Show[]
@@ -52,6 +66,10 @@ export interface HallEvents {
   pointOf(focus: { id: string; show: ShowKind; lift?: number }): ShowPoint | null
   /** A render task says where its kind of show stands (null: it no longer knows). */
   setSite(kind: ShowKind, site: ShowSite | null): void
+  /** What stands round a kind's site that the camera should not film through (`clearAzimuth`). */
+  blockersOf(kind: ShowKind): readonly ViewBlocker[]
+  /** A render task says what stands round its kind's site (null: nothing known). */
+  setBlockers(kind: ShowKind, blockers: (() => readonly ViewBlocker[]) | null): void
   /** Called when the shows on stage change (one starts, leaves, is mended or ends). */
   subscribe(fn: () => void): () => void
   force(kind: ShowKind, who?: ShowWho): Show
@@ -103,6 +121,7 @@ export function createEvents(session: HallSession): HallEvents & { read(): void 
   const clearedAt = new Map<string, number>()
   const announced = new Set<string>()
   const sites = new Map<ShowKind, ShowSite>()
+  const blockers = new Map<ShowKind, () => readonly ViewBlocker[]>()
   const listeners = new Set<() => void>()
   let reads = 0
   let total = 0
@@ -217,6 +236,11 @@ export function createEvents(session: HallSession): HallEvents & { read(): void 
     setSite(kind, site) {
       if (site) sites.set(kind, site)
       else sites.delete(kind)
+    },
+    blockersOf: (kind) => blockers.get(kind)?.() ?? [],
+    setBlockers(kind, list) {
+      if (list) blockers.set(kind, list)
+      else blockers.delete(kind)
     },
     subscribe(fn) {
       listeners.add(fn)

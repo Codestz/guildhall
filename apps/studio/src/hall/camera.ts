@@ -30,7 +30,7 @@ import type { ViewerHud } from "@guildhall/ui"
 import type { Chips } from "../hexworld/chips.ts"
 import type { HudParts } from "../hexworld/index.ts"
 import type { BuiltPlace } from "../hexworld/job.ts"
-import { hallEvents } from "./events.ts"
+import { hallEvents, type ViewBlocker } from "./events.ts"
 import type { HallSession } from "./feeds/index.ts"
 import type { SessionPlaces } from "./feeds/places.ts"
 import { galleonPoint } from "./sea.ts"
@@ -270,6 +270,8 @@ export interface ShotSizes {
   aspect?: number
   /** The island's middle (x, z): a sea show is filmed from the island, looking out. */
   centre?: readonly [number, number]
+  /** What stands round the show's site (a graveyard's pines): its shot turns until they are out of the way. */
+  blockers?: readonly ViewBlocker[]
 }
 
 /** One beat of a show's framing: from `at` ms after the cut, this far and this steep (`ofMap`: a share of the map view's distance). */
@@ -322,6 +324,72 @@ export const SEAWARD: ReadonlySet<ShowKind | "galleon"> = new Set(["ghostship", 
 /** How long a show's move from one beat to the next takes, ms. */
 export const BEAT_GLIDE_MS = 3500
 
+/** How far round the azimuth search steps, and how far either side a clear view must stay clear (the held shot's drift), degrees. */
+const CLEAR_STEP = 15
+const CLEAR_MARGIN = 10
+/** The last metres before the subject that do not count (what stands right by it frames it). */
+const CLEAR_NEAR = 1.2
+/** Where on a subject standing at its site's point a view must reach, metres over its feet: its shins and its chest. */
+const SUBJECT_HEIGHTS: readonly number[] = [0.4, 1.3]
+
+/**
+ * True when the lines from the eye (a pose `distance` off `target`, at `azimuth` and `elevation`,
+ * degrees) to a figure standing at `target` (its shins and its chest, `heights` over it) pass through
+ * none of `blockers` (nor does the eye stand in one). Pure.
+ */
+export function viewClear(
+  target: readonly [number, number, number],
+  distance: number,
+  elevation: number,
+  azimuth: number,
+  blockers: readonly ViewBlocker[],
+  heights: readonly number[] = SUBJECT_HEIGHTS,
+): boolean {
+  const az = (azimuth * Math.PI) / 180
+  const el = (elevation * Math.PI) / 180
+  const flat = distance * Math.cos(el)
+  const ex = target[0] + flat * Math.sin(az)
+  const ey = target[1] + distance * Math.sin(el)
+  const ez = target[2] + flat * Math.cos(az)
+  const steps = Math.max(8, Math.ceil(distance / 0.5))
+  const last = 1 - CLEAR_NEAR / Math.max(distance, CLEAR_NEAR)
+  for (const h of heights) {
+    const ty = target[1] + h
+    for (const b of blockers)
+      for (let i = 0; i <= steps; i++) {
+        const u = (i / steps) * last
+        const x = ex + (target[0] - ex) * u
+        const y = ey + (ty - ey) * u
+        const z = ez + (target[2] - ez) * u
+        if (y >= b.bottom && y <= b.top && Math.hypot(x - b.x, z - b.z) < b.r) return false
+      }
+  }
+  return true
+}
+
+/**
+ * The azimuth nearest `from` (degrees) whose view of `target` no blocker stands in, a little either
+ * side too (a held shot drifts round); `from` when no way round is clear. Pure.
+ */
+export function clearAzimuth(
+  target: readonly [number, number, number],
+  distance: number,
+  elevation: number,
+  from: number,
+  blockers: readonly ViewBlocker[],
+): number {
+  const clear = (az: number) =>
+    viewClear(target, distance, elevation, az, blockers) &&
+    viewClear(target, distance, elevation, az - CLEAR_MARGIN, blockers) &&
+    viewClear(target, distance, elevation, az + CLEAR_MARGIN, blockers)
+  for (let k = 0; k <= 180 / CLEAR_STEP; k++)
+    for (const side of k === 0 ? [0] : [1, -1]) {
+      const az = from + side * k * CLEAR_STEP
+      if (clear(az)) return az
+    }
+  return from
+}
+
 /** Which of a show's beats `ms` after its cut is in (its index; -1 for a kind without beats). Pure. */
 export function showBeatAt(kind: ShowKind | "galleon", ms: number): number {
   const beats = SHOW_BEATS[kind]
@@ -358,7 +426,8 @@ export function shotPose(
       const dx = target[0] - sizes.centre[0]
       const dz = target[2] - sizes.centre[1]
       if (Math.hypot(dx, dz) > 1) pose.azimuth = (Math.atan2(-dx, -dz) * 180) / Math.PI
-    }
+    } else if (sizes.blockers?.length)
+      pose.azimuth = clearAzimuth(target, pose.distance, pose.elevation, pose.azimuth, sizes.blockers)
     return pose
   }
   if (distance === "map") return at(sizes.map, 60)
@@ -718,6 +787,7 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
       aspect: stage.camera.aspect,
       ...(focus.kind === "place" ? { tiles: placeOf(focus.place)?.tiles ?? 0 } : {}),
       ...(kind ? { show: kind, beat: lastCut === null ? 0 : Math.max(0, now() - lastCut) } : {}),
+      ...(kind && kind !== "galleon" ? { blockers: hallEvents()?.blockersOf(kind) ?? [] } : {}),
       ...(kind && rig.world() ? { centre: rig.world()?.centre as [number, number] } : {}),
     }
   }

@@ -33,15 +33,20 @@ import {
 export {
   bankAt,
   breathAt,
+  CRUISE_CLEAR,
   DRAGON_ARRIVE_S,
   DRAGON_LEAVE_S,
   dragonAt,
   dragonFlight,
   dragonOrbit,
   dragonState,
+  highestUnder,
+  SWOOP_CLEAR,
+  shadowLook,
 } from "./dragon.ts"
 export {
   buildBunting,
+  CROWN_S,
   FINALE_S,
   fireworksProgramme,
   POLE_H,
@@ -64,6 +69,8 @@ export interface ShowsOpts {
   clock?: () => number
   /** Reduced motion; the user's setting when left out. */
   still?: boolean
+  /** The island's surface at (x, z) (`ShowCtx.ground`): the dragon's clearance and its shadow. */
+  ground?: (x: number, z: number) => number
 }
 
 export interface ShowsStats {
@@ -191,6 +198,7 @@ export function createShows(stage: Stage, opts: ShowsOpts): Shows {
       night: light.night > NIGHT_AT,
       still: opts.still ?? reducedMotion(),
       nightLevel: () => opts.light().night,
+      ...(opts.ground ? { ground: opts.ground } : {}),
     })
     piece.object.visible = false
     stage.scene.add(piece.object)

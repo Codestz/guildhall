@@ -11,7 +11,7 @@
  *
  * `window.guildhall.ext.shows` drives them for shots: `play(kind | show)`, `stop(kind?)`, `clear()`,
  * `hold(t | null)` (every show held `t` seconds in), `ready()`, `now()`, `playing()`, `stats()`,
- * `sites()` (the peak, the square's poles and the keep).
+ * `sites()` (the peak, the square's poles and the keep), `part(name)` (a show's scene part).
  */
 import {
   createShows,
@@ -40,6 +40,8 @@ export function mountShows(parts: {
   sites: EventSites
   span: number
   light: () => DayLight
+  /** The island's surface at (x, z), the sea's off the land: the dragon flies clear of it, its shadow on it. */
+  ground?: (x: number, z: number) => number
   /** A session plays on the island: its world events, on its clock, once its HUD is up. */
   session?: (() => HallSession | null) | boolean
 }): Shows {
@@ -49,6 +51,7 @@ export function mountShows(parts: {
     sites: parts.sites,
     span: parts.span,
     light: parts.light,
+    ...(parts.ground ? { ground: parts.ground } : {}),
     clock: () => (driver ? driver.clock.get().at / 1000 : performance.now() / 1000),
   })
   let detach = () => {}
@@ -105,6 +108,8 @@ export function mountShows(parts: {
       now: shows.now,
       playing: shows.playing,
       stats: shows.stats,
+      // a show's part by name (`dragon flying`, `dragon shadow`), for shots that follow it
+      part: (name: string) => parts.stage.scene.getObjectByName(name) ?? null,
       sites: () => ({
         peak: parts.sites.peak ?? null,
         square: parts.sites.square ?? null,

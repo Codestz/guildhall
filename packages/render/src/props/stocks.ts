@@ -76,6 +76,11 @@ export interface StocksStats {
 export interface Stocks {
   /** Draws stock k (the plan's order) at its sample: laid out again only when its level changed. */
   set(k: number, sample: StockSample): void
+  /**
+   * Takes stock k out (a hall's history: its tile not yet risen) or puts it back as last set: its pile,
+   * its cart and rail, its shadow.
+   */
+  hide(k: number, hidden: boolean): void
   /** Float i at `at`, turned `yaw`, or hidden (null). */
   float(i: number, at: V3 | null, yaw?: number): void
   /** The lines this frame: begin, one per fisher (tip to float, sagging), end. */
@@ -100,6 +105,11 @@ interface Drawn {
   y: number
   /** A cart: its instance, and where it is on the rail now (−1: never placed). */
   cart?: { instance: number; roll: number; y0: number; y1: number; at: StockPiece[] }
+  /** Its rail's instances. */
+  rail: number[]
+  /** Taken out (`hide`), and its last sample (laid out again as it comes back). */
+  hidden: boolean
+  last: StockSample | null
 }
 
 const scratch = {
@@ -188,7 +198,7 @@ export async function createStocks(
   let fade = 1
   const shade = (k: number) => {
     const d = disc[k]
-    if (d) shadows.set(k, d.x, d.y, d.z, d.r, d.a * fade)
+    if (d) shadows.set(k, d.x, d.y, d.z, d.r, drawn[k]?.hidden ? 0 : d.a * fade)
   }
 
   const drawn: Drawn[] = stocks.map((stock, k) => {
@@ -204,7 +214,18 @@ export async function createStocks(
       instances.push(i)
     }
     const y = ground(stock.at[0], stock.at[2], stock.at[1])
-    const d: Drawn = { stock, kind: stock.kind, instances, geometries, shown: 0, level: -1, y }
+    const d: Drawn = {
+      stock,
+      kind: stock.kind,
+      instances,
+      geometries,
+      shown: 0,
+      level: -1,
+      y,
+      rail: [],
+      hidden: false,
+      last: null,
+    }
     // a cart and its rail
     const cartG = geometryId.get(CART)
     const trackG = geometryId.get(TRACK)
@@ -212,6 +233,7 @@ export async function createStocks(
       if (trackG !== undefined)
         for (const r of rails[k] ?? []) {
           const i = mesh.addInstance(trackG)
+          d.rail.push(i)
           const ty = ground(r.at[0], r.at[1], stock.at[1])
           scratch.q.setFromAxisAngle(scratch.p.set(0, 1, 0), r.yaw)
           mesh.setMatrixAt(
@@ -300,10 +322,12 @@ export async function createStocks(
     rolls++
   }
 
-  return {
+  const api: Stocks = {
     set(k, sample) {
       const d = drawn[k]
       if (!d) return
+      d.last = sample
+      if (d.hidden) return
       const level = stockLevel(d.kind, sample.count, d.stock.cap)
       const roll = sample.roll ?? 0
       if (level !== d.level) {
@@ -328,6 +352,20 @@ export async function createStocks(
         relayouts++
         if (d.cart) placeCart(d, roll)
       } else if (d.cart && Math.abs(roll - d.cart.roll) > 1e-4) placeCart(d, roll)
+    },
+    hide(k, hidden) {
+      const d = drawn[k]
+      if (!d || d.hidden === hidden) return
+      d.hidden = hidden
+      if (hidden) {
+        for (const i of d.instances) mesh.setVisibleAt(i, false)
+        d.shown = 0
+        d.level = -1
+      }
+      for (const i of d.rail) mesh.setVisibleAt(i, !hidden)
+      if (d.cart) mesh.setVisibleAt(d.cart.instance, !hidden)
+      shade(k)
+      if (!hidden && d.last) api.set(k, d.last)
     },
     float(i, at, yaw = 0) {
       const id = floatIds[i]
@@ -386,4 +424,5 @@ export async function createStocks(
       faded.dispose()
     },
   }
+  return api
 }

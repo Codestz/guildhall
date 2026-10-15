@@ -4,6 +4,8 @@
  * none the rest of the year. How much shows follows the season's autumn weight (`harvestShow`), so the
  * heaps grow in as autumn begins and are gone by winter.
  *
+ * A hall's history reveal hides the heaps on land not yet risen (`hide`, through hexworld/index.ts).
+ *
  * `window.guildhall.ext.harvest`: `stats()` (pieces, heaps, shown, draws), `heaps()` (where they stand).
  */
 import type { Catalog } from "@guildhall/assets"
@@ -18,7 +20,9 @@ const logger = log("hexworld:harvest")
 export interface HarvestMount {
   stats(): ReturnType<Harvest["stats"]>
   /** Where each heap stands (its first piece), world metres (shots). */
-  heaps(): { x: number; y: number; z: number; piece: string }[]
+  heaps(): { x: number; y: number; z: number; piece: string; hidden: boolean }[]
+  /** Hides the heaps standing where `at` says is not there now (null: all there). */
+  hide(at: ((x: number, z: number) => boolean) | null): void
   dispose(): void
 }
 
@@ -40,11 +44,23 @@ export async function mountHarvest(parts: {
   }
   const off = parts.stage.onFrame(() => made.show(harvestShow(parts.weights().autumn)))
   logger.info("harvest", made.stats())
+  let gone: ((x: number, z: number) => boolean) | null = null
   const firsts = new Map<string, HarvestPiece>()
   for (const p of piles) if (!firsts.has(`${p.tile}:${p.heap}`)) firsts.set(`${p.tile}:${p.heap}`, p)
   return {
     stats: made.stats,
-    heaps: () => [...firsts.values()].map((p) => ({ x: p.x, y: p.y, z: p.z, piece: p.piece })),
+    heaps: () =>
+      [...firsts.values()].map((p) => ({
+        x: p.x,
+        y: p.y,
+        z: p.z,
+        piece: p.piece,
+        hidden: gone?.(p.x, p.z) ?? false,
+      })),
+    hide: (at) => {
+      gone = at
+      made.hide(at)
+    },
     dispose() {
       off()
       made.dispose()

@@ -323,7 +323,12 @@ export const STAR_S: Readonly<Record<ShellStyle, number>> = {
 export const STARS = 60
 const TRAIL = 7
 /** When the finale's salvo begins, seconds into the show. */
-export const FINALE_S = 21.5
+export const FINALE_S = 19.6
+/**
+ * When the finale's crown of gold willows bursts, seconds into the show: well inside the director's
+ * hold on the festival (sim `SHOW_LOOK.festival`, 30 s), its stars burning out before the cut.
+ */
+export const CROWN_S = 24
 
 /** red, gold, cyan, green, rose, cream, violet, orange: bright, so they bloom by night. */
 export const SHELL_COLOURS = [
@@ -342,7 +347,7 @@ const CREAM_I = 5
 /**
  * The night's programme, the same every time: an opening of single shells, a middle that mixes every
  * kind (two at once now and then), a finale salvo from `FINALE_S` that builds to a crown of gold
- * willows and a crackle, and a short coda. About 30 shells over 36 s; the director holds the keep
+ * willows and a crackle bursting at `CROWN_S` (~24 s), and a short coda. About 30 shells over 36 s; the director holds the keep
  * through the finale (sim `SHOW_LOOK.festival`). Many colours, as the user asked: every shell has its
  * own and turns to another as it burns; only the willows are gold.
  */
@@ -377,7 +382,7 @@ export function fireworksProgramme(): Shell[] {
   shell(15.9, "crackle", 1, 5)
   shell(17.1, "peony", 1.1, 7)
   shell(17.6, "ring", 1, 4)
-  shell(19.3, "peony", 1.1, 2)
+  shell(18.3, "peony", 1.1, 2)
   // the finale: a salvo, quicker and bigger, crowned by gold willows and a crackle
   const salvo: ShellStyle[] = [
     "peony",
@@ -392,13 +397,14 @@ export function fireworksProgramme(): Shell[] {
     "peony",
   ]
   salvo.forEach((style, i) => {
-    shell(FINALE_S + i * 0.42, style, 1.15 + i * 0.02)
+    shell(FINALE_S + i * 0.36, style, 1.15 + i * 0.02)
   })
-  for (let i = 0; i < 3; i++) shell(FINALE_S + 4.6 + i * 0.22, "willow", 1.3)
-  shell(FINALE_S + 5.4, "crackle", 1.35, CREAM_I, GOLD_I)
+  // the crown: three gold willows bursting together at `CROWN_S`, a crackle over them a moment later
+  for (let i = 0; i < 3; i++) shell(CROWN_S - ROCKET_S + i * 0.2, "willow", 1.3)
+  shell(CROWN_S - ROCKET_S + 0.75, "crackle", 1.35, CREAM_I, GOLD_I)
   // the coda
-  shell(32.0, "peony", 1, 4, 5)
-  shell(34.6, "willow", 1.1)
+  shell(31.0, "peony", 1, 4, 5)
+  shell(33.6, "willow", 1.1)
   return out
 }
 

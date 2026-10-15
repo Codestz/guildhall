@@ -78,6 +78,16 @@ export {
   moonAt,
   sunAt,
 } from "./light.ts"
+export {
+  BLIGHT_MIX,
+  LIVING_NIGHT,
+  LIVING_SICK,
+  LIVING_TINT,
+  LIVING_WARM,
+  type LivingField,
+  patchLivingTint,
+  setLivingField,
+} from "./livingTint.ts"
 export type { LodCounts } from "./lod.ts"
 export { discMarker, hexOutline, spotMarker } from "./markers.ts"
 export { paletteMaterial } from "./material.ts"

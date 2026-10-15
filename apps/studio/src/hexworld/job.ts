@@ -269,6 +269,12 @@ export interface MapStage {
   graveyard: HexGraveyard | null
   /** The island's regions as the region tint's field (render regionTint.ts); null without regions. */
   regions: RegionFieldData | null
+  /**
+   * The hex → place lookup: the grid's radius, the zone each tile is in (world `HexZones.zoneOf`: zone
+   * index + 1 per grid tile, 0 none) and each zone's heart tile. What living work keys its tint on and the
+   * hover picks by (hall/living.ts, hall/hover.ts).
+   */
+  tiles: { radius: number; zoneOf: Int16Array; hearts: Int32Array }
   stats: {
     land: number
     tiles: number
@@ -526,9 +532,14 @@ export function transferables(msg: FromWorker): ArrayBuffer[] {
   if (msg.type === "map") {
     const s = msg.map.structures
     const r = msg.map.regions
-    return [msg.map.paths, ...(s ? [s.position, s.color, s.normal] : []), ...(r ? [r.data] : [])].map(
-      (a) => a.buffer as ArrayBuffer,
-    )
+    const t = msg.map.tiles
+    return [
+      msg.map.paths,
+      ...(s ? [s.position, s.color, s.normal] : []),
+      ...(r ? [r.data] : []),
+      t.zoneOf,
+      t.hearts,
+    ].map((a) => a.buffer as ArrayBuffer)
   }
   if (msg.type === "pieces")
     return [msg.pieces.index, msg.pieces.place, msg.pieces.cluster].map((a) => a.buffer as ArrayBuffer)
@@ -621,6 +632,11 @@ export function runHexJob(
       sea: seaSites(h, z, w, { sea: SEA_LEVEL, keepOff: berths }),
       graveyard: w.graveyard,
       regions: regionField(h, w, span),
+      tiles: {
+        radius: h.grid.radius,
+        zoneOf: Int16Array.from(z.zoneOf),
+        hearts: Int32Array.from(z.zones, (zone) => zone.tile),
+      },
       stats: {
         land: h.stats.land,
         tiles: w.tiles.length,

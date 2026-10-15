@@ -94,6 +94,10 @@ export function homePlaces(kinds: readonly string[]): HomePlaces {
     },
     name: (zone) => (zone === undefined ? HALL : (NAMES[kinds[zone] ?? ""] ?? HALL)),
     placeAt: () => undefined,
+    folderAt(zone) {
+      for (const [district, at] of dealt) if (at === zone) return district
+      return undefined
+    },
     reset() {
       dealt = new Map()
       used = new Map()

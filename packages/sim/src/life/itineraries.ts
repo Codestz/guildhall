@@ -1,5 +1,7 @@
 import { type Craft, hash } from "@guildhall/core"
 import {
+  cutsHard,
+  HARD,
   type HeroBoard,
   type HeroPose,
   type HeroSpot,
@@ -601,7 +603,7 @@ export class LifePlanner {
     let from: LifeSpot
     if (walking && pose) {
       from = this.kit.island
-        ? heroFrom(this.kit.walk, this.kit.island, pose.at, pose.facing)
+        ? heroFrom(this.kit.walk, this.kit.island, pose.at, pose.facing, this.kit.near)
         : nearestNode(this.kit.walk, pose.at, pose.facing)
     } else from = track.here
     const there: Spotted = facing === undefined ? to : { ...to, facing }
@@ -813,8 +815,14 @@ export class LifePlanner {
     const n = this.kit.walk.nodes[node]!
     let ring = this.rings.get(zone)
     if (!ring || ring.length <= k) {
-      // (each a body's room from every wall and house round the heart)
-      ring = ringPlaces(n, this.kit.spots(zone), Math.max(16, (k + 1) * 2), (x, z) => this.roomAt(x, z))
+      // (each a body's room from every wall and house round the heart, and reached from it straight:
+      // not one behind a curtain wall the heart's node stands by)
+      ring = ringPlaces(
+        n,
+        this.kit.spots(zone),
+        Math.max(16, (k + 1) * 2),
+        (x, z) => this.roomAt(x, z) && this.seenFrom(n, x, z),
+      )
       this.rings.set(zone, ring)
     }
     const [x, z] = ring[k] ?? [n.x, n.z]
@@ -825,6 +833,15 @@ export class LifePlanner {
   private roomAt(x: number, z: number): boolean {
     const near = this.kit.near
     return !near?.(x, z, RING_BODY).some((o) => "pts" in o && !o.soft && solidDistance(o, x, z) < RING_BODY)
+  }
+
+  /** Whether the straight way from a node to (x, z) runs through no wall or house (world `cutsHard`). */
+  private seenFrom(n: { x: number; y: number; z: number }, x: number, z: number): boolean {
+    const near = this.kit.near
+    if (!near) return true
+    const hard = (px: number, pz: number, r: number) =>
+      near(px, pz, r).filter((o) => "pts" in o && HARD(o.kind))
+    return !cutsHard([n.x, n.y, n.z], [x, n.y, z], hard)
   }
 
   /** Each place's ring places so far (`ringPlaces`, grown as more are asked for). */
@@ -1061,6 +1078,9 @@ export class LifePlanner {
           if (out.some((o) => Math.hypot(o[0] - x, o[2] - z) < 0.05)) continue
           const blockers = this.kit.near?.(x, z, 0.6) ?? []
           if (blockers.some((o) => "pts" in o && !o.soft && solidDistance(o, x, z) < 0.3)) continue
+          // (walked to from the board's node: not a row behind the wall it stands by)
+          const n = this.kit.walk.nodes[board.spot.node]
+          if (n && !this.seenFrom(n, x, z)) continue
           out.push([x, b.at[1], z])
         }
     this.briefing = out
@@ -1145,7 +1165,7 @@ export class LifePlanner {
     const pose = poseAt(track.it, t)
     if (pose?.act === "walk") {
       const n = this.kit.island
-        ? heroFrom(this.kit.walk, this.kit.island, pose.at, pose.facing)
+        ? heroFrom(this.kit.walk, this.kit.island, pose.at, pose.facing, this.kit.near)
         : nearestNode(this.kit.walk, pose.at, pose.facing)
       cut(track.it.steps, t)
       track.here = { node: n.node, at: pose.at, facing: pose.facing, ground: pose.ground }

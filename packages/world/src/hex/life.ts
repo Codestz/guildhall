@@ -671,16 +671,22 @@ export function heroRoute(
 
 /**
  * A point as a start for `heroRoute` (a pose sampled mid-walk, when a hero is sent elsewhere): on the
- * walk node nearest it, its own tile's or a neighbour's first, else any. Facing kept.
+ * walk node nearest it, its own tile's or a neighbour's first, else any. Facing kept. With `near` (the
+ * blockers), of its tile's and its neighbours' nodes the nearest whose straight way from it runs through
+ * no wall, house or fence first: one walking by a castle's curtain is not sent through it to the court's.
  */
-export function heroFrom(walk: HexWalk, h: HexIsland, at: Vec3, facing = 0): LifeSpot {
+export function heroFrom(walk: HexWalk, h: HexIsland, at: Vec3, facing = 0, near?: NearBlockers): LifeSpot {
   const g = h.grid
   const { q, r } = hexAt(at[0] / HEX_TILE_SIZE, at[2] / HEX_TILE_SIZE)
   const i = g.index(q, r)
   const round = i < 0 ? [] : [i, ...g.neighbours(i).filter((j) => j >= 0)]
   let node = -1
   let best = Number.POSITIVE_INFINITY
-  const consider = (c: number) => {
+  let clear = -1
+  let clearD = Number.POSITIVE_INFINITY
+  const hard =
+    near && ((x: number, z: number, r: number) => near(x, z, r).filter((o) => "pts" in o && HARD(o.kind)))
+  const consider = (c: number, look: boolean) => {
     if (c < 0) return
     const n = walk.nodes[c]!
     const d = Math.hypot(n.x - at[0], n.z - at[2])
@@ -688,12 +694,17 @@ export function heroFrom(walk: HexWalk, h: HexIsland, at: Vec3, facing = 0): Lif
       best = d
       node = c
     }
+    if (look && hard && d < clearD - 1e-9 && !cutsHard(at, [n.x, n.y, n.z], hard)) {
+      clearD = d
+      clear = c
+    }
   }
   for (const j of round) {
-    consider(walk.at(j))
-    consider(walk.door(j))
+    consider(walk.at(j), true)
+    consider(walk.door(j), true)
   }
-  if (node < 0) for (let c = 0; c < walk.nodes.length; c++) consider(c)
+  if (clear >= 0) node = clear
+  if (node < 0) for (let c = 0; c < walk.nodes.length; c++) consider(c, false)
   const n = node >= 0 ? walk.nodes[node] : undefined
   return { node, at, facing, ground: n ? !onDeck(n) : true }
 }

@@ -2,14 +2,15 @@
  * The site's routes, as pure rules (the router and the shell read them; `site/index.tsx` draws them):
  *
  * - `/`            the live island, with the first-visit welcome card
- * - `/demos`       the demo picker over the island (a story opens as `/?story=<id>`)
+ * - `/demos`       the demo picker over the island, for a direct visit (a story opens as `/?story=<id>`);
+ *                  from inside the site the picker opens over the page in place (nav.ts `openDemosWith`)
  * - `/harbour`     the live chronicles: every repo with its whole history read
  * - `/built`       How it's built, with the journey
  * - `/hall/<o>/<r>` a repo's island; `/hall` alone asks for the repo
  * - `/studio`, `/pieces`, …  the Studio, public and view-only off localhost
  *
  * The island, the demos and a bare `/hall` are one world: moving between them keeps the island that is
- * already built (`worldKey`), so opening the crest menu's Demos never rebuilds the map.
+ * already built (`worldKey`).
  */
 import { parseRepo, type SiteDest, type Story } from "@guildhall/ui"
 import { hasParam, param, worldEntries } from "../params.ts"

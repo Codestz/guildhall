@@ -265,7 +265,7 @@ site does not ship them.
 ## V1
 
 V1 is kept for history. Its code is on the [`v1` tag](https://github.com/Codestz/guildhall/tree/v1)
-and runs from `legacy/` here. V1 had the OpenCode plugin (`opencode-guildhall` on npm), the
+(the hub and the Claude Code hook that live mode uses are kept here). V1 had the OpenCode plugin (`opencode-guildhall` on npm), the
 archipelago of repos and the WebGPU renderer; [RELEASE_NOTES.md](RELEASE_NOTES.md) says what moved,
 what changed and what is parked. Animals are parked too: they did not fit the low-poly style, so
 pens and pastures stand empty for now.

@@ -1,7 +1,7 @@
 /**
  * How far each point of the water is from the land, as a texture the water reads (water.ts `field`):
  * the depth colour, the foam rim and the wave lines rolling in all key off it, as V1's baked shore mask
- * did (legacy/packages/hall/src/scene/nature/shoreBake.ts), but from a plain land test instead of a GPU
+ * did (v1:packages/hall/src/scene/nature/shoreBake.ts), but from a plain land test instead of a GPU
  * bake, so it works for any ground the caller can answer "is this land?" for. The distances themselves
  * are three-free (shoreDistance.ts), so a worker can bake the bytes and the main thread only uploads them.
  */

@@ -36,4 +36,4 @@ covers (the world claims those tiles when they are free open ground on its level
 `scene-part` tile, else places the scene's one-tile prefab); `tier` marks the Guildhall castle's pieces. The world
 reads these files through `installTilePrefabs`; its code `TILE_PREFABS` is only the fallback.
 
-The old house/landmark/vignette recipes the ring town read are archived in `legacy/data/recipes/`.
+The old house/landmark/vignette recipes the ring town read are in git history (`legacy/data/recipes/`, removed at the V1 cutover).

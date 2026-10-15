@@ -1,6 +1,6 @@
 # The told stories' goldens
 
-What V1's own sim (`main:packages/sim`, the same files as `legacy/packages/sim` on `v2`) told; `test/stories-golden.test.ts` checks the port (`src/stories/`) tells the same, change for change.
+What V1's own sim (`packages/sim` on the `v1` tag) told; `test/stories-golden.test.ts` checks the port (`src/stories/`) tells the same, change for change.
 
 | File | What |
 | --- | --- |
@@ -14,13 +14,13 @@ The V2 saga is new (re-authored for the hex island), so it has no V1 golden: `te
 
 ## Remaking them
 
-Save the driver below as `v1gold.ts` outside the repo, with `<repo>` replaced by the checkout's absolute path, and run `bun v1gold.ts <repo>/packages/sim/test/fixtures/stories`. It imports V1's files by path; their imports of `@guildhall/core` are types only, so nothing else is needed.
+Check out the `v1` tag somewhere outside this checkout, save the driver below as `v1gold.ts` outside both, with `<v1>` replaced by the V1 checkout's absolute path, and run `bun v1gold.ts <repo>/packages/sim/test/fixtures/stories`. It imports V1's files by path; their imports of `@guildhall/core` are types only, so nothing else is needed.
 
 ```ts
-import { factions } from "<repo>/legacy/packages/sim/src/factions.ts"
-import { parties, party, rush, solo } from "<repo>/legacy/packages/sim/src/scenarios.ts"
-import { seas } from "<repo>/legacy/packages/sim/src/seas.ts"
-import { Script } from "<repo>/legacy/packages/sim/src/script.ts"
+import { factions } from "<v1>/packages/sim/src/factions.ts"
+import { parties, party, rush, solo } from "<v1>/packages/sim/src/scenarios.ts"
+import { seas } from "<v1>/packages/sim/src/seas.ts"
+import { Script } from "<v1>/packages/sim/src/script.ts"
 
 const out = process.argv[2] ?? "."
 

@@ -1,5 +1,5 @@
 /**
- * The studio's base sheet: `@guildhall/ui`'s tokens (V1's HUD, legacy/packages/hall/src/hall.css) and the
+ * The studio's base sheet: `@guildhall/ui`'s tokens (V1's HUD, v1:packages/hall/src/hall.css) and the
  * controls every tool screen shares (tool buttons, pill toggles, selects, ranges, chips), then the piece
  * browser's layout. The top bar holds it, so it is on every screen; a screen's own sheet adds layout,
  * never a second copy of a control.

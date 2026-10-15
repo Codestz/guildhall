@@ -1,4 +1,4 @@
-// From V1 hall (legacy/packages/hall/src/audio/music.ts), held to its goldens (test/audio.test.ts).
+// From V1 hall (v1:packages/hall/src/audio/music.ts), held to its goldens (test/audio.test.ts).
 import type { EventKind } from "@guildhall/sim"
 import type { CueKind, MoodId, SigilKind } from "./kinds.ts"
 

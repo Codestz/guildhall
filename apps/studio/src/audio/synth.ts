@@ -1,4 +1,4 @@
-// From V1 hall (legacy/packages/hall/src/audio/synth.ts).
+// From V1 hall (v1:packages/hall/src/audio/synth.ts).
 import { frequencyOf, type Note, type Timbre } from "./music.ts"
 
 /**

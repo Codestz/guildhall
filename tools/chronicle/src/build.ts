@@ -11,8 +11,9 @@
  * packages/sim/src/repo/{chronicle,catalog}.ts change. The default --out is
  * tools/chronicle/dist/chronicle.js (git-ignored).
  *
- * Until 2026-10 this lived in V1 as legacy/scripts/chronicle-build.ts (bundling legacy/scripts/
- * chronicle.ts); a bundle's Source line names the file it was built from.
+ * Until the V1 cutover (2026-10) this was legacy/scripts/chronicle-build.ts, bundling
+ * legacy/scripts/chronicle.ts (scripts/ on the v1 tag); a bundle's Source line names the file it
+ * was built from.
  */
 import { mkdir, writeFile } from "node:fs/promises"
 import { dirname, join, relative, resolve } from "node:path"

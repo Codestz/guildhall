@@ -1,4 +1,4 @@
-// From V1 hall (legacy/packages/hall/src/audio/samples.ts), held to its goldens (test/audio.test.ts).
+// From V1 hall (v1:packages/hall/src/audio/samples.ts), held to its goldens (test/audio.test.ts).
 import type { Craft } from "@guildhall/core"
 import { BASE } from "../env.ts"
 import type { CueKind } from "./kinds.ts"

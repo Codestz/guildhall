@@ -5,7 +5,7 @@ import { STORIES_DIR, v1 } from "./stories-fixtures.ts"
 import { storyInput } from "./story-fixtures.ts"
 
 /**
- * The DSL's golden: V1's own sim (main:packages/sim = legacy/packages/sim) told these stories, and the
+ * The DSL's golden: V1's own sim (v1:packages/sim) told these stories, and the
  * port tells them the same, change for change (fixtures/stories/README.md says how they were made).
  */
 

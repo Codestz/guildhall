@@ -1,4 +1,4 @@
-// From V1 hall (legacy/packages/hall/src/guild/events.ts `WorldEvents`, guild/undead.ts `Undead`,
+// From V1 hall (v1:packages/hall/src/guild/events.ts `WorldEvents`, guild/undead.ts `Undead`,
 // scene/events/EventsLayer.tsx `LOOK`): the live scheduler, remade as a pure function of the log.
 
 import type { CiState } from "@guildhall/core"

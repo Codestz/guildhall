@@ -1,6 +1,6 @@
 /**
  * Self-contained PNG reading and writing (8-bit grey/RGB/palette/RGBA, not interlaced), ported from
- * legacy/scripts/palette.ts, so the importer samples texture atlases without an image library.
+ * V1's v1:scripts/palette.ts, so the importer samples texture atlases without an image library.
  */
 import { deflateSync, inflateSync } from "node:zlib"
 

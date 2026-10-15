@@ -1,6 +1,6 @@
 /**
  * The sound (src/audio), ported from V1: the pure parts held to V1's goldens (fixtures/audio-v1.jsonl,
- * written by audio-v1.gen.ts from legacy/packages/hall/src/audio), the engine on a fake WebAudio, the
+ * written from V1's v1:packages/hall/src/audio by a generator removed at the cutover), the engine on a fake WebAudio, the
  * driver and the cues on V2's world events, and the saga played through: its beats sound their cues.
  */
 import { describe, expect, test } from "bun:test"

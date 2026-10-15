@@ -107,8 +107,8 @@ composer, the hex map, NPCs, grips. Online it is read-only: explore freely, noth
 - **WebGPU.** V1's experimental renderer is gone; V2 draws on WebGL.
 - **The crowd of 300.** The rush story sends twelve heroes; the big crowd waits for the crowd's
   level of detail in the stories.
-- **The OpenCode plugin and the nine guild agents** stay V1 (`opencode-guildhall` on npm, code in
-  `legacy/`). The demo stories still include an OpenCode party.
+- **The OpenCode plugin and the nine guild agents** stay V1 (`opencode-guildhall` on npm, code on
+  the `v1` tag). The demo stories still include an OpenCode party.
 - **"Deepen this island".** The hall has no button to request a chronicle yet; open a request on
   [guildhall-chronicles](https://github.com/Codestz/guildhall-chronicles) instead.
 

@@ -1,5 +1,5 @@
 /**
- * Guildhall's design tokens, carried over from V1's HUD (legacy/packages/hall/src/hall.css `:root`, the
+ * Guildhall's design tokens, carried over from V1's HUD (v1:packages/hall/src/hall.css `:root`, the
  * site's demos.css and loader.css): warm ink plaques, brass hairlines, three faces. Scoped to `.gh` so
  * a page opts in by class. Contrast on `--ink-solid` (V1's measurements): paper 15.6:1, muted 10.6:1,
  * faint 7.3:1, brass-hi 11.9:1, ink on brass 9.4:1.

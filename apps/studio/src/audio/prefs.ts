@@ -1,4 +1,4 @@
-// From V1 hall (legacy/packages/hall/src/hud/prefs.ts, its sound half), held to its goldens.
+// From V1 hall (v1:packages/hall/src/hud/prefs.ts, its sound half), held to its goldens.
 /**
  * Sound prefs: off until the viewer turns it on, then remembered with its levels under V1's own key
  * (`guildhall.sound`, so a V1 visitor's choice carries over). Being "on" here never starts audio by

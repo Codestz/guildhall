@@ -1,4 +1,4 @@
-// From V1 hall (legacy/packages/hall/src/hud/Sound.tsx): the speaker and Settings › Sound.
+// From V1 hall (v1:packages/hall/src/hud/Sound.tsx): the speaker and Settings › Sound.
 import { Slider, Toggle } from "@guildhall/ui"
 import { useSyncExternalStore } from "react"
 import { audio } from "./engine.ts"

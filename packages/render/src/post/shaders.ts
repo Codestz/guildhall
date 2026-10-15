@@ -1,7 +1,7 @@
 /**
  * The post pipeline's GLSL (WebGL2, GLSL3 via three's ShaderMaterial): the bloom's bright pass and mip
  * chain, and the one composite pass that does everything else. Ported from V1's post chain
- * (legacy/packages/hall/src/scene/atmosphere/Post.tsx, GradeEffect.ts, MoodLut.ts): bloom, ink outlines
+ * (v1:packages/hall/src/scene/atmosphere/Post.tsx, GradeEffect.ts, MoodLut.ts): bloom, ink outlines
  * from the depth buffer, exposure and Neutral tone mapping, the mood LUT, the hour's grade (V2's own
  * `airGrade`, which the palette material draws in place when there is no post) and the vignette.
  */

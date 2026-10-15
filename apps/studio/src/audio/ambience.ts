@@ -1,4 +1,4 @@
-// From V1 hall (legacy/packages/hall/src/audio/ambience.ts): `ambienceOf` is held to its goldens
+// From V1 hall (v1:packages/hall/src/audio/ambience.ts): `ambienceOf` is held to its goldens
 // (test/audio.test.ts); the V2 island adds a town's crowd, birds by day and the storm's thunder.
 import { type Listener, placeOf, smoothstep } from "./spatial.ts"
 

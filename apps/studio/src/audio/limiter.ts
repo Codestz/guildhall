@@ -1,4 +1,4 @@
-// From V1 hall (legacy/packages/hall/src/audio/limiter.ts), held to its goldens (test/audio.test.ts).
+// From V1 hall (v1:packages/hall/src/audio/limiter.ts), held to its goldens (test/audio.test.ts).
 /**
  * Restraint, as rules (Townscaper's "no notifications"): a busy guild must never become noise.
  *

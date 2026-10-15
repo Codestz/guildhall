@@ -1,4 +1,4 @@
-// From V1 hall (legacy/packages/hall/src/audio/engine.ts); the V2 island adds the bed's crowd, birds and thunder.
+// From V1 hall (v1:packages/hall/src/audio/engine.ts); the V2 island adds the bed's crowd, birds and thunder.
 import type { EventKind } from "@guildhall/sim"
 import { Ambience, type BedLevels } from "./ambience.ts"
 import type { CueKind, SigilKind } from "./kinds.ts"

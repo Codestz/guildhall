@@ -1,5 +1,5 @@
 /**
- * Mood LUTs, ported from V1 (legacy/packages/hall/src/scene/atmosphere/lut.ts): each mood's film
+ * Mood LUTs, ported from V1 (v1:packages/hall/src/scene/atmosphere/lut.ts): each mood's film
  * stock, as a 3D colour table the post pass looks every pixel up in after tone mapping (post/index.ts). The grade before it (exposure,
  * saturation, split tone, contrast: GradeEffect.ts, sky.ts) still sets the levels; the LUT adds
  * what a per-pixel formula can't cheaply do — moves by hue band: the lime and mustard of sunlit

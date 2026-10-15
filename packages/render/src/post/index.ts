@@ -1,5 +1,5 @@
 /**
- * The post pipeline (V1's look: legacy/packages/hall/src/scene/atmosphere/Post.tsx): the scene drawn
+ * The post pipeline (V1's look: v1:packages/hall/src/scene/atmosphere/Post.tsx): the scene drawn
  * into a multisampled half-float target with its depth, then a mip-chain bloom and one composite pass to
  * the canvas — ink outlines from the depth, bloom, exposure and Neutral tone mapping, the mood LUT per
  * hour, the hour's grade and a vignette. The stage draws through it once enabled (`stage.setDraw`).

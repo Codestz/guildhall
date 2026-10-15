@@ -1,4 +1,4 @@
-// From V1 hall (legacy/packages/hall/src/audio/spatial.ts), held to its goldens (test/audio.test.ts).
+// From V1 hall (v1:packages/hall/src/audio/spatial.ts), held to its goldens (test/audio.test.ts).
 /**
  * Where sounds sit, cheaply: a stereo pan and a distance gain from the camera, not HRTF. The
  * listener is the point on the ground the camera looks at, its right-hand direction, and how wide

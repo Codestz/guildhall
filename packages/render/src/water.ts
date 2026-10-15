@@ -24,7 +24,7 @@ import { patchCascades } from "./sun/patch.ts"
 import { warmPrograms } from "./warm.ts"
 
 /**
- * V1's water (legacy/packages/hall/src/scene/nature/waterNodes.ts) measured its shore distances in its
+ * V1's water (v1:packages/hall/src/scene/nature/waterNodes.ts) measured its shore distances in its
  * own hex units (HEX_SCALE 5); V2's hexes are 3.1 m across the corners, about 0.6 of V1's. Every V1
  * distance threshold is read in these units, so the bands keep V1's proportions to the tiles.
  */

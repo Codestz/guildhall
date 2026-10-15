@@ -20,3 +20,7 @@ library/.cache/
 
 # Vercel CLI output (vercel build / link)
 .vercel
+
+# The generated asset library (tools/import) and the downloaded CC0 packs: local only, ~2.7 GB
+/library/
+/assets/

@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, test } from "bun:test"
 import {
   BufferAttribute,
   type BufferGeometry,
+  Frustum,
   Group,
   Matrix4,
   Mesh,
@@ -11,13 +12,14 @@ import {
   PerspectiveCamera,
   PlaneGeometry,
   Scene,
+  Sphere,
   SphereGeometry,
   Vector3,
 } from "three"
 import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import { createStaticBatch } from "../src/batch.ts"
 import { batchGeometry } from "../src/batchGeometry.ts"
-import { LodBatchedMesh } from "../src/batchMesh.ts"
+import { LodBatchedMesh, setLod } from "../src/batchMesh.ts"
 import { DETAIL_FADE_PX, DETAIL_RADIUS, fadeWeight, SHELL, SWAP_PX, screenRadius } from "../src/lod.ts"
 import { FADE_STEPS, ID_BITS, inCode, keeps, outCode, packDraw, shrinkCode } from "../src/lodFade.ts"
 import {
@@ -406,6 +408,126 @@ describe("LodBatchedMesh", () => {
     uploads = indirect.version
     expect(pass(m, moved, false, 2).tris).toEqual([full])
     expect(indirect.version).toBe(uploads + 1)
+  })
+
+  /**
+   * A big batch (over the grid's minimum): `n` balls of radius 0.5 scattered over a 200 m square at
+   * heights 0–10, in one geometry (no tiers: a list is its ids), the odd one hidden.
+   */
+  const scattered = (n = 700) => {
+    const m = new LodBatchedMesh(n, 2000, 6000, new MeshBasicMaterial())
+    const ball = m.addGeometry(twoToneSphere())
+    let seed = 7
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff
+      return seed / 0x7fffffff
+    }
+    const centres: [number, number, number][] = []
+    for (let i = 0; i < n; i++) {
+      const id = m.addInstance(ball)
+      const at: [number, number, number] = [rand() * 200 - 100, rand() * 10, rand() * 200 - 100]
+      centres.push(at)
+      m.setMatrixAt(id, new Matrix4().makeTranslation(...at).scale(new Vector3(0.5, 0.5, 0.5)))
+      if (i % 7 === 3) m.setVisibleAt(id, false)
+    }
+    return { m, centres }
+  }
+  /** The ids a frustum meets, by three's own sphere test, in instance order: what any walk must list. */
+  const brute = (
+    m: LodBatchedMesh,
+    cam: PerspectiveCamera | OrthographicCamera,
+    centres: [number, number, number][],
+  ) => {
+    const f = new Frustum().setFromProjectionMatrix(
+      new Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse),
+    )
+    const info = (m as unknown as { _instanceInfo: { visible: boolean }[] })._instanceInfo
+    const out: number[] = []
+    centres.forEach((c, i) => {
+      if (info[i]!.visible && f.intersectsSphere(new Sphere(new Vector3(...c), 0.5))) out.push(i)
+    })
+    return out
+  }
+
+  test("the grid lists what the sphere test lists, in order, from a shadow box or a perspective view", () => {
+    const { m, centres } = scattered()
+    // a cascade's box over a corner of the field, from a low sun
+    const sun = new OrthographicCamera(-30, 30, 30, -30, 1, 400)
+    sun.position.set(60 + 150, 100, -40 + 90)
+    sun.lookAt(60, 0, -40)
+    sun.updateMatrixWorld()
+    const fromSun = pass(m, sun, true)
+    const met = brute(m, sun, centres)
+    expect(met.length).toBeGreaterThan(20)
+    expect(met.length).toBeLessThan(centres.length / 2)
+    expect(fromSun.ids).toEqual(met)
+    // a perspective view across the field, at full detail (sizing would drop the far balls under a pixel)
+    const eye = new PerspectiveCamera(50, 1.6, 0.1, 500)
+    eye.position.set(-120, 30, 0)
+    eye.lookAt(0, 0, 0)
+    eye.updateMatrixWorld()
+    eye.updateProjectionMatrix()
+    setLod(false)
+    try {
+      const seen = pass(m, eye)
+      const inView = brute(m, eye, centres)
+      expect(inView.length).toBeGreaterThan(50)
+      expect(inView.length).toBeLessThan(centres.length)
+      expect(seen.ids).toEqual(inView)
+      // a piece moved out of its cell is still found where it went, and one moved in is not listed
+      const first = met[0]!
+      m.setMatrixAt(first, new Matrix4().makeTranslation(-90, 0, 90).scale(new Vector3(0.5, 0.5, 0.5)))
+      centres[first] = [-90, 0, 90]
+      const last = inView[inView.length - 1]!
+      m.setMatrixAt(last, new Matrix4().makeTranslation(60, 0, -40).scale(new Vector3(0.5, 0.5, 0.5)))
+      centres[last] = [60, 0, -40]
+      expect(pass(m, sun, true).ids).toEqual(brute(m, sun, centres))
+      expect(pass(m, eye).ids).toEqual(brute(m, eye, centres))
+    } finally {
+      setLod(true)
+    }
+  })
+
+  test("a shadow pass whose box holds the whole batch keeps its list: no walk, no upload, until a change", () => {
+    const { m, centres } = scattered()
+    const everything = (cam: OrthographicCamera) => brute(m, cam, centres)
+    // the town cascade: a box round the whole field, from one sun, then from one turned a little
+    const town = (azimuth: number) => {
+      const cam = new OrthographicCamera(-160, 160, 160, -160, 1, 600)
+      cam.position.set(Math.cos(azimuth) * 200, 150, Math.sin(azimuth) * 200)
+      cam.lookAt(0, 0, 0)
+      cam.updateMatrixWorld()
+      return cam
+    }
+    const a = pass(m, town(0.5), true)
+    expect(a.ids).toEqual(everything(town(0.5)))
+    expect(a.ids.length).toBe(600)
+    const walks = m.walks
+    const all = (m as unknown as { all: { ids: { version: number } } }).all
+    const uploads = all.ids.version
+    // the sun turned: the same list stands, without a walk or an upload
+    const b = pass(m, town(0.52), true)
+    expect(b).toEqual(a)
+    expect(m.walks).toBe(walks)
+    expect(all.ids.version).toBe(uploads)
+    // a near cascade's box (not the whole batch) walks, into the side list: the kept list still stands
+    const near = new OrthographicCamera(-20, 20, 20, -20, 1, 400)
+    near.position.set(100, 100, 100)
+    near.lookAt(0, 0, 0)
+    near.updateMatrixWorld()
+    expect(pass(m, near, true).ids).toEqual(everything(near))
+    expect(m.walks).toBe(walks + 1)
+    expect(pass(m, town(0.54), true)).toEqual(a)
+    expect(m.walks).toBe(walks + 1)
+    // an instance hidden: the list is walked again, without it
+    m.setVisibleAt(a.ids[10]!, false)
+    const c = pass(m, town(0.56), true)
+    expect(c.ids).toEqual(everything(town(0.56)))
+    expect(c.ids.length).toBe(599)
+    expect(m.walks).toBe(walks + 2)
+    expect(all.ids.version).toBe(uploads + 1)
+    expect(pass(m, town(0.58), true)).toEqual(c)
+    expect(m.walks).toBe(walks + 2)
   })
 })
 

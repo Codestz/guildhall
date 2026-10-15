@@ -12,6 +12,14 @@
  * The same walk reveals the batch in an order (reveal.ts, a history replay): an instance past the
  * reveal's count is left out of every pass, and one on the frontier is listed with a fade code (grown
  * from its origin, or dithered in), so a scrub never rebuilds the batch and nothing snaps.
+ *
+ * The walk's cull goes through a grid: the instances binned by their spheres into cells over the
+ * batch's own ground, each cell with the box that holds every member's sphere. A pass tests the cells'
+ * boxes against its frustum and only the members of the cells it touches get the sphere test (none
+ * where the cell is wholly inside and the pass does not size), in instance order, so the list is the
+ * same list: a cell outside the frustum holds no sphere inside it. A shadow pass whose box holds the
+ * whole batch (the town cascade, from any sun) keeps its list in buffers of its own until the
+ * instances or the reveal change: the sun turning re-renders it without a walk or an upload.
  */
 import {
   BatchedMesh,
@@ -64,7 +72,85 @@ const NO_FADE = {
 }
 const NO_IDS = new Uint32Array(0)
 
+/** A multi-draw list: its buffers and how many draws it holds. */
+interface List {
+  starts: Int32Array
+  counts: Int32Array
+  count: number
+  ids: DataTexture | null
+}
+
+/**
+ * The cull grid (see the top): cells over the mesh's own x and z, each cell's members (CSR: cell c's
+ * are `items[start[c]..start[c + 1])`) and the box that holds their spheres, and the union of them all.
+ */
+interface Grid {
+  nx: number
+  nz: number
+  size: number
+  x0: number
+  z0: number
+  start: Int32Array
+  items: Int32Array
+  /** Cell c's box: min x, y, z then max x, y, z at `c * 6`. */
+  box: Float64Array
+  /** Every cell's box together: the whole batch. */
+  min: [number, number, number]
+  max: [number, number, number]
+}
+
+/** Below this many instances the grid is not worth its build: every instance gets the sphere test. */
+const GRID_MIN = 512
+/** Cells a side (the longer of x and z): ~30 a side bins 19 k pieces at ~20 per cell on a 500 m island. */
+const GRID_SIDE = 32
+/** Instances moved since the grid was built are tested whatever their cell says; past this many it is rebuilt. */
+const LOOSE_MAX = 64
+/** The cull's mark on an instance: not in a cell the frustum touches, in one it touches, in one it holds whole. */
+const OUT = 0
+const TOUCHED = 1
+const HELD = 2
+
+/** What a shadow pass's whole-batch list was made from: the same again means the same list. */
+interface ListKey {
+  reveal: Int32Array | null
+  count: number
+  span: number
+  bytes: number
+  capacity: number
+  width: number
+}
+
+/**
+ * Where `box` (min xyz, max xyz at `at` in `boxes`) stands to the frustum: OUT past a plane, HELD
+ * inside every plane, TOUCHED otherwise. A box inside a plane holds no point outside it, so the
+ * members of a HELD cell all pass the sphere test; an OUT cell holds nothing the frustum meets.
+ */
+function classify(planes: Frustum["planes"], boxes: Float64Array, at: number): number {
+  let held = HELD
+  for (let p = 0; p < 6; p++) {
+    const { normal, constant } = planes[p] as Frustum["planes"][number]
+    const nx = normal.x
+    const ny = normal.y
+    const nz = normal.z
+    const far =
+      nx * (boxes[at + (nx > 0 ? 3 : 0)] as number) +
+      ny * (boxes[at + (ny > 0 ? 4 : 1)] as number) +
+      nz * (boxes[at + (nz > 0 ? 5 : 2)] as number) +
+      constant
+    if (far < 0) return OUT
+    const near =
+      nx * (boxes[at + (nx > 0 ? 0 : 3)] as number) +
+      ny * (boxes[at + (ny > 0 ? 1 : 4)] as number) +
+      nz * (boxes[at + (nz > 0 ? 2 : 5)] as number) +
+      constant
+    if (near < 0) held = TOUCHED
+  }
+  return held
+}
+
 const frustum = new Frustum()
+/** The whole batch's box, for the shadow pass's test (min xyz, max xyz). */
+const wholeBox = new Float64Array(6)
 const toLocal = new Matrix4()
 const viewer = new Vector3()
 const sphere = new Sphere()
@@ -122,7 +208,7 @@ export class LodBatchedMesh extends BatchedMesh {
   revealSpan = 1
   revealLook: "grow" | "dither" = "grow"
   /** The second multi-draw's list: the draws mid-crossfade. */
-  private fade = {
+  private fade: List = {
     starts: new Int32Array(0),
     counts: new Int32Array(0),
     count: 0,
@@ -135,35 +221,78 @@ export class LodBatchedMesh extends BatchedMesh {
    * again on the next frame (18 k instances, the indirect texture's upload) with the camera still: the
    * sun turning a quarter degree cost that walk on top of its own.
    */
-  private side = {
+  private side: List = {
     starts: new Int32Array(0),
     counts: new Int32Array(0),
     count: 0,
-    ids: null as DataTexture | null,
+    ids: null,
   }
-  /** The main list's buffers while the side list stands in for them; null when the main list is in place. */
+  /**
+   * The list of a shadow pass whose box holds the whole batch (the town cascade): every active
+   * instance at the shadow tier, whatever the sun's direction. Kept, with what it was made from
+   * (`allKey`; null: none), until the instances or the reveal change: the next such pass swaps it in
+   * without a walk and without the indirect texture's upload.
+   */
+  private all: List = {
+    starts: new Int32Array(0),
+    counts: new Int32Array(0),
+    count: 0,
+    ids: null,
+  }
+  private allKey: ListKey | null = null
+  /** The main list's buffers while a side list stands in for them; null when the main list is in place. */
   private kept: {
     starts: Int32Array
     counts: Int32Array
     count: number
     ids: Internals["_indirectTexture"]
+    /** The list standing in, to take the draw count back. */
+    list: List
   } | null = null
+  /** The cull grid (see the top), its marks per instance, which cell each instance is in (-1: none), the loose ones. */
+  private grid: Grid | null = null
+  private gridStale = true
+  private marks = new Uint8Array(0)
+  private readonly cellOf: number[] = []
+  private readonly loose: number[] = []
+  /** How many walks have run (probes and tests: a kept list is no walk). */
+  walks = 0
 
   /** What the last main pass drew. */
   get lod(): LodCounts {
     return this.counts
   }
 
+  /** The instances or what they draw changed: the main list is to be walked again, the whole-batch list is gone. */
+  private touch(): void {
+    this.dirty = true
+    this.allKey = null
+  }
+
+  /** Instance `id`'s matrix changed: out of its cell (tested on its own), the grid rebuilt once many have. */
+  private moved(id: number): void {
+    this.stale[id] = true
+    if (this.gridStale) return
+    const cell = this.cellOf[id]
+    if (cell === undefined || cell < 0) {
+      if (cell === undefined) this.gridStale = true
+      return
+    }
+    this.cellOf[id] = -1
+    this.loose.push(id)
+    if (this.loose.length > LOOSE_MAX) this.gridStale = true
+  }
+
   /** Gives `geometryId` coarser `tiers` (geometry ids, finer first) to draw instead when small. */
   setTiers(geometryId: number, tiers: readonly number[]): void {
     this.tierIds[geometryId] = [geometryId, ...tiers]
-    this.dirty = true
+    this.touch()
   }
 
   /** How far `geometryId` (a tier, a shell) strays from the full detail it stands in for, metres. */
   setLodError(geometryId: number, metres: number): void {
     this.errors[geometryId] = metres
-    this.dirty = true
+    this.touch()
   }
 
   override addGeometry(
@@ -174,30 +303,30 @@ export class LodBatchedMesh extends BatchedMesh {
     const id = super.addGeometry(geometry, reservedVertexCount, reservedIndexCount)
     // its own only, until setTiers: the walk then never makes a list per instance
     this.tierIds[id] ??= [id]
-    this.dirty = true
+    this.touch()
     return id
   }
 
   override setVisibleAt(instanceId: number, visible: boolean): this {
     super.setVisibleAt(instanceId, visible)
-    this.dirty = true
+    this.touch()
     return this
   }
 
   override deleteInstance(instanceId: number): this {
     super.deleteInstance(instanceId)
-    this.dirty = true
+    this.touch()
     return this
   }
 
   override setInstanceCount(maxInstanceCount: number): void {
     super.setInstanceCount(maxInstanceCount)
-    this.dirty = true
+    this.touch()
   }
 
   override setGeometrySize(maxVertexCount: number, maxIndexCount: number): void {
     super.setGeometrySize(maxVertexCount, maxIndexCount)
-    this.dirty = true
+    this.touch()
   }
 
   /** Whether the main pass's list from `camera` into the renderer's buffer is the one already listed. */
@@ -244,28 +373,31 @@ export class LodBatchedMesh extends BatchedMesh {
     this.shellWeight.push(1)
     this.clusterOf[shell] = c
     for (const id of parts) this.clusterOf[id] = c
-    this.dirty = true
+    this.touch()
   }
 
   override addInstance(geometryId: number): number {
     const id = super.addInstance(geometryId)
     this.stale[id] = true
     this.clusterOf[id] = NONE
-    this.dirty = true
+    // a new instance (or a deleted one's slot again) has no cell yet
+    this.cellOf[id] = -1
+    this.gridStale = true
+    this.touch()
     return id
   }
 
   override setMatrixAt(instanceId: number, m: Matrix4): this {
     super.setMatrixAt(instanceId, m)
-    this.stale[instanceId] = true
-    this.dirty = true
+    this.moved(instanceId)
+    this.touch()
     return this
   }
 
   override setGeometryIdAt(instanceId: number, geometryId: number): this {
     super.setGeometryIdAt(instanceId, geometryId)
-    this.stale[instanceId] = true
-    this.dirty = true
+    this.moved(instanceId)
+    this.touch()
     return this
   }
 
@@ -289,7 +421,7 @@ export class LodBatchedMesh extends BatchedMesh {
   }
 
   /** Sizes the crossfade list (or the side list) like the main one (they grow together). */
-  private fadeList(size: number, side: number, list = this.fade) {
+  private fadeList(size: number, side: number, list: List = this.fade): List {
     const f = list
     if (f.starts.length !== size) {
       f.starts = new Int32Array(size)
@@ -302,16 +434,17 @@ export class LodBatchedMesh extends BatchedMesh {
     return f
   }
 
-  /** Puts the side list's buffers in the main list's place (for a pass that is not the main view's). */
-  private standIn(): void {
+  /** Puts `list`'s buffers in the main list's place (for a pass that is not the main view's). */
+  private standIn(list: List): void {
     const self = this as unknown as Internals
     if (this.kept) return
-    const side = this.fadeList(self._multiDrawStarts.length, self._indirectTexture.image.width, this.side)
+    const side = this.fadeList(self._multiDrawStarts.length, self._indirectTexture.image.width, list)
     this.kept = {
       starts: self._multiDrawStarts,
       counts: self._multiDrawCounts,
       count: self._multiDrawCount,
       ids: self._indirectTexture,
+      list,
     }
     self._multiDrawStarts = side.starts
     self._multiDrawCounts = side.counts
@@ -324,12 +457,159 @@ export class LodBatchedMesh extends BatchedMesh {
     const self = this as unknown as Internals
     const kept = this.kept
     if (!kept) return
-    this.side.count = self._multiDrawCount
+    kept.list.count = self._multiDrawCount
     self._multiDrawStarts = kept.starts
     self._multiDrawCounts = kept.counts
     self._multiDrawCount = kept.count
     self._indirectTexture = kept.ids
     this.kept = null
+  }
+
+  /**
+   * Bins every active instance by its sphere's centre into the grid's cells (the spheres refreshed
+   * where stale), each cell's box grown to hold its members' spheres. Once, after the batch is filled;
+   * again only when instances are added or many have moved.
+   */
+  private buildGrid(): void {
+    const self = this as unknown as Internals
+    const info = self._instanceInfo
+    const n = info.length
+    this.loose.length = 0
+    this.gridStale = false
+    if (this.marks.length !== n) this.marks = new Uint8Array(n)
+    if (n < GRID_MIN) {
+      this.grid = null
+      return
+    }
+    const s = this.spheres
+    let minX = Number.POSITIVE_INFINITY
+    let minZ = Number.POSITIVE_INFINITY
+    let maxX = Number.NEGATIVE_INFINITY
+    let maxZ = Number.NEGATIVE_INFINITY
+    let active = 0
+    for (let i = 0; i < n; i++) {
+      const instance = info[i] as Internals["_instanceInfo"][number]
+      this.cellOf[i] = -1
+      if (!instance.active) continue
+      this.sphereOf(i, instance.geometryIndex)
+      const x = s[i * 4] as number
+      const z = s[i * 4 + 2] as number
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (z < minZ) minZ = z
+      if (z > maxZ) maxZ = z
+      active++
+    }
+    if (active === 0) {
+      this.grid = null
+      return
+    }
+    const size = Math.max(Math.max(maxX - minX, maxZ - minZ) / GRID_SIDE, 1e-3)
+    const nx = Math.floor((maxX - minX) / size) + 1
+    const nz = Math.floor((maxZ - minZ) / size) + 1
+    const cells = nx * nz
+    const start = new Int32Array(cells + 1)
+    const items = new Int32Array(active)
+    const box = new Float64Array(cells * 6)
+    for (let c = 0; c < cells; c++) {
+      box[c * 6] = box[c * 6 + 1] = box[c * 6 + 2] = Number.POSITIVE_INFINITY
+      box[c * 6 + 3] = box[c * 6 + 4] = box[c * 6 + 5] = Number.NEGATIVE_INFINITY
+    }
+    const min: [number, number, number] = [
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+    ]
+    const max: [number, number, number] = [
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+    ]
+    for (let i = 0; i < n; i++) {
+      if (!(info[i] as Internals["_instanceInfo"][number]).active) continue
+      const x = s[i * 4] as number
+      const y = s[i * 4 + 1] as number
+      const z = s[i * 4 + 2] as number
+      const r = s[i * 4 + 3] as number
+      const c =
+        Math.min(nz - 1, Math.floor((z - minZ) / size)) * nx + Math.min(nx - 1, Math.floor((x - minX) / size))
+      this.cellOf[i] = c
+      start[c + 1] = (start[c + 1] as number) + 1
+      const at = c * 6
+      if (x - r < (box[at] as number)) box[at] = x - r
+      if (y - r < (box[at + 1] as number)) box[at + 1] = y - r
+      if (z - r < (box[at + 2] as number)) box[at + 2] = z - r
+      if (x + r > (box[at + 3] as number)) box[at + 3] = x + r
+      if (y + r > (box[at + 4] as number)) box[at + 4] = y + r
+      if (z + r > (box[at + 5] as number)) box[at + 5] = z + r
+    }
+    for (let c = 0; c < cells; c++) {
+      start[c + 1] = (start[c + 1] as number) + (start[c] as number)
+      if (start[c + 1] === start[c]) continue
+      const at = c * 6
+      for (let k = 0; k < 3; k++) {
+        if ((box[at + k] as number) < (min[k] as number)) min[k] = box[at + k] as number
+        if ((box[at + 3 + k] as number) > (max[k] as number)) max[k] = box[at + 3 + k] as number
+      }
+    }
+    // in instance order within a cell (the walk keeps the order anyway: it goes by the marks)
+    const fill = start.slice(0, cells)
+    for (let i = 0; i < n; i++) {
+      const c = this.cellOf[i] as number
+      if (c < 0) continue
+      items[fill[c] as number] = i
+      fill[c] = (fill[c] as number) + 1
+    }
+    this.grid = { nx, nz, size, x0: minX, z0: minZ, start, items, box, min, max }
+  }
+
+  /**
+   * Whether `frustum` (in the mesh's own space) holds the whole batch: every cell's box inside it and
+   * every loose instance's sphere met. False without a grid.
+   */
+  private holdsAll(): boolean {
+    if (this.gridStale) this.buildGrid()
+    const grid = this.grid
+    if (!grid) return false
+    const planes = frustum.planes
+    for (let k = 0; k < 3; k++) {
+      wholeBox[k] = grid.min[k] as number
+      wholeBox[3 + k] = grid.max[k] as number
+    }
+    if (classify(planes, wholeBox, 0) !== HELD) return false
+    const info = (this as unknown as Internals)._instanceInfo
+    for (const id of this.loose) {
+      const instance = info[id] as Internals["_instanceInfo"][number]
+      if (instance.active && !frustum.intersectsSphere(this.sphereOf(id, instance.geometryIndex)))
+        return false
+    }
+    return true
+  }
+
+  /**
+   * Marks the instances `frustum` (in the mesh's own space) may meet: the members of the cells it
+   * touches (HELD where it holds the cell whole), the loose ones always. Null when there is no grid:
+   * every instance is then tested.
+   */
+  private cull(): Uint8Array | null {
+    if (this.gridStale) this.buildGrid()
+    const grid = this.grid
+    if (!grid) return null
+    const marks = this.marks
+    marks.fill(OUT)
+    const planes = frustum.planes
+    const { start, items, box } = grid
+    const cells = grid.nx * grid.nz
+    for (let c = 0; c < cells; c++) {
+      const from = start[c] as number
+      const to = start[c + 1] as number
+      if (from === to) continue
+      const mark = classify(planes, box, c * 6)
+      if (mark === OUT) continue
+      for (let k = from; k < to; k++) marks[items[k] as number] = mark
+    }
+    for (const id of this.loose) marks[id] = TOUCHED
+    return marks
   }
 
   /** The crossfading draws, after the main ones: the same buffers, the dithering material. */
@@ -381,6 +661,7 @@ export class LodBatchedMesh extends BatchedMesh {
     this.standDown()
     this.fade.ids?.dispose()
     this.side.ids?.dispose()
+    this.all.ids?.dispose()
     super.dispose()
     return this
   }
@@ -431,12 +712,45 @@ export class LodBatchedMesh extends BatchedMesh {
     const perspective = (camera as PerspectiveCamera).isPerspectiveCamera === true
     const main = !shadow && perspective
     // the main pass's list is still the one in the buffers: nothing to walk, nothing to upload
-    if (main) {
-      if (this.sameAsListed(renderer, camera)) return
-    } else this.standIn()
+    if (main && this.sameAsListed(renderer, camera)) return
     toLocal.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(this.matrixWorld)
     frustum.setFromProjectionMatrix(toLocal, camera.coordinateSystem, camera.reversedDepth)
     viewer.setFromMatrixPosition(camera.matrixWorld).applyMatrix4(inverse.copy(this.matrixWorld).invert())
+    // a shadow pass whose box holds the whole batch lists the whole-batch list, kept between passes
+    let key: ListKey | null = null
+    if (!main) {
+      if (shadow && this.holdsAll()) {
+        key = {
+          reveal: this.reveal,
+          count: this.revealCount,
+          span: this.revealSpan,
+          bytes: bytesPerElement * multiplier,
+          capacity: self._multiDrawStarts.length,
+          width: self._indirectTexture.image.width,
+        }
+        const had = this.allKey
+        if (
+          had &&
+          had.reveal === key.reveal &&
+          had.count === key.count &&
+          had.span === key.span &&
+          had.bytes === key.bytes &&
+          had.capacity === key.capacity &&
+          had.width === key.width
+        ) {
+          // the same list as the last such pass: in place as it stands, no walk, no upload
+          this.standIn(this.all)
+          self._multiDrawCount = this.all.count
+          self._multiDrawBytesPerElement = bytesPerElement
+          self._visibilityChanged = false
+          return
+        }
+      }
+      this.standIn(key ? this.all : this.side)
+    }
+    this.walks++
+    // the cull's marks (null: no grid, every instance tested)
+    const marks = this.cull()
     // Only the main view picks levels by size; any other camera is drawn coarse, whole.
     const sized = !shadow && perspective && lodOn
     const full = !shadow && perspective && !lodOn
@@ -500,6 +814,8 @@ export class LodBatchedMesh extends BatchedMesh {
     const reveal = this.reveal
     const grow = this.revealLook === "grow"
     for (let i = 0; i < info.length; i++) {
+      const mark = marks === null ? TOUCHED : (marks[i] as number)
+      if (mark === OUT) continue
       const instance = info[i] as Internals["_instanceInfo"][number]
       if (!instance.visible || !instance.active) continue
       // the reveal: left out past the frontier; on it, how far in (1: whole)
@@ -528,8 +844,8 @@ export class LodBatchedMesh extends BatchedMesh {
         clusterCode = isShell ? (q === FADE_STEPS ? 0 : q) : outCode(this.shellWeight[c] as number)
       }
       const geometryId = instance.geometryIndex
-      const bounds = this.sphereOf(i, geometryId)
-      if (!frustum.intersectsSphere(bounds)) continue
+      // a pass that sizes needs the sphere anyway; one that does not skips it where the cell is held whole
+      if ((sized || mark !== HELD) && !frustum.intersectsSphere(this.sphereOf(i, geometryId))) continue
 
       const ids = this.tierIds[geometryId] as number[]
       if (isShell) {
@@ -543,7 +859,8 @@ export class LodBatchedMesh extends BatchedMesh {
         emit(i, ids[tier] as number, 0)
         continue
       }
-      const perMetre = scaleAt(bounds)
+      // `sphere` is this instance's (sphereOf above: a sizing pass always takes it)
+      const perMetre = scaleAt(sphere)
       // the coarsest tier fully in, and the next on its way in with its weight (no allocation: per instance)
       let tier = 0
       let next = 0
@@ -566,7 +883,7 @@ export class LodBatchedMesh extends BatchedMesh {
       if (w === 0) next = tier
       // detail shrinks away as it falls through DETAIL_FADE_PX
       const shrink =
-        bounds.radius < DETAIL_RADIUS ? 1 - fadeWeight(bounds.radius * perMetre, DETAIL_FADE_PX) : 1
+        sphere.radius < DETAIL_RADIUS ? 1 - fadeWeight(sphere.radius * perMetre, DETAIL_FADE_PX) : 1
       if (shrink <= 0) continue
       tiers[tier] = (tiers[tier] as number) + 1
       if (revealCode !== 0) {
@@ -588,9 +905,9 @@ export class LodBatchedMesh extends BatchedMesh {
     self._multiDrawCount = drawn
     self._multiDrawBytesPerElement = bytesPerElement
     self._visibilityChanged = false
-    if (!shadow && perspective) {
+    if (main) {
       this.counts = { tiers, near, shells }
       this.dirty = false
-    }
+    } else if (key) this.allKey = key
   }
 }

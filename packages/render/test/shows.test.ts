@@ -9,6 +9,7 @@ import {
   beatAngle,
   breathAt,
   buildBunting,
+  CRUISE_CLEAR,
   createShows,
   DRAGON_ARRIVE_S,
   DRAGON_LEAVE_S,
@@ -18,11 +19,14 @@ import {
   envelope,
   FINALE_S,
   fireworksProgramme,
+  highestUnder,
   ROCKET_S,
   rainbowSize,
   SHOW_KINDS,
   SHOW_S,
   STAR_S,
+  SWOOP_CLEAR,
+  shadowLook,
   wingAngle,
 } from "../src/shows/index.ts"
 import type { Stage } from "../src/stage.ts"
@@ -238,7 +242,7 @@ describe("the dragon's flight", () => {
         clock = t
         step(0.016)
       }
-      const group = stage.scene.getObjectByName("show dragon")
+      const group = stage.scene.getObjectByName("dragon flying")
       group?.updateMatrixWorld(true)
       const m = group?.matrixWorld.elements.slice() ?? []
       shows.dispose()
@@ -247,6 +251,93 @@ describe("the dragon's flight", () => {
     const seek = await pose([23.4])
     const play = await pose(Array.from({ length: 200 }, (_, i) => i * 0.117).concat([23.4]))
     for (let k = 0; k < 16; k++) expect(play[k] as number).toBeCloseTo(seek[k] as number, 9)
+  })
+})
+
+describe("the dragon over the land", () => {
+  // a hill under the route's north side, and the island's own sites (a keep, places)
+  const hill = (x: number, z: number) =>
+    Math.max(0, 14 - Math.hypot(x - (sites.peak?.at[0] ?? 0), z - ((sites.peak?.at[2] ?? 0) - 30)) * 0.3)
+  const ground = (x: number, z: number) =>
+    Math.max(
+      sites.peak && Math.hypot(x - sites.peak.at[0], z - sites.peak.at[2]) < 10 ? sites.peak.at[1] : 0,
+      hill(x, z),
+    )
+  const plan = dragonFlight({ sites, ground })
+  const total = SHOW_S.dragon
+  const high = highestUnder(plan.route, plan.length, { sites, ground }) as number
+
+  test("the highest thing under the route counts the ground, the keep and the buildings", () => {
+    expect(high).toBeGreaterThanOrEqual(13)
+    if (sites.castle) {
+      const keep = {
+        sites: { ...sites, castle: [plan.centre[0], 60, plan.centre[2] + 30] as [number, number, number] },
+        ground,
+      }
+      // a keep the route passes over raises it
+      expect(highestUnder(plan.route, plan.length, keep)).toBeGreaterThanOrEqual(high)
+    }
+    expect(highestUnder(plan.route, plan.length, { sites })).toBeNull()
+  })
+
+  test("it cruises at least 25 m over the highest ground under its route, swoops no lower than 12 m", () => {
+    expect(plan.centre[1] + plan.low.cruise).toBeGreaterThanOrEqual(high + CRUISE_CLEAR - 1e-6)
+    expect(plan.centre[1] + plan.low.all).toBeGreaterThanOrEqual(high + SWOOP_CLEAR - 1e-6)
+    // flown, in, round and out: never closer than a swoop's clearance to the ground under it
+    for (let t = 0; t < total; t += 0.05) {
+      const [x, y, z] = dragonAt(plan, t, total)
+      expect(y - ground(x, z)).toBeGreaterThanOrEqual(SWOOP_CLEAR)
+    }
+    // it still swoops: its lowest well under its cruise
+    expect(plan.low.cruise - plan.low.all).toBeGreaterThan(4)
+  })
+
+  test("the same route raised: its ground track and acts do not move", () => {
+    const flat = dragonFlight({ sites })
+    for (const d of [0, 40, 123])
+      for (const k of [0, 1]) expect(plan.route(d)[k]).toBeCloseTo(flat.route(d)[k] as number, 9)
+    expect(plan.cycle).toBe(flat.cycle)
+    expect(plan.centre[1]).toBeGreaterThanOrEqual(flat.centre[1])
+  })
+
+  test("its shadow: wider and fainter the higher it flies, gone far up, faint by night", () => {
+    const near = shadowLook(15, 0)
+    const far = shadowLook(45, 0)
+    expect(far.across).toBeGreaterThan(near.across)
+    expect(far.alpha).toBeLessThan(near.alpha)
+    expect(near.along).toBeLessThan(near.across)
+    expect(shadowLook(200, 0).alpha).toBe(0)
+    expect(shadowLook(15, 1).alpha).toBeLessThan(near.alpha / 2)
+  })
+
+  test("with the ground known it casts one more draw while it flies, laid on the ground", async () => {
+    let clock = 0
+    const { stage, step } = fakeStage()
+    const shows = createShows(stage, { sites, span: 160, light: light(0), clock: () => clock, ground })
+    shows.play({ kind: "dragon", start: 0, end: total })
+    await shows.ready()
+    clock = 20
+    step(0.016)
+    const shadow = stage.scene.getObjectByName("dragon shadow")
+    expect(shadow?.visible).toBe(true)
+    const draws = shows.stats().draws
+    expect(draws).toBeGreaterThanOrEqual(2)
+    expect(draws).toBeLessThanOrEqual(3)
+    const pos = (
+      shadow as unknown as {
+        geometry: {
+          getAttribute(n: string): {
+            getX(i: number): number
+            getY(i: number): number
+            getZ(i: number): number
+            count: number
+          }
+        }
+      }
+    ).geometry.getAttribute("position")
+    for (let i = 0; i < pos.count; i += 7)
+      expect(pos.getY(i)).toBeCloseTo(ground(pos.getX(i), pos.getZ(i)) + 0.12, 4)
+    shows.dispose()
   })
 })
 

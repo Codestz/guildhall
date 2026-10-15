@@ -721,6 +721,7 @@ const world = {
         sites: m.sites,
         span,
         light: () => sky.light(),
+        ground: (x, z) => Math.max(SEA_LEVEL, groundAt(x, z)),
         session: extra.session ?? session,
       })
       steps.progress(0.74, 150)

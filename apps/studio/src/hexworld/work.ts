@@ -274,6 +274,8 @@ export interface WorkOpts {
   /** Screen seconds to a day hour. */
   secPerHour: number
   fishers: readonly Fisher[]
+  /** Where the island is not there now (a hall's history: land not yet risen): its stocks are not drawn. */
+  hidden?: () => ((x: number, z: number) => boolean) | null
 }
 
 /** What a townsfolk at work did this frame (life's sample of them). */
@@ -378,6 +380,8 @@ export async function createWork(o: WorkOpts): Promise<Work> {
   const near: [number, number, number] = [0, 0, 0]
   const far: [number, number, number] = [0, 0, 0]
   let since = Number.POSITIVE_INFINITY
+  /** Some stock was hidden last frame (so all are shown again once nothing is). */
+  let anyGone = false
   let beats = 0
   let ms = 0
   let secs = 0
@@ -452,9 +456,19 @@ export async function createWork(o: WorkOpts): Promise<Work> {
         // TODO(sound): audio/ has spot sounds for world events only, no per-beat entry yet; call it here
         beats++
       }
-      // the stocks (once landed): their levels every STOCK_EVERY s (and on a seek, and as they land),
-      // the carts every frame; faded in over their first STOCKS_FADE_S
+      // the stocks (once landed): none where the island is not there now (a history's sea), their levels
+      // every STOCK_EVERY s (and on a seek, and as they land), the carts every frame; faded in over their
+      // first STOCKS_FADE_S
       if (stocks) {
+        const gone = o.hidden?.() ?? null
+        if (gone || anyGone) {
+          anyGone = false
+          for (const [k, s] of o.stocks.entries()) {
+            const out = gone?.(s.at[0], s.at[2]) ?? false
+            stocks.hide(k, out)
+            anyGone ||= out
+          }
+        }
         since += dt
         if (seek || since >= STOCK_EVERY || fade === 0) {
           since = 0

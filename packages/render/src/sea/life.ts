@@ -120,6 +120,21 @@ const CRATE_LAYER = 0.47
 const GOODS = ["banner-red", "royal-blue", "gold", "teal", "orange", "purple"]
 const DECK = { large: 3.4 }
 const GOLD = "kaykit-resources/gold-bars"
+/**
+ * The galleon's lanterns by night (model units of the large ship, bow +z): one hung off its stern rail
+ * and one at its mainmast's head, each a lit glass and a warm halo; and how much its sails glow, lit
+ * from them and the deck (a share of their own colour at full night).
+ */
+export const GALLEON_LANTERNS: readonly {
+  at: readonly [number, number, number]
+  glass: number
+  halo: number
+}[] = [
+  { at: [0, 7.4, -10.9], glass: 0.42, halo: 3.4 },
+  { at: [0, 13.6, -1.37], glass: 0.32, halo: 2.6 },
+]
+export const SAIL_GLOW = 0.22
+const LANTERN = new Color(1, 0.72, 0.36)
 export const SEA_PIECES = [...MODELS, GHOST.piece, CRATE, GOLD] as const
 
 const MAX_SHIPS = 16
@@ -217,6 +232,8 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
   const ghostFade = { value: 0 }
   /** The swell's clock for the sails' work in the wind. */
   const seaTime = { value: 0 }
+  /** How much the galleon's sails glow (night). */
+  const sailGlow = { value: 0 }
   const ghostTime = { value: 0 }
   const glows = glowMesh()
   const beam = beamMesh()
@@ -327,7 +344,11 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
       const hull = new InstancedBufferAttribute(new Float32Array(MAX_SHIPS * 2), 2)
       hull.setUsage(DynamicDrawUsage)
       merged.setAttribute("instanceHull", hull)
-      const m = new InstancedMesh(merged, fxMaterial("sea-fleet", { patch: fleetPatch(seaTime) }), MAX_SHIPS)
+      const m = new InstancedMesh(
+        merged,
+        fxMaterial("sea-fleet", { patch: fleetPatch(seaTime, sailGlow) }),
+        MAX_SHIPS,
+      )
       const sails = new Color(...swatch(GALLEON_SAILS))
       for (let i = 0; i < MAX_SHIPS; i++) m.setColorAt(i, sails)
       m.name = "sea fleet"
@@ -475,6 +496,9 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
     if (opts.water && (flow.length || wakes)) opts.water.setWakes(flow, "sea")
     wakes = flow.length
     drawnTris = 0
+    // by night the galleon hangs out its lanterns and its sails catch their light
+    const lamps = opts.light?.().lamps ?? 0
+    sailGlow.value = SAIL_GLOW * lamps
     if (fleet) {
       const seen = fleet.geometry.getAttribute("instanceSeen") as InstancedBufferAttribute
       const hulls = fleet.geometry.getAttribute("instanceHull") as InstancedBufferAttribute
@@ -486,6 +510,14 @@ export function createSeaLife(stage: Stage, opts: SeaLifeOpts): SeaLife {
         if (k >= MAX_SHIPS || pose.seen <= 0.002) continue
         const h = HULLS[pose.hull]
         fleet.setMatrixAt(k, shipMatrix(pose, h.scale, h.draft, phaseOf(pose.key), h.feel, h.sails))
+        if (pose.hull === "galleon" && lamps > 0.02)
+          for (const l of GALLEON_LANTERNS) {
+            // where it hangs as the hull rides the swell (the matrix just set)
+            p.set(l.at[0], l.at[1], l.at[2]).applyMatrix4(matrix)
+            const a = lamps * pose.seen
+            put(p.x, p.y, p.z, l.glass, l.glass, colour.copy(LANTERN).multiplyScalar(2.2), a, 1)
+            put(p.x, p.y, p.z, l.halo, l.halo, LANTERN, 0.55 * a)
+          }
         seen.setX(k, pose.seen)
         const load = pose.hull === "cargo" ? pose.crates : h.extras
         hulls.setXY(k, h.model, load)
@@ -853,16 +885,25 @@ const phaseOf = (key: string) => {
  * 8, against `instanceHull.x`) or a load past its count (`part` % 8, against `instanceHull.y`) folds
  * to the origin, so its triangles are drawn as nothing.
  */
-const fleetPatch = (time: { value: number }) => (shader: WebGLProgramParametersWithUniforms) => {
-  shader.uniforms.uSeaTime = time
-  shader.vertexShader = shader.vertexShader
-    .replace(
-      "#include <common>",
-      "#include <common>\nattribute float part;\nattribute float cloth;\nattribute vec2 instanceHull;\nuniform float uSeaTime;",
-    )
-    .replace(
-      "#include <begin_vertex>",
-      `vec3 transformed = vec3( position );
+const fleetPatch =
+  (time: { value: number }, sailGlow: { value: number }) => (shader: WebGLProgramParametersWithUniforms) => {
+    shader.uniforms.uSeaTime = time
+    shader.uniforms.uSailGlow = sailGlow
+    // the galleon's sails (its pale cloth, `tint`) glow a little by night, lit by its lanterns and its deck
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", "#include <common>\nuniform float uSailGlow;\nvarying float vSail;")
+      .replace(
+        "#include <emissivemap_fragment>",
+        "#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * vSail * uSailGlow;",
+      )
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nattribute float part;\nattribute float cloth;\nattribute vec2 instanceHull;\nuniform float uSeaTime;\nvarying float vSail;",
+      )
+      .replace(
+        "#include <begin_vertex>",
+        `vec3 transformed = vec3( position );
 // the sails fill and work in the wind, each ship in its own time (from where it is)
 if ( cloth > 0.0 ) {
   float ph = dot( instanceMatrix[ 3 ].xz, vec2( 0.37, 0.23 ) );
@@ -872,9 +913,10 @@ if ( cloth > 0.0 ) {
 }
 float hullOf = floor( part / 8.0 + 0.01 );
 float slotOf = part - hullOf * 8.0;
-if ( abs( hullOf - instanceHull.x ) > 0.5 || slotOf > instanceHull.y + 0.5 ) transformed = vec3( 0.0 );`,
-    )
-}
+if ( abs( hullOf - instanceHull.x ) > 0.5 || slotOf > instanceHull.y + 0.5 ) transformed = vec3( 0.0 );
+vSail = tint;`,
+      )
+  }
 
 /** The ghost ship's look: the palette's colours drained to a sea green, a glowing rim, half there, fading into the water below. */
 function spectral(fade: { value: number }, time: { value: number }): MeshStandardMaterial {

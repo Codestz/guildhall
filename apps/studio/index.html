@@ -33,9 +33,31 @@
     />
     <style>
       html, body { margin: 0; background: #15110d; color-scheme: dark; }
+      /* The boot cover: painted with this HTML, before any script, and kept until the app's own loading
+         screen (the same ink, the same crest) or the first screen is up, so no frame shows a bare page or
+         a bare canvas. App.tsx fades it out (`data-state="out"`) and removes it. */
+      #boot { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px;
+        background: radial-gradient(ellipse 70% 60% at 50% 40%, rgba(220, 182, 98, 0.1), transparent 70%),
+          radial-gradient(ellipse at 50% 45%, #241b13 0%, #15110d 55%, #0c0907 100%);
+        transition: opacity 0.3s ease-in-out, visibility 0s linear 0.3s; }
+      #boot[data-state="out"] { opacity: 0; visibility: hidden; pointer-events: none; }
+      #boot > div { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+      #boot i { display: grid; place-items: center; width: 56px; height: 56px; color: #ecd9a8; border: 1px solid rgba(220, 182, 98, 0.45); border-radius: 50%;
+        background: radial-gradient(circle at 50% 35%, rgba(220, 182, 98, 0.18), transparent 70%); box-shadow: 0 0 40px -8px rgba(220, 182, 98, 0.35);
+        animation: boot-breathe 2.4s ease-in-out infinite; }
+      #boot p { margin: 0; font: 400 clamp(26px, 4vw, 40px)/1.05 "Marcellus SC", Georgia, serif; letter-spacing: 0.07em; color: #ecd9a8; }
+      #boot u { display: block; width: 120px; height: 1px; text-decoration: none; background: linear-gradient(90deg, transparent, #dcb662, transparent); opacity: 0.6; }
+      #boot b { display: block; width: 168px; height: 2px; border-radius: 2px; background: rgba(236, 217, 168, 0.12); overflow: hidden; }
+      #boot b::after { content: ""; display: block; width: 40%; height: 100%; background: #dcb662; animation: boot-sweep 1.6s ease-in-out infinite; }
+      #boot small { margin-top: 10px; font: 400 11px/1.4 "Marcellus SC", Georgia, serif; letter-spacing: 0.18em; color: rgba(236, 217, 168, 0.45); }
+      @keyframes boot-breathe { 50% { box-shadow: 0 0 56px -4px rgba(220, 182, 98, 0.5); } }
+      @keyframes boot-sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
     </style>
   </head>
   <body>
+    <div id="boot" role="status" aria-live="polite"><div><i aria-hidden="true">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 20h18M5 20V10l7-6 7 6v10M9 20v-5h6v5"/></svg>
+    </i><p>Guildhall</p><u></u><b></b><small>EVENTS IN. A LIVING WORLD OUT.</small></div></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -51,6 +51,30 @@ function useUrl(): string {
 }
 
 /** The tab's title for a screen: its directory name, "Not found" for a path no screen answers. */
+/** How long the boot cover takes to fade (index.html's transition), ms. */
+const BOOT_FADE_MS = 300
+
+/**
+ * Retires index.html's boot cover (painted before any script, so the page is never bare): once the
+ * screen has mounted, it fades over whatever is up now (a world's own loading cover is the same ink and
+ * crest, so the hand-off shows nothing; a site page is its own) and is removed after the fade. A world
+ * screen's cover is already in `host` when `mount` returns (the viewer builds it synchronously), so no
+ * frame between them shows the canvas's clear colour.
+ */
+function retireBoot(host: HTMLElement | null): void {
+  const boot = document.getElementById("boot")
+  if (!boot) return
+  const covered =
+    host?.querySelector(".ui-loader") !== null && host?.querySelector(".ui-loader") !== undefined
+  // a world's cover is up at once: hand off now; a page without one fades the boot over its first paint
+  const fade = () => {
+    boot.dataset.state = "out"
+    setTimeout(() => boot.remove(), BOOT_FADE_MS + 50)
+  }
+  if (covered) fade()
+  else requestAnimationFrame(() => requestAnimationFrame(fade))
+}
+
 function titleOf(id: string | null, fallback: string): string {
   if (id === null) return "Lost at sea · Guildhall"
   if (id === "island") return "Guildhall"
@@ -110,11 +134,13 @@ export function App({ debug }: { debug: DebugHost }) {
     const target = id ? screenFor(id) : undefined
     if (!target || !host.current) {
       logger.warn("unknown route", { url })
+      retireBoot(null)
       debug.mounted()
       return
     }
     logger.info("mount", { screen: target.id })
     const dispose = target.mount(host.current, { query: params, attach: debug.attach, load: debug.load })
+    retireBoot(host.current)
     // screens load as their own chunks, so the Viewer may arrive after the mount: watch for it
     const el = host.current
     const seen = () => setViewer(el.querySelector("[data-gh-viewer]") !== null)

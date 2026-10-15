@@ -15,6 +15,8 @@ export interface SessionPlaces {
   name: PlaceName
   /** The built place standing on a zone (the hall: the capital's). */
   placeAt(zone: number | undefined): BuiltPlace | undefined
+  /** The folder a zone stands for, when it is not a built place's (the home: a story's district dealt to it). */
+  folderAt?(zone: number): string | undefined
 }
 
 export function sessionPlaces(repo: HallRepo | null, places: readonly BuiltPlace[]): SessionPlaces {

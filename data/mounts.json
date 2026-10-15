@@ -406,7 +406,31 @@
         0
       ],
       "clips": {
+        "Lie_Down": {
+          "hide": true
+        },
+        "Lie_Idle": {
+          "hide": true
+        },
+        "Lie_StandUp": {
+          "hide": true
+        },
+        "Sit_Chair_Down": {
+          "hide": true
+        },
         "Sit_Chair_Idle": {
+          "hide": true
+        },
+        "Sit_Chair_StandUp": {
+          "hide": true
+        },
+        "Sit_Floor_Down": {
+          "hide": true
+        },
+        "Sit_Floor_Idle": {
+          "hide": true
+        },
+        "Sit_Floor_StandUp": {
           "hide": true
         },
         "Walking_A": {
@@ -927,7 +951,31 @@
         0
       ],
       "clips": {
+        "Lie_Down": {
+          "hide": true
+        },
+        "Lie_Idle": {
+          "hide": true
+        },
+        "Lie_StandUp": {
+          "hide": true
+        },
+        "Sit_Chair_Down": {
+          "hide": true
+        },
         "Sit_Chair_Idle": {
+          "hide": true
+        },
+        "Sit_Chair_StandUp": {
+          "hide": true
+        },
+        "Sit_Floor_Down": {
+          "hide": true
+        },
+        "Sit_Floor_Idle": {
+          "hide": true
+        },
+        "Sit_Floor_StandUp": {
           "hide": true
         },
         "Walking_A": {
@@ -988,7 +1036,31 @@
         0
       ],
       "clips": {
+        "Lie_Down": {
+          "hide": true
+        },
+        "Lie_Idle": {
+          "hide": true
+        },
+        "Lie_StandUp": {
+          "hide": true
+        },
+        "Sit_Chair_Down": {
+          "hide": true
+        },
         "Sit_Chair_Idle": {
+          "hide": true
+        },
+        "Sit_Chair_StandUp": {
+          "hide": true
+        },
+        "Sit_Floor_Down": {
+          "hide": true
+        },
+        "Sit_Floor_Idle": {
+          "hide": true
+        },
+        "Sit_Floor_StandUp": {
           "hide": true
         },
         "Walking_A": {
@@ -1118,7 +1190,31 @@
         0
       ],
       "clips": {
+        "Lie_Down": {
+          "hide": true
+        },
+        "Lie_Idle": {
+          "hide": true
+        },
+        "Lie_StandUp": {
+          "hide": true
+        },
+        "Sit_Chair_Down": {
+          "hide": true
+        },
         "Sit_Chair_Idle": {
+          "hide": true
+        },
+        "Sit_Chair_StandUp": {
+          "hide": true
+        },
+        "Sit_Floor_Down": {
+          "hide": true
+        },
+        "Sit_Floor_Idle": {
+          "hide": true
+        },
+        "Sit_Floor_StandUp": {
           "hide": true
         },
         "Walking_A": {
@@ -1208,7 +1304,31 @@
             0
           ]
         },
+        "Lie_Down": {
+          "hide": true
+        },
+        "Lie_Idle": {
+          "hide": true
+        },
+        "Lie_StandUp": {
+          "hide": true
+        },
+        "Sit_Chair_Down": {
+          "hide": true
+        },
         "Sit_Chair_Idle": {
+          "hide": true
+        },
+        "Sit_Chair_StandUp": {
+          "hide": true
+        },
+        "Sit_Floor_Down": {
+          "hide": true
+        },
+        "Sit_Floor_Idle": {
+          "hide": true
+        },
+        "Sit_Floor_StandUp": {
           "hide": true
         },
         "Walking_A": {

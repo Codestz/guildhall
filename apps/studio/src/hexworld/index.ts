@@ -151,6 +151,8 @@ interface Stages {
 
 /** Logical cores from which a screen plans life in a worker of its own beside the build's. */
 const SPLIT_CORES = 4
+/** Under the loading cover the stage draws on every this-many-th vsync (15 Hz on a 60 Hz display). */
+const COVER_PACE = 4
 
 /** The job's stages as they arrive: from the worker(s), or inline (a tick later) where there is none. */
 function startJob(spec: Promise<HexJobSpec>): Stages {
@@ -503,6 +505,10 @@ const world = {
     })
     // the post pipeline anti-aliases its own target (SMAA); the canvas's MSAA is for `?post=0` alone
     const stage = createStage(host, { antialias: ctx.query.get("post") === "0" })
+    // Under the cover nothing drawn is seen: the stage draws on every COVER_PACE-th vsync and the thread
+    // goes to the build (the pieces' bake, the crowd's), until the settle, which needs the frames at
+    // their own rate to see them calm.
+    if (cover) stage.throttle(COVER_PACE)
     ctx.attach(stage)
     viewer.attachStage(stage)
     const cam = worldCamera(stage, viewer.camera, ctx.query)
@@ -931,6 +937,7 @@ const world = {
         })
       // The light: shaders compiled and a calm run of frames drawn with all of it in, behind the cover.
       go("Light", 0.99)
+      stage.throttle(1)
       const ready = await settle(stage, {
         until: torn,
         onCalm: (share) => steps.progress(0.93 + 0.06 * share, 200),

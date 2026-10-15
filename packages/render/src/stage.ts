@@ -12,6 +12,7 @@ import {
   type WebGLRenderTarget,
 } from "three"
 import { createGovernor, parseDprPin } from "./governor.ts"
+import { type PacePick, vsyncOf } from "./pace.ts"
 import { createRig, type Rig } from "./rig/index.ts"
 import { type FrameCounters, FrameRing, NO_COUNTERS, summarize } from "./stats.ts"
 import { createTiming, type Timing } from "./timing.ts"
@@ -38,6 +39,20 @@ export interface Stage {
    * an explicit pick); null (Auto) hands the DPR back to the governor, from where the stage started.
    */
   pickDpr(dpr: number | null): void
+  /**
+   * The viewer's motion pick (pace.ts): Smooth 30 holds the ~30 cadence, Max the display's rate, Auto
+   * lets the pacer choose.
+   */
+  pickPace(pick: PacePick): void
+  /** The pacing in force: the vsync divisor drawn on, the display's interval and the pick. */
+  pace(): { divisor: number; vsyncMs: number; pick: PacePick }
+  /** Draws on every `divisor`-th vsync from now on (the pacer's lever; 1: every vsync). */
+  setPace(divisor: number): void
+  /**
+   * A second divisor, the screen's: while its cover is up nothing drawn is seen, so it draws on every
+   * `divisor`-th vsync and leaves the thread to the build; 1 lifts it. The pacer's divisor still counts.
+   */
+  throttle(divisor: number): void
   /** Puts the camera at a pose at once (the rig holds it inside its world, when it has one). */
   setCamera(p: CameraPose): void
   /** The pose being drawn (in free flight: the eye and the point it looks at). */
@@ -156,10 +171,24 @@ export function createStage(
   let drawTarget: WebGLRenderTarget | null = null
   let knownPrograms = 0
   let holds = 0
+  // pacing (pace.ts): the frame is drawn on every `divisor`-th vsync; `throttle` is a second divisor a
+  // screen sets while its cover is up (nothing seen, so fewer frames drawn behind it); the raw gaps say
+  // what the display's own rate is
+  let divisor = 1
+  let throttle = 1
+  let vsyncs = 0
+  let lastRaw: number | null = null
+  const rawGaps = new FrameRing(90)
 
   const frame = (now: number) => {
     const start = performance.now()
     raf = requestAnimationFrame(frame)
+    if (lastRaw !== null) rawGaps.push(now - lastRaw)
+    lastRaw = now
+    vsyncs++
+    // a skipped vsync: nothing drawn, no hook run, no GPU work; the next drawn frame's dt covers it
+    const every = Math.max(divisor, throttle)
+    if (every > 1 && vsyncs % every !== 0) return
     const ms = last === null ? 0 : now - last
     last = now
     // held: nothing drawn, no hook run, and the frame after the hold is a fresh start (no dt owed)
@@ -226,7 +255,7 @@ export function createStage(
       return new Promise((done) =>
         setTimeout(() => {
           samplers.delete(s)
-          done(summarize(s.intervals, s.costs, counters, dpr, split.stop()))
+          done({ ...summarize(s.intervals, s.costs, counters, dpr, split.stop()), intervals: s.intervals })
         }, ms),
       )
     },
@@ -235,6 +264,16 @@ export function createStage(
       renderer.setPixelRatio(dpr)
     },
     pickDpr: (next) => governor.pick(next),
+    pickPace: (next) => governor.pickPace(next),
+    pace: () => ({ divisor, vsyncMs: vsyncOf(rawGaps.values()), pick: governor.pacePick() }),
+    setPace(next) {
+      if (next !== divisor)
+        logger.info("pace", { divisor: next, vsyncMs: Math.round(vsyncOf(rawGaps.values()) * 10) / 10 })
+      divisor = Math.max(1, Math.round(next))
+    },
+    throttle(next) {
+      throttle = Math.max(1, Math.round(next))
+    },
     setCamera: (p) => rig.set(p),
     getCamera: () => rig.get(),
     rig,

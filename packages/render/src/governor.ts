@@ -1,4 +1,5 @@
 import { log } from "@guildhall/core"
+import { divisorFor, initialPace, type PacePick, paceWindow } from "./pace.ts"
 import type { Stage } from "./stage.ts"
 
 /** How far one governor move changes the DPR. */
@@ -135,21 +136,45 @@ export interface Governor {
    * `null` (Auto) hands it back, from the DPR the stage started at.
    */
   pick(dpr: number | null): void
+  /** The viewer's motion pick (Settings, Motion; pace.ts). */
+  pickPace(pick: PacePick): void
+  pacePick(): PacePick
   dispose(): void
+}
+
+/**
+ * The DPR governor's budget while the stage is paced: the paced frame (the display's interval times the
+ * divisor), less a margin. At the display's rate it is `targetMs`.
+ */
+export function pacedBudget(targetMs: number, divisor: number, vsyncMs: number): number {
+  return divisor > 1 ? vsyncMs * divisor * 0.85 : targetMs
 }
 
 /**
  * Holds the stage's frame cost under `targetMs` by trading resolution: once a second it reads the p95
  * cost of the frames drawn in that second and steps the DPR (see `governorStep`). Logs every change on
- * `render:dpr`.
+ * `render:dpr`. The pacer (pace.ts) runs in the same window, first: in Auto the DPR steps down only
+ * once the stage is paced at 30 and still over its paced budget (the user: quality never drops to buy
+ * fps); with Max picked the frame rate is what is wanted, so the DPR trades for it as before.
  */
 export function createGovernor(stage: Stage, opts: GovernorOpts): Governor {
   const start = stage.stats().dpr
+  let pacePick: PacePick = "auto"
+  let pace = initialPace()
   if (opts.pin !== undefined) {
     const pin = opts.pin
     stage.setDpr(pin)
     logger.info("pinned", { dpr: pin })
-    return { pinned: true, pick: (dpr) => stage.setDpr(dpr ?? pin), dispose() {} }
+    return {
+      pinned: true,
+      pick: (dpr) => stage.setDpr(dpr ?? pin),
+      pickPace(next) {
+        pacePick = next
+        if (next !== "auto") stage.setPace(next === "max" ? 1 : divisorFor(stage.pace().vsyncMs))
+      },
+      pacePick: () => pacePick,
+      dispose() {},
+    }
   }
   const hi = Math.min(opts.dpr[1], start)
   const range: [number, number] = [Math.min(opts.dpr[0], hi), hi]
@@ -162,13 +187,31 @@ export function createGovernor(stage: Stage, opts: GovernorOpts): Governor {
       const reading = await stage.sample(WINDOW_MS)
       // A hidden tab draws nothing: no frames is no evidence either way.
       if (!running || reading.fps === 0 || !reading.costMs) continue
-      const next = governWindow(state, reading.costMs.p95, range, opts.targetMs, pick)
+      // the pace first
+      const { vsyncMs } = stage.pace()
+      const nextPace = paceWindow(
+        pace,
+        { vsyncMs, intervals: reading.intervals ?? [], costP95: reading.costMs.p95 },
+        pacePick,
+      )
+      if (nextPace.divisor !== pace.divisor) stage.setPace(nextPace.divisor)
+      pace = nextPace
+      // then the DPR, against the paced budget; in Auto only once paced (else the frames are the pacer's to hold)
+      const divisor = pace.divisor
+      const budget = pacedBudget(opts.targetMs, divisor, vsyncMs)
+      const mayDrop = pacePick === "max" || divisor > 1 || divisorFor(vsyncMs) === 1
+      const next = governWindow(state, reading.costMs.p95, range, budget, pick)
+      if (!mayDrop && next.dpr < state.dpr) {
+        state = { ...state, history: [] }
+        continue
+      }
       if (pick === null && next.dpr !== state.dpr) {
         logger.info(next.dpr < state.dpr ? "down" : "up", {
           from: state.dpr,
           to: next.dpr,
           p95: Number(reading.costMs.p95.toFixed(2)),
-          targetMs: opts.targetMs,
+          targetMs: Number(budget.toFixed(1)),
+          pace: divisor,
         })
         stage.setDpr(next.dpr)
       }
@@ -185,6 +228,16 @@ export function createGovernor(stage: Stage, opts: GovernorOpts): Governor {
       stage.setDpr(dpr ?? start)
       logger.info(dpr === null ? "auto" : "picked", { dpr: dpr ?? start })
     },
+    pickPace(next) {
+      pacePick = next
+      pace = initialPace()
+      // a pick takes at once; Auto starts afresh at the display's rate and measures from there
+      const divisor = next === "smooth" ? divisorFor(stage.pace().vsyncMs) : 1
+      pace = { ...pace, divisor }
+      stage.setPace(divisor)
+      logger.info("motion", { pick: next, divisor })
+    },
+    pacePick: () => pacePick,
     dispose() {
       running = false
     },

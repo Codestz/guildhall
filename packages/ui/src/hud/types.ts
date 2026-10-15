@@ -136,6 +136,8 @@ export type TimeScale = "history" | "session"
 export type Names = "world" | "source"
 export type HudMode = "detailed" | "minimal" | "hidden"
 export type Quality = "auto" | "low" | "medium" | "high" | "ultra"
+/** Frame pacing (render pace.ts): the pacer's choice, a steady ~30, or the display's own rate. */
+export type Motion = "auto" | "smooth" | "max"
 
 /** How the Bard films: eases and drifts, or cuts like a broadcast (and skips a replay's quiet stretches). */
 export type DirectorStyle = "calm" | "cinematic"
@@ -157,6 +159,10 @@ export interface SettingsValues {
   quality: Quality
   /** Auto quality's pick right now, shown beside "Auto". */
   qualityNow?: Exclude<Quality, "auto">
+  /** Frame pacing: Auto (a steady 30 when the display's rate will not hold), Smooth 30, or Max; left out, no Motion lever. */
+  motion?: Motion
+  /** What Auto motion draws at right now, shown beside "Auto" (`"30"` or `"max"`). */
+  motionNow?: "30" | "max"
   hud: HudMode
   captions: boolean
   directorStyle?: DirectorStyle

@@ -25,7 +25,14 @@
  * the captions, then the face bar (+N) and the act chip on one row, then the timeline's hairline.
  */
 import type { CameraPose } from "@guildhall/core"
-import { type QualityPick, qualityDpr, qualityOf, type WeatherKind } from "@guildhall/render"
+import {
+  type PacePick,
+  paceOf,
+  type QualityPick,
+  qualityDpr,
+  qualityOf,
+  type WeatherKind,
+} from "@guildhall/render"
 import {
   type Chronicle,
   DAY_MS,
@@ -301,6 +308,24 @@ function applyQuality(stage: HudParts["stage"], pick: QualityPick): void {
   stage.pickDpr(qualityDpr(pick, devicePixelRatio || 1))
 }
 
+/** Where the hall keeps the viewer's motion pick (Settings, Motion: Auto · Smooth 30 · Max) between visits. */
+const MOTION_KEY = "gh.hall.motion"
+
+function storedMotion(): PacePick {
+  try {
+    return paceOf(localStorage.getItem(MOTION_KEY))
+  } catch {
+    return "auto"
+  }
+}
+
+function storeMotion(pick: PacePick): void {
+  try {
+    if (pick === "auto") localStorage.removeItem(MOTION_KEY)
+    else localStorage.setItem(MOTION_KEY, pick)
+  } catch {}
+}
+
 /** The tiers the hall offers (the renderer has no Ultra). */
 const QUALITIES: readonly { value: Quality; label: string }[] = [
   { value: "auto", label: "Auto" },
@@ -534,6 +559,8 @@ export function HallHud(props: HallHudProps) {
   useEffect(() => {
     const pick = storedQuality()
     if (pick !== "auto") applyQuality(parts.stage, pick)
+    const pace = storedMotion()
+    if (pace !== "auto") parts.stage.pickPace(pace)
   }, [parts.stage])
   // the session, if the hall has one: its 10 Hz snapshot, and the hero opened in the sheet
   const live = props.session
@@ -575,6 +602,20 @@ export function HallHud(props: HallHudProps) {
 
   // ── Settings' levers ──
   const [quality, setQuality] = useState(storedQuality)
+  const [motion, setMotion] = useState(storedMotion)
+  // what Auto motion draws at now, read once a second while the sheet shows it
+  const [motionNow, setMotionNow] = useState<"30" | "max">("max")
+  const settingsOpen = state.open === "settings"
+  useEffect(() => {
+    if (!settingsOpen) return
+    const read = () => {
+      const pace = parts.stage.pace()
+      setMotionNow(pace && pace.divisor > 1 ? "30" : "max")
+    }
+    read()
+    const timer = setInterval(read, 1000)
+    return () => clearInterval(timer)
+  }, [settingsOpen, parts.stage])
   const [captions, setCaptions] = useState(true)
   const [style, setStyle] = useState<"calm" | "cinematic">(levers.cinematic ? "cinematic" : "calm")
   const [weather, setWeather] = useState<WeatherPick>(levers.weather ?? "auto")
@@ -904,6 +945,8 @@ export function HallHud(props: HallHudProps) {
     pace,
     director: directing,
     quality,
+    motion,
+    motionNow,
     hud: state.mode,
     captions,
     ...(snap ? { directorStyle: style } : {}),
@@ -923,6 +966,12 @@ export function HallHud(props: HallHudProps) {
       setQuality(pick)
       storeQuality(pick)
       applyQuality(parts.stage, pick)
+    }
+    if (patch.motion !== undefined) {
+      const pick = paceOf(patch.motion)
+      setMotion(pick)
+      storeMotion(pick)
+      parts.stage.pickPace(pick)
     }
     if (patch.hud !== undefined) hud.dispatch({ type: "mode", mode: patch.hud })
     if (patch.captions !== undefined) setCaptions(patch.captions)

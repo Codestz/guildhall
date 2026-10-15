@@ -8,6 +8,8 @@ import type { configureLog, logRecords } from "./log.ts"
 export interface FrameStats {
   fps: number
   frameMs: { p50: number; p95: number }
+  /** The gaps themselves (ms, in order) when the stretch was sampled: the pacer reads how many missed a vsync. */
+  intervals?: readonly number[]
   /** CPU time spent inside the frame callback (frame hooks plus `renderer.render`), ms. */
   costMs?: { p50: number; p95: number }
   /** Every draw and triangle of the frame: the main pass plus the shadow passes. */

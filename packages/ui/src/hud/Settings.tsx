@@ -12,6 +12,7 @@ import { Glyphs } from "./glyphs.tsx"
 import type {
   DirectorStyle,
   HudMode,
+  Motion,
   Names,
   Quality,
   SeasonPick,
@@ -25,6 +26,12 @@ const NAMES: readonly { value: Names; label: string; hint: string }[] = [
   { value: "source", label: "Source", hint: "The source's own names: Verifier" },
 ]
 const PACES = [0.5, 1, 2, 4] as const
+/** Frame pacing (render pace.ts): the pacer's choice, a steady ~30, or the display's own rate. */
+const MOTIONS: readonly { value: Motion; label: string }[] = [
+  { value: "auto", label: "Auto" },
+  { value: "smooth", label: "Smooth 30" },
+  { value: "max", label: "Max" },
+]
 const QUALITIES: readonly { value: Quality; label: string }[] = [
   { value: "auto", label: "Auto" },
   { value: "low", label: "Low" },
@@ -223,6 +230,31 @@ export function SettingsPanel({
                 : "Pinned, and kept for your next visits. Low is lightest on a phone or an old laptop."}
           </p>
         </Section>
+
+        {values.motion !== undefined && (
+          <Section
+            title="Motion"
+            value={
+              values.motion === "auto" && values.motionNow
+                ? `Auto · now ${values.motionNow === "30" ? "steady 30" : "max"}`
+                : undefined
+            }
+          >
+            <Segmented
+              label="Pacing"
+              value={values.motion}
+              options={MOTIONS}
+              onChange={(v) => onChange({ motion: v as Motion })}
+            />
+            <p className="ui-hint">
+              {values.motion === "auto"
+                ? "A steady 30 when the screen's own rate will not hold, back up once it will. Nothing is drawn simpler for it."
+                : values.motion === "smooth"
+                  ? "Every frame evenly spaced at about 30 a second, at full quality."
+                  : "The screen's own rate, whatever it costs."}
+            </p>
+          </Section>
+        )}
 
         <section className="hud-set-section hud-set-director" aria-labelledby={directorId}>
           <header className="hud-director-head">

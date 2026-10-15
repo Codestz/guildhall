@@ -1,6 +1,6 @@
 /**
  * The sea: what happens to a guild's project on GitHub, beside what its adventurers do. The hub polls
- * GitHub for each project with a GitHub remote (packages/hub/src/github.ts) and reads what it finds
+ * GitHub for each project with a GitHub remote (live/hub/src/github.ts) and reads what it finds
  * as these events; the sim tells them too (packages/sim/src/seas.ts). PROTOCOL.md §7.
  *
  * Every event has a stable `id`: the same thing seen twice (a later poll, a hub restart) has the same

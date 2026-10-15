@@ -2,7 +2,7 @@
  * The hall's event feeds (plan-hud-events H1): `/hall/<owner>/<repo>?feed=live|replay|story`.
  *
  *   feed     `Feed`, `FeedSink`, `FeedStatus`: the lean V1 shape
- *   live     `LiveFeed`: the legacy hub's WebSocket (seq dedup, backoff, the backlog rule)
+ *   live     `LiveFeed`: the live hub's WebSocket (live/hub) (seq dedup, backoff, the backlog rule)
  *   replay   `ReplayFeed`: a recorded `.jsonl` (a guild chronicle the dev Studio serves, core's fixtures)
  *   story    `StoryFeed`: a demo story (sim `story(id)`, D1), told on the hall's repo
  *   session  `createSession`: the hall's one EventLog, its clock and a 10 Hz snapshot for React

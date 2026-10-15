@@ -18,8 +18,8 @@ source ──► adapter ──POST /events──► hub (127.0.0.1:4747) ──
 
 Adapters today:
 
-- **OpenCode**: `packages/herald`, a plugin inside OpenCode 1 and 2.
-- **Claude Code**: `packages/claude-code`, a hook command.
+- **OpenCode**: `packages/herald` (V1, on the `v1` tag), a plugin inside OpenCode 1 and 2.
+- **Claude Code**: `live/claude-code`, a hook command.
 
 Each adapter translates its source into one shared vocabulary of **changes**. The hall reads only
 changes, so it can't tell which adapter (or which simulation) a guild came from.
@@ -49,10 +49,10 @@ changes, so it can't tell which adapter (or which simulation) a guild came from.
 ### 1.1 Roles and archetypes
 
 A session's `agent` names its role, and the world draws each role as an **archetype**
-(`packages/roster/src/archetypes.ts`). The agent name stays on the wire as the source spells it; the
+(`live/roster/src/archetypes.ts`). The agent name stays on the wire as the source spells it; the
 hall shows the archetype's name with the source's own as a subtitle (`Warden · verifier`), or the
 source's names alone when the viewer picks plain names in Settings. The roster
-(`packages/roster/src/roles.ts`) ships nine roles:
+(`live/roster/src/roles.ts`) ships nine roles:
 
 | Agent name | Role | Archetype |
 |---|---|---|
@@ -79,7 +79,7 @@ ignored. It is optional and additive: a hall that predates it reads the agent na
 
 An adventurer's **rank** (apprentice, journeyman, master) comes from what it has done, not from
 the wire: for agents, a journeyman past 20 deeds or 1M tokens, a master past 60 deeds or 4M tokens
-(`packages/roster/src/ranks.ts`).
+(`live/roster/src/ranks.ts`).
 
 ### 1.2 Deeds: crafts, names and inputs the world reads
 
@@ -205,7 +205,7 @@ safe to repeat: a second identical `session`, `status` or `tool` change leaves t
 | `step` | | | It finished one model turn. |
 | `usage` | | `tokens`, `cost` | Running totals for the session (they replace, not add). |
 
-Limits on fields (`packages/hub/src/validate.ts`):
+Limits on fields (`live/hub/src/validate.ts`):
 
 | What | Limit |
 |---|---|
@@ -223,7 +223,7 @@ lets through fields the union doesn't name, so a newer adapter may add some.
 
 ### 3.1 Dispatch: adapter → hub
 
-What an adapter POSTs (`packages/hub/src/protocol.ts`):
+What an adapter POSTs (`live/hub/src/protocol.ts`):
 
 ```ts
 interface Dispatch {
@@ -322,14 +322,14 @@ are created on first mention and fields only fill in. The exception is a deed's 
 set, not merged, so a late `running` after a `completed` would set it back. Send a deed's changes
 in order.
 
-**Batching** is up to the adapter. The OpenCode adapter's courier (`packages/herald/src/courier.ts`)
+**Batching** is up to the adapter. The OpenCode adapter's courier (`packages/herald/src/courier.ts`, on the `v1` tag)
 is the reference:
 
 - It flushes every 120 ms, at most 500 changes and 8 MB per POST, one POST at a time.
 - A 413 splits the batch in half. Any other 4xx is dropped, since the hub will never take it.
 - A 5xx, 408, 429, timeout or no answer is kept (at most 10,000 queued) and retried with backoff
   from 600 ms up to 10 s.
-- With nothing listening, it starts a hub (`bun packages/hub/src/main.ts`), at most once every
+- With nothing listening, it starts a hub (`bun live/hub/src/main.ts`), at most once every
   30 s.
 
 An adapter that runs as a short-lived process (a hook) sends one small dispatch per event and gives
@@ -392,8 +392,8 @@ is the quest that sent it.
 
 ## 6. The Claude Code adapter
 
-`packages/claude-code` is a command that Claude Code runs on each hook event. To set it up, run
-`bun packages/claude-code/src/install.ts --print`. It prints the `hooks` block to merge into
+`live/claude-code` is a command that Claude Code runs on each hook event. To set it up, run
+`bun live/claude-code/src/install.ts --print`. It prints the `hooks` block to merge into
 `~/.claude/settings.json` and never edits that file itself. The hook reads the event's JSON from
 stdin and POSTs one dispatch with no `raw`, giving the hub 200 ms to answer. It prints nothing and
 always exits 0. If no hub is listening, it starts one for the events that follow (at most once
@@ -441,7 +441,7 @@ Where Claude Code's names become the world's:
 ## 7. The sea: GitHub
 
 The hub watches GitHub for each project with a GitHub remote that it has heard from in the last 6 h
-(`packages/hub/src/github.ts`). It reads the answers as a small vocabulary of **sea events**
+(`live/hub/src/github.ts`). It reads the answers as a small vocabulary of **sea events**
 (`SeaEvent` in `packages/core/src/sea.ts`):
 
 | `kind` | Fields | When |

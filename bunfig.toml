@@ -1,3 +1,0 @@
-[test]
-# V1 lives in legacy/ as its own project with its own `bun test`; a bare `bun test` here never runs it.
-pathIgnorePatterns = ["legacy/**"]

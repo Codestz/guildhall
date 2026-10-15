@@ -1,6 +1,6 @@
 /**
  * The guild's wire vocabulary, ported from V1's core unchanged (PROTOCOL.md beside this file): what
- * the legacy hub and its adapters send over wire v1, so V2 is just another hall client of them.
+ * the live hub (live/hub) and its adapters send over wire v1, so V2 is just another hall client of them.
  *
  *   wire      `GuildEvent`, the envelope, and `WIRE_VERSION`
  *   changes   `Change`, what a session did, in one vocabulary for every host

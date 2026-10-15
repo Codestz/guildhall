@@ -1,5 +1,5 @@
 /**
- * Following the legacy hub (plan §3.6 B, V1 ADR 0003; V1's guild/feeds/live.ts rewritten lean): a
+ * Following the live hub (live/hub; plan §3.6 B, V1 ADR 0003; V1's guild/feeds/live.ts rewritten lean): a
  * WebSocket to 127.0.0.1:4747, a `hello` with everything the hub keeps, then `events` and `sea` as they
  * happen. Wire v1, the hub unchanged; read-only (answering a plea waits for the per-boot token).
  *

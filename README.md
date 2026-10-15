@@ -129,19 +129,19 @@ bun run shots <url> --out <path>   # a headless screenshot with frame stats
 
 Live mode is **localhost only**. The hub that collects your sessions binds `127.0.0.1` and refuses
 any non-local origin, so the public site never sees your agents. It is V1's hub and hook, kept under
-`legacy/` and unchanged.
+[`live/`](live) and unchanged.
 
-1. Install V1's dependencies once:
+1. Install the dependencies once, from the repo root:
 
    ```sh
-   cd legacy && bun install && cd ..
+   bun install
    ```
 
 2. Print the hook block and merge it into the settings of the project you want to watch
    (`<project>/.claude/settings.local.json`), or into `~/.claude/settings.json` for every project:
 
    ```sh
-   bun legacy/packages/claude-code/src/install.ts --print
+   bun live/claude-code/src/install.ts --print
    ```
 
    The command only prints; it never edits a settings file. The hook runs on 13 Claude Code events,
@@ -149,7 +149,7 @@ any non-local origin, so the public site never sees your agents. It is V1's hub 
    the full path from `which bun` in the printed commands. To remove it, delete the block.
 
 3. Start a Claude Code session in that project. The hook starts the hub the first time it's needed;
-   you can also run it yourself with `bun legacy/packages/hub/src/main.ts` (port 4747).
+   you can also run it yourself with `bun live/hub/src/main.ts` (port 4747).
 
 4. With `bun run dev` running, open:
 
@@ -183,7 +183,7 @@ short:
 | [`packages/ui`](packages/ui) | The React HUD and site pieces |
 | [`apps/studio`](apps/studio) | The site and the Studio in one app |
 | [`tools/*`](tools) | `import` (packs to library), `shots` (screenshots and the perf bench), `palette`, `chronicle` (the deep chronicle builder the chronicles repo runs) |
-| [`legacy/`](legacy) | V1, still runnable: the hub and the Claude Code hook live mode uses |
+| [`live/`](live) | V1's hub and Claude Code hook, which live mode runs on your machine |
 
 - **One-way layers.** `core → assets → world → sim → render`, each importing only the ones before
   it. `ui` sits beside render and never touches three.js. Apps may use any package but never import
@@ -264,10 +264,10 @@ site does not ship them.
 
 ## V1
 
-V1 is kept for history. Its code is on the [`v1` tag](https://github.com/Codestz/guildhall/tree/v1)
-(the hub and the Claude Code hook that live mode uses are kept here). V1 had the OpenCode plugin (`opencode-guildhall` on npm), the
-archipelago of repos and the WebGPU renderer; [RELEASE_NOTES.md](RELEASE_NOTES.md) says what moved,
-what changed and what is parked. Animals are parked too: they did not fit the low-poly style, so
+V1 is kept for history. Its code is on the [`v1` tag](https://github.com/Codestz/guildhall/tree/v1);
+only its hub and Claude Code hook stay here, in `live/`. V1 had the OpenCode plugin
+(`opencode-guildhall` on npm), the archipelago of repos and the WebGPU renderer;
+[RELEASE_NOTES.md](RELEASE_NOTES.md) says what moved, what changed and what is parked. Animals are parked too: they did not fit the low-poly style, so
 pens and pastures stand empty for now.
 
 ## License

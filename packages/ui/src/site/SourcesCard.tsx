@@ -69,12 +69,12 @@ export function SourcesCard({ onClose, hub = "127.0.0.1:4747" }: SourcesCardProp
           </ul>
           <ol className="site-steps">
             <li>
-              <b>Run the hub.</b> From a clone, <code>bun legacy/packages/hub/src/main.ts</code>; it listens
-              on <code>{hub}</code>. Claude Code's hook starts it for you the first time it is needed.
+              <b>Run the hub.</b> From a clone, <code>bun live/hub/src/main.ts</code>; it listens on{" "}
+              <code>{hub}</code>. Claude Code's hook starts it for you the first time it is needed.
             </li>
             <li>
-              <b>Add a source.</b> For Claude Code, <code>npm install -g opencode-guildhall</code>, then{" "}
-              <code>opencode-guildhall claude-code --print</code> and merge the hooks it prints into your
+              <b>Add a source.</b> For Claude Code, from the same clone,{" "}
+              <code>bun live/claude-code/src/install.ts --print</code> and merge the hooks it prints into your
               Claude Code settings (it only prints, it never edits them). For OpenCode, add{" "}
               <code>"plugin": ["opencode-guildhall"]</code> to <code>opencode.json</code>.
             </li>

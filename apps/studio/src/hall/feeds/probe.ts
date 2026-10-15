@@ -21,7 +21,7 @@ export function isLocalHost(hostname: string): boolean {
 }
 
 export interface ProbeOptions {
-  /** The hub's socket address (default: the legacy hub). */
+  /** The hub's socket address (default: the live hub, live/hub). */
   url?: string
   /** Which guilds are this repo's. */
   guild: (guild: string) => boolean

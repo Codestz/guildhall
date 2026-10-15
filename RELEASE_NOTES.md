@@ -1,7 +1,7 @@
 # Guildhall V2
 
 V2 is a rebuild. The idea is V1's: events in, a living world out. The world, the engine under it and
-the site around it are new. V1 is kept on the `v1` tag and runs from `legacy/`.
+the site around it are new. V1 is kept on the `v1` tag; its hub and hook, which live mode uses, are in `live/`.
 
 ## What's new
 
@@ -88,11 +88,11 @@ composer, the hex map, NPCs, grips. Online it is read-only: explore freely, noth
 - **New links.** V1's `/how` redirects to `/built`, and the old `.html` pages to their new paths. A
   repo's island moves from `/?repo=owner/name` to `/hall/owner/name`.
 - **Live mode runs on localhost only.** V2 has no npm package. To watch your own Claude Code
-  sessions, run V1's hub and hook from `legacy/` and open `/hall/<owner>/<repo>?feed=live` on the dev
+  sessions, run V1's hub and hook from `live/` and open `/hall/<owner>/<repo>?feed=live` on the dev
   server (the README has the steps). The public site plays demo stories and chronicles only.
-- **Packages.** V1's `hall`, `herald`, `hub`, `roster` and `opencode-guildhall` are replaced by
+- **Packages.** V1's `hall`, `herald` and `opencode-guildhall` are replaced by
   `core → assets → world → sim → render`, with `ui` beside them and one app, `apps/studio`. A test
-  keeps the layers one-way.
+  keeps the layers one-way. V1's `hub`, `claude-code`, `core` and `roster` run live mode from `live/`.
 - **Assets.** One house style: chunky KayKit and Kenney pieces, all CC0, mapped onto one palette and
   baked into vertex colours. Characters are scaled so their heads reach a door's top.
 - **WebGL only.** At a few dozen draw calls the cost is pixels and triangles, not calls, so WebGPU

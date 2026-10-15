@@ -8,7 +8,7 @@ import { Adventurer, Script } from "./script.ts"
  * at once. Each is told in the changes its adapter makes: the OpenCode guildmaster sends the guild's
  * own roles; the Claude Code conversation (no agent name of its own, so the model's default) sends
  * Claude Code's built-in `Explore`, a Wanderer, and Agentry's `implementer`, which its adapter maps to
- * the roster's `guild-implementer`. Its deeds are spelled as packages/claude-code translates them:
+ * the roster's `guild-implementer`. Its deeds are spelled as live/claude-code translates them:
  * `bash`, `read`, `mcp__<server>__<tool>`.
  */
 export function factions(seed = 1): Change[] {

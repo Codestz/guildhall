@@ -14,7 +14,7 @@ import {
 } from "@guildhall/core"
 import type { WireInput } from "@guildhall/sim"
 
-/** A hub message (legacy hub PROTOCOL.md §4), checked. */
+/** A hub message (live/core/PROTOCOL.md §4), checked. */
 export type HubMessage =
   | { type: "hello"; events: GuildEvent[]; sea: SeaRecord[] }
   | { type: "events"; events: GuildEvent[] }
@@ -52,7 +52,7 @@ export function isGuildEvent(value: unknown): value is GuildEvent {
 
 /**
  * Which of the hub's guilds are this repo's: the hub names a guild after its project's folder, and a
- * second clone of the same name `name·2` (legacy hub projects.ts), so `guildhall` takes `guildhall`,
+ * second clone of the same name `name·2` (live/hub/src/projects.ts), so `guildhall` takes `guildhall`,
  * `guildhall·2`…, never `guildhall-site`. `want` is the repo's name (`Codestz/guildhall` → `guildhall`),
  * or the guild a link names exactly (`?guild=`).
  */

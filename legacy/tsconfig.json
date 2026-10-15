@@ -1,9 +1,0 @@
-{
-  "files": [],
-  "references": [
-    { "path": "packages/core" },
-    { "path": "packages/roster" },
-    { "path": "packages/hub" },
-    { "path": "packages/claude-code" }
-  ]
-}

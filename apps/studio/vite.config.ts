@@ -62,7 +62,7 @@ function folder(name: string, root: string): Plugin {
   }
 }
 
-/** Where the legacy hub writes its guild chronicles (V1 ADR 0003; GUILDHALL_HOME as the hub reads it). */
+/** Where the live hub (live/hub) writes its guild chronicles (V1 ADR 0003; GUILDHALL_HOME as the hub reads it). */
 const CHRONICLES = join(process.env.GUILDHALL_HOME ?? join(homedir(), ".cache", "guildhall"), "chronicles")
 
 /**

@@ -11,6 +11,10 @@
     { "path": "tools/import" },
     { "path": "tools/shots" },
     { "path": "tools/palette" },
-    { "path": "tools/chronicle" }
+    { "path": "tools/chronicle" },
+    { "path": "live/core" },
+    { "path": "live/roster" },
+    { "path": "live/hub" },
+    { "path": "live/claude-code" }
   ]
 }

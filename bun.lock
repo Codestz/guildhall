@@ -30,6 +30,35 @@
         "vite": "^8.3.2",
       },
     },
+    "live/claude-code": {
+      "name": "@guildhall/claude-code",
+      "version": "0.0.0",
+      "dependencies": {
+        "@guildhall/live-core": "workspace:*",
+        "@guildhall/roster": "workspace:*",
+      },
+      "devDependencies": {
+        "@guildhall/hub": "workspace:*",
+      },
+    },
+    "live/core": {
+      "name": "@guildhall/live-core",
+      "version": "0.0.0",
+    },
+    "live/hub": {
+      "name": "@guildhall/hub",
+      "version": "0.0.0",
+      "dependencies": {
+        "@guildhall/live-core": "workspace:*",
+      },
+    },
+    "live/roster": {
+      "name": "@guildhall/roster",
+      "version": "0.0.0",
+      "dependencies": {
+        "@guildhall/live-core": "workspace:*",
+      },
+    },
     "packages/assets": {
       "name": "@guildhall/assets",
       "version": "0.0.0",
@@ -162,13 +191,21 @@
 
     "@guildhall/chronicle": ["@guildhall/chronicle@workspace:tools/chronicle"],
 
+    "@guildhall/claude-code": ["@guildhall/claude-code@workspace:live/claude-code"],
+
     "@guildhall/core": ["@guildhall/core@workspace:packages/core"],
 
+    "@guildhall/hub": ["@guildhall/hub@workspace:live/hub"],
+
     "@guildhall/import": ["@guildhall/import@workspace:tools/import"],
+
+    "@guildhall/live-core": ["@guildhall/live-core@workspace:live/core"],
 
     "@guildhall/palette": ["@guildhall/palette@workspace:tools/palette"],
 
     "@guildhall/render": ["@guildhall/render@workspace:packages/render"],
+
+    "@guildhall/roster": ["@guildhall/roster@workspace:live/roster"],
 
     "@guildhall/shots": ["@guildhall/shots@workspace:tools/shots"],
 

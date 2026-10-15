@@ -263,7 +263,7 @@ export function runtimeSweep(
     for (let k = 0; k < heroes.length; k++) {
       const id = nf + k
       const p = poses[id]!
-      const ghost = (p as { ghost?: boolean }).ghost === true
+      const ghost = (p as { ghost?: unknown }).ghost != null && (p as { ghost?: unknown }).ghost !== false
       if (p.indoors || ghost) {
         was[k] = null
         continue

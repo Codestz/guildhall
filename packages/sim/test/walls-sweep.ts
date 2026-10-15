@@ -85,7 +85,11 @@ export const SWEPT_STORIES: readonly StoryId[] = ["saga", "events", "party", "so
  * A walk a ghost drifts (decisions.md 10-14 "Fallen hero": a pale ghost drifts to the graveyard): a ghost
  * passes through fences and walls, so its walks are not swept. Only a walk marked `ghost` is let off.
  */
-const ghostly = (s: LifeStep): boolean => (s as { ghost?: boolean }).ghost === true
+const ghostly = (s: LifeStep): boolean => {
+  // a ghost's step carries its timing ({from, fade}) or a lift: any value but false marks it
+  const g = (s as { ghost?: unknown }).ghost
+  return g != null && g !== false
+}
 export type Source = (typeof SOURCES)[number]
 
 export interface Tally {

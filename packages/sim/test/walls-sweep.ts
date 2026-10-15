@@ -3,16 +3,20 @@
  * take a shorter path, visible in the castle"): every townsperson's day and every hero's walks on an
  * island, sampled every 10 cm along the way, against the collision layer's hard solids (buildings,
  * walls, towers, fences, a stair's cheeks, a bridge's rails). Counted per source: what made the bit of
- * way that cuts in.
+ * way that cuts in. The heroes: every demo story's (`SWEPT_STORIES`), their strikes at the graveyard
+ * among them, and every grave's strike spot from the gathering and every place and back (decisions.md
+ * 10-14: "Warden in the graveyard walked out where there's no gate and then through walls").
  *
  *   bun packages/sim/test/walls-sweep.ts [seeds=1-6] [files=4000,12000]   prints the table
  *
  * A walk's own ends are not counted against what they stand in (a door's last metre when it goes in or
  * comes out, a seat, a gate's post a guard leans on), and a shoulder brushing a wall (`BRUSH`) is not a
- * cut.
+ * cut; a thin one (a fence, a curtain's face: thinner than two brushes) is a cut when a way is half
+ * through it. A ghost's drift (a walk marked `ghost`) passes through walls and is not swept.
  */
 import {
   boardReaders,
+  graveStrikeSpot,
   guildhallZone,
   HARD,
   HEX_TILE_SIZE,
@@ -39,7 +43,7 @@ import {
   type WalkBlocker,
   workTiles,
 } from "@guildhall/world"
-import { type LifeKit, story } from "../src/index.ts"
+import { type LifeKit, type StoryId, story } from "../src/index.ts"
 import { installTiles, itineraries } from "./life-choreo-fixtures.ts"
 import { played } from "./stories-fixtures.ts"
 
@@ -70,7 +74,18 @@ export const SOURCES = [
   "hero route",
   "hero direct",
   "hero stay",
+  "hero to a grave",
+  "hero from a grave",
 ] as const
+
+/** The stories whose heroes are swept: the demos the island opens (their walks, their strikes at the graves). */
+export const SWEPT_STORIES: readonly StoryId[] = ["saga", "events", "party", "solo", "rush"]
+
+/**
+ * A walk a ghost drifts (decisions.md 10-14 "Fallen hero": a pale ghost drifts to the graveyard): a ghost
+ * passes through fences and walls, so its walks are not swept. Only a walk marked `ghost` is let off.
+ */
+const ghostly = (s: LifeStep): boolean => (s as { ghost?: boolean }).ghost === true
 export type Source = (typeof SOURCES)[number]
 
 export interface Tally {
@@ -95,6 +110,8 @@ export interface Cut {
   a: [number, number]
   b: [number, number]
   castle?: boolean
+  /** In or beside the graveyard's tiles. */
+  graveyard?: boolean
 }
 
 type Near = (x: number, z: number, r: number) => Solid[]
@@ -156,12 +173,13 @@ export function endsOwn(ends: readonly End[]): Skip {
     })
 }
 
+const isHard = (o: Solid) => HARD(o.kind)
 /** How deep a point is in a hard solid (≤ 0: out), the ones `skip` lists aside. */
 function depthAt(near: Near, x: number, z: number, skip: Skip): [number, Solid | null] {
   let worst = 0
   let by: Solid | null = null
   for (const o of near(x, z, 0.05)) {
-    if (!HARD(o.kind) || skip(o, x, z)) continue
+    if (!isHard(o) || skip(o, x, z)) continue
     const d = -solidDistance(o, x, z)
     if (d > worst) {
       worst = d
@@ -174,6 +192,8 @@ function depthAt(near: Near, x: number, z: number, skip: Skip): [number, Solid |
 export interface Sweep {
   table: Table
   cuts: Cut[]
+  /** Strikes the swept stories planned at the graves (their walks there and back are swept). */
+  struck: number
 }
 
 function tallySegment(
@@ -217,10 +237,58 @@ function tallySegment(
         b: [b[0]!, b[2]!],
       }
   }
+  // a thin wall (a fence, a rail: thinner than two brushes) is never a brush deep: the way through it is
+  // looked for along the segment instead, a cut when it is more than half into it, its ends' own aside
+  if (!offset)
+    for (const o of near((a[0]! + b[0]!) / 2, (a[2]! + b[2]!) / 2, len / 2 + 0.1)) {
+      // (a stair's cheeks and a bridge's rails, pieces of no piece, are walked along on their stairs)
+      if (!isHard(o) || !o.piece) continue
+      const half = thickness(o)
+      if (half >= BRUSH + 0.05) continue
+      const m = Math.max(1, Math.ceil(len / 0.01))
+      let worst = 0
+      let wx = 0
+      let wz = 0
+      for (let j = 0; j <= m; j++) {
+        const x = a[0]! + ((b[0]! - a[0]!) * j) / m
+        const z = a[2]! + ((b[2]! - a[2]!) * j) / m
+        const d = -solidDistance(o, x, z)
+        if (d > worst && !skip(o, x, z)) {
+          worst = d
+          wx = x
+          wz = z
+        }
+      }
+      if (worst < half * 0.8) continue
+      t.samples++
+      hit = true
+      if (!deepest || worst > deepest.depth)
+        deepest = {
+          source,
+          who,
+          x: wx,
+          z: wz,
+          depth: worst,
+          piece: o.piece,
+          a: [a[0]!, a[2]!],
+          b: [b[0]!, b[2]!],
+        }
+    }
   if (hit) {
     t.cuts++
     if (deepest) out.cuts.push(deepest)
   }
+}
+
+const thick = new WeakMap<Solid, number>()
+/** How far in a solid's middle is from its outline (half a fence's thickness), metres. */
+function thickness(o: Solid): number {
+  let d = thick.get(o)
+  if (d === undefined) {
+    d = Math.max(0, -solidDistance(o, o.cx, o.cz))
+    thick.set(o, d)
+  }
+  return d
 }
 
 /** Whether a point is (within 0.6 m of) a walk node: a laned way's corner. */
@@ -233,6 +301,10 @@ function nodeish(walk: HexWalk, grid: Map<string, number[]>, x: number, z: numbe
   return false
 }
 
+/** Whether a point is one of the graves' strike spots (a hero's walk there or from there). */
+const atGrave = (graves: readonly (readonly number[])[], p: readonly number[]): boolean =>
+  graves.some((g) => Math.hypot(g[0]! - p[0]!, g[2]! - p[2]!) < 0.05)
+
 /** The steps' walks and stays, each bit of way by what made it. */
 function sweepSteps(
   out: Sweep,
@@ -243,6 +315,8 @@ function sweepSteps(
   who: string,
   hero: boolean,
   secPerHour: number,
+  heroSource?: Source,
+  graves?: readonly (readonly number[])[],
 ): void {
   for (let si = 0; si < steps.length; si++) {
     const s = steps[si]!
@@ -265,6 +339,7 @@ function sweepSteps(
       }
       continue
     }
+    if (ghostly(s)) continue
     const w = s as LifeWalk
     const prev = steps[si - 1] ?? steps[steps.length - 1]
     const next = steps[si + 1] ?? steps[0]
@@ -288,6 +363,9 @@ function sweepSteps(
       const b = w.pts[k + 1]!
       let src: Source
       if (w.carry) src = "carry trip"
+      else if (hero && heroSource) src = heroSource
+      else if (hero && graves && atGrave(graves, b0)) src = "hero to a grave"
+      else if (hero && graves && atGrave(graves, a0)) src = "hero from a grave"
       else if (hero) {
         const direct =
           w.pts.length <= 3 &&
@@ -311,7 +389,7 @@ export interface Island {
 /** One island's sweep: its townsfolk's day, the saga's heroes, every place's hero spots from the gathering. */
 export function sweepIsland(
   { seed, files }: Island,
-  opts: { heroes?: boolean } = {},
+  opts: { heroes?: boolean; stories?: readonly StoryId[] } = {},
 ): Sweep & { ms: number } {
   const t0 = performance.now()
   const h = hexIsland({ seed, files })
@@ -321,7 +399,7 @@ export function sweepIsland(
   const places = lifePlaces(h, z, w, walk, { heroSpots: 3 })
   const f = places.furniture
   const near: Near = (x, zz, r) => f.solidsNear(x, zz, r)
-  const out: Sweep = { table: emptyTable(), cuts: [] }
+  const out: Sweep = { table: emptyTable(), cuts: [], struck: 0 }
   const grid = new Map<string, number[]>()
   for (const [i, n] of walk.nodes.entries())
     for (const dx of [-1, 0, 1])
@@ -421,6 +499,9 @@ export function sweepIsland(
       tallySegment(out, near, "board reader spot", who("reader"), r.at, r.at, () => false)
 
   if (opts.heroes !== false) {
+    // the graveyard's strike spots, as the Studio gives them (lifePlan.ts `kitOf`)
+    const gy = w.graveyard
+    const gyNode = gy ? walk.at(gy.tile) : -1
     const kit: LifeKit = {
       walk,
       spots: (zi) => places.heroSpots(zi),
@@ -428,7 +509,12 @@ export function sweepIsland(
       near: places.walkNear,
       island: h,
       board,
+      ...(gy && gyNode >= 0
+        ? { graves: { strike: (slot: number) => graveStrikeSpot(gy, gyNode, slot) } }
+        : {}),
     }
+    const strikes = gy && gyNode >= 0 ? gy.graves.map((_, k) => graveStrikeSpot(gy, gyNode, k)!) : []
+    const graves = strikes.map((s) => s.at)
     // the saga, its four units at four places (the castle's own court among them where it has one)
     const zones = z.zones.map((_, i) => i).filter((i) => i !== kit.home && places.heroSpots(i).length)
     const units = ["packages/world", "packages/render", "apps/studio", "packages/sim"]
@@ -437,9 +523,33 @@ export function sweepIsland(
       const u = units.findIndex((p) => path.includes(p))
       return u < 0 ? kit.home : pick(u)
     }
-    const told = story("saga", { seed: 1 })
-    const its = itineraries(played(told, placeOf), kit, { mps: 0.8 * 1.15, hurry: { within: 10, mps: 5 } })
-    for (const it of its.values()) sweepSteps(out, near, walk, grid, it.steps, who(`hero ${it.id}`), true, 1)
+    for (const id of opts.stories ?? SWEPT_STORIES) {
+      const told = story(id, { seed: 1 })
+      const its = itineraries(played(told, placeOf), kit, { mps: 0.8 * 1.15, hurry: { within: 10, mps: 5 } })
+      for (const it of its.values()) {
+        sweepSteps(out, near, walk, grid, it.steps, who(`${id} hero ${it.id}`), true, 1, undefined, graves)
+        out.struck += it.acts.filter((a) => a.play === "strike").length
+      }
+    }
+    // every grave from the gathering and back, and from it to every place's spots (where a hero who
+    // struck it goes back to its work)
+    const homeSpots = kit.spots(kit.home)
+    const firsts = [...z.zones.keys()].flatMap((zi) => kit.spots(zi).slice(0, 1))
+    for (const [k, grave] of strikes.entries())
+      for (const [a, b, src] of [
+        ...homeSpots.map((s) => [s, grave, "hero to a grave"] as const),
+        ...homeSpots.map((s) => [grave, s, "hero from a grave"] as const),
+        ...firsts.map((s) => [grave, s, "hero from a grave"] as const),
+        ...firsts.map((s) => [s, grave, "hero to a grave"] as const),
+      ]) {
+        const r = heroRouteOf(walk, a, b, places.walkNear)
+        if (!r) continue
+        const steps: LifeStep[] = [
+          { kind: "stay", from: -1, to: 0, at: a.at, facing: 0, act: "idle", ground: true },
+          r,
+        ]
+        sweepSteps(out, near, walk, grid, steps, who(`grave ${k}`), true, 1, src)
+      }
     // every place's hero spots from the gathering and back (the routes any session may take)
     const home = kit.spots(kit.home)
     for (const zi of z.zones.keys()) {
@@ -462,9 +572,14 @@ export function sweepIsland(
   }
   // which cuts are in the castle (its site's tiles and the curtain's notches)
   const site = new Set([...(z.castle?.tiles ?? []), ...(z.castle?.foot ?? [])])
+  // … and which in and round the graveyard (its two tiles and their neighbours)
+  const yard = new Set<number>()
+  for (const t of w.graveyard ? [w.graveyard.tile, ...w.graveyard.cover] : [])
+    for (const j of [t, ...h.grid.neighbours(t)]) if (j >= 0) yard.add(j)
   for (const c of out.cuts) {
     const { q, r } = hexAt(c.x / HEX_TILE_SIZE, c.z / HEX_TILE_SIZE)
     if (site.has(h.grid.index(q, r))) c.castle = true
+    if (yard.has(h.grid.index(q, r))) c.graveyard = true
   }
   return { ...out, ms: performance.now() - t0 }
 }
@@ -516,7 +631,10 @@ if (import.meta.main) {
       tables.push(r.table)
       cuts.push(...r.cuts)
       const n = SOURCES.reduce((m, s) => m + r.table[s].cuts, 0)
-      console.log(`seed ${seed} files ${files}: ${n} cuts (${Math.round(r.ms)} ms)`)
+      const yard = r.cuts.filter((c) => c.graveyard).length
+      console.log(
+        `seed ${seed} files ${files}: ${n} cuts, ${yard} by the graveyard, ${r.struck} strikes (${Math.round(r.ms)} ms)`,
+      )
     }
   console.log(printTable(sumTables(tables)))
   if (process.env.CUTS) {

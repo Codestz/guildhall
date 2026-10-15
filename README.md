@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <img src=".github/media/v2-hero.webp" alt="The demo guild's castle at golden hour: a stone keep and a great hall inside a curtain wall, forest and fields around it. Six heroes are at work, with chips over their heads ('Artisan II, editing', 'Architect, returning with loot'), portraits in the face bar at the top left, the chronicle at the bottom left and a caption reading 'The Guildmaster sends the Artisan, the Artisan II and the Archivist out at once.'" width="100%" />
+  <img src=".github/media/v2-hero.webp" alt="The demo guild's castle at golden hour: a stone keep and a great hall inside a curtain wall, the village, fields and the graveyard behind it. Heroes are coming home, with chips over their heads ('Artisan II, returning with loot', 'Artisan, returning with loot', 'Architect, home with loot', 'Guildmaster, dispatching'), six portraits in the face bar at the top left, the chronicle at the bottom left ('Guildmaster sends a quest: Verify against the contract', 'Warden joins the party') and a caption reading 'The Artisan returns with the loot: Lookahead row added; boundary test passes.'" width="100%" />
 </p>
 
 Guildhall turns what happens in a repository into a world you can watch. The repo's folders and
@@ -48,9 +48,25 @@ castle that grows with the repo, and a world built off the main thread.
   orbits around the hero you follow.
 
 <p align="center">
-  <img src=".github/media/v2-react.webp" alt="React's repository as a hex island seen from the sea: villages and towns labelled with its packages (compiler, 4,253 files, capital; react-dom, react-reconciler, react-devtools-shared and more), roads between them, rivers, lakes, forest and a mine." width="100%" />
+  <img src=".github/media/v2-react.webp" alt="React's repository as a hex island in autumn, seen from the sea: villages and towns labelled with its packages (compiler, 4,253 files, capital; react-dom, react-reconciler, react-devtools-shared, scripts as a mine, fixtures as a camp and more), roads between them, rivers, lakes and orange and green woods, with the timeline at the bottom: Watch it grow, 12 Oct 2026, 1,954 contributors, 7,254 files." width="100%" />
   <br /><sub>React's island at <a href="https://guildhall.codestz.dev/hall/facebook/react">/hall/facebook/react</a>.</sub>
 </p>
+
+The island keeps the seasons: a hall takes them from its own timeline, so Watch it grow turns the
+years, and a demo story keeps its own. Places live with the work: one being read glows warm, one being
+edited raises its scaffold, and one failing is blighted until the fix lands. **Share island**, in the
+crest menu, draws the island as it stands today into a Chronicle card to download or link.
+
+<table>
+  <tr>
+    <td width="50%"><img src=".github/media/v2-winter.webp" alt="The keep in winter during the World events demo: snow on the roofs, the walls and the fields, low sun, and chips over the heroes in the yard ('Artisan II, editing hexworld/shows.ts', 'Illuminator, editing shows/festival.ts', 'Guildmaster, dispatching')." width="100%" /></td>
+    <td width="50%"><img src=".github/media/v2-share.webp" alt="React's Chronicle card, landscape, as Share island draws it: 'The Chronicle of react/react, since May 2013, 13 years', 13 years, 19.1k commits, 1,954 contributors, 130 releases, 37 places, 7,254 files, three lines of its history, and the autumn island beside them." width="100%" /></td>
+  </tr>
+  <tr>
+    <td valign="top"><sub><strong>Winter.</strong> The World events demo is told in the snow.</sub></td>
+    <td valign="top"><sub><strong>Share island.</strong> React's Chronicle card, landscape.</sub></td>
+  </tr>
+</table>
 
 ## The island answers
 
@@ -61,10 +77,10 @@ one in turn.
 
 <table>
   <tr>
-    <td width="25%"><img src=".github/media/v2-strip-fireworks.webp" alt="Night over the island: a gold and rose firework bursting above the lit keep and village." width="100%" /></td>
-    <td width="25%"><img src=".github/media/v2-strip-dragon.webp" alt="A red dragon flying over the coast and the mountains in the rain." width="100%" /></td>
-    <td width="25%"><img src=".github/media/v2-strip-tavern.webp" alt="The tavern's beer garden at eight in the evening: patrons round the tables under a glowing lamp, a song line over them." width="100%" /></td>
-    <td width="25%"><img src=".github/media/v2-strip-skeleton.webp" alt="A skeleton warrior rising from a grave among the headstones of the graveyard." width="100%" /></td>
+    <td width="25%"><img src=".github/media/v2-strip-fireworks.webp" alt="Night over the island in the Saga's festival: a blue ring firework above the dark sea and the lamplit village, the keep lit at the bottom." width="100%" /></td>
+    <td width="25%"><img src=".github/media/v2-strip-dragon.webp" alt="A red dragon flying in the rain over a grey sea and the snowy coast of the island." width="100%" /></td>
+    <td width="25%"><img src=".github/media/v2-strip-tavern.webp" alt="The tavern's beer garden at eight in the evening: patrons round the tables in lamplight, toasting ('Another round!', 'To the guild!')." width="100%" /></td>
+    <td width="25%"><img src=".github/media/v2-strip-skeleton.webp" alt="A horned skeleton warrior rising from a grave among the headstones of the graveyard, autumn trees and fields behind." width="100%" /></td>
   </tr>
   <tr>
     <td valign="top"><sub><strong>Fireworks.</strong> Fifteen clean deeds earn a festival at nightfall.</sub></td>
@@ -201,7 +217,7 @@ short:
 ## On your phone
 
 <p align="center">
-  <img src=".github/media/v2-phone.webp" alt="The island on a phone, 390 pixels wide: the castle at golden hour, a caption at the bottom and a bar of six hero portraits, with the crest, the party's name and a menu button along the top." width="260" />
+  <img src=".github/media/v2-phone.webp" alt="The island on a phone, 390 pixels wide: the keep and the great hall at golden hour with the Guildmaster's chip and knights in the yard, the caption 'The Guildmaster sends the Artisan, the Artisan II and the Archivist out at once.' and a face bar of five hero portraits and +1 at the bottom, with the crest, the party's name and a menu button along the top." width="260" />
 </p>
 
 The same site works at 390 px wide. The top row is the crest, the repo and a menu. The menu opens
@@ -212,7 +228,7 @@ like the desktop.
 ## The Studio
 
 <p align="center">
-  <img src=".github/media/v2-studio.webp" alt="The Studio's home: 'Guildhall Studio, Events in. A living world out.', a live tile preview of a canteen with its beer garden, and counts: 1,525 pieces, 17 packs, 82 tile prefabs, 232 activity spots, 310 animation clips." width="100%" />
+  <img src=".github/media/v2-studio.webp" alt="The Studio's home: 'Guildhall Studio, Events in. A living world out.', the read-only badge in the top bar, a live tile preview of a canteen with its beer garden, and counts: 1,568 pieces, 18 packs, 83 tile prefabs, 234 activity spots, 132 animation clips." width="100%" />
 </p>
 
 The Studio is where the world is made: pieces and palette at true scale, the tile composer, the hex
@@ -228,7 +244,8 @@ must not change what you see**.
 - LOD switches only where the difference is under about a pixel, and crossfades over a band; every
   threshold has a gap between switching in and out, so nothing pops or flickers.
 - The governor holds a 12 ms frame by trading resolution, a quarter step of pixel ratio at a time.
-  It never overrides a quality you pick in Settings.
+  It never overrides a quality you pick in Settings, and Settings → Motion holds the frame rate to
+  Auto, Smooth 30 or Max.
 - Shadow cascades re-aim only when the camera leaves an inner area, so panning costs what standing
   still does.
 - Placed pieces are batched per material, the crowd draws from one baked bone texture, and the

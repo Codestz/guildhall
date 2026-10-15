@@ -84,6 +84,13 @@
         "@guildhall/core": "workspace:*",
       },
     },
+    "tools/chronicle": {
+      "name": "@guildhall/chronicle",
+      "version": "0.0.0",
+      "dependencies": {
+        "@guildhall/sim": "workspace:*",
+      },
+    },
     "tools/import": {
       "name": "@guildhall/import",
       "version": "0.0.0",
@@ -152,6 +159,8 @@
     "@gltf-transform/functions": ["@gltf-transform/functions@4.5.1", "", { "dependencies": { "@gltf-transform/core": "^4.5.1", "@gltf-transform/extensions": "^4.5.1", "ktx-parse": "^1.1.0", "ndarray": "^1.0.19", "ndarray-lanczos": "^0.3.0", "ndarray-pixels": "^5.2.0" } }, "sha512-rfm4nQY2DJ+ip1e15xp7YfQwhRno3kPLcGw4EZiRk1dVwMV3cdFMcF08glYcO/+oLyYkUEs3xXMJYXa0cPgcTg=="],
 
     "@guildhall/assets": ["@guildhall/assets@workspace:packages/assets"],
+
+    "@guildhall/chronicle": ["@guildhall/chronicle@workspace:tools/chronicle"],
 
     "@guildhall/core": ["@guildhall/core@workspace:packages/core"],
 

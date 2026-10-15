@@ -182,7 +182,7 @@ short:
 | [`packages/render`](packages/render) | three.js: the stage, batches and LOD, crowd, water, sky, shadows, event effects |
 | [`packages/ui`](packages/ui) | The React HUD and site pieces |
 | [`apps/studio`](apps/studio) | The site and the Studio in one app |
-| [`tools/*`](tools) | `import` (packs to library), `shots` (screenshots and the perf bench), `palette` |
+| [`tools/*`](tools) | `import` (packs to library), `shots` (screenshots and the perf bench), `palette`, `chronicle` (the deep chronicle builder the chronicles repo runs) |
 | [`legacy/`](legacy) | V1, still runnable: the hub and the Claude Code hook live mode uses |
 
 - **One-way layers.** `core → assets → world → sim → render`, each importing only the ones before

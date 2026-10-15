@@ -66,8 +66,14 @@ export type ChronicleResult =
 
 /** Names GitHub now spells otherwise: the chronicle is filed under the new one. */
 const ALIASES: Record<string, string> = { "facebook/react": "react/react" }
-/** Files the studio ships (apps/studio/public/lab/repo), by chronicle stem. */
-const LOCAL: Record<string, string> = { react__react: "react", codestz__guildhall: "guildhall" }
+/**
+ * Files the studio ships (apps/studio/public/lab/repo), by chronicle stem: the ones
+ * `bun tools/chronicle/src/cli.ts bundle` rebuilds.
+ */
+export const LOCAL_COPIES: Readonly<Record<string, string>> = {
+  react__react: "react",
+  codestz__guildhall: "guildhall",
+}
 
 const REPO = /^[\w.-]+\/[\w.-]+$/
 const DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -119,7 +125,7 @@ export async function chronicleFor(
       reason = error instanceof Error ? error.message : reason
     }
   } else if (got.kind === "failed") reason = got.reason
-  const local = LOCAL[stem]
+  const local = LOCAL_COPIES[stem]
   if (local) {
     const copy = await get(`${opts.localBase ?? LOCAL_CHRONICLES}${local}.json.gz`, opts)
     if (copy.kind === "ok") {

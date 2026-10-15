@@ -30,6 +30,7 @@ import { type SessionPlaces, sessionPlaces } from "../feeds/places.ts"
 import { storyTitle } from "../feeds/story.ts"
 import { driveFx } from "../fx.ts"
 import { type HallFloat, HallHud, type HallHudProps, type HallLevers, REMEMBERED } from "./HallHud.tsx"
+import { watchClear } from "./clear.ts"
 import { createHeroPortraits } from "./portraits.ts"
 import type { HudSession } from "./SessionHud.tsx"
 import { holdHallHudStyle } from "./style.ts"
@@ -146,6 +147,8 @@ function mountOn(
     return el
   }
   const float: HallFloat = { top: slot("top"), caps: slot("caps"), acts: slot("acts") }
+  // the captions and the bar stay centred on the screen, stepping aside only where a panel would cover them
+  const stopClear = watchClear(viewer.root)
   // the book and the cards are dialogs over the whole page (the site's crest included)
   const modals = document.createElement("div")
   modals.className = "gh hall-hud-modals"
@@ -205,6 +208,7 @@ function mountOn(
     levers,
     parts: { ...rest, camera },
     dispose() {
+      stopClear()
       offFx()
       offEvents()
       camera.dispose()

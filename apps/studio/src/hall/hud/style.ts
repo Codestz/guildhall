@@ -59,8 +59,8 @@ const CSS = /* css */ `
 .gh .ui-hud-bottom .hall-timeline[data-pinned="false"] { pointer-events: none; }
 .gh .ui-hud-bottom .hall-timeline[data-pinned="false"] .hud-timeline-hint { pointer-events: auto; }
 .gh.site-root .ui-viewer[data-phone] .ui-hud-bottom .hall-timeline, .gh .ui-viewer[data-phone] .ui-hud-bottom .hall-timeline { width: 100%; }
-/* a sheet that is up without a panel opened (Detailed's Chronicle) keeps the bar clear of it too */
-.ui-viewer:not([data-phone]) .ui-hud-sheet:not(:empty) ~ .ui-hud-bottom { translate: calc(-50% - 190px) 0; }
+/* the bar is centred on the screen; a sheet's panel moves it only by what it would cover (hud/clear.ts) */
+.ui-viewer:not([data-phone]) .ui-hud-bottom, .ui-viewer:not([data-phone]) .ui-hud-sheet:not(:empty) ~ .ui-hud-bottom { translate: calc(-50% - var(--bar-shift, 0px)) 0; }
 /* a phone: the timeline is the bottom edge, a hairline across it (a tap opens the bar); the row over it
    steps up while the bar is open */
 .ui-viewer[data-phone] .hud-timeline-hint { left: 0; width: 100%; margin-left: 0; }
@@ -86,7 +86,7 @@ const CSS = /* css */ `
 /* the history's tape is always open: the captions ride over it, one row or two (--tape-h, timeline.tsx) */
 .ui-viewer:not([data-phone], [data-hud-mode="hidden"]):has(.ui-hud-bottom .hall-timeline[data-scale="history"]) .hall-caps { bottom: calc(var(--gut) + var(--tape-h, 60px) + 14px); }
 .ui-viewer[data-hud-mode="hidden"] .hall-caps { bottom: var(--gut); }
-.ui-viewer:not([data-phone]) .ui-hud-sheet:not(:empty) ~ .hall-caps { translate: calc(-50% - 190px) 0; }
+.ui-viewer:not([data-phone]) .hall-caps { translate: calc(-50% - var(--caps-shift, 0px)) 0; }
 /* the act chip bottom right (V1), its title centred, its list up over it */
 .hall-acts { right: var(--gut); bottom: var(--gut); align-items: flex-end; }
 .ui-viewer:not([data-phone]) .ui-hud-sheet:not(:empty) ~ .hall-acts { right: calc(var(--gut) + min(380px, 100% - 2 * var(--gut)) + 12px); }

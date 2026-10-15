@@ -55,6 +55,14 @@ interface Cluster {
 
 /** No cluster. */
 const NONE = -1
+/** A side pass's crossfade list: there is none (side passes carry no fade codes). */
+const NO_FADE = {
+  starts: new Int32Array(0),
+  counts: new Int32Array(0),
+  count: 0,
+  ids: null as DataTexture | null,
+}
+const NO_IDS = new Uint32Array(0)
 
 const frustum = new Frustum()
 const toLocal = new Matrix4()
@@ -120,6 +128,26 @@ export class LodBatchedMesh extends BatchedMesh {
     count: 0,
     ids: null as DataTexture | null,
   }
+  /**
+   * The list of every pass that is not the main view's (a shadow cascade, an orthographic still): its
+   * own buffers, swapped in for the walk and the draw and out again after. Written into the main
+   * pass's buffers, as three's BatchedMesh does, a cascade's re-render left the main list to be walked
+   * again on the next frame (18 k instances, the indirect texture's upload) with the camera still: the
+   * sun turning a quarter degree cost that walk on top of its own.
+   */
+  private side = {
+    starts: new Int32Array(0),
+    counts: new Int32Array(0),
+    count: 0,
+    ids: null as DataTexture | null,
+  }
+  /** The main list's buffers while the side list stands in for them; null when the main list is in place. */
+  private kept: {
+    starts: Int32Array
+    counts: Int32Array
+    count: number
+    ids: Internals["_indirectTexture"]
+  } | null = null
 
   /** What the last main pass drew. */
   get lod(): LodCounts {
@@ -260,9 +288,9 @@ export class LodBatchedMesh extends BatchedMesh {
     return sphere
   }
 
-  /** Sizes the crossfade list like the main one (they grow together). */
-  private fadeList(size: number, side: number) {
-    const f = this.fade
+  /** Sizes the crossfade list (or the side list) like the main one (they grow together). */
+  private fadeList(size: number, side: number, list = this.fade) {
+    const f = list
     if (f.starts.length !== size) {
       f.starts = new Int32Array(size)
       f.counts = new Int32Array(size)
@@ -274,6 +302,36 @@ export class LodBatchedMesh extends BatchedMesh {
     return f
   }
 
+  /** Puts the side list's buffers in the main list's place (for a pass that is not the main view's). */
+  private standIn(): void {
+    const self = this as unknown as Internals
+    if (this.kept) return
+    const side = this.fadeList(self._multiDrawStarts.length, self._indirectTexture.image.width, this.side)
+    this.kept = {
+      starts: self._multiDrawStarts,
+      counts: self._multiDrawCounts,
+      count: self._multiDrawCount,
+      ids: self._indirectTexture,
+    }
+    self._multiDrawStarts = side.starts
+    self._multiDrawCounts = side.counts
+    self._multiDrawCount = side.count
+    self._indirectTexture = side.ids as unknown as Internals["_indirectTexture"]
+  }
+
+  /** Puts the main list's buffers back after a side pass has drawn. */
+  private standDown(): void {
+    const self = this as unknown as Internals
+    const kept = this.kept
+    if (!kept) return
+    this.side.count = self._multiDrawCount
+    self._multiDrawStarts = kept.starts
+    self._multiDrawCounts = kept.counts
+    self._multiDrawCount = kept.count
+    self._indirectTexture = kept.ids
+    this.kept = null
+  }
+
   /** The crossfading draws, after the main ones: the same buffers, the dithering material. */
   override onAfterRender(
     renderer: WebGLRenderer,
@@ -283,6 +341,12 @@ export class LodBatchedMesh extends BatchedMesh {
     _material: Material,
     group: Parameters<BatchedMesh["onAfterRender"]>[5],
   ): void {
+    // a side pass's draw (an orthographic still, or a shadow pass through onBeforeRender) is done: the
+    // main list comes back, and there is no crossfade to draw (side passes carry no fade codes)
+    if (this.kept) {
+      this.standDown()
+      return
+    }
     const f = this.fade
     if (!this.fadeMaterial || f.count === 0 || !f.ids) return
     const self = this as unknown as Internals
@@ -314,9 +378,15 @@ export class LodBatchedMesh extends BatchedMesh {
   }
 
   override dispose(): this {
+    this.standDown()
     this.fade.ids?.dispose()
+    this.side.ids?.dispose()
     super.dispose()
     return this
+  }
+
+  override onAfterShadow(): void {
+    this.standDown()
   }
 
   override onBeforeRender(
@@ -359,10 +429,11 @@ export class LodBatchedMesh extends BatchedMesh {
     }
 
     const perspective = (camera as PerspectiveCamera).isPerspectiveCamera === true
+    const main = !shadow && perspective
     // the main pass's list is still the one in the buffers: nothing to walk, nothing to upload
-    if (!shadow && perspective) {
+    if (main) {
       if (this.sameAsListed(renderer, camera)) return
-    } else this.dirty = true
+    } else this.standIn()
     toLocal.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(this.matrixWorld)
     frustum.setFromProjectionMatrix(toLocal, camera.coordinateSystem, camera.reversedDepth)
     viewer.setFromMatrixPosition(camera.matrixWorld).applyMatrix4(inverse.copy(this.matrixWorld).invert())
@@ -403,10 +474,11 @@ export class LodBatchedMesh extends BatchedMesh {
     const capacity = Math.min(starts.length, indirect.length)
     const geometries = self._geometryInfo
     let drawn = 0
-    const fade = this.fadeList(starts.length, self._indirectTexture.image.width)
-    const fadeIds = (fade.ids as DataTexture).image.data as Uint32Array
+    // the crossfade list is the main pass's own: a side pass (no fade codes) leaves it as it stands
+    const fade = main ? this.fadeList(starts.length, self._indirectTexture.image.width) : NO_FADE
+    const fadeIds = fade.ids ? (fade.ids.image.data as Uint32Array) : NO_IDS
     fade.count = 0
-    const apart = this.fadeMaterial !== null
+    const apart = main && this.fadeMaterial !== null
     const emit = (id: number, geometryId: number, code: number) => {
       if (drawsNothing(code)) return
       const range = geometries[geometryId] as { start: number; count: number }

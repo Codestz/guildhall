@@ -259,6 +259,8 @@ describe("LodBatchedMesh", () => {
     const r = renderer(dpr)
     if (shadow) m.onBeforeShadow(r as never, m, cam, cam, m.geometry, m.material as never)
     else m.onBeforeRender(r as never, new Scene(), cam, m.geometry, m.material as never)
+    // what three draws between the two hooks (a shadow pass's own list stands in for the main one
+    // until onAfterShadow puts it back)
     const internal = m as unknown as {
       _multiDrawCount: number
       _multiDrawCounts: Int32Array
@@ -266,11 +268,13 @@ describe("LodBatchedMesh", () => {
     }
     const n = internal._multiDrawCount
     const packed = Array.from(internal._indirectTexture.image.data.slice(0, n))
-    return {
+    const draws = {
       tris: Array.from(internal._multiDrawCounts.slice(0, n)).map((k) => k / 3),
       codes: packed.map((v) => v >>> ID_BITS),
       ids: packed.map((v) => v & ((1 << ID_BITS) - 1)),
     }
+    if (shadow) m.onAfterShadow(r as never, m, cam, cam, m.geometry, m.material as never, null as never)
+    return draws
   }
 
   test("near: the cluster's parts and every piece at full detail, drawn whole", () => {
@@ -379,14 +383,15 @@ describe("LodBatchedMesh", () => {
     let uploads = indirect.version
     expect(pass(m, cam)).toEqual(first)
     expect(indirect.version).toBe(uploads)
-    // a shadow pass writes the same buffers: the next main pass lists again
+    // a shadow pass writes its own buffers: the main list stands, and the next main pass neither
+    // walks nor uploads (a cascade re-rendered on a still camera used to cost the main walk again)
     const sun = new OrthographicCamera(-10, 10, 10, -10, 0.1, 100)
     sun.position.set(0, 0, 20)
     sun.updateMatrixWorld()
     pass(m, sun, true)
     uploads = indirect.version
     expect(pass(m, cam)).toEqual(first)
-    expect(indirect.version).toBe(uploads + 1)
+    expect(indirect.version).toBe(uploads)
     // the camera moves: listed again
     uploads = indirect.version
     const moved = camera(4.5)

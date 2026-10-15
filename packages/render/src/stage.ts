@@ -12,6 +12,7 @@ import {
   WebGLRenderer,
   type WebGLRenderTarget,
 } from "three"
+import { stageFlags } from "./flags.ts"
 import { createGovernor, deviceProfile, type LeverName, parseDprPin, startTier } from "./governor.ts"
 import { type PacePick, vsyncOf } from "./pace.ts"
 import { createRig, type Rig } from "./rig/index.ts"
@@ -105,7 +106,7 @@ export function clampDpr(device: number, [min, max]: readonly [number, number]):
 
 /**
  * A lit scene drawn every animation frame into a canvas that fills `host`, with an orbit camera. A DPR
- * governor keeps the frame cost under budget within `opts.dpr`; `?dpr=` in the page's URL pins it.
+ * governor keeps the frame cost under budget within `opts.dpr`; `setStageFlags({ dpr })` pins it.
  */
 export function createStage(
   host: HTMLElement,
@@ -152,7 +153,7 @@ export function createStage(
   // GPU timer queries on `?timers=1` only: on ANGLE/Metal they cost ~1.3 ms a frame (they split the
   // command buffers) and read command-buffer wall time rather than pass cost. The CPU buckets always run.
   const timing = createTiming(renderer, {
-    gpu: new URLSearchParams(globalThis.location?.search ?? "").get("timers") === "1",
+    gpu: stageFlags().gpuTimers,
   })
 
   // three counts shadow-map draws into the same `info.render` as the main pass; tally them apart, and
@@ -347,7 +348,7 @@ export function createStage(
   const governor = createGovernor(stage, {
     targetMs: BUDGET_MS,
     dpr: range,
-    pin: parseDprPin(globalThis.location?.search ?? ""),
+    pin: parseDprPin(stageFlags().dpr),
     // the ladder's levers, as the modules register them (a tier step applies every one it has)
     apply: (values) => {
       for (const [name, fn] of levers) fn(values[name])

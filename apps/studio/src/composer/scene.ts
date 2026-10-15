@@ -79,8 +79,8 @@ export interface TileScene {
   show(t: TilePrefab, opts: ShowOpts): Promise<void>
   select(sel: Selection | null): void
   setMode(mode: GizmoMode): void
-  /** Aims the camera: `close` on the tile, else wide enough for the neighbours. */
-  frame(close?: boolean): void
+  /** Aims the camera on the tile. */
+  frame(): void
   dispose(): void
 }
 
@@ -479,10 +479,8 @@ export function createTileScene(
       gizmo.setMode(next)
       applySnap()
     },
-    frame(close = true) {
-      const pose: CameraPose = close
-        ? { target: [0, 0.8, 0.4], azimuth: 22, elevation: 42, distance: 14 }
-        : { target: [0, 0.6, 0], azimuth: 22, elevation: 50, distance: 34 }
+    frame() {
+      const pose: CameraPose = { target: [0, 0.8, 0.4], azimuth: 22, elevation: 42, distance: 14 }
       stage.setCamera(pose)
       sun.markDirty()
     },

@@ -290,7 +290,7 @@ const LEFT_OUT = new Set(["tags", "batches"])
  * What the showcase ships of the library, from `STUDIO_LIBRARY` at build time:
  *   "style" (the default)  the house style's packs alone (STYLE_PACKS): their catalog shards, the
  *                          pieces and thumbnails those shards name, and the rigs their characters use;
- *   "full"                 every imported pack, as it is on disk (`?packs=all` then shows them all);
+ *   "full"                 every imported pack, as it is on disk (`?packs=all&dev=1` then shows them all);
  *   an https URL           nothing: the page reads `<url>/catalog/index.json` and the rest from there
  *                          (a CDN or bucket holding the same layout, e.g. the "style" copy uploaded).
  */

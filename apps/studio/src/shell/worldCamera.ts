@@ -4,6 +4,7 @@
  * chip's toggle, and `?cam=free` starting in it. `ui=0` leaves the chip out for clean shots.
  */
 import type { Stage, World } from "@guildhall/render"
+import { param } from "../params.ts"
 import { type CamKeys, createCamChip } from "./camKeys.ts"
 
 export interface WorldCamera {
@@ -54,8 +55,8 @@ export function worldCamera(stage: Stage, host: HTMLElement, query: URLSearchPar
       if (world) stage.rig.setWorld(world)
       if (started || !stage.rig.world()) return
       started = true
-      if (query.get("ui") !== "0") chip = createCamChip(host, stage.rig)
-      if (query.get("cam") === "free") stage.rig.setMode("free")
+      if (param(query, "ui")) chip = createCamChip(host, stage.rig)
+      if (param(query, "cam") === "free") stage.rig.setMode("free")
     },
     dispose() {
       chip?.dispose()

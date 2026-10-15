@@ -13,6 +13,7 @@
 import type { Stage } from "@guildhall/render"
 import { toScreen } from "@guildhall/render"
 import { plate } from "@guildhall/ui"
+import { param, type QueryLike } from "../params.ts"
 
 export interface PlaceLabel {
   /** The name on the plate. */
@@ -373,4 +374,4 @@ export function createPlaceLabels(
 }
 
 /** `?labels=0`: no plates. */
-export const labelsOn = (query: URLSearchParams): boolean => query.get("labels") !== "0"
+export const labelsOn = (query: QueryLike): boolean => param(query, "labels")

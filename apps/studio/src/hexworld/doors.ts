@@ -66,8 +66,6 @@ export async function createDoors(
     load: Parameters<typeof createGates>[2]
     doorways: readonly HexDoorway[]
     life: DoorLife | null
-    /** Every doorway drawn open (`?doors=open`: to check them against the meshes). */
-    all?: boolean
     /** The screen's clock, hours (what day and night follow). */
     hour(): number
   },
@@ -149,7 +147,6 @@ export async function createDoors(
     }
     // ---- doorways: the passes round the clock (and across midnight) ----
     open.clear()
-    if (opts.all) for (let k = 0; k < opts.doorways.length; k++) open.set(k, 1)
     if (opts.life && timed.length) {
       const now = opts.life.clock()
       const add = (p: Timed, at: number) => {

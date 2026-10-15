@@ -14,6 +14,8 @@
  * `?hub=ws://127.0.0.1:<port>/ws`, `?src=` (a chronicle of the guild, or a path on this origin),
  * `?story=saga|solo|party|parties|rush|seas|factions`, `?seed=`, `?st=<seconds>` (open at), `?act=1..5` (a story opens at that act, like the home), `?play=0` (open paused).
  */
+
+import { param } from "../../params.ts"
 import type { Feed, FeedKind } from "./feed.ts"
 import { hubUrlOf, LiveFeed } from "./live.ts"
 import { fetchRecording, ReplayFeed, recordingUrl } from "./replay.ts"
@@ -26,31 +28,31 @@ export { createSession, type HallSession, type SessionSnapshot } from "./session
 
 /** The feed a link asks for, or null (no `?feed=`: the hall shows its history only). */
 export function feedKindOf(query: URLSearchParams): FeedKind | null {
-  const asked = query.get("feed")
+  const asked = param(query, "feed")
   return asked === "live" || asked === "replay" || asked === "story" ? asked : null
 }
 
 /** The feed for a repo's hall (`slug`: `Codestz/guildhall`). */
 export function openFeed(kind: FeedKind, slug: string, query: URLSearchParams, stage: StoryStage = {}): Feed {
   const repo = slug.split("/").pop() || slug
-  const exact = query.get("guild")
+  const exact = param(query, "guild")
   const guild = exact ?? repo
   if (kind === "live")
     return new LiveFeed({
-      url: hubUrlOf(query.get("hub")),
+      url: hubUrlOf(param(query, "hub")),
       guild: guildMatcher(guild, exact !== null),
       name: guild,
     })
   if (kind === "replay") {
-    const url = recordingUrl(guild, query.get("src"))
+    const url = recordingUrl(guild, param(query, "src"))
     const file = decodeURIComponent(url.split("/").pop() ?? url)
     return new ReplayFeed({
       name: file === "latest.jsonl" ? "latest session" : file.replace(/\.jsonl$/, "").slice(0, 16),
       load: () => fetchRecording(url),
     })
   }
-  const story = storyOf(query.get("story"))
-  const seed = Number(query.get("seed"))
+  const story = storyOf(param(query, "story"))
+  const seed = param(query, "seed") ?? 0
   const act = actOf(query)
   return new StoryFeed(story, {
     ...stage,

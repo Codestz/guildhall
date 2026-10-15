@@ -5,6 +5,8 @@
  * takes only local origins): it asks for the `hello`, the guilds in it, and gives up after `PROBE_MS`.
  * The public site never probes. The socket and the timers are injectable, for tests.
  */
+
+import { hasParam, param } from "../../params.ts"
 import type { SocketLike } from "./live.ts"
 import { hubUrlOf } from "./live.ts"
 import { guildMatcher, hubMessage } from "./wire.ts"
@@ -82,11 +84,11 @@ export async function autoFeed(
   slug: string,
   opts: AutoFeedOptions,
 ): Promise<"live" | null> {
-  if (query.has("feed") || !isLocalHost(opts.hostname)) return null
+  if (hasParam(query, "feed") || !isLocalHost(opts.hostname)) return null
   const repo = slug.split("/").pop() || slug
-  const exact = query.get("guild")
+  const exact = param(query, "guild")
   const answered = await (opts.probe ?? probeHub)({
-    url: hubUrlOf(query.get("hub")),
+    url: hubUrlOf(param(query, "hub")),
     guild: guildMatcher(exact ?? repo, exact !== null),
   }).catch(() => false)
   return answered ? "live" : null

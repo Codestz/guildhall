@@ -89,6 +89,7 @@ import { createPortal } from "react-dom"
 import { SoundButton, SoundSettings } from "../../audio/ui.tsx"
 import type { HudParts } from "../../hexworld/index.ts"
 import type { BuiltPlace } from "../../hexworld/job.ts"
+import { patchAddress } from "../../shell/router.ts"
 import { captureStage } from "../../shell/viewer.ts"
 import type { HallTime } from "../clock.ts"
 import { type EraShots, eraShotKey } from "../eraShots.ts"
@@ -186,6 +187,8 @@ export interface HallHudProps {
   home?: { title: string; leave?: { label: string; href: string } }
   /** The Legends' era pictures (eraShots.ts): filmed when the book opens; the latest is the card's island. */
   eraShots?: EraShots
+  /** The island's size in files, where Settings › World may change it (the home's; a hall's is its repo's). */
+  size?: number
 }
 
 const nothing = () => () => {}
@@ -957,7 +960,9 @@ export function HallHud(props: HallHudProps) {
     hour,
     ...(parts.fx ? { weather } : {}),
     ...(parts.season ? { season } : {}),
+    ...(props.size !== undefined ? { size: props.size } : {}),
   }
+  // Settings › World is what a link carries: each pick goes into the address (public params, in place)
   const onSettings = (patch: Partial<SettingsValues>) => {
     if (patch.pace !== undefined) {
       if (live) live.session.clock.setRate(patch.pace)
@@ -982,11 +987,18 @@ export function HallHud(props: HallHudProps) {
       setStyle(patch.directorStyle)
       levers.cinematic = patch.directorStyle === "cinematic"
     }
-    if (patch.time !== undefined) setTimeMode(patch.time)
+    if (patch.time !== undefined) {
+      setTimeMode(patch.time)
+      // a link holds a pinned hour only: any other mode opens on the island's own
+      patchAddress({ hour: patch.time === "fixed" ? String(hour) : null })
+    }
     if (patch.hour !== undefined) {
       parts.clock.set(patch.hour)
       setHour(patch.hour)
+      patchAddress({ hour: String(patch.hour) })
     }
+    // a new size is a new island: the address moves and the world is built again at that size
+    if (patch.size !== undefined) patchAddress({ files: String(patch.size) }, true)
     if (patch.weather !== undefined) {
       setWeather(patch.weather)
       const pin = patch.weather === "auto" ? null : (patch.weather as WeatherKind)
@@ -996,6 +1008,7 @@ export function HallHud(props: HallHudProps) {
     if (patch.season !== undefined) {
       setSeason(patch.season)
       parts.season?.pin(patch.season)
+      patchAddress({ season: patch.season === "auto" ? null : patch.season })
     }
   }
   const followed = filmed ? roster.heroes.find((h) => h.id === filmed) : undefined

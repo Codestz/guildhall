@@ -9,6 +9,7 @@ import {
   SCALE_FLAGS,
   type ScaleFlag,
 } from "@guildhall/assets"
+import { param } from "../params.ts"
 
 export type Flag = PieceFlag | ScaleFlag
 
@@ -33,13 +34,13 @@ const isFlag = (v: string): v is Flag => (FLAGS as readonly string[]).includes(v
 
 /** `?q=…&pack=…&cat=…&flag=a,b&misfit=1`; unknown categories and flags are ignored. */
 export function parseFilters(query: URLSearchParams): Filters {
-  const cat = query.get("cat")
+  const cat = param(query, "cat")
   return {
-    text: query.get("q") ?? "",
-    pack: query.get("pack") || null,
+    text: param(query, "q") ?? "",
+    pack: param(query, "pack") || null,
     category: cat && isCategory(cat) ? cat : null,
-    flags: (query.get("flag") ?? "").split(",").filter(isFlag),
-    misfit: query.get("misfit") === "1",
+    flags: (param(query, "flag") ?? "").split(",").filter(isFlag),
+    misfit: param(query, "misfit"),
   }
 }
 

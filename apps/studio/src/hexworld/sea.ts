@@ -31,6 +31,7 @@ import {
   type Water,
 } from "@guildhall/render"
 import type { HallSession } from "../hall/feeds/session.ts"
+import { param } from "../params.ts"
 
 export interface SeaSpec {
   merchants: boolean
@@ -45,7 +46,7 @@ const LAMPS: Record<string, CiState> = { red: "failed", amber: "running", warm: 
 
 /** `?sea=`: null when absent, "off" for `0`. */
 export function seaOf(query: Pick<URLSearchParams, "get">): SeaSpec | "off" | null {
-  const raw = query.get("sea")
+  const raw = param(query, "sea")
   if (raw === null) return null
   if (raw === "0") return "off"
   const spec: SeaSpec = {

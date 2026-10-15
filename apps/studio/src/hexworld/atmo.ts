@@ -18,6 +18,7 @@ import {
   RIG_LIMITS,
   type Stage,
 } from "@guildhall/render"
+import { param, type QueryLike } from "../params.ts"
 import { islandWorld } from "../shell/worldCamera.ts"
 
 export interface AtmoKnobs {
@@ -26,16 +27,13 @@ export interface AtmoKnobs {
   clouds: number
 }
 
-const knob = (query: URLSearchParams, key: string): number => {
-  const v = Number(query.get(key))
-  return query.has(key) && Number.isFinite(v) ? Math.min(2, Math.max(0, v)) : 1
-}
+const knob = (v: number | null): number => (v === null ? 1 : Math.min(2, Math.max(0, v)))
 
-export function atmoKnobs(query: URLSearchParams): AtmoKnobs {
+export function atmoKnobs(query: QueryLike): AtmoKnobs {
   return {
-    on: query.get("atmo") !== "0",
-    haze: knob(query, "haze"),
-    clouds: knob(query, "clouds"),
+    on: param(query, "atmo"),
+    haze: knob(param(query, "haze")),
+    clouds: knob(param(query, "clouds")),
   }
 }
 

@@ -4,6 +4,7 @@
  * Every edit returns a new mount; nothing here touches three or the DOM.
  */
 import type { CatalogEntry, Mount, MountClip, MountSlot, MountsFile, Vec3 } from "@guildhall/assets"
+import { param } from "../../params.ts"
 
 /** The rig every editable body plays (the slot frames are measured on it). */
 export const RIG = "rig-medium"
@@ -33,12 +34,12 @@ export interface EditorQuery {
 
 /** `?piece=<id>&body=<id>&clip=<name>&t=<0..1>`, with the defaults for anything missing or bad. */
 export function parseQuery(q: URLSearchParams): EditorQuery {
-  const t = Number(q.get("t"))
+  const t = Number(param(q, "t"))
   return {
-    piece: q.get("piece") || DEFAULTS.piece,
-    body: q.get("body") || DEFAULTS.body,
-    clip: q.get("clip") || DEFAULTS.clip,
-    t: q.get("t") !== null && Number.isFinite(t) ? Math.min(1, Math.max(0, t)) : DEFAULTS.t,
+    piece: param(q, "piece") || DEFAULTS.piece,
+    body: param(q, "body") || DEFAULTS.body,
+    clip: param(q, "clip") || DEFAULTS.clip,
+    t: param(q, "t") !== null && Number.isFinite(t) ? Math.min(1, Math.max(0, t)) : DEFAULTS.t,
   }
 }
 

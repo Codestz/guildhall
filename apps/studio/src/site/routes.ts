@@ -12,6 +12,7 @@
  * already built (`worldKey`), so opening the crest menu's Demos never rebuilds the map.
  */
 import { parseRepo, type SiteDest, type Story } from "@guildhall/ui"
+import { hasParam, param, worldEntries } from "../params.ts"
 import { canonical, href } from "../shell/router.ts"
 
 /** The screen ids that belong to the site (everything else is the Studio). */
@@ -33,7 +34,7 @@ export const destHref = (dest: SiteDest): string => href(DEST_SCREEN[dest])
 
 /** The valid `owner/repo` a hall's path names, or null (`/hall`, or a path that is not a GitHub repo). */
 export function hallSlug(query: URLSearchParams): string | null {
-  const text = query.get("repo")
+  const text = param(query, "repo")
   if (!text) return null
   const parsed = parseRepo(text)
   return parsed.ok ? parsed.slug : null
@@ -53,19 +54,15 @@ export function hallSeed(slug: string): number {
   return (h % 9000) + 1
 }
 
-/** The query keys that say what the visitor is looking at, not how the world is built. */
-const VIEW_ONLY = new Set(["story", "act", "ui", "bar", "hud", "log", "t", "next"])
-
 /**
  * What the island's world is made from: the keys that change the map (seed, files, hour, weather…), in a
  * stable order. A hall with a repo is its own world; `/`, `/demos` and `/hall` share the default one.
  */
 export function worldKey(screen: string, query: URLSearchParams): string {
   const slug = screen === "hall" ? hallSlug(query) : null
-  const rest = [...query.entries()]
-    .filter(([k]) => !VIEW_ONLY.has(k) && k !== "repo")
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([k, v]) => `${k}=${v}`)
+  // the registry's world-building keys (params.ts: not `view`), the repo aside (the slug says it)
+  const rest = worldEntries(query)
+    .filter((kv) => !kv.startsWith("repo="))
     .join("&")
   return `${slug ? `hall:${slug.toLowerCase()}` : "island"}?${rest}`
 }
@@ -86,9 +83,9 @@ export function worldQuery(screen: string, query: URLSearchParams): URLSearchPar
   out.delete("story")
   out.delete("act")
   const slug = screen === "hall" ? hallSlug(query) : null
-  if (slug && !out.has("seed")) out.set("seed", String(hallSeed(slug)))
+  if (slug && !hasParam(out, "seed")) out.set("seed", String(hallSeed(slug)))
   // the island's name on its card and loading cover: the repo in a hall, the brand on the site's own island
-  if (!out.has("name")) out.set("name", slug ?? "Guildhall")
+  if (!hasParam(out, "name")) out.set("name", slug ?? "Guildhall")
   return out
 }
 
@@ -108,9 +105,9 @@ export function openedStory(
   query: URLSearchParams,
   stories: readonly Story[],
 ): { story: Story; act?: number } | null {
-  const story = stories.find((s) => s.id === query.get("story"))
+  const story = stories.find((s) => s.id === param(query, "story"))
   if (!story) return null
-  const n = Number(query.get("act"))
+  const n = param(query, "act")
   const act = story.acts?.find((a) => a.n === n)?.n
   return act ? { story, act } : { story }
 }

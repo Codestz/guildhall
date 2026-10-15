@@ -7,6 +7,9 @@
 import type { KnobSection } from "@guildhall/ui"
 import { HEX_ISLAND_DEFAULTS, LEVEL_STEP, NATURE_CHOSEN } from "@guildhall/world"
 
+/** The island's size when the link names none: a repo of this many files. */
+export const DEFAULT_FILES = 4000
+
 const times = (v: number) => `×${v.toFixed(2)}`
 
 export const nature = (key: keyof typeof NATURE_CHOSEN | "pine" | "rock", label: string) => ({
@@ -46,7 +49,7 @@ export function islandKnobs(seedKey: string): KnobSection[] {
           min: 100,
           max: 30000,
           step: 100,
-          default: 4000,
+          default: DEFAULT_FILES,
           apply: "reload",
         },
         {

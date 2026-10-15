@@ -50,6 +50,7 @@ import {
   type WorkKind,
   workfxOf,
 } from "@guildhall/render"
+import { param } from "../params.ts"
 
 export interface FxSpec {
   weather: WeatherKind | null
@@ -65,7 +66,7 @@ export interface FxSpec {
 
 /** `?fx=`: null when absent or `0`. */
 export function fxOf(query: Pick<URLSearchParams, "get">): FxSpec | null {
-  const raw = query.get("fx")
+  const raw = param(query, "fx")
   if (raw === null || raw === "0") return null
   const spec: FxSpec = { weather: null, ships: 0, busy: [], progress: {}, close: "sink", lamps: false }
   for (const part of raw.split(/[,;]/)) {
@@ -245,7 +246,7 @@ export function mountWorkFx(parts: {
   pieces: () => readonly SitePiece[]
   sea: number
 }): WorkFxMount | null {
-  const spec = workfxOf(parts.query.get("workfx"))
+  const spec = workfxOf(param(parts.query, "workfx"))
   if (spec?.off) return null
   const fx = createWorkFx(parts.stage, { light: parts.light })
   const fire = (kind: WorkKind, at: readonly [number, number, number], opts: { seed?: number } = {}) =>

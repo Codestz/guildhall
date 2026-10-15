@@ -1,3 +1,4 @@
+import { param, type QueryLike } from "../params.ts"
 /**
  * When is a world ready to be shown? The loading screen (shell/viewer.ts `loading`, V1's boot card) covers
  * the stage until this says so, and the island is then revealed once: nothing arrives in view.
@@ -156,6 +157,6 @@ export function publishWorld(state: WorldState | null): void {
 }
 
 /** `?loader=0`: no cover and no gate. */
-export function loaderOn(query: URLSearchParams): boolean {
-  return query.get("loader") !== "0"
+export function loaderOn(query: QueryLike): boolean {
+  return param(query, "loader")
 }

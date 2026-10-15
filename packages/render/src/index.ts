@@ -53,6 +53,7 @@ export {
   gateFrame,
 } from "./doors.ts"
 export * from "./events/index.ts"
+export { type StageFlags, setStageFlags } from "./flags.ts"
 export { createGizmo, type Gizmo, type GizmoMode, type GizmoOpts, type GizmoPose } from "./gizmo.ts"
 export {
   type DeviceProfile,

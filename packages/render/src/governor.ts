@@ -113,10 +113,9 @@ export function qualityTier(pick: QualityPick): number | null {
   return pick === "high" ? 0 : pick === "medium" ? 1 : TIERS.length - 1
 }
 
-/** The DPR a `?dpr=` query pins, or undefined when it names none (or nothing usable). */
-export function parseDprPin(search: string): number | undefined {
-  const text = new URLSearchParams(search).get("dpr")
-  if (text === null) return undefined
+/** The DPR a `?dpr=` value pins (the page's query is the app's to read), or undefined when it names none (or nothing usable). */
+export function parseDprPin(text: string | null | undefined): number | undefined {
+  if (text === null || text === undefined) return undefined
   const dpr = Number(text)
   if (text.trim() === "" || !Number.isFinite(dpr) || dpr <= 0) {
     logger.warn("ignoring ?dpr=", { value: text })

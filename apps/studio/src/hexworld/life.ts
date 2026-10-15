@@ -8,7 +8,7 @@
  *
  * Time: the day moves on SPEEDUP times faster than real time and people walk slower per day-hour by as
  * much, so they walk at a natural pace while their routine visibly moves on. When the screen's clock is
- * moved (dragged or played) the day follows it. Agents run on real seconds (`?lifeT=` starts them on).
+ * moved (dragged or played) the day follows it. Agents run on real seconds.
  *
  * The plan itself (everyone's day, the agents' itineraries, the solids: lifePlan.ts) is made in the
  * build worker and arrives as data; this thread builds the collision layer on it and draws.
@@ -139,8 +139,6 @@ export interface LifeOpts {
   overlay?: boolean
   /** Mark the heroes' spots (`?heroSpots=1`, world heroes.ts) instead of the collision layer. */
   heroSpots?: boolean
-  /** Seconds into the agents' source at the start (`?lifeT=` for shots). */
-  agentT?: number
   /**
    * Who the agents are and where each is (lifeAgents.ts `AgentSource`, on life's agent seconds). Its
    * heroes when everyone is drawn get figures of their own; a source that grows (`version`) is drawn on
@@ -562,7 +560,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     let held: number | null = null
     let seen = opts.hour()
     let day = seen
-    let secs = opts.agentT ?? 0
+    let secs = 0
     let dt = 0
     const last = looks.map(() => [Number.NaN, 0] as [number, number])
     /** Each hero's beat as last drawn: a beat fires as it begins. */

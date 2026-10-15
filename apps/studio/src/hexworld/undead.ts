@@ -27,13 +27,14 @@ import { asStruck, gravesOf, type Itinerary, type Show, undeadKind } from "@guil
 import type { HexGraveyard, PlacedPiece } from "@guildhall/world"
 import type { HallEvents, ViewBlocker } from "../hall/events.ts"
 import type { HallSession } from "../hall/feeds/session.ts"
+import { param } from "../params.ts"
 
 export const UNDEAD_SCENES = ["rise", "vigil", "sink", "minion", "all"] as const
 export type UndeadScene = (typeof UNDEAD_SCENES)[number]
 
 /** `?undead=`: the scene to play, or null. */
 export function undeadOf(query: Pick<URLSearchParams, "get">): UndeadScene | null {
-  const v = query.get("undead")
+  const v = param(query, "undead")
   return (UNDEAD_SCENES as readonly string[]).includes(v ?? "") ? (v as UndeadScene) : null
 }
 

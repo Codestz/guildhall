@@ -1144,6 +1144,14 @@ export function hexWalk(
     join(id, street, "door")
   }
 
+  // ---- the graveyard (graveyard.ts): its front tile is walked into by its gate, from the road it faces
+  // (not by the nearest road, over its fence) ----
+  const yard = z.graveyard
+  if (yard) {
+    const road = byTile.get(g.neighbours(yard.tile)[yard.door]!)
+    if (road !== undefined) join(road, centreNode(yard.tile, "path"), "path")
+  }
+
   // ---- spurs out to work tiles off the roads ----
   const open = (i: number) => {
     const k = kindOf(h, i)

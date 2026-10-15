@@ -24,8 +24,8 @@ import {
   type WorkFx,
 } from "@guildhall/render"
 import { asStruck, gravesOf, type Itinerary, type Show, undeadKind } from "@guildhall/sim"
-import type { HexGraveyard } from "@guildhall/world"
-import type { HallEvents } from "../hall/events.ts"
+import type { HexGraveyard, PlacedPiece } from "@guildhall/world"
+import type { HallEvents, ViewBlocker } from "../hall/events.ts"
 import type { HallSession } from "../hall/feeds/session.ts"
 
 export const UNDEAD_SCENES = ["rise", "vigil", "sink", "minion", "all"] as const
@@ -90,6 +90,69 @@ export function sessionFigures(
   })
 }
 
+/** How far round the graves the camera's view is checked for what stands in it, metres (a rise is filmed from 12 m). */
+export const BLOCK_REACH = 18
+/** Pieces a camera sees through (open, or bare): never in the way. */
+const SEE_THROUGH = /fence|dead|lantern|candle|bone|skull|ribcage/
+/** An arch or a gateway: open in the middle, solid at its posts (this share of its width in from each end). */
+const ARCH = /arch|gate/
+const POST = 0.1
+/** Pieces lower than this never hide a skeleton from a camera above (fences, headstones, bushes), metres. */
+const BLOCK_LOW = 1.6
+
+/**
+ * What stands round the graveyard that a camera filming a grave must not look through (hall/camera.ts
+ * `clearAzimuth`): every solid piece within `BLOCK_REACH` of the graves taller than a fence, as an upright
+ * cylinder; a tree as its crown (its trunk is thin), anything else from the ground up. `size` is a
+ * piece's [w, h, d] at scale 1 (the catalog's), undefined for one it does not know. Pure.
+ */
+export function graveBlockers(
+  graves: readonly { x: number; z: number }[],
+  pieces: readonly PlacedPiece[],
+  size: (id: string) => readonly [number, number, number] | undefined,
+): ViewBlocker[] {
+  if (!graves.length) return []
+  const cx = graves.reduce((n, g) => n + g.x, 0) / graves.length
+  const cz = graves.reduce((n, g) => n + g.z, 0) / graves.length
+  const out: ViewBlocker[] = []
+  for (const p of pieces) {
+    if (Math.hypot(p.x - cx, p.z - cz) > BLOCK_REACH) continue
+    // open or bare things a camera sees through: the fence, the gate's arch, the yard's dead trees, lamps
+    if (SEE_THROUGH.test(p.piece)) continue
+    const s = size(p.piece)
+    if (!s) continue
+    const h = s[1] * p.scale
+    if (h < BLOCK_LOW) continue
+    if (ARCH.test(p.piece)) {
+      // its two posts, at either end of its width (the piece's own x, turned as it is placed)
+      const half = (s[0] * p.scale) / 2
+      const r = Math.max(0.25, s[0] * p.scale * POST)
+      for (const side of [-1, 1]) {
+        const lx = side * (half - r)
+        out.push({
+          x: p.x + lx * Math.cos(p.rot),
+          z: p.z - lx * Math.sin(p.rot),
+          r,
+          bottom: p.y,
+          top: p.y + h,
+          what: p.piece,
+        })
+      }
+      continue
+    }
+    const tree = /tree|pine|birch|oak/.test(p.piece)
+    out.push({
+      x: p.x,
+      z: p.z,
+      r: Math.max(s[0], s[2]) * p.scale * 0.5 * (tree ? 0.85 : 1),
+      bottom: p.y + (tree ? h * 0.3 : 0),
+      top: p.y + h,
+      what: p.piece,
+    })
+  }
+  return out
+}
+
 export interface UndeadMount {
   undead: Undead
   dispose(): void
@@ -107,6 +170,8 @@ export function mountUndead(parts: {
   hall: boolean
   /** The session playing on the island, when it is not the hall HUD's own (the site's home). */
   session?: () => HallSession | null
+  /** What stands round the graveyard (`graveBlockers`): the camera films a rise from where none hides it. */
+  blockers?: readonly ViewBlocker[]
 }): UndeadMount | null {
   const { stage, graveyard } = parts
   if (!graveyard) return null
@@ -147,6 +212,8 @@ export function mountUndead(parts: {
         const slot = show.params.grave?.slot
         return slot === undefined ? null : undead.point(slot)
       })
+      const blockers = parts.blockers ?? []
+      hall.setBlockers("undead", blockers.length ? () => blockers : null)
     }
     lastFigures = figures
     undead.update(figures, t, dt)
@@ -164,6 +231,7 @@ export function mountUndead(parts: {
       },
       at: () => sceneAt(),
       graves: () => graveyard.graves,
+      blockers: () => parts.blockers ?? [],
       gate: () => graveyard.gate,
       figures: () => lastFigures,
       ready: () => undead.ready(),
@@ -174,6 +242,7 @@ export function mountUndead(parts: {
     dispose() {
       off()
       site?.setSite("undead", null)
+      site?.setBlockers("undead", null)
       undead.dispose()
       if (ext) delete ext.undead
     },

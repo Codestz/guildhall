@@ -13,6 +13,7 @@ import {
   type Box,
   biasStep,
   CLOSE,
+  clearAzimuth,
   clearFrame,
   createHallCamera,
   directorDefault,
@@ -33,8 +34,11 @@ import {
   TRACK,
   trackStep,
   USER_WAIT_MS,
+  viewClear,
 } from "../src/hall/camera.ts"
+import type { ViewBlocker } from "../src/hall/events.ts"
 import type { HallSession } from "../src/hall/feeds/index.ts"
+import { graveBlockers } from "../src/hexworld/undead.ts"
 
 type Vec3 = [number, number, number]
 const W = 1440
@@ -494,5 +498,92 @@ describe("a pleading hero's chip stays in the clear area", () => {
     expect(biasStep(box(30, 300, 120, 400), rect, 10, { x: 60, y: 0 })).toEqual({ dx: -20, dy: 0 })
     // no nudge, nothing to do
     expect(biasStep(box(150, 300, 240, 400), rect, 10, { x: 0, y: 0 })).toEqual({ dx: 0, dy: 0 })
+  })
+})
+
+describe("a rise filmed past what stands round the grave", () => {
+  const grave: Vec3 = [0, 0, 0]
+  // a pine 2 m off the grave toward +x (azimuth 90°): its crown from 2 m to 6 m up
+  const pine: ViewBlocker = { x: 2, z: 0, r: 0.8, bottom: 2, top: 6, what: "kaykit-forest/tree-4-a" }
+
+  test("a view straight through the pine's crown is not clear; one from the side is", () => {
+    expect(viewClear(grave, 12, 30, 90, [pine])).toBe(false)
+    expect(viewClear(grave, 12, 30, 0, [pine])).toBe(true)
+    expect(viewClear(grave, 12, 30, 270, [pine])).toBe(true)
+    // nothing in the way: always clear
+    expect(viewClear(grave, 12, 30, 90, [])).toBe(true)
+  })
+
+  test("the eye standing in a crown is not clear", () => {
+    const over: ViewBlocker = { x: 10.4, z: 0, r: 1.5, bottom: 4, top: 9 }
+    expect(viewClear(grave, 12, 30, 90, [over])).toBe(false)
+  })
+
+  test("the director turns to the nearest clear way round, with room for its drift", () => {
+    const az = clearAzimuth(grave, 12, 30, 90, [pine])
+    expect(az).not.toBe(90)
+    expect(Math.abs(az - 90)).toBeLessThanOrEqual(60)
+    for (const d of [-10, 0, 10]) expect(viewClear(grave, 12, 30, az + d, [pine])).toBe(true)
+    // already clear: it keeps its way
+    expect(clearAzimuth(grave, 12, 30, 200, [pine])).toBe(200)
+    // nowhere clear (a ring of trees): it keeps its way rather than spin
+    const ring: ViewBlocker[] = Array.from({ length: 12 }, (_, k) => ({
+      x: Math.sin((k * Math.PI) / 6) * 3,
+      z: Math.cos((k * Math.PI) / 6) * 3,
+      r: 1.6,
+      bottom: 0,
+      top: 9,
+    }))
+    expect(clearAzimuth(grave, 12, 30, 45, ring)).toBe(45)
+  })
+
+  test("a rise's shot takes the clear way when its site says what stands round it", () => {
+    const pose = shotPose(
+      "show",
+      "mid",
+      grave,
+      { azimuth: 90 },
+      { map: 400, show: "undead", blockers: [pine] },
+    )
+    expect(pose.azimuth).not.toBe(90)
+    expect(viewClear(grave, pose.distance, pose.elevation, pose.azimuth, [pine])).toBe(true)
+    expect(shotPose("show", "mid", grave, { azimuth: 90 }, { map: 400, show: "undead" }).azimuth).toBe(90)
+  })
+
+  test("the graveyard's blockers: solid things near the graves, a tree by its crown, an arch by its posts", () => {
+    const size = (id: string): [number, number, number] | undefined =>
+      id.includes("tree")
+        ? [2, 6, 2]
+        : id.includes("arch")
+          ? [4, 4.4, 0.8]
+          : id.includes("fence")
+            ? [2.4, 1.3, 0.3]
+            : id.includes("rock")
+              ? [3, 2.5, 3]
+              : undefined
+    const at = (piece: string, x: number, z = 0, rot = 0) => ({ piece, x, y: 1, z, rot, scale: 1 })
+    const out = graveBlockers(
+      [{ x: 0, z: 0 }],
+      [
+        at("kaykit-forest/tree-4-a", 2),
+        at("kaykit-halloween/fence", 1),
+        at("kaykit-halloween/tree-dead-large", 1),
+        at("kaykit-halloween/arch", 0, 2),
+        at("kaykit-nature/rock-big", -4),
+        at("kaykit-forest/tree-4-a", 40),
+        at("mystery/piece", 3),
+      ],
+      size,
+    )
+    const tree = out.find((b) => b.what?.includes("tree-4-a"))
+    expect(tree?.bottom).toBeGreaterThan(1)
+    expect(tree?.top).toBe(7)
+    expect(out.filter((b) => b.what?.includes("tree-4-a"))).toHaveLength(1) // the far one is out of reach
+    expect(out.some((b) => /fence|dead/.test(b.what ?? ""))).toBe(false)
+    const posts = out.filter((b) => b.what?.includes("arch"))
+    expect(posts).toHaveLength(2)
+    expect(Math.abs((posts[0]?.x ?? 0) - (posts[1]?.x ?? 0))).toBeGreaterThan(2.5)
+    expect(out.find((b) => b.what?.includes("rock"))?.bottom).toBe(1)
+    expect(graveBlockers([], [at("kaykit-forest/tree-4-a", 2)], size)).toEqual([])
   })
 })

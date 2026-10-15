@@ -111,7 +111,7 @@ import { mountSeason, type SeasonMount, timelineSeason } from "./season.ts"
 import { mountSeasonFx, type SeasonFx } from "./seasonFx.ts"
 import { sessionAgents } from "./sessionAgents.ts"
 import { mountShows } from "./shows.ts"
-import { mountUndead, type UndeadMount } from "./undead.ts"
+import { graveBlockers, mountUndead, type UndeadMount } from "./undead.ts"
 
 const logger = log("studio:hexworld")
 
@@ -836,9 +836,12 @@ const world = {
           session: extra.session ?? session,
         })
       // the graveyard's undead (undead.ts): a session's graves, or `?undead=`; nothing loads until one stands
+      const graves = m.graveyard?.graves ?? []
       undead = mountUndead({
         stage,
         graveyard: m.graveyard,
+        // what stands round the graves (a pine), for the camera to film a rise past
+        blockers: graveBlockers(graves, loose, (id) => catalog.get(id)?.size),
         library: { catalog, url: libraryUrl },
         workfx: workfx?.fx ?? null,
         query: ctx.query,

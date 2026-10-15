@@ -46,6 +46,7 @@ export {
 } from "./dragon.ts"
 export {
   buildBunting,
+  CROWN_S,
   FINALE_S,
   fireworksProgramme,
   POLE_H,

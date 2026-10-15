@@ -9,6 +9,7 @@ import {
   beatAngle,
   breathAt,
   buildBunting,
+  CROWN_S,
   CRUISE_CLEAR,
   createShows,
   DRAGON_ARRIVE_S,
@@ -431,5 +432,19 @@ describe("the fireworks' programme", () => {
       3,
     )
     for (const s of shells) expect(s.launch + ROCKET_S + STAR_S[s.style]).toBeLessThan(SHOW_S.festival - 1)
+  })
+
+  test("the gold-willow crown bursts at ~24 s and burns out inside the director's 30 s hold", () => {
+    const crown = shells.filter((s) => s.style === "willow" && s.launch >= FINALE_S && s.launch < 30)
+    expect(crown.length).toBeGreaterThanOrEqual(3)
+    for (const s of crown) {
+      const burst = s.launch + ROCKET_S
+      expect(Math.abs(burst - CROWN_S)).toBeLessThan(0.6)
+      expect(burst + STAR_S.willow).toBeLessThan(30)
+    }
+    expect(CROWN_S).toBeCloseTo(24, 0)
+    // the salvo leads into it: nothing of the finale launches after the crown but its crackle
+    const late = shells.filter((s) => s.launch > CROWN_S - ROCKET_S + 0.5 && s.launch < 30)
+    expect(late.map((s) => s.style)).toEqual(["crackle"])
   })
 })

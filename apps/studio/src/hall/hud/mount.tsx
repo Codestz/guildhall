@@ -17,10 +17,12 @@ import { holdHudStyle } from "@guildhall/ui"
 import { createRoot, type Root } from "react-dom/client"
 import type { HudParts } from "../../hexworld/index.ts"
 import { storySeason } from "../../hexworld/season.ts"
+import { mountAutoNext } from "../../site/autoNext.ts"
 import { hallChronicle } from "../../site/chronicle.ts"
 import { HomeFeed, type HomeStory, homeStoryOf } from "../../site/homeFeed.ts"
 import { setHome } from "../../site/homeHud.tsx"
 import { homePlaces } from "../../site/homePlaces.ts"
+import { storyHref } from "../../site/routes.ts"
 import { type HallCamera, mountHallCamera } from "../camera.ts"
 import type { HallTime } from "../clock.ts"
 import { createEraShots, hallCapture } from "../eraShots.ts"
@@ -355,13 +357,27 @@ export function mountHomeHud(parts: HudParts, opts: HomeHudOptions): () => void 
   })
   session.start(places.placeOf)
   const portraits = createHeroPortraits(parts)
-  // the demo guild goes round again; a told story stops at its end for the visitor to leave or replay
+  // the demo guild goes round again; a told story stops at its end, its world going on (the heroes walk
+  // home and rest), and after a while the next demo plays (site/autoNext.ts: a pill counts it down, any
+  // input cancels it)
+  let next: ReturnType<typeof mountAutoNext> | null = null
   const after = (s: HallSession) => {
     const c = s.clock.get()
     if (story === "demo" && !c.playing && c.end > c.start && c.at >= c.end) s.clock.play(true)
+    next?.frame(story === "demo" ? null : story, s.restedMs())
   }
   // the camera: the director films the demo guild or the story (V1's home: B, ?director=0)
   const m = mountOn(parts, { session, places }, { query: opts.query, time: opts.time, director: true, after })
+  // `?next=0`: a story stays at its end (shots, a visitor's link to one story)
+  if (opts.query.get("next") !== "0")
+    next = mountAutoNext(m.float.top.parentElement ?? m.float.top, (id) => {
+      // the page's own knobs kept (its seed, its hour): only the story changes, from its start
+      const q = new URLSearchParams(location.search)
+      q.set("story", id)
+      q.delete("act")
+      q.delete("st")
+      opts.go(storyHref(`?${q}`))
+    })
   // a told story is set in its own season (saga in autumn, the world events in winter…); the demo guild in today's
   parts.season?.setSource(() => {
     const name = storySeason(story)
@@ -427,6 +443,7 @@ export function mountHomeHud(parts: HudParts, opts: HomeHudOptions): () => void 
   return () => {
     parts.season?.setSource(null)
     setHome(null)
+    next?.dispose()
     m.dispose()
     portraits.dispose()
   }

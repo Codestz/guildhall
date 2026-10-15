@@ -15,6 +15,22 @@ import { type NpcLook, type NpcRecipe, validateNpc } from "./recipe.ts"
  */
 export const SKIN_RAMPS: readonly string[] = ["skin"]
 
+/** The two-handed guard: both fists on one hilt, so it is no stance for a hand that holds a shield. */
+export const TWO_HANDED_GUARD = "Melee_2H_Idle"
+
+/** True when `mounts` put a shield in a hand. */
+export const holdsShield = (mounts: readonly { piece: string }[]): boolean =>
+  mounts.some((m) => /(^|\/)shield/.test(m.piece))
+
+/**
+ * The clip `look` stands on when asked for `clip`: its own plain idle in place of the two-handed guard
+ * while it carries a shield (sword and board is no two-handed grip), else `clip`. Combat clips (the
+ * block, a duel's strikes) and two-handed holders' guard are left as they are.
+ */
+export function standClip(clip: string, look: Pick<NpcLook, "mounts" | "clips">): string {
+  return clip === TWO_HANDED_GUARD && holdsShield(look.mounts) ? look.clips.idle : clip
+}
+
 /** One of `options`, drawn by `salt`. */
 const pick = <T>(options: readonly T[], seed: number, salt: string): T =>
   options[Math.min(options.length - 1, Math.floor(roll(seed, salt) * options.length))] as T
@@ -59,6 +75,9 @@ export function resolveNpc(r: NpcRecipe, seed: number, cat: Catalog): NpcLook {
   if (r.hands?.r) hold(pick(r.hands.r, seed, "right-hand"), "hand.r")
   if (r.hands?.l) hold(pick(r.hands.l, seed, "left-hand"), "hand.l")
 
+  // a shield-bearer idles plain, never in the two-handed guard (Idle_A when the recipe lists nothing else)
+  const idles = holdsShield(mounts) ? r.activity.idle.filter((c) => c !== TWO_HANDED_GUARD) : r.activity.idle
+
   return {
     recipe: r.id,
     seed,
@@ -66,7 +85,11 @@ export function resolveNpc(r: NpcRecipe, seed: number, cat: Catalog): NpcLook {
     hide,
     rampMap,
     mounts,
-    clips: { work: r.activity.work, idle: pick(r.activity.idle, seed, "idle"), walk: r.activity.walk },
+    clips: {
+      work: r.activity.work,
+      idle: idles.length > 0 ? pick(idles, seed, "idle") : "Idle_A",
+      walk: r.activity.walk,
+    },
     scale: within(r.vary.height, seed, "height"),
     speed: within(r.vary.speed, seed, "speed"),
     phase: roll(seed, "phase"),

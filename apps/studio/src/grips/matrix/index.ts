@@ -220,7 +220,7 @@ export const grips: Screen = {
       if (row.mount === "missing") return
       const ch = await loadCharacter(body, rig, libraryUrl)
       ch.root.position.set(...at)
-      ch.root.rotation.y = YAW
+      ch.root.rotation.y = params.yaw ?? YAW
       if (!ch.play(column.clip, column.t === null ? {} : { t: column.t })) return
       if (row.mount === "axes") {
         for (const slot of ["hand.r", "hand.l"] as MountSlot[]) attachMount(ch, axesProp(), AXES_MOUNT, slot)

@@ -55,6 +55,8 @@ export interface MatrixParams {
   columns: Column[]
   axes: boolean
   body: string
+  /** Radians the bodies turn about +y (`yaw=` in degrees; default the right hand toward the camera). */
+  yaw: number | null
 }
 
 const list = (text: string | null): string[] =>
@@ -84,5 +86,8 @@ export function parseParams(query: URLSearchParams): MatrixParams {
     columns,
     axes: query.get("axes") === "1",
     body: query.get("body") || DEFAULT_BODY,
+    yaw: Number.isFinite(Number.parseFloat(query.get("yaw") ?? ""))
+      ? (Number(query.get("yaw")) * Math.PI) / 180
+      : null,
   }
 }

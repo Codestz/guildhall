@@ -188,7 +188,10 @@ const CSS = /* css */ `
 .gh .ui-hud-corner .hud-brand .ui-figures dd { font-size: 14px; }
 .gh .ui-hud-corner .hud-brand .ui-figures dt { font-size: 11px; }
 .gh .ui-hud-corner .hud-about { gap: 6px; padding-top: 7px; font-size: 12.5px; line-height: 1.45; }
-.gh .hud-about .hall-about-links { flex-wrap: nowrap; gap: 12px; white-space: nowrap; }
+.gh .hud-about .hall-about-links { flex-wrap: wrap; gap: 2px 14px; }
+/* the repo chip's details panel (user 10-14): the width follows its content up to a max, the links wrap inside */
+.gh .ui-hud-corner > .hud-brand-more { width: fit-content; min-width: min(var(--hud-col), 100%); max-width: min(360px, 100%); }
+.gh .hud-brand-more .hall-about-links .site-link { white-space: nowrap; }
 .gh .hud-about .hall-about-links .site-link { min-height: 26px; font-size: 12.5px; padding: 0; }
 
 /* the sheet: the panel fills it, scrolling inside */

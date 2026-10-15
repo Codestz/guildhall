@@ -143,14 +143,14 @@ export const STORIES: readonly Story[] = [
     title: "New world",
     kicker: "The generator",
     blurb:
-      "One landmass sized by a repo's files, mountain ranges laid inland, rivers that fall to the sea, forests and hill towns.",
+      "The island generator on its own page: seed 7 grown for a repo of 12,000 files, pulled back to see the whole landmass, its ranges, rivers, forests and hill towns. Change the seed or the size in the link.",
     shows: [
       "Rivers run from the ranges to the coast, under bridges where roads cross",
-      "Far land draws simpler, so the island stays light",
+      "Any seed, any size: /town/<seed>?files=<n>",
     ],
     art: `${ART}/world.webp`,
-    alt: "React's repository as one island with mountain ranges, rivers falling to the sea, forests and hill towns.",
-    link: "/hall/facebook/react",
+    alt: "One generated island seen whole from above: a hex landmass crossed by roads, rivers falling to the sea, forests and villages, a keep at its heart.",
+    link: "/town/7?files=12000",
   },
   {
     id: "island",

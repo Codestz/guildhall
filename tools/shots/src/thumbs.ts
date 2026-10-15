@@ -172,10 +172,11 @@ export const DEMOS: readonly Pose[] = [
   { id: "react", url: `/hall/facebook/react?labels=0&${BARE}`, ...DEMO, run: pulled(1.6, 44), settle: 7000 },
   {
     id: "world",
-    url: `/hall/facebook/react?labels=0&${BARE}`,
+    // the generator's own page (`/town/<seed>?files=`): a 12,000-file landmass, the whole of it in the frame
+    url: `/town/7?files=12000&${BARE}`,
     ...DEMO,
-    run: pulled(4.2, 52, 120),
-    settle: 8000,
+    run: pulled(5.6, 52, 30),
+    settle: 9000,
   },
   { id: "island", url: `/hall/Codestz/mcpx?labels=0&${BARE}`, ...DEMO, run: pulled(2.4, 50), settle: 7000 },
   { id: "night", url: `/?hour=21&weather=storm&${BARE}`, ...DEMO, run: HIDE_HUD, settle: 10_000 },

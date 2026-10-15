@@ -341,9 +341,16 @@ export async function createCrowd(
     const joints = parts[0] ? boneMap(bake, parts[0]) : null
     if (!joints) throw new Error(`createCrowd: body "${bodyIds[i]}" is not on the baked rig`)
     const base = mergeParts(parts, joints)
-    geometries.push([base, ...BODY_TIERS.map((tier) => simplifyParts(base, tier))])
-    partNames.push(parts.map((p) => p.name))
     await slicer.yield()
+    // each coarser tier its own slice: a body's simplify is ~10–20 ms (the undead's crowd is built
+    // while the world is in view)
+    const tiers = [base]
+    for (const tier of BODY_TIERS) {
+      tiers.push(simplifyParts(base, tier))
+      await slicer.yield()
+    }
+    geometries.push(tiers)
+    partNames.push(parts.map((p) => p.name))
   }
   const vertices = geometries.flat().reduce((n, g) => n + g.getAttribute("position").count, 0)
   const indices = geometries.flat().reduce((n, g) => n + (g.index?.count ?? 0), 0)

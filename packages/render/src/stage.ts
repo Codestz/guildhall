@@ -4,6 +4,7 @@ import {
   ColorManagement,
   DirectionalLight,
   HemisphereLight,
+  type Material,
   PerspectiveCamera,
   Scene,
   SRGBColorSpace,
@@ -213,12 +214,28 @@ export function createStage(
     // so a long frame on load can be laid at the right material's door (tools/shots/trace.ts reads the log).
     const programs = renderer.info.programs
     if (programs && programs.length > knownPrograms) {
+      // each new program named by the object and material that hold it (an unnamed ShaderMaterial is
+      // told apart by what it is on), from the renderer's own bookkeeping; a program nobody in the
+      // scene holds (a post pass's, a warm-up's stand-in) keeps its own name
+      const holders = new Map<number, string>()
+      scene.traverse((o) => {
+        const m = (o as { material?: Material | Material[] }).material
+        if (!m) return
+        for (const material of Array.isArray(m) ? m : [m]) {
+          const held = (renderer.properties.get(material) as { programs?: Map<string, { id: number }> })
+            .programs
+          if (!held) continue
+          for (const p of held.values())
+            if (!holders.has(p.id)) holders.set(p.id, `${o.name || o.type}/${material.name || material.type}`)
+        }
+      })
       logger.info("programs", {
         ms: Math.round(cost),
         made: programs.slice(knownPrograms).map((p) => {
           const key = (p as { cacheKey?: string }).cacheKey ?? ""
           const own = /guildhall-[\w-]+/.exec(key)?.[0]
-          return own ? `${p.name}#${own}` : p.name
+          const name = holders.get(p.id) ?? p.name
+          return own ? `${name}#${own}` : name
         }),
       })
       knownPrograms = programs.length

@@ -83,6 +83,27 @@ if (browser)
     })
     await page.goto(url)
     await waitReady(page)
+    // ACT=show:dragon | weather:rain | season:winter | undead:rise: something done once the world is
+    // up (through `window.guildhall.ext`), to name what its first use costs; then the settle
+    const act = process.env.ACT
+    if (act) {
+      await page.waitForTimeout(1500)
+      const [what, arg = ""] = act.split(":")
+      await page.evaluate(
+        ([what, arg]) => {
+          const ext = window.guildhall?.ext as
+            | Record<string, Record<string, (...a: unknown[]) => unknown> | undefined>
+            | undefined
+          if (!ext) return
+          if (what === "show") ext.shows?.play?.(arg)
+          else if (what === "weather") ext.fx?.weather?.(arg, false)
+          else if (what === "season") ext.season?.set?.(arg, false)
+          else if (what === "undead") ext.undead?.play?.(arg)
+          performance.mark(`act:${what}:${arg}`)
+        },
+        [what, arg] as const,
+      )
+    }
     await page.waitForTimeout(SETTLE_MS)
     // what the page itself saw, to cross-check the trace's tasks, and its log (the stage names the
     // programs each frame built, the builders say when they finished), to read beside them
@@ -169,8 +190,9 @@ for (const e of onMain) {
   if (!data) continue
   profiles.set(e.id ?? "", { startTime: data.startTime, nodes: new Map(), samples: [] })
 }
+// (a chunk is matched to its profile by id alone: a worker's chunks may carry another thread's ids)
 for (const e of events) {
-  if (e.name !== "ProfileChunk" || e.pid !== pid) continue
+  if (e.name !== "ProfileChunk") continue
   const profile = profiles.get(e.id ?? "")
   const data = e.args?.data as
     | { cpuProfile?: { nodes?: ProfileNode[]; samples?: number[] }; timeDeltas?: number[] }

@@ -106,6 +106,7 @@ import type { AgentDesk, AgentDeskReply, AgentDeskRequest, LifePlan } from "./li
 import { HALL_STEPS, LINES, loadPlan, PITCH, STEPS, type Step } from "./loading.ts"
 import { createPlaceLabels, kindWord, labelsOn, type PlaceLabels } from "./places.ts"
 import { loaderOn, publishWorld, settle } from "./ready.ts"
+import { residentAgents, residentsOf } from "./residents.ts"
 import { mountSea, type SeaMount, seaOf, seaOn } from "./sea.ts"
 import { mountSeason, type SeasonMount, timelineSeason } from "./season.ts"
 import { mountSeasonFx, type SeasonFx } from "./seasonFx.ts"
@@ -441,9 +442,12 @@ const world = {
     })
     // the authored tile prefabs (data/tiles) before anything is built from them in the worker
     // the agents life plans with (lifeAgents.ts): the demo story; `?agents=0` none; a hall playing a
-    // session (`?feed=`) none at first, then its session's heroes (sessionAgents.ts, once its HUD is up)
+    // session (`?feed=`) none at first, then its session's heroes (sessionAgents.ts, once its HUD is up);
+    // a hall with no session its resident guild (residents.ts, once life is up), not the demo's
     const session = extra.session !== undefined || (hall && ctx.query.has("feed"))
-    const agentsFeed = lifeOn && !session ? agentFeedOf(ctx.query.get("agents")) : Promise.resolve(null)
+    const residing = hall && !session && !ctx.query.has("agents")
+    const agentsFeed =
+      lifeOn && !session && !residing ? agentFeedOf(ctx.query.get("agents")) : Promise.resolve(null)
     const job = startJob(
       Promise.all([read, loadTiles(), agentsFeed]).then(([, tiles, agents]) => ({
         agents,
@@ -777,12 +781,12 @@ const world = {
           plan: job.life,
           // the agents: the guild the worker planned (the demo story); a session's come later
           agents: job.life.then((plan) => (plan.agents ? agentSource(plan.agents) : null)),
-          agentPool: session,
+          agentPool: session || residing,
           // a hero's work beats make the work FX's bursts (sparks off a hammer, pages, motes)
           beat: (b, at, sample) => workfx?.fx.beat(b, at, sample),
           // the heroes' chips, in the labels layer with the plates (`?chips=0`: none); a repo's hall with
-          // no session (its history alone) has no guild to name: its walkers stay unlabelled townsfolk
-          ...(ctx.query.get("chips") !== "0" && !(hall && !session) ? { chips: viewer.labels } : {}),
+          // no session names its residents (their day in a word: no session's calls)
+          ...(ctx.query.get("chips") !== "0" ? { chips: viewer.labels } : {}),
           debug: overlay
             ? () => {
                 const island = hexIsland({ ...shape, seed, files })
@@ -800,6 +804,21 @@ const world = {
           heroSpots,
         })
         await life.ready
+        // a hall with no session: its resident guild, the repo's busiest hands at home on its island
+        const repo = stats.repo
+        if (residing && life && repo?.kind === "chronicled" && repo.hands?.length) {
+          const residents = residentsOf(repo.hands, m.places, repo.places)
+          if (residents.length) {
+            const own = life
+            const agents = residentAgents(
+              residents,
+              (req) => job.planAgents(req),
+              () => own.clock(),
+            )
+            own.setAgents(agents)
+            unAgents = agents.dispose
+          }
+        }
         // the lamps the lamplighters light at dusk come up one by one as each is reached (the plan's)
         void job.life.then((plan) => {
           if (!disposed) night?.schedule(plan.lamps)

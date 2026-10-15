@@ -33,6 +33,8 @@ export type HallRepo =
       /** Where the chronicle came from. */
       source: "cdn" | "local"
       generatedAt: string
+      /** Its busiest hands (bots aside), busiest first: the hall's resident guild (residents.ts). */
+      hands?: RepoHand[]
     }
   | {
       kind: "sketch"
@@ -41,6 +43,32 @@ export type HallRepo =
       why: "not-chronicled" | "unavailable"
       reason?: string
     }
+
+/** One of a repo's busiest hands, as its resident guild draws them (residents.ts). */
+export interface RepoHand {
+  name: string
+  commits: number
+  /** The units they touch most, their own first (the chronicle's `home` and `also`). */
+  units: string[]
+}
+
+/** How many hands a hall keeps for its residents. */
+export const HANDS_KEPT = 5
+/** A name a machine goes by that the chronicle did not mark a bot. */
+const MACHINE = /bot\b|\[bot\]|script$|^github-actions/i
+
+/** The chronicle's busiest people (bots aside), busiest first, at most `HANDS_KEPT`. Pure. */
+export function handsOf(c: Pick<Chronicle, "contributors">): RepoHand[] {
+  return c.contributors
+    .filter((p) => !p.bot && !MACHINE.test(p.name) && !MACHINE.test(p.login ?? ""))
+    .sort((a, b) => b.commits - a.commits || a.first - b.first || (a.name < b.name ? -1 : 1))
+    .slice(0, HANDS_KEPT)
+    .map((p) => ({
+      name: p.name,
+      commits: p.commits,
+      units: [...(p.home ? [p.home] : []), ...(p.also ?? [])],
+    }))
+}
 
 /**
  * The hall's read of a chronicle at its last day: the repo's figures and its units as places. The size is
@@ -62,6 +90,7 @@ export function repoOf(c: Chronicle, source: "cdn" | "local"): HallRepo {
     places: placeSpecs(units, landTiles(files), (born) => landTiles(filesAt(c, born)), c.repo.name),
     source,
     generatedAt: c.generatedAt,
+    hands: handsOf(c),
   }
 }
 

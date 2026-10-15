@@ -104,12 +104,12 @@ export function pieceOutline(piece: string): Outline | undefined {
 
 /** Ground cover and things on the water or overhead: nobody bumps into them. */
 const SOFT =
-  /^(kaykit-forest\/(grass|bush|flower|mushroom|clover)|kenney-nature\/(grass|flower|crop|plant|mushroom|lily|path|ground|cliff|bridge|log|canoe|pot)|kenney-pirate\/(boat|ship|structure-platform|platform|patch|grass|flag|mast|hole)|kenney-castle\/(flag|ground|bridge|stairs)|kaykit-dungeon\/(banner|floor|ceiling|candle|coin|bottle)|kenney-survival\/(fish|bucket|bottle|floor|grass|patch)|kaykit-hexagon\/(hex|tiles|building-dirt|building-grain|building-bridge))/
+  /^(kaykit-forest\/(grass|bush|flower|mushroom|clover)|kenney-nature\/(grass|flower|crop|plant|mushroom|lily|path|ground|cliff|bridge|log|canoe|pot)|kenney-pirate\/(boat|ship|structure-platform|platform|patch|grass|flag|mast|hole)|kenney-castle\/(flag|ground|bridge|stairs)|kaykit-dungeon\/(banner|floor|ceiling|candle|coin|bottle)|kenney-survival\/(fish|bucket|bottle|floor|grass|patch)|kaykit-hexagon\/(hex|tiles|building-dirt|building-grain|building-bridge)|kaykit-halloween\/(path|floor))/
 const TRUNK = /^(kaykit-forest\/tree-|kenney-nature\/tree|kenney-castle\/tree-(large|small))/
 const SEAT = /(bench|stool|chair|throne)/
 const BUILDING = /^(kaykit-hexagon\/building-|kaykit-builder\/)/
 const WALL =
-  /^(kaykit-hexagon\/(wall|fence)|kenney-castle\/(wall|tower|gate|door|metal-gate)|kenney-nature\/fence|kenney-town\/(fence|hedge|wall)|kenney-pirate\/(castle|tower)|kenney-graveyard\/(fence|iron-fence|stone-wall|brick-wall))/
+  /^(kaykit-hexagon\/(wall|fence)|kenney-castle\/(wall|tower|gate|door|metal-gate)|kenney-nature\/fence|kenney-town\/(fence|hedge|wall)|kenney-pirate\/(castle|tower)|kenney-graveyard\/(fence|iron-fence|stone-wall|brick-wall)|kaykit-halloween\/(fence(?!-pillar)|arch))/
 /** A tree's trunk radius at scale 1 (the crown is over people's heads). */
 const TRUNK_R = 0.35
 /** Smaller than this round (metres, as placed) nobody needs to step round it. */

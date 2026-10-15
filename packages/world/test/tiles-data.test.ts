@@ -166,7 +166,7 @@ describe("drills (drills.ts)", () => {
     // both sides attack and both defend
     for (const moves of duel.sides) expect(moves.some((m) => CONTACT[m.clip] !== undefined)).toBe(true)
     // they step in to fight and out after
-    expect(drillFrame("duel", 0, 5).step).toBeGreaterThan(0.1)
+    expect(drillFrame("duel", 0, 5).step).toBeGreaterThan(0.03)
     expect(drillFrame("duel", 0, 18).step).toBeLessThan(0.01)
   })
 

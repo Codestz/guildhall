@@ -79,6 +79,17 @@ const PARRY = "Melee_Block_Hit"
 
 /** Seconds a duel's bout lasts (both bouts on a tile share it, half a bout apart: `pairShare`). */
 export const BOUT_S = 19
+/**
+ * Metres between a face-to-face pair's centres at rest (a duel's two spots, a hero's sparring spot and
+ * anyone near it): two bodies, a shield and a sword's reach between them, so a blow lands on the shield
+ * and the helmets never touch. Shared by every source that squares two fighters up (data/tiles pairs,
+ * heroes.ts).
+ */
+export const DUEL_APART = 1.6
+/** Metres between them at the nearest, stepped in for the bout's blows (each steps half the difference). */
+export const DUEL_CLOSEST = 1.5
+/** Metres each side steps in for the bout. */
+const DUEL_STEP = (DUEL_APART - DUEL_CLOSEST) / 2
 /** Seconds a step in or out takes. */
 export const STEP_S = 0.5
 /**
@@ -96,7 +107,7 @@ export const DRILLS: Readonly<Record<string, Drill>> = {
     sync: "pair",
     solo: "wait",
     steps: [
-      [0.1, 0.14],
+      [0.1, DUEL_STEP],
       [16.6, 0],
     ],
     sides: [

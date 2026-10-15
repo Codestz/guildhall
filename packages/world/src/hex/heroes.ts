@@ -22,6 +22,7 @@
 import { BOARD_PIN } from "./board.ts"
 import { DOOR_HALF, DOOR_RUN } from "./checks.ts"
 import { type Solid, solidDistance } from "./collide.ts"
+import { DUEL_APART } from "./drills.ts"
 import { hexAt } from "./grid.ts"
 import { type HexIsland, kindOf } from "./island.ts"
 import type { LifeSpot, Vec3 } from "./life.ts"
@@ -172,6 +173,13 @@ export interface HeroPoolInputs {
   home: number
 }
 
+/**
+ * How far two hero spots keep apart: `base`, or DUEL_APART where either is a `drill` spot (a hero there
+ * may spar, sword and shield: whoever stands near is squared up to, and must stand a duel's distance off).
+ */
+const roomOf = (p: HeroPose, q: HeroPose, base: number): number =>
+  p === "drill" || q === "drill" ? Math.max(base, DUEL_APART) : base
+
 const headingTo = (ax: number, az: number, bx: number, bz: number) => Math.atan2(bx - ax, bz - az)
 
 /** A candidate: where, facing what, read as what, how wanted (lower first), and what it stands at. */
@@ -228,7 +236,7 @@ export function heroSpotPool(inp: HeroPoolInputs, k: number): HeroPool {
   /** The room kept from a meeting slot now (FROM_SLOT_WIDE first, FROM_SLOT where that leaves too few). */
   let slotRoom = FROM_SLOT_WIDE
   let folkCells: Map<number, { x: number; z: number; r: number }[]> | null = null
-  const nearFolk = (x: number, zz: number, tight: boolean): boolean => {
+  const nearFolk = (x: number, zz: number, tight: boolean, room = 0): boolean => {
     if (!folkCells) {
       const cells = new Map<number, { x: number; z: number; r: number }[]>()
       const add = (p: { x: number; z: number; r: number }) => {
@@ -249,7 +257,8 @@ export function heroSpotPool(inp: HeroPoolInputs, k: number): HeroPool {
       for (let b = cz - 1; b <= cz + 1; b++)
         for (const p of folkCells.get(folkKey(a, b)) ?? [])
           if (
-            Math.hypot(p.x - x, p.z - zz) < (p.r === FROM_SLOT ? (tight ? FROM_SLOT_TIGHT : slotRoom) : p.r)
+            Math.hypot(p.x - x, p.z - zz) <
+            Math.max(room, p.r === FROM_SLOT ? (tight ? FROM_SLOT_TIGHT : slotRoom) : p.r)
           )
             return true
     return false
@@ -325,7 +334,7 @@ export function heroSpotPool(inp: HeroPoolInputs, k: number): HeroPool {
     const top = floor(i)
     if (Number.isNaN(top) || w.stairAt?.(c.x, c.z) != null) return null
     if (furniture.blocked(c.x, c.z, ROOM) || strips.on(c.x, c.z, ROOM)) return null
-    if (inDoorway(c.x, c.z) || nearFolk(c.x, c.z, tight)) return null
+    if (inDoorway(c.x, c.z) || nearFolk(c.x, c.z, tight, c.pose === "drill" ? DUEL_APART : 0)) return null
     const node = nodeFor(c.x, c.z, top)
     if (node < 0) return null
     const at: Vec3 = [c.x, walk.nodes[node]!.y, c.z]
@@ -363,8 +372,8 @@ export function heroSpotPool(inp: HeroPoolInputs, k: number): HeroPool {
     const out: HeroSpot[] = []
     const used = new Set<number>()
     const clear = (c: Candidate) =>
-      out.every((s) => Math.hypot(s.at[0] - c.x, s.at[2] - c.z) >= apart) &&
-      placed.every((s) => Math.hypot(s.at[0] - c.x, s.at[2] - c.z) >= APART)
+      out.every((s) => Math.hypot(s.at[0] - c.x, s.at[2] - c.z) >= roomOf(s.pose, c.pose, apart)) &&
+      placed.every((s) => Math.hypot(s.at[0] - c.x, s.at[2] - c.z) >= roomOf(s.pose, c.pose, APART))
     // one spot to a thing worked at first, then a second at the same where there is room
     for (const pass of [0, 1])
       for (const c of found) {
@@ -499,7 +508,7 @@ export function heroSpotPool(inp: HeroPoolInputs, k: number): HeroPool {
     const out: HeroSpot[] = []
     const clear = (x: number, zz: number) =>
       out.every((s) => Math.hypot(s.at[0] - x, s.at[2] - zz) >= GATHER_APART) &&
-      placed.every((s) => Math.hypot(s.at[0] - x, s.at[2] - zz) >= APART)
+      placed.every((s) => Math.hypot(s.at[0] - x, s.at[2] - zz) >= roomOf(s.pose, "gather", APART))
     for (const c of sorted) {
       if (out.length + 2 > want) break
       // across the way it faces first, then turned a quarter at a time

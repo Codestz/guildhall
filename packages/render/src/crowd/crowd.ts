@@ -415,6 +415,10 @@ export async function createCrowd(
   }
 
   const blobs = createBlobs(actors.length)
+  // the far LOD distance (the quality ladder's lever): a bias over 1 draws the coarser bodies from closer in
+  ;(stage as Partial<Pick<Stage, "lever">>).lever?.("lodBias", (k) => {
+    bodies.lodBias = k
+  })
   // their programs link in the background before the first draw, which would otherwise wait for them (warm.ts)
   for (const o of [bodies, props, blobs.mesh]) o.visible = false
   stage.scene.add(bodies, props, blobs.mesh)

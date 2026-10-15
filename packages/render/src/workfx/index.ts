@@ -198,6 +198,11 @@ export function createWorkFx(stage: Stage, opts: WorkFxOpts = {}): WorkFx {
   })
 
   const slots = createSlots(n)
+  // how many may be alive at once (the quality ladder's lever): a burst past it is smaller, or nothing
+  let cap = n
+  ;(stage as Partial<Pick<Stage, "lever">>).lever?.("particles", (value) => {
+    cap = Math.max(0, Math.min(n, Math.round(value)))
+  })
   let clock = 0
   /** When the last particle alive is gone. */
   let until = 0
@@ -257,7 +262,8 @@ export function createWorkFx(stage: Stage, opts: WorkFxOpts = {}): WorkFx {
     const scale = o.scale ?? 1
     const start = clock - Math.max(0, o.ago ?? 0)
     const end = start + KIND[kind].life
-    const taken = takeSlots(slots, burstCount(kind, scale), clock, end)
+    const room = cap >= n ? n : Math.max(0, cap - aliveAt(slots, clock))
+    const taken = takeSlots(slots, Math.min(burstCount(kind, scale), room), clock, end)
     if (!taken.length) {
       skipped++
       return 0

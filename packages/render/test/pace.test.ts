@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { pacedBudget } from "../src/governor.ts"
 import {
   CALM_RATIO,
+  cadencesFor,
   DOWN_WINDOWS,
   divisorFor,
   initialPace,
@@ -33,12 +34,18 @@ describe("the pace divisor", () => {
     expect(divisorFor(0)).toBe(1)
   })
 
-  test("the display's interval is the median of the raw gaps, a stall or a drop aside", () => {
+  test("the display's interval is read off the quickest raw gaps, snapped to a standard rate", () => {
     const gaps = Array.from({ length: 30 }, () => HZ60)
     gaps[3] = 150
     gaps[9] = 0.5
     expect(vsyncOf(gaps)).toBeCloseTo(HZ60, 5)
     expect(vsyncOf([HZ60, HZ60])).toBeCloseTo(HZ60, 5)
+    // under load most frames take two vsyncs: the display is still a 60 Hz one
+    const loaded = Array.from({ length: 30 }, (_, i) => (i % 5 === 0 ? HZ60 * 1.05 : HZ60 * 2))
+    expect(vsyncOf(loaded)).toBeCloseTo(HZ60, 5)
+    // a 120 Hz display read with jitter
+    const pro = Array.from({ length: 30 }, (_, i) => HZ120 * (1 + (i % 3) * 0.1))
+    expect(vsyncOf(pro)).toBeCloseTo(HZ120, 5)
   })
 })
 
@@ -60,9 +67,20 @@ describe("the pacer in Auto", () => {
     expect(s.lastMove).toBe("down")
   })
 
-  test("on 120 Hz it steps to every 4th vsync", () => {
+  test("on 120 Hz it steps to every 2nd vsync first (a steady 60), then to every 4th (a steady 30)", () => {
+    expect(cadencesFor(HZ120)).toEqual([1, 2, 4])
+    expect(cadencesFor(HZ60)).toEqual([1, 2])
+    expect(cadencesFor(1000 / 144)).toEqual([1, 2, 5])
     let s = initialPace()
     for (let k = 0; k < DOWN_WINDOWS; k++) s = paceStep(s, second(HZ120, 30))
+    expect(s.divisor).toBe(2)
+    // at 60 the frames hold: it stays
+    for (let k = 0; k < 10; k++)
+      s = paceStep(s, { vsyncMs: HZ120, intervals: Array(60).fill(HZ120 * 2), costP95: 12 })
+    expect(s.divisor).toBe(2)
+    // at 60 they miss too: down to 30
+    for (let k = 0; k < DOWN_WINDOWS; k++)
+      s = paceStep(s, { vsyncMs: HZ120, intervals: Array(30).fill(HZ120 * 4), costP95: 28 })
     expect(s.divisor).toBe(4)
   })
 

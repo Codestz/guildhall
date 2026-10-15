@@ -12,7 +12,7 @@ import {
   WebGLRenderer,
   type WebGLRenderTarget,
 } from "three"
-import { createGovernor, parseDprPin } from "./governor.ts"
+import { createGovernor, deviceProfile, type LeverName, parseDprPin, startTier } from "./governor.ts"
 import { type PacePick, vsyncOf } from "./pace.ts"
 import { createRig, type Rig } from "./rig/index.ts"
 import { type FrameCounters, FrameRing, NO_COUNTERS, summarize } from "./stats.ts"
@@ -54,6 +54,15 @@ export interface Stage {
    * `divisor`-th vsync and leaves the thread to the build; 1 lifts it. The pacer's divisor still counts.
    */
   throttle(divisor: number): void
+  /**
+   * A quality lever a module registers (governor.ts `TIERS`: "shadowMap", "lodBias", "particles"): the
+   * ladder's current value is applied at once, and again at every step. Registering twice replaces.
+   */
+  lever(name: LeverName, apply: (value: number) => void): void
+  /** The ladder's tier now (0: full quality), and the viewer's fixed tier (null: Auto). */
+  tier(): { tier: number; pick: number | null }
+  /** Holds the ladder at a tier (a quality pick), or hands it back to the governor with null. */
+  pickTier(tier: number | null): void
   /** Puts the camera at a pose at once (the rig holds it inside its world, when it has one). */
   setCamera(p: CameraPose): void
   /** The pose being drawn (in free flight: the eye and the point it looks at). */
@@ -272,7 +281,11 @@ export function createStage(
       return new Promise((done) =>
         setTimeout(() => {
           samplers.delete(s)
-          done({ ...summarize(s.intervals, s.costs, counters, dpr, split.stop()), intervals: s.intervals })
+          done({
+            ...summarize(s.intervals, s.costs, counters, dpr, split.stop()),
+            intervals: s.intervals,
+            covered: throttle > 1 || holds > 0,
+          })
         }, ms),
       )
     },
@@ -282,6 +295,12 @@ export function createStage(
     },
     pickDpr: (next) => governor.pick(next),
     pickPace: (next) => governor.pickPace(next),
+    lever(name, apply) {
+      levers.set(name, apply)
+      apply(governor.tierValues()[name])
+    },
+    tier: () => governor.tier(),
+    pickTier: (next) => governor.pickTier(next),
     pace: () => ({ divisor, vsyncMs: vsyncOf(rawGaps.values()), pick: governor.pacePick() }),
     setPace(next) {
       if (next !== divisor)
@@ -324,10 +343,16 @@ export function createStage(
       logger.info("disposed")
     },
   }
+  const levers = new Map<LeverName, (value: number) => void>()
   const governor = createGovernor(stage, {
     targetMs: BUDGET_MS,
     dpr: range,
     pin: parseDprPin(globalThis.location?.search ?? ""),
+    // the ladder's levers, as the modules register them (a tier step applies every one it has)
+    apply: (values) => {
+      for (const [name, fn] of levers) fn(values[name])
+    },
+    start: startTier(deviceProfile()),
   })
   return stage
 }

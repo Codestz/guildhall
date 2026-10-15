@@ -38,7 +38,9 @@ export function resolveChrome(): string {
 const UNCAPPED_ARGS = ["--disable-gpu-vsync", "--disable-frame-rate-limit"]
 
 export function chromeArgs(): string[] {
-  const capped = process.env.GUILDHALL_UNCAPPED !== "1" && onBattery()
+  // GUILDHALL_UNCAPPED=0 holds the display's rate wherever the power comes from (the pacing runs)
+  const capped =
+    process.env.GUILDHALL_UNCAPPED === "0" || (process.env.GUILDHALL_UNCAPPED !== "1" && onBattery())
   // GUILDHALL_ANGLE=gl tries the OpenGL backend (its GPU timer queries read differently from Metal's)
   const angle = process.env.GUILDHALL_ANGLE || "metal"
   return [`--use-angle=${angle}`, "--enable-gpu", ...(capped ? [] : UNCAPPED_ARGS)]

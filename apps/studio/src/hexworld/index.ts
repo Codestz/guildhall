@@ -39,6 +39,8 @@ import {
   type Post,
   type PostAa,
   pieceVertices,
+  prefetchPrograms,
+  prewarmStocksPrograms,
   type Stage,
   type StaticBatch,
   type Sun,
@@ -49,8 +51,6 @@ import {
   type VertexMeshData,
   vertexMeshData,
   type Water,
-  prefetchPrograms,
-  prewarmStocksPrograms,
   warmBatchPrograms,
   warmCrowdPrograms,
   warmScene,
@@ -778,6 +778,27 @@ const world = {
       // every show's programs linked and kept now, under the cover (render shows/index.ts `prewarm`):
       // without the cover (`?loader=0`) a show's first start links its own
       const prewarmed = cover ? shows.prewarm().catch(() => undefined) : Promise.resolve()
+      // the graveyard's undead (undead.ts): a session's graves, or `?undead=`; nothing loads until one stands.
+      // Mounted here, before the shore and the life wait: where skeletons may rise (a hall, the FX)
+      // their rig, bake and programs load now under the cover, as a first rise would in view (46 ms
+      // frames), waited for with the shows' before the settle
+      const graves = m.graveyard?.graves ?? []
+      undead = mountUndead({
+        stage,
+        graveyard: m.graveyard,
+        // what stands round the graves (a pine), for the camera to film a rise past
+        blockers: graveBlockers(graves, loose, (id) => catalog.get(id)?.size),
+        library: { catalog, url: libraryUrl },
+        workfx: workfx?.fx ?? null,
+        query: ctx.query,
+        itinerary: (id) => life?.itinerary(id),
+        hall: fxOn || session,
+        ...(extra.session ? { session: extra.session } : {}),
+      })
+      const undeadWarmed =
+        cover && undead && (fxOn || session)
+          ? undead.undead.prewarm().catch(() => undefined)
+          : Promise.resolve()
       steps.progress(0.74, 150)
       go("Water", 0.8)
       await shoreDone
@@ -893,26 +914,6 @@ const world = {
           ghostNear: m.graveyard ? [m.graveyard.gate[0], m.graveyard.gate[2]] : null,
           session: extra.session ?? session,
         })
-      // the graveyard's undead (undead.ts): a session's graves, or `?undead=`; nothing loads until one stands
-      const graves = m.graveyard?.graves ?? []
-      undead = mountUndead({
-        stage,
-        graveyard: m.graveyard,
-        // what stands round the graves (a pine), for the camera to film a rise past
-        blockers: graveBlockers(graves, loose, (id) => catalog.get(id)?.size),
-        library: { catalog, url: libraryUrl },
-        workfx: workfx?.fx ?? null,
-        query: ctx.query,
-        itinerary: (id) => life?.itinerary(id),
-        hall: fxOn || session,
-        ...(extra.session ? { session: extra.session } : {}),
-      })
-      // where skeletons may rise (a hall, the FX), their rig, bake and programs load now under the
-      // cover, as a first rise would in view (46 ms frames); waited for with the shows' below
-      const undeadWarmed =
-        cover && undead && (fxOn || session)
-          ? undead.undead.prewarm().catch(() => undefined)
-          : Promise.resolve()
       // the docket (docket.ts): the open issues' plates over the quay and their petitioners queueing on it
       if (life)
         docket = mountDocket({

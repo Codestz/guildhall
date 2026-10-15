@@ -54,8 +54,19 @@ export {
 } from "./doors.ts"
 export * from "./events/index.ts"
 export { createGizmo, type Gizmo, type GizmoMode, type GizmoOpts, type GizmoPose } from "./gizmo.ts"
-export { QUALITY_DPR, type QualityPick, qualityDpr, qualityOf } from "./governor.ts"
-export { divisorFor, PACE_PICKS, type PacePick, paceOf } from "./pace.ts"
+export {
+  type DeviceProfile,
+  deviceProfile,
+  type LeverName,
+  QUALITY_DPR,
+  type QualityPick,
+  qualityDpr,
+  qualityOf,
+  qualityTier,
+  startTier,
+  TIERS,
+  type TierValues,
+} from "./governor.ts"
 export { disposeObject, heroSilhouette, testBox } from "./hero.ts"
 export {
   applyLight,
@@ -83,6 +94,7 @@ export {
   setNightGrade,
   windowsDark,
 } from "./night/index.ts"
+export { divisorFor, PACE_PICKS, type PacePick, paceOf } from "./pace.ts"
 export { loadPiece } from "./pieces.ts"
 export {
   bustCamera,

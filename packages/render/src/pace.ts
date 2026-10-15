@@ -45,6 +45,25 @@ export function divisorFor(vsyncMs: number): number {
   return Math.max(2, Math.round(PACE_MS / vsyncMs))
 }
 
+/** A cadence of about 60 a second, ms a frame. */
+const SIXTY_MS = 1000 / 60
+
+/**
+ * The cadences Auto steps through on a display of `vsyncMs` a frame, quickest first: every vsync, then
+ * (on a display quicker than 60 Hz) the divisor that gives ~60, then the one that gives ~30. A 120 Hz
+ * display that holds 60 is paced to 60, not straight to 30.
+ */
+export function cadencesFor(vsyncMs: number): number[] {
+  const out = [1]
+  if (vsyncMs > 0 && vsyncMs < SIXTY_MS * 0.75) {
+    const sixty = Math.max(2, Math.round(SIXTY_MS / vsyncMs))
+    out.push(sixty)
+  }
+  const thirty = divisorFor(vsyncMs)
+  if (thirty > (out[out.length - 1] as number)) out.push(thirty)
+  return out
+}
+
 /** One second of drawn frames, as the pacer reads it. */
 export interface PaceWindow {
   /** The display's interval (ms), from the raw rAF timestamps. */
@@ -83,23 +102,36 @@ export function missShare(intervals: readonly number[], dueMs: number): number {
 
 /** The pacer after one window, in Auto. */
 export function paceStep(state: PaceState, w: PaceWindow): PaceState {
-  const paced = divisorFor(w.vsyncMs)
-  if (paced === 1) return state.divisor === 1 ? state : { ...state, divisor: 1 }
-  if (state.divisor === 1) {
-    const bad = missShare(w.intervals, w.vsyncMs) > MISS_SHARE
+  const rungs = cadencesFor(w.vsyncMs)
+  const last = rungs[rungs.length - 1] as number
+  if (last === 1) return state.divisor === 1 ? state : { ...state, divisor: 1 }
+  // the rung in force (a display whose rate moved keeps the nearest)
+  let at = rungs.indexOf(state.divisor)
+  if (at < 0) at = rungs.findIndex((d) => d >= state.divisor)
+  if (at < 0) at = rungs.length - 1
+  const divisor = rungs[at] as number
+  const due = w.vsyncMs * divisor
+  // down a rung once this cadence misses its due interval two seconds running
+  if (at < rungs.length - 1) {
+    const bad = missShare(w.intervals, due) > MISS_SHARE
     const run = bad ? state.bad + 1 : 0
     if (run >= DOWN_WINDOWS) {
       // a drop soon after a raise: the raise did not hold, so the next one waits twice as long
       const upWindows =
         state.lastMove === "up" ? Math.min(MAX_UP_WINDOWS, state.upWindows * 2) : state.upWindows
-      return { divisor: paced, bad: 0, calm: 0, upWindows, lastMove: "down" }
+      return { divisor: rungs[at + 1] as number, bad: 0, calm: 0, upWindows, lastMove: "down" }
     }
-    return { ...state, bad: run }
+    if (run > 0) return { ...state, divisor, bad: run, calm: 0 }
   }
-  // paced: back up only after a long calm stretch with room to hold the display's rate
-  const calm = w.costP95 < w.vsyncMs * CALM_RATIO ? state.calm + 1 : 0
-  if (calm >= state.upWindows) return { ...state, divisor: 1, bad: 0, calm: 0, lastMove: "up" }
-  return { ...state, divisor: paced, calm }
+  // up a rung only after a long calm stretch with room to hold the quicker cadence
+  if (at > 0) {
+    const quicker = w.vsyncMs * (rungs[at - 1] as number)
+    const calm = w.costP95 < quicker * CALM_RATIO ? state.calm + 1 : 0
+    if (calm >= state.upWindows)
+      return { ...state, divisor: rungs[at - 1] as number, bad: 0, calm: 0, lastMove: "up" }
+    return { ...state, divisor, bad: 0, calm }
+  }
+  return { ...state, divisor, bad: 0 }
 }
 
 /**
@@ -112,9 +144,35 @@ export function paceWindow(state: PaceState, w: PaceWindow, pick: PacePick): Pac
   return paceStep(state, w)
 }
 
-/** The display's interval from raw rAF gaps: the median, so a stall or a dropped frame does not move it. */
+/** The display rates a vsync estimate snaps to (Hz). */
+export const DISPLAY_HZ: readonly number[] = [30, 48, 60, 72, 90, 120, 144, 165, 240]
+
+/**
+ * The display's interval from raw rAF gaps: a low percentile of them (under load most gaps are two
+ * vsyncs, and the median would call a 60 Hz display a 30; the quickest frames still land on one),
+ * snapped to the nearest standard rate so a jittery second does not move it.
+ */
 export function vsyncOf(rawGaps: readonly number[], fallback = 1000 / 60): number {
-  const gaps = rawGaps.filter((g) => g > 1 && g < 200).sort((a, b) => a - b)
+  const gaps = rawGaps.filter((g) => g > 1 && g < 200)
   if (gaps.length < 8) return fallback
-  return gaps[Math.floor(gaps.length / 2)] as number
+  // every gap snapped to the nearest standard interval; the display's is the quickest one that a fifth
+  // of the gaps land on (a loaded second lands most of them on two vsyncs, its quickest on one)
+  const counts = new Map<number, number>()
+  for (const g of gaps) {
+    let best = fallback
+    let off = Number.POSITIVE_INFINITY
+    for (const hz of DISPLAY_HZ) {
+      const ms = 1000 / hz
+      const d = Math.abs(Math.log(g / ms))
+      if (d < off) {
+        off = d
+        best = ms
+      }
+    }
+    counts.set(best, (counts.get(best) ?? 0) + 1)
+  }
+  const floor = gaps.length * 0.2
+  let quickest = Number.POSITIVE_INFINITY
+  for (const [ms, n] of counts) if (n >= floor && ms < quickest) quickest = ms
+  return Number.isFinite(quickest) ? quickest : fallback
 }

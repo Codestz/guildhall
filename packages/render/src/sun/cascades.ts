@@ -93,7 +93,7 @@ function aim(light: DirectionalLight, fit: CascadeFit, softness: number): void {
 export function createSun(stage: Stage, opts: SunOpts): Sun {
   const { renderer, scene, sun } = stage
   const radii = opts.radii ?? DEFAULTS.radii
-  const mapSize = opts.mapSize ?? DEFAULTS.mapSize
+  let mapSize = opts.mapSize ?? DEFAULTS.mapSize
   const span: Span = { floor: opts.town.min[1], ceiling: opts.town.max[1] }
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = PCFShadowMap
@@ -144,6 +144,21 @@ export function createSun(stage: Stage, opts: SunOpts): Sun {
     refit()
   }
   markDirty()
+  /** The maps at another size (the quality ladder's lever): every map remade and re-aimed. */
+  const setMapSize = (size: number) => {
+    const next = Math.max(256, Math.round(size))
+    if (next === mapSize) return
+    mapSize = next
+    for (const light of lights) {
+      const texels = light === town ? mapSize : Math.round(mapSize * MARGIN)
+      light.shadow.mapSize.set(texels, texels)
+      light.shadow.map?.dispose()
+      light.shadow.map = null
+    }
+    logger.info("shadow maps", { mapSize })
+    markDirty()
+  }
+  stage.lever?.("shadowMap", setMapSize)
   const unsubscribe = stage.onFrame(refit)
 
   // Count the maps three actually redraws: it renders every due map inside `shadowMap.render`. The

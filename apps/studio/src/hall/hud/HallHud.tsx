@@ -31,6 +31,7 @@ import {
   type QualityPick,
   qualityDpr,
   qualityOf,
+  qualityTier,
   type WeatherKind,
 } from "@guildhall/render"
 import {
@@ -306,6 +307,8 @@ function storeQuality(pick: QualityPick): void {
 /** Puts a pick in force: a tier holds the DPR (the governor stands aside); Auto hands it back. */
 function applyQuality(stage: HudParts["stage"], pick: QualityPick): void {
   stage.pickDpr(qualityDpr(pick, devicePixelRatio || 1))
+  // and the ladder's tier (render governor.ts TIERS): a pick holds it, Auto hands it back
+  stage.pickTier(qualityTier(pick))
 }
 
 /** Where the hall keeps the viewer's motion pick (Settings, Motion: Auto · Smooth 30 · Max) between visits. */

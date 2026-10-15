@@ -85,6 +85,11 @@ export class LodBatchedMesh extends BatchedMesh {
   private dirty = true
   /** Geometry id → how far it strays from what it stands in for, metres in its own space (0: exact). */
   private readonly errors: number[] = []
+  /**
+   * Multiplies every error before it is judged (the quality ladder's lever): 1 swaps where the
+   * difference is under a pixel, 2 swaps at half the distance (the coarser tiers from closer in).
+   */
+  lodBias = 1
   /** Per instance: world bounding sphere (x, y, z, r), its matrix's largest scale, stale flag, cluster. */
   private readonly spheres: number[] = []
   private readonly scales: number[] = []
@@ -381,7 +386,10 @@ export class LodBatchedMesh extends BatchedMesh {
       if (sized) {
         const s = this.sphereOf(shell, shellInfo.geometryIndex)
         const error =
-          (this.errors[shellInfo.geometryIndex] ?? 0) * (this.scales[shell] as number) * scaleAt(s)
+          (this.errors[shellInfo.geometryIndex] ?? 0) *
+          (this.scales[shell] as number) *
+          scaleAt(s) *
+          this.lodBias
         this.shellWeight[c] = fadeWeight(error, SWAP_PX)
         if (inCode(this.shellWeight[c] as number) < FADE_STEPS) near++
       } else this.shellWeight[c] = full ? 0 : 1
@@ -472,7 +480,7 @@ export class LodBatchedMesh extends BatchedMesh {
       for (let k = 1; k < ids.length; k++) {
         // a tier that reuses the finer one's geometry is that one
         if (ids[k] === ids[k - 1]) break
-        const wk = fadeWeight((this.errors[ids[k] as number] ?? 0) * toPx, SWAP_PX)
+        const wk = fadeWeight((this.errors[ids[k] as number] ?? 0) * toPx * this.lodBias, SWAP_PX)
         if (wk >= 1) {
           tier = k
           continue

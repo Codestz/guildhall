@@ -4,6 +4,7 @@
  *
  *   /grips?props=held&clips=idle,chop,sit&t=0.3,0.7&axes=1
  */
+import { hasParam, param } from "../../params.ts"
 
 /** Column keys → Rig_Medium clip names (all verified in the rig's clip list). */
 export const CLIPS: Readonly<Record<string, string>> = {
@@ -74,20 +75,20 @@ function times(text: string | null): number[] {
 
 /** The query → the matrix. A clip key not in `CLIPS` is taken as a rig clip name as written. */
 export function parseParams(query: URLSearchParams): MatrixParams {
-  const props = list(query.get("props"))
-  const keys = list(query.get("clips"))
-  const ts = times(query.get("t"))
+  const props = list(param(query, "props"))
+  const keys = list(param(query, "clips"))
+  const ts = times(param(query, "t"))
   const columns = (keys.length > 0 ? keys : [...DEFAULT_CLIPS]).flatMap((key): Column[] => {
     const clip = CLIPS[key] ?? key
     return ts.length > 0 ? ts.map((t) => ({ key, clip, t })) : [{ key, clip, t: null }]
   })
+  const yaw = param(query, "yaw")
   return {
-    props: props[0] === "held" ? "held" : props.length > 0 || query.has("props") ? props : DEFAULT_PROPS,
+    props:
+      props[0] === "held" ? "held" : props.length > 0 || hasParam(query, "props") ? props : DEFAULT_PROPS,
     columns,
-    axes: query.get("axes") === "1",
-    body: query.get("body") || DEFAULT_BODY,
-    yaw: Number.isFinite(Number.parseFloat(query.get("yaw") ?? ""))
-      ? (Number(query.get("yaw")) * Math.PI) / 180
-      : null,
+    axes: param(query, "axes"),
+    body: param(query, "body") || DEFAULT_BODY,
+    yaw: yaw === null ? null : (yaw * Math.PI) / 180,
   }
 }

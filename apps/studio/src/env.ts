@@ -5,6 +5,8 @@
 
 declare global {
   interface ImportMetaEnv {
+    /** True in vite's dev server (the dev params are honoured: params.ts). */
+    readonly DEV?: boolean
     /** Vite's `base`, always ending in "/". */
     readonly BASE_URL?: string
     /** "1" in the read-only showcase build (`bun run build:showcase`). */

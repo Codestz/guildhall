@@ -296,6 +296,27 @@ h3 .st-code { font-size: 0.8em; letter-spacing: 0; }
 .st-card-drawing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; font-size: var(--t-lg); color: var(--muted); }
 .st-spinner { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--brass-wash); border-top-color: var(--brass); animation: st-spin 0.9s linear infinite; }
 @keyframes st-spin { to { transform: rotate(1turn); } }
+/* while the hall films the island for the card: the card on ink under the era book's slow light, and a word on it */
+.st-card-preview img { animation: st-fade 0.5s ease-out; }
+.st-card-preview[data-filming] img { opacity: 0.5; filter: saturate(0.7); }
+.st-card-preview[data-filming]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 236, 196, 0.12) 45%, rgba(255, 236, 196, 0.22) 50%, rgba(255, 236, 196, 0.12) 55%, transparent 80%) -150% 0 / 60% 100% no-repeat;
+  animation: st-shimmer 1.8s ease-in-out infinite;
+}
+.st-card-filming { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; padding: 16px; pointer-events: none; }
+.st-card-filming > div { display: grid; justify-items: center; gap: 8px; max-width: 34ch; padding: 14px 20px; border-radius: var(--r-sm); background: rgba(14, 10, 7, 0.82); box-shadow: 0 0 0 1px var(--brass-line); text-align: center; }
+.st-card-filming b { font: 400 18px/1.2 var(--display); letter-spacing: 0.04em; color: var(--brass-hi); }
+.st-card-filming b + span { font-size: 14px; line-height: 1.4; color: var(--muted); text-wrap: pretty; }
+/* a phone's landscape preview is a short band: the word alone */
+@media (max-width: 520px) {
+  .st-card-preview[data-format="landscape"] .st-card-filming > div { grid-auto-flow: column; align-items: center; gap: 10px; padding: 10px 14px; }
+  .st-card-preview[data-format="landscape"] .st-card-filming b + span { display: none; }
+}
 .st-card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .st-card-actions .ui-btn { min-height: 40px; padding: 0 16px 0 13px; font-size: var(--t-lg); gap: 8px; text-decoration: none; }
 .st-card-note { margin: -4px 0 0; font-size: 13px; color: var(--faint); overflow-wrap: anywhere; }
@@ -515,5 +536,6 @@ button.st-place-hero:hover { background: var(--raise-2); }
   .st-spinner { animation-duration: 2.4s; }
   .st-era-island[aria-busy="true"]::before { animation: none; }
   .st-era-island img { animation: none; }
+  .st-card-preview img, .st-card-preview[data-filming]::before { animation: none; }
 }
 `

@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { libraryUrl } from "../catalog.ts"
 import * as data from "../data.ts"
 import { SHOWCASE } from "../env.ts"
+import { param } from "../params.ts"
 import type { ScreenCtx } from "../screens.ts"
 import { ExportButtons } from "../shell/Export.tsx"
 import { currentQuery, replaceQuery } from "../shell/router.ts"
@@ -94,13 +95,12 @@ export function TileComposer({
   const [id, setId] = useState(tiles.has(initial) ? initial : (input.tiles[0]?.id ?? ""))
   const [doc, setDoc] = useState<History>(() => history(tiles.get(id)!))
   const [saved, setSaved] = useState<TilePrefab>(doc.now)
-  // `?sel=spots:2` opens with that item selected (shots, shared links)
-  const [sel, setSel] = useState<Selection | null>(() => parseSel(ctx.query.get("sel")))
+  const [sel, setSel] = useState<Selection | null>(null)
   const [tab, setTab] = useState<Layer>(sel?.layer ?? "pieces")
   const [mode, setMode] = useState<GizmoMode>("translate")
-  const [around, setAround] = useState<Around>((ctx.query.get("around") as Around | null) ?? "same")
-  const [tryOn, setTryOn] = useState(ctx.query.get("try") === "1")
-  const [markers, setMarkers] = useState(ctx.query.get("markers") !== "0")
+  const [around, setAround] = useState<Around>((param(ctx.query, "around") as Around | null) ?? "same")
+  const [tryOn, setTryOn] = useState(param(ctx.query, "try") === "1")
+  const [markers, setMarkers] = useState(true)
   const [tone, setTone] = useState(0)
   const [filter, setFilter] = useState("")
   const [search, setSearch] = useState("")
@@ -148,7 +148,7 @@ export function TileComposer({
     })
     scene.current = s
     ctx.attach(s.stage)
-    s.frame(ctx.query.get("view") !== "wide")
+    s.frame()
     return () => {
       scene.current = null
       s.dispose()
@@ -660,12 +660,6 @@ export function TileComposer({
       </aside>
     </div>
   )
-}
-
-/** `layer:index` → a selection, or null. */
-function parseSel(raw: string | null): Selection | null {
-  const m = /^(pieces|spots|blockers):(\d+)$/.exec(raw ?? "")
-  return m ? { layer: m[1] as Layer, i: Number(m[2]) } : null
 }
 
 /** A first scale for a new piece: KayKit hex buildings at scale B, everything else near half. */

@@ -25,6 +25,7 @@ import {
   seasonOfDate,
   seasonPinOf,
 } from "@guildhall/render"
+import { param } from "../params.ts"
 
 /** What the screen says the season is (a wheel value 0 … 4), or null: today's. */
 export type SeasonSource = () => number | null
@@ -71,7 +72,7 @@ export function mountSeason(parts: {
   now?: () => number
 }): SeasonMount {
   const now = parts.now ?? Date.now
-  const asked = seasonPinOf(parts.query.get("season"))
+  const asked = seasonPinOf(param(parts.query, "season"))
   let pinAt: number | null = typeof asked === "number" ? asked : null
   let source: SeasonSource | null = null
   const want = () => pinAt ?? source?.() ?? seasonOfDate(now())

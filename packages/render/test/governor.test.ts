@@ -124,19 +124,16 @@ describe("governorStep", () => {
 
 describe("parseDprPin", () => {
   test.each([
-    ["?dpr=1", 1],
-    ["?screen=lineup&dpr=1.75", 1.75],
-    ["dpr=2", 2],
-  ])("%p pins %p", (search, dpr) => {
-    expect(parseDprPin(search)).toBe(dpr)
+    ["1", 1],
+    ["1.75", 1.75],
+    ["2", 2],
+  ])("%p pins %p", (text, dpr) => {
+    expect(parseDprPin(text)).toBe(dpr)
   })
 
-  test.each([[""], ["?screen=m0"], ["?dpr="], ["?dpr=two"], ["?dpr=0"], ["?dpr=-1"], ["?dpr=Infinity"]])(
-    "%p pins nothing",
-    (search) => {
-      expect(parseDprPin(search)).toBeUndefined()
-    },
-  )
+  test.each([[null], [undefined], [""], ["two"], ["0"], ["-1"], ["Infinity"]])("%p pins nothing", (text) => {
+    expect(parseDprPin(text)).toBeUndefined()
+  })
 })
 
 describe("the viewer's quality pick", () => {

@@ -6,6 +6,7 @@
  * Old deep links (`?screen=<id>&…`) resolve too, and the shell replaces them with the path form.
  */
 import { BASE } from "../env.ts"
+import { type ParamName, type PublicParam, publicOnly, rawParam } from "../params.ts"
 
 export interface Route {
   /** The screen id (`screens.ts`). */
@@ -13,7 +14,7 @@ export interface Route {
   /** The path under the base, no slash at either end; "" is the home page. */
   path: string
   /** The query key the trailing path segments carry, and how many segments the id has. */
-  param?: { key: string; parts: number }
+  param?: { key: ParamName; parts: number }
 }
 
 export const ROUTES: readonly Route[] = [
@@ -39,7 +40,7 @@ export const ROUTES: readonly Route[] = [
  * Paths that were screens of their own and now open another: `/lab/hexworld?seed=3` was the town's
  * island on a lab path, and is `/town/3`. The query key named `from` moves to the screen's id key.
  */
-const ALIASES: readonly { path: string; screen: string; from: string; to: string }[] = [
+const ALIASES: readonly { path: string; screen: string; from: ParamName; to: ParamName }[] = [
   { path: "lab/hexworld", screen: "town", from: "seed", to: "town" },
 ]
 
@@ -58,7 +59,7 @@ const segments = (path: string): string[] => path.split("/").filter(Boolean)
 /** A URL's pathname and search → the screen and its query. */
 export function resolve(pathname: string, search: string, base = BASE): Resolved {
   const query = new URLSearchParams(search)
-  const named = query.get("screen")
+  const named = rawParam(query, "screen")
   if (named !== null) {
     query.delete("screen")
     return { screen: ROUTES.some((r) => r.screen === named) ? named : null, query }
@@ -73,7 +74,7 @@ export function resolve(pathname: string, search: string, base = BASE): Resolved
   }
   const alias = ALIASES.find((a) => parts.join("/") === a.path)
   if (alias) {
-    const id = query.get(alias.from)
+    const id = rawParam(query, alias.from)
     query.delete(alias.from)
     if (id !== null) query.set(alias.to, id)
     return { screen: alias.screen, query }
@@ -109,7 +110,7 @@ export function href(
   const rest = new URLSearchParams(query)
   rest.delete("screen")
   let path = route.path
-  const id = route.param ? rest.get(route.param.key) : null
+  const id = route.param ? rawParam(rest, route.param.key) : null
   if (route.param && id) {
     const parts = id.split("/")
     if (parts.length === route.param.parts && parts.every(Boolean)) {
@@ -147,6 +148,32 @@ export const current = (): Resolved => resolve(location.pathname, location.searc
 
 /** The query the open screen reads (its path id folded in), for screens that re-read their deep link. */
 export const currentQuery = (): URLSearchParams => current().query
+
+/**
+ * The address on screen as a link for someone else: absolute, its public parameters only (params.ts), so
+ * it reopens the same island at the same moment (a hall's `?t=`, a story and its act, Settings › World).
+ */
+export function publicLink(): string {
+  const { screen, query } = current()
+  return screen ? new URL(href(screen, publicOnly(query)), location.origin).href : location.href
+}
+
+/**
+ * Sets (a string) or clears (null) public parameters of the address in place, no history entry: Settings ›
+ * World and the hall's day at rest, so a reload or a shared link opens what is on screen. `rebuild`
+ * then tells the shell the address moved (a `popstate`), so a change that builds the world anew (its
+ * size) remounts it.
+ */
+export function patchAddress(patch: Partial<Record<PublicParam, string | null>>, rebuild = false): void {
+  const url = new URL(location.href)
+  for (const [k, v] of Object.entries(patch) as [string, string | null | undefined][]) {
+    if (v === null || v === undefined) url.searchParams.delete(k)
+    else url.searchParams.set(k, v)
+  }
+  if (url.href === location.href) return
+  history.replaceState(history.state, "", url)
+  if (rebuild) dispatchEvent(new PopStateEvent("popstate"))
+}
 
 /**
  * Rewrites the deep link in place (no history entry, no remount) to the open screen with `query`:

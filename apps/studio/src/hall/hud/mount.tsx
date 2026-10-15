@@ -16,7 +16,10 @@ import { repoLegendMarkdown, repoLegendOf, repoRecapOf, requestChronicleUrl } fr
 import { holdHudStyle } from "@guildhall/ui"
 import { createRoot, type Root } from "react-dom/client"
 import type { HudParts } from "../../hexworld/index.ts"
+import { DEFAULT_FILES } from "../../hexworld/knobs.ts"
 import { storySeason } from "../../hexworld/season.ts"
+import { hasParam, param } from "../../params.ts"
+import { currentQuery } from "../../shell/router.ts"
 import { mountAutoNext } from "../../site/autoNext.ts"
 import { hallChronicle } from "../../site/chronicle.ts"
 import { HomeFeed, type HomeStory, homeStoryOf } from "../../site/homeFeed.ts"
@@ -25,7 +28,7 @@ import { homePlaces } from "../../site/homePlaces.ts"
 import { storyHref } from "../../site/routes.ts"
 import { type HallCamera, mountHallCamera } from "../camera.ts"
 import type { HallTime } from "../clock.ts"
-import { createEraShots, hallCapture } from "../eraShots.ts"
+import { createEraShots, type EraShots, hallCapture } from "../eraShots.ts"
 import { mountEvents } from "../events.ts"
 import { createSession, feedKindOf, type HallSession, openFeed } from "../feeds/index.ts"
 import { type SessionPlaces, sessionPlaces } from "../feeds/places.ts"
@@ -105,6 +108,8 @@ function createLevers(): HallLevers & { setSkip(k: number): void } {
 
 interface Mounted {
   root: Root
+  /** The island's pictures: the Legends' eras, the Chronicle card's island (eraShots.ts), filmed when asked for. */
+  eraShots: EraShots
   modals: HTMLElement
   float: HallFloat
   camera: HallCamera
@@ -157,8 +162,11 @@ function mountOn(
   document.body.append(modals)
   const root = createRoot(host)
   const levers = createLevers()
+  // the island's pictures: filmed only once the book or the card asks (eraShots.ts)
+  const eraShots = createEraShots(hallCapture(parts))
+  if (ext) ext.eraShots = () => eraShots.stats()
   // `?weather=clear|cloudy|rain|storm|snow`: a sky pinned from the link (a demo's night storm), as Settings pins it
-  levers.weather = weatherOf(opts.query.get("weather"))
+  levers.weather = weatherOf(param(opts.query, "weather"))
   if (levers.weather) parts.fx?.drive.set(levers.weather)
   if (ext) ext.levers = levers
 
@@ -204,12 +212,15 @@ function mountOn(
 
   return {
     root,
+    eraShots,
     modals,
     float,
     camera,
     levers,
     parts: { ...rest, camera },
     dispose() {
+      eraShots.dispose()
+      if (ext?.eraShots) delete ext.eraShots
       stopClear()
       offFx()
       offEvents()
@@ -259,7 +270,6 @@ function startSession(parts: HudParts, opts: HallHudOptions): HudSession | null 
   const query = opts.query
   const kind = query ? feedKindOf(query) : null
   if (!query || !kind) return null
-  const st = Number(query.get("st"))
   // a story is told on this repo: its paths rehomed onto the repo's units, so heroes reach its places
   const repo = parts.repo?.kind === "chronicled" ? parts.repo : null
   const units = repo?.places.flatMap((p) =>
@@ -267,8 +277,7 @@ function startSession(parts: HudParts, opts: HallHudOptions): HudSession | null 
   )
   const stage = { name: repo?.name ?? opts.slug, ...(units?.length ? { units } : {}) }
   const session = createSession(openFeed(kind, opts.slug, query, stage), {
-    autoplay: query.get("play") !== "0",
-    ...(query.has("st") && Number.isFinite(st) ? { openAt: Math.max(0, st) } : {}),
+    ...openOf(query),
   })
   const places = sessionPlaces(parts.repo, parts.places)
   session.start(places.placeOf)
@@ -284,10 +293,6 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
   const live = startSession(parts, opts)
   if (live) current = live.session
   const m = mountOn(parts, live, { query: opts.query ?? new URLSearchParams(), time: opts.time ?? null })
-  // the Legends' era pictures: filmed only once the book opens (eraShots.ts)
-  const eraShots = createEraShots(hallCapture(parts))
-  const ext = window.guildhall?.ext as Record<string, unknown> | undefined
-  if (ext) ext.eraShots = () => eraShots.stats()
   let gone = false
   void hallChronicle(opts.slug).then((found) => {
     if (gone) return
@@ -314,14 +319,12 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
         {...(found.status === "unavailable" ? { onRetry: opts.retry } : {})}
         {...(live ? { session: live } : {})}
         time={opts.time ?? null}
-        eraShots={eraShots}
+        eraShots={m.eraShots}
       />,
     )
   })
   return () => {
     gone = true
-    eraShots.dispose()
-    if (ext?.eraShots) delete ext.eraShots
     if (live && current === live.session) current = null
     m.dispose()
     live?.portraits?.dispose()
@@ -338,22 +341,20 @@ export interface HomeHudOptions {
   time: HallTime
 }
 
-/** The act a link opens a story at, or undefined. */
-const actOf = (query: URLSearchParams): number | undefined => {
-  const n = Number(query.get("act"))
-  return Number.isInteger(n) && n >= 1 && n <= 5 ? n : undefined
+/** How a link opens its session: playing unless `?play=0`, at `?st=` seconds when it names them. */
+function openOf(query: URLSearchParams): { autoplay: boolean; openAt?: number } {
+  const st = param(query, "st")
+  return { autoplay: param(query, "play"), ...(st !== null ? { openAt: Math.max(0, st) } : {}) }
 }
 
 /** Mounts the home's HUD on the island's Viewer once the island is built. Returns the unmount. */
 export function mountHomeHud(parts: HudParts, opts: HomeHudOptions): () => void {
   const places = homePlaces(parts.zoneKinds)
-  let story: HomeStory = homeStoryOf(opts.query.get("story"))
-  let act = actOf(opts.query)
+  let story: HomeStory = homeStoryOf(param(opts.query, "story"))
+  let act = param(opts.query, "act")
   const feed = new HomeFeed(story)
-  const st = Number(opts.query.get("st"))
   const session = createSession(feed, {
-    autoplay: opts.query.get("play") !== "0",
-    ...(opts.query.has("st") && Number.isFinite(st) ? { openAt: Math.max(0, st) } : {}),
+    ...openOf(opts.query),
   })
   session.start(places.placeOf)
   const portraits = createHeroPortraits(parts)
@@ -369,10 +370,10 @@ export function mountHomeHud(parts: HudParts, opts: HomeHudOptions): () => void 
   // the camera: the director films the demo guild or the story (V1's home: B, ?director=0)
   const m = mountOn(parts, { session, places }, { query: opts.query, time: opts.time, director: true, after })
   // `?next=0`: a story stays at its end (shots, a visitor's link to one story)
-  if (opts.query.get("next") !== "0")
+  if (param(opts.query, "next"))
     next = mountAutoNext(m.float.top.parentElement ?? m.float.top, (id) => {
       // the page's own knobs kept (its seed, its hour): only the story changes, from its start
-      const q = new URLSearchParams(location.search)
+      const q = currentQuery()
       q.set("story", id)
       q.delete("act")
       q.delete("st")
@@ -392,7 +393,7 @@ export function mountHomeHud(parts: HudParts, opts: HomeHudOptions): () => void 
     session.clock.seek(c.start + chapter.at, { jump: true })
     session.clock.play(true)
   }
-  if (act && !opts.query.has("st")) openAct(act)
+  if (act && !hasParam(opts.query, "st")) openAct(act)
 
   const paint = () =>
     m.root.render(
@@ -410,6 +411,8 @@ export function mountHomeHud(parts: HudParts, opts: HomeHudOptions): () => void 
         hrefs={opts.hrefs}
         session={{ session, places, repo: "guildhall", portraits }}
         time={opts.time}
+        eraShots={m.eraShots}
+        size={param(opts.query, "files") ?? DEFAULT_FILES}
         home={{
           title: story === "demo" ? "The demo guild" : storyTitle(story),
           ...(story === "demo" ? {} : { leave: { label: "Leave the story", href: opts.hrefs.island } }),

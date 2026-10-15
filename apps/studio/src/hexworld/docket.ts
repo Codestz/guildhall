@@ -23,6 +23,7 @@ import { harbourOf, type Issue, type Petitioners } from "@guildhall/sim"
 import { PHONE_MAX } from "@guildhall/ui"
 import { type LifePose, PETITION_CAP, type PetitionLane, petitionerPoses } from "@guildhall/world"
 import type { HallSession } from "../hall/feeds/session.ts"
+import { param } from "../params.ts"
 import type { Life } from "./life.ts"
 
 /** Plates shown at most (the oldest open issues), and on a phone. */
@@ -56,7 +57,7 @@ export function docketPlates(
 
 /** `?docket=`: how many issues the look opens with, or null. */
 export function docketOf(query: Pick<URLSearchParams, "get">): number | null {
-  const v = query.get("docket")
+  const v = param(query, "docket")
   if (v === null || v === "0") return null
   const n = Math.floor(Number(v))
   return Number.isFinite(n) && n >= 1 ? Math.min(30, n) : 3

@@ -501,18 +501,6 @@ const HELP = [
 
 const rgb = ([r, g, b]: [number, number, number]) => `rgb(${r},${g},${b})`
 
-/** Old links: `?grid=1` and `?growth=1` were two buttons; they are the view knob now. */
-function migrate(q: URLSearchParams): URLSearchParams {
-  const out = new URLSearchParams(q)
-  if (!out.has("view")) {
-    if (out.get("growth") === "1") out.set("view", "growth")
-    else if (out.get("grid") === "1") out.set("view", "grid")
-  }
-  out.delete("grid")
-  out.delete("growth")
-  return out
-}
-
 function viewOf(values: KnobValues): View {
   const spec = { ...HEX_ISLAND_DEFAULTS, seed: values.seed as number }
   for (const k of KNOB_KEYS) spec[k] = values[k] as number
@@ -530,8 +518,7 @@ export const hexmap: Screen = {
   id: "hexmap",
   title: "Hex map",
   mount(host, ctx) {
-    const query = migrate(ctx.query)
-    const viewer = mountViewer(host, { ...ctx, query }, "hexmap", {
+    const viewer = mountViewer(host, ctx, "hexmap", {
       title: "The island from above",
       subtitle:
         "Heights in steps, sand, cliffs, rivers, lakes and forest; places, roads and fields over them.",

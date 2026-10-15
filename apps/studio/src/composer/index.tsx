@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client"
 import { holdStudioStyle } from "../browser/style.ts"
 import { loadCatalog } from "../catalog.ts"
 import * as data from "../data.ts"
+import { param } from "../params.ts"
 import type { Screen } from "../screens.ts"
 import { loadTiles } from "../tiles.ts"
 import { parseTileId } from "./model.ts"
@@ -46,7 +47,7 @@ async function boot(): Promise<ComposerData | null> {
  * The tile composer (`/composer/<tile-id>`, decisions.md "Polish round"): a tile prefab on one hex at
  * scale B with its neighbours; its pieces placed and turned with the gizmo, its activity spots and
  * blockers drawn and edited, "try" stands townsfolk on every spot; saves to `data/tiles/<id>.json`.
- * `?try=1`, `?around=grass|shore|step`, `?markers=0` and `?view=wide` open it in that state.
+ * `?try=1` and `?around=grass|shore|step` open it in that state (the composer writes them as they change).
  */
 export const composer: Screen = {
   id: "composer",
@@ -66,7 +67,7 @@ export const composer: Screen = {
     const start = async () => {
       const [input] = await Promise.all([boot(), style.ready])
       if (disposed) return
-      const initial = parseTileId(ctx.query.get("tile")) ?? "tavern"
+      const initial = parseTileId(param(ctx.query, "tile")) ?? "tavern"
       flushSync(() =>
         root.render(
           input?.tiles.length ? (

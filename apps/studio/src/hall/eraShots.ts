@@ -13,7 +13,8 @@
  * order, one still at a time, each in short slices after a frame is drawn (render still.ts). A picture
  * is cached per repo and era (`eraShotKey`) for the page's life, so a book opened again, or the hall
  * opened again, shows it at once. The latest era's picture is the island today: the Chronicle card
- * reuses it.
+ * reuses it, and films it on demand when the book has not (an island with no eras films itself as it
+ * stands, `at: null`).
  *
  * `window.guildhall.ext.eraShots()`: the queue's and the stills' numbers (shots, the perf probe).
  */
@@ -65,10 +66,13 @@ const DRAWN = new Map<string, string>()
 export const eraShotKey = (slug: string, era: { id: string; end: number }): string =>
   `${slug}#${era.id}@${era.end}`
 
-/** One picture to draw: its key, and the moment the island is shown at (epoch ms). */
+/**
+ * One picture to draw: its key, and the moment the island is shown at (epoch ms), or null for the island
+ * as it stands now (in its own season: the Chronicle card's picture where there is no era to film).
+ */
 export interface EraShotJob {
   key: string
-  at: number
+  at: number | null
 }
 
 export interface EraShotStats {
@@ -97,9 +101,9 @@ export interface EraShots {
   dispose(): void
 }
 
-/** What draws one picture: the island at `at` (epoch ms) as an image URL. */
+/** What draws one picture: the island at `at` (epoch ms; null: as it stands now) as an image URL. */
 export interface EraCapture {
-  shoot(at: number): Promise<string>
+  shoot(at: number | null): Promise<string>
   stats(): StillStats | null
   dispose(): void
 }
@@ -198,14 +202,15 @@ export function eraPose(world: { centre: readonly [number, number]; half: number
 }
 
 /**
- * The hall's capture: stills of its island through its post pipeline, laid out by its history. Null
- * where it cannot film (no post, no history: the chapters then show their counts alone).
+ * The island's capture: stills through its post pipeline, laid out by its history at an era's end (a
+ * hall's), or as it stands now. Null where it cannot film (no post pipeline: the chapters then show their
+ * counts alone, the card the live frame); an island with no history films only as it stands.
  */
 export function hallCapture(
   parts: Pick<HudParts, "stage" | "post" | "still" | "clock" | "season">,
 ): EraCapture | null {
   const { stage, post, still } = parts
-  if (!post || !still) return null
+  if (!post) return null
   let stills: ReturnType<typeof createStills> | null = null
   return {
     shoot(at) {
@@ -224,12 +229,13 @@ export function hallCapture(
             if (UNSEEN.has(o.name)) hidden.push(o)
           })
           for (const o of hidden) o.visible = false
-          const island = still(at)
+          // an era's end: the island laid out and in season as it was then; now: as it stands
+          const island = at !== null && still ? still(at) : null
           const hour = parts.clock.get()
           parts.clock.set(GOLDEN_HOUR)
-          applySeason(seasonOfDate(at))
+          if (at !== null) applySeason(seasonOfDate(at))
           return () => {
-            applySeason(parts.season?.drive.at() ?? SEASON_AT.summer)
+            if (at !== null) applySeason(parts.season?.drive.at() ?? SEASON_AT.summer)
             parts.clock.set(hour)
             island?.()
             for (const o of hidden) o.visible = true

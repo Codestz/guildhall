@@ -3,6 +3,7 @@ import { log } from "@guildhall/core"
 import { flushSync } from "react-dom"
 import { createRoot } from "react-dom/client"
 import { loadCatalog } from "../catalog.ts"
+import { param } from "../params.ts"
 import type { Screen } from "../screens.ts"
 import { currentQuery } from "../shell/router.ts"
 import type { PlayerState, PlayOptions } from "../viewer/player.ts"
@@ -85,7 +86,7 @@ export const pieces: Screen = {
           entries: catalog?.all().length ?? 0,
           packs: Object.fromEntries((catalog?.index.packs ?? []).map((p) => [p.id, p.count])),
           shown: catalog ? applyFilters(catalog, filters).length : 0,
-          selected: currentQuery().get("id"),
+          selected: param(currentQuery(), "id"),
           animation: player ? { ...player.state(), clips: player.clips } : null,
           filters,
           facets: catalog?.facets() ?? null,
@@ -126,7 +127,7 @@ export const pieces: Screen = {
             <Browser
               catalog={loaded}
               ctx={ctx}
-              initial={{ filters: parseFilters(ctx.query), id: ctx.query.get("id") }}
+              initial={{ filters: parseFilters(ctx.query), id: param(ctx.query, "id") }}
               bind={(next) => {
                 handle = next
               }}

@@ -30,6 +30,7 @@ import type { ViewerHud } from "@guildhall/ui"
 import type { Chips } from "../hexworld/chips.ts"
 import type { HudParts } from "../hexworld/index.ts"
 import type { BuiltPlace } from "../hexworld/job.ts"
+import { param } from "../params.ts"
 import { hallEvents, type ViewBlocker } from "./events.ts"
 import type { HallSession } from "./feeds/index.ts"
 import type { SessionPlaces } from "./feeds/places.ts"
@@ -248,10 +249,10 @@ export function mayCut(now: number, lastCut: number | null, urgent = false): boo
 
 /** The director's default for a feed: on for a told story, off for live and replay (`?director=` wins). */
 export function directorDefault(query: Pick<URLSearchParams, "get">): boolean {
-  const asked = query.get("director")
+  const asked = param(query, "director")
   if (asked === "1" || asked === "on") return true
   if (asked === "0" || asked === "off") return false
-  return query.get("feed") === "story"
+  return param(query, "feed") === "story"
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -529,7 +530,7 @@ export function createHallCamera(opts: HallCameraOptions): HallCamera {
   /** The framing the camera opened with: what a reset returns to. */
   const opening = rig.get()
   let directorOn =
-    opts.query.get("director") === null && opts.director !== undefined
+    param(opts.query, "director") === null && opts.director !== undefined
       ? opts.director
       : directorDefault(opts.query)
   let userAt: number | null = null

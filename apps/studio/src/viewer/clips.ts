@@ -1,5 +1,6 @@
 /** A character's clips as the inspector lists them: counted, searched and grouped by what they show. */
 import type { CatalogEntry, RigEntry } from "@guildhall/assets"
+import { param } from "../params.ts"
 
 export const CLIP_GROUPS = ["idle", "walk/run", "work", "sit", "social", "combat", "other"] as const
 export type ClipGroup = (typeof CLIP_GROUPS)[number]
@@ -86,7 +87,7 @@ export function clipSearch(
 
 /** The `&clip=` and `&t=` a deep link asks for (`t` only when it is a fraction in [0, 1]). */
 export function parseClipLink(query: URLSearchParams): { clip: string | null; t?: number } {
-  const raw = query.get("t")
+  const raw = param(query, "t")
   const t = raw === null || raw.trim() === "" ? Number.NaN : Number(raw)
-  return { clip: query.get("clip"), ...(t >= 0 && t <= 1 ? { t } : {}) }
+  return { clip: param(query, "clip"), ...(t >= 0 && t <= 1 ? { t } : {}) }
 }

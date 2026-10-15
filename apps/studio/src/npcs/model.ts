@@ -15,6 +15,7 @@ import {
   SKIN_RAMPS,
   validateNpc,
 } from "@guildhall/assets"
+import { param } from "../params.ts"
 import { href } from "../shell/router.ts"
 
 /** The rig every townsperson body shares (decisions, Characters). */
@@ -47,18 +48,21 @@ export const DEFAULT_ROLE = "farmer"
 
 /** The query, with defaults for anything missing or unreadable. */
 export function parseQuery(q: URLSearchParams): NpcQuery {
-  const role = q.get("recipe") ?? ""
-  const seed = Number(q.get("seed"))
-  const strip = Number(q.get("strip"))
-  const t = Number(q.get("t"))
-  const clip = q.get("clip") as Activity
+  const role = param(q, "recipe") ?? ""
+  const seed = param(q, "seed")
+  const strip = Number(param(q, "strip"))
+  const t = Number(param(q, "t"))
+  const clip = param(q, "clip") as Activity
   return {
     role: ID.test(role) ? role : DEFAULT_ROLE,
-    seed: q.get("seed") !== null && Number.isInteger(seed) && seed >= 0 ? seed : 1,
+    seed: seed !== null && Number.isInteger(seed) && seed >= 0 ? seed : 1,
     strip: Number.isInteger(strip) && strip >= 1 ? Math.min(strip, MAX_STRIP) : STRIP,
     clip: ACTIVITIES.includes(clip) ? clip : "idle",
-    t: q.get("t") !== null && q.get("t") !== "" && Number.isFinite(t) ? Math.min(1, Math.max(0, t)) : null,
-    map: q.get("cam") === "map",
+    t:
+      param(q, "t") !== null && param(q, "t") !== "" && Number.isFinite(t)
+        ? Math.min(1, Math.max(0, t))
+        : null,
+    map: param(q, "cam") === "map",
   }
 }
 

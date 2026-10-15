@@ -23,7 +23,6 @@ export interface PanelActions {
 
 export interface Panel {
   update(state: PanelState): void
-  showExport(open: boolean): void
   dispose(): void
 }
 
@@ -211,7 +210,6 @@ export function createPanel(
       hex.setAttribute("aria-invalid", "false")
       was.textContent = `in the file: ${shipped[state.selected]}`
     },
-    showExport,
     dispose() {
       side.innerHTML = ""
       picker.remove()

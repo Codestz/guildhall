@@ -7,7 +7,7 @@
  * The island is built in a worker (job.ts) and arrives in stages: the ground first (drawn at once), the
  * shore field and the water next, the pieces, while their models load, and last the life plan (everyone's
  * day: a second of path searches that never blocks this thread). This thread only uploads and draws.
- * `?files=` sizes the island like a repo of that many files; `?hour=`, `?az=`, `?shadow=`, `?fill=`,
+ * `?files=` sizes the island like a repo of that many files; `?hour=`, `?shadow=`, `?fill=`,
  * `?post=0`, `?aa=msaa|none` and `?ground=hex|soft` are for comparisons; `?step=` tries another height per
  * level (metres, default LEVEL_STEP) and `?detail=0` shows the ground without its painted small hexes and
  * speckle. The nature knobs (plan-hex "Nature pass", world nature.ts), all multipliers, 1 today:
@@ -71,6 +71,7 @@ import { mountSound } from "../audio/mount.ts"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
 import type { HallCamera } from "../hall/camera.ts"
 import type { HallSession } from "../hall/feeds/session.ts"
+import { hasParam, param } from "../params.ts"
 import type { Screen, ScreenCtx } from "../screens.ts"
 import { current } from "../shell/router.ts"
 import { mountViewer } from "../shell/viewer.ts"
@@ -101,7 +102,7 @@ import {
   shapeOf,
   type ToWorker,
 } from "./job.ts"
-import { clock, islandKnobs } from "./knobs.ts"
+import { clock, DEFAULT_FILES, islandKnobs } from "./knobs.ts"
 import { createLife, type Life } from "./life.ts"
 import { agentFeedOf, agentSource } from "./lifeAgents.ts"
 import type { AgentDesk, AgentDeskReply, AgentDeskRequest, LifePlan } from "./lifePlan.ts"
@@ -362,7 +363,7 @@ export interface HudParts {
   heroAt(id: string): [number, number, number] | null
   /** How a session's hero is drawn (its figure's look, life's `heroLook`): its HUD portrait. */
   heroLook?(id: string): ReturnType<Life["heroLook"]>
-  /** The heroes' chips (null: no life, no agents, or `?chips=0`): the one followed, a plea mark tapped. */
+  /** The heroes' chips (null: no life, no agents): the one followed, a plea mark tapped. */
   chips: Pick<Chips, "select" | "onPlea" | "hit" | "extent"> | null
   /** The hall's camera (hall/camera.ts: follow a hero, the director), set by the hall's HUD as it mounts. */
   camera?: HallCamera
@@ -409,36 +410,34 @@ const world = {
   mount(outer: HTMLElement, ctx: ScreenCtx, hooks?: WorldHooks, extra: HexWorldExtra = {}): () => void {
     const t0 = performance.now()
     const since = () => Math.round(performance.now() - t0)
-    const num = (k: string, d: number) => {
-      const v = Number(ctx.query.get(k))
-      return ctx.query.has(k) && Number.isFinite(v) ? v : d
-    }
-    const seed = num("seed", Number(ctx.query.get("town")) || 1)
+    const num = (k: "seed" | "files" | "step" | "hour" | "shadow" | "fill", d: number) =>
+      param(ctx.query, k) ?? d
+    const seed = num("seed", Number(param(ctx.query, "town")) || 1)
     // the island's size: the query's (`?files=`, default 4,000), or, in a hall, the repo's once its chronicle is read
-    let files = num("files", 4000)
+    let files = num("files", DEFAULT_FILES)
     let places: PlaceSpec[] | undefined
     const hall = extra.repo !== undefined
     const stats: HallStats = { repo: null, chronicleMs: 0, buildMs: 0, revealMs: 0, places: [] }
     // the worker starts first: it builds while the stage, its context and the catalog get ready
     const step = num("step", LEVEL_STEP)
-    const detail = ctx.query.get("detail") !== "0"
+    const detail = param(ctx.query, "detail")
     // `?lod=0`: every piece at full detail at any distance, the reference a LOD change is judged against
-    setLod(ctx.query.get("lod") !== "0")
+    setLod(param(ctx.query, "lod"))
     // the nature knobs (?tree= ?pine= ?bush= ?rock= ?grass= ?flower= ?woods= ?wild=), for side-by-sides
     const nature = natureOf(ctx.query)
     // the hex map's shape knobs (?coast= ?hills= ?rain= ?forest=): `/lab/hexmap`'s island in 3D
     const shape = shapeOf(ctx.query)
     // the collision overlay (`?collide=1`, `?spots=1`) builds the map again on this thread for its walk graph;
     // `?heroSpots=1` marks the heroes' spots (world heroes.ts) over the scene, alone
-    const heroSpots = ctx.query.get("heroSpots") === "1"
-    const overlay = ctx.query.get("collide") === "1" || ctx.query.get("spots") === "1" || heroSpots
-    const lifeOn = ctx.query.get("life") !== "0"
+    const heroSpots = param(ctx.query, "heroSpots")
+    const overlay = param(ctx.query, "collide") || param(ctx.query, "spots") || heroSpots
+    const lifeOn = param(ctx.query, "life")
     // the event FX (fx.ts): off unless a hall asks for them or `?fx=` shows them; off, nothing of them exists
     const fxSpec = fxOf(ctx.query)
     const fxOn = extra.fx === true || fxSpec !== null
     const catalogLoad = loadCatalog()
     // `?name=`: the island's own name (the site's `/` is "Guildhall", a hall its repo), else the seed's
-    const name = ctx.query.get("name") || `Island ${roman(seed)}`
+    const name = param(ctx.query, "name") || `Island ${roman(seed)}`
     // the chrome: the Viewer's corners and Inspector round the stage (shell/viewer.ts); the seed is the
     // path's on `/town/<seed>`, so its knob writes `town`
     const seedKey = current().screen === "town" ? "town" : "seed"
@@ -479,24 +478,23 @@ const world = {
     // the agents life plans with (lifeAgents.ts): the demo story; `?agents=0` none; a hall playing a
     // session (`?feed=`) none at first, then its session's heroes (sessionAgents.ts, once its HUD is up);
     // a hall with no session its resident guild (residents.ts, once life is up), not the demo's
-    const session = extra.session !== undefined || (hall && ctx.query.has("feed"))
-    const residing = hall && !session && !ctx.query.has("agents")
+    const session = extra.session !== undefined || (hall && hasParam(ctx.query, "feed"))
+    const residing = hall && !session && !hasParam(ctx.query, "agents")
     const agentsFeed =
-      lifeOn && !session && !residing ? agentFeedOf(ctx.query.get("agents")) : Promise.resolve(null)
+      lifeOn && !session && !residing ? agentFeedOf(param(ctx.query, "agents")) : Promise.resolve(null)
     const job = startJob(
       Promise.all([read, loadTiles(), agentsFeed]).then(([, tiles, agents]) => ({
         agents,
         ...(stats.repo?.kind === "chronicled" ? { repo: stats.repo.name } : {}),
         seed,
         files,
-        ground: groundOf(ctx.query.get("ground")),
+        ground: groundOf(param(ctx.query, "ground")),
         step,
         paint: detail,
         tiles: tiles.length ? tiles : null,
         nature,
         shape,
         life: lifeOn,
-        ...(ctx.query.get("regions") === "0" ? { regions: false } : {}),
         ...(places ? { places } : {}),
       })),
     )
@@ -506,7 +504,7 @@ const world = {
       tornDown = done
     })
     // the post pipeline anti-aliases its own target (SMAA); the canvas's MSAA is for `?post=0` alone
-    const stage = createStage(host, { antialias: ctx.query.get("post") === "0" })
+    const stage = createStage(host, { antialias: !param(ctx.query, "post") })
     // Under the cover nothing drawn is seen: the stage draws on every COVER_PACE-th vsync and the thread
     // goes to the build (the pieces' bake, the crowd's), until the settle, which needs the frames at
     // their own rate to see them calm.
@@ -634,8 +632,8 @@ const world = {
       const sea = Math.max(span * 3, stage.camera.far * 0.95)
       air = createIslandAir(stage, { light: () => sky.light(), span, seed, sea, knobs: atmoKnobs(ctx.query) })
       drive?.attach(air.atmosphere)
-      if (ctx.query.get("post") !== "0")
-        post = createPost(stage, { light: () => sky.light(), aa: aaOf(ctx.query.get("aa")) })
+      if (param(ctx.query, "post"))
+        post = createPost(stage, { light: () => sky.light(), aa: aaOf(param(ctx.query, "aa")) })
       // The programs of all that (the dome, the clouds, the lamps, the post passes) link in the
       // background while the worker still builds the ground, and nothing is drawn until they have (the
       // cover is up): drawn before, that frame linked them one by one, 0.1–1.1 s on the main thread.
@@ -663,7 +661,7 @@ const world = {
           for (const count of bones) void warmCrowdPrograms(stage, count)
           for (const file of rigs) loadClips(libraryUrl(file)).catch(() => undefined)
         })
-      const azimuth = num("az", sideLit(sky.light().sunDir))
+      const azimuth = sideLit(sky.light().sunDir)
       const pose: CameraPose = m.heart
         ? { target: m.heart, azimuth, elevation: 38, distance: 70 }
         : { target: [0, 0, 0], azimuth, elevation: 45, distance: span * 1.6 }
@@ -768,7 +766,6 @@ const world = {
       // the sky and town shows (shows.ts): nothing in the scene until one plays
       shows = mountShows({
         stage,
-        query: ctx.query,
         sites: m.sites,
         span,
         light: () => sky.light(),
@@ -844,9 +841,9 @@ const world = {
           agentPool: session || residing,
           // a hero's work beats make the work FX's bursts (sparks off a hammer, pages, motes)
           beat: (b, at, sample) => workfx?.fx.beat(b, at, sample),
-          // the heroes' chips, in the labels layer with the plates (`?chips=0`: none); a repo's hall with
+          // the heroes' chips, in the labels layer with the plates; a repo's hall with
           // no session names its residents (their day in a word: no session's calls)
-          ...(ctx.query.get("chips") !== "0" ? { chips: viewer.labels } : {}),
+          chips: viewer.labels,
           debug: overlay
             ? () => {
                 const island = hexIsland({ ...shape, seed, files })
@@ -857,7 +854,6 @@ const world = {
           groundAt,
           hour: () => now,
           seed,
-          agentT: num("lifeT", 0),
           workfx: workfx?.fx ?? null,
           sea: SEA_LEVEL,
           overlay,
@@ -892,7 +888,6 @@ const world = {
         load,
         doorways: life?.doorways() ?? [],
         life,
-        all: ctx.query.get("doors") === "open",
         hour: () => now,
       })
       if (disposed) {

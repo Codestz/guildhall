@@ -6,8 +6,9 @@ import { holdStudioStyle } from "../browser/style.ts"
 import { createClock, createHallTime, type HallTime } from "../hall/clock.ts"
 import { playingSeasonDate } from "../hall/seasonPace.ts"
 import type { HudParts } from "../hexworld/index.ts"
+import { hasParam, param } from "../params.ts"
 import type { Screen, ScreenCtx } from "../screens.ts"
-import { current, href } from "../shell/router.ts"
+import { current, href, patchAddress } from "../shell/router.ts"
 import { addShellStyle } from "../shell/style.ts"
 import { hallChronicle, hallRepo } from "./chronicle.ts"
 import { homeSession } from "./homeHud.tsx"
@@ -64,7 +65,7 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
       const root = document.createElement("div")
       root.className = "gh site-root"
       // `?dev=1`: the Viewer's tools and Inspector over the site's world, for the studio's own checks
-      if (ctx.query.get("dev") === "1") root.dataset.dev = ""
+      if (param(ctx.query, "dev")) root.dataset.dev = ""
       const world = document.createElement("div")
       world.className = "site-world"
       const pieces = document.createElement("div")
@@ -76,9 +77,9 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
       let gone = false
       // a repo's hall owns its clock (hall/clock.ts): the timeline bar reads it, the history reveal follows it
       const slug = id === "hall" ? hallSlug(ctx.query) : null
-      const history = withWorld && slug && ctx.query.get("history") !== "0"
+      const history = withWorld && slug
       // `?feed=live|replay|story`: the hall's session (hall/feeds), started by its HUD, on the bar's Session scale
-      const feed = withWorld && slug ? ctx.query.get("feed") : null
+      const feed = withWorld && slug ? param(ctx.query, "feed") : null
       // the home (the island, the demos over it, a bare /hall) plays a session of its own: its bar is the Session scale
       const home = withWorld && !slug
       // on localhost a hall with no `?feed=` follows the hub when it answers (hall/feeds/probe.ts): `hallQuery` then says so
@@ -93,7 +94,7 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
       let offWorld = () => {}
       let stopCover = () => {}
       if (withWorld) {
-        stopCover = coverUntilReveal(root, ctx.query.get("loader") !== "0")
+        stopCover = coverUntilReveal(root, param(ctx.query, "loader"))
         const inner: ScreenCtx = { ...ctx, query: worldQuery(id, ctx.query) }
         // a repo's hall builds from the repo's chronicle (hexworld/hall.ts), read while the 3D code streams in
         const repo = slug ? hallRepo(slug) : undefined
@@ -163,12 +164,12 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
                   ? hall.createHistory({
                       time,
                       chronicle: hallChronicle(slug).then((r) => (r.status === "ok" ? r.chronicle : null)),
-                      at: hall.readT(ctx.query.get("t")),
+                      at: hall.readT(param(ctx.query, "t")),
                       onRest: writeT,
                     })
                   : null
               // a hall with a session (`?feed=`) shows its events on the island: CI weather, PR ships, scaffolds
-              const fx = hallQuery.has("feed")
+              const fx = hasParam(hallQuery, "feed")
               // the season follows the history's date on the bar (Watch it grow cycles its years); a session's: today's
               const seasonDate =
                 past && time
@@ -216,12 +217,7 @@ function siteScreen(id: string, title: string, withWorld: boolean): Screen {
 }
 
 /** The hall's `?t=` follows its clock at rest, in place (no history entry, no remount): a link opens on that day. */
-function writeT(t: string | null): void {
-  const url = new URL(location.href)
-  if (t === null) url.searchParams.delete("t")
-  else url.searchParams.set("t", t)
-  if (url.href !== location.href) history.replaceState(history.state, "", url)
-}
+const writeT = (t: string | null): void => patchAddress({ t })
 
 /** `/`: the live island with its HUD and the demo guild at work, and the first-visit welcome bar. */
 export const island = siteScreen("island", "Island", true)

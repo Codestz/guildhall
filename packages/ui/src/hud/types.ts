@@ -172,4 +172,6 @@ export interface SettingsValues {
   weather?: WeatherPick
   /** The season (left out: no Season lever). */
   season?: SeasonPick
+  /** The island's size, as a repo of this many files (left out: no Size lever; a repo's hall is its repo's size). */
+  size?: number
 }

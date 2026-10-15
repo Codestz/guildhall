@@ -2,6 +2,8 @@
 import { type Catalog, type CatalogEntry, type CatalogIndex, createCatalog, inStyle } from "@guildhall/assets"
 import { log } from "@guildhall/core"
 import { LIBRARY_GZ, LIBRARY_ROOT } from "./env.ts"
+import { param } from "./params.ts"
+import { currentQuery } from "./shell/router.ts"
 
 const logger = log("studio:catalog")
 
@@ -11,11 +13,10 @@ export const LIBRARY = LIBRARY_ROOT
 type Fetch = (url: string) => Promise<Pick<Response, "ok" | "status" | "json">>
 
 /**
- * Whether the Studio shows every imported pack (`?packs=all`) or only the house style's (the default:
- * decisions.md "Clean restart on hex").
+ * Whether the Studio shows every imported pack (`?packs=all`, a dev param: params.ts) or only the house
+ * style's (the default: decisions.md "Clean restart on hex").
  */
-const allPacks = (): boolean =>
-  typeof location !== "undefined" && new URLSearchParams(location.search).get("packs") === "all"
+const allPacks = (): boolean => typeof location !== "undefined" && param(currentQuery(), "packs") === "all"
 
 /**
  * The library's catalog, or null when there is no library yet (no index, or an index listing no

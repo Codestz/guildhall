@@ -40,7 +40,7 @@ export interface HeroLook {
 
 /**
  * What life draws the agents from (L2): who they are, and where each is at `secs`, seconds on life's
- * agent clock (`?lifeT=` sets where it starts); null while one is not on the island.
+ * agent clock; null while one is not on the island.
  */
 export interface AgentSource {
   list(): readonly HeroLook[]

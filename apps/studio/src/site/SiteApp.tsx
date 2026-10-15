@@ -1,6 +1,6 @@
 /**
  * The site's pieces over the island (or, on `/harbour` and `/built`, alone): the crest menu everywhere, ⌘K,
- * the first-visit welcome bar, the demo picker on `/demos`, the repo field on a bare `/hall`, the harbour,
+ * the first-visit welcome bar, the demo picker (on `/demos`, or over any page in place), the repo field on a bare `/hall`, the harbour,
  * How it's built, and "Connect a source". A story the link names plays on the island's HUD (homeHud.tsx).
  * It reads the URL itself (so a move between `/`,
  * `/demos` and a bare `/hall` keeps the island that is already built) and moves by `openUrl`.
@@ -18,14 +18,15 @@ import {
   WelcomeCard,
   writeWelcomeDismissed,
 } from "@guildhall/ui"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
+import { onShareOffer, shareOffer } from "../hall/hud/share.ts"
 import { current, href } from "../shell/router.ts"
 import { Switcher } from "../shell/Switcher.tsx"
 import { BUILT } from "./built.ts"
 import { repoArt, useCatalog, useLiveStories } from "./chronicle.ts"
 import { homeStoryOf } from "./homeFeed.ts"
 import { homeStage } from "./homeHud.tsx"
-import { openUrl } from "./nav.ts"
+import { openDemosWith, openUrl } from "./nav.ts"
 import { destHref, hallSlug, openedStory, storyHref } from "./routes.ts"
 import { STORIES } from "./stories.ts"
 
@@ -63,6 +64,23 @@ export function SiteApp() {
   const [welcome, setWelcome] = useState(() => !readWelcomeDismissed())
   const [busy, setBusy] = useState(false)
   const [sources, setSources] = useState(false)
+  // the demos over the page in place (the crest menu's Demos, the welcome card's, the HUD's): nothing
+  // under it moves, and closing it leaves the visitor where they were (nav.ts `openDemosWith`)
+  const [demosOver, setDemosOver] = useState(false)
+  // "Share island" while the island's HUD can draw its card (hall/hud/share.ts)
+  const share = useSyncExternalStore(onShareOffer, shareOffer)
+  useEffect(() => {
+    openDemosWith(() => {
+      setMenu(false)
+      setPalette(false)
+      setDemosOver(true)
+    })
+    return () => openDemosWith(null)
+  }, [])
+  // a move elsewhere (back, forward, a link) takes it down
+  const address = `${screen}?${query}`
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the address is what changed
+  useEffect(() => setDemosOver(false), [address])
   const live = useLiveStories()
   const catalog = useCatalog()
 
@@ -152,6 +170,7 @@ export function SiteApp() {
         }}
         onPalette={() => setPalette(true)}
         onSources={() => setSources(true)}
+        {...(share ? { onShare: share } : {})}
       />
 
       {card && (
@@ -182,15 +201,20 @@ export function SiteApp() {
         />
       )}
 
-      {screen === "demos" && (
+      {(screen === "demos" || demosOver) && (
         <DemoPicker
           stories={[...STORIES, ...live]}
           hrefFor={hrefFor}
           onOpen={(s, act) => {
             seen()
+            setDemosOver(false)
             go(hrefFor(s, act))
           }}
-          onClose={() => go(href("island"))}
+          onClose={() => {
+            setDemosOver(false)
+            // `/demos` visited directly is a page of its own: closing it lands on the island under it
+            if (screen === "demos") go(href("island"))
+          }}
         />
       )}
 

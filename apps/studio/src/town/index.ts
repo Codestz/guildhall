@@ -1,4 +1,5 @@
 import { hexWorldScreen } from "../hexworld/index.ts"
+import { param } from "../params.ts"
 import type { Screen } from "../screens.ts"
 
 /**
@@ -10,7 +11,7 @@ export const town: Screen = {
   title: "Town",
   mount(host, ctx) {
     const q = new URLSearchParams(ctx.query)
-    const id = q.get("town")
+    const id = param(q, "town")
     if (id && /^\d+$/.test(id)) q.set("seed", id)
     q.delete("town")
     return hexWorldScreen.mount(host, { ...ctx, query: q })

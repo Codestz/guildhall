@@ -1,9 +1,7 @@
 /**
  * The sky and town shows (render shows/): a dragon round the peaks, a comet (a shower of shooting stars
  * by night), a rainbow (a moonbow by night), a festival round the busiest square. The world-events
- * engine plays them through `Shows.play(show)`; for a look:
- *
- *   ?show=dragon | comet | rainbow | festival      plays it once the island is ready (`+` for several)
+ * engine plays them through `Shows.play(show)`.
  *
  * A session on the island (a hall's, the home's story) plays the engine's own: once its HUD is up the
  * shows run on the session's clock and hall/shows.ts `driveSkyShows` plays what hall/events.ts says is
@@ -18,25 +16,13 @@ import {
   type DayLight,
   type EventSites,
   NIGHT_AT,
-  SHOW_KINDS,
-  type ShowKind,
   type Shows,
   type Stage,
 } from "@guildhall/render"
 import type { HallSession } from "../hall/feeds/session.ts"
 
-/** `?show=`: the kinds to play, in order (none when absent or unknown). */
-export function showsOf(raw: string | null): ShowKind[] {
-  if (!raw) return []
-  return raw
-    .split(/[+,]/)
-    .map((k) => k.trim())
-    .filter((k): k is ShowKind => (SHOW_KINDS as readonly string[]).includes(k))
-}
-
 export function mountShows(parts: {
   stage: Stage
-  query: Pick<URLSearchParams, "get">
   sites: EventSites
   span: number
   light: () => DayLight
@@ -116,11 +102,6 @@ export function mountShows(parts: {
         castle: parts.sites.castle,
       }),
     }
-  const kinds = showsOf(parts.query.get("show"))
-  if (kinds.length)
-    void (window.guildhall?.ready() ?? Promise.resolve()).then(() => {
-      for (const kind of kinds) shows.play(kind)
-    })
   return {
     ...shows,
     dispose() {

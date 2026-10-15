@@ -18,22 +18,11 @@ function el(tag: "div" | "aside" | "main", className: string): HTMLElement {
   return node
 }
 
-/** `?swatch=` as an id or a swatch name; null when it names none. */
-function swatchParam(text: string | null): number | null {
-  if (text === null) return null
-  const byName = PALETTE.swatches.find((s) => s.name === text)
-  if (byName) return byName.id
-  const id = Number(text)
-  return Number.isInteger(id) && id >= 0 && id < PALETTE.swatches.length ? id : null
-}
-
 /**
  * The palette tuner (`/palette`): every ramp as a row of three swatches, a picker for the one
  * clicked, and twelve library pieces (one per pack/category) recoloured live from their `_SWATCH` /
  * `_SHADE` attributes as the palette is edited or a biome's ramp swaps are previewed. Export shows the
  * edited palette.json to copy (the page cannot write files).
- * Deep link: `&biome=autumn`, `&swatch=<id|name>` (open the picker), `&export=1`, and `&colour=baked`
- * to leave the pieces in their baked COLOR_0 (the palette they were imported with).
  */
 export const palette: Screen = {
   id: "palette",
@@ -52,19 +41,17 @@ export const palette: Screen = {
 
     const stage = createStage(stageHost)
     ctx.attach(stage)
-    const live = ctx.query.get("colour") !== "baked"
     const biomes = Object.keys(PALETTE.biomes)
-    const wanted = ctx.query.get("biome") ?? "temperate"
     const state: PanelState = {
       hexes: PALETTE.swatches.map((s) => s.hex),
-      biome: biomes.includes(wanted) ? wanted : (biomes[0] ?? "temperate"),
-      selected: swatchParam(ctx.query.get("swatch")),
+      biome: biomes.includes("temperate") ? "temperate" : (biomes[0] ?? "temperate"),
+      selected: null,
     }
     let preview: Preview | null = null
     let disposed = false
 
     const recolour = () => {
-      if (live) preview?.recolour(shadeTable(state.hexes, biomeIds(PALETTE, state.biome)))
+      preview?.recolour(shadeTable(state.hexes, biomeIds(PALETTE, state.biome)))
     }
     const panel = createPanel(PALETTE, side, view, {
       setHex(id, hex) {
@@ -95,8 +82,7 @@ export const palette: Screen = {
       if (disposed) return built.dispose()
       preview = built
       recolour()
-      if (ctx.query.get("export") === "1") panel.showExport(true)
-      logger.info("cast", { shown: cast.length, live, biome: state.biome, skipped: built.skipped })
+      logger.info("cast", { shown: cast.length, biome: state.biome, skipped: built.skipped })
     }
     ctx.load(boot()).catch((error: unknown) => logger.error("boot failed", { error: String(error) }))
 

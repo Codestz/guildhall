@@ -5,6 +5,7 @@
  */
 import type { SeaEvent } from "@guildhall/core"
 import { STORY_IDS, type StoryId, type StoryShowRules, type StoryUnit, story } from "@guildhall/sim"
+import { param, type QueryLike } from "../../params.ts"
 import type { Feed, FeedChapter, FeedSink, FeedStatus } from "./feed.ts"
 
 /**
@@ -32,10 +33,7 @@ export const storyOf = (asked: string | null): StoryId =>
   (STORY_IDS as readonly string[]).includes(asked ?? "") ? (asked as StoryId) : "saga"
 
 /** The act a link opens a story at (`?act=`, 1 – 5), or undefined. */
-export function actOf(query: Pick<URLSearchParams, "get">): number | undefined {
-  const n = Number(query.get("act"))
-  return Number.isInteger(n) && n >= 1 && n <= 5 ? n : undefined
-}
+export const actOf = (query: QueryLike): number | undefined => param(query, "act")
 
 /** Where a story is told: the hall's repo (its name, its units), and the jitter's seed. */
 export interface StoryStage {

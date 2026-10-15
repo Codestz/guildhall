@@ -6,6 +6,7 @@
  */
 import type { Stage } from "@guildhall/render"
 import { createViewer, type Viewer, type ViewerOptions } from "@guildhall/ui"
+import { param } from "../params.ts"
 import type { ScreenCtx } from "../screens.ts"
 import { placeOf } from "./directory.ts"
 import { current, href, replaceQuery } from "./router.ts"
@@ -60,7 +61,7 @@ export function mountViewer(
   opts: StudioViewerOptions,
 ): StudioViewer {
   const place = placeOf(screen)
-  const bare = ctx.query.get("ui") === "0" || ctx.query.get("bar") === "0"
+  const bare = !param(ctx.query, "ui") || !param(ctx.query, "bar")
   const viewer = createViewer(host, {
     ...opts,
     // the top bar already says group / tool: a card naming what is on stage carries the tool as its eyebrow

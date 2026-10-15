@@ -3,6 +3,7 @@ import { log } from "@guildhall/core"
 import { createStage, createViewer, type Overlay, type Stage, type Viewer } from "@guildhall/render"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import { libraryUrl } from "../catalog.ts"
+import { param } from "../params.ts"
 import type { ScreenCtx } from "../screens.ts"
 import { currentQuery, replaceQuery } from "../shell/router.ts"
 import { AnimationPanel } from "./Animation.tsx"
@@ -168,7 +169,7 @@ export function Inspector({
     const shown = viewer.current
     const stage = staged.current
     if (!shown || !stage) return
-    const opened = link.current && link.current.get("id") === entry?.id ? link.current : null
+    const opened = link.current && param(link.current, "id") === entry?.id ? link.current : null
     if (!opened) link.current = null
     if (!entry) {
       shown.clear()

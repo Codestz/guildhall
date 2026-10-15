@@ -49,6 +49,7 @@ import {
   type TilePrefab,
   workTiles,
 } from "@guildhall/world"
+import { param, type QueryLike } from "../params.ts"
 import type { AgentFeed } from "./lifeAgents.ts"
 import {
   type AgentDesk,
@@ -111,8 +112,6 @@ export interface HexJobSpec {
   shape?: IslandShape
   /** A repo's units as places (hall.ts, sim `placeSpecs`); left out: the island's own places. */
   places?: PlaceSpec[]
-  /** The island's regions (world regions.ts, `?regions=0` off); left out: on. */
-  regions?: boolean
   /** Plan the island's life as the last stage (lifePlan.ts); left out or false: no `life` stage (`?life=0`). */
   life?: boolean
   /**
@@ -146,12 +145,11 @@ export interface BuiltPlace {
 export type IslandShape = Partial<Pick<HexIslandSpec, "coast" | "hills" | "rain" | "forest">>
 
 /** The shape knobs a page's query sets: only those given, each a finite number. */
-export function shapeOf(query: Pick<URLSearchParams, "get">): IslandShape {
+export function shapeOf(query: QueryLike): IslandShape {
   const out: IslandShape = {}
   for (const k of ["coast", "hills", "rain", "forest"] as const) {
-    const raw = query.get(k)
-    const v = raw === null || raw === "" ? Number.NaN : Number(raw)
-    if (Number.isFinite(v) && v >= 0) out[k] = v
+    const v = param(query, k)
+    if (v !== null && v >= 0) out[k] = v
   }
   return out
 }
@@ -160,12 +158,11 @@ export function shapeOf(query: Pick<URLSearchParams, "get">): IslandShape {
  * The nature a page builds with (nature.ts `HexNature`): the chosen nature (`NATURE_CHOSEN`), each knob
  * the query gives (a positive number) over it.
  */
-export function natureOf(query: Pick<URLSearchParams, "get">): HexNature {
+export function natureOf(query: QueryLike): HexNature {
   const out: HexNature = { ...NATURE_CHOSEN }
   for (const k of NATURE_KNOBS) {
-    const raw = query.get(k)
-    const v = raw === null || raw === "" ? Number.NaN : Number(raw)
-    if (Number.isFinite(v) && v > 0 && v <= 4) out[k] = v
+    const v = param(query, k)
+    if (v !== null && v > 0 && v <= 4) out[k] = v
   }
   return out
 }
@@ -564,7 +561,7 @@ export function runHexJob(
   lap("island")
   const z = hexZones(h, { wild: spec.nature?.wild, ...(spec.places ? { places: spec.places } : {}) })
   lap("zones")
-  const w = hexWorld(h, z, { step: spec.step, nature: spec.nature, regions: spec.regions !== false })
+  const w = hexWorld(h, z, { step: spec.step, nature: spec.nature, regions: true })
   lap("world")
   /** Plans life on the world as placed (the pieces at the heights the world put them) and posts it. */
   const planLife = (placed: HexWorld): AgentDesk => {

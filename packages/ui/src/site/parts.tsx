@@ -69,6 +69,12 @@ export const BookGlyph = () =>
     <path d="M3 3.2c1.8-.6 3.6-.4 5 .8v9c-1.4-1.2-3.2-1.4-5-.8zM13 3.2c-1.8-.6-3.6-.4-5 .8v9c1.4-1.2 3.2-1.4 5-.8z" />,
     18,
   )
+/** A picture leaving its frame: what the HUD's Chronicle card shares. */
+export const ShareGlyph = () =>
+  svg(
+    <path d="M8 10V2.5M5 5.2 8 2.3l3 2.9M5.5 7.5H4a1 1 0 0 0-1 1v4.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8.5a1 1 0 0 0-1-1h-1.5" />,
+    18,
+  )
 export const ArrowGlyph = () => svg(<path d="M3 8h9.5M8.5 4l4 4-4 4" />, 16)
 export const CheckGlyph = () => svg(<path d="m3.5 8.4 3 3 6-6.4" />, 14)
 export const AlertGlyph = () => svg(<path d="M8 2 14.2 13H1.8zM8 6.4v3M8 11.4v.1" />, 14)

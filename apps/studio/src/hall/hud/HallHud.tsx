@@ -89,9 +89,10 @@ import { createPortal } from "react-dom"
 import { SoundButton, SoundSettings } from "../../audio/ui.tsx"
 import type { HudParts } from "../../hexworld/index.ts"
 import type { BuiltPlace } from "../../hexworld/job.ts"
+import { patchAddress, publicLink } from "../../shell/router.ts"
 import { captureStage } from "../../shell/viewer.ts"
 import type { HallTime } from "../clock.ts"
-import { type EraShots, eraShotKey } from "../eraShots.ts"
+import { type EraShotJob, type EraShots, eraShotKey } from "../eraShots.ts"
 import type { SessionSnapshot } from "../feeds/session.ts"
 import {
   chronicleOf,
@@ -115,6 +116,7 @@ import {
   sessionStatus,
   sourceOf,
 } from "./SessionHud.tsx"
+import { offerShare } from "./share.ts"
 import {
   brandOf,
   feedOf,
@@ -186,6 +188,8 @@ export interface HallHudProps {
   home?: { title: string; leave?: { label: string; href: string } }
   /** The Legends' era pictures (eraShots.ts): filmed when the book opens; the latest is the card's island. */
   eraShots?: EraShots
+  /** The island's size in files, where Settings › World may change it (the home's; a hall's is its repo's). */
+  size?: number
 }
 
 const nothing = () => () => {}
@@ -550,6 +554,7 @@ export function HallHud(props: HallHudProps) {
   const [sources, setSources] = useState(false)
   const [following, setFollowing] = useState<string | null>(null)
   const [cardOf, setCardOf] = useState<"repo" | "session">("repo")
+  const [cardPicture, setCardPicture] = useState<"island" | "moment">("island")
   // Detailed opens the Guild and the Chronicle; either may still be folded by hand until the mode changes
   const [folded, setFolded] = useState<{ roster: boolean; chronicle: boolean }>({
     roster: false,
@@ -737,13 +742,40 @@ export function HallHud(props: HallHudProps) {
   useEffect(() => {
     if (state.open === "legends" && shots) shots.want(eraJobs)
   }, [state.open, shots, eraJobs])
-  // the latest era ends today: its picture is the Repo Chronicle card's island when it is drawn
-  const lastKey = eraJobs[eraJobs.length - 1]?.key
-  const latest = lastKey ? shots?.get(lastKey) : undefined
-  const repoFrame = latest ?? frame
+  // today's island, the card's picture: the latest era's (it ends today; the book shares it), or, with no
+  // eras to film, the island as it stands, filmed once for this mount
+  const [mountedAt] = useState(() => Date.now())
+  const islandJob = useMemo<EraShotJob>(
+    () => eraJobs[eraJobs.length - 1] ?? { key: `${slug}#now@${mountedAt}`, at: null },
+    [eraJobs, slug, mountedAt],
+  )
 
   const toggle = (id: string) => hud.dispatch({ type: "toggle", id })
   const close = () => hud.dispatch({ type: "close" })
+  /**
+   * The one way to the Chronicle card (the rail, the Chronicle's foot, the Legends, the site's "Share
+   * island"): a repo's card, or the session's story so far; its picture the island filmed for it (asked for
+   * here, the card shows the filming) or the moment on screen.
+   */
+  const openCard = (
+    kind: "repo" | "session",
+    opts: { from?: string; picture?: "island" | "moment" } = {},
+  ) => {
+    const picture = opts.picture ?? (kind === "repo" ? "island" : "moment")
+    setCardOf(kind)
+    setCardPicture(picture)
+    if (picture === "island") shots?.want([islandJob])
+    hud.dispatch({ type: "open", id: "card", ...(opts.from ? { from: opts.from } : {}) })
+  }
+  // the site's crest menu offers "Share island" while a card can be drawn: the repo's, else the session's
+  const shareable = recap ? "repo" : live ? "session" : null
+  const openCardRef = useRef(openCard)
+  openCardRef.current = openCard
+  useEffect(() => {
+    if (!shareable) return
+    offerShare(() => openCardRef.current(shareable, { picture: "island" }))
+    return () => offerShare(null)
+  }, [shareable])
   // the phone's one menu: its tabs, the one shown now (null: folded), the one ☰ opens next
   const tabs = useMemo(() => menuTabs({ guild: Boolean(live), places: !home }), [live, home])
   const tab = phone ? menuTab(state.open, state.back, tabs) : null
@@ -826,6 +858,12 @@ export function HallHud(props: HallHudProps) {
       }),
     })
   }, [wantsBook, live])
+
+  // the card's words: the repo's chronicle, or the session's story so far (told when the card opens)
+  const cardRecap = useMemo(
+    () => (cardOf === "repo" && recap ? recapView(recap) : told?.recap ? sessionRecapView(told.recap) : null),
+    [cardOf, recap, told],
+  )
 
   const onFeedPick = (id: string) => {
     if (sessionFeed) return openHero(id, phone ? "chronicle" : undefined)
@@ -915,10 +953,7 @@ export function HallHud(props: HallHudProps) {
                 <Button
                   size="sm"
                   variant="secondary"
-                  onClick={() => {
-                    setCardOf(sessionFeed ? "session" : "repo")
-                    hud.dispatch({ type: "open", id: "card" })
-                  }}
+                  onClick={() => openCard(sessionFeed ? "session" : "repo")}
                 >
                   <StoryGlyphs.card size={14} />
                   Chronicle card
@@ -957,7 +992,9 @@ export function HallHud(props: HallHudProps) {
     hour,
     ...(parts.fx ? { weather } : {}),
     ...(parts.season ? { season } : {}),
+    ...(props.size !== undefined ? { size: props.size } : {}),
   }
+  // Settings › World is what a link carries: each pick goes into the address (public params, in place)
   const onSettings = (patch: Partial<SettingsValues>) => {
     if (patch.pace !== undefined) {
       if (live) live.session.clock.setRate(patch.pace)
@@ -982,11 +1019,18 @@ export function HallHud(props: HallHudProps) {
       setStyle(patch.directorStyle)
       levers.cinematic = patch.directorStyle === "cinematic"
     }
-    if (patch.time !== undefined) setTimeMode(patch.time)
+    if (patch.time !== undefined) {
+      setTimeMode(patch.time)
+      // a link holds a pinned hour only: any other mode opens on the island's own
+      patchAddress({ hour: patch.time === "fixed" ? String(hour) : null })
+    }
     if (patch.hour !== undefined) {
       parts.clock.set(patch.hour)
       setHour(patch.hour)
+      patchAddress({ hour: String(patch.hour) })
     }
+    // a new size is a new island: the address moves and the world is built again at that size
+    if (patch.size !== undefined) patchAddress({ files: String(patch.size) }, true)
     if (patch.weather !== undefined) {
       setWeather(patch.weather)
       const pin = patch.weather === "auto" ? null : (patch.weather as WeatherKind)
@@ -996,6 +1040,7 @@ export function HallHud(props: HallHudProps) {
     if (patch.season !== undefined) {
       setSeason(patch.season)
       parts.season?.pin(patch.season)
+      patchAddress({ season: patch.season === "auto" ? null : patch.season })
     }
   }
   const followed = filmed ? roster.heroes.find((h) => h.id === filmed) : undefined
@@ -1185,10 +1230,7 @@ export function HallHud(props: HallHudProps) {
                 id="card"
                 label="Chronicle card"
                 open={state.open === "card"}
-                onClick={() => {
-                  setCardOf(live ? "session" : "repo")
-                  toggle("card")
-                }}
+                onClick={() => (state.open === "card" ? toggle("card") : openCard(live ? "session" : "repo"))}
               >
                 <StoryGlyphs.card size={18} />
               </RailButton>
@@ -1338,36 +1380,23 @@ export function HallHud(props: HallHudProps) {
             {...(told?.markdown ? { markdown: told.markdown } : {})}
             {...(props.legendMarkdown ? { historyMarkdown: props.legendMarkdown } : {})}
             view={live ? "session" : "history"}
-            onCard={(view) => {
-              setCardOf(view === "history" ? "repo" : "session")
-              hud.dispatch({ type: "open", id: "card", from: "legends" })
-            }}
+            onCard={(view) => openCard(view === "history" ? "repo" : "session", { from: "legends" })}
             onClose={() => hud.dispatch({ type: "closeAll" })}
           />,
           props.modals,
         )}
       {state.open === "card" &&
-        (cardOf === "repo" && recap
-          ? createPortal(
-              <ChronicleCard
-                recap={recapView(recap)}
-                {...(repoFrame ? { image: repoFrame } : {})}
-                focus={{ x: 0.5, y: 0.5 }}
-                link={`https://${recap.link}`}
-                onClose={close}
-              />,
-              props.modals,
-            )
-          : told?.recap &&
-            createPortal(
-              <ChronicleCard
-                recap={sessionRecapView(told.recap)}
-                {...(frame ? { image: frame } : {})}
-                focus={{ x: 0.5, y: 0.5 }}
-                onClose={close}
-              />,
-              props.modals,
-            ))}
+        cardRecap &&
+        createPortal(
+          <IslandCard
+            recap={cardRecap}
+            shots={shots}
+            job={cardPicture === "island" ? islandJob : null}
+            frame={frame}
+            onClose={close}
+          />,
+          props.modals,
+        )}
       {sources && createPortal(<SourcesCard onClose={() => setSources(false)} />, props.modals)}
     </>
   )
@@ -1403,6 +1432,57 @@ function EraBook({
     <LegendsBook
       {...book}
       {...(legend ? { history: { repo: legend.repo, sessions: [], milestones: [], legend } } : {})}
+    />
+  )
+}
+
+/** The least time the card shows the island being filmed, ms. */
+const MIN_FILMING_MS = 1600
+
+/** Where the island sits in its picture (one object: the card redraws when its focus changes). */
+const CENTRE = { x: 0.5, y: 0.5 }
+
+/**
+ * The Chronicle card with its picture: the island filmed for it (`job`: the card shows the filming until
+ * it lands, and only it re-renders when it does), or the moment on screen (`frame`), which also stands in
+ * where the island cannot be filmed. Its link is the address on screen, public params only.
+ */
+function IslandCard({
+  recap,
+  shots,
+  job,
+  frame,
+  onClose,
+}: {
+  recap: RecapView
+  shots: EraShots | null
+  job: EraShotJob | null
+  frame: string | undefined
+  onClose(): void
+}) {
+  useSyncExternalStore(shots?.subscribe ?? nothing, shots?.version ?? zero)
+  const shot = job ? shots?.get(job.key) : undefined
+  const waiting = Boolean(job && shots?.waiting(job.key))
+  // a picture filmed for this card (not one the book already had) shows its filming long enough to be
+  // seen: a still can land within a frame or two, and the card on ink would only flicker
+  const [fresh] = useState(() => Boolean(job && !shots?.get(job.key)))
+  const [holding, setHolding] = useState(fresh)
+  useEffect(() => {
+    if (!holding) return
+    const timer = setTimeout(() => setHolding(false), MIN_FILMING_MS)
+    return () => clearTimeout(timer)
+  }, [holding])
+  const filming = (waiting && !shot) || (holding && (waiting || Boolean(shot)))
+  const image = shot ?? (filming ? undefined : frame)
+  const [link] = useState(publicLink)
+  return (
+    <ChronicleCard
+      recap={recap}
+      {...(image ? { image } : {})}
+      filming={filming}
+      focus={CENTRE}
+      link={link}
+      onClose={onClose}
     />
   )
 }

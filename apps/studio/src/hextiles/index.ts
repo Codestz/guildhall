@@ -24,6 +24,7 @@ import {
 import { type KnobSection, placePlate, plate } from "@guildhall/ui"
 import { CHARACTER_SCALE, HEX_TILE_SIZE, placeTile, TILE_GROUPS, tilePrefabs } from "@guildhall/world"
 import { libraryUrl, loadCatalog } from "../catalog.ts"
+import { param } from "../params.ts"
 import type { Screen } from "../screens.ts"
 import { href } from "../shell/router.ts"
 import { mountViewer } from "../shell/viewer.ts"
@@ -60,10 +61,10 @@ export const hexTiles: Screen = {
   id: "hextiles",
   title: "Tile prefabs",
   mount(outer, ctx) {
-    const sheet = ctx.query.get("tile")
-    if (sheet && ctx.query.get("sheet") === "1") return mountSheet(outer, ctx, sheet)
-    const one = ctx.query.get("tile")
-    const group = ctx.query.get("group")
+    const sheet = param(ctx.query, "tile")
+    if (sheet && param(ctx.query, "sheet")) return mountSheet(outer, ctx, sheet)
+    const one = param(ctx.query, "tile")
+    const group = param(ctx.query, "group")
     const viewer = mountViewer(outer, ctx, "hextiles", {
       title: one ? "One tile" : group ? `${cap(group)} tiles` : "Every tile",
       subtitle: "Each prefab on its own hex at scale B, a character beside it for scale.",

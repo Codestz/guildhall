@@ -1,7 +1,7 @@
 /**
- * Settings (V1's hud/Settings.tsx), fed by props, in V1's order: Your repo, Quality, the Director's
- * controls (the story's pace, the world's hour and weather, the Bard and how it films), Camera, Sound (a
- * slot: the sound agent fills it), Display. A side drawer on desktop, a bottom sheet on a phone.
+ * Settings (V1's hud/Settings.tsx), fed by props, in V1's order: Your repo, Quality, the World (its
+ * season, its hour, its size: what a link to it carries), the Director's controls (the story's pace, the
+ * weather, the Bard and how it films), Camera, Sound (a slot: the sound agent fills it), Display. A side drawer on desktop, a bottom sheet on a phone.
  * Non-modal: the world stays live behind it; it takes focus on open and Esc inside it closes it. Dev
  * controls (`dev`) only show where the caller allows them (`?dev=1`). A section whose values are left
  * out is not drawn.
@@ -78,6 +78,17 @@ const SEASONS: readonly { value: SeasonPick; label: string }[] = [
   { value: "autumn", label: "Autumn" },
   { value: "winter", label: "Winter" },
 ]
+
+/** The island's sizes, as a repo of so many files (a hall's is its repo's, so it is never offered there). */
+const WORLD_SIZES: readonly { value: number; label: string }[] = [
+  { value: 1500, label: "Small" },
+  { value: 4000, label: "Medium" },
+  { value: 12000, label: "Large" },
+]
+
+/** The offered size nearest `files`. */
+const sizeOf = (files: number): number =>
+  WORLD_SIZES.reduce((best, s) => (Math.abs(s.value - files) < Math.abs(best - files) ? s.value : best), 4000)
 
 /** The camera's keys, as the Settings sheet lists them. */
 export const SETTINGS_KEYS: readonly (readonly [string, string])[] = [
@@ -177,7 +188,7 @@ export function SettingsPanel({
   }, [])
   const auto = values.quality === "auto"
   const qualityNow = values.qualityNow && qualities.find((q) => q.value === values.qualityNow)?.label
-  const world = values.time !== undefined || values.weather !== undefined || values.season !== undefined
+  const world = values.time !== undefined || values.season !== undefined || values.size !== undefined
   const style = values.directorStyle
 
   return (
@@ -256,12 +267,63 @@ export function SettingsPanel({
           </Section>
         )}
 
+        {world && (
+          <Section title="World" value="Kept in the link">
+            {values.season !== undefined && (
+              <>
+                <Segmented
+                  label={`Season${seasonNow ? ` · ${seasonNow}` : ""}`}
+                  value={values.season}
+                  options={SEASONS}
+                  onChange={(v) => onChange({ season: v as SeasonPick })}
+                />
+                {values.season === "auto" && (
+                  <p className="ui-hint">
+                    Follows the date: the timeline's in a history, the story's own, else today's.
+                  </p>
+                )}
+              </>
+            )}
+            {values.time !== undefined && (
+              <>
+                <Segmented
+                  label={`Time${hourNow !== undefined ? ` · ${hourWords(hourNow)}` : ""}`}
+                  value={values.time}
+                  options={TIMES}
+                  onChange={(v) => onChange({ time: v as TimeMode })}
+                />
+                {values.time === "fixed" && (
+                  <Slider
+                    label="Hour of day"
+                    value={values.hour ?? hourNow ?? 12}
+                    min={0}
+                    max={23.5}
+                    step={0.5}
+                    format={hourWords}
+                    onChange={(hour) => onChange({ hour })}
+                  />
+                )}
+                <p className="ui-hint">{TIMES.find((t) => t.value === values.time)?.hint}</p>
+              </>
+            )}
+            {values.size !== undefined && (
+              <>
+                <Segmented
+                  label={`Size · ${values.size.toLocaleString("en-US")} files`}
+                  value={String(sizeOf(values.size))}
+                  options={WORLD_SIZES.map((s) => ({ value: String(s.value), label: s.label }))}
+                  onChange={(v) => onChange({ size: Number(v) })}
+                />
+                <p className="ui-hint">The island grows again, as a repo of that many files.</p>
+              </>
+            )}
+          </Section>
+        )}
+
         <section className="hud-set-section hud-set-director" aria-labelledby={directorId}>
           <header className="hud-director-head">
             <h3 id={directorId}>Director's controls</h3>
-            <p className="ui-hint">
-              The story's pace, the hour, the weather and the season, and how the Bard films them.
-            </p>
+            <p className="ui-hint">The story's pace, the weather, and how the Bard films them.</p>
           </header>
           <Sub title="Story" value={values.pace === 0 ? "Paused" : undefined}>
             <Segmented
@@ -271,57 +333,16 @@ export function SettingsPanel({
               onChange={(v) => onChange({ pace: Number(v) })}
             />
           </Sub>
-          {world && (
-            <Sub title="World">
-              {values.time !== undefined && (
-                <>
-                  <Segmented
-                    label={`Time${hourNow !== undefined ? ` · ${hourWords(hourNow)}` : ""}`}
-                    value={values.time}
-                    options={TIMES}
-                    onChange={(v) => onChange({ time: v as TimeMode })}
-                  />
-                  {values.time === "fixed" && (
-                    <Slider
-                      label="Hour of day"
-                      value={values.hour ?? hourNow ?? 12}
-                      min={0}
-                      max={23.5}
-                      step={0.5}
-                      format={hourWords}
-                      onChange={(hour) => onChange({ hour })}
-                    />
-                  )}
-                  <p className="ui-hint">{TIMES.find((t) => t.value === values.time)?.hint}</p>
-                </>
-              )}
-              {values.weather !== undefined && (
-                <>
-                  <Segmented
-                    label={`Weather${weatherNow ? ` · ${weatherNow}` : ""}`}
-                    value={values.weather}
-                    options={weathers}
-                    onChange={(v) => onChange({ weather: v as WeatherPick })}
-                  />
-                  {values.weather === "auto" && (
-                    <p className="ui-hint">Follows the guild: failures bring clouds, rain and storms.</p>
-                  )}
-                </>
-              )}
-              {values.season !== undefined && (
-                <>
-                  <Segmented
-                    label={`Season${seasonNow ? ` · ${seasonNow}` : ""}`}
-                    value={values.season}
-                    options={SEASONS}
-                    onChange={(v) => onChange({ season: v as SeasonPick })}
-                  />
-                  {values.season === "auto" && (
-                    <p className="ui-hint">
-                      Follows the date: the timeline's in a history, the story's own, else today's.
-                    </p>
-                  )}
-                </>
+          {values.weather !== undefined && (
+            <Sub title="Weather" value={weatherNow}>
+              <Segmented
+                label="Sky"
+                value={values.weather}
+                options={weathers}
+                onChange={(v) => onChange({ weather: v as WeatherPick })}
+              />
+              {values.weather === "auto" && (
+                <p className="ui-hint">Follows the guild: failures bring clouds, rain and storms.</p>
               )}
             </Sub>
           )}

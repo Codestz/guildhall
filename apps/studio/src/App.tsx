@@ -1,8 +1,10 @@
 import { configureLog, type FrameStats, log } from "@guildhall/core"
+import { setStageFlags } from "@guildhall/render/flags"
 import { holdSiteStyle, NotFoundPage, PerfHud } from "@guildhall/ui"
 import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { holdStudioStyle } from "./browser/style.ts"
 import type { DebugHost } from "./debug.ts"
+import { param } from "./params.ts"
 import { screenFor } from "./screens.ts"
 import { HOME_ID, placeOf } from "./shell/directory.ts"
 import { canonical, here, href, resolve } from "./shell/router.ts"
@@ -111,11 +113,11 @@ export function App({ debug }: { debug: DebugHost }) {
   const { pathname, search } = new URL(url, location.origin)
   const { screen: id, query } = resolve(pathname, search)
   const screen = id ? screenFor(id) : undefined
-  const [hud, setHud] = useState(query.get("hud") === "perf")
+  const [hud, setHud] = useState(param(query, "hud") === "perf")
   // a Viewer screen has its tools top-right: the perf HUD hangs below them
   const [viewer, setViewer] = useState(false)
   // `?bar=0` hides the top bar: bare screens, for shots and embeds.
-  const bar = query.get("bar") !== "0"
+  const bar = param(query, "bar")
 
   useEffect(() => {
     document.title = titleOf(screen ? screen.id : null, screen?.title ?? "")
@@ -128,9 +130,11 @@ export function App({ debug }: { debug: DebugHost }) {
   useEffect(() => {
     const at = new URL(url, location.origin)
     const { screen: id, query: params } = resolve(at.pathname, at.search)
-    const spec = params.get("log")
+    const spec = param(params, "log")
     if (spec) configureLog(spec)
-    setHud(params.get("hud") === "perf")
+    // the stages this screen makes: GPU timers and a fixed DPR (render never reads the address itself)
+    setStageFlags({ gpuTimers: param(params, "timers"), dpr: param(params, "dpr") })
+    setHud(param(params, "hud") === "perf")
     const target = id ? screenFor(id) : undefined
     if (!target || !host.current) {
       logger.warn("unknown route", { url })

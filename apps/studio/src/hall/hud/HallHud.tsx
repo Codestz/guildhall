@@ -95,7 +95,7 @@ import {
 import { beatsOf } from "../historyEvents.ts"
 import { HallTimeline } from "../timeline.tsx"
 import { useHistoryNarration } from "./historyHud.ts"
-import { faceSlots, type MenuTab, menuOpens, menuTab, menuTabs, TAB_LABEL } from "./phone.ts"
+import { faceCap, type MenuTab, menuOpens, menuTab, menuTabs, TAB_LABEL } from "./phone.ts"
 import { usePortraitOf } from "./portraits.ts"
 import {
   HeroSheet,
@@ -501,7 +501,7 @@ export function HallHud(props: HallHudProps) {
   const { hud, parts, slug, chronicle, legend, recap, float, levers } = props
   const state = useHud(hud)
   const phone = usePhone(hud)
-  const width = useViewerWidth(hud, phone)
+  const width = useViewerWidth(hud, true)
   const short = useShortScreen(hud)
   useCrestWidth(hud)
   const camera = parts.camera
@@ -1064,7 +1064,7 @@ export function HallHud(props: HallHudProps) {
         if (detailed && !phone) setFolded((f) => ({ ...f, roster: false }))
         else hud.dispatch({ type: "open", id: "roster" })
       }}
-      {...(phone && width > 0 ? { max: faceSlots(width, PHONE_GUT, actsPx) } : {})}
+      max={faceCap(phone, width, PHONE_GUT, phone ? actsPx : 0)}
     />
   )
 

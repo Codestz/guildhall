@@ -4,7 +4,7 @@
  */
 import { describe, expect, test } from "bun:test"
 import { pickFaces } from "@guildhall/ui"
-import { FACE_GAP, FACE_PX, faceSlots, menuOpens, menuTab, menuTabs } from "../src/hall/hud/phone.ts"
+import { FACE_GAP, FACE_PX, FACES_MAX, faceCap, faceSlots, menuOpens, menuTab, menuTabs } from "../src/hall/hud/phone.ts"
 import { speaks, TAP_PX, tapSlop } from "../src/hexworld/chips.ts"
 
 describe("the phone's menu", () => {
@@ -75,5 +75,18 @@ describe("chips on a phone", () => {
     expect(18 + 2 * small.y).toBeGreaterThanOrEqual(TAP_PX)
     expect(tapSlop(120, 50, true)).toEqual({ x: 4, y: 4 })
     expect(tapSlop(60, 18, false)).toEqual({ x: 4, y: 4 })
+  })
+})
+
+describe("the face bar's cap (user 10-14)", () => {
+  test("a desktop shows ten, a phone five, however wide the room", () => {
+    expect(faceCap(false, 1440, 12)).toBe(FACES_MAX.desktop)
+    expect(faceCap(true, 390, 12)).toBe(FACES_MAX.phone)
+    expect(faceCap(true, 900, 12)).toBe(FACES_MAX.phone)
+  })
+  test("a narrow screen shows what fits, and the cap alone before it is measured (the loading bar)", () => {
+    expect(faceCap(true, 320, 12, 52)).toBe(faceSlots(320, 12, 52))
+    expect(faceCap(true, 0, 12)).toBe(FACES_MAX.phone)
+    expect(faceCap(false, 0, 12)).toBe(FACES_MAX.desktop)
   })
 })

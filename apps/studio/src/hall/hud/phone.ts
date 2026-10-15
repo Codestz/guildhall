@@ -58,3 +58,15 @@ export function faceSlots(width: number, gut: number, beside = 0): number {
   const room = width - 2 * gut - (beside > 0 ? beside + ROW_GAP : 0) - BAR_PAD - BAR_MORE
   return Math.max(1, Math.floor((room + FACE_GAP) / (FACE_PX + FACE_GAP)))
 }
+
+/** The most faces the bar shows before its "+N", whatever the room: a desktop's ten, a phone's five (user 10-14). */
+export const FACES_MAX = { desktop: 10, phone: 5 } as const
+
+/**
+ * The face bar's cap: `FACES_MAX` for the screen, fewer if that many do not fit `width` px (`faceSlots`).
+ * Before the viewer is measured (`width` 0: the bar while the hall loads) the cap alone.
+ */
+export function faceCap(phone: boolean, width: number, gut: number, beside = 0): number {
+  const most = phone ? FACES_MAX.phone : FACES_MAX.desktop
+  return width > 0 ? Math.min(most, faceSlots(width, gut, beside)) : most
+}

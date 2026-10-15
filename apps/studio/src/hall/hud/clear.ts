@@ -58,9 +58,16 @@ export function watchClear(root: HTMLElement): () => void {
         const width = shownWidth(strip)
         const base = { viewW: view.width, width, top }
         if (panelBox && panelBox.width > 0)
-          shift = clearShift({ ...base, panel: { left: panelBox.left - view.left, bottom: panelBox.bottom - view.top } })
+          shift = clearShift({
+            ...base,
+            panel: { left: panelBox.left - view.left, bottom: panelBox.bottom - view.top },
+          })
         // the act chip sits at the foot: it covers whatever reaches it
-        if (chipBox) shift = Math.max(shift, clearShift({ ...base, panel: { left: chipBox.left - view.left, bottom: view.height } }))
+        if (chipBox)
+          shift = Math.max(
+            shift,
+            clearShift({ ...base, panel: { left: chipBox.left - view.left, bottom: view.height } }),
+          )
       }
       root.style.setProperty(name, `${shift}px`)
     }

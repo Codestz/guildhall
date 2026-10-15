@@ -9,7 +9,10 @@ const [out, url, w = "1440", h = "900", click, wait = "6000"] = process.argv.sli
 if (!out || !url) throw new Error("usage: uireview.ts <out.png> <url> <w> <h> [click] [wait]")
 const browser = await launchChrome("uireview")
 try {
-  const page = await browser.newPage({ viewport: { width: Number(w), height: Number(h) }, deviceScaleFactor: 1 })
+  const page = await browser.newPage({
+    viewport: { width: Number(w), height: Number(h) },
+    deviceScaleFactor: 1,
+  })
   await page.goto(url, { waitUntil: "domcontentloaded" })
   await page.waitForTimeout(Number(wait))
   if (click) {

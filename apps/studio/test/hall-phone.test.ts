@@ -4,7 +4,16 @@
  */
 import { describe, expect, test } from "bun:test"
 import { pickFaces } from "@guildhall/ui"
-import { FACE_GAP, FACE_PX, FACES_MAX, faceCap, faceSlots, menuOpens, menuTab, menuTabs } from "../src/hall/hud/phone.ts"
+import {
+  FACE_GAP,
+  FACE_PX,
+  FACES_MAX,
+  faceCap,
+  faceSlots,
+  menuOpens,
+  menuTab,
+  menuTabs,
+} from "../src/hall/hud/phone.ts"
 import { speaks, TAP_PX, tapSlop } from "../src/hexworld/chips.ts"
 
 describe("the phone's menu", () => {

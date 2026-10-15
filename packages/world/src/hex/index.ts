@@ -173,7 +173,6 @@ export {
   petitionerPoses,
   petitionLane,
 } from "./petitioners.ts"
-export { type GroundHit, type PickOpts, pickGround } from "./pick.ts"
 export { parseTilePrefabs, SPOT_KINDS, TILE_GROUNDS, TILE_GROUPS, validateTilePrefab } from "./prefabs.ts"
 export {
   type HexRegion,

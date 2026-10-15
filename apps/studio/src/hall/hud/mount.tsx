@@ -17,7 +17,6 @@ import { holdHudStyle } from "@guildhall/ui"
 import { createRoot, type Root } from "react-dom/client"
 import type { HudParts } from "../../hexworld/index.ts"
 import { DEFAULT_FILES } from "../../hexworld/knobs.ts"
-import { kindWord } from "../../hexworld/places.ts"
 import { storySeason } from "../../hexworld/season.ts"
 import { hasParam, param } from "../../params.ts"
 import { currentQuery } from "../../shell/router.ts"
@@ -35,7 +34,6 @@ import { createSession, feedKindOf, type HallSession, openFeed } from "../feeds/
 import { type SessionPlaces, sessionPlaces } from "../feeds/places.ts"
 import { storyTitle } from "../feeds/story.ts"
 import { driveFx } from "../fx.ts"
-import { activityLines, canHover, type HoverTip, mountHover, zonePicker } from "../hover.ts"
 import { heartOf, type Living, mountLiving } from "../living.ts"
 import { watchClear } from "./clear.ts"
 import { type HallFloat, HallHud, type HallHudProps, type HallLevers, REMEMBERED } from "./HallHud.tsx"
@@ -128,7 +126,7 @@ interface Mounted {
  */
 function mountOn(
   parts: HudParts,
-  live: { session: HallSession; places: Pick<SessionPlaces, "placeAt" | "name" | "folderAt"> } | null,
+  live: { session: HallSession; places: Pick<SessionPlaces, "placeAt"> } | null,
   opts: {
     query: URLSearchParams
     time?: HallTime | null
@@ -233,24 +231,6 @@ function mountOn(
       heart: (zone: number) => heartOf(tiles, zone, groundAt),
     }
   }
-  // the places named under a resting mouse, and what the work does there now (hall/hover.ts)
-  const zoneAt =
-    parts.tiles && parts.groundAt
-      ? zonePicker({ host: viewer.stage, stage: parts.stage, tiles: parts.tiles, groundAt: parts.groundAt })
-      : null
-  const describe = (zone: number) => describePlace(zone, parts, live, living)
-  const hover =
-    zoneAt && canHover()
-      ? mountHover({
-          host: viewer.stage,
-          layer: viewer.labels,
-          zoneAt,
-          describe,
-          ...(parts.chips ? { chipAt: (x: number, y: number) => parts.chips?.hit(x, y) ?? null } : {}),
-        })
-      : null
-  // for shots: the zone under a point of the stage, and the tip it would show there
-  if (ext && zoneAt) ext.hover = { zoneAt, describe }
 
   return {
     root,
@@ -267,8 +247,6 @@ function mountOn(
       offFx()
       offEvents()
       living?.dispose()
-      hover?.()
-      if (ext?.hover) delete ext.hover
       if (ext?.living) delete ext.living
       camera.dispose()
       if (live) {
@@ -287,44 +265,6 @@ function mountOn(
       }, 0)
     },
   }
-}
-
-/** A word's first letter up: "the market" → "The market". */
-const upFirst = (s: string) => (s ? s[0]?.toUpperCase() + s.slice(1) : s)
-
-/**
- * The hover's tip for a zone: a hall's built place (its folder's name, its path and kind), or on the
- * home a zone a story's folder was dealt to (that folder, the zone's kind), the Guildhall's own keep;
- * then what the work does there now (living work). Null where nothing stands for a folder.
- */
-export function describePlace(
-  zone: number,
-  parts: Pick<HudParts, "places" | "zoneKinds">,
-  live: { session: HallSession; places: Pick<SessionPlaces, "name" | "folderAt"> } | null,
-  living: Pick<Living, "about"> | null,
-): HoverTip | null {
-  const built = parts.places.find((p) => p.zone === zone)
-  const kind = parts.zoneKinds[zone] ?? built?.kind ?? ""
-  const folder = built ? undefined : live?.places.folderAt?.(zone)
-  let title: string
-  let detail: string
-  if (built) {
-    title = built.label
-    detail = `${built.id === "/" ? "/ (the root)" : built.id} · ${kindWord(built.kind)}`
-  } else if (folder) {
-    title = folder
-    detail = kindWord(kind)
-  } else if (kind === "castle") {
-    title = "The Guildhall"
-    detail = "the guild's keep"
-  } else if (live && !parts.places.length && kind) {
-    // the home's island: a zone no folder of the story has reached yet
-    title = upFirst(live.places.name(zone))
-    detail = kindWord(kind)
-  } else return null
-  const world = live?.session.snapshot().world
-  const lines = activityLines(living?.about(zone) ?? null, (id) => world?.actors.get(id)?.name)
-  return { title, detail, lines }
 }
 
 // ── a repo's hall ──────────────────────────────────────────────────

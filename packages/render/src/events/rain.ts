@@ -16,6 +16,7 @@ import {
   Vector3,
 } from "three"
 import type { Stage } from "../stage.ts"
+import { warmPrograms } from "../warm.ts"
 import { random, smoothstep } from "./ease.ts"
 
 /** Streaks in the box. */
@@ -116,6 +117,12 @@ export function createRain(stage: Stage, seed = 1): Rain {
   lines.renderOrder = 10
   stage.scene.add(lines)
   stage.timing.gpu.tag(lines, "sky")
+  // its program links in the background before its first draw (warm.ts): the first rain of a world
+  // linked it in the frame, a dropped frame as the sky turned
+  let warmed = false
+  void warmPrograms(stage, lines).then(() => {
+    warmed = true
+  })
 
   let amount = 0
   const wind: [number, number] = [0, 0]
@@ -123,7 +130,7 @@ export function createRain(stage: Stage, seed = 1): Rain {
     const pose = stage.getCamera()
     const far = 1 - smoothstep(RAIN_FAR[0], RAIN_FAR[1], pose.distance)
     const opacity = 0.32 * amount * far
-    lines.visible = opacity > 0.004
+    lines.visible = warmed && opacity > 0.004
     if (!lines.visible) return
     // wraps on a whole number of falls through the box (3600 s × 16 m/s = 1440 × 40 m): no jump
     uniforms.uTime.value = (uniforms.uTime.value + Math.min(dt, 0.1)) % 3600

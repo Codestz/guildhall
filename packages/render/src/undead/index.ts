@@ -71,6 +71,11 @@ export interface Undead {
   update(figures: readonly UndeadFigure[], t: number, dt: number): void
   /** Resolves once the skeletons are loaded (at once while none was ever wanted). */
   ready(): Promise<void>
+  /**
+   * Loads the skeletons now (their rig, their bake, their crowd's programs), as the first figure
+   * would: for under a loading cover, so the first rise builds nothing in view.
+   */
+  prewarm(): Promise<void>
   /** Where a grave's skeleton stands (its feet), for the camera; null for an unknown slot. */
   point(slot: number): [number, number, number] | null
   stats(): UndeadStats
@@ -193,6 +198,7 @@ export function createUndead(stage: Stage, opts: UndeadOpts): Undead {
       if (costs.length > 120) costs.shift()
     },
     ready: () => loading ?? Promise.resolve(),
+    prewarm: () => load(),
     point(slot) {
       const g = graves[slot]
       return g ? [g.x, g.y, g.z] : null

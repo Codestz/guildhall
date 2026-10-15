@@ -16,6 +16,7 @@ import {
   Vector3,
 } from "three"
 import type { Stage } from "../stage.ts"
+import { warmPrograms } from "../warm.ts"
 import { random, smoothstep } from "./ease.ts"
 import { RAIN_FAR } from "./rain.ts"
 
@@ -110,6 +111,11 @@ export function createSnow(stage: Stage, seed = 1): Snow {
   points.renderOrder = 10
   stage.scene.add(points)
   stage.timing.gpu.tag(points, "sky")
+  // its program links in the background before its first draw (warm.ts), as the rain's does
+  let warmed = false
+  void warmPrograms(stage, points).then(() => {
+    warmed = true
+  })
 
   let amount = 0
   let bright = 1
@@ -119,7 +125,7 @@ export function createSnow(stage: Stage, seed = 1): Snow {
     const pose = stage.getCamera()
     const far = 1 - smoothstep(RAIN_FAR[0], RAIN_FAR[1], pose.distance)
     const opacity = 1.0 * amount * far
-    points.visible = opacity > 0.004
+    points.visible = warmed && opacity > 0.004
     if (!points.visible) return
     // a whole number of falls through the box (3600 s × 1.6 m/s = 144 × 40 m) and of sway cycles: no jump
     uniforms.uTime.value = (uniforms.uTime.value + Math.min(dt, 0.1)) % 3600

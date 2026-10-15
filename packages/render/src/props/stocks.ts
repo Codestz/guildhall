@@ -26,6 +26,7 @@ import {
   Quaternion,
   Vector3,
 } from "three"
+import { standInGeometry } from "../batch.ts"
 import { batchGeometry } from "../batchGeometry.ts"
 import { paletteMaterial } from "../material.ts"
 import { loadPiece } from "../pieces.ts"
@@ -425,4 +426,27 @@ export async function createStocks(
     },
   }
   return api
+}
+
+/**
+ * Links the stocks' see-through program now and keeps it (warm.ts `pin`): the stocks load off the
+ * ready path, after the island is revealed, and the link's wait for their faded palette (the one
+ * program of theirs the batch has not made) was a dropped frame as they landed. For under the cover.
+ */
+export async function prewarmStocksPrograms(stage: Stage): Promise<void> {
+  const solid = paletteMaterial("batched")
+  const faded = solid.clone()
+  faded.onBeforeCompile = solid.onBeforeCompile
+  faded.transparent = true
+  const geometry = standInGeometry()
+  const mesh = new BatchedMesh(1, 3, 3, faded)
+  mesh.addInstance(mesh.addGeometry(geometry))
+  mesh.receiveShadow = true
+  mesh.visible = false
+  try {
+    await warmPrograms(stage, mesh, undefined, { pin: true })
+  } finally {
+    mesh.dispose()
+    geometry.dispose()
+  }
 }

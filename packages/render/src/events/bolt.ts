@@ -15,6 +15,7 @@ import {
   Vector3,
 } from "three"
 import type { Stage } from "../stage.ts"
+import { warmPrograms } from "../warm.ts"
 import { random } from "./ease.ts"
 
 /** How long a strike lasts, seconds. */
@@ -114,6 +115,8 @@ export function createBolt(stage: Stage): Bolt {
   mesh.renderOrder = 11
   stage.scene.add(mesh)
   stage.timing.gpu.tag(mesh, "sky")
+  // its program links in the background now (warm.ts), not in the first flash's frame
+  void warmPrograms(stage, mesh)
 
   const side = new Vector3()
   const along = new Vector3()

@@ -35,4 +35,10 @@ export {
   stockRoom,
   TRACK,
 } from "./stockLayout.ts"
-export { createStocks, type Stocks, type StocksOpts, type StocksStats } from "./stocks.ts"
+export {
+  createStocks,
+  prewarmStocksPrograms,
+  type Stocks,
+  type StocksOpts,
+  type StocksStats,
+} from "./stocks.ts"

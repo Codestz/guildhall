@@ -81,7 +81,10 @@ export async function warmPrograms(
   if (typeof renderer.compile !== "function" || !renderer.properties) return
   const start = performance.now()
   const programs = new Set<Program>()
+  const made = renderer.info.programs?.length ?? 0
+  const compiled: Material[] = []
   const collect = (material: Material) => {
+    compiled.push(material)
     const held = (renderer.properties.get(material) as Props).programs
     if (held) for (const p of held.values()) programs.add(p)
   }
@@ -115,11 +118,32 @@ export async function warmPrograms(
   }
   if (!materials) {
     compile()
+    type Caster = Object3D & { material?: Material | Material[]; castShadow?: boolean }
+    const casters = new Map<Material, Caster[]>()
     object.traverse((node) => {
-      const m = (node as { material?: Material | Material[] }).material
+      const m = (node as Caster).material
       if (!m) return
-      for (const material of Array.isArray(m) ? m : [m]) collect(material)
+      for (const material of Array.isArray(m) ? m : [m]) {
+        collect(material)
+        // a caster draws into the shadow maps with three's depth material too: warmed as well, or
+        // it links in the first shadow pass that sees the object (a show's dragon: a late frame)
+        if ((node as Caster).castShadow === true && !Array.isArray(m)) {
+          const list = casters.get(material) ?? []
+          list.push(node as Caster)
+          casters.set(material, list)
+        }
+      }
     })
+    for (const [material, meshes] of casters) {
+      const depth = depthMaterialFor(material)
+      for (const mesh of meshes) mesh.material = depth
+      try {
+        compile(depth)
+      } finally {
+        for (const mesh of meshes) mesh.material = material
+      }
+      collect(depth)
+    }
   } else {
     type WithMaterial = Object3D & { material?: Material | Material[] }
     const meshes: WithMaterial[] = []
@@ -140,7 +164,17 @@ export async function warmPrograms(
     }
   }
   const count = programs.size
+  // Pinned: a material whose program was made here is never disposed, so three keeps the program
+  // for the page's life (it drops one the moment its last material goes: a show's materials go with
+  // the show, and the next play linked the same program again, a dropped frame each time).
+  if (options.pin && (renderer.info.programs?.length ?? 0) > made)
+    for (const material of compiled)
+      if (!(material as { __pinned?: boolean }).__pinned) {
+        ;(material as { __pinned?: boolean }).__pinned = true
+        material.dispose = () => {}
+      }
   let ready = 0
+  let waited = 0
   while (performance.now() - start < GIVE_UP_MS) {
     for (const p of programs) {
       if (!p.isReady()) continue
@@ -148,9 +182,14 @@ export async function warmPrograms(
       // be really done (on ANGLE/Metal `isReady` turns true before the shaders are compiled, 0.3–1.4 s
       // for the big ones): made here, the wait is this task's and the first draw's frame is spared;
       // a stand-in compiled ahead (`prefetch: false`) leaves it to whoever draws the program first.
+      // (On ANGLE/Metal the wait is the same however long after `isReady` the read comes, measured at
+      // 2 s: the compile is lazy until a sync use. After the world is up it is a dropped frame, so what
+      // can be is linked under the cover and kept: `pin`, the shows' and the undead's prewarms.)
       if (options.prefetch !== false) {
+        const t = performance.now()
         p.getUniforms()
         p.getAttributes()
+        waited += performance.now() - t
       }
       programs.delete(p)
       ready++
@@ -163,6 +202,7 @@ export async function warmPrograms(
     programs: count,
     ready,
     ms: Math.round(performance.now() - start),
+    waitedMs: Math.round(waited),
   })
 }
 
@@ -173,6 +213,11 @@ export interface WarmOptions {
   prefetch?: boolean
   /** The scene the object is drawn in (its fog and lights key the program); default the stage's. */
   scene?: Scene
+  /**
+   * Keep the programs made here for the page's life (the materials are never disposed): for what is
+   * built and torn down again and again (a show's pieces), so its programs link once, under the cover.
+   */
+  pin?: boolean
 }
 
 /** The slice of a Stage the warm-up needs (a bare renderer in the tests). */
@@ -199,4 +244,39 @@ export async function warmScene(stage: WarmStage): Promise<void> {
   }
   await run.catch(() => undefined)
   logger.debug("warmed scene", { ms: Math.round(performance.now() - start) })
+}
+
+/**
+ * Reads the layout of every program the scene's materials hold that was never read (the sync reads
+ * `warmPrograms` makes; `warmScene` and the settle's `compileAsync` make none): for under the loading
+ * cover, once everything is in. A program compiled ahead but first drawn later (the lamp pools and the
+ * window spill, hidden until the sky darkens: at dusk, or as the rain comes) made its first frame wait
+ * 30–45 ms on ANGLE/Metal, a dropped frame in view. Returns how many were read and the ms they took.
+ */
+export function prefetchPrograms(stage: WarmStage): { programs: number; ms: number } {
+  const { renderer, scene } = stage
+  if (!renderer.properties) return { programs: 0, ms: 0 }
+  const start = performance.now()
+  const seen = new Set<Program>()
+  let read = 0
+  scene.traverse((node) => {
+    const m = (node as { material?: Material | Material[] }).material
+    if (!m) return
+    for (const material of Array.isArray(m) ? m : [m]) {
+      const held = (renderer.properties.get(material) as Props).programs
+      if (!held) continue
+      for (const p of held.values()) {
+        if (seen.has(p)) continue
+        seen.add(p)
+        // (three keeps the reads: a program read before answers from its cache)
+        if ((p as { cachedUniforms?: unknown }).cachedUniforms) continue
+        p.getUniforms()
+        p.getAttributes()
+        read++
+      }
+    }
+  })
+  const ms = Math.round(performance.now() - start)
+  logger.debug("prefetched", { programs: read, ms })
+  return { programs: read, ms }
 }

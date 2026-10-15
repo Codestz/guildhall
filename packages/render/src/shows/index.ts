@@ -90,6 +90,8 @@ export interface Shows {
    * already playing is re-timed (a dragon's `end` moved on keeps it circling) rather than doubled.
    */
   play(show: Show | ShowKind): Show
+  /** Links every kind's programs ahead and keeps them, so no show's start links one (for under a loading cover). */
+  prewarm(): Promise<void>
   /** Ends a kind now (a dragon turns for home and leaves; the rest fade out quickly); all with none. */
   stop(kind?: ShowKind): void
   /** Removes every show at once, no fade. */
@@ -175,6 +177,42 @@ export function createShows(stage: Stage, opts: ShowsOpts): Shows {
     off = null
   }
 
+  /** What a show is built with now: the sites, the span, the light (its night form), the motion preference. */
+  const ctxOf = (): ShowCtx => {
+    const light = opts.light()
+    return {
+      stage,
+      sites: opts.sites,
+      span: opts.span,
+      night: light.night > NIGHT_AT,
+      still: opts.still ?? reducedMotion(),
+      nightLevel: () => opts.light().night,
+      ...(opts.ground ? { ground: opts.ground } : {}),
+    }
+  }
+
+  /**
+   * Links every kind's programs now and keeps them (warm.ts `pin`): each kind built once, hidden, its
+   * programs read and pinned, the piece torn down again. Under the loading cover, where the links'
+   * waits (30–50 ms each on ANGLE/Metal, at the first sync use whatever came before) cost no frame
+   * anyone sees; a show's first start then links nothing, and nor does its tenth (a show's own
+   * materials go with it, and three dropped the program with them).
+   */
+  const prewarm = async (): Promise<void> => {
+    for (const kind of SHOW_KINDS) {
+      if (disposed) return
+      const piece = build(kind, ctxOf())
+      piece.object.visible = false
+      stage.scene.add(piece.object)
+      try {
+        await warmPrograms(stage, piece.object, undefined, { pin: true })
+      } finally {
+        piece.object.removeFromParent()
+        piece.dispose()
+      }
+    }
+  }
+
   const play = (input: Show | ShowKind): Show => {
     const t = now()
     const show: Show =
@@ -190,16 +228,7 @@ export function createShows(stage: Stage, opts: ShowsOpts): Shows {
       if (show.params) current.show.params = show.params
       return current.show
     }
-    const light = opts.light()
-    const piece = build(show.kind, {
-      stage,
-      sites: opts.sites,
-      span: opts.span,
-      night: light.night > NIGHT_AT,
-      still: opts.still ?? reducedMotion(),
-      nightLevel: () => opts.light().night,
-      ...(opts.ground ? { ground: opts.ground } : {}),
-    })
+    const piece = build(show.kind, ctxOf())
     piece.object.visible = false
     stage.scene.add(piece.object)
     const entry: Playing = { show, piece, shown: false, ready: Promise.resolve() }
@@ -213,6 +242,7 @@ export function createShows(stage: Stage, opts: ShowsOpts): Shows {
 
   return {
     play,
+    prewarm,
     stop(kind) {
       const t = now()
       for (const k of kind ? [kind] : SHOW_KINDS) {

@@ -115,9 +115,13 @@ export function createSkyDrive(stage: Stage, opts: SkyDriveOpts): SkyDrive {
   let look: WeatherLook = weatherLook(applied, cover, lamps)
   let light: DayLight = base.light()
   let exposure = stage.renderer.toneMappingExposure
-  let rain: ReturnType<typeof createRain> | null = null
-  let snow: ReturnType<typeof createSnow> | null = null
-  let bolt: ReturnType<typeof createBolt> | null = null
+  // the rain and the snow are made now, hidden (each links its program in the background as it is
+  // made): made at the first wet frame, as before, the link's wait landed in view seconds after a
+  // weather change, a dropped frame
+  const rain: ReturnType<typeof createRain> | null = createRain(stage, opts.seed ?? 1)
+  const snow: ReturnType<typeof createSnow> | null = createSnow(stage, opts.seed ?? 1)
+  // (the bolt too: made at the first strike, its link's wait was the storm's first flash's frame)
+  const bolt: ReturnType<typeof createBolt> | null = opts.strikeAt ? createBolt(stage) : null
   let strikeT = Number.NEGATIVE_INFINITY
   let nextAt = 2
   let strikes = 0
@@ -214,12 +218,10 @@ export function createSkyDrive(stage: Stage, opts: SkyDriveOpts): SkyDrive {
     SNOW_COVER.uWet.value = look.wet
     // the deck's colours after the atmosphere has painted them this frame (this hook runs after its own)
     if (atmosphere) toneClouds()
-    if (look.rain > 0 && !rain) rain = createRain(stage, opts.seed ?? 1)
     if (rain) {
       const heading = ((atmosphere?.params().windHeading ?? 30) * Math.PI) / 180
       rain.set(look.rain, [Math.cos(heading) * look.wind * 0.6, Math.sin(heading) * look.wind * 0.6])
     }
-    if (look.snow > 0 && !snow) snow = createSnow(stage, opts.seed ?? 1)
     if (snow) {
       const heading = ((atmosphere?.params().windHeading ?? 30) * Math.PI) / 180
       const bright = smoothstepDay(light.elevation)
@@ -247,7 +249,7 @@ export function createSkyDrive(stage: Stage, opts: SkyDriveOpts): SkyDrive {
     strikes++
     const at = opts.strikeAt
     if (!at) return
-    bolt ??= createBolt(stage)
+    if (!bolt) return
     // from the cloud base, or from well up when the deck is far higher (the bolt's jags then show)
     const deck = (ATMOSPHERE.uCloudHeight.value as number) || at[1] + 80
     const top = Math.min(deck, at[1] + 90)

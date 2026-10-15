@@ -49,6 +49,8 @@ import {
   type VertexMeshData,
   vertexMeshData,
   type Water,
+  prefetchPrograms,
+  prewarmStocksPrograms,
   warmBatchPrograms,
   warmCrowdPrograms,
   warmScene,
@@ -773,6 +775,9 @@ const world = {
         ground: (x, z) => Math.max(SEA_LEVEL, groundAt(x, z)),
         session: extra.session ?? session,
       })
+      // every show's programs linked and kept now, under the cover (render shows/index.ts `prewarm`):
+      // without the cover (`?loader=0`) a show's first start links its own
+      const prewarmed = cover ? shows.prewarm().catch(() => undefined) : Promise.resolve()
       steps.progress(0.74, 150)
       go("Water", 0.8)
       await shoreDone
@@ -902,6 +907,12 @@ const world = {
         hall: fxOn || session,
         ...(extra.session ? { session: extra.session } : {}),
       })
+      // where skeletons may rise (a hall, the FX), their rig, bake and programs load now under the
+      // cover, as a first rise would in view (46 ms frames); waited for with the shows' below
+      const undeadWarmed =
+        cover && undead && (fxOn || session)
+          ? undead.undead.prewarm().catch(() => undefined)
+          : Promise.resolve()
       // the docket (docket.ts): the open issues' plates over the quay and their petitioners queueing on it
       if (life)
         docket = mountDocket({
@@ -937,6 +948,12 @@ const world = {
         })
       // The light: shaders compiled and a calm run of frames drawn with all of it in, behind the cover.
       go("Light", 0.99)
+      // the shows' programs, linked and kept now (their links' waits land here, under the cover, not
+      // at a dragon's first beat); and the sea's and the weather's wait for the same reason
+      // (and the stocks' see-through palette, theirs alone: the stocks land after the reveal)
+      await Promise.all([prewarmed, undeadWarmed, lifeOn ? prewarmStocksPrograms(stage) : Promise.resolve()])
+      // and every program compiled ahead but never read (the lamps', the windows': first drawn at dusk)
+      prefetchPrograms(stage)
       stage.throttle(1)
       const ready = await settle(stage, {
         until: torn,

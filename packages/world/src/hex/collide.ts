@@ -45,6 +45,38 @@ export interface Solid {
   seen?: number
 }
 
+/** Each solid's box (x0, z0, x1, z1), worked out the first time `solidBoxDistance` asks (kept off the solid: a plan posts its solids). */
+const boxes = new WeakMap<Solid, Float64Array>()
+
+/**
+ * How far a point is from the box round a solid: zero inside it, else a lower bound on `solidDistance`
+ * (never over it), for a quick "farther than r" before the outline's own distance. A wall's or a
+ * house's round (`cx, cz, r`) covers far more ground than its box does.
+ */
+export function solidBoxDistance(s: Solid, x: number, z: number): number {
+  let b = boxes.get(s)
+  if (!b) {
+    const p = s.pts
+    let x0 = Number.POSITIVE_INFINITY
+    let z0 = Number.POSITIVE_INFINITY
+    let x1 = Number.NEGATIVE_INFINITY
+    let z1 = Number.NEGATIVE_INFINITY
+    for (let k = 0; k < p.length; k += 2) {
+      const px = p[k] as number
+      const pz = p[k + 1] as number
+      if (px < x0) x0 = px
+      if (px > x1) x1 = px
+      if (pz < z0) z0 = pz
+      if (pz > z1) z1 = pz
+    }
+    b = new Float64Array([x0, z0, x1, z1])
+    boxes.set(s, b)
+  }
+  const dx = x < (b[0] as number) ? (b[0] as number) - x : x > (b[2] as number) ? x - (b[2] as number) : 0
+  const dz = z < (b[1] as number) ? (b[1] as number) - z : z > (b[3] as number) ? z - (b[3] as number) : 0
+  return dx === 0 ? dz : dz === 0 ? dx : Math.sqrt(dx * dx + dz * dz)
+}
+
 /** KayKit buildings with open ground among their parts (stalls, targets, a scaffold, a ruin). */
 const OPEN_BUILDING = /building-(market|archeryrange|stage|scaffolding|destroyed|grain|dirt)/
 /** Whether a piece is solid to its foot's outline (a closed building), not to its parts. */

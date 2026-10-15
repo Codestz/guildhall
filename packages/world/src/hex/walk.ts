@@ -13,7 +13,7 @@
  *
  * `route(a, b)` is the shortest node path (A*), so any place reaches any other the roads join.
  */
-import { discSolid, pieceSolids, type Solid, SolidGrid, solidDistance } from "./collide.ts"
+import { discSolid, pieceSolids, type Solid, SolidGrid, solidBoxDistance, solidDistance } from "./collide.ts"
 import { hexCentre } from "./grid.ts"
 import { type HexIsland, kindOf } from "./island.ts"
 import { HEX_TILE_SIZE } from "./tiles.ts"
@@ -496,7 +496,8 @@ export function gridWay(
         by = null
         for (const o of near(x, z, C)) {
           const so = solidOfBlocker(o)
-          if ((soft || !so.soft) && solidDistance(so, x, z) < C) {
+          // (its box first: a wall's round covers whole streets its outline is nowhere near)
+          if ((soft || !so.soft) && solidBoxDistance(so, x, z) < C && solidDistance(so, x, z) < C) {
             if (!by) by = []
             by.push(so)
           }
@@ -753,7 +754,7 @@ export function walledIn(
       by = null
       for (const o of near(cx, cz, C)) {
         const so = solidOfBlocker(o)
-        if (!so.soft && solidDistance(so, cx, cz) < C) {
+        if (!so.soft && solidBoxDistance(so, cx, cz) < C && solidDistance(so, cx, cz) < C) {
           if (!by) by = []
           by.push(so)
         }
@@ -830,7 +831,7 @@ export function floodWay(
       by = null
       for (const o of near(cx, cz, C)) {
         const so = solidOfBlocker(o)
-        if (!so.soft && solidDistance(so, cx, cz) < C) {
+        if (!so.soft && solidBoxDistance(so, cx, cz) < C && solidDistance(so, cx, cz) < C) {
           if (!by) by = []
           by.push(so)
         }

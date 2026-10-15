@@ -128,4 +128,5 @@ composer, the hex map, NPCs, grips. Online it is read-only: explore freely, noth
   lowering resolution; there is no separate phone tier. It has been tried in an emulator, not yet on
   every device.
 - **The deploy** is built on one machine, because the asset library is generated locally and not
-  in git.
+  in git: `vercel build --prod` and `vercel deploy --prebuilt --prod` from `apps/studio`
+  ([DEPLOY.md](DEPLOY.md)). Git-triggered deployments are off, so a push never builds the site.

@@ -78,11 +78,29 @@ export {
   type LifeKit,
   LifePlanner,
   poseAt,
+  ringPlaces,
   shownAt,
   stepPose,
   WORK_DWELL_MS,
   walkEnd,
 } from "./itineraries.ts"
+export {
+  DAWN,
+  DAY_RATE,
+  type DayClock,
+  GHOST_FADE_MS,
+  GHOST_LINGER_MS,
+  GHOST_RISE_MS,
+  ghostAt,
+  type Haunt,
+  hourAt,
+  isNight,
+  NIGHT_FROM,
+  QUIET_MS,
+  REST_SETTLE_MS,
+  type RestKit,
+  restNext,
+} from "./rest.ts"
 export { SCAFFOLD_EDITS, scaffoldProgress } from "./scaffold.ts"
 export {
   type AgentInfo,

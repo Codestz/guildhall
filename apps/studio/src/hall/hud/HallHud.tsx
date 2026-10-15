@@ -29,6 +29,7 @@ import { type QualityPick, qualityDpr, qualityOf, type WeatherKind } from "@guil
 import {
   type Chronicle,
   DAY_MS,
+  DAY_RATE,
   type Legend,
   legendMarkdown,
   legendOf,
@@ -465,12 +466,22 @@ function useToasts(entries: readonly SessionEntry[], on: boolean, still: boolean
   return items
 }
 
-/** The time-of-day lever at work: the local clock, a fast day, a told story's acts; Fixed leaves the hour be. */
+/**
+ * The time-of-day lever at work: the local clock, a fast day, a told story's acts; Fixed leaves the hour
+ * be. A told story over (`ended`) keeps its day going at life's own pace (sim `DAY_RATE` day-hours an
+ * hour: the townsfolk's), so dusk turns to night over the heroes at rest (the world never freezes).
+ */
 function useTimeOfDay(
   clock: HudParts["clock"],
   mode: TimeMode,
   chapter: { at: number; of: number } | null,
+  ended = false,
 ): void {
+  useEffect(() => {
+    if (mode !== "story" || !ended) return
+    const timer = setInterval(() => clock.set((clock.get() + DAY_RATE / 3600) % 24), 1000)
+    return () => clearInterval(timer)
+  }, [clock, mode, ended])
   useEffect(() => {
     if (mode === "real") {
       clock.set(nowHour())
@@ -569,12 +580,22 @@ export function HallHud(props: HallHudProps) {
   const [weather, setWeather] = useState<WeatherPick>(levers.weather ?? "auto")
   const [season, setSeason] = useState<SeasonPick>(() => parts.season?.pinned() ?? "auto")
   const storyTold = (snap?.chapters.length ?? 0) > 0
-  const [timeMode, setTimeMode] = useState<TimeMode>(() => (storyTold ? "story" : "fixed"))
+  // (a told story keeps its own hours, acts or none: its day goes on once it is over)
+  const [timeMode, setTimeMode] = useState<TimeMode>(() =>
+    storyTold || snap?.kind === "story" ? "story" : "fixed",
+  )
   const [hour, setHour] = useState(() => parts.clock.get())
+  const ended =
+    !!snap &&
+    snap.clock.mode === "replay" &&
+    !snap.clock.playing &&
+    snap.clock.end > snap.clock.start &&
+    snap.clock.at >= snap.clock.end
   useTimeOfDay(
     parts.clock,
     timeMode,
     snap && storyTold ? { at: Math.max(0, snap.chapter), of: snap.chapters.length } : null,
+    ended,
   )
   const pace = snap ? snap.clock.rate : (props.time?.clock.get().rate ?? 1)
 

@@ -99,7 +99,11 @@ export function verbOf(
     case "failed":
       return { verb: "fallen", glyph: "fail", tone: "fail", ...none }
     case "done":
-      if (a.parent === undefined) return { verb: "resting", glyph: "idle", tone: "idle", ...none }
+      // (its work over, it goes about the island at rest: sim rest.ts)
+      if (a.parent === undefined)
+        return walking
+          ? { verb: "strolling", glyph: "walk", tone: "idle", ...none }
+          : { verb: "resting", glyph: "idle", tone: "idle", ...none }
       return walking
         ? { verb: "returning with loot", glyph: "loot", tone: "loot", ...none }
         : { verb: "home with loot", glyph: "loot", tone: "loot", ...none }

@@ -7,7 +7,14 @@
  * A hero is posed from the same state as the crowd (`poseHero`): the clip and its phase, and the clip
  * it is fading out of, so handing a person from one to the other changes nothing on screen.
  */
-import { type BufferGeometry, Mesh, Uint8BufferAttribute } from "three"
+import {
+  type BufferGeometry,
+  Color,
+  type Material,
+  Mesh,
+  MeshBasicMaterial,
+  Uint8BufferAttribute,
+} from "three"
 import type { Npc } from "../character/npc.ts"
 import { GLOW_SWATCHES } from "../night/glow.ts"
 import { mergeBody } from "./parts.ts"
@@ -159,4 +166,45 @@ export function poseHero(npc: Npc, playing: Playing): void {
     if (old && old !== now) mixer.existingAction(old)?.stop()
   }
   ch.update(0)
+}
+
+/** A ghost's colour (a pale, cold blue-white) and how see-through it is at its fullest. */
+export const GHOST_COLOUR = new Color(0xb9dcff)
+export const GHOST_OPACITY = 0.55
+
+/** Each ghosted hero's own materials, kept while it is drawn as a ghost, and the ghost's material. */
+const ghosted = new WeakMap<Hero, { was: Map<Mesh, Material | Material[]>; mat: MeshBasicMaterial }>()
+
+/**
+ * Draws a hero as a ghost (a fallen hero's: sim rest.ts), `ghost` 0–1 how visible: every mesh of it in
+ * one pale, cold, see-through material; undefined puts its own materials back.
+ */
+export function ghostHero(hero: Hero, ghost: number | undefined): void {
+  const was = ghosted.get(hero)
+  if (ghost === undefined) {
+    if (!was) return
+    for (const [mesh, m] of was.was) mesh.material = m
+    was.mat.dispose()
+    ghosted.delete(hero)
+    return
+  }
+  let g = was
+  if (!g) {
+    const mat = new MeshBasicMaterial({
+      color: GHOST_COLOUR,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    })
+    const kept = new Map<Mesh, Material | Material[]>()
+    hero.npc.root.traverse((node) => {
+      if (node instanceof Mesh) {
+        kept.set(node, node.material)
+        node.material = mat
+      }
+    })
+    g = { was: kept, mat }
+    ghosted.set(hero, g)
+  }
+  g.mat.opacity = GHOST_OPACITY * Math.max(0, Math.min(1, ghost))
 }

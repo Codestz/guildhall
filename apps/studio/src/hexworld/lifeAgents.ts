@@ -25,6 +25,7 @@ import {
   type WorldEvent,
 } from "@guildhall/sim"
 import type { HexWalk, HexZones, LifePose, ZoneKind } from "@guildhall/world"
+import type { ChipView } from "./chips.ts"
 
 /** How a hero is drawn: its banner and its body. */
 export interface HeroLook {
@@ -57,6 +58,11 @@ export interface AgentSource {
   ownNames?: boolean
   /** Hero `id`'s itinerary as planned (shots and probes read what it does when). */
   itinerary?(id: string): Itinerary | undefined
+  /**
+   * The chips' views at `secs` drawn from the source itself, not from a guild's world (the hall's
+   * residents: residents.ts, who have no session to tell of); read like `worldAt`'s, a few times a second.
+   */
+  chipViews?(secs: number, walking: (id: string) => boolean): Map<string, ChipView>
 }
 
 /** Which agents the island shows (the job's spec): the demo story, or a recorded guild's wire. */

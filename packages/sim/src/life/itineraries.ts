@@ -41,6 +41,28 @@ import {
   STRIKE_WATCH_MS,
   strikeWalkMs,
 } from "./graveStrike.ts"
+import {
+  type DayClock,
+  DOOR_MS,
+  GHOST_DRIFT_MS,
+  GHOST_FADE_MS,
+  GHOST_LINGER_MS,
+  GHOST_PACE,
+  GHOST_RISE_MS,
+  GHOST_TOP,
+  ghostAt,
+  ghostLift,
+  hourAt,
+  msUntilHour,
+  QUIET_MS,
+  REST_SETTLE_MS,
+  type RestGo,
+  type RestKit,
+  restNext,
+  restRnd,
+  restStay,
+  wakeHour,
+} from "./rest.ts"
 
 /**
  * The heroes' itineraries (plan-hud-events.md §3.1, L1; decision D): where each hero walks and stands,
@@ -92,6 +114,12 @@ import {
  *   a green CI     everyone standing cheers for `CHEER_MS`;
  *   rest           sitting at the gathering (its spots face each other in pairs).
  *
+ * Once its work is over (rest.ts, with `LifeKit.rest`): a hero done, failed or long quiet sits a while,
+ * then goes about the island's day (haunts, its seat, the tavern in the evening, a door at night); a
+ * subagent that leaves walks into the Guildhall's door; a fallen one that leaves rises as a ghost and
+ * drifts to a grave. The hall's resident guild (`LifePlanner.resident`) lives that day from the start,
+ * working at its own places by day. Its hours are the planner's `DayClock` (`setDay`).
+ *
  * A moment holds the hero (its `hold`): a call heard meanwhile starts its routine once it is over. A
  * moment's follow-up (walking back to its seat) is a timer `advance` fires at its time, like a dwell.
  */
@@ -111,6 +139,8 @@ export interface LifeKit {
   board?: HeroBoard | null
   /** The graveyard's strike spots (graveStrike.ts): with them, a hero who mends a grave strikes it. */
   graves?: GraveKit | null
+  /** Where heroes go once their work is over (rest.ts): haunts, doors, graves; none: they stay at their seats. */
+  rest?: RestKit | null
 }
 
 export interface ItineraryOptions {
@@ -165,7 +195,14 @@ const STRAIGHT_DOGLEG = [0.6, -0.6, 1.2, -1.2, 1.8, -1.8]
  * A stay at a hero spot: what kind of work it reads as there (its `pose`), when it is a hero spot; a
  * rising stay (`rise`) is a seated hero getting up before it walks off (`RISE_MS`).
  */
-export type HeroStay = LifeStay & { pose?: HeroPose; rise?: true }
+export type HeroStay = LifeStay & {
+  pose?: HeroPose
+  rise?: true
+  /** A rise played as a slow stand-up (a ghost rising out of its slump). */
+  slow?: true
+  /** At rest at a haunt (rest.ts): how it stands there. */
+  rest?: "chat" | "toast"
+}
 export type HeroStep = HeroStay | LifeWalk
 
 /** What a hero does from `from` to `to` (ms): a play of craft.ts, a call's craft, a way to face. */
@@ -191,11 +228,41 @@ export interface Itinerary {
   acts: HeroAct[]
   /** Its own seed (picks between a place's routines). */
   seed: number
+  /** Fallen and gone (rest.ts): a ghost from `from` (rising out of its slump), fading from `fade`. */
+  ghost?: { from: number; fade: number }
 }
 
 /** A hero's pose, and what it is drawn doing there (absent: the body's own clip for the act). */
 export interface AgentPose extends LifePose {
   sample?: LifeSample
+  /** A ghost (rest.ts): how visible, 0–1 (rising, fading); absent for the living. */
+  ghost?: number
+}
+
+/**
+ * How a walk goes (`walkTo`): strolled (never run), at a share of the pace, after a slow rise; a glide
+ * (a ghost's: no steps to keep to) pressed to arrive `within` ms, never faster than `top` m/s.
+ */
+interface WalkHow {
+  stroll?: boolean
+  pace?: number
+  slowRise?: boolean
+  glide?: { within: number; top: number }
+}
+
+/** A hero at rest (rest.ts): its next move's time, how many it has made, where it is. */
+interface Rest {
+  next: number
+  /** Resting now (else a quiet or settling timer that may begin it). */
+  on: boolean
+  k: number
+  /** Where it went last: a haunt's index, -1 its seat, -2 at work, null nowhere yet. */
+  last: number | null
+  /** The spot it holds there (a haunt's, a resident's work spot), released when it moves on. */
+  held?: string
+  /** Gone in at a door for the night (`door` is where it comes out). */
+  asleep?: boolean
+  door?: LifeSpot
 }
 
 /** What a hero is set to: a place, how it stands there, whether it is leaving. */
@@ -256,6 +323,10 @@ interface Track {
   call?: Craft
   /** Briefed at the board: its errand's end is the briefing's. */
   briefed?: boolean
+  /** Its life once its work is over (rest.ts), or the timer that may begin it. */
+  rest?: Rest
+  /** A resident of the hall (no session): its own places (zones), worked at by day. */
+  resident?: readonly number[]
 }
 
 interface Booked {
@@ -323,6 +394,8 @@ export class LifePlanner {
   private readonly hurry: { within: number; mps: number } | undefined
   /** The graves mended as the events come, for their fixers to strike (graveStrike.ts; none without `kit.graves`). */
   private readonly strikes: GraveStrikes | null
+  /** The day's clock (rest.ts): when it is evening, night, morning for heroes at rest. */
+  private day: DayClock | null = null
 
   constructor(
     private readonly kit: LifeKit,
@@ -373,14 +446,36 @@ export class LifePlanner {
     return this.tracks.get(id)?.it
   }
 
+  /** Sets the day's clock heroes at rest keep to (rest.ts): the hour at a time, and its pace. */
+  setDay(day: DayClock | null): void {
+    this.day = day
+  }
+
+  /**
+   * Hero `id` (joined: an `actor.join` pushed) is one of the hall's residents (no session: rest.ts): it
+   * lives the island's day from `t`, working at `zones` by day.
+   */
+  resident(id: string, zones: readonly number[], t: number): void {
+    const track = this.tracks.get(id)
+    if (!track) return
+    track.resident = [...zones]
+    const at = Math.max(t, this.now) + 1 + Math.floor(restRnd(track.it.seed, "first") * 6000)
+    track.rest = { next: at, on: true, k: 0, last: null }
+  }
+
   /** Folds one event (in log order) and plans what it changes. One earlier than `at` counts as heard now. */
   push(ev: WorldEvent): void {
     const t = Math.max(ev.at, this.now)
     this.advance(t)
     this.state = reduce(this.state, ev)
+    const about = "id" in ev ? this.tracks.get(ev.id) : undefined
+    // a hero at rest hears of its session again: back to its seat (and to what the event says)
+    if (about?.rest?.on && !about.resident) this.unrest(about, t)
     this.review(t)
     this.react(ev, t)
     if (this.strikes) for (const s of this.strikes.take(ev)) this.strikeGrave(s, t)
+    const track = "id" in ev ? this.tracks.get(ev.id) : undefined
+    if (track && !track.resident) this.armRest(track, t)
   }
 
   /** Plans the moves that fall due by `t` (a dwell running out, an errand's end) with no event to make them. */
@@ -395,6 +490,8 @@ export class LifePlanner {
       for (const track of this.tracks.values()) {
         if (track.timer !== undefined && track.timer > this.now && track.timer < due) due = track.timer
         if (track.wake !== undefined && track.wake > this.now && track.wake < due) due = track.wake
+        const rest = track.rest?.next
+        if (rest !== undefined && rest > this.now && rest < due) due = rest
       }
       if (due > t) break
       this.now = due
@@ -403,6 +500,7 @@ export class LifePlanner {
       this.review(due)
       for (const track of this.tracks.values()) if (track.timer === due) this.fire(track, due)
       for (const track of later) this.later(track, due)
+      for (const track of this.tracks.values()) if (track.rest?.next === due) this.restMove(track, due)
     }
     if (t > this.now) this.now = t
   }
@@ -412,6 +510,7 @@ export class LifePlanner {
    * end) with no event left to come: the end of a log planned whole.
    */
   settle(): void {
+    // (a hero's rest runs on for ever: its timers are not what a log's end leaves to plan)
     for (let n = 0; n < 100_000; n++) {
       let due = Number.POSITIVE_INFINITY
       for (const a of this.state.actors.values())
@@ -458,6 +557,11 @@ export class LifePlanner {
       const ended = a.status === "done" || a.status === "failed"
       if (track.hold > t && was.zone !== want.zone && !want.leave && !ended) {
         track.wake = track.hold
+        continue
+      }
+      // fallen and leaving: a ghost that drifts to the graveyard (rest.ts)
+      if (want.leave && !was.leave && a.status === "failed" && this.ghost(track, t)) {
+        track.want = want
         continue
       }
       if (was.zone === want.zone) this.stand(track, want, t)
@@ -546,6 +650,11 @@ export class LifePlanner {
   /** Walks from where it is at `t` to a free spot of the place it should be at. */
   private move(track: Track, want: Want, t: number): void {
     this.release(track.spot.key, t)
+    // at rest: called away from it (an armed timer stays: it waits for this walk's end)
+    if (track.rest?.on) {
+      if (track.rest.held) this.release(track.rest.held, t)
+      track.rest = undefined
+    }
     // where it sets off from (where a walk planned at this instant set off from, too)
     const from = track.was?.at === t ? track.was.here : (poseBefore(track.it, t) ?? track.here)
     const to = this.book(track.it.id, want, t, track.own, from.at)
@@ -588,7 +697,14 @@ export class LifePlanner {
    * Walks from where it is at `t` (its stay, or where it has got to on a walk) to `to` and stays there,
    * facing `facing` (the spot's own when left out); when it arrives. Nothing before `t` changes.
    */
-  private walkTo(track: Track, to: Spotted, t: number, act: "work" | "idle", facing?: number): number {
+  private walkTo(
+    track: Track,
+    to: Spotted,
+    t: number,
+    act: "work" | "idle",
+    facing?: number,
+    how: WalkHow = {},
+  ): number {
     const { steps } = track.it
     // a walk planned at this same instant is planned again from where the first started
     const again = track.was?.at === t
@@ -609,8 +725,13 @@ export class LifePlanner {
     // seated (at rest, slumped): it gets up where it sits before it sets off
     let leave = t
     if (seated && !walking && metres >= 1e-6) {
-      leave = t + RISE_MS
-      steps.push({ ...stayAt(track.here, t, "idle"), to: leave, rise: true })
+      leave = t + (how.slowRise ? GHOST_RISE_MS : RISE_MS)
+      steps.push({
+        ...stayAt(track.here, t, "idle"),
+        to: leave,
+        rise: true,
+        ...(how.slowRise ? { slow: true as const } : {}),
+      })
     }
     track.here = there
     let walk: LifeWalk | null
@@ -618,16 +739,25 @@ export class LifePlanner {
       metres >= 1e-6 && metres < STRAIGHT && !walking && from.ground && to.ground
         ? this.across(from.at, to.at)
         : null
+    const mps = this.mps * (how.pace ?? 1)
     if (metres < 1e-6) walk = null
-    else if (way) walk = this.straight([from.at, ...way], leave)
+    else if (way) walk = this.straight([from.at, ...way], leave, mps)
     else {
       const route = heroRoute(this.kit.walk, from, to, {
         leave,
-        mps: this.mps,
+        mps,
         lane: this.lane,
         ...(this.kit.near ? { near: this.kit.near } : {}),
       })
-      walk = route && this.paced(route)
+      walk = route && (how.stroll ? route : this.paced(route))
+    }
+    const glide = how.glide
+    if (walk && glide && walk.to - walk.from > glide.within) {
+      const took = walk.to - walk.from
+      const scale = Math.max(glide.within / took, mps / (glide.top / 1000))
+      const from = walk.from
+      const times = walk.times.map((x) => from + (x - from) * scale)
+      walk = { ...walk, times, to: times[times.length - 1] as number }
     }
     // (no way found: there now, as before, and no getting up for it)
     if (walk) steps.push(walk)
@@ -683,13 +813,11 @@ export class LifePlanner {
     return null
   }
 
-  /** A walk along `pts` (open ground) from `t`, at the walking pace. */
-  private straight(pts: readonly [number, number, number][], t: number): LifeWalk {
+  /** A walk along `pts` (open ground) from `t`, at the walking pace (or `mps`, metres a ms). */
+  private straight(pts: readonly [number, number, number][], t: number, mps = this.mps): LifeWalk {
     const times = [t]
     for (let k = 1; k < pts.length; k++)
-      times.push(
-        times[k - 1]! + Math.hypot(pts[k]![0] - pts[k - 1]![0], pts[k]![2] - pts[k - 1]![2]) / this.mps,
-      )
+      times.push(times[k - 1]! + Math.hypot(pts[k]![0] - pts[k - 1]![0], pts[k]![2] - pts[k - 1]![2]) / mps)
     return {
       kind: "walk",
       from: t,
@@ -731,12 +859,17 @@ export class LifePlanner {
     if (after) this.act(track, after, t)
   }
 
-  /** A leaver fades once home: when its walk there ends (and what it does there is over), or now. */
+  /**
+   * A leaver fades once home: when its walk there ends (and what it does there is over), or now; with
+   * the island's doors (`LifeKit.rest`) it then walks into the Guildhall's and fades there.
+   */
   private fade(track: Track, t: number): void {
     const last = track.it.steps[track.it.steps.length - 1]!
     // seen home a while first (a stay begun just now, where it stood: no arrival to see)
     const home = last.from < t ? last.from : last.from + FADE_AFTER_MS
-    const at = Math.max(t, home, track.hold)
+    let at = Math.max(t, home, track.hold)
+    const door = this.kit.rest?.doors[0]
+    if (door) at = this.walkTo(track, door, at, "idle", undefined, { stroll: true }) + DOOR_MS
     const span = track.it.shown[track.it.shown.length - 1]!
     span[1] = at
     this.booked.set(track.spot.key, { id: track.it.id, until: at })
@@ -923,6 +1056,8 @@ export class LifePlanner {
   private later(track: Track, t: number): void {
     const later = track.later
     track.later = undefined
+    // (a ghost already: its fall was played as it rose)
+    if (track.it.ghost) return
     const a = this.state.actors.get(track.it.id)
     if (!a) return
     if (later === "fail") this.fail(track, t)
@@ -1156,6 +1291,217 @@ export class LifePlanner {
     track.hold = Number.POSITIVE_INFINITY
   }
 
+  // ---- once the work is over (rest.ts): rest, sleep, the ghost ----
+
+  /**
+   * After an event about it: the timer that may begin a hero's rest. Done or failed, once it is home and
+   * has sat a while (`REST_SETTLE_MS`); otherwise when nothing is heard of it for `QUIET_MS`.
+   */
+  private armRest(track: Track, t: number): void {
+    const a = this.state.actors.get(track.it.id)
+    if (!a || a.gone !== undefined || track.want.leave) {
+      track.rest = undefined
+      return
+    }
+    const ended = a.status === "done" || a.status === "failed"
+    const last = track.it.steps[track.it.steps.length - 1]!
+    const settle = REST_SETTLE_MS * (1 + restRnd(track.it.seed, "settle"))
+    const next = ended ? Math.max(t, last.from, track.hold) + settle : t + QUIET_MS
+    track.rest = { next: Math.max(next, this.now + 1), on: false, k: 0, last: null }
+  }
+
+  /** Whether a hero may begin to rest at `t`: its work over (or long quiet), nothing holding it, nothing pending. */
+  private restful(a: WorldActor, track: Track, t: number): boolean {
+    if (track.resident) return true
+    if (track.hold > t || (track.timer !== undefined && track.timer > t) || track.board) return false
+    if (track.wake !== undefined && track.wake > t) return false
+    if (track.want.zone !== this.kit.home || a.status === "waiting") return false
+    if (a.pending && t < a.pending.since + DWELL_MS) return false
+    // there, not on its way
+    const last = track.it.steps[track.it.steps.length - 1]!
+    if (last.kind !== "stay" || last.from > t) return false
+    if (a.status === "done" || a.status === "failed") return true
+    // quiet: no call going on, and no subagent of its own still at work
+    if (a.intent && a.intent.ended === undefined) return false
+    return !(a.parent === undefined && this.dispatching(a.id))
+  }
+
+  /** The door a hero goes in at for the night (and comes out of): one of the few nearest the Guildhall, by its seed. */
+  private doorOf(track: Track): LifeSpot | undefined {
+    const doors = this.kit.rest?.doors ?? []
+    if (!doors.length) return undefined
+    return doors[Math.floor(restRnd(track.it.seed, "door") * Math.min(4, doors.length))]
+  }
+
+  /** Out of its door again in the morning: on the island from `t`, standing before the door. */
+  private wake(track: Track, rest: Rest, t: number): void {
+    const door = rest.door
+    rest.asleep = false
+    if (!door) return
+    const out: Spotted = { ...door, facing: door.facing + Math.PI }
+    track.it.shown.push([t, Number.POSITIVE_INFINITY])
+    cut(track.it.steps, t)
+    track.it.steps.push(stayAt(out, t, "idle"))
+    track.here = out
+    track.was = undefined
+  }
+
+  /** A hero at rest makes its next move (rest.ts `restNext`): to a haunt, its seat, its work, or to bed. */
+  private restMove(track: Track, t: number): void {
+    const r = track.rest!
+    const a = this.state.actors.get(track.it.id)
+    if (!r.on) {
+      const ended = a?.status === "done" || a?.status === "failed"
+      if (!a || a.gone !== undefined || track.want.leave) {
+        track.rest = undefined
+        return
+      }
+      if (!this.restful(a, track, t)) {
+        r.next = t + (ended ? 5000 : QUIET_MS)
+        return
+      }
+      // home from its finished work, it sits a while there first
+      const sat = ended
+        ? track.it.steps[track.it.steps.length - 1]!.from +
+          REST_SETTLE_MS * (1 + restRnd(track.it.seed, "settle"))
+        : t
+      if (sat > t) {
+        r.next = sat
+        return
+      }
+      r.on = true
+    }
+    const seed = track.it.seed
+    const haunts = this.kit.rest?.haunts ?? []
+    let go: RestGo = restNext({
+      seed,
+      k: r.k,
+      hour: hourAt(this.day, t),
+      haunts,
+      ...(track.resident ? { zones: track.resident } : {}),
+      last: r.last,
+    })
+    r.k++
+    if (go.kind === "sleep") {
+      if (r.asleep) {
+        r.next = t + Math.max(60_000, msUntilHour(this.day, t, wakeHour(seed)))
+        return
+      }
+      const door = this.doorOf(track)
+      if (door) {
+        this.leaveSpot(r, t)
+        cutActs(track.it.acts, t)
+        const arrive = this.walkTo(track, door, t, "idle", undefined, { stroll: true })
+        const gone = arrive + DOOR_MS
+        const span = track.it.shown[track.it.shown.length - 1]!
+        span[1] = gone
+        r.asleep = true
+        r.door = door
+        r.last = null
+        r.next = gone + Math.max(60_000, msUntilHour(this.day, gone, wakeHour(seed)))
+        return
+      }
+      go = { kind: "seat" }
+    }
+    this.leaveSpot(r, t)
+    if (r.asleep) this.wake(track, r, t)
+    cutActs(track.it.acts, t)
+    let arrive = t
+    if (go.kind === "haunt") {
+      const hi = go.haunt
+      const haunt = haunts[hi]!
+      const k = haunt.spots.findIndex((_, j) => this.free(`rest:${hi}:${j}`, track.it.id, t))
+      if (k < 0) go = { kind: "seat" }
+      else {
+        const key = `rest:${hi}:${k}`
+        this.booked.set(key, { id: track.it.id, until: Number.POSITIVE_INFINITY })
+        r.held = key
+        arrive = this.walkTo(track, haunt.spots[k]!, t, "idle", undefined, { stroll: true })
+        const stay = track.it.steps[track.it.steps.length - 1] as HeroStay
+        stay.rest = go.stand
+        r.last = go.haunt
+      }
+    }
+    if (go.kind === "work") {
+      const want: Want = { zone: go.zone, act: "work", leave: false }
+      const spot = this.book(track.it.id, want, t, new Map(), track.here.at)
+      r.held = spot.key
+      arrive = this.walkTo(track, spot.spot, t, "work", undefined, { stroll: true })
+      const crafts = ["edit", "read", "edit", "search", "edit", "run"] as const
+      const craft = crafts[Math.floor(restRnd(seed, `craft${r.k}`) * crafts.length)]!
+      this.act(track, "craft", arrive, { craft })
+      r.last = -2
+    }
+    if (go.kind === "seat") {
+      arrive =
+        track.here === track.spot.spot
+          ? t
+          : this.walkTo(track, track.spot.spot, t, "idle", undefined, { stroll: true })
+      r.last = -1
+    }
+    r.next = Math.max(arrive, t) + restStay(seed, r.k, go)
+  }
+
+  /** Lets go of the spot a hero at rest held where it was. */
+  private leaveSpot(r: Rest, t: number): void {
+    if (r.held) this.release(r.held, t)
+    r.held = undefined
+  }
+
+  /** A hero at rest hears of its session again: out of its door if it slept, back to its seat. */
+  private unrest(track: Track, t: number): void {
+    const r = track.rest!
+    track.rest = undefined
+    this.leaveSpot(r, t)
+    if (r.asleep) this.wake(track, r, t)
+    cutActs(track.it.acts, t)
+    if (track.here !== track.spot.spot) this.walkTo(track, track.spot.spot, t, track.want.act)
+  }
+
+  /**
+   * A fallen subagent leaves (rest.ts): it slumps out its hold, then rises from it as a ghost, drifts to
+   * a free grave and fades there. False with no graves on the island (it goes home and fades, as before).
+   */
+  private ghost(track: Track, t: number): boolean {
+    const graves = this.kit.rest?.graves ?? []
+    if (!graves.length) return false
+    // its fall heard while it worked out its dwell: the blow and the slump first, where it stands
+    if (track.later === "fail") {
+      track.later = undefined
+      this.fail(track, t)
+    }
+    const start = Math.max(t, track.hold)
+    track.timer = undefined
+    track.after = undefined
+    track.wake = undefined
+    track.rest = undefined
+    this.release(track.spot.key, t)
+    const first = track.it.seed % graves.length
+    let k = first
+    for (let j = 0; j < graves.length; j++) {
+      const at = (first + j) % graves.length
+      if (this.free(`grave:${at}`, track.it.id, start)) {
+        k = at
+        break
+      }
+    }
+    cutActs(track.it.acts, start)
+    const arrive = this.walkTo(track, graves[k]!, start, "idle", undefined, {
+      stroll: true,
+      pace: GHOST_PACE,
+      slowRise: true,
+      glide: { within: GHOST_DRIFT_MS, top: GHOST_TOP },
+    })
+    const fade = arrive + GHOST_LINGER_MS
+    const end = fade + GHOST_FADE_MS
+    track.it.ghost = { from: start, fade }
+    const span = track.it.shown[track.it.shown.length - 1]!
+    span[1] = end
+    this.booked.set(`grave:${k}`, { id: track.it.id, until: end })
+    track.hold = end
+    return true
+  }
+
   // ---- the graveyard (world events Task B's hook, graveStrike.ts): kept apart from the moments above ----
 
   /**
@@ -1322,6 +1668,11 @@ export function poseAt(it: Itinerary, t: number): AgentPose | null {
   const step = it.steps[k]!
   const pose: AgentPose = stepPose(it.steps, t, k)!
   const act = it.acts ? actAt(it.acts, t) : undefined
+  const ghost = it.ghost ? ghostAt(it.ghost, t) : null
+  if (ghost !== null && it.ghost) {
+    pose.ghost = ghost
+    pose.lift = (pose.lift ?? 0) + ghostLift(it.ghost, t)
+  }
   if (step.kind === "walk") {
     // walking: the walk's own clip; only the loot it carries shows
     if (act?.play === "carry")
@@ -1334,8 +1685,12 @@ export function poseAt(it: Itinerary, t: number): AgentPose | null {
   }
   const stay = step as HeroStay
   if (stay.rise) {
-    // getting up off the ground, then off
-    const r = routineAt(playRoutine("rise", undefined, undefined), t - stay.from, stay.facing)
+    // getting up off the ground, then off (a ghost slowly, out of its slump)
+    const r = routineAt(
+      playRoutine(stay.slow ? "standup" : "rise", undefined, undefined),
+      t - stay.from,
+      stay.facing,
+    )
     pose.sample = { clip: r.clip, phase: r.phase, props: r.props }
     return pose
   }
@@ -1344,6 +1699,8 @@ export function poseAt(it: Itinerary, t: number): AgentPose | null {
   if ((play === "craft" || play === "think") && stay.act !== "work") play = undefined
   if (play === undefined && stay.act === "work") play = "think"
   if (play === undefined && stay.act === "idle" && stay.pose === "gather") play = "rest"
+  // at rest at a haunt: chatting, toasting at the tavern
+  if (play === undefined && stay.rest) play = stay.rest
   if (play === undefined) return pose
   const since = Math.max(stay.from, play === act?.play && act ? act.from : stay.from)
   const facing = act?.face ?? stay.facing

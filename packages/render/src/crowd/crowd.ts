@@ -55,6 +55,7 @@ import {
 import { createBlobs } from "./blobs.ts"
 import {
   chooseHeroes,
+  ghostHero,
   glowSwatches,
   type Hero,
   heroShown,
@@ -93,6 +94,11 @@ export interface ActorSample {
   phase: number
   /** Not drawn this frame (indoors): no body, props, shadow, nor hero. */
   hidden?: boolean
+  /**
+   * A ghost (a fallen hero's: 0–1 how visible): drawn as its hero only, pale and see-through
+   * (heroes.ts `ghostHero`), with no shadow; nothing while its hero is not made yet.
+   */
+  ghost?: number
   /**
    * The props in hand this frame (catalog ids, of its look's mounts): the others are not drawn (a hero's
    * book while it reads, its hammer while it hammers). None: every mount of its look.
@@ -621,8 +627,20 @@ export async function createCrowd(
         }
         const [x, y, z] = s.position
         const scale = person.actor.look.scale
-        blobs.place(i, x, y, z, scale)
+        const ghost = s.ghost
+        if (ghost === undefined) blobs.place(i, x, y, z, scale)
+        else blobs.place(i, 0, -1000, 0, 0)
         const hero = person.shown ? person.hero : null
+        if (person.hero) ghostHero(person.hero, ghost)
+        if (!hero && ghost !== undefined) {
+          // a ghost is its hero or nothing (the crowd's body is opaque)
+          bodies.setVisibleAt(person.instance, false)
+          for (const p of person.props) {
+            props.setVisibleAt(p.instance, false)
+            p.drawn = false
+          }
+          continue
+        }
         if (hero) {
           const root = hero.npc.root
           root.position.set(x, y, z)

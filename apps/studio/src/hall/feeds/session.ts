@@ -6,8 +6,13 @@
  * snapshot of it at most 10 times a second (`throttled`), never per frame.
  *
  * Who else reads it: the hall HUD (the snapshot), the timeline bar (the clock), and life (L1/L2), which
- * takes `log()` and `clock` to pose the heroes (`hallSession()` hands them over). `log()` is replaced
+ * takes `log()` and `lifeAt()` to pose the heroes (`hallSession()` hands them over). `log()` is replaced
  * when the feed starts over (a hub's hello): `onReset` says so.
+ *
+ * The world never freezes (decisions.md "User review notes (10-14 evening)"): when a told story or a
+ * recording has played to its end the session clock stops there, but life's time (`lifeAt`) runs on in
+ * real time past it, so the heroes finish what they were doing and go about their rest; `restedMs` says
+ * how long the session has stood at its end (the home's "Next story" counts from it).
  */
 import type { Change, GuildEvent, SeaEvent } from "@guildhall/core"
 import {
@@ -28,7 +33,7 @@ import {
   type WireInput,
   type WorldEvent,
 } from "@guildhall/sim"
-import { createSessionClock, type SessionClock, type SessionClockState } from "./clock.ts"
+import { createSessionClock, MAX_DT, type SessionClock, type SessionClockState } from "./clock.ts"
 import type { Feed, FeedChapter, FeedKind, FeedSink, FeedStatus } from "./feed.ts"
 import { LiveFeed } from "./live.ts"
 import { type ThrottleOptions, throttled } from "./store.ts"
@@ -68,6 +73,13 @@ export interface HallSession {
   purseAt?(master: string, at: number): { tokens: number; cost: number } | undefined
   /** The log's first event's time (epoch ms), or null while it is empty. */
   origin(): number | null
+  /**
+   * Where life looks (epoch ms): the clock's `at`, and once a replay or a story has stopped at its end,
+   * on past it in real time (the heroes walk home and rest; nobody freezes mid-road). Live: now.
+   */
+  lifeAt(): number
+  /** ms the session has stood at its end (a told story over, a recording played out); 0 elsewhere. */
+  restedMs(): number
   /** What the session's Teller has told so far (its moments, its sessions): the Legends and the card. */
   teller(): Teller | null
   /** Starts the feed; `placeOf` binds a file path to a zone (the hall's places). */
@@ -122,6 +134,8 @@ export function createSession(feed: Feed, opts: SessionOptions = {}): HallSessio
   let version = 0
   let started = false
   let loaded = false
+  /** ms life has run on past the clock's end, at rest there. */
+  let rested = 0
   const resets = new Set<() => void>()
 
   const snapshot = (): SessionSnapshot => {
@@ -257,6 +271,8 @@ export function createSession(feed: Feed, opts: SessionOptions = {}): HallSessio
     model: () => ctx.model,
     purseAt: (master, at) => purses.at(master, at),
     origin: () => log.events[0]?.at ?? null,
+    lifeAt: () => clock.get().at + rested,
+    restedMs: () => rested,
     teller: () => teller,
     start(bind) {
       if (started) return
@@ -278,6 +294,9 @@ export function createSession(feed: Feed, opts: SessionOptions = {}): HallSessio
       const before = clock.get()
       if (loaded || live) clock.tick(dt)
       const c = clock.get()
+      // at rest at its end (played out, or left there): life runs on in real time; anywhere else it is the clock's
+      const atEnd = loaded && c.mode === "replay" && !c.playing && c.end > c.start && c.at >= c.end
+      rested = atEnd && before.at >= before.end ? rested + Math.max(0, Math.min(dt, MAX_DT)) * 1000 : 0
       if (c.jumps !== jumps) {
         jumps = c.jumps
         narrator = null

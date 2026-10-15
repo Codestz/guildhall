@@ -19,7 +19,8 @@ import type { HeroPose } from "@guildhall/world"
  * and the moments the planner choreographs (itineraries.ts): the Guildmaster pinning a quest at the
  * notice board and beckoning the recruit, the recruit's briefing, the loot carried home and set down,
  * a failure's blow and slump, a plea's wave, a cheer, standing up again (and getting up quickly before a
- * walk), and rest (sitting two by two at the gathering; thinking there stands still).
+ * walk), and rest (sitting two by two at the gathering; thinking there stands still; once its work is over
+ * chatting at a haunt, toasting at the tavern: rest.ts).
  *
  * A routine is sampled by `routineAt`, a pure function of the ms since it began: the same at every t
  * however it is reached (a scrub and a play agree).
@@ -252,6 +253,8 @@ export type Play =
   | "rest"
   | "rise"
   | "strike"
+  | "chat"
+  | "toast"
 
 const SIT: readonly Move[] = [{ clip: "Sit_Floor_Down", ms: SIT_MS }, { clip: "Sit_Floor_Idle" }]
 
@@ -295,6 +298,28 @@ const PLAYS: Readonly<Record<Exclude<Play, "craft" | "think">, Routine>> = {
     props: [],
   },
   rest: { moves: SIT, loop: "last", props: [] },
+  // at rest at a haunt (rest.ts): standing about, looking round at the others; at the tavern now and then a toast
+  chat: {
+    moves: [
+      { clip: "Idle_B" },
+      { clip: "Idle_A" },
+      { clip: "Idle_B", turn: 0.35 },
+      { clip: "Idle_A", turn: 0.35 },
+    ],
+    loop: "all",
+    props: [],
+  },
+  toast: {
+    moves: [
+      { clip: "Idle_B" },
+      { clip: "Idle_A" },
+      { clip: "Idle_B", turn: -0.3 },
+      { clip: "Cheering" },
+      { clip: "Idle_A" },
+    ],
+    loop: "all",
+    props: [],
+  },
   // getting up off the ground before walking off (the itinerary's rising stay)
   rise: {
     moves: [{ clip: "Sit_Floor_StandUp", ms: RISE_MS, fit: true }, { clip: "Idle_A" }],

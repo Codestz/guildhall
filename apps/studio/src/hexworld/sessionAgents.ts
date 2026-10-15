@@ -3,11 +3,14 @@
  * the hall's places as zones) is planned where the walk graph is, the build worker's life desk
  * (lifePlan.ts `AgentDesk`), as it grows: each frame sends the events since the last reply and gets back
  * every hero's itinerary (sim `LifePlanner`, the same itineraries a whole-log plan makes, so a scrub
- * shows what playing showed). A pose is the itinerary sampled at the session clock's `at`, not life's
- * own seconds: the hall's timeline moves the heroes.
+ * shows what playing showed). A pose is the itinerary sampled at the session's `lifeAt`, not life's own
+ * seconds: the hall's timeline moves the heroes, and once a story has played to its end life's time runs
+ * on past it (the session's `lifeAt`), so the heroes walk home and rest instead of freezing mid-road.
  *
  * A new log (a hub's hello: `onReset`) starts the desk over. Live, the moves a dwell makes with no event
  * after it are planned up to a second behind now; an event heard later than that is planned when heard.
+ * Played back, the desk plans `AHEAD` past where life looks (its rest: sim rest.ts), and with every ask
+ * it hears the hour the island shows (`hour`), so its heroes keep the island's evening and night.
  */
 import { DWELL_MS, type Itinerary, poseAt } from "@guildhall/sim"
 import type { HallSession } from "../hall/feeds/session.ts"
@@ -16,6 +19,8 @@ import type { AgentDeskReply, AgentDeskRequest } from "./lifePlan.ts"
 
 /** Live: the desk plans this far behind now (ms), so an event heard a little late is still in order. */
 const LIVE_LAG = 1000
+/** Played back: the desk plans this far past where life looks (ms), and asks again halfway through it. */
+export const AHEAD = 20_000
 
 export interface SessionAgents extends AgentSource {
   /** Stops listening to the session. */
@@ -24,10 +29,17 @@ export interface SessionAgents extends AgentSource {
   lastMs(): number
 }
 
+/** Where life looks in a session: its `lifeAt` (on past a story's end), or its clock's `at`. */
+const lifeOf = (session: Pick<HallSession, "clock"> & Partial<Pick<HallSession, "lifeAt">>) =>
+  session.lifeAt ? session.lifeAt() : session.clock.get().at
+
 export function sessionAgents(
-  session: Pick<HallSession, "log" | "clock" | "feed" | "onReset"> & Partial<Pick<HallSession, "snapshot">>,
+  session: Pick<HallSession, "log" | "clock" | "feed" | "onReset"> &
+    Partial<Pick<HallSession, "snapshot" | "lifeAt">>,
   plan: (req: AgentDeskRequest) => Promise<AgentDeskReply | null>,
   now: () => number = Date.now,
+  /** The hour the island shows now (life's day clock), for the desk's day; none: no evening, no night. */
+  hour?: () => number,
 ): SessionAgents {
   let log = session.log()
   let sent = 0
@@ -50,7 +62,7 @@ export function sessionAgents(
     lastMs: () => ms,
     poseAt(id) {
       const it = byId.get(id)
-      return it ? poseAt(it, session.clock.get().at) : null
+      return it ? poseAt(it, lifeOf(session)) : null
     },
     itinerary: (id) => byId.get(id),
     // the HUD's 10 Hz snapshot: the world at the session clock (no fold of its own)
@@ -69,9 +81,16 @@ export function sessionAgents(
       const n = log.length
       const last = log.events[n - 1]?.at
       if (last === undefined) return
-      const until = live ? Math.max(last, now() - LIVE_LAG) : last + DWELL_MS
-      if (n === sent && !reset && until <= planned + (live ? LIVE_LAG : 0)) return
-      const req: AgentDeskRequest = { events: log.events.slice(sent, n), until, ...(reset ? { reset } : {}) }
+      const at = lifeOf(session)
+      const until = live ? Math.max(last, now() - LIVE_LAG) : Math.max(last + DWELL_MS, at + AHEAD)
+      const step = live ? LIVE_LAG : AHEAD / 2
+      if (n === sent && !reset && until <= planned + step) return
+      const req: AgentDeskRequest = {
+        events: log.events.slice(sent, n),
+        until,
+        ...(reset ? { reset } : {}),
+        ...(hour ? { day: { at, hour: hour() } } : {}),
+      }
       const asked = log
       sent = n
       reset = false

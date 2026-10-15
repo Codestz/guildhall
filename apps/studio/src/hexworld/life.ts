@@ -116,6 +116,8 @@ const SAY_UP = 1.15
 const SAY_SAT = 0.85
 /** How often the chips' words are read again from the source's world when it has not changed, ms. */
 const WORDS_MS = 250
+/** What a ghost plays while it glides (sim rest.ts): standing still in the air, no steps. */
+const GHOST_GLIDE = "Idle_B"
 /** Where an agent not on the island yet is kept (undrawn) before its first pose. */
 const OFF_ISLAND: LifePose = { at: [0, 0, 0], facing: 0, act: "idle", indoors: true, ground: true }
 
@@ -760,6 +762,24 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       // a hero: what its work or its moment plays (sim life's sample, a pure function of its clock), with
       // the props it holds for it; walking, the walk with its role's own props (or the loot it carries)
       const doing = fig ? (p as AgentPose).sample : undefined
+      // a fallen hero's ghost (sim rest.ts): drawn pale and see-through, empty-handed, gliding (no steps)
+      const ghost = fig ? (p as AgentPose).ghost : undefined
+      if (ghost !== undefined) {
+        const glide = p.act === "walk" || !doing
+        const clip = glide ? GHOST_GLIDE : doing.clip
+        const seconds = durations.get(clip) ?? 2
+        phase[id] = glide ? phase[id]! + dt / seconds : doing.phase
+        heading[id] = p.facing
+        return {
+          position: [x, y, zz],
+          heading: p.facing,
+          clip,
+          phase: phase[id]! - Math.floor(phase[id]!),
+          hidden: p.indoors || (hiddenAt !== null && hiddenAt(x, zz)),
+          props: NOTHING,
+          ghost,
+        }
+      }
       const props = fig ? (doing ? hands(doing.props) : fig.own) : undefined
       if (doing && p.act !== "walk") {
         phase[id] = doing.phase
@@ -828,7 +848,12 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
     const placeChips = () => {
       if (!chips) return
       const now = performance.now()
-      const w = source?.worldAt?.(secs) ?? null
+      // (a source that draws its own chips: the hall's residents)
+      if (source?.chipViews && now - wordsAt >= WORDS_MS) {
+        wordsAt = now
+        chips.set(source.chipViews(secs, walkingId))
+      }
+      const w = source?.chipViews ? null : (source?.worldAt?.(secs) ?? null)
       if (w && (w.world !== wordsWorld || now - wordsAt >= WORDS_MS)) {
         wordsWorld = w.world
         wordsAt = now

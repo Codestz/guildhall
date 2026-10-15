@@ -1006,7 +1006,13 @@ const world = {
               if (tries > 0) setTimeout(() => look(tries - 1), 100)
               return
             }
-            const agents = sessionAgents(playing, (req) => job.planAgents(req))
+            // (the desk hears the hour life shows, so heroes at rest keep the island's evening and night)
+            const agents = sessionAgents(
+              playing,
+              (req) => job.planAgents(req),
+              Date.now,
+              () => life?.clock() ?? now,
+            )
             life.setAgents(agents)
             unAgents = agents.dispose
           }

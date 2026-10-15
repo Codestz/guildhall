@@ -13,6 +13,7 @@ import {
   type AgentInfo,
   agentsOf,
   bindPlaces,
+  type DayClock,
   DWELL_MS,
   EventLog,
   flush,
@@ -23,12 +24,15 @@ import {
   normalize,
   normalizer,
   planAgents,
+  type RestKit,
+  ringPlaces,
   type WorldEvent,
 } from "@guildhall/sim"
 import {
   type BoardReader,
   boardReaders,
   doorPasses,
+  doorSpot,
   type Folk,
   graveStrikeSpot,
   guildhallZone,
@@ -41,6 +45,7 @@ import {
   hexWalk,
   type LampLighting,
   type LifePlaces,
+  type LifeSpot,
   lampLightings,
   lifePlaces,
   type PetitionLane,
@@ -50,6 +55,7 @@ import {
   planStocks,
   type Solid,
   type Stock,
+  solidDistance,
   type Walkway,
   workTiles,
 } from "@guildhall/world"
@@ -143,7 +149,7 @@ export function planLifeDesk(
   // one reservation book for the townsfolk; the heroes' spots are a pool of their own beside it (set
   // aside when first asked for, and changing nobody's day)
   const places = lifePlaces(h, z, w, walk, { heroSpots: HERO_SPOTS })
-  const kit = kitOf(h, z, walk, places, w.graveyard)
+  const kit = kitOf(h, z, walk, places, w.graveyard, w)
   const t1 = now()
   const agents = opts.agents ? planGuild(z, walk, kit, opts.agents, opts) : null
   const agentsMs = now() - t1
@@ -188,20 +194,106 @@ export function kitOf(
   walk: HexWalk,
   places: Pick<LifePlaces, "heroSpots" | "walkNear">,
   graveyard?: HexGraveyard | null,
+  /** The world's doors and tiles: with them, where heroes go once their work is over (`restKitOf`). */
+  world?: Pick<HexWorld, "tiles" | "doorways">,
 ): LifeKit {
   // the graveyard's strike spots (world graveyard.ts): a hero who mends a grave goes there to strike it
   const node = graveyard ? walk.at(graveyard.tile) : -1
+  const home = guildhallZone(walk, z)
   return {
     walk,
     spots: (zi) => places.heroSpots(zi),
-    home: guildhallZone(walk, z),
+    home,
     near: places.walkNear,
     island: h,
     board: places.heroSpots.board(),
     ...(graveyard && node >= 0
       ? { graves: { strike: (slot: number) => graveStrikeSpot(graveyard, node, slot) } }
       : {}),
+    ...(world
+      ? { rest: restKitOf(z, walk, world, places, home, graveyard && node >= 0 ? { graveyard, node } : null) }
+      : {}),
   }
+}
+
+/** Doors a hero at rest may sleep behind: the nearest few to the Guildhall's heart reached from it. */
+const REST_DOORS = 6
+/** How many stand at a haunt at once, and how far from what stands round them (metres: a body and a little). */
+const HAUNT_SPOTS = 6
+const HAUNT_ROOM = 0.45
+/** A haunt's places stand within this of its node (metres): before the tavern's door, round a square's heart. */
+const HAUNT_REACH = 4
+
+/**
+ * Where heroes go once their work is over (sim rest.ts): the haunts (the tavern nearest the Guildhall,
+ * standing before its door; the nearest town or market square), the doors nearest the Guildhall (a leaver
+ * walks in at the first) and the graveyard's graves (a ghost fades at one). Every haunt place keeps a
+ * body's room from the solids and from where the townsfolk stand. Pure.
+ */
+export function restKitOf(
+  z: HexZones,
+  walk: HexWalk,
+  w: Pick<HexWorld, "tiles" | "doorways">,
+  places: Pick<LifePlaces, "walkNear">,
+  home: number,
+  graves: { graveyard: HexGraveyard; node: number } | null,
+): RestKit {
+  const heartNode = walk.hearts[home] ?? -1
+  const heart = walk.nodes[heartNode]
+  if (!heart) return { haunts: [], doors: [], graves: [] }
+  const reached = (node: number) => node === heartNode || walk.route(heartNode, node) !== null
+  const far = (x: number, zz: number) => Math.hypot(x - heart.x, zz - heart.z)
+  const room = (x: number, zz: number) =>
+    places
+      .walkNear(x, zz, HAUNT_ROOM + 0.6)
+      .every((b) =>
+        "pts" in b
+          ? b.soft || solidDistance(b, x, zz) >= HAUNT_ROOM
+          : Math.hypot(b.x - x, b.z - zz) >= b.r + HAUNT_ROOM,
+      )
+  /** A haunt's places round a node: rings out from it, each with room, facing the node. */
+  const round = (node: number): LifeSpot[] => {
+    const n = walk.nodes[node]!
+    return ringPlaces(
+      n,
+      [],
+      HAUNT_SPOTS,
+      (x, zz) => Math.hypot(x - n.x, zz - n.z) < HAUNT_REACH && room(x, zz),
+    ).map(([x, zz]) => ({ node, at: [x, n.y, zz], facing: Math.atan2(n.x - x, n.z - zz), ground: true }))
+  }
+  const haunts: RestKit["haunts"][number][] = []
+  // the tavern: before its door, the nearest to the Guildhall
+  const tavern = w.tiles
+    .filter((t) => t.prefab && /tavern/.test(t.prefab) && walk.door(t.i) >= 0 && reached(walk.door(t.i)))
+    .sort((a, b) => far(a.x, a.z) - far(b.x, b.z))[0]
+  if (tavern) {
+    const spots = round(walk.door(tavern.i))
+    if (spots.length >= 2) haunts.push({ kind: "tavern", spots })
+  }
+  // a square: the nearest town's or market's heart that is not the Guildhall's
+  const nodeFar = (node: number) => far(walk.nodes[node]!.x, walk.nodes[node]!.z)
+  const square = z.zones
+    .map((zone, zi) => ({ kind: zone.kind, node: walk.hearts[zi] ?? -1, zi }))
+    .filter(
+      (q) => q.zi !== home && q.node >= 0 && (q.kind === "town" || q.kind === "market") && reached(q.node),
+    )
+    .sort((a, b) => nodeFar(a.node) - nodeFar(b.node))[0]
+  if (square) {
+    const spots = round(square.node)
+    if (spots.length >= 2) haunts.push({ kind: "square", spots })
+  }
+  // the doors: the nearest the Guildhall's heart, reached from it
+  const doorways = new Map(w.doorways.map((d) => [d.tile, d]))
+  const doors = w.doorways
+    .map((d) => walk.door(d.tile))
+    .filter((node) => node >= 0 && reached(node))
+    .map((node) => doorSpot(walk, node, doorways))
+    .sort((a, b) => far(a.at[0], a.at[2]) - far(b.at[0], b.at[2]))
+    .slice(0, REST_DOORS)
+  const stones = graves
+    ? graves.graveyard.graves.flatMap((_, k) => graveStrikeSpot(graves.graveyard, graves.node, k) ?? [])
+    : []
+  return { haunts, doors, graves: stones }
 }
 
 /**
@@ -221,6 +313,13 @@ export interface AgentDeskRequest {
   events: WorldEvent[]
   /** Plan the moves due by then too (a dwell that ran out with no event after it). */
   until: number
+  /** The day's clock heroes at rest keep to (sim rest.ts `DayClock`): the hour the island shows at a time. */
+  day?: DayClock
+  /**
+   * The hall's residents (no session: residents.ts), joined by `events`: each one's own places (zones),
+   * worked at by day. Sent once, with the reset.
+   */
+  residents?: { id: string; zones: number[] }[]
 }
 
 export interface AgentDeskReply {
@@ -241,7 +340,9 @@ export function agentDesk(kit: LifeKit): AgentDesk {
     plan(req) {
       const t0 = performance.now()
       if (req.reset) planner = new LifePlanner(kit, AGENT_OPTS)
+      if (req.day) planner.setDay(req.day)
       for (const ev of req.events) planner.push(ev)
+      for (const r of req.residents ?? []) planner.resident(r.id, r.zones, req.events[0]?.at ?? planner.at)
       if (req.until > planner.at) planner.advance(req.until)
       return {
         cast: agentsOf(planner.world),

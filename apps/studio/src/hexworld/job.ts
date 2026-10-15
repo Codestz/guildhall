@@ -115,6 +115,13 @@ export interface HexJobSpec {
   regions?: boolean
   /** Plan the island's life as the last stage (lifePlan.ts); left out or false: no `life` stage (`?life=0`). */
   life?: boolean
+  /**
+   * "life": this job builds the island's pure map and plans its life, posting the `life` stage alone
+   * (the second worker of a screen, started beside the one that posts the map, the ground, the pieces
+   * and the shore: the plan is the reveal's long pole, and it needs only the world as placed). The
+   * same island, zones and world from the same spec, so the same plan the one worker made.
+   */
+  only?: "life"
   /** The agents life plans with it (lifeAgents.ts): the demo story, a recorded guild, or none (null). */
   agents?: AgentFeed | null
   /** The repo's name ("owner/name"), for binding a recording's absolute paths to its places. */
@@ -559,6 +566,19 @@ export function runHexJob(
   lap("zones")
   const w = hexWorld(h, z, { step: spec.step, nature: spec.nature, regions: spec.regions !== false })
   lap("world")
+  /** Plans life on the world as placed (the pieces at the heights the world put them) and posts it. */
+  const planLife = (placed: HexWorld): AgentDesk => {
+    const agents = spec.agents === undefined ? ({ kind: "story" } as const) : spec.agents
+    const opts = {
+      agents,
+      ...(spec.places ? { places: spec.places } : {}),
+      ...(spec.repo ? { repo: spec.repo } : {}),
+    }
+    const made = planLifeDesk(h, z, placed, spec.seed, now, opts)
+    post({ type: "life", life: made.plan })
+    return made.desk
+  }
+  if (spec.only === "life") return spec.life ? planLife(w) : null
   const R = HEX_TILE_SIZE
   const { pools, pooled, sunk } = sinkPools(w)
   let span = 0
@@ -664,19 +684,9 @@ export function runHexJob(
   // Life next, before the shore: the plan is the reveal's long pole (the crowd is built from it once the
   // pieces are in), while the water is drawn from the shore field only after the batch is built, so the
   // shore's own time is hidden behind the pieces' load wherever it lands.
-  let desk: AgentDesk | null = null
-  if (spec.life) {
-    const placed = { ...w, pieces: w.pieces.map((p, k) => ({ ...p, y: placedY[k] as number })) }
-    const agents = spec.agents === undefined ? ({ kind: "story" } as const) : spec.agents
-    const opts = {
-      agents,
-      ...(spec.places ? { places: spec.places } : {}),
-      ...(spec.repo ? { repo: spec.repo } : {}),
-    }
-    const made = planLifeDesk(h, z, placed, spec.seed, now, opts)
-    desk = made.desk
-    post({ type: "life", life: made.plan })
-  }
+  const desk = spec.life
+    ? planLife({ ...w, pieces: w.pieces.map((p, k) => ({ ...p, y: placedY[k] as number })) })
+    : null
   // The shore field: how far every point of the water is from land (anything but a water tile).
   t0 = now()
   const g = h.grid

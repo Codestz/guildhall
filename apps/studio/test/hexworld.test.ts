@@ -148,11 +148,30 @@ describe("runHexJob life stage", () => {
   }
   const msgs: FromWorker[] = []
   runHexJob(spec, (m) => msgs.push(m))
-  const life = msgs[4]?.type === "life" ? msgs[4].life : null
+  const life = msgs[3]?.type === "life" ? msgs[3].life : null
 
-  test("comes after the shore, and only when asked for", () => {
-    expect(msgs.map((m) => m.type)).toEqual(["map", "ground", "pieces", "shore", "life", "harvest"])
+  test("comes after the pieces (before the shore, which nothing waits on until the batch is built), and only when asked for", () => {
+    expect(msgs.map((m) => m.type)).toEqual(["map", "ground", "pieces", "life", "shore", "harvest"])
     expect(life).not.toBeNull()
+  })
+
+  test("a life-only job (the screen's second worker) posts the life stage alone, and the very same plan", () => {
+    const only: FromWorker[] = []
+    const desk = runHexJob({ ...spec, only: "life" }, (m) => only.push(m))
+    expect(only.map((m) => m.type)).toEqual(["life"])
+    expect(desk).not.toBeNull()
+    const plan = only[0]?.type === "life" ? only[0].life : null
+    const { stats: _, ...whole } = life!
+    const { stats: __, ...alone } = plan!
+    // (a solid's `seen` is the collision grid's query stamp, a counter of this process: not the plan's)
+    const text = (p: object) => JSON.stringify(p, (k, v) => (k === "seen" ? undefined : v))
+    expect(text(alone)).toBe(text(whole))
+  })
+
+  test("a life-only job asked for no life posts nothing", () => {
+    const none: FromWorker[] = []
+    expect(runHexJob({ ...spec, life: false, only: "life" }, (m) => none.push(m))).toBeNull()
+    expect(none).toEqual([])
   })
 
   test("carries everyone's day, the agents' itineraries, the solids, the walkways and the doorways", () => {

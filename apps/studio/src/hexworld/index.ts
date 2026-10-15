@@ -149,7 +149,10 @@ interface Stages {
   dispose(): void
 }
 
-/** The job's stages as they arrive: from the worker, or inline (a tick later) where there is none. */
+/** Logical cores from which a screen plans life in a worker of its own beside the build's. */
+const SPLIT_CORES = 4
+
+/** The job's stages as they arrive: from the worker(s), or inline (a tick later) where there is none. */
 function startJob(spec: Promise<HexJobSpec>): Stages {
   const waiting: { take(stage: unknown): void; fail(e: Error): void }[] = []
   const stage = <T>() =>
@@ -192,17 +195,44 @@ function startJob(spec: Promise<HexJobSpec>): Stages {
     else fail(new Error(msg.message))
   }
   let worker: Worker | null = null
+  /**
+   * A second worker that plans life beside the first (job.ts `only: "life"`): the plan is the reveal's
+   * long pole (1.8 s at 4k, 3 s on a hall the size of react, in V8), and the one worker could only start
+   * it after the ground, the pieces and the shore. Two workers both build the island's pure world (the
+   * same world from the same spec: the same plan), so only where the machine has the cores for it.
+   */
+  let lifeWorker: Worker | null = null
+  const spawn = () => new Worker(new URL("./worker.ts", import.meta.url), { type: "module" })
   try {
-    worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" })
+    worker = spawn()
+    if ((navigator.hardwareConcurrency ?? 2) >= SPLIT_CORES)
+      try {
+        lifeWorker = spawn()
+      } catch {
+        lifeWorker = null
+      }
   } catch (error) {
     logger.warn("no worker, building inline", { error: String(error) })
   }
   if (worker) {
     worker.onmessage = (e: MessageEvent<FromWorker>) => take(e.data)
     worker.onerror = (e) => fail(new Error(e.message))
-    // the worker boots while the spec (the authored tiles) loads
+    if (lifeWorker) {
+      lifeWorker.onmessage = (e: MessageEvent<FromWorker>) => take(e.data)
+      lifeWorker.onerror = (e) => fail(new Error(e.message))
+    }
+    // the workers boot while the spec (the authored tiles) loads
     const w = worker
-    spec.then((s) => w.postMessage({ type: "job", spec: s } satisfies ToWorker), fail)
+    spec.then((s) => {
+      if (lifeWorker && s.life) {
+        lifeWorker.postMessage({ type: "job", spec: { ...s, only: "life" } } satisfies ToWorker)
+        w.postMessage({ type: "job", spec: { ...s, life: false } } satisfies ToWorker)
+      } else {
+        lifeWorker?.terminate()
+        lifeWorker = null
+        w.postMessage({ type: "job", spec: s } satisfies ToWorker)
+      }
+    }, fail)
   } else
     spec.then((s) => {
       try {
@@ -219,18 +249,20 @@ function startJob(spec: Promise<HexJobSpec>): Stages {
     shore,
     life,
     planAgents(req) {
-      if (!worker) return Promise.resolve(desk?.plan(req) ?? null)
+      // the desk lives where life was planned
+      const planner = lifeWorker ?? worker
+      if (!planner) return Promise.resolve(desk?.plan(req) ?? null)
       const id = nextAsk++
-      const w = worker
       return new Promise((answer) => {
         asked.set(id, answer)
-        w.postMessage({ type: "agents", id, req } satisfies ToWorker)
+        planner.postMessage({ type: "agents", id, req } satisfies ToWorker)
       })
     },
     dispose() {
       for (const answer of asked.values()) answer(null)
       asked.clear()
       worker?.terminate()
+      lifeWorker?.terminate()
       // a stage still awaited settles (a settled one ignores this), so nothing waits on a dead job
       fail(new Error("disposed"))
     },

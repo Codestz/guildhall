@@ -39,6 +39,9 @@ const uniforms = {
   uGlowColour: { value: GLOW_COLOUR.clone().multiplyScalar(GLOW_PEAK) },
 }
 
+/** The night grade's uniform itself (`setNightGrade`), for a chunk that weighs its light by the hour. */
+export const NIGHT_GRADE: { readonly value: number } = uniforms.uNight
+
 /** How lit the town's light sources are, 0 (day) to 1 (night). */
 export function setGlow(level: number): void {
   uniforms.uGlow.value = Math.min(1, Math.max(0, level))

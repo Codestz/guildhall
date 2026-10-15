@@ -29,11 +29,12 @@ import { storyHref } from "../../site/routes.ts"
 import { type HallCamera, mountHallCamera } from "../camera.ts"
 import type { HallTime } from "../clock.ts"
 import { createEraShots, type EraShots, hallCapture } from "../eraShots.ts"
-import { mountEvents } from "../events.ts"
+import { hallEvents, mountEvents } from "../events.ts"
 import { createSession, feedKindOf, type HallSession, openFeed } from "../feeds/index.ts"
 import { type SessionPlaces, sessionPlaces } from "../feeds/places.ts"
 import { storyTitle } from "../feeds/story.ts"
 import { driveFx } from "../fx.ts"
+import { heartOf, type Living, mountLiving } from "../living.ts"
 import { watchClear } from "./clear.ts"
 import { type HallFloat, HallHud, type HallHudProps, type HallLevers, REMEMBERED } from "./HallHud.tsx"
 import { createHeroPortraits } from "./portraits.ts"
@@ -182,6 +183,7 @@ function mountOn(
   let raf = 0
   let offFx = () => {}
   let offEvents = () => {}
+  let living: Living | null = null
   if (live) {
     const { session } = live
     opts.time?.setSession(session)
@@ -208,6 +210,26 @@ function mountOn(
     // the island's event FX (weather, ships, scaffolds) read the session, twice a second
     if (parts.fx) offFx = driveFx(parts.fx, session, () => levers.weather)
     offEvents = mountEvents(session)
+    // living work: the reads glow their places, the failures blight them (hall/living.ts)
+    if (parts.living && parts.tiles)
+      living = mountLiving({
+        stage: parts.stage,
+        session,
+        field: parts.living,
+        tiles: parts.tiles,
+        events: hallEvents,
+      })
+  }
+  if (ext && living && parts.tiles && parts.groundAt) {
+    const own = living
+    const { tiles, groundAt } = parts
+    ext.living = {
+      spans: () => own.spans(),
+      about: (zone: number) => own.about(zone),
+      stats: own.stats,
+      // for shots: where a place's heart stands, to frame it
+      heart: (zone: number) => heartOf(tiles, zone, groundAt),
+    }
   }
 
   return {
@@ -224,6 +246,8 @@ function mountOn(
       stopClear()
       offFx()
       offEvents()
+      living?.dispose()
+      if (ext?.living) delete ext.living
       camera.dispose()
       if (live) {
         cancelAnimationFrame(raf)

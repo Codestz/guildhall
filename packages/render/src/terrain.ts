@@ -3,6 +3,7 @@
  * prisms (`?ground=hex`), both taking the cascaded sun like every placed piece.
  */
 import { BufferAttribute, BufferGeometry, Color, Mesh, MeshStandardMaterial, SRGBColorSpace } from "three"
+import { livingMaterial, patchLivingTint } from "./livingTint.ts"
 import { paletteMaterial } from "./material.ts"
 import type { Stage } from "./stage.ts"
 
@@ -12,7 +13,7 @@ export interface TerrainMesh {
 
 /** A draped surface's material: one colour, pulled a hair toward the camera so it sits over the ground. */
 export function surfaceMaterial(color: string, roughness = 1): MeshStandardMaterial {
-  return new MeshStandardMaterial({
+  const material = new MeshStandardMaterial({
     color,
     roughness,
     metalness: 0,
@@ -20,6 +21,10 @@ export function surfaceMaterial(color: string, roughness = 1): MeshStandardMater
     polygonOffsetFactor: -4,
     polygonOffsetUnits: -4,
   })
+  // a road through a place being read glows with it, through a failing one is blighted (livingTint.ts)
+  material.onBeforeCompile = patchLivingTint
+  livingMaterial(material, false)
+  return material
 }
 
 /** A draped surface (roads, water) from triangle positions in one colour. */

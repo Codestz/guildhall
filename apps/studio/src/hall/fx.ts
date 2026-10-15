@@ -2,17 +2,20 @@
  * The hall's session drives the island's event FX (render events/, F1): twice a second, not every
  * frame, it reads the world at the session's clock (`log().stateAt(clock.at)`) and hands the FX what it
  * says. CI is the weather (`weatherOf`), each open pull request a ship at the harbour (`harbourOf`: a
- * new one sails in, a vanished one leaves, merged or closed by the merged count), and a place where a
- * hero is at work raises a scaffold. A scrub or a new log reads the same way, so the FX follow the bar.
+ * new one sails in, a vanished one leaves, merged or closed by the merged count), and a place being edited
+ * raises a scaffold, standing a while after the edit (sim story/living.ts `editedPlaces`: living work, the
+ * reads' glow and the failures' blight being hall/living.ts's). A scrub or a new log reads the same way,
+ * so the FX follow the bar.
  * The ships sail at the clock's rate (`fleetRate`): a replay at 4× sails them 4× as fast, a paused one
  * holds them where they are.
  */
 
 import type { WeatherKind } from "@guildhall/render"
-import { harbourOf, heroes } from "@guildhall/sim"
+import { editedPlaces, harbourOf, workSpans } from "@guildhall/sim"
 import type { Fx } from "../hexworld/fx.ts"
 import type { SessionClockState } from "./feeds/clock.ts"
 import type { HallSession } from "./feeds/index.ts"
+import { reducedMotion } from "./living.ts"
 
 /** How often the FX read the session, ms. */
 export const FX_READ_MS = 500
@@ -23,8 +26,16 @@ export function fleetRate(clock: Pick<SessionClockState, "mode" | "playing" | "r
   return clock.playing ? clock.rate : 0
 }
 
-/** `pin`: a weather the viewer picked (Settings), over what the session says; null follows the session. */
-export function driveFx(fx: Fx, session: HallSession, pin?: () => WeatherKind | null): () => void {
+/**
+ * `pin`: a weather the viewer picked (Settings), over what the session says; null follows the session.
+ * `still` (reduced motion): the scaffolds go up and come down at once.
+ */
+export function driveFx(
+  fx: Fx,
+  session: HallSession,
+  pin?: () => WeatherKind | null,
+  still: () => boolean = reducedMotion(),
+): () => void {
   let jumps = session.clock.get().jumps
   const follow = () => fx.ships?.setRate(fleetRate(session.clock.get()))
   follow()
@@ -39,13 +50,14 @@ export function driveFx(fx: Fx, session: HallSession, pin?: () => WeatherKind | 
     const harbour = harbourOf(world)
     fx.drive.set(pin?.() ?? harbour.weather)
     fx.ships?.update(harbour)
+    // the edits' scaffolds on life's clock (a told story's last edit comes down after its end)
+    const t = session.lifeAt()
     const busy = new Set<string>()
-    for (const h of heroes(world, at))
-      if (h.place !== undefined && h.status === "working") {
-        const id = fx.placeId(String(h.place))
-        if (id) busy.add(id)
-      }
-    fx.scaffolds?.set(busy)
+    for (const place of editedPlaces(workSpans(session.log().events, t), t)) {
+      const id = fx.placeId(String(place))
+      if (id) busy.add(id)
+    }
+    fx.scaffolds?.set(busy, still())
   }
   read()
   const timer = setInterval(read, FX_READ_MS)

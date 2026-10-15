@@ -7,6 +7,7 @@
 import { BufferAttribute, BufferGeometry, Mesh, MeshStandardMaterial } from "three"
 import { patchCloudShade } from "./atmosphere/shade.ts"
 import { patchSnowCover } from "./events/snowCover.ts"
+import { livingMaterial, patchLivingTint } from "./livingTint.ts"
 import { paletteMaterial } from "./material.ts"
 import { patchRegionTint } from "./regionTint.ts"
 import { patchSeason } from "./season.ts"
@@ -76,9 +77,12 @@ export function groundMaterial(): MeshStandardMaterial {
         .replace("#include <color_fragment>", SPECKLE_FRAGMENT)
       // after the speckle, so the region's green is turned before the speckle reads it
       patchRegionTint(shader, "ground")
+      // a place being read glows, a failing one is blighted (livingTint.ts)
+      patchLivingTint(shader)
       patchSeason(shader, "ground")
     }
     ground.customProgramCacheKey = () => "guildhall-ground"
+    livingMaterial(ground)
   }
   return ground
 }

@@ -33,6 +33,7 @@ import {
   FRAME,
   GATE_PIECES,
   gateFrame,
+  type LivingField,
   loadClips,
   loadPiece,
   type Night,
@@ -44,6 +45,7 @@ import {
   type Stage,
   type StaticBatch,
   type Sun,
+  setLivingField,
   setLod,
   setRegionField,
   shoreFieldTexture,
@@ -85,6 +87,7 @@ import { type Fx, fxOf, mountFx, mountWorkFx, type WorkFxMount } from "./fx.ts"
 import { type HallRepo, hallBuild, hallSubtitle, placeRows } from "./hall.ts"
 import { type HarvestMount, mountHarvest } from "./harvest.ts"
 import {
+  type MapStage as BuiltMap,
   type BuiltPlace,
   batchSets,
   type FromWorker,
@@ -373,6 +376,12 @@ export interface HudParts {
   post?: Post | null
   /** The island as it was at a date, for one draw (`WorldHooks.still`; a hall's history), else null. */
   still?: ((at: number) => (() => void) | null) | null
+  /** The hex → place lookup (job.ts `MapStage.tiles`): the grid, each tile's zone, each zone's heart. */
+  tiles?: BuiltMap["tiles"]
+  /** The ground's height at (x, z), metres (the hover's pick marches the pointer's ray over it). */
+  groundAt?: (x: number, z: number) => number
+  /** The living work's tint over the tiles (render livingTint.ts), laid where a session plays; else null. */
+  living?: LivingField | null
 }
 
 /** What `window.guildhall.ext.hall` tells the shots: how long each part took, and the places built. */
@@ -539,6 +548,7 @@ const world = {
     let unAgents = () => {}
     let unSound = () => {}
     let pick: ((index: number) => void) | null = null
+    let living: LivingField | null = null
     let dayClock: HudParts["clock"] = { get: () => 0, set: () => {} }
     const meshes: TerrainMesh[] = []
 
@@ -549,6 +559,9 @@ const world = {
       if (disposed) return
       // the island's regions: the ground's green turned, snow on the peaks, mist on the marsh (render regionTint.ts)
       setRegionField(m.regions)
+      // living work (hall/living.ts): a place read glows, a failing one is blighted; laid empty where a
+      // session may play, nothing in it (and nothing drawn differently) until the work touches a place
+      if (fxOn || session) living = setLivingField({ radius: m.tiles.radius, tile: HEX_TILE_SIZE })
       // a hook sees the pure map first (~0.1 s, behind the cover): life plans on the same one below
       if (hooks) {
         island = hexIsland({ ...shape, seed, files })
@@ -1056,6 +1069,9 @@ const world = {
           season,
           post,
           still: hooks?.still ? (at) => hooks.still?.(at) ?? null : null,
+          tiles: m.tiles,
+          groundAt: (x, z) => Math.max(SEA_LEVEL, groundAt(x, z)),
+          living,
         })
       // a hall's session drives its heroes: planned in the worker as its log grows (the HUD starts the
       // session as it mounts, which may be a moment after this: looked for until it is there)
@@ -1121,6 +1137,7 @@ const world = {
       water?.dispose()
       disposeField()
       setRegionField(null)
+      living?.dispose()
       air?.dispose()
       night?.dispose()
       seasonFx?.dispose()

@@ -82,12 +82,9 @@ describe("the notice board", () => {
     expect(boards.length).toBeGreaterThanOrEqual(ISLANDS.length - 1)
     for (const { seed, files, w } of boards) {
       const parts = boardPieces(w.board!)
-      for (const p of parts)
-        expect([seed, files, w.pieces.some((q) => JSON.stringify(q) === JSON.stringify(p))]).toEqual([
-          seed,
-          files,
-          true,
-        ])
+      // (every piece written once: writing each one again per part ran this test past its time)
+      const placed = new Set(w.pieces.map((q) => JSON.stringify(q)))
+      for (const p of parts) expect([seed, files, placed.has(JSON.stringify(p))]).toEqual([seed, files, true])
     }
     const again = hexWorld(built[4]!.h, built[4]!.z)
     expect(again.board).toEqual(built[4]!.w.board)

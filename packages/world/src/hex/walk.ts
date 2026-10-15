@@ -455,95 +455,132 @@ export function gridWay(
       const so = solidOfBlocker(o)
       if (solidDistance(so, p[0], p[2]) < 0.05) ends.add(so)
     }
-  const state = new Int8Array(nx * nz) // 0 unknown, 1 open, 2 closed
+  // the search's per-cell state, g and parent live in a scratch kept between searches: a cell this search
+  // has not touched reads as unknown / infinite / no parent (`touch` stamps it), in place of three fresh
+  // arrays filled per call (up to 400k cells each, thousands of calls an island)
+  const { stamp, g, from, state, mark } = gridScratchOf(nx * nz)
+  const touch = (k: number) => {
+    if (stamp[k] !== mark) {
+      stamp[k] = mark
+      g[k] = Number.POSITIVE_INFINITY
+      from[k] = -1
+      state[k] = 0 // 0 unknown, 1 open, 2 closed
+    }
+  }
   const cx = (i: number) => x0 + (i + 0.5) * GRID
   const cz = (j: number) => z0 + (j + 0.5) * GRID
+  const ax = a[0]
+  const az = a[2]
+  const bx = b[0]
+  const bz = b[2]
+  /**
+   * Whether `so` lets a cell at (x, z), `d` from the end `p`, be open: by either end (a spot set against
+   * a wall, a door) a body may come as near as the end itself does, and out of what the end stands in
+   * (its seat, its doorway) as far as it takes to leave it, no further.
+   */
+  const byEnd = (so: Solid, px: number, pz: number, d: number, x: number, z: number) => {
+    const dp = solidDistance(so, px, pz)
+    const r = dp < 0.05 && ends.has(so) ? ownRoom(dp) : END_ROOM
+    return d < r && solidDistance(so, x, z) >= Math.min(C, dp) - 0.01
+  }
   const open = (i: number, j: number): boolean => {
     if (i < 0 || j < 0 || i >= nx || j >= nz) return false
     const k = j * nx + i
+    touch(k)
     if (!state[k]) {
       // the world cell's closers (shared), less the ones an end stands in
-      const wk = (gi0 + i + 32768) * 65536 + (gj0 + j + 32768)
-      let by = memo.cells.get(wk)
+      let by = memo.cells.get(gi0 + i, gj0 + j)
+      const x = cx(i)
+      const z = cz(j)
       if (by === undefined) {
         by = null
-        for (const o of near(cx(i), cz(j), C)) {
+        for (const o of near(x, z, C)) {
           const so = solidOfBlocker(o)
-          if ((soft || !so.soft) && solidDistance(so, cx(i), cz(j)) < C) {
+          if ((soft || !so.soft) && solidDistance(so, x, z) < C) {
             if (!by) by = []
             by.push(so)
           }
         }
-        memo.cells.set(wk, by)
+        memo.cells.set(gi0 + i, gj0 + j, by)
       }
-      // by either end (a spot set against a wall, a door) a body may come as near as the end itself does,
-      // and out of what the end stands in (its seat, its doorway) as far as it takes to leave it: no further
-      const x = cx(i)
-      const z = cz(j)
-      const fromA = Math.hypot(x - a[0], z - a[2])
-      const fromB = Math.hypot(x - b[0], z - b[2])
-      const byEnd = (so: Solid, p: Pt, d: number) => {
-        const dp = solidDistance(so, p[0], p[2])
-        const r = dp < 0.05 && ends.has(so) ? ownRoom(dp) : END_ROOM
-        return d < r && solidDistance(so, x, z) >= Math.min(C, dp) - 0.01
+      let ok = true
+      if (by) {
+        const fromA = Math.hypot(x - ax, z - az)
+        const fromB = Math.hypot(x - bx, z - bz)
+        for (const so of by)
+          if (!(byEnd(so, ax, az, fromA, x, z) || byEnd(so, bx, bz, fromB, x, z))) {
+            ok = false
+            break
+          }
       }
-      state[k] = !by || by.every((so) => byEnd(so, a, fromA) || byEnd(so, b, fromB)) ? 1 : 2
+      state[k] = ok ? 1 : 2
     }
     return state[k] === 1
   }
-  const cell = (p: Pt): [number, number] => [Math.floor((p[0] - x0) / GRID), Math.floor((p[2] - z0) / GRID)]
-  const [ai, aj] = cell(a)
-  const [bi, bj] = cell(b)
+  const ai = Math.floor((ax - x0) / GRID)
+  const aj = Math.floor((az - z0) / GRID)
+  const bi = Math.floor((bx - x0) / GRID)
+  const bj = Math.floor((bz - z0) / GRID)
   const goal = bj * nx + bi
-  const g = new Float32Array(nx * nz).fill(Number.POSITIVE_INFINITY)
-  const from = new Int32Array(nx * nz).fill(-1)
-  const h = (i: number, j: number) => Math.hypot(i - bi, j - bj)
-  // a binary heap of cells by f
-  const hf: number[] = []
-  const hk: number[] = []
-  const swap = (p: number, q: number) => {
-    const f = hf[p]!
-    hf[p] = hf[q]!
-    hf[q] = f
-    const k = hk[p]!
-    hk[p] = hk[q]!
-    hk[q] = k
-  }
+  // A binary heap of cells by f, on typed arrays kept between searches (`heapOf`): the same pushes,
+  // the same comparisons and so the same pops as the array pair it replaces (a tie between equal f
+  // values settles the same way), at a fraction of the cost under V8.
+  const heap = heapOf(8 * steps + 8)
+  const hf = heap.f
+  const hk = heap.k
+  let hn = 0
   const push = (f: number, k: number) => {
-    hf.push(f)
-    hk.push(k)
-    for (let c = hf.length - 1; c > 0; ) {
+    let c = hn++
+    hf[c] = f
+    hk[c] = k
+    while (c > 0) {
       const p = (c - 1) >> 1
-      if (hf[p]! <= hf[c]!) break
-      swap(p, c)
+      const pf = hf[p] as number
+      if (pf <= f) break
+      hf[c] = pf
+      hk[c] = hk[p] as number
       c = p
     }
+    hf[c] = f
+    hk[c] = k
   }
   const pop = (): number => {
-    const top = hk[0]!
-    const lf = hf.pop()!
-    const lk = hk.pop()!
-    if (hf.length) {
-      hf[0] = lf
-      hk[0] = lk
-      for (let c = 0; ; ) {
+    const top = hk[0] as number
+    hn--
+    if (hn > 0) {
+      const lf = hf[hn] as number
+      const lk = hk[hn] as number
+      let c = 0
+      for (;;) {
         const l = c * 2 + 1
         const r = l + 1
         let m = c
-        if (l < hf.length && hf[l]! < hf[m]!) m = l
-        if (r < hf.length && hf[r]! < hf[m]!) m = r
+        let mf = lf
+        if (l < hn && (hf[l] as number) < mf) {
+          m = l
+          mf = hf[l] as number
+        }
+        if (r < hn && (hf[r] as number) < mf) {
+          m = r
+          mf = hf[r] as number
+        }
         if (m === c) break
-        swap(m, c)
+        hf[c] = mf
+        hk[c] = hk[m] as number
         c = m
       }
+      hf[c] = lf
+      hk[c] = lk
     }
     return top
   }
   const start = aj * nx + ai
+  touch(start)
+  touch(goal)
   g[start] = 0
-  push(h(ai, aj), start)
+  push(Math.hypot(ai - bi, aj - bj), start)
   let found = false
-  for (let it = 0; hf.length && it < steps; it++) {
+  for (let it = 0; hn > 0 && it < steps; it++) {
     const k = pop()
     if (k === goal) {
       found = true
@@ -551,6 +588,7 @@ export function gridWay(
     }
     const i = k % nx
     const j = (k - i) / nx
+    const gk = g[k] as number
     for (let di = -1; di <= 1; di++)
       for (let dj = -1; dj <= 1; dj++) {
         if (!di && !dj) continue
@@ -560,11 +598,12 @@ export function gridWay(
         if (nk !== goal && !open(ni, nj)) continue
         // no corner cutting past a closed cell
         if (di && dj && (!open(i + di, j) || !open(i, j + dj))) continue
-        const ng = g[k]! + (di && dj ? Math.SQRT2 : 1)
-        if (ng >= g[nk]!) continue
+        const ng = gk + (di && dj ? Math.SQRT2 : 1)
+        touch(nk)
+        if (ng >= (g[nk] as number)) continue
         g[nk] = ng
         from[nk] = k
-        push(ng + h(ni, nj), nk)
+        push(ng + Math.hypot(ni - bi, nj - bj), nk)
       }
   }
   if (!found) {
@@ -604,9 +643,81 @@ export function gridWay(
   return out
 }
 
+/**
+ * A world cell's key in a GridMemo: one integer under 2^31 for cells within MEMO_HALF of the origin
+ * (2 km at the finest grid; V8 keeps such Map keys as small integers, a heap number costs the lookup
+ * several times over), the wide key beyond, offset past them.
+ */
+const MEMO_HALF = 20000
+const MEMO_SPAN = 2 * MEMO_HALF
+function memoKey(gi: number, gj: number): number {
+  const i = gi + MEMO_HALF
+  const j = gj + MEMO_HALF
+  if (i >= 0 && i < MEMO_SPAN && j >= 0 && j < MEMO_SPAN) return i * MEMO_SPAN + j
+  return 2 ** 31 + (gi + 32768) * 65536 + (gj + 32768)
+}
+
+/** The grid searches' heap arrays, grown to the largest asked for and kept. */
+let heap = { f: new Float64Array(0), k: new Int32Array(0) }
+function heapOf(capacity: number): { f: Float64Array; k: Int32Array } {
+  if (heap.f.length < capacity) heap = { f: new Float64Array(capacity), k: new Int32Array(capacity) }
+  return heap
+}
+
+/** A page of the cell cache is this many cells a side. */
+const PAGE = 64
+/**
+ * Per world cell, the blockers that close it (null: open; undefined: not asked yet), in pages of
+ * PAGE × PAGE cells in a small Map: one Map over every cell of an island (millions at a fine grid, on a
+ * repo the size of react) made each lookup a cache miss on a giant hash table.
+ */
+class CellCache {
+  private pages = new Map<number, (Solid[] | null | undefined)[]>()
+  get(gi: number, gj: number): Solid[] | null | undefined {
+    const page = this.pages.get(((gi >> 6) + 4096) * 8192 + ((gj >> 6) + 4096))
+    return page ? page[(gi & 63) * PAGE + (gj & 63)] : undefined
+  }
+  set(gi: number, gj: number, by: Solid[] | null): void {
+    const key = ((gi >> 6) + 4096) * 8192 + ((gj >> 6) + 4096)
+    let page = this.pages.get(key)
+    if (!page) {
+      page = new Array<Solid[] | null | undefined>(PAGE * PAGE).fill(undefined)
+      this.pages.set(key, page)
+    }
+    page[(gi & 63) * PAGE + (gj & 63)] = by
+  }
+}
+
+/** The grid searches' per-cell scratch (cost, parent, open state), stamped per search and kept between them. */
+interface GridScratch {
+  stamp: Int32Array
+  g: Float32Array
+  from: Int32Array
+  state: Int8Array
+}
+let gridScratch: GridScratch = {
+  stamp: new Int32Array(0),
+  g: new Float32Array(0),
+  from: new Int32Array(0),
+  state: new Int8Array(0),
+}
+let gridSearches = 0
+function gridScratchOf(cells: number): GridScratch & { mark: number } {
+  if (gridScratch.stamp.length < cells) {
+    gridScratch = {
+      stamp: new Int32Array(cells),
+      g: new Float32Array(cells),
+      from: new Int32Array(cells),
+      state: new Int8Array(cells),
+    }
+    gridSearches = 0
+  }
+  return { ...gridScratch, mark: ++gridSearches }
+}
+
 interface GridMemo {
   /** Per world cell, the hard blockers that close it (null: open). */
-  cells: Map<number, Solid[] | null>
+  cells: CellCache
   /** Ways already found (or not), by their ends. */
   ways: Map<string, [number, number][]>
 }
@@ -635,8 +746,7 @@ export function walledIn(
   const i0 = Math.floor(x / GRID)
   const j0 = Math.floor(z / GRID)
   const open = (i: number, j: number): boolean => {
-    const wk = (i + 32768) * 65536 + (j + 32768)
-    let by = memo.cells.get(wk)
+    let by = memo.cells.get(i, j)
     const cx = (i + 0.5) * GRID
     const cz = (j + 0.5) * GRID
     if (by === undefined) {
@@ -648,7 +758,7 @@ export function walledIn(
           by.push(so)
         }
       }
-      memo.cells.set(wk, by)
+      memo.cells.set(i, j, by)
     }
     if (!by) return true
     // by the point a body comes as near a wall as the point does, and out of what it stands in (its
@@ -664,7 +774,7 @@ export function walledIn(
     const so = solidOfBlocker(o)
     if (solidDistance(so, x, z) < 0.05) own.add(so)
   }
-  const seen = new Set<number>([(i0 + 32768) * 65536 + (j0 + 32768)])
+  const seen = new Set<number>([memoKey(i0, j0)])
   const queue: [number, number][] = [[i0, j0]]
   const far = (reach / GRID) ** 2
   let out = false
@@ -677,16 +787,13 @@ export function walledIn(
       out = true
       break
     }
-    for (const [di, dj] of [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-    ] as const) {
-      const k = (i + di + 32768) * 65536 + (j + dj + 32768)
-      if (seen.has(k) || !open(i + di, j + dj)) continue
+    for (let s = 0; s < 4; s++) {
+      const ni = i + FLOOD_DI[s]!
+      const nj = j + FLOOD_DJ[s]!
+      const k = memoKey(ni, nj)
+      if (seen.has(k) || !open(ni, nj)) continue
       seen.add(k)
-      queue.push([i + di, j + dj])
+      queue.push([ni, nj])
     }
   }
   memo.ways.set(key, out ? [] : [[x, z]])
@@ -716,8 +823,7 @@ export function floodWay(
     if (solidDistance(so, x, z) < 0.05) own.add(so)
   }
   const open = (i: number, j: number): boolean => {
-    const wk = (i + 32768) * 65536 + (j + 32768)
-    let by = memo.cells.get(wk)
+    let by = memo.cells.get(i, j)
     const cx = (i + 0.5) * GRID
     const cz = (j + 0.5) * GRID
     if (by === undefined) {
@@ -729,53 +835,74 @@ export function floodWay(
           by.push(so)
         }
       }
-      memo.cells.set(wk, by)
+      memo.cells.set(i, j, by)
     }
     if (!by) return true
     const off = Math.hypot(cx - x, cz - z)
-    return by.every((so) => {
+    for (const so of by) {
       const d = solidDistance(so, x, z)
-      return off < (own.has(so) ? ownRoom(d) : END_ROOM) && solidDistance(so, cx, cz) >= Math.min(C, d) - 0.01
-    })
+      if (
+        !(off < (own.has(so) ? ownRoom(d) : END_ROOM) && solidDistance(so, cx, cz) >= Math.min(C, d) - 0.01)
+      )
+        return false
+    }
+    return true
   }
   const i0 = Math.floor(x / GRID)
   const j0 = Math.floor(z / GRID)
-  const key = (i: number, j: number) => (i + 32768) * 65536 + (j + 32768)
-  const from = new Map<number, number>([[key(i0, j0), -1]])
-  const queue: [number, number][] = [[i0, j0]]
   const far = (reach / GRID) ** 2
+  // The flood's cells live in a box of `reach` round the point (every cell within `far` is inside it),
+  // indexed by offset: a stamped scratch array says which were reached and from where (in place of a Map
+  // keyed per cell, and a pair per queued cell), the same cells in the same order. The scratch is kept
+  // between floods and only grows (one per spot: a few hundred floods a plan, 160k cells at most each).
+  const half = Math.ceil(reach / GRID) + 1
+  const W = 2 * half + 1
+  const cellOf = (i: number, j: number) => (i - i0 + half) * W + (j - j0 + half)
+  const { stamp, parent, queue, mark } = floodScratch(W * W)
+  const root = cellOf(i0, j0)
+  stamp[root] = mark
+  parent[root] = -1
+  queue[0] = root
+  let length = 1
   let hit = -1
-  let end: [number, number] | null = null
-  for (let q = 0; q < queue.length && q < 160000 && hit < 0; q++) {
-    const [i, j] = queue[q]!
+  let end = -1
+  const nearSq = (FLOOD_AT * 0.99) ** 2
+  const farSq = (FLOOD_AT * 1.01) ** 2
+  for (let q = 0; q < length && q < 160000 && hit < 0; q++) {
+    const cell = queue[q] as number
+    const i = Math.floor(cell / W) - half + i0
+    const j = (cell % W) - half + j0
     const cx = (i + 0.5) * GRID
     const cz = (j + 0.5) * GRID
-    for (const [t, n] of to.entries())
-      if (Math.hypot(cx - n.x, cz - n.z) <= FLOOD_AT) {
-        hit = t
-        end = [i, j]
-        break
-      }
-    for (const [di, dj] of [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-    ] as const) {
-      const ni = i + di
-      const nj = j + dj
-      const k = key(ni, nj)
-      if (from.has(k) || (ni - i0) ** 2 + (nj - j0) ** 2 >= far || !open(ni, nj)) continue
-      from.set(k, key(i, j))
-      queue.push([ni, nj])
+    for (let t = 0; t < to.length; t++) {
+      const n = to[t] as { x: number; z: number }
+      const dx = cx - n.x
+      const dz = cz - n.z
+      // the exact `hypot <= FLOOD_AT`, its square root taken only where the squares cannot settle it
+      const d2 = dx * dx + dz * dz
+      if (d2 > farSq) continue
+      if (d2 > nearSq && !(Math.hypot(dx, dz) <= FLOOD_AT)) continue
+      hit = t
+      end = cell
+      break
+    }
+    for (let s = 0; s < 4; s++) {
+      const ni = i + FLOOD_DI[s]!
+      const nj = j + FLOOD_DJ[s]!
+      if ((ni - i0) ** 2 + (nj - j0) ** 2 >= far) continue
+      const k = cellOf(ni, nj)
+      if (stamp[k] === mark || !open(ni, nj)) continue
+      stamp[k] = mark
+      parent[k] = cell
+      queue[length++] = k
     }
   }
-  if (hit < 0 || !end) return null
+  if (hit < 0 || end < 0) return null
   // the cells back from the node to the point, pulled taut over open cells
   const cells: [number, number][] = []
-  for (let k = key(end[0], end[1]); k >= 0; k = from.get(k)!) {
-    const i = Math.floor(k / 65536) - 32768
-    const j = (k % 65536) - 32768
+  for (let k = end; k >= 0; k = parent[k] as number) {
+    const i = Math.floor(k / W) - half + i0
+    const j = (k % W) - half + j0
     cells.push([(i + 0.5) * GRID, (j + 0.5) * GRID])
   }
   const sees = (p: [number, number], q: [number, number]) => {
@@ -801,6 +928,28 @@ export function floodWay(
 }
 /** A flood reaches a walk node this near it, metres. */
 const FLOOD_AT = 0.6
+/** The flood's four ways out of a cell, in the order it takes them (east, west, south, north). */
+const FLOOD_DI = [1, -1, 0, 0] as const
+const FLOOD_DJ = [0, 0, 1, -1] as const
+
+interface FloodScratch {
+  /** Which flood last reached each cell of the box (its `stamp`), and from which cell. */
+  stamp: Int32Array
+  parent: Int32Array
+  /** The cells in the order they were reached. */
+  queue: Int32Array
+}
+let scratch: FloodScratch = { stamp: new Int32Array(0), parent: new Int32Array(0), queue: new Int32Array(0) }
+/** Floods so far on the scratch: the next one's stamp (a fresh scratch's cells all read 0, so it starts over). */
+let floods = 0
+/** The flood's scratch arrays, at least `cells` long, and this flood's stamp. */
+function floodScratch(cells: number): FloodScratch & { mark: number } {
+  if (scratch.stamp.length < cells) {
+    scratch = { stamp: new Int32Array(cells), parent: new Int32Array(cells), queue: new Int32Array(cells) }
+    floods = 0
+  }
+  return { ...scratch, mark: ++floods }
+}
 
 function memoOf(near: object, kind: string): GridMemo {
   let byKind = memos.get(near)
@@ -810,7 +959,7 @@ function memoOf(near: object, kind: string): GridMemo {
   }
   let m = byKind.get(kind)
   if (!m) {
-    m = { cells: new Map(), ways: new Map() }
+    m = { cells: new CellCache(), ways: new Map() }
     byKind.set(kind, m)
   }
   return m

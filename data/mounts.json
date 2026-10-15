@@ -156,8 +156,35 @@
         0
       ],
       "clips": {
+        "Lie_Down": {
+          "hide": true
+        },
+        "Lie_Idle": {
+          "hide": true
+        },
+        "Lie_StandUp": {
+          "hide": true
+        },
         "Melee_2H_Idle": {
           "roll": 1.5708
+        },
+        "Sit_Chair_Down": {
+          "hide": true
+        },
+        "Sit_Chair_Idle": {
+          "hide": true
+        },
+        "Sit_Chair_StandUp": {
+          "hide": true
+        },
+        "Sit_Floor_Down": {
+          "hide": true
+        },
+        "Sit_Floor_Idle": {
+          "hide": true
+        },
+        "Sit_Floor_StandUp": {
+          "hide": true
         }
       },
       "edge": [
@@ -180,8 +207,35 @@
         0
       ],
       "clips": {
+        "Lie_Down": {
+          "hide": true
+        },
+        "Lie_Idle": {
+          "hide": true
+        },
+        "Lie_StandUp": {
+          "hide": true
+        },
         "Melee_2H_Idle": {
           "roll": 1.5708
+        },
+        "Sit_Chair_Down": {
+          "hide": true
+        },
+        "Sit_Chair_Idle": {
+          "hide": true
+        },
+        "Sit_Chair_StandUp": {
+          "hide": true
+        },
+        "Sit_Floor_Down": {
+          "hide": true
+        },
+        "Sit_Floor_Idle": {
+          "hide": true
+        },
+        "Sit_Floor_StandUp": {
+          "hide": true
         }
       },
       "edge": [
@@ -204,8 +258,35 @@
         0
       ],
       "clips": {
+        "Lie_Down": {
+          "hide": true
+        },
+        "Lie_Idle": {
+          "hide": true
+        },
+        "Lie_StandUp": {
+          "hide": true
+        },
         "Melee_2H_Idle": {
           "roll": 1.5708
+        },
+        "Sit_Chair_Down": {
+          "hide": true
+        },
+        "Sit_Chair_Idle": {
+          "hide": true
+        },
+        "Sit_Chair_StandUp": {
+          "hide": true
+        },
+        "Sit_Floor_Down": {
+          "hide": true
+        },
+        "Sit_Floor_Idle": {
+          "hide": true
+        },
+        "Sit_Floor_StandUp": {
+          "hide": true
         }
       },
       "edge": [

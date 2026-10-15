@@ -20,6 +20,7 @@ import {
   type NpcLook,
   type NpcRecipe,
   resolveNpc,
+  standClip,
   validateNpc,
 } from "@guildhall/assets"
 import { hash, log } from "@guildhall/core"
@@ -801,11 +802,11 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       const carried = p.act === "walk" && p.carry && worn[id] ? drawnAs(p.carry) : undefined
       const chest = carried !== undefined && CARRIED.has(carried)
       // walking: the walk (one that keeps the pace: sim walkFor), or the run or sprint a hero takes on a
-      // long way (sim gait.ts); at a spot, its clip
+      // long way (sim gait.ts); at a spot, its clip (a shield-bearer's plain idle for a two-handed guard)
       const clip = chest
         ? CARRY_WALK
         : p.clip && (p.act !== "walk" || isRun(p.clip))
-          ? p.clip
+          ? standClip(p.clip, look)
           : p.act === "walk"
             ? walkFor(look.clips.walk, fig ? AGENT_OPTS.mps : LIFE_MPS)
             : look.clips[p.act]

@@ -5,6 +5,8 @@ import {
   chronicleFor,
   chronicleStem,
   loadCatalog,
+  namesRepo,
+  openRequestFor,
   parseCatalog,
   requestChronicleUrl,
 } from "../src/index.ts"
@@ -146,5 +148,98 @@ describe("requestChronicleUrl", () => {
     expect(url.searchParams.get("template")).toBe("chronicle.yml")
     expect(url.searchParams.get("title")).toBe("Chronicle: facebook/react")
     expect(url.searchParams.get("repo")).toBe("facebook/react")
+  })
+
+  test("names only the form's file, its title and its `repo` field (chronicles .github/ISSUE_TEMPLATE/chronicle.yml)", () => {
+    const url = new URL(requestChronicleUrl("vercel", "next.js"))
+    expect([...url.searchParams.keys()].sort()).toEqual(["repo", "template", "title"])
+    expect(url.searchParams.get("repo")).toBe("vercel/next.js")
+    expect(url.searchParams.get("title")).toBe("Chronicle: vercel/next.js")
+  })
+
+  test("keeps an odd name whole through the query", () => {
+    const url = new URL(requestChronicleUrl("a-b", "c_d.e"))
+    expect(url.searchParams.get("repo")).toBe("a-b/c_d.e")
+    expect(url.search).not.toContain(" ")
+  })
+})
+
+describe("namesRepo", () => {
+  test("finds the name as the form's field, a title, or a github.com link", () => {
+    expect(namesRepo("### Repository\n\nvercel/next.js\n\n### Public repo", "vercel", "next.js")).toBe(true)
+    expect(namesRepo("Chronicle: Vercel/Next.js", "vercel", "next.js")).toBe(true)
+    expect(namesRepo("https://github.com/vercel/next.js.git", "vercel", "next.js")).toBe(true)
+    expect(namesRepo("please do vercel/next.js.", "vercel", "next.js")).toBe(true)
+  })
+
+  test("not a longer name that starts the same, nor another owner's", () => {
+    expect(namesRepo("vercel/next.js-starter", "vercel", "next.js")).toBe(false)
+    expect(namesRepo("vercel/next.jsx", "vercel", "next.js")).toBe(false)
+    expect(namesRepo("notvercel/next.js", "vercel", "next.js")).toBe(false)
+    // a dot in the name is a dot, not any character
+    expect(namesRepo("vercel/nextXjs", "vercel", "next.js")).toBe(false)
+  })
+})
+
+describe("openRequestFor", () => {
+  const answering = (body: unknown, status = 200, calls: string[] = []) =>
+    (async (input: string | URL | Request) => {
+      calls.push(String(input))
+      return new Response(JSON.stringify(body), { status })
+    }) as typeof fetch
+  const issue = (over: Record<string, unknown> = {}) => ({
+    html_url: "https://github.com/Codestz/guildhall-chronicles/issues/42",
+    state: "open",
+    title: "Chronicle: vercel/next.js",
+    body: "### Repository\n\nvercel/next.js",
+    labels: [{ name: "chronicle" }],
+    ...over,
+  })
+
+  test("asks GitHub's search for the chronicles repo's open requests naming the repo", async () => {
+    const calls: string[] = []
+    await openRequestFor("vercel", "next.js", { fetch: answering({ items: [] }, 200, calls) })
+    const url = new URL(calls[0] ?? "")
+    expect(url.origin + url.pathname).toBe("https://api.github.com/search/issues")
+    const q = url.searchParams.get("q") ?? ""
+    expect(q).toContain("repo:Codestz/guildhall-chronicles")
+    expect(q).toContain("is:open")
+    expect(q).toContain('"vercel/next.js"')
+  })
+
+  test("an open request is found, and says when it is queued", async () => {
+    expect(await openRequestFor("vercel", "next.js", { fetch: answering({ items: [issue()] }) })).toEqual({
+      status: "open",
+      url: "https://github.com/Codestz/guildhall-chronicles/issues/42",
+      queued: false,
+    })
+    const queued = issue({ labels: [{ name: "chronicle" }, { name: "queued" }] })
+    const found = await openRequestFor("vercel", "next.js", { fetch: answering({ items: [queued] }) })
+    expect(found).toMatchObject({ status: "open", queued: true })
+  })
+
+  test("a loose match for another repo, a closed issue or a foreign link is not a request", async () => {
+    const items = [
+      issue({ title: "Chronicle: vercel/next.js-starter", body: "vercel/next.js-starter" }),
+      issue({ state: "closed" }),
+      issue({ html_url: "https://evil.test/issues/1" }),
+    ]
+    expect(await openRequestFor("vercel", "next.js", { fetch: answering({ items }) })).toEqual({
+      status: "none",
+    })
+  })
+
+  test("fails soft: a rate limit, a network error or an odd answer is unavailable", async () => {
+    const limited = await openRequestFor("vercel", "next.js", { fetch: answering({ message: "rate" }, 403) })
+    expect(limited).toEqual({ status: "unavailable", reason: "HTTP 403" })
+    expect((await openRequestFor("vercel", "next.js", { fetch: down })).status).toBe("unavailable")
+    expect((await openRequestFor("vercel", "next.js", { fetch: answering({}) })).status).toBe("unavailable")
+  })
+
+  test("a malformed name asks nobody", async () => {
+    const calls: string[] = []
+    const found = await openRequestFor("a/b", "c", { fetch: answering({ items: [] }, 200, calls) })
+    expect(found).toEqual({ status: "none" })
+    expect(calls).toEqual([])
   })
 })

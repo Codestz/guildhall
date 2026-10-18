@@ -116,7 +116,9 @@ import {
   sessionStatus,
   sourceOf,
 } from "./SessionHud.tsx"
+import { SketchNotice } from "./SketchNotice.tsx"
 import { offerShare } from "./share.ts"
+import { cardGuild, type SketchNotice as SketchNoticeOf } from "./sketch.ts"
 import {
   brandOf,
   feedOf,
@@ -176,6 +178,8 @@ export interface HallHudProps {
   /** No chronicle: the link that asks for one, and a retry when it could not be read. */
   request?: string
   onRetry?: () => void
+  /** A sketch island: the notice that says so, and the way to the real one (sketch.ts). */
+  notice?: SketchNoticeOf
   /** The hall's session (`?feed=`): the Guild, the Pleas, a hero's Dossier, the Brand's source. */
   session?: HudSession
   /** The hall's time: the bar's clock. */
@@ -853,7 +857,7 @@ export function HallHud(props: HallHudProps) {
         history: teller.history,
         sessions,
         lookup: { session: (id) => teller.session(id) },
-        guild: home ? "The demo guild" : slug,
+        guild: home ? "The demo guild" : cardGuild(slug, Boolean(brand.sketch)),
         story: snap?.name ?? "",
       }),
     })
@@ -897,7 +901,7 @@ export function HallHud(props: HallHudProps) {
         )}
         {props.request && (
           <a className="site-link" href={props.request} target="_blank" rel="noreferrer">
-            Request a chronicle
+            Chronicle this repo
           </a>
         )}
         {props.onRetry && (
@@ -1270,6 +1274,13 @@ export function HallHud(props: HallHudProps) {
               onFollow={setFollowing}
               compact={phone}
               className="hall-parties"
+            />
+          )}
+          {props.notice && !hidden && (
+            <SketchNotice
+              notice={props.notice}
+              away={brandOpen || placesOpen || rosterOpen || (phone && state.open !== null)}
+              {...(props.onRetry ? { onRetry: props.onRetry } : {})}
             />
           )}
           {!phone && !rosterOpen && faces}

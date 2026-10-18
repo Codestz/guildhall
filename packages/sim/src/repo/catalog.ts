@@ -153,6 +153,68 @@ export function requestChronicleUrl(owner: string, repo: string): string {
   return `https://github.com/${CHRONICLES_REPO}/issues/new?${query}`
 }
 
+/** An open request for a repo's chronicle, as GitHub's issue search finds it. */
+export type RequestResult =
+  | {
+      status: "open"
+      /** The request issue's page. */
+      url: string
+      /** Waiting for a maintainer's approval or the day's cap (the build labels it `queued`). */
+      queued: boolean
+    }
+  | { status: "none" }
+  | { status: "unavailable"; reason: string }
+
+/** GitHub's issue search for the chronicles repo's open requests naming `owner/repo` (unauthenticated: 10 a minute). */
+export function requestSearchUrl(owner: string, repo: string): string {
+  const q = `repo:${CHRONICLES_REPO} is:issue is:open label:chronicle "${owner}/${repo}"`
+  return `https://api.github.com/search/issues?${new URLSearchParams({ q, per_page: "10" })}`
+}
+
+/**
+ * True when `text` names `owner/repo` itself (as the form's field, a title or a github.com link), not
+ * a longer name that starts the same (`vercel/next.js-starter`). Case-insensitive, as GitHub's names are.
+ */
+export function namesRepo(text: string, owner: string, repo: string): boolean {
+  const name = `${owner}/${repo}`.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  // after the name: nothing a name could go on with (a word, a dash, a dot and more), `.git` allowed
+  return new RegExp(`(^|[^\\w.-])${name}(?![\\w-]|\\.(?!git\\b)\\w)`).test(text.toLowerCase())
+}
+
+/**
+ * Whether a request for `owner/repo`'s chronicle is open (a build on its way, or queued). Asks GitHub's
+ * public search once, unauthenticated; a search that matched loosely is checked by name. Never rejects:
+ * a rate limit, a timeout or an odd answer is "unavailable", which the hall treats as no request.
+ */
+export async function openRequestFor(
+  owner: string,
+  repo: string,
+  opts: Pick<FetchOptions, "fetch" | "timeoutMs"> = {},
+): Promise<RequestResult> {
+  if (!chronicleStem(owner, repo)) return { status: "none" }
+  const got = await get(requestSearchUrl(owner, repo), opts)
+  if (got.kind !== "ok")
+    return { status: "unavailable", reason: got.kind === "missing" ? "HTTP 404" : got.reason }
+  try {
+    const answer = JSON.parse(new TextDecoder().decode(got.bytes)) as { items?: unknown }
+    if (!Array.isArray(answer.items)) return { status: "unavailable", reason: "not a search answer" }
+    for (const item of answer.items as Array<Record<string, unknown> | null>) {
+      if (!item || typeof item !== "object" || item.state !== "open" || item.pull_request) continue
+      const url = item.html_url
+      if (typeof url !== "string" || !url.startsWith(`https://github.com/${CHRONICLES_REPO}/issues/`))
+        continue
+      const text = `${typeof item.title === "string" ? item.title : ""}\n${typeof item.body === "string" ? item.body : ""}`
+      if (!namesRepo(text, owner, repo)) continue
+      const labels = Array.isArray(item.labels) ? item.labels : []
+      const queued = labels.some((l) => (l as { name?: unknown } | null)?.name === "queued")
+      return { status: "open", url, queued }
+    }
+    return { status: "none" }
+  } catch {
+    return { status: "unavailable", reason: "not JSON" }
+  }
+}
+
 /**
  * A catalog from JSON (it comes off a CDN: trusted for nothing). A reason string when it isn't one
  * (including an unknown `v`); a malformed entry is dropped, the rest kept.

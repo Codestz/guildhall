@@ -194,6 +194,24 @@ const CSS = /* css */ `
 .gh .hud-brand-more .hall-about-links .site-link { white-space: nowrap; }
 .gh .hud-about .hall-about-links .site-link { min-height: 26px; font-size: 12.5px; padding: 0; }
 
+/* a sketch island's notice (SketchNotice.tsx): under the top row at the column's width, the Brand's ink;
+   a phone's is tighter (two lines of words, the action and its line on one row) */
+.gh .ui-hud-corner > .hall-sketch {
+  width: var(--hud-col); max-width: 100%; display: grid; gap: 6px; padding: 8px 8px 10px 12px;
+  border-radius: var(--hud-r); border: 1px solid var(--hair); animation: hud-drop 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.hall-sketch-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.hall-sketch-head .hud-source-dot { flex: none; margin: 0; }
+.hall-sketch-title { flex: 1; min-width: 0; margin: 0; font: 400 15px/1.2 var(--display); letter-spacing: 0.06em; color: var(--brass-hi); }
+.gh .hall-sketch-close { flex: none; width: 28px; height: 28px; margin: -2px 0 -2px auto; border-color: transparent; background: none; color: var(--faint); }
+.hall-sketch-body { margin: 0; padding-right: 8px; font-size: 12.5px; line-height: 1.45; color: var(--paper); }
+.hall-sketch-act { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding-right: 4px; }
+.gh .hall-sketch-act .ui-btn { text-decoration: none; }
+.hall-sketch-foot { flex: 1 1 160px; font-size: 11.5px; line-height: 1.35; color: var(--muted); }
+.ui-viewer[data-phone] .hall-sketch-body { font-size: 12px; }
+.gh .ui-viewer[data-phone] .hall-sketch-act .ui-btn { min-height: 36px; }
+@media (prefers-reduced-motion: reduce) { .gh .ui-hud-corner > .hall-sketch { animation: none; } }
+
 /* the sheet: the panel fills it, scrolling inside */
 .hall-sheet { display: flex; flex-direction: column; min-height: 0; max-height: 100%; outline: none; }
 .hall-sheet > * { min-height: 0; max-height: 100%; }

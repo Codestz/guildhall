@@ -39,6 +39,7 @@ import { watchClear } from "./clear.ts"
 import { type HallFloat, HallHud, type HallHudProps, type HallLevers, REMEMBERED } from "./HallHud.tsx"
 import { createHeroPortraits } from "./portraits.ts"
 import type { HudSession } from "./SessionHud.tsx"
+import { sketchNoticeOf } from "./sketch.ts"
 import { holdHallHudStyle } from "./style.ts"
 import { placeLabelOf } from "./view.ts"
 
@@ -325,6 +326,8 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
     const label = placeLabelOf(parts.places)
     const legend = chronicle ? repoLegendOf(chronicle, { placeOf: label }) : null
     const [owner = "", repo = ""] = opts.slug.split("/")
+    // no chronicle: the island is a sketch, and the HUD says so (sketch.ts)
+    const notice = sketchNoticeOf(found, opts.slug)
     m.root.render(
       <HallHud
         hud={parts.viewer.hud}
@@ -340,6 +343,7 @@ export function mountHallHud(parts: HudParts, opts: HallHudOptions): () => void 
         go={opts.go}
         hrefs={opts.hrefs}
         {...(found.status === "not-chronicled" ? { request: requestChronicleUrl(owner, repo) } : {})}
+        {...(notice ? { notice } : {})}
         {...(found.status === "unavailable" ? { onRetry: opts.retry } : {})}
         {...(live ? { session: live } : {})}
         time={opts.time ?? null}

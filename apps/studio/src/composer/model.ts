@@ -3,7 +3,12 @@
  * and pure edits on it. Every edit returns a new prefab; nothing here touches the stage.
  */
 import {
+  blockerShapes,
   HEX_TILE_SIZE,
+  isBlockerBox,
+  isBlockerOf,
+  pieceOutline,
+  shapeDistance,
   type TileBlocker,
   type TilePiece,
   type TilePrefab,
@@ -83,20 +88,33 @@ export function patchPiece(t: TilePrefab, i: number, patch: Partial<TilePiece>):
 export function patchSpot(t: TilePrefab, i: number, patch: Partial<TileSpot>): TilePrefab {
   return edit(t, "spots", i, (s) => strip({ ...s, ...patch }))
 }
-export function patchBlocker(t: TilePrefab, i: number, patch: Partial<TileBlocker>): TilePrefab {
-  return edit(t, "blockers", i, (b) => strip({ ...b, ...patch }))
+export function patchBlocker(
+  t: TilePrefab,
+  i: number,
+  patch: { [K in "x" | "z" | "r" | "w" | "d" | "rot" | "pad"]?: number },
+): TilePrefab {
+  return edit(t, "blockers", i, (b) => strip({ ...b, ...patch }) as TileBlocker)
 }
 
 const strip = <T extends object>(o: T): T =>
   Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T
 
-/** Moves whatever `sel` names to (x, z) and, for a piece or spot, turns it to `rot` (radians). */
+/**
+ * Moves whatever `sel` names to (x, z) and, for a piece, a spot or a box, turns it to `rot` (radians). A
+ * blocker that is a piece's own shape moves with its piece, not on its own: it stays.
+ */
 export function moveTo(t: TilePrefab, sel: Selection, x: number, z: number, rot?: number): TilePrefab {
   if (sel.layer === "pieces")
     return patchPiece(t, sel.i, { x: mm(x), z: mm(z), ...(rot === undefined ? {} : { rot: mm(rot) }) })
   if (sel.layer === "spots")
     return patchSpot(t, sel.i, { x: mm(x), z: mm(z), ...(rot === undefined ? {} : { facing: mm(rot) }) })
-  return patchBlocker(t, sel.i, { x: mm(x), z: mm(z) })
+  const b = t.blockers?.[sel.i]
+  if (!b || isBlockerOf(b)) return t
+  return patchBlocker(t, sel.i, {
+    x: mm(x),
+    z: mm(z),
+    ...(rot !== undefined && isBlockerBox(b) ? { rot: mm(rot) } : {}),
+  })
 }
 
 /** Adds a piece at (x, z); returns the prefab and the new piece's index. */
@@ -116,23 +134,69 @@ export function addBlocker(t: TilePrefab, x = 0, z = 0, r = 0.5): [TilePrefab, n
   return [{ ...t, blockers }, blockers.length - 1]
 }
 
-/**
- * A blocker round piece `i`: centred on it, as wide as its footprint (`size`, the catalog's metres at
- * scale 1, times the piece's scale), half the larger side plus a little room to pass.
- */
-export function blockerFor(
-  t: TilePrefab,
-  i: number,
-  size: readonly [number, number, number],
-): [TilePrefab, number] {
-  const q = t.pieces[i]
-  if (!q) return [t, -1]
-  const r = (Math.max(size[0], size[2]) * q.scale) / 2 + 0.1
-  return addBlocker(t, q.x, q.z, Math.min(3, Math.max(0.2, r)))
+/** Adds a box blocker (written out by hand: `w` along its own x, `d` along its z) at (x, z). */
+export function addBox(t: TilePrefab, x = 0, z = 0, w = 0.8, d = 0.6): [TilePrefab, number] {
+  const blockers = [...(t.blockers ?? []), { x: mm(x), z: mm(z), w: mm(w), d: mm(d), rot: 0 }]
+  return [{ ...t, blockers }, blockers.length - 1]
 }
 
-/** Removes the selected item; an emptied optional list is dropped from the file. */
+/**
+ * A blocker for piece `i`: its own shape (`{ of: i }`, world blockers.ts: a box or a circle per part,
+ * from its outline as placed), which follows the piece. One it already has is picked instead.
+ */
+export function blockerFor(t: TilePrefab, i: number): [TilePrefab, number] {
+  if (!t.pieces[i]) return [t, -1]
+  const have = (t.blockers ?? []).findIndex((b) => isBlockerOf(b) && b.of === i)
+  if (have >= 0) return [t, have]
+  const blockers = [...(t.blockers ?? []), { of: i }]
+  return [{ ...t, blockers }, blockers.length - 1]
+}
+
+/**
+ * Blocker `i`, a piece's own shape, written out as the boxes and circles it is now (a manual override:
+ * they stay where they are when the piece moves, and can be sized by hand). Returns its first index.
+ */
+export function writeOut(t: TilePrefab, i: number): [TilePrefab, number] {
+  const b = t.blockers?.[i]
+  if (!b || !isBlockerOf(b)) return [t, i]
+  const shapes = blockerShapes(b, t.pieces).map(
+    (sh): TileBlocker =>
+      sh.kind === "circle"
+        ? { x: mm(sh.x), z: mm(sh.z), r: mm(sh.r) }
+        : { x: mm(sh.x), z: mm(sh.z), w: mm(sh.w), d: mm(sh.d), rot: mm(sh.rot) },
+  )
+  if (!shapes.length) return [t, i]
+  const blockers = [...(t.blockers ?? [])]
+  blockers.splice(i, 1, ...shapes)
+  return [{ ...t, blockers }, i]
+}
+
+/** What a blocker is, for the lists: the piece it is the shape of, a box, a circle. */
+export function blockerLabel(t: TilePrefab, b: TileBlocker): { what: string; num: string } {
+  if (isBlockerOf(b)) {
+    const n = blockerShapes(b, t.pieces).length
+    return {
+      what: `${t.pieces[b.of]?.piece.split("/")[1] ?? "?"}`,
+      num: `piece ${b.of + 1}${n > 1 ? ` · ${n} parts` : ""}${b.pad ? ` · +${b.pad}` : ""}`,
+    }
+  }
+  if (isBlockerBox(b))
+    return { what: "box", num: `${b.w.toFixed(2)}×${b.d.toFixed(2)} · ${b.x.toFixed(1)},${b.z.toFixed(1)}` }
+  return { what: "circle", num: `r ${b.r.toFixed(2)} · ${b.x.toFixed(1)},${b.z.toFixed(1)}` }
+}
+
+/**
+ * Removes the selected item; an emptied optional list is dropped from the file. A piece takes its own
+ * blocker with it, and the blockers of the pieces after it follow them down the list.
+ */
 export function remove(t: TilePrefab, sel: Selection): TilePrefab {
+  if (sel.layer === "pieces" && t.blockers?.some(isBlockerOf)) {
+    const blockers = t.blockers
+      .filter((b) => !isBlockerOf(b) || b.of !== sel.i)
+      .map((b) => (isBlockerOf(b) && b.of > sel.i ? { ...b, of: b.of - 1 } : b))
+    const { blockers: _old, ...rest } = t
+    t = blockers.length ? { ...rest, blockers } : (rest as TilePrefab)
+  }
   const list = ((t[sel.layer] ?? []) as unknown[]).filter((_, k) => k !== sel.i)
   if (sel.layer !== "pieces" && list.length === 0) {
     const { [sel.layer]: _gone, ...rest } = t
@@ -145,7 +209,8 @@ export function remove(t: TilePrefab, sel: Selection): TilePrefab {
 export function duplicate(t: TilePrefab, sel: Selection): [TilePrefab, number] {
   const list = [...((t[sel.layer] ?? []) as { x: number; z: number }[])]
   const item = list[sel.i]
-  if (!item) return [t, -1]
+  // (a piece's own shape is the piece's: copy the piece)
+  if (!item || (sel.layer === "blockers" && isBlockerOf(item as TileBlocker))) return [t, -1]
   list.push({ ...item, x: mm(item.x + 0.5) })
   return [{ ...t, [sel.layer]: list }, list.length - 1]
 }
@@ -174,10 +239,23 @@ export function lint(
     if (s.clip && !known.clip(s.clip)) out.push(`spot ${k + 1}: no clip "${s.clip}" on rig-medium`)
     if (s.prop && !known.prop(s.prop)) out.push(`spot ${k + 1}: ${s.prop} has no grip (data/mounts.json)`)
     if (!onTile(s.x, s.z, 0.15) && !t.footprint?.length) out.push(`spot ${k + 1} is off the tile`)
-    // (a sitter is in its seat's disc, a sleeper on its bed's: the seat and the bed are what they use)
+    // (a sitter is in its seat's shape, a sleeper on its bed's: the seat and the bed are what they use)
     for (const [j, b] of (t.blockers ?? []).entries())
-      if (Math.hypot(s.x - b.x, s.z - b.z) < b.r - 0.05 && s.kind !== "sit" && s.kind !== "sleep")
+      if (
+        s.kind !== "sit" &&
+        s.kind !== "sleep" &&
+        blockerShapes(b, t.pieces).some((sh) => shapeDistance(sh, s.x, s.z) < -0.05)
+      )
         out.push(`spot ${k + 1} stands inside blocker ${j + 1}`)
+  })
+  t.blockers?.forEach((b, j) => {
+    if (!isBlockerOf(b)) return
+    const q = t.pieces[b.of]
+    if (!q) out.push(`blocker ${j + 1}: there is no piece ${b.of + 1}`)
+    else if (!blockerShapes(b, t.pieces).length)
+      out.push(
+        `blocker ${j + 1}: ${q.piece.split("/")[1]} has ${pieceOutline(q.piece) ? "no parts to walk round" : "no outline"}: write a box or a circle`,
+      )
   })
   return out
 }

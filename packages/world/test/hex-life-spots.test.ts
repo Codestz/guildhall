@@ -10,6 +10,7 @@ import {
   type LifeStep,
   lifePlaces,
   planFolk,
+  solidDistance,
   WALK_CLEAR,
   workTiles,
 } from "../src/hex/index.ts"
@@ -92,6 +93,9 @@ describe("people at spots", () => {
   const w = hexWorld(h, z)
   const walk = hexWalk(h, z, w, { reach: workTiles(h, z) })
   const places = lifePlaces(h, z, w, walk)
+  /** The blockers within `r` of a point: by their real shape where they have one (a cart's box), else their disc. */
+  const within = (x: number, zz: number, r: number) =>
+    places.furniture.near(x, zz, r).filter((d) => !d.solid || solidDistance(d.solid, x, zz) < r)
   const agents = [0, 1, 2].map((slot) =>
     agentLoop(walk, z, [{ place: "camp", work: 30, idle: 5 }], { slot, role: "archer", places }),
   )
@@ -188,7 +192,7 @@ describe("people at spots", () => {
     for (const [zi] of z.zones.entries()) {
       const slots = places.slots(zi)
       for (const [k, s] of slots.entries()) {
-        expect(places.furniture.near(s.at[0], s.at[2], 0.25)).toHaveLength(0)
+        expect(within(s.at[0], s.at[2], 0.25)).toHaveLength(0)
         for (const o of slots.slice(k + 1))
           expect(Math.hypot(o.at[0] - s.at[0], o.at[2] - s.at[2])).toBeGreaterThan(0.8)
       }
@@ -213,7 +217,7 @@ describe("people at spots", () => {
             const end = Math.hypot(x - s.pts.at(-1)![0], zz - s.pts.at(-1)![2])
             if (start < 1.5 || end < 1.5) continue
             points++
-            if (places.furniture.near(x, zz, 0).length) inside++
+            if (within(x, zz, 0).length) inside++
           }
         }
       }

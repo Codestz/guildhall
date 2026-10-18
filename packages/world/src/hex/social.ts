@@ -35,11 +35,12 @@ import {
   nodeNear,
   spotAt,
   type Vec3,
+  WEAVE_M,
 } from "./life.ts"
 import { PROPS, routineSpan } from "./routines.ts"
 import { HARD } from "./spots.ts"
 import { HEX_TILE_SIZE, opensEvening } from "./tiles.ts"
-import { cutsHard, floodWay, type HexWalk } from "./walk.ts"
+import { cutsHard, floodWay, type HexWalk, ownRoom, PROP_TIGHT } from "./walk.ts"
 import type { HexDoorway, HexWorld } from "./world.ts"
 import type { HexZones } from "./zones.ts"
 
@@ -391,8 +392,11 @@ function tipsy(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
       to: w.from + dur * slow,
       tipsy: weave,
     }
-    // (not a way so tight to a wall or a fence that the weave would take them into it)
-    if (weavesIntoWall(slowed, solids)) continue
+    // (not a way so tight to a wall or a fence that the weave would take them into it; where props stand
+    // close, a narrower weave that keeps a body off them: through a beer garden's stools)
+    if (weavesInto(slowed, solids, false)) continue
+    const sway = sways().find((v) => !weavesInto({ ...slowed, sway: v }, solids, true)) ?? NARROWEST
+    if (sway !== WEAVE_M) slowed.sway = sway
     // half-way, a wall to slump against (a body's width off it), else a reel where they are
     // (never on a hero's spot: LifePlaces `heroNear`)
     const free = (t: number) => {
@@ -418,11 +422,17 @@ function tipsy(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
   }
 }
 
+/** How far a tipsy walk weaves either side of its way, the widest first (lifePose WEAVE_M; asked late, life.ts imports this file). */
+const sways = (): readonly number[] => [WEAVE_M, 0.15, 0.08, NARROWEST]
+/** … the narrowest, also where the way itself runs close to props (a sway still reads as tipsy). */
+const NARROWEST = 0.03
+
 /**
  * Whether a tipsy walk's weave (lifePose) would take the walker into a wall, a house or a fence on the
- * way: sampled every few centimetres of it, the house its ends stand in (a door's threshold) aside.
+ * way (`props`: or a body into a prop, a stool, a lamp's post), sampled every few centimetres of it, what
+ * its ends stand in (a door's threshold, the bench it gets up from) aside.
  */
-function weavesIntoWall(w: LifeWalk, furniture: LifePlaces["furniture"]): boolean {
+function weavesInto(w: LifeWalk, furniture: LifePlaces["furniture"], props: boolean): boolean {
   const a = w.pts[0]!
   const b = w.pts[w.pts.length - 1]!
   const steps: LifeStep[] = [w]
@@ -433,7 +443,20 @@ function weavesIntoWall(w: LifeWalk, furniture: LifePlaces["furniture"]): boolea
   for (let k = 1; k < n; k++) {
     const t = w.from + ((w.to - w.from) * k) / n
     const p = lifePose(steps, t, 24).at
-    for (const s of furniture.solidsNear(p[0], p[2], 0.05)) {
+    for (const s of furniture.solidsNear(p[0], p[2], props ? PROP_TIGHT : 0.05)) {
+      if (s.soft) continue
+      if (props) {
+        if (HARD(s.kind) || solidDistance(s, p[0], p[2]) >= PROP_TIGHT) continue
+        // (the prop an end stands at, as far as it takes to step off it: the stool they get up from)
+        const own = [a, b].some((e) => {
+          const d = solidDistance(s, e[0], e[2])
+          return (
+            d < PROP_TIGHT + 0.08 && Math.hypot(p[0] - e[0], p[2] - e[2]) < ownRoom(d) + (w.sway ?? WEAVE_M)
+          )
+        })
+        if (own) continue
+        return true
+      }
       if (!HARD(s.kind) || solidDistance(s, p[0], p[2]) >= -WEAVE_ROOM) continue
       if (solidDistance(s, a[0], a[2]) < 1 || solidDistance(s, b[0], b[2]) < 1) continue
       return true

@@ -59,6 +59,10 @@ const CORE = 0.2
 const DOOR = 1
 /** How far from a walk's end a walker may be in what the end stands in (its doorway's house), metres. */
 const DOOR_ROOM = 1.6
+/** A prop this near a walk's end is what the end stands at (its bench, its stall), metres … */
+const PROP_OWN = 0.25
+/** … and a walker this near that end (more, out of one the end stands in) may still be in it, metres. */
+const PROP_OFF = 0.4
 /** A step up or down a walker may be pushed onto, metres. */
 const STEP = 0.2
 /** How far ahead a walker starts steering round someone standing in its way, metres. */
@@ -129,9 +133,19 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
   const own = (s: Solid, i: number, p: SpacePose, px: number, pz: number): boolean => {
     if (world.solidDistance(s, baseX[i]!, baseZ[i]!) < 0.02) return true
     if (!walk[i]) return false
-    for (const e of [p.to, p.from])
-      if (e && world.solidDistance(s, e[0]!, e[2]!) < DOOR && hyp(px - e[0]!, pz - e[2]!) < DOOR_ROOM)
+    const hard = s.kind === "building" || s.kind === "wall"
+    for (const e of [p.to, p.from]) {
+      if (!e) continue
+      const d = world.solidDistance(s, e[0]!, e[2]!)
+      // a house or a wall by a door the walk goes in or out at, as far as its threshold; a prop only the
+      // end stands at (the bench it gets up from), as far as it takes to step off it
+      if (
+        hard
+          ? d < DOOR && hyp(px - e[0]!, pz - e[2]!) < DOOR_ROOM
+          : d < PROP_OWN && hyp(px - e[0]!, pz - e[2]!) < PROP_OFF - Math.min(0, d)
+      )
         return true
+    }
     return false
   }
   /** Whether (px, pz) is inside a solid person `i` may not stand in (a wall, a house, a fence, a cart). */

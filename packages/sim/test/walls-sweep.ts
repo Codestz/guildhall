@@ -116,6 +116,8 @@ export interface Cut {
   castle?: boolean
   /** In or beside the graveyard's tiles. */
   graveyard?: boolean
+  /** The prefab of the tile it is on. */
+  prefab?: string
 }
 
 type Near = (x: number, z: number, r: number) => Solid[]
@@ -178,11 +180,49 @@ export function endsOwn(ends: readonly End[]): Skip {
 }
 
 const isHard = (o: Solid) => HARD(o.kind)
-/** How deep a point is in a hard solid (≤ 0: out), the ones `skip` lists aside. */
-function depthAt(near: Near, x: number, z: number, skip: Skip): [number, Solid | null] {
+
+/**
+ * What a sweep looks for: `walls`, a walker's middle in a building, a wall or a fence (more than a brush
+ * deep); `props`, a walker's body in a prop as its outline is drawn (a cart, a crate, a stall, a bench, a
+ * barrel, a tree's trunk): the middle nearer one than `PROP_BODY` less a brush (`PROP_BRUSH`), and someone
+ * standing with their middle in one (a seat sat on aside).
+ */
+export type SweepMode = "walls" | "props"
+/** A body's half-width at a prop's height (hips and arms over a cart's bed or a crate), metres. */
+export const PROP_BODY = 0.2
+/** How far a body may brush into a prop before it is clipped (a sleeve against a crate), metres. */
+export const PROP_BRUSH = 0.05
+/** The solids a body is drawn through when it walks into them: the pieces that are not walls or houses. */
+export const isProp = (o: Solid): boolean =>
+  !o.soft && (o.kind === "prop" || o.kind === "seat" || o.kind === "trunk" || o.kind === "blocker")
+/** How near a solid a walk's end may stand and it still be the end's own (a seat, a cart worked at), by mode. */
+const endSlack = (mode: SweepMode) => (mode === "props" ? PROP_BODY + 0.05 : 0.05)
+
+/**
+ * How deep a point is in what the sweep looks for (≤ 0: out), the ones `skip` lists aside; `stand`: someone
+ * standing there (a stay), not walking. Props: how far a walker's body is in one, or how deep a
+ * stander's middle is.
+ */
+function depthAt(
+  near: Near,
+  x: number,
+  z: number,
+  skip: Skip,
+  mode: SweepMode = "walls",
+  stand = false,
+): [number, Solid | null] {
   let worst = 0
   let by: Solid | null = null
-  for (const o of near(x, z, 0.05)) {
+  for (const o of near(x, z, mode === "props" ? PROP_BODY : 0.05)) {
+    if (mode === "props") {
+      if (!isProp(o) || skip(o, x, z) || (stand && o.kind === "seat")) continue
+      const d = stand ? -solidDistance(o, x, z) : PROP_BODY - solidDistance(o, x, z)
+      if (d > worst) {
+        worst = d
+        by = o
+      }
+      continue
+    }
     if (!isHard(o) || skip(o, x, z)) continue
     const d = -solidDistance(o, x, z)
     if (d > worst) {
@@ -198,6 +238,8 @@ export interface Sweep {
   cuts: Cut[]
   /** Strikes the swept stories planned at the graves (their walks there and back are swept). */
   struck: number
+  /** What it looks for (walls by default). */
+  mode?: SweepMode
 }
 
 function tallySegment(
@@ -209,7 +251,9 @@ function tallySegment(
   b: readonly number[],
   skip: Skip,
   offset?: (f: number) => [number, number],
+  stand = false,
 ): void {
+  const mode = out.mode ?? "walls"
   const t = out.table[source]
   t.seen++
   const len = Math.hypot(b[0]! - a[0]!, b[2]! - a[2]!)
@@ -225,8 +269,8 @@ function tallySegment(
       x += dx
       z += dz
     }
-    const [d, by] = depthAt(near, x, z, skip)
-    if (d <= BRUSH) continue
+    const [d, by] = depthAt(near, x, z, skip, mode, stand)
+    if (d <= (mode === "walls" ? BRUSH : stand ? 0.02 : PROP_BRUSH)) continue
     t.samples++
     hit = true
     if (!deepest || d > deepest.depth)
@@ -243,7 +287,7 @@ function tallySegment(
   }
   // a thin wall (a fence, a rail: thinner than two brushes) is never a brush deep: the way through it is
   // looked for along the segment instead, a cut when it is more than half into it, its ends' own aside
-  if (!offset)
+  if (!offset && mode === "walls")
     for (const o of near((a[0]! + b[0]!) / 2, (a[2]! + b[2]!) / 2, len / 2 + 0.1)) {
       // (a stair's cheeks and a bridge's rails, pieces of no piece, are walked along on their stairs)
       if (!isHard(o) || !o.piece) continue
@@ -327,7 +371,19 @@ function sweepSteps(
     if (s.kind === "stay") {
       if (s.indoors) continue
       // where it stands (its own seat, its post: what it stands in at the spot is the spot's own)
-      tallySegment(out, near, hero ? "hero stay" : "stay spot", who, s.at, s.at, () => false)
+      // (a sitter's legs are under the table they sit at: what a seated stay stands in is its own)
+      const seated = /^Sit/.test(s.clip ?? "")
+      tallySegment(
+        out,
+        near,
+        hero ? "hero stay" : "stay spot",
+        who,
+        s.at,
+        s.at,
+        () => seated && out.mode === "props",
+        undefined,
+        true,
+      )
       if (s.routine && !hero) {
         // a routine's part standing off the spot (a step down a row, to a basket, a move): a cycle's shifts
         const own = new Set(
@@ -338,7 +394,17 @@ function sweepSteps(
           const f = routineSample(s.routine, u)
           if (!f.shift) continue
           const [px, pz] = spotFrame(s.at[0], s.at[2], s.facing, f.shift[0], f.shift[1])
-          tallySegment(out, near, "routine shift", who, [px, 0, pz], [px, 0, pz], (o) => own.has(o))
+          tallySegment(
+            out,
+            near,
+            "routine shift",
+            who,
+            [px, 0, pz],
+            [px, 0, pz],
+            (o) => own.has(o),
+            undefined,
+            true,
+          )
         }
       }
       continue
@@ -358,8 +424,10 @@ function sweepSteps(
       prev.at === a0 &&
       /chat|wave|reel|slump/.test(prev.routine?.id ?? "")
     const skip = endsOwn([
-      fromIn ? { at: a0, slack: DOOR, door: w.pts } : { at: a0, slack: 0.05 },
-      toIn ? { at: b0, slack: DOOR, door: [...w.pts].reverse() } : { at: b0, slack: 0.05 },
+      fromIn ? { at: a0, slack: DOOR, door: w.pts } : { at: a0, slack: endSlack(out.mode ?? "walls") },
+      toIn
+        ? { at: b0, slack: DOOR, door: [...w.pts].reverse() }
+        : { at: b0, slack: endSlack(out.mode ?? "walls") },
     ])
     const last = w.pts.length - 2
     for (let k = 0; k + 1 < w.pts.length; k++) {
@@ -393,7 +461,7 @@ export interface Island {
 /** One island's sweep: its townsfolk's day, the saga's heroes, every place's hero spots from the gathering. */
 export function sweepIsland(
   { seed, files }: Island,
-  opts: { heroes?: boolean; stories?: readonly StoryId[] } = {},
+  opts: { heroes?: boolean; stories?: readonly StoryId[]; mode?: SweepMode } = {},
 ): Sweep & { ms: number } {
   const t0 = performance.now()
   const h = hexIsland({ seed, files })
@@ -403,7 +471,7 @@ export function sweepIsland(
   const places = lifePlaces(h, z, w, walk, { heroSpots: 3 })
   const f = places.furniture
   const near: Near = (x, zz, r) => f.solidsNear(x, zz, r)
-  const out: Sweep = { table: emptyTable(), cuts: [], struck: 0 }
+  const out: Sweep = { table: emptyTable(), cuts: [], struck: 0, mode: opts.mode ?? "walls" }
   const grid = new Map<string, number[]>()
   for (const [i, n] of walk.nodes.entries())
     for (const dx of [-1, 0, 1])
@@ -428,8 +496,8 @@ export function sweepIsland(
           ? "raw castle edge"
           : "raw edge (not walked)"
     const door = a.kind === "door" || b.kind === "door"
-    // (an edge with no way round its wall is in no route: not walked)
-    if (e.walled) continue
+    // (an edge with no way round its wall is in no route: not walked; nor, as it is, by a body past props)
+    if (e.walled || out.mode === "props") continue
     // along its way round, when it has one
     const line = [[a.x, a.y, a.z], ...(e.via ?? []).map(([x, z]) => [x, a.y, z]), [b.x, b.y, b.z]]
     for (let k = 0; k + 1 < line.length; k++)
@@ -446,8 +514,8 @@ export function sweepIsland(
               { at: [b.x, 0, b.z], slack: DOOR, door: [...line].reverse() },
             ])
           : endsOwn([
-              { at: [a.x, 0, a.z], slack: 0.05 },
-              { at: [b.x, 0, b.z], slack: 0.05 },
+              { at: [a.x, 0, a.z], slack: endSlack(out.mode ?? "walls") },
+              { at: [b.x, 0, b.z], slack: endSlack(out.mode ?? "walls") },
             ]),
       )
   }
@@ -469,10 +537,10 @@ export function sweepIsland(
       const skip = endsOwn([
         prev?.kind === "stay" && prev.indoors
           ? { at: a0, slack: DOOR, door: s.pts, sway: WEAVE }
-          : { at: a0, slack: 0.05 },
+          : { at: a0, slack: endSlack(out.mode ?? "walls") },
         next?.kind === "stay" && next.indoors
           ? { at: b0, slack: DOOR, door: [...s.pts].reverse(), sway: WEAVE }
-          : { at: b0, slack: 0.05 },
+          : { at: b0, slack: endSlack(out.mode ?? "walls") },
       ])
       for (let t = s.from; t < s.to; t += 2 / 3600) {
         const pose = lifePose(p.day, t, 24)
@@ -495,12 +563,12 @@ export function sweepIsland(
         tallySegment(out, near, "petitioner lane", who("petitions"), way[k]!, way[k + 1]!, skip)
     }
     for (const p of lane.places)
-      tallySegment(out, near, "petitioner lane", who("queue"), p.at, p.at, () => false)
+      tallySegment(out, near, "petitioner lane", who("queue"), p.at, p.at, () => false, undefined, true)
   }
   const board = places.heroSpots.board()
   if (board)
     for (const r of boardReaders(board, f))
-      tallySegment(out, near, "board reader spot", who("reader"), r.at, r.at, () => false)
+      tallySegment(out, near, "board reader spot", who("reader"), r.at, r.at, () => false, undefined, true)
 
   if (opts.heroes !== false) {
     // the graveyard's strike spots, as the Studio gives them (lifePlan.ts `kitOf`)
@@ -580,10 +648,13 @@ export function sweepIsland(
   const yard = new Set<number>()
   for (const t of w.graveyard ? [w.graveyard.tile, ...w.graveyard.cover] : [])
     for (const j of [t, ...h.grid.neighbours(t)]) if (j >= 0) yard.add(j)
+  const prefabAt = new Map(w.tiles.map((t) => [t.i, t.prefab ?? ""]))
   for (const c of out.cuts) {
     const { q, r } = hexAt(c.x / HEX_TILE_SIZE, c.z / HEX_TILE_SIZE)
     if (site.has(h.grid.index(q, r))) c.castle = true
     if (yard.has(h.grid.index(q, r))) c.graveyard = true
+    const prefab = prefabAt.get(h.grid.index(q, r))
+    if (prefab) c.prefab = prefab
   }
   return { ...out, ms: performance.now() - t0 }
 }
@@ -631,7 +702,7 @@ if (import.meta.main) {
   const cuts: Cut[] = []
   for (const seed of seeds)
     for (const files of sizes) {
-      const r = sweepIsland({ seed, files })
+      const r = sweepIsland({ seed, files }, { mode: process.env.MODE === "props" ? "props" : "walls" })
       tables.push(r.table)
       cuts.push(...r.cuts)
       const n = SOURCES.reduce((m, s) => m + r.table[s].cuts, 0)

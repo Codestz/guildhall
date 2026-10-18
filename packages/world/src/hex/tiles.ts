@@ -7,6 +7,9 @@
  * world uses until then (tests, a build with no data).
  */
 import { hash2 } from "../geom/noise.ts"
+import { mirrorBlocker, type TileBlocker } from "./blockers.ts"
+
+export type { TileBlocker } from "./blockers.ts"
 
 /** Centre to corner of one hex tile, metres (scale B: a KayKit hex house at half its import fills it). */
 export const HEX_TILE_SIZE = 3.1
@@ -78,7 +81,10 @@ export interface TilePrefab {
   variants?: string[]
   /** Where people do things on this tile (tile space, metres round its centre; turned with the tile). */
   spots?: TileSpot[]
-  /** What people walk round (props on the tile): discs in tile space. */
+  /**
+   * What people walk round (props on the tile), tile space (blockers.ts): most as the piece they cover
+   * (`{ of }`: its own outline as placed, a box or a circle), else a box or a circle written out.
+   */
   blockers?: TileBlocker[]
   /**
    * The neighbouring tiles this prefab also covers (world.ts claims them, or falls back to one tile), as tile
@@ -145,7 +151,7 @@ export function mirrorPrefab(p: TilePrefab): TilePrefab {
     })),
   }
   if (p.spots) m.spots = p.spots.map((s) => ({ ...s, x: -s.x, facing: -s.facing }))
-  if (p.blockers) m.blockers = p.blockers.map((b) => ({ ...b, x: -b.x }))
+  if (p.blockers) m.blockers = p.blockers.map(mirrorBlocker)
   if (p.decks) m.decks = p.decks.map((d) => ({ ...d, ax: -d.ax, bx: -d.bx }))
   if (p.footprint) m.footprint = p.footprint.map(mirrorSide)
   mirrored.set(p, m)
@@ -200,13 +206,6 @@ export function spotWindows(hours: SpotHours | undefined): [number, number][] {
 /** Whether a spot's windows include an evening one (from five on): a drinking place's seats. */
 export const opensEvening = (hours: SpotHours | undefined): boolean =>
   spotWindows(hours).some(([from]) => from >= 16)
-
-/** A disc nobody walks through (a cart, a stall, a well), tile space. */
-export interface TileBlocker {
-  x: number
-  z: number
-  r: number
-}
 
 /**
  * Kenney's woods and canvas are baked to the sandstone ramp, which reads pink beside KayKit's timber

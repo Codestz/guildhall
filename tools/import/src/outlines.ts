@@ -231,13 +231,19 @@ async function outlineOf(file: string, opening: boolean): Promise<PieceOutline |
   // the solids: triangles cut to the band over the floor, drawn on the grid, each part's hull
   const floor = lo + Math.min(FLOOR, (hi - lo) * 0.25)
   const cells = new Set<string>()
+  /** The cut triangles' own corners, by the cell each is in: a part's outline is theirs, not its cells'. */
+  const corners = new Map<string, P[]>()
   for (const t of tris) {
     const cut = slab(t, floor, lo + BAND)
-    if (cut.length >= 2)
-      cover(
-        cut.map((v): P => [v[0], v[2]]),
-        (i, j) => cells.add(`${i},${j}`),
-      )
+    if (cut.length < 2) continue
+    const flat = cut.map((v): P => [v[0], v[2]])
+    cover(flat, (i, j) => cells.add(`${i},${j}`))
+    for (const v of flat) {
+      const k = `${Math.floor(v[0] / CELL)},${Math.floor(v[1] / CELL)}`
+      const list = corners.get(k)
+      if (list) list.push(v)
+      else corners.set(k, [v])
+    }
   }
   if (opening) {
     // the opening runs across the piece's long axis at its middle: as wide as the nearest vertex to the
@@ -271,6 +277,7 @@ async function outlineOf(file: string, opening: boolean): Promise<PieceOutline |
   for (const start of cells) {
     if (seen.has(start)) continue
     const part: P[] = []
+    const exact: P[] = []
     const mine: [number, number][] = []
     const queue = [start]
     seen.add(start)
@@ -284,6 +291,7 @@ async function outlineOf(file: string, opening: boolean): Promise<PieceOutline |
         [(i + 1) * CELL, (j + 1) * CELL],
         [i * CELL, (j + 1) * CELL],
       )
+      for (const v of corners.get(key) ?? []) exact.push(v)
       for (let di = -1; di <= 1; di++)
         for (let dj = -1; dj <= 1; dj++) {
           const nk = `${i + di},${j + dj}`
@@ -292,14 +300,29 @@ async function outlineOf(file: string, opening: boolean): Promise<PieceOutline |
           queue.push(nk)
         }
     }
-    const whole = simplify(hull(part), MAX_POINTS)
+    // the hull of the geometry itself (its corners in the part's cells), not of the cells it touches (a
+    // cell's width bigger all round); a part with too few corners of its own (an opening cut through a
+    // floor) keeps its cells' outline
+    const own = exact.length >= 3 ? simplify(hull(exact), MAX_POINTS) : []
+    // (one so thin the decimetre rounding would flatten it to a line, a rail, keeps its cells' width)
+    const kept = hull(round(own))
+    const whole = kept.length >= 3 && area(kept) >= 0.01 ? own : simplify(hull(part), MAX_POINTS)
     // a part far from convex (a fence round a yard, a ring of walls) is its cells, as boxes: its hull
     // would close the yard it stands round
     if (mine.length > 6 && mine.length * CELL * CELL < area(whole) * HOLLOW) parts.push(...boxes(mine))
     else parts.push(whole)
   }
   parts.sort((a, b) => area(b) - area(a))
-  return { top: hi - lo, foot: round(foot), solids: parts.slice(0, MAX_PARTS).map(round) }
+  // (rounded to the decimetre, then the hull again: a thin part's rounded corners are not convex)
+  const tidy = (h: P[]) => hull(round(h))
+  return {
+    top: hi - lo,
+    foot: tidy(foot),
+    solids: parts
+      .slice(0, MAX_PARTS)
+      .map(tidy)
+      .filter((h) => h.length >= 3),
+  }
 }
 
 async function main() {

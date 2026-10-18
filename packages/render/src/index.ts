@@ -89,7 +89,7 @@ export {
   setLivingField,
 } from "./livingTint.ts"
 export type { LodCounts } from "./lod.ts"
-export { discMarker, hexOutline, spotMarker } from "./markers.ts"
+export { discMarker, hexOutline, outlineMarker, spotMarker } from "./markers.ts"
 export { paletteMaterial } from "./material.ts"
 export { group, loadModel, type Measure, measure, poseModel } from "./model.ts"
 export {

@@ -1,19 +1,10 @@
 {
   "blockers": [
     {
-      "r": 1.477,
-      "x": 0,
-      "z": -0.4
+      "of": 1
     },
     {
-      "r": 0.554,
-      "x": -1.775,
-      "z": 1.128
-    },
-    {
-      "r": 0.467,
-      "x": 1.806,
-      "z": 1.246
+      "of": 2
     }
   ],
   "ground": "dirt",
@@ -46,24 +37,24 @@
   "spots": [
     {
       "clip": "Chopping",
-      "facing": -0.552,
+      "facing": -2.279,
       "kind": "work",
       "prop": "kaykit-tools/axe",
       "roles": [
         "lumberjack"
       ],
-      "x": -1.5,
-      "z": 0.55
+      "x": -1.2,
+      "z": 1.62
     },
     {
       "clip": "Sawing",
-      "facing": 0.785,
+      "facing": -0.021,
       "kind": "work",
       "roles": [
         "lumberjack"
       ],
-      "x": 1.35,
-      "z": 0.75
+      "x": 1.82,
+      "z": 0.586
     }
   ]
 }

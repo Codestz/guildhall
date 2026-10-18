@@ -183,6 +183,64 @@ export function cutsSolid(
   return segmentDistance(so, ax + ux * s0, az + uz * s0, ax + ux * s1, az + uz * s1) < 0.02
 }
 
+/** A body's half-width at a prop's height and a little: nearer a prop's outline than this, a way brushes it, metres. */
+export const PROP_TIGHT = 0.17
+/** The room a way round a prop keeps from it (and from every wall), on the fine grid, metres. */
+const PROP_ROOM = 0.24
+/** … and where there is less, a body's half-width: the least room a way squeezes between props with, metres. */
+const PROP_SQUEEZE = 0.2
+/** How far round its ends a way round props may keep only the room its end has, metres. */
+const ROOM_END = 0.35
+/** How many corners either side of a tight bit of way are looked at again with it, at most. */
+const ROOM_RUN = 6
+/** How far off a way's own height the ground under a way round may be (a step, not a terrace's edge), metres. */
+const ROOM_STEP = 0.3
+
+/** What `near` may also tell (lifePlaces' `walkNear`): the ground's height, for a way round to keep to its level. */
+export type NearWithGround = ((x: number, z: number, r: number) => readonly WalkBlocker[]) & {
+  heightAt?: (x: number, z: number) => number
+  /** A walkway's height at a point (a deck, a bridge, a flight), null off them. */
+  walkwayAt?: (x: number, z: number) => number | null
+}
+/** How near a prop a walk's end may stand and the prop still be the end's own (the bench it gets up from), metres. */
+const PROP_OWN = 0.25
+
+/**
+ * Whether segment a→b comes nearer a prop (a cart, a crate, a lamp's post, a bench, a tree's trunk: not a
+ * wall or a house, not a soft place) than PROP_TIGHT; by an end standing within `ra`/`rb` of one, only past
+ * the stretch it takes to leave it (`cutsSolid`'s; a negative reach: no end there).
+ */
+export function brushesProp(
+  a: readonly number[],
+  b: readonly number[],
+  near: (x: number, z: number, r: number) => readonly WalkBlocker[],
+  ra: number,
+  rb: number,
+): boolean {
+  const ax = a[0]!
+  const az = a[2]!
+  const bx = b[0]!
+  const bz = b[2]!
+  const len = Math.hypot(bx - ax, bz - az)
+  if (len < 1e-6) return false
+  const ux = (bx - ax) / len
+  const uz = (bz - az) / len
+  for (const o of near((ax + bx) / 2, (az + bz) / 2, len / 2 + PROP_TIGHT)) {
+    const so = solidOfBlocker(o)
+    if (so.soft || so.kind === "building" || so.kind === "wall") continue
+    const da = solidDistance(so, ax, az)
+    const db = solidDistance(so, bx, bz)
+    let s0 = 0
+    let s1 = len
+    if (da < ra) s0 = Math.max(ownRoom(da), da < 0 && ra > PROP_OWN ? outAlong(so, ax, az, bx, bz, len) : 0)
+    if (db < rb)
+      s1 = len - Math.max(ownRoom(db), db < 0 && rb > PROP_OWN ? outAlong(so, bx, bz, ax, az, len) : 0)
+    if (s1 <= s0) continue
+    if (segmentDistance(so, ax + ux * s0, az + uz * s0, ax + ux * s1, az + uz * s1) < PROP_TIGHT) return true
+  }
+  return false
+}
+
 /**
  * Whether segment a→b runs through a wall, a building or a fence (a hard blocker: the soft places people
  * stand a while aside), by its ends what they stand in aside (`from`/`to`: how near an end a blocker may
@@ -435,6 +493,8 @@ export function gridWay(
   soft = false,
   /** The most cells it opens (by default a few thousand, ten times that past GRID_FAR). */
   steps = GRID_MARGIN > GRID_FAR ? GRID_STEPS * 10 : GRID_STEPS,
+  /** How far round either end a cell may be as near what stands there as the end itself is, metres. */
+  endRoom = END_ROOM,
 ): [number, number][] {
   // the box is on the world's own grid, so the cells' answers are shared by every way looked for
   const x0 = Math.floor((Math.min(a[0], b[0]) - GRID_MARGIN) / GRID) * GRID
@@ -443,7 +503,7 @@ export function gridWay(
   const nz = Math.ceil((Math.max(a[2], b[2]) + GRID_MARGIN - z0) / GRID)
   if (nx * nz > 400000) return []
   const memo = memoOf(near, `${C},${GRID},${soft}`)
-  const key = `${a[0].toFixed(2)},${a[2].toFixed(2)},${b[0].toFixed(2)},${b[2].toFixed(2)},${any},${GRID_MARGIN},${steps}`
+  const key = `${a[0].toFixed(2)},${a[2].toFixed(2)},${b[0].toFixed(2)},${b[2].toFixed(2)},${any},${GRID_MARGIN},${steps},${endRoom}`
   const had = memo.ways.get(key)
   if (had) return had
   const gi0 = Math.round(x0 / GRID)
@@ -480,7 +540,7 @@ export function gridWay(
    */
   const byEnd = (so: Solid, px: number, pz: number, d: number, x: number, z: number) => {
     const dp = solidDistance(so, px, pz)
-    const r = dp < 0.05 && ends.has(so) ? ownRoom(dp) : END_ROOM
+    const r = dp < 0.05 && ends.has(so) ? Math.max(ownRoom(dp), endRoom) : endRoom
     return d < r && solidDistance(so, x, z) >= Math.min(C, dp) - 0.01
   }
   const open = (i: number, j: number): boolean => {
@@ -1140,6 +1200,99 @@ export function clearWay(
     P.splice(k + 1, 0, ...way)
     G.splice(k, 0, ...way.map(() => G[k]!))
     k += way.length
+    fixed++
+  }
+  // last, a body's room off the props (a cart, a crate, a lamp's post, a bench): a bit of way that brushes
+  // one nearer than a body's half-width (what its ends stand at aside: the bench it gets up from, the
+  // stall it works at) goes the way a fine grid finds with that room, round the gap too narrow for a body
+  // (between a fountain and a lamp) instead of through it; where there is no such way it stays
+  // The stretch looked at again runs from the last corner before it with a body's room (or the walk's
+  // start) to the first after it (or its end), so a corner set in a tight spot is no reason to squeeze.
+  const level = (near as NearWithGround).heightAt
+  const onWay = (near as NearWithGround).walkwayAt
+  /** Where feet stand at a point: a walkway's planks, else the ground (null: `near` does not say). */
+  const heightOf = (x: number, z: number): number | null => onWay?.(x, z) ?? level?.(x, z) ?? null
+  const brushAt = (k: number) =>
+    brushesProp(
+      P[k]!,
+      P[k + 1]!,
+      near,
+      k === 0 ? (door.from ? DOOR_SLACK : PROP_OWN) : -1,
+      k + 2 === P.length ? (door.to ? DOOR_SLACK : PROP_OWN) : -1,
+    )
+  const roomy = (k: number) => {
+    const p = P[k]!
+    return near(p[0], p[2], PROP_ROOM).every((o) => {
+      const so = solidOfBlocker(o)
+      return (
+        so.soft || so.kind === "building" || so.kind === "wall" || solidDistance(so, p[0], p[2]) >= PROP_ROOM
+      )
+    })
+  }
+  for (let k = 0, fixed = 0; k < P.length - 1 && fixed < (door.thorough ? 40 : 24); k++) {
+    if (!brushAt(k)) continue
+    let s = k
+    let e = k + 1
+    while (s > 0 && k - s < ROOM_RUN && !roomy(s)) s--
+    while (e < P.length - 1 && e - k < ROOM_RUN && !roomy(e)) e++
+    // (a stretch over a deck or a flight keeps to it: a grid knows no steps)
+    // (over a deck or a flight only where `near` says where the walkways are: a way round keeps to them)
+    const deck = G.slice(s, e).some((g) => !g)
+    if (deck && !onWay) continue
+    const a = P[s]!
+    const b = P[e]!
+    const first = s === 0
+    const last = e === P.length - 1
+    // (roomy first; where the props stand close, as much room as a body's half-width takes; out of a nook
+    // its ends stand in, as near what stands there as the end is, for a step or two)
+    let found: [number, number][] | null = null
+    for (const room of [PROP_ROOM, PROP_SQUEEZE, PROP_TIGHT]) {
+      for (const [p, q, margin] of [
+        [a, b, GRID_NEAR],
+        [b, a, GRID_NEAR],
+        [a, b, GRID_FAR],
+      ] as const) {
+        const w = gridWay(p, q, near, room, 0.1, false, margin, false, undefined, ROOM_END)
+        // (no corners: no way at all, or the straight one is clear, the corners between left out)
+        if (!w.length && !gridWay(p, q, near, room, 0.1, true, margin, false, undefined, ROOM_END).length)
+          continue
+        found = p === a ? w : [...w].reverse()
+        break
+      }
+      if (found) break
+    }
+    if (!found || (!found.length && e === s + 1)) continue
+    const len = Math.hypot(b[0] - a[0], b[2] - a[2]) || 1
+    const ux = (b[0] - a[0]) / len
+    const uz = (b[2] - a[2]) / len
+    const y = (t: number) => a[1] + (b[1] - a[1]) * Math.max(0, Math.min(1, t / len))
+    const way = found.map(([x, z]): Pt => [x, y((x - a[0]) * ux + (z - a[2]) * uz), z])
+    // (the way round must itself keep out of the walls, and on the level: never off a terrace's edge)
+    const pts = [a, ...way, b]
+    let bad = false
+    for (let j = 0; j + 1 < pts.length && !bad; j++) {
+      const p = pts[j]!
+      const q = pts[j + 1]!
+      bad = cutBy(p, q, first && j === 0, last && j + 2 === pts.length, walls)
+      for (let f = j > 0 ? 0 : 0.25; f < 1 && !bad; f += 0.25) {
+        const x = p[0] + (q[0] - p[0]) * f
+        const z = p[2] + (q[2] - p[2]) * f
+        const under = heightOf(x, z)
+        bad = under === null ? deck : Math.abs(under - (p[1] + (q[1] - p[1]) * f)) > ROOM_STEP
+      }
+    }
+    if (bad) continue
+    P.splice(s + 1, e - s - 1, ...way)
+    // (a new bit of way is on a walkway's planks where its middle is, else on the ground)
+    G.splice(
+      s,
+      e - s,
+      ...pts.slice(0, -1).map((p, j) => {
+        const q = pts[j + 1]!
+        return !deck || onWay?.((p[0] + q[0]) / 2, (p[2] + q[2]) / 2) == null
+      }),
+    )
+    k = s + way.length
     fixed++
   }
   // (what still runs through a wall, a house or a fence: the walk has no clean way, for its planner to

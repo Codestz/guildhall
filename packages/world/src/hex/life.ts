@@ -41,10 +41,12 @@ import { HEX_TILE_SIZE, opensEvening, type SpotHours, spotWindows } from "./tile
 import {
   clearWay,
   cutsHard,
+  cutsSolid,
   DOOR_SLACK,
   floodWay,
   type HexWalk,
   type HexWalkNode,
+  type NearWithGround,
   type WalkBlocker,
   walledIn,
 } from "./walk.ts"
@@ -112,6 +114,8 @@ export interface LifeWalk {
   carry?: string
   /** Walked tipsy (social.ts): weaving side to side, one weave this long (the loop's unit). */
   tipsy?: number
+  /** How far either side of its way a tipsy walk weaves, metres (WEAVE_M; less where props stand close). */
+  sway?: number
 }
 
 export type LifeStep = LifeStay | LifeWalk
@@ -654,7 +658,7 @@ export function lifePose(steps: readonly LifeStep[], t: number, period: number):
     // a weave either side of the way, eased in and out at its ends, the body turned with it
     const ease = Math.max(0, Math.min(1, (h - s.from) / (s.tipsy * 2), (s.to - h) / (s.tipsy * 2)))
     const ph = ((h - s.from) / s.tipsy) * Math.PI * 2
-    const side = WEAVE_M * ease * Math.sin(ph)
+    const side = (s.sway ?? WEAVE_M) * ease * Math.sin(ph)
     at[0] -= Math.cos(facing) * side
     at[2] += Math.sin(facing) * side
     facing += WEAVE_TURN * ease * Math.cos(ph)
@@ -673,7 +677,7 @@ export function lifePose(steps: readonly LifeStep[], t: number, period: number):
 }
 
 /** A tipsy walk's weave either side of the way, metres, and the body's turn with it, radians. */
-const WEAVE_M = 0.22
+export const WEAVE_M = 0.22
 const WEAVE_TURN = 0.35
 
 /**
@@ -985,7 +989,7 @@ export function lifePlaces(
   h: HexIsland,
   z: HexZones,
   w: Pick<HexWorld, "tiles" | "pieces"> &
-    Partial<Pick<HexWorld, "stairAt" | "stairs" | "bridges" | "doorways" | "board">>,
+    Partial<Pick<HexWorld, "stairAt" | "stairs" | "bridges" | "doorways" | "board" | "heightAt">>,
   walk: HexWalk,
   opts: { heroSpots?: number } = {},
 ): LifePlaces {
@@ -1017,8 +1021,14 @@ export function lifePlaces(
     const uz = (b.z - a.z) / len
     let n = 0
     for (const d of furniture.near((a.x + b.x) / 2, (a.z + b.z) / 2, len / 2 + 1)) {
-      if (d.r < 0.6 || Math.hypot(b.x - d.x, b.z - d.z) < d.r || Math.hypot(a.x - d.x, a.z - d.z) < d.r)
+      if (d.r < 0.6) continue
+      // a blocker's real shape (a cart's box): crossed when the way cuts it, an end standing in it aside
+      if (d.solid) {
+        if (solidDistance(d.solid, a.x, a.z) < 0 || solidDistance(d.solid, b.x, b.z) < 0) continue
+        if (cutsSolid(d.solid, a.x, a.z, b.x, b.z)) n++
         continue
+      }
+      if (Math.hypot(b.x - d.x, b.z - d.z) < d.r || Math.hypot(a.x - d.x, a.z - d.z) < d.r) continue
       const t = (d.x - a.x) * ux + (d.z - a.z) * uz
       if (t > 0 && t < len && Math.abs((d.x - a.x) * -uz + (d.z - a.z) * ux) < d.r) n++
     }
@@ -1265,7 +1275,11 @@ export function lifePlaces(
         const zz = cz + Math.sin(a) * r
         const node = walkable(x, zz)
         if (node < 0) continue
-        if (furniture.near(x, zz, 0.3).length || furniture.blocked(x, zz, 0.3)) continue
+        if (
+          furniture.near(x, zz, 0.3).some((d) => !d.solid || solidDistance(d.solid, x, zz) < 0.3) ||
+          furniture.blocked(x, zz, 0.3)
+        )
+          continue
         // nobody's slot on someone's spot
         if (spotGrid().near(x, zz, 0).length) continue
         if (w.stairAt?.(x, zz) != null) continue
@@ -1311,6 +1325,9 @@ export function lifePlaces(
     const b = standing.near(x, zz, r)
     return b.length ? [...a, ...b] : a
   }
+  // (and the ground's height, so a way round a prop keeps to its level: walk.ts clearWay)
+  if (w.heightAt) (walkNear as NearWithGround).heightAt = w.heightAt
+  ;(walkNear as NearWithGround).walkwayAt = furniture.walkwayAt
   const isWalled = (spot: number) => {
     nodeOf(spot)
     return walled.has(spot)
@@ -1501,8 +1518,8 @@ export function lifePlaces(
     }
     return made
   }
-  // a castle round's point: a body's room from every wall and building
-  const roundFree = (x: number, zz: number) => !furniture.blocked(x, zz, ROUND_BODY, HARD)
+  // a castle round's point: a body's room from every wall, building and prop (a cart in the yard)
+  const roundFree = (x: number, zz: number) => !furniture.blocked(x, zz, ROUND_BODY)
   const poolInputs = {
     h,
     z,
@@ -1706,7 +1723,7 @@ export function planFolk(
     }
     return undefined
   }
-  const roundFree = (x: number, zz: number) => !places.furniture.blocked(x, zz, ROUND_BODY, HARD)
+  const roundFree = (x: number, zz: number) => !places.furniture.blocked(x, zz, ROUND_BODY)
   /** A castle's rounds (castleRounds), from a start of each guard's own. */
   const rounds = (zi: number, pick: number): LifeSpot[] => {
     const out = castleRounds(h, z, walk, zi, roundFree)

@@ -15,7 +15,6 @@ import {
   createStage,
   createSun,
   createSurface,
-  discMarker,
   disposeObject,
   type GizmoMode,
   type GizmoPose,
@@ -25,6 +24,7 @@ import {
   loadPiece,
   measure,
   type Npc,
+  outlineMarker,
   recolourPiece,
   type Stage,
   spotMarker,
@@ -32,6 +32,7 @@ import {
   toScreen,
 } from "@guildhall/render"
 import {
+  blockerShapes,
   CHARACTER_SCALE,
   DIRS,
   FRONT_SIDE,
@@ -40,6 +41,7 @@ import {
   KENNEY_WOOD,
   LEAF_TONES,
   LEVEL_STEP,
+  shapeOutline,
   sideDir,
   type TileGround,
   type TilePiece,
@@ -344,8 +346,12 @@ export function createTileScene(
       })
       t.blockers?.forEach((b, i) => {
         const on = selected?.layer === "blockers" && selected.i === i
-        const g = group(`blocker-${i}`, discMarker(b.r, BLOCKER_COLOUR, on))
-        g.position.set(b.x, baseOf(t), b.z)
+        // its real shape: the piece's own (a box, a circle per part), or the box or circle written out
+        const g = group(
+          `blocker-${i}`,
+          ...blockerShapes(b, t.pieces).map((sh) => outlineMarker(shapeOutline(sh, 36), BLOCKER_COLOUR, on)),
+        )
+        g.position.set(0, baseOf(t), 0)
         marks!.add(g)
         nodes.blockers[i] = g
       })

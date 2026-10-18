@@ -127,7 +127,22 @@ export function validateTilePrefab(json: unknown, file?: string): string[] {
           at(path, "an object")
           return
         }
+        // the shape of one of its pieces (blockers.ts), a box, or a circle (an old disc)
+        if (b.of !== undefined) {
+          const n = Array.isArray(t.pieces) ? t.pieces.length : 0
+          if (!Number.isInteger(b.of) || (b.of as number) < 0 || (b.of as number) >= n)
+            at(`${path}.of`, `a piece's index (0–${n - 1})`)
+          if (b.pad !== undefined && (!isNum(b.pad) || b.pad < 0 || b.pad > 1))
+            at(`${path}.pad`, "metres in [0, 1]")
+          return
+        }
         point(path, b)
+        if (b.w !== undefined || b.d !== undefined) {
+          if (!isNum(b.w) || b.w <= 0 || b.w > 6) at(`${path}.w`, "a width in (0, 6] m")
+          if (!isNum(b.d) || b.d <= 0 || b.d > 6) at(`${path}.d`, "a depth in (0, 6] m")
+          if (b.rot !== undefined && !isNum(b.rot)) at(`${path}.rot`, "radians")
+          return
+        }
         if (!isNum(b.r) || b.r <= 0 || b.r > 3) at(`${path}.r`, "a radius in (0, 3] m")
       })
   }

@@ -86,7 +86,7 @@ export function collideView(
       // the solids
       g.lineWidth = 1.5
       for (const s of collide.solidsNear(t[0], t[2], REACH)) {
-        if (s.soft) continue
+        // (a tile's authored blockers, their real shapes, dashed: kept clear of where there is room)
         g.strokeStyle = s.kind === "blocker" ? "rgba(255,120,120,0.75)" : "rgba(255,40,40,0.95)"
         g.setLineDash(s.kind === "blocker" ? [4, 3] : [])
         const y = s.base + 0.05

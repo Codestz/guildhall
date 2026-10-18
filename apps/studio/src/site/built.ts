@@ -131,7 +131,7 @@ export const BUILT: BuiltContent = {
       blocks: [
         {
           kind: "p",
-          text: "Townsfolk live by daily routines: they go to authored **spots** where they sit, work, talk or drink, and the evening finds them in the tavern garden. 234 spots and 474 blockers are authored as data on 83 tile prefabs, so a design opinion (“a canteen with a beer garden”) becomes something the simulation uses.",
+          text: "Townsfolk live by daily routines: they go to authored **spots** where they sit, work, talk or drink, and the evening finds them in the tavern garden. 234 spots and 432 blockers are authored as data on 83 tile prefabs (a blocker is the box or circle of the piece it covers, from that piece's own outline), so a design opinion (“a canteen with a beer garden”) becomes something the simulation uses.",
         },
         {
           kind: "techs",

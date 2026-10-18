@@ -26,10 +26,12 @@ import { currentQuery, replaceQuery } from "../shell/router.ts"
 import { Field, NumberField, Segments, short } from "./controls.tsx"
 import {
   addBlocker,
+  addBox,
   addPiece,
   addSpot,
   back,
   blockerFor,
+  blockerLabel,
   copyAs,
   duplicate,
   forward,
@@ -49,6 +51,7 @@ import {
   type SpotKind,
   snapToEdge,
   tidy,
+  writeOut,
 } from "./model.ts"
 import { AROUND, type Around, createTileScene, type TileScene } from "./scene.ts"
 
@@ -273,12 +276,15 @@ export function TileComposer({
       }
       if ((e.key === "[" || e.key === "]") && s.layer === "blockers") {
         const b = cur.tile.blockers?.[s.i]
-        if (b)
+        const by = e.key === "]" ? 0.05 : -0.05
+        const r2 = (v: number) => Math.round(v * 100) / 100
+        // a circle wider, a box longer and wider, a piece's own shape grown (its pad)
+        if (b && "of" in b) change(patchBlocker(cur.tile, s.i, { pad: Math.max(0, r2((b.pad ?? 0) + by)) }))
+        else if (b && "w" in b)
           change(
-            patchBlocker(cur.tile, s.i, {
-              r: Math.max(0.1, Math.round((b.r + (e.key === "]" ? 0.05 : -0.05)) * 100) / 100),
-            }),
+            patchBlocker(cur.tile, s.i, { w: Math.max(0.1, r2(b.w + by)), d: Math.max(0.1, r2(b.d + by)) }),
           )
+        else if (b) change(patchBlocker(cur.tile, s.i, { r: Math.max(0.1, r2(b.r + by)) }))
       }
     }
     addEventListener("keydown", onKey)
@@ -589,8 +595,11 @@ export function TileComposer({
           {tab === "blockers" && (
             <>
               <div className="gh-chips gh-add">
+                <button type="button" className="gh-toggle" onClick={() => run(addBox(t), "blockers")}>
+                  + box
+                </button>
                 <button type="button" className="gh-toggle" onClick={() => run(addBlocker(t), "blockers")}>
-                  + blocker
+                  + circle
                 </button>
               </div>
               <ul className="gh-list placed">
@@ -598,10 +607,10 @@ export function TileComposer({
                   // biome-ignore lint/suspicious/noArrayIndexKey: blockers are positional
                   <li key={i} data-selected={sel?.layer === "blockers" && sel.i === i}>
                     <button type="button" className="pick" onClick={() => select("blockers", i)}>
-                      <span className="what">disc {i + 1}</span>
-                      <span className="num">
-                        r {b.r.toFixed(2)} · {b.x.toFixed(1)},{b.z.toFixed(1)}
+                      <span className="what">
+                        {i + 1}. {blockerLabel(t, b).what}
                       </span>
+                      <span className="num">{blockerLabel(t, b).num}</span>
                     </button>
                   </li>
                 ))}
@@ -805,7 +814,8 @@ function Inspector({
             <button
               type="button"
               className="gh-toggle"
-              onClick={() => entry && onRun(blockerFor(t, sel.i, entry.size), "blockers")}
+              title="people walk round its own shape (a box or a circle per part), which follows it"
+              onClick={() => onRun(blockerFor(t, sel.i), "blockers")}
             >
               block it
             </button>
@@ -956,6 +966,39 @@ function Inspector({
   const b = t.blockers?.[sel.i]
   if (!b) return null
   const set = (patch: Parameters<typeof patchBlocker>[2]) => onChange(patchBlocker(t, sel.i, patch))
+  if ("of" in b)
+    return (
+      <div className="gh-inspect">
+        <div className="gh-sec-head">
+          <p className="gh-eyebrow">blocker {sel.i + 1}</p>
+        </div>
+        <p className="gh-hint-line">
+          The shape of piece {b.of + 1} ({t.pieces[b.of]?.piece.split("/")[1] ?? "none"}) as it stands: it
+          moves and turns with it.
+        </p>
+        <div className="gh-nums">
+          <NumberField
+            label="pad"
+            value={b.pad ?? 0}
+            step={0.05}
+            min={0}
+            max={1}
+            unit="m"
+            onChange={(pad) => set({ pad })}
+          />
+        </div>
+        {actions(
+          <button
+            type="button"
+            className="gh-toggle"
+            title="as boxes and circles of its own, sized by hand (they stay put when the piece moves)"
+            onClick={() => onRun(writeOut(t, sel.i), "blockers")}
+          >
+            write it out
+          </button>,
+        )}
+      </div>
+    )
   return (
     <div className="gh-inspect">
       <div className="gh-sec-head">
@@ -964,15 +1007,45 @@ function Inspector({
       <div className="gh-nums">
         <NumberField label="x" value={b.x} step={0.05} unit="m" onChange={(x) => set({ x })} />
         <NumberField label="z" value={b.z} step={0.05} unit="m" onChange={(z) => set({ z })} />
-        <NumberField
-          label="r"
-          value={b.r}
-          step={0.05}
-          min={0.1}
-          max={3}
-          unit="m"
-          onChange={(r) => set({ r })}
-        />
+        {"w" in b ? (
+          <>
+            <NumberField
+              label="w"
+              value={b.w}
+              step={0.05}
+              min={0.1}
+              max={6}
+              unit="m"
+              onChange={(w) => set({ w })}
+            />
+            <NumberField
+              label="d"
+              value={b.d}
+              step={0.05}
+              min={0.1}
+              max={6}
+              unit="m"
+              onChange={(d) => set({ d })}
+            />
+            <NumberField
+              label="turn"
+              value={b.rot ?? 0}
+              step={0.05}
+              unit="rad"
+              onChange={(rot) => set({ rot })}
+            />
+          </>
+        ) : (
+          <NumberField
+            label="r"
+            value={b.r}
+            step={0.05}
+            min={0.1}
+            max={3}
+            unit="m"
+            onChange={(r) => set({ r })}
+          />
+        )}
       </div>
       {actions()}
     </div>

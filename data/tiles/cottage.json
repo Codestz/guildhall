@@ -1,11 +1,5 @@
 {
-  "blockers": [
-    {
-      "r": 1.025,
-      "x": 0,
-      "z": -0.4
-    }
-  ],
+  "blockers": [],
   "ground": "grass",
   "group": "town",
   "id": "cottage",

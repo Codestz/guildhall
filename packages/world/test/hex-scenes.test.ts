@@ -7,6 +7,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { castleTier } from "../src/hex/zones.ts"
 import {
+  blockerShapes,
   HEX_TILE_SIZE,
   hexAt,
   hexIsland,
@@ -258,7 +259,20 @@ describe("a mirrored scene", () => {
     expect(m.footprint).toEqual([1, 0])
     expect(m.pieces.map((q) => [q.x, q.z, q.rot])).toEqual(p.pieces.map((q) => [-q.x, q.z, -q.rot]))
     expect(m.spots!.map((s) => [s.x, s.z, s.facing])).toEqual(p.spots!.map((s) => [-s.x, s.z, -s.facing]))
-    expect(m.blockers!.map((b) => [b.x, b.z, b.r])).toEqual(p.blockers!.map((b) => [-b.x, b.z, b.r]))
+    // a piece's own shape stays its piece's (that piece is the one mirrored); a circle or a box is mirrored
+    expect(m.blockers).toEqual(
+      p.blockers!.map((b) =>
+        "of" in b
+          ? b
+          : "w" in b
+            ? { ...b, x: -b.x, ...(b.rot !== undefined ? { rot: -b.rot } : {}) }
+            : { ...b, x: -b.x },
+      ),
+    )
+    // … so the shapes people walk round stand on the mirrored side, round the pieces as they now stand
+    const shapes = (q: typeof p) => q.blockers!.flatMap((b) => blockerShapes(b, q.pieces))
+    expect(shapes(m).length).toBe(shapes(p).length)
+    for (const [k, s] of shapes(p).entries()) expect(Math.sign(shapes(m)[k]!.x)).toBe(-Math.sign(s.x))
     expect(m.decks!.map((d) => [d.ax, d.bx])).toEqual(p.decks!.map((d) => [-d.ax, -d.bx]))
     expect(mirrorPrefab(p)).toBe(m)
   })

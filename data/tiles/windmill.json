@@ -1,11 +1,5 @@
 {
-  "blockers": [
-    {
-      "r": 1.352,
-      "x": 0,
-      "z": 0
-    }
-  ],
+  "blockers": [],
   "ground": "grass",
   "group": "landmark",
   "id": "windmill",

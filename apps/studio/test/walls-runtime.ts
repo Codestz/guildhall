@@ -51,6 +51,14 @@ export const BRUSH = 0.15
 /** By a walk's end, how near it a solid counts as its own and how far from it (space.ts DOOR, DOOR_ROOM). */
 const DOOR = 1
 const DOOR_ROOM = 1.6
+/** A body's half-width at a prop's height, and the brush it may sink into one (the plan's props sweep's). */
+export const PROP_BODY = 0.2
+export const PROP_BRUSH = 0.05
+/** Two drawn bodies whose rounds overlap by more than this intersect (one of them walking), metres. */
+export const BODY_TOUCH = 0.05
+/** The props a body is drawn through: the pieces that are not walls or houses (collide.ts kinds). */
+const propLike = (o: Solid): boolean =>
+  !o.soft && (o.kind === "prop" || o.kind === "seat" || o.kind === "trunk" || o.kind === "blocker")
 
 export function installTiles(): void {
   const dir = join(import.meta.dir, "../../../data/tiles")
@@ -85,6 +93,23 @@ export interface RuntimeSweep {
   readers: number
   /** Frames someone was pushed off their way (an offset over 2 cm): what the crowd did at all. */
   pushed: number
+  /**
+   * Frames in which some walker's drawn body is in a prop past its brush (its walk's own ends aside: the
+   * bench it gets up from, the cart it works at), and how many such person-frames.
+   */
+  propFrames: number
+  propHits: number
+  /** … and frames in which someone standing (or sitting) is pushed deeper into one than their spot is. */
+  standFrames: number
+  standHits: number
+  /** Frames in which two drawn bodies intersect (one walking), and how many such pair-frames. */
+  overlapFrames: number
+  overlapPairs: number
+  /** The deepest few prop hits and body overlaps, for a look. */
+  propWorst: Intrusion[]
+  overlapWorst: { who: string; x: number; z: number; depth: number; hour: number }[]
+  /** CPU of the crowd's step alone, ms a frame (mean). */
+  stepMs: number
   /** Heroes' drawn positions looked at, and the graves they struck (a story's). */
   heroLooked: number
   struck: number
@@ -193,6 +218,15 @@ export function runtimeSweep(
     readers: 0,
     pushed: 0,
     heroLooked: 0,
+    propFrames: 0,
+    propHits: 0,
+    standFrames: 0,
+    standHits: 0,
+    overlapFrames: 0,
+    overlapPairs: 0,
+    propWorst: [],
+    overlapWorst: [],
+    stepMs: 0,
     struck: heroes.reduce((m, it) => m + it.acts.filter((a) => a.play === "strike").length, 0),
     ms: 0,
   }
@@ -219,6 +253,8 @@ export function runtimeSweep(
   }
   // the first frame sets everyone where their day has them (no push yet)
   let day = (secs / SEC_PER_HOUR) % 24
+  let stepMs = 0
+  const cells = new Map<number, number[]>()
   for (; secs < end; secs += dt) {
     day = (secs / SEC_PER_HOUR) % 24
     for (let id = 0; id < n; id++) {
@@ -236,8 +272,91 @@ export function runtimeSweep(
         (readers.size ? readers.pose(id, secs, day, SEC_PER_HOUR) : null) ??
         lifePose(folk[id]!.day, day - (late * SPEEDUP) / 3600, 24)
     }
+    const s0 = performance.now()
     space.step(poses, dt)
+    stepMs += performance.now() - s0
     out.frames++
+    // the props: a walker's body in one (its ends' own aside), a stander pushed into one
+    let propHit = false
+    let standHit = false
+    for (let id = 0; id < n; id++) {
+      const p = poses[id]!
+      const ghost = (p as { ghost?: unknown }).ghost != null && (p as { ghost?: unknown }).ghost !== false
+      if (p.indoors || ghost) continue
+      const x = space.x[id]!
+      const zz = space.z[id]!
+      for (const o of collide.solidsNear(x, zz, PROP_BODY)) {
+        if (!propLike(o)) continue
+        const d = solidDistance(o, x, zz)
+        if (d >= PROP_BODY - PROP_BRUSH) continue
+        if (p.act === "walk") {
+          let own = false
+          for (const e of [p.from, p.to]) {
+            if (!e) continue
+            const de = solidDistance(o, e[0], e[2])
+            if (de < PROP_BODY + 0.05 && Math.hypot(x - e[0], zz - e[2]) < ownRoom(de) + 0.1) own = true
+          }
+          if (own) continue
+        } else {
+          // standing: only a push deeper than the spot itself (and never a seat sat on)
+          if (o.kind === "seat" || d >= solidDistance(o, p.at[0], p.at[2]) - 0.02) continue
+        }
+        if (p.act === "walk") {
+          out.propHits++
+          propHit = true
+        } else {
+          out.standHits++
+          standHit = true
+        }
+        if (out.propWorst.length < 100_000)
+          out.propWorst.push({
+            kind: "crowd push",
+            who: `s${seed}/${files}:${id >= nf ? `hero ${heroes[id - nf]!.id}` : `folk ${id} ${folk[id]!.role}`} ${p.act}`,
+            x,
+            z: zz,
+            depth: PROP_BODY - d,
+            ...(o.piece ? { piece: o.piece } : {}),
+            hour: day,
+          })
+        break
+      }
+    }
+    if (propHit) out.propFrames++
+    if (standHit) out.standFrames++
+    // two bodies drawn through each other (one walking)
+    cells.clear()
+    for (let id = 0; id < n; id++) {
+      const p = poses[id]!
+      if (p.indoors) continue
+      const k = (Math.floor(space.x[id]! / 1.2) + 32768) * 65536 + Math.floor(space.z[id]! / 1.2) + 32768
+      const c = cells.get(k)
+      if (c) c.push(id)
+      else cells.set(k, [id])
+    }
+    let touch = false
+    for (const [k, list] of cells)
+      for (const a of list)
+        for (const dk of [0, 1, 65536 - 1, 65536, 65536 + 1])
+          for (const b of dk === 0 ? list : (cells.get(k + dk) ?? [])) {
+            if (dk === 0 && b <= a) continue
+            const pa = poses[a]!
+            const pb = poses[b]!
+            if (pa.act !== "walk" && pb.act !== "walk") continue
+            const d = Math.hypot(space.x[a]! - space.x[b]!, space.z[a]! - space.z[b]!)
+            const over = radii[a]! + radii[b]! - d
+            if (over <= BODY_TOUCH) continue
+            out.overlapPairs++
+            touch = true
+            if (out.overlapWorst.length < 100_000)
+              out.overlapWorst.push({
+                who: `${a}/${b}`,
+                x: space.x[a]!,
+                z: space.z[a]!,
+                depth: over,
+                hour: day,
+              })
+          }
+    if (touch) out.overlapFrames++
     // a quest pinned: who stands about near the board comes to read it
     if (day >= nextPin && day < 22 && plan.readers.length) {
       nextPin += pinEvery
@@ -336,6 +455,7 @@ export function runtimeSweep(
       }
     }
   }
+  out.stepMs = stepMs / Math.max(1, out.frames)
   out.ms = performance.now() - t0
   return out
 }
@@ -360,6 +480,27 @@ if (import.meta.main) {
           `seed ${seed} files ${files}${story ? ` ${story}` : ""}: ${r.frames} frames, ${r.looked} looked, ${r.pushed} pushed, ${r.readers} readers, ${r.heroLooked} hero frames, ${r.struck} strikes; ` +
             `crowd push ${by.get("crowd push") ?? 0}, reader walk ${by.get("reader walk") ?? 0}, hero drawn ${by.get("hero drawn") ?? 0} (${Math.round(r.ms)} ms)`,
         )
+        console.log(
+          `  props: ${r.propFrames} frames, ${r.propHits} person-frames (walkers); ${r.standFrames} frames, ${r.standHits} person-frames (pushed while standing); bodies: ${r.overlapFrames} frames, ${r.overlapPairs} pair-frames; step ${r.stepMs.toFixed(3)} ms/frame`,
+        )
+        if (process.env.PIECES) {
+          const byPiece = new Map<string, number>()
+          for (const i of r.propWorst) byPiece.set(i.piece ?? "-", (byPiece.get(i.piece ?? "-") ?? 0) + 1)
+          console.log(
+            `  by piece: ${[...byPiece]
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, Number(process.env.PIECES))
+              .map(([k, v]) => `${k} ${v}`)
+              .join(", ")}`,
+          )
+        }
+        if (process.env.PROPS)
+          for (const i of [...r.propWorst]
+            .sort((a, b) => b.depth - a.depth)
+            .slice(0, Number(process.env.PROPS)))
+            console.log(
+              `  prop ${i.who} ${i.depth.toFixed(2)} m ${i.piece ?? ""} at ${i.x.toFixed(1)},${i.z.toFixed(1)} h${i.hour.toFixed(2)}`,
+            )
         const seen = new Set<string>()
         for (const i of r.intrusions.sort((a, b) => b.depth - a.depth)) {
           const k = `${i.kind} ${i.who} ${i.piece}`

@@ -64,6 +64,60 @@ export function discMarker(r: number, colour: string, on = false): Object3D {
   return g
 }
 
+/**
+ * A blocker's shape: a convex outline on the ground (corners x, z after one another, in the group's own
+ * frame: a box's four, a circle's ring), a faint fill inside a solid rim; brighter when `on`.
+ */
+export function outlineMarker(pts: readonly number[], colour: string, on = false): Object3D {
+  const g = new Group()
+  g.name = "outline-marker"
+  const n = pts.length / 2
+  if (n < 3) return g
+  let cx = 0
+  let cz = 0
+  for (let k = 0; k < n; k++) {
+    cx += pts[k * 2]! / n
+    cz += pts[k * 2 + 1]! / n
+  }
+  // the rim: the outline less the same drawn in toward its middle (a convex outline stays one)
+  let reach = Number.POSITIVE_INFINITY
+  for (let k = 0; k < n; k++) {
+    const ax = pts[k * 2]!
+    const az = pts[k * 2 + 1]!
+    const bx = pts[((k + 1) % n) * 2]!
+    const bz = pts[((k + 1) % n) * 2 + 1]!
+    const l = Math.hypot(bx - ax, bz - az) || 1
+    // the middle's distance from this edge's line
+    reach = Math.min(reach, Math.abs((cx - ax) * (bz - az) - (cz - az) * (bx - ax)) / l)
+  }
+  const width = Math.min(on ? 0.07 : 0.045, reach * 0.5)
+  const k0 = reach > 0 ? 1 - width / reach : 0
+  // laid flat, the shape's +y runs to −z: (x, z) is drawn at (x, −z)
+  const outer = new Shape()
+  const inner = new Shape()
+  const fill = new Shape()
+  for (let k = 0; k < n; k++) {
+    const x = pts[k * 2]!
+    const z = pts[k * 2 + 1]!
+    const ix = cx + (x - cx) * k0
+    const iz = cz + (z - cz) * k0
+    if (k === 0) {
+      outer.moveTo(x, -z)
+      inner.moveTo(ix, -iz)
+      fill.moveTo(x, -z)
+    } else {
+      outer.lineTo(x, -z)
+      inner.lineTo(ix, -iz)
+      fill.lineTo(x, -z)
+    }
+  }
+  outer.holes.push(inner)
+  g.add(flat(new ShapeGeometry(fill), colour, on ? 0.34 : 0.18))
+  g.add(flat(new ShapeGeometry(outer), colour, on ? 1 : 0.85))
+  for (const child of g.children) child.position.y = 0.03
+  return g
+}
+
 /** A hex outline (pointy-top, `size` centre to corner) as a thin flat ring, e.g. a claimed footprint tile. */
 export function hexOutline(size: number, colour: string, width = 0.06): Object3D {
   const outer = new Shape()

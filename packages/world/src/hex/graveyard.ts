@@ -157,28 +157,28 @@ export function graveyardPrefab(): TilePrefab {
     pieces.push(piece("floor-dirt-grave", g.x, g.z, g.facing, DIRT_SCALE, round(RIM_TOP - 1.53 * DIRT_SCALE)))
     // a mound of fresh earth in it, lying the way its riser lies (Kenney's grave: KayKit has none)
     pieces.push({ ...piece("", g.x, g.z, g.facing, EARTH_SCALE), piece: EARTH })
+    // (each headstone, the crypt and the dead trees are walked round by their own shapes: blockers.ts)
+    blockers.push({ of: pieces.length })
     pieces.push(piece(stone, g.x + out * HEAD_OUT, g.z, g.facing, scale))
-    blockers.push({ x: round(g.x + out * HEAD_OUT), z: g.z, r: 0.38 })
   })
   // the crypt at the back, its door on the path
+  blockers.push({ of: pieces.length })
   pieces.push(piece("crypt", 0, CRYPT_Z, 0, CRYPT_SCALE))
-  blockers.push({ x: 0, z: round(CRYPT_Z), r: 1.35 })
   // lanterns either side of its door, candles on two graves, dead trees in the back corners, bones
   for (const s of [-1, 1]) pieces.push(piece("lantern-standing", s * 0.72, CRYPT_Z + 1.75, 0, 0.42))
   pieces.push(piece("candle-triple", -COLUMN - HEAD_OUT + 0.05, 1.3 + 0.42, 0.4, 0.4))
   pieces.push(piece("candle", COLUMN + HEAD_OUT - 0.05, -1.3 - 0.4, 0, 0.4))
-  pieces.push(piece("tree-dead-medium", -2.25, BACK_Z - 0.2, 0.6, 0.42))
-  pieces.push(piece("tree-dead-small", 2.3, BACK_Z + 0.1, 2.4, 0.42))
-  pieces.push(piece("tree-dead-large", 2.2, 0.1, -0.5, 0.36))
+  for (const [name, x, z, rot, scale] of [
+    ["tree-dead-medium", -2.25, BACK_Z - 0.2, 0.6, 0.42],
+    ["tree-dead-small", 2.3, BACK_Z + 0.1, 2.4, 0.42],
+    ["tree-dead-large", 2.2, 0.1, -0.5, 0.36],
+  ] as const) {
+    blockers.push({ of: pieces.length })
+    pieces.push(piece(name, x, z, rot, scale))
+  }
   pieces.push(piece("skull", 1.9, BACK_Z - 1.5, 0.9, 0.25))
   pieces.push(piece("bone-a", -0.6, -2.6, 0.7, 0.3))
   pieces.push(piece("ribcage", -1.95, BACK_Z - 1.2, 1.2, 0.28))
-  for (const [x, z, r] of [
-    [-2.25, BACK_Z - 0.2, 0.25],
-    [2.3, BACK_Z + 0.1, 0.25],
-    [2.2, 0.1, 0.3],
-  ] as const)
-    blockers.push({ x, z: round(z), r })
   return {
     id: GRAVEYARD_SCENE,
     name: "Graveyard",

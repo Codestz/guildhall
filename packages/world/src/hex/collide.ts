@@ -143,7 +143,9 @@ const BUILDING = /^(kaykit-hexagon\/building-|kaykit-builder\/)/
 const WALL =
   /^(kaykit-hexagon\/(wall|fence)|kenney-castle\/(wall|tower|gate|door|metal-gate)|kenney-nature\/fence|kenney-town\/(fence|hedge|wall)|kenney-pirate\/(castle|tower)|kenney-graveyard\/(fence|iron-fence|stone-wall|brick-wall)|kaykit-halloween\/(fence(?!-pillar)|arch))/
 /** A tree's trunk radius at scale 1 (the crown is over people's heads). */
-const TRUNK_R = 0.35
+export const TRUNK_R = 0.35
+/** A prop lower than this (metres, as placed) is stepped on or over, not round. */
+const STEP_ON = 0.12
 /** Smaller than this round (metres, as placed) nobody needs to step round it. */
 const TINY = 0.12
 
@@ -244,6 +246,8 @@ export function pieceSolids(p: PlacedPiece): Solid[] {
   if (kind === "trunk") return [discSolid("trunk", p.x, p.z, TRUNK_R * p.scale, p.y)]
   const o = pieceOutline(p.piece)
   if (!o) return []
+  // a prop no higher than a step (planks laid on a quay, a mat) is stood on, not walked round
+  if (kind === "prop" && o.top * p.scale < STEP_ON) return []
   // a closed building is solid to its foot's outline (its rooms are not walked in: only the parts of an
   // open one, a market's stalls or a range's targets, leave the ground between them free)
   if (solidToFoot(p.piece)) {

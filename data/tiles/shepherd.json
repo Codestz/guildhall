@@ -1,11 +1,5 @@
 {
-  "blockers": [
-    {
-      "r": 0.768,
-      "x": 0.6,
-      "z": -0.8
-    }
-  ],
+  "blockers": [],
   "ground": "grass",
   "group": "country",
   "id": "shepherd",

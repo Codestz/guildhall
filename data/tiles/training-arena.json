@@ -1,79 +1,49 @@
 {
   "blockers": [
     {
-      "r": 0.18,
-      "x": 1.419,
-      "z": 0.779
+      "of": 7
     },
     {
-      "r": 0.18,
-      "x": 1.419,
-      "z": -0.779
+      "of": 8
     },
     {
-      "r": 0.3,
-      "x": 3.55,
-      "z": -4.3
+      "of": 9
     },
     {
-      "r": 0.3,
-      "x": 4.75,
-      "z": -4.3
+      "of": 12
     },
     {
-      "r": 0.3,
-      "x": 5.95,
-      "z": -4.3
+      "of": 15
     },
     {
-      "r": 0.3,
-      "x": 4.1,
-      "z": -5.05
+      "of": 18
     },
     {
-      "r": 0.3,
-      "x": 5.37,
-      "z": -5.05
+      "of": 19
     },
     {
-      "r": 0.45,
-      "x": 1.0,
-      "z": -1.55
+      "of": 20
     },
     {
-      "r": 0.45,
-      "x": 1.0,
-      "z": 1.6
+      "of": 21
     },
     {
-      "r": 0.45,
-      "x": -1.1,
-      "z": -1.9
+      "of": 22
     },
     {
-      "r": 0.45,
-      "x": -1.9,
-      "z": -0.55
+      "of": 27
     },
     {
-      "r": 0.2,
-      "x": -0.2,
-      "z": -2.2
+      "of": 32
     },
     {
-      "r": 0.2,
-      "x": 0.75,
-      "z": -2.35
+      "of": 34
     },
     {
-      "r": 0.3,
-      "x": 6.6,
-      "z": -1.4
+      "of": 36
     },
     {
-      "r": 0.2,
-      "x": 2.0,
-      "z": 2.3
+      "of": 39
     }
   ],
   "footprint": [
@@ -90,7 +60,7 @@
       "rot": -1.571,
       "scale": 0.38,
       "x": 5.135,
-      "z": 0.0
+      "z": 0
     },
     {
       "piece": "kenney-nature/fence-simple",
@@ -244,20 +214,20 @@
       "piece": "kenney-graveyard/bench",
       "rot": 1.571,
       "scale": 0.55,
-      "x": 1.0,
+      "x": 1,
       "z": -1.55
     },
     {
       "piece": "kenney-graveyard/bench",
       "rot": 1.571,
       "scale": 0.55,
-      "x": 1.0,
+      "x": 1,
       "z": 1.6
     },
     {
       "piece": "kenney-survival/campfire-stand",
       "pin": true,
-      "rot": 0.0,
+      "rot": 0,
       "scale": 0.85,
       "x": -1.1,
       "z": -1.9
@@ -265,7 +235,7 @@
     {
       "piece": "kaykit-weapons/spear-a",
       "pin": true,
-      "rot": 0.0,
+      "rot": 0,
       "scale": 0.45,
       "tilt": [
         -0.22,
@@ -277,7 +247,7 @@
     {
       "piece": "kaykit-weapons/sword-a",
       "pin": true,
-      "rot": 0.0,
+      "rot": 0,
       "scale": 0.47,
       "tilt": [
         -0.22,
@@ -289,7 +259,7 @@
     {
       "piece": "kaykit-weapons/sword-b",
       "pin": true,
-      "rot": 0.0,
+      "rot": 0,
       "scale": 0.47,
       "tilt": [
         -0.22,
@@ -301,7 +271,7 @@
     {
       "piece": "kaykit-weapons/spear-a",
       "pin": true,
-      "rot": 0.0,
+      "rot": 0,
       "scale": 0.45,
       "tilt": [
         -0.22,
@@ -409,10 +379,10 @@
     },
     {
       "piece": "kenney-survival/bucket",
-      "rot": 0.0,
+      "rot": 0,
       "scale": 0.5,
       "x": 6.95,
-      "z": -1.0
+      "z": -1
     },
     {
       "piece": "kaykit-dungeon/banner-shield-blue",
@@ -425,7 +395,7 @@
       "piece": "kenney-castle/flag",
       "rot": 0,
       "scale": 0.5,
-      "x": 2.0,
+      "x": 2,
       "z": 2.3
     }
   ],

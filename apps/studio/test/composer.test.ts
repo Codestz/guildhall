@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { HEX_TILE_SIZE, sideDir, type TilePrefab } from "@guildhall/world"
+import { blockerShapes, HEX_TILE_SIZE, sideDir, type TilePrefab } from "@guildhall/world"
 import {
   addBlocker,
   addPiece,
@@ -23,6 +23,7 @@ import {
   remove,
   snapToEdge,
   tidy,
+  writeOut,
 } from "../src/composer/model.ts"
 
 const tile = (): TilePrefab => ({
@@ -67,11 +68,44 @@ describe("tile composer document", () => {
     expect(remove(t, { layer: "pieces", i: 0 }).pieces).toEqual([])
   })
 
-  test("duplicate copies beside the original; a blocker for a piece covers its footprint", () => {
+  test("duplicate copies beside the original; a blocker for a piece is that piece's own shape", () => {
     const [t, i] = duplicate(tile(), { layer: "pieces", i: 0 })
     expect(t.pieces[i]).toMatchObject({ x: 0.8, z: 2.2 })
-    const [b, j] = blockerFor(patchPiece(t, 0, { scale: 0.5 }), 0, [1.2, 1, 0.8])
-    expect(b.blockers?.[j]?.r).toBeCloseTo(0.4)
+    const [b, j] = blockerFor(patchPiece(t, 0, { scale: 0.5 }), 0)
+    expect(b.blockers?.[j]).toEqual({ of: 0 })
+    // (asked again: the one it has)
+    expect(blockerFor(b, 0)).toEqual([b, j])
+    // its shape follows the piece: a box along the fence, where the fence now stands
+    const [sh] = blockerShapes(b.blockers![j]!, moveTo(b, { layer: "pieces", i: 0 }, 1, 1).pieces)
+    expect(sh).toMatchObject({ kind: "box" })
+    expect(sh!.x).toBeCloseTo(1, 1)
+    expect(sh!.z).toBeCloseTo(1, 1)
+    // … and is not moved on its own, nor copied apart from it
+    expect(moveTo(b, { layer: "blockers", i: j }, 2, 2)).toBe(b)
+    expect(duplicate(b, { layer: "blockers", i: j })[1]).toBe(-1)
+  })
+
+  test("a piece taken away takes its own blocker; the later pieces' blockers follow them down", () => {
+    let t: TilePrefab = { ...tile(), pieces: [...tile().pieces, ...tile().pieces, ...tile().pieces] }
+    t = blockerFor(blockerFor(blockerFor(t, 0)[0], 1)[0], 2)[0]
+    t = addBlocker(t, 1, 1, 0.3)[0]
+    expect(remove(t, { layer: "pieces", i: 1 }).blockers).toEqual([
+      { of: 0 },
+      { of: 1 },
+      { x: 1, z: 1, r: 0.3 },
+    ])
+  })
+
+  test("a piece's blocker written out is its boxes and circles, sized and turned by hand from there", () => {
+    const t = blockerFor({ ...tile(), pieces: [{ ...tile().pieces[0]!, rot: 0.5 }] }, 0)[0]
+    const [w, k] = writeOut(t, 0)
+    const b = w.blockers![k]!
+    expect(b).toMatchObject({ rot: 0.5 })
+    expect("w" in b && b.w > 0 && b.d > 0).toBe(true)
+    // a box turns with the gizmo; a circle only moves
+    expect(moveTo(w, { layer: "blockers", i: k }, 0, 0, 1).blockers![k]).toMatchObject({ x: 0, z: 0, rot: 1 })
+    const [c, ci] = addBlocker(w, 1, 1, 0.4)
+    expect(moveTo(c, { layer: "blockers", i: ci }, 0, 0, 1).blockers![ci]).toEqual({ x: 0, z: 0, r: 0.4 })
   })
 
   test("to edge: on the nearest tile side, along it, spanning it", () => {
@@ -137,6 +171,18 @@ describe("tile composer document", () => {
       ],
     }
     expect(lint(t, { piece: () => true, clip: () => true, prop: () => true })).toEqual([
+      "spot 1 stands inside blocker 1",
+    ])
+    // a box: inside it along its length, past it across (it is turned a quarter: its w runs along z)
+    const box: TilePrefab = {
+      ...tile(),
+      spots: [
+        { kind: "work", x: 0, z: 0.9, facing: 0 },
+        { kind: "work", x: 0.5, z: 0, facing: 0 },
+      ],
+      blockers: [{ x: 0, z: 0, w: 2, d: 0.6, rot: Math.PI / 2 }],
+    }
+    expect(lint(box, { piece: () => true, clip: () => true, prop: () => true })).toEqual([
       "spot 1 stands inside blocker 1",
     ])
   })

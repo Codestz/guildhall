@@ -11,6 +11,7 @@
  *
  * Every building also blocks its footprint, authored or not, so nobody cuts through a house.
  */
+import { blockerShapes, isBlockerOf, pieceBlockerShapes, shapeSolid } from "./blockers.ts"
 import {
   discSolid,
   pieceOutline,
@@ -40,11 +41,15 @@ export interface PlacedSpot extends TileSpot {
   tile: number
 }
 
-/** A disc nobody walks through, world metres. */
+/**
+ * Something nobody walks through, world metres: a disc round it, and (a tile's authored blocker,
+ * blockers.ts) its real shape, a box or a circle, as a solid.
+ */
 export interface Disc {
   x: number
   z: number
   r: number
+  solid?: Solid
 }
 
 export interface TileFurniture {
@@ -63,16 +68,27 @@ export interface TileFurniture {
   solidsNear(x: number, z: number, r: number): Solid[]
   /** Whether a body of radius `r` at (x, z) stands in a solid (of the kinds `kinds` lets in). */
   blocked(x: number, z: number, r: number, kinds?: (k: SolidKind) => boolean): boolean
+  /** A stair's tread, a bridge's or a deck's planks at a point (its height), or null off every walkway. */
+  walkwayAt(x: number, z: number): number | null
   /** Spots left out: set inside a building, a wall or a fence too deep to move out of. */
   dropped: PlacedSpot[]
 }
 
+/** How far from where its prefab writes it a piece may have been put and still be the one a blocker covers, metres. */
+const OF_REACH = 0.35
 /** A body's half-width at a spot, metres: no spot stands nearer a building, a wall or a fence. */
 export const SPOT_CLEAR = 0.22
 /** A body's core: nearer a wall than this a spot is moved (and no gap narrower lets a body through). */
 export const BODY_CORE = 0.12
 /** A work spot's (a body at arm's length from what it works at, chest to the wall). */
 export const WORK_CLEAR = 0.1
+/**
+ * A spot whose middle is nearer a prop's outline than PROP_IN (a crate, a cart, a stall's table) steps
+ * out to PROP_OUT from it, at most PROP_STEP from where it was written, metres.
+ */
+const PROP_IN = 0.04
+const PROP_OUT = 0.08
+const PROP_STEP = 0.45
 /** What no spot stands in: buildings, walls, towers, fences. */
 export const HARD = (k: SolidKind): boolean => k === "building" || k === "wall"
 
@@ -322,6 +338,40 @@ export function tileFurniture(
   }
   const spots: PlacedSpot[] = []
   const blockers: Disc[] = []
+  /** The authored blockers' shapes, as solids (soft: kept clear of where there is room). */
+  const shaped: Solid[] = []
+  // the pieces as placed, by id and 2 m cell: a blocker that is a piece's own shape (`of`) stands where
+  // that piece was put (its jitter, a nudge off the road), and is none where it is packed away
+  const PCELL = 2
+  const placedAt = new Map<string, PlacedPiece[]>()
+  const pkey = (id: string, cx: number, cz: number) => `${id}|${cx}|${cz}`
+  for (const p of w.pieces as readonly PlacedPiece[]) {
+    const k = pkey(p.piece, Math.floor(p.x / PCELL), Math.floor(p.z / PCELL))
+    const list = placedAt.get(k)
+    if (list) list.push(p)
+    else placedAt.set(k, [p])
+  }
+  /** The placed piece `id` nearest (x, y, z) within `reach` metres on the ground, if any. */
+  const placedNear = (
+    id: string,
+    x: number,
+    y: number,
+    z: number,
+    reach: number,
+  ): PlacedPiece | undefined => {
+    let best: PlacedPiece | undefined
+    let bestD = reach
+    for (let cx = Math.floor((x - reach) / PCELL); cx <= Math.floor((x + reach) / PCELL); cx++)
+      for (let cz = Math.floor((z - reach) / PCELL); cz <= Math.floor((z + reach) / PCELL); cz++)
+        for (const p of placedAt.get(pkey(id, cx, cz)) ?? []) {
+          const d = Math.hypot(p.x - x, p.z - z) + Math.abs(p.y - y) * 0.5
+          if (d < bestD) {
+            bestD = d
+            best = p
+          }
+        }
+    return best
+  }
   // which tiles carry authored spots / blockers: their pieces add none of the fallback's
   const authoredSpots = new Set<number>()
   const authoredBlockers = new Set<number>()
@@ -337,20 +387,29 @@ export function tileFurniture(
     if (prefab.blockers) {
       authoredBlockers.add(t.i)
       for (const b of prefab.blockers) {
-        const [x, z] = turn(t.x, t.z, t.rot, b.x, b.z)
-        blockers.push({ x, z, r: b.r })
+        let solids: Solid[]
+        if (isBlockerOf(b)) {
+          // the piece's own shape, as it was placed (none: it is packed away on this tile)
+          const q = prefab.pieces[b.of]
+          if (!q) continue
+          const [x, z] = turn(t.x, t.z, t.rot, q.x, q.z)
+          const p = placedNear(q.piece, x, t.top + (q.y ?? 0), z, OF_REACH)
+          if (!p) continue
+          solids = pieceBlockerShapes(p, b.pad ?? 0).map((sh) => shapeSolid(sh, 0, 0, 0, p.y))
+        } else solids = blockerShapes(b, []).map((sh) => shapeSolid(sh, t.x, t.z, t.rot, t.top))
+        for (const so of solids) {
+          so.soft = true
+          shaped.push(so)
+          blockers.push({ x: so.cx, z: so.cz, r: so.r, solid: so })
+        }
       }
     }
   }
   // the collision layer: every piece's outline, the authored blockers, the stairs' cheeks, the rails
   const solids: Solid[] = []
-  // the composer's blocker discs: kept clear of where there is room, but the pieces' own outlines are
-  // the walls (a lantern's disc is far rounder than its post)
-  for (const b of blockers) {
-    const d = discSolid("blocker", b.x, b.z, b.r, 0)
-    d.soft = true
-    solids.push(d)
-  }
+  // the composer's blockers (their real shapes): kept clear of where there is room, but the pieces' own
+  // outlines are the walls
+  solids.push(...shaped)
   for (const st of w.stairs ?? []) solids.push(...walkwaySolids(st))
   for (const b of w.bridges ?? []) for (const leg of b.legs) solids.push(...walkwaySolids(leg))
   const ways = [...(w.stairs ?? []), ...(w.bridges ?? []).flatMap((b) => b.legs), ...(w.decks ?? [])]
@@ -422,6 +481,25 @@ export function tileFurniture(
       }
       if (!moved) break
     }
+    // … and one standing in a prop as it was placed (a merchant's spot by a stall a hair of jitter took
+    // over it, a pile's by its logs) steps out of it, a little way, the shortest way (a seat's sitter and a
+    // bed's sleeper are where they are)
+    if (sp.kind !== "sit")
+      for (let round = 0; round < 3; round++) {
+        let moved = false
+        for (const o of grid.near(x, z, PROP_OUT)) {
+          if (o.soft || HARD(o.kind) || o.kind === "seat") continue
+          const d = solidDistance(o, x, z, dir)
+          if (d >= PROP_IN) continue
+          const nx = x + dir[0] * (PROP_OUT - d)
+          const nz = z + dir[1] * (PROP_OUT - d)
+          if (Math.hypot(nx - sp.x, nz - sp.z) > PROP_STEP || blocked(nx, nz, BODY_CORE, HARD)) continue
+          x = nx
+          z = nz
+          moved = true
+        }
+        if (!moved) break
+      }
     // a spot on a deck or a flight (a fisher at the quay's edge) stays on it
     if (onWay(sp.x, sp.z) && !onWay(x, z)) {
       x = sp.x
@@ -460,6 +538,7 @@ export function tileFurniture(
     blockers,
     solids,
     solidsNear: (x, z, r) => grid.near(x, z, r),
+    walkwayAt: wayAt,
     blocked,
     dropped,
     on: (tile) => onTile.get(tile) ?? [],

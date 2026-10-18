@@ -1,11 +1,5 @@
 {
-  "blockers": [
-    {
-      "r": 1.654,
-      "x": 0,
-      "z": 0
-    }
-  ],
+  "blockers": [],
   "ground": "dirt",
   "group": "town",
   "id": "barracks",

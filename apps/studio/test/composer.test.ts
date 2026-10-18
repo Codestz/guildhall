@@ -1,5 +1,7 @@
 /** The tile composer's document edits (composer/model.ts): pure functions over one tile prefab. */
 import { describe, expect, test } from "bun:test"
+import { readdirSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 import { HEX_TILE_SIZE, sideDir, type TilePrefab } from "@guildhall/world"
 import {
   addBlocker,
@@ -119,5 +121,37 @@ describe("tile composer document", () => {
     expect(out).toContain("off the tile")
     expect(out).toContain('no clip "Nope"')
     expect(out).toContain("has no grip")
+  })
+
+  test("lint names a spot inside a blocker (a seat's sitter and a bed's sleeper aside)", () => {
+    const t: TilePrefab = {
+      ...tile(),
+      spots: [
+        { kind: "talk", x: 0.9, z: 1.75, facing: 0 },
+        { kind: "sit", x: 0, z: 0, facing: 0 },
+        { kind: "sleep", x: 0, z: 0, facing: 0 },
+      ],
+      blockers: [
+        { x: 1.15, z: 1.95, r: 0.482 },
+        { x: 0, z: 0, r: 0.6 },
+      ],
+    }
+    expect(lint(t, { piece: () => true, clip: () => true, prop: () => true })).toEqual([
+      "spot 1 stands inside blocker 1",
+    ])
+  })
+
+  test("no tile in data/tiles has a spot standing inside one of its blockers", () => {
+    const dir = join(import.meta.dir, "../../../data/tiles")
+    const files = readdirSync(dir).filter((f) => f.endsWith(".json"))
+    expect(files.length).toBeGreaterThan(50)
+    const known = { piece: () => true, clip: () => true, prop: () => true }
+    const inside = files.flatMap((f) => {
+      const t = JSON.parse(readFileSync(join(dir, f), "utf8")) as TilePrefab
+      return lint(t, known)
+        .filter((w) => w.includes("inside blocker"))
+        .map((w) => `${f}: ${w}`)
+    })
+    expect(inside).toEqual([])
   })
 })

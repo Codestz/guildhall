@@ -174,8 +174,9 @@ export function lint(
     if (s.clip && !known.clip(s.clip)) out.push(`spot ${k + 1}: no clip "${s.clip}" on rig-medium`)
     if (s.prop && !known.prop(s.prop)) out.push(`spot ${k + 1}: ${s.prop} has no grip (data/mounts.json)`)
     if (!onTile(s.x, s.z, 0.15) && !t.footprint?.length) out.push(`spot ${k + 1} is off the tile`)
+    // (a sitter is in its seat's disc, a sleeper on its bed's: the seat and the bed are what they use)
     for (const [j, b] of (t.blockers ?? []).entries())
-      if (Math.hypot(s.x - b.x, s.z - b.z) < b.r - 0.05 && s.kind !== "sit")
+      if (Math.hypot(s.x - b.x, s.z - b.z) < b.r - 0.05 && s.kind !== "sit" && s.kind !== "sleep")
         out.push(`spot ${k + 1} stands inside blocker ${j + 1}`)
   })
   return out

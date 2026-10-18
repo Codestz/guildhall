@@ -17,6 +17,8 @@
     "@guildhall/sim": "workspace:*",
     "@guildhall/ui": "workspace:*",
     "@guildhall/world": "workspace:*",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

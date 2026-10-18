@@ -24,6 +24,7 @@ import { DRILLS, pairedDrill } from "./drills.ts"
 import { hexAt, hexCentre } from "./grid.ts"
 import { type HeroPool, heroSpotPool } from "./heroes.ts"
 import { type HexIsland, kindOf } from "./island.ts"
+import { openGround } from "./pull.ts"
 import {
   CHOP_TRIP,
   cyclesSpan,
@@ -1327,6 +1328,7 @@ export function lifePlaces(
   }
   // (and the ground's height, so a way round a prop keeps to its level: walk.ts clearWay)
   if (w.heightAt) (walkNear as NearWithGround).heightAt = w.heightAt
+  ;(walkNear as NearWithGround).openAt = openGround(h, z)
   ;(walkNear as NearWithGround).walkwayAt = furniture.walkwayAt
   const isWalled = (spot: number) => {
     nodeOf(spot)

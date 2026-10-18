@@ -21,6 +21,7 @@ import {
   type SolidKind,
   solidDistance,
   solidKind,
+  type Walkway,
   walkwayAt,
   walkwaySolids,
 } from "./collide.ts"
@@ -413,8 +414,29 @@ export function tileFurniture(
   for (const st of w.stairs ?? []) solids.push(...walkwaySolids(st))
   for (const b of w.bridges ?? []) for (const leg of b.legs) solids.push(...walkwaySolids(leg))
   const ways = [...(w.stairs ?? []), ...(w.bridges ?? []).flatMap((b) => b.legs), ...(w.decks ?? [])]
+  // the walkways in 4 m cells (asked for often: every way round a prop checks the ground it goes over)
+  const WCELL = 4
+  const wayCells = new Map<number, Walkway[]>()
+  const wkey = (cx: number, cz: number) => (cx + 4096) * 8192 + cz + 4096
+  for (const st of ways) {
+    const pad = st.half + 0.3
+    for (
+      let cx = Math.floor((Math.min(st.ax, st.bx) - pad) / WCELL);
+      cx <= Math.floor((Math.max(st.ax, st.bx) + pad) / WCELL);
+      cx++
+    )
+      for (
+        let cz = Math.floor((Math.min(st.az, st.bz) - pad) / WCELL);
+        cz <= Math.floor((Math.max(st.az, st.bz) + pad) / WCELL);
+        cz++
+      ) {
+        const list = wayCells.get(wkey(cx, cz))
+        if (list) list.push(st)
+        else wayCells.set(wkey(cx, cz), [st])
+      }
+  }
   const wayAt = (x: number, z: number) => {
-    for (const st of ways) {
+    for (const st of wayCells.get(wkey(Math.floor(x / WCELL), Math.floor(z / WCELL))) ?? []) {
       const y = walkwayAt(st, x, z)
       if (y !== null) return y
     }

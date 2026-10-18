@@ -14,8 +14,9 @@
  * `route(a, b)` is the shortest node path (A*), so any place reaches any other the roads join.
  */
 import { discSolid, pieceSolids, type Solid, SolidGrid, solidBoxDistance, solidDistance } from "./collide.ts"
-import { hexCentre } from "./grid.ts"
+import { hexAt, hexCentre } from "./grid.ts"
 import { type HexIsland, kindOf } from "./island.ts"
+import { openTile } from "./pull.ts"
 import { HEX_TILE_SIZE } from "./tiles.ts"
 import type { HexWorld } from "./world.ts"
 import { type HexZones, useOf } from "./zones.ts"
@@ -47,6 +48,11 @@ export interface HexWalkEdge {
   via?: [number, number][]
   /** Through a wall with no way round it: left out of every route (its nodes keep their other edges). */
   walled?: boolean
+  /**
+   * What taking it costs a route, when not its length: a shortcut over open ground (`crossEdges`) costs
+   * more than its metres, so the roads stay the way people mostly take.
+   */
+  cost?: number
 }
 
 export interface HexWalk {
@@ -189,6 +195,17 @@ export const PROP_TIGHT = 0.17
 const PROP_ROOM = 0.24
 /** … and where there is less, a body's half-width: the least room a way squeezes between props with, metres. */
 const PROP_SQUEEZE = 0.2
+/**
+ * The ways a stretch too near a prop looks for, in order: the roomiest first round the stretch, as much
+ * room as a body's half-width takes, and the least a body squeezes by; then from its far end, then wider.
+ */
+const ROOM_TRIES = (a: Pt, b: Pt): readonly (readonly [number, Pt, Pt, number])[] => [
+  [PROP_ROOM, a, b, GRID_NEAR],
+  [PROP_SQUEEZE, a, b, GRID_NEAR],
+  [PROP_TIGHT, a, b, GRID_NEAR],
+  [PROP_TIGHT, b, a, GRID_NEAR],
+  [PROP_SQUEEZE, a, b, GRID_FAR],
+]
 /** How far round its ends a way round props may keep only the room its end has, metres. */
 const ROOM_END = 0.35
 /** How many corners either side of a tight bit of way are looked at again with it, at most. */
@@ -201,6 +218,8 @@ export type NearWithGround = ((x: number, z: number, r: number) => readonly Walk
   heightAt?: (x: number, z: number) => number
   /** A walkway's height at a point (a deck, a bridge, a flight), null off them. */
   walkwayAt?: (x: number, z: number) => number | null
+  /** The open ground a way may be pulled taut over (pull.ts `openGround`): its level there, null off it. */
+  openAt?: (x: number, z: number) => number | null
 }
 /** How near a prop a walk's end may stand and the prop still be the end's own (the bench it gets up from), metres. */
 const PROP_OWN = 0.25
@@ -217,6 +236,22 @@ export function brushesProp(
   ra: number,
   rb: number,
 ): boolean {
+  return nearerThan(a, b, near, ra, rb, PROP_TIGHT, false)
+}
+
+/**
+ * Whether segment a→b comes nearer than `room` to a prop (`hard`: to a wall or a house), what its ends
+ * stand at aside as `brushesProp` sets them aside.
+ */
+function nearerThan(
+  a: readonly number[],
+  b: readonly number[],
+  near: (x: number, z: number, r: number) => readonly WalkBlocker[],
+  ra: number,
+  rb: number,
+  room: number,
+  hard: boolean,
+): boolean {
   const ax = a[0]!
   const az = a[2]!
   const bx = b[0]!
@@ -225,9 +260,9 @@ export function brushesProp(
   if (len < 1e-6) return false
   const ux = (bx - ax) / len
   const uz = (bz - az) / len
-  for (const o of near((ax + bx) / 2, (az + bz) / 2, len / 2 + PROP_TIGHT)) {
+  for (const o of near((ax + bx) / 2, (az + bz) / 2, len / 2 + room)) {
     const so = solidOfBlocker(o)
-    if (so.soft || so.kind === "building" || so.kind === "wall") continue
+    if (so.soft || (so.kind === "building" || so.kind === "wall") !== hard) continue
     const da = solidDistance(so, ax, az)
     const db = solidDistance(so, bx, bz)
     let s0 = 0
@@ -236,9 +271,100 @@ export function brushesProp(
     if (db < rb)
       s1 = len - Math.max(ownRoom(db), db < 0 && rb > PROP_OWN ? outAlong(so, bx, bz, ax, az, len) : 0)
     if (s1 <= s0) continue
-    if (segmentDistance(so, ax + ux * s0, az + uz * s0, ax + ux * s1, az + uz * s1) < PROP_TIGHT) return true
+    if (segmentDistance(so, ax + ux * s0, az + uz * s0, ax + ux * s1, az + uz * s1) < room) return true
   }
   return false
+}
+
+/** How many corners on a way may be dropped at once, and how long a pulled straight may be, metres. */
+const PULL_AHEAD = 12
+const PULL_MAX = 30
+/** A corner is only dropped for at least this much less way, metres. */
+const PULL_GAIN = 0.05
+/** The room a pulled straight keeps from a wall or a house (what its ends stand in aside), metres. */
+const PULL_WALL = 0.25
+/** How near its ends a pulled straight may cross ground no shortcut goes over (a door's plot), metres. */
+const PULL_END = 1.0
+/** How far off a way's height the ground under a pulled straight may be (no terrace's edge), metres. */
+const PULL_STEP = 0.25
+
+/**
+ * The corners of way `P` (its segments' ground flags `G`) it can do without, dropped in place (pull.ts):
+ * from each corner kept, straight on to the furthest of the next PULL_AHEAD it reaches with the straight
+ * line on the ground (no deck, no flight), over open ground (`openAt`, a door's own plot by an end
+ * aside) at the way's own height, cutting no wall or house (`walls`; what the walk's ends stand in aside)
+ * and keeping PULL_WALL off them, a body's room off every prop (`brushesProp`), and through no one's
+ * place (a soft disc round a spot someone stands at, but the walk's own ends').
+ */
+function pullTaut(
+  P: Pt[],
+  G: boolean[],
+  near: (x: number, z: number, r: number) => readonly WalkBlocker[],
+  openAt: (x: number, z: number) => number | null,
+  walls: (x: number, z: number, r: number) => readonly WalkBlocker[],
+  door: { from?: boolean; to?: boolean },
+): void {
+  if (P.length < 3) return
+  const level = (near as NearWithGround).heightAt
+  const last = P.length - 1
+  const reach = (k: number) =>
+    k === 0 ? (door.from ? DOOR_SLACK : PROP_OWN) : k === last ? (door.to ? DOOR_SLACK : PROP_OWN) : -1
+  const canPull = (i: number, j: number, walked: number): boolean => {
+    for (let k = i; k < j; k++) if (!G[k]) return false
+    const a = P[i]!
+    const b = P[j]!
+    const len = Math.hypot(b[0] - a[0], b[2] - a[2])
+    if (len > PULL_MAX || walked - len < PULL_GAIN) return false
+    // over open ground of one level, at the way's own height
+    const n = Math.max(1, Math.ceil(len / 0.5))
+    let lv: number | null = null
+    for (let s = 0; s <= n; s++) {
+      const f = s / n
+      const x = a[0] + (b[0] - a[0]) * f
+      const z = a[2] + (b[2] - a[2]) * f
+      const here = openAt(x, z)
+      if (here === null) {
+        if (Math.min(f, 1 - f) * len >= PULL_END) return false
+      } else if (lv === null) lv = here
+      else if (here !== lv) return false
+      if (level && Math.abs(level(x, z) - (a[1] + (b[1] - a[1]) * f)) > PULL_STEP) return false
+    }
+    // through no wall or house, and a little off them; a body's room off the props
+    const ra = i === 0 ? (door.from ? DOOR_SLACK : 0.05) : Number.NEGATIVE_INFINITY
+    const rb = j === last ? (door.to ? DOOR_SLACK : 0.05) : Number.NEGATIVE_INFINITY
+    for (const o of walls((a[0] + b[0]) / 2, (a[2] + b[2]) / 2, len / 2 + 0.1))
+      if (cutsSolid(solidOfBlocker(o), a[0], a[2], b[0], b[2], ra, rb)) return false
+    if (nearerThan(a, b, near, reach(i), reach(j), PULL_WALL, true)) return false
+    if (nearerThan(a, b, near, reach(i), reach(j), PROP_TIGHT, false)) return false
+    // through no one's place but the walk's own ends'
+    for (const o of near((a[0] + b[0]) / 2, (a[2] + b[2]) / 2, len / 2 + 0.3)) {
+      const so = solidOfBlocker(o)
+      if (!so.soft || so.kind !== "blocker") continue
+      if (solidDistance(so, P[0]![0], P[0]![2]) < 0.05 || solidDistance(so, P[last]![0], P[last]![2]) < 0.05)
+        continue
+      if (segmentDistance(so, a[0], a[2], b[0], b[2]) < 0.05) return false
+    }
+    return true
+  }
+  const keep: Pt[] = [P[0]!]
+  const flags: boolean[] = []
+  let i = 0
+  while (i < last) {
+    let j = i + 1
+    let walked = Math.hypot(P[j]![0] - P[i]![0], P[j]![2] - P[i]![2])
+    while (j < last && j + 1 - i <= PULL_AHEAD) {
+      const w = walked + Math.hypot(P[j + 1]![0] - P[j]![0], P[j + 1]![2] - P[j]![2])
+      if (!canPull(i, j + 1, w)) break
+      walked = w
+      j++
+    }
+    flags.push(j === i + 1 ? G[i]! : true)
+    keep.push(P[j]!)
+    i = j
+  }
+  if (keep.length === P.length) return
+  P.splice(0, P.length, ...keep)
+  G.splice(0, G.length, ...flags)
 }
 
 /**
@@ -480,6 +606,9 @@ const CORE = 0.12
  * than the clearance closed but those an end stands in), pulled taut; its corners, none when there is no
  * way (or it is no tighter than the straight one).
  */
+/** Whether the last `gridWay` found no way at all (its [] is also a straight way's: no corners). */
+let gridMissed = false
+
 export function gridWay(
   a: Pt,
   b: Pt,
@@ -501,11 +630,15 @@ export function gridWay(
   const z0 = Math.floor((Math.min(a[2], b[2]) - GRID_MARGIN) / GRID) * GRID
   const nx = Math.ceil((Math.max(a[0], b[0]) + GRID_MARGIN - x0) / GRID)
   const nz = Math.ceil((Math.max(a[2], b[2]) + GRID_MARGIN - z0) / GRID)
+  gridMissed = true
   if (nx * nz > 400000) return []
   const memo = memoOf(near, `${C},${GRID},${soft}`)
   const key = `${a[0].toFixed(2)},${a[2].toFixed(2)},${b[0].toFixed(2)},${b[2].toFixed(2)},${any},${GRID_MARGIN},${steps},${endRoom}`
   const had = memo.ways.get(key)
-  if (had) return had
+  if (had) {
+    gridMissed = memo.none.has(key)
+    return had
+  }
   const gi0 = Math.round(x0 / GRID)
   const gj0 = Math.round(z0 / GRID)
   // the blockers an end stands in (its own seat, its doorway) do not close cells
@@ -669,8 +802,10 @@ export function gridWay(
   }
   if (!found) {
     memo.ways.set(key, [])
+    memo.none.add(key)
     return []
   }
+  gridMissed = false
   if (any) {
     memo.ways.set(key, [[b[0], b[2]]])
     return [[b[0], b[2]]]
@@ -781,6 +916,8 @@ interface GridMemo {
   cells: CellCache
   /** Ways already found (or not), by their ends. */
   ways: Map<string, [number, number][]>
+  /** The ways' keys that found none (`ways` has [] for them and for a straight way alike). */
+  none: Set<string>
 }
 const memos = new WeakMap<object, Map<string, GridMemo>>()
 /** The fine grid's shared answers for one `near` at one clearance and cell size. */
@@ -1020,7 +1157,7 @@ function memoOf(near: object, kind: string): GridMemo {
   }
   let m = byKind.get(kind)
   if (!m) {
-    m = { cells: new CellCache(), ways: new Map() }
+    m = { cells: new CellCache(), ways: new Map(), none: new Set() }
     byKind.set(kind, m)
   }
   return m
@@ -1202,6 +1339,10 @@ export function clearWay(
     k += way.length
     fixed++
   }
+  // pulled taut (pull.ts): the corners the way can do without are dropped, so it goes straight where it
+  // can, not from lane to lane and corner to corner round the middle of a square or a bend
+  const openAt = (near as NearWithGround).openAt
+  if (openAt) pullTaut(P, G, near, openAt, walls, door)
   // last, a body's room off the props (a cart, a crate, a lamp's post, a bench): a bit of way that brushes
   // one nearer than a body's half-width (what its ends stand at aside: the bench it gets up from, the
   // stall it works at) goes the way a fine grid finds with that room, round the gap too narrow for a body
@@ -1246,20 +1387,12 @@ export function clearWay(
     // (roomy first; where the props stand close, as much room as a body's half-width takes; out of a nook
     // its ends stand in, as near what stands there as the end is, for a step or two)
     let found: [number, number][] | null = null
-    for (const room of [PROP_ROOM, PROP_SQUEEZE, PROP_TIGHT]) {
-      for (const [p, q, margin] of [
-        [a, b, GRID_NEAR],
-        [b, a, GRID_NEAR],
-        [a, b, GRID_FAR],
-      ] as const) {
-        const w = gridWay(p, q, near, room, 0.1, false, margin, false, undefined, ROOM_END)
-        // (no corners: no way at all, or the straight one is clear, the corners between left out)
-        if (!w.length && !gridWay(p, q, near, room, 0.1, true, margin, false, undefined, ROOM_END).length)
-          continue
-        found = p === a ? w : [...w].reverse()
-        break
-      }
-      if (found) break
+    for (const [room, p, q, margin] of ROOM_TRIES(a, b)) {
+      const w = gridWay(p, q, near, room, 0.1, false, margin, false, undefined, ROOM_END)
+      // (no corners: no way at all, or the straight one is clear, the corners between left out)
+      if (gridMissed) continue
+      found = p === a ? w : [...w].reverse()
+      break
     }
     if (!found || (!found.length && e === s + 1)) continue
     const len = Math.hypot(b[0] - a[0], b[2] - a[2]) || 1
@@ -1329,6 +1462,112 @@ const side = (d: number): [number, number] => {
  * The walk graph of a built island. `reach` lists tiles people must be able to walk to (work tiles off
  * the roads); each gets a spur to the graph when one is found within a few steps.
  */
+/** How far apart two nodes a shortcut joins may be at most, metres (two tiles' width and a little). */
+const CROSS_REACH = 11.5
+/** A shortcut is made where the walk graph's own way is this many times the straight line or more. */
+const CROSS_GAIN = 1.3
+/** A shortcut costs a route this many times its metres: the roads stay the way people mostly take. */
+const CROSS_COST = 1.25
+/** The room a shortcut keeps from a wall, a house and a prop, metres. */
+const CROSS_ROOM = 0.35
+/** How near its ends a shortcut may cross ground that is no open ground (a door's own plot), metres. */
+const CROSS_END = 1.2
+
+/**
+ * Shortcuts over open ground (pull.ts `openTile`: a square, a court, a yard, a garden, a green, a street):
+ * a node joined straight to another within CROSS_REACH where the graph's own way between them is
+ * CROSS_GAIN times the straight line or more, the line on open, dry ground of the one level all the way
+ * (a door's own plot by its end aside) and CROSS_ROOM clear of every wall, house and prop. Each costs a
+ * route CROSS_COST its length (`HexWalkEdge.cost`). Not over a bridge or a dock (their decks are their own).
+ */
+function crossEdges(
+  nodes: HexWalkNode[],
+  edges: HexWalkEdge[],
+  out: number[][],
+  open: (tile: number) => boolean,
+  h: HexIsland,
+  near: (x: number, z: number, r: number) => readonly Solid[],
+): void {
+  const g = h.grid
+  const usable = (n: HexWalkNode) =>
+    n.kind === "road" || n.kind === "square" || n.kind === "door" || n.kind === "path"
+  const tileOf = (x: number, z: number) => {
+    const { q, r } = hexAt(x / HEX_TILE_SIZE, z / HEX_TILE_SIZE)
+    return g.index(q, r)
+  }
+  // nodes in bins as wide as a shortcut's reach
+  const bins = new Map<string, number[]>()
+  const bin = (x: number, z: number) => `${Math.floor(x / CROSS_REACH)},${Math.floor(z / CROSS_REACH)}`
+  for (const [i, n] of nodes.entries()) {
+    if (!usable(n) || !out[i]!.length) continue
+    const k = bin(n.x, n.z)
+    const list = bins.get(k)
+    if (list) list.push(i)
+    else bins.set(k, [i])
+  }
+  /** The graph's way from `from` to every node within `max` metres of way (its own edges, before any shortcut). */
+  const within = (from: number, max: number): Map<number, number> => {
+    const dist = new Map<number, number>([[from, 0]])
+    const queue: [number, number][] = [[0, from]]
+    while (queue.length) {
+      let m = 0
+      for (let k = 1; k < queue.length; k++) if (queue[k]![0] < queue[m]![0]) m = k
+      const [d, i] = queue.splice(m, 1)[0]!
+      if (d > (dist.get(i) ?? Number.POSITIVE_INFINITY)) continue
+      for (const id of out[i]!) {
+        const e = edges[id]!
+        const j = e.a === i ? e.b : e.a
+        const nd = d + e.len
+        if (nd > max || nd >= (dist.get(j) ?? Number.POSITIVE_INFINITY)) continue
+        dist.set(j, nd)
+        queue.push([nd, j])
+      }
+    }
+    return dist
+  }
+  /** Whether the straight way a→b is open ground of a's level all along, and clear by CROSS_ROOM. */
+  const clear = (a: HexWalkNode, b: HexWalkNode, len: number): boolean => {
+    const level = h.level[a.tile]!
+    const n = Math.ceil(len / 0.5)
+    for (let s = 0; s <= n; s++) {
+      const x = a.x + ((b.x - a.x) * s) / n
+      const z = a.z + ((b.z - a.z) * s) / n
+      const t = tileOf(x, z)
+      if (t < 0 || h.level[t] !== level) return false
+      const byEnd = Math.min((len * s) / n, len - (len * s) / n) < CROSS_END
+      if (!open(t) && !byEnd) return false
+    }
+    for (const o of near((a.x + b.x) / 2, (a.z + b.z) / 2, len / 2 + CROSS_ROOM))
+      if (!o.soft && segmentDistance(o, a.x, a.z, b.x, b.z) < CROSS_ROOM) return false
+    return true
+  }
+  const made: HexWalkEdge[] = []
+  for (const [i, a] of nodes.entries()) {
+    if (!usable(a) || !out[i]!.length) continue
+    const cx = Math.floor(a.x / CROSS_REACH)
+    const cz = Math.floor(a.z / CROSS_REACH)
+    let dist: Map<number, number> | null = null
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dz = -1; dz <= 1; dz++)
+        for (const j of bins.get(`${cx + dx},${cz + dz}`) ?? []) {
+          if (j <= i) continue
+          const b = nodes[j]!
+          const len = Math.hypot(b.x - a.x, b.z - a.z)
+          if (len > CROSS_REACH || len < 1 || Math.abs(b.y - a.y) > 0.2) continue
+          if (h.level[a.tile] !== h.level[b.tile]) continue
+          dist ??= within(i, CROSS_REACH * CROSS_GAIN)
+          if ((dist.get(j) ?? Number.POSITIVE_INFINITY) < len * CROSS_GAIN) continue
+          if (!clear(a, b, len)) continue
+          made.push({ a: i, b: j, kind: "path", len, cost: len * CROSS_COST })
+        }
+  }
+  for (const e of made) {
+    edges.push(e)
+    out[e.a]!.push(edges.length - 1)
+    out[e.b]!.push(edges.length - 1)
+  }
+}
+
 export function hexWalk(
   h: HexIsland,
   z: HexZones,
@@ -1552,7 +1791,7 @@ export function hexWalk(
       for (const e of out[i]!) {
         const edge = edges[e]!
         const j = edge.a === i ? edge.b : edge.a
-        const d = dist[i]! + edge.len
+        const d = dist[i]! + (edge.cost ?? edge.len)
         if (d < dist[j]!) {
           dist[j] = d
           prev[j] = i
@@ -1727,6 +1966,18 @@ export function hexWalk(
         }
       }
     }
+    // ---- shortcuts over open ground: across a square, a green or a yard between two streets ----
+    const props = new SolidGrid(
+      w.pieces.flatMap(pieceSolids).filter((s) => s.kind !== "building" && s.kind !== "wall"),
+    )
+    crossEdges(
+      nodes,
+      edges,
+      out,
+      (i) => openTile(h, z, i),
+      h,
+      (x, zz, r) => [...hard.near(x, zz, r), ...props.near(x, zz, r)],
+    )
   }
 
   return {

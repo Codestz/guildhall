@@ -360,6 +360,28 @@ export function doorPasses(steps: readonly LifeStep[]): DoorPass[] {
   return out.sort((a, b) => a.t - b.t)
 }
 
+/** How far before a seat someone stands to sit down on it or after getting up, metres. */
+const SEAT_FRONT = 0.45
+
+/**
+ * The point before a seat a sitter steps to from it and from where they sit down (none for a spot that is
+ * no seat, or where that point stands in something: a table's edge, a wall).
+ */
+function seatFront(spot: LifeSpot, near?: NearBlockers): Vec3[] {
+  if (!near || !/^Sit/.test(spot.clip ?? "") || !spot.ground) return []
+  const x = spot.at[0] + Math.sin(spot.facing) * SEAT_FRONT
+  const z = spot.at[2] + Math.cos(spot.facing) * SEAT_FRONT
+  for (const o of near(x, z, 0.15))
+    if (
+      "pts" in o &&
+      !o.soft &&
+      solidDistance(o, x, z) < 0.15 &&
+      solidDistance(o, spot.at[0], spot.at[2]) >= 0.02
+    )
+      return []
+  return [[x, spot.at[1], z]]
+}
+
 /** The way through the nodes of `path`, each point pushed `lane` metres to the walker's right. */
 export function laneLine(walk: HexWalk, path: readonly number[], lane: number): Vec3[] {
   const p = path.map((i) => walk.nodes[i]!)
@@ -570,13 +592,18 @@ export class LoopBuilder {
     const yIn = line[line.length - 1]![1]
     const away: Vec3[] = out ? [...out].reverse().map(([x, z]): Vec3 => [x, yOut, z]) : []
     const come: Vec3[] = into ? into.map(([x, z]): Vec3 => [x, yIn, z]) : []
-    const pts: Vec3[] = [this.here.at, ...away, ...line.slice(first, last), ...come, to.at]
+    // a seat is got up from and sat down on from its front, not over its back or its arm (a bench)
+    const rise = seatFront(this.here, out ? undefined : this.near)
+    const sit = seatFront(to, into ? undefined : this.near)
+    const pts: Vec3[] = [this.here.at, ...rise, ...away, ...line.slice(first, last), ...come, ...sit, to.at]
     // each point's flag (the spots their own nodes'); a segment is on a deck when either end is
     const pf = [
       flags[0]!,
+      ...rise.map(() => true),
       ...away.map(() => true),
       ...flags.slice(first, last),
       ...come.map(() => true),
+      ...sit.map(() => true),
       flags[flags.length - 1]!,
     ]
     const ground: boolean[] = []

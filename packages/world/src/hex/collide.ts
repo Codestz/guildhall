@@ -91,7 +91,24 @@ interface Outline {
   foot: Float64Array
   /** The parts people bump into (a market's stalls apart, a gate's two sides). */
   hulls: Float64Array[]
+  /** How high over the foot each part starts, at scale 1 (0: from the ground; a roof's frame overhead). */
+  bottoms: number[]
 }
+
+/**
+ * Pieces whose outline the library reads wrong for walking (a frame overhead joined to its posts reads
+ * as one part from the ground up), written by hand in OUTLINE_DATA's form: their parts, each with how
+ * high it starts (@y, scale 1). A shed's or a stable's roof on four posts: the posts, and the roof over
+ * all, which only blocks where the piece is placed so small that it hangs at a body's height.
+ */
+const PART_OVERRIDES: Readonly<Record<string, string>> = {
+  "kenney-survival/structure-roof":
+    "-1.4,-1.4 -0.8,-1.4 -0.8,-0.8 -1.4,-0.8 | 0.8,-1.4 1.4,-1.4 1.4,-0.8 0.8,-0.8 | 0.8,0.8 1.4,0.8 1.4,1.4 0.8,1.4 | -1.4,0.8 -0.8,0.8 -0.8,1.4 -1.4,1.4 | @1.5 -1.4,-1.4 1.4,-1.4 1.4,1.4 -1.4,1.4",
+  "kenney-survival/structure-canvas":
+    "-1.4,-1.4 -0.8,-1.4 -0.8,-0.8 -1.4,-0.8 | 0.8,-1.4 1.4,-1.4 1.4,-0.8 0.8,-0.8 | 0.8,0.8 1.4,0.8 1.4,1.4 0.8,1.4 | -1.4,0.8 -0.8,0.8 -0.8,1.4 -1.4,1.4 | @1.3 -1.4,-1.4 1.4,-1.4 1.4,1.4 -1.4,1.4",
+}
+/** A part starting this high (metres, as placed) or higher is over a body's head: nobody bumps into it. */
+export const OVERHEAD = 1.2
 
 let outlines: Map<string, Outline> | null = null
 /** Every piece's outline at scale 1, by id (parsed once). */
@@ -102,29 +119,41 @@ function outlineTable(): Map<string, Outline> {
     const parts = line.trim().split(" ")
     if (parts.length < 4) continue
     const hulls: Float64Array[] = []
+    const bottoms: number[] = []
     let foot: Float64Array | null = null
     let pts: number[] = []
+    let bottom = 0
     const end = () => {
-      if (pts.length >= 6) hulls.push(new Float64Array(pts))
+      if (pts.length >= 6) {
+        hulls.push(new Float64Array(pts))
+        bottoms.push(bottom)
+      }
       pts = []
+      bottom = 0
     }
-    for (let k = 2; k < parts.length; k++) {
-      if (parts[k] === "||") {
+    const override = PART_OVERRIDES[parts[0]!]
+    const tokens = override ? [...parts.slice(0, parts.indexOf("||") + 1), ...override.split(" ")] : parts
+    for (let k = 2; k < tokens.length; k++) {
+      if (tokens[k] === "||") {
         foot = new Float64Array(pts)
         pts = []
         continue
       }
-      if (parts[k] === "|") {
+      if (tokens[k] === "|") {
         end()
         continue
       }
-      const [x, z] = parts[k]!.split(",").map(Number) as [number, number]
+      if (tokens[k]!.startsWith("@")) {
+        bottom = Number(tokens[k]!.slice(1))
+        continue
+      }
+      const [x, z] = tokens[k]!.split(",").map(Number) as [number, number]
       // the same corner twice (rounded together) once
       if (pts.length && pts[pts.length - 2] === x && pts[pts.length - 1] === z) continue
       pts.push(x, z)
     }
     end()
-    if (foot && foot.length >= 6) outlines.set(parts[0]!, { top: Number(parts[1]), foot, hulls })
+    if (foot && foot.length >= 6) outlines.set(parts[0]!, { top: Number(parts[1]), foot, hulls, bottoms })
   }
   return outlines
 }
@@ -272,7 +301,9 @@ export function pieceSolids(p: PlacedPiece): Solid[] {
     gate = [p.x, p.z, ax * c + az * sn, -ax * sn + az * c]
   }
   const swung = SWUNG[p.piece]
-  for (const hull of o.hulls) {
+  for (const [h, hull] of o.hulls.entries()) {
+    // (a roof's frame over a body's head is not walked into)
+    if ((o.bottoms[h] ?? 0) * p.scale >= OVERHEAD) continue
     // a leaf that swings back against its post (render doors.ts) is no solid: the opening is open
     if (swung !== undefined && leafOf(hull, swung)) continue
     const c: number[] = []

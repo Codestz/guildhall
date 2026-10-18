@@ -8,7 +8,7 @@
  *   spots    nobody stands inside a piece: a spot is outside every piece's outline (collide.ts), the
  *            seat a sitter sits on and the ground cover underfoot aside (user: a guard stood in a pot).
  */
-import { pieceOutline, solidDistance, solidFrom, solidKind, solidToFoot } from "./collide.ts"
+import { OVERHEAD, pieceOutline, solidDistance, solidFrom, solidKind, solidToFoot } from "./collide.ts"
 import type { TilePiece, TilePrefab } from "./tiles.ts"
 
 /** A door's approach: how far out from the front wall, metres. */
@@ -26,7 +26,11 @@ const COVER = /(grass|flower|plant|mushroom|clover|lily|crop|path|patch|floor|gr
 function outlinesOf(q: TilePiece): number[][] {
   const o = pieceOutline(q.piece)
   if (!o || o.top * q.scale < FLAT || COVER.test(q.piece)) return []
-  const polys = solidToFoot(q.piece) || !o.hulls.length ? [o.foot] : o.hulls
+  // (a roof's frame over a body's head aside)
+  const polys =
+    solidToFoot(q.piece) || !o.hulls.length
+      ? [o.foot]
+      : o.hulls.filter((_, k) => (o.bottoms[k] ?? 0) * q.scale < OVERHEAD)
   const c = Math.cos(q.rot)
   const s = Math.sin(q.rot)
   return polys.map((p) => {

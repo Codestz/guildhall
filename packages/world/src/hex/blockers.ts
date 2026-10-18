@@ -13,7 +13,16 @@
  *   { x, z, w, d, rot }             a box: `w` along its own x, `d` along its own z, turned like a piece
  *   { x, z, r }                     a circle
  */
-import { boxSolid, discSolid, pieceOutline, type Solid, solidKind, solidToFoot, TRUNK_R } from "./collide.ts"
+import {
+  boxSolid,
+  discSolid,
+  OVERHEAD,
+  pieceOutline,
+  type Solid,
+  solidKind,
+  solidToFoot,
+  TRUNK_R,
+} from "./collide.ts"
 
 /** A circle, tile space (an old disc reads as one). */
 export interface BlockerCircle {
@@ -60,10 +69,12 @@ const ROUND = 0.89
 const ROUND_ASPECT = 1.25
 
 /** The parts of a piece people walk round, at scale 1 in its own frame: a closed building's foot, else its parts. */
-function partsOf(piece: string): Float64Array[] {
+function partsOf(piece: string, scale: number): Float64Array[] {
   const o = pieceOutline(piece)
   if (!o) return []
-  return solidToFoot(piece) || !o.hulls.length ? [o.foot] : o.hulls
+  if (solidToFoot(piece) || !o.hulls.length) return [o.foot]
+  // (a roof's frame over a body's head is walked under)
+  return o.hulls.filter((_, k) => (o.bottoms[k] ?? 0) * scale < OVERHEAD)
 }
 
 /**
@@ -77,7 +88,7 @@ export function pieceBlockerShapes(p: BlockerPiece, pad = 0): BlockerShape[] {
   const c = Math.cos(p.rot)
   const s = Math.sin(p.rot)
   const out: BlockerShape[] = []
-  for (const part of partsOf(p.piece)) {
+  for (const part of partsOf(p.piece, p.scale)) {
     const n = part.length / 2
     const xs: number[] = []
     const zs: number[] = []

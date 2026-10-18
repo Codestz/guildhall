@@ -252,12 +252,29 @@ function nearerThan(
   room: number,
   hard: boolean,
 ): boolean {
+  return gapTo(a, b, near, ra, rb, room, hard) < room
+}
+
+/**
+ * How near segment a→b comes to a prop (`hard`: a wall or a house), looked for within `room`, what its
+ * ends stand at aside (`brushesProp`'s); `room` when none is nearer.
+ */
+function gapTo(
+  a: readonly number[],
+  b: readonly number[],
+  near: (x: number, z: number, r: number) => readonly WalkBlocker[],
+  ra: number,
+  rb: number,
+  room: number,
+  hard: boolean,
+): number {
+  let gap = room
   const ax = a[0]!
   const az = a[2]!
   const bx = b[0]!
   const bz = b[2]!
   const len = Math.hypot(bx - ax, bz - az)
-  if (len < 1e-6) return false
+  if (len < 1e-6) return gap
   const ux = (bx - ax) / len
   const uz = (bz - az) / len
   for (const o of near((ax + bx) / 2, (az + bz) / 2, len / 2 + room)) {
@@ -271,9 +288,10 @@ function nearerThan(
     if (db < rb)
       s1 = len - Math.max(ownRoom(db), db < 0 && rb > PROP_OWN ? outAlong(so, bx, bz, ax, az, len) : 0)
     if (s1 <= s0) continue
-    if (segmentDistance(so, ax + ux * s0, az + uz * s0, ax + ux * s1, az + uz * s1) < room) return true
+    gap = Math.min(gap, segmentDistance(so, ax + ux * s0, az + uz * s0, ax + ux * s1, az + uz * s1))
+    if (gap <= 0) return 0
   }
-  return false
+  return gap
 }
 
 /** How many corners on a way may be dropped at once, and how long a pulled straight may be, metres. */
@@ -1386,35 +1404,50 @@ export function clearWay(
     const last = e === P.length - 1
     // (roomy first; where the props stand close, as much room as a body's half-width takes; out of a nook
     // its ends stand in, as near what stands there as the end is, for a step or two)
-    let found: [number, number][] | null = null
-    for (const [room, p, q, margin] of ROOM_TRIES(a, b)) {
-      const w = gridWay(p, q, near, room, 0.1, false, margin, false, undefined, ROOM_END)
-      // (no corners: no way at all, or the straight one is clear, the corners between left out)
-      if (gridMissed) continue
-      found = p === a ? w : [...w].reverse()
-      break
-    }
-    if (!found || (!found.length && e === s + 1)) continue
     const len = Math.hypot(b[0] - a[0], b[2] - a[2]) || 1
     const ux = (b[0] - a[0]) / len
     const uz = (b[2] - a[2]) / len
     const y = (t: number) => a[1] + (b[1] - a[1]) * Math.max(0, Math.min(1, t / len))
-    const way = found.map(([x, z]): Pt => [x, y((x - a[0]) * ux + (z - a[2]) * uz), z])
-    // (the way round must itself keep out of the walls, and on the level: never off a terrace's edge)
-    const pts = [a, ...way, b]
-    let bad = false
-    for (let j = 0; j + 1 < pts.length && !bad; j++) {
-      const p = pts[j]!
-      const q = pts[j + 1]!
-      bad = cutBy(p, q, first && j === 0, last && j + 2 === pts.length, walls)
-      for (let f = j > 0 ? 0 : 0.25; f < 1 && !bad; f += 0.25) {
-        const x = p[0] + (q[0] - p[0]) * f
-        const z = p[2] + (q[2] - p[2]) * f
-        const under = heightOf(x, z)
-        bad = under === null ? deck : Math.abs(under - (p[1] + (q[1] - p[1]) * f)) > ROOM_STEP
+    /** How deep `line`'s bits brush props, summed (its walk's own ends' aside), Infinity if it is no way. */
+    const brushes = (line: readonly Pt[]): number => {
+      let n = 0
+      for (let j = 0; j + 1 < line.length; j++) {
+        const p = line[j]!
+        const q = line[j + 1]!
+        const ra = first && j === 0 ? (door.from ? DOOR_SLACK : PROP_OWN) : -1
+        const rb = last && j + 2 === line.length ? (door.to ? DOOR_SLACK : PROP_OWN) : -1
+        // (it must keep out of the walls, and on the level: never off a terrace's edge)
+        if (cutBy(p, q, first && j === 0, last && j + 2 === line.length, walls))
+          return Number.POSITIVE_INFINITY
+        for (let f = j > 0 ? 0 : 0.25; f < 1; f += 0.25) {
+          const x = p[0] + (q[0] - p[0]) * f
+          const z = p[2] + (q[2] - p[2]) * f
+          const under = heightOf(x, z)
+          if (under === null ? deck : Math.abs(under - (p[1] + (q[1] - p[1]) * f)) > ROOM_STEP)
+            return Number.POSITIVE_INFINITY
+        }
+        n += PROP_TIGHT - gapTo(p, q, near, ra, rb, PROP_TIGHT, false)
       }
+      return n
     }
-    if (bad) continue
+    // the first way found that brushes nothing, else the one that brushes least, if less than now
+    let best = brushes(P.slice(s, e + 1))
+    let way: Pt[] | null = null
+    for (const [room, p, q, margin] of ROOM_TRIES(a, b)) {
+      const w = gridWay(p, q, near, room, 0.1, false, margin, false, undefined, ROOM_END)
+      // (no corners: no way at all, or the straight one is clear, the corners between left out)
+      if (gridMissed) continue
+      const found = p === a ? w : [...w].reverse()
+      if (!found.length && e === s + 1) continue
+      const cand = found.map(([x, z]): Pt => [x, y((x - a[0]) * ux + (z - a[2]) * uz), z])
+      const n = brushes([a, ...cand, b])
+      if (n >= best - 1e-3) continue
+      best = n
+      way = cand
+      if (n < 1e-6) break
+    }
+    if (!way) continue
+    const pts = [a, ...way, b]
     P.splice(s + 1, e - s - 1, ...way)
     // (a new bit of way is on a walkway's planks where its middle is, else on the ground)
     G.splice(

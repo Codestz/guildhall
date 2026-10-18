@@ -18,7 +18,7 @@
  * Nobody animal: people only (user, 10-13).
  */
 import { hash2 } from "../geom/noise.ts"
-import { solidDistance } from "./collide.ts"
+import { type SolidKind, solidDistance } from "./collide.ts"
 import { hexAt } from "./grid.ts"
 import type { HexIsland } from "./island.ts"
 import {
@@ -121,8 +121,47 @@ const LAMP_FROM = 17.4
 /** … and lights none after this hour (day hours). */
 const LAMP_BY = 20.9
 const LAMP_S = 2.6
-/** A lamplighter stands this far off the post, metres. */
-const LAMP_ARM = 0.75
+/**
+ * The post-lantern's own shape, in its frame at scale 1 (the glb's): its pole stands this far behind its
+ * origin (along -z), this thick round, and its lantern hangs this far in front (along +z) off the arm.
+ * The origin is mid-arm, so a spot "an arm's length off the post" measured from it can be in the pole.
+ */
+const LAMP_POLE_Z = -0.567
+const LAMP_POLE_R = 0.15
+const LAMP_LANTERN_Z = 0.433
+/** A lamplighter stands this far off the pole, metres (the first ring tried first): beside it, the lantern in reach. */
+const LAMP_RINGS = [0.6, 0.7, 0.5]
+/**
+ * Where round the pole he may stand, radians off its arm (0: under the lantern): beside it, either side,
+ * never under the lantern (his head in it) nor behind the pole (the torch through it).
+ */
+const LAMP_SIDES = [50, -50, 70, -70, 90, -90, 110, -110, 130, -130].map((d) => (d * Math.PI) / 180)
+/** A body's room on a lamplighter's spot and on his last steps to it, metres. */
+export const LAMP_BODY = 0.3
+
+/** A lamp post's pole and lantern on the ground (x, z), from its piece. */
+export function lampPost(p: { x: number; z: number; rot: number; scale: number }): {
+  pole: [number, number]
+  lantern: [number, number]
+  r: number
+} {
+  const s = Math.sin(p.rot) * p.scale
+  const c = Math.cos(p.rot) * p.scale
+  return {
+    pole: [p.x + LAMP_POLE_Z * s, p.z + LAMP_POLE_Z * c],
+    lantern: [p.x + LAMP_LANTERN_Z * s, p.z + LAMP_LANTERN_Z * c],
+    r: LAMP_POLE_R * p.scale,
+  }
+}
+
+/** Distance from (px, pz) to the segment a–b, on the ground. */
+const segDistance = (px: number, pz: number, ax: number, az: number, bx: number, bz: number) => {
+  const dx = bx - ax
+  const dz = bz - az
+  const l2 = dx * dx + dz * dz
+  const t = l2 > 0 ? Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / l2)) : 0
+  return Math.hypot(ax + dx * t - px, az + dz * t - pz)
+}
 
 const rnd = (seed: number, a: number, b: number) => hash2(seed, a, b)
 const key = (x: number, z: number) => `${x.toFixed(3)},${z.toFixed(3)}`
@@ -554,7 +593,7 @@ function meetings(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
 /** A lamplighter for the town's places with lamp posts: round them at dusk with a torch. */
 function lamplighters(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
   const g = o.h.grid
-  const byZone = new Map<number, { x: number; z: number; tile: number }[]>()
+  const byZone = new Map<number, { x: number; z: number; rot: number; scale: number; tile: number }[]>()
   for (const p of o.w.pieces) {
     if (!LAMP.test(p.piece)) continue
     const { q, r } = hexAt(p.x / HEX_TILE_SIZE, p.z / HEX_TILE_SIZE)
@@ -563,7 +602,7 @@ function lamplighters(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
     if (zi < 0 || !LAMP_KINDS.has(o.z.zones[zi]!.kind)) continue
     const list = byZone.get(zi) ?? []
     if (!list.length) byZone.set(zi, list)
-    list.push({ x: p.x, z: p.z, tile })
+    list.push({ x: p.x, z: p.z, rot: p.rot, scale: p.scale, tile })
   }
   const zones = [...byZone.entries()]
     .filter(([, l]) => l.length >= LAMP_MIN)
@@ -575,29 +614,60 @@ function lamplighters(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
     const id = folk.length
     const r = (salt: number) => rnd(o.seed + 4441 + salt, id, zi)
     const home = homeOf(o, zi, o.z.zones[zi]!.tiles[Math.floor(r(1) * o.z.zones[zi]!.tiles.length)]!, r(2))
-    // each lamp's spot: an arm's length off the post, toward the way, facing it
-    const stands: LifeSpot[] = []
+    // each lamp's spot: beside its pole, on the street's side, facing the lantern (the post's origin is
+    // mid-arm: measured from it, a spot could put the pole through him or his torch through the pole).
+    // Each lamp keeps its free sides in order: the walk there may still brush the pole, and the next is tried
+    type Stand = LifeSpot & { lamp: [number, number]; pole: [number, number]; clear: number }
+    const stands: Stand[][] = []
     for (const l of lamps) {
+      const { pole, lantern, r: poleR } = lampPost(l)
       // (from the street the post stands on, not from across the houses)
       const node = nodeNear(o.walk, o.h, l.x, l.z, o.places.walkNear, o.walk.hearts[zi]!)
       const n = o.walk.nodes[node]!
-      const base = Math.atan2(n.x - l.x, n.z - l.z)
-      // the first side the street reaches straight; else the first free one, by its way in round the
-      // fences (a post in a tavern's garden, reached by the garden's gap); none: the lamp is left
-      let round: LifeSpot | null = null
-      let straight: LifeSpot | null = null
-      for (const da of [0, 0.6, -0.6, 1.2, -1.2, 1.9, -1.9, Math.PI]) {
-        const a = base + da
-        const x = l.x + Math.sin(a) * LAMP_ARM
-        const zz = l.z + Math.cos(a) * LAMP_ARM
-        if (o.places.furniture.blocked(x, zz, 0.26) || o.places.heroNear(x, zz, 0)) continue
+      const arm = Math.atan2(lantern[0] - pole[0], lantern[1] - pole[1])
+      const street = Math.atan2(n.x - pole[0], n.z - pole[1])
+      const off = (a: number) => Math.abs(Math.atan2(Math.sin(a - street), Math.cos(a - street)))
+      // the places round the pole: the nearest the street first, at the ring's own distance first; those
+      // clear of everything, then those only in a composer's disc (kept clear where there is room)
+      const free = (x: number, zz: number, kinds?: (k: SolidKind) => boolean) =>
+        !o.places.furniture.blocked(x, zz, 0.26, kinds) && !o.places.heroNear(x, zz, 0)
+      const ring = LAMP_RINGS.flatMap((d, i) =>
+        LAMP_SIDES.map((da) => {
+          const a = arm + da
+          return { a, d, key: i * 10 + off(a) }
+        }),
+      )
+        .sort((p, q) => p.key - q.key)
+        .map(({ a, d }) => [pole[0] + Math.sin(a) * d, pole[1] + Math.cos(a) * d] as const)
+      const places = [
+        ...ring.filter(([x, zz]) => free(x, zz)),
+        ...ring.filter(([x, zz]) => !free(x, zz) && free(x, zz, (k) => k !== "blocker")),
+      ]
+      // the last steps in keep a body off the pole too
+      const clear = poleR + LAMP_BODY
+      const passes = (from: readonly number[], x: number, zz: number) =>
+        segDistance(pole[0], pole[1], from[0]!, from[1]!, x, zz) >= clear - 1e-6
+      // the places the street reaches straight first; then those reached by a way in round the fences (a
+      // post in a tavern's garden, by the garden's gap); none: the lamp is left
+      const straight: Stand[] = []
+      const round: Stand[] = []
+      for (const [x, zz] of places) {
         const at: Vec3 = [x, n.y, zz]
-        const stand: LifeSpot = { node, at, facing: headingTo(x, zz, l.x, l.z), ground: true }
-        if (!cutsHard([n.x, n.y, n.z], at, o.places.walkNear)) {
-          straight = stand
-          break
+        const stand: Stand = {
+          node,
+          at,
+          facing: headingTo(x, zz, lantern[0], lantern[1]),
+          ground: true,
+          lamp: [l.x, l.z],
+          pole,
+          clear,
         }
-        if (round) continue
+        if (!cutsHard([n.x, n.y, n.z], at, o.places.walkNear) && passes([n.x, n.z], x, zz)) {
+          straight.push(stand)
+          continue
+        }
+        // (a few ways round are plenty: each is a flood)
+        if (round.length >= 3) continue
         const found = floodWay(
           x,
           zz,
@@ -605,14 +675,15 @@ function lamplighters(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
           [n],
           Math.min(20, 4 + 2 * Math.hypot(n.x - x, n.z - zz)),
         )
-        if (found) round = found.way.length ? { ...stand, way: found.way } : stand
+        if (found && passes(found.way.at(-1) ?? [n.x, n.z], x, zz))
+          round.push(found.way.length ? { ...stand, way: found.way } : stand)
       }
-      const stand = straight ?? round
-      if (stand) stands.push(stand)
+      const all = [...straight, ...round]
+      if (all.length) stands.push(all)
     }
     if (stands.length < LAMP_MIN) continue
     // nearest first from home, then the nearest next
-    const route: LifeSpot[] = []
+    const route: Stand[][] = []
     let cx = home.spot.at[0]
     let cz = home.spot.at[2]
     const left = [...stands]
@@ -620,14 +691,14 @@ function lamplighters(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
       let k = 0
       for (let j = 1; j < left.length; j++)
         if (
-          Math.hypot(left[j]!.at[0] - cx, left[j]!.at[2] - cz) <
-          Math.hypot(left[k]!.at[0] - cx, left[k]!.at[2] - cz)
+          Math.hypot(left[j]![0]!.at[0] - cx, left[j]![0]!.at[2] - cz) <
+          Math.hypot(left[k]![0]!.at[0] - cx, left[k]![0]!.at[2] - cz)
         )
           k = j
       const s = left.splice(k, 1)[0]!
       route.push(s)
-      cx = s.at[0]
-      cz = s.at[2]
+      cx = s[0]!.at[0]
+      cz = s[0]!.at[2]
     }
     const b = new LoopBuilder(
       o.walk,
@@ -637,31 +708,117 @@ function lamplighters(folk: Folk[], o: SocialOpts, stats: SocialStats): void {
       { act: "idle", indoors: home.indoors },
       o.places.walkNear,
     )
-    let t = LAMP_FROM + r(3) * 0.3
-    let lit = 0
-    for (const [k, s] of route.entries()) {
-      const at: LifeSpot = { ...s, routine: { id: "light", seed: Math.floor(r(10 + k) * 2 ** 30) } }
-      // (a lamp the way round the houses reaches only after dark is left for the night)
-      const before = b.mark()
-      const arrive = b.go(t, at, { act: "work" })
-      // (… and one no clean way reaches, round the fences, is left out)
-      if (b.cuts > before.cuts) {
-        b.back(before)
-        continue
+    /** The walks since `from` keep a body off each of these poles. */
+    const clearOf = (from: number, poles: readonly Stand[]) => {
+      for (const s of b.steps.slice(from)) {
+        if (s.kind !== "walk") continue
+        for (let i = 1; i < s.pts.length; i++) {
+          const a = s.pts[i - 1]!
+          const c = s.pts[i]!
+          for (const q of poles)
+            if (segDistance(q.pole[0], q.pole[1], a[0], a[2], c[0], c[2]) < q.clear - 1e-6) return false
+        }
       }
-      if (arrive > LAMP_BY) {
-        b.back(before)
-        break
-      }
-      t = arrive + LAMP_S / o.secPerHour
-      lit++
-      if (t > 20.5) break
+      return true
     }
-    if (lit < LAMP_MIN) continue
-    b.go(t, home.spot, { act: "idle", indoors: home.indoors })
+    let t = LAMP_FROM + r(3) * 0.3
+    /** The lamps lit so far: which on the route, from which side, and where the loop was before it. */
+    const lit: { k: number; side: number; before: ReturnType<LoopBuilder["mark"]>; t: number }[] = []
+    /**
+     * Lights lamp `k` of the route from the first of its sides from `from` on that a clean way reaches (round
+     * the fences, a body off its pole and the last one's): the side, -1 for none, null when too late (a lamp
+     * the way round the houses reaches only after dark is left for the night).
+     */
+    const light = (k: number, from: number): number | null => {
+      const sides = route[k]!
+      const prev = lit.at(-1)
+      const after = prev ? route[prev.k]![prev.side]! : null
+      for (let j = from; j < sides.length; j++) {
+        const s = sides[j]!
+        const { lamp, pole: _p, clear: _c, ...spot } = s
+        const at: LifeSpot = {
+          ...spot,
+          routine: { id: "light", seed: Math.floor(r(10 + k) * 2 ** 30), lamp },
+        }
+        const before = b.mark()
+        const arrive = b.go(t, at, { act: "work" })
+        if (b.cuts > before.cuts || !clearOf(before.steps, after ? [s, after] : [s])) {
+          b.back(before)
+          continue
+        }
+        if (arrive > LAMP_BY) {
+          b.back(before)
+          return null
+        }
+        // (and the way on from it, out to its street, keeps off the pole as well)
+        const done = arrive + LAMP_S / o.secPerHour
+        const on = b.mark()
+        b.go(done, spotAt(o.walk, s.node, 0, 0), { act: "idle" })
+        const away = clearOf(on.steps, [s])
+        b.back(on)
+        if (!away) {
+          b.back(before)
+          continue
+        }
+        lit.push({ k, side: j, before, t })
+        t = done
+        return j
+      }
+      return -1
+    }
+    /** Takes the last lamp back off the round. */
+    const unlight = () => {
+      const p = lit.pop()!
+      b.back(p.before)
+      t = p.t
+      return p
+    }
+    /** Lamp `k` next on the round; when no side of it is reached clean, the last lamp from its next sides. */
+    const next = (k: number): number | null => {
+      const got = light(k, 0)
+      if (got !== -1 || !lit.length) return got
+      const p = unlight()
+      for (let side = p.side; ; ) {
+        const again = light(p.k, side + 1)
+        if (again === null || again < 0) break
+        const then = light(k, 0)
+        if (then !== -1) return then
+        side = unlight().side
+      }
+      // (none: the last as it was, and lamp k left out)
+      light(p.k, p.side)
+      return -1
+    }
+    for (let k = 0; k < route.length; k++) if (next(k) === null || t > 20.5) break
+    /** Home from the last lamp, a body off its pole: false (nothing walked) when the way brushes it. */
+    const goHome = () => {
+      const m = b.mark()
+      b.go(t, home.spot, { act: "idle", indoors: home.indoors })
+      const p = lit.at(-1)
+      if (!p || clearOf(m.steps, [route[p.k]![p.side]!])) return true
+      b.back(m)
+      return false
+    }
+    // the last lamp from its next side when the way home from it brushes its pole; none: it is left
+    while (!goHome()) {
+      const p = unlight()
+      let side = p.side
+      let back = false
+      for (;;) {
+        const got = light(p.k, side + 1)
+        if (got === null || got < 0) break
+        if (goHome()) {
+          back = true
+          break
+        }
+        side = unlight().side
+      }
+      if (back) break
+    }
+    if (lit.length < LAMP_MIN) continue
     folk.push({ id, role: "lamplighter", zone: zi, day: b.close(24), prop: PROPS.torch })
     stats.lamplighters++
-    stats.lamps += lit
+    stats.lamps += lit.length
   }
 }
 
@@ -672,15 +829,15 @@ export interface LampLighting {
   at: number
 }
 
-/** The lamps lit by hand over the day: each lamplighter's `light` stays, the post an arm's length ahead. */
+/** The lamps lit by hand over the day: each lamplighter's `light` stays, at the post it names. */
 export function lampLightings(folk: readonly Folk[], secPerHour: number): LampLighting[] {
   const out: LampLighting[] = []
   for (const f of folk)
     for (const s of f.day) {
-      if (s.kind !== "stay" || s.routine?.id !== "light") continue
+      if (s.kind !== "stay" || s.routine?.id !== "light" || !s.routine.lamp) continue
       out.push({
-        x: s.at[0] + Math.sin(s.facing) * LAMP_ARM,
-        z: s.at[2] + Math.cos(s.facing) * LAMP_ARM,
+        x: s.routine.lamp[0],
+        z: s.routine.lamp[1],
         // the torch reaches the glass part-way through the Interact (routines.ts `light`: its beat at 0.55)
         at: s.from + (1.3 * 0.55) / secPerHour,
       })

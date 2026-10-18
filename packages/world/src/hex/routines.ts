@@ -599,6 +599,8 @@ export interface RoutineAt {
    * and a buyer and a seller haggle on one clock, whenever each arrived.
    */
   day?: number
+  /** The lamp a lamplighter's `light` lights: its post's origin on the ground (x, z). */
+  lamp?: [number, number]
 }
 
 /**

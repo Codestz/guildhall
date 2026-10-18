@@ -17,9 +17,11 @@ import {
   hexWorld,
   hexZones,
   installTilePrefabs,
+  LAMP_BODY,
   type LifeStay,
   type LifeStep,
   lampLightings,
+  lampPost,
   lifePlaces,
   lifePose,
   planFolk,
@@ -267,6 +269,44 @@ describe("life between people", () => {
       expect(l.at).toBeLessThan(21)
     }
   })
+
+  test("a lamplighter lights each lamp from beside its pole, never in it, and walks up to it clear of it", () => {
+    let n = 0
+    for (const seed of [1, 2, 3]) {
+      const { folk, w } = island(seed)
+      const posts = w.pieces.filter((p) => /post-lantern/.test(p.piece)).map((p) => ({ p, ...lampPost(p) }))
+      for (const f of folk.filter((f) => f.role === "lamplighter"))
+        for (const [k, s] of f.day.entries()) {
+          if (s.kind !== "stay" || s.routine?.id !== "light") continue
+          n++
+          // clear of every pole by its radius and a body
+          for (const q of posts)
+            expect(Math.hypot(s.at[0] - q.pole[0], s.at[2] - q.pole[1])).toBeGreaterThanOrEqual(
+              q.r + LAMP_BODY,
+            )
+          // beside its own: half a metre or so off its pole, facing its lantern
+          const own = posts.find(
+            (q) => Math.hypot(q.p.x - s.routine!.lamp![0], q.p.z - s.routine!.lamp![1]) < 1e-6,
+          )!
+          const d = Math.hypot(s.at[0] - own.pole[0], s.at[2] - own.pole[1])
+          expect(d).toBeGreaterThanOrEqual(0.5 - 1e-9)
+          expect(d).toBeLessThanOrEqual(0.7 + 1e-9)
+          const face = Math.atan2(own.lantern[0] - s.at[0], own.lantern[1] - s.at[2])
+          expect(Math.abs(Math.sin((face - s.facing) / 2))).toBeLessThan(1e-6)
+          // the walk there keeps a body off the pole all the way, and the walk on (to the next lamp or home)
+          for (const w of [f.day[k - 1], f.day[k + 1]]) {
+            if (w?.kind !== "walk") continue
+            for (let t = w.from; t <= w.to; t += (w.to - w.from) / 64) {
+              const at = lifePose(f.day, t, 24).at
+              expect(Math.hypot(at[0] - own.pole[0], at[2] - own.pole[1])).toBeGreaterThanOrEqual(
+                own.r + LAMP_BODY - 1e-6,
+              )
+            }
+          }
+        }
+    }
+    expect(n).toBeGreaterThan(20)
+  }, 60000)
 
   test("the notice board's readers stand clear of everything, of the pinning spot and of each other", () => {
     const { places } = island(1)

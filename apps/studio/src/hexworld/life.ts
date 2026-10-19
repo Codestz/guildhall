@@ -109,6 +109,16 @@ import {
 export { LIFE_MPS, SPEEDUP } from "./lifePlan.ts"
 
 const logger = log("studio:hexworld:life")
+
+/** How far a walker's body turns off its way's heading toward where it is drawn going, at most, radians. */
+const VEER_TURN = 0.6
+/** The heading a walker is drawn going (dx, dz this frame), kept within VEER_TURN of its way's `facing`. */
+const facedAs = (facing: number, dx: number, dz: number): number => {
+  let d = (Math.atan2(dx, dz) - facing) % (Math.PI * 2)
+  if (d > Math.PI) d -= Math.PI * 2
+  if (d < -Math.PI) d += Math.PI * 2
+  return facing + Math.max(-VEER_TURN, Math.min(VEER_TURN, d))
+}
 /** A chip stands this far over an agent's feet, metres: just over its head. */
 const CHIP_UP = 1.3
 
@@ -714,7 +724,9 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
       const zz = space.z[id]!
       const y = footAt(x, zz, p) + (p.lift ?? 0)
       const prev = last[id]!
-      const moved = Number.isNaN(prev[0]) ? 0 : Math.sqrt((x - prev[0]) ** 2 + (zz - prev[1]) ** 2)
+      const mdx = Number.isNaN(prev[0]) ? 0 : x - prev[0]
+      const mdz = Number.isNaN(prev[1]) ? 0 : zz - prev[1]
+      const moved = Math.sqrt(mdx ** 2 + mdz ** 2)
       prev[0] = x
       prev[1] = zz
       // at a spot, its routine (a duel's side, a drill line: on the shared clock) or its clip; walking,
@@ -797,7 +809,12 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
           ...(props ? { props } : {}),
         }
       }
-      heading[id] = p.facing
+      // walking: turned the way the body is drawn going (a veer round someone, not a slide sideways),
+      // eased; standing or barely moving, the way its pose faces
+      heading[id] =
+        p.act === "walk" && moved > 0.15 * dt
+          ? easeAngle(heading[id]!, facedAs(p.facing, mdx, mdz), dt, 0.12)
+          : p.facing
       // a load in both arms (a log to the pile, a basket to market): the carrying walk, the load on the chest
       const carried = p.act === "walk" && p.carry && worn[id] ? drawnAs(p.carry) : undefined
       const chest = carried !== undefined && CARRIED.has(carried)
@@ -827,7 +844,7 @@ export function createLife(stage: Stage, opts: LifeOpts): Life {
             )
       return {
         position: [x, y, zz],
-        heading: p.facing,
+        heading: heading[id]!,
         clip,
         phase: phase[id]! - Math.floor(phase[id]!),
         hidden: p.indoors || (hiddenAt !== null && hiddenAt(x, zz)),

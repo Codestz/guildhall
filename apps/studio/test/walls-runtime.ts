@@ -39,7 +39,7 @@ import {
 import { createSession } from "../src/hall/feeds/session.ts"
 import { planLifeDesk, SEC_PER_HOUR, SPEEDUP } from "../src/hexworld/lifePlan.ts"
 import { createReaders, type ReaderCandidate } from "../src/hexworld/readers.ts"
-import { createSpace } from "../src/hexworld/space.ts"
+import { createSpace, SEATED_R } from "../src/hexworld/space.ts"
 import { HomeFeed } from "../src/site/homeFeed.ts"
 import { homePlaces } from "../src/site/homePlaces.ts"
 
@@ -56,6 +56,8 @@ export const PROP_BODY = 0.2
 export const PROP_BRUSH = 0.05
 /** Two drawn bodies whose rounds overlap by more than this intersect (one of them walking), metres. */
 export const BODY_TOUCH = 0.05
+/** A walker this near its walk's start or end is getting up from or sitting down at its spot, metres. */
+export const ENDS = 0.8
 /** The props a body is drawn through: the pieces that are not walls or houses (collide.ts kinds). */
 const propLike = (o: Solid): boolean =>
   !o.soft && (o.kind === "prop" || o.kind === "seat" || o.kind === "trunk" || o.kind === "blocker")
@@ -105,6 +107,12 @@ export interface RuntimeSweep {
   /** Frames in which two drawn bodies intersect (one walking), and how many such pair-frames. */
   overlapFrames: number
   overlapPairs: number
+  /**
+   * … of them, those in passing: no walker of the pair within ENDS of its walk's start or end (getting up
+   * from beside someone, or sitting down next to them, is close on purpose).
+   */
+  passFrames: number
+  passPairs: number
   /** The deepest few prop hits and body overlaps, for a look. */
   propWorst: Intrusion[]
   overlapWorst: { who: string; x: number; z: number; depth: number; hour: number }[]
@@ -224,6 +232,8 @@ export function runtimeSweep(
     standHits: 0,
     overlapFrames: 0,
     overlapPairs: 0,
+    passFrames: 0,
+    passPairs: 0,
     propWorst: [],
     overlapWorst: [],
     stepMs: 0,
@@ -334,6 +344,10 @@ export function runtimeSweep(
       else cells.set(k, [id])
     }
     let touch = false
+    let pass = false
+    const byEnds = (q: LifePose, id: number) =>
+      q.act === "walk" &&
+      [q.from, q.to].some((e) => e && Math.hypot(space.x[id]! - e[0], space.z[id]! - e[2]) < ENDS)
     for (const [k, list] of cells)
       for (const a of list)
         for (const dk of [0, 1, 65536 - 1, 65536, 65536 + 1])
@@ -343,13 +357,26 @@ export function runtimeSweep(
             const pb = poses[b]!
             if (pa.act !== "walk" && pb.act !== "walk") continue
             const d = Math.hypot(space.x[a]! - space.x[b]!, space.z[a]! - space.z[b]!)
-            const over = radii[a]! + radii[b]! - d
+            const sat = (q: LifePose, i: number) =>
+              q.act !== "walk" && (q.lift || /^Sit/.test(q.clip ?? ""))
+                ? Math.min(radii[i]!, SEATED_R)
+                : radii[i]!
+            const over = sat(pa, a) + sat(pb, b) - d
             if (over <= BODY_TOUCH) continue
             out.overlapPairs++
             touch = true
+            if (!byEnds(pa, a) && !byEnds(pb, b)) {
+              out.passPairs++
+              pass = true
+            }
             if (out.overlapWorst.length < 100_000)
               out.overlapWorst.push({
-                who: `${a}/${b}`,
+                who: `${a}/${b} ${[pa, pb]
+                  .map((q) =>
+                    q.act === "walk" ? "walk" : q.lift || /^Sit/.test(q.clip ?? "") ? "sit" : "stand",
+                  )
+                  .sort()
+                  .join("+")}`,
                 x: space.x[a]!,
                 z: space.z[a]!,
                 depth: over,
@@ -357,6 +384,7 @@ export function runtimeSweep(
               })
           }
     if (touch) out.overlapFrames++
+    if (pass) out.passFrames++
     // a quest pinned: who stands about near the board comes to read it
     if (day >= nextPin && day < 22 && plan.readers.length) {
       nextPin += pinEvery
@@ -481,7 +509,7 @@ if (import.meta.main) {
             `crowd push ${by.get("crowd push") ?? 0}, reader walk ${by.get("reader walk") ?? 0}, hero drawn ${by.get("hero drawn") ?? 0} (${Math.round(r.ms)} ms)`,
         )
         console.log(
-          `  props: ${r.propFrames} frames, ${r.propHits} person-frames (walkers); ${r.standFrames} frames, ${r.standHits} person-frames (pushed while standing); bodies: ${r.overlapFrames} frames, ${r.overlapPairs} pair-frames; step ${r.stepMs.toFixed(3)} ms/frame`,
+          `  props: ${r.propFrames} frames, ${r.propHits} person-frames (walkers); ${r.standFrames} frames, ${r.standHits} person-frames (pushed while standing); bodies: ${r.overlapFrames} frames, ${r.overlapPairs} pair-frames (in passing ${r.passFrames}, ${r.passPairs}); step ${r.stepMs.toFixed(3)} ms/frame`,
         )
         if (process.env.PIECES) {
           const byPiece = new Map<string, number>()

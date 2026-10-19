@@ -37,6 +37,9 @@ export interface SpacePose {
   /** Walking: where the walk starts and ends. */
   from?: readonly number[]
   to?: readonly number[]
+  /** At a spot: the clip played there and how high the seat holds them (a sitter is not pushed about). */
+  clip?: string
+  lift?: number
 }
 
 /** How far apart two rounds keep beyond touching, metres. */
@@ -48,6 +51,8 @@ const SIDESTEP = 1.6
 /** The furthest a walker is pushed off its way, and a stayer off its spot, metres. */
 const WALK_CAP = 1.1
 const STAY_CAP = 0.45
+/** … and a sitter leans aside on their seat this far at most, metres (no further: they are sat). */
+const SEAT_CAP = 0.12
 /** The most a walker may lag its schedule queueing, seconds; it catches up this much faster. */
 const MAX_DELAY = 12
 const CATCH_UP = 0.3
@@ -73,6 +78,16 @@ const ARRIVE = 1.6
 const RELAX = 0.9
 /** The grid cell, metres: two rounds that can touch are in neighbouring cells. */
 const CELL = 1.2
+/** A sitter's round at most, metres (a body seated takes less room than its hat's brim standing). */
+export const SEATED_R = 0.3
+/**
+ * Two walkers coming at each other see it this many seconds ahead (their ways' own speeds), and this far
+ * apart at most, metres: each side-steps early, the walker coming the other way passing on its right.
+ */
+const HORIZON = 1.6
+const AHEAD = 2.3
+/** How fast a walker veers to pass another, metres a second (a gentle drift, not a side-step). */
+const VEER = 0.55
 
 export interface Space {
   /** Puts everyone for this frame (poses at their delayed clocks), `dt` seconds after the last. */
@@ -104,6 +119,13 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
   const dirZ = new Float32Array(n)
   /** Walking within ARRIVE of the walk's end: about to take its spot. */
   const arriving = new Uint8Array(n)
+  /** Sitting at a spot (a bench, a stool): kept where they sit, everyone else gives way. */
+  const seated = new Uint8Array(n)
+  /** Each walker's speed along its way this frame (metres a second, from its way's own move). */
+  const velX = new Float32Array(n)
+  const velZ = new Float32Array(n)
+  const lastX = new Float32Array(n).fill(Number.NaN)
+  const lastZ = new Float32Array(n).fill(Number.NaN)
   const cells = new Map<number, number[]>()
   const pool: number[][] = []
   const dir: [number, number] = [0, 0]
@@ -114,6 +136,8 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
 
   /** A plane distance (Math.hypot takes its arguments as a list: an allocation per call, in V8). */
   const hyp = (a: number, b: number): number => Math.sqrt(a * a + b * b)
+  /** Person i's round: as wide as drawn, a sitter's no wider than SEATED_R (arms in, the hat over the seat). */
+  const round = (i: number): number => (seated[i] ? Math.min(radii[i]!, SEATED_R) : radii[i]!)
   /** Whether a walker may stand at (px, pz): on its way's step and out of every solid. */
   const fits = (i: number, px: number, pz: number): boolean =>
     Math.abs(world.heightAt(px, pz) - baseY[i]!) <= STEP
@@ -156,6 +180,8 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
   }
   /** Per frame: how hard each walker brakes behind the one ahead (kept, not made, each frame). */
   const brake = new Float32Array(n)
+  /** Per frame: how long each walker waits at a narrow bit for one coming the other way. */
+  const wait = new Float32Array(n)
 
   const step = (poses: readonly SpacePose[], dt: number) => {
     const relax = Math.exp(-dt / RELAX)
@@ -178,6 +204,15 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
         continue
       }
       walk[i] = p.act === "walk" ? 1 : 0
+      seated[i] = !walk[i] && (!!p.lift || /^Sit/.test(p.clip ?? "")) ? 1 : 0
+      // the way's own velocity (a jump, a new walk, a frame with no time: none)
+      const vx = (baseX[i]! - lastX[i]!) / Math.max(dt, 1e-3)
+      const vz = (baseZ[i]! - lastZ[i]!) / Math.max(dt, 1e-3)
+      const fast = !walk[i] || !(vx * vx + vz * vz < 9) || dt <= 0
+      velX[i] = fast ? 0 : vx
+      velZ[i] = fast ? 0 : vz
+      lastX[i] = baseX[i]!
+      lastZ[i] = baseZ[i]!
       dirX[i] = Math.sin(p.facing)
       dirZ[i] = Math.cos(p.facing)
       arriving[i] = walk[i] && p.to && hyp(p.to[0]! - baseX[i]!, p.to[2]! - baseZ[i]!) < ARRIVE ? 1 : 0
@@ -205,7 +240,7 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
           for (const a of list)
             for (const b of other) {
               if (b <= a) continue
-              const reach = radii[a]! + radii[b]! + LOOK + 0.1
+              const reach = radii[a]! + radii[b]! + (walk[a] || walk[b] ? AHEAD : LOOK + 0.1)
               if (Math.abs(x[a]! - x[b]!) > reach || Math.abs(z[a]! - z[b]!) > reach) continue
               if (npairs * 2 + 2 > pairs.length) {
                 const grown = new Int32Array(pairs.length * 2)
@@ -277,6 +312,62 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
       x[w] = x[w]! + dirZ[w]! * sgn * steer * k
       z[w] = z[w]! - dirX[w]! * sgn * steer * k
     }
+    // two walkers that would meet (their ways' own speeds, a little ahead): each veers off early, away
+    // from where the other will be, the one coming the other way to its right; where neither has room (a
+    // door, a gate, a bridge's planks), the one further from where they would meet waits for the other
+    const veer = VEER * Math.max(dt, 1 / 120)
+    wait.fill(0)
+    for (let q = 0; q < npairs; q++) {
+      const a = pairs[q * 2]!
+      const b = pairs[q * 2 + 1]!
+      if (!walk[a] && !walk[b]) continue
+      const rx = x[b]! - x[a]!
+      const rz = z[b]! - z[a]!
+      const vx = velX[b]! - velX[a]!
+      const vz = velZ[b]! - velZ[a]!
+      const vv = vx * vx + vz * vz
+      if (vv < 1e-4) continue
+      const t = -(rx * vx + rz * vz) / vv
+      if (t <= 0 || t > HORIZON) continue
+      const mx = rx + vx * t
+      const mz = rz + vz * t
+      const need = round(a) + round(b) + MARGIN
+      const miss = hyp(mx, mz)
+      if (miss >= need) continue
+      const k = (1 - t / HORIZON) * Math.min(1, (need - miss) / need + 0.25)
+      const headOn = dirX[a]! * dirX[b]! + dirZ[a]! * dirZ[b]! < -0.5
+      let stuck = 0
+      for (const [w, sx, sz] of [
+        [a, mx, mz],
+        [b, -mx, -mz],
+      ] as const) {
+        // (one standing or sitting does not move; one about to take its spot goes straight there)
+        if (!walk[w] || arriving[w]) continue
+        // its right: (dirZ, −dirX); the side away from the other's coming place, or the right head-on
+        let sgn = headOn ? 1 : sx * dirZ[w]! - sz * dirX[w]! > 0 ? -1 : 1
+        if (!room(w, sgn, need * 0.5)) {
+          if (room(w, -sgn, need * 0.5)) sgn = -sgn
+          else {
+            stuck++
+            continue
+          }
+        }
+        const share = walk[a] && walk[b] ? 1 : 2
+        x[w] = x[w]! + dirZ[w]! * sgn * veer * k * share
+        z[w] = z[w]! - dirX[w]! * sgn * veer * k * share
+      }
+      if (stuck === 2 && headOn && walk[a] && walk[b]) {
+        // the narrow bit: the one further from where they meet waits there
+        const da = hyp(velX[a]!, velZ[a]!)
+        const db = hyp(velX[b]!, velZ[b]!)
+        const w = da * t > db * t ? a : b
+        wait[w] = Math.max(wait[w]!, 1 - t / HORIZON)
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      if (!live[i] || !walk[i] || wait[i]! <= 0) continue
+      if (delay[i]! < MAX_DELAY) delay[i] = delay[i]! + dt * wait[i]!
+    }
     // rounds apart: a few passes over the pairs
     for (let pass = 0; pass < 3; pass++)
       for (let q = 0; q < npairs; q++) {
@@ -285,7 +376,7 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
         let ex = x[a]! - x[b]!
         let ez = z[a]! - z[b]!
         let d = hyp(ex, ez)
-        const need = radii[a]! + radii[b]! + MARGIN
+        const need = round(a) + round(b) + MARGIN
         if (d >= need) continue
         if (d < 1e-4) {
           // exactly together: part them across the way of either, by a fixed per-pair turn
@@ -298,8 +389,10 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
           ez /= d
         }
         // whoever stands at a spot keeps it: a walker gives way
+        // (a sitter only leans aside on their seat: SEAT_CAP)
         const wa = walk[a] ? 1 : STAYER
         const wb = walk[b] ? 1 : STAYER
+        if (wa + wb === 0) continue
         const move = need - d
         const fa = wa / (wa + wb)
         x[a] = x[a]! + ex * move * fa
@@ -322,7 +415,7 @@ export function createSpace(radii: Float32Array, world: SpaceWorld): Space {
       }
       ox = offX[i]! + cx
       oz = offZ[i]! + cz
-      const cap = walk[i] ? WALK_CAP : STAY_CAP
+      const cap = walk[i] ? WALK_CAP : seated[i] ? SEAT_CAP : STAY_CAP
       const m = hyp(ox, oz)
       if (m > cap) {
         ox *= cap / m
